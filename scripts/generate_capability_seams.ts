@@ -245,6 +245,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
       'libs/core/entry-ledger.ts',
       'libs/core/storage/local-storage-backend.ts',
       'libs/core/storage/memory-storage-backend.ts',
+      'libs/core/storage/object-storage-backend.stub.ts',
     ],
   },
   'lease-backend': {

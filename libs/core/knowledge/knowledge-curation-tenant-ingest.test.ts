@@ -90,7 +90,7 @@ afterAll(() => {
 });
 
 describe('computeTenantIngestCuration', () => {
-  it('flags stale cards by frontmatter last_updated, falls back to ingested_at, skips fresh ones', () => {
+  it('flags stale cards by frontmatter last_updated, falls back to ingested_at, skips fresh ones', async () => {
     // Asset 1: card with an old last_updated (kind reference → 120d SLO) — stale.
     writeFixtureFile(
       'knowledge/confidential/acme-corp/reports/stale.md',
@@ -125,7 +125,7 @@ describe('computeTenantIngestCuration', () => {
       ].join('\n') + '\n'
     );
 
-    const sections = computeTenantIngestCuration({
+    const sections = await computeTenantIngestCuration({
       config: CONFIG,
       now: NOW,
       tenants: ['acme-corp', 'other-co'],
@@ -160,8 +160,8 @@ describe('computeTenantIngestCuration', () => {
     ]);
   });
 
-  it('is advisory and fail-open: an unregistered tenant is skipped, never thrown', () => {
-    const sections = computeTenantIngestCuration({
+  it('is advisory and fail-open: an unregistered tenant is skipped, never thrown', async () => {
+    const sections = await computeTenantIngestCuration({
       config: CONFIG,
       now: NOW,
       tenants: ['ghost-co'],
@@ -170,7 +170,7 @@ describe('computeTenantIngestCuration', () => {
     expect(sections).toEqual([]);
   });
 
-  it('does not read a directory that occupies a tenant card path', () => {
+  it('does not read a directory that occupies a tenant card path', async () => {
     const directoryCard = path.join(
       fixtureRoot,
       'knowledge/confidential/acme-corp/reports/directory-card.md'
@@ -185,7 +185,7 @@ describe('computeTenantIngestCuration', () => {
       }) + '\n'
     );
 
-    const sections = computeTenantIngestCuration({
+    const sections = await computeTenantIngestCuration({
       config: CONFIG,
       now: NOW,
       tenants: ['acme-corp'],
@@ -203,7 +203,7 @@ describe('computeTenantIngestCuration', () => {
     );
   });
 
-  it('rejects an external tenant-ingest fixture root before ledger access', () => {
+  it('rejects an external tenant-ingest fixture root before ledger access', async () => {
     const key = 'KYBERION_CURATION_TENANT_ROOTDIR';
     const previous = process.env[key];
     // This case is about the scope guard, so the root must genuinely be
@@ -215,9 +215,9 @@ describe('computeTenantIngestCuration', () => {
       `kyberion-external-curation-root-${randomUUID()}`
     );
     try {
-      expect(() =>
+      await expect(
         computeTenantIngestCuration({ config: CONFIG, now: NOW, tenants: ['acme-corp'] })
-      ).toThrow('RESOURCE_PATH_SCOPE');
+      ).rejects.toThrow('RESOURCE_PATH_SCOPE');
     } finally {
       if (previous === undefined) delete process.env[key];
       else process.env[key] = previous;

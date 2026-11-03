@@ -1,12 +1,12 @@
 /**
  * memory storage backend — hermetic backend for tests and dry runs.
  *
- * `createMemoryStorageBackend()` returns an isolated store; injecting it via
- * `createEntryLedger(path, { backend })` (or any future StorageBackend
- * consumer) exercises the full ledger path without touching the filesystem.
- * Importing this module also registers one shared `memory` provider on the
- * seam so `resolveStorageBackend('memory')` works — it is never in the
- * governed default chain, so production resolution can never land on it.
+ * `createMemoryStorageBackend()` returns an isolated sync store; inject it via
+ * `createEntryLedger(path, { backend })` (sync or async — entry-ledger
+ * normalizes). Importing this module also registers one shared `memory`
+ * provider on the seam so `resolveStorageBackend('memory')` works — it is
+ * never in the governed default chain, so production resolution can never
+ * land on it.
  *
  * The model is deliberately lenient: parent directories are implicit and
  * append creates the file, matching a key/value object store rather than a
@@ -17,14 +17,14 @@
 import * as path from 'node:path';
 import {
   registerStorageBackend,
-  type StorageBackend,
   type StorageStat,
   type StorageTextLine,
+  type SyncStorageBackend,
 } from './storage-backend.js';
 
 export const MEMORY_STORAGE_BACKEND_ID = 'memory';
 
-class MemoryStorageBackend implements StorageBackend {
+class MemoryStorageBackend implements SyncStorageBackend {
   readonly id = MEMORY_STORAGE_BACKEND_ID;
   private readonly files = new Map<string, string>();
   private readonly dirs = new Set<string>(['/']);
@@ -138,7 +138,7 @@ class MemoryStorageBackend implements StorageBackend {
   }
 }
 
-export function createMemoryStorageBackend(): StorageBackend {
+export function createMemoryStorageBackend(): SyncStorageBackend {
   return new MemoryStorageBackend();
 }
 

@@ -191,7 +191,7 @@ describe('ingest tenant-local duplicate evidence', () => {
     ];
 
     // Interrupt the actual append after commitIngest has written the card.
-    const append = vi.spyOn(assetLedger, 'appendAssetRecord').mockImplementationOnce(() => {
+    const append = vi.spyOn(assetLedger, 'appendAssetRecord').mockImplementationOnce(async () => {
       throw new Error('synthetic ledger append interrupted');
     });
     await expect(main(argv)).rejects.toThrow('synthetic ledger append interrupted');

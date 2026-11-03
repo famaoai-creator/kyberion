@@ -192,7 +192,7 @@ describe('pipeline promotion resource boundaries', () => {
     const knowledgeRoot = `${fixture}/knowledge/confidential/${tenant}`;
     const sourcePath = `${fixture}/src/flow.json`;
     const target = `${knowledgeRoot}/pipelines/ledger-flow.json`;
-    const ledger = () => readAssetLedger(tenant, { knowledgeRoot });
+    const ledger = async () => readAssetLedger(tenant, { knowledgeRoot });
     const journals: string[] = [];
     let runId: string;
     const writeSource = (message: string) => {
@@ -265,7 +265,7 @@ describe('pipeline promotion resource boundaries', () => {
       const assetId = deriveAssetId('adf', sourcePath);
       const first = await promote();
       const written = readTextFile(pathResolver.rootResolve(target));
-      expect(ledger()).toEqual([
+      expect(await ledger()).toEqual([
         expect.objectContaining({
           asset_id: assetId,
           source_system: 'adf',
@@ -287,13 +287,13 @@ describe('pipeline promotion resource boundaries', () => {
 
       const same = await promote(['--force']);
       expect(readTextFile(pathResolver.rootResolve(target))).toBe(written);
-      expect(ledger()).toHaveLength(1);
+      expect(await ledger()).toHaveLength(1);
       expect(same.asset).toMatchObject({ version: 1, recorded: false });
 
       writeSource('two');
       const changed = await promote(['--force']);
-      expect(ledger()).toHaveLength(2);
-      expect(ledger()[1]).toMatchObject({ version: 2, supersedes: `${assetId}@v1` });
+      expect(await ledger()).toHaveLength(2);
+      expect((await ledger())[1]).toMatchObject({ version: 2, supersedes: `${assetId}@v1` });
       expect(changed.asset).toMatchObject({ ref: `asset:${assetId}@v2`, recorded: true });
     });
 
