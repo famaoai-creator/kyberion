@@ -1,87 +1,62 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { getRegisteredEnvBool } from '@agent/core/foundation/env';
-import {
-  SURFACE_SESSION_COOKIE,
-  peekSessionExpiry,
-  resolveLoginRedirect,
-} from '@agent/core/surface/surface-session-cookie';
-
-const LOOPBACK_ADDRESSES = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
+import { resolveSurfaceBrowserUrl } from '@agent/core/surface/surface-url';
 
 /**
- * Keep the proxy decision on the same registered environment accessor as
- * the route guard. Using it prevents this boundary from drifting in its
- * accepted boolean spellings.
+ * Chronos compatibility app (MSN-KYBERION-SERVER-20261104). The operations
+ * console moved into Concierge: pages are served at `/ops`, the API at
+ * `/api/ops`. This process keeps its port only so old bookmarks and scripts
+ * land on the new origin:
+ *
+ *   /api/healthz        → served locally (surface health probe)
+ *   /api/<path>         → 308 <concierge>/api/ops/<path>
+ *   /discussion         → 308 <concierge>/ops/discussion
+ *   any other path      → 308 <concierge>/ops
+ *
+ * The query string (`?section=…`, tenant/organization/project scope, …) is
+ * preserved. 308 keeps the method and body, so an old POST is replayed against
+ * Concierge, which applies its own viewer and mutation gates. Nothing is
+ * authorized here.
  */
-function isTrustProxyEnabled(): boolean {
-  return getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true;
+export const CHRONOS_HEALTH_PATH = '/api/healthz';
+
+export function chronosRedirectPath(pathname: string): string | null {
+  if (pathname === CHRONOS_HEALTH_PATH) return null;
+  if (pathname === '/api' || pathname.startsWith('/api/')) {
+    return '/api/ops' + pathname.slice('/api'.length);
+  }
+  if (pathname === '/discussion' || pathname.startsWith('/discussion/')) return '/ops/discussion';
+  return '/ops';
 }
 
-/**
- * Resolve the caller peer. Forwarded headers are caller-controlled unless a
- * trusted reverse proxy overwrites them, so they are only consulted when
- * `KYBERION_TRUST_PROXY` is explicitly enabled — matching `lib/api-guard.ts`.
- */
-function resolvePeerIp(request: NextRequest): string | undefined {
-  const directIp = (request as NextRequest & { ip?: string }).ip;
-  if (directIp) return directIp;
-  if (!isTrustProxyEnabled()) return undefined;
-  return (
-    request.headers.get('x-real-ip')?.trim() ||
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    undefined
-  );
+export function chronosRedirectTarget(
+  pathname: string,
+  search: string,
+  conciergeOrigin: string
+): string | null {
+  const path = chronosRedirectPath(pathname);
+  if (path === null) return null;
+  return new URL(path + (search || ''), conciergeOrigin).toString();
 }
 
-/**
- * Keep the API surface closed before a route module is evaluated. The route
- * guard performs the full token/registry/role decision; this request
- * boundary prevents accidental unguarded API routes and leaves /healthz as
- * the sole explicit public probe. Unauthenticated remote browser page
- * navigations are redirected to the shared OIDC /login page; API calls keep
- * returning 401 JSON and loopback is never redirected.
- */
 export function proxy(request: NextRequest): NextResponse {
-  const pathname = request.nextUrl.pathname;
-  if (pathname === '/api/healthz') return NextResponse.next();
-  const authorization = request.headers.get('authorization');
-  const legacyCookie = request.cookies.get('kyberion_token')?.value;
-  const sessionCookie = request.cookies.get(SURFACE_SESSION_COOKIE)?.value;
-  const hasCredential = Boolean(authorization || legacyCookie || sessionCookie);
-  const peerIp = resolvePeerIp(request);
-  const loopback = Boolean(peerIp && LOOPBACK_ADDRESSES.includes(peerIp));
-
-  if (!pathname.startsWith('/api/')) {
-    // UX-only: a sole session cookie that is visibly expired/malformed counts
-    // as no credential so the browser is sent to sign in again. APIs still
-    // verify the token themselves.
-    const staleSessionOnly =
-      !authorization &&
-      !legacyCookie &&
-      sessionCookie &&
-      peekSessionExpiry(sessionCookie) !== 'valid';
-    const redirect = resolveLoginRedirect({
-      method: request.method ?? 'GET',
-      pathname,
-      search: request.nextUrl.search ?? '',
-      headers: request.headers,
-      loopback,
-      hasCredential: hasCredential && !staleSessionOnly,
-    });
-    if (redirect) {
-      // Next's proxy runtime rejects a bare relative Location ("Invalid URL");
-      // resolve against the request URL like the other Next surfaces do.
-      return NextResponse.redirect(new URL(redirect, request.url), 302);
-    }
-    return NextResponse.next();
+  const { pathname, search } = request.nextUrl;
+  if (pathname === CHRONOS_HEALTH_PATH) return NextResponse.next();
+  let origin: string;
+  try {
+    origin = resolveSurfaceBrowserUrl('concierge');
+  } catch {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'The operations console moved to Concierge, whose URL is not configured.',
+      },
+      { status: 503 }
+    );
   }
-
-  if (!hasCredential && !loopback) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized.' }, { status: 401 });
-  }
-  return NextResponse.next();
+  const target = chronosRedirectTarget(pathname, search, origin);
+  return target ? NextResponse.redirect(target, 308) : NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image).*)'],
 };

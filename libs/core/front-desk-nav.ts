@@ -130,8 +130,8 @@ export const FRONT_DESK_MENU: readonly FrontDeskMenuItem[] = [
     id: 'deliverables',
     label_key: 'front_desk:nav_deliverables',
     sublabel_key: 'front_desk:nav_deliverables_sub',
-    surface: 'chronos-mirror-v2',
-    path: '/?section=deliverables',
+    surface: 'concierge',
+    path: '/ops?section=deliverables',
     min_role: 'viewer',
     group_key: 'front_desk:nav_group_resources',
     icon: 'folder',
@@ -150,8 +150,8 @@ export const FRONT_DESK_MENU: readonly FrontDeskMenuItem[] = [
     id: 'knowledge',
     label_key: 'front_desk:nav_knowledge',
     sublabel_key: 'front_desk:nav_knowledge_sub',
-    surface: 'chronos-mirror-v2',
-    path: '/?section=knowledge',
+    surface: 'concierge',
+    path: '/ops?section=knowledge',
     min_role: 'viewer',
     group_key: 'front_desk:nav_group_resources',
     icon: 'book',
@@ -160,8 +160,8 @@ export const FRONT_DESK_MENU: readonly FrontDeskMenuItem[] = [
     id: 'discussion',
     label_key: 'front_desk:nav_discussion',
     sublabel_key: 'front_desk:nav_discussion_sub',
-    surface: 'chronos-mirror-v2',
-    path: '/?section=discussion',
+    surface: 'concierge',
+    path: '/ops?section=discussion',
     min_role: 'viewer',
     group_key: 'front_desk:nav_group_resources',
     icon: 'chat',
@@ -200,8 +200,8 @@ export const FRONT_DESK_MENU: readonly FrontDeskMenuItem[] = [
     id: 'operations',
     label_key: 'front_desk:nav_operations',
     sublabel_key: 'front_desk:nav_operations_sub',
-    surface: 'chronos-mirror-v2',
-    path: '/?section=operations',
+    surface: 'concierge',
+    path: '/ops?section=operations',
     min_role: 'owner',
     group_key: 'front_desk:nav_group_manage',
     icon: 'settings',
@@ -210,8 +210,8 @@ export const FRONT_DESK_MENU: readonly FrontDeskMenuItem[] = [
     id: 'surface-control',
     label_key: 'front_desk:nav_surfaces',
     sublabel_key: 'front_desk:nav_surfaces_sub',
-    surface: 'chronos-mirror-v2',
-    path: '/?section=surface-control',
+    surface: 'concierge',
+    path: '/ops?section=surface-control',
     min_role: 'owner',
     group_key: 'front_desk:nav_group_manage',
     icon: 'settings',
@@ -220,8 +220,8 @@ export const FRONT_DESK_MENU: readonly FrontDeskMenuItem[] = [
     id: 'diagnostics',
     label_key: 'front_desk:nav_diagnostics',
     sublabel_key: 'front_desk:nav_diagnostics_sub',
-    surface: 'chronos-mirror-v2',
-    path: '/?section=diagnostics',
+    surface: 'concierge',
+    path: '/ops?section=diagnostics',
     min_role: 'owner',
     group_key: 'front_desk:nav_group_manage',
     icon: 'chart',
@@ -381,8 +381,9 @@ function resolveItems(
       const href = external ? base.replace(/\/+$/, '') + item.path : item.path;
       return {
         ...item,
-        scope_query_style:
-          item.surface === 'chronos-mirror-v2' ? ('snake' as const) : ('camel' as const),
+        // The operations console (Concierge `/ops`, formerly Chronos) reads
+        // snake_case scope queries (`tenant_slug`, `organization_id`, …).
+        scope_query_style: usesSnakeScopeQuery(item) ? ('snake' as const) : ('camel' as const),
         href,
         external,
         allowed: frontDeskRoleAllows(role, item.min_role),
@@ -432,6 +433,18 @@ export function readFrontDeskSurfaceUrls(): Record<FrontDeskPrimarySurfaceId, st
     }
   }
   return urls;
+}
+
+/** Path of the operations console inside Concierge (the former Chronos surface). */
+export const FRONT_DESK_OPS_CONSOLE_PATH = '/ops';
+
+function usesSnakeScopeQuery(item: FrontDeskMenuItem): boolean {
+  return (
+    item.surface === 'chronos-mirror-v2' ||
+    item.path === FRONT_DESK_OPS_CONSOLE_PATH ||
+    item.path.startsWith(FRONT_DESK_OPS_CONSOLE_PATH + '?') ||
+    item.path.startsWith(FRONT_DESK_OPS_CONSOLE_PATH + '/')
+  );
 }
 
 function isOptionalSurface(id: FrontDeskSurfaceId): id is FrontDeskOptionalSurfaceId {

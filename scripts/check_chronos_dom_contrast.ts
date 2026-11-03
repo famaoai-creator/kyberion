@@ -93,18 +93,19 @@ async function waitForServer(
 }
 
 function startChronos(port: number): { child: ChildProcess; getStartupOutput: () => string } {
-  const chronosRoot = resolve(process.cwd(), 'presence/displays/chronos-mirror-v2');
+  // The operations console (former Chronos) is served by Concierge under /ops.
+  // The explicit local-operator listener attests the loopback peer; the
+  // anonymous-loopback escape hatch lets this headless browser in without a
+  // sign-in, for this check only.
+  const conciergeRoot = resolve(process.cwd(), 'presence/displays/concierge');
   let startupOutput = '';
-  const child = spawn('pnpm', ['start', '--port', String(port)], {
-    cwd: chronosRoot,
+  const child = spawn('pnpm', ['local:start', '--port', String(port)], {
+    cwd: conciergeRoot,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
       NODE_ENV: 'production',
-      HOSTNAME: '127.0.0.1',
-      // The server binds loopback only; TRUST_PROXY lets Next 15+ (no NextRequest.ip)
-      // treat this local browser as loopback instead of redirecting it to /login.
-      KYBERION_TRUST_PROXY: '1',
+      KYBERION_CONCIERGE_ALLOW_ANONYMOUS_LOOPBACK: '1',
     },
     detached: process.platform !== 'win32',
   });
@@ -149,11 +150,14 @@ async function inspect(url: string, mode: 'light' | 'dark'): Promise<Finding[]> 
   try {
     const page = await browser.newPage({ colorScheme: mode, reducedMotion: 'reduce' });
     page.setDefaultTimeout(120_000);
+    // The console follows the Concierge shell theme (設定 › 表示).
     await page.addInitScript((theme) => {
-      window.localStorage.setItem('chronos.theme-mode', theme);
+      window.localStorage.setItem('kyberion.ui.theme', theme);
     }, mode);
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-    // Chronos resolves the system preference and applies the requested theme
+    const target = new URL(url);
+    if (target.pathname === '/') target.pathname = '/ops';
+    await page.goto(target.toString(), { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    // The shell resolves the system preference and applies the requested theme
     // in a client effect. A fixed delay was too short on slower CI runners,
     // so the contrast sample could capture the light background during the
     // dark-token first render (or vice versa).

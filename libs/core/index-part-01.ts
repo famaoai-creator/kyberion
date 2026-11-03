@@ -355,6 +355,7 @@ export * from './ranking-signals.js';
 export * from './tool/runtime-health-history.js';
 
 export * from './bridge-typing.js';
+export * from './bridge-poll-loop.js';
 
 export * from './draft-refine.js';
 

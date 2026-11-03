@@ -27,3 +27,18 @@ describe('front-desk nested setup navigation', () => {
     expect(currentItemId(pathname)).toBe(expected);
   });
 });
+
+describe('front-desk operations console navigation (/ops)', () => {
+  it.each([
+    ['knowledge', 'knowledge'],
+    ['diagnostics', 'diagnostics'],
+    ['surface-control', 'surface-control'],
+    ['home', null],
+    [null, null],
+  ])('marks /ops?section=%s as %s', (section, expected) => {
+    expect(currentItemId('/ops', section)).toBe(expected);
+  });
+  it('marks the discussion page as the discussion entry', () => {
+    expect(currentItemId('/ops/discussion')).toBe('discussion');
+  });
+});

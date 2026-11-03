@@ -7,8 +7,8 @@ import { readSafeJsonFile } from './lib/json-input.js';
 
 const ROOT = pathResolver.rootDir();
 const ALLOWED_CJS_FILES = new Set([
-  'presence/displays/chronos-mirror-v2/postcss.config.cjs',
-  'presence/displays/chronos-mirror-v2/tailwind.config.cjs',
+  'presence/displays/concierge/postcss.config.cjs',
+  'presence/displays/concierge/tailwind.config.cjs',
   'scripts/hyperframes-localhost-preload.cjs',
   'scripts/refactor/standardize-yargs.js',
   'templates/skill-template-cjs/scripts/main.cjs',

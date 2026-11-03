@@ -45,6 +45,11 @@ vi.mock('@agent/core/dot/dot-lifecycle', async (importOriginal) => {
       dotId: string,
       deps: Parameters<typeof actual.enableDotEventContinuation>[1]
     ) => actual.enableDotEventContinuation(dotId, { ...deps, rootDir: mocks.rootDir }),
+    transitionDotCharterStatus: (
+      dotId: string,
+      target: Parameters<typeof actual.transitionDotCharterStatus>[1],
+      deps: Parameters<typeof actual.transitionDotCharterStatus>[2]
+    ) => actual.transitionDotCharterStatus(dotId, target, { ...deps, rootDir: mocks.rootDir }),
   };
 });
 vi.mock('@agent/core/dot/dot-wake-orchestration', () => ({
@@ -77,7 +82,9 @@ vi.mock('@agent/core/dot/dot-dispatch', async (importOriginal) => {
 });
 vi.mock('./daemon_watchdog.js', () => ({ DEFAULT_DAEMONS: [] }));
 
-import { runDotCharters } from './dot_charters.js';
+import { parseTransitionExpectations, runDotCharters } from './dot_charters.js';
+import { dotAdmissionScopeHash } from '@agent/core/dot/dot-admission-identity';
+import { findDotCharter } from '@agent/core/dot/dot-charter';
 import { DOT_STATUS_SECTIONS } from '@agent/core/dot/dot-extension-registry';
 import {
   appendActionRecord,
@@ -494,5 +501,79 @@ describe('forward event continuation CLI', () => {
     });
     expect(mocks.install).not.toHaveBeenCalled();
     expect(mocks.wake).not.toHaveBeenCalled();
+  });
+});
+
+describe('dot transition expectations (delegated lifecycle worker)', () => {
+  it('parses and validates the expectation flags', () => {
+    expect(parseTransitionExpectations(['pause', 'x'])).toEqual({});
+    expect(
+      parseTransitionExpectations([
+        'pause',
+        'x',
+        '--expect-status',
+        'active',
+        '--expect-admission-hash',
+        'a'.repeat(64),
+        '--expect-scope-json',
+        '{"tier":"public"}',
+      ])
+    ).toEqual({
+      expectedStatus: 'active',
+      expectedAdmissionScopeHash: 'a'.repeat(64),
+      expectedScope: { tier: 'public' },
+    });
+    expect(() => parseTransitionExpectations(['--expect-status', 'gone'])).toThrow(
+      /DOT_TRANSITION_EXPECTATION/
+    );
+    expect(() => parseTransitionExpectations(['--expect-admission-hash'])).toThrow(
+      /requires a value/
+    );
+    expect(() => parseTransitionExpectations(['--expect-scope-json', '[1]'])).toThrow();
+  });
+
+  it('fails closed when the charter no longer matches, and pauses when it does', async () => {
+    writeCharter(CHARTER, 'collision');
+    const expectedHash = dotAdmissionScopeHash(CHARTER);
+    const stale = await runDotCharters([
+      'pause',
+      CHARTER.dot_id,
+      '--expect-status',
+      'paused',
+      '--expect-admission-hash',
+      expectedHash,
+      '--json',
+    ]);
+    expect(stale).toBeUndefined();
+    expect(process.exitCode).toBe(1);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('DOT_TRANSITION_CONFLICT'));
+    process.exitCode = undefined;
+    vi.mocked(console.error).mockClear();
+    const rescoped = await runDotCharters([
+      'pause',
+      CHARTER.dot_id,
+      '--expect-status',
+      'active',
+      '--expect-admission-hash',
+      'b'.repeat(64),
+      '--json',
+    ]);
+    expect(rescoped).toBeUndefined();
+    expect(process.exitCode).toBe(1);
+    process.exitCode = undefined;
+    expect(findDotCharter(CHARTER.dot_id)?.charter.status).toBe('active');
+    const paused = await runDotCharters([
+      'pause',
+      CHARTER.dot_id,
+      '--expect-status',
+      'active',
+      '--expect-admission-hash',
+      expectedHash,
+      '--expect-scope-json',
+      JSON.stringify(CHARTER.scope),
+      '--json',
+      '--quiet',
+    ]);
+    expect(paused).toMatchObject({ ok: true, dot_id: CHARTER.dot_id, status: 'paused' });
   });
 });

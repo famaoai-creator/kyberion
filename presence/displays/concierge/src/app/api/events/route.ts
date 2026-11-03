@@ -1,8 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import {
-  startBridgePollLoop,
-  type BridgePollLoopHandle,
-} from '../../../../../../../satellites/shared/bridge-poll-loop';
+import { startBridgePollLoop, type BridgePollLoopHandle } from '@agent/core/bridge-poll-loop';
 import type { NextRequest } from 'next/server';
 import { createLogger } from '@agent/core/logger';
 import { readConciergeHome } from '../../../lib/headless-projections';

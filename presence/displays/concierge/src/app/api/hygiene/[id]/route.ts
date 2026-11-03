@@ -1,5 +1,5 @@
+import { serverDelegatedChildEnv } from '../../../../lib/server-child-env';
 import { NextRequest, NextResponse } from 'next/server';
-import { buildExecutionEnv } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
             ...decidedByArgs,
           ];
     const result = safeExecResult(process.execPath, args, {
-      env: buildExecutionEnv(process.env, 'mission_controller'),
+      env: serverDelegatedChildEnv('mission_controller'),
       cwd: rootDir,
       timeoutMs: CONTROLLER_TIMEOUT_MS,
       maxOutputMB: 5,

@@ -70,6 +70,12 @@ import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration
 import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
 import { DEFAULT_DAEMONS } from './daemon_watchdog.js';
 import {
+  DOT_TRANSITION_EXPECT_FLAGS,
+  parseTransitionExpectations,
+} from './lib/dot-transition-expectations.js';
+
+export { parseTransitionExpectations };
+import {
   defineScript,
   isDirectScript,
   ScriptExitError,
@@ -237,12 +243,13 @@ function reportCreate(argv: string[]) {
 }
 
 function reportTransition(verb: 'activate' | 'pause' | 'retire', argv: string[]) {
-  const dotId = argv.find((arg) => !arg.startsWith('--'));
+  const dotId = cliPositionals(argv, DOT_TRANSITION_EXPECT_FLAGS)[0];
   if (!dotId) throw new Error(`usage: pnpm kyberion dot ${verb} <dot_id>`);
   const target: DotCharterStatus =
     verb === 'activate' ? 'active' : verb === 'pause' ? 'paused' : 'retired';
   const charter = transitionDotCharterStatus(dotId, target, {
     supervisedDaemonIds: DEFAULT_DAEMONS,
+    ...parseTransitionExpectations(argv),
   });
   return { ok: true, dot_id: dotId, status: charter.status };
 }

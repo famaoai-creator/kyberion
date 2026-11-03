@@ -411,11 +411,18 @@ it('requires an exact selected tenant and rejects other surfaces', async () => {
       () => undefined
     )
   ).toThrow(/RESOURCE_SCOPE_INVALID/);
-  process.env.SYSTEM_ROLE = 'concierge';
-  try {
-    await expect(receiptAccess(false, () => undefined)).rejects.toThrow(/ROLE_ASSUMPTION_DENIED/);
-  } finally {
-    delete process.env.SYSTEM_ROLE;
+  // Only the surface that owns discussions (Concierge, /api/ops/discussions)
+  // may assume the receipt mediator; the Chronos redirect app may not.
+  for (const systemRole of ['slack_bridge', 'chronos_mirror_v2']) {
+    process.env.SYSTEM_ROLE = systemRole;
+    try {
+      await expect(
+        receiptAccess(false, () => undefined),
+        systemRole
+      ).rejects.toThrow(/ROLE_ASSUMPTION_DENIED/);
+    } finally {
+      delete process.env.SYSTEM_ROLE;
+    }
   }
 });
 it('cannot follow symlink or hard-link receipt aliases outside its exact capability', async () => {

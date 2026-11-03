@@ -6,7 +6,7 @@ import {
   normalizeMissionAssets,
   parseTaskBoard,
   summarizeNextTasks,
-} from '../presence/displays/chronos-mirror-v2/src/lib/mission-progress';
+} from '../presence/displays/concierge/src/lib/ops/mission-progress';
 
 describe('Chronos mission progress helpers', () => {
   it('parses task board step counts and status', () => {

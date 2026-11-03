@@ -214,7 +214,7 @@ describe('readFrontDeskSurfacePorts', () => {
 });
 
 describe('optional destinations', () => {
-  it('omits unavailable surfaces without guessed ports', () => {
+  it('hosts the operations console items on Concierge and needs no optional surface', () => {
     const menu = resolveFrontDeskMenu({ currentSurface: 'concierge', role: 'owner' });
     expect(menu.map((item) => item.id)).toEqual([
       'decide',
@@ -226,10 +226,16 @@ describe('optional destinations', () => {
       'organizations',
       'projects',
       'actors',
+      'deliverables',
       'ingest',
+      'knowledge',
+      'discussion',
       'first-job',
       'help',
       'organization',
+      'operations',
+      'surface-control',
+      'diagnostics',
       'settings',
     ]);
     expect(
@@ -238,7 +244,7 @@ describe('optional destinations', () => {
       )
     ).toBe(false);
   });
-  it('uses verified optional bases and preserves section selection', () => {
+  it('keeps /ops section links same-origin with the snake_case scope query', () => {
     const menu = resolveFrontDeskMenu({
       currentSurface: 'concierge',
       role: 'owner',
@@ -248,9 +254,10 @@ describe('optional destinations', () => {
       },
     });
     expect(menu).toHaveLength(FRONT_DESK_MENU.length);
-    expect(menu.find((item) => item.id === 'knowledge')?.href).toBe(
-      'http://localhost:4300/?section=knowledge'
-    );
+    // The former Chronos destinations are same-origin /ops sections now, even
+    // while a Chronos process is still reachable during the migration.
+    expect(menu.find((item) => item.id === 'knowledge')?.href).toBe('/ops?section=knowledge');
+    expect(menu.find((item) => item.id === 'knowledge')?.external).toBe(false);
     expect(menu.some((item) => item.id === 'monitor')).toBe(false);
     expect(menu.find((item) => item.id === 'knowledge')?.scope_query_style).toBe('snake');
   });
@@ -335,5 +342,29 @@ it('keeps organization management available without optional Chronos', () => {
     surface: 'concierge',
     allowed: true,
     scope_query_style: 'camel',
+  });
+});
+
+describe('operations console destinations (former Chronos)', () => {
+  it('resolves to the Concierge origin from presence-studio', () => {
+    const menu = resolveFrontDeskMenu({
+      currentSurface: 'presence-studio',
+      role: 'owner',
+      urls: { concierge: 'http://127.0.0.1:3050' },
+    });
+    for (const id of [
+      'deliverables',
+      'knowledge',
+      'discussion',
+      'operations',
+      'surface-control',
+      'diagnostics',
+    ]) {
+      const item = menu.find((entry) => entry.id === id);
+      expect(item?.surface, id).toBe('concierge');
+      expect(item?.href, id).toBe(`http://127.0.0.1:3050/ops?section=${id}`);
+      expect(item?.scope_query_style, id).toBe('snake');
+    }
+    expect(FRONT_DESK_MENU.some((item) => item.surface === 'chronos-mirror-v2')).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
+import { serverDelegatedChildEnv } from './server-child-env';
 import { randomUUID } from 'node:crypto';
-import { buildExecutionEnv } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import * as secureIo from '@agent/core/secure-io';
 
@@ -46,7 +46,7 @@ export type AvatarScriptRunner = (args: string[], timeoutMs: number) => Promise<
 
 const defaultRunner: AvatarScriptRunner = (args, timeoutMs) =>
   secureIo.safeExecResultAsync(process.execPath, [AVATAR_SCRIPT_RELATIVE, ...args], {
-    env: buildExecutionEnv(process.env, 'sovereign_concierge'),
+    env: serverDelegatedChildEnv('sovereign_concierge'),
     cwd: pathResolver.rootDir(),
     timeoutMs,
     maxOutputMB: 5,

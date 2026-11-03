@@ -75,12 +75,12 @@ const DEFAULT_PAGES: PageSpec[] = [
   { surface: 'presence-studio', pageName: 'home', path: '/' },
   { surface: 'presence-studio', pageName: 'ask', path: '/ask' },
   { surface: 'presence-studio', pageName: 'progress', path: '/progress' },
-  { surface: 'chronos-mirror-v2', pageName: 'home', path: '/' },
-  // Chronos is a single-page console; other visualization scopes are
-  // reachable by URL via `?section=<scope>` (see src/app/page.tsx).
-  { surface: 'chronos-mirror-v2', pageName: 'governance', path: '/?section=governance' },
-  { surface: 'chronos-mirror-v2', pageName: 'missions', path: '/?section=missions' },
-  { surface: 'chronos-mirror-v2', pageName: 'operations', path: '/?section=operations' },
+  // The operations console (former Chronos) is a single page inside Concierge;
+  // its scopes are reachable via `/ops?section=<scope>` (src/app/ops/page.tsx).
+  { surface: 'concierge', pageName: 'ops-home', path: '/ops' },
+  { surface: 'concierge', pageName: 'ops-governance', path: '/ops?section=governance' },
+  { surface: 'concierge', pageName: 'ops-missions', path: '/ops?section=missions' },
+  { surface: 'concierge', pageName: 'ops-operations', path: '/ops?section=operations' },
   // operator-surface's mission overview is the root page; /missions itself
   // has no index route (only /missions/[id]).
   { surface: 'operator-surface', pageName: 'missions', path: '/' },

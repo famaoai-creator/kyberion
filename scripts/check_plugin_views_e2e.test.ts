@@ -42,14 +42,12 @@ describe('check_plugin_views_e2e helpers (PE-02)', () => {
     expect(() => parseE2eArgs(['--launch-mode', 'docker'])).toThrow(/--launch-mode/);
   });
 
-  it('mirrors the environment surface_runtime gives the Chronos surface', () => {
+  it('mirrors the environment surface_runtime gives the Concierge surface', () => {
     const [manifest] = (
       JSON.parse(
         String(
           safeReadFile(
-            pathResolver.rootResolve(
-              'knowledge/product/governance/surfaces/chronos-mirror-v2.json'
-            ),
+            pathResolver.rootResolve('knowledge/product/governance/surfaces/concierge.json'),
             { encoding: 'utf8' }
           )
         )
@@ -59,7 +57,9 @@ describe('check_plugin_views_e2e helpers (PE-02)', () => {
       String(safeReadFile(pathResolver.rootResolve('package.json'), { encoding: 'utf8' }))
     ) as { scripts: Record<string, string> };
     expect(pkg.scripts.surfaces).toContain('KYBERION_PERSONA=worker SYSTEM_ROLE=surface_runtime');
-    expect(manifest.env ?? {}).toEqual({});
+    expect(manifest.env ?? {}).toEqual({
+      KYBERION_SCOPE_ENV_PATH: 'active/shared/runtime/scope-surfaces.env',
+    });
     // The env surface_runtime actually builds for this manifest (on an empty base).
     expect(
       buildSurfaceLaunchEnv(manifest.id, manifest.service_id || manifest.id, manifest.env, {})

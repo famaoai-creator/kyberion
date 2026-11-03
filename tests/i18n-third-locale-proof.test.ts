@@ -12,7 +12,7 @@ import {
   setChronosLocalePreference,
   uxMessage,
   uxText,
-} from '../presence/displays/chronos-mirror-v2/src/lib/ux-vocabulary.js';
+} from '../presence/displays/concierge/src/lib/ops/ux-vocabulary.js';
 import catalog from '../knowledge/product/orchestration/user-facing-vocabulary.json';
 
 /**

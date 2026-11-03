@@ -38,7 +38,7 @@ it('uses installed owner consent for a real standalone PR boundary and respects 
     return { status: 0, stdout, stderr: '' };
   };
   const create = (id: string) => {
-    vi.stubEnv('SYSTEM_ROLE', 'chronos_mirror_v2');
+    vi.stubEnv('SYSTEM_ROLE', 'concierge');
     try {
       return authority.withExecutionContext('chronos_operator', () =>
         runtime.withInstalledOnboardingAuthority(id, () => {

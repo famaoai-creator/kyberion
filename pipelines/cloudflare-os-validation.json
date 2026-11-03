@@ -26,10 +26,10 @@
           "tests/vitest-network-guard.test.ts",
           "presence/displays/presence-studio/security.test.ts",
           "presence/displays/presence-studio/os-control-plane-route.test.ts",
-          "presence/displays/chronos-mirror-v2/src/app/api/os/control-plane/route.test.ts",
-          "presence/displays/chronos-mirror-v2/src/app/api/os/control-plane/route-surface.integration.test.ts",
-          "presence/displays/chronos-mirror-v2/src/app/api/os/share-grants/route.test.ts",
-          "presence/displays/chronos-mirror-v2/src/components/CloudflareOsPanel.test.ts"
+          "presence/displays/concierge/src/app/api/ops/os/control-plane/route.test.ts",
+          "presence/displays/concierge/src/app/api/ops/os/control-plane/route-surface.integration.test.ts",
+          "presence/displays/concierge/src/app/api/ops/os/share-grants/route.test.ts",
+          "presence/displays/concierge/src/components/ops/CloudflareOsPanel.test.ts"
         ],
         "test_timeout_ms": 30000
       }

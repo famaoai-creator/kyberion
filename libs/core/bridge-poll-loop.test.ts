@@ -3,7 +3,7 @@ import {
   startBridgePollLoop,
   startBridgeSequentialPoll,
   stopAllBridgePollLoops,
-} from '../../satellites/shared/bridge-poll-loop.js';
+} from './bridge-poll-loop.js';
 
 afterEach(() => {
   stopAllBridgePollLoops();
