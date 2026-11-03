@@ -250,6 +250,10 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
       'libs/core/lease/kv-lease-backend.stub.ts',
     ],
   },
+  'event-bus': {
+    declaration: 'libs/core/event/event-bus.ts',
+    consumers: ['libs/core/event/local-event-bus.ts', 'libs/core/event/memory-event-bus.ts'],
+  },
   'structured-runner': {
     declaration: 'libs/core/mission/mission-llm.ts',
     consumers: ['libs/core/mission/mission-llm.ts'],

@@ -21,6 +21,7 @@
     "web-search-runtime",
     "storage-backend",
     "provider-transport",
-    "lease-backend"
+    "lease-backend",
+    "event-bus"
   ]
 }
