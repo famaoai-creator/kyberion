@@ -2696,6 +2696,10 @@
       "types": "./dist/lease/memory-lease-backend.d.ts",
       "default": "./dist/lease/memory-lease-backend.js"
     },
+    "./lease/kv-lease-backend.stub": {
+      "types": "./dist/lease/kv-lease-backend.stub.d.ts",
+      "default": "./dist/lease/kv-lease-backend.stub.js"
+    },
     "./ledger": {
       "types": "./dist/ledger.d.ts",
       "default": "./dist/ledger.js"

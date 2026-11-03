@@ -14,6 +14,11 @@ import {
 import { LOCAL_LEASE_BACKEND_ID, getLeaseBackend, resolveLeaseBackend } from './lease-backend.js';
 import './local-lease-backend.js';
 import { MEMORY_LEASE_BACKEND_ID, createMemoryLeaseBackend } from './memory-lease-backend.js';
+import {
+  KV_LEASE_BACKEND_STUB_ID,
+  createKvLeaseBackendStub,
+  createSharedKvLeaseStore,
+} from './kv-lease-backend.stub.js';
 
 describe('lease-backend seam', () => {
   it('resolves the governed default to local-file-lock', () => {
@@ -33,6 +38,65 @@ describe('lease-backend seam', () => {
   it('keeps memory out of the default chain (registered but never auto-selected)', () => {
     expect(getLeaseBackend(MEMORY_LEASE_BACKEND_ID)).toBeDefined();
     expect(resolveLeaseBackend().id).toBe(LOCAL_LEASE_BACKEND_ID);
+  });
+
+  it('keeps kv-lock-stub out of the default chain (registered but never auto-selected)', () => {
+    expect(getLeaseBackend(KV_LEASE_BACKEND_STUB_ID)).toBeDefined();
+    expect(resolveLeaseBackend(KV_LEASE_BACKEND_STUB_ID).id).toBe(KV_LEASE_BACKEND_STUB_ID);
+    expect(resolveLeaseBackend().id).toBe(LOCAL_LEASE_BACKEND_ID);
+  });
+});
+
+describe('writer-lease on a kv-lock stub (distributed contract)', () => {
+  it('rejects withLockSync — distributed backends have no blocking sync mutex', () => {
+    const backend = createKvLeaseBackendStub({ nodeId: 'a' });
+    expect(() => backend.withLockSync('ns', () => 1)).toThrow(/sync lock unsupported/);
+    expect(() =>
+      withFencedWriterLeaseSync<void>({
+        resourceId: 'kv-sync',
+        ownerId: 'owner-a',
+        leasePath: '/leases/kv-sync.json',
+        backend,
+        fn: () => undefined,
+      })
+    ).toThrow(/sync lock unsupported/);
+  });
+
+  it('excludes two nodes that share one KV store via async withLock', async () => {
+    const store = createSharedKvLeaseStore();
+    const nodeA = createKvLeaseBackendStub({ store, nodeId: 'a', lockDelayMs: 2 });
+    const nodeB = createKvLeaseBackendStub({ store, nodeId: 'b' });
+    const key = '/leases/kv-shared.json';
+    const order: string[] = [];
+
+    const first = withFencedWriterLease<void>({
+      resourceId: 'kv-shared',
+      ownerId: 'owner-a',
+      leasePath: key,
+      backend: nodeA,
+      fn: async () => {
+        order.push('a-enter');
+        await new Promise<void>((resolve) => setTimeout(resolve, 15));
+        order.push('a-exit');
+      },
+    });
+
+    // Start B while A still holds the namespace lock — must not interleave.
+    await new Promise<void>((resolve) => setTimeout(resolve, 1));
+    const second = withFencedWriterLease<void>({
+      resourceId: 'kv-shared',
+      ownerId: 'owner-b',
+      leasePath: key,
+      backend: nodeB,
+      fn: async () => {
+        order.push('b-enter');
+        order.push('b-exit');
+      },
+    });
+
+    await Promise.all([first, second]);
+    expect(order).toEqual(['a-enter', 'a-exit', 'b-enter', 'b-exit']);
+    expect(store.records.get(key)?.fence).toBeGreaterThanOrEqual(1);
   });
 });
 
