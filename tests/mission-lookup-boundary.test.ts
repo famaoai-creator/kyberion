@@ -51,6 +51,8 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'libs/core/mission/mission-task-supersede.ts': 'lifecycle',
   'libs/core/mission/mission-triage.ts': 'lifecycle',
   'libs/core/mission/mission-work-reconciliation.ts': 'lifecycle',
+  // Gate proofs must refuse hidden/ambiguous missions rather than skip evidence.
+  'libs/core/mission/refactoring-evidence.ts': 'lifecycle',
   'libs/core/workforce/work-inventory-promotion.ts': 'lifecycle',
   'scripts/background_review_mission_e2e.ts': 'lifecycle',
   'scripts/backup.ts': 'lifecycle',

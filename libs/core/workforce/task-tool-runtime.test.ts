@@ -98,6 +98,41 @@ function harness(profile = 'implementer', canonicalRole = 'implementer') {
 }
 
 describe('claimed task tool runtime', () => {
+  it('refuses to reintroduce an original source target after private workspace preparation', () => {
+    const h = harness();
+    const task = h.options.tasks!()[0];
+    task.source_workspace = {
+      version: 1,
+      baseline_commit: 'a'.repeat(40),
+      source_paths: ['libs/example.ts'],
+    };
+    task.target_path = 'libs/example.ts';
+    expect(() => createRuntimeForTask(h.metadata, scope, h.options)).toThrow(
+      'private exact source binding'
+    );
+  });
+  it('invalidates a live runtime when its private workspace baseline binding changes', async () => {
+    const h = harness();
+    const task = h.options.tasks!()[0];
+    task.source_workspace = {
+      version: 1,
+      baseline_commit: 'a'.repeat(40),
+      source_paths: ['libs/example.ts'],
+    };
+    const runtime = createRuntimeForTask(h.metadata, scope, h.options)!;
+    task.source_workspace = {
+      version: 1,
+      baseline_commit: 'b'.repeat(40),
+      source_paths: ['libs/example.ts'],
+    };
+    await expect(
+      runtime.execute({
+        name: 'kyberion_task_write_artifact',
+        arguments: { name: 'report.txt', content: 'bad' },
+      })
+    ).rejects.toThrow();
+    expect(h.writeArtifact).not.toHaveBeenCalled();
+  });
   it.each([
     'evidence/continuous-owner.json',
     'artifacts/../evidence/continuous-owner.json',
