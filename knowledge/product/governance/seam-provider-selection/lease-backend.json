@@ -1,0 +1,49 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "lease-backend",
+      "default_provider": "local-file-lock",
+      "fallback_purpose": "coordinate",
+      "traits": {
+        "safety": "Strength of the mutual-exclusion guarantee (inter-process file lock > single-process memory).",
+        "zero_config": "Works with no operator opt-in or extra configuration.",
+        "distributed": "Excludes holders on more than one runtime node."
+      },
+      "providers": {
+        "local-file-lock": {
+          "traits": { "safety": 0.9, "zero_config": 1, "distributed": 0 },
+          "trait_basis": {
+            "safety": "declared",
+            "zero_config": "declared",
+            "distributed": "declared"
+          },
+          "evidence": [
+            "libs/core/lease/local-lease-backend.ts (foundation withLock/withLockSync inter-process mutex + governed-catalog fenced record via secure-io)"
+          ]
+        },
+        "memory": {
+          "traits": { "safety": 0.3, "zero_config": 1, "distributed": 0 },
+          "trait_basis": {
+            "safety": "declared",
+            "zero_config": "declared",
+            "distributed": "declared"
+          },
+          "evidence": [
+            "libs/core/lease/memory-lease-backend.ts (single-process mutex + in-memory records; hermetic tests only — never in the default chain)"
+          ]
+        }
+      },
+      "purposes": {
+        "coordinate": {
+          "description": "Exclude concurrent writers and hold a fenced lease record for one resource.",
+          "weights": { "safety": 0.6, "zero_config": 0.3, "distributed": 0.1 }
+        }
+      },
+      "default_chains": {
+        "default": ["local-file-lock"]
+      }
+    }
+  ]
+}
