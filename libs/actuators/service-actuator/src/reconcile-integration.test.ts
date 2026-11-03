@@ -109,11 +109,15 @@ vi.mock('@agent/core/service/service-binding', () => ({
 vi.mock('./service-actuator-tenant-binding.js', () => ({
   authorizeTenantServiceBinding: vi.fn(() => ({ approvalRequired: false })),
 }));
-vi.mock('@agent/core/path-resolver', () => ({
-  ...mocks.pathResolver,
-  pathResolver: mocks.pathResolver,
-  capabilityEntry: (id: string) => `dist/${id}.js`,
-}));
+vi.mock('@agent/core/path-resolver', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/path-resolver')>();
+  return {
+    ...actual,
+    ...mocks.pathResolver,
+    pathResolver: { ...actual.pathResolver, ...mocks.pathResolver },
+    capabilityEntry: (id: string) => `dist/${id}.js`,
+  };
+});
 vi.mock('@agent/core/service/service-engine', () => ({
   executeServicePreset: mocks.executeServicePreset,
   executeMcp: vi.fn(),

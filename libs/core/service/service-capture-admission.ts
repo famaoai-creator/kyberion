@@ -1,7 +1,7 @@
 import '../governance/authorization-overlay.js';
 import { subjectAuthorization } from '../foundation/authorization-registry.js';
 /** Internal exact-request, single-use scoped read admission. No domain-layer imports belong here. */
-import { createHash } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { getPluginExecutionContext } from '../shell/sandbox-policy.js';
 import {
   loadServiceEndpointsCatalog,
@@ -81,8 +81,10 @@ interface Admission {
   verify: () => Promise<ScopedServiceCaptureTransport>;
 }
 const admissions = new WeakMap<object, Admission>();
+// Process-local authentication tag for ephemeral admissions, never a persisted password digest.
+const admissionIntegrityKey = randomBytes(32);
 function hash(input: unknown): string {
-  return createHash('sha256').update(JSON.stringify(input)).digest('hex');
+  return createHmac('sha256', admissionIntegrityKey).update(JSON.stringify(input)).digest('hex');
 }
 function presetHash(preset: ServicePresetRecord, action: string): string {
   const { operations: _operations, ...configuration } = preset;
