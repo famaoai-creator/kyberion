@@ -10,7 +10,54 @@ import {
   renderIntentOutcomeLabel,
 } from '@agent/core/intent/intent-resolution-contract';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { readChronosJsonObject, type JsonObjectRequest } from '../../../../lib/ops/request-input';
+
+/**
+ * Stable, non-reversible key of the server-resolved viewer and the tenant set
+ * it acts in. Conversation threads and pending mission proposals are stored
+ * under it, so a client-chosen `sessionId` can never reach another viewer's
+ * thread history or proposal.
+ */
+export function opsViewerPrincipalKey(viewer: {
+  principalId?: string;
+  memberId?: string;
+  role: string;
+  source: string;
+  tenantSlugs: string[] | 'all';
+}): string {
+  const principal = viewer.principalId || viewer.memberId || `${viewer.source}:${viewer.role}`;
+  const tenants = viewer.tenantSlugs === 'all' ? '*' : [...viewer.tenantSlugs].sort().join(',');
+  return createHash('sha256')
+    .update(`ops-conversation\n${principal}\n${tenants}`)
+    .digest('hex')
+    .slice(0, 24);
+}
+
+/** `p<viewer key>.<client session>`: the client only picks a thread inside its own namespace. */
+export function opsConversationSessionId(
+  viewer: Parameters<typeof opsViewerPrincipalKey>[0],
+  clientSessionId: unknown
+): string {
+  const client =
+    typeof clientSessionId === 'string' && clientSessionId.trim()
+      ? clientSessionId
+          .trim()
+          .replace(/[^a-zA-Z0-9._-]/g, '_')
+          .slice(0, 64)
+      : 'default';
+  return `p${opsViewerPrincipalKey(viewer)}.${client}`;
+}
+
+/** A pending proposal is actionable only by the principal it was proposed to. */
+export function opsProposalBelongsToViewer(
+  state: { authorPrincipalKey?: string } | null,
+  viewer: Parameters<typeof opsViewerPrincipalKey>[0]
+): boolean {
+  return Boolean(
+    state?.authorPrincipalKey && state.authorPrincipalKey === opsViewerPrincipalKey(viewer)
+  );
+}
 
 export function chronosConversationScope(viewer: {
   tenantSlugs: string[] | 'all';
@@ -44,6 +91,22 @@ export function chronosViewerCanAccessAgentScope(
   return eventScopeMatches(scope, { tenant_slugs: viewer.tenantSlugs });
 }
 
+/**
+ * The only pipelines the console's deterministic `node dist/scripts/run_pipeline.js
+ * --input <pipeline>` shortcut may run: read-only readiness / inventory checks
+ * the console offers itself. Anything else (writers, actuators with side
+ * effects) goes through a governed mission or pipeline flow, never this
+ * shortcut. The child runs bounded by SYSTEM_ROLE=concierge (server-child-env).
+ */
+export const OPS_CONSOLE_PIPELINE_ALLOWLIST: readonly string[] = [
+  'pipelines/baseline-check.json',
+  'pipelines/system-upgrade-check.json',
+  'pipelines/vital-check.json',
+  'pipelines/system-diagnostics.json',
+  'pipelines/list-capabilities.json',
+  'pipelines/inspect-workspace-surfaces.json',
+];
+
 export function resolveChronosPipelineInputPath(rootDir: string, candidate: string): string | null {
   const normalized = candidate.trim().replaceAll('\\', '/');
   if (!normalized || path.isAbsolute(normalized)) return null;
@@ -56,7 +119,8 @@ export function resolveChronosPipelineInputPath(rootDir: string, candidate: stri
     relative.startsWith('../') ||
     path.isAbsolute(relative) ||
     (!relative.startsWith('pipelines/') && relative !== 'pipelines') ||
-    path.extname(relative) !== '.json'
+    path.extname(relative) !== '.json' ||
+    !OPS_CONSOLE_PIPELINE_ALLOWLIST.includes(relative)
   ) {
     return null;
   }

@@ -1,3 +1,4 @@
+import { governedWorkerEnv } from '../../../../lib/server-child-env';
 import { NextRequest, NextResponse } from 'next/server';
 import { beginInteractiveServiceOAuth } from '@agent/core/oauth-broker';
 import { getRegisteredEnvText } from '@agent/core/foundation';
@@ -52,7 +53,13 @@ async function ensureOAuthCallbackSurface(): Promise<void> {
     const result = safeExecResult(
       process.execPath,
       [SURFACE_RUNTIME_RELATIVE, 'start', '--surface', OAUTH_CALLBACK_SURFACE_ID],
-      { cwd: rootDir, timeoutMs: SURFACE_START_TIMEOUT_MS, maxOutputMB: 1 }
+      {
+        cwd: rootDir,
+        timeoutMs: SURFACE_START_TIMEOUT_MS,
+        maxOutputMB: 1,
+        // The surface launcher runs under its own system role, never unbounded.
+        env: governedWorkerEnv('surface_runtime'),
+      }
     );
     if (result.status !== 0) {
       console.error(

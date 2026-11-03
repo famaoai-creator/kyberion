@@ -132,3 +132,39 @@ describe('schedule quick action (D3 governed worker dispatch)', () => {
     expect(source).not.toContain("import('@agent/core/generation-scheduler')");
   });
 });
+
+describe('schedule dispatch audit (M2)', () => {
+  it('audits the viewer principal, a worker that cannot start, and a timeout as unconfirmed', async () => {
+    const audits: Array<Record<string, unknown>> = [];
+    const audit = (entry: Record<string, unknown>) => audits.push(entry);
+    await dispatchGenerationScheduleWorker(
+      'list',
+      { run: async () => ({ stdout: '[]', stderr: '', status: 0 }), audit },
+      'human:owner'
+    );
+    expect(audits[0]).toEqual({ action: 'list', result: 'completed', actor: 'human:owner' });
+
+    await expect(
+      dispatchGenerationScheduleWorker(
+        'tick',
+        {
+          run: () => {
+            throw new Error('spawn ENOENT');
+          },
+          audit,
+        },
+        'human:owner'
+      )
+    ).rejects.toThrow('spawn ENOENT');
+    expect(audits[1]).toMatchObject({ action: 'tick', result: 'failed', actor: 'human:owner' });
+
+    await expect(
+      dispatchGenerationScheduleWorker(
+        'tick',
+        { run: async () => ({ stdout: '', stderr: '', status: null }), audit },
+        'human:owner'
+      )
+    ).rejects.toThrow(/unconfirmed/);
+    expect(audits[2]).toMatchObject({ result: 'error', outcome: 'unconfirmed' });
+  });
+});

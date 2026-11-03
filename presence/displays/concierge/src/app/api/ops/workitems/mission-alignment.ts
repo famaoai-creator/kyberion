@@ -1,5 +1,6 @@
+import { serverDelegatedChildEnv } from '../../../../lib/server-child-env';
 /** Existing scoped WorkItem action -> governed alignment CLI, never a shell or a new execution API. */
-import { buildExecutionEnv, withExecutionContext } from '@agent/core/authority';
+import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResultAsync, safeExistsSync } from '@agent/core/secure-io';
 import { getWorkItem, type WorkItem } from '@agent/core/workforce/work-coordination';
@@ -25,7 +26,7 @@ export async function requestWorkItemMissionAlignment(authorized: WorkItem) {
     throw new Error('only a held typed mission intake can request alignment');
   const script = pathResolver.rootResolve('dist/scripts/mission_alignment_request.js');
   if (!safeExistsSync(script)) throw new Error('build the governed mission alignment script first');
-  const env = buildExecutionEnv(process.env, 'mission_controller');
+  const env = serverDelegatedChildEnv('mission_controller');
   delete env.MISSION_ID;
   delete env.KYBERION_CUSTOMER;
   delete env.KYBERION_PROJECT_ID;

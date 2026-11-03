@@ -1,6 +1,7 @@
+import { serverDelegatedChildEnv } from '../../../lib/server-child-env';
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
-import { buildExecutionEnv, withExecutionContext } from '@agent/core/authority';
+import { withExecutionContext } from '@agent/core/authority';
 import {
   loadConfigMissionBriefAtPath,
   loadConfigMissionPresetAtPath,
@@ -280,7 +281,7 @@ export async function POST(req: NextRequest) {
       ...Object.entries(inputs).flatMap(([key, value]) => ['--input', `${key}=${value}`]),
     ];
     const result = safeExecResult(process.execPath, args, {
-      env: buildExecutionEnv(process.env, 'sovereign_concierge'),
+      env: serverDelegatedChildEnv('sovereign_concierge'),
       cwd: rootDir,
       timeoutMs: CREATE_TIMEOUT_MS,
       maxOutputMB: 5,

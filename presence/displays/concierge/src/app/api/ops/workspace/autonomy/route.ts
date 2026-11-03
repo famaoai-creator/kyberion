@@ -12,6 +12,7 @@ import {
 import { resolveChronosWorkspace } from '../../../../../lib/ops/workspace-scope';
 import {
   DotLifecycleDispatchError,
+  auditDotLifecycleDenial,
   dispatchDotLifecycleWorker,
 } from '../../../../../lib/ops/dot-lifecycle-dispatch';
 
@@ -82,12 +83,24 @@ export async function POST(req: NextRequest) {
       projectIds: scope.projectIds,
       tierAccess: scope.tierAccess,
     };
-    const plan = withViewerExecutionContext(viewer, () =>
-      planWorkspaceAutonomyControl(selection, viewer, {
-        dot_id: input.dot_id as string,
-        action: input.action as 'pause' | 'resume' | 'activate',
-      })
-    );
+    let plan;
+    try {
+      plan = withViewerExecutionContext(viewer, () =>
+        planWorkspaceAutonomyControl(selection, viewer, {
+          dot_id: input.dot_id as string,
+          action: input.action as 'pause' | 'resume' | 'activate',
+        })
+      );
+    } catch (error) {
+      // M2: a plan-time refusal is audited like a dispatch; the worker never runs.
+      await auditDotLifecycleDenial({
+        action: String(input.action),
+        dotId: String(input.dot_id),
+        ...(viewer.principalId ? { actor: viewer.principalId } : {}),
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
     const charter = await dispatchDotLifecycleWorker(plan, viewer.principalId);
     return NextResponse.json({
       ok: true,

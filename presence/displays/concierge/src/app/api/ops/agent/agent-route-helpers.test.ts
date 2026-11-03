@@ -5,6 +5,9 @@ import {
   intentResolutionA2ui,
   parseChronosAgentBody,
   parseChronosAgentsBody,
+  opsConversationSessionId,
+  opsProposalBelongsToViewer,
+  opsViewerPrincipalKey,
   resolveChronosPipelineInputPath,
 } from './agent-route-helpers';
 
@@ -82,10 +85,16 @@ describe('chronosConversationScope', () => {
     ).toEqual({ scope_kind: 'system', tier: 'public' });
   });
 
-  it('only resolves JSON pipelines inside the repository pipelines directory', () => {
-    expect(resolveChronosPipelineInputPath('/repo', 'pipelines/daily.json')).toBe(
-      '/repo/pipelines/daily.json'
+  it('only resolves allowlisted read-only pipelines (H1)', () => {
+    expect(resolveChronosPipelineInputPath('/repo', 'pipelines/baseline-check.json')).toBe(
+      '/repo/pipelines/baseline-check.json'
     );
+    // Any other pipeline, even inside pipelines/, is refused by the shortcut.
+    expect(resolveChronosPipelineInputPath('/repo', 'pipelines/daily.json')).toBeNull();
+    expect(
+      resolveChronosPipelineInputPath('/repo', 'pipelines/generation-schedule-tick.json')
+    ).toBeNull();
+    expect(resolveChronosPipelineInputPath('/repo', 'pipelines/../pipelines/x.json')).toBeNull();
     expect(resolveChronosPipelineInputPath('/repo', '../secrets.json')).toBeNull();
     expect(resolveChronosPipelineInputPath('/repo', 'knowledge/private.json')).toBeNull();
     expect(resolveChronosPipelineInputPath('/repo', '/tmp/pipeline.json')).toBeNull();
@@ -251,5 +260,38 @@ describe('parseChronosAgentBody', () => {
     ['object locale', { query: 'status', locale: { value: 'en' } }],
   ])('rejects %s before conversation dispatch', (_label, body) => {
     expect(parseChronosAgentBody(body)).toMatchObject({ ok: false });
+  });
+});
+
+describe('conversation and proposal binding to the viewer (M1)', () => {
+  const owner = {
+    principalId: 'human:owner',
+    role: 'localadmin',
+    source: 'token',
+    tenantSlugs: 'all' as const,
+  };
+  const reader = { ...owner, principalId: 'human:reader', role: 'readonly' };
+
+  it('namespaces the client session id by the server-resolved principal', () => {
+    expect(opsConversationSessionId(owner, 'chronos-default')).not.toBe(
+      opsConversationSessionId(reader, 'chronos-default')
+    );
+    expect(opsConversationSessionId(owner, undefined)).toBe(
+      opsConversationSessionId(owner, 'default')
+    );
+    // The same principal in another tenant set gets another thread.
+    expect(opsConversationSessionId(owner, 's')).not.toBe(
+      opsConversationSessionId({ ...owner, tenantSlugs: ['acme'] }, 's')
+    );
+    expect(opsConversationSessionId(owner, '../../etc')).toMatch(/^p[0-9a-f]{24}\.[\w.-]+$/);
+  });
+
+  it('lets only the author principal confirm or discard a proposal', () => {
+    const state = { authorPrincipalKey: opsViewerPrincipalKey(owner) };
+    expect(opsProposalBelongsToViewer(state, owner)).toBe(true);
+    expect(opsProposalBelongsToViewer(state, reader)).toBe(false);
+    // Legacy state without an author is never actionable.
+    expect(opsProposalBelongsToViewer({}, owner)).toBe(false);
+    expect(opsProposalBelongsToViewer(null, owner)).toBe(false);
   });
 });
