@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IntakeVectorsPolicy",
+  "type": "object",
+  "required": ["version", "vectors"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string" },
+    "description": { "type": "string" },
+    "vectors": {
+      "type": "object",
+      "required": ["manual_vaulting", "connector_skills", "agentic_web_fetch", "vault_mount"],
+      "additionalProperties": false,
+      "properties": {
+        "manual_vaulting": { "$ref": "#/definitions/vector" },
+        "connector_skills": { "$ref": "#/definitions/vector" },
+        "agentic_web_fetch": { "$ref": "#/definitions/vector" },
+        "vault_mount": { "$ref": "#/definitions/vector" }
+      }
+    }
+  },
+  "definitions": {
+    "vector": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "description",
+        "source_types",
+        "requires_host_gate",
+        "agent_writable",
+        "landing_floor"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "description": { "type": "string" },
+        "source_types": { "type": "array", "items": { "type": "string" } },
+        "requires_host_gate": { "type": "boolean" },
+        "agent_writable": { "type": "boolean" },
+        "landing_floor": { "type": "string" }
+      }
+    }
+  }
+}

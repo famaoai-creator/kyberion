@@ -390,7 +390,7 @@ export function vitestLivePath(absolutePath: string): string {
     return path.join(sandbox, 'repo', repoRelative);
   }
   const relative = path.relative(ACTIVE_ROOT, absolutePath).split(path.sep).join('/');
-  if (relative.startsWith('..') || path.isAbsolute(relative)) return absolutePath;
+  if (!isPathInsideOrEqual(ACTIVE_ROOT, absolutePath)) return absolutePath;
   const hit = VITEST_LIVE_SUBTREES.some((prefix) =>
     prefix.endsWith('/') ? `${relative}/`.startsWith(prefix) : relative === prefix
   );
@@ -1060,7 +1060,7 @@ export function toRepoRelative(targetPath: string): string {
 export function normalizeStoredPath(targetPath: string): { path: string; foreign: boolean } {
   if (!targetPath || !path.isAbsolute(targetPath)) return { path: targetPath, foreign: false };
   const rel = path.relative(PROJECT_ROOT_DIR, targetPath);
-  if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) return { path: rel, foreign: false };
+  if (isPathInside(PROJECT_ROOT_DIR, targetPath)) return { path: rel, foreign: false };
   return { path: targetPath, foreign: true };
 }
 
@@ -1072,6 +1072,15 @@ export function isPathInside(parent: string, candidate: string): boolean {
     relative !== '..' &&
     !relative.startsWith(`..${path.sep}`) &&
     !path.isAbsolute(relative)
+  );
+}
+
+/** Whether `candidate` is inside `parent` or equal to it (containment, not strict-inside). */
+export function isPathInsideOrEqual(parent: string, candidate: string): boolean {
+  const relative = path.relative(parent, candidate);
+  return (
+    relative === '' ||
+    (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
   );
 }
 
@@ -1122,6 +1131,7 @@ export const pathResolver = {
   toRepoRelative,
   normalizeStoredPath,
   isPathInside,
+  isPathInsideOrEqual,
   primaryCheckoutRootDir,
   isAuthorityStoreRelativePath,
   storeRelativePath,

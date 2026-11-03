@@ -175,8 +175,7 @@ export function parseTrackingResult(
 
 function localFile(file: string, model = false): string {
   const absolute = assertSafeRepositoryPath(pathResolver.rootResolve(file));
-  const relative = path.relative(pathResolver.rootDir(), absolute);
-  if (!relative || relative.startsWith('..') || path.isAbsolute(relative))
+  if (!pathResolver.isPathInside(pathResolver.rootDir(), absolute))
     fail('input and models must be repository files');
   const stat = safeLstat(absolute);
   if (!stat.isFile() || stat.size <= 0 || stat.size > (model ? 200 : 1024) * 1024 * 1024)

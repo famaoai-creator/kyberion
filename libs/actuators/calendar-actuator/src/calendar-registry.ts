@@ -13,6 +13,7 @@ import {
   runCalendarExternalEffect,
   type CalendarMutationKind,
 } from '@agent/core/meeting/calendar-external-effect';
+import { wrapAdapterEffects } from '@agent/core/governance/adapter-effect-proxy';
 import type { CalendarParams } from './calendar-types.js';
 
 function governCalendarBackend(adapter: CalendarBackendAdapter): CalendarBackendAdapter {
@@ -21,27 +22,16 @@ function governCalendarBackend(adapter: CalendarBackendAdapter): CalendarBackend
     updateEvent: 'update_event',
     deleteEvent: 'delete_event',
   } as const;
-  const methods = new Map<PropertyKey, unknown>();
-  return new Proxy(adapter, {
-    get(target, property) {
-      const value = Reflect.get(target, property, target);
-      if (typeof value !== 'function') return value;
-      if (!methods.has(property)) {
-        const kind: CalendarMutationKind | undefined = Object.hasOwn(mutations, property)
-          ? mutations[property as keyof typeof mutations]
-          : undefined;
-        methods.set(
-          property,
-          kind
-            ? (params: CalendarParams) =>
-                runCalendarExternalEffect(params, kind, { backend: target.id, params }, () =>
-                  value.call(target, params)
-                )
-            : value.bind(target)
-        );
-      }
-      return methods.get(property);
-    },
+  return wrapAdapterEffects(adapter, (property, original, target) => {
+    const kind: CalendarMutationKind | undefined = Object.hasOwn(mutations, property)
+      ? mutations[property as keyof typeof mutations]
+      : undefined;
+    return kind
+      ? (params: CalendarParams) =>
+          runCalendarExternalEffect(params, kind, { backend: target.id, params }, async () =>
+            Reflect.apply(original, target, [params])
+          )
+      : undefined;
   });
 }
 

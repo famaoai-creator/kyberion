@@ -535,8 +535,7 @@ function validatePeerExposure(baseUrl: string, exposure: PeerNetworkExposure): v
 }
 
 function isPathWithin(candidate: string, root: string): boolean {
-  const relative = path.relative(root, candidate);
-  return Boolean(relative) && !relative.startsWith('..') && !path.isAbsolute(relative);
+  return pathResolver.isPathInside(root, candidate);
 }
 
 export function registerPeerNetworkPeer(

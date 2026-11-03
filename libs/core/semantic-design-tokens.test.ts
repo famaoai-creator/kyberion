@@ -6,16 +6,21 @@ import * as os from 'node:os';
 const rootDirRef = vi.hoisted(() => ({ value: process.cwd() }));
 let rootDir = rootDirRef.value;
 
-vi.mock('./path-resolver.js', () => ({
-  pathResolver: {
-    knowledge: (sub = '') => path.join(rootDirRef.value, 'knowledge', sub),
-    rootResolve: (sub = '') =>
-      sub.startsWith('knowledge/product/schemas/')
-        ? path.join(process.cwd(), sub)
-        : path.join(rootDirRef.value, sub),
-    rootDir: () => rootDirRef.value,
-  },
-}));
+vi.mock('./path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./path-resolver.js')>();
+  return {
+    ...actual,
+    pathResolver: {
+      ...actual.pathResolver,
+      knowledge: (sub = '') => path.join(rootDirRef.value, 'knowledge', sub),
+      rootResolve: (sub = '') =>
+        sub.startsWith('knowledge/product/schemas/')
+          ? path.join(process.cwd(), sub)
+          : path.join(rootDirRef.value, sub),
+      rootDir: () => rootDirRef.value,
+    },
+  };
+});
 
 const designWarnings = vi.hoisted(() => [] as string[]);
 
