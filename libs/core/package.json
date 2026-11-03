@@ -628,6 +628,10 @@
       "types": "./dist/authn-providers.d.ts",
       "default": "./dist/authn-providers.js"
     },
+    "./authn/installation-step-up": {
+      "types": "./dist/authn/installation-step-up.d.ts",
+      "default": "./dist/authn/installation-step-up.js"
+    },
     "./authn/passkey-credential-store": {
       "types": "./dist/authn/passkey-credential-store.d.ts",
       "default": "./dist/authn/passkey-credential-store.js"
@@ -6644,6 +6648,10 @@
       "types": "./dist/surface/human-request-runtime-config.d.ts",
       "default": "./dist/surface/human-request-runtime-config.js"
     },
+    "./surface/installation-owner-access": {
+      "types": "./dist/surface/installation-owner-access.d.ts",
+      "default": "./dist/surface/installation-owner-access.js"
+    },
     "./surface/oidc-browser-login": {
       "types": "./dist/surface/oidc-browser-login.d.ts",
       "default": "./dist/surface/oidc-browser-login.js"
@@ -6683,6 +6691,14 @@
     "./surface/surface-artifact-store": {
       "types": "./dist/surface/surface-artifact-store.d.ts",
       "default": "./dist/surface/surface-artifact-store.js"
+    },
+    "./surface/surface-operation-registry": {
+      "types": "./dist/surface/surface-operation-registry.d.ts",
+      "default": "./dist/surface/surface-operation-registry.js"
+    },
+    "./surface/workspace-graph": {
+      "types": "./dist/surface/workspace-graph.d.ts",
+      "default": "./dist/surface/workspace-graph.js"
     },
     "./surface/surface-auth-routes": {
       "types": "./dist/surface/surface-auth-routes.d.ts",

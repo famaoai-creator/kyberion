@@ -275,6 +275,25 @@ describe('pipeline approval resume', () => {
     expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
   });
 
+  it('reports no resume expectation when no suspended run journal exists', () => {
+    mocks.loadPipelineRunJournal.mockImplementation(() => {
+      throw new Error('[PIPELINE_JOURNAL] run not found: run-1');
+    });
+    expect(resumePipelineRunAfterApproval(record)).toEqual({
+      status: 'not_applicable',
+      reason: 'approval is not bound to a suspended pipeline run',
+      resumeExpected: false,
+    });
+    expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
+  });
+
+  it('keeps resume expectation for journal errors other than a missing run', () => {
+    mocks.loadPipelineRunJournal.mockImplementation(() => {
+      throw new Error('[PIPELINE_JOURNAL] missing run_started; refusing to resume');
+    });
+    expect(() => resumePipelineRunAfterApproval(record)).toThrow('missing run_started');
+  });
+
   it('does not launch a run whose journal is already finished', () => {
     mocks.loadPipelineRunJournal.mockReturnValue({
       run_id: 'run-1',

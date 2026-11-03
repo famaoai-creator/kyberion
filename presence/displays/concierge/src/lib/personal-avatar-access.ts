@@ -1,25 +1,29 @@
 import * as path from 'node:path';
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import { withExecutionContext } from '@agent/core/authority';
 import type { PersonalAvatarSetKind } from '@agent/core/presence-avatar';
 import * as secureIo from '@agent/core/secure-io';
 import type { ConciergeViewerContext } from './viewer-context';
+import {
+  installationAccessDenied,
+  resolveConciergeInstallationAccess,
+} from './installation-access';
 
 /** URL base the concierge serves the user's generated avatar frames from (PA-10). */
 export const CONCIERGE_AVATAR_URL_BASE = '/api/me/avatar';
 
 /**
- * PA-10: the generated avatar set is personal-tier data. Concierge viewer
- * scopes never carry `personal`, so — like `/api/setup`, which already reads
- * the profile for the local owner — only the loopback localadmin session may
- * read it. Token viewers (any role) get 403.
+ * PA-10: the generated avatar set is personal-tier data of the installation
+ * owner. Concierge viewer scopes never carry `personal`, so — like
+ * `/api/setup`, which serves the owner's profile — only the installation
+ * owner may read it (installation-access.ts, any transport). Changes go
+ * through `POST /api/setup`, which applies the installation write gate.
+ * Anyone else gets a stable 401/403 code.
  */
 export function requireConciergeAvatarOwner(context: ConciergeViewerContext): NextResponse | null {
-  if (context.source === 'loopback' && context.role === 'localadmin') return null;
-  return NextResponse.json(
-    { ok: false, error: 'The personal avatar requires the local owner session.' },
-    { status: 403, headers: { 'Cache-Control': 'no-store' } }
-  );
+  const decision = resolveConciergeInstallationAccess(context, 'read');
+  if (decision.allowed) return null;
+  return installationAccessDenied(decision);
 }
 
 /**

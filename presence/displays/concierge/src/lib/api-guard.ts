@@ -37,8 +37,23 @@ export function requireConciergeMutationAccess(req: NextRequest): NextResponse |
       { status: 403 }
     );
   }
+  // The internal listener URL (127.0.0.1) need not match the host alias the
+  // browser used (localhost): the browser-facing origin is the Host header,
+  // which isSameOriginMutation already checked against Origin for cookie
+  // requests. Compare Origin against it so either loopback alias works.
+  let mutationUrl = surfaceMutationRequestUrl(req);
+  const requestHost = req.headers.get('host');
+  if (requestHost) {
+    try {
+      const parsed = new URL(mutationUrl);
+      parsed.host = requestHost;
+      mutationUrl = parsed.toString();
+    } catch {
+      // Non-URL request targets (test doubles, framework adapters) pass through.
+    }
+  }
   const decision = authorizeSurfaceMutation({
-    url: surfaceMutationRequestUrl(req),
+    url: mutationUrl,
     getHeader: (name) => req.headers.get(name),
   });
   if (!decision.ok) {

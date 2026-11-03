@@ -31,6 +31,17 @@ A local proxy that removes all provenance is indistinguishable from a local
 process. Local processes and other users of the same machine are inside this
 local-operator trust boundary.
 
+A request with no credential is treated as the local operator only while
+bootstrap is open. Bootstrap is open until first-run setup is claimed and
+until any owner can sign in. Once an installation owner is bound, such a
+request gets 401 and browsers are sent to `/login`. Settings that apply to
+the whole machine are authorized by the installation owner's identity: a
+change from another device needs a passkey confirmation. Headless automation
+that cannot sign in can set the default-off
+`KYBERION_CONCIERGE_ALLOW_ANONYMOUS_LOOPBACK=1`. The surface health probe uses
+the public, data-free `/api/healthz`. See
+[installation-owner-authorization](../../../knowledge/product/governance/installation-owner-authorization.md).
+
 ## Authenticated remote deployment
 
 The existing `dev` and `start` commands remain ordinary Next commands.

@@ -45,8 +45,10 @@ import { useSettingsExitRegistration } from '../../lib/settings-exit-guard';
 import { useVoiceSelection } from '../../lib/use-voice-selection';
 import { useTrainingAssignments } from '../../lib/use-training-assignments';
 import { useRecordingConsent } from '../../lib/use-recording-consent';
+import { openServiceConsentWindow } from '../../lib/oauth-popup';
 import { ProfileSection } from './sections/ProfileSection';
 import type { SettingsSaveFeedbackState } from './sections/SettingsSaveFeedback';
+import { installationAccessCodeOf } from '../../lib/installation-access-client';
 import { MembersSection, type MemberFormState } from './sections/MembersSection';
 import { ServicesSection } from './sections/ServicesSection';
 import { VoiceSection } from './sections/VoiceSection';
@@ -54,9 +56,11 @@ import { NotificationsSection } from './sections/NotificationsSection';
 import { RecordingConsentSection } from './sections/RecordingConsentSection';
 import { PluginsSection, type PluginConfirmState } from './sections/PluginsSection';
 import { AdvancedSection, type ManagementState } from './sections/AdvancedSection';
+import { AuthoritySection } from './sections/AuthoritySection';
 import { DisplaySection } from './sections/DisplaySection';
 import { PasskeyPane } from './sections/PasskeyPane';
 import { FormScope } from './sections/form-scope';
+import { buildSettingsPatch, type ProfileDraft } from '../../lib/settings-save-patch';
 import { postSetupUpload, toUploadFile } from './settings-api';
 import {
   SYSTEM_SELECTION,
@@ -64,7 +68,7 @@ import {
   readSelectedTenant,
   readTenantSelection,
 } from '../../lib/tenant-context';
-import { createSettingsNavigation } from './settings-navigation';
+import { createSettingsNavigation, resolveSettingsTarget } from './settings-navigation';
 import './settings.css';
 import { SettingsReadiness } from './settings-readiness';
 import { createSettingsMenu } from './settings-menu';
@@ -87,8 +91,13 @@ type Setup = SetupPayload;
 
 const DEFAULT_SERVICES = ['google-workspace', 'slack', 'browser'];
 
-type ProfileDraft = { name: string; primary_domain: string; vision: string; agent_id: string };
 type SaveBarState = 'clean' | 'dirty' | 'saving' | 'saved' | 'error';
+
+/** The server's own refusal text, when it sent one. */
+const failureMessage = (body: unknown): string | undefined =>
+  body && typeof body === 'object' && typeof (body as { error?: unknown }).error === 'string'
+    ? (body as { error: string }).error
+    : undefined;
 
 const sameServices = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
@@ -642,6 +651,16 @@ export default function SettingsPage() {
       settingsNavigation.current = null;
     };
   }, [settingsReady]);
+  // The section becomes visible only after `activeSection` commits, so
+  // scrollIntoView inside the navigation helper hits a display:none element.
+  // Reveal the hash target (or the content top) once it is laid out.
+  React.useLayoutEffect(() => {
+    if (!settingsReady) return;
+    const target = resolveSettingsTarget(window.location?.hash ?? '');
+    const element = target ? document.getElementById(target.id) : null;
+    if (element) element.scrollIntoView({ block: 'start', behavior: 'auto' });
+    else window.scrollTo?.({ top: 0, behavior: 'auto' });
+  }, [activeSection, settingsReady]);
 
   const saveNotification = React.useCallback(
     async (grouped = false): Promise<boolean> => {
@@ -712,7 +731,7 @@ export default function SettingsPage() {
       setOauthBusyId(serviceId);
       setOauthMessage(null);
       setOauthError(false);
-      const oauthWindow = window.open('', '_blank', 'noopener');
+      const oauthWindow = openServiceConsentWindow();
       try {
         const response = await globalThis.fetch('/api/oauth/begin', {
           method: 'POST',
@@ -763,96 +782,63 @@ export default function SettingsPage() {
     [t]
   );
 
-  const applyOnboarding = React.useCallback(
-    async (
-      includeVoice: boolean,
-      grouped = false,
-      section?: 'profile' | 'services'
-    ): Promise<boolean> => {
+  // Settings saves send only the edited fields (`save_settings`); the server
+  // merges them onto the stored profile. The profile button also carries
+  // service edits (its label covers both), the services button only those.
+  const saveSettings = React.useCallback(
+    async (grouped = false, section?: 'profile' | 'services'): Promise<boolean> => {
       if (!setup || (savePending.current && !grouped)) return false;
-      if (!grouped) {
-        savePending.current = true;
-        setSaveFeedback(section ? { section, phase: 'saving' } : null);
-        if (section) setNotice(null);
-      }
-      const epoch = draftSession.epoch();
       const submitted = { ...profile };
       const submittedServices = [...services];
-      const saved = {
-        name: submitted.name.trim() || 'user',
-        primary_domain: submitted.primary_domain.trim() || 'personal operations',
-        vision: submitted.vision.trim() || t('setup.default_vision'),
-        agent_id: submitted.agent_id.trim() || 'sovereign-agent',
-      };
+      const servicesChanged =
+        savedServices === null ||
+        !sameServices(submittedServices, savedServices) ||
+        // First save: persist the selection the page shows, not an empty one.
+        setup.selected_services === undefined;
+      const built = buildSettingsPatch({
+        savedProfile,
+        ...(section !== 'services' ? { profile: submitted } : {}),
+        ...(servicesChanged ? { services: submittedServices } : {}),
+      });
+      if (!grouped) {
+        savePending.current = true;
+        setSaveFeedback(section ? { section, phase: built ? 'saving' : 'saved' } : null);
+        if (section) setNotice(null);
+      }
+      if (!built) {
+        if (!grouped) savePending.current = false;
+        return true;
+      }
+      const epoch = draftSession.epoch();
       setBusy(true);
       let submittedRequest = false;
       try {
         if (!(await draftSession.check(epoch))) return false;
-        const providerPriority = setup.providers?.priority?.length
-          ? setup.providers.priority
-          : ['codex-cli'];
         draftSession.advance('setup');
         submittedRequest = true;
         const response = await fetch('/api/setup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'apply_onboarding',
-            draft: {
-              version: '1.0.0',
-              identity: {
-                name: saved.name,
-                language: 'ja',
-                interaction_style: 'Concierge',
-                primary_domain: saved.primary_domain,
-                vision: saved.vision,
-                agent_id: saved.agent_id,
-              },
-              voice: {
-                enabled: includeVoice,
-                profile_id: voice.profile_id,
-                display_name: voice.display_name,
-                language: 'ja',
-                engine_id: 'mlx_audio_qwen3',
-                sample_refs: voiceSampleRefs.slice(0, 3),
-              },
-              services: submittedServices.map((service_id) => ({
-                service_id,
-                auth_mode:
-                  service_id === 'browser' || service_id === 'voice-hub' ? 'session' : 'oauth',
-                required: service_id === 'google-workspace',
-              })),
-              providers: {
-                priority: providerPriority,
-                default_models: setup.providers?.default_models || {},
-              },
-              tools: {
-                mode_preference: {
-                  python: 'installed_first',
-                  node: 'installed_first',
-                  system: 'installed_first',
-                },
-                install_requires_approval: true,
-                pin_requires_approval: true,
-              },
-              tutorial: { mode: 'simulate', summary: t('setup.tutorial_summary') },
-            },
-          }),
+          body: JSON.stringify({ action: 'save_settings', patch: built.patch }),
         });
         if (!draftSession.current(epoch) || !draftSession.inspect(response)) return false;
         const receipt = await response.json().catch(() => null);
         if (!draftSession.current(epoch)) return false;
+        const denied = response.ok ? null : installationAccessCodeOf(receipt);
+        if (denied && section) {
+          // Installation scope: another member, or the owner on another
+          // device before a passkey confirmation — not a failed save.
+          setSaveFeedback({ section, phase: 'rejected', access: denied });
+          return false;
+        }
         if (!response.ok || !isOnboardingSaveReceipt(receipt))
-          throw new Error('Unconfirmed onboarding save');
+          throw new Error('Unconfirmed settings save');
         if (!(await draftSession.check(epoch))) return false;
         draftSession.advance('setup');
-        ackProfile(submitted, saved);
-        ackServices(submittedServices);
+        if (built.patch.identity && built.savedProfile) ackProfile(submitted, built.savedProfile);
+        if (built.patch.services) ackServices(submittedServices);
         if (section) setSaveFeedback({ section, phase: 'saved' });
-        if (!section)
-          setNotice({
-            text: includeVoice ? t('setup.voice_registered') : t('setup.onboarding_saved'),
-          });
+        if (!section) setNotice({ text: t('setup.onboarding_saved') });
         await refresh();
         return draftSession.current(epoch);
       } catch {
@@ -877,27 +863,75 @@ export default function SettingsPage() {
       profile,
       refresh,
       services,
+      savedProfile,
+      savedServices,
       setup,
       t,
-      voice,
-      voiceSampleRefs,
       draftSession,
       ackProfile,
       ackServices,
     ]
   );
 
-  const saveManagement = React.useCallback(async () => {
+  // Voice registration saves immediately and only the voice profile: the
+  // stored engine and languages of an existing profile are kept server-side.
+  const registerVoice = React.useCallback(async () => {
+    if (savePending.current) return;
+    savePending.current = true;
     setBusy(true);
+    setSaveFeedback({ section: 'voice', phase: 'saving' });
+    try {
+      const response = await fetch('/api/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save_settings',
+          patch: {
+            voice: {
+              profile_id: voice.profile_id,
+              display_name: voice.display_name,
+              sample_refs: voiceSampleRefs.slice(0, 3),
+            },
+          },
+        }),
+      });
+      const receipt = await response.json().catch(() => null);
+      if (!response.ok || !isOnboardingSaveReceipt(receipt)) {
+        setSaveFeedback({ section: 'voice', phase: 'rejected', message: failureMessage(receipt) });
+        return;
+      }
+      setSaveFeedback({ section: 'voice', phase: 'saved' });
+      await refresh();
+    } catch {
+      setSaveFeedback({ section: 'voice', phase: 'unconfirmed' });
+    } finally {
+      savePending.current = false;
+      setBusy(false);
+    }
+  }, [refresh, voice, voiceSampleRefs]);
+
+  // 詳細設定 (management) saves immediately, for an explicitly selected
+  // registered tenant only (the server refuses anything else). Profile
+  // drafts are not sent: unsaved Profile edits stay in the Profile section.
+  const saveManagement = React.useCallback(async () => {
+    if (!setup || savePending.current) return;
+    if (!setup.tenant.catalog.some((tenant) => tenant.tenant_slug === management.tenant_slug)) {
+      setSaveFeedback({
+        section: 'advanced',
+        phase: 'rejected',
+        message: t('api.config.tenant_invalid'),
+      });
+      return;
+    }
+    savePending.current = true;
+    setBusy(true);
+    setSaveFeedback({ section: 'advanced', phase: 'saving' });
     try {
       const response = await fetch('/api/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'save_management',
-          name: profile.name,
-          primary_domain: profile.primary_domain,
-          vision: profile.vision,
           tenant: {
             slug: management.tenant_slug,
             display_name: management.tenant_display_name,
@@ -911,15 +945,20 @@ export default function SettingsPage() {
           },
         }),
       });
-      if (!response.ok) throw new Error('Management save failed');
-      setNotice({ text: t('setup.management_saved') });
+      const body = await response.json().catch(() => null);
+      if (!response.ok || body?.ok !== true) {
+        setSaveFeedback({ section: 'advanced', phase: 'rejected', message: failureMessage(body) });
+        return;
+      }
+      setSaveFeedback({ section: 'advanced', phase: 'saved' });
       await refresh();
-    } catch (err) {
-      setNotice({ text: err instanceof Error ? err.message : String(err), error: true });
+    } catch {
+      setSaveFeedback({ section: 'advanced', phase: 'unconfirmed' });
     } finally {
+      savePending.current = false;
       setBusy(false);
     }
-  }, [management, profile, refresh, t]);
+  }, [management, refresh, setup, t]);
 
   const upload = React.useCallback(
     async (action: 'avatar' | 'voice_sample', file: File, source = 'upload') => {
@@ -1094,8 +1133,9 @@ export default function SettingsPage() {
             : 'clean';
 
   // One save for every grouped unsaved change: プロフィール + サービス連携
-  // share the onboarding draft (`apply_onboarding`), 通知 its own route —
-  // exactly the calls their per-section buttons make.
+  // share one edited-fields patch (`save_settings`), 通知 its own route.
+  // Voice, avatar, 詳細設定 and plugins save immediately from their own
+  // buttons and report the result next to that button.
   const saveAll = async () => {
     if (savePending.current) return;
     setSaveFeedback(null);
@@ -1110,7 +1150,7 @@ export default function SettingsPage() {
     setBusy(true);
     try {
       let ok = true;
-      if (profileDirty || servicesDirty) ok = (await applyOnboarding(false, true)) && ok;
+      if (profileDirty || servicesDirty) ok = (await saveSettings(true)) && ok;
       if (notifDirty && draftSession.current(epoch)) ok = (await saveNotification(true)) && ok;
       if (!draftSession.current(epoch)) return;
       setSaveBarPhase(ok ? 'saved' : 'error');
@@ -1163,7 +1203,7 @@ export default function SettingsPage() {
             busy={busy}
             saveFeedback={saveFeedback?.section === 'profile' ? saveFeedback : null}
             hasUnsavedChanges={profileDirty || servicesDirty}
-            onSaveProfile={() => void applyOnboarding(false, false, 'profile')}
+            onSaveProfile={() => void saveSettings(false, 'profile')}
             sectionRef={setSectionRef('profile')}
           >
             <DisplaySection locale={locale} t={t} onLocaleChange={setLocale} />
@@ -1210,8 +1250,6 @@ export default function SettingsPage() {
             t={t}
             setup={setup}
             services={services}
-            authorityTenants={meTenants.filter((tenant) => tenant.status === 'active')}
-            selectedTenant={meViewing?.tenant_slug || readSelectedTenant() || undefined}
             setServices={setServices}
             busy={busy}
             oauthOperation={oauthOperation}
@@ -1221,8 +1259,8 @@ export default function SettingsPage() {
             oauthError={oauthError}
             onConnectOAuth={(serviceId, serviceLabel) => void connectOAuth(serviceId, serviceLabel)}
             saveFeedback={saveFeedback?.section === 'services' ? saveFeedback : null}
-            hasUnsavedChanges={profileDirty || servicesDirty}
-            onSaveConnections={() => void applyOnboarding(false, false, 'services')}
+            hasUnsavedChanges={servicesDirty}
+            onSaveConnections={() => void saveSettings(false, 'services')}
             sectionRef={setSectionRef('services')}
           />
         );
@@ -1243,7 +1281,8 @@ export default function SettingsPage() {
             onStartVoiceRecording={() => void startVoiceRecording()}
             onStopVoiceRecording={stopVoiceRecording}
             onVoiceSampleFileChange={(file) => void upload('voice_sample', file, 'upload')}
-            onSaveVoice={() => void applyOnboarding(true)}
+            onSaveVoice={() => void registerVoice()}
+            saveFeedback={saveFeedback?.section === 'voice' ? saveFeedback : null}
             voiceSelection={voiceSelection}
             voiceDevices={voiceDevices}
             voiceSelectionBusy={voiceSelectionBusy}
@@ -1268,6 +1307,18 @@ export default function SettingsPage() {
             hasUnsavedChanges={notifDirty}
             onSaveNotification={() => void saveNotification()}
             sectionRef={setSectionRef('notifications')}
+          />
+        );
+
+      case 'authority':
+        return (
+          <AuthoritySection
+            key="authority"
+            locale={locale}
+            t={t}
+            authorityTenants={meTenants.filter((tenant) => tenant.status === 'active')}
+            selectedTenant={meViewing?.tenant_slug || readSelectedTenant() || undefined}
+            sectionRef={setSectionRef('authority')}
           />
         );
 
@@ -1313,6 +1364,7 @@ export default function SettingsPage() {
             management={management}
             setManagement={setManagement}
             onSaveManagement={() => void saveManagement()}
+            saveFeedback={saveFeedback?.section === 'advanced' ? saveFeedback : null}
             configPresets={configPresets}
             configTenants={configTenants}
             configTenant={configTenant}
@@ -1374,7 +1426,15 @@ export default function SettingsPage() {
             {settingsNav}
           </Disclosure>
         </div>
-        <div className="settings-content">{sectionOrder.map((id) => renderSection(id))}</div>
+        <div className="settings-content">
+          {/* Sections stay mounted so in-progress panel state survives a
+              switch; only the active section is visible. */}
+          {sectionOrder.map((id) => (
+            <div key={id} hidden={id !== activeSection}>
+              {renderSection(id)}
+            </div>
+          ))}
+        </div>
       </div>
 
       {saveBarState !== 'clean' ? (

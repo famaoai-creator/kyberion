@@ -17,7 +17,7 @@ import { logger } from '@agent/core/core';
 import { humanActor } from '@agent/core/actor';
 import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
 import { frontDeskRoleFromViewerScope, type FrontDeskRole } from '@agent/core/front-desk-identity';
-import { resolveFrontDeskMenu, readFrontDeskSurfaceUrls } from '@agent/core/front-desk-nav';
+import { resolveFrontDeskDestination, readFrontDeskSurfaceUrls } from '@agent/core/front-desk-nav';
 import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract-parser';
 import {
   defaultHearingScenario,
@@ -192,11 +192,11 @@ function buildWorkInventoryNextAction(
   locale: SupportedLocale,
   viewer: PresenceStudioViewerContext
 ) {
-  const progressItem = resolveFrontDeskMenu({
+  const progressItem = resolveFrontDeskDestination('progress', {
     currentSurface: 'presence-studio',
     urls: readFrontDeskSurfaceUrls(),
     role: frontDeskRoleFromViewerScope(toFrontDeskViewerScope(viewer)),
-  }).find((item) => item.id === 'progress');
+  });
   return {
     label_key: 'front_desk:hearing_inventory_open' as const,
     label: catalogT('front_desk:hearing_inventory_open', undefined, locale),

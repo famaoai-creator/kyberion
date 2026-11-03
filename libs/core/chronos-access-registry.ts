@@ -6,6 +6,7 @@ import type { OsKnowledgeTier } from './cloudflare-os-control-plane.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, withSensitivePathMediation } from './secure-io.js';
 import { secretGuard } from './secret/secret-guard.js';
+import { signalInstallationBootstrapChange } from './surface/installation-bootstrap-signal.js';
 
 export { isValidChronosScopeId } from './foundation/scope.js';
 
@@ -182,5 +183,7 @@ export function issueChronosAccessToken(
   secretGuard.storeConnectionDocument('chronos-access', {
     tokens: [...existingTokens, registration],
   });
+  // An owner-bound token can close installation bootstrap.
+  if (input.memberId) signalInstallationBootstrapChange();
   return { token, registration };
 }

@@ -848,7 +848,7 @@ function sendFrontDeskPage(
  * shell partials are never served on their own.
  */
 export const FRONT_DESK_TEMPLATE_FILE_REDIRECTS: Readonly<Record<string, string>> = Object.freeze({
-  '/home.html': '/',
+  '/home.html': '/home',
   '/index.html': '/work',
   '/ask.html': '/ask',
   '/progress.html': '/progress',
@@ -907,7 +907,15 @@ export function registerFrontDeskHomeWorkPages(app: express.Express, staticDir: 
     next();
   });
 
+  // Unified shell: the workspace overview lives on Concierge (`/w`), so the
+  // studio root hands the person to it instead of a second, partial home.
+  // The studio home page stays reachable at `/home`.
   app.get('/', (req, res) => {
+    const queryIndex = req.originalUrl.indexOf('?');
+    const query = queryIndex === -1 ? '' : req.originalUrl.slice(queryIndex);
+    res.redirect(302, readFrontDeskSurfaceUrls().concierge + '/w' + query);
+  });
+  app.get('/home', (req, res) => {
     sendFrontDeskPage(req, res, staticDir, 'home.html');
   });
 

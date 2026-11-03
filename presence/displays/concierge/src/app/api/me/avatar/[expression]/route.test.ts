@@ -4,7 +4,20 @@ import type { NextRequest } from 'next/server';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 
-const fixture = vi.hoisted(() => ({ root: '', viewer: undefined as unknown }));
+const fixture = vi.hoisted(() => ({ root: '', viewer: undefined as unknown, bootstrap: true }));
+// Installation state: bootstrap open (no owner bound yet) unless a test binds one.
+vi.mock('@agent/core/surface/first-run-setup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/surface/first-run-setup')>()),
+  readFirstRunStatus: () => ({
+    state: fixture.bootstrap ? 'unclaimed' : 'claimed',
+    code_active: false,
+  }),
+}));
+vi.mock('@agent/core/organization/member-registry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/organization/member-registry')>()),
+  readMemberProfile: (id: string) =>
+    id === 'owner' ? { member_id: 'owner', status: 'active' } : null,
+}));
 vi.mock('@agent/core/profile-root', () => ({ resolveActiveProfileRoot: () => fixture.root }));
 vi.mock('../../../../../lib/viewer-context', async () => {
   const actual = await vi.importActual<typeof import('../../../../../lib/viewer-context')>(
@@ -13,6 +26,8 @@ vi.mock('../../../../../lib/viewer-context', async () => {
   return { ...actual, resolveConciergeViewer: vi.fn(() => fixture.viewer) };
 });
 
+import { humanActor } from '@agent/core/actor';
+import { resetInstallationBootstrapCache } from '@agent/core/surface/installation-owner-access';
 import { GET } from './route';
 import { GET as describeGet } from '../route';
 
@@ -34,6 +49,8 @@ describe('concierge GET /api/me/avatar/[expression]', () => {
   beforeEach(() => {
     fixture.root = pathResolver.sharedTmp(`concierge-avatar-${process.pid}`);
     fixture.viewer = viewer('loopback', 'localadmin');
+    fixture.bootstrap = true;
+    resetInstallationBootstrapCache();
     const dir = path.join(fixture.root, 'avatar');
     safeMkdir(dir, { recursive: true });
     safeWriteFile(path.join(dir, 'neutral.png'), PNG);
@@ -52,6 +69,36 @@ describe('concierge GET /api/me/avatar/[expression]', () => {
     expect(Buffer.from(await res.arrayBuffer())).toEqual(PNG);
   });
 
+  it('serves the installation owner signed in from any device', async () => {
+    fixture.bootstrap = false;
+    resetInstallationBootstrapCache();
+    const owner = viewer('token', 'localadmin');
+    fixture.viewer = {
+      context: {
+        ...owner.context,
+        memberId: 'owner',
+        principal: {
+          actor: humanActor('owner'),
+          principalId: 'dev-user',
+          ...owner.context,
+          source: 'oidc',
+          provider: 'browser-session',
+          assurance: 'high',
+          memberId: 'owner',
+        },
+      },
+    };
+    expect((await GET(req, params('neutral'))).status).toBe(200);
+  });
+
+  it('refuses credential-less loopback once an owner is bound (401, sign in)', async () => {
+    fixture.bootstrap = false;
+    resetInstallationBootstrapCache();
+    const res = await GET(req, params('neutral'));
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({ error: 'authentication_required' });
+  });
+
   it.each([
     ['token localadmin', viewer('token', 'localadmin')],
     ['token readonly', viewer('token', 'readonly')],
@@ -60,6 +107,7 @@ describe('concierge GET /api/me/avatar/[expression]', () => {
     const res = await GET(req, params('neutral'));
     expect(res.status).toBe(403);
     expect(res.headers.get('content-type')).toContain('application/json');
+    expect(await res.json()).toMatchObject({ error: 'installation_owner_required' });
   });
 
   it.each(['../my-identity', 'avatar-profile', 'neutral.png', '..%2Fsecret'])(

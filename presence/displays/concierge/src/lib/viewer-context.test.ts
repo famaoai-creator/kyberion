@@ -4,6 +4,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { withLocalPeerRequest } from '../../test/local-peer-fixture';
 
+// Installation bootstrap state for credential-less loopback (installation-owner
+// model): open unless a test binds an owner.
+const bootstrap = vi.hoisted(() => ({ open: true }));
+vi.mock('@agent/core/surface/first-run-setup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/surface/first-run-setup')>()),
+  readFirstRunStatus: () => ({
+    state: bootstrap.open ? 'unclaimed' : 'claimed',
+    code_active: false,
+  }),
+}));
+
 const REGISTERED_TOKEN = 'registered-concierge-token';
 
 function tokenHash(token: string): string {
@@ -52,6 +63,24 @@ describe('concierge viewer-context tier masking', () => {
     if (registryMocked) {
       registryMocked = false;
       vi.resetModules();
+    }
+  });
+
+  it('retires credential-less loopback localadmin once an owner is bound', async () => {
+    const { resetInstallationBootstrapCache } =
+      await import('@agent/core/surface/installation-owner-access');
+    const { resolveConciergeViewer } = await import('./viewer-context.js');
+    bootstrap.open = false;
+    resetInstallationBootstrapCache();
+    try {
+      const resolved = withLocalPeerRequest(
+        new NextRequest('http://localhost/api/concierge/inbox'),
+        resolveConciergeViewer
+      );
+      expect(resolved.response?.status).toBe(401);
+    } finally {
+      bootstrap.open = true;
+      resetInstallationBootstrapCache();
     }
   });
 

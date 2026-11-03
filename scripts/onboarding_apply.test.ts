@@ -65,9 +65,19 @@ describe('onboarding_apply', () => {
         branch: 'main',
       },
       {
+        operation_id: 'vcs:pr_merge',
+        repository: 'https://github.com/fixture/repo',
+        branch_pattern: 'feat/*',
+      },
+      {
         operation_id: 'vcs:push',
         repository: 'https://github.com/fixture/repo',
         branch: 'agent/kyberion-development',
+      },
+      {
+        operation_id: 'vcs:push',
+        repository: 'https://github.com/fixture/repo',
+        branch_pattern: 'feat/*',
       },
     ]);
     expect(input.data_tier).toEqual({ read: ['public'], write: ['public'] });

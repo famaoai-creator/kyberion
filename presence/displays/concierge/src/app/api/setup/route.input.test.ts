@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 const guard = vi.hoisted(() => vi.fn(() => null));
@@ -7,10 +7,27 @@ const writes = vi.hoisted(() => ({
   safeWriteFile: vi.fn(),
   writeTenantProfile: vi.fn(),
   applyBrowserOnboarding: vi.fn(),
+  applyBrowserOnboardingSettingsPatch: vi.fn(async () => ({
+    ok: true,
+    applied_at: '2026-11-03T00:00:00.000Z',
+    artifacts: [],
+    warnings: [],
+  })),
 }));
 
 vi.mock('../../../lib/api-guard', () => ({ requireConciergeMutationAccess: guard }));
-vi.mock('../../../lib/viewer-context', () => ({ resolveConciergeViewer: vi.fn() }));
+const installation = vi.hoisted(() => ({
+  gate: vi.fn((): { grant?: unknown; response?: Response } => ({
+    grant: { allowed: true, mode: 'write' },
+  })),
+}));
+vi.mock('../../../lib/viewer-context', () => ({
+  resolveConciergeViewer: vi.fn(() => ({ context: { role: 'localadmin', source: 'token' } })),
+}));
+vi.mock('../../../lib/installation-access', () => ({
+  requireConciergeInstallationAccess: installation.gate,
+  resolveConciergeInstallationAccess: vi.fn(() => ({ allowed: true })),
+}));
 vi.mock('../../../lib/front-desk-member', () => ({ resolveConciergeDecidedBy: vi.fn(() => null) }));
 vi.mock('../../../lib/i18n', () => ({
   conciergeText: vi.fn((key: string) => key),
@@ -18,10 +35,18 @@ vi.mock('../../../lib/i18n', () => ({
 }));
 vi.mock('@agent/core/foundation', () => ({
   getRegisteredEnvText: vi.fn(() => undefined),
+  nowIso: vi.fn(() => '2026-11-03T00:00:00.000Z'),
   readJson: vi.fn(() => ({})),
+  readJsonObjectRequest: vi.fn(async (req: { json: () => Promise<unknown> }) => {
+    const body = await req.json();
+    return body && typeof body === 'object' && !Array.isArray(body)
+      ? { ok: true, body }
+      : { ok: false, error: 'request body must be an object' };
+  }),
 }));
 vi.mock('@agent/core/browser/browser-onboarding', () => ({
   applyBrowserOnboarding: writes.applyBrowserOnboarding,
+  applyBrowserOnboardingSettingsPatch: writes.applyBrowserOnboardingSettingsPatch,
   getBrowserOnboardingState: vi.fn(() => ({})),
   saveBrowserOnboardingVoiceSample: vi.fn(),
 }));
@@ -84,6 +109,8 @@ describe('concierge setup input contract', () => {
     ['unknown root field', { action: 'save_management', debug: true }],
     ['unknown tenant field', { action: 'save_management', tenant: { debug: true } }],
     ['unknown agent field', { action: 'save_management', agent: { debug: true } }],
+    ['settings patch with a draft', { action: 'save_settings', patch: {}, draft: {} }],
+    ['settings patch array', { action: 'save_settings', patch: [] }],
   ])('rejects %s before any write', async (_label, body) => {
     const response = await POST(request(body));
 
@@ -92,5 +119,75 @@ describe('concierge setup input contract', () => {
     expect(writes.safeWriteFile).not.toHaveBeenCalled();
     expect(writes.writeTenantProfile).not.toHaveBeenCalled();
     expect(writes.applyBrowserOnboarding).not.toHaveBeenCalled();
+    expect(writes.applyBrowserOnboardingSettingsPatch).not.toHaveBeenCalled();
+  });
+});
+
+describe('concierge setup installation write gate', () => {
+  it('refuses a non-owner or un-stepped-up write before reading the body', async () => {
+    installation.gate.mockReturnValueOnce({
+      response: new Response(
+        JSON.stringify({ ok: false, error: 'installation_step_up_required' }),
+        {
+          status: 403,
+        }
+      ),
+    });
+    const json = vi.fn(async () => ({ action: 'save_settings', patch: {} }));
+    const response = await POST({
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json,
+    } as unknown as NextRequest);
+    expect(response.status).toBe(403);
+    expect(json).not.toHaveBeenCalled();
+    expect(installation.gate).toHaveBeenLastCalledWith(
+      expect.anything(),
+      'write',
+      expect.anything(),
+      'setup update'
+    );
+    expect(writes.applyBrowserOnboardingSettingsPatch).not.toHaveBeenCalled();
+  });
+});
+
+describe('concierge settings saves change only what was edited', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('forwards a settings patch to the merging writer, never the full onboarding draft', async () => {
+    const patch = { identity: { name: 'Renamed' }, voice: { sample_refs: ['voice/a.webm'] } };
+    const response = await POST(request({ action: 'save_settings', patch }));
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).onboarding.ok).toBe(true);
+    expect(writes.applyBrowserOnboarding).not.toHaveBeenCalled();
+    expect(writes.applyBrowserOnboardingSettingsPatch).toHaveBeenCalledWith({
+      identity: { name: 'Renamed' },
+      voice: { sample_refs: ['/tmp/repo/voice/a.webm'] },
+    });
+  });
+
+  it('answers a malformed settings patch with 400 instead of a server error', async () => {
+    const zodError = Object.assign(new Error('bad patch'), { name: 'ZodError' });
+    writes.applyBrowserOnboardingSettingsPatch.mockRejectedValueOnce(zodError);
+    const response = await POST(request({ action: 'save_settings', patch: { identity: {} } }));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe('api.onboarding_input');
+  });
+
+  it.each([
+    ['no tenant', { action: 'save_management', agent: { agent_id: 'agent-1' } }],
+    ['an unregistered tenant', { action: 'save_management', tenant: { slug: 'default' } }],
+  ])('refuses save_management with %s instead of creating one', async (_label, body) => {
+    const response = await POST(request(body));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      code: 'TENANT_SELECTION_REQUIRED',
+      error: 'api.config.tenant_invalid',
+    });
+    expect(writes.writeTenantProfile).not.toHaveBeenCalled();
+    expect(writes.safeWriteFile).not.toHaveBeenCalled();
   });
 });

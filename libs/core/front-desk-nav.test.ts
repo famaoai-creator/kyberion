@@ -34,13 +34,15 @@ afterEach(() => vi.unstubAllGlobals());
 describe('FRONT_DESK_MENU', () => {
   it('lists existing destinations in stable groups without an item limit', () => {
     expect(FRONT_DESK_MENU.map((item) => item.id)).toEqual([
-      'home',
-      'ask',
       'decide',
-      'progress',
-      'workspace',
+      'ask',
       'missions',
       'work-items',
+      'approvals',
+      'overview',
+      'organizations',
+      'projects',
+      'actors',
       'deliverables',
       'ingest',
       'knowledge',
@@ -92,12 +94,10 @@ describe('resolveFrontDeskMenu', () => {
     const menu = resolveFrontDeskMenu({ currentSurface: 'presence-studio' });
     const byId = Object.fromEntries(menu.map((item) => [item.id, item]));
 
-    expect(byId.home.href).toBe('/');
-    expect(byId.home.external).toBe(false);
     expect(byId.ask.href).toBe('/ask');
     expect(byId.ask.external).toBe(false);
-    expect(byId.progress.href).toBe('/progress');
-    expect(byId.progress.external).toBe(false);
+    expect(byId.overview.href).toBe('http://127.0.0.1:3050/w');
+    expect(byId.missions.href).toBe('http://127.0.0.1:3050/w/mission');
 
     expect(byId.decide.href).toBe('http://127.0.0.1:3050/');
     expect(byId.decide.external).toBe(true);
@@ -114,12 +114,13 @@ describe('resolveFrontDeskMenu', () => {
     expect(byId.settings.href).toBe('/settings');
     expect(byId.settings.external).toBe(false);
 
-    expect(byId.home.href).toBe('http://127.0.0.1:3031/');
-    expect(byId.home.external).toBe(true);
     expect(byId.ask.href).toBe('http://127.0.0.1:3031/ask');
     expect(byId.ask.external).toBe(true);
-    expect(byId.progress.href).toBe('http://127.0.0.1:3031/progress');
-    expect(byId.progress.external).toBe(true);
+    for (const id of ['missions', 'work-items', 'approvals', 'overview', 'projects', 'actors']) {
+      expect(byId[id].external).toBe(false);
+      expect(byId[id].href.startsWith('/w')).toBe(true);
+    }
+    expect(byId.organizations.href).toBe('/w/organization');
   });
 
   it('honors custom ports overrides', () => {
@@ -134,8 +135,8 @@ describe('resolveFrontDeskMenu', () => {
   it('gates allowed by role, defaulting to viewer when role is omitted', () => {
     const defaultMenu = resolveFrontDeskMenu({ currentSurface: 'presence-studio' });
     const byIdDefault = Object.fromEntries(defaultMenu.map((item) => [item.id, item]));
-    expect(byIdDefault.home.allowed).toBe(true);
-    expect(byIdDefault.progress.allowed).toBe(true);
+    expect(byIdDefault.overview.allowed).toBe(true);
+    expect(byIdDefault.missions.allowed).toBe(true);
     expect(byIdDefault.ask.allowed).toBe(false);
     expect(byIdDefault.decide.allowed).toBe(false);
     expect(byIdDefault.settings.allowed).toBe(false);
@@ -216,11 +217,15 @@ describe('optional destinations', () => {
   it('omits unavailable surfaces without guessed ports', () => {
     const menu = resolveFrontDeskMenu({ currentSurface: 'concierge', role: 'owner' });
     expect(menu.map((item) => item.id)).toEqual([
-      'home',
-      'ask',
       'decide',
-      'progress',
-      'workspace',
+      'ask',
+      'missions',
+      'work-items',
+      'approvals',
+      'overview',
+      'organizations',
+      'projects',
+      'actors',
       'ingest',
       'first-job',
       'help',
@@ -243,11 +248,11 @@ describe('optional destinations', () => {
       },
     });
     expect(menu).toHaveLength(FRONT_DESK_MENU.length);
-    expect(menu.find((item) => item.id === 'missions')?.href).toBe(
-      'http://localhost:4300/?section=missions'
+    expect(menu.find((item) => item.id === 'knowledge')?.href).toBe(
+      'http://localhost:4300/?section=knowledge'
     );
     expect(menu.some((item) => item.id === 'monitor')).toBe(false);
-    expect(menu.find((item) => item.id === 'missions')?.scope_query_style).toBe('snake');
+    expect(menu.find((item) => item.id === 'knowledge')?.scope_query_style).toBe('snake');
   });
   it.each(['viewer', 'operator', 'approver', 'owner'] as const)(
     'keeps role gates for %s with all surfaces available',

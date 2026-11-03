@@ -149,6 +149,46 @@
       "band": "govern"
     },
     {
+      "name": "kyberion.workspace.summary",
+      "description": "Counts, tenant → organization → project tree, and attention items in the caller scope.",
+      "category": "workspace",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover"
+    },
+    {
+      "name": "kyberion.workspace.list",
+      "description": "List workspace entities of one kind (mission, project, work item, approval, actor …) with narrowing filters.",
+      "category": "workspace",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover"
+    },
+    {
+      "name": "kyberion.workspace.get",
+      "description": "One workspace entity with lineage, contained entities and involved actors.",
+      "category": "workspace",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover"
+    },
+    {
+      "name": "kyberion.workspace.search",
+      "description": "Search workspace entities of every kind by text.",
+      "category": "workspace",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover"
+    },
+    {
       "name": "kyberion.capability.list",
       "description": "List available Kyberion actuator capabilities.",
       "category": "capability",
