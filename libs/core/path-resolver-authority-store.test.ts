@@ -89,6 +89,14 @@ describe('primary-checkout authority store resolution', () => {
     expect(resolver.resolve('active/shared/observability/channels/terminal/approvals.jsonl')).toBe(
       path.join(primary, 'active/shared/observability/channels/terminal/approvals.jsonl')
     );
+    // The channels root is the storage-channel enumeration point — without it
+    // a linked worktree lists its own empty dir and system requests vanish.
+    expect(resolver.resolve('active/shared/coordination/channels')).toBe(
+      path.join(primary, 'active/shared/coordination/channels')
+    );
+    expect(resolver.resolve('active/shared/observability/channels')).toBe(
+      path.join(primary, 'active/shared/observability/channels')
+    );
     expect(resolver.resolve('active/shared/runtime/tenant-approvals/acme/x.json')).toBe(
       path.join(primary, 'active/shared/runtime/tenant-approvals/acme/x.json')
     );
@@ -148,6 +156,10 @@ describe('primary-checkout authority store resolution', () => {
         'active/shared/coordination/channels/slack/approvals/requests/r.json'
       )
     ).toBe(true);
+    expect(resolver.isAuthorityStoreRelativePath('active/shared/coordination/channels')).toBe(true);
+    expect(resolver.isAuthorityStoreRelativePath('active/shared/observability/channels')).toBe(
+      true
+    );
     expect(
       resolver.isAuthorityStoreRelativePath(
         'active/shared/coordination/channels/slack/outbox/m.json'

@@ -97,7 +97,12 @@ export function primaryCheckoutRootDir(): string {
 const AUTHORITY_STORE_PATTERNS: readonly RegExp[] = [
   /^knowledge\/personal\/charters(?:\/|$)/,
   /^knowledge\/confidential\/[^/]+\/charters(?:\/|$)/,
+  // The channels root itself is the enumeration point for approval storage
+  // channels — without it a linked worktree lists its own (empty) dir and
+  // every system-partition request becomes invisible to `kyberion approvals`.
+  /^active\/shared\/coordination\/channels$/,
   /^active\/shared\/coordination\/channels\/[^/]+\/approvals(?:\/|$)/,
+  /^active\/shared\/observability\/channels$/,
   /^active\/shared\/observability\/channels\/[^/]+\/approvals\.jsonl(?:\/|$)/,
   /^active\/shared\/runtime\/tenant-approvals(?:\/|$)/,
 ];
