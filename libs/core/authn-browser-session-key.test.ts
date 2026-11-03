@@ -3,14 +3,20 @@ const state = vi.hoisted(() => ({
   document: undefined as { hmac_key?: string } | undefined,
   denied: false,
 }));
-vi.mock('./secret/secret-guard.js', () => ({
-  secretGuard: {
-    loadConnectionDocument: () => {
-      if (state.denied) throw new Error('denied');
-      return state.document;
+vi.mock('./secret/secret-guard.js', async () => {
+  const binding = await import('./foundation/credential-binding.js');
+  return {
+    secretGuard: {
+      loadConnectionDocument: () => {
+        if (state.denied) throw new Error('denied');
+        // Mirror the real guard: tenant execution cannot read personal docs.
+        if (binding.credentialExecutionIdentity().tenantSlug)
+          throw new Error('[CREDENTIAL_CONNECTION_DENIED] tenant execution');
+        return state.document;
+      },
     },
-  },
-}));
+  };
+});
 import { browserSessionKey, BROWSER_SESSION_MIN_KEY_BYTES } from './authn-browser-session-key.js';
 import {
   browserSessionKey as compatibilityKey,
@@ -44,6 +50,15 @@ describe('browser-session key leaf', () => {
     expect(browserSessionKey({ env: {} })).toBeNull();
     state.denied = true;
     expect(browserSessionKey({ env: {} })).toBeNull();
+  });
+  it('reads the operator-wide key even when a tenant scope is bound (persisted `scope use`)', () => {
+    vi.stubEnv('KYBERION_TENANT', 'tenant-a');
+    try {
+      state.document = { hmac_key: 'k'.repeat(32) };
+      expect(browserSessionKey({ env: {} })?.toString()).toBe('k'.repeat(32));
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
   it('preserves session HMAC, expiry, and rotation behavior through the compatibility provider', () => {
     const deps = { env: { KYBERION_SESSION_SECRET: 'z'.repeat(32) }, now: 1700000000000 };
