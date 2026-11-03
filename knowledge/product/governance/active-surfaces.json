@@ -5,7 +5,7 @@
     {
       "id": "chronos-mirror-v2",
       "kind": "ui",
-      "description": "Interactive Chronos control surface served as a workspace application",
+      "description": "Chronos compatibility redirects: the operations console moved to Concierge (/ops, /api/ops); this app keeps port 3000 for old bookmarks and serves /api/healthz",
       "command": "pnpm",
       "args": [
         "--dir",

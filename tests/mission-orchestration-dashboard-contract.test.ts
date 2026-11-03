@@ -92,13 +92,13 @@ describe('mission orchestration dashboard contract', () => {
   });
 
   it('shows mission intelligence in Chronos default view', () => {
-    const page = read('presence/displays/chronos-mirror-v2/src/app/page.tsx');
+    const page = read('presence/displays/concierge/src/app/ops/page.tsx');
     // SX: page.tsx was split into a shell, the legacy sections, and a static
     // config module; each label/route now lives in the file that owns it.
     const legacySections = read(
-      'presence/displays/chronos-mirror-v2/src/app/ChronosMirrorLegacySections.tsx'
+      'presence/displays/concierge/src/app/ops/ChronosMirrorLegacySections.tsx'
     );
-    const pageConfig = read('presence/displays/chronos-mirror-v2/src/app/chronos-page-config.ts');
+    const pageConfig = read('presence/displays/concierge/src/app/ops/chronos-page-config.ts');
     // SX: MissionIntelligence.tsx was split into per-panel modules. The contract
     // is that the MissionIntelligence surface as a whole still renders all of
     // this, so assert against the whole family rather than a single file.
@@ -115,7 +115,7 @@ describe('mission orchestration dashboard contract', () => {
       'MissionIntelligenceTypes.ts',
       'MissionIntelligenceViewHelpers.tsx',
     ]
-      .map((file) => read(`presence/displays/chronos-mirror-v2/src/components/${file}`))
+      .map((file) => read(`presence/displays/concierge/src/components/ops/${file}`))
       .join('\n');
     // SX: the intelligence route's control/observation data collectors were
     // extracted into sibling modules; the route handler is the three together.
@@ -127,13 +127,13 @@ describe('mission orchestration dashboard contract', () => {
       'intelligence-input.ts',
       'actions.ts',
     ]
-      .map((file) => read(`presence/displays/chronos-mirror-v2/src/app/api/intelligence/${file}`))
+      .map((file) => read(`presence/displays/concierge/src/app/api/ops/intelligence/${file}`))
       .join('\n');
     const streamRoute = read(
-      'presence/displays/chronos-mirror-v2/src/app/api/intelligence/stream/route.ts'
+      'presence/displays/concierge/src/app/api/ops/intelligence/stream/route.ts'
     );
-    const messageFeed = read('presence/displays/chronos-mirror-v2/src/lib/agent-message-feed.ts');
-    const agentRoute = read('presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts');
+    const messageFeed = read('presence/displays/concierge/src/lib/ops/agent-message-feed.ts');
+    const agentRoute = read('presence/displays/concierge/src/app/api/ops/agent/route.ts');
 
     expect(page).toContain('MissionIntelligence');
     // UX-03: the label moved into the vocabulary catalog; the page renders it via its key.
@@ -182,7 +182,7 @@ describe('mission orchestration dashboard contract', () => {
     expect(component).toContain("url.searchParams.set('mission', selectedMissionId)");
     expect(component).toContain("const mission = params.get('mission')");
     expect(component).toContain('new EventSource(');
-    expect(component).toContain("'/api/intelligence/stream'");
+    expect(component).toContain("opsApiPath('/intelligence/stream')");
     expect(component).toContain('No mission-scoped agent messages observed yet.');
     expect(component).toContain("'chronos_owner_summaries'");
     expect(component).toContain('Delivery Exceptions');
@@ -264,8 +264,8 @@ describe('mission orchestration dashboard contract', () => {
     expect(route).toContain('chronos_localadmin');
     // f27cfe780 removed `roleToMissionRole` from all three intelligence-route
     // modules, where it had only ever been an unused import; the route's real
-    // access-role gate is getChronosAccessRoleOrThrow (route.ts), so pin that.
-    expect(route).toContain('getChronosAccessRoleOrThrow');
+    // access-role gate is getOpsAccessRole (route.ts), so pin that.
+    expect(route).toContain('getOpsAccessRole');
     expect(route).toContain('surface_outbox_cleared');
     expect(route).toContain('runtimeLeases');
     expect(route).toContain('runtimeDoctor');
@@ -289,7 +289,7 @@ describe('mission orchestration dashboard contract', () => {
     expect(agentRoute).toContain('services-setup');
     expect(agentRoute).toContain('reasoning-setup');
     expect(agentRoute).toContain("import('@agent/core/core')");
-    expect(route).toContain("from '../../../lib/intelligence-primitives'");
+    expect(route).toContain("from '../../../../lib/ops/intelligence-primitives'");
     expect(route).toContain('emitMissionOrchestrationObservation');
   });
 

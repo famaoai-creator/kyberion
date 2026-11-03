@@ -1,0 +1,86 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { buildOrganizationManagementView } from '@agent/core/organization/organization-operating-model-management';
+import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
+import { resolveCompany } from '@agent/core/company';
+import { guardOpsRequest, requireOpsAccess } from '../../../../lib/ops/ops-request-guard';
+import {
+  resolveOpsViewerForRequest,
+  strictViewerScopeTenantSlugs,
+  strictViewerScopeOrganizationIds,
+  strictViewerScopeProjectIds,
+  viewerErrorResponse,
+  withViewerExecutionContext,
+  ViewerContextError,
+} from '../../../../lib/ops/ops-viewer';
+import { readChronosOptionalStringParam } from '../../../../lib/ops/request-input';
+
+/**
+ * Read-only organization control-plane projection for Chronos Mirror.
+ * The browser may narrow the organization view to a tenant, but the
+ * request-derived viewer remains the authority for whether that tenant can be
+ * read. When no tenant is selected, preserve the active customer for the
+ * all-tenant operator view and use the sole granted tenant for scoped viewers.
+ */
+export async function GET(req: NextRequest) {
+  const denied = guardOpsRequest(req);
+  if (denied) return denied;
+  const accessDenied = requireOpsAccess(req, 'readonly');
+  if (accessDenied) return accessDenied;
+
+  const resolvedViewer = resolveOpsViewerForRequest(req);
+  if (resolvedViewer.response) return resolvedViewer.response;
+
+  try {
+    const viewer = resolvedViewer.context;
+    // This legacy projection contains organization-wide lineage and aggregates.
+    // Until every aggregate is project-scoped, never expose it to project-limited viewers.
+    const requestedProject = readChronosOptionalStringParam(
+      req.nextUrl.searchParams.get('project_id')
+    );
+    if (requestedProject || strictViewerScopeProjectIds(viewer) !== 'all') {
+      throw new ViewerContextError(
+        403,
+        'The organization-wide overview is unavailable for project scope. Use Management for authorized project details.'
+      );
+    }
+    const requestedTenant = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'));
+    const tenantSlugs = strictViewerScopeTenantSlugs(viewer, requestedTenant);
+    const selectedTenant =
+      requestedTenant ||
+      (tenantSlugs !== 'all' && tenantSlugs.length === 1 ? tenantSlugs[0] : undefined);
+    // Only a selected tenant needs the registry, and the registry is personal
+    // tier: listing it unconditionally denied the whole projection to every
+    // viewer without personal-tier access, including the all-tenant operator
+    // view that names no tenant at all.
+    if (selectedTenant) {
+      const registeredTenants = withViewerExecutionContext(viewer, () => listTenantProfileSlugs());
+      if (!registeredTenants.includes(selectedTenant)) {
+        throw new ViewerContextError(403, `tenant is not registered: ${selectedTenant}`);
+      }
+    }
+    const company = resolveCompany(selectedTenant);
+    const requestedOrganization = readChronosOptionalStringParam(
+      req.nextUrl.searchParams.get('organization_id')
+    );
+    const organizationId = requestedOrganization || company.company_id;
+    strictViewerScopeOrganizationIds(viewer, organizationId);
+    const view = withViewerExecutionContext(viewer, () =>
+      buildOrganizationManagementView({
+        organizationId,
+        tier: 'confidential',
+        tenantSlug: company.tenant_slug,
+      })
+    );
+    return NextResponse.json({
+      view,
+      tenant: {
+        company_id: organizationId,
+        tenant_slug: company.tenant_slug,
+        name: view.purpose?.name || view.operational_state?.name || company.name,
+      },
+    });
+  } catch (error) {
+    if (error instanceof ViewerContextError) return viewerErrorResponse(error);
+    return viewerErrorResponse(error, 500);
+  }
+}

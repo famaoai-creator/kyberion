@@ -235,7 +235,7 @@ describe('catalog real governed IO', () => {
       coverage: { status: 'complete', page_count: 2, accepted_count: 3 },
     });
     const { collectInformationAssets } =
-      await import('../../../presence/displays/chronos-mirror-v2/src/lib/information-assets.js');
+      await import('../../../presence/displays/concierge/src/lib/ops/information-assets.js');
     const projected = collectInformationAssets(
       {
         role: 'readonly',

@@ -1151,28 +1151,28 @@
       "json_state_write_budget": 4,
       "runtime_path_literal_budget": 1
     },
-    "presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts": {
+    "presence/displays/concierge/src/app/api/ops/agent/route.ts": {
       "json_state_write_budget": 1
     },
-    "presence/displays/chronos-mirror-v2/src/app/api/intelligence/intelligence-observation-data.ts": {
+    "presence/displays/concierge/src/app/api/ops/intelligence/intelligence-observation-data.ts": {
       "exported_type_name_duplication_budget": 1
     },
-    "presence/displays/chronos-mirror-v2/src/app/api/mission-asset/route.ts": {
+    "presence/displays/concierge/src/app/api/ops/mission-asset/route.ts": {
       "runtime_path_literal_budget": 1
     },
-    "presence/displays/chronos-mirror-v2/src/components/MissionIntelligenceTypes.ts": {
+    "presence/displays/concierge/src/components/ops/MissionIntelligenceTypes.ts": {
       "exported_type_name_duplication_budget": 1
     },
-    "presence/displays/chronos-mirror-v2/src/lib/api-guard.ts": {
+    "presence/displays/concierge/src/lib/ops/ops-request-guard.ts": {
       "rate_limiter_impl_budget": 2
     },
-    "presence/displays/chronos-mirror-v2/src/lib/browser-session-control.ts": {
+    "presence/displays/concierge/src/lib/ops/browser-session-control.ts": {
       "json_state_write_budget": 1
     },
-    "presence/displays/chronos-mirror-v2/src/lib/computer-sessions.ts": {
+    "presence/displays/concierge/src/lib/ops/computer-sessions.ts": {
       "runtime_path_literal_budget": 2
     },
-    "presence/displays/chronos-mirror-v2/src/lib/viewer-context.ts": {
+    "presence/displays/concierge/src/lib/ops/ops-viewer.ts": {
       "env_direct_read_budget": 1
     },
     "presence/displays/computer-surface/auth.ts": {
@@ -1922,8 +1922,8 @@
     ],
     "MissionSummary": [
       "libs/core/mission/mission-read-model.ts",
-      "presence/displays/chronos-mirror-v2/src/app/api/intelligence/intelligence-observation-data.ts",
-      "presence/displays/chronos-mirror-v2/src/components/MissionIntelligenceTypes.ts"
+      "presence/displays/concierge/src/app/api/ops/intelligence/intelligence-observation-data.ts",
+      "presence/displays/concierge/src/components/ops/MissionIntelligenceTypes.ts"
     ],
     "PadTier": [
       "scripts/lib/local-artifact-pad.ts",

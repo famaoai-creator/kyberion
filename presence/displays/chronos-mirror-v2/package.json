@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "description": "Compatibility redirects for the former Chronos surface: pages → Concierge /ops, API → Concierge /api/ops (MSN-KYBERION-SERVER-20261104).",
   "scripts": {
     "dev": "next dev --webpack -H 127.0.0.1",
     "build": "next build --webpack",
@@ -11,26 +12,14 @@
   },
   "dependencies": {
     "@agent/core": "workspace:*",
-    "@agent/shared-ui": "workspace:*",
-    "@copilotkit/react-core": "^1.79.1",
-    "@copilotkit/react-ui": "^1.79.1",
-    "@copilotkit/runtime": "^1.79.1",
-    "clsx": "^2.1.1",
-    "lucide-react": "^1.59.0",
     "next": "^16.4.2",
-    "node-pty": "^1.1.0",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "tailwind-merge": "^3.7.0",
-    "vscode-languageserver-types": "^3.18.4"
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "autoprefixer": "^10.6.1",
-    "postcss": "^8.5.30",
-    "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3"
   }
 }

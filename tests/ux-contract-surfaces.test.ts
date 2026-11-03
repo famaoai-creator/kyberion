@@ -33,7 +33,7 @@ describe('IntentResolutionContract surface coverage', () => {
   const evidence: Array<{ surface: string; file: string; markers: string[] }> = [
     {
       surface: 'chronos-mirror-v2',
-      file: 'presence/displays/chronos-mirror-v2/src/app/api/agent/agent-route-helpers.ts',
+      file: 'presence/displays/concierge/src/app/api/ops/agent/agent-route-helpers.ts',
       markers: ['intentResolutionA2ui', 'contract.missing_inputs', 'contract.next_action'],
     },
     {

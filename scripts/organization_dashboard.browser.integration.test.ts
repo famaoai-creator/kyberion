@@ -181,7 +181,7 @@ it.skipIf(process.env.KYBERION_TEST_CHRONOS_BROWSER !== '1')(
         ],
       })
     );
-    const appRoot = path.join(sourceRoot, 'presence/displays/chronos-mirror-v2');
+    const appRoot = path.join(sourceRoot, 'presence/displays/concierge');
     const port = 20280 + (process.pid % 1000);
     const origin = 'http://127.0.0.1:' + port;
     const server = owner(() =>
@@ -356,12 +356,12 @@ it.skipIf(process.env.KYBERION_TEST_CHRONOS_BROWSER !== '1')(
       await vi.waitFor(
         async () => {
           expect(server.exitCode, serverLog).toBeNull();
-          expect((await fetch(origin + '/api/healthz')).ok).toBe(true);
+          expect((await fetch(origin + '/api/ops/healthz')).ok).toBe(true);
         },
         { timeout: 15_000, interval: 200 }
       );
       const api = async (query: string, credential = token) =>
-        fetch(origin + '/api/organization-dashboard?' + query, {
+        fetch(origin + '/api/ops/organization-dashboard?' + query, {
           headers: { Authorization: 'Bearer ' + credential },
         });
       const initial = await api('project_id=' + projectA);
@@ -373,7 +373,7 @@ it.skipIf(process.env.KYBERION_TEST_CHRONOS_BROWSER !== '1')(
         ready: 0,
       });
       const desktop = 'dashboard-desktop-' + process.pid;
-      await open(desktop, '/?section=home&project_id=' + projectA, token);
+      await open(desktop, '/ops?section=home&project_id=' + projectA, token);
       await waitDashboard(desktop, '同僚の確認待ちの仕事');
       expect(await read(desktop, `() => ${dashboard}.innerText`)).toContain('閲覧者: owner');
       await run(desktop, 'apply', 'click', {
@@ -400,7 +400,7 @@ it.skipIf(process.env.KYBERION_TEST_CHRONOS_BROWSER !== '1')(
       ]);
       await shot(desktop, 'desktop.png');
       const mobile = 'dashboard-mobile-' + process.pid;
-      await open(mobile, '/?section=home&project_id=' + projectA, token, true);
+      await open(mobile, '/ops?section=home&project_id=' + projectA, token, true);
       await waitDashboard(mobile, '同僚の確認待ちの仕事', true);
       const bounds = await read(
         mobile,
@@ -413,7 +413,7 @@ it.skipIf(process.env.KYBERION_TEST_CHRONOS_BROWSER !== '1')(
       expect(bounds.width).toBeLessThanOrEqual(bounds.viewport);
       await shot(mobile, 'mobile.png', true);
       const restricted = 'dashboard-restricted-' + process.pid;
-      await open(restricted, '/?section=home&project_id=' + projectA, restrictedToken);
+      await open(restricted, '/ops?section=home&project_id=' + projectA, restrictedToken);
       await waitDashboard(restricted, '同僚の確認待ちの仕事');
       expect(
         await read(
@@ -428,7 +428,7 @@ it.skipIf(process.env.KYBERION_TEST_CHRONOS_BROWSER !== '1')(
         'tenant=foreign-fixture',
       ])
         expect((await api(query, restrictedToken)).status).toBe(403);
-      await open(restricted, '/?section=home&project_id=' + projectB, restrictedToken);
+      await open(restricted, '/ops?section=home&project_id=' + projectB, restrictedToken);
       await waitDashboard(restricted, '件数は不明');
       expect(await read(restricted, `() => ${dashboard}.innerText`)).not.toContain(
         '同僚の確認待ちの仕事'

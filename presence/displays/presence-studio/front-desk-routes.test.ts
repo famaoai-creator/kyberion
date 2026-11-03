@@ -246,10 +246,16 @@ describe('FD-00 GET /api/front-desk/nav composition (mirrors the route in server
       'organizations',
       'projects',
       'actors',
+      'deliverables',
       'ingest',
+      'knowledge',
+      'discussion',
       'first-job',
       'help',
       'organization',
+      'operations',
+      'surface-control',
+      'diagnostics',
       'settings',
     ]);
     expect(items.map((item) => item.label)).toEqual([
@@ -262,12 +268,22 @@ describe('FD-00 GET /api/front-desk/nav composition (mirrors the route in server
       '組織',
       'プロジェクト',
       '人とエージェント',
+      '成果物',
       '資料の取込',
+      'ナレッジ',
+      'ディスカッション',
       'はじめての仕事',
       '使い方を見る',
       '組織の編集',
+      'エージェント運用',
+      '画面の管理',
+      '診断',
       '設定',
     ]);
+    // The operations console (former Chronos) is served by Concierge under /ops.
+    expect(items.find((item) => item.id === 'knowledge')?.href).toBe(
+      'http://127.0.0.1:4050/ops?section=knowledge'
+    );
     // decide/settings live on concierge — the port must come from the
     // (mocked) manifest, never a hardcoded literal.
     expect(items.find((item) => item.id === 'decide')?.href).toBe('http://127.0.0.1:4050/');

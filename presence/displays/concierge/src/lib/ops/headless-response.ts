@@ -1,0 +1,100 @@
+import {
+  buildChronosHeadlessManifest,
+  createHeadlessEnvelope,
+  filterHeadlessManifestForViewer,
+  type HeadlessApiManifest,
+} from '@agent/core/headless-surface-contract';
+import type { ViewerContext } from './ops-viewer';
+import {
+  toSurfaceAuthorizationContext,
+  viewerErrorResponse,
+  ViewerContextError,
+} from './ops-viewer';
+import { headlessViewerScope, HeadlessQueryError } from './headless-projections';
+import { authorizeSurfaceContextOperation } from '@agent/core/surface/surface-authn';
+import { opsApiPath } from './ops-api-path';
+
+/** The Chronos headless contract, with its paths mounted under `/api/ops` in Concierge. */
+export function headlessManifest(): HeadlessApiManifest {
+  const manifest = buildChronosHeadlessManifest();
+  const mount = (path: string) => (path.startsWith('/api/') ? opsApiPath(path.slice(4)) : path);
+  return {
+    ...manifest,
+    resources: manifest.resources.map((resource) => ({
+      ...resource,
+      query_path: mount(resource.query_path),
+      ...(resource.a2ui_path ? { a2ui_path: mount(resource.a2ui_path) } : {}),
+    })),
+    operations: manifest.operations.map((operation) => ({
+      ...operation,
+      path: mount(operation.path),
+    })),
+  };
+}
+
+export function headlessManifestForViewer(viewer: ViewerContext): HeadlessApiManifest {
+  return filterHeadlessManifestForViewer(
+    toSurfaceAuthorizationContext(viewer),
+    headlessManifest(),
+    authorizeSurfaceContextOperation
+  );
+}
+
+export function authorizeHeadlessOperation(
+  viewer: ViewerContext,
+  operationId: string,
+  resource?: { tenantSlug?: string; organizationId?: string; projectId?: string; tier?: string }
+): void {
+  const operation = headlessManifest().operations.find(
+    (candidate) => candidate.operation_id === operationId
+  );
+  if (!operation) throw new ViewerContextError(403, `unknown headless operation: ${operationId}`);
+  const decision = authorizeSurfaceContextOperation({
+    context: toSurfaceAuthorizationContext(viewer),
+    operation: {
+      operationId: operation.operation_id,
+      effect: operation.effect,
+      requiredRole: operation.required_role,
+      requiredPermissions: operation.required_permissions,
+    },
+    resource,
+    surface: 'chronos',
+  });
+  if (!decision.allowed) throw new ViewerContextError(403, decision.reason);
+}
+
+export function headlessEnvelope<T>(
+  resource: string,
+  data: T,
+  viewer: ViewerContext,
+  manifest = headlessManifest()
+) {
+  return createHeadlessEnvelope({
+    resource,
+    data,
+    scope: headlessViewerScope(viewer),
+    manifest,
+    authorizationContext: toSurfaceAuthorizationContext(viewer),
+    authorize: authorizeSurfaceContextOperation,
+  });
+}
+
+export function headlessErrorResponse(error: unknown, statusOverride?: number) {
+  return viewerErrorResponse(
+    error,
+    statusOverride ?? (error instanceof HeadlessQueryError ? 400 : undefined)
+  );
+}
+
+export function parseHeadlessLimit(
+  rawValue: string | null,
+  defaultValue: number,
+  maximum: number
+): number {
+  if (rawValue === null || rawValue.trim() === '') return defaultValue;
+  const value = Number(rawValue);
+  if (!Number.isInteger(value) || value < 1 || value > maximum) {
+    throw new HeadlessQueryError(`invalid limit: expected an integer from 1 to ${maximum}`);
+  }
+  return value;
+}

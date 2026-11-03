@@ -567,7 +567,6 @@ const VOCABULARY_SCAN_DIRS = [
   'libs/core',
   'scripts',
   'presence/displays/presence-studio',
-  'presence/displays/chronos-mirror-v2/src',
   'presence/displays/operator-surface/src',
   'presence/displays/concierge/src',
   'satellites',
@@ -835,7 +834,7 @@ function validateDesignTokenCatalog(violations: string[]) {
   const expectedThemes = expectedKyberionThemeEntries(tokens);
 
   const tokenFiles = [
-    'presence/displays/chronos-mirror-v2/src/app/globals.css',
+    'presence/displays/concierge/src/app/ops/globals.css',
     'presence/displays/operator-surface/src/app/globals.css',
     'presence/displays/presence-studio/static/design-tokens.css',
     'presence/displays/computer-surface/static/design-tokens.css',
@@ -889,7 +888,6 @@ function validateDesignTokenCatalog(violations: string[]) {
       )
     );
     for (const relativePath of [
-      'presence/displays/chronos-mirror-v2/src/app/kyberion-ui.css',
       'presence/displays/operator-surface/src/app/kyberion-ui.css',
       'presence/displays/presence-studio/static/kyberion-ui.css',
       'presence/displays/computer-surface/static/kyberion-ui.css',
@@ -909,9 +907,7 @@ function validateDesignTokenCatalog(violations: string[]) {
     }
   }
 
-  const tailwindPath = pathResolver.rootResolve(
-    'presence/displays/chronos-mirror-v2/tailwind.config.cjs'
-  );
+  const tailwindPath = pathResolver.rootResolve('presence/displays/concierge/tailwind.config.cjs');
   if (!safeExistsSync(tailwindPath)) {
     violations.push('design-tokens: missing tailwind.config.cjs');
   } else {

@@ -6,7 +6,7 @@ import {
   OPERATOR_VIEW_LINKS,
   SURFACE_ROLES,
   buildAttentionItems,
-} from '../presence/displays/chronos-mirror-v2/src/lib/operator-console';
+} from '../presence/displays/concierge/src/lib/ops/operator-console';
 
 describe('Chronos operator console helpers', () => {
   it('defines the expected surface taxonomy for human-agent connection', () => {

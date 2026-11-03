@@ -3,15 +3,15 @@
   "generated_at": "2026-10-19T10:52:42.078Z",
   "counts": {
     "src": {
-      "any_keywords": 2356,
-      "as_any": 378,
+      "any_keywords": 2346,
+      "as_any": 377,
       "ts_ignore": 1,
       "files": 3179,
       "max_lines": 2023
     },
     "test": {
-      "any_keywords": 1587,
-      "as_any": 1038,
+      "any_keywords": 1584,
+      "as_any": 1013,
       "ts_ignore": 2,
       "files": 2679,
       "max_lines": 3494

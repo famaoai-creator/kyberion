@@ -1,0 +1,94 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
+
+import { guardOpsRequest, requireOpsAccess } from '../../../../lib/ops/ops-request-guard';
+import { compileUserIntentFlow } from '@agent/core/intent/intent-contract';
+import { loadOrganizationProfile } from '@agent/core/organization/organization-profile';
+import { buildPlanPreview } from '../../../../lib/ops/plan-preview';
+import { readChronosJsonObject } from '../../../../lib/ops/request-input';
+import {
+  resolveOpsViewerForRequest,
+  viewerErrorResponse,
+  viewerScopeTenantSlugs,
+  withViewerExecutionContextAsync,
+} from '../../../../lib/ops/ops-viewer';
+
+export async function POST(req: NextRequest) {
+  try {
+    const denied = guardOpsRequest(req);
+    if (denied) return denied;
+    const requiresAccess = requireOpsAccess(req, 'readonly');
+    if (requiresAccess) return requiresAccess;
+    const resolvedViewer = resolveOpsViewerForRequest(req);
+    if (resolvedViewer.response) return resolvedViewer.response;
+
+    const parsedBody = await readChronosJsonObject(req, 'Chronos plan preview');
+    if (parsedBody.ok !== true)
+      return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+    const { body } = parsedBody;
+    const requestText = typeof body?.requestText === 'string' ? body.requestText.trim() : '';
+    if (!requestText) {
+      return NextResponse.json({ error: 'Missing requestText' }, { status: 400 });
+    }
+
+    const tenantSlug = typeof body?.tenantSlug === 'string' ? body.tenantSlug.trim() : undefined;
+    const tenantSlugs = viewerScopeTenantSlugs(resolvedViewer.context, tenantSlug);
+    if (!tenantSlug && tenantSlugs !== 'all' && tenantSlugs.length !== 1) {
+      throw new Error('tenant must be selected for a multi-tenant viewer');
+    }
+    const tier = 'confidential';
+    if (body?.tenantId && resolvedViewer.context.tenantSlugs !== 'all') {
+      throw new Error('tenantId must be resolved by the server for a scoped viewer');
+    }
+    const missionId =
+      typeof body?.missionId === 'string'
+        ? body.missionId.trim()
+        : `PREVIEW-${randomUUID().slice(0, 8).toUpperCase()}`;
+    const flow = await withViewerExecutionContextAsync(resolvedViewer.context, () =>
+      compileUserIntentFlow({
+        text: requestText,
+        channel: 'chronos',
+        locale: typeof body?.locale === 'string' ? body.locale : 'ja',
+        projectId: typeof body?.projectId === 'string' ? body.projectId : undefined,
+        projectName: typeof body?.projectName === 'string' ? body.projectName : undefined,
+        trackId: typeof body?.trackId === 'string' ? body.trackId : undefined,
+        trackName: typeof body?.trackName === 'string' ? body.trackName : undefined,
+        tier,
+        tenantId: typeof body?.tenantId === 'string' ? body.tenantId : undefined,
+        tenantSlug: tenantSlugs === 'all' ? undefined : tenantSlugs[0],
+        serviceBindings: Array.isArray(body?.serviceBindings)
+          ? body.serviceBindings.filter(
+              (value: unknown): value is string => typeof value === 'string'
+            )
+          : undefined,
+        runtimeContext:
+          typeof body?.runtimeContext === 'object' && body.runtimeContext
+            ? (body.runtimeContext as Record<string, unknown>)
+            : undefined,
+      })
+    );
+
+    return NextResponse.json({
+      preview: buildPlanPreview(
+        {
+          missionId,
+          requestText,
+          tier,
+          missionType: typeof body?.missionType === 'string' ? body.missionType : undefined,
+          projectId: typeof body?.projectId === 'string' ? body.projectId : undefined,
+          projectName: typeof body?.projectName === 'string' ? body.projectName : undefined,
+          trackId: typeof body?.trackId === 'string' ? body.trackId : undefined,
+          trackName: typeof body?.trackName === 'string' ? body.trackName : undefined,
+          assignedPersona:
+            typeof body?.assignedPersona === 'string' ? body.assignedPersona : undefined,
+          organizationProfile: loadOrganizationProfile() || undefined,
+        },
+        flow
+      ),
+    });
+  } catch (err: any) {
+    if (err?.message?.includes('viewer') || err?.message?.includes('tenant'))
+      return viewerErrorResponse(err);
+    return viewerErrorResponse(err, 500);
+  }
+}

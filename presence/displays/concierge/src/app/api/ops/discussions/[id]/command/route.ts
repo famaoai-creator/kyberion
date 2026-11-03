@@ -1,0 +1,132 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { ensureDiscussionRunning } from '@agent/core/discussion/discussion-engine';
+import {
+  readDiscussionRoom,
+  sanitizeDiscussionId,
+  submitDiscussionCommand,
+  DiscussionUserError,
+} from '@agent/core/discussion/discussion-store';
+import type {
+  DiscussionCommand,
+  DiscussionCommandKind,
+} from '@agent/core/discussion/discussion-types';
+import { guardOpsRequest, requireOpsAccess } from '../../../../../../lib/ops/ops-request-guard';
+import { assertDiscussionVisible } from '../../../../../../lib/ops/discussion-access';
+import { readChronosJsonObject } from '../../../../../../lib/ops/request-input';
+import {
+  resolveOpsViewerForRequest,
+  viewerErrorResponse,
+  withViewerExecutionContext,
+} from '../../../../../../lib/ops/ops-viewer';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+const COMMAND_KINDS: readonly DiscussionCommandKind[] = [
+  'pause',
+  'resume',
+  'inject',
+  'redirect',
+  'ask',
+  'open_vote',
+  'cast_vote',
+  'conclude',
+  'stop',
+  'set_speaker',
+  'finalize',
+  'consult',
+  'regenerate',
+  'edit_message',
+  'summarize',
+];
+const TEXT_KINDS = new Set<DiscussionCommandKind>([
+  'redirect',
+  'ask',
+  'open_vote',
+  'consult',
+  'edit_message',
+]);
+
+function parseCommand(body: Record<string, unknown>): DiscussionCommand | string {
+  const kind = body.kind;
+  if (typeof kind !== 'string' || !COMMAND_KINDS.includes(kind as DiscussionCommandKind)) {
+    return 'unknown command kind';
+  }
+  const text = typeof body.text === 'string' ? body.text.trim().slice(0, 4000) : undefined;
+  const attachments = Array.isArray(body.attachments)
+    ? body.attachments
+        .filter((a): a is string => typeof a === 'string')
+        .map((a) => a.slice(0, 64))
+        .slice(0, 8)
+    : [];
+  if (TEXT_KINDS.has(kind as DiscussionCommandKind) && !text) return 'text is required';
+  if (kind === 'inject' && !text && attachments.length === 0) return 'text is required';
+  const options = Array.isArray(body.options)
+    ? body.options
+        .filter((o): o is string => typeof o === 'string' && o.trim().length > 0)
+        .map((o) => o.trim().slice(0, 60))
+        .slice(0, 5)
+    : undefined;
+  return {
+    kind: kind as DiscussionCommandKind,
+    ...(text ? { text } : {}),
+    ...(typeof body.target === 'string' && body.target ? { target: body.target.slice(0, 64) } : {}),
+    ...(options?.length ? { options } : {}),
+    ...(typeof body.choice === 'string' && body.choice ? { choice: body.choice.slice(0, 60) } : {}),
+    ...(attachments.length ? { attachments } : {}),
+  };
+}
+
+/** Human steering: pause, inject, redirect, ask, vote, conclude, stop. */
+export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const denied = guardOpsRequest(req);
+  if (denied) return denied;
+  const requiresAccess = requireOpsAccess(req, 'localadmin');
+  if (requiresAccess) return requiresAccess;
+  const resolvedViewer = resolveOpsViewerForRequest(req);
+  if (resolvedViewer.response) return resolvedViewer.response;
+  const viewer = resolvedViewer.context;
+  try {
+    const roomId = sanitizeDiscussionId((await context.params).id);
+    const parsed = await readChronosJsonObject(req, 'Chronos discussion command');
+    if (parsed.ok !== true) {
+      return NextResponse.json({ ok: false, error: parsed.error }, { status: 400 });
+    }
+    const command = parseCommand(parsed.body);
+    if (typeof command === 'string') {
+      return NextResponse.json({ ok: false, error: command }, { status: 400 });
+    }
+    const room = withViewerExecutionContext(viewer, () => readDiscussionRoom(roomId));
+    if (!room)
+      return NextResponse.json({ ok: false, error: 'discussion not found' }, { status: 404 });
+    assertDiscussionVisible(viewer, room.scope);
+    if (room.config?.single_pass && command.kind !== 'stop') {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'A single-model brief accepts only Stop while running. Start a new room for another request.',
+        },
+        { status: 409 }
+      );
+    }
+    if (room.status === 'concluded' || room.status === 'stopped' || room.status === 'failed') {
+      return NextResponse.json(
+        { ok: false, error: `discussion already ${room.status}` },
+        { status: 409 }
+      );
+    }
+    const next = withViewerExecutionContext(viewer, () => {
+      submitDiscussionCommand(roomId, viewer.principalId ?? viewer.role, command);
+      // Re-attach an engine if the server restarted mid-discussion.
+      void ensureDiscussionRunning(roomId);
+      return readDiscussionRoom(roomId);
+    });
+    return NextResponse.json({ ok: true, room: next }, { status: 202 });
+  } catch (error) {
+    if (error instanceof DiscussionUserError) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    }
+    return viewerErrorResponse(error, 400);
+  }
+}

@@ -78,9 +78,11 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'libs/core/tool/runtime-scope.ts': 'scope-derivation',
   'libs/core/untrusted-content.ts': 'scope-derivation',
   'libs/core/visual-raster.ts': 'scope-derivation',
-  'presence/displays/chronos-mirror-v2/src/app/api/deliverable-preview/route.ts':
-    'scope-derivation',
-  'presence/displays/chronos-mirror-v2/src/lib/su-surface-data.ts': 'scope-derivation',
+  'presence/displays/concierge/src/app/api/ops/deliverable-preview/route.ts': 'scope-derivation',
+  'presence/displays/concierge/src/lib/ops/su-surface-data.ts': 'scope-derivation',
+  // The operations console inside Concierge (moved from Chronos, MSN-KYBERION-SERVER-20261104).
+  'presence/displays/concierge/src/app/api/ops/deliverable-preview/route.ts': 'scope-derivation',
+  'presence/displays/concierge/src/lib/ops/su-surface-data.ts': 'scope-derivation',
   'presence/displays/presence-studio/hearing-mission-routes.ts': 'scope-derivation',
   // placement
   'libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts': 'placement',
