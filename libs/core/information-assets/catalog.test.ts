@@ -57,7 +57,7 @@ vi.mock('../organization/organization-people-access.js', () => ({
   recordPeopleManagementAudit: async () => {},
 }));
 vi.mock('../ingest-asset-ledger.js', () => ({
-  findAssetBySource: () => null,
+  findAssetBySource: async () => null,
   assetProvenanceRef: () => '',
 }));
 vi.mock('../organization/organization-operating-model-persistence.js', () => ({

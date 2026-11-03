@@ -30,9 +30,9 @@ const input = (overrides: Partial<PromotionAssetInput> = {}): PromotionAssetInpu
   ...overrides,
 });
 
-function land(overrides: Partial<PromotionAssetInput> = {}) {
-  const plan = planPromotionAsset(input(overrides), options);
-  commitPromotionAsset(TENANT, plan, options);
+async function land(overrides: Partial<PromotionAssetInput> = {}) {
+  const plan = await planPromotionAsset(input(overrides), options);
+  await commitPromotionAsset(TENANT, plan, options);
   return plan;
 }
 
@@ -52,13 +52,13 @@ describe('promotion-ledger', () => {
     expect(() => resolvePromotionActor('[x]')).toThrow(/\[x\] tenant promotion refused/);
   });
 
-  it('lands version 1, skips identical content, supersedes changed content', () => {
-    const first = land();
+  it('lands version 1, skips identical content, supersedes changed content', async () => {
+    const first = await land();
     expect(first.action).toBe('append');
     expect(first.record).toMatchObject({ version: 1, visible_to: [TENANT] });
     expect(first.record.supersedes).toBeUndefined();
-    expect(land().action).toBe('unchanged');
-    const second = land({ contentSha256: 'b'.repeat(64) });
+    expect((await land()).action).toBe('unchanged');
+    const second = await land({ contentSha256: 'b'.repeat(64) });
     const assetId = deriveAssetId('scratch', 'active/shared/tmp/job-a/work');
     expect(promotionAssetSummary(second)).toEqual({
       asset_id: assetId,
@@ -69,9 +69,9 @@ describe('promotion-ledger', () => {
     });
   });
 
-  it('links a re-promotion from a new source to the asset that held the target', () => {
-    const first = land();
-    const replacement = land({
+  it('links a re-promotion from a new source to the asset that held the target', async () => {
+    const first = await land();
+    const replacement = await land({
       sourceId: 'active/shared/tmp/job-b/work',
       contentSha256: 'c'.repeat(64),
     });
@@ -81,7 +81,7 @@ describe('promotion-ledger', () => {
     });
     // Back to the first source with its old content: the target changed
     // hands, so this is a new version, not a skip.
-    const back = land();
+    const back = await land();
     expect(back.action).toBe('append');
     expect(back.record).toMatchObject({
       version: 2,
@@ -89,13 +89,13 @@ describe('promotion-ledger', () => {
     });
   });
 
-  it('refuses a second target for a source already recorded elsewhere', () => {
-    land();
-    expect(() =>
+  it('refuses a second target for a source already recorded elsewhere', async () => {
+    await land();
+    await expect(
       planPromotionAsset(
         input({ targetPath: `${options.knowledgeRoot}/tools/other/TOOL.json` }),
         options
       )
-    ).toThrow(/\[scratch:promote\] ledger conflict — .* \| .* \| evidence: /);
+    ).rejects.toThrow(/\[scratch:promote\] ledger conflict — .* \| .* \| evidence: /);
   });
 });

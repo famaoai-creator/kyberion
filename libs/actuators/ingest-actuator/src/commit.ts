@@ -55,7 +55,7 @@ import { scanForInjection, wrapUntrusted } from '@agent/core/untrusted-content';
 import { scrubContent } from '@agent/core/pii-scrubber';
 import { updateMemoryPromotionCandidateStatus } from '@agent/core/knowledge/memory-promotion-queue';
 import { verifyStewardApproval } from '@agent/core/ingest-tier-gate';
-import { withExecutionContext } from '@agent/core/authority';
+import { withExecutionContextAsync } from '@agent/core/authority';
 import type { IngestLedgerPathOptions } from '@agent/core/ingest-asset-ledger';
 import type { IngestQuotaCheck, IngestQuotaLevel } from '@agent/core/ingest-quota';
 import type { MemoryCandidate } from '@agent/core/knowledge/memory-promotion-queue';
@@ -313,7 +313,7 @@ function scrubCardParts(normalized: NormalizeCardResult, overrideIds: string[]):
  * a SUPERSEDE (same target_path, version+1, supersedes ref) when the same
  * source arrives with new content.
  */
-export function commitIngest(input: IngestCommitInput): IngestCommitResult {
+export async function commitIngest(input: IngestCommitInput): Promise<IngestCommitResult> {
   const tenantSlug = String(input?.tenant_slug || '').trim();
   if (!tenantSlug) fail('tenant_slug is required');
   const normalized = input?.normalized;
@@ -522,8 +522,8 @@ export function commitIngest(input: IngestCommitInput): IngestCommitResult {
   // The tenant registry lives in the personal tier, which ingest_commit cannot
   // read — hand the ledger the root resolved above instead of re-resolving it.
   const ledgerPathOptions = { ...pathOptions, knowledgeRoot: ledgerKnowledgeRoot };
-  const committed = withExecutionContext(INGEST_COMMIT_ROLE, () => {
-    const prior = findAssetBySource(tenantSlug, sourceSystem, sourceId, ledgerPathOptions);
+  const committed = await withExecutionContextAsync(INGEST_COMMIT_ROLE, async () => {
+    const prior = await findAssetBySource(tenantSlug, sourceSystem, sourceId, ledgerPathOptions);
 
     let version = 1;
     let supersedes: string | undefined;
@@ -593,7 +593,7 @@ export function commitIngest(input: IngestCommitInput): IngestCommitResult {
     // (d) land the SCRUBBED card and (e) append the ledger record — same ceremony.
     safeMkdir(path.dirname(landingAbsolute), { recursive: true });
     safeWriteFile(landingAbsolute, finalCard, { encoding: 'utf8' });
-    appendAssetRecord(tenantSlug, record, ledgerPathOptions);
+    await appendAssetRecord(tenantSlug, record, ledgerPathOptions);
 
     return {
       committed: true as const,

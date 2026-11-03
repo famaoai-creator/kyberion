@@ -62,8 +62,8 @@ function card(sourceId: string, markdown: string): NormalizeCardResult {
   });
 }
 
-function commitOnce(sourceId: string, markdown = `# Quota\n\nBody of ${sourceId}.`) {
-  return commitIngest({
+async function commitOnce(sourceId: string, markdown = `# Quota\n\nBody of ${sourceId}.`) {
+  return await commitIngest({
     tenant_slug: 'acme-corp',
     normalized: card(sourceId, markdown),
     now: NOW,
@@ -133,15 +133,15 @@ afterEach(() => {
 });
 
 describe('ingest:commit quota gate (DA-08 acceptance 3)', () => {
-  it('walks ok → warn → block across the daily file budget, recording usage only on success', () => {
+  it('walks ok → warn → block across the daily file budget, recording usage only on success', async () => {
     // 1st commit: projected 1/2 files, under warn_ratio 0.9×2 → ok.
-    const first = commitOnce('PAGE-Q1');
+    const first = await commitOnce('PAGE-Q1');
     expect(first.committed).toBe(true);
     expect(first.quota_level).toBe('ok');
     expect(readCounter()).toMatchObject({ files: 1 });
 
     // 2nd commit: projected 2 >= 0.9×2 → warn, still commits (staged enforcement).
-    const second = commitOnce('PAGE-Q2');
+    const second = await commitOnce('PAGE-Q2');
     expect(second.committed).toBe(true);
     expect(second.quota_level).toBe('warn');
     expect(readCounter()).toMatchObject({ files: 2 });
@@ -151,16 +151,16 @@ describe('ingest:commit quota gate (DA-08 acceptance 3)', () => {
 
     // 3rd commit: projected 3 > 2 → block. Structured error, nothing written,
     // no quota consumed.
-    expect(() => commitOnce('PAGE-Q3')).toThrow(/blocked by the ingest quota \(files\)/);
+    await expect(commitOnce('PAGE-Q3')).rejects.toThrow(/blocked by the ingest quota \(files\)/);
     expect(
       safeExistsSync(path.join(fixtureRoot, 'knowledge/confidential/acme-corp/reports/PAGE-Q3.md'))
     ).toBe(false);
-    expect(readAssetLedger('acme-corp', options)).toHaveLength(2);
+    expect(await readAssetLedger('acme-corp', options)).toHaveLength(2);
     expect(readCounter()).toMatchObject({ files: 2 });
 
     // A duplicate re-ingest short-circuits BEFORE the quota gate: no error,
     // no write, no quota consumed.
-    const duplicate = commitIngest({
+    const duplicate = await commitIngest({
       tenant_slug: 'acme-corp',
       normalized: card('PAGE-Q1', '# Quota\n\nBody of PAGE-Q1.'),
       dedup_result: { duplicate: true, registered: false },
@@ -171,10 +171,10 @@ describe('ingest:commit quota gate (DA-08 acceptance 3)', () => {
     expect(readCounter()).toMatchObject({ files: 2 });
   });
 
-  it('stays inert for tests that do not opt in (spend-guard VITEST convention)', () => {
+  it('stays inert for tests that do not opt in (spend-guard VITEST convention)', async () => {
     delete process.env.KYBERION_INGEST_QUOTA_TEST;
     // Over the file budget from the previous test, but the gate is off: commits fine.
-    const result = commitOnce('PAGE-Q4');
+    const result = await commitOnce('PAGE-Q4');
     expect(result.committed).toBe(true);
     expect(result.quota_level).toBeUndefined();
     // And no usage is recorded when enforcement is off.

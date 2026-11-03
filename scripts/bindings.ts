@@ -43,6 +43,7 @@ import '@agent/core/secret/provider-registry';
 import '@agent/core/storage/storage-backend';
 import '@agent/core/storage/local-storage-backend';
 import '@agent/core/storage/memory-storage-backend';
+import '@agent/core/storage/object-storage-backend.stub';
 import '@agent/core/lease/lease-backend';
 import '@agent/core/lease/local-lease-backend';
 import '@agent/core/lease/memory-lease-backend';

@@ -88,15 +88,15 @@ afterEach(() => {
 const NOW = new Date('2026-07-25T00:00:00.000Z');
 
 describe('computeCurationReport — low-yield hints', () => {
-  it('ignores corpus scan roots outside the repository', () => {
+  it('ignores corpus scan roots outside the repository', async () => {
     process.env.KYBERION_CURATION_SCAN_ROOTS = '/tmp/external-curation-corpus';
 
-    const report = computeCurationReport({ now: NOW });
+    const report = await computeCurationReport({ now: NOW });
 
     expect(report.freshness_breaches).toEqual([]);
   });
 
-  it('does not follow a symlinked corpus entry', () => {
+  it('does not follow a symlinked corpus entry', async () => {
     const targetRoot = path.join(suiteRoot, 'outside-corpus');
     safeMkdir(targetRoot, { recursive: true });
     safeWriteFile(
@@ -106,7 +106,7 @@ describe('computeCurationReport — low-yield hints', () => {
     safeMkdir(scanRootOverride, { recursive: true });
     safeSymlinkSync(targetRoot, path.join(scanRootOverride, 'linked-corpus'), 'dir');
 
-    const report = computeCurationReport({ now: NOW });
+    const report = await computeCurationReport({ now: NOW });
 
     expect(report.freshness_breaches).toEqual([]);
   });
@@ -157,7 +157,7 @@ describe('computeCurationReport — low-yield hints', () => {
     );
   });
 
-  it('flags a document delivered >= threshold times with zero recorded uses', () => {
+  it('flags a document delivered >= threshold times with zero recorded uses', async () => {
     writeUsageFixture([
       {
         document_path: 'knowledge/product/architecture/foo.md',
@@ -169,7 +169,7 @@ describe('computeCurationReport — low-yield hints', () => {
       },
     ]);
 
-    const report = computeCurationReport({ now: NOW });
+    const report = await computeCurationReport({ now: NOW });
     expect(report.low_yield_hints).toEqual([
       {
         document_path: 'knowledge/product/architecture/foo.md',
@@ -182,7 +182,7 @@ describe('computeCurationReport — low-yield hints', () => {
     expect(report.summary.low_yield_count).toBe(1);
   });
 
-  it('excludes documents below the delivery threshold or with at least one use', () => {
+  it('excludes documents below the delivery threshold or with at least one use', async () => {
     writeUsageFixture([
       {
         document_path: 'knowledge/product/below-threshold.md',
@@ -202,19 +202,19 @@ describe('computeCurationReport — low-yield hints', () => {
       },
     ]);
 
-    const report = computeCurationReport({ now: NOW });
+    const report = await computeCurationReport({ now: NOW });
     expect(report.low_yield_hints).toEqual([]);
   });
 });
 
 describe('computeCurationReport — freshness SLO breaches', () => {
-  it('flags a governance doc older than its kind threshold (default config: 90 days)', () => {
+  it('flags a governance doc older than its kind threshold (default config: 90 days)', async () => {
     writeCorpusDoc(
       'stale-governance.md',
       ['---', 'kind: governance', 'last_updated: 2026-01-01', '---', '', '# Stale'].join('\n')
     );
 
-    const report = computeCurationReport({ now: NOW });
+    const report = await computeCurationReport({ now: NOW });
     expect(report.freshness_breaches).toEqual([
       {
         document_path: expect.stringContaining('stale-governance.md'),
@@ -228,65 +228,66 @@ describe('computeCurationReport — freshness SLO breaches', () => {
     expect(report.freshness_breaches[0]?.age_days).toBeGreaterThan(90);
   });
 
-  it('does not flag an old doc as stale when its text worked in a recent run', () => {
+  it('does not flag an old doc as stale when its text worked in a recent run', async () => {
     process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR = `${suiteRoot}/feedback`;
     writeCorpusDoc(
       'old-but-working.md',
       ['---', 'kind: governance', 'last_updated: 2026-01-01', '---', '', '# Works'].join('\n')
     );
-    const docPath = computeCurationReport({ now: NOW }).freshness_breaches[0]!.document_path;
+    const docPath = (await computeCurationReport({ now: NOW })).freshness_breaches[0]!
+      .document_path;
     recordKnowledgeVerifiedRun({ documentPaths: [docPath], at: '2026-07-20T00:00:00.000Z' });
 
-    const report = computeCurationReport({ now: NOW });
+    const report = await computeCurationReport({ now: NOW });
     expect(report.freshness_breaches).toEqual([]);
     expect(report.summary.stale_suppressed_by_verified_runs).toBe(1);
 
     // A success older than the window does not re-confirm it.
     recordKnowledgeVerifiedRun({ documentPaths: [docPath], at: '2026-01-02T00:00:00.000Z' });
-    expect(computeCurationReport({ now: NOW }).freshness_breaches).toHaveLength(1);
+    expect((await computeCurationReport({ now: NOW })).freshness_breaches).toHaveLength(1);
   });
 
-  it('does not flag a playbook doc within its 60-day threshold', () => {
+  it('does not flag a playbook doc within its 60-day threshold', async () => {
     writeCorpusDoc(
       'fresh-playbook.md',
       ['---', 'kind: playbook', 'last_updated: 2026-07-01', '---', '', '# Fresh'].join('\n')
     );
 
-    const report = computeCurationReport({ now: NOW });
+    const report = await computeCurationReport({ now: NOW });
     expect(report.freshness_breaches).toEqual([]);
     expect(report.scanned_document_count).toBe(1);
   });
 
-  it('flags a doc with no last_updated frontmatter as missing_last_updated', () => {
+  it('flags a doc with no last_updated frontmatter as missing_last_updated', async () => {
     writeCorpusDoc(
       'no-date.md',
       ['---', 'kind: knowledge_hint', '---', '', '# No date'].join('\n')
     );
 
-    const report = computeCurationReport({ now: NOW });
+    const report = await computeCurationReport({ now: NOW });
     expect(report.freshness_breaches).toEqual([
       expect.objectContaining({ reason: 'missing_last_updated', kind: 'knowledge_hint' }),
     ]);
   });
 
-  it('excludes a doc with no declared or inferable kind entirely', () => {
+  it('excludes a doc with no declared or inferable kind entirely', async () => {
     writeCorpusDoc('no-kind.md', ['# Untyped doc', '', 'no frontmatter at all'].join('\n'));
 
-    const report = computeCurationReport({ now: NOW });
+    const report = await computeCurationReport({ now: NOW });
     expect(report.scanned_document_count).toBe(0);
     expect(report.freshness_breaches).toEqual([]);
   });
 });
 
 describe('computeCurationReport — SLO thresholds come from config', () => {
-  it('produces a different breach set when the SLO config fixture changes', () => {
+  it('produces a different breach set when the SLO config fixture changes', async () => {
     writeCorpusDoc(
       'medium-age-playbook.md',
       ['---', 'kind: playbook', 'last_updated: 2026-05-01', '---', '', '# Medium age'].join('\n')
     );
 
     // Default config: playbook threshold 60 days. 2026-05-01 → 2026-07-25 is ~85 days: breach.
-    const defaultReport = computeCurationReport({ now: NOW });
+    const defaultReport = await computeCurationReport({ now: NOW });
     expect(defaultReport.freshness_breaches).toHaveLength(1);
     expect(defaultReport.config.freshness_days_by_kind.playbook).toBe(60);
 
@@ -297,7 +298,7 @@ describe('computeCurationReport — SLO thresholds come from config', () => {
       freshness_days_by_kind: { governance: 90, playbook: 120, knowledge_hint: 30 },
       default_freshness_days: 180,
     });
-    const widenedReport = computeCurationReport({ now: NOW });
+    const widenedReport = await computeCurationReport({ now: NOW });
     expect(widenedReport.config.freshness_days_by_kind.playbook).toBe(120);
     expect(widenedReport.freshness_breaches).toEqual([]);
   });
@@ -330,7 +331,7 @@ describe('computeCurationReport — SLO thresholds come from config', () => {
 });
 
 describe('computeCurationReport — determinism', () => {
-  it('produces identical output (aside from generated_at) across repeated calls on unchanged input', () => {
+  it('produces identical output (aside from generated_at) across repeated calls on unchanged input', async () => {
     writeUsageFixture([
       {
         document_path: 'knowledge/product/foo.md',
@@ -345,14 +346,14 @@ describe('computeCurationReport — determinism', () => {
       'stale.md',
       ['---', 'kind: governance', 'last_updated: 2026-01-01', '---'].join('\n')
     );
-    const first = computeCurationReport({ now: NOW });
-    const second = computeCurationReport({ now: NOW });
+    const first = await computeCurationReport({ now: NOW });
+    const second = await computeCurationReport({ now: NOW });
     expect(second).toEqual(first);
   });
 });
 
 describe('writeCurationReport / generateKnowledgeCurationReport', () => {
-  it('writes deterministic markdown matching renderCurationReportMarkdown to the configured report path', () => {
+  it('writes deterministic markdown matching renderCurationReportMarkdown to the configured report path', async () => {
     writeUsageFixture([
       {
         document_path: 'knowledge/product/foo.md',
@@ -368,7 +369,7 @@ describe('writeCurationReport / generateKnowledgeCurationReport', () => {
       ['---', 'kind: governance', 'last_updated: 2026-01-01', '---'].join('\n')
     );
 
-    const report = computeCurationReport({ now: NOW });
+    const report = await computeCurationReport({ now: NOW });
     const { reportPath } = writeCurationReport(report);
 
     expect(reportPath).toBe(pathResolver.rootResolve(reportPathOverride));
@@ -382,17 +383,17 @@ describe('writeCurationReport / generateKnowledgeCurationReport', () => {
     expect(written.toLowerCase()).toContain('do not edit manually');
   });
 
-  it('generateKnowledgeCurationReport computes and persists in one call', () => {
+  it('generateKnowledgeCurationReport computes and persists in one call', async () => {
     writeCorpusDoc(
       'stale.md',
       ['---', 'kind: governance', 'last_updated: 2026-01-01', '---'].join('\n')
     );
-    const { report, reportPath } = generateKnowledgeCurationReport({ now: NOW });
+    const { report, reportPath } = await generateKnowledgeCurationReport({ now: NOW });
     expect(report.freshness_breaches).toHaveLength(1);
     expect(safeExistsSync(reportPath)).toBe(true);
   });
 
-  it('queues an archive advisory only after two weekly low-yield and freshness observations', () => {
+  it('queues an archive advisory only after two weekly low-yield and freshness observations', async () => {
     writeUsageFixture([
       {
         document_path: 'knowledge/product/foo.md',
@@ -411,9 +412,9 @@ describe('writeCurationReport / generateKnowledgeCurationReport', () => {
       .relative(pathResolver.rootDir(), pathResolver.rootResolve(`${scanRootOverride}/stale.md`))
       .replace(/\\/g, '/');
 
-    const first = generateKnowledgeCurationReport({ now: NOW });
+    const first = await generateKnowledgeCurationReport({ now: NOW });
     expect(first.report.archive_advisories).toEqual([]);
-    const second = generateKnowledgeCurationReport({
+    const second = await generateKnowledgeCurationReport({
       now: new Date(NOW.getTime() + 7 * 24 * 60 * 60 * 1000),
     });
     expect(second.report.archive_advisories).toEqual([]);
@@ -430,8 +431,8 @@ describe('writeCurationReport / generateKnowledgeCurationReport', () => {
         last_seen: '2026-07-01T00:00:00.000Z',
       },
     ]);
-    generateKnowledgeCurationReport({ now: NOW });
-    const third = generateKnowledgeCurationReport({
+    await generateKnowledgeCurationReport({ now: NOW });
+    const third = await generateKnowledgeCurationReport({
       now: new Date(NOW.getTime() + 7 * 24 * 60 * 60 * 1000),
     });
     expect(third.report.archive_advisories).toHaveLength(1);
@@ -441,7 +442,7 @@ describe('writeCurationReport / generateKnowledgeCurationReport', () => {
     });
   });
 
-  it('never touches usage/promotion state — the report is read-only over KP-05 data', () => {
+  it('never touches usage/promotion state — the report is read-only over KP-05 data', async () => {
     writeUsageFixture([
       {
         document_path: 'knowledge/product/foo.md',
@@ -454,7 +455,7 @@ describe('writeCurationReport / generateKnowledgeCurationReport', () => {
     ]);
     const usagePath = pathResolver.rootResolve(usagePathOverride);
     const before = safeReadFile(usagePath, { encoding: 'utf8' });
-    computeCurationReport({ now: NOW });
+    await computeCurationReport({ now: NOW });
     const after = safeReadFile(usagePath, { encoding: 'utf8' });
     expect(after).toEqual(before);
   });

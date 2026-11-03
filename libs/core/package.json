@@ -6460,6 +6460,10 @@
       "types": "./dist/storage/memory-storage-backend.d.ts",
       "default": "./dist/storage/memory-storage-backend.js"
     },
+    "./storage/object-storage-backend.stub": {
+      "types": "./dist/storage/object-storage-backend.stub.d.ts",
+      "default": "./dist/storage/object-storage-backend.stub.js"
+    },
     "./streaming-stt-bridge": {
       "types": "./dist/voice/streaming-stt-bridge.d.ts",
       "default": "./dist/voice/streaming-stt-bridge.js"

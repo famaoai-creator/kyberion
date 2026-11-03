@@ -168,11 +168,11 @@ export function createKnowledgePackage(input: {
  * Best-effort by design: a tenant without a profile/ledger, or a file that
  * was never ingested, yields null and the export proceeds unchanged.
  */
-export function resolveIngestAssetProvenance(input: {
+export async function resolveIngestAssetProvenance(input: {
   tenantSlug: string;
   rawData: string;
   pathOptions?: IngestLedgerPathOptions;
-}): string | null {
+}): Promise<string | null> {
   const tenantSlug = String(input.tenantSlug || '').trim();
   if (!tenantSlug) return null;
   const frontmatter = parseFrontmatterBlock(input.rawData);
@@ -181,11 +181,11 @@ export function resolveIngestAssetProvenance(input: {
   try {
     const contentSha = frontmatter.content_sha256;
     if (contentSha && /^[a-f0-9]{64}$/.test(contentSha)) {
-      const byHash = findAssetByContentHash(tenantSlug, contentSha, pathOptions);
+      const byHash = await findAssetByContentHash(tenantSlug, contentSha, pathOptions);
       if (byHash) return assetProvenanceRef(byHash);
     }
     if (frontmatter.source_system && frontmatter.source_id) {
-      const bySource = findAssetBySource(
+      const bySource = await findAssetBySource(
         tenantSlug,
         frontmatter.source_system,
         frontmatter.source_id,

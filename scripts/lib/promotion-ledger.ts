@@ -71,13 +71,13 @@ export interface PromotionAssetPlan {
 }
 
 /** Latest record (highest version, last appended on ties) currently pointing at a target. */
-function latestForTarget(
+async function latestForTarget(
   tenant: string,
   targetPath: string,
   options: IngestLedgerPathOptions
-): IngestAssetRecord | null {
+): Promise<IngestAssetRecord | null> {
   let latest: IngestAssetRecord | null = null;
-  for (const record of readAssetLedger(tenant, options)) {
+  for (const record of await readAssetLedger(tenant, options)) {
     if (record.target_path === targetPath) latest = record;
   }
   return latest;
@@ -93,11 +93,11 @@ function latestForTarget(
  * - Same source already recorded for a different target → refused: asset ids
  *   derive from the source, so a second target would corrupt its version chain.
  */
-export function planPromotionAsset(
+export async function planPromotionAsset(
   input: PromotionAssetInput,
   options: IngestLedgerPathOptions = {}
-): PromotionAssetPlan {
-  const prior = findAssetBySource(input.tenant, input.sourceSystem, input.sourceId, options);
+): Promise<PromotionAssetPlan> {
+  const prior = await findAssetBySource(input.tenant, input.sourceSystem, input.sourceId, options);
   if (prior && prior.target_path !== input.targetPath) {
     throw new Error(
       `${input.tag} ledger conflict — ${input.sourceId} is already recorded as ${prior.target_path} (${assetProvenanceRef(prior)}) | ` +
@@ -105,7 +105,7 @@ export function planPromotionAsset(
         `evidence: ${input.targetPath}`
     );
   }
-  const holder = latestForTarget(input.tenant, input.targetPath, options);
+  const holder = await latestForTarget(input.tenant, input.targetPath, options);
   if (
     prior &&
     prior.content_sha256 === input.contentSha256 &&
@@ -134,12 +134,12 @@ export function planPromotionAsset(
 }
 
 /** Append the planned record (no-op for 'unchanged'). */
-export function commitPromotionAsset(
+export async function commitPromotionAsset(
   tenant: string,
   plan: PromotionAssetPlan,
   options: IngestLedgerPathOptions = {}
-): void {
-  if (plan.action === 'append') appendAssetRecord(tenant, plan.record, options);
+): Promise<void> {
+  if (plan.action === 'append') await appendAssetRecord(tenant, plan.record, options);
 }
 
 /** Ledger summary returned by the commands (and written to the scratch marker). */

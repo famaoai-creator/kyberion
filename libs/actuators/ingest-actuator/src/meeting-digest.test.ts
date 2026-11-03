@@ -368,7 +368,7 @@ describe('ingest:meeting_digest', () => {
       expect(summaryPrompt).not.toContain('<script>');
 
       // Ledger lineage carries the standing approval and the ceremony identity.
-      const ledger = readAssetLedger(TENANT, { rootDir: root, knowledgeRoot: ROOT_REL });
+      const ledger = await readAssetLedger(TENANT, { rootDir: root, knowledgeRoot: ROOT_REL });
       const digest = ledger.find((r) => r.source_id === '2003');
       expect(digest?.approval_id).toBe('APPROVAL-TEST-1');
       expect(digest?.ingested_by).toBe('ecosystem_architect');
@@ -467,7 +467,7 @@ describe('ingest:meeting_digest', () => {
       expect(run3.pages.find((p) => p.meeting_date === '2026-09-17')?.action).toBe('updated');
       expect(third.prompts.some((p) => p.includes('"open_issues"'))).toBe(false);
       expect(read(root, `${TARGET_DIR}/2026-09-17.md`)).toContain('source_version: 6');
-      const ledger = readAssetLedger(TENANT, { rootDir: root, knowledgeRoot: ROOT_REL });
+      const ledger = await readAssetLedger(TENANT, { rootDir: root, knowledgeRoot: ROOT_REL });
       const versions = ledger.filter((r) => r.source_id === '2002').map((r) => r.version);
       expect(versions).toEqual([1, 2]);
     }

@@ -10,14 +10,20 @@
  * Domain semantics stay outside: validation rules, dedupe keys, state
  * transitions, tenant isolation and compaction policy are caller concerns.
  *
- * Persistence goes through the `storage-backend` seam: callers may inject a
- * `StorageBackend` (e.g. `createMemoryStorageBackend()` for hermetic tests);
- * without one the governed default — `local-fs` over secure-io — applies, so
- * tier, tenant, symlink and audit checks are unchanged.
+ * Persistence goes through the async `storage-backend` seam: callers may
+ * inject a sync or async `StorageBackend` (e.g. `createMemoryStorageBackend()`
+ * for hermetic tests); without one the governed default — `local-fs` over
+ * secure-io — applies, so tier, tenant, symlink and audit checks are unchanged.
+ * All ledger methods are async so Promise-based backends can await durability.
  */
 
 import * as path from 'node:path';
-import { resolveStorageBackend, type StorageBackend } from './storage/storage-backend.js';
+import {
+  asAsyncStorageBackend,
+  resolveStorageBackend,
+  type AsyncStorageBackend,
+  type SyncStorageBackend,
+} from './storage/storage-backend.js';
 import './storage/local-storage-backend.js';
 
 export interface EntryLedgerOptions {
@@ -26,20 +32,20 @@ export interface EntryLedgerOptions {
   /** Require the ledger file to be a regular file (symlink rejected). */
   requireRegularFile?: boolean;
   /** Persistence backend. Defaults to the governed seam resolution (local-fs). */
-  backend?: StorageBackend;
+  backend?: AsyncStorageBackend | SyncStorageBackend;
 }
 
 export interface EntryLedger<T> {
   readonly path: string;
   /** Append one entry. The caller validates/shapes it first. */
-  append(entry: T): T;
+  append(entry: T): Promise<T>;
   /** Read all entries in append order; optional per-line map may drop rows by returning null. */
-  readAll(map?: (value: unknown, lineNumber: number) => T | null): T[];
-  exists(): boolean;
+  readAll(map?: (value: unknown, lineNumber: number) => T | null): Promise<T[]>;
+  exists(): Promise<boolean>;
 }
 
-function assertRegularFile(backend: StorageBackend, filePath: string): void {
-  const stat = backend.stat(filePath);
+async function assertRegularFile(backend: AsyncStorageBackend, filePath: string): Promise<void> {
+  const stat = await backend.stat(filePath);
   if (stat === null) return;
   if (!stat.isFile() || stat.isSymbolicLink()) {
     throw new Error(`[ENTRY_LEDGER] ledger must be a regular file: ${filePath}`);
@@ -51,25 +57,25 @@ export function createEntryLedger<T>(
   options: EntryLedgerOptions = {}
 ): EntryLedger<T> {
   const { onMalformed = 'skip', requireRegularFile = true } = options;
-  const backend = options.backend ?? resolveStorageBackend();
+  const backend = asAsyncStorageBackend(options.backend ?? resolveStorageBackend());
 
-  const ensure = (): void => {
-    if (requireRegularFile) assertRegularFile(backend, ledgerPath);
+  const ensure = async (): Promise<void> => {
+    if (requireRegularFile) await assertRegularFile(backend, ledgerPath);
   };
 
   return {
     path: ledgerPath,
-    append(entry: T): T {
-      ensure();
-      backend.mkdir(path.dirname(ledgerPath));
-      backend.append(ledgerPath, `${JSON.stringify(entry)}\n`);
+    async append(entry: T): Promise<T> {
+      await ensure();
+      await backend.mkdir(path.dirname(ledgerPath));
+      await backend.append(ledgerPath, `${JSON.stringify(entry)}\n`);
       return entry;
     },
-    readAll(map?: (value: unknown, lineNumber: number) => T | null): T[] {
-      if (!backend.exists(ledgerPath)) return [];
-      ensure();
+    async readAll(map?: (value: unknown, lineNumber: number) => T | null): Promise<T[]> {
+      if (!(await backend.exists(ledgerPath))) return [];
+      await ensure();
       const entries: T[] = [];
-      for (const line of backend.readLines(ledgerPath)) {
+      for await (const line of backend.readLines(ledgerPath)) {
         if (!line.text.trim()) continue;
         let value: unknown;
         try {
@@ -89,7 +95,7 @@ export function createEntryLedger<T>(
       }
       return entries;
     },
-    exists(): boolean {
+    async exists(): Promise<boolean> {
       return backend.exists(ledgerPath);
     },
   };
