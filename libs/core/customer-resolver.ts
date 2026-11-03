@@ -43,8 +43,7 @@ export function customerRoot(
   if (!slug) return null;
   const base = path.join(rootDir, 'customer', slug);
   const candidate = subPath ? path.resolve(base, subPath) : base;
-  const relative = path.relative(base, candidate);
-  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+  if (!pathResolver.isPathInsideOrEqual(base, candidate)) {
     throw new Error(
       `[CUSTOMER_SCOPE] customer overlay path escapes customer '${slug}': ${subPath}`
     );

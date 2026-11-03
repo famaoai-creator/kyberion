@@ -87,11 +87,7 @@ export function resolvePluginSourceRealPath(candidatePath: string): string {
 }
 
 export function isPathContainedIn(root: string, candidate: string): boolean {
-  const rootResolved = path.resolve(root);
-  const candidateResolved = path.resolve(candidate);
-  if (candidateResolved === rootResolved) return true;
-  const rel = path.relative(rootResolved, candidateResolved);
-  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+  return pathResolver.isPathInsideOrEqual(path.resolve(root), path.resolve(candidate));
 }
 
 /**
