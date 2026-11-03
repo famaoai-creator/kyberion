@@ -12,10 +12,19 @@ interface PeerRequestLike {
   headers: { get(name: string): string | null };
 }
 
+/**
+ * Best-known client address for attribution (rate limiting): the verified
+ * local-peer proof, else what the framework reports. Never an authority input.
+ */
 export function conciergePeerAddress(req: PeerRequestLike): string | null {
   return verifiedLocalPeerAddress(req) || req.ip || null;
 }
 
+/**
+ * Loopback authority comes only from the local server's request-lifetime
+ * proof (server/local-peer.ts). `req.ip` is framework/proxy supplied and is
+ * never trusted here.
+ */
 export function isLoopbackPeer(req: PeerRequestLike): boolean {
-  return isLoopbackAddress(conciergePeerAddress(req) ?? undefined);
+  return isLoopbackAddress(verifiedLocalPeerAddress(req) ?? undefined);
 }

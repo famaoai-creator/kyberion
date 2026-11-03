@@ -17,7 +17,11 @@ import { normalizeLocale, type SupportedLocale } from '@agent/core/locale-normal
 import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
 import { logger } from '@agent/core/core';
 import { frontDeskRoleFromViewerScope } from '@agent/core/front-desk-identity';
-import { FRONT_DESK_MENU, readFrontDeskSurfacePorts } from '@agent/core/front-desk-nav';
+import {
+  FRONT_DESK_LINKED_DESTINATIONS,
+  FRONT_DESK_MENU,
+  readFrontDeskSurfacePorts,
+} from '@agent/core/front-desk-nav';
 import { hearingPhaseProgress } from '@agent/core/hearing-scenario-catalog';
 import {
   listUiComponents,
@@ -101,7 +105,7 @@ export function describeComponentsForViewer(
   locale: SupportedLocale
 ) {
   const role = viewerRole(viewer);
-  const groups = FRONT_DESK_MENU.map((item) => ({
+  const groups = [...FRONT_DESK_MENU, ...FRONT_DESK_LINKED_DESTINATIONS].map((item) => ({
     id: item.id,
     label: catalogT(item.label_key as VocabularyKey, undefined, locale),
   }));

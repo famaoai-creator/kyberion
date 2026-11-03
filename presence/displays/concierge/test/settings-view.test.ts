@@ -52,6 +52,7 @@ describe('orderSectionsForFirstRun', () => {
       'members',
       'services',
       'recording',
+      'authority',
       'plugins',
     ]);
   });

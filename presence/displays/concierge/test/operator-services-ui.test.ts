@@ -474,6 +474,32 @@ describe('operator service registration rendered interactions', () => {
     expect(m.container.querySelector('input')).toBeNull();
     expect(api.calls).toEqual([null]);
   });
+
+  it('shows another member a read-only installation-owner notice instead of a broken 403', async () => {
+    const api = mockApi(() => response({ ok: false, error: 'installation_owner_required' }, 403));
+    const m = mount();
+    await flush();
+    expect(m.html()).toContain(t('settings.installation_owner_only'));
+    expect(m.html()).toContain(t('settings.installation_owner_only_detail'));
+    expect(m.container.querySelector('input')).toBeNull();
+    expect(() => button(m.container, t('settings.installation_step_up_action'))).toThrow();
+    expect(api.calls).toEqual([null]);
+  });
+
+  it('asks a remote owner to confirm with a passkey when a write needs a step-up', async () => {
+    const api = mockApi((body) =>
+      body?.action === 'propose'
+        ? response({ ok: false, error: 'installation_step_up_required' }, 403)
+        : undefined
+    );
+    const m = mount();
+    await flush();
+    await click(button(card(m), t('settings.operator_prepare')));
+    expect(card(m).textContent).toContain(t('settings.installation_step_up_title'));
+    expect(card(m).textContent).toContain(t('settings.installation_step_up_detail'));
+    expect(card(m).querySelector('input')).toBeNull();
+    expect(api.calls.filter((body) => body?.action === 'propose')).toHaveLength(1);
+  });
 });
 
 it('explains known service scope in Japanese and keeps raw operations in closed technical details', async () => {

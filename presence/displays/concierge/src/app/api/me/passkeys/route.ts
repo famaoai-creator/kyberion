@@ -9,6 +9,14 @@ import {
 } from '@agent/core/authn/webauthn-verifier';
 import { listPasskeyCredentials } from '@agent/core/authn/passkey-credential-store';
 import { passkeyStepUpRequired } from '@agent/core/authn/passkey-step-up';
+import { recordInstallationStepUp } from '@agent/core/authn/installation-step-up';
+import { INSTALLATION_OWNER_MEMBER_ID } from '@agent/core/surface/installation-owner-access';
+import { isLoopbackPeer } from '../../../../lib/loopback-peer';
+import {
+  conciergeSessionBinding,
+  installationAccessDenied,
+  resolveConciergeInstallationAccess,
+} from '../../../../lib/installation-access';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
@@ -19,6 +27,7 @@ import {
   passkeyErrorStatus,
   passkeyRateLimited,
   passkeyUnavailable,
+  reportInstallationStepUp,
   reportPasskeyChange,
 } from '../../../../lib/passkey-server';
 
@@ -56,6 +65,28 @@ export function GET(req: NextRequest) {
 }
 
 /**
+ * The installation owner's passkey is what unlocks installation-scope
+ * changes from another device. So the owner's FIRST usable passkey (no
+ * step-up possible yet) is enrolled only from a trusted loopback peer — a
+ * stolen remote session cannot plant its own key and then step up. Later
+ * passkeys need a step-up from an existing one; the cooldown and the
+ * operator notification still apply.
+ */
+function firstOwnerPasskeyDenied(req: NextRequest, memberId: string): NextResponse | null {
+  if (memberId !== INSTALLATION_OWNER_MEMBER_ID || isLoopbackPeer(req)) return null;
+  const stepUp = withExecutionContext(ROLE, () => passkeyStepUpRequired(memberId, new Date()));
+  if (stepUp) return null;
+  return NextResponse.json(
+    {
+      ok: false,
+      error: 'installation_owner_first_passkey_loopback_required',
+      error_code: 'installation_owner_first_passkey_loopback_required',
+    },
+    { status: 403, headers: { 'Cache-Control': 'no-store' } }
+  );
+}
+
+/**
  * `options` starts a registration, `verify` completes it (`response`, optional
  * `label`), `revoke` removes one of the viewer's passkeys (`credential_id`).
  * While the member has a usable passkey, a registration or revoke first needs
@@ -63,6 +94,11 @@ export function GET(req: NextRequest) {
  * `step_up_verify` (`response`) — an assertion from that usable passkey —
  * which returns a single-use `step_up_token`. Only the browser that ran the
  * step-up holds it; `options`, `verify` and `revoke` must send it back.
+ *
+ * `purpose: installation` (installation owner only) confirms a change to
+ * settings of the whole machine from a non-loopback browser: `step_up_verify`
+ * then records the confirmation server-side, bound to this session, for five
+ * minutes (installation-step-up.ts) and returns only `step_up_expires_at`.
  */
 export async function POST(req: NextRequest) {
   const denied = requireConciergeMutationAccess(req);
@@ -126,11 +162,20 @@ export async function POST(req: NextRequest) {
     if (!rp) return passkeyUnavailable('origin_not_configured');
 
     if (action === 'step_up_options') {
-      if (body.purpose !== 'enroll' && body.purpose !== 'revoke') {
+      if (
+        body.purpose !== 'enroll' &&
+        body.purpose !== 'revoke' &&
+        body.purpose !== 'installation'
+      ) {
         return NextResponse.json(
-          { ok: false, error: 'purpose must be enroll or revoke' },
+          { ok: false, error: 'purpose must be enroll, revoke or installation' },
           { status: 400 }
         );
+      }
+      if (body.purpose === 'installation') {
+        // Only the installation owner confirms installation-scope changes.
+        const installation = resolveConciergeInstallationAccess(resolved.context, 'read', req);
+        if (!installation.allowed) return installationAccessDenied(installation);
       }
       if (body.purpose === 'revoke' && !credentialId) {
         return NextResponse.json(
@@ -151,6 +196,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'options') {
+      const firstOwnerPasskey = firstOwnerPasskeyDenied(req, member.memberId);
+      if (firstOwnerPasskey) return firstOwnerPasskey;
       const options = await withExecutionContextAsync(ROLE, () =>
         createPasskeyRegistrationOptions({
           memberId: member.memberId,
@@ -171,6 +218,28 @@ export async function POST(req: NextRequest) {
       const confirmed = await withExecutionContextAsync(ROLE, () =>
         verifyPasskeyStepUp({ memberId: member.memberId, response, rp })
       );
+      if (confirmed.purpose === 'installation') {
+        // Spend the step-up into a short server-side record bound to this
+        // session; the browser never holds an installation token.
+        const installation = resolveConciergeInstallationAccess(resolved.context, 'read', req);
+        const sessionBinding = conciergeSessionBinding(req);
+        if (!installation.allowed) return installationAccessDenied(installation);
+        if (!sessionBinding) return passkeyUnavailable('member_required');
+        const recorded = withExecutionContext(ROLE, () =>
+          recordInstallationStepUp(member.memberId, {
+            sessionBinding,
+            stepUpToken: confirmed.stepUpToken,
+          })
+        );
+        reportInstallationStepUp(member, {
+          credentialId: confirmed.credentialId,
+          expiresAt: recorded.expiresAt,
+        });
+        return NextResponse.json(
+          { ok: true, purpose: 'installation', step_up_expires_at: recorded.expiresAt },
+          { headers: { 'Cache-Control': 'no-store' } }
+        );
+      }
       return NextResponse.json(
         {
           ok: true,
@@ -182,6 +251,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const firstOwnerPasskey = firstOwnerPasskeyDenied(req, member.memberId);
+    if (firstOwnerPasskey) return firstOwnerPasskey;
     const response = body.response as Parameters<typeof verifyPasskeyRegistration>[0]['response'];
     const passkey = await withExecutionContextAsync(ROLE, () =>
       verifyPasskeyRegistration({

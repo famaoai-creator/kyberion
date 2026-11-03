@@ -33,6 +33,7 @@ import {
   writeTenantProfile,
 } from '../organization/tenant-registry.js';
 import { secretGuard } from '../secret/secret-guard.js';
+import { signalInstallationBootstrapChange } from './installation-bootstrap-signal.js';
 
 export const FIRST_RUN_DOCUMENT = 'kyberion-first-run';
 export const FIRST_RUN_DEFAULT_MEMBER_ID = 'owner';
@@ -86,6 +87,12 @@ interface FirstRunDocument {
   claimed_at?: string | null;
   claimed_member_id?: string | null;
   claimed_tenant_slug?: string | null;
+  /**
+   * Sticky: set the first time bootstrap is observed closed by an owner
+   * credential that did not come from the claim. Revoking that credential
+   * later never re-opens bootstrap.
+   */
+  bootstrap_closed_at?: string | null;
 }
 
 function registryOptions(options: FirstRunOptions) {
@@ -149,12 +156,25 @@ function generateCode(): string {
 }
 
 /**
- * True when some active member holding an owner membership can already sign
- * in from a browser (a registry token or a bound IdP identity). An unreadable
- * registry counts as "yes": it must never re-open the bootstrap.
+ * True when an owner can already sign in from a browser (a registry token or
+ * a bound IdP identity): the installation owner member (`owner`) holding any
+ * credential — whatever its memberships or status — or some active member
+ * holding an owner membership. An unreadable registry counts as "yes": it
+ * must never re-open the bootstrap.
  */
 function ownerCanSignIn(options: FirstRunOptions): boolean {
   try {
+    const installationOwner = readMemberProfile(
+      FIRST_RUN_DEFAULT_MEMBER_ID,
+      registryOptions(options)
+    );
+    if (
+      installationOwner &&
+      (installationOwner.access_registrations.length > 0 ||
+        (installationOwner.external_identities ?? []).length > 0)
+    ) {
+      return true;
+    }
     for (const memberId of listMemberIdsStrict(registryOptions(options))) {
       const member = readMemberProfile(memberId, registryOptions(options));
       if (
@@ -184,7 +204,18 @@ export function readFirstRunStatus(options: FirstRunOptions = {}): FirstRunStatu
   } catch {
     return { state: 'claimed', code_active: false };
   }
-  if (doc.claimed_at || ownerCanSignIn(options)) return { state: 'claimed', code_active: false };
+  if (doc.claimed_at || doc.bootstrap_closed_at) return { state: 'claimed', code_active: false };
+  if (ownerCanSignIn(options)) {
+    // Make the closure sticky: a later revocation of that credential must
+    // not hand localadmin back to anonymous loopback.
+    try {
+      storeDocument({ bootstrap_closed_at: new Date(nowMs(options)).toISOString() });
+      signalInstallationBootstrapChange();
+    } catch {
+      // Still closed for this read; the next read retries the marker.
+    }
+    return { state: 'claimed', code_active: false };
+  }
   const expiresAt = doc.code_expires_at ? Date.parse(doc.code_expires_at) : NaN;
   const active = Boolean(doc.code_hash) && Number.isFinite(expiresAt) && expiresAt > nowMs(options);
   return {
@@ -362,6 +393,7 @@ export function claimFirstRun(
     claimed_member_id: memberId,
     claimed_tenant_slug: tenantSlug,
   });
+  signalInstallationBootstrapChange();
   record(options, {
     operation: 'claim',
     result: 'completed',
