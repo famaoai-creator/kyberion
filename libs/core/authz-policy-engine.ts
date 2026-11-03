@@ -35,7 +35,8 @@ import {
   type SeamProviderCandidate,
   type SeamProviderDecision,
 } from './seam-provider-selection.js';
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
+import { type SeamProviderMetadata } from './seam.js';
+import { createProviderRegistry } from './provider-registry.js';
 import type { ResolvedPrincipal } from './authn-principal-resolver.js';
 
 const logger = createLogger('authz-policy-engine');
@@ -141,26 +142,26 @@ export interface AuthzProvider {
   authorize(query: AuthzQuery, deps?: AuthzResolveDeps): AuthzDecision;
 }
 
-const authzProviderSeam = createSeam<AuthzProvider>({
-  key: AUTHZ_SEAM_ID,
-  multiplicity: 'named',
-  catalog: coreSeamCatalog,
+const authzProviderRegistry = createProviderRegistry<AuthzProvider>({
+  seam: AUTHZ_SEAM_ID,
   owner: 'libs/core/authz-policy-engine.ts',
+  source: 'authz-provider-extension',
+  missingIdError: 'AuthzProvider must have a non-empty id',
 });
 
 export function registerAuthzProvider(
   provider: AuthzProvider,
-  metadata: SeamProviderMetadata = { provenance: 'plugin', source: 'authz-provider-extension' }
+  metadata?: SeamProviderMetadata
 ): () => void {
-  return authzProviderSeam.register(provider.id, provider, metadata);
+  return authzProviderRegistry.register(provider, metadata);
 }
 
 export function getAuthzProvider(id: string): AuthzProvider | null {
-  return authzProviderSeam.getOptional(id) ?? null;
+  return authzProviderRegistry.get(id) ?? null;
 }
 
 export function listAuthzProviders(restrictTo?: readonly string[]): AuthzProvider[] {
-  const all = authzProviderSeam.list().map((entry) => entry.implementation);
+  const all = authzProviderRegistry.list();
   return restrictTo?.length ? all.filter((p) => restrictTo.includes(p.id)) : all;
 }
 

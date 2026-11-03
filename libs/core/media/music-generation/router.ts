@@ -1,14 +1,15 @@
-import { logger } from '../../core.js';
 import { isAppleSilicon } from '../../platform.js';
 import {
-  explainSeamProviderDecision,
-  listSeamSelectionPurposes,
-  resolveSeamProviderDecision,
-  resolveSeamSelectionEntry,
-  type ResolveSeamProviderOptions,
-  type SeamProviderCandidate,
-} from '../../seam-provider-selection.js';
-import type { MusicGenerationRequest, MusicGenerationResult } from '../music-generation-types.js';
+  ProviderChainRouter,
+  ProviderSelectionError,
+  unmetCandidateSummary,
+} from '../../provider-chain-router.js';
+import { type SeamProviderCandidate } from '../../seam-provider-selection.js';
+import type {
+  MusicGenerationProvider,
+  MusicGenerationRequest,
+  MusicGenerationResult,
+} from '../music-generation-types.js';
 import {
   MUSIC_GENERATION_PROVIDER_SEAM,
   listMusicGenerationProviders,
@@ -16,12 +17,9 @@ import {
 } from './provider-registry.js';
 
 /**
- * Order used without a purpose: MLX first on Apple Silicon, Stable Audio
- * elsewhere. Composition-only providers (chatmusician_mlx) are intentionally
- * absent here, but resolveMusicProviderChain still tries eligible leftovers
- * as a sorted last-resort tail — so chatmusician may run without a purpose
- * when every platform-ordered provider is ineligible. Prefer purpose
- * 'compose' or an explicit preference to select it deliberately.
+ * Label used for the provider field of a total-failure result — mirrors the
+ * platform-ordered head of the policy's `default_chains` without reading the
+ * policy (selection itself is data-driven; this is report text only).
  */
 function platformOrder(): string[] {
   return isAppleSilicon()
@@ -65,69 +63,36 @@ function failedSelection(provider: string, error: string): MusicGenerationResult
   return { status: 'failed', provider, elapsedMs: 0, error };
 }
 
-/**
- * Without a purpose an operator rule matching the request may lead the
- * platform order (a mission pin it produced is reused); requests no rule
- * matches keep that order and record nothing.
- */
-function operatorRuleLead(candidates: SeamProviderCandidate[]): string[] {
-  const entry = resolveSeamSelectionEntry({ seam: MUSIC_GENERATION_PROVIDER_SEAM });
-  if (entry.kind !== 'governed') return [];
-  const options: ResolveSeamProviderOptions = {
-    ...entry.request,
-    candidates,
-  };
-  const preview = explainSeamProviderDecision(options);
-  if (preview.strategy !== 'rule' && preview.strategy !== 'pinned') return [];
-  const decision = resolveSeamProviderDecision(options);
-  return decision.provider_id ? [decision.provider_id] : [];
-}
+const chainSpec = {
+  seam: MUSIC_GENERATION_PROVIDER_SEAM,
+  label: '[music_generation_bridge]',
+  errorTag: '[MUSIC_GENERATION_SELECTION]',
+  eligibility: (request: MusicGenerationRequest) => listMusicGenerationCandidates(request),
+  // A named provider runs as asked — no default order or eligible tail is
+  // appended; the loop below reports each failure itself.
+  explicitPreference: (request: MusicGenerationRequest) => request.providerPreference,
+  preferenceOnly: true,
+  purpose: (request: MusicGenerationRequest) => request.purpose,
+  defaultOrderKey: () => `platform:${isAppleSilicon() ? 'apple_silicon' : 'generic'}`,
+  builtinDefaultOrder: () => platformOrder(),
+  governedScope: 'lead',
+  strictPurposes: true,
+  sortEligibleTail: true,
+} as const;
 
-/** Which providers to try, in order; a string is a selection failure. */
-async function resolveMusicProviderChain(
-  request: MusicGenerationRequest
-): Promise<string[] | string> {
-  const purpose = request.purpose?.trim();
-  if (purpose) {
-    const known = listSeamSelectionPurposes(MUSIC_GENERATION_PROVIDER_SEAM);
-    if (!known.includes(purpose)) {
-      throw new Error(
-        `[MUSIC_GENERATION_SELECTION] unknown purpose '${purpose}' for seam '${MUSIC_GENERATION_PROVIDER_SEAM}' (known: ${known.join(', ')})`
-      );
-    }
-  }
-  const candidates = await listMusicGenerationCandidates(request);
-  if (purpose) {
-    const entry = resolveSeamSelectionEntry({ seam: MUSIC_GENERATION_PROVIDER_SEAM, purpose });
-    if (entry.kind !== 'governed')
-      throw new Error('[MUSIC_GENERATION_SELECTION] Purpose requires a governed selection');
-    const decision = resolveSeamProviderDecision({
-      ...entry.request,
-      candidates,
-    });
-    if (!decision.provider_id) return `[MUSIC_GENERATION_SELECTION] ${decision.rationale}`;
-    logger.info(
-      `[music_generation_bridge] provider '${decision.provider_id}' selected (${decision.strategy}): ${decision.rationale}`
-    );
-    return decision.ranked;
-  }
-  const eligible = new Set(candidates.filter((c) => c.eligible).map((c) => c.id));
-  const lead = operatorRuleLead(candidates);
-  const preferred = platformOrder();
-  const chain = [
-    ...lead,
-    ...preferred.filter((id) => eligible.has(id) && !lead.includes(id)),
-    ...[...eligible]
-      .filter((id) => !lead.includes(id) && !preferred.includes(id))
-      .sort((left, right) => left.localeCompare(right)),
-  ];
-  if (chain.length > 0) return chain;
-  const reasons = candidates.map((c) => `${c.id}: ${(c.unmet ?? []).join(', ') || 'ineligible'}`);
-  const vocalHint =
-    request.vocals === true
-      ? ' No vocal-capable provider is registered (all local providers are instrumental-only; singing-voice synthesis via SongGeneration-MLX is a documented future path).'
-      : '';
-  return `No available Music Generation provider could be resolved (${reasons.join('; ')}).${vocalHint}`;
+/**
+ * Which providers to try, in order: a purpose yields the governed ranked
+ * chain; an operator rule or mission pin leads the platform default chain;
+ * the remaining eligible providers trail alphabetically. Throws on an
+ * unknown purpose; an unresolvable governed selection surfaces as
+ * ProviderSelectionError.
+ */
+async function resolveMusicProviderChain(request: MusicGenerationRequest): Promise<string[]> {
+  const router = new ProviderChainRouter<MusicGenerationProvider, MusicGenerationRequest>(
+    listMusicGenerationProviders(),
+    chainSpec
+  );
+  return router.resolveProviderIds(request);
 }
 
 /**
@@ -139,14 +104,27 @@ async function resolveMusicProviderChain(
 export async function generateMusic(
   request: MusicGenerationRequest
 ): Promise<MusicGenerationResult> {
-  const explicit = Boolean(request.providerPreference?.length);
-  const resolved = explicit
-    ? request.providerPreference!
-    : await resolveMusicProviderChain(request);
-  if (typeof resolved === 'string') {
-    return failedSelection(platformOrder()[0]!, resolved);
+  let preference: string[];
+  try {
+    preference = await resolveMusicProviderChain(request);
+  } catch (error) {
+    if (error instanceof ProviderSelectionError) {
+      return failedSelection(platformOrder()[0]!, error.message);
+    }
+    throw error;
   }
-  const preference = resolved;
+  if (preference.length === 0) {
+    const candidates = await listMusicGenerationCandidates(request);
+    const reasons = unmetCandidateSummary(candidates);
+    const vocalHint =
+      request.vocals === true
+        ? ' No vocal-capable provider is registered (all local providers are instrumental-only; singing-voice synthesis via SongGeneration-MLX is a documented future path).'
+        : '';
+    return failedSelection(
+      platformOrder()[0]!,
+      `No available Music Generation provider could be resolved (${reasons}).${vocalHint}`
+    );
+  }
 
   let lastError: string | undefined;
   const wantsVocals = request.vocals === true;

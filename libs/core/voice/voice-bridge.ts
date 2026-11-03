@@ -12,7 +12,7 @@
 
 import { logger } from '../core.js';
 import { nowIso } from '../foundation/time.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 import {
   listDemotedProviders,
   reportProviderHealthy,
@@ -146,17 +146,16 @@ const voiceBridgeSeam = createSeam<VoiceBridge>({
   catalog: coreSeamCatalog,
   owner: 'libs/core/voice/voice-bridge.ts',
 });
-let registeredDisposer: (() => void) | null = null;
+const voiceBridgeLifecycle = createSeamLifecycle(voiceBridgeSeam);
 
 export function registerVoiceBridge(bridge: VoiceBridge): () => void {
   if (!bridge || typeof bridge.name !== 'string' || !bridge.name.trim()) {
     throw new TypeError('Voice bridge must have a non-empty name');
   }
-  registeredDisposer = voiceBridgeSeam.register(bridge.name, bridge, {
+  return voiceBridgeLifecycle.register(bridge.name, bridge, {
     provenance: 'builtin',
     source: 'voice-bridge',
   });
-  return registeredDisposer;
 }
 
 export function getVoiceBridge(): VoiceBridge {
@@ -164,8 +163,7 @@ export function getVoiceBridge(): VoiceBridge {
 }
 
 export function resetVoiceBridge(): void {
-  registeredDisposer?.();
-  registeredDisposer = null;
+  voiceBridgeLifecycle.reset();
 }
 
 function basename(p: string): string {

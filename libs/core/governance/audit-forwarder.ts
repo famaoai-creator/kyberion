@@ -24,7 +24,7 @@ import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { redactSensitiveObject } from '../network.js';
 import { registerAuditForwarderPublisher, type AuditEntry } from './audit-chain.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 
 export interface AuditForwarder {
@@ -38,7 +38,7 @@ const auditForwarderSeam = createSeam<AuditForwarder>({
   catalog: coreSeamCatalog,
   owner: 'libs/core/governance/audit-forwarder.ts',
 });
-let registeredDisposer: (() => void) | null = null;
+const auditForwarderLifecycle = createSeamLifecycle(auditForwarderSeam);
 
 export function parseAuditForwarderHeaders(raw: string | undefined): Record<string, string> {
   if (!raw) return {};
@@ -59,11 +59,10 @@ export function parseAuditForwarderHeaders(raw: string | undefined): Record<stri
 }
 
 export function registerAuditForwarder(forwarder: AuditForwarder): () => void {
-  registeredDisposer = auditForwarderSeam.register(forwarder.name, forwarder, {
+  return auditForwarderLifecycle.register(forwarder.name, forwarder, {
     provenance: 'builtin',
     source: 'audit-forwarder',
   });
-  return registeredDisposer;
 }
 
 export function getAuditForwarder(): AuditForwarder {
@@ -71,8 +70,7 @@ export function getAuditForwarder(): AuditForwarder {
 }
 
 export function resetAuditForwarder(): void {
-  registeredDisposer?.();
-  registeredDisposer = null;
+  auditForwarderLifecycle.reset();
 }
 
 export const stubAuditForwarder: AuditForwarder = {

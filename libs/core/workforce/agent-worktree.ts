@@ -15,7 +15,7 @@ import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { withLockSync } from '../foundation/lock-utils.js';
-import { knowledge, rootDir, shared } from '../path-resolver.js';
+import { isPathInsideOrEqual, knowledge, rootDir, shared } from '../path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExecResult,
@@ -235,7 +235,7 @@ export function createAgentWorktree(
   }
   // Never inside tracked content: a worktree inside the checkout must be ignored by it.
   const relative = path.relative(repoRoot, dir);
-  if (!relative.startsWith('..') && !path.isAbsolute(relative)) {
+  if (isPathInsideOrEqual(repoRoot, dir)) {
     if (git(repoRoot, ['check-ignore', '-q', '--no-index', relative]).status !== 0) {
       throw new Error(`[AGENT_WORKTREE_PATH] ${relative} is not gitignored in ${repoRoot}`);
     }

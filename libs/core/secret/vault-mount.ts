@@ -136,8 +136,7 @@ export function isAllowedVaultMountPath(targetPath: string): boolean {
       // broken mount: only the literal target applies
     }
     for (const base of bases) {
-      const rel = path.relative(base, normalizedTarget);
-      if (rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))) {
+      if (pathResolver.isPathInsideOrEqual(base, normalizedTarget)) {
         return true;
       }
     }
