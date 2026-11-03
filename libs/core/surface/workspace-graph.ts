@@ -58,6 +58,8 @@ export interface GraphActorLink {
   actorId: string;
   /** The part this actor plays here: owner, assignee, requester, member, agent … */
   role: string;
+  /** Display name, when the actor is a known member or agent. */
+  label?: string;
 }
 
 export interface GraphNode extends GraphRef {
@@ -124,6 +126,8 @@ export interface WorkspaceGraphSources {
     projectId?: string;
     persona?: string;
     lastEvent?: string;
+    /** The human goal; used as the mission's display name. */
+    goal?: string;
   }>;
   missionDetail(missionId: string): {
     tasks: MissionTaskRecord[];
@@ -197,10 +201,19 @@ function asStaffing(value: unknown): MissionStaffingRecord[] {
   });
 }
 
-function goalOf(state: unknown): string | undefined {
-  const outcome = (state as { outcome_contract?: { requested_result?: unknown } } | undefined)
-    ?.outcome_contract;
-  return typeof outcome?.requested_result === 'string' ? outcome.requested_result : undefined;
+const GENERIC_GOAL = /^Deliver mission outcome aligned to /u;
+
+/** The human goal of a mission: the intent summary, else a non-boilerplate requested result. */
+export function goalOf(state: unknown): string | undefined {
+  const record = state as
+    | { intent?: { goal_summary?: unknown }; outcome_contract?: { requested_result?: unknown } }
+    | undefined;
+  const summary = record?.intent?.goal_summary;
+  if (typeof summary === 'string' && summary.trim()) return summary.trim();
+  const requested = record?.outcome_contract?.requested_result;
+  return typeof requested === 'string' && requested.trim() && !GENERIC_GOAL.test(requested)
+    ? requested.trim()
+    : undefined;
 }
 
 /** Production readers, each run as the read-only graph reader role. */
@@ -252,7 +265,16 @@ export function defaultWorkspaceGraphSources(): WorkspaceGraphSources {
           });
       }),
     projects: () => read(() => listProjectRecords()),
-    missions: () => read(() => listMissionSummaries()),
+    missions: () =>
+      read(() =>
+        listMissionSummaries().map((summary) => {
+          const dir = missionPathOrNull(findMissionPath, summary.id);
+          const goal = dir
+            ? goalOf(readJsonObject(path.join(dir, 'mission-state.json')))
+            : undefined;
+          return goal ? { ...summary, goal } : summary;
+        })
+      ),
     missionDetail: (missionId) =>
       read(() => {
         const dir = missionPathOrNull(findMissionPath, missionId);
@@ -412,15 +434,21 @@ export function collectWorkspaceGraph(
     put({
       kind: 'mission',
       id: mission.id,
-      label: mission.id,
+      label: mission.goal || mission.id,
       status: mission.status,
       tier: mission.tier,
       tenantSlug: mission.tenantSlug,
       organizationId: mission.organizationId,
       projectId: mission.projectId,
       missionId: mission.id,
-      ...(mission.lastEvent ? { summary: mission.lastEvent } : {}),
-      ...(mission.persona ? { facts: { persona: mission.persona } } : {}),
+      ...(mission.persona || mission.lastEvent
+        ? {
+            facts: {
+              ...(mission.persona ? { persona: mission.persona } : {}),
+              ...(mission.lastEvent ? { last_event: mission.lastEvent } : {}),
+            },
+          }
+        : {}),
     });
   }
 
@@ -506,6 +534,16 @@ export function collectWorkspaceGraph(
     });
   }
 
+  // Actor chips read as people, not ids: label every link whose actor is known.
+  const actorLabels = new Map(
+    [...nodes.values()].filter((n) => n.kind === 'actor').map((n) => [n.id, n.label])
+  );
+  for (const node of nodes.values()) {
+    if (!node.actors) continue;
+    node.actors = node.actors.map((link) =>
+      actorLabels.has(link.actorId) ? { ...link, label: actorLabels.get(link.actorId)! } : link
+    );
+  }
   return { generatedAt: now().toISOString(), nodes: [...nodes.values()], degraded };
 }
 
@@ -719,8 +757,22 @@ export function getGraphEntity(
       return true;
     })
     .map((link) => {
-      const actor = find('actor', link.actorId);
-      return { ...link, label: actor?.label ?? link.actorId, known: Boolean(actor) };
+      // Staffing names an agent by its profile slug; the identity ledger by
+      // its full ActorRef (kyberion://agent/<org>/<slug>). Either resolves.
+      const actor =
+        find('actor', link.actorId) ??
+        graph.nodes.find(
+          (n) =>
+            n.kind === 'actor' &&
+            n.id.startsWith('kyberion://agent/') &&
+            n.id.endsWith(`/${link.actorId}`)
+        );
+      return {
+        ...link,
+        ...(actor ? { actorId: actor.id } : {}),
+        label: actor?.label ?? link.actorId,
+        known: Boolean(actor),
+      };
     });
 
   const view: GraphEntityView = { node, lineage, children, actors };

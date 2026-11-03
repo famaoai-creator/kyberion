@@ -3,6 +3,7 @@ import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
 import type { SurfaceAuthorizationContext } from './surface-authorization.js';
 import {
+  goalOf,
   collectWorkspaceGraph,
   filterWorkspaceGraph,
   getGraphEntity,
@@ -288,6 +289,72 @@ describe('workspace graph', () => {
         .map((n) => n.id)
         .sort()
     ).toEqual(['member-alice', 'nhi-builder']);
+  });
+});
+
+describe('workspace graph naming', () => {
+  it('names a mission by its intent, skipping boilerplate results', () => {
+    expect(goalOf({ intent: { goal_summary: ' Ship it ' } })).toBe('Ship it');
+    expect(goalOf({ outcome_contract: { requested_result: 'Publish the site' } })).toBe(
+      'Publish the site'
+    );
+    expect(
+      goalOf({
+        outcome_contract: {
+          requested_result: 'Deliver mission outcome aligned to company://x/vision',
+        },
+      })
+    ).toBeUndefined();
+  });
+
+  it('uses the goal as the mission label and keeps the last event as a fact', () => {
+    const graph = collectWorkspaceGraph(
+      sources({
+        missions: () => [
+          {
+            id: 'MSN-G',
+            status: 'active',
+            tier: 'public',
+            goal: 'Ship it',
+            lastEvent: 'ROUTE (x)',
+          },
+        ],
+      })
+    );
+    expect(graph.nodes.find((n) => n.id === 'MSN-G')).toMatchObject({
+      label: 'Ship it',
+      facts: { last_event: 'ROUTE (x)' },
+    });
+    expect(graph.nodes.find((n) => n.id === 'MSN-G')?.summary).toBeUndefined();
+  });
+
+  it('resolves a staffing slug to the agent ActorRef', () => {
+    const graph = collectWorkspaceGraph(
+      sources({
+        agents: () => [
+          {
+            nhi_id: 'kyberion://agent/acme-hq/builder',
+            display_name: 'Builder',
+            affiliation: { tenant_slug: 'acme' },
+          },
+        ],
+        missionDetail: () => ({
+          tasks: [],
+          staffing: [{ actor_id: 'builder', team_role: 'owner' }],
+        }),
+      })
+    );
+    const view = getGraphEntity(graph, 'mission', 'MSN-A1', {
+      missionDetail: () => ({ tasks: [], staffing: [{ actor_id: 'builder', team_role: 'owner' }] }),
+    })!;
+    expect(view.actors).toContainEqual(
+      expect.objectContaining({
+        actorId: 'kyberion://agent/acme-hq/builder',
+        role: 'owner',
+        label: 'Builder',
+        known: true,
+      })
+    );
   });
 });
 

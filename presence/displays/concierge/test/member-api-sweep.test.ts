@@ -64,9 +64,14 @@ function collectCalls(): Map<string, string> {
 describe('member API sweep', () => {
   it('every literal frontDeskFetch callsite is an allowed member path', () => {
     const violations: string[] = [];
-    const re = /frontDeskFetch\s*\(\s*[`'"]([^`'"]*)[`'"]/g;
     for (const file of clientFiles) {
       const source = fs.readFileSync(file, 'utf8');
+      // Files that import `frontDeskFetch as fetch` call it as plain `fetch(` —
+      // those calls throw at runtime too, so they are swept the same way.
+      const aliased = /frontDeskFetch\s+as\s+fetch\b/.test(source);
+      const re = aliased
+        ? /(?<![\w.])(?:frontDeskFetch|fetch)\s*\(\s*[`'"]([^`'"]*)[`'"]/g
+        : /frontDeskFetch\s*\(\s*[`'"]([^`'"]*)[`'"]/g;
       let match: RegExpExecArray | null;
       while ((match = re.exec(source))) {
         const literal = match[1].replace(/\$\{.*$/, '').replace(/[?#].*$/, '');

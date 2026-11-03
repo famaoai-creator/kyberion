@@ -13879,19 +13879,19 @@
         "qps-ploc": "⟦Şėŧůṗ ŀőř⟧"
       },
       "header.tagline": {
-        "en": "Executive secretary — requests, approvals, outcomes, exceptions",
-        "ja": "CEO秘書 — 依頼・承認・成果・例外",
-        "qps-ploc": "⟦Ėẋėƈůŧïṽė şėƈřėŧȧřẏ — řėɋůėşŧş, ȧṗṗřőṽȧŀş, őůŧƈőɱėş, ėẋƈėṗŧïőñş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+        "en": "Requests, decisions, work and your organization in one place",
+        "ja": "依頼・判断・仕事・組織をひとつの場所で",
+        "qps-ploc": "⟦Řėɋůėşŧş, ḓėƈïşïőñş, ẇőřķ ȧñḓ ẏőůř őřɠȧñïẑȧŧïőñ ïñ őñė ṗŀȧƈė ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
       },
       "header.title": {
-        "en": "Concierge",
-        "ja": "秘書室",
-        "qps-ploc": "⟦Ƈőñƈïėřɠė ŀőř⟧"
+        "en": "Kyberion",
+        "ja": "Kyberion",
+        "qps-ploc": "⟦Ķẏƀėřïőñ ŀőř⟧"
       },
       "header.role_badge": {
-        "en": "Executive secretary",
-        "ja": "CEO秘書",
-        "qps-ploc": "⟦Ėẋėƈůŧïṽė şėƈřėŧȧřẏ ŀőřėɱ ⟧"
+        "en": "Workspace",
+        "ja": "ワークスペース",
+        "qps-ploc": "⟦Ẇőřķşṗȧƈė ŀőř⟧"
       },
       "theme.label": {
         "en": "Theme",

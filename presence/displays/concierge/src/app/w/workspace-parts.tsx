@@ -128,7 +128,7 @@ export function ActorChips({ t, actors }: { t: Translate; actors?: readonly Grap
       {actors.map((actor) => (
         <Badge
           key={`${actor.actorId}:${actor.role}`}
-          label={`${roleLabel(t, actor.role)}: ${actor.actorId}`}
+          label={`${roleLabel(t, actor.role)}: ${actor.label ?? actor.actorId}`}
           tone="neutral"
         />
       ))}
