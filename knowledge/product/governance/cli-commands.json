@@ -2377,6 +2377,16 @@
       "group": "dev"
     },
     {
+      "id": "script.generate.governance-import-baseline",
+      "script": "generate:governance-import-baseline",
+      "command": "generate governance-import-baseline",
+      "noun": "generate",
+      "verb": "governance-import-baseline",
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_governance_import_baseline",
+      "group": "dev"
+    },
+    {
       "id": "script.generate.knowledge-index",
       "script": "generate:knowledge-index",
       "command": "generate knowledge-index",
@@ -2394,6 +2404,16 @@
       "verb": "op-registry",
       "audience": "dev",
       "description": "cli_cmd_script_generate_op_registry",
+      "group": "dev"
+    },
+    {
+      "id": "script.generate.platform-read-baseline",
+      "script": "generate:platform-read-baseline",
+      "command": "generate platform-read-baseline",
+      "noun": "generate",
+      "verb": "platform-read-baseline",
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_platform_read_baseline",
       "group": "dev"
     },
     {

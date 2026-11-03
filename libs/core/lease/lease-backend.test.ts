@@ -64,11 +64,14 @@ describe('writer-lease on a kv-lock stub (distributed contract)', () => {
 
   it('excludes two nodes that share one KV store via async withLock', async () => {
     const store = createSharedKvLeaseStore();
-    const nodeA = createKvLeaseBackendStub({ store, nodeId: 'a', lockDelayMs: 2 });
+    const nodeA = createKvLeaseBackendStub({ store, nodeId: 'a' });
     const nodeB = createKvLeaseBackendStub({ store, nodeId: 'b' });
     const key = '/leases/kv-shared.json';
     const order: string[] = [];
 
+    // A holds the lock until we release this gate — no real-time sleeps.
+    let releaseA!: () => void;
+    const aGate = new Promise<void>((resolve) => (releaseA = resolve));
     const first = withFencedWriterLease<void>({
       resourceId: 'kv-shared',
       ownerId: 'owner-a',
@@ -76,13 +79,11 @@ describe('writer-lease on a kv-lock stub (distributed contract)', () => {
       backend: nodeA,
       fn: async () => {
         order.push('a-enter');
-        await new Promise<void>((resolve) => setTimeout(resolve, 15));
+        await aGate;
         order.push('a-exit');
       },
     });
 
-    // Start B while A still holds the namespace lock — must not interleave.
-    await new Promise<void>((resolve) => setTimeout(resolve, 1));
     const second = withFencedWriterLease<void>({
       resourceId: 'kv-shared',
       ownerId: 'owner-b',
@@ -93,6 +94,10 @@ describe('writer-lease on a kv-lock stub (distributed contract)', () => {
         order.push('b-exit');
       },
     });
+
+    // Flush pending microtasks so B's acquire is queued behind A's held lock.
+    for (let i = 0; i < 50; i++) await Promise.resolve();
+    releaseA();
 
     await Promise.all([first, second]);
     expect(order).toEqual(['a-enter', 'a-exit', 'b-enter', 'b-exit']);
