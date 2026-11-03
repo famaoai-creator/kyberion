@@ -31,16 +31,20 @@ export interface FrontDeskMenuItem {
   min_role: FrontDeskRole;
 }
 
+/**
+ * The rail reads as one product: everyday work, the organization's
+ * structure (one Concierge workspace, `/w`), materials, then management.
+ */
 export const FRONT_DESK_MENU: readonly FrontDeskMenuItem[] = [
   {
-    id: 'home',
-    label_key: 'front_desk:nav_home',
-    sublabel_key: 'front_desk:nav_home_sub',
-    surface: 'presence-studio',
+    id: 'decide',
+    label_key: 'front_desk:nav_decide',
+    sublabel_key: 'front_desk:nav_decide_sub',
+    surface: 'concierge',
     path: '/',
-    min_role: 'viewer',
+    min_role: 'approver',
     group_key: 'front_desk:nav_group_work',
-    icon: 'home',
+    icon: 'approval',
   },
   {
     id: 'ask',
@@ -53,41 +57,11 @@ export const FRONT_DESK_MENU: readonly FrontDeskMenuItem[] = [
     icon: 'chat',
   },
   {
-    id: 'decide',
-    label_key: 'front_desk:nav_decide',
-    sublabel_key: 'front_desk:nav_decide_sub',
-    surface: 'concierge',
-    path: '/',
-    min_role: 'approver',
-    group_key: 'front_desk:nav_group_work',
-    icon: 'approval',
-  },
-  {
-    id: 'progress',
-    label_key: 'front_desk:nav_progress',
-    sublabel_key: 'front_desk:nav_progress_sub',
-    surface: 'presence-studio',
-    path: '/progress',
-    min_role: 'viewer',
-    group_key: 'front_desk:nav_group_work',
-    icon: 'chart',
-  },
-  {
-    id: 'workspace',
-    label_key: 'front_desk:nav_workspace',
-    sublabel_key: 'front_desk:nav_workspace_sub',
-    surface: 'presence-studio',
-    path: '/work',
-    min_role: 'viewer',
-    group_key: 'front_desk:nav_group_work',
-    icon: 'chat',
-  },
-  {
     id: 'missions',
     label_key: 'front_desk:nav_missions',
     sublabel_key: 'front_desk:nav_missions_sub',
-    surface: 'chronos-mirror-v2',
-    path: '/?section=missions',
+    surface: 'concierge',
+    path: '/w/mission',
     min_role: 'viewer',
     group_key: 'front_desk:nav_group_work',
     icon: 'mission',
@@ -96,11 +70,61 @@ export const FRONT_DESK_MENU: readonly FrontDeskMenuItem[] = [
     id: 'work-items',
     label_key: 'front_desk:nav_work_items',
     sublabel_key: 'front_desk:nav_work_items_sub',
-    surface: 'chronos-mirror-v2',
-    path: '/?section=work-items',
-    min_role: 'operator',
+    surface: 'concierge',
+    path: '/w/work_item',
+    min_role: 'viewer',
     group_key: 'front_desk:nav_group_work',
     icon: 'check',
+  },
+  {
+    id: 'approvals',
+    label_key: 'front_desk:nav_approvals',
+    sublabel_key: 'front_desk:nav_approvals_sub',
+    surface: 'concierge',
+    path: '/w/approval',
+    min_role: 'viewer',
+    group_key: 'front_desk:nav_group_work',
+    icon: 'approval',
+  },
+  {
+    id: 'overview',
+    label_key: 'front_desk:nav_overview',
+    sublabel_key: 'front_desk:nav_overview_sub',
+    surface: 'concierge',
+    path: '/w',
+    min_role: 'viewer',
+    group_key: 'front_desk:nav_group_organization',
+    icon: 'home',
+  },
+  {
+    id: 'organizations',
+    label_key: 'front_desk:nav_org_list',
+    sublabel_key: 'front_desk:nav_org_list_sub',
+    surface: 'concierge',
+    path: '/w/organization',
+    min_role: 'viewer',
+    group_key: 'front_desk:nav_group_organization',
+    icon: 'user',
+  },
+  {
+    id: 'projects',
+    label_key: 'front_desk:nav_projects',
+    sublabel_key: 'front_desk:nav_projects_sub',
+    surface: 'concierge',
+    path: '/w/project',
+    min_role: 'viewer',
+    group_key: 'front_desk:nav_group_organization',
+    icon: 'folder',
+  },
+  {
+    id: 'actors',
+    label_key: 'front_desk:nav_actors',
+    sublabel_key: 'front_desk:nav_actors_sub',
+    surface: 'concierge',
+    path: '/w/actor',
+    min_role: 'viewer',
+    group_key: 'front_desk:nav_group_organization',
+    icon: 'user',
   },
   {
     id: 'deliverables',
@@ -214,6 +238,34 @@ export const FRONT_DESK_MENU: readonly FrontDeskMenuItem[] = [
   },
 ] as const;
 
+/**
+ * Destinations other screens still link to (hearing completion, component
+ * groups) but that the rail no longer lists: the workspace pages on
+ * Concierge replaced them as navigation entries.
+ */
+export const FRONT_DESK_LINKED_DESTINATIONS: readonly FrontDeskMenuItem[] = [
+  {
+    id: 'home',
+    label_key: 'front_desk:nav_home',
+    sublabel_key: 'front_desk:nav_home_sub',
+    surface: 'presence-studio',
+    path: '/',
+    min_role: 'viewer',
+    group_key: 'front_desk:nav_group_work',
+    icon: 'home',
+  },
+  {
+    id: 'progress',
+    label_key: 'front_desk:nav_progress',
+    sublabel_key: 'front_desk:nav_progress_sub',
+    surface: 'presence-studio',
+    path: '/progress',
+    min_role: 'viewer',
+    group_key: 'front_desk:nav_group_work',
+    icon: 'chart',
+  },
+] as const;
+
 export const FRONT_DESK_HELP_LINK = {
   id: 'help',
   label_key: 'front_desk:nav_help',
@@ -271,39 +323,65 @@ export function frontDeskRoleFromViewer(input: {
  * defaults to the least-privileged `viewer` role so unknown-role rendering
  * never over-shows privileged items.
  */
-export function resolveFrontDeskMenu(input: {
+export interface FrontDeskMenuResolveInput {
   currentSurface: FrontDeskPrimarySurfaceId;
   availableSurfaces?: FrontDeskAvailableSurfaces;
   ports?: Partial<FrontDeskSurfacePorts>;
   urls?: Partial<Record<FrontDeskSurfaceId, string>>;
   role?: FrontDeskRole;
-}): Array<
-  FrontDeskMenuItem & {
-    href: string;
-    external: boolean;
-    allowed: boolean;
-    scope_query_style: 'snake' | 'camel';
-  }
-> {
+}
+
+export type ResolvedFrontDeskMenuItem = FrontDeskMenuItem & {
+  href: string;
+  external: boolean;
+  allowed: boolean;
+  scope_query_style: 'snake' | 'camel';
+};
+
+export function resolveFrontDeskMenu(
+  input: FrontDeskMenuResolveInput
+): ResolvedFrontDeskMenuItem[] {
+  return resolveItems(FRONT_DESK_MENU, input);
+}
+
+/**
+ * One destination by id — a rail item or a linked-only destination
+ * (`FRONT_DESK_LINKED_DESTINATIONS`) — resolved exactly like the rail.
+ */
+export function resolveFrontDeskDestination(
+  id: string,
+  input: FrontDeskMenuResolveInput
+): ResolvedFrontDeskMenuItem | undefined {
+  return resolveItems([...FRONT_DESK_MENU, ...FRONT_DESK_LINKED_DESTINATIONS], input).find(
+    (item) => item.id === id
+  );
+}
+
+function resolveItems(
+  catalog: readonly FrontDeskMenuItem[],
+  input: FrontDeskMenuResolveInput
+): ResolvedFrontDeskMenuItem[] {
   const ports: FrontDeskSurfacePorts = { ...DEFAULT_FRONT_DESK_PORTS, ...input.ports };
   const role = input.role ?? 'viewer';
-  return FRONT_DESK_MENU.filter(
-    (item) => !isOptionalSurface(item.surface) || Boolean(input.availableSurfaces?.[item.surface])
-  ).map((item) => {
-    const external = item.surface !== input.currentSurface;
-    const base = isOptionalSurface(item.surface)
-      ? input.availableSurfaces![item.surface]!
-      : (input.urls?.[item.surface] ?? `http://127.0.0.1:${ports[item.surface]}`);
-    const href = external ? base.replace(/\/+$/, '') + item.path : item.path;
-    return {
-      ...item,
-      scope_query_style:
-        item.surface === 'chronos-mirror-v2' ? ('snake' as const) : ('camel' as const),
-      href,
-      external,
-      allowed: frontDeskRoleAllows(role, item.min_role),
-    };
-  });
+  return catalog
+    .filter(
+      (item) => !isOptionalSurface(item.surface) || Boolean(input.availableSurfaces?.[item.surface])
+    )
+    .map((item) => {
+      const external = item.surface !== input.currentSurface;
+      const base = isOptionalSurface(item.surface)
+        ? input.availableSurfaces![item.surface]!
+        : (input.urls?.[item.surface] ?? `http://127.0.0.1:${ports[item.surface]}`);
+      const href = external ? base.replace(/\/+$/, '') + item.path : item.path;
+      return {
+        ...item,
+        scope_query_style:
+          item.surface === 'chronos-mirror-v2' ? ('snake' as const) : ('camel' as const),
+        href,
+        external,
+        allowed: frontDeskRoleAllows(role, item.min_role),
+      };
+    });
 }
 
 /**
