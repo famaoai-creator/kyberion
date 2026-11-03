@@ -201,6 +201,45 @@ function realRoot(): { real: string; caseInsensitive: boolean } {
   return realRootCache;
 }
 
+// eslint-disable-next-line no-var
+var realPrimaryRootCache: { root: string; real: string } | undefined;
+
+/**
+ * realpath of the primary checkout root — the second governed root that owns
+ * shared authority state in a linked worktree. Equal to realRoot() anywhere
+ * else, making the primary-root branches below a no-op outside worktrees.
+ */
+function realPrimaryRoot(): { real: string } {
+  const root = path.resolve(pathResolver.primaryCheckoutRootDir());
+  if (realPrimaryRootCache?.root === root) return realPrimaryRootCache;
+  let real = root;
+  try {
+    real = fs.realpathSync.native(root);
+  } catch {
+    // Unresolvable root: the spelled path stays the comparison base.
+  }
+  realPrimaryRootCache = { root, real };
+  return realPrimaryRootCache;
+}
+
+/**
+ * `isInside` contract for the primary checkout, restricted to shared
+ * authority subtrees: returns the primary-relative form of `candidate` only
+ * when it names governed authority state (spelled or real path spelling).
+ * Non-authority paths under the primary checkout stay outside — the worktree
+ * process holds no implicit grant over them.
+ */
+function insidePrimaryAuthority(candidate: string): string | undefined {
+  const primary = pathResolver.primaryCheckoutRootDir();
+  if (primary === pathResolver.rootDir()) return undefined;
+  const abs = path.resolve(candidate);
+  const rel = isInside(path.resolve(primary), abs) ?? isInside(realPrimaryRoot().real, abs);
+  return rel !== undefined &&
+    pathResolver.isAuthorityStoreRelativePath(rel.split(path.sep).join('/'))
+    ? rel
+    : undefined;
+}
+
 /**
  * On a case-insensitive volume, the on-disk spelling of an existing entry
  * `leaf` in the real directory `realDir` (`knowledge/PERSONAL` -> `personal`);
@@ -283,6 +322,7 @@ function physicalPath(absPath: string, hops = 0): string {
     let linkText: string;
     if (link.startsWith(logicalRoot + path.sep)) linkText = fs.readlinkSync(link);
     else if (link.startsWith(physicalRoot + path.sep)) linkText = fs.readlinkSync(link);
+    else if (insidePrimaryAuthority(link) !== undefined) linkText = fs.readlinkSync(link);
     else
       throw Object.assign(new Error('dangling link outside the repository'), { code: 'EOUTSIDE' });
     const parentReal = fs.realpathSync.native(path.dirname(link));
@@ -327,16 +367,31 @@ export function canonicalGuardPath(resolved: string, mode: CanonicalMode): strin
 /** Inverse of toLogicalRoot: the same location under the realpath of the root (no linked prefix). */
 function toPhysicalRoot(logical: string): string {
   const relative = isInside(path.resolve(pathResolver.rootDir()), logical);
-  if (relative === undefined) return logical;
-  return relative === '' ? realRoot().real : path.join(realRoot().real, relative);
+  if (relative !== undefined) {
+    return relative === '' ? realRoot().real : path.join(realRoot().real, relative);
+  }
+  const relPrimary = insidePrimaryAuthority(logical);
+  if (relPrimary !== undefined) {
+    return relPrimary === ''
+      ? realPrimaryRoot().real
+      : path.join(realPrimaryRoot().real, relPrimary);
+  }
+  return logical;
 }
 
 /** Re-express a physical path under the logical root (see the block comment above). */
 function toLogicalRoot(physical: string): string {
   const relative = isInside(realRoot().real, physical);
-  if (relative === undefined) return physical;
-  const logicalRoot = path.resolve(pathResolver.rootDir());
-  return relative === '' ? logicalRoot : path.join(logicalRoot, relative);
+  if (relative !== undefined) {
+    const logicalRoot = path.resolve(pathResolver.rootDir());
+    return relative === '' ? logicalRoot : path.join(logicalRoot, relative);
+  }
+  const relPrimary = insidePrimaryAuthority(physical);
+  if (relPrimary !== undefined) {
+    const logicalPrimary = path.resolve(pathResolver.primaryCheckoutRootDir());
+    return relPrimary === '' ? logicalPrimary : path.join(logicalPrimary, relPrimary);
+  }
+  return physical;
 }
 
 /**
@@ -961,6 +1016,7 @@ function leafIsInode(canonical: string, held: fs.Stats, exact = false): boolean 
     else if (target === physicalRoot) now = fs.statSync(physicalRoot);
     else if (target.startsWith(logicalRoot + path.sep)) now = fs.lstatSync(target);
     else if (target.startsWith(physicalRoot + path.sep)) now = fs.lstatSync(target);
+    else if (insidePrimaryAuthority(target) !== undefined) now = fs.lstatSync(target);
     else now = vaultTargetIdentity(target);
   } catch {
     return false;
@@ -1049,7 +1105,8 @@ export function safeRealpath(filePath: string): string {
   assertScopedMetadataReadable(resolved, filePath);
   if (
     isInside(path.resolve(pathResolver.rootDir()), resolved) === undefined &&
-    isInside(realRoot().real, resolved) === undefined
+    isInside(realRoot().real, resolved) === undefined &&
+    insidePrimaryAuthority(resolved) === undefined
   ) {
     throw new Error(`[PATH_OUTSIDE_REPOSITORY] ${filePath} resolves outside the repository`);
   }
@@ -1072,7 +1129,10 @@ export function safeRealpath(filePath: string): string {
   const canonical = path.join(real, ...missing);
   const root = fs.realpathSync.native(pathResolver.rootDir());
   const relative = path.relative(root, canonical);
-  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+  if (
+    (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) &&
+    insidePrimaryAuthority(canonical) === undefined
+  ) {
     throw new Error(`[PATH_OUTSIDE_REPOSITORY] ${filePath} resolves outside the repository`);
   }
   assertSensitivePathAllowed(canonical, 'read', mediationProbe());
@@ -1218,6 +1278,7 @@ function sameInodeAt(canonical: string, held: fs.Stats): boolean {
     if (target.startsWith(path.resolve(pathResolver.rootDir()) + path.sep))
       now = fs.statSync(target);
     else if (target.startsWith(realRoot().real + path.sep)) now = fs.statSync(target);
+    else if (insidePrimaryAuthority(target) !== undefined) now = fs.statSync(target);
   } catch {
     return false;
   }
@@ -1369,7 +1430,8 @@ export function mkdirGuarded(
     current = path.join(current, name);
     if (
       !current.startsWith(logicalRoot + path.sep) &&
-      !current.startsWith(physicalRoot + path.sep)
+      !current.startsWith(physicalRoot + path.sep) &&
+      insidePrimaryAuthority(current) === undefined
     ) {
       throw new Error(`[SECURITY] Refusing to create ${displayPath}: outside the repository`);
     }
