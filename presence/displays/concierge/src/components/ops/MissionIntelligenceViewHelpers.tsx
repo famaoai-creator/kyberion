@@ -1,7 +1,6 @@
 import { KeyValue, StatusPill, isKbStatus } from '@agent/shared-ui';
 import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
 import { type AttentionItem } from '../../lib/ops/operator-console';
-import { optionalStringField, parseJsonRecord } from '../../lib/ops/json-record';
 import {
   chronosSpeechLocale,
   resolveChronosLocale,
@@ -27,15 +26,19 @@ import type {
   WorkLoopPreview,
 } from './MissionIntelligenceTypes';
 
-const MISSION_INTELLIGENCE_PREFS_KEY = 'chronos.mission-intelligence.prefs';
+/**
+ * The focused mission lives in the URL (`?mission=<id>`), not in browser
+ * storage: the id can come from approval records, so it is never written
+ * to persistent client storage, and a focused view can be shared as a link.
+ */
+const MISSION_QUERY_PARAM = 'mission';
+const MISSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 
 export function loadMissionIntelligenceSelectedMissionId(): string | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = window.localStorage.getItem(MISSION_INTELLIGENCE_PREFS_KEY);
-    if (!raw) return null;
-    const parsed = parseJsonRecord(raw);
-    return parsed ? optionalStringField(parsed, 'selectedMissionId') || null : null;
+    const value = new URL(window.location.href).searchParams.get(MISSION_QUERY_PARAM);
+    return value && MISSION_ID_PATTERN.test(value) ? value : null;
   } catch {
     return null;
   }
@@ -44,12 +47,16 @@ export function loadMissionIntelligenceSelectedMissionId(): string | null {
 export function saveMissionIntelligenceSelectedMissionId(selectedMissionId: string | null): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(
-      MISSION_INTELLIGENCE_PREFS_KEY,
-      JSON.stringify({ selectedMissionId })
-    );
+    const url = new URL(window.location.href);
+    if (selectedMissionId && MISSION_ID_PATTERN.test(selectedMissionId)) {
+      url.searchParams.set(MISSION_QUERY_PARAM, selectedMissionId);
+    } else {
+      url.searchParams.delete(MISSION_QUERY_PARAM);
+    }
+    if (url.href !== window.location.href)
+      window.history.replaceState(window.history.state, '', url);
   } catch {
-    // localStorage may be denied; ignore.
+    // History may be unavailable (sandboxed frame); the selection stays in memory.
   }
 }
 
