@@ -4,7 +4,6 @@ import {
   buildSingleOpPipelinePayload,
   defineActuator,
   defineCatalogBackedActuator,
-  defineLegacyPipelineActuator,
   planActuatorDryRun,
   resolveCliActionKind,
   runAdfActuatorPipeline,
@@ -85,9 +84,7 @@ describe('actuator SDK', () => {
     // steps:[{type, op, params}]}; the kind lives on the step, so a wrapped
     // capture must resolve to capture for --dry-run to actually run it.
     expect(
-      resolveCliActionKind(
-        buildSingleOpPipelinePayload('read', { path: 'a' }, 'capture')
-      )
+      resolveCliActionKind(buildSingleOpPipelinePayload('read', { path: 'a' }, 'capture'))
     ).toBe('capture');
     expect(
       resolveCliActionKind(
@@ -197,32 +194,6 @@ describe('actuator SDK', () => {
       op: 'fail',
       error: 'invalid input',
     });
-  });
-
-  it('adapts a legacy pipeline handler behind the execute operation', async () => {
-    const seen: unknown[] = [];
-    const actuator = defineLegacyPipelineActuator({
-      id: 'legacy-demo',
-      handleAction: (input) => {
-        seen.push(input);
-        return { result: 'ok' };
-      },
-    });
-
-    await expect(
-      actuator.dispatch(
-        'execute',
-        { op: 'demo:run', type: 'transform', params: { value: 1 } },
-        { request_id: 'r1' }
-      )
-    ).resolves.toMatchObject({ ok: true, output: { result: 'ok' } });
-    expect(seen).toEqual([
-      {
-        action: 'pipeline',
-        steps: [{ type: 'transform', op: 'demo:run', params: { value: 1 } }],
-        context: { request_id: 'r1' },
-      },
-    ]);
   });
 
   it('enforces authored catalog schemas before dispatching the legacy handler', async () => {
