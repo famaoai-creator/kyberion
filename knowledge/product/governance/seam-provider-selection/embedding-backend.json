@@ -1,0 +1,64 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "embedding-backend",
+      "default_provider": "mlx",
+      "fallback_purpose": "embed",
+      "traits": {
+        "quality": "Real semantic embeddings vs hash-bucket approximation.",
+        "offline": "Runs without network access or API credentials.",
+        "zero_config": "Works with no operator opt-in or extra configuration."
+      },
+      "providers": {
+        "mlx": {
+          "traits": { "quality": 1, "offline": 1, "zero_config": 0.8 },
+          "trait_basis": {
+            "quality": "declared",
+            "offline": "declared",
+            "zero_config": "declared"
+          },
+          "evidence": [
+            "libs/core/mlx-embedding-backend.ts (MlxEmbeddingBackend: local mlx_embeddings via Apple Silicon; isMlxAvailable() platform gate)"
+          ]
+        },
+        "gemini": {
+          "traits": { "quality": 1, "offline": 0, "zero_config": 0.3 },
+          "trait_basis": {
+            "quality": "declared",
+            "offline": "declared",
+            "zero_config": "declared"
+          },
+          "evidence": [
+            "libs/core/provider/gemini-embedding-backend.ts (GeminiEmbeddingBackend: hosted embedding API; isGeminiEmbeddingAvailable() credential gate)"
+          ]
+        },
+        "local-hash-embedding": {
+          "traits": { "quality": 0.2, "offline": 1, "zero_config": 1 },
+          "trait_basis": {
+            "quality": "declared",
+            "offline": "declared",
+            "zero_config": "declared"
+          },
+          "evidence": [
+            "libs/core/embedding-backend.ts (FNV-1a token-hash buckets, VECTOR_SIZE=64; quality 'approximate', always available)"
+          ]
+        }
+      },
+      "default_chains": {
+        "default": ["mlx", "gemini", "local-hash-embedding"]
+      },
+      "purposes": {
+        "embed": {
+          "description": "Best embedding quality available on this host — local MLX first, hosted Gemini when MLX is unavailable, hash fallback last.",
+          "weights": { "quality": 0.7, "offline": 0.2, "zero_config": 0.1 }
+        },
+        "offline": {
+          "description": "No-network environments — drop the hosted backend from the chain.",
+          "weights": { "offline": 0.8, "zero_config": 0.2 }
+        }
+      }
+    }
+  ]
+}

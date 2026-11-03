@@ -29,7 +29,12 @@ export {
   withTaskCredentialBinding,
   type TaskCredentialBinding,
 } from '../foundation/credential-binding.js';
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from '../seam.js';
 
 export interface ResolveSecretInput {
   key: string;
@@ -67,7 +72,7 @@ const secretResolverSeam = createSeam<SecretResolver>({
   catalog: coreSeamCatalog,
   owner: 'libs/core/secret/secret-resolver.ts',
 });
-let registeredDisposer: (() => void) | null = null;
+const secretResolverLifecycle = createSeamLifecycle(secretResolverSeam);
 
 export function registerSecretResolver(
   resolver: SecretResolver,
@@ -83,11 +88,9 @@ export function registerSecretResolver(
     secretResolverSeam.getOptional()?.name === 'local-credential-allocations' &&
     resolver.name !== 'local-credential-allocations'
   ) {
-    registeredDisposer?.();
-    registeredDisposer = null;
+    secretResolverLifecycle.reset();
   }
-  registeredDisposer = secretResolverSeam.register(resolver.name, resolver, metadata);
-  return registeredDisposer;
+  return secretResolverLifecycle.register(resolver.name, resolver, metadata);
 }
 
 export function getSecretResolver(): SecretResolver | null {
@@ -95,8 +98,7 @@ export function getSecretResolver(): SecretResolver | null {
 }
 
 export function resetSecretResolver(): void {
-  registeredDisposer?.();
-  registeredDisposer = null;
+  secretResolverLifecycle.reset();
 }
 
 function assertSecretReference(reference: SecretReference): void {

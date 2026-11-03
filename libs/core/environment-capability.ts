@@ -21,6 +21,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { hostNodePlatform } from './platform-facts.js';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import { logger } from './core.js';
@@ -190,7 +191,7 @@ export function hasEnvironmentCapabilityProbe(probe_id: string): boolean {
 
 function appliesToHost(cap: EnvironmentCapability): boolean {
   if (!cap.applies_to_platforms || cap.applies_to_platforms.length === 0) return true;
-  return cap.applies_to_platforms.includes(process.platform);
+  return cap.applies_to_platforms.includes(hostNodePlatform());
 }
 
 function stableManifestFingerprint(manifest: EnvironmentManifest): string {
@@ -212,7 +213,7 @@ function stableManifestFingerprint(manifest: EnvironmentManifest): string {
 
 export function resolveCapabilityInstall(
   install: CapabilityInstall,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = hostNodePlatform()
 ): CapabilityInstall {
   const override = install.platform_overrides?.[platform];
   if (!override) return install;
@@ -227,7 +228,7 @@ function stableHostFingerprint(): string {
   return createHash('sha256')
     .update(
       JSON.stringify({
-        platform: process.platform,
+        platform: hostNodePlatform(),
         arch: process.arch,
         node: process.versions.node,
       })
@@ -546,7 +547,7 @@ export async function bootstrapManifest(
     host_fingerprint: stableHostFingerprint(),
     generated_at: generatedAt,
     expires_at: addMinutes(generatedAt, DEFAULT_RECEIPT_TTL_MINUTES),
-    host_platform: process.platform,
+    host_platform: hostNodePlatform(),
     satisfied,
     unsatisfied,
     installs_performed: installsPerformed,

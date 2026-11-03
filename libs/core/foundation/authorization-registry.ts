@@ -305,6 +305,11 @@ const OPERATION_PREFIXES: Readonly<Record<string, RegistryEntry>> = {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
   },
+  // media:video:${provider}:submit|cancel — paid external generation.
+  'media:video:': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+  },
 };
 
 const FAILSAFE_UNDECLARED: RegistryEntry = {

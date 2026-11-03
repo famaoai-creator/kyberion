@@ -12,6 +12,7 @@
  */
 
 import * as path from 'node:path';
+import { isPathInsideOrEqual } from '../path-resolver.js';
 import type {
   ScenarioFinalCheck,
   ScenarioResponseMatcher,
@@ -96,8 +97,7 @@ function spanNames(span: TraceSpan, out: Set<string>): Set<string> {
 function resolveUnderRoot(runRoot: string, relativePath: string): string | null {
   if (path.isAbsolute(relativePath) || relativePath.split(/[\\/]+/u).includes('..')) return null;
   const resolved = path.resolve(runRoot, relativePath);
-  const relative = path.relative(runRoot, resolved);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) return null;
+  if (!isPathInsideOrEqual(runRoot, resolved)) return null;
   return resolved;
 }
 

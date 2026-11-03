@@ -108,12 +108,7 @@ function isSafeTenantDesignPath(
     return false;
   }
   const relative = path.relative(boundary, absolute);
-  if (
-    !relative ||
-    relative === '..' ||
-    relative.startsWith(`..${path.sep}`) ||
-    path.isAbsolute(relative)
-  ) {
+  if (!pathResolver.isPathInside(boundary, absolute)) {
     return false;
   }
 

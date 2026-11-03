@@ -23,7 +23,7 @@ interface SeamDeclaration {
   catalogBacked: boolean;
 }
 
-const SEAM_CONSTRUCTORS = new Set(['createSeam', 'defineSeam']);
+const SEAM_CONSTRUCTORS = new Set(['createSeam', 'defineSeam', 'createProviderRegistry']);
 
 export function readCapabilitySeamsTextFile(filePath: string): string {
   if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
@@ -64,6 +64,26 @@ function literalString(node: ts.Expression | undefined): string | undefined {
   return node && ts.isStringLiteralLike(node) ? node.text.trim() : undefined;
 }
 
+/** Resolve `const NAME = 'literal'` declarations so `seam: NAME` reads as its literal. */
+function constStringLiterals(sourceFile: ts.SourceFile): Map<string, string> {
+  const literals = new Map<string, string>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableStatement(node) && node.declarationList.declarations.length === 1) {
+      const decl = node.declarationList.declarations[0];
+      if (
+        ts.isIdentifier(decl.name) &&
+        decl.initializer &&
+        ts.isStringLiteralLike(decl.initializer)
+      ) {
+        literals.set(decl.name.text, decl.initializer.text.trim());
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return literals;
+}
+
 function scanDeclarations(): SeamDeclaration[] {
   const declarations: SeamDeclaration[] = [];
   for (const file of collectSourceFiles(SOURCE_ROOT)) {
@@ -75,6 +95,7 @@ function scanDeclarations(): SeamDeclaration[] {
       true,
       ts.ScriptKind.TS
     );
+    const consts = constStringLiterals(sourceFile);
     const visit = (node: ts.Node): void => {
       if (
         ts.isCallExpression(node) &&
@@ -83,13 +104,20 @@ function scanDeclarations(): SeamDeclaration[] {
       ) {
         const argument = node.arguments[0];
         if (!argument || !ts.isObjectLiteralExpression(argument)) return;
-        const key = literalString(property(argument, 'key')?.initializer);
+        const factoryBacked = node.expression.text === 'createProviderRegistry';
+        // createProviderRegistry takes { seam } instead of { key } and always
+        // registers with coreSeamCatalog inside the factory.
+        const keyExpression = property(argument, factoryBacked ? 'seam' : 'key')?.initializer;
+        let key = literalString(keyExpression);
+        if (!key && keyExpression && ts.isIdentifier(keyExpression)) {
+          key = consts.get(keyExpression.text);
+        }
         if (!key) return;
         declarations.push({
           key,
           file: path.relative(pathResolver.rootDir(), file),
           line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
-          catalogBacked: property(argument, 'catalog') !== undefined,
+          catalogBacked: factoryBacked || property(argument, 'catalog') !== undefined,
         });
       }
       ts.forEachChild(node, visit);

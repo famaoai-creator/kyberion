@@ -1172,6 +1172,12 @@
     "presence/displays/chronos-mirror-v2/src/lib/computer-sessions.ts": {
       "runtime_path_literal_budget": 2
     },
+    "presence/displays/chronos-mirror-v2/src/lib/customer-decision-parse.ts": {
+      "exported_type_name_duplication_budget": 1
+    },
+    "presence/displays/chronos-mirror-v2/src/lib/json-record.ts": {
+      "exported_type_name_duplication_budget": 1
+    },
     "presence/displays/chronos-mirror-v2/src/lib/viewer-context.ts": {
       "env_direct_read_budget": 1
     },

@@ -8,7 +8,7 @@
  */
 
 import { logger } from '../core.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 import type { IntentBody } from './intent-delta.js';
 import {
   listDemotedProviders,
@@ -95,17 +95,16 @@ const intentExtractorSeam = createSeam<IntentExtractor>({
   catalog: coreSeamCatalog,
   owner: 'libs/core/intent/intent-extractor.ts',
 });
-let registeredDisposer: (() => void) | null = null;
+const intentExtractorLifecycle = createSeamLifecycle(intentExtractorSeam);
 
 export function registerIntentExtractor(extractor: IntentExtractor): () => void {
   if (!extractor || typeof extractor.name !== 'string' || !extractor.name.trim()) {
     throw new TypeError('Intent extractor must have a non-empty name');
   }
-  registeredDisposer = intentExtractorSeam.register(extractor.name, extractor, {
+  return intentExtractorLifecycle.register(extractor.name, extractor, {
     provenance: 'builtin',
     source: 'intent-extractor',
   });
-  return registeredDisposer;
 }
 
 export function getIntentExtractor(): IntentExtractor {
@@ -113,8 +112,7 @@ export function getIntentExtractor(): IntentExtractor {
 }
 
 export function resetIntentExtractor(): void {
-  registeredDisposer?.();
-  registeredDisposer = null;
+  intentExtractorLifecycle.reset();
 }
 
 function summarizeGoal(text: string): string {

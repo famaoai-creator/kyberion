@@ -12,6 +12,7 @@
 
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { assertIntakeVectorEnabled } from '@agent/core/intake-vectors';
 import {
   listVaultMounts,
   mountToVault,
@@ -62,6 +63,7 @@ export async function main(argv: string[], print: (msg: string) => void): Promis
     }
 
     try {
+      assertIntakeVectorEnabled('vault_mount');
       const entry = mountToVault(source, name);
       if (parsed.json) {
         print(JSON.stringify(entry, null, 2));

@@ -51,8 +51,7 @@ function tenantDesignThemeOverlayCatalog(filePath: string) {
 }
 
 function isWithinRoot(filePath: string, rootDir: string): boolean {
-  const relative = path.relative(path.resolve(rootDir), path.resolve(filePath));
-  return Boolean(relative) && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+  return pathResolver.isPathInside(path.resolve(rootDir), path.resolve(filePath));
 }
 
 /** Load a tenant design override through one schema and secure path boundary. */

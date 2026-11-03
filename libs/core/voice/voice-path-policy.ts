@@ -9,8 +9,7 @@ function projectRoot(): string {
 }
 
 function isWithin(child: string, parent: string): boolean {
-  const relative = path.relative(parent, child);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+  return pathResolver.isPathInsideOrEqual(parent, child);
 }
 
 function approvedRoots(kind: VoicePathKind): string[] {

@@ -1,4 +1,4 @@
-import { coreSeamCatalog, createSeam } from './seam.js';
+import { coreSeamCatalog, createSeam, createSeamLifecycle } from './seam.js';
 
 export interface EmbeddingBackend {
   name: string;
@@ -9,14 +9,16 @@ export interface EmbeddingBackend {
   embedBatch(texts: string[]): Promise<Float32Array[]>;
 }
 
+export const EMBEDDING_BACKEND_SEAM = 'embedding-backend';
+
 const VECTOR_SIZE = 64;
 const embeddingBackendSeam = createSeam<EmbeddingBackend>({
-  key: 'embedding-backend',
+  key: EMBEDDING_BACKEND_SEAM,
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
   owner: 'libs/core/embedding-backend.ts',
 });
-let registeredBackendDisposer: (() => void) | null = null;
+const embeddingBackendLifecycle = createSeamLifecycle(embeddingBackendSeam);
 
 function hashToken(token: string): number {
   let hash = 2166136261;
@@ -88,16 +90,14 @@ export function registerEmbeddingBackend(backend: EmbeddingBackend | null): () =
   if (!backend || typeof backend.name !== 'string' || !backend.name.trim()) {
     throw new TypeError('Embedding backend must have a non-empty name');
   }
-  registeredBackendDisposer = embeddingBackendSeam.register(backend.name, backend, {
+  return embeddingBackendLifecycle.register(backend.name, backend, {
     provenance: 'builtin',
     source: 'embedding-backend',
   });
-  return registeredBackendDisposer;
 }
 
 export function resetEmbeddingBackend(): void {
-  registeredBackendDisposer?.();
-  registeredBackendDisposer = null;
+  embeddingBackendLifecycle.reset();
 }
 
 export function cosineSimilarity(a: Float32Array, b: Float32Array): number {

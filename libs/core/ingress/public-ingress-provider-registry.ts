@@ -14,6 +14,7 @@
  * wins. The chosen route and the reason are part of the result.
  */
 import { pathToFileURL } from 'node:url';
+import { hostNodePlatform } from '../platform-facts.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { pathResolver } from '../path-resolver.js';
@@ -163,7 +164,7 @@ function unsupported(
 /** Readiness of one descriptor; never throws (failures are `unsupported` with a reason). */
 export async function probePublicIngressDescriptor(
   descriptor: PublicIngressProviderDescriptor,
-  platform: string = process.platform
+  platform: string = hostNodePlatform()
 ): Promise<IngressReadiness> {
   if (descriptor.status === 'planned') {
     return unsupported(descriptor, 'provider module not implemented yet (catalog status planned)');
