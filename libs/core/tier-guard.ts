@@ -1172,15 +1172,24 @@ export function validateWritePermission(
   }
 
   // 1.5 Tenant scope — deny cross-tenant writes when the persona is tenant-bound.
-  const tenantDenial = checkTenantScope(
-    policy,
-    relativePath,
-    tenantSlug,
-    brokeredTenants,
-    brokerApproval,
-    authorities,
-    { kind: operation, role: currentRole }
-  );
+  // The personal approval store partitions by owner hash, not tenant: its
+  // `shared` segment is the untenanted sentinel and the owner-bound I/O
+  // capability window is the authorization boundary, so a tenant-bound host
+  // must not hit a cross-tenant denial before that window is consulted.
+  const personalApprovalStoreIo =
+    currentRole === PERSONAL_APPROVAL_STORE_ROLE &&
+    personalApprovalIoAllowed(relativePath, operation);
+  const tenantDenial = personalApprovalStoreIo
+    ? null
+    : checkTenantScope(
+        policy,
+        relativePath,
+        tenantSlug,
+        brokeredTenants,
+        brokerApproval,
+        authorities,
+        { kind: operation, role: currentRole }
+      );
   if (tenantDenial) return tenantDenial;
 
   // Durable state contains tier data; broad runtime defaults must not grant
@@ -1372,15 +1381,24 @@ export function inspectReadPermission(
       const protectedMatch = extractTenantFromProtectedPrefix(relativePath, cfg.protectedPrefixes);
       if (protectedMatch) {
         const identity = resolvePolicyIdentityContext();
-        const denial = checkTenantScope(
-          loaded.policy,
-          relativePath,
-          identity.tenantSlug,
-          identity.brokeredTenants,
-          identity.brokerApproval,
-          identity.authorities,
-          { kind: 'read', role: identity.role }
-        );
+        // The personal approval store partitions by owner hash, not tenant:
+        // its `shared` segment is the untenanted sentinel and the owner-bound
+        // I/O capability window is the authorization boundary, so a
+        // tenant-bound host must not hit a cross-tenant denial first.
+        const personalApprovalStoreIo =
+          identity.role === PERSONAL_APPROVAL_STORE_ROLE &&
+          personalApprovalIoAllowed(relativePath, operation);
+        const denial = personalApprovalStoreIo
+          ? null
+          : checkTenantScope(
+              loaded.policy,
+              relativePath,
+              identity.tenantSlug,
+              identity.brokeredTenants,
+              identity.brokerApproval,
+              identity.authorities,
+              { kind: 'read', role: identity.role }
+            );
         if (denial) return denial;
         // The ledger allow decisions below judge a knowledge mirror path; the
         // role's deny_read carve-outs must still see the real ledger path.
