@@ -9,6 +9,40 @@ import { gitFetch } from '../vcs/git.js';
 import { assertVcsCwdScope } from '../vcs/cwd-scope.js';
 import { pathResolver } from '../path-resolver.js';
 
+/** Pre-allocation check, not a lock: main may move later; clone then fails closed. */
+export function assertReviewedLocalDevelopmentBaseline(
+  source: string,
+  baseline: string,
+  assertCurrent: () => void
+): void {
+  if (path.resolve(source) !== path.resolve(pathResolver.rootDir()))
+    throw new Error('Private clone source must be the trusted governance checkout');
+  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(baseline))
+    throw new Error('Offline clone requires an exact reviewed immutable commit');
+  const read = (args: string[]) => {
+    assertCurrent();
+    assertMissionOwnerPath('verify the reviewed local development baseline');
+    assertVcsCwdScope(source);
+    const result = safeExecResult(
+      'git',
+      args,
+      hardenedLocalWorkspaceGitOptions({
+        cwd: source,
+        timeoutMs: 10_000,
+        maxOutputMB: 1,
+        env: { GIT_NO_REPLACE_OBJECTS: '1' },
+      })
+    );
+    assertCurrent();
+    if (result.status !== 0 || result.error)
+      throw new Error('Offline clone baseline must exist and be reachable from local main');
+    return result.stdout.trim();
+  };
+  if (read(['rev-parse', '--verify', `${baseline}^{commit}`]) !== baseline)
+    throw new Error('Offline clone baseline is not the reviewed local commit');
+  read(['merge-base', '--is-ancestor', baseline, 'refs/heads/main']);
+}
+
 export function createDevelopmentWorkspaceGitRunner(
   cwd: string,
   sourcePaths: readonly string[],
@@ -61,7 +95,8 @@ export function cloneIsolatedDevelopmentRepository(
   source: string,
   target: string,
   repositoryUrl: string,
-  assertCurrent: () => void
+  assertCurrent: () => void,
+  options: { localBaselineCommit?: string } = {}
 ): void {
   if (path.resolve(source) !== path.resolve(pathResolver.rootDir()))
     throw new Error('Private clone source must be the trusted governance checkout');
@@ -73,12 +108,22 @@ export function cloneIsolatedDevelopmentRepository(
     const result = safeExecResult(
       'git',
       args,
-      hardenedLocalWorkspaceGitOptions({ cwd, timeoutMs: 120_000, maxOutputMB: 2 })
+      hardenedLocalWorkspaceGitOptions({
+        cwd,
+        timeoutMs: 120_000,
+        maxOutputMB: 2,
+        env: { GIT_NO_REPLACE_OBJECTS: '1' },
+      })
     );
     assertCurrent();
     if (result.status !== 0 || result.error)
       throw new Error('Private repository setup failed; reconcile its registered workspace');
+    return result.stdout.trim();
   };
+  const localBaseline = options.localBaselineCommit;
+  if (localBaseline !== undefined) {
+    assertReviewedLocalDevelopmentBaseline(source, localBaseline, assertCurrent);
+  }
   execute(
     [
       'clone',
@@ -96,6 +141,16 @@ export function cloneIsolatedDevelopmentRepository(
     ],
     source
   );
+  if (localBaseline !== undefined) {
+    // This clone contains source main's reachable committed history, not an
+    // export/sanitization of that history. Never copy untracked runtime state.
+    // No network refresh or remote publication destination exists in this mode.
+    execute(['remote', 'remove', 'origin'], target);
+    execute(['checkout', '-B', 'main', localBaseline], target);
+    if (execute(['rev-parse', '--verify', 'HEAD'], target) !== localBaseline)
+      throw new Error('Offline clone HEAD differs from its reviewed baseline');
+    return;
+  }
   execute(['remote', 'set-url', 'origin', repositoryUrl], target);
   // Only this just-created, unclaimed clone may initialize its baseline. Local
   // main in the governance checkout can lag the reviewed destination.

@@ -3,6 +3,7 @@ import {
   type SurfaceAsyncChannel,
 } from '../surface/channel-surface-types.js';
 import type { ArtifactReviewerProfile } from './mission-review-gates.js';
+import type { TaskSourceWorkspace } from '../foundation/task-tool-grant-validation.js';
 import { extractSurfaceBlocks } from '../surface/surface-response-blocks.js';
 
 export interface SlackPayload {
@@ -92,6 +93,8 @@ export interface PlannedNextTask {
   resource_claims?: string[];
   /** Owner-authored exact source-file grant; preserved through progress rewrites. */
   source_edit_paths?: string[];
+  /** Original exact source grant and immutable offline baseline; no execution authority. */
+  source_workspace?: TaskSourceWorkspace;
   /** Approval remains required unless the owner explicitly grants otherwise. */
   source_edit_requires_approval?: boolean;
   /** Owner-authored exact repository pipeline references. */
