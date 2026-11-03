@@ -65,13 +65,15 @@ export function entryExists(p: string): boolean {
       stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
     else if (candidate.startsWith(physicalRoot + path.sep))
       stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
-    else if (
-      (candidate.startsWith(primaryLogical + path.sep) ||
-        candidate.startsWith(primaryReal + path.sep)) &&
-      insidePrimaryAuthority(candidate) !== undefined
-    )
+    else if (candidate.startsWith(primaryLogical + path.sep)) {
+      if (insidePrimaryAuthority(candidate) === undefined)
+        throw Object.assign(new Error('path is outside the repository'), { code: 'EOUTSIDE' });
       stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
-    else throw Object.assign(new Error('path is outside the repository'), { code: 'EOUTSIDE' });
+    } else if (candidate.startsWith(primaryReal + path.sep)) {
+      if (insidePrimaryAuthority(candidate) === undefined)
+        throw Object.assign(new Error('path is outside the repository'), { code: 'EOUTSIDE' });
+      stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
+    } else throw Object.assign(new Error('path is outside the repository'), { code: 'EOUTSIDE' });
   } catch (error) {
     if (errnoCode(error) === 'ENOTDIR') return false;
     rethrowAsErrno(error, 'lstat');
@@ -263,12 +265,11 @@ function onDiskLeaf(realDir: string, leaf: string): string {
   let candidate: string | undefined;
   if (joined.startsWith(path.resolve(pathResolver.rootDir()) + path.sep)) candidate = joined;
   else if (joined.startsWith(realRoot().real + path.sep)) candidate = joined;
-  else if (
-    (joined.startsWith(path.resolve(pathResolver.primaryCheckoutRootDir()) + path.sep) ||
-      joined.startsWith(realPrimaryRoot().real + path.sep)) &&
-    insidePrimaryAuthority(joined) !== undefined
-  )
-    candidate = joined;
+  else if (joined.startsWith(path.resolve(pathResolver.primaryCheckoutRootDir()) + path.sep)) {
+    if (insidePrimaryAuthority(joined) !== undefined) candidate = joined;
+  } else if (joined.startsWith(realPrimaryRoot().real + path.sep)) {
+    if (insidePrimaryAuthority(joined) !== undefined) candidate = joined;
+  }
   if (candidate === undefined) return leaf;
   let stat: fs.Stats | undefined;
   try {
@@ -339,13 +340,19 @@ function physicalPath(absPath: string, hops = 0): string {
     let linkText: string;
     if (link.startsWith(logicalRoot + path.sep)) linkText = fs.readlinkSync(link);
     else if (link.startsWith(physicalRoot + path.sep)) linkText = fs.readlinkSync(link);
-    else if (
-      (link.startsWith(path.resolve(pathResolver.primaryCheckoutRootDir()) + path.sep) ||
-        link.startsWith(realPrimaryRoot().real + path.sep)) &&
-      insidePrimaryAuthority(link) !== undefined
-    )
+    else if (link.startsWith(path.resolve(pathResolver.primaryCheckoutRootDir()) + path.sep)) {
+      if (insidePrimaryAuthority(link) === undefined)
+        throw Object.assign(new Error('dangling link outside the repository'), {
+          code: 'EOUTSIDE',
+        });
       linkText = fs.readlinkSync(link);
-    else
+    } else if (link.startsWith(realPrimaryRoot().real + path.sep)) {
+      if (insidePrimaryAuthority(link) === undefined)
+        throw Object.assign(new Error('dangling link outside the repository'), {
+          code: 'EOUTSIDE',
+        });
+      linkText = fs.readlinkSync(link);
+    } else
       throw Object.assign(new Error('dangling link outside the repository'), { code: 'EOUTSIDE' });
     const parentReal = fs.realpathSync.native(path.dirname(link));
     const target = path.resolve(parentReal, linkText);
@@ -1305,7 +1312,11 @@ function sameInodeAt(canonical: string, held: fs.Stats): boolean {
     if (target.startsWith(path.resolve(pathResolver.rootDir()) + path.sep))
       now = fs.statSync(target);
     else if (target.startsWith(realRoot().real + path.sep)) now = fs.statSync(target);
-    else if (insidePrimaryAuthority(target) !== undefined) now = fs.statSync(target);
+    else if (target.startsWith(path.resolve(pathResolver.primaryCheckoutRootDir()) + path.sep)) {
+      if (insidePrimaryAuthority(target) !== undefined) now = fs.statSync(target);
+    } else if (target.startsWith(realPrimaryRoot().real + path.sep)) {
+      if (insidePrimaryAuthority(target) !== undefined) now = fs.statSync(target);
+    }
   } catch {
     return false;
   }
