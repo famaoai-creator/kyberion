@@ -1,5 +1,5 @@
 import type {
-  JsonRecord,
+  VideoGenerationJsonRecord,
   VideoGenerationProvider,
   VideoGenerationRequest,
   VideoGenerationStatus,
@@ -26,7 +26,7 @@ export class GoogleVeoProvider implements VideoGenerationProvider {
 
   async submit(request: VideoGenerationRequest): Promise<VideoGenerationSubmission> {
     const key = this.apiKey();
-    const instance: JsonRecord = { prompt: request.prompt };
+    const instance: VideoGenerationJsonRecord = { prompt: request.prompt };
     if (request.first_frame_image?.startsWith('data:')) {
       const match = request.first_frame_image.match(/^data:([^;]+);base64,(.+)$/u);
       if (match) instance.image = { inlineData: { mimeType: match[1], data: match[2] } };
@@ -35,7 +35,7 @@ export class GoogleVeoProvider implements VideoGenerationProvider {
       const match = request.last_frame_image.match(/^data:([^;]+);base64,(.+)$/u);
       if (match) instance.lastFrame = { inlineData: { mimeType: match[1], data: match[2] } };
     }
-    const parameters: JsonRecord = {};
+    const parameters: VideoGenerationJsonRecord = {};
     if (request.aspect_ratio) parameters.aspectRatio = request.aspect_ratio;
     if (request.resolution) parameters.resolution = request.resolution;
     const operation = await jsonRequest(
