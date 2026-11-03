@@ -22,7 +22,16 @@ export interface MissionWorkflowSelectionInput {
   missionTypeHint?: string;
   intentId?: string;
   taskType?: string;
+  /** When set, refactoring utterance markers promote taskType to `refactoring`. */
+  utterance?: string;
 }
+
+export {
+  loadRefactoringUtterancePatterns,
+  resolveEffectiveMissionType,
+  utteranceRequestsRefactoring,
+} from './mission-refactoring-routing.js';
+import { resolveEffectiveMissionType } from './mission-refactoring-routing.js';
 
 export type WorkflowPhaseGateCheckKind =
   | 'evidence_exists'
@@ -229,7 +238,12 @@ export function resolveMissionWorkflowDesign(
   const projectedExecutionShape = projectExecutionShapeToWorkflowShape(
     normalizeExecutionShape(input.executionShape)
   );
-  const missionTypeHint = normalize(input.missionTypeHint);
+  const missionTypeHint = normalize(
+    resolveEffectiveMissionType({
+      missionType: input.missionTypeHint,
+      utterance: input.utterance,
+    }) ?? input.missionTypeHint
+  );
   const meetingFacilitationHint = missionTypeHint === 'meeting_facilitation';
   // Mission-type hints route type-first creations (`mission create <tier>
   // <tenant> <type>`) onto their dedicated process templates when the intent
@@ -289,6 +303,17 @@ export function resolveMissionWorkflowDesign(
       intentId: 'contract-review',
       taskType: 'contract_review',
     },
+    // Structure-only code change: same mission_class as feature work, but a
+    // dedicated task_type so the refactoring workflow (and its playbook) win
+    // over code-change-aidlc via first-match on task_types.
+    refactoring: {
+      missionClass: 'code_change',
+      taskType: 'refactoring',
+    },
+    code_change: {
+      missionClass: 'code_change',
+      taskType: 'development',
+    },
     customer_onboarding: {
       missionClass: 'customer_engagement',
       intentId: 'customer-onboarding',
@@ -316,7 +341,9 @@ export function resolveMissionWorkflowDesign(
     riskProfile: normalize(input.riskProfile) || 'review_required',
     executionShape: projectedExecutionShape,
     intentId: normalize(input.intentId) || hint?.intentId,
-    taskType: normalize(input.taskType) || hint?.taskType,
+    // Prefer an explicit taskType; otherwise take the mission-type hint's
+    // mapped task type (e.g. refactoring → taskType refactoring).
+    taskType: normalize(input.taskType) || hint?.taskType || missionTypeHint,
   };
 
   const selected =

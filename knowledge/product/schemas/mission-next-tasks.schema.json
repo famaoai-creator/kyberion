@@ -6,6 +6,22 @@
   "items": {
     "type": "object",
     "properties": {
+      "source_workspace": {
+        "type": "object",
+        "required": ["version", "baseline_commit", "source_paths"],
+        "properties": {
+          "version": { "const": 1 },
+          "baseline_commit": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+          "source_paths": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "additionalProperties": false
+      },
       "compaction_durability": {
         "type": "object",
         "required": ["retention_ms"],

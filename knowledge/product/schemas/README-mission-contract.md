@@ -36,5 +36,6 @@ the moment `knowledge/` is reorganized — this happened twice (`mission-governa
 `product`/`public` reorg and were only caught by manual audit). Declaring tier+tags survives a
 directory move; only the runtime resolver needs to know the new physical layout.
 
-As of 2026-07-23 no mission template in `mission-templates.json` populates this field yet — it's
-available for template authors adding tier-aware, workflow-scoped knowledge to a mission type.
+As of 2026-11-03 the `refactoring` mission template declares `knowledge_injections` for
+orchestration/refactoring tags; other templates may still omit the field until they need
+tier-aware, workflow-scoped knowledge.
