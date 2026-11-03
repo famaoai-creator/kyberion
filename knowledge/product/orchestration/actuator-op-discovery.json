@@ -15549,7 +15549,17 @@
               }
             },
             "additionalProperties": false,
-            "required": ["html"]
+            "anyOf": [
+              {
+                "required": ["html"]
+              },
+              {
+                "required": ["path"]
+              },
+              {
+                "required": ["from"]
+              }
+            ]
           },
           "examples": [
             {
