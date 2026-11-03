@@ -45,6 +45,11 @@
           ]
         }
       },
+      "default_chains": {
+        "platform:apple_silicon": ["musicgen_mlx", "musicgen_audiogen", "stable_audio_3"],
+        "platform:generic": ["stable_audio_3", "musicgen_mlx", "musicgen_audiogen"],
+        "default": ["stable_audio_3", "musicgen_mlx", "musicgen_audiogen"]
+      },
       "purposes": {
         "quality": {
           "description": "Musical fidelity matters most (final soundtracks, deliverables).",

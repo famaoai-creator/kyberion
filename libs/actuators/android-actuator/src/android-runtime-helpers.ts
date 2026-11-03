@@ -1,4 +1,9 @@
 import { executeLlmDecideOp } from '@agent/core/semantic-decide';
+import {
+  buildSessionHandoffArtifact,
+  ensureParentDir,
+  resolveAppProfile,
+} from '@agent/core/mobile-runtime-helpers';
 import { decodeEntities } from '@agent/core/text-escaping';
 import {
   assertSafeRepositoryPath,
@@ -13,7 +18,6 @@ import { resolveAdbBin } from '@agent/core/tool/tool-binary-resolvers';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolvePipelineContextValues } from '@agent/core/logic-utils';
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
-import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry, sleep, getRetryDefaults } from '@agent/core/async-utils';
 import { defineCatalog, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 
@@ -1019,13 +1023,6 @@ function dumpUiTree(serial: string, options?: AndroidAction['options']): string 
   }
 }
 
-function ensureParentDir(targetPath: string): void {
-  const dir = path.dirname(targetPath);
-  if (!safeExistsSync(dir)) {
-    safeMkdir(dir, { recursive: true });
-  }
-}
-
 function resolveUiTreeSource(
   params: Record<string, unknown>,
   ctx: Record<string, any>,
@@ -1228,99 +1225,6 @@ function serializeTapTarget(target: AndroidTapTarget) {
 
 function loadAndroidUiDefaults(): AndroidUiDefaults {
   return androidUiDefaultsCatalog.load();
-}
-
-function buildSessionHandoffArtifact(
-  params: Record<string, unknown>,
-  ctx: Record<string, any>,
-  resolve: (val: unknown) => unknown,
-  platform: 'android' | 'ios'
-) {
-  const profile = resolveAppProfile(params, ctx);
-  const targetUrl = String(
-    resolve(
-      params.target_url ||
-        profile?.webview?.session_handoff?.target_url ||
-        profile?.webview?.entry_url ||
-        ''
-    )
-  ).trim();
-  if (!targetUrl)
-    throw new Error(
-      'emit_session_handoff requires params.target_url or app_profile.webview.session_handoff.target_url'
-    );
-
-  const localStorage =
-    resolveObjectRef(params.local_storage_from, ctx) || resolve(params.local_storage) || {};
-  const sessionStorage =
-    resolveObjectRef(params.session_storage_from, ctx) || resolve(params.session_storage) || {};
-  const headers = resolveObjectRef(params.headers_from, ctx) || resolve(params.headers) || {};
-  const cookies = resolveObjectRef(params.cookies_from, ctx) || resolve(params.cookies) || [];
-
-  return {
-    kind: 'webview-session-handoff',
-    target_url: targetUrl,
-    origin: safeOrigin(targetUrl),
-    browser_session_id: String(
-      resolve(
-        params.browser_session_id ||
-          profile?.webview?.session_handoff?.browser_session_id ||
-          `${platform}-webview`
-      )
-    ),
-    prefer_persistent_context:
-      params.prefer_persistent_context ??
-      profile?.webview?.session_handoff?.prefer_persistent_context ??
-      true,
-    cookies,
-    local_storage: localStorage,
-    session_storage: sessionStorage,
-    headers,
-    source: {
-      platform,
-      app_id: profile?.app_id || ctx.app_id || `${platform}-app`,
-    },
-  };
-}
-
-function resolveObjectRef(key: any, ctx: Record<string, any>): any {
-  if (!key || typeof key !== 'string') return undefined;
-  return ctx[key];
-}
-
-function safeOrigin(targetUrl: string): string {
-  try {
-    return new URL(targetUrl).origin;
-  } catch {
-    return '';
-  }
-}
-
-function resolveAppProfile(
-  params: Record<string, unknown>,
-  ctx: Record<string, any>
-): MobileAppProfile | undefined {
-  if (params.app_profile && typeof params.app_profile === 'object') {
-    assertValidMobileAppProfile(params.app_profile, 'params.app_profile');
-    return params.app_profile as MobileAppProfile;
-  }
-  if (params.profile && typeof params.profile === 'object') {
-    assertValidMobileAppProfile(params.profile, 'params.profile');
-    return params.profile as MobileAppProfile;
-  }
-  if (typeof params.app_profile_from === 'string' && ctx[params.app_profile_from]) {
-    assertValidMobileAppProfile(ctx[params.app_profile_from], `ctx.${params.app_profile_from}`);
-    return ctx[params.app_profile_from] as MobileAppProfile;
-  }
-  if (typeof params.profile_from === 'string' && ctx[params.profile_from]) {
-    assertValidMobileAppProfile(ctx[params.profile_from], `ctx.${params.profile_from}`);
-    return ctx[params.profile_from] as MobileAppProfile;
-  }
-  if (ctx.app_profile) {
-    assertValidMobileAppProfile(ctx.app_profile, 'ctx.app_profile');
-    return ctx.app_profile as MobileAppProfile;
-  }
-  return undefined;
 }
 
 function matchUiNodes(

@@ -14,6 +14,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { isMacOS } from './platform-facts.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
@@ -132,7 +133,7 @@ export class MlxEmbeddingBackend implements EmbeddingBackend {
 
 /** Returns true when macOS + mlx_embed.py script is present. */
 export function isMlxAvailable(): boolean {
-  if (process.platform !== 'darwin') return false;
+  if (!isMacOS()) return false;
   return safeExistsSync(rootResolve('scripts/mlx_embed.py'));
 }
 
@@ -144,7 +145,7 @@ export function probeMlxEmbeddingBackend(env: NodeJS.ProcessEnv = process.env): 
 } {
   const scriptPath = rootResolve('scripts/mlx_embed.py');
   return {
-    available: process.platform === 'darwin' && safeExistsSync(scriptPath),
+    available: isMacOS() && safeExistsSync(scriptPath),
     model: getRegisteredEnvText('KYBERION_MLX_EMBED_MODEL', { env }) ?? DEFAULT_MODEL,
     scriptPath,
   };

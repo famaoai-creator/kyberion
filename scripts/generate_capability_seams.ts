@@ -89,6 +89,22 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
       'libs/actuators/voice-actuator/src/voice-action-helpers.ts',
     ],
   },
+  'authn-principal-resolver': {
+    declaration: 'libs/core/authn-principal-resolver.ts',
+    consumers: [
+      'libs/core/surface/surface-authn.ts',
+      'libs/core/surface/oidc-browser-login.ts',
+      'libs/core/organization/company-setup-workflow.ts',
+    ],
+  },
+  'authz-policy-engine': {
+    declaration: 'libs/core/authz-policy-engine.ts',
+    consumers: [
+      'libs/core/authz-providers.ts',
+      'libs/core/surface/surface-authorization.ts',
+      'libs/core/agent-execution-context.ts',
+    ],
+  },
   'ocr-provider': {
     declaration: 'libs/core/ocr/provider-registry.ts',
     consumers: ['libs/core/ocr/router.ts', 'libs/core/ocr-bridge.ts'],
@@ -112,6 +128,14 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     consumers: [
       'libs/core/media/music-generation/router.ts',
       'libs/core/media/music-generation-bridge.ts',
+    ],
+  },
+  'video-generation-provider-adapter': {
+    declaration: 'libs/core/media/video-generation/provider-registry.ts',
+    consumers: [
+      'libs/core/media/video-generation/builtin-adapters.ts',
+      'libs/core/media/video-generation/provider.ts',
+      'libs/actuators/media-generation-actuator/src/video-generation-provider.ts',
     ],
   },
   'risky-approval-override': {
@@ -200,6 +224,10 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/risky-op-approval-port.ts',
     consumers: ['libs/core/risky-op-registry.ts', 'libs/core/mesh/acp-mediator.ts'],
   },
+  'secret-provider': {
+    declaration: 'libs/core/secret/provider-registry.ts',
+    consumers: ['libs/core/secret/secret-bridge.ts'],
+  },
   'secret-resolver': {
     declaration: 'libs/core/secret/secret-resolver.ts',
     consumers: ['libs/core/service/service-secret-resolver.ts'],
@@ -280,7 +308,11 @@ function validateRoles(bindings: ReturnType<typeof loadCoreSeamBindings>): strin
       continue;
     }
     const declarationSource = source(role.declaration);
-    if (!declarationSource.includes('createSeam') && !declarationSource.includes('defineSeam')) {
+    if (
+      !declarationSource.includes('createSeam') &&
+      !declarationSource.includes('defineSeam') &&
+      !declarationSource.includes('createProviderRegistry')
+    ) {
       findings.push(`${binding.key}: declaration has no createSeam call (${role.declaration})`);
     }
     if (role.consumers.length === 0) findings.push(`${binding.key}: consumer list is empty`);

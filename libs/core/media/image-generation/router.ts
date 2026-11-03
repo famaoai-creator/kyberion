@@ -11,14 +11,8 @@ import {
   recordReferenceEgressReceipt,
   referenceImageViolation,
 } from '../image-reference-consent.js';
-import {
-  explainSeamProviderDecision,
-  listSeamSelectionPurposes,
-  resolveSeamProviderDecision,
-  resolveSeamSelectionEntry,
-  type ResolveSeamProviderOptions,
-  type SeamProviderCandidate,
-} from '../../seam-provider-selection.js';
+import { ProviderChainRouter } from '../../provider-chain-router.js';
+import { type SeamProviderCandidate } from '../../seam-provider-selection.js';
 import { imageNeedsAdmission, governImageProvider } from './admission.js';
 import { IMAGE_GENERATION_PROVIDER_SEAM } from './provider-registry.js';
 import { isRateLimitOrQuotaError } from './provider-support.js';
@@ -32,13 +26,116 @@ function imageSelectionContext(request: ImageGenerationRequest): Record<string, 
   return context;
 }
 
-export class AdaptivePolicyRouter {
-  private providers: Map<string, ImageGenerationProvider> = new Map();
+interface ImageEligibilityFlags {
+  /**
+   * Chain path passes true: an interactive hand-off provider may serve the
+   * default chain (the mode chain never blocked on hand-off). The governed
+   * path leaves it unset so `request.allowHostHandoff` applies.
+   */
+  allowHostHandoff?: boolean;
+  /** Consent checks suppressed while planning (planProvider). */
+  ignoreConsent?: boolean;
+}
+
+/**
+ * Hermetic fallback for `default_chains` in the image-generation-provider
+ * selection policy — used only when the policy directory is unavailable
+ * (isolated unit-test environments). The policy file is the source of truth.
+ */
+const IMAGE_BUILTIN_DEFAULT_CHAINS: Record<string, readonly string[]> = {
+  local_only: ['apple_playground', 'windows_native', 'local_flux', 'local_diffusion', 'comfyui'],
+  privacy_first: ['apple_playground', 'windows_native', 'local_flux', 'local_diffusion', 'comfyui'],
+  fast: [
+    'gemini_fast',
+    'gemini_service',
+    'gemini_image',
+    'apple_playground',
+    'windows_native',
+    'local_flux',
+    'comfyui',
+    'llm_api',
+    'cursor_host_bridge',
+    'host_agent',
+  ],
+  artistic: [
+    'cursor_host_bridge',
+    'codex_host_bridge',
+    'agy_host_bridge',
+    'host_agent',
+    'apple_playground',
+    'windows_native',
+    'gemini_service',
+    'gemini_fast',
+    'gemini_image',
+    'llm_api',
+    'local_flux',
+    'comfyui',
+  ],
+  balanced: [
+    'cursor_host_bridge',
+    'codex_host_bridge',
+    'agy_host_bridge',
+    'host_agent',
+    'apple_playground',
+    'windows_native',
+    'local_flux',
+    'comfyui',
+    'gemini_fast',
+    'gemini_service',
+    'gemini_image',
+    'llm_api',
+  ],
+};
+
+export class AdaptivePolicyRouter extends ProviderChainRouter<
+  ImageGenerationProvider,
+  ImageGenerationRequest
+> {
   private fallbackGraph: Map<string, string> = new Map();
 
   constructor(providers: ImageGenerationProvider[]) {
-    for (const p of providers) {
-      this.providers.set(p.id, governImageProvider(p));
+    super(providers, {
+      seam: IMAGE_GENERATION_PROVIDER_SEAM,
+      label: '[image_generation_bridge]',
+      errorTag: '[IMAGE_GENERATION_SELECTION]',
+      eligibility: (request, flags) => {
+        const f = (flags ?? {}) as ImageEligibilityFlags;
+        return this.selectionCandidates(request, {
+          allowHostHandoff: f.allowHostHandoff ?? request.allowHostHandoff === true,
+          ignoreConsent: f.ignoreConsent === true,
+        });
+      },
+      explicitPreference: (request) => request.providerPreference,
+      purpose: (request) => request.purpose,
+      context: imageSelectionContext,
+      defaultOrderKey: (request) => `mode:${request.mode || 'balanced'}`,
+      builtinDefaultOrder: (request) =>
+        IMAGE_BUILTIN_DEFAULT_CHAINS[request.mode || 'balanced'] ??
+        IMAGE_BUILTIN_DEFAULT_CHAINS.balanced,
+      governedScope: 'lead',
+      strictPurposes: true,
+      // A provider must appear in a default_chains entry or be reached
+      // through the fallback graph — unlisted registrations never serve
+      // implicitly.
+      registrationTail: false,
+      chainTail: (ids) => {
+        const extra: string[] = [];
+        const visited = new Set<string>(ids);
+        for (const id of ids) {
+          let current = id;
+          while (this.fallbackGraph.has(current)) {
+            const nextId = this.fallbackGraph.get(current)!;
+            if (visited.has(nextId)) break;
+            visited.add(nextId);
+            extra.push(nextId);
+            current = nextId;
+          }
+        }
+        return extra;
+      },
+    });
+    for (const provider of providers) {
+      this.providers.set(provider.id, governImageProvider(provider));
     }
     this.initFallbackGraph();
   }
@@ -112,14 +209,16 @@ export class AdaptivePolicyRouter {
    */
   private async selectionCandidates(
     request: ImageGenerationRequest,
-    allowHostHandoff: boolean
+    options: { allowHostHandoff: boolean; ignoreConsent?: boolean }
   ): Promise<SeamProviderCandidate[]> {
     const candidates: SeamProviderCandidate[] = [];
     for (const provider of this.providers.values()) {
       const unmet: string[] = [];
-      const violation = this.hardViolation(request, provider);
+      const violation = this.hardViolation(request, provider, {
+        ignoreConsent: options.ignoreConsent,
+      });
       if (violation) unmet.push(violation);
-      if (provider.requiresInteractiveHandoff && !allowHostHandoff) {
+      if (provider.requiresInteractiveHandoff && !options.allowHostHandoff) {
         unmet.push('interactive host hand-off not allowed (allow_host_handoff)');
       }
       if (unmet.length === 0 && !(await provider.isAvailable())) unmet.push('unavailable');
@@ -130,172 +229,24 @@ export class AdaptivePolicyRouter {
 
   /** Candidates with eligibility for this request (hand-off only when allowed); for calibration. */
   async listCandidates(request: ImageGenerationRequest): Promise<SeamProviderCandidate[]> {
-    return this.selectionCandidates(request, request.allowHostHandoff === true);
-  }
-
-  /**
-   * Purpose-driven chain: every registered provider is filtered by the mode's
-   * hard constraints, availability and (unless allowed) interactive hand-off;
-   * the eligible ones are ranked by the governed seam policy. The decision is
-   * audited and pinned per mission under the purpose.
-   */
-  private async resolvePurposeChain(
-    request: ImageGenerationRequest,
-    selection: Omit<ResolveSeamProviderOptions, 'candidates'>
-  ): Promise<ImageGenerationProvider[]> {
-    const purpose = selection.purpose!;
-    const known = listSeamSelectionPurposes(IMAGE_GENERATION_PROVIDER_SEAM);
-    if (!known.includes(purpose)) {
-      throw new Error(
-        `[IMAGE_GENERATION_SELECTION] unknown purpose '${purpose}' for seam '${IMAGE_GENERATION_PROVIDER_SEAM}' (known: ${known.join(', ')})`
-      );
-    }
-    const candidates = await this.selectionCandidates(request, request.allowHostHandoff === true);
-    const decision = resolveSeamProviderDecision({ ...selection, candidates });
-    if (!decision.provider_id) {
-      throw new Error(`[IMAGE_GENERATION_SELECTION] ${decision.rationale}`);
-    }
-    logger.info(
-      `[image_generation_bridge] provider '${decision.provider_id}' selected (${decision.strategy}): ${decision.rationale}`
-    );
-    return decision.ranked.map((id) => this.providers.get(id)!);
-  }
-
-  /**
-   * Without a purpose, an operator rule matching this request picks the
-   * provider that leads the mode chain (a mission pin it produced is reused).
-   * A request no rule matches keeps the mode chain unchanged — nothing is
-   * recorded or pinned for it. Hand-off providers stay eligible, as in the
-   * mode chain.
-   */
-  private async resolveOperatorRuleLead(request: ImageGenerationRequest): Promise<string[]> {
-    const entry = resolveSeamSelectionEntry({
-      seam: IMAGE_GENERATION_PROVIDER_SEAM,
-      context: imageSelectionContext(request),
+    return this.selectionCandidates(request, {
+      allowHostHandoff: request.allowHostHandoff === true,
     });
-    if (entry.kind !== 'governed') return [];
-    const options: ResolveSeamProviderOptions = {
-      ...entry.request,
-      candidates: await this.selectionCandidates(request, request.allowHostHandoff === true),
-    };
-    // A matching rule whose providers are all ineligible keeps the mode chain.
-    const preview = explainSeamProviderDecision(options);
-    if (preview.strategy !== 'rule' && preview.strategy !== 'pinned') return [];
-    const decision = resolveSeamProviderDecision(options);
-    if (!decision.provider_id) return [];
-    logger.info(
-      `[image_generation_bridge] provider '${decision.provider_id}' leads the ${request.mode || 'balanced'} chain (${decision.strategy}): ${decision.rationale}`
-    );
-    return [decision.provider_id];
   }
 
+  /**
+   * Providers to try, in order: a purpose yields the governed ranked chain;
+   * a matching operator rule or mission pin leads the mode's `default_chains`
+   * entry; fallback_backend_id edges then trail the selected providers.
+   */
   async resolveCandidateChain(
     request: ImageGenerationRequest,
     options: { ignoreConsent?: boolean } = {}
   ): Promise<ImageGenerationProvider[]> {
-    const hasPreference = Boolean(request.providerPreference && request.providerPreference.length);
-    if (!hasPreference) {
-      const entry = resolveSeamSelectionEntry({
-        seam: IMAGE_GENERATION_PROVIDER_SEAM,
-        purpose: request.purpose,
-        context: imageSelectionContext(request),
-      });
-      if (entry.kind === 'governed' && entry.request.purpose) {
-        return this.resolvePurposeChain(request, entry.request);
-      }
-    }
-    const ruleLead = hasPreference ? [] : await this.resolveOperatorRuleLead(request);
-    const candidates: ImageGenerationProvider[] = [];
-    const seenIds = new Set<string>();
-
-    const addIfAvailableAndCompliant = async (provider: ImageGenerationProvider | undefined) => {
-      if (!provider || seenIds.has(provider.id)) return;
-      if (this.hardViolation(request, provider, options)) return;
-      if (await provider.isAvailable()) {
-        candidates.push(provider);
-        seenIds.add(provider.id);
-      }
-    };
-
-    for (const id of [...ruleLead, ...(request.providerPreference ?? [])]) {
-      await addIfAvailableAndCompliant(this.providers.get(id));
-    }
-
-    const mode = request.mode || 'balanced';
-
-    let defaultChain: string[] = [];
-    if (mode === 'local_only' || mode === 'privacy_first') {
-      defaultChain = [
-        'apple_playground',
-        'windows_native',
-        'local_flux',
-        'local_diffusion',
-        'comfyui',
-      ];
-    } else if (mode === 'fast') {
-      defaultChain = [
-        'gemini_fast',
-        'gemini_service',
-        'gemini_image',
-        'apple_playground',
-        'windows_native',
-        'local_flux',
-        'comfyui',
-        'llm_api',
-        'cursor_host_bridge',
-        'host_agent',
-      ];
-    } else if (mode === 'artistic') {
-      defaultChain = [
-        'cursor_host_bridge',
-        'codex_host_bridge',
-        'agy_host_bridge',
-        'host_agent',
-        'apple_playground',
-        'windows_native',
-        'gemini_service',
-        'gemini_fast',
-        'gemini_image',
-        'llm_api',
-        'local_flux',
-        'comfyui',
-      ];
-    } else {
-      // balanced
-      defaultChain = [
-        'cursor_host_bridge',
-        'codex_host_bridge',
-        'agy_host_bridge',
-        'host_agent',
-        'apple_playground',
-        'windows_native',
-        'local_flux',
-        'comfyui',
-        'gemini_fast',
-        'gemini_service',
-        'gemini_image',
-        'llm_api',
-      ];
-    }
-
-    for (const id of defaultChain) {
-      await addIfAvailableAndCompliant(this.providers.get(id));
-    }
-
-    // Follow governed fallback_backend_id chains for any selected candidates
-    const visited = new Set<string>(seenIds);
-    for (const c of [...candidates]) {
-      let curr = c.id;
-      while (this.fallbackGraph.has(curr)) {
-        const nextId = this.fallbackGraph.get(curr)!;
-        if (visited.has(nextId)) break;
-        visited.add(nextId);
-        await addIfAvailableAndCompliant(this.providers.get(nextId));
-        curr = nextId;
-      }
-    }
-
-    return candidates;
+    return this.resolveProviderChain(request, {
+      allowHostHandoff: true,
+      ignoreConsent: options.ignoreConsent === true,
+    } satisfies ImageEligibilityFlags);
   }
 
   async selectProvider(request: ImageGenerationRequest): Promise<ImageGenerationProvider> {

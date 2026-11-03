@@ -1,4 +1,5 @@
 import { safeWriteFile, safeCopyFileSync, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
+import { hostNodePlatform } from '@agent/core/platform-facts';
 import { executeServicePreset } from '@agent/core/service/service-engine';
 import { runExternalOperation } from '@agent/core/governance/external-operation';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -122,7 +123,7 @@ function resolveGenerationBackend(
           ? 'music'
           : 'workflow';
   if (modality === 'image' || modality === 'video' || modality === 'music') {
-    const backend = resolveMediaBackendForPlatform(modality, backendId, process.platform);
+    const backend = resolveMediaBackendForPlatform(modality, backendId, hostNodePlatform());
     return { ...backend, modality };
   }
 

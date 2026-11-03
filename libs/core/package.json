@@ -1844,6 +1844,10 @@
       "types": "./dist/governance/external-operation-target.d.ts",
       "default": "./dist/governance/external-operation-target.js"
     },
+    "./governance/adapter-effect-proxy": {
+      "types": "./dist/governance/adapter-effect-proxy.d.ts",
+      "default": "./dist/governance/adapter-effect-proxy.js"
+    },
     "./governance/external-operation": {
       "types": "./dist/governance/external-operation.d.ts",
       "default": "./dist/governance/external-operation.js"
@@ -2940,6 +2944,14 @@
       "types": "./dist/media/music-workflow-compiler.d.ts",
       "default": "./dist/media/music-workflow-compiler.js"
     },
+    "./media/video-generation/provider": {
+      "types": "./dist/media/video-generation/provider.d.ts",
+      "default": "./dist/media/video-generation/provider.js"
+    },
+    "./media/video-generation/provider-registry": {
+      "types": "./dist/media/video-generation/provider-registry.d.ts",
+      "default": "./dist/media/video-generation/provider-registry.js"
+    },
     "./media/native-docx-engine/engine": {
       "types": "./dist/media/native-docx-engine/engine.d.ts",
       "default": "./dist/media/native-docx-engine/engine.js"
@@ -4019,6 +4031,10 @@
     "./mobile-profile-validators": {
       "types": "./dist/mobile-profile-validators.d.ts",
       "default": "./dist/mobile-profile-validators.js"
+    },
+    "./mobile-runtime-helpers": {
+      "types": "./dist/mobile-runtime-helpers.d.ts",
+      "default": "./dist/mobile-runtime-helpers.js"
     },
     "./model-performance-index": {
       "types": "./dist/reasoning/model-performance-index.d.ts",
@@ -5911,6 +5927,10 @@
     "./secret/secret-introduction": {
       "types": "./dist/secret/secret-introduction.d.ts",
       "default": "./dist/secret/secret-introduction.js"
+    },
+    "./secret/provider-registry": {
+      "types": "./dist/secret/provider-registry.d.ts",
+      "default": "./dist/secret/provider-registry.js"
     },
     "./secret/secret-resolver": {
       "types": "./dist/secret/secret-resolver.d.ts",

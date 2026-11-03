@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { hostNodePlatform } from '../platform-facts.js';
 import { pathResolver } from '../path-resolver.js';
 
 import {
@@ -108,7 +109,7 @@ function loadPersistedPreferences(): AdapterDefaultPreferences {
 }
 
 function supportedOnCurrentPlatform(platforms: string[]): boolean {
-  return platforms.includes('any') || platforms.includes(process.platform);
+  return platforms.includes('any') || platforms.includes(hostNodePlatform());
 }
 
 function statusForRecord(
@@ -120,7 +121,7 @@ function statusForRecord(
     return {
       status: 'unsupported',
       selectable: false,
-      reason: `${kind} is not supported on platform ${process.platform}.`,
+      reason: `${kind} is not supported on platform ${hostNodePlatform()}.`,
     };
   }
   if (status === 'disabled') {

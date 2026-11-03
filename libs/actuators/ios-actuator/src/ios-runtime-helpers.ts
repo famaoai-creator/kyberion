@@ -1,4 +1,9 @@
 import { logger } from '@agent/core/core';
+import {
+  buildSessionHandoffArtifact,
+  ensureParentDir,
+  resolveAppProfile,
+} from '@agent/core/mobile-runtime-helpers';
 import { resolveAxeBin, resolveXcrunBin } from '@agent/core/tool/tool-binary-resolvers';
 import {
   assertSafeRepositoryPath,
@@ -11,7 +16,6 @@ import {
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolvePipelineContextValues } from '@agent/core/logic-utils';
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
-import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { isRecord, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 
@@ -415,7 +419,7 @@ async function opApply(
       return { ...ctx, last_screenshot_path: outPath, ios_device_udid: device };
     }
     case 'emit_session_handoff': {
-      const handoff = buildSessionHandoffArtifact(params, ctx, resolve);
+      const handoff = buildSessionHandoffArtifact(params, ctx, resolve, 'ios');
       const outPath = resolveIosRepositoryPath(
         rootDir,
         resolve(
@@ -772,95 +776,4 @@ function resolveAppPath(
   const profile = resolveAppProfile(params, ctx);
   const profilePath = String(profile?.launch?.app_path || '').trim();
   return profilePath ? resolveIosRepositoryPath(rootDir, profilePath) : '';
-}
-
-function buildSessionHandoffArtifact(
-  params: any,
-  ctx: Record<string, any>,
-  resolve: (val: any) => any
-) {
-  const profile = resolveAppProfile(params, ctx);
-  const targetUrl = String(
-    resolve(
-      params.target_url ||
-        profile?.webview?.session_handoff?.target_url ||
-        profile?.webview?.entry_url ||
-        ''
-    )
-  ).trim();
-  if (!targetUrl)
-    throw new Error(
-      'emit_session_handoff requires params.target_url or app_profile.webview.session_handoff.target_url'
-    );
-
-  return {
-    kind: 'webview-session-handoff',
-    target_url: targetUrl,
-    origin: safeOrigin(targetUrl),
-    browser_session_id: String(
-      resolve(
-        params.browser_session_id ||
-          profile?.webview?.session_handoff?.browser_session_id ||
-          'ios-webview'
-      )
-    ),
-    prefer_persistent_context:
-      params.prefer_persistent_context ??
-      profile?.webview?.session_handoff?.prefer_persistent_context ??
-      true,
-    cookies: resolveObjectRef(params.cookies_from, ctx) || resolve(params.cookies) || [],
-    local_storage:
-      resolveObjectRef(params.local_storage_from, ctx) || resolve(params.local_storage) || {},
-    session_storage:
-      resolveObjectRef(params.session_storage_from, ctx) || resolve(params.session_storage) || {},
-    headers: resolveObjectRef(params.headers_from, ctx) || resolve(params.headers) || {},
-    source: {
-      platform: 'ios',
-      app_id: profile?.app_id || ctx.app_id || 'ios-app',
-    },
-  };
-}
-
-function resolveObjectRef(key: any, ctx: Record<string, any>): any {
-  if (!key || typeof key !== 'string') return undefined;
-  return ctx[key];
-}
-
-function safeOrigin(targetUrl: string): string {
-  try {
-    return new URL(targetUrl).origin;
-  } catch {
-    return '';
-  }
-}
-
-function resolveAppProfile(params: any, ctx: Record<string, any>): MobileAppProfile | undefined {
-  if (params.app_profile && typeof params.app_profile === 'object') {
-    assertValidMobileAppProfile(params.app_profile, 'params.app_profile');
-    return params.app_profile as MobileAppProfile;
-  }
-  if (params.profile && typeof params.profile === 'object') {
-    assertValidMobileAppProfile(params.profile, 'params.profile');
-    return params.profile as MobileAppProfile;
-  }
-  if (typeof params.app_profile_from === 'string' && ctx[params.app_profile_from]) {
-    assertValidMobileAppProfile(ctx[params.app_profile_from], `ctx.${params.app_profile_from}`);
-    return ctx[params.app_profile_from] as MobileAppProfile;
-  }
-  if (typeof params.profile_from === 'string' && ctx[params.profile_from]) {
-    assertValidMobileAppProfile(ctx[params.profile_from], `ctx.${params.profile_from}`);
-    return ctx[params.profile_from] as MobileAppProfile;
-  }
-  if (ctx.app_profile) {
-    assertValidMobileAppProfile(ctx.app_profile, 'ctx.app_profile');
-    return ctx.app_profile as MobileAppProfile;
-  }
-  return undefined;
-}
-
-function ensureParentDir(targetPath: string): void {
-  const dir = path.dirname(targetPath);
-  if (!safeExistsSync(dir)) {
-    safeMkdir(dir, { recursive: true });
-  }
 }

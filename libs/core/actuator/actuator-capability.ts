@@ -7,6 +7,7 @@
  */
 
 import path from 'node:path';
+import { hostNodePlatform } from '../platform-facts.js';
 import { createBinaryAvailability } from '#binary-availability';
 import { logger } from '../core.js';
 import { getRegisteredEnvBool, getRegisteredEnvText } from '../foundation/env.js';
@@ -85,7 +86,7 @@ function compareActuatorCatalogOrder(left: string, right: string): number {
 // checks is milliseconds for the whole manifest set. PATHEXT covers Windows
 // .cmd/.exe shims just like `where`.
 const hasBinary = createBinaryAvailability({
-  platform: process.platform,
+  platform: hostNodePlatform(),
   pathValue: process.env.PATH,
   pathDelimiter: path.delimiter,
   pathExt: process.env.PATHEXT,
@@ -126,7 +127,7 @@ function evaluateManifestCapability(capability: ManifestCapability): ActuatorCap
     ...(capability.prerequisites?.binaries || []),
     ...(capability.requirements?.bin || []),
     ...(capability.requirements?.bin_by_platform?.[
-      process.platform as 'darwin' | 'linux' | 'win32'
+      hostNodePlatform() as 'darwin' | 'linux' | 'win32'
     ] || []),
   ];
   const envRequirements = [
@@ -137,9 +138,9 @@ function evaluateManifestCapability(capability: ManifestCapability): ActuatorCap
 
   const missing: string[] = [];
 
-  if (platformRequirements.length > 0 && !platformRequirements.includes(process.platform)) {
+  if (platformRequirements.length > 0 && !platformRequirements.includes(hostNodePlatform())) {
     missing.push(
-      `requires platform ${platformRequirements.join('|')} (current: ${process.platform})`
+      `requires platform ${platformRequirements.join('|')} (current: ${hostNodePlatform()})`
     );
   }
   for (const binary of binaryRequirements) {
@@ -147,7 +148,7 @@ function evaluateManifestCapability(capability: ManifestCapability): ActuatorCap
   }
   const envPlatforms = capability.requirements?.env_platforms;
   const envApplies =
-    !envPlatforms || envPlatforms.length === 0 || envPlatforms.includes(process.platform);
+    !envPlatforms || envPlatforms.length === 0 || envPlatforms.includes(hostNodePlatform());
   if (envApplies) {
     for (const envName of envRequirements) {
       if (!envRequirementMet(envName)) missing.push(`missing env: ${envName}`);
@@ -331,9 +332,9 @@ registerCapabilityProbe('vision-actuator', async () => {
     },
     {
       op: 'ocr_image',
-      available: process.platform !== 'win32' || nativeRecognition.ocr,
+      available: hostNodePlatform() !== 'win32' || nativeRecognition.ocr,
       reason:
-        process.platform !== 'win32' || nativeRecognition.ocr
+        hostNodePlatform() !== 'win32' || nativeRecognition.ocr
           ? undefined
           : nativeRecognition.reason || 'Windows native OCR helper is unavailable',
     },
