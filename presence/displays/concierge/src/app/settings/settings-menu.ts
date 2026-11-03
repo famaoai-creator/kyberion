@@ -22,6 +22,11 @@ const SECTIONS: Record<
     description: 'settings_desc_recording',
     icon: 'shield',
   },
+  authority: {
+    label: 'settings_nav_authority',
+    description: 'settings_desc_authority',
+    icon: 'approval',
+  },
   plugins: { label: 'settings_nav_plugins', description: 'settings_desc_plugins', icon: 'puzzle' },
   advanced: {
     label: 'settings_nav_advanced',
@@ -42,7 +47,11 @@ export function createSettingsMenu(
       label: 'settings_group_companion',
       sections: ['services', 'voice', 'notifications', 'recording'],
     },
-    { id: 'administration', label: 'settings_group_manage', sections: ['plugins', 'advanced'] },
+    {
+      id: 'administration',
+      label: 'settings_group_manage',
+      sections: ['authority', 'plugins', 'advanced'],
+    },
   ];
   return groups.map((group) => ({
     id: group.id,

@@ -9,12 +9,8 @@ import type { ConciergeLocale } from '../../../lib/i18n';
 import type { Setup } from '../../../lib/settings-types';
 import { groupConnections, type ConnectionViewItem } from '../../../lib/connection-view';
 import { OperatorServiceRegistrationPanel } from './OperatorServiceRegistrationPanel';
-import { OnboardingAuthorityPanel } from './OnboardingAuthorityPanel';
-import { ProviderAttestationSection } from './ProviderAttestationSection';
 import { ReasoningSection } from './ReasoningSection';
 import { ServiceCatalogPane } from './ServiceCatalogPane';
-import { GovernanceSection } from './GovernanceSection';
-import { CharterPane } from './CharterPane';
 import { FormScope, type SettingsTranslate } from './form-scope';
 
 /** Service selections are metadata. Token registration and authentication are separate actions. */
@@ -35,8 +31,6 @@ export type ServicesSectionProps = {
   onConnectOAuth: (serviceId: string, serviceLabel: string) => void;
   onSaveConnections: () => void;
   sectionRef: (element: HTMLElement | null) => void;
-  authorityTenants?: { tenant_slug: string; display_name: string }[];
-  selectedTenant?: string;
 };
 
 export function ServicesSection({
@@ -54,8 +48,6 @@ export function ServicesSection({
   oauthMessage,
   oauthError = false,
   onConnectOAuth,
-  authorityTenants = [],
-  selectedTenant,
   onSaveConnections,
   sectionRef,
 }: ServicesSectionProps) {
@@ -160,19 +152,6 @@ export function ServicesSection({
         oauthError={oauthError}
       />
       <OperatorServiceRegistrationPanel t={t} />
-      <OnboardingAuthorityPanel
-        locale={locale}
-        tenants={authorityTenants}
-        selectedTenant={selectedTenant}
-      />
-      <ProviderAttestationSection
-        t={t}
-        locale={locale}
-        tenants={authorityTenants}
-        selectedTenant={selectedTenant}
-      />
-      <GovernanceSection t={t} />
-      <CharterPane t={t} />
     </div>
   );
 }

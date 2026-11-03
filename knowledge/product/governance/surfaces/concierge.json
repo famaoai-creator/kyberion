@@ -13,7 +13,10 @@
       "ownerType": "surface-runtime-manifest",
       "port": 3050,
       "healthPath": "/api/summary",
-      "enabled": true
+      "enabled": true,
+      "env": {
+        "KYBERION_SCOPE_ENV_PATH": "active/shared/runtime/scope-surfaces.env"
+      }
     }
   ]
 }
