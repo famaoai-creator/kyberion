@@ -18,6 +18,7 @@
 /* eslint-disable no-restricted-imports, no-restricted-syntax -- repo-wide import scanner; see file header */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeJson } from '@agent/core/foundation/json';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const rootDir = process.cwd();
@@ -95,8 +96,7 @@ export function scanGovernanceImportBaseline(): {
   };
 }
 
-function main(argv: readonly string[]): number {
-  const checkOnly = argv.includes('--check');
+function main(checkOnly: boolean): number {
   const scanned = scanGovernanceImportBaseline();
   const next = `${JSON.stringify(scanned, null, 2)}\n`;
 
@@ -113,8 +113,7 @@ function main(argv: readonly string[]): number {
     return 0;
   }
 
-  fs.mkdirSync(path.dirname(baselinePath), { recursive: true });
-  fs.writeFileSync(baselinePath, next, 'utf8');
+  writeJson(baselinePath, scanned);
   process.stdout.write(
     `[governance-import-baseline] wrote ${path.relative(rootDir, baselinePath)} ` +
       `(fs=${scanned.fs_imports.length}, child_process=${scanned.child_process_imports.length})\n`
@@ -124,9 +123,9 @@ function main(argv: readonly string[]): number {
 
 export const generateGovernanceImportBaselineScript = defineScript({
   name: 'generate-governance-import-baseline',
-  flags: [],
+  flags: ['check'],
   run(context) {
-    const exitCode = main(context.argv);
+    const exitCode = main(context.check);
     process.exitCode = exitCode;
     return exitCode;
   },

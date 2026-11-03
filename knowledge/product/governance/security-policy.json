@@ -812,6 +812,9 @@
     "customer_create": { "allow_write": ["customer/"] },
     "onboarding": { "allow_write": ["customer/"] },
     "assemble_changelog": { "allow_write": ["CHANGELOG.md", "changelog.d/"] },
+    "generate_governance_import_baseline": {
+      "allow_write": ["tests/fixtures/governance-import-baseline.json"]
+    },
     "generate_changelog": { "allow_write": ["CHANGELOG.md"] },
     "generate_design_tokens": {
       "allow_write": [
