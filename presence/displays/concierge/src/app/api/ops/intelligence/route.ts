@@ -38,7 +38,7 @@ import {
   listSurfaceOutboxMessages,
   summarizeMissionSeedAssessment,
 } from '../../../../lib/ops/intelligence-primitives';
-import { getProjectManagementView } from '@agent/core/project/project-management';
+import { readProjectManagementForViewer } from './project-management-data';
 import { resolveCompany } from '@agent/core/company';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
 import { inferDeliverableTier } from '../../../../lib/ops/deliverable-inbox';
@@ -220,10 +220,7 @@ export async function GET(req: NextRequest) {
         (tenantSlugs === 'all' || tenantSlugs.includes(project.tenant_slug as string))
     );
     const projectManagement = intelligenceData.safeCollect('collectProjectManagement', [], () =>
-      projects.map((project) => {
-        const view = getProjectManagementView(project.project_id);
-        return { project: view.project, lineage: view.lineage };
-      })
+      readProjectManagementForViewer(projects)
     );
     const projectIds = new Set(projects.map((project) => project.project_id));
     const projectTracks = listProjectTrackRecords().filter(
