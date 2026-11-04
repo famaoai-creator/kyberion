@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "seam-selection-defaults.schema.json",
+  "title": "Saved seam provider defaults",
+  "description": "Saved default provider per seam (libs/core/seam-selection-defaults.ts). One file per layer: the operator file (active/shared/runtime/seam-selection/defaults.json) uses only `defaults`; a scope partition file (active/shared/runtime/seam-selection-defaults/<tier>/<tenant|shared>/defaults.json) holds the tenant layer in `defaults` plus organization and project layers. A saved default applies only when the caller gives no explicit provider and no purpose; mission pins and operator rules still win, and eligibility always decides.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": "1.0.0" },
+    "defaults": { "$ref": "#/definitions/seamMap" },
+    "organizations": {
+      "type": "object",
+      "description": "organization_id → seam → saved default.",
+      "propertyNames": { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+      "additionalProperties": { "$ref": "#/definitions/seamMap" }
+    },
+    "projects": {
+      "type": "object",
+      "description": "project_id → seam → saved default.",
+      "propertyNames": { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+      "additionalProperties": { "$ref": "#/definitions/seamMap" }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["version"],
+  "definitions": {
+    "seamMap": {
+      "type": "object",
+      "description": "seam id → saved default provider.",
+      "propertyNames": { "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+      "additionalProperties": { "$ref": "#/definitions/entry" }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "type": "string", "minLength": 1 },
+        "note": { "type": "string" },
+        "set_by": { "type": "string", "minLength": 1 },
+        "set_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["provider", "set_by", "set_at"]
+    }
+  }
+}

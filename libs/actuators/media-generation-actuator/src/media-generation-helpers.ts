@@ -20,7 +20,11 @@ import {
   resolveMediaBackendForPlatform,
 } from '@agent/core/media/media-backend-registry';
 import { listImageGenerationProviders } from '@agent/core/media/image-generation-bridge';
-import { listMusicGenerationProviders } from '@agent/core/media/music-generation-bridge';
+import {
+  listMusicGenerationCandidates,
+  listMusicGenerationProviders,
+} from '@agent/core/media/music-generation-bridge';
+import { savedSeamDefaultFor } from '@agent/core/seam-provider-selection';
 import {
   resolveCreativeDesign,
   renderPromptStyleBlock,
@@ -523,6 +527,46 @@ function resolveMusicProviderPurpose(params: Record<string, unknown>): string | 
   return purpose || undefined;
 }
 
+const MUSIC_GENERATION_PROVIDER_SEAM = 'music-generation-provider';
+
+/**
+ * Saved `music-generation-provider` default (seam-selection-defaults) for a
+ * request with no named backend, purpose or provider_preference. The seam's
+ * provider ids are music-bridge providers (musicgen_mlx, stable_audio_3, …),
+ * not media backend ids, so a saved default selects the direct music bridge
+ * route — whose router then leads with it — instead of becoming backend_id.
+ * Returns the provider only when it is registered and can run this request;
+ * otherwise undefined, and the ComfyUI default stays.
+ */
+async function resolveMusicSavedDefaultProvider(
+  params: Record<string, unknown>
+): Promise<string | undefined> {
+  const adf = isPlainObject(params?.music_adf) ? params.music_adf : undefined;
+  const engine = adf && isPlainObject(adf.engine) ? adf.engine : undefined;
+  if (String(params?.backend_id || engine?.backend_id || '').trim()) return undefined;
+  if (resolveMusicProviderPurpose(params)) return undefined;
+  const preference = params?.provider_preference || params?.providerPreference;
+  if (Array.isArray(preference) && preference.length > 0) return undefined;
+  const saved = savedSeamDefaultFor(MUSIC_GENERATION_PROVIDER_SEAM);
+  if (!saved || !listMusicGenerationProviders().some((p) => p.id === saved.provider)) {
+    return undefined;
+  }
+  let request: ReturnType<typeof resolveMusicBridgeRequest>;
+  try {
+    request = resolveMusicBridgeRequest(params);
+  } catch {
+    // No prompt / music_adf: the ComfyUI path reports its own error.
+    return undefined;
+  }
+  const format = resolveMusicRequestedFormat(params);
+  const candidates = await listMusicGenerationCandidates({
+    ...(request.durationSec !== undefined ? { durationSec: request.durationSec } : {}),
+    ...(request.vocals !== undefined ? { vocals: request.vocals } : {}),
+    ...(format ? { format } : {}),
+  });
+  return candidates.some((c) => c.id === saved.provider && c.eligible) ? saved.provider : undefined;
+}
+
 /** Requested music format (params.format or music_adf.output.format). */
 function resolveMusicRequestedFormat(params: Record<string, unknown>): string | undefined {
   if (typeof params?.format === 'string' && params.format.trim()) return params.format.trim();
@@ -632,13 +676,20 @@ function applyPromptStylePack(action: string, params: any): any {
   return next;
 }
 
-function preparePromptBasedGeneration(action: string, input: any): PromptGenerationRequest {
+function preparePromptBasedGeneration(
+  action: string,
+  input: any,
+  /** directMusic: a saved music default routes this request to the music bridge. */
+  options: { directMusic?: boolean } = {}
+): PromptGenerationRequest {
   const params = applyPromptStylePack(action, input);
   const musicBackend =
     action === 'generate_music' ? resolveGenerationBackend(action, params) : undefined;
   const directMusic = Boolean(
     musicBackend &&
-    (isDirectMusicGenerationBackend(musicBackend) || resolveMusicProviderPurpose(params))
+    (isDirectMusicGenerationBackend(musicBackend) ||
+      resolveMusicProviderPurpose(params) ||
+      options.directMusic === true)
   );
   const compiled =
     action === 'generate_music' && params.music_adf && !directMusic
@@ -849,6 +900,7 @@ export {
   describeGeneratedBackend,
   musicBackendIdForProvider,
   resolveMusicProviderPurpose,
+  resolveMusicSavedDefaultProvider,
   resolveMusicRequestedFormat,
   resolveMusicProviderPreference,
   resolveMusicBridgeRequest,

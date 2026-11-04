@@ -28,7 +28,7 @@
 
 import { createProviderRegistry } from '../provider-registry.js';
 import type { SeamProviderMetadata } from '../seam.js';
-import { getSeamSelectionPolicy } from '../seam-provider-selection.js';
+import { resolveSeamDefaultOrder } from '../seam-provider-selection.js';
 import type { SafeExecOptions } from '../secure-io.js';
 
 export const VCS_BACKEND_SEAM = 'vcs-backend';
@@ -86,7 +86,8 @@ export function resetVcsBackends(): void {
 
 /**
  * Resolve the backend for a caller. An explicit selector always wins; without
- * one the governed `default_chains.default` ordering picks the first
+ * one the saved seam default (`KYBERION_SEAM_DEFAULTS` / scope layers) then the
+ * governed `default_chains.default` ordering picks the first
  * registered provider, falling back to `local-git` then to whatever is
  * registered. Throws when nothing is registered — local-git is installed by
  * importing `local-git-backend.ts`, which the typed verb surface relies on.
@@ -107,9 +108,7 @@ export function resolveVcsBackend(selector?: string): VcsBackend {
     }
     return backend;
   }
-  const chain = getSeamSelectionPolicy(VCS_BACKEND_SEAM)?.default_chains?.default ?? [
-    LOCAL_GIT_BACKEND_ID,
-  ];
+  const chain = resolveSeamDefaultOrder(VCS_BACKEND_SEAM, { builtin: [LOCAL_GIT_BACKEND_ID] });
   for (const id of chain) {
     const backend = vcsBackendRegistry.get(id);
     if (backend) return backend;

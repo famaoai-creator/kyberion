@@ -12,6 +12,7 @@ import {
   resolveSeamAutoProvider,
   type SeamProviderMetadata,
 } from '../seam.js';
+import { resolveSeamDefaultProvider } from '../seam-provider-selection.js';
 
 export interface BrowserAutomationLaunchPersistentContextOptions {
   channel?: string;
@@ -121,9 +122,17 @@ export function resolveBrowserAutomationRuntime(
   }
   // Capability-restricted providers (e.g. lightpanda) are opt-in only: 'auto'
   // never silently downgrades a session, whatever the registration order.
+  // Saved seam default → policy default → builtin, among full-capability
+  // providers only (a saved restricted default is ignored here).
+  const isFull = (id: string) =>
+    bridges.some((bridge) => bridge.bridge_id === id && !bridge.capabilities);
+  const preferred = resolveSeamDefaultProvider(browserAutomationRuntimeSeam.key, {
+    eligible: isFull,
+    builtin: ['playwright-chromium'],
+  });
   const full = resolveSeamAutoProvider(browserAutomationRuntimeSeam, {
     eligible: (bridge) => !bridge.capabilities,
-    defaultProvider: 'playwright-chromium',
+    defaultProvider: preferred?.provider,
   });
   if (!full) {
     throw new Error(

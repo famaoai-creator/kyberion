@@ -39,6 +39,7 @@ const mocks = vi.hoisted(() => ({
   compileVideoGenerationADF: vi.fn(),
   generateImage: vi.fn(),
   generateMusic: vi.fn(),
+  listMusicGenerationCandidates: vi.fn(),
   secureFetch: vi.fn(),
   retry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
   safeCopyFileSync: vi.fn(),
@@ -112,6 +113,7 @@ vi.mock('@agent/core/media/image-generation-bridge', async (importOriginal) => (
 vi.mock('@agent/core/media/music-generation-bridge', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/media/music-generation-bridge')>()),
   generateMusic: mocks.generateMusic,
+  listMusicGenerationCandidates: mocks.listMusicGenerationCandidates,
 }));
 
 const selectionRecord = vi.hoisted(() => vi.fn());
@@ -265,6 +267,8 @@ function resetTestDoubles(): void {
   mocks.compileVideoGenerationADF.mockReset();
   mocks.generateImage.mockReset();
   mocks.generateMusic.mockReset();
+  mocks.listMusicGenerationCandidates.mockReset();
+  mocks.listMusicGenerationCandidates.mockResolvedValue([]);
   mocks.secureFetch.mockReset();
   mocks.retry.mockReset();
   mocks.retry.mockImplementation(async (fn: () => Promise<unknown>) => fn());
@@ -705,6 +709,57 @@ describe('media-generation-actuator', () => {
       expect.objectContaining({ providerPreference: ['musicgen_mlx'] })
     );
     expect(mocks.generateMusic.mock.lastCall?.[0]).not.toHaveProperty('purpose');
+  });
+
+  it('routes to the music bridge on an eligible saved seam default without purpose or backend', async () => {
+    mocks.generateMusic.mockResolvedValue({
+      status: 'succeeded',
+      provider: 'stable_audio_3',
+      path: 'active/shared/tmp/saved-default-music.wav',
+      elapsedMs: 5,
+    });
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.listMusicGenerationCandidates.mockResolvedValue([
+      { id: 'stable_audio_3', eligible: true, unmet: [] },
+      { id: 'musicgen_mlx', eligible: true, unmet: [] },
+    ]);
+    mocks.executeServicePreset.mockResolvedValue({ status: 'submitted', prompt_id: 'comfy-1' });
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'music-generation-provider=stable_audio_3');
+    const { handleAction } = await import('./index.js');
+    try {
+      const result = await handleAction({
+        action: 'generate_music',
+        params: { prompt: 'calm piano', duration_sec: 20 },
+      });
+      expect(mocks.executeServicePreset).not.toHaveBeenCalled();
+      expect(mocks.generateMusic).toHaveBeenCalledTimes(1);
+      expect(mocks.generateMusic.mock.lastCall?.[0]).not.toHaveProperty('purpose');
+      expect(mocks.generateMusic.mock.lastCall?.[0]?.providerPreference).toBeUndefined();
+      expect(result).toEqual(
+        expect.objectContaining({ status: 'succeeded', backend_id: 'stable_audio_3' })
+      );
+
+      // An explicit backend keeps its own route (named provider, no saved lead).
+      await handleAction({
+        action: 'generate_music',
+        params: { prompt: 'calm piano', backend_id: 'media-generation.musicgen_mlx' },
+      });
+      expect(mocks.generateMusic.mock.lastCall?.[0]).toEqual(
+        expect.objectContaining({ providerPreference: ['musicgen_mlx'] })
+      );
+
+      // An ineligible saved default keeps the ComfyUI default.
+      mocks.generateMusic.mockClear();
+      mocks.listMusicGenerationCandidates.mockResolvedValue([
+        { id: 'stable_audio_3', eligible: false, unmet: ['unavailable'] },
+      ]);
+      const helpers = await import('./media-generation-helpers.js');
+      expect(
+        await helpers.resolveMusicSavedDefaultProvider({ prompt: 'calm piano' })
+      ).toBeUndefined();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('persists a purpose-selected video backend in the submitted job request', async () => {

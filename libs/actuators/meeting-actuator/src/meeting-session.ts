@@ -20,7 +20,10 @@ import { parseSafeJsonInput, getRegisteredEnvText } from '@agent/core/foundation
 import * as path from 'node:path';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import { installMeetingParticipationDriver } from '@agent/core/meeting/meeting-driver-module-loader';
-import { getMeetingJoinDriver } from '@agent/core/meeting/meeting-join-driver';
+import {
+  getMeetingJoinDriver,
+  resolveDefaultMeetingJoinDriverId,
+} from '@agent/core/meeting/meeting-join-driver';
 import type { MeetingPlatform, TranscriptChunk } from '@agent/core/meeting/meeting-session-types';
 import { StubAudioBus } from '@agent/core/voice/audio-bus';
 import { resolveAudioBus, type AudioBusId } from '@agent/core/voice/audio-bus-resolver';
@@ -183,7 +186,7 @@ export async function runRegisteredJoinDriver(params: {
   const url = String(params.url || '').trim();
   if (!url) throw new Error('[meeting] extension join requires params.url');
   const platform = String(params.platform || 'auto').trim() || 'auto';
-  const driverId = String(params.driver_id || 'chrome-extension').trim();
+  const driverId = String(params.driver_id || resolveDefaultMeetingJoinDriverId()).trim();
   if (!driverId) throw new Error('[meeting] join driver id must not be empty');
   const durationSec = Math.max(0, Number(params.duration_sec || 0));
   let driver = getMeetingJoinDriver(driverId);

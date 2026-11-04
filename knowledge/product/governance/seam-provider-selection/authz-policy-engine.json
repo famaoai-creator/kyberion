@@ -4,6 +4,7 @@
   "seams": [
     {
       "seam_id": "authz-policy-engine",
+      "allow_saved_default": false,
       "default_provider": "role-scope",
       "fallback_purpose": "default_surface",
       "traits": {

@@ -225,6 +225,8 @@ describe('durable partitioned runtime state', () => {
       'active/shared/runtime/customer-decision-invites/confidential/',
       'active/shared/runtime/browser-bridge-mailbox/personal/',
       'active/shared/runtime/browser-bridge-mailbox/confidential/',
+      'active/shared/runtime/seam-selection-defaults/personal/',
+      'active/shared/runtime/seam-selection-defaults/confidential/',
     ]);
     expect(
       partitionedRuntimeStateTierInPath(

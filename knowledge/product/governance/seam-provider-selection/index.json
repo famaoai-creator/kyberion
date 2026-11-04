@@ -24,6 +24,12 @@
     "lease-backend",
     "event-bus",
     "vcs-backend",
-    "trace-exporter"
+    "trace-exporter",
+    "judgment-backend",
+    "screen.capture-backend",
+    "public-ingress-provider",
+    "meeting-join-driver",
+    "email-account-provider",
+    "calendar-provider"
   ]
 }
