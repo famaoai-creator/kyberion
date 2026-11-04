@@ -1,0 +1,48 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "email-account-provider",
+      "default_provider": "gmail",
+      "fallback_purpose": "deliver",
+      "traits": {
+        "runtime_support": "A runtime adapter can send, draft, reply, list and archive today (setup-only connectors score 0).",
+        "setup_ease": "How little operator setup the account needs before it is ready (one CLI login scores highest)."
+      },
+      "providers": {
+        "gmail": {
+          "traits": { "runtime_support": 1, "setup_ease": 0.7 },
+          "trait_basis": { "runtime_support": "declared", "setup_ease": "declared" },
+          "evidence": [
+            "libs/core/integrations/email-workflow.ts (GmailEmailAccountAdapter via the gws CLI; first in EmailAccountRegistry auto order before this policy)",
+            "libs/core/integrations/email-account-catalog.ts (gmail descriptor: selectable, ready once `gws auth status` reports credentials)"
+          ]
+        },
+        "outlook": {
+          "traits": { "runtime_support": 1, "setup_ease": 0.6 },
+          "trait_basis": { "runtime_support": "declared", "setup_ease": "declared" },
+          "evidence": [
+            "libs/core/integrations/email-workflow.ts (OutlookEmailAccountAdapter via the Microsoft 365 CLI; second in auto order)"
+          ]
+        },
+        "yahoo": {
+          "traits": { "runtime_support": 0, "setup_ease": 0 },
+          "trait_basis": { "runtime_support": "declared", "setup_ease": "declared" },
+          "evidence": [
+            "libs/core/integrations/email-workflow.ts (SetupOnlyEmailAccountAdapter('yahoo'): never ready; needs an OAuth/IMAP connector — never in the default chain)"
+          ]
+        }
+      },
+      "purposes": {
+        "deliver": {
+          "description": "Send or draft mail through whichever authenticated account works today.",
+          "weights": { "runtime_support": 0.8, "setup_ease": 0.2 }
+        }
+      },
+      "default_chains": {
+        "default": ["gmail", "outlook"]
+      }
+    }
+  ]
+}

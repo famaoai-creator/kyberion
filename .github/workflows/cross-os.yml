@@ -114,6 +114,7 @@ jobs:
           path: |
             dist/
             libs/core/dist/
+            libs/kernel/dist/
             libs/shared-*/dist/
             presence/displays/terminal-hud/dist/
             plugins/dist/
@@ -342,7 +343,7 @@ jobs:
           libs/core/windows-os-automation.test.ts
           scripts/check_stale_dist.test.ts
 
-      # Live UI Automation smoke: launches Notepad and a WPF window on the
+      # Live UI Automation smoke: launches a WinForms editor and a WPF window on the
       # runner's interactive desktop, focuses them and checks that
       # os_accessibility finds their controls in the foreground window, then
       # clicks the WPF OK button through its Set-of-Marks mark with the

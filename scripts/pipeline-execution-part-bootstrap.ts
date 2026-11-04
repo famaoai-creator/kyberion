@@ -23,7 +23,6 @@ import { validateOpInput } from '@agent/core/pipeline/op-input-contracts';
 import { getRegisteredEnv } from '@agent/core/foundation/env';
 import { nowIso } from '@agent/core/foundation/time';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
-import { defineLegacyPipelineActuator } from '@agent/core/actuator/actuator-sdk';
 import type {
   PipelineRunJournalHandle,
   PipelineRunJournalState,
@@ -783,35 +782,10 @@ export async function loadActuatorDispatch(
       const mod = moduleCache[domain];
 
       const actuator =
-        mod.actuator && typeof mod.actuator.dispatch === 'function'
-          ? mod.actuator
-          : typeof mod.handleAction === 'function'
-            ? defineLegacyPipelineActuator({ id: domain, handleAction: mod.handleAction })
-            : undefined;
+        mod.actuator && typeof mod.actuator.dispatch === 'function' ? mod.actuator : undefined;
       if (!actuator) throw new Error(`Actuator ${domain} does not expose the SDK ABI`);
 
-      // Prefer a declared operation. Older actuators expose the contained
-      // compatibility adapter's `execute` operation instead.
-      const operation = Object.prototype.hasOwnProperty.call(actuator.ops, op) ? op : 'execute';
-      let legacyType = type;
-      if (!legacyType) {
-        try {
-          legacyType = determineActuatorStepType(domain, op);
-        } catch {
-          legacyType = 'apply';
-        }
-      }
-      const input =
-        operation === op
-          ? params
-          : {
-              op,
-              type: legacyType,
-              params,
-              options: ctx.__pipeline_options,
-              ...(trace ? { pipelineTrace: trace } : {}),
-            };
-      const sdkResult = await actuator.dispatch(operation, input, ctx);
+      const sdkResult = await actuator.dispatch(op, params, ctx);
       if (!sdkResult.ok) {
         throw new ActuatorStepFailedError(
           sdkResult.error || `Actuator operation failed: ${domain}:${op}`

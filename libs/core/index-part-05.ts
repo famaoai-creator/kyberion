@@ -373,6 +373,7 @@ export type {
 
 export * from './seam-provider-selection.js';
 
+export * from './seam-selection-defaults.js';
 export * from './seam-selection-rules.js';
 
 export * from './seam-calibration.js';

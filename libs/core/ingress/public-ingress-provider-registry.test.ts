@@ -188,3 +188,35 @@ describe('public ingress readiness and selection', () => {
     expect(readiness.reason).toMatch(/failed to load/);
   });
 });
+
+describe('public-ingress-provider saved seam default', () => {
+  it('uses a ready saved default and says so', async () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'public-ingress-provider=tailscale-funnel');
+    const provider = fakeProvider('tailscale-funnel', {});
+    registerPublicIngressProvider(provider);
+    const selection = await selectPublicIngressProvider({ platform: 'darwin' });
+    expect(selection.provider).toBe(provider);
+    expect(selection.route).toBe('default');
+    expect(selection.reason).toMatch(/saved seam default \(env\) tailscale-funnel/);
+  });
+
+  it('a saved default that is not ready falls back to catalog order', async () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'public-ingress-provider=ngrok');
+    registerPublicIngressProvider(fakeProvider('tailscale-funnel', {}));
+    const selection = await selectPublicIngressProvider({ platform: 'darwin' });
+    expect(selection.candidate.provider_id).toBe('tailscale-funnel');
+    expect(selection.reason).toMatch(/first ready provider/);
+  });
+
+  it('KYBERION_INGRESS_PROVIDER and an explicit provider still win', async () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'public-ingress-provider=ngrok');
+    vi.stubEnv('KYBERION_INGRESS_PROVIDER', 'tailscale-funnel');
+    registerPublicIngressProvider(fakeProvider('tailscale-funnel', {}));
+    expect((await selectPublicIngressProvider({ platform: 'darwin' })).route).toBe('env');
+    const explicit = await selectPublicIngressProvider({
+      providerId: 'tailscale-funnel',
+      platform: 'darwin',
+    });
+    expect(explicit.route).toBe('explicit');
+  });
+});

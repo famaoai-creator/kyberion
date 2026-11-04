@@ -111,6 +111,7 @@ describe('pipeline approval resume', () => {
   it('restores journal authority instead of inheriting the approving runtime', () => {
     const authority = mocks.loadPipelineRunJournal().started.execution_authority;
     authority.policy_env.KYBERION_ALLOW_UNSAFE_SHELL = '0';
+    authority.policy_env.KYBERION_NHI_ACTOR = 'enforce';
     authority.policy_env.KYBERION_PROVIDER_EGRESS_POLICY_PATH = 'original-strict-policy.json';
     vi.stubEnv('SYSTEM_ROLE', 'generation_schedule');
     vi.stubEnv('MISSION_ROLE', 'generation_scheduler');
@@ -118,6 +119,7 @@ describe('pipeline approval resume', () => {
     vi.stubEnv('KYBERION_TENANT', 'approver');
     vi.stubEnv('KYBERION_PROJECT_ID', 'approver-project');
     vi.stubEnv('KYBERION_NHI_ID', 'nhi-approver');
+    vi.stubEnv('KYBERION_NHI_ACTOR', 'off');
     vi.stubEnv('KYBERION_TASK_GRANTS_PATH', 'approver-grants.json');
     vi.stubEnv('KYBERION_SUDO', 'true');
     vi.stubEnv('KYBERION_SUDO_SCOPE', 'all');
@@ -140,7 +142,7 @@ describe('pipeline approval resume', () => {
               KYBERION_ORGANIZATION_ID: 'org-original',
               KYBERION_PROJECT_ID: 'project-original',
               KYBERION_CUSTOMER: 'customer-original',
-              KYBERION_NHI_ACTOR: 'actor-original',
+              KYBERION_NHI_ACTOR: 'enforce',
               KYBERION_NHI_ID: 'nhi-original',
               KYBERION_AGENT_ID: 'agent-original',
               KYBERION_TASK_GRANTS_PATH: '',
@@ -154,6 +156,20 @@ describe('pipeline approval resume', () => {
           }),
         })
       );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('refuses a historical snapshot missing only the NHI policy mode', () => {
+    delete mocks.loadPipelineRunJournal().started.execution_authority.policy_env.KYBERION_NHI_ACTOR;
+    vi.stubEnv('KYBERION_NHI_ACTOR', 'off');
+    try {
+      expect(resumePipelineRunAfterApproval(record)).toMatchObject({
+        status: 'not_applicable',
+        reason: 'original execution authority is missing; resume from the original runtime',
+      });
+      expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllEnvs();
     }

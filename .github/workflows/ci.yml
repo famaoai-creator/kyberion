@@ -55,6 +55,7 @@ jobs:
           path: |
             dist/
             libs/core/dist/
+            libs/kernel/dist/
             libs/shared-*/dist/
             presence/displays/terminal-hud/dist/
             plugins/dist/
@@ -258,13 +259,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-suite: [smoke, core, actuators]
+        test-suite: [smoke, actuators]
         include:
           - test-suite: smoke
             command: pnpm run test
-          - test-suite: core
-            command: pnpm test -- --suite core --coverage
-            pr-duplicate: true
           - test-suite: actuators
             command: pnpm test -- --suite actuators
             pr-duplicate: true
@@ -289,7 +287,7 @@ jobs:
             shard: '2/2'
             command: pnpm test -- --suite integration --skip-gate-tests --shard=2/2
     steps:
-      # core and actuators run in pr-validation.yml on pull requests and in the
+      # Actuators run in pr-validation.yml on pull requests and in the
       # merge queue; keep the job (and its check name) but skip the duplicate
       # work there.
       - name: Skip suite already covered by pr-validation
@@ -366,14 +364,6 @@ jobs:
         shell: bash
         run: ${{ matrix.command }} 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v6
-        if: ${{ (matrix.test-suite == 'core' && always()) && !((github.event_name == 'pull_request' || github.event_name == 'merge_group') && matrix.pr-duplicate) }}
-        with:
-          name: coverage-report
-          path: coverage/
-          retention-days: 14
-
       # Classify the captured output and print the next command per failure
       # (operations-hygiene runbook §1 "CI failure triage").
       - name: Triage failure
@@ -381,6 +371,156 @@ jobs:
         uses: ./.github/actions/ci-failure-triage
         with:
           job: test (${{ matrix.test-suite }}${{ matrix.shard && format(', {0}', matrix.shard) || '' }})
+
+  # Keep files serial within each runner: core suites share governed fixtures.
+  # Shards collect coverage; only the merged report enforces global thresholds.
+  core-coverage-shards:
+    if: ${{ github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: build-artifacts
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@v5
+
+      # Native PDF engine CJK embedding test needs a CJK font on Linux
+      - name: Install CJK fonts
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          for source in /etc/apt/sources.list.d/*azure* /etc/apt/sources.list.d/*microsoft*; do
+            if [ -f "$source" ]; then sudo mv "$source" "$source.disabled"; fi
+          done
+          # GitHub hosted images may leave Ubuntu sources pointed at the Azure
+          # mirror inside ubuntu.sources; that mirror can stall package downloads.
+          for source in /etc/apt/sources.list /etc/apt/apt-mirrors.txt /etc/apt/sources.list.d/*.sources; do
+            if [ -f "$source" ]; then sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' "$source"; fi
+          done
+          if [ -r /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc ]; then
+            echo "CJK font already available; skipping package installation."
+            exit 0
+          fi
+          for attempt in 1 2 3; do
+            if sudo timeout --signal=TERM 300s apt-get \
+              -o Acquire::ForceIPv4=true \
+              -o Acquire::Retries=3 \
+              -o Acquire::http::Timeout=30 \
+              -o Acquire::https::Timeout=30 \
+              -o Acquire::http::Pipeline-Depth=0 \
+              -o DPkg::Lock::Timeout=60 update; then
+              break
+            fi
+            if [ "$attempt" = "3" ]; then exit 1; fi
+            echo "::warning::apt-get update attempt ${attempt} failed; retrying in 15s"
+            sleep 15
+          done
+          for attempt in 1 2 3; do
+            if sudo timeout --signal=TERM 300s apt-get \
+              -o Acquire::ForceIPv4=true \
+              -o Acquire::Retries=3 \
+              -o Acquire::http::Timeout=30 \
+              -o Acquire::https::Timeout=30 \
+              -o Acquire::http::Pipeline-Depth=0 \
+              -o DPkg::Lock::Timeout=60 install -y --no-install-recommends fonts-noto-cjk; then
+              break
+            fi
+            if [ "$attempt" = "3" ]; then exit 1; fi
+            echo "::warning::apt-get install attempt ${attempt} failed; retrying in 15s"
+            sleep 15
+          done
+
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
+        with:
+          node-version: '24'
+
+      - name: Download compiler outputs
+        uses: actions/download-artifact@v6
+        with:
+          name: build-outputs
+
+      - name: Run core coverage shard
+        env:
+          KYBERION_PERSONA: worker
+          MISSION_ROLE: mission_controller
+        shell: bash
+        run: >-
+          pnpm test -- --suite core --coverage --shard=${{ matrix.shard }}/6
+          --reporter=default --reporter=blob
+          --outputFile.blob=coverage-blobs/shard-${{ matrix.shard }}.json
+          --coverage.thresholds.lines=0 --coverage.thresholds.functions=0
+          --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
+          2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
+
+      - name: Upload core coverage blob
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: core-coverage-blob-${{ matrix.shard }}
+          path: coverage-blobs/shard-${{ matrix.shard }}.json
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Triage failure
+        if: failure()
+        uses: ./.github/actions/ci-failure-triage
+        with:
+          job: core-coverage-shards (${{ matrix.shard }}/6)
+
+  core-coverage:
+    name: test (core)
+    if: ${{ always() && github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [build-artifacts, core-coverage-shards]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Require every coverage shard to succeed
+        env:
+          BUILD_RESULT: ${{ needs.build-artifacts.result }}
+          SHARD_RESULT: ${{ needs.core-coverage-shards.result }}
+        run: test "$BUILD_RESULT" = success && test "$SHARD_RESULT" = success
+
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
+        with:
+          node-version: '24'
+
+      - name: Download coverage blobs
+        uses: actions/download-artifact@v6
+        with:
+          pattern: core-coverage-blob-*
+          path: coverage-blobs
+          merge-multiple: true
+
+      - name: Require all six coverage blobs
+        shell: bash
+        run: |
+          for shard in 1 2 3 4 5 6; do
+            test -s "coverage-blobs/shard-${shard}.json"
+          done
+          test "$(find coverage-blobs -maxdepth 1 -type f | wc -l)" -eq 6
+
+      - name: Merge coverage and enforce original global thresholds
+        shell: bash
+        run: pnpm exec vitest --merge-reports=coverage-blobs --coverage 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
+
+      - name: Upload coverage report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
+
+      - name: Triage failure
+        if: failure()
+        uses: ./.github/actions/ci-failure-triage
+        with:
+          job: test (core)
 
   security:
     runs-on: ubuntu-latest

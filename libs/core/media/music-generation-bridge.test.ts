@@ -878,6 +878,20 @@ describe('generateMusic provider selection', () => {
     );
   });
 
+  it('lets a saved seam default lead the platform order; explicit wins, ineligible falls back', async () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'music-generation-provider=stable_audio_3');
+    expect((await generateMusic({ prompt: 'x' })).provider).toBe('stable_audio_3');
+    expect(
+      (await generateMusic({ prompt: 'x', providerPreference: ['musicgen_mlx'] })).provider
+    ).toBe('musicgen_mlx');
+
+    mocks.probeToolRuntime.mockImplementation((toolId: string) =>
+      toolId === 'stable_audio_3' ? { selected_action: 'install' } : runnable
+    );
+    expect((await generateMusic({ prompt: 'x' })).provider).toBe('musicgen_mlx');
+    expect(stableAudio).toHaveBeenCalledTimes(1);
+  });
+
   it('lets a named provider win over the purpose', async () => {
     const result = await generateMusic({
       prompt: 'x',

@@ -54,6 +54,7 @@ import {
   resolveSeamProviderDecision,
   type SeamProviderDecision,
 } from '../seam-provider-selection.js';
+import { savedSeamDefaultFor } from '../seam-provider-selection.js';
 import { runExternalOperation } from '../governance/external-operation.js';
 import {
   primaryLanguageSubtag,
@@ -331,6 +332,18 @@ export function listSpeechToTextCandidates(
   });
 }
 
+/**
+ * KYBERION_STT_COMMAND (with KYBERION_STT_PRIORITY) is the operator's explicit
+ * STT configuration: its priority order outranks a generic saved seam
+ * default. Returns the priority default to pass as the caller default only
+ * when both are present, so the no-saved-default path is unchanged.
+ */
+function envConfiguredDefault(bridges: SpeechToTextBridge[]): string | undefined {
+  if (!envText(process.env, 'KYBERION_STT_COMMAND')?.trim()) return undefined;
+  if (!savedSeamDefaultFor(SPEECH_TO_TEXT_SEAM)) return undefined;
+  return highestPriorityBridge(bridges)?.name;
+}
+
 function selectionContext(options: {
   requires?: SpeechToTextRequirements;
   context?: Record<string, string>;
@@ -352,16 +365,18 @@ export function shouldSelectSpeechToTextBridges(
     bridges?: SpeechToTextBridge[];
   } = {}
 ): boolean {
+  const requires = options.requires ?? {};
+  const bridges = options.bridges ?? getSpeechToTextBridges();
+  const envDefault = envConfiguredDefault(bridges);
   const entry = {
     seam: SPEECH_TO_TEXT_SEAM,
     purpose: options.purpose,
     context: selectionContext(options),
+    ...(envDefault ? { defaultProvider: envDefault } : {}),
   };
-  // Preserve the cheap opt-in path: no bridge discovery is needed for a
-  // purpose or a matching operator rule.
+  // Preserve the cheap opt-in path: a purpose, a matching operator rule or a
+  // saved seam default selects without checking the priority default.
   if (resolveSeamSelectionEntry(entry).kind === 'governed') return true;
-  const requires = options.requires ?? {};
-  const bridges = options.bridges ?? getSpeechToTextBridges();
   const priorityDefault = options.bridges
     ? highestPriorityBridge(bridges)
     : getSpeechToTextBridge();
@@ -391,10 +406,12 @@ export function selectSpeechToTextBridges(
   const bridges = options.bridges ?? getSpeechToTextBridges();
   const candidates = listSpeechToTextCandidates(requires, bridges);
   const context = selectionContext(options);
+  const envDefault = purpose ? undefined : envConfiguredDefault(bridges);
   const decision = resolveSeamProviderDecision({
     seam: SPEECH_TO_TEXT_SEAM,
     candidates,
     ...(purpose ? { purpose } : {}),
+    ...(envDefault ? { defaultProvider: envDefault } : {}),
     ...(context ? { context } : {}),
     decisionKey: purpose || 'default',
   });

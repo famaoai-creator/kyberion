@@ -1,4 +1,5 @@
 /** Domain barrel — public surface for libs/core/secret */
+export * from './external-secret-providers.js';
 export * from './secret-bridge.js';
 export * from './secret-encryption.js';
 export * from './secret-guard-entry.js';

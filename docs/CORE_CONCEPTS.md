@@ -37,6 +37,18 @@ to the current task. Model selection and connectivity proofs are separate decisi
 See [Credential lifecycle, allocation, and execution](../knowledge/product/architecture/api-credential-proof-boundary.md)
 for the conceptual contract and implemented versus planned capabilities.
 
+### Who acts within a tenant?
+
+A conversational persona such as Haru is the human-facing window, not the durable
+identity that receives authority. Use a personal NHI for personal work and a
+separate tenant-affiliated NHI for each company. Organization participation
+describes membership and responsibilities; expertise profiles describe skills;
+implementer and reviewer are task roles. None grants authority or replaces human
+approval. Independent review requires a genuinely separate reviewer, not an alias
+or session change. The common window never permits cross-tenant sharing or a
+public downgrade. See the [actor identity and responsibility model](../knowledge/product/architecture/actor-identity-and-responsibility-model.md)
+for the additive implementation and remaining migration work.
+
 ## 5. Surface
 
 A human-facing entrance, each with one role: **Concierge** (what do I decide?), **Presence Studio** (what are we doing together?), **Chronos Mirror** (control tower), the audit monitor, the hands-on mirror, the terminal home (`pnpm kyberion`), chat bridges, and the local capture **pads** (`pnpm pads`). Surfaces show state and take requests; they do not own missions.
