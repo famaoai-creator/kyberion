@@ -296,4 +296,34 @@ describe('purpose-driven OCR provider selection', () => {
     });
     expect(ja[0]!.id).toBe('llm_api');
   });
+
+  it('lets a saved seam default lead the mode chain; explicit wins; ineligible falls back', async () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'ocr-provider=llm_api');
+    const router = new AdaptivePolicyRouter([
+      makeProvider('tesseract', 'none'),
+      makeProvider('apple_vision', 'none'),
+      makeProvider('llm_api', 'external'),
+    ]);
+
+    const balanced = await router.resolveCandidates({
+      path: 'test.png',
+      training_use: 'training_eligible',
+    });
+    expect(balanced.map((p) => p.id)).toEqual(['llm_api', 'apple_vision', 'tesseract']);
+
+    const explicit = await router.resolveCandidates({
+      path: 'test.png',
+      training_use: 'training_eligible',
+      providerPreference: ['tesseract'],
+    });
+    expect(explicit[0]!.id).toBe('tesseract');
+
+    // local_only forbids external egress: the saved default cannot widen the mode.
+    const local = await router.resolveCandidates({
+      path: 'test.png',
+      mode: 'local_only',
+      training_use: 'training_eligible',
+    });
+    expect(local.map((p) => p.id)).toEqual(['apple_vision', 'tesseract']);
+  });
 });

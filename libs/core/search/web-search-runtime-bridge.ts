@@ -14,6 +14,8 @@ import {
   resolveSeamAutoProvider,
   type SeamProviderMetadata,
 } from '../seam.js';
+import { resolveSeamDefaultProvider } from '../seam-provider-selection.js';
+import { resolveSavedSeamDefault } from '../seam-selection-defaults.js';
 
 export interface WebSearchHit {
   title: string;
@@ -96,7 +98,8 @@ export function resetWebSearchRuntimeBridges(): void {
 /**
  * Resolve a search backend.
  * - explicit id → that provider (must be registered)
- * - `auto` / empty → the offline-safe provider (no `capabilities`), typically `stub`
+ * - `auto` / empty → the saved seam default (if registered), else the
+ *   offline-safe provider (no `capabilities`), typically `stub`
  */
 export function resolveWebSearchRuntime(preference?: string): WebSearchRuntimeBridge {
   const bridges = listWebSearchRuntimeBridges();
@@ -118,9 +121,22 @@ export function resolveWebSearchRuntime(preference?: string): WebSearchRuntimeBr
   if (bridges.length === 0) {
     throw new Error('[web-search-runtime] no web search runtime providers registered');
   }
+  // A saved seam default is a deliberate (audited) operator opt-in, so it may
+  // name a service-backed provider; it only needs to be registered.
+  const saved = resolveSavedSeamDefault(webSearchRuntimeSeam.key);
+  const savedBridge = saved && bridges.find((bridge) => bridge.bridge_id === saved.provider);
+  if (savedBridge) return savedBridge;
+  // Otherwise policy default → builtin, among offline-safe providers only.
+  const isOffline = (id: string) =>
+    bridges.some((bridge) => bridge.bridge_id === id && !bridge.capabilities);
+  const preferred = resolveSeamDefaultProvider(webSearchRuntimeSeam.key, {
+    eligible: isOffline,
+    builtin: [STUB_WEB_SEARCH_RUNTIME_ID],
+    ignoreSavedDefault: true,
+  });
   const offline = resolveSeamAutoProvider(webSearchRuntimeSeam, {
     eligible: (bridge) => !bridge.capabilities,
-    defaultProvider: STUB_WEB_SEARCH_RUNTIME_ID,
+    defaultProvider: preferred?.provider,
   });
   if (!offline) {
     throw new Error(
