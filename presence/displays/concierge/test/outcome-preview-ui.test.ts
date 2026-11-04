@@ -33,7 +33,7 @@ vi.mock('../src/lib/i18n', () => ({
 }));
 vi.mock('../src/app/outcome-files', () => ({ OutcomeFiles: () => null }));
 vi.mock('../src/app/review-checkin', () => ({ ReviewCheckin: () => null }));
-import ConciergePage from '../src/app/page';
+import ConciergePage from '../src/app/front-desk-inbox';
 
 const item = (entry_id: string) => ({
   entry_id,

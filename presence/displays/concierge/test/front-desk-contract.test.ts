@@ -73,7 +73,7 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
   });
 
   it('FD-04: `/` renders the 決める queue from front_desk decide_* vocabulary, defers client-side only, and never blocks on window dialogs', () => {
-    const page = read('src/app/page.tsx');
+    const page = read('src/app/front-desk-inbox.tsx');
     const decideView = read('src/lib/decide-view.ts');
 
     // Header row: h1 = nav_decide, lead paragraph = decide_lead, filter chips

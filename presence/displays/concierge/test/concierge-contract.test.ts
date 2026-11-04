@@ -10,7 +10,7 @@ const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('concierge surface contract', () => {
   it('keeps approval errors safe without changing decision dispatch or retrying', () => {
-    const page = safeReadFile(path.join(appDir, 'src/app/page.tsx')).toString();
+    const page = safeReadFile(path.join(appDir, 'src/app/front-desk-inbox.tsx')).toString();
     const decision = page.slice(
       page.indexOf('const decideApproval ='),
       page.indexOf('const [changeFormId')
@@ -376,7 +376,7 @@ describe('concierge surface contract', () => {
   });
 
   it('replaces window.prompt and 30 s summary polling on the home page', () => {
-    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+    const page = fs.readFileSync(path.join(appDir, 'src/app/front-desk-inbox.tsx'), 'utf8');
     expect(page).not.toContain('window.prompt');
     expect(page).toContain("t('home.change_send')");
     expect(page).toContain('startSummaryWatch');
@@ -571,7 +571,7 @@ describe('concierge surface contract', () => {
       'utf8'
     );
     const server = fs.readFileSync(path.join(appDir, 'src/lib/hygiene-server.ts'), 'utf8');
-    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+    const page = fs.readFileSync(path.join(appDir, 'src/app/front-desk-inbox.tsx'), 'utf8');
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -620,7 +620,7 @@ describe('concierge surface contract', () => {
       path.join(appDir, 'src/app/api/outcomes/[id]/preview/route.ts'),
       'utf8'
     );
-    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+    const page = fs.readFileSync(path.join(appDir, 'src/app/front-desk-inbox.tsx'), 'utf8');
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -720,7 +720,7 @@ describe('concierge surface contract', () => {
       path.join(appDir, 'src/app/api/memory-queue/[id]/route.ts'),
       'utf8'
     );
-    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+    const page = fs.readFileSync(path.join(appDir, 'src/app/front-desk-inbox.tsx'), 'utf8');
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -888,7 +888,7 @@ describe('concierge surface contract', () => {
   });
 
   it('surfaces bounded response waiting with a recovery-oriented status panel', () => {
-    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+    const page = fs.readFileSync(path.join(appDir, 'src/app/front-desk-inbox.tsx'), 'utf8');
     const route = fs.readFileSync(
       path.join(appDir, 'src/app/api/response-status/route.ts'),
       'utf8'
@@ -900,7 +900,7 @@ describe('concierge surface contract', () => {
     expect(route).toContain('staleChildCount');
   });
   it('CS-04/FD-04: presents one prioritized decision queue (決める) whose cards call the guarded decision endpoints', () => {
-    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+    const page = fs.readFileSync(path.join(appDir, 'src/app/front-desk-inbox.tsx'), 'utf8');
     // One queue section, ordered by decision urgency, rendered from the same
     // card helpers the (now removed) detail panes used to duplicate.
     expect(page).toContain('decide-queue');
