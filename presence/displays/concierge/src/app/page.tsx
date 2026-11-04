@@ -779,7 +779,8 @@ export default function ConciergePage() {
           <Button
             label={frontDeskText('decide_reject', locale)}
             variant="danger"
-            disabled={busyId === item.id}
+            // Rejecting an expired request still clears it; a resolved one is final.
+            disabled={busyId === item.id || item.brief?.state === 'resolved'}
             onClick={() => void decideApproval(item, 'rejected')}
           />
           {nested ? null : later(entry.id, busyId === item.id)}

@@ -99,9 +99,9 @@
   padding: 0 var(--kb-ui-space-2);
   text-align: center;
   font-size: var(--kb-ui-font-size-xs);
-  color: var(--kb-ui-badge-fg);
-  background: var(--kb-ui-badge-bg);
-  border: 1px solid var(--kb-ui-badge-border);
+  color: var(--kb-ui-badge-fg, var(--kb-ui-text-muted));
+  background: var(--kb-ui-badge-bg, var(--kb-ui-surface-sunken));
+  border: 1px solid var(--kb-ui-badge-border, var(--kb-ui-border));
   border-radius: 999px;
 }
 

@@ -59,6 +59,24 @@ function buildMatchers(): ReasonMatcher[] {
   return built;
 }
 
+/**
+ * List params name machine things (repository paths, risk-axis and operation
+ * class codes). The card body never shows them: a path list becomes its count
+ * and the code lists are dropped (the concierge templates take no list); the
+ * stored reason stays whole in the brief's details disclosure.
+ */
+function bodyParams(
+  captured: Readonly<Record<string, string>>
+): Record<string, string | number> | undefined {
+  const params: Record<string, string | number> = {};
+  for (const [name, value] of Object.entries(captured)) {
+    if (name === 'paths')
+      params.count = value.split(/[,、]/u).filter((entry) => entry.trim()).length;
+    else if (name !== 'axes' && name !== 'classes') params[name] = value;
+  }
+  return Object.keys(params).length ? params : undefined;
+}
+
 export function decisionReasonText(text: string | undefined | null): DisplayText | undefined {
   const value = String(text ?? '').trim();
   if (!value) return undefined;
@@ -66,11 +84,10 @@ export function decisionReasonText(text: string | undefined | null): DisplayText
   for (const matcher of matchers) {
     const match = matcher.pattern.exec(value);
     if (!match) continue;
-    if (!matcher.params.length) return { key: matcher.key };
-    return {
-      key: matcher.key,
-      params: Object.fromEntries(matcher.params.map((name, i) => [name, match[i + 1] ?? ''])),
-    };
+    const params = bodyParams(
+      Object.fromEntries(matcher.params.map((name, i) => [name, match[i + 1] ?? '']))
+    );
+    return params ? { key: matcher.key, params } : { key: matcher.key };
   }
   return undefined;
 }
