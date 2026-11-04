@@ -3789,6 +3789,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_SEAM_DEFAULTS",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Process-level saved seam defaults, `seam=provider;seam2=provider` (libs/core/seam-selection-defaults.ts). Highest saved-default layer (above project/organization/tenant/operator); applies only when no explicit provider and no purpose is given, and eligibility still decides.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
       "name": "KYBERION_SEAM_SELECTION_RULES_PATH",
       "category": "path",
       "type": "path",

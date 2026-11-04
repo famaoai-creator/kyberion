@@ -22,6 +22,8 @@ export const PARTITIONED_RUNTIME_STATE_ROOTS = {
   customer_decision_invites: 'active/shared/runtime/customer-decision-invites',
   /** Kyberion -> Chrome extension pull mailbox (browser/browser-bridge-mailbox.ts). */
   browser_bridge_mailbox: 'active/shared/runtime/browser-bridge-mailbox',
+  /** Saved per-seam provider defaults: tenant / organization / project layers (seam-selection-defaults.ts). */
+  seam_selection_defaults: 'active/shared/runtime/seam-selection-defaults',
 } as const;
 
 /**
