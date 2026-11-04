@@ -413,8 +413,8 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
   continuing — never assume your working tree survived.
 - **Before opening a PR**, follow
   [pre-pr-ci-readiness-checklist.ja.md](./pre-pr-ci-readiness-checklist.ja.md):
-  `pnpm check -- --scope pr` plus the exception-table rows for your
-  changed paths, then its PR creation steps (push, base `main`,
+  `pnpm check -- --changed` and the affected tests (`pnpm exec vitest run --changed origin/main`)
+  plus the exception-table rows for your changed paths, then its PR creation steps (push, base `main`,
   `pnpm kyberion pr create --title ... --body-file ...`). Do not treat
   pending CI as green.
 
