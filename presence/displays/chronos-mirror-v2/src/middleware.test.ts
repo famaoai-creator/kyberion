@@ -3,18 +3,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   resolveSurfaceBrowserUrl: vi.fn((_surface: string): string => 'http://127.0.0.1:3050'),
+  resolveSurfaceUrl: vi.fn((_surface: string): string => 'http://127.0.0.1:3050'),
 }));
 vi.mock('@agent/core/surface/surface-url', () => ({
   resolveSurfaceBrowserUrl: mocks.resolveSurfaceBrowserUrl,
+  resolveSurfaceUrl: mocks.resolveSurfaceUrl,
 }));
 
-import { chronosRedirectTarget, proxy } from './proxy.js';
+import { chronosRedirectTarget, conciergeOriginForRequest, proxy } from './proxy.js';
 
 const CONCIERGE = 'http://127.0.0.1:3050';
 
 describe('Chronos compatibility redirects', () => {
   beforeEach(() => {
     mocks.resolveSurfaceBrowserUrl.mockReset().mockReturnValue(CONCIERGE);
+    mocks.resolveSurfaceUrl.mockReset().mockReturnValue(CONCIERGE);
   });
 
   it.each([
@@ -57,5 +60,45 @@ describe('Chronos compatibility redirects', () => {
       throw new Error('[SURFACE_URL] Invalid browser surface URL');
     });
     expect(proxy(new NextRequest('http://127.0.0.1:3000/')).status).toBe(503);
+  });
+
+  it.each([
+    // loopback browser host, no declared public origin → keep the browser's hostname
+    ['localhost:3000', CONCIERGE, 'http://localhost:3050'],
+    ['LOCALHOST:3000', CONCIERGE, 'http://localhost:3050'],
+    ['[::1]:3000', CONCIERGE, 'http://[::1]:3050'],
+    ['127.0.0.1:3000', CONCIERGE, CONCIERGE],
+    // non-loopback / hostile / missing Host → never derived from the request
+    ['evil.example.com', CONCIERGE, CONCIERGE],
+    ['localhost.evil.example:3000', CONCIERGE, CONCIERGE],
+    ['localhost@evil.example', CONCIERGE, CONCIERGE],
+    ['', CONCIERGE, CONCIERGE],
+    [null, CONCIERGE, CONCIERGE],
+  ])('keeps loopback host %s → %s base → %s', (host, base, expected) => {
+    expect(conciergeOriginForRequest(base, base, host)).toBe(expected);
+  });
+
+  it('never rewrites a declared public or overridden origin', () => {
+    expect(conciergeOriginForRequest('https://ops.example.com', CONCIERGE, 'localhost:3000')).toBe(
+      'https://ops.example.com'
+    );
+    // declared loopback public origin differs from the registry origin → kept verbatim
+    expect(conciergeOriginForRequest('http://127.0.0.1:4050', CONCIERGE, 'localhost:3000')).toBe(
+      'http://127.0.0.1:4050'
+    );
+    // urlEnv override pointing at a non-loopback host → kept verbatim
+    expect(
+      conciergeOriginForRequest('http://10.0.0.5:3050', 'http://10.0.0.5:3050', 'localhost:3000')
+    ).toBe('http://10.0.0.5:3050');
+  });
+
+  it('redirects a localhost:3000 visit to localhost on the Concierge port', () => {
+    const response = proxy(
+      new NextRequest('http://localhost:3000/?section=work-items', {
+        headers: { host: 'localhost:3000' },
+      })
+    );
+    expect(response.status).toBe(308);
+    expect(response.headers.get('location')).toBe('http://localhost:3050/ops?section=work-items');
   });
 });

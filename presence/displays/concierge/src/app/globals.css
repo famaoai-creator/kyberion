@@ -211,8 +211,94 @@ body {
   border-radius: var(--kb-ui-radius-md);
 }
 
+/* Decision brief — what to decide, why, and what each answer does (decision-brief.tsx). */
+
+.brief {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-3);
+}
+
+.brief-label {
+  margin: 0 0 var(--kb-ui-space-1);
+  font-size: var(--kb-ui-font-size-xs);
+  font-weight: 600;
+  color: var(--kb-ui-text-muted);
+}
+
+.brief-ask {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-lg);
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.brief-text {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.brief-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--kb-ui-space-4);
+}
+
+.brief-list {
+  margin: 0;
+  padding-left: var(--kb-ui-space-4);
+}
+
+.brief-impact,
+.brief-details {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--kb-ui-space-1) var(--kb-ui-space-3);
+  margin: 0;
+}
+
+.brief-impact dt,
+.brief-details dt {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.brief-impact dd,
+.brief-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.brief-details code {
+  font-size: var(--kb-ui-font-size-xs);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.brief-recommend {
+  padding: var(--kb-ui-space-2) var(--kb-ui-space-3);
+  border-left: 3px solid var(--kb-ui-accent);
+  background: var(--kb-ui-surface-sunken);
+}
+
+.brief-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-2) var(--kb-ui-space-4);
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+}
+
+.brief-group {
+  padding-left: var(--kb-ui-space-3);
+  border-left: 2px dashed var(--kb-ui-border);
+}
+
 @media (max-width: 720px) {
-  .decide-columns {
+  .decide-columns,
+  .brief-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 

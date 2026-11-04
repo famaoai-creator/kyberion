@@ -17,6 +17,11 @@ const mocks = vi.hoisted(() => ({
   viewerScopeTenantSlugs: vi.fn(),
   viewerErrorResponse: vi.fn(),
   withViewerExecutionContext: vi.fn((_viewer: unknown, fn: () => unknown) => fn()),
+  invalidateWorkspaceGraphCache: vi.fn(),
+}));
+
+vi.mock('@agent/core/surface/surface-operation-registry', () => ({
+  invalidateWorkspaceGraphCache: mocks.invalidateWorkspaceGraphCache,
 }));
 
 vi.mock('@agent/core/workforce/work-coordination', () => ({
@@ -144,6 +149,7 @@ describe('workitems route', () => {
     });
     expect(await response.json()).toMatchObject({
       ok: true,
+      accessRole: 'localadmin',
       scope: 'operations',
       view: 'active',
       items: [{ item_id: 'WI-1' }],
@@ -257,5 +263,18 @@ describe('explicit mission alignment action', () => {
     mocks.requireOpsAccess.mockReturnValue(NextResponse.json({ ok: false }, { status: 403 }));
     expect((await post()).status).toBe(403);
     expect(mocks.requestAlignment).not.toHaveBeenCalled();
+  });
+  it('moves a card through the governed update and drops the cached workspace graph', async () => {
+    mocks.updateWorkItem.mockReturnValue({ ...intake(), status: 'in_progress' });
+    const response = await post({ itemId: 'WI-1', status: 'in_progress' });
+    expect(response.status).toBe(200);
+    expect(mocks.updateWorkItem).toHaveBeenCalledWith({ itemId: 'WI-1', status: 'in_progress' });
+    expect(mocks.invalidateWorkspaceGraphCache).toHaveBeenCalledTimes(1);
+  });
+  it('keeps the cache when the move is refused', async () => {
+    mocks.requireOpsAccess.mockReturnValue(NextResponse.json({ ok: false }, { status: 403 }));
+    expect((await post({ itemId: 'WI-1', status: 'done' })).status).toBe(403);
+    expect(mocks.updateWorkItem).not.toHaveBeenCalled();
+    expect(mocks.invalidateWorkspaceGraphCache).not.toHaveBeenCalled();
   });
 });

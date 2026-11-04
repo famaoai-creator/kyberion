@@ -1730,6 +1730,48 @@ body {
   gap: var(--kb-ui-space-2);
 }
 
+/* Inside the Concierge shell: scope selectors and console controls on one row. */
+.chronos-header--embedded {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kb-ui-space-2) var(--kb-ui-space-4);
+  padding-bottom: var(--kb-ui-space-2);
+}
+
+.chronos-header--embedded > .chronos-header__controls {
+  margin-left: auto;
+}
+
+.chronos-viewer-details {
+  position: relative;
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-muted);
+}
+
+.chronos-viewer-details > summary {
+  cursor: pointer;
+}
+
+.chronos-viewer-details[open] > .kb-badge {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--kb-ui-space-1));
+  z-index: 30;
+  white-space: nowrap;
+}
+
+.chronos-viewer-details--inline > div {
+  margin-top: var(--kb-ui-space-2);
+}
+
+.chronos-viewer-details > summary:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+}
+
+
 /* Tenant › organization › project scope, compacted under the title. */
 .chronos-scope {
   display: flex;
@@ -2582,4 +2624,131 @@ body {
 /* Keep the floating chat launcher (≈30–36px, 16px from the edge) off the last row. */
 .chronos-shell .kb-app-shell__main {
   padding-bottom: calc(var(--kb-ui-space-5) + 56px);
+}
+
+/* Organization dashboard: stat tiles that open their detail, KR progress bars. */
+.org-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--kb-ui-space-2);
+}
+
+.org-stat {
+  display: block;
+  padding: 0;
+  text-align: start;
+  background: none;
+  border: 0;
+  border-radius: var(--kb-ui-radius-md);
+}
+
+button.org-stat {
+  cursor: pointer;
+}
+
+button.org-stat:hover .kb-metric {
+  border-color: var(--kb-ui-accent);
+}
+
+button.org-stat:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+}
+
+button.org-stat .kb-metric__description {
+  color: var(--kb-ui-accent-text);
+}
+
+.org-objectives,
+.org-krs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.org-objective {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  padding: var(--kb-ui-space-3);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  background: var(--kb-ui-surface);
+}
+
+.org-objective__head,
+.org-kr__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+}
+
+.org-objective__title {
+  flex: 1 1 12rem;
+  font-weight: 600;
+  color: var(--kb-ui-text);
+}
+
+.org-kr {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+}
+
+.org-kr__title {
+  flex: 1 1 10rem;
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text);
+}
+
+.org-kr__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+}
+
+.org-kr__track {
+  position: relative;
+  flex: 1;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--kb-ui-surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--kb-ui-border);
+}
+
+.org-kr__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--kb-ui-accent);
+}
+
+.org-kr[data-status='met'] .org-kr__fill {
+  background: var(--kb-ui-success-fg);
+}
+
+.org-kr[data-status='at_risk'] .org-kr__fill {
+  background: var(--kb-ui-warning-fg);
+}
+
+.org-kr[data-status='off_track'] .org-kr__fill {
+  background: var(--kb-ui-danger-fg);
+}
+
+.org-kr__percent {
+  flex: none;
+  font-size: var(--kb-ui-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--kb-ui-text-muted);
+}
+
+.org-kr__meta {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-muted);
 }

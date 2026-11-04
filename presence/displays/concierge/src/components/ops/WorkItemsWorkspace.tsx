@@ -2,11 +2,10 @@
 
 import { opsApiPath, opsPagePath } from '../../lib/ops/ops-api-path';
 import * as React from 'react';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
-import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
+import { localeToBcp47 } from '@agent/core/locale-normalize';
+import type { DisplayText } from '@agent/core/surface/display-humanize';
 import {
   Badge,
-  Button,
   Callout,
   Disclosure,
   List,
@@ -17,6 +16,18 @@ import {
 } from '@agent/shared-ui';
 import { useChronosLocale } from '../../lib/ops/hooks';
 import { uxMessage, uxText, uxTextOr, type SupportedLocale } from '../../lib/ops/ux-vocabulary';
+import { entityHref } from '../../lib/workspace-view';
+import {
+  BoardViewToggle,
+  WorkItemBoard,
+  type BoardTranslate,
+  type BoardViewMode,
+} from '../work-board/WorkItemBoard';
+import {
+  WORK_ITEM_STATUS_LABEL_KEYS,
+  actorDisplayName,
+  type BoardCard,
+} from '../work-board/work-item-board';
 import {
   parseWorkItemMutationResponse,
   parseWorkItemAdmissionResponse,
@@ -37,15 +48,7 @@ type WorkItemLineage = ClientWorkItemLineage;
 
 type WorkCoordinationSummary = ClientWorkCoordinationSummary;
 
-const STATUS_LABEL_KEY: Record<string, string> = {
-  backlog: 'chronos_status_backlog',
-  ready: 'chronos_status_ready',
-  in_progress: 'chronos_status_in_progress',
-  blocked: 'chronos_blocked_count',
-  review: 'chronos_status_review',
-  done: 'chronos_status_done',
-  archived: 'chronos_status_archived',
-};
+const STATUS_LABEL_KEY = WORK_ITEM_STATUS_LABEL_KEYS;
 
 function metadataText(
   metadata: Record<string, unknown> | undefined,
@@ -65,10 +68,46 @@ function missionIdFromItem(item: WorkItem): string | null {
   );
 }
 
-function compactDate(value: string): string {
-  if (!value) return '-';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+type WorkItemCard = BoardCard & { item: WorkItem };
+
+const BOARD_VIEW_STORAGE_KEY = 'kyberion.ops.work-board.view';
+
+function readStoredBoardView(): BoardViewMode {
+  if (typeof window === 'undefined') return 'board';
+  try {
+    return window.localStorage.getItem(BOARD_VIEW_STORAGE_KEY) === 'list' ? 'list' : 'board';
+  } catch {
+    return 'board';
+  }
+}
+
+/** A work item as a board card: display names and lineage, never raw ids where a name exists. */
+export function workItemCard(
+  item: WorkItem,
+  renderActor: (text: DisplayText) => string
+): WorkItemCard {
+  const assigneeId =
+    item.assignee_user_id ||
+    item.assignee_peer_id ||
+    metadataText(item.metadata, ['assignee_label', 'assigneeLabel']) ||
+    undefined;
+  const projectId = item.context?.project_id || item.project_id || undefined;
+  const missionId = missionIdFromItem(item) || undefined;
+  return {
+    id: item.item_id,
+    title: item.title,
+    status: item.status,
+    priority: item.priority,
+    assignee: actorDisplayName(assigneeId, renderActor),
+    ...(projectId ? { project: { id: projectId, label: projectId } } : {}),
+    ...(missionId && missionId !== projectId
+      ? { mission: { id: missionId, label: missionId } }
+      : {}),
+    updatedAt: item.updated_at || item.created_at,
+    description: item.description,
+    href: entityHref('work_item', item.item_id),
+    item,
+  };
 }
 
 export function WorkItemsWorkspace({
@@ -101,6 +140,17 @@ export function WorkItemsWorkspace({
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [statusFilter, setStatusFilter] = React.useState<string>('all');
+  const [accessRole, setAccessRole] = React.useState<'readonly' | 'localadmin'>('readonly');
+  const [boardView, setBoardView] = React.useState<BoardViewMode>('board');
+  React.useEffect(() => setBoardView(readStoredBoardView()), []);
+  const changeBoardView = React.useCallback((next: BoardViewMode) => {
+    setBoardView(next);
+    try {
+      window.localStorage.setItem(BOARD_VIEW_STORAGE_KEY, next);
+    } catch {
+      /* storage unavailable: the choice lasts for this page only */
+    }
+  }, []);
 
   const refresh = React.useCallback(async () => {
     try {
@@ -118,6 +168,7 @@ export function WorkItemsWorkspace({
       const payload = parseWorkItemsResponse(await response.json().catch(() => null));
       if (!response.ok || !payload) throw new Error('Invalid work items response');
       setItems(payload.items);
+      setAccessRole(payload.accessRole === 'localadmin' ? 'localadmin' : 'readonly');
       setAdmissions(() => {
         const next: Record<string, ClientMissionAdmission> = {};
         for (const item of payload.items) {
@@ -160,6 +211,7 @@ export function WorkItemsWorkspace({
     return () => clearInterval(timer);
   }, [refresh]);
 
+  // Throws on refusal so the board rolls its optimistic move back.
   const moveItem = React.useCallback(
     async (itemId: string, status: string) => {
       setBusyId(itemId);
@@ -172,8 +224,6 @@ export function WorkItemsWorkspace({
         const payload = parseWorkItemMutationResponse(await response.json().catch(() => null));
         if (!response.ok || !payload) throw new Error('Invalid work item move response');
         await refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
       } finally {
         setBusyId(null);
       }
@@ -215,8 +265,21 @@ export function WorkItemsWorkspace({
   const statusLabel = (status: string) =>
     uxText(STATUS_LABEL_KEY[status] || 'chronos_status_unknown', locale);
 
-  const visibleItems =
-    statusFilter === 'all' ? items : items.filter((item) => item.status === statusFilter);
+  const boardT: BoardTranslate = React.useCallback(
+    (key, params) => (params ? uxMessage(key, params, key, locale) : uxText(key, locale)),
+    [locale]
+  );
+  const renderActor = React.useCallback(
+    (text: DisplayText) =>
+      'text' in text ? text.text : uxMessage(text.key, text.params ?? {}, text.key, locale),
+    [locale]
+  );
+  const cards = React.useMemo(
+    () => items.map((item) => workItemCard(item, renderActor)),
+    [items, renderActor]
+  );
+  const visibleCards =
+    statusFilter === 'all' ? cards : cards.filter((card) => card.status === statusFilter);
   const tabItems = [
     {
       id: 'all',
@@ -243,22 +306,6 @@ export function WorkItemsWorkspace({
         title={uxText('chronos_work_items', locale)}
         description={uxText('chronos_nav_work_items_hint', locale)}
       >
-        <div className="flex flex-wrap gap-2">
-          <Badge
-            tone="accent"
-            label={`${uxText('chronos_work_scope', locale)}: ${workScopeLabel(projection?.scope, locale)}`}
-          />
-          <Badge
-            label={`${uxText('chronos_work_view', locale)}: ${workViewLabel(projection?.view, locale)}`}
-          />
-          {contextSummary ? (
-            <Badge
-              tone={projection?.quality?.missing_context ? 'warning' : undefined}
-              label={`${uxText('chronos_work_context', locale)}: ${contextSummary}`}
-            />
-          ) : null}
-        </div>
-
         {error ? (
           <Callout
             tone="danger"
@@ -295,194 +342,68 @@ export function WorkItemsWorkspace({
         ) : null}
 
         {items.length > 0 ? (
-          <div className="chronos-subnav">
-            <Tabs
-              items={tabItems}
-              active={statusFilter}
-              onSelect={setStatusFilter}
-              label={uxTextOr('chronos_ws_status_filter', 'Filter by status', locale)}
-            />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <BoardViewToggle t={boardT} view={boardView} onChange={changeBoardView} />
+            {boardView === 'list' ? (
+              <div className="chronos-subnav">
+                <Tabs
+                  items={tabItems}
+                  active={statusFilter}
+                  onSelect={setStatusFilter}
+                  label={uxTextOr('chronos_ws_status_filter', 'Filter by status', locale)}
+                />
+              </div>
+            ) : null}
           </div>
         ) : null}
 
-        <div className="kb-table-wrap">
-          <table className="kb-table">
-            <thead>
-              <tr>
-                <th scope="col">{uxTextOr('chronos_ws_col_work_item', 'Work item', locale)}</th>
-                <th scope="col" style={{ width: '9rem' }}>
-                  {uxText('chronos_col_status', locale)}
-                </th>
-                <th scope="col">{uxText('chronos_work_item_assignee', locale)}</th>
-                <th scope="col" style={{ width: '6rem' }}>
-                  {uxText('chronos_work_item_priority', locale)}
-                </th>
-                <th scope="col" style={{ width: '7rem' }}>
-                  {uxText('chronos_work_item_updated', locale)}
-                </th>
-                <th scope="col" data-align="end" style={{ width: '7rem' }}>
-                  {uxTextOr('chronos_ws_col_move', 'Move', locale)}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleItems.length === 0 ? (
-                <tr>
-                  <td className="kb-table__empty" colSpan={6}>
-                    {uxText('chronos_work_item_no_items', locale)}
-                  </td>
-                </tr>
-              ) : (
-                visibleItems.map((item) => {
-                  const columnIndex = statuses.indexOf(item.status);
-                  const missionId = missionIdFromItem(item);
-                  const assignedBy =
-                    metadataText(item.metadata, [
-                      'assigned_by',
-                      'assignedBy',
-                      'created_by',
-                      'createdBy',
-                      'requested_by',
-                      'requestedBy',
-                    ]) || item.source;
-                  const assignee =
-                    item.assignee_user_id ||
-                    item.assignee_peer_id ||
-                    metadataText(item.metadata, ['assignee_label', 'assigneeLabel']) ||
-                    uxText('chronos_work_item_unassigned', locale);
-                  const previous = columnIndex > 0 ? statuses[columnIndex - 1] : null;
-                  const next =
-                    columnIndex >= 0 && columnIndex < statuses.length - 1
-                      ? statuses[columnIndex + 1]
-                      : null;
-                  return (
-                    <tr key={item.item_id}>
-                      <td>
-                        <div className="chronos-mission-cell">
-                          <span className="chronos-mission-cell__title">{item.title}</span>
-                          {item.description && item.description !== item.title ? (
-                            <span className="kb-list__meta">{item.description}</span>
-                          ) : null}
-                          <span className="chronos-mission-cell__id">{item.item_id}</span>
-                          <span className="kb-list__meta">
-                            {uxText('chronos_work_item_assigned_by', locale)}: {assignedBy} ·{' '}
-                            {uxText('chronos_work_item_source', locale)}:{' '}
-                            {item.source_ref || item.source} ·{' '}
-                            {uxText('chronos_work_item_created', locale)}:{' '}
-                            {compactDate(item.created_at)}
-                          </span>
-                          <WorkItemLineageChain context={item.context} locale={locale} />
-                          <WorkItemMissionAlignmentAction
-                            item={item}
-                            admission={admissions[item.item_id]}
-                            busy={busyId === item.item_id || preparing.current.has(item.item_id)}
-                            locale={locale}
-                            onRequest={requestAlignment}
-                          />
-                          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                            <a
-                              className="chronos-mission-cell__id"
-                              href={opsPagePath(
-                                `?section=discussion&goal=${encodeURIComponent(item.title)}${missionId ? `&mission=${encodeURIComponent(missionId)}` : ''}`
-                              )}
-                            >
-                              {uxText('chronos_ws_discuss_item', locale)}
-                            </a>
-                            {typeof item.metadata?.discussion_id === 'string' ? (
-                              <a
-                                className="chronos-mission-cell__id"
-                                href={opsPagePath(
-                                  `?section=discussion&room=${encodeURIComponent(item.metadata.discussion_id)}`
-                                )}
-                              >
-                                {uxText('chronos_ws_open_discussion', locale)}
-                              </a>
-                            ) : null}
-                          </div>
-                          {missionId && onOpenMission ? (
-                            <div>
-                              <button
-                                type="button"
-                                className="chronos-mission-cell__title chronos-mission-cell__id"
-                                onClick={() => onOpenMission(missionId)}
-                              >
-                                {uxText('chronos_mission', locale)}: {missionId}
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td>
-                        <StatusPill
-                          status={workItemStatus(item.status)}
-                          label={statusLabel(item.status)}
-                        />
-                      </td>
-                      <td className="chronos-muted">{assignee}</td>
-                      <td data-mono="true">{item.priority}</td>
-                      <td className="chronos-muted">{compactDate(item.updated_at)}</td>
-                      <td data-align="end">
-                        <div className="flex justify-end gap-1">
-                          {previous ? (
-                            <Button
-                              label={uxMessage(
-                                'chronos_ws_move_to',
-                                { status: statusLabel(previous) },
-                                'Move to {status}',
-                                locale
-                              )}
-                              variant="ghost"
-                              disabled={busyId === item.item_id}
-                              onClick={() => void moveItem(item.item_id, previous)}
-                            >
-                              <ArrowLeft size={14} aria-hidden="true" />
-                            </Button>
-                          ) : null}
-                          {next ? (
-                            <Button
-                              label={uxMessage(
-                                'chronos_ws_move_to',
-                                { status: statusLabel(next) },
-                                'Move to {status}',
-                                locale
-                              )}
-                              variant="secondary"
-                              disabled={busyId === item.item_id}
-                              onClick={() => void moveItem(item.item_id, next)}
-                            >
-                              <ArrowRight size={14} aria-hidden="true" />
-                            </Button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+        {items.length === 0 ? (
+          <p className="kb-text kb-text--muted">{uxText('chronos_work_item_no_items', locale)}</p>
+        ) : (
+          <WorkItemBoard
+            cards={boardView === 'list' ? visibleCards : cards}
+            t={boardT}
+            statusLabel={statusLabel}
+            locale={localeToBcp47(locale)}
+            canMove={accessRole === 'localadmin'}
+            onMove={(card, status) => moveItem(card.id, status)}
+            label={uxText('ux_b_board_label', locale)}
+            layout={boardView}
+            renderCardExtra={(card) => (
+              <WorkItemCardExtra
+                item={card.item}
+                admission={admissions[card.id]}
+                busy={busyId === card.id || preparing.current.has(card.id)}
+                locale={locale}
+                onRequest={requestAlignment}
+                onOpenMission={onOpenMission}
+              />
+            )}
+          />
+        )}
       </Section>
 
       {projection?.lineage ? (
-        <WorkItemLineageOverview lineage={projection.lineage} locale={locale} />
+        <WorkItemLineageOverview lineage={projection.lineage} locale={locale}>
+          <div className="flex flex-wrap gap-2">
+            <Badge
+              tone="accent"
+              label={`${uxText('chronos_work_scope', locale)}: ${workScopeLabel(projection?.scope, locale)}`}
+            />
+            <Badge
+              label={`${uxText('chronos_work_view', locale)}: ${workViewLabel(projection?.view, locale)}`}
+            />
+            {contextSummary ? (
+              <Badge
+                tone={projection?.quality?.missing_context ? 'warning' : undefined}
+                label={`${uxText('chronos_work_context', locale)}: ${contextSummary}`}
+              />
+            ) : null}
+          </div>
+        </WorkItemLineageOverview>
       ) : null}
     </>
   );
-}
-
-const WORK_ITEM_STATUS: Record<string, KbStatus> = {
-  backlog: 'planned',
-  ready: 'ready',
-  in_progress: 'working',
-  blocked: 'blocked',
-  review: 'review',
-  done: 'done',
-  archived: 'archived',
-};
-
-function workItemStatus(status: string): KbStatus {
-  return WORK_ITEM_STATUS[status] || 'n/a';
 }
 
 const LINEAGE_LABEL_KEYS: Record<string, string> = {
@@ -496,15 +417,18 @@ const LINEAGE_LABEL_KEYS: Record<string, string> = {
 function WorkItemLineageOverview({
   lineage,
   locale,
+  children,
 }: {
   lineage: WorkItemLineage;
   locale: SupportedLocale;
+  children?: React.ReactNode;
 }) {
   return (
     <Section
       title={uxText('chronos_lineage_title', locale)}
       description={uxText('chronos_lineage_description', locale)}
     >
+      {children}
       <div className="flex flex-wrap gap-2">
         <StatusPill
           status="completed"
@@ -569,39 +493,58 @@ function WorkItemLineageOverview({
   );
 }
 
-function WorkItemLineageChain({
-  context,
+/** Console-only controls under a card: mission alignment, discussion, mission drill-down. */
+function WorkItemCardExtra({
+  item,
+  admission,
+  busy,
   locale,
+  onRequest,
+  onOpenMission,
 }: {
-  context: WorkItem['context'];
+  item: WorkItem;
+  admission?: ClientMissionAdmission;
+  busy: boolean;
   locale: SupportedLocale;
+  onRequest: (itemId: string) => void | Promise<void>;
+  onOpenMission?: (missionId: string) => void;
 }) {
-  if (!context) return null;
-  const chain = [
-    ['tenant_slug', context.tenant_slug],
-    ['organization_id', context.organization_id],
-    ['project_id', context.project_id],
-    ['mission_id', context.mission_id],
-    ['task_id', context.task_id],
-  ] as const;
-  const missingLabel = uxText('chronos_lineage_missing', locale);
+  const missionId = missionIdFromItem(item);
   return (
-    <span
-      className="kb-list__meta"
-      aria-label={uxTextOr('chronos_ws_scope_lineage', 'Scope lineage', locale)}
-    >
-      {chain.map(([kind, value], index) => (
-        <React.Fragment key={kind}>
-          <span
-            title={value || `${lineageLabel(kind, locale)} ${missingLabel}`}
-            className={value ? undefined : 'chronos-scope__error'}
+    <>
+      <WorkItemMissionAlignmentAction
+        item={item}
+        admission={admission}
+        busy={busy}
+        locale={locale}
+        onRequest={onRequest}
+      />
+      <div className="wb-card__links">
+        <a
+          className="kb-link"
+          href={opsPagePath(
+            `?section=discussion&goal=${encodeURIComponent(item.title)}${missionId ? `&mission=${encodeURIComponent(missionId)}` : ''}`
+          )}
+        >
+          {uxText('chronos_ws_discuss_item', locale)}
+        </a>
+        {typeof item.metadata?.discussion_id === 'string' ? (
+          <a
+            className="kb-link"
+            href={opsPagePath(
+              `?section=discussion&room=${encodeURIComponent(item.metadata.discussion_id)}`
+            )}
           >
-            {lineageLabel(kind, locale)}: {value || missingLabel}
-          </span>
-          {index < chain.length - 1 ? ' › ' : null}
-        </React.Fragment>
-      ))}
-    </span>
+            {uxText('chronos_ws_open_discussion', locale)}
+          </a>
+        ) : null}
+        {missionId && onOpenMission ? (
+          <button type="button" className="kb-link" onClick={() => onOpenMission(missionId)}>
+            {uxText('ux_b_card_open_mission', locale)}
+          </button>
+        ) : null}
+      </div>
+    </>
   );
 }
 

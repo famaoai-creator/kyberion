@@ -42,6 +42,8 @@ export type ClientWorkItemLineage = {
 
 export type ClientWorkItemsResponse = {
   ok: true;
+  /** The viewer's console role; absent from older servers (treated as readonly). */
+  accessRole?: 'readonly' | 'localadmin';
   statuses: string[];
   items: ClientWorkItem[];
   scope: string;
@@ -260,6 +262,9 @@ export function parseWorkItemsResponse(value: unknown): ClientWorkItemsResponse 
   return items.every((entry): entry is NonNullable<typeof entry> => entry !== undefined)
     ? {
         ok: true,
+        ...(value.accessRole === 'readonly' || value.accessRole === 'localadmin'
+          ? { accessRole: value.accessRole }
+          : {}),
         statuses: value.statuses,
         items,
         scope: value.scope,

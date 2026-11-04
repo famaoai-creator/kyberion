@@ -84,6 +84,9 @@ const CADENCE_SCHEMA_PATH = pathResolver.knowledge(
 const DECISION_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-decision.schema.json'
 );
+/** Measurements kept per KR in the management view, enough for a trend line. */
+const KR_HISTORY_LIMIT = 8;
+
 const STATE_FILE_NAME = 'organization-state.json';
 const DOMAIN_FILE_NAME = 'domain.json';
 const CAPABILITY_FILE_NAME = 'capability.json';
@@ -1319,31 +1322,52 @@ export function buildOrganizationManagementView(input: {
       : state;
   });
   const outcomeRefs = [...new Set(learningRefs)];
+  const krScope = purpose
+    ? {
+        organizationId: input.organizationId,
+        tenantSlug: tenantSlug === 'shared' ? undefined : tenantSlug,
+        tier: purpose.tier,
+      }
+    : null;
+  let krRows: KrMeasurementRow[] = [];
+  if (krScope) {
+    try {
+      krRows = readJsonLines(
+        path.resolve(input.rootDir || pathResolver.rootDir(), orgKrLedgerPath(krScope)),
+        { onMalformed: 'skip' }
+      ) as KrMeasurementRow[];
+    } catch {
+      krRows = [];
+    }
+  }
   const objectiveProgressById = new Map(
-    (purpose
-      ? rollUpObjectiveProgress(
-          {
-            organizationId: input.organizationId,
-            tenantSlug: tenantSlug === 'shared' ? undefined : tenantSlug,
-            tier: purpose.tier,
-          },
-          {
-            loadPurpose: () => purpose,
-            readMeasurements: (scope) => {
-              try {
-                return readJsonLines(
-                  path.resolve(input.rootDir || pathResolver.rootDir(), orgKrLedgerPath(scope)),
-                  { onMalformed: 'skip' }
-                ) as KrMeasurementRow[];
-              } catch {
-                return [];
-              }
-            },
-          }
-        ).objectives
+    (purpose && krScope
+      ? rollUpObjectiveProgress(krScope, {
+          loadPurpose: () => purpose,
+          readMeasurements: () => krRows,
+        }).objectives
       : []
     ).map((entry) => [entry.objective_id, entry])
   );
+  // Recent measurements per (objective, KR), oldest first, so a reader can show
+  // a trend without re-reading the ledger.
+  const krHistory = new Map<
+    string,
+    Array<{ value: number; progress: number; measured_at: string }>
+  >();
+  for (const row of krRows) {
+    if (row.scope !== 'org' || !row.objective_id || !row.measured_at) continue;
+    if (row.organization_id && row.organization_id !== input.organizationId) continue;
+    if (!Number.isFinite(row.value) || !Number.isFinite(row.progress)) continue;
+    const key = `${row.objective_id}\u0000${row.kr_id}`;
+    const list = krHistory.get(key) ?? [];
+    list.push({ value: row.value, progress: row.progress, measured_at: row.measured_at });
+    krHistory.set(key, list);
+  }
+  for (const list of krHistory.values()) {
+    list.sort((left, right) => left.measured_at.localeCompare(right.measured_at));
+    list.splice(0, Math.max(0, list.length - KR_HISTORY_LIMIT));
+  }
   const outcomeAccounting = {
     objectives: (purpose?.objectives || []).map((objective) => ({
       objective_id: objective.objective_id,
@@ -1359,11 +1383,18 @@ export function buildOrganizationManagementView(input: {
         const measured = objectiveProgressById
           .get(objective.objective_id)
           ?.key_results.find((entry) => entry.kr_id === kr.kr_id);
+        const history = krHistory.get(`${objective.objective_id}\u0000${kr.kr_id}`) ?? [];
         return {
           kr_id: kr.kr_id,
           title: kr.title,
+          target: kr.target,
+          direction: kr.direction,
+          ...(kr.baseline !== undefined ? { baseline: kr.baseline } : {}),
+          ...(kr.unit ? { unit: kr.unit } : {}),
+          ...(measured?.value !== undefined ? { value: measured.value } : {}),
           ...(measured?.progress !== undefined ? { progress: measured.progress } : {}),
           ...(measured?.measured_at ? { measured_at: measured.measured_at } : {}),
+          ...(history.length > 1 ? { history } : {}),
         };
       }),
       projects: solutionProjects

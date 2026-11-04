@@ -1,11 +1,18 @@
 import type { CeoSurfaceSummary } from '@agent/core/ceo-surface-summary';
 import type { ConciergeViewerContext } from './viewer-context';
 
-/** Counts and one headline of one scope — never its item lists. */
+/**
+ * Counts, one headline and the pending decisions of one scope. The decisions
+ * are what the person must act on, so the personal view lists them (with
+ * their tenant) instead of making the person switch company first; every
+ * other item list stays behind the company switch.
+ */
 export interface PersonalScopeCard {
   counts: CeoSurfaceSummary['briefing']['counts'];
   /** Title of the most urgent approval, when one is waiting. */
   headline?: string;
+  /** Pending approvals read through the viewer narrowed to this scope (omitted when none). */
+  approvals?: CeoSurfaceSummary['approval_queue'];
 }
 
 /**
@@ -34,6 +41,7 @@ function scopeCard(home: CeoSurfaceSummary): PersonalScopeCard {
   const title = home.approval_queue[0]?.title?.trim();
   return {
     counts: { ...home.briefing.counts },
+    ...(home.approval_queue.length ? { approvals: [...home.approval_queue] } : {}),
     ...(title
       ? {
           headline:

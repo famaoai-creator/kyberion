@@ -19,7 +19,7 @@ import {
 } from '@agent/shared-ui';
 import { TENANT_CHANGED_EVENT, tenantFromChangeEvent } from '../lib/tenant-context';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
-import { frontDeskText } from '../lib/i18n';
+import { conciergeText, frontDeskText } from '../lib/i18n';
 import { ReviewCheckin } from './review-checkin';
 import { PersonalOverview } from './personal-overview';
 import { OutcomeFiles } from './outcome-files';
@@ -40,6 +40,9 @@ import {
 import { useOutcomePreview } from '../lib/use-outcome-preview';
 import { decideWithPasskey } from '../lib/passkey-client';
 import { formatApprovalFailure, readApprovalResponseFailure } from '../lib/approval-failure';
+import { compareDecisionUrgency, groupByDecision } from '@agent/core/surface/decision-brief';
+import { cardSummary, kindBrief, renderDisplayText } from '../lib/decision-brief-view';
+import { BriefStateBadge, DecisionBriefBlock, KindBriefBlock } from './decision-brief';
 import { parseConciergeMutationResponse } from '../lib/mutation-response';
 import {
   deriveCardFields,
@@ -188,6 +191,9 @@ function DecideCardFrame({
 }) {
   const relative = relativeWhen(timeIso, locale);
   const showColumns = Boolean(fields.why) || hasEffectColumn(fields);
+  // Card body text never carries hashes, paths or JSON, and stays ~2 lines;
+  // the whole (stripped) text is one click away.
+  const why = fields.why ? cardSummary(fields.why) : null;
   return (
     <div id={`decide-${reactKey}`} className="decide-card" data-kind={kind}>
       <Section title={title} headingLevel={3}>
@@ -203,12 +209,18 @@ function DecideCardFrame({
           {extraMeta ? <span className="decide-time decide-due">{extraMeta}</span> : null}
           {decideByText ? <span className="decide-by-badge">{decideByText}</span> : null}
         </div>
+        {kind !== 'approval' ? <KindBriefBlock brief={kindBrief(kind)} locale={locale} /> : null}
         {showColumns ? (
           <div className="decide-columns">
-            {fields.why ? (
+            {why?.short ? (
               <div className="decide-column">
                 <p className="decide-column-label">{frontDeskText('decide_why', locale)}</p>
-                <p className="decide-column-body">{fields.why}</p>
+                <p className="decide-column-body">{why.short}</p>
+                {why.clamped ? (
+                  <Disclosure summary={conciergeText('ux_a_show_more', locale)}>
+                    <p className="decide-column-body">{why.full}</p>
+                  </Disclosure>
+                ) : null}
               </div>
             ) : null}
             {hasEffectColumn(fields) && fields.effectLabelKey ? (
@@ -475,7 +487,7 @@ export default function ConciergePage() {
         }
         setNotice({
           text: t(decision === 'approved' ? 'home.approved_notice' : 'home.rejected_notice', {
-            title: item.title,
+            title: item.brief ? renderDisplayText(item.brief.ask, locale) : item.title,
           }),
         });
         await refresh();
@@ -588,8 +600,16 @@ export default function ConciergePage() {
   // Queue order = decision urgency: approvals block others' work, stalled
   // missions and learnings wait on the human alone, deliverables and
   // exceptions can breathe a little longer.
+  // Approvals: most urgent first, and identical requests folded into one card
+  // ("同じ依頼が N 件") whose others stay individually decidable inside it.
+  const approvalGroups = groupByDecision(
+    [...(summary?.approval_queue ?? [])].sort(compareDecisionUrgency)
+  );
+  const sameApprovals = new Map(
+    approvalGroups.map((group) => [group.lead.id, group.others] as const)
+  );
   const allEntries: DecideQueueEntry[] = [
-    ...(summary?.approval_queue ?? []).map((item): DecideQueueEntry => ({
+    ...approvalGroups.map(({ lead: item }): DecideQueueEntry => ({
       id: `approval-${item.id}`,
       kind: 'approval',
       item,
@@ -691,9 +711,17 @@ export default function ConciergePage() {
   // CS-04/FD-04 — every item awaiting the human's decision is rendered by one
   // card helper per kind; the unified queue is the only place these render
   // (the four duplicate panes are gone, plan §2.1/FD-04).
-  const renderApprovalCard = (entry: Extract<DecideQueueEntry, { kind: 'approval' }>) => {
+  const renderApprovalCard = (
+    entry: Extract<DecideQueueEntry, { kind: 'approval' }>,
+    nested = false
+  ): React.ReactNode => {
     const item = entry.item;
     const fields = deriveCardFields(entry);
+    const same = nested ? [] : (sameApprovals.get(item.id) ?? []);
+    const approveLabel =
+      item.min_assurance === 'A3'
+        ? frontDeskText('decide_approve_passkey', locale)
+        : frontDeskText('decide_approve', locale);
     return (
       <DecideCardFrame
         key={entry.id}
@@ -710,10 +738,20 @@ export default function ConciergePage() {
               })
             : null
         }
-        title={item.title}
+        title={item.brief ? renderDisplayText(item.brief.ask, locale) : item.title}
+        status={<BriefStateBadge brief={item.brief} locale={locale} />}
         fields={fields}
         locale={locale}
       >
+        {item.brief ? (
+          <DecisionBriefBlock
+            brief={item.brief}
+            locale={locale}
+            showAsk={false}
+            approveLabel={approveLabel}
+            rejectLabel={frontDeskText('decide_reject', locale)}
+          />
+        ) : null}
         {item.review_scope || item.evidence?.length ? (
           <details className="approval-review-scope">
             <summary>{t('queue.review_scope')}</summary>
@@ -733,13 +771,9 @@ export default function ConciergePage() {
         ) : null}
         <div className="decide-actions">
           <Button
-            label={
-              item.min_assurance === 'A3'
-                ? frontDeskText('decide_approve_passkey', locale)
-                : frontDeskText('decide_approve', locale)
-            }
+            label={approveLabel}
             variant="primary"
-            disabled={busyId === item.id}
+            disabled={busyId === item.id || (item.brief ? item.brief.state !== 'pending' : false)}
             onClick={() => void decideApproval(item, 'approved')}
           />
           <Button
@@ -748,8 +782,23 @@ export default function ConciergePage() {
             disabled={busyId === item.id}
             onClick={() => void decideApproval(item, 'rejected')}
           />
-          {later(entry.id, busyId === item.id)}
+          {nested ? null : later(entry.id, busyId === item.id)}
         </div>
+        {same.length ? (
+          <Disclosure
+            summary={conciergeText('ux_a_brief_same_count', locale, { count: same.length + 1 })}
+          >
+            <p className="decide-muted">{conciergeText('ux_a_brief_same_lead', locale)}</p>
+            <div className="decide-list brief-group">
+              {same.map((other) =>
+                renderApprovalCard(
+                  { id: `approval-${other.id}`, kind: 'approval', item: other },
+                  true
+                )
+              )}
+            </div>
+          </Disclosure>
+        ) : null}
       </DecideCardFrame>
     );
   };
@@ -1074,7 +1123,9 @@ export default function ConciergePage() {
   const entryTitle = (entry: DecideQueueEntry): string =>
     entry.kind === 'memory'
       ? t(`memory.kind.${entry.item.kind}` as Parameters<typeof t>[0])
-      : entry.item.title;
+      : entry.kind === 'approval' && entry.item.brief
+        ? renderDisplayText(entry.item.brief.ask, locale)
+        : entry.item.title;
 
   const renderEntry = (entry: DecideQueueEntry): React.ReactNode => {
     switch (entry.kind) {
@@ -1101,7 +1152,9 @@ export default function ConciergePage() {
       ? nextEntry.item.reason
         ? t(`hygiene.reason.${nextEntry.item.reason}` as Parameters<typeof t>[0])
         : undefined
-      : deriveCardFields(nextEntry).why
+      : nextEntry.kind === 'approval' && nextEntry.item.brief?.why[0]
+        ? renderDisplayText(nextEntry.item.brief.why[0], locale)
+        : cardSummary(deriveCardFields(nextEntry).why).short || undefined
     : undefined;
   const nextReason = [
     nextWhy,
@@ -1124,7 +1177,6 @@ export default function ConciergePage() {
   return (
     <>
       {notice ? <Callout tone={notice.error ? 'danger' : 'success'} title={notice.text} /> : null}
-      <ReviewCheckin key={reviewTenant} tenant={reviewTenant} />
 
       {personalAggregate ? (
         <PersonalOverview locale={locale} />
@@ -1246,6 +1298,12 @@ export default function ConciergePage() {
           ) : null}
         </>
       )}
+
+      {/* The read-only record check-in is secondary to deciding: below the
+          decisions, collapsed until asked for. */}
+      <Disclosure summary={conciergeText('ux_a_checkin_summary', locale)}>
+        <ReviewCheckin key={reviewTenant} tenant={reviewTenant} />
+      </Disclosure>
 
       {responseStatus ? (
         <Section title={t('home.response_title')} description={t('home.response_description')}>

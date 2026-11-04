@@ -3,10 +3,27 @@
 import * as React from 'react';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Callout, EmptyState, PageHeader, statusLabel, useKbI18n } from '@agent/shared-ui';
+import { localeToBcp47 } from '@agent/core/locale-normalize';
+import type { DisplayText } from '@agent/core/surface/display-humanize';
 import { useConciergeI18n } from '../../../lib/use-concierge-i18n';
 import { useWorkspaceResource } from '../../../lib/use-workspace-resource';
+import { opsApiPath } from '../../../lib/ops/ops-api-path';
+import { uxMessage, uxText } from '../../../lib/ops/ux-vocabulary';
+import { parseWorkItemsResponse } from '../../../lib/ops/workitems-response';
+import {
+  BoardViewToggle,
+  WorkItemBoard,
+  type BoardTranslate,
+  type BoardViewMode,
+} from '../../../components/work-board/WorkItemBoard';
+import {
+  WORK_ITEM_STATUS_LABEL_KEYS,
+  actorDisplayName,
+  type BoardCard,
+} from '../../../components/work-board/work-item-board';
 import {
   decodeRouteSegment,
+  entityHref,
   isWorkspaceKind,
   kindListHref,
   listQueryFromSearch,
@@ -64,6 +81,7 @@ function WorkspaceList() {
  */
 function KindList({ t, kind }: { t: Translate; kind: GraphEntityKind }) {
   const { t: kbT } = useKbI18n();
+  const { locale } = useConciergeI18n();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -104,11 +122,26 @@ function KindList({ t, kind }: { t: Translate; kind: GraphEntityKind }) {
     [summary.state, summary.data]
   );
 
-  const items = list.state === 'ready' ? list.data.items : [];
+  // A board reload (after a move) keeps the previous cards on screen instead of
+  // unmounting the board into a loading state.
+  const lastReady = React.useRef<{ kind: GraphEntityKind; items: GraphNode[] } | null>(null);
+  if (list.state === 'ready') lastReady.current = { kind, items: list.data.items };
+  const stale =
+    list.state === 'loading' && kind === 'work_item' && lastReady.current?.kind === kind
+      ? lastReady.current.items
+      : null;
+  const listReady = list.state === 'ready' || stale !== null;
+  const items = list.state === 'ready' ? list.data.items : (stale ?? []);
   const facets = statusFacets(items);
   const shown = status ? items.filter((item) => item.status === status) : items;
   const narrowing = narrowingEntries(query);
   const filtered = Boolean(query.q || status);
+  // Work items read as a kanban board by default; `?view=list` keeps the list.
+  const boardKind = kind === 'work_item';
+  const layout: BoardViewMode =
+    boardKind && searchParams?.get('view') !== 'list' ? 'board' : 'list';
+  const showBoard = boardKind && layout === 'board';
+  const canMove = useWorkItemMoveAccess(showBoard);
 
   return (
     <div className="ws-page">
@@ -127,6 +160,13 @@ function KindList({ t, kind }: { t: Translate; kind: GraphEntityKind }) {
               .join(' › '),
           })}
           action={{ label: t('ws_scope_show_all'), href: kindListHref(kind) }}
+        />
+      ) : null}
+      {boardKind ? (
+        <BoardViewToggle
+          t={(key) => t(key as Parameters<Translate>[0])}
+          view={layout}
+          onChange={(next) => replaceQuery({ view: next === 'list' ? 'list' : undefined })}
         />
       ) : null}
       <div className="ws-filters">
@@ -167,22 +207,32 @@ function KindList({ t, kind }: { t: Translate; kind: GraphEntityKind }) {
           </div>
         ) : null}
       </div>
-      {list.state === 'loading' ? <LoadingState t={t} /> : null}
+      {list.state === 'loading' && !listReady ? <LoadingState t={t} /> : null}
       {list.state === 'error' ? (
         <LoadErrorState t={t} error={list.error} onRetry={list.reload} />
       ) : null}
-      {list.state === 'ready' ? (
+      {listReady ? (
         shown.length ? (
           <>
             <p className="ws-count-line" role="status">
               {t('ws_result_count', { count: shown.length })}
             </p>
-            <EntityList
-              t={t}
-              items={shown}
-              labels={labels}
-              label={t('ws_list_label', { kind: kindsLabel(t, kind) })}
-            />
+            {showBoard ? (
+              <WorkItemGraphBoard
+                items={shown}
+                labels={labels}
+                locale={locale}
+                canMove={canMove}
+                onMoved={list.reload}
+              />
+            ) : (
+              <EntityList
+                t={t}
+                items={shown}
+                labels={labels}
+                label={t('ws_list_label', { kind: kindsLabel(t, kind) })}
+              />
+            )}
           </>
         ) : filtered ? (
           <EmptyState
@@ -201,5 +251,130 @@ function KindList({ t, kind }: { t: Translate; kind: GraphEntityKind }) {
         )
       ) : null}
     </div>
+  );
+}
+
+type GraphCard = BoardCard;
+
+/** Whether the viewer may move cards: the console role from its work-item projection. */
+function useWorkItemMoveAccess(enabled: boolean): boolean {
+  const [canMove, setCanMove] = React.useState(false);
+  React.useEffect(() => {
+    if (!enabled) return;
+    const controller = new AbortController();
+    void fetch(opsApiPath('/workitems?scope=work_items'), {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = parseWorkItemsResponse(await response.json().catch(() => null));
+        if (!controller.signal.aborted) {
+          setCanMove(response.ok && payload?.accessRole === 'localadmin');
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setCanMove(false);
+      });
+    return () => controller.abort();
+  }, [enabled]);
+  return canMove;
+}
+
+/**
+ * `/w/work_item` as a board. Cards come from the same viewer-scoped list as
+ * the list view (search and narrowing apply); a move goes through the governed
+ * console route (`POST /api/ops/workitems`), which re-checks role and scope.
+ * The role is read from the console's work-item projection so readonly
+ * viewers see the board without move controls.
+ */
+function WorkItemGraphBoard({
+  items,
+  labels,
+  locale,
+  canMove,
+  onMoved,
+}: {
+  items: readonly GraphNode[];
+  labels: ReadonlyMap<string, string>;
+  locale: string;
+  canMove: boolean;
+  onMoved: () => void;
+}) {
+  const uiLocale = locale as Parameters<typeof uxText>[1];
+  const boardT: BoardTranslate = React.useCallback(
+    (key, params) => (params ? uxMessage(key, params, key, uiLocale) : uxText(key, uiLocale)),
+    [uiLocale]
+  );
+  const renderActor = React.useCallback(
+    (text: DisplayText) =>
+      'text' in text ? text.text : uxMessage(text.key, text.params ?? {}, text.key, uiLocale),
+    [uiLocale]
+  );
+  const statusName = React.useCallback(
+    (value: string) =>
+      uxText(WORK_ITEM_STATUS_LABEL_KEYS[value] || 'chronos_status_unknown', uiLocale),
+    [uiLocale]
+  );
+  const cards = React.useMemo<GraphCard[]>(
+    () =>
+      items.map((node) => {
+        const assignee = node.actors?.find((actor) => actor.role === 'assignee');
+        const priority = node.facts?.priority;
+        return {
+          id: node.id,
+          title: node.label,
+          status: node.status ?? 'backlog',
+          ...(typeof priority === 'string' ? { priority } : {}),
+          assignee: assignee
+            ? (assignee.label ?? actorDisplayName(assignee.actorId, renderActor))
+            : undefined,
+          ...(node.projectId
+            ? {
+                project: {
+                  id: node.projectId,
+                  label: labels.get(`project:${node.projectId}`) ?? node.projectId,
+                },
+              }
+            : {}),
+          ...(node.missionId
+            ? {
+                mission: {
+                  id: node.missionId,
+                  label: labels.get(`mission:${node.missionId}`) ?? node.missionId,
+                },
+              }
+            : {}),
+          updatedAt: node.updatedAt,
+          description: node.summary,
+          href: entityHref('work_item', node.id),
+        };
+      }),
+    [items, labels, renderActor]
+  );
+
+  const move = React.useCallback(
+    async (card: GraphCard, status: string) => {
+      const response = await fetch(opsApiPath('/workitems'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId: card.id, status }),
+      });
+      const payload = (await response.json().catch(() => null)) as { ok?: unknown } | null;
+      if (!response.ok || payload?.ok !== true) throw new Error('work item move refused');
+      onMoved();
+    },
+    [onMoved]
+  );
+
+  return (
+    <WorkItemBoard
+      cards={cards}
+      t={boardT}
+      statusLabel={statusName}
+      locale={localeToBcp47(uiLocale)}
+      canMove={canMove}
+      onMove={move}
+      label={boardT('ux_b_board_label')}
+    />
   );
 }
