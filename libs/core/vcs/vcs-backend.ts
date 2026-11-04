@@ -7,11 +7,13 @@
  * governed push-fetch-pull) that all delegate to a `VcsCommandRunner`. Today
  * the only runner is the local git CLI via governed `safeExecResult`.
  * Distributed runtimes need the same verb surface over a different execution
- * substrate — a remote workspace, a VCS host API, or an in-process engine —
- * without changing call sites.
+ * substrate — a remote workspace or an in-process engine — without changing
+ * call sites. Forge operations (pull requests, checks, repository metadata)
+ * are NOT git argv and live on the separate async `vcs-host` seam
+ * (`vcs-host.ts`).
  *
  * Providers register by id (`local-git` builtin, `memory` for hermetic tests,
- * libgit2/github-api later); selection order is governed data
+ * libgit2 / remote executors later); selection order is governed data
  * (`seam-provider-selection/vcs-backend.json` `default_chains`), never a
  * hard-coded preference list.
  *
