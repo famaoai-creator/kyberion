@@ -45,8 +45,10 @@
 
 import { z } from 'zod';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { readJsonLines } from '../foundation/json.js';
+import { streamJsonLines } from '../jsonl-read.js';
 import { nowIso } from '../foundation/time.js';
 import { isVitestProcess } from '../foundation/env.js';
 import { pathResolver } from '../path-resolver.js';
@@ -458,6 +460,38 @@ export interface AgentIdentityJournalOptions {
   now?: () => string;
 }
 
+/** A secret-free consistency reference, NOT a signature or execution attestation. */
+export interface RuntimeBindingReference {
+  version: 1;
+  nhi_id: string;
+  journal_seq: number;
+  sha256: string;
+}
+
+export interface RuntimeBindingHistory {
+  assurance: 'metadata_only';
+  nhi_id: string;
+  journal_seq: number;
+  instance_id: string;
+  tenant_slug: string;
+  accountable_human_id: string;
+  bound_at: string;
+  expires_at?: string;
+}
+
+const runtimeBindingReferenceSchema = z
+  .object({
+    version: z.literal(1),
+    nhi_id: z.string().regex(NHI_ID_PATTERN),
+    journal_seq: z.number().int().nonnegative().refine(Number.isSafeInteger),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+
+function bindingHistoryDigest(history: RuntimeBindingHistory): string {
+  return createHash('sha256').update(JSON.stringify(history)).digest('hex');
+}
+
 type AgentIdentityStoreAccess = <R>(
   resources: { reads: string[]; writes?: string[] },
   run: () => R
@@ -550,6 +584,154 @@ export class AgentIdentityJournal {
       const payload = event.payload as { nhi_id?: unknown };
       return payload?.nhi_id === nhiId ? Math.max(revision, event.seq) : revision;
     }, -1);
+  }
+
+  /** Diagnostic only. Current authorization must still use the live admission checks. */
+  captureRuntimeBindingReference(input: {
+    nhiId: string;
+    instanceId: string;
+    sessionId: string;
+    tenantSlug: string;
+  }): RuntimeBindingReference | undefined {
+    const events = this.readStrictHistory();
+    const state = runInRestoreMode(() =>
+      this.kernel.project(events).get('agent_identity')
+    ) as AgentIdentityState;
+    const identity = state.identities[input.nhiId];
+    const binding = identity?.runtime_instances?.find(
+      (entry) => entry.instance_id === input.instanceId
+    );
+    if (
+      identity?.lifecycle_status !== 'active' ||
+      !input.sessionId ||
+      binding?.session_id !== input.sessionId ||
+      binding.tenant_slug !== input.tenantSlug
+    )
+      return undefined;
+    for (let index = events.length - 1; index >= 0; index--) {
+      const event = events[index];
+      if (event.op !== AGENT_IDENTITY_OPS.instanceBound) continue;
+      const payload = instanceBoundPayloadSchema.parse(event.payload);
+      if (payload.nhi_id !== input.nhiId || payload.instance_id !== input.instanceId) continue;
+      const history = this.bindingHistoryAt(events, event.seq, input.tenantSlug);
+      if (!history) continue; // Redundant/no-op events do not replace the effective bind.
+      if (
+        payload.bound_at !== binding.bound_at ||
+        payload.pid !== binding.pid ||
+        (payload.session_id || undefined) !== binding.session_id ||
+        (payload.provider || undefined) !== binding.provider ||
+        (payload.model_id || undefined) !== binding.model_id ||
+        (payload.expires_at || undefined) !== binding.expires_at ||
+        (payload.tenant_slug || undefined) !== binding.tenant_slug
+      )
+        return undefined;
+      return {
+        version: 1,
+        nhi_id: history.nhi_id,
+        journal_seq: event.seq,
+        sha256: bindingHistoryDigest(history),
+      };
+    }
+    return undefined;
+  }
+
+  /** Survives release/retirement. Never authorizes current access or proves authorship. */
+  resolveRuntimeBindingReference(
+    reference: RuntimeBindingReference,
+    tenantSlug: string
+  ): RuntimeBindingHistory | undefined {
+    const parsed = runtimeBindingReferenceSchema.safeParse(reference);
+    if (!parsed.success) return undefined;
+    const history = this.bindingHistoryAt(
+      this.readStrictHistory(),
+      parsed.data.journal_seq,
+      tenantSlug
+    );
+    if (
+      !history ||
+      history.nhi_id !== parsed.data.nhi_id ||
+      bindingHistoryDigest(history) !== parsed.data.sha256
+    )
+      return undefined;
+    return history;
+  }
+
+  private bindingHistoryAt(
+    events: JournalEventEnvelope[],
+    seq: number,
+    tenantSlug: string
+  ): RuntimeBindingHistory | undefined {
+    if (!isValidTenantSlug(tenantSlug)) return undefined;
+    const event = events[seq];
+    if (!event || event.op !== AGENT_IDENTITY_OPS.instanceBound) return undefined;
+    const payload = instanceBoundPayloadSchema.parse(event.payload);
+    const before = runInRestoreMode(() =>
+      this.kernel.project(events.slice(0, seq)).get('agent_identity')
+    ) as AgentIdentityState;
+    const identity = before.identities[payload.nhi_id];
+    // A syntactically valid event can be a reducer no-op. Do not invent a binding.
+    if (
+      !identity ||
+      (identity.lifecycle_status !== 'active' &&
+        !(identity.lifecycle_status === 'provisioned' && payload.activate_provisioned)) ||
+      payload.tenant_slug !== tenantSlug ||
+      (identity.affiliation.tenant_slug && identity.affiliation.tenant_slug !== tenantSlug) ||
+      !Number.isFinite(Date.parse(payload.bound_at)) ||
+      (payload.expires_at !== undefined && !Number.isFinite(Date.parse(payload.expires_at)))
+    )
+      return undefined;
+    const after = runInRestoreMode(() =>
+      this.kernel.project(events.slice(0, seq + 1)).get('agent_identity')
+    ) as AgentIdentityState;
+    const previousBinding = identity.runtime_instances?.find(
+      (entry) => entry.instance_id === payload.instance_id
+    );
+    const nextBinding = after.identities[payload.nhi_id]?.runtime_instances?.find(
+      (entry) => entry.instance_id === payload.instance_id
+    );
+    if (!nextBinding || JSON.stringify(previousBinding) === JSON.stringify(nextBinding))
+      return undefined;
+    // Explicit allowlist: session tokens, provider hints and raw payloads never escape.
+    return {
+      assurance: 'metadata_only',
+      nhi_id: identity.nhi_id,
+      journal_seq: seq,
+      instance_id: payload.instance_id,
+      tenant_slug: tenantSlug,
+      accountable_human_id: identity.accountable_human_id,
+      bound_at: payload.bound_at,
+      ...(payload.expires_at !== undefined ? { expires_at: payload.expires_at } : {}),
+    };
+  }
+
+  private readStrictHistory(): JournalEventEnvelope[] {
+    const read = () => {
+      if (!safeExistsSync(this.journalPath)) return [];
+      if (!safeLstat(this.journalPath).isFile()) throw new Error('invalid journal resource');
+      let nextSeq = 0;
+      return Array.from(
+        streamJsonLines<JournalEventEnvelope>(this.journalPath, {
+          map: (value) => {
+            const event = journalEventEnvelopeSchema.parse(value);
+            if (
+              event.v !== AGENT_IDENTITY_JOURNAL_VERSION ||
+              !Number.isSafeInteger(event.seq) ||
+              event.seq !== nextSeq++
+            )
+              throw new Error('invalid journal sequence or version');
+            this.kernel.validatePayload(event.op, event.payload);
+            return event;
+          },
+        })
+      );
+    };
+    try {
+      const access = agentIdentityStoreAccess.getStore();
+      return access ? access({ reads: [this.journalPath] }, read) : read();
+    } catch {
+      // Parser errors can contain the credential-bearing source line.
+      throw new Error('[RUNTIME_BINDING_HISTORY] journal history unavailable');
+    }
   }
 
   private readJournal(): AgentIdentityReadResult {
@@ -833,6 +1015,21 @@ export function getAgentIdentity(nhiId: string): AgentIdentityRecord | null {
 
 export function getAgentIdentityRevision(nhiId: string): number {
   return getDefaultJournal().revision(nhiId);
+}
+
+/** Optional diagnostic reference; not admission or authenticated execution proof. */
+export function captureRuntimeBindingReference(
+  input: Parameters<AgentIdentityJournal['captureRuntimeBindingReference']>[0]
+): RuntimeBindingReference | undefined {
+  return getDefaultJournal().captureRuntimeBindingReference(input);
+}
+
+/** Historical metadata only. A matching digest cannot authenticate the journal writer. */
+export function resolveRuntimeBindingReference(
+  reference: RuntimeBindingReference,
+  tenantSlug: string
+): RuntimeBindingHistory | undefined {
+  return getDefaultJournal().resolveRuntimeBindingReference(reference, tenantSlug);
 }
 
 export function agentIdentityJournalResourcePath(): string {
