@@ -163,8 +163,6 @@
     "scripts/customer_list.test.ts",
     "scripts/customer_migrate_from_personal.test.ts",
     "scripts/customer_switch.test.ts",
-    "scripts/generate_governance_import_baseline.ts",
-    "scripts/generate_platform_read_baseline.ts",
     "scripts/git_merge_regenerate.mjs",
     "scripts/import_design_md_catalog.test.ts",
     "scripts/install_chronos_launchd.test.ts",
