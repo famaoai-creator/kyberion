@@ -122,3 +122,37 @@ describe('vad backend seam selection', () => {
     );
   });
 });
+
+describe('vad backend seam: saved seam default', () => {
+  beforeEach(() => {
+    record.mockClear();
+    safeRmSync(dir, { recursive: true, force: true });
+    vi.stubEnv('MISSION_ID', '');
+    vi.stubEnv('KYBERION_VAD', '');
+    vi.stubEnv('KYBERION_SEAM_SELECTION_RULES_PATH', rulesFile);
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    resetVadBackendRegistry();
+    safeRmSync(dir, { recursive: true, force: true });
+  });
+
+  it('chooses the saved default without a purpose; KYBERION_VAD still wins', () => {
+    fakeBackend('silero', true);
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'voice.vad-backend=silero');
+    const resolved = resolveVadBackend();
+    expect(resolved.backend.backend_id).toBe('silero');
+    expect(resolved.decision).toMatchObject({ strategy: 'default', default_source: 'env' });
+    vi.stubEnv('KYBERION_VAD', 'energy');
+    expect(resolveVadBackend().backend.backend_id).toBe('energy');
+    expect(resolveVadBackend('energy').decision).toBeUndefined();
+  });
+
+  it('falls back to energy when the saved default is unavailable', () => {
+    fakeBackend('silero', false);
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'voice.vad-backend=silero');
+    const resolved = resolveVadBackend();
+    expect(resolved.backend.backend_id).toBe('energy');
+    expect(resolved.decision?.default_source).toBe('policy');
+  });
+});
