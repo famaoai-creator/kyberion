@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { stubReasoningBackend, type ReasoningBackend } from '../reasoning/reasoning-backend.js';
 import {
+  getReasoningPayloadScope,
+  type ReasoningPayloadScope,
+} from '../reasoning/reasoning-egress-scope.js';
+import {
   ROLE_INTENT_MAX_CHARS,
   buildRoleDraftPrompt,
   deriveRoleDraftId,
@@ -23,12 +27,15 @@ const INVENTORY: RoleDraftInventory = {
   actuators: ['artifact-actuator', 'email-actuator'],
   tiers: ['public', 'confidential'],
   team_roles: ['owner', 'planner', 'reviewer'],
+  // Authority-only roles have no team role of the same id.
+  authority_roles: ['mission_controller', 'reviewer', 'system_configurator'],
 };
 
 const INTENT = 'A role that reconciles monthly vendor invoices against purchase orders.';
 
 const GOOD_ANSWER = {
   name: 'Invoice Reconciler',
+  team_role_id: 'invoice_reconciler',
   domain: 'finance',
   description:
     'Owns month-end matching of supplier invoices to approved purchase orders, flags mismatches for review and never approves payments itself.',
@@ -147,6 +154,22 @@ describe('role intent draft (R6)', () => {
     expect(isPastedIntent(INTENT, INTENT)).toBe(true);
     expect(isPastedIntent(`Role: ${INTENT}`, INTENT)).toBe(true);
     expect(isPastedIntent(GOOD_ANSWER.description, INTENT)).toBe(false);
+  });
+
+  it('detects a near-paraphrase of the intent without flagging a real mandate', () => {
+    expect(
+      isPastedIntent(
+        'This role reconciles monthly vendor invoices against purchase orders.',
+        INTENT
+      )
+    ).toBe(true);
+    // Restates the request, then adds substance: not a paste.
+    expect(
+      isPastedIntent(
+        'Reconciles monthly vendor invoices against purchase orders; escalates unmatched lines to finance reviewers, keeps an audit trail per supplier and never releases payments.',
+        INTENT
+      )
+    ).toBe(false);
   });
 
   it('regenerates once when the description pastes the intent', async () => {
@@ -270,14 +293,103 @@ describe('role intent draft (R6)', () => {
     );
   });
 
-  it('warns when the drafted id collides with an existing team role', async () => {
-    const backend = fakeBackend({ ...GOOD_ANSWER, name: 'Reviewer' });
+  it('never drafts an id that collides with an existing team role', async () => {
+    const backend = fakeBackend({ ...GOOD_ANSWER, name: 'Reviewer', team_role_id: 'reviewer' });
     const result = await draftRoleFromIntent({
       intent: INTENT,
       inventory: INVENTORY,
       backend,
       probeActuator: alwaysAvailable,
     });
-    expect(result.warnings.join(' ')).toContain("team role 'reviewer' already exists");
+    expect(result.status === 'drafted' && result.draft.team_role_id).toBe('reviewer_2');
+    expect(result.warnings.join(' ')).toContain("role id 'reviewer' already belongs");
+    expect(result.warnings.join(' ')).toContain(
+      'edit --team-role-id/--authority in the create command'
+    );
+  });
+
+  it('never drafts an id that would merge into an authority-only role', async () => {
+    // `system_configurator` has no team role, so a team-role-only check misses it;
+    // confirming would union into the existing authority record's grants.
+    const backend = fakeBackend({
+      ...GOOD_ANSWER,
+      name: 'System Configurator',
+      team_role_id: 'system_configurator',
+    });
+    const result = await draftRoleFromIntent({
+      intent: INTENT,
+      inventory: INVENTORY,
+      backend,
+      probeActuator: alwaysAvailable,
+    });
+    expect(result.status).toBe('drafted');
+    if (result.status !== 'drafted') return;
+    expect(result.draft.team_role_id).toBe('system_configurator_2');
+    expect(INVENTORY.authority_roles).not.toContain(result.draft.team_role_id);
+    expect(result.fallbacks).toContainEqual({
+      field: 'team_role_id',
+      rejected: 'system_configurator',
+      used: 'system_configurator_2',
+    });
+  });
+
+  it('derives the id from an ASCII name when the model omits it, and from the field for a non-ASCII name', () => {
+    const { team_role_id: _omit, ...withoutId } = GOOD_ANSWER;
+    expect(settleRoleDraft(withoutId, INVENTORY, INTENT).draft.team_role_id).toBe(
+      'invoice_reconciler'
+    );
+    const japanese = settleRoleDraft(
+      { ...GOOD_ANSWER, name: '請求書照合担当', team_role_id: 'invoice_matcher' },
+      INVENTORY,
+      INTENT
+    );
+    expect(japanese.draft).toMatchObject({
+      name: '請求書照合担当',
+      team_role_id: 'invoice_matcher',
+    });
+    expect(() =>
+      settleRoleDraft({ ...withoutId, name: '請求書照合担当' }, INVENTORY, INTENT)
+    ).toThrow('team_role_id');
+  });
+
+  it('strips control characters from values it records as dropped or fallen back', () => {
+    const settled = settleRoleDraft(
+      {
+        ...GOOD_ANSWER,
+        allowed_actuators: ['evil\u001b[31m-actuator\n'],
+        persona: 'sove\u0007reign',
+      },
+      INVENTORY,
+      INTENT
+    );
+    const recorded = JSON.stringify([settled.dropped, settled.fallbacks]);
+    expect(recorded).not.toMatch(/\\u00(1b|07)|\\n/);
+    expect(settled.dropped[0].value).toBe('evil [31m-actuator');
+  });
+
+  it('declares the drafting payload as confidential, with the tenant when known', async () => {
+    let seen: ReasoningPayloadScope | undefined;
+    const backend = fakeBackend(GOOD_ANSWER);
+    backend.prompt.mockImplementation(async () => {
+      seen = getReasoningPayloadScope();
+      return JSON.stringify(GOOD_ANSWER);
+    });
+    await draftRoleFromIntent({
+      intent: INTENT,
+      inventory: INVENTORY,
+      backend,
+      tenantSlug: 'acme',
+      probeActuator: alwaysAvailable,
+    });
+    expect(seen).toMatchObject({ tier: 'confidential', tenant_slug: 'acme' });
+  });
+
+  it('classifies an egress denial distinctly from an unavailable backend', async () => {
+    const backend = fakeBackend();
+    backend.prompt.mockRejectedValue(
+      new Error('[REASONING_EGRESS_DENIED] training_use local_only forbids sending')
+    );
+    const result = await draftRoleFromIntent({ intent: INTENT, inventory: INVENTORY, backend });
+    expect(result.status === 'failed' && result.failure.class).toBe('egress_denied');
   });
 });

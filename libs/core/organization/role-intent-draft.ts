@@ -5,7 +5,10 @@ import { frameUntrustedInput } from '../untrusted-input-framing.js';
 import { scanForInjection } from '../untrusted-content.js';
 import { parseStructuredJson } from '../structured-reasoning.js';
 import { getReasoningBackend, type ReasoningBackend } from '../reasoning/reasoning-backend.js';
-import { withReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
+import {
+  ReasoningEgressDeniedError,
+  withReasoningPayloadScope,
+} from '../reasoning/reasoning-egress-scope.js';
 import { loadAuthorityRoleIndex, loadTeamRoleIndex } from '../mission/mission-team-index.js';
 import { loadActuatorManifestCatalog } from '../actuator/actuator-manifest-index.js';
 import { checkActuatorCapabilities } from '../actuator/actuator-capability.js';
@@ -46,6 +49,9 @@ const NAME_MAX = 60;
 const DESCRIPTION_MIN = 40;
 const DESCRIPTION_MAX = 600;
 const OWNERSHIP_MAX = 300;
+const RECORDED_VALUE_MAX = 120;
+/** ASCII snake_case, 3-48 chars: what `role create` can use as a file and index key. */
+export const TEAM_ROLE_ID_PATTERN = /^[a-z][a-z0-9_]{2,47}$/;
 
 /** Personas a drafted role may default to. Privileged personas are not draftable. */
 export const DRAFTABLE_PERSONAS = ['analyst', 'worker', 'mission_owner'] as const;
@@ -73,6 +79,12 @@ export interface RoleDraftInventory {
   actuators: string[];
   tiers: string[];
   team_roles: string[];
+  /**
+   * Existing authority-role ids. Never offered to the model; reserved so a
+   * drafted id can never merge into an existing authority role on confirm
+   * (`role create` unions into an existing record's grants).
+   */
+  authority_roles: string[];
 }
 
 export interface RoleIntentDraft {
@@ -113,6 +125,7 @@ export type RoleIntentDraftFailureClass =
   | 'intent_empty'
   | 'intent_too_long'
   | 'backend_unavailable'
+  | 'egress_denied'
   | 'invalid_response'
   | 'pasted_instructions';
 
@@ -155,8 +168,8 @@ export interface ActuatorConnectionProbe {
 export interface DraftRoleFromIntentInput {
   intent: string;
   inventory: RoleDraftInventory;
-  /** Existing team-role ids; a drafted id that collides is warned about, not renamed. */
-  existingTeamRoles?: Iterable<string>;
+  /** Tenant that owns the intent, when known; scopes the reasoning egress check. */
+  tenantSlug?: string;
   /** Defaults to `getReasoningBackend()`. */
   backend?: ReasoningBackend;
   /** Defaults to the actuator manifest capability check. */
@@ -208,6 +221,7 @@ export function loadRoleDraftInventory(input: {
     actuators: sortedUnique(actuators),
     tiers: [...DRAFTABLE_TIERS],
     team_roles: sortedUnique(Object.keys(teamRoles)),
+    authority_roles: sortedUnique(Object.keys(authorityRoles)),
   };
 }
 
@@ -226,6 +240,7 @@ function canonicalInventory(inventory: RoleDraftInventory): string {
     actuators: inventory.actuators,
     tiers: inventory.tiers,
     team_roles: inventory.team_roles,
+    authority_roles: inventory.authority_roles,
   });
 }
 
@@ -263,9 +278,18 @@ export function buildRoleDraftSchema(inventory: RoleDraftInventory): Record<stri
   return {
     type: 'object',
     additionalProperties: false,
-    required: ['name', 'domain', 'description', 'persona', 'autonomy_level'],
+    required: ['name', 'team_role_id', 'domain', 'description', 'persona', 'autonomy_level'],
     properties: {
-      name: { type: 'string', maxLength: NAME_MAX, description: 'Short display name of the role.' },
+      name: {
+        type: 'string',
+        maxLength: NAME_MAX,
+        description: 'Short display name of the role, in the language of the request.',
+      },
+      team_role_id: {
+        type: 'string',
+        pattern: TEAM_ROLE_ID_PATTERN.source,
+        description: 'ASCII snake_case identifier for the role, e.g. invoice_reconciler.',
+      },
       domain: { type: 'string', enum: inventory.domains },
       description: {
         type: 'string',
@@ -329,10 +353,17 @@ function normalizeForComparison(value: string): string {
     .trim();
 }
 
+function wordSet(normalized: string): Set<string> {
+  return new Set(normalized.split(' ').filter((word) => word.length >= 2));
+}
+
 /**
  * Instructions that are the operator's sentence, or little more than it.
- * Either direction counts: a description that contains the intent and adds
- * under ~40%, or one that is a fragment covering most of the intent.
+ * Three ways count: a description that contains the intent and adds under
+ * ~40%; a fragment covering most of the intent; or a near-paraphrase whose
+ * words are mostly the intent's words (≥80% of the intent's words reused
+ * AND ≥60% of its own words taken from the intent — a real mandate that
+ * restates the request and then adds substance stays below the second bar).
  */
 export function isPastedIntent(text: string, intent: string): boolean {
   const a = normalizeForComparison(text);
@@ -341,7 +372,12 @@ export function isPastedIntent(text: string, intent: string): boolean {
   if (a === j) return true;
   if (a.includes(j) && j.length * 10 >= a.length * 6) return true;
   if (j.includes(a) && a.length * 10 >= j.length * 6) return true;
-  return false;
+  const intentWords = wordSet(j);
+  const textWords = wordSet(a);
+  if (intentWords.size < 4 || textWords.size === 0) return false;
+  let shared = 0;
+  for (const word of textWords) if (intentWords.has(word)) shared += 1;
+  return shared * 10 >= intentWords.size * 8 && shared * 10 >= textWords.size * 6;
 }
 
 function cleanLine(value: unknown, max: number): string {
@@ -377,11 +413,11 @@ function pickFromInventory(
     const id = String(value ?? '').trim();
     if (!id || picked.includes(id)) continue;
     if (!allowedSet.has(id)) {
-      dropped.push({ field, value: id.slice(0, 120), reason: 'not_in_inventory' });
+      dropped.push({ field, value: cleanLine(id, RECORDED_VALUE_MAX), reason: 'not_in_inventory' });
       continue;
     }
     if (picked.length >= max) {
-      dropped.push({ field, value: id, reason: 'over_limit' });
+      dropped.push({ field, value: cleanLine(id, RECORDED_VALUE_MAX), reason: 'over_limit' });
       continue;
     }
     picked.push(id);
@@ -398,7 +434,8 @@ function pickOne<T extends string>(
 ): T {
   const value = typeof raw === 'string' ? raw.trim() : '';
   if ((allowed as readonly string[]).includes(value)) return value as T;
-  if (value) fallbacks.push({ field, rejected: value.slice(0, 120), used: fallback });
+  if (value)
+    fallbacks.push({ field, rejected: cleanLine(value, RECORDED_VALUE_MAX), used: fallback });
   return fallback;
 }
 
@@ -427,10 +464,36 @@ export function settleRoleDraft(
   const fallbacks: RoleDraftFallback[] = [];
 
   const name = cleanLine(args.name, NAME_MAX);
-  const teamRoleId = toTeamRoleId(name);
   const description = cleanLine(args.description, DESCRIPTION_MAX);
-  if (!name || !teamRoleId) {
+  if (!name || !/[\p{L}\p{N}]/u.test(name)) {
     throw new RoleDraftRejected('invalid_response', 'the name is missing or has no letters/digits');
+  }
+  // The id is its own field so a non-ASCII display name (e.g. Japanese) still
+  // yields a usable key; an ASCII name is the fallback source.
+  const rawId = typeof args.team_role_id === 'string' ? args.team_role_id.trim() : '';
+  const proposedId = TEAM_ROLE_ID_PATTERN.test(rawId) ? rawId : toTeamRoleId(name);
+  if (!TEAM_ROLE_ID_PATTERN.test(proposedId)) {
+    throw new RoleDraftRejected(
+      'invalid_response',
+      'team_role_id is missing or not ASCII snake_case (3-48 chars, e.g. invoice_reconciler)'
+    );
+  }
+  if (rawId && rawId !== proposedId) {
+    fallbacks.push({
+      field: 'team_role_id',
+      rejected: cleanLine(rawId, RECORDED_VALUE_MAX),
+      used: proposedId,
+    });
+  }
+  // Never let a draft name an existing team OR authority role: confirming
+  // would merge into that record's grants (write scopes, tiers, actuators).
+  const reserved = new Set([...inventory.team_roles, ...inventory.authority_roles]);
+  let teamRoleId = proposedId;
+  for (let suffix = 2; reserved.has(teamRoleId); suffix += 1) {
+    teamRoleId = `${proposedId.slice(0, 44)}_${suffix}`;
+  }
+  if (teamRoleId !== proposedId) {
+    fallbacks.push({ field: 'team_role_id', rejected: proposedId, used: teamRoleId });
   }
   if (description.length < DESCRIPTION_MIN) {
     throw new RoleDraftRejected(
@@ -484,7 +547,7 @@ export function settleRoleDraft(
     const fallback = defaults.escalation_parent_team_role;
     fallbacks.push({
       field: 'escalation_parent_team_role',
-      rejected: rawParent.slice(0, 120),
+      rejected: cleanLine(rawParent, RECORDED_VALUE_MAX),
       used: fallback ?? 'domain default',
     });
   }
@@ -655,10 +718,34 @@ export async function draftRoleFromIntent(
     let raw: string;
     try {
       raw = await withReasoningPayloadScope(
-        { tier: 'public', purpose: 'role intent draft', attachment_count: 0 },
+        {
+          // Operator intent may describe internal work: treat it like other
+          // drafting inputs (customer-decision draft, peer auto-reply).
+          tier: 'confidential',
+          ...(input.tenantSlug ? { tenant_slug: input.tenantSlug } : {}),
+          purpose: 'role intent draft',
+          attachment_count: 0,
+        },
         () => backend.prompt(buildRoleDraftPrompt(intent, input.inventory, rejection))
       );
     } catch (error) {
+      const egressDenied =
+        error instanceof ReasoningEgressDeniedError ||
+        (error instanceof Error && error.message.includes('[REASONING_EGRESS_DENIED]'));
+      if (egressDenied) {
+        return {
+          status: 'failed',
+          draft_id: draftId,
+          inventory_digest: inventoryDigest,
+          attempts: attempt,
+          warnings,
+          failure: {
+            class: 'egress_denied',
+            message: (error as Error).message,
+            next: 'use a local reasoning backend, or pass --tenant <slug> for a tenant whose provider egress policy allows this backend',
+          },
+        };
+      }
       return {
         status: 'failed',
         draft_id: draftId,
@@ -680,10 +767,17 @@ export async function draftRoleFromIntent(
         throw new RoleDraftRejected('invalid_response', 'the answer was not parseable JSON');
       }
       const settled = settleRoleDraft(parsed, input.inventory, intent);
-      const existing = new Set(input.existingTeamRoles ?? input.inventory.team_roles);
-      if (existing.has(settled.draft.team_role_id)) {
+      const renamed = settled.fallbacks.find(
+        (entry) => entry.field === 'team_role_id' && entry.used === settled.draft.team_role_id
+      );
+      if (
+        renamed &&
+        input.inventory.team_roles
+          .concat(input.inventory.authority_roles)
+          .includes(renamed.rejected)
+      ) {
         warnings.push(
-          `team role '${settled.draft.team_role_id}' already exists; confirming would update it — rename with --name if that is not intended`
+          `role id '${renamed.rejected}' already belongs to an existing team or authority role; drafted as '${settled.draft.team_role_id}' so confirming cannot merge into it — edit --team-role-id/--authority in the create command to choose another free id`
         );
       }
       const missing = await findMissingConnections(
