@@ -46,11 +46,10 @@
     {
       "id": "emit-audit-log",
       "role": "sink",
-      "op": "file:write_file",
+      "op": "file:append",
       "consumes": "audit_findings",
       "params": {
         "path": "knowledge/confidential/governance/culture-audit-log.jsonl",
-        "append": true,
         "content": {
           "ts": "{{timestamp}}",
           "verdict": "{{audit_findings.summary}}",

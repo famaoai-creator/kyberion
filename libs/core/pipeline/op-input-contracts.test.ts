@@ -77,13 +77,6 @@ describe('op-input-contracts', () => {
     }
   });
 
-  it('keeps legacy operation envelopes open until their typed migration', () => {
-    expect(validateOpInput('file', 'read', { path: 'a.txt', export_as: 'content' })).toEqual({
-      valid: true,
-    });
-    expect(validateOpInput('file', 'read', { path: 'a.txt', typo: true })).toEqual({ valid: true });
-  });
-
   it('accepts governed pipeline metadata without reopening the operation envelope', () => {
     expect(
       validateOpInput('system', 'probe_active_profile', {
@@ -167,6 +160,42 @@ describe('op-input-contracts', () => {
           _facets: {},
         })
       ).toEqual({ valid: true });
+    });
+  });
+
+  describe('typed file contracts', () => {
+    it('rejects unknown keys on strict file ops', () => {
+      const result = validateOpInput('file', 'read', { path: 'a.txt', typo: true });
+      expect(result.valid).toBe(false);
+    });
+
+    it('accepts audited capture/export params', () => {
+      expect(
+        validateOpInput('file', 'tail', { path: 'a.log', pos_key: 'p', export_as: 'tail' })
+      ).toEqual({ valid: true });
+      expect(
+        validateOpInput('file', 'search', { path: 'src', pattern: 'x', export_as: 'hits' })
+      ).toEqual({ valid: true });
+    });
+
+    it('accepts either path or output_path on write_file/write_artifact', () => {
+      expect(validateOpInput('file', 'write_file', { output_path: 'o.txt' })).toEqual({
+        valid: true,
+      });
+      expect(validateOpInput('file', 'write_artifact', { path: 'o.txt', data: {} })).toEqual({
+        valid: true,
+      });
+      expect(validateOpInput('file', 'write_file', {})).toEqual(
+        expect.objectContaining({ valid: false })
+      );
+    });
+
+    it('accepts audited append params and rejects the write_file append flag', () => {
+      expect(
+        validateOpInput('file', 'append', { path: 'a.txt', content: 'x', newline: false })
+      ).toEqual({ valid: true });
+      const result = validateOpInput('file', 'write_file', { path: 'a.txt', append: true });
+      expect(result.valid).toBe(false);
     });
   });
 
