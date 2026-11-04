@@ -7,6 +7,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
 import {
   Badge,
+  Button,
   Callout,
   EmptyState,
   KeyValue,
@@ -14,9 +15,9 @@ import {
   Skeleton,
   StatusPill,
 } from '@agent/shared-ui';
-import { WsPreformatted, WsSelectTable, WsTitleCell } from './ChronosWsParts';
-import { useChronosLocale } from '../../lib/ops/hooks';
+import { WsPreformatted, WsSelectTable, WsTextareaField, WsTitleCell } from './ChronosWsParts';
 import { NeedsYouLink } from '../needs-you-link';
+import { useChronosLocale } from '../../lib/ops/hooks';
 import {
   formatChronosDateTime,
   uxMessage,
@@ -113,10 +114,16 @@ export function DeliverablesWorkspace({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [items, setItems] = React.useState<Deliverable[]>([]);
-  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  // `?artifact=<id>` (Home's recent deliverables) opens that row first.
+  const [selectedId, setSelectedId] = React.useState<string | null>(
+    () => searchParams.get('artifact') || null
+  );
   const [preview, setPreview] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [accessRole, setAccessRole] = React.useState<'readonly' | 'localadmin'>('readonly');
+  const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [comment, setComment] = React.useState('');
   const selected = items.find((item) => item.artifactId === selectedId) || items[0] || null;
 
   const refresh = React.useCallback(async () => {
@@ -133,6 +140,7 @@ export function DeliverablesWorkspace({
       const parsed = parseDeliverablesResponse(payload);
       if (!response.ok || !parsed) throw new Error('Invalid deliverables response');
       const nextItems = parsed.deliverables;
+      setAccessRole(parsed.accessRole);
       setItems(nextItems);
       setSelectedId((current) =>
         nextItems.some((item: Deliverable) => item.artifactId === current)
@@ -184,6 +192,27 @@ export function DeliverablesWorkspace({
     };
   }, [selected, locale]);
 
+  const review = async (verdict: 'accept' | 'request-changes' | 'reject') => {
+    if (!selected) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(opsApiPath('/deliverable-review'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artifactId: selected.artifactId, verdict, comment, tenant }),
+      });
+      if (!response.ok) throw new Error('Failed to review the deliverable');
+      setComment('');
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const localAdmin = accessRole === 'localadmin';
   const scopeLabel = `${tenant || uxText('chronos_ac_scope_all', locale)} · ${items.length}`;
   const showAllHref = (() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -258,10 +287,7 @@ export function DeliverablesWorkspace({
       </Section>
 
       {selected ? (
-        <Section
-          title={selected.kind}
-          description={browseOnly ? undefined : uxText('chronos_preview_review', locale)}
-        >
+        <Section title={selected.kind} description={uxText('chronos_preview_review', locale)}>
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill
               status={reviewStatus(selected.reviewVerdict)}
@@ -345,8 +371,47 @@ export function DeliverablesWorkspace({
               ]}
             />
           ) : null}
-          {/* Browsing only: the review decision lives in あなた待ち (IA contract §2). */}
-          <NeedsYouLink reason="review" locale={locale} />
+          {selected.awaitingInboxDecision ? (
+            // One place per decision: an artifact with an open governed inbox
+            // entry is decided in あなた待ち. Any other stored artifact keeps an
+            // optional review here (not a queue item, so it is never counted).
+            <NeedsYouLink reason="review" locale={locale} />
+          ) : (
+            <>
+              <WsTextareaField
+                id="chronos-deliverable-comment"
+                label={uxTextOr('chronos_ws_review_comment_label', 'Review comment', locale)}
+                value={comment}
+                onChange={setComment}
+                placeholder={uxText('chronos_review_comment', locale)}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  label={uxText('chronos_approve', locale)}
+                  variant="primary"
+                  disabled={busy || selected.missing || !localAdmin}
+                  onClick={() => void review('accept')}
+                />
+                <Button
+                  label={uxText('chronos_request_changes', locale)}
+                  variant="secondary"
+                  disabled={busy || selected.missing || !localAdmin}
+                  onClick={() => void review('request-changes')}
+                />
+                <Button
+                  label={uxText('chronos_reject', locale)}
+                  variant="danger"
+                  disabled={busy || selected.missing || !localAdmin}
+                  onClick={() => void review('reject')}
+                />
+              </div>
+              {!localAdmin ? (
+                <p className="kb-text kb-text--muted">
+                  {uxText('chronos_localadmin_required', locale)}
+                </p>
+              ) : null}
+            </>
+          )}
         </Section>
       ) : loading ? null : (
         <Section>
