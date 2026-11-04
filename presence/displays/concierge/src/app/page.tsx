@@ -134,7 +134,7 @@ export default function HomePage() {
           <SetupChecklist t={translate} locale={locale} checklist={checklist.data} />
         ) : null}
         <NeedsYouTile t={translate} bcp47={bcp47} summary={needs} onRetry={needs.reload} />
-        <AgentsTile t={translate} home={home} onRetry={home.reload} />
+        <AgentsTile t={translate} bcp47={bcp47} home={home} onRetry={home.reload} />
         <MissionsTile t={translate} bcp47={bcp47} home={home} onRetry={home.reload} />
         <HealthTile t={translate} bcp47={bcp47} home={home} onRetry={home.reload} />
         <KeyResultsTile t={translate} bcp47={bcp47} home={home} onRetry={home.reload} />

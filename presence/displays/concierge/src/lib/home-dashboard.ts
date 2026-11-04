@@ -52,6 +52,11 @@ export interface HomeDashboard {
   generatedAt: string;
   /** Tiles whose source could not be read. Their data below is empty, never zero-as-healthy. */
   unavailable: HomeSection[];
+  /**
+   * Tiles whose detail is withheld by the selection: the personal (all-company)
+   * view shows counts only, never one company's titles (`applyTenantSelection`).
+   */
+  withheld?: HomeSection[];
   agents: Record<HomeAgentState, number> & { total: number; unassignedItems: number };
   missions: {
     open: { active: number; planned: number; paused: number; failed: number };
@@ -343,6 +348,21 @@ function organizationTenant(viewer: ViewerContext): string | undefined | null {
   if (scopeList(viewer.projectIds) !== 'all') return null;
   if (viewer.tenantSlugs === 'all') return undefined;
   return viewer.tenantSlugs.length === 1 ? viewer.tenantSlugs[0] : null;
+}
+
+/**
+ * The personal (all-company) selection: aggregate counts only. Company
+ * titles — stopped missions, key results, deliverables — are dropped so Home
+ * follows the same selection model as the rest of the shell.
+ */
+export function countsOnlyHomeDashboard(dashboard: HomeDashboard): HomeDashboard {
+  return {
+    ...dashboard,
+    withheld: ['krs', 'deliverables'],
+    missions: { ...dashboard.missions, blocked: [] },
+    krs: { state: dashboard.krs.state, items: [] },
+    deliverables: [],
+  };
 }
 
 /** Reads every source once for this viewer (already narrowed to the shell's scope). */
