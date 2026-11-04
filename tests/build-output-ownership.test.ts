@@ -45,9 +45,44 @@ describe('single-owner build contract', () => {
       expect(config.compilerOptions.outDir).toMatch(/^\.?\/?dist$/);
       expect(config.compilerOptions.tsBuildInfoFile).toBe('./dist/.tsbuildinfo');
       expect(config.compilerOptions.composite).toBe(true);
-      expect(readJson(id + '/package.json').scripts.build).toContain(
-        'write_core_dist_scope.mjs --run'
+      // `tsc -b` through a core reference re-emits libs/core/dist, so such a
+      // package must restore the core dist scope afterwards. A package with no
+      // core reference (the core-free kernel) never touches libs/core/dist.
+      const buildsCore =
+        id === 'libs/core' ||
+        (config.references ?? []).some(
+          (ref: { path: string }) => path.posix.join(id, ref.path) === 'libs/core'
+        );
+      if (buildsCore) {
+        expect(readJson(id + '/package.json').scripts.build).toContain(
+          'write_core_dist_scope.mjs --run'
+        );
+      }
+    }
+  });
+
+  it('keeps @agent/kernel free of any @agent/core dependency', () => {
+    const pkg = readJson('libs/kernel/package.json');
+    expect({ ...pkg.dependencies, ...pkg.devDependencies }).not.toHaveProperty('@agent/core');
+    expect(readJson('libs/kernel/tsconfig.json').references ?? []).toEqual([]);
+  });
+
+  it('ships every owned package dist in each CI build artifact', () => {
+    // Downstream CI jobs restore compiler outputs from the build artifact instead of
+    // rebuilding; a package dist missing from the upload list fails at runtime there.
+    for (const workflow of ['ci.yml', 'pr-validation.yml', 'cross-os.yml']) {
+      const text = safeReadFile(pathResolver.rootResolve('.github/workflows/' + workflow), {
+        encoding: 'utf8',
+      }) as string;
+      const uploaded = [...text.matchAll(/^\s+((?:libs|presence)\/[^\s]*\/dist\/)$/gm)].map(
+        (match) => new RegExp('^' + match[1].replace(/\*/g, '[^/]+').replace(/\/$/, '') + '$')
       );
+      for (const { id } of PACKAGE_BUILD_OUTPUTS) {
+        expect(
+          uploaded.some((pattern) => pattern.test(id + '/dist')),
+          workflow + ' uploads ' + id + '/dist'
+        ).toBe(true);
+      }
     }
   });
 
