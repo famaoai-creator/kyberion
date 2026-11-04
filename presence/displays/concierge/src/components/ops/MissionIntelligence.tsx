@@ -30,7 +30,6 @@ import type {
   IntelligencePayload,
   MissionIntelligenceWorkspace,
   MissionSummary,
-  PendingApprovalSummary,
   ReferenceDetail,
 } from './MissionIntelligenceTypes';
 
@@ -90,7 +89,6 @@ export function MissionIntelligence({
   const [missionActionTarget, setMissionActionTarget] = useState<string | null>(null);
   const [missionSeedTarget, setMissionSeedTarget] = useState<string | null>(null);
   const [trackSeedTarget, setTrackSeedTarget] = useState<string | null>(null);
-  const [approvalTarget, setApprovalTarget] = useState<string | null>(null);
   const [surfaceActionTarget, setSurfaceActionTarget] = useState<string | null>(null);
   const [memoryPromotionTarget, setMemoryPromotionTarget] = useState<'dry-run' | 'promote' | null>(
     null
@@ -490,34 +488,6 @@ export function MissionIntelligence({
         endpoint,
         openLabel: 'open raw template',
       });
-    }
-  };
-
-  const decideApproval = async (
-    approval: PendingApprovalSummary,
-    decision: 'approved' | 'rejected'
-  ) => {
-    try {
-      setApprovalTarget(approval.id);
-      const res = await fetch(intelligenceUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'approval_decision',
-          requestId: approval.id,
-          channel: approval.channel,
-          storageChannel: approval.storageChannel,
-          decision,
-          ...(approval.presentedDigest ? { presentedDigest: approval.presentedDigest } : {}),
-        }),
-      });
-      if (!res.ok) throw new Error('Approval decision failed');
-      setActionResult(`${approval.id}: ${decision}`);
-      await refreshData();
-    } catch (err: any) {
-      setError(err.message || 'Approval decision failed');
-    } finally {
-      setApprovalTarget(null);
     }
   };
 
@@ -1308,8 +1278,6 @@ export function MissionIntelligence({
           data,
           locale,
           mt,
-          approvalTarget,
-          decideApproval,
           decideDistillCandidate,
           distillCandidateTarget,
           filteredRecentArtifactsByTrack,
