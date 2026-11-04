@@ -125,9 +125,14 @@ export function companyActionAllowed(state: CompanySetupState, action: CompanyAc
 export function companySetupHref(tenantSlug: string): string {
   return '/setup/company?' + new URLSearchParams({ tenant: tenantSlug }).toString();
 }
+/**
+ * The activation approval in the one decision queue, `/inbox` (MSN-SHELL-IA):
+ * narrowed to the company and to approvals, landing on the card when known.
+ */
 export function companyApprovalHref(setup: CompanySetup): string {
+  const query = new URLSearchParams({ tenant: setup.tenantSlug, reason: 'approval' }).toString();
   const anchor = setup.activationApproval
-    ? 'decide-approval-' + encodeURIComponent(setup.activationApproval.id)
-    : 'decide-heading';
-  return '/?' + new URLSearchParams({ tenant: setup.tenantSlug }).toString() + '#' + anchor;
+    ? '#decide-approval-' + encodeURIComponent(setup.activationApproval.id)
+    : '';
+  return '/inbox?' + query + anchor;
 }
