@@ -2827,7 +2827,7 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Optional runtime setting for nhi id; leave unset to use the built-in configuration.",
+      "description": "Canonical claimed runtime NHI URI. Organization execution additionally requires the matching live KYBERION_NHI_SESSION admission. This identity selector is separate from the KYBERION_NHI_ACTOR verification policy mode.",
       "documented": true
     },
     {
@@ -2835,7 +2835,7 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Session token issued by `pnpm onboarding nhi-session apply` after human approval; selects the governed runtime-instance binding that admits this process to act as the claimed KYBERION_NHI_ACTOR under an organization scope. The token only selects a journal record — it cannot create one.",
+      "description": "Session token issued by `pnpm onboarding nhi-session apply` after human approval; selects the governed runtime-instance binding that admits this process to act as the claimed KYBERION_NHI_ID under an organization scope. The token only selects a journal record — it cannot create one. Legacy URI-valued KYBERION_NHI_ACTOR claims remain readable for compatibility; off/warn/enforce are policy modes, never identities.",
       "documented": true,
       "subsystem": "identity"
     },

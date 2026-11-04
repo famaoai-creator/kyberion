@@ -6,7 +6,7 @@
  * `expires_at`; `instance_released` revokes it. Admission is then *consumed*
  * by `inspectInstalledOnboardingRuntime`: an org-scoped delegated external
  * operation is admitted only when the process claims an nhi_id whose identity
- * record holds a live binding with the same session token (KYBERION_NHI_ACTOR
+ * record holds a live binding with the same session token (KYBERION_NHI_ID
  * + KYBERION_NHI_SESSION). The env pair selects a governed record — it can
  * never create one — so bare env spoofing fails closed.
  *
@@ -42,11 +42,15 @@ import {
 } from '../agent/agent-identity.js';
 import { withExecutionContext } from '../authority.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { agentIdentityMatchesTenant } from '../persona-identity.js';
+import { resolveClaimedNhiId } from '../nhi-id.js';
 import type { CharterPathOptions } from '../governance/accountability-charter-registry.js';
 
 export const NHI_SESSION_ADMISSION_CHANNEL = 'nhi-session-admission';
 /** Claimed session token selecting a governed runtime-instance binding. */
 export const NHI_SESSION_ENV = 'KYBERION_NHI_SESSION';
+/** Identity selection is separate from KYBERION_NHI_ACTOR's verification policy mode. */
+export const NHI_IDENTITY_ENV = 'KYBERION_NHI_ID';
 export const ADMISSION_SESSION_PREFIX = 'kns1.';
 export const ADMISSION_INSTANCE_PREFIX = 'nhi-session:';
 export const DEFAULT_ADMISSION_TTL_SECONDS = 8 * 3600;
@@ -112,8 +116,16 @@ function assertOrgAdmissionTarget(
   // Fail closed on organization scope: the admitted NHI must belong to the
   // tenant's organization — never let an ambient other-tenant identity serve.
   if (
-    agent.affiliation.tenant_slug !== tenantSlug &&
-    agent.affiliation.organization_id !== tenantSlug
+    !agentIdentityMatchesTenant(agent, tenantSlug) &&
+    !(
+      checks.lifecycle === false &&
+      !agent.affiliation.tenant_slug &&
+      agent.runtime_instances?.some(
+        (entry) =>
+          entry.instance_id.startsWith(ADMISSION_INSTANCE_PREFIX) &&
+          entry.tenant_slug === tenantSlug
+      )
+    )
   )
     deny('NHI is not affiliated with this tenant');
   return { owner: { id: principal.accountableId }, agent };
@@ -333,7 +345,7 @@ export function applyNhiSessionAdmission(
     expires_at: plan.expires_at,
     lifecycle_status: bound.lifecycle_status,
     env: {
-      KYBERION_NHI_ACTOR: plan.nhi_id,
+      [NHI_IDENTITY_ENV]: plan.nhi_id,
       [NHI_SESSION_ENV]: sessionId,
     },
   };
@@ -381,12 +393,17 @@ export function listNhiSessionAdmissions(
     .filter(
       (agent) =>
         !filter.tenant_slug ||
-        agent.affiliation.tenant_slug === filter.tenant_slug ||
-        agent.affiliation.organization_id === filter.tenant_slug
+        agentIdentityMatchesTenant(agent, filter.tenant_slug) ||
+        (!agent.affiliation.tenant_slug &&
+          agent.runtime_instances?.some((entry) => entry.tenant_slug === filter.tenant_slug))
     )
     .flatMap((agent) =>
       (agent.runtime_instances ?? [])
-        .filter((entry) => entry.instance_id.startsWith(ADMISSION_INSTANCE_PREFIX))
+        .filter(
+          (entry) =>
+            entry.instance_id.startsWith(ADMISSION_INSTANCE_PREFIX) &&
+            (!filter.tenant_slug || entry.tenant_slug === filter.tenant_slug)
+        )
         .map((instance) => ({
           nhi_id: agent.nhi_id,
           lifecycle_status: agent.lifecycle_status,
@@ -409,6 +426,10 @@ export function findLiveSessionAdmission(
 ): AgentRuntimeInstanceBinding | undefined {
   const agent = getAgentIdentity(nhiId);
   if (!agent || ['suspended', 'retired'].includes(agent.lifecycle_status)) return undefined;
+  // Legacy identities without affiliation may consume only their already-approved
+  // exact tenant session. An explicit foreign affiliation is never overridden.
+  if (agent.affiliation.tenant_slug && !agentIdentityMatchesTenant(agent, tenantSlug))
+    return undefined;
   return (agent.runtime_instances ?? []).find(
     (entry) =>
       entry.instance_id.startsWith(ADMISSION_INSTANCE_PREFIX) &&
@@ -421,4 +442,12 @@ export function findLiveSessionAdmission(
 /** The session token this process was configured with, if any. */
 export function claimedSessionId(): string | undefined {
   return getRegisteredEnvText(NHI_SESSION_ENV)?.trim() || undefined;
+}
+
+/** Legacy URI claims remain readable; policy values (off/warn/enforce) are never actor IDs. */
+export function claimedNhiIdentity(): string | undefined {
+  return resolveClaimedNhiId(
+    getRegisteredEnvText(NHI_IDENTITY_ENV, { preserveEmpty: true }),
+    getRegisteredEnvText('KYBERION_NHI_ACTOR')
+  );
 }
