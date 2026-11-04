@@ -1,4 +1,3 @@
-import * as fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const record = vi.fn();
@@ -10,6 +9,7 @@ vi.mock('./provider/provider-pins-store.js', () => ({
   pinSeamProviderDecision: () => null,
 }));
 
+const { safeExistsSync, safeRmSync } = await import('./secure-io.js');
 const defaults = await import('./seam-selection-defaults.js');
 const selection = await import('./seam-provider-selection.js');
 const { ProviderChainRouter } = await import('./provider-chain-router.js');
@@ -33,7 +33,7 @@ function cleanup(): void {
     seamDefaultsScopePath(TENANT),
     seamDefaultsScopePath(),
   ]) {
-    fs.rmSync(file, { force: true });
+    safeRmSync(file, { force: true });
   }
 }
 
@@ -107,7 +107,7 @@ describe('saved seam defaults store', () => {
       layer: 'tenant',
       tenant_slug: TENANT,
     });
-    expect(fs.existsSync(seamDefaultsOperatorPath())).toBe(false);
+    expect(safeExistsSync(seamDefaultsOperatorPath())).toBe(false);
     expect(seamDefaultsScopePath(TENANT)).toContain(
       `seam-selection-defaults/confidential/${TENANT}/defaults.json`
     );
