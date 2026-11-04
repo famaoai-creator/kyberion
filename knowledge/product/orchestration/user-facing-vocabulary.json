@@ -7058,16 +7058,6 @@
         "ja": "対象",
         "qps-ploc": "⟦Ŧȧřɠėŧ ŀőř⟧"
       },
-      "chronos_fov_terminal_approval": {
-        "en": "Approve in the terminal",
-        "ja": "ターミナルで承認",
-        "qps-ploc": "⟦Ȧṗṗřőṽė ïñ ŧħė ŧėřɱïñȧŀ ŀőřėɱ ï⟧"
-      },
-      "chronos_fov_terminal_approval_detail": {
-        "en": "Run the command below. After approval, enter the value in Concierge under Settings → Introduce secret. Chronos never collects secret values.",
-        "ja": "次のコマンドを実行してください。承認後、Concierge の「設定 → シークレットを登録」で値を入力します。Chronos はシークレットの値を受け取りません。",
-        "qps-ploc": "⟦Řůñ ŧħė ƈőɱɱȧñḓ ƀėŀőẇ. Ȧƒŧėř ȧṗṗřőṽȧŀ, ėñŧėř ŧħė ṽȧŀůė ïñ Ƈőñƈïėřɠė ůñḓėř Şėŧŧïñɠş → Ïñŧřőḓůƈė şėƈřėŧ. Ƈħřőñőş ñėṽėř ƈőŀŀėƈŧş şėƈřėŧ ṽȧŀůėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
-      },
       "chronos_fov_title_audit_trail": {
         "en": "Audit trail",
         "ja": "監査の記録",
@@ -19713,11 +19703,6 @@
         "ja": "承認待ち",
         "qps-ploc": "⟦Ṗėñḓïñɠ ȧṗṗřőṽȧŀş ŀőřėɱ⟧"
       },
-      "governance.pending_empty": {
-        "en": "No requests are waiting for approval.",
-        "ja": "承認待ちはありません。",
-        "qps-ploc": "⟦Ñő řėɋůėşŧş ȧřė ẇȧïŧïñɠ ƒőř ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ⟧"
-      },
       "governance.approve_passkey": {
         "en": "Approve with passkey",
         "ja": "パスキーで承認",
@@ -19782,16 +19767,6 @@
         "en": "linked {subject} → {member}",
         "ja": "{subject} を {member} に紐付けました",
         "qps-ploc": "⟦ŀïñķėḓ {subject} → {member} ŀőřėɱ ïṗ⟧"
-      },
-      "governance.approved_msg": {
-        "en": "approved {id}",
-        "ja": "{id} を承認しました",
-        "qps-ploc": "⟦ȧṗṗřőṽėḓ {id} ŀőřė⟧"
-      },
-      "governance.expires": {
-        "en": "expires {at}",
-        "ja": "期限 {at}",
-        "qps-ploc": "⟦ėẋṗïřėş {at} ŀőř⟧"
       },
       "attestation.title": {
         "en": "Provider attestation",
