@@ -4,7 +4,10 @@ import {
   ProviderSelectionError,
   unmetCandidateSummary,
 } from '../../provider-chain-router.js';
-import { type SeamProviderCandidate } from '../../seam-provider-selection.js';
+import {
+  resolveSeamDefaultOrder,
+  type SeamProviderCandidate,
+} from '../../seam-provider-selection.js';
 import type {
   MusicGenerationProvider,
   MusicGenerationRequest,
@@ -17,14 +20,32 @@ import {
 } from './provider-registry.js';
 
 /**
- * Label used for the provider field of a total-failure result — mirrors the
- * platform-ordered head of the policy's `default_chains` without reading the
- * policy (selection itself is data-driven; this is report text only).
+ * Hermetic fallback for the policy's platform `default_chains` — used only
+ * when the policy directory is unavailable. The policy file is the source of
+ * truth.
  */
 function platformOrder(): string[] {
   return isAppleSilicon()
     ? ['musicgen_mlx', 'musicgen_audiogen', 'stable_audio_3']
     : ['stable_audio_3', 'musicgen_mlx', 'musicgen_audiogen'];
+}
+
+function platformOrderKey(): string {
+  return `platform:${isAppleSilicon() ? 'apple_silicon' : 'generic'}`;
+}
+
+/**
+ * Provider named in a failure result when nothing ran: the saved seam
+ * default, else the policy's platform chain head, else the builtin order.
+ * Report text only — selection goes through ProviderChainRouter.
+ */
+function defaultProviderLabel(): string {
+  return (
+    resolveSeamDefaultOrder(MUSIC_GENERATION_PROVIDER_SEAM, {
+      orderKey: platformOrderKey(),
+      builtin: platformOrder(),
+    })[0] ?? platformOrder()[0]!
+  );
 }
 
 /**
@@ -73,7 +94,7 @@ const chainSpec = {
   explicitPreference: (request: MusicGenerationRequest) => request.providerPreference,
   preferenceOnly: true,
   purpose: (request: MusicGenerationRequest) => request.purpose,
-  defaultOrderKey: () => `platform:${isAppleSilicon() ? 'apple_silicon' : 'generic'}`,
+  defaultOrderKey: () => platformOrderKey(),
   builtinDefaultOrder: () => platformOrder(),
   governedScope: 'lead',
   strictPurposes: true,
@@ -109,7 +130,7 @@ export async function generateMusic(
     preference = await resolveMusicProviderChain(request);
   } catch (error) {
     if (error instanceof ProviderSelectionError) {
-      return failedSelection(platformOrder()[0]!, error.message);
+      return failedSelection(defaultProviderLabel(), error.message);
     }
     throw error;
   }
@@ -121,7 +142,7 @@ export async function generateMusic(
         ? ' No vocal-capable provider is registered (all local providers are instrumental-only; singing-voice synthesis via SongGeneration-MLX is a documented future path).'
         : '';
     return failedSelection(
-      platformOrder()[0]!,
+      defaultProviderLabel(),
       `No available Music Generation provider could be resolved (${reasons}).${vocalHint}`
     );
   }
@@ -151,7 +172,7 @@ export async function generateMusic(
 
   return {
     status: 'failed',
-    provider: preference[0] || 'stable_audio_3',
+    provider: preference[0] || defaultProviderLabel(),
     elapsedMs: 0,
     error: lastError || 'No available Music Generation provider could be resolved.',
   };

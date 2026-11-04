@@ -235,6 +235,19 @@ describe('saved defaults in governed selection', () => {
     ).toEqual({ provider: 'local-file-lock', source: 'policy' });
   });
 
+  it('security seams opt out of saved defaults (allow_saved_default: false)', () => {
+    vi.stubEnv(
+      'KYBERION_SEAM_DEFAULTS',
+      'authz-policy-engine=deny-all;authn-principal-resolver=stub;lease-backend=memory'
+    );
+    expect(selection.savedSeamDefaultFor('authz-policy-engine')).toBeNull();
+    expect(selection.savedSeamDefaultFor('authn-principal-resolver')).toBeNull();
+    expect(selection.savedSeamDefaultFor('lease-backend')?.provider).toBe('memory');
+    expect(selection.resolveSeamSelectionEntry({ seam: 'authz-policy-engine' }).kind).toBe(
+      'legacy'
+    );
+  });
+
   it('a provider chain router lets the saved default lead the policy chain', async () => {
     const providers = OCR.map((candidate) => ({ id: candidate.id }));
     const router = new ProviderChainRouter(providers, {
