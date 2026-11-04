@@ -3442,8 +3442,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -3517,10 +3516,16 @@
               "url": {
                 "type": "string",
                 "minLength": 1
+              },
+              "waitUntil": {
+                "type": "string",
+                "enum": ["load", "domcontentloaded", "commit", "networkidle"]
+              },
+              "onboarding_isolated_navigation": {
+                "type": "boolean"
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -3630,8 +3635,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -3653,12 +3657,23 @@
                 "type": "string",
                 "minLength": 1
               },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "dom_path": {
+                "type": "string"
+              },
+              "high_risk": {
+                "type": "boolean"
+              },
               "export_as": {
                 "type": "string"
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -3676,8 +3691,7 @@
                 "type": "string"
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [{}]
         },
@@ -3710,9 +3724,17 @@
             "type": "object",
             "properties": {
               "limit": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 2000
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2000
+                  }
+                ]
               },
               "from": {
                 "type": "string"
@@ -3721,8 +3743,7 @@
                 "type": "string"
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -3767,10 +3788,17 @@
               "title": {
                 "type": "string",
                 "minLength": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              },
+              "max_elements": {
+                "type": "integer",
+                "minimum": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -3902,12 +3930,14 @@
               "path": {
                 "type": "string"
               },
+              "from": {
+                "type": "string"
+              },
               "export_as": {
                 "type": "string"
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -4049,10 +4079,28 @@
               },
               "element_name": {
                 "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "dom_path": {
+                "type": "string"
+              },
+              "high_risk": {
+                "type": "boolean"
+              },
+              "timeout": {
+                "type": "number",
+                "minimum": 1
+              },
+              "wait_for_navigation": {
+                "type": "boolean"
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -4100,8 +4148,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -4245,10 +4292,16 @@
               },
               "text": {
                 "type": "string"
+              },
+              "field": {
+                "type": "string"
+              },
+              "timeout": {
+                "type": "number",
+                "minimum": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -4358,10 +4411,22 @@
               "secret_ref": {
                 "type": "string",
                 "minLength": 1
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "dom_path": {
+                "type": "string"
+              },
+              "timeout": {
+                "type": "number",
+                "minimum": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -4442,10 +4507,13 @@
               "key": {
                 "type": "string",
                 "minLength": 1
+              },
+              "timeout": {
+                "type": "number",
+                "minimum": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -4525,8 +4593,7 @@
                 "type": "number"
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -4546,10 +4613,25 @@
               "ref": {
                 "type": "string",
                 "minLength": 1
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "dom_path": {
+                "type": "string"
+              },
+              "high_risk": {
+                "type": "boolean"
+              },
+              "timeout": {
+                "type": "number",
+                "minimum": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -4673,14 +4755,6 @@
           "kind": "apply",
           "input_schema": {
             "type": "object",
-            "anyOf": [
-              {
-                "required": ["selector"]
-              },
-              {
-                "required": ["ref"]
-              }
-            ],
             "properties": {
               "selector": {
                 "type": "string",
@@ -4689,10 +4763,20 @@
               "ref": {
                 "type": "string",
                 "minLength": 1
+              },
+              "state": {
+                "type": "string"
+              },
+              "timeout": {
+                "type": "number",
+                "minimum": 1
+              },
+              "duration": {
+                "type": "number",
+                "minimum": 0
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -4808,10 +4892,29 @@
               "url": {
                 "type": "string",
                 "minLength": 1
+              },
+              "tab_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "select": {
+                "type": "boolean"
+              },
+              "waitUntil": {
+                "type": "string",
+                "enum": ["load", "domcontentloaded", "commit", "networkidle"]
+              },
+              "record_trace": {
+                "type": "boolean"
+              },
+              "keep_alive": {
+                "type": "boolean"
+              },
+              "onboarding_isolated_navigation": {
+                "type": "boolean"
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7370,10 +7473,13 @@
               "path": {
                 "type": "string",
                 "minLength": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7391,10 +7497,13 @@
               "path": {
                 "type": "string",
                 "minLength": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7412,10 +7521,13 @@
               "path": {
                 "type": "string",
                 "minLength": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7433,10 +7545,13 @@
               "path": {
                 "type": "string",
                 "minLength": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7454,10 +7569,13 @@
               "path": {
                 "type": "string",
                 "minLength": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7479,10 +7597,13 @@
               "pattern": {
                 "type": "string",
                 "minLength": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7501,10 +7622,13 @@
               "path": {
                 "type": "string",
                 "minLength": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7522,10 +7646,17 @@
               "path": {
                 "type": "string",
                 "minLength": 1
+              },
+              "pos_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7627,8 +7758,7 @@
                 "type": "boolean"
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7653,8 +7783,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7673,10 +7802,13 @@
               "path": {
                 "type": "string",
                 "minLength": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7694,10 +7826,13 @@
               "path": {
                 "type": "string",
                 "minLength": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7721,8 +7856,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7748,8 +7882,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7787,8 +7920,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7804,7 +7936,14 @@
           "kind": "apply",
           "input_schema": {
             "type": "object",
-            "required": ["path"],
+            "anyOf": [
+              {
+                "required": ["path"]
+              },
+              {
+                "required": ["output_path"]
+              }
+            ],
             "properties": {
               "path": {
                 "type": "string",
@@ -7821,8 +7960,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -7952,8 +8090,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -8018,8 +8155,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -8075,8 +8211,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -8125,8 +8260,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -8190,8 +8324,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
@@ -8322,8 +8455,7 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "additionalProperties": false
           },
           "examples": [
             {
