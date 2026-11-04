@@ -53,10 +53,13 @@ node dist/scripts/mission_controller.js review-task <MISSION_ID> <review_task_id
 ```
 
 This hashes the reviewed artifact (`task.review_target`'s own deliverable), computes who
-actually recorded evidence for that target from the execution ledger, and rejects the review
+was attributed as recording evidence for that target in the execution ledger, and rejects the review
 if the reviewer agent id is the same as an implementer agent id, or if any finding is
-`severity: "blocking"` — independence is verified from what actually happened in this
-mission, not self-declared by the caller. This is exactly the gap an adversarial review of
+`severity: "blocking"`. This is a **legacy actor-claim separation check**, not authenticated
+execution provenance: ledger and reviewer actor IDs can still be caller-supplied aliases.
+It does not prove that two labels represent different actors or runtime instances.
+See [review independence assurance](../review-independence-assurance.md) for the compatible
+policy transition and requirements for stronger proof. This addresses the gap an adversarial review of
 this process itself found (a single-reviewer pass approving via a bare placeholder file);
 see `knowledge/product/architecture/browser-execution-substrate-howto.md`'s "Review process
 note" for how that was discovered, and treat every review-kind task the same way going
@@ -91,8 +94,8 @@ template task is recorded while the work happens**. Verified end to end on 2026-
      --evidence <deliverable,...> --actor-id <agent that did it> --team-role <planner|implementer|reviewer>
    ```
 
-   `--actor-id` is not optional in practice: `review-task` computes reviewer independence
-   from the actor ids recorded for the review target, and without them review is rejected
+   `--actor-id` is not optional in practice: `review-task` checks legacy actor-label separation
+   against the actor ids recorded for the review target, and without them review is rejected
    ("implementer identity is missing"). When `record-evidence` (or `review-task`) completes a
    task (and each task it completes by cascade) it also appends an estimated
    `source: direct_cli` usage entry (tokens/cost not observed, recorded as null/0) to the
