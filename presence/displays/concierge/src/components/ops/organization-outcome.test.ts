@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  interventionPresentation,
   krStatus,
   krTrend,
   krView,
@@ -72,5 +73,32 @@ describe('organization tenant choice', () => {
       open_incidents: 4,
       pending_decisions: 4,
     });
+  });
+});
+
+describe('intervention presentation', () => {
+  it('turns machine reasons into a localized sentence and a place to act', () => {
+    expect(
+      interventionPresentation({
+        kind: 'operation',
+        reason: 'overdue_operations requires operator attention.',
+      })
+    ).toEqual({ reason: { key: 'ux_b_intervention_overdue_operations' }, action: 'operations' });
+    expect(
+      interventionPresentation({ kind: 'decision', reason: 'Decision is pending_approval.' })
+    ).toEqual({
+      reason: { key: 'ux_b_intervention_decision', params: { status: 'pending approval' } },
+      action: 'decisions',
+    });
+    expect(interventionPresentation({ kind: 'incident', reason: 'Incident is open.' })).toEqual({
+      reason: { key: 'ux_b_intervention_incident', params: { status: 'open' } },
+      action: 'operations',
+    });
+    expect(
+      interventionPresentation({
+        kind: 'project',
+        reason: 'unknown_code requires operator attention.',
+      })
+    ).toEqual({ reason: { key: 'ux_b_intervention_generic' }, action: 'project' });
   });
 });

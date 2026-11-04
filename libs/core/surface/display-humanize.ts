@@ -148,6 +148,19 @@ export function humanizeSummary(
   return { ...clampText(text, maxChars), stripped };
 }
 
+/** `MSN-CONT-B73…: `, `WI-12: ` — an uppercase entity id used as a title prefix. */
+const ID_PREFIX = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\s*[:：]\s*/u;
+
+/**
+ * Drops a leading entity id (`MSN-…: Do the thing` → `Do the thing`) when a
+ * title remains; the id belongs in a chip or the detail view, not the heading.
+ */
+export function stripIdPrefix(title: string | undefined | null): string {
+  const text = String(title ?? '').trim();
+  const rest = text.replace(ID_PREFIX, '').trim();
+  return rest || text;
+}
+
 /** Display names the surface already knows (members, agents), by actor id. */
 export type ActorNameLookup = (actorId: string) => string | undefined;
 

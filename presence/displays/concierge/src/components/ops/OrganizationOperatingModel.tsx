@@ -23,9 +23,13 @@ import { uxMessage, uxText, type SupportedLocale } from '../../lib/ops/ux-vocabu
 import { parseOrganizationOperatingModelResponse } from '../../lib/ops/organization-operating-model-response';
 import { CustomerDecisionCard } from './CustomerDecisionDrilldown';
 import { normalizeChronosTenantScopePayload, type ChronosTenantOption } from './tenant-scope-data';
+import { entityHref } from '../../lib/workspace-view';
+import { CommandDisclosure } from './CommandDisclosure';
 import {
+  interventionPresentation,
   krView,
   resolveOrganizationTenant,
+  type InterventionAction,
   sumAccounting,
   type KrStatus,
   type OrganizationAccountingTotals,
@@ -501,31 +505,48 @@ export function OrganizationOperatingModel({
                       label: uxText('chronos_org_col_priority', locale),
                       width: '7rem',
                     },
-                    { key: 'item', label: uxText('chronos_org_col_item', locale) },
-                    { key: 'reason', label: uxText('chronos_org_col_reason', locale) },
-                    { key: 'next', label: uxText('chronos_org_col_next_action', locale) },
+                    { key: 'item', label: uxText('ux_b_intervention_col_item', locale) },
+                    { key: 'next', label: uxText('ux_b_intervention_col_action', locale) },
                   ]}
-                  rows={view.control_plane.intervention_points.slice(0, 6).map((point) => ({
-                    priority: {
-                      badge: uxText(
-                        PRIORITY_LABEL_KEY[point.priority] || PRIORITY_LABEL_KEY.low,
-                        locale
+                  rows={view.control_plane.intervention_points.slice(0, 6).map((point) => {
+                    const shown = interventionPresentation(point);
+                    return {
+                      priority: {
+                        badge: uxText(
+                          PRIORITY_LABEL_KEY[point.priority] || PRIORITY_LABEL_KEY.low,
+                          locale
+                        ),
+                        tone: PRIORITY_TONE[point.priority] || 'neutral',
+                      },
+                      item: (
+                        <>
+                          <span className="org-intervention__reason">
+                            {uxMessage(shown.reason.key, shown.reason.params ?? {}, '', locale)}
+                          </span>
+                          <span className="org-intervention__id">{point.id}</span>
+                        </>
                       ),
-                      tone: PRIORITY_TONE[point.priority] || 'neutral',
-                    },
-                    item: { title: point.id, id: point.kind },
-                    reason: point.reason,
-                    next: (
-                      <code className="kb-text kb-text--muted">
-                        {organizationInterventionCommand(
-                          point.kind,
-                          point.id,
-                          view.organization_id,
-                          tenant!
-                        )}
-                      </code>
-                    ),
-                  }))}
+                      next: (
+                        <div className="org-intervention__action">
+                          <InterventionActionButton
+                            action={shown.action}
+                            id={point.id}
+                            locale={locale}
+                            onOpenOperations={onOpenOperations}
+                            onOpenGovernance={onOpenGovernance}
+                          />
+                          <CommandDisclosure
+                            command={organizationInterventionCommand(
+                              point.kind,
+                              point.id,
+                              view.organization_id,
+                              tenant!
+                            )}
+                          />
+                        </div>
+                      ),
+                    };
+                  })}
                 />
               ) : (
                 <Callout tone="success" title={uxText('chronos_org_no_interventions', locale)} />
@@ -605,35 +626,42 @@ function OrganizationStatTiles({
   locale,
   onOpenOperations,
   onOpenGovernance,
+  hrefs,
 }: {
   accounting: OrganizationAccountingTotals;
   locale: SupportedLocale;
   onOpenOperations?: () => void;
   onOpenGovernance?: () => void;
+  /** Links instead of callbacks (the home dashboard opens the console sections). */
+  hrefs?: { operations: string; decisions: string };
 }) {
   const tiles: Array<{
     key: string;
     value: number;
     tone: 'danger' | 'warning';
     onOpen?: () => void;
+    href?: string;
   }> = [
     {
       key: 'ux_b_org_stat_incidents',
       value: accounting.open_incidents,
       tone: 'danger',
       onOpen: onOpenOperations,
+      href: hrefs?.operations,
     },
     {
       key: 'ux_b_org_stat_overdue',
       value: accounting.overdue_operations,
       tone: 'warning',
       onOpen: onOpenOperations,
+      href: hrefs?.operations,
     },
     {
       key: 'ux_b_org_stat_decisions',
       value: accounting.pending_decisions,
       tone: 'warning',
       onOpen: onOpenGovernance,
+      href: hrefs?.decisions,
     },
   ];
   return (
@@ -644,9 +672,18 @@ function OrganizationStatTiles({
             label={uxText(tile.key, locale)}
             value={tile.value}
             tone={tile.value > 0 ? tile.tone : undefined}
-            description={tile.onOpen ? uxText('ux_b_org_stat_open', locale) : undefined}
+            description={
+              tile.onOpen || tile.href ? uxText('ux_b_org_stat_open', locale) : undefined
+            }
           />
         );
+        if (tile.href) {
+          return (
+            <a key={tile.key} className="org-stat org-stat--link" href={tile.href}>
+              {metric}
+            </a>
+          );
+        }
         return tile.onOpen ? (
           <button key={tile.key} type="button" className="org-stat" onClick={tile.onOpen}>
             {metric}
@@ -889,6 +926,135 @@ function OrganizationAggregate({
           decisions: row.accounting ? row.accounting.pending_decisions : '—',
         }))}
       />
+    </Section>
+  );
+}
+
+/** The human next step for an intervention: open where it is handled. */
+function InterventionActionButton({
+  action,
+  id,
+  locale,
+  onOpenOperations,
+  onOpenGovernance,
+}: {
+  action: InterventionAction;
+  id: string;
+  locale: SupportedLocale;
+  onOpenOperations?: () => void;
+  onOpenGovernance?: () => void;
+}) {
+  if (action === 'project') {
+    return (
+      <a className="kb-btn kb-btn--secondary" href={entityHref('project', id)}>
+        {uxText('ux_b_action_open_project', locale)}
+      </a>
+    );
+  }
+  const onOpen = action === 'decisions' ? onOpenGovernance : onOpenOperations;
+  if (!onOpen) return null;
+  return (
+    <Button
+      variant="secondary"
+      label={uxText(
+        action === 'decisions' ? 'ux_b_action_open_decisions' : 'ux_b_action_open_operations',
+        locale
+      )}
+      onClick={onOpen}
+    />
+  );
+}
+
+/**
+ * The home dashboard's organization block: the same tenant resolution as the
+ * 組織 section (the selected tenant, else the only one in scope, else a
+ * chooser with the total), the attention tiles and the KR progress bars.
+ */
+export function OrganizationOutcomeSnapshot({
+  tenant: selectedTenant,
+  organizationId,
+  hrefs,
+}: {
+  tenant?: string;
+  organizationId?: string;
+  hrefs: { operations: string; decisions: string };
+}) {
+  const locale = useChronosLocale();
+  const scopeTenants = useScopeTenants(!selectedTenant);
+  const choice = resolveOrganizationTenant(
+    selectedTenant,
+    (scopeTenants ?? []).map((entry) => entry.slug)
+  );
+  const [chosenTenant, setChosenTenant] = React.useState('');
+  const tenant =
+    choice.mode === 'single'
+      ? choice.tenant
+      : choice.mode === 'multiple' && choice.tenants.includes(chosenTenant)
+        ? chosenTenant
+        : undefined;
+  const tenantName = (slug: string) =>
+    scopeTenants?.find((entry) => entry.slug === slug)?.displayName || slug;
+  const [result, setResult] = React.useState<{
+    tenant: string;
+    view: OrganizationOperatingModelView | null;
+  } | null>(null);
+  React.useEffect(() => {
+    if (!tenant) return;
+    let cancelled = false;
+    void fetchOrganizationView({ tenant, organizationId })
+      .then((view) => {
+        if (!cancelled) setResult({ tenant, view });
+      })
+      .catch(() => {
+        if (!cancelled) setResult({ tenant, view: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tenant, organizationId]);
+  const view = result && result.tenant === tenant ? result.view : undefined;
+
+  if (choice.mode === 'none') return null;
+  return (
+    <Section headingLevel={3} title={uxText('chronos_org_title', locale)}>
+      {choice.mode === 'multiple' ? (
+        <Tabs
+          variant="secondary"
+          label={uxText('ux_b_org_tenant_choice', locale)}
+          active={tenant ?? ''}
+          onSelect={(id) => setChosenTenant(id)}
+          items={[
+            { id: '', label: uxText('ux_b_org_all_tenants', locale) },
+            ...choice.tenants.map((slug) => ({ id: slug, label: tenantName(slug) })),
+          ]}
+        />
+      ) : null}
+      {choice.mode === 'multiple' && !tenant ? (
+        <OrganizationAggregate
+          tenants={choice.tenants}
+          tenantName={tenantName}
+          organizationId={organizationId}
+          locale={locale}
+          onChoose={setChosenTenant}
+        />
+      ) : view === undefined ? (
+        <Skeleton shape="card" lines={2} label={uxText('chronos_org_loading', locale)} />
+      ) : view === null ? (
+        <Callout tone="warning" title={uxText('chronos_org_load_failed', locale)} />
+      ) : (
+        <>
+          <OrganizationStatTiles
+            accounting={view.control_plane.accounting}
+            locale={locale}
+            hrefs={hrefs}
+          />
+          {view.purpose?.objectives?.length ? (
+            <OrganizationObjectives view={view} locale={locale} />
+          ) : (
+            <p className="kb-text kb-text--muted">{uxText('chronos_org_no_objectives', locale)}</p>
+          )}
+        </>
+      )}
     </Section>
   );
 }

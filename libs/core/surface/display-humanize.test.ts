@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { clampText, describeActor, humanizeSummary, stripMachineText } from './display-humanize.js';
+import {
+  clampText,
+  describeActor,
+  humanizeSummary,
+  stripMachineText,
+  stripIdPrefix,
+} from './display-humanize.js';
 
 const PR_SUMMARY =
   'Task: vcs:pr_create\n\nResult:\n- Created active/shared/artifacts/confidential/famao-ai/evidence/pr-publication/c4396aa619129eea16a92e80be87da7592c122316f3d9514fa4077ffc1b5db76/29533c06a309d71599a8fbc0c70763d8092b12a3b3b0dc8fa14ecba5373fe54d.json\n\nApproval required:\n- none\n\nDefault action:\n- unknown; no external delivery was performed';
@@ -43,6 +49,19 @@ describe('clampText / humanizeSummary', () => {
       short: '短い文です。',
       clamped: false,
     });
+  });
+});
+
+describe('stripIdPrefix', () => {
+  it('drops a leading entity id and keeps a title-only id', () => {
+    expect(stripIdPrefix('MSN-CONT-B737332D594E0B122AAD75D8C273: テスト計画に沿って実行する')).toBe(
+      'テスト計画に沿って実行する'
+    );
+    expect(stripIdPrefix('WI-12： Review the plan')).toBe('Review the plan');
+    expect(stripIdPrefix('MSN-1:')).toBe('MSN-1:');
+    expect(stripIdPrefix('P0-1 doctor/bootstrap 一本化')).toBe('P0-1 doctor/bootstrap 一本化');
+    expect(stripIdPrefix('Note: plain words')).toBe('Note: plain words');
+    expect(stripIdPrefix(undefined)).toBe('');
   });
 });
 

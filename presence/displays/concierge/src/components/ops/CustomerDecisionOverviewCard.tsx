@@ -6,7 +6,6 @@ import type { KbTableCell, KbTone } from '@agent/core/surface/a2ui-catalog';
 import {
   Badge,
   Callout,
-  Code,
   Disclosure,
   EmptyState,
   KbLink,
@@ -17,6 +16,7 @@ import {
   safeHref,
   type ActionRefLike,
 } from '@agent/shared-ui';
+import { CommandDisclosure } from './CommandDisclosure';
 import { ChronosInline, ChronosMeta } from './chronos-ui';
 import { uxMessage, uxText, type SupportedLocale } from '../../lib/ops/ux-vocabulary';
 import type { CustomerDecisionHrefs } from '../../lib/ops/customer-decision-navigation';
@@ -577,10 +577,9 @@ export function CustomerDecisionOverviewPanel({
                 </Section>
               ) : null}
 
-              <Code
-                title={uxText('chronos_cd_how_to_act', locale)}
-                language="shell"
-                code={customerDecisionCommands(tenant).join('\n')}
+              <CommandDisclosure
+                label={uxText('chronos_cd_how_to_act', locale)}
+                command={customerDecisionCommands(tenant).join('\n')}
               />
             </>
           )

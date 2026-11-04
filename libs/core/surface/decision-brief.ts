@@ -111,6 +111,12 @@ export interface DecisionBriefOptions {
   publication?: PublicationPreview;
   names?: ActorNameLookup;
   now?: number;
+  /**
+   * Recognizes a stored reason (rendered in the server's locale when the card
+   * was made) and returns its vocabulary key, so the reader's locale wins.
+   * Server callers pass `decisionReasonText`; without it text passes through.
+   */
+  reasonText?: (text: string) => DisplayText | undefined;
 }
 
 const ASK_CHARS = 160;
@@ -327,6 +333,13 @@ export function buildDecisionBrief(
   const why: DisplayText[] = [...(known?.why ?? [])];
   const reasonTexts = [justification?.reason, ...(card?.riskReasons ?? [])];
   for (const reason of reasonTexts) {
+    const localized = reason ? options.reasonText?.(reason) : undefined;
+    if (localized) {
+      const sameLine = (entry: DisplayText) =>
+        'key' in entry && 'key' in localized && entry.key === localized.key;
+      if (!why.some(sameLine)) why.push(localized);
+      continue;
+    }
     const line = human(reason);
     if (
       line &&

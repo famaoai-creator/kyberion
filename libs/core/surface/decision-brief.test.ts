@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { t } from '../t.js';
 import type { VocabularyKey } from '../t.js';
 import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
+import { decisionReasonText } from './decision-reason-text.js';
 import {
   buildDecisionBrief,
   compareDecisionUrgency,
@@ -175,6 +176,31 @@ describe('buildDecisionBrief — other kinds', () => {
     expect(render(brief.ifSilent)).toBe('通知から 60 分たつと、異議がなければ進みます。');
     expect(render(brief.requester)).toBe('エージェントの提案：Kyberion Productization');
     expect(brief.reversible).toBe(true);
+  });
+
+  it('localizes a stored English gate reason for a Japanese reader', () => {
+    const brief = buildDecisionBrief(
+      {
+        id: 'r',
+        kind: 'channel-approval',
+        title: 'Approval required: dot:measure',
+        status: 'pending',
+        requestedBy: 'dot:kyberion-productization',
+        requestedAt: '2026-10-24T21:18:04.946Z',
+        decisionCard: {
+          question: 'Measure the scorecard?',
+          riskTier: 'notify',
+          riskReasons: ['The agent asked for your judgment'],
+          reversible: true,
+          evidence: [],
+          level: 'veto',
+        },
+      } as never,
+      { reasonText: decisionReasonText }
+    );
+    const why = brief.why.map((line) => render(line));
+    expect(why).toContain('エージェント自身が人の判断を求めました');
+    expect(why).not.toContain('The agent asked for your judgment');
   });
 
   it('names tenant and provider for a provider attestation', () => {
