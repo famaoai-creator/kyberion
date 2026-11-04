@@ -20127,6 +20127,11 @@
         "en": "{workspace}. Change it with the workspace switcher.",
         "ja": "{workspace}(切り替えはワークスペースの選択から)",
         "qps-ploc": "⟦{workspace}. Ƈħȧñɠė ïŧ ẇïŧħ ŧħė ẇőřķşṗȧƈė şẇïŧƈħėř. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_shell_crumb_home": {
+        "en": "Home",
+        "ja": "ホーム",
+        "qps-ploc": "⟦Ħőɱė ŀőř⟧"
       }
     },
     "onboarding": {
