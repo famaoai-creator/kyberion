@@ -29,6 +29,8 @@ const INVENTORY: RoleDraftInventory = {
   team_roles: ['owner', 'planner', 'reviewer'],
   // Authority-only roles have no team role of the same id.
   authority_roles: ['mission_controller', 'reviewer', 'system_configurator'],
+  // Known only to other stores role create writes (role-authority map, role docs).
+  reserved_role_ids: ['solution_architect'],
 };
 
 const INTENT = 'A role that reconciles monthly vendor invoices against purchase orders.';
@@ -331,6 +333,15 @@ describe('role intent draft (R6)', () => {
       rejected: 'system_configurator',
       used: 'system_configurator_2',
     });
+  });
+
+  it('never drafts an id known only to another role store', () => {
+    const settled = settleRoleDraft(
+      { ...GOOD_ANSWER, name: 'Solution Architect', team_role_id: 'solution_architect' },
+      INVENTORY,
+      INTENT
+    );
+    expect(settled.draft.team_role_id).toBe('solution_architect_2');
   });
 
   it('derives the id from an ASCII name when the model omits it, and from the field for a non-ASCII name', () => {

@@ -132,6 +132,43 @@ describe('pnpm organization role draft --from-intent', () => {
     );
   });
 
+  it('suffixes a drafted id that exists only in the role-authority map and role docs', async () => {
+    // solution_architect has no team or authority role file, but role create
+    // would still rewrite its role-authority-map entry and its role docs.
+    useBackend({ ...ANSWER, name: 'Solution Architect', team_role_id: 'solution_architect' });
+    const printed: string[] = [];
+    await main(
+      ['role', 'draft', '--from-intent', 'A role that designs solutions for customers.', '--json'],
+      (value) => printed.push(String(value)),
+      DEPS
+    );
+    const envelope = JSON.parse(printed.join('\n'));
+    expect(envelope.draft.team_role_id).toBe('solution_architect_2');
+    expect(envelope.next_commands.preview).toContain('--team-role-id solution_architect_2');
+  });
+
+  it('role create refuses an explicit --team-role-id that names an existing role unless --update', async () => {
+    const base = ['role', 'create', '--name', 'Solution Architect', '--domain', 'default'];
+    await expect(
+      main([...base, '--team-role-id', 'solution_architect', '--dry-run'])
+    ).rejects.toThrow("--team-role-id 'solution_architect' already names an existing role");
+    const before = snapshotRoleState();
+    const printed: string[] = [];
+    await main(
+      [...base, '--team-role-id', 'solution_architect', '--update', '--dry-run'],
+      (value) => printed.push(String(value))
+    );
+    expect(JSON.parse(printed.join('\n'))).toMatchObject({
+      status: 'dry-run',
+      role_id: 'solution_architect',
+    });
+    // Without --team-role-id the historical behaviour is unchanged.
+    printed.length = 0;
+    await main([...base, '--dry-run'], (value) => printed.push(String(value)));
+    expect(JSON.parse(printed.join('\n')).role_id).toBe('solution_architect');
+    expect(snapshotRoleState()).toEqual(before);
+  });
+
   it('prints exactly one result through the organization facade', async () => {
     useBackend({ ...ANSWER, allowed_actuators: [] });
     const printed: unknown[] = [];
