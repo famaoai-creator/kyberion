@@ -110,6 +110,30 @@ function legacyEntry(item: NeedsYouItem): DecideQueueEntry | null {
 }
 
 /**
+ * Where a `#<anchor>` deep link lands once the queue has loaded (review UX-L6):
+ * the card itself, the lead card of the folded group that holds it, or — for a
+ * card the viewer set aside — the card after revealing it (`reveal`).
+ */
+export function resolveInboxAnchor(
+  items: readonly NeedsYouItem[],
+  deferred: ReadonlySet<string>,
+  hash: string
+): { scrollTo: string; reveal?: string } | null {
+  const target = hash.replace(/^#/u, '');
+  if (!target) return null;
+  for (const item of items) {
+    const hit =
+      cardAnchor(item) === target ||
+      (item.group ?? []).some((other) => cardAnchor(other) === target);
+    if (!hit) continue;
+    return deferred.has(item.id)
+      ? { scrollTo: cardAnchor(item), reveal: item.id }
+      : { scrollTo: cardAnchor(item) };
+  }
+  return null;
+}
+
+/**
  * The card's anchor. Approvals keep the legacy `decide-approval-<id>` anchor
  * so existing deep links (`inboxHrefForApproval`) land on the card.
  */
@@ -129,11 +153,18 @@ export function itemTitle(
   return renderDisplayText(item.title, locale);
 }
 
+/** The tenant's customer-decision card on 組織 (its open cases and agendas). */
+export function customerDecisionCardHref(tenant?: string): string {
+  const query = tenant ? `?${new URLSearchParams({ tenant }).toString()}` : '';
+  return `/org${query}#customer-decisions`;
+}
+
 export function NeedsYouCard({
   item,
   locale,
   t,
   busy,
+  isBusy,
   onDecide,
   onLater,
   preview,
@@ -143,6 +174,8 @@ export function NeedsYouCard({
   locale: ConciergeLocale;
   t: (key: string, params?: Record<string, string | number>) => string;
   busy: boolean;
+  /** Per-card busy state, so each folded record is disabled by its own decision. */
+  isBusy?: (id: string) => boolean;
   onDecide(decision: CardDecision): void | Promise<void>;
   onLater?(item: NeedsYouItem): void;
   preview: OutcomePreviewState;
@@ -242,8 +275,20 @@ export function NeedsYouCard({
     );
     actions = (
       <>
+        {has('mark_handled') ? (
+          <Button
+            label={c('ia_inbox_decision_mark_handled')}
+            variant="primary"
+            disabled={busy}
+            onClick={() => void onDecide({ kind: 'review', item, status: 'accepted' })}
+          />
+        ) : null}
         {has('open') ? (
-          <Button variant="primary" href="/org" label={c('ia_inbox_decision_open')} />
+          <Button
+            variant="secondary"
+            href={customerDecisionCardHref(item.tenant_slug)}
+            label={c('ia_inbox_decision_open')}
+          />
         ) : null}
         {later}
       </>
@@ -298,7 +343,7 @@ export function NeedsYouCard({
         <Button
           variant="primary"
           href={item.knowledge.learningReviewUrl}
-          label={t('memory.review_in_chronos')}
+          label={t('memory.review_in_library')}
         />
         {later}
       </>
@@ -399,7 +444,12 @@ export function NeedsYouCard({
 
   const outcome = item.outcome;
   return (
-    <div id={cardAnchor(item)} className="decide-card inbox-card" data-reason={item.reason}>
+    <div
+      id={cardAnchor(item)}
+      tabIndex={-1}
+      className="decide-card inbox-card"
+      data-reason={item.reason}
+    >
       <Section title={itemTitle(item, locale, t)} headingLevel={3}>
         <div className="decide-card-meta">
           <Badge label={c(`ia_inbox_reason_${item.reason}`)} tone={REASON_TONES[item.reason]} />
@@ -558,7 +608,8 @@ export function NeedsYouCard({
                   item={other}
                   locale={locale}
                   t={t}
-                  busy={busy}
+                  busy={isBusy ? isBusy(other.id) : busy}
+                  isBusy={isBusy}
                   onDecide={onDecide}
                   preview={preview}
                   nested
