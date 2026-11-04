@@ -8,6 +8,10 @@ import {
   type ReasoningBackend,
 } from '@agent/core/reasoning/reasoning-backend';
 import { main } from './org.js';
+import { main as organizationMain } from './organization.js';
+
+// Hermetic: never probe the host's actuator prerequisites.
+const DEPS = { probeActuator: async () => ({ available: true, prerequisites: [] }) };
 
 const ANSWER = {
   name: 'Invoice Reconciler',
@@ -26,6 +30,7 @@ const GOVERNED_ROLE_FILES = [
   'knowledge/product/governance/authority-role-index.json',
   'knowledge/product/governance/role-authority-map.json',
   'knowledge/product/governance/security-policy.json',
+  'knowledge/product/governance/role-write-access.json',
 ];
 
 function snapshotRoleState(): Record<string, string> {
@@ -35,6 +40,11 @@ function snapshotRoleState(): Record<string, string> {
   }
   snapshot['team-roles/'] = safeReaddir(
     pathResolver.rootResolve('knowledge/product/orchestration/team-roles')
+  )
+    .sort()
+    .join(',');
+  snapshot['authority-roles/'] = safeReaddir(
+    pathResolver.rootResolve('knowledge/product/governance/authority-roles')
   )
     .sort()
     .join(',');
@@ -63,15 +73,19 @@ describe('pnpm organization role draft --from-intent', () => {
     const printed: string[] = [];
     await main(
       ['role', 'draft', '--from-intent', 'A role that reconciles vendor invoices monthly.'],
-      (value) => printed.push(String(value))
+      (value) => printed.push(String(value)),
+      DEPS
     );
     expect(prompt).toHaveBeenCalledTimes(1);
     const output = printed.join('\n');
     expect(output).toContain('not created — draft only');
     expect(output).toContain('required_capabilities=invented_capability (not_in_inventory)');
     expect(output).toContain(
-      "pnpm organization role create --name 'Invoice Reconciler' --domain finance"
+      "pnpm organization role create --name 'Invoice Reconciler' --team-role-id invoice_reconciler --authority invoice_reconciler --domain finance"
     );
+    // The template-merged grant is shown, not only the drafted values.
+    expect(output).toContain('Effective grant on confirm');
+    expect(output).toMatch(/tiers: +confidential, public/);
     expect(output).toContain('--dry-run');
     expect(output).toContain('--approval-id <approved-request-id>');
     expect(snapshotRoleState()).toEqual(before);
@@ -88,7 +102,8 @@ describe('pnpm organization role draft --from-intent', () => {
         'A role that reconciles vendor invoices monthly.',
         '--json',
       ],
-      (value) => printed.push(String(value))
+      (value) => printed.push(String(value)),
+      DEPS
     );
     const envelope = JSON.parse(printed.join('\n'));
     expect(envelope.status).toBe('drafted');
@@ -109,7 +124,28 @@ describe('pnpm organization role draft --from-intent', () => {
     expect(prompt).not.toHaveBeenCalled();
   });
 
-  it('requires --from-intent', async () => {
+  it('requires a --from-intent value that is not another flag', async () => {
     await expect(main(['role', 'draft'])).rejects.toThrow('--from-intent');
+    await expect(main(['role', 'draft', '--from-intent'])).rejects.toThrow('requires a value');
+    await expect(main(['role', 'draft', '--from-intent', '--json'])).rejects.toThrow(
+      'requires a value'
+    );
+  });
+
+  it('prints exactly one result through the organization facade', async () => {
+    useBackend({ ...ANSWER, allowed_actuators: [] });
+    const printed: unknown[] = [];
+    await organizationMain(
+      [
+        'role',
+        'draft',
+        '--from-intent',
+        'A role that reconciles vendor invoices monthly.',
+        '--json',
+      ],
+      (value) => printed.push(value)
+    );
+    expect(printed).toHaveLength(1);
+    expect(JSON.parse(String(printed[0])).status).toBe('drafted');
   });
 });
