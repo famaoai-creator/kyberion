@@ -134,32 +134,49 @@ describe('dashboard tiles', () => {
     expect(markup).toContain('Missions appear here');
   });
 
-  it('hides the setup checklist once every organization is set up, and lists only open steps', () => {
+  it('hides the setup checklist once complete, and lists only open steps from the settings checklist', () => {
+    // The steps and anchors are stream D's `setup.checklist` contract, so Home
+    // links to exactly the card 設定 › はじめに opens.
     const done = render(
       React.createElement(SetupChecklist, {
         t,
-        organizations: [{ tenant_slug: 'acme', steps: [], done: 4, total: 4, all_done: true }],
+        locale: 'en',
+        checklist: { steps: [], done: 7, total: 7, complete: true },
       })
     );
     expect(done).toBe('');
     const open = render(
       React.createElement(SetupChecklist, {
         t,
-        organizations: [
-          {
-            tenant_slug: 'acme',
-            done: 1,
-            total: 2,
-            all_done: false,
-            steps: [
-              { id: 'organization', done: true, href: '#settings-members' },
-              { id: 'members', done: false, href: '#settings-invites' },
-            ],
-          },
-        ],
+        locale: 'en',
+        checklist: {
+          steps: [
+            { id: 'identity', status: 'done', anchor: 'settings-members', estimate_minutes: 3 },
+            { id: 'reasoning', status: 'todo', anchor: 'settings-reasoning', estimate_minutes: 5 },
+            { id: 'budget', status: 'unknown', anchor: 'settings-budget', estimate_minutes: 2 },
+          ],
+          done: 1,
+          total: 3,
+          complete: false,
+          next: 'reasoning',
+        },
       })
     );
-    expect(open).toContain('href="/settings#settings-invites"');
+    expect(open).toContain('href="/settings#settings-reasoning"');
+    expect(open).toContain('href="/settings#settings-budget"');
     expect(open).not.toContain('#settings-members');
+  });
+
+  it('links the cost tile budget action to the settings budget card', () => {
+    const noSpend = composeHomeDashboard({ now: Date.parse('2026-11-05T00:00:00Z'), failed: [] });
+    const markup = render(
+      React.createElement(CostTile, {
+        t,
+        home: { state: 'ready', data: noSpend },
+        onRetry: noop,
+        bcp47: 'en',
+      })
+    );
+    expect(markup).toContain('href="/settings#settings-budget"');
   });
 });
