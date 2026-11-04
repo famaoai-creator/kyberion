@@ -116,6 +116,8 @@ type OrgRoleCreateOptions = {
   teamRoleId: string;
   dryRun: boolean;
   approvalId?: string;
+  /** CLI only: allow an explicit --team-role-id that names an existing role. */
+  update?: boolean;
 };
 
 type OrgRolePromoteOptions = {
@@ -253,6 +255,8 @@ function helpText(): string {
     '  --tenant <slug>               (draft) Tenant owning the intent; scopes the reasoning egress check.',
     '  --json                        (draft) Print the draft envelope as JSON.',
     '  --team-role-id <id>           (create) ASCII snake_case team-role id; defaults to the normalized --name.',
+    '                                Refused when the id already names an existing role, unless --update.',
+    '  --update                      (create) Allow --team-role-id to update an existing role on purpose.',
   ].join('\n');
 }
 
@@ -340,6 +344,7 @@ function parseArgs(argv: string[]): OrgCommand {
     if (arg === '--name') options.name = args[++i];
     else if (arg === '--domain') options.domain = args[++i];
     else if (arg === '--team-role-id') options.teamRoleId = args[++i];
+    else if (arg === '--update') options.update = true;
     else if (arg === '--authority' || arg === '--authority-role')
       options.authorityRoleId = args[++i];
     else if (arg === '--persona') options.persona = args[++i];
@@ -684,6 +689,38 @@ function loadAuthorityRoleDirectory(rootDir: string): Record<string, AuthorityRo
     safeExistsSync(directory) && safeReaddir(directory).some((entry) => entry.endsWith('.json'));
   if (!hasDirectoryEntries && !safeExistsSync(snapshot)) return {};
   return loadGovernedAuthorityRoleIndex(rootDir);
+}
+
+/**
+ * Every role id that any store `role create` writes already holds: team and
+ * authority roles, the role-authority map (role and authority_role values),
+ * role-write-access, security-policy authority permissions, and role docs.
+ * A new role must not take one of these ids — the create would merge into
+ * or overwrite that role's records.
+ */
+export function collectExistingRoleIds(rootDir: string): Set<string> {
+  const ids = new Set<string>([
+    ...Object.keys(loadTeamRoleDirectory(rootDir)),
+    ...Object.keys(loadAuthorityRoleDirectory(rootDir)),
+  ]);
+  const map = loadRoleAuthorityMap(rootDir);
+  for (const bucket of ['system_roles', 'mission_roles', 'context_roles'] as const) {
+    for (const entry of map[bucket] || []) {
+      if (entry.role) ids.add(entry.role);
+      if (entry.authority_role) ids.add(entry.authority_role);
+    }
+  }
+  for (const role of Object.keys(loadRoleWriteAccess(rootDir).roles || {})) ids.add(role);
+  for (const role of Object.keys(loadSecurityPolicy(rootDir).authority_role_permissions || {})) {
+    ids.add(role);
+  }
+  const docsDir = path.join(rootDir, 'knowledge', 'product', 'roles');
+  if (safeExistsSync(docsDir)) {
+    for (const entry of safeReaddir(docsDir)) {
+      if (!entry.startsWith('.')) ids.add(entry);
+    }
+  }
+  return ids;
 }
 
 function writeAuthorityRoleBundle(
@@ -1228,6 +1265,7 @@ async function runRoleDraft(
   const inventory = loadRoleDraftInventory({
     domains: roleDraftDomainDefaults(),
     defaultDomain: 'default',
+    reservedRoleIds: collectExistingRoleIds(pathResolver.rootDir()),
   });
   const result = await draftRoleFromIntent({
     intent: options.intent,
@@ -1272,6 +1310,14 @@ export async function main(
   }
 
   const rootDir = pathResolver.rootDir();
+  if (command.kind === 'role-create' && command.options.teamRoleId && !command.options.update) {
+    const explicitId = normalizeRoleId(String(command.options.teamRoleId));
+    if (collectExistingRoleIds(rootDir).has(explicitId)) {
+      throw new Error(
+        `--team-role-id '${explicitId}' already names an existing role; creating it would merge into or overwrite that role's records — choose a free id, or pass --update to change that role on purpose`
+      );
+    }
+  }
   const result =
     command.kind === 'role-create'
       ? withExecutionContext('ecosystem_architect', () =>

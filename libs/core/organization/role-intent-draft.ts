@@ -85,6 +85,13 @@ export interface RoleDraftInventory {
    * (`role create` unions into an existing record's grants).
    */
   authority_roles: string[];
+  /**
+   * Every role id any store `role create` writes already knows (role-authority
+   * map, role-write-access, security-policy permissions, role docs, …).
+   * Supplied by the caller that owns those stores; unioned with
+   * `team_roles` and `authority_roles` when reserving a drafted id.
+   */
+  reserved_role_ids: string[];
 }
 
 export interface RoleIntentDraft {
@@ -189,6 +196,8 @@ export function loadRoleDraftInventory(input: {
   domains: Record<string, RoleDraftDomainDefaults>;
   defaultDomain: string;
   rootDir?: string;
+  /** Role ids known to stores outside the team/authority indexes. */
+  reservedRoleIds?: Iterable<string>;
 }): RoleDraftInventory {
   const teamRoles = loadTeamRoleIndex(input.rootDir);
   const authorityRoles = loadAuthorityRoleIndex(input.rootDir);
@@ -222,6 +231,7 @@ export function loadRoleDraftInventory(input: {
     tiers: [...DRAFTABLE_TIERS],
     team_roles: sortedUnique(Object.keys(teamRoles)),
     authority_roles: sortedUnique(Object.keys(authorityRoles)),
+    reserved_role_ids: sortedUnique(input.reservedRoleIds ?? []),
   };
 }
 
@@ -241,6 +251,7 @@ function canonicalInventory(inventory: RoleDraftInventory): string {
     tiers: inventory.tiers,
     team_roles: inventory.team_roles,
     authority_roles: inventory.authority_roles,
+    reserved_role_ids: inventory.reserved_role_ids,
   });
 }
 
@@ -439,6 +450,14 @@ function pickOne<T extends string>(
   return fallback;
 }
 
+function reservedRoleIdSet(inventory: RoleDraftInventory): Set<string> {
+  return new Set([
+    ...inventory.team_roles,
+    ...inventory.authority_roles,
+    ...(inventory.reserved_role_ids ?? []),
+  ]);
+}
+
 export interface SettledRoleDraft {
   draft: RoleIntentDraft;
   dropped: RoleDraftDroppedSelection[];
@@ -485,9 +504,9 @@ export function settleRoleDraft(
       used: proposedId,
     });
   }
-  // Never let a draft name an existing team OR authority role: confirming
-  // would merge into that record's grants (write scopes, tiers, actuators).
-  const reserved = new Set([...inventory.team_roles, ...inventory.authority_roles]);
+  // Never let a draft name any existing role: confirming would merge into or
+  // overwrite that role's records (grants, authority map, write access, docs).
+  const reserved = reservedRoleIdSet(inventory);
   let teamRoleId = proposedId;
   for (let suffix = 2; reserved.has(teamRoleId); suffix += 1) {
     teamRoleId = `${proposedId.slice(0, 44)}_${suffix}`;
@@ -770,14 +789,9 @@ export async function draftRoleFromIntent(
       const renamed = settled.fallbacks.find(
         (entry) => entry.field === 'team_role_id' && entry.used === settled.draft.team_role_id
       );
-      if (
-        renamed &&
-        input.inventory.team_roles
-          .concat(input.inventory.authority_roles)
-          .includes(renamed.rejected)
-      ) {
+      if (renamed && reservedRoleIdSet(input.inventory).has(renamed.rejected)) {
         warnings.push(
-          `role id '${renamed.rejected}' already belongs to an existing team or authority role; drafted as '${settled.draft.team_role_id}' so confirming cannot merge into it — edit --team-role-id/--authority in the create command to choose another free id`
+          `role id '${renamed.rejected}' already belongs to an existing role; drafted as '${settled.draft.team_role_id}' so confirming cannot merge into it — edit --team-role-id/--authority in the create command to choose another free id`
         );
       }
       const missing = await findMissingConnections(
