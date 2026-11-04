@@ -14,8 +14,9 @@ import {
   Section,
   StatusPill,
 } from '@agent/shared-ui';
-import { WsPreformatted, WsSelectTable, WsTextareaField, WsTitleCell } from './ChronosWsParts';
+import { WsPreformatted, WsSelectTable, WsTitleCell } from './ChronosWsParts';
 import { useChronosLocale } from '../../lib/ops/hooks';
+import { NeedsYouLink } from '../needs-you-link';
 import {
   formatChronosDateTime,
   uxText,
@@ -95,13 +96,8 @@ export function ApprovalsWorkspace({
   const returnCandidateKey = searchParams.get('candidateKey');
   const [items, setItems] = React.useState<Approval[]>([]);
   const [selectedKey, setSelectedKey] = React.useState<string | null>(null);
-  const [busy, setBusy] = React.useState(false);
-  const [fresh, setFresh] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [accessRole, setAccessRole] = React.useState<'readonly' | 'localadmin'>('readonly');
-  const [note, setNote] = React.useState('');
   const refreshVersion = React.useRef(0);
-  const mutationInFlight = React.useRef(false);
   const view = React.useRef({ tenant: scopeKey, search });
   view.current = { tenant: scopeKey, search };
   const selected = selectedKey
@@ -110,7 +106,6 @@ export function ApprovalsWorkspace({
 
   const refresh = React.useCallback(async () => {
     const version = ++refreshVersion.current;
-    setFresh(false);
     try {
       const query = approvalWorkspaceQuery(search, tenant);
       for (const [key, value] of workspaceQuery(workspace)) query.set(key, value);
@@ -126,7 +121,6 @@ export function ApprovalsWorkspace({
         search !== view.current.search
       )
         return;
-      setAccessRole(payload.accessRole);
       setItems(payload.approvals);
       if (requestedId) {
         const exact = payload.approvals.filter(
@@ -144,7 +138,6 @@ export function ApprovalsWorkspace({
               : null
         );
       }
-      setFresh(true);
       setError(null);
     } catch (err) {
       if (
@@ -164,61 +157,7 @@ export function ApprovalsWorkspace({
       refreshVersion.current += 1;
     };
   }, [refresh]);
-  React.useEffect(() => {
-    setNote('');
-  }, [selectedKey]);
 
-  const decide = async (decision: 'approved' | 'rejected') => {
-    if (
-      !selected ||
-      !fresh ||
-      accessRole !== 'localadmin' ||
-      selected.status !== 'pending' ||
-      mutationInFlight.current
-    )
-      return;
-    mutationInFlight.current = true;
-    setBusy(true);
-    setError(null);
-    try {
-      const response = await fetch(opsApiPath('/intelligence'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'approval_decision',
-          requestId: selected.id,
-          channel: selected.channel,
-          storageChannel: selected.storageChannel,
-          decision,
-          note,
-          tenant,
-          ...Object.fromEntries(workspaceQuery(workspace)),
-          ...(selected.presentedDigest ? { presentedDigest: selected.presentedDigest } : {}),
-        }),
-      });
-      const payload = await response.json().catch(() => null);
-      if (
-        !response.ok ||
-        payload?.ok !== true ||
-        payload.approval?.id !== selected.id ||
-        payload.approval?.storageChannel !== selected.storageChannel ||
-        typeof payload.approval?.status !== 'string'
-      )
-        throw new Error(uxText('chronos_learning_outcome_unknown', locale));
-      if (scopeKey !== view.current.tenant || search !== view.current.search) return;
-      setNote('');
-      await refresh();
-    } catch (err) {
-      if (scopeKey !== view.current.tenant || search !== view.current.search) return;
-      setFresh(false);
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      mutationInFlight.current = false;
-      setBusy(false);
-    }
-  };
-
-  const localAdmin = accessRole === 'localadmin';
   const scopeLabel =
     ([tenant, organizationId, projectId, workspace.operation_id].filter(Boolean).join(' / ') ||
       uxText('chronos_ac_scope_all', locale)) +
@@ -243,7 +182,6 @@ export function ApprovalsWorkspace({
           <Button
             label={uxText('chronos_learning_refresh', locale)}
             variant="secondary"
-            disabled={busy}
             onClick={() => void refresh()}
           />
           {returnHref ? (
@@ -447,30 +385,8 @@ export function ApprovalsWorkspace({
               <WsPreformatted text={selected.sourceText} />
             </Disclosure>
           ) : null}
-          <WsTextareaField
-            id="chronos-approval-note"
-            label={uxTextOr('chronos_ws_decision_note_label', 'Decision note', locale)}
-            value={note}
-            onChange={setNote}
-            placeholder={uxText('chronos_decision_note', locale)}
-          />
-          <div className="flex flex-wrap gap-2">
-            <Button
-              label={uxText('chronos_approve', locale)}
-              variant="primary"
-              disabled={busy || !fresh || !localAdmin || selected.status !== 'pending'}
-              onClick={() => void decide('approved')}
-            />
-            <Button
-              label={uxText('chronos_reject', locale)}
-              variant="danger"
-              disabled={busy || !fresh || !localAdmin || selected.status !== 'pending'}
-              onClick={() => void decide('rejected')}
-            />
-          </div>
-          {!localAdmin ? (
-            <p className="kb-text kb-text--muted">{uxText('chronos_admin_action_hint', locale)}</p>
-          ) : null}
+          {/* Read-only detail: the decision lives in あなた待ち (IA contract §2). */}
+          <NeedsYouLink reason="approval" locale={locale === 'ja' ? 'ja' : 'en'} />
         </Section>
       ) : (
         <Section>

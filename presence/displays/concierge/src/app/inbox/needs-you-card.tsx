@@ -233,9 +233,7 @@ export function NeedsYouCard({
     actions = (
       <>
         {has('open') ? (
-          <a className="kb-button" href="/org">
-            {c('ia_inbox_decision_open')}
-          </a>
+          <Button variant="primary" href="/org" label={c('ia_inbox_decision_open')} />
         ) : null}
         {later}
       </>
@@ -287,9 +285,11 @@ export function NeedsYouCard({
     body = <KindBriefBlock brief={kindBrief('memory')} locale={locale} />;
     actions = item.knowledge.learningReviewUrl ? (
       <>
-        <a className="kb-button" href={item.knowledge.learningReviewUrl}>
-          {t('memory.review_in_chronos')}
-        </a>
+        <Button
+          variant="primary"
+          href={item.knowledge.learningReviewUrl}
+          label={t('memory.review_in_chronos')}
+        />
         {later}
       </>
     ) : (

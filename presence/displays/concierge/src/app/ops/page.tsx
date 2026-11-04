@@ -102,7 +102,6 @@ import {
   parsePlanPreviewResponse,
   type ClientPlanPreview,
 } from '../../lib/ops/plan-preview-response';
-import { parseDeliverableReviewResponse } from '../../lib/ops/deliverable-review-response';
 import { parseConnectionReviewResponse } from '../../lib/ops/connection-review-response';
 import {
   parseMissionApprovalResponse,
@@ -152,16 +151,6 @@ function ChronosMirrorV2Content() {
   const [deliverablesError, setDeliverablesError] = useState<string | null>(null);
   const [deliverablesQuery, setDeliverablesQuery] = useState('');
   const [deliverablesRefreshTick, setDeliverablesRefreshTick] = useState(0);
-  const [selectedDeliverableId, setSelectedDeliverableId] = useState<string | null>(null);
-  const [deliverableReviewComment, setDeliverableReviewComment] = useState('');
-  const [deliverableReviewBusy, setDeliverableReviewBusy] = useState(false);
-  const [deliverableReviewError, setDeliverableReviewError] = useState<string | null>(null);
-  // LC-10 ask-why: when a reject / request-changes lands without any reason,
-  // ask exactly one skippable question so the redo/learning loops get a
-  // deterministic category instead of nothing.
-  const [deliverableAskWhyVerdict, setDeliverableAskWhyVerdict] = useState<
-    'reject' | 'request-changes' | null
-  >(null);
   const [operatorHomeSummary, setOperatorHomeSummary] = useState<ClientOperatorHomeSummary | null>(
     null
   );
@@ -739,60 +728,6 @@ function ChronosMirrorV2Content() {
     setDeliverablesRefreshTick((value) => value + 1);
   }, []);
 
-  const submitDeliverableReview = useCallback(
-    async (
-      verdict: 'accept' | 'reject' | 'request-changes',
-      options?: { reasonCategory?: string; skipAskWhy?: boolean }
-    ) => {
-      const item = deliverables.find((entry) => entry.artifactId === selectedDeliverableId);
-      if (!item) {
-        setDeliverableReviewError(uxText('chronos_deliverable_select_required', locale));
-        return;
-      }
-      // LC-10 ask-why: a rejection with no comment and no category teaches
-      // nothing — ask one skippable question before submitting.
-      if (
-        verdict !== 'accept' &&
-        !deliverableReviewComment.trim() &&
-        !options?.reasonCategory &&
-        !options?.skipAskWhy
-      ) {
-        setDeliverableAskWhyVerdict(verdict);
-        return;
-      }
-      setDeliverableAskWhyVerdict(null);
-      setDeliverableReviewBusy(true);
-      setDeliverableReviewError(null);
-      try {
-        const response = await fetch(opsApiPath('/deliverable-review'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            artifactId: item.artifactId,
-            verdict,
-            comment: deliverableReviewComment,
-            reasonCategory: options?.reasonCategory,
-          }),
-        });
-        const payload = await response.json().catch(() => null);
-        if (!response.ok) throw new Error('deliverable review failed');
-        const parsed = parseDeliverableReviewResponse(payload);
-        if (!parsed) throw new Error('Invalid deliverable review response');
-        setDeliverableReviewComment('');
-        refreshDeliverables();
-        setOperatorHomeRefreshTick((value) => value + 1);
-        if (parsed.state.current_artifact_id) {
-          setSelectedDeliverableId(parsed.state.current_artifact_id);
-        }
-      } catch (error) {
-        setDeliverableReviewError(error instanceof Error ? error.message : String(error));
-      } finally {
-        setDeliverableReviewBusy(false);
-      }
-    },
-    [deliverableReviewComment, deliverables, locale, refreshDeliverables, selectedDeliverableId]
-  );
-
   const submitConnectionReview = useCallback(
     async (bindingId: string, action: 'approve' | 'hold' | 'delete' | 'modify') => {
       setConnectionReviewBusyId(bindingId);
@@ -1089,16 +1024,6 @@ function ChronosMirrorV2Content() {
     setDeliverablesQuery,
     deliverablesRefreshTick,
     setDeliverablesRefreshTick,
-    selectedDeliverableId,
-    setSelectedDeliverableId,
-    deliverableReviewComment,
-    setDeliverableReviewComment,
-    deliverableReviewBusy,
-    setDeliverableReviewBusy,
-    deliverableReviewError,
-    setDeliverableReviewError,
-    deliverableAskWhyVerdict,
-    setDeliverableAskWhyVerdict,
     operatorHomeSummary,
     setOperatorHomeSummary,
     operatorHomeError,
@@ -1168,7 +1093,6 @@ function ChronosMirrorV2Content() {
     runPlanPreview,
     approvePlanAndStart,
     refreshDeliverables,
-    submitDeliverableReview,
     submitConnectionReview,
     handleOperatorViewOpen,
     handleScenarioOpen,
