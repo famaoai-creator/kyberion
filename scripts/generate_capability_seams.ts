@@ -270,6 +270,15 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
       'libs/core/vcs/memory-vcs-backend.ts',
     ],
   },
+  'vcs-host': {
+    declaration: 'libs/core/vcs/vcs-host.ts',
+    consumers: [
+      'libs/core/vcs/vcs-host-verbs.ts',
+      'libs/core/vcs/gh-cli-host-provider.ts',
+      'libs/core/vcs/github-rest-host-provider.ts',
+      'libs/core/vcs/memory-vcs-host-provider.ts',
+    ],
+  },
   'structured-runner': {
     declaration: 'libs/core/mission/mission-llm.ts',
     consumers: ['libs/core/mission/mission-llm.ts'],
