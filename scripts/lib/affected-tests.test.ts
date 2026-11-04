@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ciTestPaths,
   dataFilesOf,
+  isCiTest,
   findReaderTests,
   isCodeFile,
   MAX_READERS_PER_FILE,
@@ -65,5 +67,18 @@ describe('affected tests planning', () => {
     );
     expect(plan.readers.find((r) => r.file === 'README.md')?.tooBroad).toBe(true);
     expect(plan.readerTests).toEqual(['tests/agents.test.ts']);
+  });
+
+  it('limits selections to the paths the CI test suites run', () => {
+    const paths = ciTestPaths();
+    expect(paths).toEqual(expect.arrayContaining(['libs/core/', 'scripts/', 'tests/']));
+    expect(paths.some((entry) => entry.startsWith('-'))).toBe(false);
+    expect(isCiTest('tests/smoke.test.ts', paths)).toBe(true);
+    expect(isCiTest('presence/displays/concierge/test/a.test.ts', paths)).toBe(false);
+    const plan = planAffectedTests({ base: 'origin/main', files: ['AGENTS.md'] }, () =>
+      ok('tests/a.test.ts\npresence/displays/concierge/test/b.test.ts\n')
+    );
+    expect(plan.readerTests).toEqual(['tests/a.test.ts']);
+    expect(plan.nonCiReaderTests).toEqual(['presence/displays/concierge/test/b.test.ts']);
   });
 });
