@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Button } from '@agent/shared-ui';
-import { conciergeText, type ConciergeLocale } from '../lib/i18n';
+import { conciergeText, resolveConciergeLocale } from '../lib/i18n';
 import {
   fetchNeedsYouSummary,
   inboxHref,
@@ -17,14 +17,16 @@ import {
  */
 export function NeedsYouLink({
   reason,
-  locale,
   lead = true,
+  locale: rawLocale,
 }: {
   reason?: NeedsYouReason;
-  locale: ConciergeLocale;
+  /** Any surface locale (ops passes its own); resolved to a Concierge locale. */
+  locale: string;
   /** Show the one-line "decisions are made in one place" explanation. */
   lead?: boolean;
 }) {
+  const locale = resolveConciergeLocale(rawLocale);
   const [summary, setSummary] = React.useState<NeedsYouSummary | null>(null);
   React.useEffect(() => {
     const controller = new AbortController();

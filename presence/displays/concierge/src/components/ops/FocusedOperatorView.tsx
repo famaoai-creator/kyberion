@@ -1148,7 +1148,7 @@ export function FocusedOperatorView({
                 </Callout>
               ) : (
                 // The decision is made in あなた待ち, never by a CLI command on screen.
-                <NeedsYouLink reason="approval" locale={locale === 'ja' ? 'ja' : 'en'} />
+                <NeedsYouLink reason="approval" locale={locale} />
               )}
             </Section>
           ))

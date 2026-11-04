@@ -1020,7 +1020,7 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
                   )}
                 </div>
                 {/* Deciding a deliverable happens in あなた待ち only (IA contract §2). */}
-                <NeedsYouLink reason="review" locale={locale === 'ja' ? 'ja' : 'en'} />
+                <NeedsYouLink reason="review" locale={locale} />
               </Section>
             </div>
           ) : null}
