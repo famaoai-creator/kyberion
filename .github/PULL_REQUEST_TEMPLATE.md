@@ -53,7 +53,7 @@
 ```bash
 # Required before open (CI runs pr + full-only gates; --changed selects both for your diff):
 pnpm check -- --changed
-pnpm exec vitest related --run $(git diff --name-only origin/main...HEAD -- '*.ts')
+pnpm exec vitest run --changed origin/main   # affected tests (vitest related); "0 test files" is not evidence
 # Plus any exception-table rows for your changed paths (actuator rebaseline, env-registry, build:actuators, …)
 ```
 
