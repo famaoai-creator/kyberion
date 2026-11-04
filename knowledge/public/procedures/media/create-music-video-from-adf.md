@@ -77,7 +77,7 @@ For a music-video scenario, replace the example composition with an ADF that set
 Pipeline example:
 
 ```bash
-pnpm pipeline --input pipelines/music-video-from-brief.json
+pnpm pipeline --input knowledge/product/pipeline-templates/music-video-from-brief.json
 ```
 
 The demo pipeline uses a governed video composition ADF, then verifies that the final artifact contains both audio and video streams.

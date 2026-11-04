@@ -2,8 +2,8 @@
 
 ## Scope
 
-- `libs/core/reasoning-backend.ts`
-- `libs/core/reasoning-bootstrap.ts`
+- `libs/core/reasoning/reasoning-backend.ts`
+- `libs/core/reasoning/reasoning-bootstrap.ts`
 
 ## Requirements
 

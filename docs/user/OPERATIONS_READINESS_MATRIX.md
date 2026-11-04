@@ -49,7 +49,7 @@ your local environment, credentials, or host permissions.
 3. Run `pnpm kyberion setup report`.
 4. Run `pnpm kyberion doctor`.
 5. Run `pnpm stance:list` if you use customer overlays.
-6. Activate the stance you want with `pnpm stance:switch <slug>`.
+6. Activate the stance you want with `pnpm stance:switch <slug> && source active/shared/runtime/customer.env`.
 7. For tenant-bound work, follow the activation gate in [`onboarding-flow.md`](../../knowledge/product/governance/onboarding-flow.md).
 8. Then work normally.
 

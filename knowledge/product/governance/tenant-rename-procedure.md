@@ -132,11 +132,11 @@ pnpm tenant rename <旧slug> --to <新slug> --display-name '<新商号>' --apply
 
 ## 8. 実装
 
-| 場所                              | 内容                                             |
-| --------------------------------- | ------------------------------------------------ |
-| `libs/core/tenant-governance.ts`  | `renameTenant()` — 計画の作成と実行              |
-| `scripts/tenant.ts`               | `rename` verb                                    |
-| `libs/core/tenant-rename.test.ts` | dry-runの無害性、移動、`tenant_id`保持、拒否条件 |
+| 場所                                          | 内容                                             |
+| --------------------------------------------- | ------------------------------------------------ |
+| `libs/core/organization/tenant-governance.ts` | `renameTenant()` — 計画の作成と実行              |
+| `scripts/tenant.ts`                           | `rename` verb                                    |
+| `libs/core/tenant-rename.test.ts`             | dry-runの無害性、移動、`tenant_id`保持、拒否条件 |
 
 ## 9. 関連
 

@@ -94,7 +94,7 @@ Kyberion: ブラウザを起動しました。操作を記録します。終わ�
 あなた: 「完了」
 Kyberion: 8 ステップの操作を記録しました。ADF に変換しますか？
 あなた: 「はい」
-Kyberion: pipelines/approval-workflow.adf.json に保存しました。
+Kyberion: pipelines/browser/approval-workflow.json に保存しました。
 ```
 
 ### 自動実行フェーズ

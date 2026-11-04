@@ -71,7 +71,7 @@ scenario file). The runner only picks up top-level `*.json` files.
 
 The runner binds process-wide seams (op fixtures, approval decisions, the
 fixture reasoning backend, preflight capture), but they act only inside the
-run's async scope (`libs/core/scenario-run-scope.ts`), which the executor
+run's async scope (`libs/core/scenario/scenario-run-scope.ts`), which the executor
 enters around all turns. Work in the same process that did not start inside a
 turn (for example other jobs in a long-running host) sees normal op
 resolution, the canonical approval handler and the previously bound reasoning

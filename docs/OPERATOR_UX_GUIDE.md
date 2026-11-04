@@ -165,14 +165,15 @@ Kyberion doctor is **`pnpm kyberion doctor`** (`pnpm run doctor` is equivalent).
 
 `pnpm run doctor` also reports the pipeline schedule registry maintained by Chronos. For the volatile memory layer, expect these scheduled entries after `node dist/scripts/chronos_daemon.js` has started at least once:
 
-| Schedule                |          Cadence | Purpose                                                                                                                    |
-| ----------------------- | ---------------: | -------------------------------------------------------------------------------------------------------------------------- |
-| `volatile-gc-daily`     |  Daily 04:00 JST | Expire and roll over volatile working-memory faces.                                                                        |
-| `storage-janitor-daily` |  Daily 04:30 JST | Run governed TTL cleanup for tmp, logs, data-vault, and runtime retention directories.                                     |
-| `volatile-index-daily`  |  Daily 05:00 JST | Rebuild the volatile knowledge index.                                                                                      |
-| `daily-routine`         |  Daily 06:00 JST | Open daily journal/TODO and roll over pending items.                                                                       |
-| `weekly-review`         | Monday 07:00 JST | Open weekly review, nominate promotion candidates, write task-model routing stats, and summarize queued memory candidates. |
-| `mesh-delivery-5min`    |  Every 5 minutes | Drive queued Mesh Hub deliveries (claim → dispatch → ack/retry/dead-letter). Requires `KYBERION_MESH_PEER_ID`.             |
+| Schedule                |          Cadence | Purpose                                                                                                                             |
+| ----------------------- | ---------------: | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `volatile-gc-daily`     |  Daily 04:00 JST | Expire and roll over volatile working-memory faces.                                                                                 |
+| `storage-janitor-daily` |  Daily 04:30 JST | Run governed TTL cleanup for tmp, logs, data-vault, and runtime retention directories.                                              |
+| `volatile-index-daily`  |  Daily 05:00 JST | Rebuild the volatile knowledge index.                                                                                               |
+| `daily-routine`         |  Daily 06:00 JST | Open daily journal/TODO and roll over pending items.                                                                                |
+| `weekly-review`         | Monday 07:00 JST | Open weekly review, nominate promotion candidates, write task-model routing stats, and summarize queued memory candidates.          |
+| `backup-daily`          |  Daily 03:15 JST | Create an encrypted daily state snapshot (configure an external backup destination for real DR).                                    |
+| `mesh-delivery-5min`    |  Every 5 minutes | Disabled by default. Drive queued Mesh Hub deliveries (claim → dispatch → ack/retry/dead-letter). Requires `KYBERION_MESH_PEER_ID`. |
 
 Typical managed entries include:
 
@@ -622,7 +623,7 @@ pnpm kyberion customer-channel list --tenant <t>
 pnpm surfaces reconcile
 pnpm surfaces status
 pnpm surfaces enable --surface <id>
-pnpm surfaces stop
+pnpm surfaces stop --surface <id>
 ```
 
 ### Resident dots, decisions and public ingress
@@ -682,8 +683,8 @@ See `knowledge/product/architecture/browser-execution-substrate-howto.md`.
 
 ```bash
 MC="node dist/scripts/mission_controller.js"
-$MC start MY-TASK --tier confidential --persona ecosystem_architect
-$MC status MY-TASK
+$MC start MSN-MY-TASK-20261104 --tier confidential --tenant-slug <slug> --persona ecosystem_architect
+$MC status MSN-MY-TASK-20261104
 $MC checkpoint MY-TASK step-1 "Progress note"
 $MC reconcile-work MY-TASK --manifest active/shared/tmp/reconciliation.json --dry-run
 $MC reconcile-work MY-TASK --manifest active/shared/tmp/reconciliation.json
@@ -814,7 +815,7 @@ iOS/Android アプリの AI-DLC/SDLC を回す標準手順(コピペ可):
 pnpm kyberion doctor -- --runtime app --platform android        # or ios / all
 
 # 1. code_change ミッションを作成(レビュー必須クラス)
-pnpm mission create MSN-FIXTUREAPP-LOGIN-<YYYYMMDD> --mission-type code_change
+pnpm mission create MSN-FIXTUREAPP-LOGIN-<YYYYMMDD> --mission-type code_change --tenant-slug <slug>
 
 # 2. SDLC 取り込み: 意図 → 要件 → 設計 → タスク分解 → NEXT_TASKS → テスト計画
 pnpm pipeline --input pipelines/sdlc-cycle.json \

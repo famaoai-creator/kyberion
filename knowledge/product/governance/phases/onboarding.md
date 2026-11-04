@@ -38,9 +38,9 @@ clone 後に「初期設定して」と頼まれたら、[プロンプト経由�
 ### Step 0〜2: baseline・導入・readiness
 
 ```bash
-pnpm pipeline --input pipelines/baseline-check.json
 pnpm install
-pnpm build
+pnpm build                                          # fresh clone では baseline より先に必要(pnpm pipeline は dist/ を使う)
+pnpm pipeline --input pipelines/baseline-check.json
 pnpm env:bootstrap --manifest kyberion-toolchain   # dist/ を使うので build の後
 pnpm kyberion doctor
 pnpm kyberion setup report --persona first-time-user
@@ -58,7 +58,7 @@ baseline が `needs_recovery` または `fatal_error` の場合は、通常の o
 
 ### Step 3: stance を決めてから identity を保存する
 
-顧客・会社として使う場合は、先に `pnpm stance:switch <customer-slug>` を実行する。
+顧客・会社として使う場合は、先に `pnpm stance:switch <customer-slug> && source active/shared/runtime/customer.env` を実行する(`stance:switch` は env ファイルを書くだけで、source しないと後続コマンドは `knowledge/personal/` を使う)。
 baseline の L3 はアクティブな profile の identity を見るため、順序を逆にしない。
 
 ```bash
@@ -152,7 +152,7 @@ mission の task に取り込む。コマンド例は標準フロー Step 11 を
 ### Step 9: 完了確認
 
 ```bash
-pnpm pipeline vital-check
+pnpm kyberion vital
 pnpm pipeline --input pipelines/baseline-check.json
 ```
 
@@ -172,7 +172,7 @@ identity のやり直しは `pnpm onboarding reset` を使う。
 ## 成功条件
 
 1. identity と onboarding summary がアクティブな profile に保存されている。
-2. `pnpm pipeline vital-check` が成功し、baseline-check が `all_clear` である。
+2. `pnpm kyberion vital` が `Overall: healthy` で、baseline-check が `all_clear` である。
 3. （ルート 2・3）tenant registry と consistency check が成功している。
 4. （ルート 2・3）customer、tenant、organization の binding が一致している。
 5. （ルート 2・3）activation receipt が `active` で、必須 probe と責任を持つ人間が記録されている。

@@ -2,7 +2,7 @@
 
 One JSON file per tenant that should be visible while this stance is active.
 This directory overrides `knowledge/personal/tenants/` — see `tenantProfileDir()`
-in `libs/core/tenant-registry.ts`.
+in `libs/core/organization/tenant-registry.ts`.
 
 A tenant profile is a **declaration that a confidentiality boundary exists**:
 its slug, display name, status, the role you hold there, and where its knowledge

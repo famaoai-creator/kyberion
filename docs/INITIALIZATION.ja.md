@@ -32,7 +32,7 @@ pnpm kyberion setup report --persona first-time-user
 pnpm surfaces reconcile
 
 # stance を決めてから identity を保存（Step 3）
-pnpm stance:switch <customer-slug>   # 顧客・会社として使う場合のみ
+pnpm stance:switch <customer-slug> && source active/shared/runtime/customer.env   # 顧客・会社として使う場合のみ
 pnpm onboarding
 
 # baseline を all_clear にする（Step 4）
@@ -102,7 +102,7 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
   - `dist/` ディレクトリが生成されます。
   - Chronos（`presence/displays/chronos-mirror-v2/.next/`）と concierge の UI がビルドされます（`build:ui`）。
   - workspace 間の runtime contract が再構築されます。
-- **ステップ構成**: `build:packages` → `build:actuators` → terminal-hud → `build:repo` → `build:bundle` → knowledge index manifest → `build:ui`。
+- **ステップ構成**(`scripts/build_repository.ts`): `dist/` の削除 → packages(`tsc -b tsconfig.packages.json`) → repository(`tsc -b tsconfig.json`。actuators を含む) → bundles → knowledge index manifest → `build:ui` → source-shadow チェック。
   UI だけを作り直す場合は `pnpm build:ui` を使います。
 
 ### Stage 3: 事前ツール確認 (Prerequisite Toolchain Check)
@@ -192,7 +192,7 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 identity の保存先と、baseline-check の L3 が確認する場所は、アクティブな stance で決まります。**identity を保存する前に**決めてください。
 
 - 自分として使う: `KYBERION_CUSTOMER` を設定しません。保存先は `knowledge/personal/` です。
-- 顧客・会社として使う: `pnpm stance:switch <customer-slug>` で切り替えます（overlay がなければ `pnpm stance:create <customer-slug>`）。保存先は `customer/{slug}/` です。
+- 顧客・会社として使う: `pnpm stance:switch <customer-slug> && source active/shared/runtime/customer.env` で切り替えます（切り替えは env ファイルを書くだけで、source しないと後続コマンドは `knowledge/personal/` を使います。overlay がなければ `pnpm stance:create <customer-slug>`）。保存先は `customer/{slug}/` です。
 
 ### Stage 7: 魂の注入 (Soul Infusion)
 
@@ -247,17 +247,19 @@ AI 会社として始める場合は、`pnpm onboarding company --vertical <vert
 オンボーディングが正しく完了したかを確認するには、以下のコマンドを実行してください。
 
 ```bash
-pnpm pipeline vital-check
+pnpm kyberion vital
 pnpm pipeline --input pipelines/baseline-check.json
 ```
 
-**期待される出力例**:
+**`pnpm kyberion vital` の期待される出力(抜粋)**:
 
-- ✅ [OK] Physical Foundation (node_modules)
-- ✅ [OK] System Build (dist)
-- ✅ [OK] Sovereign Identity
-- ✅ [OK] Sovereign Vision
-- ✅ [OK] Onboarding Summary
+- ✅ Sovereign Identity: OK
+- ✅ Agent Identity: OK
+- ✅ Sovereign Vision: OK
+- ✅ Onboarding Summary: OK
+- Overall: healthy
+
+(`pnpm pipeline vital-check` はログを出すだけの軽いパイプラインで、identity や onboarding summary は確認せず、失敗もしません。)
 
 baseline-check の `status` が `all_clear` であれば完了です。
 

@@ -115,7 +115,7 @@ Power/Interest Grid に基づく：
 
 - 依存: [relationship-graph-protocol.md](relationship-graph-protocol.md)
 - 土台: [pmo/standard/stakeholder_management.md](../../public/pmo/standard/stakeholder_management.md)
-- パイプライン: [pipelines/stakeholder-consensus-orchestrator.json](../pipeline-templates/stakeholder-consensus-orchestrator.json)
+- パイプライン: [knowledge/product/pipeline-templates/stakeholder-consensus-orchestrator.json](../pipeline-templates/stakeholder-consensus-orchestrator.json)
 
 ---
 

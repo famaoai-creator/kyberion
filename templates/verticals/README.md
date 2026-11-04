@@ -47,7 +47,7 @@ pnpm pipeline --input customer/acme-corp/mission-seeds/ringi-2026-q2/pipeline.js
 
 1. Pick a recurring use case (one that comes up across multiple customers / contexts).
 2. Make the customer-specific bits explicit in the README (URLs, selectors, who approves what).
-3. Use `core:include` with `params.fragment` + `params.context` for shared steps (e.g. `fragments/intra-login.json`). Only use ops that exist in `knowledge/product/governance/actuator-op-registry.json` — `pnpm check-op-coverage`-style tests assert this.
+3. Use `core:include` with `params.fragment` + `params.context` for shared steps (e.g. `fragments/intra-login.json`). Only use ops that exist in `knowledge/product/governance/actuator-op-registry.json` — `scripts/vertical-templates-ops.test.ts` asserts this.
 4. Add `on_error.fallback` for known failure modes — these verticals will hit production conditions.
 5. Add an entry to the table above.
 

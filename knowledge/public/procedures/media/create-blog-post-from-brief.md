@@ -55,7 +55,7 @@ Suggested pipeline pattern:
 Example run:
 
 ```bash
-pnpm pipeline --input pipelines/blog-article-from-brief.json
+pnpm pipeline --input knowledge/product/pipeline-templates/blog-article-from-brief.json
 ```
 
 If you want a rendered preview, add a document-generation step after the draft and map the same brief into a document artifact.

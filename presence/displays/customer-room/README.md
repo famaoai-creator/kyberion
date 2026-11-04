@@ -130,5 +130,5 @@ src/app/main.ts           the page
 static/                   index.html, app.css, generated kyberion-ui(.tokens).css
 ```
 
-The two generated stylesheets come from `pnpm generate:design-tokens` like the
+The two generated stylesheets come from `node --import ./scripts/ts-loader.mjs scripts/generate_design_tokens.ts` like the
 other surfaces; do not edit them.

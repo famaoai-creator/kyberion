@@ -308,7 +308,7 @@ One canonical term per layer; the aliases are names you will meet in code, docs,
 
 ### Display
 
-**(advanced)** A surface that is a web UI served from `presence/displays/<name>/` (concierge, presence-studio, chronos-mirror-v2, operator-surface, computer-surface, terminal-hud). All displays render through the shared `kyberion-base` A2UI catalog. "Display" names the implementation form; "surface" names the role it plays.
+**(advanced)** A surface that is a web UI served from `presence/displays/<name>/` (concierge, presence-studio, chronos-mirror-v2 (now a compatibility redirect), operator-surface, computer-surface, customer-room, a2ui-host), plus the Ink TUI `terminal-hud`. The web displays render through the shared `kyberion-base` A2UI catalog (a2ui-host is a standalone A2UI viewer with its own tokens). "Display" names the implementation form; "surface" names the role it plays.
 
 ### Presence
 
@@ -332,11 +332,11 @@ One canonical term per layer; the aliases are names you will meet in code, docs,
 
 ### Concierge
 
-**(first-win)** The CEO-secretary surface (秘書室, `presence/displays/concierge`, port 3050): requests, approvals, outcomes, exceptions, plus `/setup` onboarding (first-run code, SSO), `/management` (organizations and projects) and `/ingest`. A company switcher in the rail narrows 決める, settings and the conversation to the selected tenant. It answers "what do I need to decide now?" and hosts the 決める, 設定, 組織 and 資料の取込 items of the Front Desk.
+**(first-win)** The CEO-secretary surface (秘書室, `presence/displays/concierge`, port 3050): requests, approvals, outcomes, exceptions, plus `/setup` onboarding (first-run code, SSO), `/management` (organizations and projects) , `/ingest`, the workspace pages under `/w`, and the operations console at `/ops` (API `/api/ops`; formerly Chronos Mirror v2). A company switcher in the rail narrows 決める, settings and the conversation to the selected tenant. It answers "what do I need to decide now?" and hosts most Front Desk items (受信箱, the `/w` workspace pages, 資料の取込, the `/ops?section=…` destinations, 組織の編集, 設定).
 
 ### Front Desk
 
-**(first-win)** The shared menu rail rendered by both Concierge and Presence Studio, built from `libs/core/front-desk-nav.ts`: five core human verbs — ホーム (home), 頼む (ask), 決める (decide), 進み具合 (progress), 設定 (settings) — plus role-gated destinations grouped as 仕事 / 資料・学習 / 管理 (missions, work items, deliverables, knowledge, discussion, organization, operations, diagnostics, …; some hosted on Chronos). One implementation, two hosting surfaces, so a person sees one menu.
+**(first-win)** The shared menu rail rendered by both Concierge and Presence Studio, built from `libs/core/front-desk-nav.ts`: role-gated destinations (`FRONT_DESK_MENU`) in four groups — 仕事 (inbox/decide, ask, missions, work items, approvals), 組織 (overview, organizations, projects, people & agents), 資料・学習 (deliverables, ingest, knowledge, discussion, first job, help) and 管理 (organization editing, operations, surface control, diagnostics, settings). Home (`/home`) and progress are linked destinations (`FRONT_DESK_LINKED_DESTINATIONS`), not rail items; operations destinations are served by Concierge at `/ops?section=…`. One implementation, two hosting surfaces, so a person sees one menu.
 
 ### Stance (vs tenant customer)
 
@@ -354,7 +354,7 @@ The planning and intent-definition phase. Work should not begin physically until
 
 ### Recovery & Resilience
 
-The automatic resume/self-healing phase entered when a stale `.kyberion.lock` or interrupted mission state is detected.
+The automatic resume/self-healing phase entered when baseline-check reports `needs_recovery` (an L0–L2 failure, e.g. a stale build) or a mission was left interrupted.
 
 ### Mission Execution
 
@@ -539,7 +539,7 @@ A narrow actuator for creating, loading, deciding, and listing human approval re
 
 ### Chronos Gateway
 
-The authenticated interactive control surface behind Chronos Mirror v2. Every API route except `/api/healthz` resolves a ViewerContext fail-closed before serving data. It can manage runtime sessions and summarize delegations, but it is not the authoritative mission owner.
+The authenticated interactive control surface, now served by Concierge at `/ops` and `/api/ops` (formerly Chronos Mirror v2, whose port 3000 only redirects there and authorizes nothing). Every API route except `/api/healthz` resolves a ViewerContext fail-closed before serving data. It can manage runtime sessions and summarize delegations, but it is not the authoritative mission owner.
 
 ### Chronos Operator
 
@@ -605,7 +605,7 @@ The plain-language card on an approval request: the question, recommendation, wh
 
 ### Discussion Room / Dialogue Room
 
-A Chronos surface (`/?section=discussion`) where a goal is worked out with a facilitated team of agents drawn from the organization's agent pool (Discussion Room), or with a facilitator that keeps a live goal card with a readiness score (Dialogue Room). Conclusions become a decision brief; kept next steps become WorkItem proposals and mission-start requests only after a human approves. → [discussion-room](../knowledge/product/architecture/discussion-room.md) · Dialogue Room: `presence/displays/chronos-mirror-v2/src/components/DialogueRoom.tsx`
+An operations-console page (Concierge `/ops?section=discussion`) where a goal is worked out with a facilitated team of agents drawn from the organization's agent pool (Discussion Room), or with a facilitator that keeps a live goal card with a readiness score (Dialogue Room). Conclusions become a decision brief; kept next steps become WorkItem proposals and mission-start requests only after a human approves. → [discussion-room](../knowledge/product/architecture/discussion-room.md) · Dialogue Room: `presence/displays/concierge/src/components/ops/DialogueRoom.tsx`
 
 ### Team Channel
 

@@ -6,7 +6,7 @@
 pipelines/
   *.json          ← Kyberion system operation pipelines (self-ops only)
   fragments/      ← Reusable step groups (core:include targets)
-  browser/        ← Recording-backed browser procedures (draft; lease-gated by the browser extension)
+  browser/        ← Recording-backed browser procedures (created on demand by the recording compiler; draft; lease-gated by the browser extension)
   config/         ← Config flows (surface-registration, tenant-onboarding, voice-engine-setup)
 
 knowledge/product/pipeline-templates/
@@ -86,26 +86,26 @@ For discovery work (browser exploration, media generation, PPTX/doc/video/web de
 
 ### Health & Diagnostics
 
-| Pipeline                      | pnpm shortcut                                         | Description                                                                                                                                                  |
-| ----------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `baseline-check`              | `pnpm pipeline --input pipelines/baseline-check.json` | Session-start health gate (onboarding / recovery / all-clear)                                                                                                |
-| `vcs-development-preflight`   | `pnpm pipeline --input pipelines/vcs-development-preflight.json --context '<context-json>'` | Read-only reconciliation of a prepared WorkItem PR, independent review and server CI; implementation and repairs stay with the mission executor. |
-| `vital-check`                 | `pnpm pipeline vital-check`                           | Core liveness check                                                                                                                                          |
-| `system-diagnostics`          | `pnpm pipeline system-diagnostics`                    | Detailed system-level diagnostic report                                                                                                                      |
-| `full-health-report`          | —                                                     | Aggregated health across all surfaces                                                                                                                        |
-| `monitor-service-health`      | —                                                     | Continuous service health monitor                                                                                                                            |
-| `system-upgrade-check`        | `pnpm system:upgrade -- --mode check`                 | Detect available system + dependency upgrades                                                                                                                |
-| `system-upgrade-execute`      | `pnpm system:upgrade -- --mode execute`               | Apply upgrades interactively                                                                                                                                 |
-| `inspect-system-hardware`     | —                                                     | Hardware and resource inventory                                                                                                                              |
-| `inspect-network-environment` | —                                                     | Network topology and connectivity check                                                                                                                      |
-| `inspect-workspace-surfaces`  | —                                                     | Active surface and channel inventory                                                                                                                         |
-| `agent-provider-check`        | —                                                     | Verify AI provider availability                                                                                                                              |
-| `audit-verify-daily`          | —                                                     | Daily audit-chain and system-ledger integrity verification for SA-01. Schedule: `15 4 * * *`.                                                                |
-| `health-degradation-watch`    | —                                                     | Hourly degradation watch: latency regressions and provider demotions vs governed thresholds; escalates via ops-alert (OP-04 Task 1). Schedule: `30 * * * *`. |
-| `dependency-vuln-scan`        | —                                                     | Daily dependency vulnerability scan and ledger append for AO-02. Schedule: `0 5 * * *`.                                                                      |
-| `tenant-drift-watch`          | —                                                     | Daily confidential tenant drift scan using scripts/watch_tenant_drift.ts with alerting enabled. Schedule: `15 5 * * *`.                                      |
-| `cowork-integration-review`   | —                                                     | Cowork Integration Review — checks MCP server reachability, surface outbox health, sync-state freshness, and pending approvals.                              |
-| `inspect-mission-inventory`   | —                                                     | List the current mission inventory through the mission controller.                                                                                           |
+| Pipeline                      | pnpm shortcut                                                                               | Description                                                                                                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `baseline-check`              | `pnpm pipeline --input pipelines/baseline-check.json`                                       | Session-start health gate (onboarding / recovery / all-clear)                                                                                                |
+| `vcs-development-preflight`   | `pnpm pipeline --input pipelines/vcs-development-preflight.json --context '<context-json>'` | Read-only reconciliation of a prepared WorkItem PR, independent review and server CI; implementation and repairs stay with the mission executor.             |
+| `vital-check`                 | `pnpm pipeline vital-check`                                                                 | Core liveness check                                                                                                                                          |
+| `system-diagnostics`          | `pnpm pipeline system-diagnostics`                                                          | Detailed system-level diagnostic report                                                                                                                      |
+| `full-health-report`          | —                                                                                           | Aggregated health across all surfaces                                                                                                                        |
+| `monitor-service-health`      | —                                                                                           | Continuous service health monitor                                                                                                                            |
+| `system-upgrade-check`        | `pnpm system:upgrade -- --mode check`                                                       | Detect available system + dependency upgrades                                                                                                                |
+| `system-upgrade-execute`      | `pnpm system:upgrade -- --mode execute`                                                     | Apply upgrades interactively                                                                                                                                 |
+| `inspect-system-hardware`     | —                                                                                           | Hardware and resource inventory                                                                                                                              |
+| `inspect-network-environment` | —                                                                                           | Network topology and connectivity check                                                                                                                      |
+| `inspect-workspace-surfaces`  | —                                                                                           | Active surface and channel inventory                                                                                                                         |
+| `agent-provider-check`        | —                                                                                           | Verify AI provider availability                                                                                                                              |
+| `audit-verify-daily`          | —                                                                                           | Daily audit-chain and system-ledger integrity verification for SA-01. Schedule: `15 4 * * *`.                                                                |
+| `health-degradation-watch`    | —                                                                                           | Hourly degradation watch: latency regressions and provider demotions vs governed thresholds; escalates via ops-alert (OP-04 Task 1). Schedule: `30 * * * *`. |
+| `dependency-vuln-scan`        | —                                                                                           | Daily dependency vulnerability scan and ledger append for AO-02. Schedule: `0 5 * * *`.                                                                      |
+| `tenant-drift-watch`          | —                                                                                           | Daily confidential tenant drift scan using scripts/watch_tenant_drift.ts with alerting enabled. Schedule: `15 5 * * *`.                                      |
+| `cowork-integration-review`   | —                                                                                           | Cowork Integration Review — checks MCP server reachability, surface outbox health, sync-state freshness, and pending approvals.                              |
+| `inspect-mission-inventory`   | —                                                                                           | List the current mission inventory through the mission controller.                                                                                           |
 
 ### Feedback Loop (Self-Repair)
 
@@ -243,11 +243,9 @@ Governed document/deck/video production and executive reporting.
 
 | Pipeline                        | Description                                                                                                               |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `campaign-suite`                | E2E-02 Task 6: generate deck/doc/video/web/mv deliverables from one campaign brief under a single resolved design.        |
 | `ceo-strategic-report`          | Generates a strategic executive report for CEO decision-making: code analysis, multi-scenario reasoning, and PPTX output. |
 | `executive-narrative-bridge`    | Bridges raw analysis into executive-grade narrative: reasoning synthesis, multi-perspective wisdom, and system logging.   |
 | `marketing-content`             | Generates brand-aligned marketing materials: diagrams, themed PPTX slides, and merged content output.                     |
-| `trial-narrated-report`         | End-to-end narrated executive report: voice narration + video composition with strict ADF preflight.                      |
 | `kyberion-vtuber-narrated-demo` | Produce a vtuber-style video that presents Kyberion as a live operator persona with on-air cues, chat, and demo beats.    |
 
 ### Chaos & Resilience
@@ -273,12 +271,9 @@ same tests; use an envelope when re-validating the slice after touching it.
 
 ### Media Demos and Production
 
-| Pipeline                      | Description                                                                                                                                                                    |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `media-produce-and-review`    | MP-01..07 deck flow: lock brief → design protocol → layout preflight → render → visual review → delivery gate; override `brief_path` / `mission_evidence_dir` with `--context` |
-| `generate-design-system-demo` | Diagnostic PPTX exercising all slide-layout presets and core element types; writes `active/shared/exports/design_system_demo.pptx`                                             |
-| `generate-masterclass-pptx`   | Layout sample deck from `pipelines/fragments/masterclass_design_protocol.json`; writes `active/shared/exports/all_objects_layout_sample.pptx`                                  |
-| `kyberion-product-intro`      | Local narrated product-intro video (ja; no publish). `scripts/kyberion_product_intro_render.ts` renders the same flow directly                                                 |
+| Pipeline                   | Description                                                                                                                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `media-produce-and-review` | MP-01..07 deck flow: lock brief → design protocol → layout preflight → render → visual review → delivery gate; override `brief_path` / `mission_evidence_dir` with `--context` |
 
 ### Op Entry Points
 
@@ -377,7 +372,7 @@ In `intent-routing-map.json`:
 
 ## Path Security
 
-Output paths must be within the project root. Use `active/shared/tmp/` or `active/shared/exports/` as staging areas.
+Output paths must be within the project root. Use `active/shared/tmp/` for scratch and `active/shared/staging/` for inbound files; write deliverables via `writeScopedArtifact`.
 
 `[ROLE_VIOLATION]` errors mean the active persona/role does not have access to the requested path. Check `knowledge/product/governance/security-policy.json`.
 
