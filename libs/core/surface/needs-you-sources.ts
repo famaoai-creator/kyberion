@@ -11,6 +11,7 @@
  * out because this reader cannot prove who the caller is.
  */
 
+import { createHash } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
 import {
   notificationMatchesScope,
@@ -175,21 +176,45 @@ function outcomesFor(viewer: SurfaceAuthorizationContext): NeedsYouOutcomeInput[
 
 const FAILURE_STATUSES = new Set(['attention', 'blocked', 'failed', 'error']);
 
-function failuresFor(viewer: SurfaceAuthorizationContext): NeedsYouFailureInput[] {
+/** A stable id for a failure notification with no request/notification id. */
+function failureFallbackId(notification: Record<string, unknown>): string {
+  const digest = createHash('sha256')
+    .update(
+      [notification.surface, notification.channel, notification.created_at, notification.title]
+        .map((part) => String(part ?? ''))
+        .join('\u0000')
+    )
+    .digest('hex')
+    .slice(0, 16);
+  return `exception-${digest}`;
+}
+
+/**
+ * Failure notifications (attention / blocked / failed / error) the viewer may
+ * see — uncapped, with stable ids, so the shell and MCP count the same items
+ * and two different failures never collapse into one. `includePersonal` is for
+ * a caller that has authenticated the owner (the unified shell); the default
+ * reader cannot prove who asks, so it never admits the personal tier.
+ */
+export function readNeedsYouFailures(
+  viewer: SurfaceAuthorizationContext,
+  options: { includePersonal?: boolean } = {}
+): NeedsYouFailureInput[] {
   const tenantSlugs = viewer.tenantSlugs === 'all' ? 'all' : [...viewer.tenantSlugs];
+  const tiers = options.includePersonal
+    ? TIERS.filter((tier) => viewer.tierAccess.includes(tier))
+    : tiersOf(viewer);
   return listSurfaceNotificationsAcrossChannels()
     .filter((notification) => FAILURE_STATUSES.has(String(notification.status || '').toLowerCase()))
-    .filter((notification) =>
-      notificationMatchesScope(notification, { tiers: tiersOf(viewer), tenantSlugs })
-    )
-    .map((notification, index) => {
+    .filter((notification) => notificationMatchesScope(notification, { tiers, tenantSlugs }))
+    .map((notification) => {
       const tenant = String(
         (notification.scope as Record<string, unknown> | undefined)?.tenant_slug ||
           notification.tenant_slug ||
           ''
       );
       return {
-        id: String(notification.request_id || notification.id || `exception-${index + 1}`),
+        id: String(notification.request_id || notification.id || failureFallbackId(notification)),
         title: String(notification.title || ''),
         text: String(notification.text || ''),
         surface: String(notification.surface || 'presence'),
@@ -213,7 +238,7 @@ export function readNeedsYouSources(viewer: SurfaceAuthorizationContext): NeedsY
       withExecutionContext('sovereign_concierge', () => outcomesFor(viewer))
     ),
     failures: guarded('notifications', () =>
-      withExecutionContext('sovereign_concierge', () => failuresFor(viewer))
+      withExecutionContext('sovereign_concierge', () => readNeedsYouFailures(viewer))
     ),
     knowledge: guarded('memory queue', () => knowledgeFor(viewer)),
     clarifications: guarded('mission hygiene', () => clarificationsFor(viewer)),
