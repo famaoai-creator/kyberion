@@ -246,22 +246,27 @@ function insidePrimaryAuthority(candidate: string): string | undefined {
 }
 
 /**
- * True when `candidate` is one of the fixed directories above a primary
- * checkout authority store (e.g. `active/shared/coordination`). Used ONLY by
- * the existence probe of the missing-ancestor walk: knowing that such a
- * directory exists lets a linked worktree resolve the first approval path in a
- * primary checkout that has no `channels/` yet. It never admits a read, write
- * or listing of the directory itself.
+ * Primary-relative form of `candidate` when it is one of the fixed directories
+ * above a primary checkout authority store (e.g. `active/shared/coordination`).
+ * Used ONLY by the existence probe of the missing-ancestor walk and to spell
+ * such a directory back under the logical primary root (so mkdirGuarded's
+ * parent comparison holds when the primary's real path differs from its
+ * spelled one). It never admits a read, write or listing of the directory:
+ * permission checks still judge it as outside the repository.
  */
-function isPrimaryAuthorityAncestor(candidate: string): boolean {
+function primaryAuthorityAncestor(candidate: string): string | undefined {
   const primary = pathResolver.primaryCheckoutRootDir();
-  if (primary === pathResolver.rootDir()) return false;
+  if (primary === pathResolver.rootDir()) return undefined;
   const abs = path.resolve(candidate);
   const rel = isInside(path.resolve(primary), abs) ?? isInside(realPrimaryRoot().real, abs);
-  return (
-    rel !== undefined &&
+  return rel !== undefined &&
     pathResolver.isAuthorityStoreAncestorRelativePath(rel.split(path.sep).join('/'))
-  );
+    ? rel
+    : undefined;
+}
+
+function isPrimaryAuthorityAncestor(candidate: string): boolean {
+  return primaryAuthorityAncestor(candidate) !== undefined;
 }
 
 /**
@@ -411,7 +416,7 @@ function toLogicalRoot(physical: string): string {
     const logicalRoot = path.resolve(pathResolver.rootDir());
     return relative === '' ? logicalRoot : path.join(logicalRoot, relative);
   }
-  const relPrimary = insidePrimaryAuthority(physical);
+  const relPrimary = insidePrimaryAuthority(physical) ?? primaryAuthorityAncestor(physical);
   if (relPrimary !== undefined) {
     const logicalPrimary = path.resolve(pathResolver.primaryCheckoutRootDir());
     return relPrimary === '' ? logicalPrimary : path.join(logicalPrimary, relPrimary);

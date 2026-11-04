@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -243,6 +243,54 @@ describe('primary-checkout authority store resolution', () => {
     ).toThrow();
     expect(() =>
       guard.canonicalGuardPath(path.join(primary, 'active/shared/coordination/inbox/x'), 'leaf')
+    ).toThrow();
+  });
+
+  it('creates the first approval directory in a primary whose real path differs from its spelling', async () => {
+    // The tmp primary is reached through a symlinked prefix on macOS
+    // (/var -> /private/var); mkdirGuarded compares each parent's canonical
+    // path with the checked one, so the ancestor must be spelled back under
+    // the logical primary root or the first mkdir is refused.
+    mkdirSync(path.join(primary, 'active', 'shared', 'coordination'), { recursive: true });
+    await loadResolver(worktree);
+    const guard = await import('./secure-io-path-guard.js');
+    const requests = path.join(
+      primary,
+      'active/shared/coordination/channels/external-operation/approvals/requests'
+    );
+    const checked = guard.canonicalGuardPath(requests, 'follow');
+    guard.mkdirGuarded(requests, checked, requests);
+    expect(existsSync(requests)).toBe(true);
+    // The ancestor walk creates nothing outside the authority stores.
+    const inbox = path.join(primary, 'active/shared/coordination/inbox/x');
+    expect(() => guard.mkdirGuarded(inbox, inbox, inbox)).toThrow();
+    expect(existsSync(path.join(primary, 'active/shared/coordination/inbox'))).toBe(false);
+  });
+
+  it('does not create a missing ancestor of the authority store', async () => {
+    // Precondition of the fix: the fixed ancestors must already exist in the
+    // primary. When coordination/ itself is missing, nothing is created.
+    mkdirSync(path.join(primary, 'active', 'shared'), { recursive: true });
+    await loadResolver(worktree);
+    const guard = await import('./secure-io-path-guard.js');
+    const requests = path.join(
+      primary,
+      'active/shared/coordination/channels/external-operation/approvals/requests'
+    );
+    expect(() => guard.mkdirGuarded(requests, requests, requests)).toThrow();
+    expect(existsSync(path.join(primary, 'active/shared/coordination'))).toBe(false);
+  });
+
+  it('refuses a dangling-symlink ancestor in the primary', async () => {
+    mkdirSync(path.join(primary, 'active', 'shared'), { recursive: true });
+    symlinkSync(path.join(tmp, 'nowhere'), path.join(primary, 'active/shared/coordination'));
+    await loadResolver(worktree);
+    const guard = await import('./secure-io-path-guard.js');
+    expect(() =>
+      guard.canonicalGuardPath(
+        path.join(primary, 'active/shared/coordination/channels/external-operation/approvals'),
+        'follow'
+      )
     ).toThrow();
   });
 });
