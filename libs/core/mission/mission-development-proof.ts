@@ -20,11 +20,25 @@ export async function verifyMissionDevelopmentPublication(
   development: MissionDevelopmentSpec,
   mode: 'review' | 'publication' | 'ci' = 'publication',
   deps: {
-    repository?: typeof readVcsDevelopmentRepository;
-    reconcile?: typeof runPreparedVcsDevelopment;
+    repository?: (
+      ...args: Parameters<typeof readVcsDevelopmentRepository>
+    ) =>
+      | Awaited<ReturnType<typeof readVcsDevelopmentRepository>>
+      | ReturnType<typeof readVcsDevelopmentRepository>;
+    reconcile?: (
+      ...args: Parameters<typeof runPreparedVcsDevelopment>
+    ) =>
+      | Awaited<ReturnType<typeof runPreparedVcsDevelopment>>
+      | ReturnType<typeof runPreparedVcsDevelopment>;
     sourceWorkspace?: typeof ensureMissionDevelopmentSourceWorkspace;
-    pr?: typeof readVcsDevelopmentPr;
-    ci?: typeof readVcsDevelopmentCiProof;
+    pr?: (
+      ...args: Parameters<typeof readVcsDevelopmentPr>
+    ) => Awaited<ReturnType<typeof readVcsDevelopmentPr>> | ReturnType<typeof readVcsDevelopmentPr>;
+    ci?: (
+      ...args: Parameters<typeof readVcsDevelopmentCiProof>
+    ) =>
+      | Awaited<ReturnType<typeof readVcsDevelopmentCiProof>>
+      | ReturnType<typeof readVcsDevelopmentCiProof>;
     head?: (cwd: string) => string;
   } = {}
 ): Promise<{ ok: boolean; reason?: string; waiting?: boolean }> {
@@ -86,11 +100,12 @@ export async function verifyMissionDevelopmentPublication(
     );
     const cwd = privateWorkspace?.cwd ?? pathResolver.rootDir();
     if (
-      (deps.repository ?? readVcsDevelopmentRepository)({ cwd }).url !== development.repository_url
+      (await (deps.repository ?? readVcsDevelopmentRepository)({ cwd })).url !==
+      development.repository_url
     )
       throw new Error('Development gate repository drift');
     if (mode === 'ci') {
-      const pr = (deps.pr ?? readVcsDevelopmentPr)(String(stored.pr_number), { cwd });
+      const pr = await (deps.pr ?? readVcsDevelopmentPr)(String(stored.pr_number), { cwd });
       const head = deps.head
         ? deps.head(cwd)
         : (() => {
@@ -101,7 +116,7 @@ export async function verifyMissionDevelopmentPublication(
               throw new Error('CI evidence source commit is unavailable');
             return value.stdout.trim();
           })();
-      const ci = (deps.ci ?? readVcsDevelopmentCiProof)(pr, { cwd });
+      const ci = await (deps.ci ?? readVcsDevelopmentCiProof)(pr, { cwd });
       if (
         pr.repository === development.repository_url &&
         pr.headBranch === 'agent/kyberion-development' &&
@@ -147,7 +162,7 @@ export async function verifyMissionDevelopmentPublication(
           reason: review.reason ?? 'Independent artifact review proof unavailable',
         };
     }
-    const proof = (deps.reconcile ?? runPreparedVcsDevelopment)(
+    const proof = await (deps.reconcile ?? runPreparedVcsDevelopment)(
       {
         cwd,
         ref: String(stored.pr_number),
