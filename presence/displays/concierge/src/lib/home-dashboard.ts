@@ -63,11 +63,11 @@ export interface HomeDashboard {
     blockedTotal: number;
   };
   health: {
-    /** Failed / (failed + completed) per day, 0..1; null on a day nothing finished. */
+    /** Failed / (failed + completed) over the 7 days ending each of the last 7 days, 0..1; null when nothing finished in that window. */
     failureRate: Array<number | null>;
     failureRateCurrent: number | null;
     failureRatePrevious: number | null;
-    /** Median hours from start to finish of missions that finished that day. */
+    /** Median hours from start to finish over the 7 days ending each of the last 7 days. */
     durationHours: Array<number | null>;
     durationCurrent: number | null;
     durationPrevious: number | null;
@@ -159,7 +159,9 @@ export function deliverableDisplayTitle(item: { path?: string; kind: string }): 
   const base = (item.path || '').split('/').pop() || '';
   const stem = base.replace(/\.[a-z0-9]{1,6}$/iu, '').replace(/[-_]+/gu, ' ');
   const text = humanizeSummary(stem, 60).short;
-  return text || '';
+  // A stem without a single letter (`2026-10-24`) names nothing; the page
+  // labels it by date instead.
+  return /\p{L}/u.test(text) ? text : '';
 }
 
 function classifyAgent(statuses: string[], errored: boolean): HomeAgentState {
@@ -198,12 +200,12 @@ export function composeHomeDashboard(snapshot: HomeSnapshot): HomeDashboard {
   // Missions: open states, 7-day throughput, the newest blocked ones.
   const missions = snapshot.missions ?? [];
   const open = { active: 0, planned: 0, paused: 0, failed: 0 };
-  const completedPerDay = Array.from({ length: HOME_DAYS }, () => 0);
-  const failedPerDay = Array.from({ length: HOME_DAYS }, () => 0);
-  const durationsPerDay = Array.from({ length: HOME_DAYS }, () => [] as number[]);
-  let previousCompleted = 0;
-  let previousFailed = 0;
-  const previousDurations: number[] = [];
+  // 14 daily buckets, oldest first; the last is the 24h ending now. The
+  // first 7 are "the 7 days before", the last 7 the current window.
+  const SPAN = HOME_DAYS * 2;
+  const completed14 = Array.from({ length: SPAN }, () => 0);
+  const failed14 = Array.from({ length: SPAN }, () => 0);
+  const durations14 = Array.from({ length: SPAN }, () => [] as number[]);
   for (const mission of missions) {
     if (OPEN_ACTIVE.has(mission.status)) open.active += 1;
     else if (mission.status === 'planned') open.planned += 1;
@@ -213,18 +215,14 @@ export function composeHomeDashboard(snapshot: HomeSnapshot): HomeDashboard {
     const at = Date.parse(mission.updatedAt || '');
     if (!finished || !Number.isFinite(at) || at > now) continue;
     const age = Math.floor((now - at) / DAY_MS);
+    if (age >= SPAN) continue;
+    const bucket = SPAN - 1 - age;
     const started = Date.parse(mission.startedAt || '');
     const hours = Number.isFinite(started) && started <= at ? (at - started) / 3_600_000 : null;
-    const failed = mission.status === 'failed';
-    if (age < HOME_DAYS) {
-      const bucket = HOME_DAYS - 1 - age;
-      if (failed) failedPerDay[bucket]! += 1;
-      else completedPerDay[bucket]! += 1;
-      if (!failed && hours !== null) durationsPerDay[bucket]!.push(hours);
-    } else if (age < HOME_DAYS * 2) {
-      if (failed) previousFailed += 1;
-      else previousCompleted += 1;
-      if (!failed && hours !== null) previousDurations.push(hours);
+    if (mission.status === 'failed') failed14[bucket]! += 1;
+    else {
+      completed14[bucket]! += 1;
+      if (hours !== null) durations14[bucket]!.push(hours);
     }
   }
   const blockedAll = missions
@@ -236,8 +234,15 @@ export function composeHomeDashboard(snapshot: HomeSnapshot): HomeDashboard {
   const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
   const rate = (failed: number, completed: number) =>
     failed + completed > 0 ? round(failed / (failed + completed), 3) : null;
+  const completedPerDay = completed14.slice(HOME_DAYS);
   const currentCompleted = sum(completedPerDay);
-  const currentFailed = sum(failedPerDay);
+  const currentFailed = sum(failed14.slice(HOME_DAYS));
+  const previousCompleted = sum(completed14.slice(0, HOME_DAYS));
+  const previousFailed = sum(failed14.slice(0, HOME_DAYS));
+  // Health lines are trailing 7-day windows ending on each of the last 7
+  // days, so a sparse week still reads as a line, not scattered dots.
+  const windowOf = <T>(values: T[], end: number) => values.slice(end - HOME_DAYS + 1, end + 1);
+  const ends = Array.from({ length: HOME_DAYS }, (_, i) => HOME_DAYS + i);
 
   // Key results: the ones furthest from target first, measured before unmeasured.
   let krs: HomeDashboard['krs'] = { state: 'no_organization', items: [] };
@@ -314,12 +319,14 @@ export function composeHomeDashboard(snapshot: HomeSnapshot): HomeDashboard {
       blockedTotal: blockedAll.length,
     },
     health: {
-      failureRate: completedPerDay.map((completed, i) => rate(failedPerDay[i]!, completed)),
+      failureRate: ends.map((end) =>
+        rate(sum(windowOf(failed14, end)), sum(windowOf(completed14, end)))
+      ),
       failureRateCurrent: rate(currentFailed, currentCompleted),
       failureRatePrevious: rate(previousFailed, previousCompleted),
-      durationHours: durationsPerDay.map((values) => round(median(values), 1)),
-      durationCurrent: round(median(durationsPerDay.flat()), 1),
-      durationPrevious: round(median(previousDurations), 1),
+      durationHours: ends.map((end) => round(median(windowOf(durations14, end).flat()), 1)),
+      durationCurrent: round(median(durations14.slice(HOME_DAYS).flat()), 1),
+      durationPrevious: round(median(durations14.slice(0, HOME_DAYS).flat()), 1),
     },
     krs,
     cost,

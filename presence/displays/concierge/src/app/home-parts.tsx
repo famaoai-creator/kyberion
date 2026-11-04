@@ -240,30 +240,22 @@ export function SetupChecklist({
       />
       {pending.map((org) => (
         <ol className="kb-home__steps" key={org.tenant_slug} aria-label={org.tenant_slug}>
-          {org.steps.map((step) => {
-            const key = SETUP_STEP_KEYS[step.id as OrgReadinessStepId];
-            const label = key ? t(key) : '';
-            if (!label) return null;
-            return (
-              <li key={step.id} data-done={step.done ? 'true' : 'false'}>
-                {step.done ? (
-                  <span className="kb-home__step">
-                    <span className="kb-home__step-mark" aria-hidden="true">
-                      ✓
-                    </span>
-                    <span>{label}</span>
-                    <span className="kb-home__muted">{t('ia_home_setup_done')}</span>
-                  </span>
-                ) : (
+          {org.steps
+            .filter((step) => !step.done)
+            .map((step) => {
+              const key = SETUP_STEP_KEYS[step.id as OrgReadinessStepId];
+              const label = key ? t(key) : '';
+              if (!label) return null;
+              return (
+                <li key={step.id}>
                   <Link className="kb-home__step" href={settingsHref(step.href)}>
                     <span className="kb-home__step-mark" aria-hidden="true" />
                     <span>{label}</span>
                     <span className="kb-home__link">{t('setup.org_ready_go')} →</span>
                   </Link>
-                )}
-              </li>
-            );
-          })}
+                </li>
+              );
+            })}
         </ol>
       ))}
     </Tile>
@@ -452,7 +444,7 @@ const MISSION_KEYS = {
 export function MissionsTile({ t, home, onRetry, bcp47 = 'en' }: TileProps) {
   const action = { label: t('ia_home_missions_open'), href: workHref() };
   return (
-    <Tile span="wide" testId="home-missions" title={t('ia_home_missions_title')} action={action}>
+    <Tile span="half" testId="home-missions" title={t('ia_home_missions_title')} action={action}>
       <HomeState t={t} home={home} section="missions" onRetry={onRetry}>
         {(data) => {
           const missions = data.missions;
@@ -543,7 +535,7 @@ export function MissionsTile({ t, home, onRetry, bcp47 = 'en' }: TileProps) {
 export function HealthTile({ t, home, onRetry, bcp47 = 'en' }: TileProps) {
   const action = { label: t('ia_home_health_open'), href: '/ops?section=diagnostics' };
   return (
-    <Tile span="narrow" testId="home-health" title={t('ia_home_health_title')} action={action}>
+    <Tile span="half" testId="home-health" title={t('ia_home_health_title')} action={action}>
       <HomeState t={t} home={home} section="health" onRetry={onRetry}>
         {(data) => {
           const health = data.health;
@@ -672,8 +664,11 @@ export function KeyResultsTile({ t, home, onRetry, bcp47 = 'en' }: TileProps) {
                       />
                     </span>
                     <span className="kb-home__muted">
-                      {progress}
-                      {value ? ` · ${value}` : ''}
+                      {kr.percent === undefined
+                        ? t('ia_home_kr_target', {
+                            target: `${fmtNumber(bcp47, kr.target, 2)}${kr.unit ? ` ${kr.unit}` : ''}`,
+                          })
+                        : `${progress}${value ? ` · ${value}` : ''}`}
                     </span>
                   </li>
                 );
@@ -800,7 +795,12 @@ export function DeliverablesTile({ t, home, onRetry, bcp47 = 'en' }: TileProps) 
                   <Link href="/library" className="kb-home__list-row">
                     <span className="kb-home__list-title">
                       {item.title ||
-                        t('ia_home_deliverables_untitled', { kind: item.kind.toUpperCase() })}
+                        t('ia_home_deliverables_dated', {
+                          date: new Date(item.updatedAt).toLocaleDateString(bcp47, {
+                            month: 'long',
+                            day: 'numeric',
+                          }),
+                        })}
                     </span>
                     <span className="kb-home__muted">
                       {item.missionTitle
