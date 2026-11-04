@@ -194,3 +194,47 @@ beforeEach(() => {
   preferencesReadiness.mockReset();
   preferencesReadiness.mockReturnValue({ status: 'missing' });
 });
+
+describe('streaming-tts-bridge: generic saved seam default', () => {
+  beforeEach(() => {
+    record.mockClear();
+    safeRmSync(dir, { recursive: true, force: true });
+    vi.stubEnv('MISSION_ID', '');
+    vi.stubEnv('KYBERION_STREAMING_TTS_BRIDGE', '');
+    vi.stubEnv('KYBERION_SEAM_SELECTION_RULES_PATH', rulesFile);
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    resetStreamingTtsBridges();
+    safeRmSync(dir, { recursive: true, force: true });
+  });
+
+  it('runs governed selection for the saved default when no engine preference is set', () => {
+    expect(resolveStreamingTtsBridge().bridge_id).toBe('stub');
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'streaming-tts-bridge=gemini');
+    expect(resolveStreamingTtsBridge().bridge_id).toBe('gemini');
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'streaming-tts-bridge/gemini' })
+    );
+  });
+
+  it('keeps explicit ids and the engine preference above it; auto is not explicit', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'streaming-tts-bridge=gemini');
+    expect(resolveStreamingTtsBridge({ bridgeId: 'stub' }).bridge_id).toBe('stub');
+    vi.stubEnv('KYBERION_STREAMING_TTS_BRIDGE', 'stub');
+    expect(resolveStreamingTtsBridge().bridge_id).toBe('stub');
+    vi.stubEnv('KYBERION_STREAMING_TTS_BRIDGE', 'auto');
+    expect(resolveStreamingTtsBridge().bridge_id).toBe('gemini');
+    expect(resolveStreamingTtsBridge({ bridgeId: 'auto' }).bridge_id).toBe('gemini');
+    preferencesReadiness.mockReturnValue({
+      status: 'ready',
+      preferences: { version: '1.0.0', streaming_tts_bridge: 'stub' },
+    });
+    expect(resolveStreamingTtsBridge().bridge_id).toBe('stub');
+  });
+
+  it('falls back to the policy default when the saved default cannot run the task', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'streaming-tts-bridge=gemini');
+    expect(resolveStreamingTtsBridge({ requires: { localOnly: true } }).bridge_id).toBe('stub');
+  });
+});
