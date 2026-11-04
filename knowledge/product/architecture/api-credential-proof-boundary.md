@@ -112,10 +112,16 @@ errors that embed child stderr (`libs/core/provider/provider-output-redaction.ts
 The needles are the secret-guard active-secret registry plus credential env values:
 every provider's declared key, `COPILOT_PROVIDER_API_KEY`, `GH_TOKEN` and
 `GITHUB_TOKEN`. A CLI reads its key from env without registering it.
-Redaction walks parsed values (`redactSecretsDeep`, depth/size-bounded,
-cycle-safe, fail closed with a marker, warning when the node cap is hit). Parsed
-outputs are redacted after parsing, never as raw JSON. Each value is also matched
-in its JSON-escaped form, so a multi-line key (PEM) inside a JSON string is caught.
+Structured results are walked value by value (`redactSecretsDeep`,
+depth/size-bounded, cycle-safe, fail closed with a marker, warning when the node
+cap is hit). These backends parse the raw CLI output first and redact the parsed
+value: shell-claude `runStructured`, shell-grok `runStructured`, gemini (all
+paths), agy `runStructured`, and codex-cli-query. The text-mode backends (cursor,
+devin, opencode, copilot-acp, and shell-claude/grok text calls) mask the
+model-written text before the structured parser reads it. A secret inside JSON
+there can make parsing fail, which fails closed and never leaks. Each value is
+also matched in its JSON-escaped form, so a multi-line key (PEM) inside a JSON
+string is caught.
 Streams work on the unmasked buffer and hold back any suffix that could begin a
 secret. A key split across chunks, or a longer secret containing a shorter one,
 is masked whole.
@@ -149,6 +155,8 @@ Covered launch sites with the flag on:
 | `safeChildEnv` callers: agent-adapter codex exec / claude `-p`, codex app-server adapter (codex native-subagent harness) | key dropped (fail closed)                                           |
 | ACP mediator (`sanitizeEnvForChild`)                                                                                     | key dropped (fail closed)                                           |
 | claude-agent SDK queries (strict and non-strict)                                                                         | key dropped (fail closed)                                           |
+| herdr pane agents (`agent start --kind claude\|codex`, `HerdrRuntimeClient.run` / `readAgent`)                           | key dropped (fail closed)                                           |
+| generic shells: pty-engine sessions, process-actuator `spawn`                                                            | key dropped (fail closed, caller-supplied env included)             |
 | `KYBERION_PROVIDER_ENV_ALLOWLIST=0` with the relay flag                                                                  | refused (`[CREDENTIAL_RELAY_CONFLICT]`)                             |
 
 "Key dropped" means those children must use their own login, or they fail to

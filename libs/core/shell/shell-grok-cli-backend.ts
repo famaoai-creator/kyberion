@@ -505,6 +505,16 @@ export class ShellGrokCliBackend implements ReasoningBackend {
     userPrompt: string;
     schema: ZodType<T>;
   }): Promise<T> {
+    // Output exit: parse the raw envelope first, then redact the parsed value
+    // and any error (masking raw JSON could break parsing on an unquoted secret).
+    return withRedactedProviderOutput(() => this.runStructuredUnredacted(params));
+  }
+
+  private async runStructuredUnredacted<T>(params: {
+    systemPrompt: string;
+    userPrompt: string;
+    schema: ZodType<T>;
+  }): Promise<T> {
     assertReasoningEgressAllowed(this.name);
     const jsonSchema = z.toJSONSchema(params.schema) as Record<string, unknown>;
     if ('$schema' in jsonSchema) delete jsonSchema['$schema'];
@@ -529,7 +539,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
       ...this.extraArgs,
     ];
 
-    const stdout = await this.spawnCli(args, '');
+    const stdout = await this.spawnCliRaw(args, '');
     let cliResult: any;
     try {
       cliResult = parseSafeJsonInput(stdout, 'Grok CLI response');
@@ -558,7 +568,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
         `[shell-grok-cli] schema validation failed: ${parsed.error.message}. Structured: ${JSON.stringify(structured).slice(0, 500)}`
       );
     }
-    return redactProviderOutputValue(parsed.data);
+    return parsed.data;
   }
 
   private spawnCli(
