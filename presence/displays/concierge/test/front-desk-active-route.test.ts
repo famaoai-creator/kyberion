@@ -1,44 +1,68 @@
 import { describe, expect, it } from 'vitest';
-import { currentItemId } from '../src/app/front-desk-rail';
+import { currentItemId, needsYouBadgeText, needsYouBadgeTotal } from '../src/app/front-desk-rail';
 
-describe('front-desk nested setup navigation', () => {
+describe('front-desk rail current destination (MSN-SHELL-IA §1)', () => {
   it.each([
-    ['/', 'decide'],
-    ['/ingest', 'ingest'],
-    ['/management', 'organization'],
+    ['/', 'home'],
+    ['/inbox', 'inbox'],
+    ['/work', 'work'],
+    ['/org', 'org'],
+    ['/library', 'library'],
+    ['/ingest', 'library'],
+    ['/management', 'org'],
+    ['/ops', 'ops'],
+    ['/ops/discussion', 'ops'],
     ['/settings', 'settings'],
     ['/setup', 'settings'],
     ['/setup/sso', 'settings'],
     ['/setup/first-run', null],
-    ['/w', 'overview'],
-    ['/w/tenant/acme', 'overview'],
-    ['/w/organization', 'organizations'],
-    ['/w/project/p-1', 'projects'],
-    ['/w/mission/MSN-1', 'missions'],
-    ['/w/task/MSN-1%2Ft1', 'missions'],
-    ['/w/work_item', 'work-items'],
-    ['/w/approval/a-1', 'approvals'],
-    ['/w/actor/m-1', 'actors'],
+    ['/w', 'home'],
+    ['/w/tenant/acme', 'org'],
+    ['/w/organization', 'org'],
+    ['/w/project/p-1', 'org'],
+    ['/w/actor/m-1', 'org'],
+    ['/w/mission/MSN-1', 'work'],
+    ['/w/task/MSN-1%2Ft1', 'work'],
+    ['/w/work_item', 'work'],
+    ['/w/approval/a-1', 'inbox'],
     ['/wiki', null],
+    ['/worker', null],
     ['/signin', null],
     ['/login', null],
     [null, null],
-  ])('maps %s to %s without marking first-run bootstrap as settings', (pathname, expected) => {
+  ])('maps %s to %s', (pathname, expected) => {
     expect(currentItemId(pathname)).toBe(expected);
+  });
+
+  it('marks every /ops section as the operations destination', () => {
+    for (const section of ['operations', 'diagnostics', 'surface-control', 'discussion', null]) {
+      expect(currentItemId('/ops', section)).toBe('ops');
+    }
   });
 });
 
-describe('front-desk operations console navigation (/ops)', () => {
-  it.each([
-    ['knowledge', 'knowledge'],
-    ['diagnostics', 'diagnostics'],
-    ['surface-control', 'surface-control'],
-    ['home', null],
-    [null, null],
-  ])('marks /ops?section=%s as %s', (section, expected) => {
-    expect(currentItemId('/ops', section)).toBe(expected);
+describe('needs-you rail badge', () => {
+  it('reads total only from an ok summary payload', () => {
+    expect(needsYouBadgeTotal({ ok: true, total: 4, overdue: 1 })).toBe(4);
+    expect(needsYouBadgeTotal({ ok: true, total: 0 })).toBe(0);
+    for (const bad of [
+      null,
+      undefined,
+      'x',
+      { ok: false, total: 3 },
+      { ok: true },
+      { ok: true, total: -1 },
+      { ok: true, total: Number.NaN },
+      { ok: true, total: '3' },
+    ]) {
+      expect(needsYouBadgeTotal(bad)).toBeNull();
+    }
   });
-  it('marks the discussion page as the discussion entry', () => {
-    expect(currentItemId('/ops/discussion')).toBe('discussion');
+
+  it('hides the badge at zero or on failure and caps long counts', () => {
+    expect(needsYouBadgeText(null)).toBeUndefined();
+    expect(needsYouBadgeText(0)).toBeUndefined();
+    expect(needsYouBadgeText(7)).toBe('7');
+    expect(needsYouBadgeText(120)).toBe('99+');
   });
 });
