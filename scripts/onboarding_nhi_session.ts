@@ -8,7 +8,7 @@
  *
  * A human-approved admission binds a session token to an organization NHI in
  * the governed agent-identity journal. Export the printed env pair
- * (KYBERION_NHI_ACTOR + KYBERION_NHI_SESSION) so this session's delegated
+ * (KYBERION_NHI_ID + KYBERION_NHI_SESSION) so this session's delegated
  * external operations run under the admitted NHI instead of a bare
  * `pipeline:<hash>` actor.
  */
@@ -116,7 +116,7 @@ export async function main(
           ...outcome,
           next:
             'Export for this session: ' +
-            `KYBERION_NHI_ACTOR=${outcome.nhi_id} ${NHI_SESSION_ENV}=${outcome.session_id} ` +
+            `KYBERION_NHI_ID=${outcome.nhi_id} ${NHI_SESSION_ENV}=${outcome.session_id} ` +
             `(valid until ${outcome.expires_at})`,
         };
       }

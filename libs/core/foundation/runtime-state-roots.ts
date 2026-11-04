@@ -22,6 +22,8 @@ export const PARTITIONED_RUNTIME_STATE_ROOTS = {
   customer_decision_invites: 'active/shared/runtime/customer-decision-invites',
   /** Kyberion -> Chrome extension pull mailbox (browser/browser-bridge-mailbox.ts). */
   browser_bridge_mailbox: 'active/shared/runtime/browser-bridge-mailbox',
+  /** Saved per-seam provider defaults: tenant / organization / project layers (seam-selection-defaults.ts). */
+  seam_selection_defaults: 'active/shared/runtime/seam-selection-defaults',
 } as const;
 
 /**
@@ -66,6 +68,8 @@ export const RUNTIME_STATE_PATHS = {
   'organization.projectsRoot': 'active/shared/runtime/projects',
   'quota.tenantBuckets': 'active/shared/runtime/tenant-rate-limit-state.json',
   'desktopAx.agentDesktopHome': 'active/shared/runtime/system/agent-desktop',
+  /** Operator layer of saved seam defaults (seam-selection-defaults.ts). */
+  'seamSelection.operatorDefaults': 'active/shared/runtime/seam-selection/defaults.json',
 } as const;
 
 export type RuntimeStateKey = keyof typeof RUNTIME_STATE_PATHS;

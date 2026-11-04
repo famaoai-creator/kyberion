@@ -1,4 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const nativeSecretMocks = vi.hoisted(() => ({
+  readNativeSecretSync: vi.fn(),
+}));
+
+vi.mock('@agent/core/secret/secret-bridge', () => nativeSecretMocks);
+vi.mock('@agent/core/secret/secret-resolver', () => ({
+  getSecretResolver: () => null,
+  resolveSecretSync: () => null,
+}));
+vi.mock('@agent/core/secret/secret-guard', () => ({
+  getSecretForIdentity: () => null,
+  loadConnectionDocument: () => ({}),
+}));
+
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
@@ -6,6 +21,7 @@ import {
   BACKUP_PASSPHRASE_INTRODUCE_COMMAND,
   backupPassphraseIdentity,
   describeBackupPassphraseAvailability,
+  governedBackupPassphraseBackend,
   resolveBackupPassphrase,
   type BackupPassphraseAuditRecord,
   type BackupPassphraseSecretBackend,
@@ -37,6 +53,7 @@ const envOf =
 describe('backup passphrase resolution', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    nativeSecretMocks.readNativeSecretSync.mockReset();
   });
 
   it('uses the governed identity kyberion-backup / PASSPHRASE', () => {
@@ -48,6 +65,31 @@ describe('backup passphrase resolution', () => {
     });
     expect(BACKUP_PASSPHRASE_INTRODUCE_COMMAND).toBe(
       'pnpm kyberion secret introduce kyberion-backup PASSPHRASE'
+    );
+  });
+
+  it('resolves an introduced Windows Credential Manager passphrase as an external secret', () => {
+    nativeSecretMocks.readNativeSecretSync.mockReturnValue({
+      value: SECRET,
+      backend: 'windows_credential_manager',
+    });
+
+    const resolved = resolveBackupPassphrase(ENV, 'create', {
+      readEnv: envOf({}),
+      audit: () => {},
+    });
+
+    expect(resolved).toEqual({
+      value: SECRET,
+      source: 'secret:windows_credential_manager',
+      envName: ENV,
+    });
+    expect(nativeSecretMocks.readNativeSecretSync).toHaveBeenCalledWith(
+      'kyberion-backup',
+      'passphrase'
+    );
+    expect(governedBackupPassphraseBackend.inBackupScopeStores(backupPassphraseIdentity())).toEqual(
+      []
     );
   });
 

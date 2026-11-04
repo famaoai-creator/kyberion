@@ -179,7 +179,12 @@ function selectVoiceSttBackendOrder(
   }
   const ranked = decision.ranked as ConcreteVoiceSttBackend[];
   if (decision.strategy === 'purpose' || decision.strategy === 'fallback') return ranked;
-  if (decision.strategy === 'default') return null;
+  // The policy default keeps the platform order; a saved seam default leads it.
+  if (decision.strategy === 'default') {
+    if (decision.default_source === 'policy' || !decision.provider_id) return null;
+    const saved = decision.provider_id as ConcreteVoiceSttBackend;
+    return [saved, ...baseOrder.filter((id) => id !== saved)];
+  }
   let leading: ConcreteVoiceSttBackend[] = [decision.provider_id as ConcreteVoiceSttBackend];
   if (decision.strategy === 'rule') {
     const rule = matchSeamSelectionRule(VOICE_HUB_STT_SEAM, request);
@@ -195,7 +200,8 @@ function selectVoiceSttBackendOrder(
  * Backend order for voice-hub STT. Explicit choices win: a requested backend
  * (request body or the operator's voice-selection preference), then
  * VOICE_HUB_STT_PREFERENCE. For `auto` without them, the voice-hub-stt seam
- * policy orders the backends when a purpose or operator rule applies;
+ * policy orders the backends when a purpose or operator rule applies, and a
+ * saved seam default (seam-selection-defaults) leads the platform order;
  * otherwise the platform default order stays. Availability probes decide
  * eligibility in every case.
  */

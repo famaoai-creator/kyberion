@@ -6,6 +6,8 @@ import {
   loadPersonalIdentityAtPath,
   writePersonalAgentIdentityAtPath,
   writePersonalIdentityAtPath,
+  personalAgentIdentityRevision,
+  readPersonalAgentIdentityStrictAtPath,
 } from './personal-identity-state.js';
 import {
   safeMkdir,
@@ -73,6 +75,45 @@ describe('personal identity state loaders', () => {
           [] as unknown as Record<string, unknown>
         )
       ).toThrow(/Invalid catalog personal-identity/);
+    });
+  });
+
+  it('rejects stale profile writes and preserves bindings during same-persona re-onboarding', () => {
+    withExecutionContext('mission_controller', () => {
+      const file = path.join(fixtureRoot, 'agent-identity.json');
+      const bindings = {
+        version: 1,
+        persona_id: 'haru',
+        accountable_human_id: 'user:owner',
+        personal_nhi_id: 'kyberion://agent/personal/haru',
+        tenant_bindings: [],
+      };
+      writePersonalAgentIdentityAtPath(file, {
+        agent_id: 'haru',
+        persona_identity_bindings: bindings,
+      });
+      const old = personalAgentIdentityRevision(readPersonalAgentIdentityStrictAtPath(file));
+      writePersonalAgentIdentityAtPath(file, { agent_id: 'haru', display_name: 'Updated' }, old);
+      expect(readPersonalAgentIdentityStrictAtPath(file)?.persona_identity_bindings).toEqual(
+        bindings
+      );
+      expect(() =>
+        writePersonalAgentIdentityAtPath(file, { agent_id: 'haru', display_name: 'Stale' }, old)
+      ).toThrow(/profile changed/);
+      expect(() => writePersonalAgentIdentityAtPath(file, { agent_id: 'renamed' })).toThrow(
+        /clear persona bindings/
+      );
+      expect(readPersonalAgentIdentityStrictAtPath(file)?.agent_id).toBe('haru');
+    });
+  });
+
+  it('strict reads distinguish missing from malformed profiles', () => {
+    withExecutionContext('mission_controller', () => {
+      const file = path.join(fixtureRoot, 'agent-identity.json');
+      expect(readPersonalAgentIdentityStrictAtPath(file)).toBeNull();
+      safeMkdir(fixtureRoot, { recursive: true });
+      safeWriteFile(file, '{invalid');
+      expect(() => readPersonalAgentIdentityStrictAtPath(file)).toThrow();
     });
   });
 });

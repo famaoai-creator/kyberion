@@ -9691,9 +9691,9 @@
         "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ƈȧṗȧƀïŀïŧẏ şėȧɱ ɠřȧṗħ ŀőřėɱ ïṗşůɱ ⟧"
       },
       "cli_cmd_script_check": {
-        "en": "Run repository checks (pnpm check -- --scope pr before a PR)",
-        "ja": "リポジトリのチェックを実行 (PR 前は --scope pr)",
-        "qps-ploc": "⟦Řůñ řėṗőşïŧőřẏ ƈħėƈķş (ṗñṗɱ ƈħėƈķ -- --şƈőṗė ṗř ƀėƒőřė ȧ ṖŘ) ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+        "en": "Run repository checks (pnpm check -- --changed before a PR)",
+        "ja": "リポジトリのチェックを実行 (PR 前は --changed)",
+        "qps-ploc": "⟦Řůñ řėṗőşïŧőřẏ ƈħėƈķş (ṗñṗɱ ƈħėƈķ -- --ƈħȧñɠėḓ ƀėƒőřė ȧ ṖŘ) ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
       },
       "cli_cmd_script_knowledge_sync": {
         "en": "Run the knowledge sync pipeline",
@@ -9716,9 +9716,9 @@
         "qps-ploc": "⟦Őṗėñ ȧ ƓïŧĦůƀ ṗůŀŀ řėɋůėşŧ ȧƒŧėř ŧħė řėȧḓïñėşş ɠȧŧėş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
       "cli_cmd_script_pr_preflight": {
-        "en": "Run the pull-request readiness gates for changed paths without creating a PR",
-        "ja": "PR を作成せずに、変更パスに応じた PR 準備ゲートを実行",
-        "qps-ploc": "⟦Řůñ ŧħė ṗůŀŀ-řėɋůėşŧ řėȧḓïñėşş ɠȧŧėş ƒőř ƈħȧñɠėḓ ṗȧŧħş ẇïŧħőůŧ ƈřėȧŧïñɠ ȧ ṖŘ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+        "en": "Run the pull-request readiness gates and affected tests for changed paths without creating a PR",
+        "ja": "PR を作成せずに、変更パスに応じた PR 準備ゲートと影響テストを実行",
+        "qps-ploc": "⟦Řůñ ŧħė ṗůŀŀ-řėɋůėşŧ řėȧḓïñėşş ɠȧŧėş ȧñḓ ȧƒƒėƈŧėḓ ŧėşŧş ƒőř ƈħȧñɠėḓ ṗȧŧħş ẇïŧħőůŧ ƈřėȧŧïñɠ ȧ ṖŘ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
       },
       "cli_cmd_script_check_commit_subject": {
         "en": "Check the HEAD commit subject",
@@ -10626,9 +10626,9 @@
         "qps-ploc": "⟦Ħėŀṗ őñŀẏ: `ķẏƀėřïőñ {command}` ẇȧş ñőŧ řůñ (ïŧ ħȧş ñő ƀůïŀŧ-ïñ --ħėŀṗ ŧħȧŧ ïş şȧƒė ŧő ƒőřẇȧřḓ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
       "cli_caution_pr_create": {
-        "en": "Caution: creates a real GitHub pull request (runs `pnpm check -- --scope pr` and the knowledge gate first).",
-        "ja": "注意: 実際に GitHub の PR を作成します (先に `pnpm check -- --scope pr` と knowledge ゲートを実行)。",
-        "qps-ploc": "⟦Ƈȧůŧïőñ: ƈřėȧŧėş ȧ řėȧŀ ƓïŧĦůƀ ṗůŀŀ řėɋůėşŧ (řůñş `ṗñṗɱ ƈħėƈķ -- --şƈőṗė ṗř` ȧñḓ ŧħė ķñőẇŀėḓɠė ɠȧŧė ƒïřşŧ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
+        "en": "Caution: creates a real GitHub pull request (runs `pnpm check -- --changed` and the knowledge gate first).",
+        "ja": "注意: 実際に GitHub の PR を作成します (先に `pnpm check -- --changed` と knowledge ゲートを実行)。",
+        "qps-ploc": "⟦Ƈȧůŧïőñ: ƈřėȧŧėş ȧ řėȧŀ ƓïŧĦůƀ ṗůŀŀ řėɋůėşŧ (řůñş `ṗñṗɱ ƈħėƈķ -- --ƈħȧñɠėḓ` ȧñḓ ŧħė ķñőẇŀėḓɠė ɠȧŧė ƒïřşŧ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
       },
       "cli_manifest_help_title": {
         "en": "Kyberion commands",

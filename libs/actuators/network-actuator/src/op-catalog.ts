@@ -29,6 +29,7 @@ const NETWORK_CONTRACTS: Record<string, InputSchema> = {
       method: { type: 'string', enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] },
       query: { type: 'object' },
       timeout: { type: 'number' },
+      timeout_ms: { type: 'number' },
       url: { type: 'string' },
     },
     required: ['url'],

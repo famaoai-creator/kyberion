@@ -23,6 +23,7 @@ import {
 } from '../secure-io.js';
 import { createLogger } from '../logger.js';
 import { getAdapterDefault } from '../actuator/adapter-default-preferences.js';
+import { resolveSeamDefaultOrder } from '../seam-provider-selection.js';
 import { type EmailAccountId, type EmailAccountOperation } from './email-account-catalog.js';
 export { listEmailAccountProviders } from './email-account-catalog.js';
 export type {
@@ -1350,8 +1351,15 @@ export class EmailAccountRegistry {
       }
       return adapter;
     }
+    // auto: the adapter default, then the generic saved seam default
+    // (`seam select default email-account-provider=<id>`), then the governed
+    // policy chain (gmail → outlook). Unlike an explicit account, an
+    // unauthenticated saved default falls through to the next ready one.
     const preferred = getAdapterDefault('email.account');
-    const ids: EmailAccountId[] = [preferred as EmailAccountId, 'gmail', 'outlook'].filter(
+    const ids: EmailAccountId[] = [
+      preferred as EmailAccountId,
+      ...resolveSeamDefaultOrder('email-account-provider', { builtin: ['gmail', 'outlook'] }),
+    ].filter(
       (id, index, values): id is EmailAccountId => Boolean(id) && values.indexOf(id) === index
     );
     for (const id of ids) {

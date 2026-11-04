@@ -110,3 +110,47 @@ describe('voice-hub STT order via the voice-hub-stt seam policy', () => {
     expect(record).not.toHaveBeenCalled();
   });
 });
+
+describe('voice-hub STT order with a saved seam default', () => {
+  beforeEach(() => {
+    record.mockClear();
+    safeRmSync(dir, { recursive: true, force: true });
+    vi.stubEnv('MISSION_ID', '');
+    vi.stubEnv('KYBERION_SEAM_SELECTION_RULES_PATH', rulesFile);
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    safeRmSync(dir, { recursive: true, force: true });
+  });
+
+  it('leads the platform order with the saved default when nothing explicit is given', () => {
+    const base = resolveVoiceSttBackendOrder('auto', availability, NO_PREFERENCE);
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'voice-hub-stt=whisper_cpp');
+    const order = resolveVoiceSttBackendOrder('auto', availability, NO_PREFERENCE);
+    expect(order).toEqual(['whisper_cpp', ...base.filter((id) => id !== 'whisper_cpp')]);
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'voice-hub-stt/whisper_cpp' })
+    );
+  });
+
+  it('keeps explicit choices above the saved default', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'voice-hub-stt=whisper_cpp');
+    expect(resolveVoiceSttBackendOrder('mlx_whisper', availability, NO_PREFERENCE)).toEqual([
+      'mlx_whisper',
+    ]);
+    expect(
+      resolveVoiceSttBackendOrder('auto', availability, {
+        VOICE_HUB_STT_PREFERENCE: 'server,mlx_whisper',
+      })
+    ).toEqual(['server', 'mlx_whisper']);
+    expect(
+      resolveVoiceSttBackendOrder('auto', availability, NO_PREFERENCE, { purpose: 'latency' })[0]
+    ).toBe('native_speech');
+  });
+
+  it('keeps the platform order when the saved default is unavailable', () => {
+    const base = resolveVoiceSttBackendOrder('auto', availability, NO_PREFERENCE);
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'voice-hub-stt=fluid_audio');
+    expect(resolveVoiceSttBackendOrder('auto', availability, NO_PREFERENCE)).toEqual(base);
+  });
+});
