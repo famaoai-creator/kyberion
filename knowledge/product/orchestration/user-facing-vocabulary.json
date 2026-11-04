@@ -14308,6 +14308,11 @@
         "ja": "Chronosで確認",
         "qps-ploc": "⟦Řėṽïėẇ ïñ Ƈħřőñőş ŀőřėɱ⟧"
       },
+      "memory.review_in_library": {
+        "en": "Review in the library",
+        "ja": "資料で確認する",
+        "qps-ploc": "⟦Řėṽïėẇ ïñ ŧħė ŀïƀřȧřẏ ŀőřėɱ ⟧"
+      },
       "concierge_escalation_hold_reply": {
         "en": "We will confirm and get back to you shortly.",
         "ja": "確認して回答します",
@@ -17248,6 +17253,11 @@
         "ja": "全体像",
         "qps-ploc": "⟦Őṽėřṽïėẇ ŀőř⟧"
       },
+      "ws_back_home": {
+        "en": "Back to Home",
+        "ja": "ホームに戻る",
+        "qps-ploc": "⟦Ƀȧƈķ ŧő Ħőɱė ŀőř⟧"
+      },
       "ws_overview_lead": {
         "en": "How companies, organizations, projects, missions and people connect — and what needs attention now.",
         "ja": "会社・組織・プロジェクト・ミッション・人のつながりと、いま対応が必要なもの。",
@@ -17628,6 +17638,16 @@
         "ja": "ほかの項目は最新です。0 件という意味ではありません。",
         "qps-ploc": "⟦Ŧħė řėşŧ őƒ ŧħė ṗȧɠė ïş ƈůřřėñŧ. Ŧħïş ïş ñőŧ ȧ ẑėřő. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
+      "ia_home_tile_withheld_title": {
+        "en": "Choose a company to see the details",
+        "ja": "会社を選ぶと詳しく表示されます",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ƈőɱṗȧñẏ ŧő şėė ŧħė ḓėŧȧïŀş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_home_tile_withheld_body": {
+        "en": "With no company selected, Home shows counts across all your companies, not one company's items.",
+        "ja": "会社を選んでいないあいだは、すべての会社の件数だけを表示し、個別の会社の内容は出しません。",
+        "qps-ploc": "⟦Ẇïŧħ ñő ƈőɱṗȧñẏ şėŀėƈŧėḓ, Ħőɱė şħőẇş ƈőůñŧş ȧƈřőşş ȧŀŀ ẏőůř ƈőɱṗȧñïėş, ñőŧ őñė ƈőɱṗȧñẏ'ş ïŧėɱş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
       "ia_home_setup_title": {
         "en": "Finish setting up",
         "ja": "セットアップを仕上げましょう",
@@ -17772,6 +17792,11 @@
         "en": "Open Operations",
         "ja": "運用を開く",
         "qps-ploc": "⟦Őṗėñ Őṗėřȧŧïőñş ŀőřė⟧"
+      },
+      "ia_home_cost_open": {
+        "en": "Open diagnostics",
+        "ja": "診断を開く",
+        "qps-ploc": "⟦Őṗėñ ḓïȧɠñőşŧïƈş ŀőřėɱ⟧"
       },
       "ia_home_agents_empty_title": {
         "en": "No agent has work right now",
@@ -20603,6 +20628,11 @@
         "ja": "案件を開く",
         "qps-ploc": "⟦Őṗėñ ŧħė ƈȧşė ŀőřė⟧"
       },
+      "ia_inbox_decision_mark_handled": {
+        "en": "Mark as handled",
+        "ja": "対応済みにする",
+        "qps-ploc": "⟦Ɱȧřķ ȧş ħȧñḓŀėḓ ŀőřė⟧"
+      },
       "ia_inbox_review_title": {
         "en": "A deliverable is ready for your check",
         "ja": "成果物の確認をお願いします",
@@ -20647,6 +20677,11 @@
         "en": "Show more",
         "ja": "さらに表示",
         "qps-ploc": "⟦Şħőẇ ɱőřė ŀőř⟧"
+      },
+      "ia_inbox_load_more_error": {
+        "en": "Couldn't load more. The items above are still current — try again.",
+        "ja": "続きを読み込めませんでした。上に出ている項目はそのまま使えます。もう一度お試しください。",
+        "qps-ploc": "⟦Ƈőůŀḓñ'ŧ ŀőȧḓ ɱőřė. Ŧħė ïŧėɱş ȧƀőṽė ȧřė şŧïŀŀ ƈůřřėñŧ — ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       },
       "ia_inbox_load_error": {
         "en": "The queue could not be loaded. Try again.",
