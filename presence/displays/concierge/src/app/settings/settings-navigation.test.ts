@@ -43,6 +43,10 @@ function harness(initial = 'http://localhost/settings?tenant=alpha') {
   elements.set('settings-display', element(0));
   elements.set('setup-services', element(800));
   elements.set('setup-governance', element(900));
+  // Category containers: the scroll tracker reads these, cards are reveal targets.
+  elements.set('settings-cat-workspace', element(-300));
+  elements.set('settings-cat-display', element(0));
+  elements.set('settings-cat-connections', element(800));
   const view = {
     ResizeObserver: class {
       constructor(callback: () => void) {
@@ -151,13 +155,13 @@ describe('settings browser navigation', () => {
     const h = harness();
     const nav = h.mount();
     expect(h.current).toHaveBeenLastCalledWith('display');
-    h.elements.get('setup-services')!.top = 10;
+    h.elements.get('settings-cat-connections')!.top = 10;
     h.callbacks.get('scroll')?.forEach((cb) => cb());
     h.callbacks.get('scroll')?.forEach((cb) => cb());
     expect(h.frames.size).toBe(1);
     h.flushFrames();
-    expect(h.current).toHaveBeenLastCalledWith('services');
-    h.elements.get('setup-services')!.top = 800;
+    expect(h.current).toHaveBeenLastCalledWith('connections');
+    h.elements.get('settings-cat-connections')!.top = 800;
     h.callbacks.get('scroll')?.forEach((cb) => cb());
     h.flushFrames();
     expect(h.current).toHaveBeenLastCalledWith('display');
@@ -172,7 +176,8 @@ describe('settings browser navigation', () => {
       id: 'settings-display',
       section: 'display',
     });
-    expect(resolveSettingsTarget('#setup-governance')?.section).toBe('authority');
+    expect(resolveSettingsTarget('#setup-governance')?.section).toBe('advanced');
+    expect(resolveSettingsTarget('#settings-cat-budget')?.section).toBe('budget');
     expect(resolveSettingsTarget('#%E0%A4%A')).toBeNull();
     expect(resolveSettingsTarget('#unknown')).toBeNull();
     expect(resolveSettingsTarget('https://example.com')).toBeNull();
@@ -181,9 +186,9 @@ describe('settings browser navigation', () => {
     expect(
       visibleSettingsSection(
         [
-          { section: 'profile', top: -500 },
+          { section: 'workspace', top: -500 },
           { section: 'display', top: 0 },
-          { section: 'services', top: 700 },
+          { section: 'connections', top: 700 },
         ],
         120
       )
@@ -191,12 +196,12 @@ describe('settings browser navigation', () => {
     expect(
       visibleSettingsSection(
         [
-          { section: 'services', top: -100 },
+          { section: 'connections', top: -100 },
           { section: 'display', top: -600 },
         ],
         120
       )
-    ).toBe('services');
+    ).toBe('connections');
   });
   it('restores an initial deep link only after targets are mounted without pushing history or taking focus', () => {
     const h = harness('http://localhost/settings?tenant=alpha#settings-display');
@@ -221,7 +226,7 @@ describe('settings browser navigation', () => {
     h.replay(h.history[1]);
     expect(h.current).toHaveBeenLastCalledWith('display');
     h.replay(h.history[2]);
-    expect(h.current).toHaveBeenLastCalledWith('services');
+    expect(h.current).toHaveBeenLastCalledWith('connections');
     h.replay(h.history[0]);
     expect(h.view.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'auto' });
     expect(h.view.history.pushState).toHaveBeenCalledTimes(2);
@@ -235,7 +240,7 @@ describe('settings browser navigation', () => {
     const nav = h.mount();
     nav.navigate('#setup-governance');
     expect(target.details.open).toBe(true);
-    expect(h.current).toHaveBeenLastCalledWith('authority');
+    expect(h.current).toHaveBeenLastCalledWith('advanced');
     const count = h.view.history.pushState.mock.calls.length;
     nav.navigate('#bad');
     h.replay('/settings#%E0%A4%A', 'hashchange');

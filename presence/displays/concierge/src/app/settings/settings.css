@@ -281,3 +281,200 @@
   border: 1px solid var(--kb-ui-border);
   object-fit: cover;
 }
+
+/*
+ * MSN-SHELL-IA-20261105 §4/§5: two-pane settings (categories left, cards
+ * right), search, setup checklist and setting meta. Tokens only.
+ */
+.kb-settings.settings-page {
+  gap: var(--kb-ui-space-6);
+}
+
+.kb-settings .settings-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  max-width: 40rem;
+}
+
+.kb-settings .settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-6);
+  min-width: 0;
+}
+
+.kb-settings .settings-category {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-6);
+  min-width: 0;
+  scroll-margin-top: var(--kb-ui-space-4);
+}
+
+.kb-settings .settings-category[hidden],
+.kb-settings .settings-card[hidden] {
+  display: none;
+}
+
+.kb-settings .settings-category__header h2 {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-lg);
+  line-height: 1.3;
+}
+
+.kb-settings .settings-category__header p {
+  margin: var(--kb-ui-space-1) 0 0;
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.kb-settings .settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  min-width: 0;
+}
+
+.kb-settings .settings-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  margin: 0;
+  padding: 0 var(--kb-ui-space-1);
+  list-style: none;
+}
+
+.kb-settings .settings-row-block .settings-meta {
+  padding: 0;
+}
+
+.kb-settings .settings-plain-list {
+  margin: 0;
+  padding-left: var(--kb-ui-space-5);
+}
+
+/* Terminal-only settings: label + badge, then the collapsed command. */
+.kb-settings .settings-cli-row__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+}
+
+.kb-settings .settings-command > summary,
+.settings-command > summary {
+  cursor: pointer;
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.settings-command__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  margin-top: var(--kb-ui-space-2);
+}
+
+.settings-command__code {
+  margin: 0;
+  padding: var(--kb-ui-space-3) var(--kb-ui-space-4);
+  background: var(--kb-ui-surface-sunken);
+  border-radius: var(--kb-ui-radius-sm);
+  font-size: var(--kb-ui-font-size-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* はじめに: progress bar (length encodes progress) and the ordered steps. */
+.kb-settings .settings-checklist__progress {
+  gap: var(--kb-ui-space-3);
+}
+
+.kb-settings .settings-checklist__bar {
+  position: relative;
+  height: var(--kb-ui-space-2);
+  border-radius: var(--kb-ui-radius-sm);
+  background: var(--kb-ui-surface-sunken);
+  overflow: hidden;
+}
+
+.kb-settings .settings-checklist__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--kb-ui-accent, var(--kb-ui-text));
+}
+
+.kb-settings .settings-checklist__steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kb-settings .settings-checklist__step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--kb-ui-space-4);
+  padding: var(--kb-ui-space-3) var(--kb-ui-space-5);
+  border-top: 1px solid var(--kb-ui-border);
+}
+
+.kb-settings .settings-checklist__step[data-next='true'] {
+  background: var(--kb-ui-surface-sunken);
+}
+
+.kb-settings .settings-checklist__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--kb-ui-space-6);
+  height: var(--kb-ui-space-6);
+  border-radius: 50%;
+  border: 1px solid var(--kb-ui-border);
+  font-size: var(--kb-ui-font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-settings .settings-checklist__step[data-status='done'] .settings-checklist__index {
+  background: var(--kb-ui-surface-sunken);
+  color: var(--kb-ui-text-muted);
+}
+
+.kb-settings .settings-checklist__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  min-width: 0;
+}
+
+.kb-settings .settings-checklist__text p {
+  margin: 0;
+}
+
+.kb-settings .settings-checklist__next {
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.kb-settings .settings-sso {
+  gap: var(--kb-ui-space-5);
+}
+
+.settings-back-link {
+  display: inline-block;
+  margin-bottom: var(--kb-ui-space-4);
+}
+
+@media (max-width: 720px) {
+  .kb-settings .settings-checklist__step {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding-left: var(--kb-ui-space-4);
+    padding-right: var(--kb-ui-space-4);
+  }
+
+  .kb-settings .settings-checklist__step > .settings-inline-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}
