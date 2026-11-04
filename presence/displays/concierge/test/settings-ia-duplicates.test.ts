@@ -1,8 +1,7 @@
-/* eslint-disable no-restricted-imports */
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 
 const redirect = vi.fn((url: string) => {
   throw Object.assign(new Error('NEXT_REDIRECT'), { url });
@@ -10,7 +9,8 @@ const redirect = vi.fn((url: string) => {
 vi.mock('next/navigation', () => ({ permanentRedirect: redirect }));
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (file: string) => fs.readFileSync(path.join(appDir, file), 'utf8');
+const read = (file: string) =>
+  String(safeReadFile(path.join(appDir, file), { encoding: 'utf8' }) ?? '');
 
 /** MSN-SHELL-IA-20261105 §4: one place per setting; old entry points redirect or link. */
 describe('settings IA: single homes and redirects', () => {
@@ -32,7 +32,7 @@ describe('settings IA: single homes and redirects', () => {
   });
 
   it('keeps the unclaimed-install bootstrap at /setup/first-run', () => {
-    expect(fs.existsSync(path.join(appDir, 'src/app/setup/first-run/page.tsx'))).toBe(true);
+    expect(safeExistsSync(path.join(appDir, 'src/app/setup/first-run/page.tsx'))).toBe(true);
     expect(read('src/app/setup/first-run/page.tsx')).not.toContain('redirect(');
   });
 
