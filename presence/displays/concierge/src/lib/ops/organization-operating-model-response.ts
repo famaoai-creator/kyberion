@@ -40,6 +40,30 @@ function numberField(record: JsonRecord, key: string): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
+const KR_DIRECTIONS = ['increase', 'decrease', 'maintain'] as const;
+
+function finiteNumber(record: JsonRecord, key: string): number | undefined {
+  const value = record[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+/** Optional display history: malformed rows are dropped, never fail the view. */
+function parseKrHistory(
+  value: unknown
+): Array<{ value: number; progress: number; measured_at: string }> | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const rows = value.flatMap((entry) => {
+    const row = safeRecord(entry);
+    const rowValue = row && finiteNumber(row, 'value');
+    const progress = row && finiteNumber(row, 'progress');
+    const measured_at = row && stringField(row, 'measured_at');
+    return rowValue !== undefined && progress !== undefined && measured_at
+      ? [{ value: rowValue, progress, measured_at }]
+      : [];
+  });
+  return rows.length ? rows : undefined;
+}
+
 function stringArray(value: unknown): string[] | undefined {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string')
     ? value
@@ -250,11 +274,23 @@ function parseView(value: unknown): OrganizationOperatingModelView | undefined {
         if (!(kr_id && krTitle)) return undefined;
         const progress = numberField(row, 'progress');
         const measured_at = stringField(row, 'measured_at');
+        const target = finiteNumber(row, 'target');
+        const baseline = finiteNumber(row, 'baseline');
+        const value = finiteNumber(row, 'value');
+        const direction = enumField(row.direction, KR_DIRECTIONS);
+        const unit = stringField(row, 'unit');
+        const history = parseKrHistory(row.history);
         return {
           kr_id,
           title: krTitle,
           ...(progress !== undefined ? { progress } : {}),
           ...(measured_at ? { measured_at } : {}),
+          ...(target !== undefined ? { target } : {}),
+          ...(baseline !== undefined ? { baseline } : {}),
+          ...(value !== undefined ? { value } : {}),
+          ...(direction ? { direction } : {}),
+          ...(unit ? { unit } : {}),
+          ...(history ? { history } : {}),
         };
       });
       const projects = arrayOf(source.projects, (project) => {

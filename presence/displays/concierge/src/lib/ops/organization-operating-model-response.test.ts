@@ -63,4 +63,56 @@ describe('organization operating model response boundary', () => {
       })
     ).toBeUndefined();
   });
+
+  it('keeps key-result targets, current value and history for progress bars', () => {
+    const parsed = parseOrganizationOperatingModelResponse({
+      view: {
+        ...base,
+        control_plane: {
+          ...base.control_plane,
+          outcome_accounting: {
+            objectives: [
+              {
+                objective_id: 'obj-1',
+                title: 'Objective',
+                coverage: 'linked',
+                key_results: [
+                  {
+                    kr_id: 'kr-1',
+                    title: 'KR',
+                    target: 100,
+                    baseline: -5,
+                    value: 60,
+                    direction: 'increase',
+                    unit: '%',
+                    progress: 0.6,
+                    measured_at: '2026-10-24T00:00:00Z',
+                    history: [
+                      { value: 40, progress: 0.4, measured_at: '2026-10-23T00:00:00Z' },
+                      { value: 'bad', progress: 0.5, measured_at: '2026-10-23T12:00:00Z' },
+                      { value: 60, progress: 0.6, measured_at: '2026-10-24T00:00:00Z' },
+                    ],
+                  },
+                  { kr_id: 'kr-2', title: 'Unmeasured', direction: 'sideways' },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    });
+    const krs = parsed?.view.control_plane.outcome_accounting.objectives[0]?.key_results;
+    expect(krs?.[0]).toMatchObject({
+      target: 100,
+      baseline: -5,
+      value: 60,
+      direction: 'increase',
+      unit: '%',
+      history: [
+        { value: 40, progress: 0.4 },
+        { value: 60, progress: 0.6 },
+      ],
+    });
+    expect(krs?.[1]).toEqual({ kr_id: 'kr-2', title: 'Unmeasured' });
+  });
 });

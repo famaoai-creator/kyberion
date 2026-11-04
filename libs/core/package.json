@@ -6596,6 +6596,10 @@
       "types": "./dist/surface/a2ui-catalog.d.ts",
       "default": "./dist/surface/a2ui-catalog.js"
     },
+    "./surface/approval-publication-preview": {
+      "types": "./dist/surface/approval-publication-preview.d.ts",
+      "default": "./dist/surface/approval-publication-preview.js"
+    },
     "./surface/browser-human-request": {
       "types": "./dist/surface/browser-human-request.d.ts",
       "default": "./dist/surface/browser-human-request.js"
@@ -6635,6 +6639,14 @@
     "./surface/channel-surface-types": {
       "types": "./dist/surface/channel-surface-types.d.ts",
       "default": "./dist/surface/channel-surface-types.js"
+    },
+    "./surface/decision-brief": {
+      "types": "./dist/surface/decision-brief.d.ts",
+      "default": "./dist/surface/decision-brief.js"
+    },
+    "./surface/display-humanize": {
+      "types": "./dist/surface/display-humanize.d.ts",
+      "default": "./dist/surface/display-humanize.js"
     },
     "./surface/first-job": {
       "types": "./dist/surface/first-job.d.ts",

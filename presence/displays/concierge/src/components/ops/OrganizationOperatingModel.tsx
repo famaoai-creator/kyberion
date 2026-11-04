@@ -9,18 +9,27 @@ import {
   Callout,
   EmptyState,
   KbChart,
-  List,
   Metric,
   Section,
   Skeleton,
   StatusPill,
   Table,
+  Tabs,
 } from '@agent/shared-ui';
+import { localeToBcp47 } from '@agent/core/locale-normalize';
 import { ChronosDiagram, ChronosInline, ChronosMeta, ChronosToolbar } from './chronos-ui';
 import { useChronosLocale } from '../../lib/ops/hooks';
 import { uxMessage, uxText, type SupportedLocale } from '../../lib/ops/ux-vocabulary';
 import { parseOrganizationOperatingModelResponse } from '../../lib/ops/organization-operating-model-response';
 import { CustomerDecisionCard } from './CustomerDecisionDrilldown';
+import { normalizeChronosTenantScopePayload, type ChronosTenantOption } from './tenant-scope-data';
+import {
+  krView,
+  resolveOrganizationTenant,
+  sumAccounting,
+  type KrStatus,
+  type OrganizationAccountingTotals,
+} from './organization-outcome';
 
 type OrganizationHealth = 'healthy' | 'degraded' | 'critical' | 'unknown';
 type OrganizationPriority = 'high' | 'medium' | 'low';
@@ -103,6 +112,12 @@ export type OrganizationOperatingModelView = {
           title: string;
           progress?: number;
           measured_at?: string;
+          target?: number;
+          baseline?: number;
+          value?: number;
+          direction?: 'increase' | 'decrease' | 'maintain';
+          unit?: string;
+          history?: Array<{ value: number; progress: number; measured_at: string }>;
         }>;
         projects?: Array<{
           project_id: string;
@@ -233,8 +248,55 @@ export function organizationReadinessLabel(
   return uxText('chronos_org_readiness_setup', locale);
 }
 
+async function fetchOrganizationView(params: {
+  tenant: string;
+  organizationId?: string;
+  projectId?: string;
+}): Promise<OrganizationOperatingModelView> {
+  const query = new URLSearchParams({ tenant: params.tenant });
+  if (params.organizationId) query.set('organization_id', params.organizationId);
+  if (params.projectId) query.set('project_id', params.projectId);
+  const response = await fetch(opsApiPath(`/organization-operating-model?${query.toString()}`), {
+    cache: 'no-store',
+  });
+  const rawPayload: unknown = await response.json().catch(() => null);
+  const payload = parseOrganizationOperatingModelResponse(rawPayload);
+  if (!response.ok || !payload) {
+    const message =
+      rawPayload &&
+      typeof rawPayload === 'object' &&
+      'error' in rawPayload &&
+      typeof rawPayload.error === 'string'
+        ? rawPayload.error
+        : `organization ${response.status}`;
+    throw new Error(message);
+  }
+  return payload.view;
+}
+
+/** Tenants the viewer may read (server-resolved); null while loading, [] when unavailable. */
+function useScopeTenants(enabled: boolean): ChronosTenantOption[] | null {
+  const [tenants, setTenants] = React.useState<ChronosTenantOption[] | null>(null);
+  React.useEffect(() => {
+    if (!enabled) return;
+    const controller = new AbortController();
+    void fetch(opsApiPath('/tenant-scope'), { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        const normalized = response.ok
+          ? normalizeChronosTenantScopePayload(await response.json().catch(() => null))
+          : null;
+        if (!controller.signal.aborted) setTenants(normalized?.tenants ?? []);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setTenants([]);
+      });
+    return () => controller.abort();
+  }, [enabled]);
+  return tenants;
+}
+
 export function OrganizationOperatingModel({
-  tenant,
+  tenant: selectedTenant,
   organizationId,
   projectId,
   onOpenGovernance,
@@ -247,6 +309,21 @@ export function OrganizationOperatingModel({
   onOpenOperations?: () => void;
 }) {
   const locale = useChronosLocale();
+  const scopeTenants = useScopeTenants(!selectedTenant);
+  const choice = resolveOrganizationTenant(
+    selectedTenant,
+    (scopeTenants ?? []).map((entry) => entry.slug)
+  );
+  // With several tenants in scope the console shows their total until one is chosen.
+  const [chosenTenant, setChosenTenant] = React.useState('');
+  const tenant =
+    choice.mode === 'single'
+      ? choice.tenant
+      : choice.mode === 'multiple' && choice.tenants.includes(chosenTenant)
+        ? chosenTenant
+        : undefined;
+  const tenantName = (slug: string) =>
+    scopeTenants?.find((entry) => entry.slug === slug)?.displayName || slug;
   const [view, setView] = React.useState<OrganizationOperatingModelView | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -260,27 +337,7 @@ export function OrganizationOperatingModel({
     }
     setBusy(true);
     try {
-      const params = new URLSearchParams();
-      if (tenant) params.set('tenant', tenant);
-      if (organizationId) params.set('organization_id', organizationId);
-      if (projectId) params.set('project_id', projectId);
-      const response = await fetch(
-        opsApiPath(`/organization-operating-model${params.size ? `?${params.toString()}` : ''}`),
-        { cache: 'no-store' }
-      );
-      const rawPayload: unknown = await response.json().catch(() => null);
-      const payload = parseOrganizationOperatingModelResponse(rawPayload);
-      if (!response.ok || !payload) {
-        const message =
-          rawPayload &&
-          typeof rawPayload === 'object' &&
-          'error' in rawPayload &&
-          typeof rawPayload.error === 'string'
-            ? rawPayload.error
-            : `organization ${response.status}`;
-        throw new Error(message);
-      }
-      setView(payload.view);
+      setView(await fetchOrganizationView({ tenant, organizationId, projectId }));
       setError(null);
     } catch (err) {
       setView(null);
@@ -328,12 +385,35 @@ export function OrganizationOperatingModel({
         <Callout tone="danger" title={uxText('chronos_org_load_failed', locale)} body={error} />
       ) : null}
 
-      {!view && !error ? (
-        tenant ? (
+      {choice.mode === 'multiple' ? (
+        <Tabs
+          variant="secondary"
+          label={uxText('ux_b_org_tenant_choice', locale)}
+          active={tenant ?? ''}
+          onSelect={(id) => setChosenTenant(id)}
+          items={[
+            { id: '', label: uxText('ux_b_org_all_tenants', locale) },
+            ...choice.tenants.map((slug) => ({ id: slug, label: tenantName(slug) })),
+          ]}
+        />
+      ) : null}
+
+      {choice.mode === 'multiple' && !tenant ? (
+        <OrganizationAggregate
+          tenants={choice.tenants}
+          tenantName={tenantName}
+          organizationId={organizationId}
+          locale={locale}
+          onChoose={setChosenTenant}
+        />
+      ) : null}
+
+      {!view && !error && (tenant || choice.mode !== 'multiple') ? (
+        tenant || (!selectedTenant && scopeTenants === null) ? (
           <Skeleton shape="card" lines={3} label={uxText('chronos_org_loading', locale)} />
         ) : (
           <EmptyState
-            title={uxText('chronos_org_select_tenant_title', locale)}
+            title={uxText('ux_b_org_no_tenants', locale)}
             body={uxText('chronos_organization_scope_hint', locale)}
           />
         )
@@ -353,6 +433,13 @@ export function OrganizationOperatingModel({
               tone={view.reconciliation.status === 'ok' ? 'neutral' : 'warning'}
             />
           </ChronosInline>
+
+          <OrganizationStatTiles
+            accounting={accounting}
+            locale={locale}
+            onOpenOperations={onOpenOperations}
+            onOpenGovernance={onOpenGovernance}
+          />
 
           <div className="chronos-metrics">
             <Metric
@@ -378,26 +465,6 @@ export function OrganizationOperatingModel({
               )}
             />
             <Metric
-              label={uxText('chronos_org_attention', locale)}
-              value={accounting.open_incidents + accounting.pending_decisions}
-              tone={
-                accounting.open_incidents > 0
-                  ? 'danger'
-                  : accounting.pending_decisions > 0
-                    ? 'warning'
-                    : undefined
-              }
-              description={uxMessage(
-                'chronos_org_attention_detail',
-                {
-                  incidents: accounting.open_incidents,
-                  decisions: accounting.pending_decisions,
-                },
-                `${accounting.open_incidents} incidents · ${accounting.pending_decisions} decisions`,
-                locale
-              )}
-            />
-            <Metric
               label={uxText('chronos_org_projects', locale)}
               value={view.solution_projects.length}
             />
@@ -417,54 +484,7 @@ export function OrganizationOperatingModel({
                 {view.purpose?.purpose || uxText('chronos_org_not_configured', locale)}
               </p>
               {view.purpose?.objectives?.length ? (
-                <>
-                  <h4 className="chronos-feed__title">
-                    {uxText('chronos_org_objectives', locale)}
-                  </h4>
-                  <List
-                    items={view.purpose.objectives.map((objective) => {
-                      const entry = view.control_plane.outcome_accounting.objectives.find(
-                        (candidate) => candidate.objective_id === objective.objective_id
-                      );
-                      const coverage = entry?.coverage;
-                      const krMeta = entry?.key_results?.length
-                        ? entry.key_results
-                            .map(
-                              (kr) =>
-                                `${kr.kr_id} ${kr.progress === undefined ? uxText('chronos_org_kr_unmeasured', locale) : `${Math.round(kr.progress * 100)}%`}`
-                            )
-                            .join(' · ')
-                        : undefined;
-                      const projectMeta = entry?.projects?.length
-                        ? entry.projects
-                            .map(
-                              (project) =>
-                                `${project.project_id} → ${uxMessage('chronos_org_objective_missions', { count: project.mission_ids.length }, `${project.mission_ids.length} missions`, locale)}`
-                            )
-                            .join(' · ')
-                        : uxText('chronos_org_objective_no_projects', locale);
-                      const meta = [krMeta, projectMeta].filter(Boolean).join(' | ') || undefined;
-                      return {
-                        title: objective.title,
-                        ...(meta ? { meta } : {}),
-                        ...(entry?.progress !== undefined
-                          ? { progress: Math.round(entry.progress * 100) }
-                          : {}),
-                        ...(coverage
-                          ? {
-                              status: (coverage === 'linked' ? 'connected' : 'missing') as KbStatus,
-                              status_label: uxText(
-                                coverage === 'linked'
-                                  ? 'chronos_org_objective_linked'
-                                  : 'chronos_org_objective_unlinked',
-                                locale
-                              ),
-                            }
-                          : {}),
-                      };
-                    })}
-                  />
-                </>
+                <OrganizationObjectives view={view} locale={locale} />
               ) : (
                 <p className="kb-text kb-text--muted">
                   {uxText('chronos_org_no_objectives', locale)}
@@ -575,6 +595,300 @@ export function OrganizationOperatingModel({
           </ChronosToolbar>
         </>
       ) : null}
+    </Section>
+  );
+}
+
+/** Open incidents / overdue operations / pending decisions, each opening where it is handled. */
+function OrganizationStatTiles({
+  accounting,
+  locale,
+  onOpenOperations,
+  onOpenGovernance,
+}: {
+  accounting: OrganizationAccountingTotals;
+  locale: SupportedLocale;
+  onOpenOperations?: () => void;
+  onOpenGovernance?: () => void;
+}) {
+  const tiles: Array<{
+    key: string;
+    value: number;
+    tone: 'danger' | 'warning';
+    onOpen?: () => void;
+  }> = [
+    {
+      key: 'ux_b_org_stat_incidents',
+      value: accounting.open_incidents,
+      tone: 'danger',
+      onOpen: onOpenOperations,
+    },
+    {
+      key: 'ux_b_org_stat_overdue',
+      value: accounting.overdue_operations,
+      tone: 'warning',
+      onOpen: onOpenOperations,
+    },
+    {
+      key: 'ux_b_org_stat_decisions',
+      value: accounting.pending_decisions,
+      tone: 'warning',
+      onOpen: onOpenGovernance,
+    },
+  ];
+  return (
+    <div className="org-stats">
+      {tiles.map((tile) => {
+        const metric = (
+          <Metric
+            label={uxText(tile.key, locale)}
+            value={tile.value}
+            tone={tile.value > 0 ? tile.tone : undefined}
+            description={tile.onOpen ? uxText('ux_b_org_stat_open', locale) : undefined}
+          />
+        );
+        return tile.onOpen ? (
+          <button key={tile.key} type="button" className="org-stat" onClick={tile.onOpen}>
+            {metric}
+          </button>
+        ) : (
+          <div key={tile.key} className="org-stat">
+            {metric}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const KR_PILL_STATUS: Record<KrStatus, KbStatus> = {
+  met: 'completed',
+  on_track: 'ready',
+  at_risk: 'degraded',
+  off_track: 'blocked',
+  unmeasured: 'n/a',
+};
+
+type OutcomeObjective =
+  OrganizationOperatingModelView['control_plane']['outcome_accounting']['objectives'][number];
+type OutcomeKeyResult = NonNullable<OutcomeObjective['key_results']>[number];
+
+function KeyResultRow({ kr, locale }: { kr: OutcomeKeyResult; locale: SupportedLocale }) {
+  const bcp47 = localeToBcp47(locale);
+  const number = new Intl.NumberFormat(bcp47, { maximumFractionDigits: 2 });
+  const format = (value: number | undefined) =>
+    value === undefined ? '—' : `${number.format(value)}${kr.unit ? ` ${kr.unit}` : ''}`;
+  const reading = krView(kr);
+  const values =
+    kr.target === undefined
+      ? null
+      : kr.baseline !== undefined
+        ? uxMessage(
+            'ux_b_kr_values',
+            { baseline: format(kr.baseline), current: format(kr.value), target: format(kr.target) },
+            '',
+            locale
+          )
+        : uxMessage(
+            'ux_b_kr_values_no_baseline',
+            { current: format(kr.value), target: format(kr.target) },
+            '',
+            locale
+          );
+  const measured = kr.measured_at
+    ? uxMessage(
+        'ux_b_kr_measured',
+        { date: new Date(kr.measured_at).toLocaleDateString(bcp47) },
+        '',
+        locale
+      )
+    : null; // the status pill already says 未計測
+  return (
+    <li className="org-kr" data-status={reading.status}>
+      <div className="org-kr__head">
+        <span className="org-kr__title">{kr.title}</span>
+        <StatusPill
+          status={KR_PILL_STATUS[reading.status]}
+          label={uxText(`ux_b_kr_status_${reading.status}`, locale)}
+        />
+      </div>
+      <div className="org-kr__bar">
+        <div
+          className="org-kr__track"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={reading.percent ?? 0}
+          aria-label={kr.title}
+        >
+          <span className="org-kr__fill" style={{ width: `${reading.percent ?? 0}%` }} />
+        </div>
+        <span className="org-kr__percent">
+          {reading.percent === undefined
+            ? '—'
+            : uxMessage('ux_b_kr_progress', { percent: reading.percent }, '', locale)}
+        </span>
+      </div>
+      <p className="org-kr__meta">
+        {[
+          values,
+          kr.direction ? uxText(`ux_b_kr_direction_${kr.direction}`, locale) : null,
+          measured,
+          reading.trend ? uxText(`ux_b_kr_trend_${reading.trend}`, locale) : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+      </p>
+    </li>
+  );
+}
+
+/** Objectives with their key results as progress bars toward the target. */
+function OrganizationObjectives({
+  view,
+  locale,
+}: {
+  view: OrganizationOperatingModelView;
+  locale: SupportedLocale;
+}) {
+  return (
+    <>
+      <h4 className="chronos-feed__title">{uxText('ux_b_org_objectives_title', locale)}</h4>
+      <ul className="org-objectives">
+        {(view.purpose?.objectives ?? []).map((objective) => {
+          const entry = view.control_plane.outcome_accounting.objectives.find(
+            (candidate) => candidate.objective_id === objective.objective_id
+          );
+          const projects = entry?.projects?.length
+            ? entry.projects
+                .map(
+                  (project) =>
+                    `${project.name || project.project_id} → ${uxMessage('chronos_org_objective_missions', { count: project.mission_ids.length }, `${project.mission_ids.length} missions`, locale)}`
+                )
+                .join(' · ')
+            : uxText('chronos_org_objective_no_projects', locale);
+          return (
+            <li key={objective.objective_id} className="org-objective">
+              <div className="org-objective__head">
+                <span className="org-objective__title">{objective.title}</span>
+                {entry?.progress !== undefined ? (
+                  <span className="org-kr__percent">
+                    {uxMessage(
+                      'ux_b_kr_progress',
+                      { percent: Math.round(entry.progress * 100) },
+                      '',
+                      locale
+                    )}
+                  </span>
+                ) : null}
+                {entry?.coverage ? (
+                  <StatusPill
+                    status={entry.coverage === 'linked' ? 'connected' : 'missing'}
+                    label={uxText(
+                      entry.coverage === 'linked'
+                        ? 'chronos_org_objective_linked'
+                        : 'chronos_org_objective_unlinked',
+                      locale
+                    )}
+                  />
+                ) : null}
+              </div>
+              {entry?.key_results?.length ? (
+                <ul className="org-krs">
+                  {entry.key_results.map((kr) => (
+                    <KeyResultRow key={kr.kr_id} kr={kr} locale={locale} />
+                  ))}
+                </ul>
+              ) : (
+                <p className="kb-text kb-text--muted">{uxText('ux_b_objective_no_krs', locale)}</p>
+              )}
+              <p className="org-kr__meta">{projects}</p>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
+const AGGREGATE_TENANT_LIMIT = 8;
+
+/** Several tenants in scope: their total, and one row per tenant to open it. */
+function OrganizationAggregate({
+  tenants,
+  tenantName,
+  organizationId,
+  locale,
+  onChoose,
+}: {
+  tenants: string[];
+  tenantName: (slug: string) => string;
+  organizationId?: string;
+  locale: SupportedLocale;
+  onChoose: (slug: string) => void;
+}) {
+  const shown = tenants.slice(0, AGGREGATE_TENANT_LIMIT);
+  const key = shown.join(',');
+  const [rows, setRows] = React.useState<Array<{
+    slug: string;
+    accounting?: OrganizationAccountingTotals;
+  }> | null>(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    setRows(null);
+    void Promise.all(
+      key.split(',').map(async (slug) => {
+        try {
+          const view = await fetchOrganizationView({ tenant: slug, organizationId });
+          return { slug, accounting: view.control_plane.accounting };
+        } catch {
+          return { slug };
+        }
+      })
+    ).then((result) => {
+      if (!cancelled) setRows(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [key, organizationId]);
+
+  if (!rows) {
+    return <Skeleton shape="card" lines={2} label={uxText('chronos_org_loading', locale)} />;
+  }
+  const readable = rows.filter((row) => row.accounting);
+  const total = sumAccounting(readable.map((row) => row.accounting!));
+  const unreadable = rows.length - readable.length;
+  return (
+    <Section
+      headingLevel={3}
+      title={uxMessage('ux_b_org_aggregate_title', { count: readable.length }, '', locale)}
+      description={uxText('ux_b_org_aggregate_body', locale)}
+    >
+      <OrganizationStatTiles accounting={total} locale={locale} />
+      {unreadable > 0 ? (
+        <p className="kb-text kb-text--muted">
+          {uxMessage('ux_b_org_aggregate_partial', { count: unreadable }, '', locale)}
+        </p>
+      ) : null}
+      <Table
+        columns={[
+          { key: 'tenant', label: uxText('chronos_tenant', locale) },
+          { key: 'incidents', label: uxText('ux_b_org_stat_incidents', locale), width: '9rem' },
+          { key: 'overdue', label: uxText('ux_b_org_stat_overdue', locale), width: '9rem' },
+          { key: 'decisions', label: uxText('ux_b_org_stat_decisions', locale), width: '9rem' },
+        ]}
+        rows={rows.map((row) => ({
+          tenant: (
+            <button type="button" className="kb-link" onClick={() => onChoose(row.slug)}>
+              {tenantName(row.slug)}
+            </button>
+          ),
+          incidents: row.accounting ? row.accounting.open_incidents : '—',
+          overdue: row.accounting ? row.accounting.overdue_operations : '—',
+          decisions: row.accounting ? row.accounting.pending_decisions : '—',
+        }))}
+      />
     </Section>
   );
 }
