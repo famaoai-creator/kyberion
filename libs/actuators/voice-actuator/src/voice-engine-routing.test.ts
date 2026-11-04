@@ -321,4 +321,47 @@ describe('voice-tts-engine routing', () => {
       );
     });
   });
+
+  describe('generic saved seam default (voice-tts-engine)', () => {
+    const speak = (params: Record<string, unknown>) =>
+      handleAction({
+        action: 'speak_local',
+        params,
+      } as unknown as ActionInput) as Promise<VoiceResult>;
+    const english = {
+      text: 'Good morning, here is the plan.',
+      rendering: {
+        language: 'en',
+        chunking: { max_chunk_chars: 200, crossfade_ms: 0, preserve_paralinguistic_tags: true },
+      },
+    };
+
+    it('speak_local uses the saved default when no engine (or auto) is named', async () => {
+      setPlatform('linux');
+      vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'voice-tts-engine=kokoro');
+      for (const params of [{ text: 'Hello there' }, { text: 'Hello there', engine_id: 'auto' }]) {
+        const result = await speak(params);
+        expect(result.status).toBe('succeeded');
+        expect(result.engine_id).toBe('kokoro');
+        expect(result.resolved_engine_id).toBe('kokoro');
+      }
+      const named = await speak({ text: 'Hello there', engine_id: 'local_say' });
+      expect(named.resolved_engine_id).toBe('local_say');
+    });
+
+    it('speak_local falls back to local_say when the saved default is unknown', async () => {
+      setPlatform('linux');
+      vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'voice-tts-engine=no_such_engine');
+      const result = await speak({ text: 'Hello there' });
+      expect(result.resolved_engine_id).toBe('local_say');
+    });
+
+    it('generate_voice: the profile default stays above the saved default', async () => {
+      setPlatform('linux');
+      vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'voice-tts-engine=kokoro');
+      const profiled = await generate(english);
+      expect(profiled.engine_id).toBe('pocket_tts');
+      expect(profiled.resolved_engine_id).toBe('pocket_tts');
+    });
+  });
 });

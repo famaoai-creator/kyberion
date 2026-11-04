@@ -26,6 +26,7 @@ export { resolveMissionTeamSelectionScope } from './mission-team-selection.js';
  * state, so gating/auditing it would only add noise.
  */
 import { buildMissionSystem, missionSystem } from './mission-system.js';
+import { assertCanGrantMissionAuthority } from './mission-state.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { resolveRole } from '../authority.js';
 import { auditChain } from '../governance/audit-chain.js';
@@ -201,7 +202,59 @@ export type MissionLifecycleUnderlyingSystem = Pick<
   | 'pauseMission'
   | 'resumeMission'
   | 'purgeMissions'
+  | GovernedPassthroughMethod
 >;
+
+/**
+ * Mutating mission-system verbs the facade exposes 1:1 (same arguments, same
+ * result) behind the uniform gate + audit. Mission id is always the first
+ * argument. Listed here rather than hand-wrapped so a new verb is one entry,
+ * not another copy of the gate/audit boilerplate.
+ */
+export const GOVERNED_PASSTHROUGH_VERBS = {
+  recordTask: 'record-task',
+  recordEvidence: 'record-evidence',
+  recordArtifactReview: 'review-task',
+  cancelMission: 'cancel',
+  repairLegacyMissionState: 'repair-state',
+  reconcileExistingWork: 'reconcile-work',
+  reenterMissionFromReview: 'reenter',
+  delegateMission: 'delegate',
+  importMission: 'import',
+  sealMission: 'seal',
+  distillMission: 'distill',
+  dispatchMissionTickets: 'dispatch-tickets',
+  grantMissionAccess: 'grant-access',
+  grantMissionSudo: 'grant-sudo',
+  approveScopeChange: 'scope-approve',
+  syncProjectLedger: 'sync-project-ledger',
+  syncProjectLedgerIfLinked: 'sync-project-ledger',
+} as const;
+
+export type GovernedPassthroughMethod = keyof typeof GOVERNED_PASSTHROUGH_VERBS;
+
+/**
+ * Verbs that widen a mission's authority. The authority check moves into the
+ * facade so every surface (not just the CLI) enforces it. `approveScopeChange`
+ * is exempt when it carries an `approvalRequestId`: that path validates the
+ * recorded human approval inside the verb itself.
+ */
+function assertPassthroughAuthority(method: GovernedPassthroughMethod, args: unknown[]): void {
+  if (method === 'grantMissionAccess' || method === 'grantMissionSudo') {
+    assertCanGrantMissionAuthority();
+  } else if (method === 'approveScopeChange') {
+    const options = args[1] as { approvalRequestId?: string } | undefined;
+    if (!options?.approvalRequestId?.trim()) assertCanGrantMissionAuthority();
+  }
+}
+
+type FullMissionSystem = ReturnType<typeof buildMissionSystem>;
+type PassthroughFn<K extends GovernedPassthroughMethod> = (
+  ...args: Parameters<FullMissionSystem[K]>
+) => Promise<Awaited<ReturnType<FullMissionSystem[K]>>>;
+export type MissionLifecyclePassthroughVerbs = {
+  [K in GovernedPassthroughMethod]: PassthroughFn<K>;
+};
 
 export interface MissionLifecycleArchiveOptions extends MissionLifecycleVerbOptions {
   /**
@@ -212,6 +265,14 @@ export interface MissionLifecycleArchiveOptions extends MissionLifecycleVerbOpti
   missionId?: string;
   /** Policy-driven sweep only: preview candidates without moving anything. */
   dryRun?: boolean;
+  /**
+   * Policy-driven sweep only: receives the matched candidates before any
+   * mission moves, so a surface can render its own preview (the CLI prints a
+   * table). The library itself never writes to stdout.
+   */
+  onCandidates?: NonNullable<
+    Parameters<MissionLifecycleUnderlyingSystem['purgeMissions']>[1]
+  >['onCandidates'];
 }
 
 /**
@@ -447,7 +508,12 @@ export function buildMissionLifecycleService(
           const archiveOne = overrides?.archiveMissionById ?? archiveMissionById;
           return archiveOne(targeted);
         }
-        return resolveSystem(explicitSystem).purgeMissions(options?.dryRun ?? false);
+        const dryRun = options?.dryRun ?? false;
+        return options?.onCandidates
+          ? resolveSystem(explicitSystem).purgeMissions(dryRun, {
+              onCandidates: options.onCandidates,
+            })
+          : resolveSystem(explicitSystem).purgeMissions(dryRun);
       });
     },
 
@@ -463,8 +529,36 @@ export function buildMissionLifecycleService(
       );
     },
 
+    ...buildPassthroughVerbs(undefined),
+
+    /**
+     * The passthrough verbs bound to a caller surface tag (and decision
+     * owner) — what a non-CLI surface uses, e.g.
+     * `missionLifecycleService.forSurface({ surface: 'slack' }).recordEvidence(...)`.
+     */
+    forSurface(options: MissionLifecycleVerbOptions): MissionLifecyclePassthroughVerbs {
+      return buildPassthroughVerbs(options);
+    },
+
     status: missionLifecycleStatus,
   };
+
+  function buildPassthroughVerbs(
+    options: MissionLifecycleVerbOptions | undefined
+  ): MissionLifecyclePassthroughVerbs {
+    const verbs: Partial<Record<GovernedPassthroughMethod, unknown>> = {};
+    for (const method of Object.keys(GOVERNED_PASSTHROUGH_VERBS) as GovernedPassthroughMethod[]) {
+      verbs[method] = async (...args: unknown[]) => {
+        const missionId = typeof args[0] === 'string' ? normalizeMissionId(args[0]) : null;
+        return runGovernedVerb(GOVERNED_PASSTHROUGH_VERBS[method], missionId, options, async () => {
+          assertPassthroughAuthority(method, args);
+          const target = resolveSystem(explicitSystem)[method] as (...a: unknown[]) => unknown;
+          return target(...args);
+        });
+      };
+    }
+    return verbs as MissionLifecyclePassthroughVerbs;
+  }
 }
 
 export type MissionLifecycleService = ReturnType<typeof buildMissionLifecycleService>;

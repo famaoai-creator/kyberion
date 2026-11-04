@@ -206,7 +206,9 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
   constructor(options: ShellClaudeCliBackendOptions = {}) {
     this.bin = options.bin ?? 'claude';
     this.model = options.model ?? resolveRuntimeModelId('anthropic-default');
-    this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
+    // 10 min: a tool-loop turn over a large organization context routinely
+    // needs more than 5 min; KYBERION_CLAUDE_CLI_TIMEOUT_MS still overrides.
+    this.timeoutMs = options.timeoutMs ?? 10 * 60 * 1000;
     this.extraArgs = options.extraArgs ?? [];
     this.nativeSubagentEnabled =
       options.nativeSubagent ??

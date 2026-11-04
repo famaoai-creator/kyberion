@@ -17,7 +17,9 @@ const SERVICE_SCHEMA = {
     auth: { type: 'string', enum: ['none', 'secret-guard', 'session'] },
     context: { type: 'object', additionalProperties: true },
     method: { type: 'string', enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] },
-    params: { type: 'object', additionalProperties: true },
+    params: {
+      anyOf: [{ type: 'object', additionalProperties: true }, { type: 'array' }],
+    },
     service_id: { type: 'string' },
     steps: { type: 'array', items: { type: 'object', additionalProperties: true } },
   },

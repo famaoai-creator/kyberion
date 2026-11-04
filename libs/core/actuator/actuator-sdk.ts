@@ -11,6 +11,7 @@ import {
 } from '../pipeline/op-preflight-stages.js';
 import { runOpPreflight } from '../pipeline/op-preflight.js';
 import { resolvePipelineInputPlaceholders } from '../pipeline/pipeline-input-contract.js';
+import { PIPELINE_EXECUTION_METADATA_PROPERTIES } from '../pipeline/op-input-contracts.js';
 import {
   executeAdfSteps,
   type AdfRunOptions,
@@ -284,55 +285,7 @@ export async function runActuatorStepSequence<
  * discovery generation, and pipeline schema coverage; it must not be inferred
  * from implementation field usage.
  */
-const LEGACY_OPEN_OPERATION_IDS = new Set([
-  'browser:close_session',
-  'browser:import_session_handoff',
-  'media:apply_pattern',
-  'media:document_diagram_asset_from_brief',
-  'media:document_digest',
-  'media:pptx_render',
-  'media:pptx_slide_text',
-  'media:save_brand_to_confidential',
-  'media:write_file',
-  'meeting:join',
-  'meeting:leave',
-  'meeting:listen',
-  'meeting:run_action_item_reminder_sweep',
-  'meeting:status',
-  'meeting:track_pending_action_items',
-  'modeling:extract_requirements',
-  'network:fetch',
-  'orchestrator:run_execution_plan_set',
-  'service:cli',
-  'system:if',
-  'system:native_tts_speak',
-  'system:probe',
-  'system:screenshot',
-  'video-composition:await_video_composition_job',
-  'voice:collect_and_register_voice_profile',
-  'voice:generate_voice',
-  'voice:health',
-  'voice:list_audio_routes',
-  'voice:probe_audio_route',
-  'voice:record_verify_repair_voice_sample',
-  'voice:record_voice_sample',
-  'voice:speak_local',
-  'voice:verify_tts_loopback',
-  'wisdom:capture_intuition',
-  'wisdom:compute_readiness_matrix',
-  'wisdom:curate_background_review',
-  'wisdom:distill',
-  'wisdom:emit_dissent_log',
-  'wisdom:extract_dissent_signals',
-  'wisdom:knowledge_inject',
-  'wisdom:perspective_fanout',
-  'wisdom:reasoning',
-  'wisdom:recommend',
-  'wisdom:render_hypothesis_report',
-  'wisdom:simulate_all',
-  'wisdom:synthesize_counterparty_persona',
-  'wisdom:typed_cross_critique',
-]);
+const LEGACY_OPEN_OPERATION_IDS = new Set<string>();
 
 export function isLegacyOpenActuatorOperation(scope: string, op: string): boolean {
   return LEGACY_OPEN_OPERATION_IDS.has(`${scope.replace(/-actuator$/u, '')}:${op}`);
@@ -506,26 +459,6 @@ export interface ActuatorDefinition<
   dispatch(op: string, input: unknown, context?: Record<string, unknown>): Promise<ActuatorResult>;
 }
 
-/**
- * Pipeline execution attaches these governed, non-user fields to every
- * operation so routing/facets can survive the actuator boundary. They are
- * accepted by runtime validation without weakening the authored operation
- * contract for any other top-level key.
- */
-const PIPELINE_EXECUTION_METADATA_PROPERTIES: Record<string, unknown> = {
-  _facets: {},
-  _reasoning_policy: {},
-  _step_id: {},
-};
-
-export type LegacyPipelineActionHandler = (input: {
-  action: 'pipeline';
-  steps: Array<{ type: string; op: string; params: Record<string, unknown> }>;
-  context: Record<string, unknown>;
-  options?: unknown;
-  pipelineTrace?: unknown;
-}) => Promise<unknown> | unknown;
-
 /** Define the one runtime ABI shared by generated and hand-written actuators. */
 export function defineActuator<Ops extends Record<string, ActuatorOpDefinition>>(options: {
   id: string;
@@ -601,91 +534,14 @@ export function defineActuator<Ops extends Record<string, ActuatorOpDefinition>>
 }
 
 /**
- * Keep older hand-written actuators on the same SDK ABI while they migrate
- * their internal operation tables. The compatibility shape is deliberately
- * contained here so pipeline execution never needs a second dispatch path.
+ * Extract the top-level `error` field a legacy action handler reports so
+ * catalog-backed dispatch can surface it as a governed failure.
  */
 function topLevelFailureError(result: unknown): string | undefined {
   const error = (result as { error?: unknown }).error;
   if (typeof error === 'string' && error) return error;
   if (error instanceof Error && error.message) return error.message;
   return undefined;
-}
-
-export function defineLegacyPipelineActuator(options: {
-  id: string;
-  handleAction: LegacyPipelineActionHandler;
-}): ActuatorDefinition {
-  type LegacyInput = {
-    op: string;
-    type?: string;
-    params?: Record<string, unknown>;
-    options?: unknown;
-    pipelineTrace?: unknown;
-  };
-  const ops: Record<string, ActuatorOpDefinition<LegacyInput>> = {
-    execute: {
-      kind: 'apply',
-      validateInput(input: unknown): LegacyInput {
-        if (!input || typeof input !== 'object' || Array.isArray(input)) {
-          throw new Error(`Actuator ${options.id} input must be an object`);
-        }
-        const candidate = input as Record<string, unknown>;
-        if (typeof candidate.op !== 'string' || candidate.op.length === 0) {
-          throw new Error(`Actuator ${options.id} input requires op`);
-        }
-        return {
-          op: candidate.op,
-          ...(typeof candidate.type === 'string' ? { type: candidate.type } : {}),
-          ...(candidate.params &&
-          typeof candidate.params === 'object' &&
-          !Array.isArray(candidate.params)
-            ? { params: candidate.params as Record<string, unknown> }
-            : {}),
-          ...(candidate.options !== undefined ? { options: candidate.options } : {}),
-          ...(candidate.pipelineTrace !== undefined
-            ? { pipelineTrace: candidate.pipelineTrace }
-            : {}),
-        };
-      },
-      async handler(input, context) {
-        const actionResult = await options.handleAction({
-          action: 'pipeline',
-          steps: [
-            {
-              type: input.type || 'apply',
-              op: input.op,
-              params: input.params || {},
-            },
-          ],
-          context,
-          ...(input.options !== undefined ? { options: input.options } : {}),
-          ...(input.pipelineTrace !== undefined ? { pipelineTrace: input.pipelineTrace } : {}),
-        });
-        if (
-          actionResult &&
-          typeof actionResult === 'object' &&
-          (actionResult as { status?: unknown }).status === 'failed'
-        ) {
-          const failedEntry = Array.isArray((actionResult as { results?: unknown }).results)
-            ? (
-                actionResult as { results: Array<{ status?: string; error?: string }> }
-              ).results.find((entry) => entry.status === 'failed')
-            : undefined;
-          throw new Error(
-            failedEntry?.error ||
-              topLevelFailureError(actionResult) ||
-              `Actuator sub-pipeline reported failure for ${options.id}:${input.op}`
-          );
-        }
-        return actionResult;
-      },
-    },
-  };
-  return defineActuator({
-    id: options.id,
-    ops,
-  });
 }
 
 /**

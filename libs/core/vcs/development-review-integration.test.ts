@@ -255,7 +255,38 @@ describe('canonical prepared WorkItem review admission', () => {
       expect(reader.verifyPreparedWorkItemReview(input, revision, ci)).toEqual({
         ok: true,
         reviewedBaseSha: revision.baseSha,
+        independence_assurance: 'legacy_actor_claim',
       });
+    }));
+  it.each([true, false])(
+    'strict independence blocks legacy receipts with missionGate=%s',
+    (missionGate) =>
+      run(() => {
+        expect(
+          reader.verifyPreparedWorkItemReview(
+            { ...input, independencePolicy: 'authenticated_execution' },
+            revision,
+            ci,
+            { missionGate }
+          )
+        ).toEqual({
+          ok: false,
+          reason: 'authenticated reviewer execution provenance is unavailable',
+          independence_assurance: 'unverified',
+        });
+      })
+  );
+  it('never reaches publication from strict mode even with an otherwise valid stored review', () =>
+    run(() => {
+      const publication = vi.fn(() => ({ status: 0, stdout: '', stderr: '' }));
+      expect(
+        reader.runPreparedVcsDevelopment(
+          { ...input, dryRun: false, independencePolicy: 'authenticated_execution' },
+          publication,
+          remote
+        ).status
+      ).toBe('review_required');
+      expect(publication).not.toHaveBeenCalled();
     }));
   it.each(['repository', 'headSha', 'baseSha'] as const)(
     'rejects changed %s against the reviewed manifest',

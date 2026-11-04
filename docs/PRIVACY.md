@@ -7,7 +7,7 @@ What Kyberion does and doesn't do with your data.
 - **No telemetry by default.** Nothing leaves your machine unless you explicitly opt in or configure an external service.
 - **Your data lives on your disk.** Kyberion stores configuration, missions, and traces under your local filesystem (or your customer/ overlay).
 - **External AI calls are explicit.** When Kyberion uses an LLM (Anthropic, OpenAI, Gemini, Claude CLI, etc.), the request goes to that provider — see §3 below.
-- **Secrets stay in OS keychain.** Kyberion uses `secret-actuator` to read credentials from your OS keychain. They never appear in committed files.
+- **Secrets stay in the OS credential store.** Kyberion uses `secret-actuator` to read credentials from macOS Keychain or Windows Credential Manager. They never appear in committed files.
 
 ## 1. What Kyberion Stores Locally
 

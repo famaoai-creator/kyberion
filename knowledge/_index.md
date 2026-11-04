@@ -31,6 +31,7 @@
 
 ## 📁 product/architecture
 - [AI-Run Meetings Use Case](./product/architecture/meeting-facilitator-use-case.md) (public | Unknown)
+- [Actor identity and responsibility model](./product/architecture/actor-identity-and-responsibility-model.md) (public | Unknown)
 - [Actuator Contract Map](./product/architecture/actuator-contract-map.md) (public | Ecosystem Architect)
 - [Actuator Operation Taxonomy](./product/architecture/actuator-op-taxonomy.md) (public | Ecosystem Architect)
 - [Agent Collaboration View](./product/architecture/agent-collaboration-view.md) (public | Ecosystem Architect)
@@ -272,6 +273,7 @@
 - [PR publication store の明示的な installation catalog 更新](./product/governance/publication-role-installation-upgrade.ja.md) (public | Unknown)
 - [PR前CI準備チェックリスト](./product/governance/pre-pr-ci-readiness-checklist.ja.md) (public | Codex)
 - [Provenance, authorization and recoverable repair boundaries](./product/governance/provenance-authorization-controls.md) (public | Unknown)
+- [Review independence assurance and migration](./product/governance/review-independence-assurance.md) (public | Unknown)
 - [Running and Probing Tenant-Bound Pipelines Without Policy Violations](./product/governance/tenant-bound-runtime-probing.md) (public | Unknown)
 - [SOP: Multi-Agent Software Development & Review](./product/governance/multi-agent-development-sop.md) (public | Ecosystem Architect)
 - [SOP: TypeScript Core Base Stabilization](./product/governance/ts-base-stabilization-sop.md) (public | Ecosystem Architect)
@@ -291,6 +293,7 @@
 - [外部入出力 actuator の統合と自律運用](./product/governance/external-actuator-governance.md) (public | Unknown)
 - [情報資産の所在登録・取得・完了確認の運用](./product/governance/information-assets-runbook.md) (public | Unknown)
 - [文脈の経済 — 長いセッションでトークンを無駄にしない](./product/governance/agent-context-economy.md) (public | Unknown)
+- [日本語の校正で変えてよいことと、変えてはいけないこと](./product/governance/japanese-prose-proofreading.md) (public | Unknown)
 
 ## 📁 product/governance/authority-roles
 - [Authority Roles](./product/governance/authority-roles/README.md) (public | Unknown)

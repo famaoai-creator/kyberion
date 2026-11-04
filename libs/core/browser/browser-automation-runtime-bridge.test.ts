@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   FULL_BROWSER_AUTOMATION_RUNTIME_CAPABILITIES,
   getBrowserAutomationRuntimeCapabilities,
@@ -68,5 +68,29 @@ describe('browser-automation-runtime bridge', () => {
       FULL_BROWSER_AUTOMATION_RUNTIME_CAPABILITIES
     );
     expect(getBrowserAutomationRuntimeCapabilities(bridge('r', RESTRICTED)).multi_tab).toBe(false);
+  });
+
+  describe('saved seam default', () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it('picks the saved full-capability default when no provider is given', () => {
+      vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'browser-automation-runtime=a-extension');
+      registerBrowserAutomationRuntimeBridge(bridge('a-extension'));
+      registerBrowserAutomationRuntimeBridge(bridge('playwright-chromium'));
+      expect(resolveBrowserAutomationRuntime().bridge_id).toBe('a-extension');
+      expect(resolveBrowserAutomationRuntime('playwright-chromium').bridge_id).toBe(
+        'playwright-chromium'
+      );
+    });
+
+    it('ignores a saved restricted or unregistered default and keeps the policy default', () => {
+      registerBrowserAutomationRuntimeBridge(bridge('lightpanda', RESTRICTED));
+      registerBrowserAutomationRuntimeBridge(bridge('a-extension'));
+      registerBrowserAutomationRuntimeBridge(bridge('playwright-chromium'));
+      vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'browser-automation-runtime=lightpanda');
+      expect(resolveBrowserAutomationRuntime().bridge_id).toBe('playwright-chromium');
+      vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'browser-automation-runtime=missing');
+      expect(resolveBrowserAutomationRuntime().bridge_id).toBe('playwright-chromium');
+    });
   });
 });

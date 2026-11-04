@@ -28,7 +28,7 @@ Before opening a PR, follow the canonical runbook
 [`knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md`](./knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md).
 Minimum bar:
 
-- [ ] `pnpm check -- --scope pr` is green locally (same gate set as PR Validation; includes `type-ratchet`, `contract-semver`, and `env-registry`).
+- [ ] `pnpm check -- --changed` is green locally (every PR Validation gate plus the full-only gates CI runs in `lint-and-validate` for your changed paths; includes `type-ratchet`, `contract-semver`, and `env-registry`), and the affected tests pass (`pnpm exec vitest run --changed origin/main`).
 - [ ] Exception-table rows for your changed paths are green (actuator rebaseline + component-inventory, `build:actuators` for core/actuator type boundaries, etc.).
 - [ ] Push first, then open the PR against `main` with `pnpm kyberion pr create --title "<conventional title>" --body-file <filled PR template>` — it runs the readiness gate unless `--skip-readiness` is passed. The exact order is in the checklist's PR creation steps.
 - [ ] New code has at least one test (unit, integration, or contract — whatever fits).

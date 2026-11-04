@@ -124,9 +124,11 @@ describe('generate_op_registry discovery output', () => {
     expect(
       operations.some((item) => item.input_schema?.['x-kyberion-contract'] === 'legacy-open')
     ).toBe(false);
+    // #1388 authored every remaining op's input schema, so no inferred
+    // contract may come back.
     expect(
       operations.some((item) => item.input_schema?.['x-kyberion-contract'] === 'inferred-legacy')
-    ).toBe(true);
+    ).toBe(false);
 
     const agentSpawn = discovery.actuators
       .find((entry) => entry.n === 'agent-actuator')

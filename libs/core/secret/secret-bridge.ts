@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn, type ChildProcess } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
@@ -16,10 +17,17 @@ import {
   withSensitivePathMediation,
 } from '../secure-io.js';
 import { SecretProvider, RegistryEntry } from './secret-types.js';
+import {
+  AWS_SECRETS_MANAGER_PROVIDER_ID,
+  GCP_SECRET_MANAGER_PROVIDER_ID,
+  HASHICORP_VAULT_PROVIDER_ID,
+  ONEPASSWORD_PROVIDER_ID,
+  createExternalSecretProviders,
+} from './external-secret-providers.js';
 import { keychainReaderAccessSwiftLines, keychainSwiftArgs } from './keychain-access.js';
 import {
-  memoizedKeychainRead,
-  invalidateKeychainRead,
+  memoizedNativeSecretRead,
+  invalidateNativeSecretRead,
 } from '../foundation/secret-resolution-session.js';
 import { ProviderChainRouter } from '../provider-chain-router.js';
 import {
@@ -234,7 +242,7 @@ export class MacKeychainSecretProvider implements SecretProvider {
       superviseKeychainChild(child, KEYCHAIN_WRITE_TIMEOUT_MS, ({ code, error }) => {
         // Any previous entry is already gone: keep the registry and read cache
         // honest, and say so, so the operator re-runs the write.
-        invalidateKeychainRead(service, account);
+        invalidateNativeSecretRead(service, account);
         // The entry is gone, so the registry must not keep listing it.
         let registryNote = '';
         if (error || code !== 0) {
@@ -252,6 +260,7 @@ export class MacKeychainSecretProvider implements SecretProvider {
           );
         } else if (code === 0) {
           try {
+            invalidateNativeSecretRead(service, account);
             registryAdd(service, account);
             resolve();
           } catch (registryError) {
@@ -303,7 +312,7 @@ export class MacKeychainSecretProvider implements SecretProvider {
           return;
         }
         try {
-          invalidateKeychainRead(service, account);
+          invalidateNativeSecretRead(service, account);
           registryRemove(service, account);
           resolve();
         } catch (registryError) {
@@ -330,6 +339,7 @@ export class WindowsCredentialManagerSecretProvider implements SecretProvider {
     account: string,
     value?: string
   ) {
+    const target = windowsCredentialTarget(service, account);
     const script = `
 Add-Type @'
 using System;
@@ -349,24 +359,54 @@ public static class KCredentialApi {
   [DllImport("Advapi32.dll")] public static extern void CredFree(IntPtr buffer);
 }
 '@
-$target = [Console]::In.ReadLine()
-$account = [Console]::In.ReadLine()
-$value = [Console]::In.ReadToEnd()
-if ('${operation}' -eq 'get') {
+$payload = [Console]::In.ReadToEnd() | ConvertFrom-Json
+$target = [string]$payload.target
+$account = [string]$payload.account
+$legacyTarget = [string]$payload.legacyTarget
+$value = [string]$payload.value
+function Get-OwnedCredentialValue([string]$credentialTarget) {
   $ptr = [IntPtr]::Zero
-  if (-not [KCredentialApi]::CredRead($target, 1, 0, [ref]$ptr)) { exit 2 }
+  if (-not [KCredentialApi]::CredRead($credentialTarget, 1, 0, [ref]$ptr)) {
+    $errorCode = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+    if ($errorCode -eq 1168) { return $null }
+    Write-Error "Credential Manager read failed with Win32 error $errorCode"
+    exit 3
+  }
   try {
     $cred = [Runtime.InteropServices.Marshal]::PtrToStructure($ptr, [type][KCredential])
-    if ($cred.CredentialBlobSize -gt 0) {
-      $bytes = New-Object byte[] $cred.CredentialBlobSize
+    if (-not [string]::Equals([string]$cred.UserName, $account, [StringComparison]::Ordinal)) { return $null }
+    $bytes = New-Object byte[] $cred.CredentialBlobSize
+    if ($bytes.Length -gt 0) {
       [Runtime.InteropServices.Marshal]::Copy($cred.CredentialBlob, $bytes, 0, $bytes.Length)
-      [Console]::Out.Write([Text.Encoding]::UTF8.GetString($bytes))
+      return [Text.Encoding]::UTF8.GetString($bytes)
     }
+    return ''
   } finally { [KCredentialApi]::CredFree($ptr) }
+}
+function Remove-OwnedCredential([string]$credentialTarget) {
+  $ptr = [IntPtr]::Zero
+  if (-not [KCredentialApi]::CredRead($credentialTarget, 1, 0, [ref]$ptr)) {
+    $errorCode = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+    return ($errorCode -eq 1168)
+  }
+  try {
+    $cred = [Runtime.InteropServices.Marshal]::PtrToStructure($ptr, [type][KCredential])
+    if (-not [string]::Equals([string]$cred.UserName, $account, [StringComparison]::Ordinal)) { return $true }
+    return [KCredentialApi]::CredDelete($credentialTarget, 1, 0)
+  } finally { [KCredentialApi]::CredFree($ptr) }
+}
+if ('${operation}' -eq 'get') {
+  $secret = Get-OwnedCredentialValue $target
+  if ($null -eq $secret -and $legacyTarget -ne $target) { $secret = Get-OwnedCredentialValue $legacyTarget }
+  if ($null -eq $secret) { exit 2 }
+  [Console]::Out.Write($secret)
   exit 0
 }
 if ('${operation}' -eq 'delete') {
-  if (-not [KCredentialApi]::CredDelete($target, 1, 0)) { exit 2 }
+  if (-not (Remove-OwnedCredential $target)) { exit 3 }
+  if ($legacyTarget -ne $target -and -not (Remove-OwnedCredential $legacyTarget)) {
+    Write-Warning 'The new credential was saved, but a matching legacy credential could not be removed.'
+  }
   exit 0
 }
 $targetPtr = [Runtime.InteropServices.Marshal]::StringToCoTaskMemUni($target)
@@ -377,14 +417,17 @@ $blobPtr = [Runtime.InteropServices.Marshal]::AllocCoTaskMem($bytes.Length)
 $cred = New-Object KCredential
 $cred.Type = 1; $cred.TargetName = $targetPtr; $cred.UserName = $userPtr
 $cred.CredentialBlob = $blobPtr; $cred.CredentialBlobSize = $bytes.Length; $cred.Persist = 2
-try { if (-not [KCredentialApi]::CredWrite([ref]$cred, 0)) { exit 2 } }
+try {
+  if (-not [KCredentialApi]::CredWrite([ref]$cred, 0)) { exit 2 }
+  if ($legacyTarget -ne $target -and -not (Remove-OwnedCredential $legacyTarget)) { exit 3 }
+}
 finally {
   [Runtime.InteropServices.Marshal]::FreeCoTaskMem($targetPtr)
   [Runtime.InteropServices.Marshal]::FreeCoTaskMem($userPtr)
   [Runtime.InteropServices.Marshal]::FreeCoTaskMem($blobPtr)
 }
 `;
-    const input = `${service}\n${account}\n${value ?? ''}`;
+    const input = JSON.stringify({ target, legacyTarget: service, account, value: value ?? '' });
     return safeExecResult('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
       timeoutMs: 10_000,
       maxOutputMB: 2,
@@ -392,15 +435,23 @@ finally {
     });
   }
 
+  getSync(service: string, account: string): string | null {
+    if (!isWindows()) return null;
+    return memoizedNativeSecretRead(service, account, () => {
+      const result = this.run('get', service, account);
+      return result.status === 0 && result.stdout.length > 0 ? result.stdout : null;
+    });
+  }
+
   async get(service: string, account: string): Promise<string | null> {
-    const result = this.run('get', service, account);
-    return result.status === 0 ? result.stdout : null;
+    return this.getSync(service, account);
   }
 
   async set(service: string, account: string, value: string): Promise<void> {
     const result = this.run('set', service, account, value);
     if (result.status !== 0)
       throw new Error(`Windows Credential Manager write failed: ${result.stderr || result.status}`);
+    invalidateNativeSecretRead(service, account);
     registryAdd(service, account);
   }
 
@@ -410,8 +461,14 @@ finally {
       throw new Error(
         `Windows Credential Manager delete failed: ${result.stderr || result.status}`
       );
+    invalidateNativeSecretRead(service, account);
     registryRemove(service, account);
   }
+}
+
+function windowsCredentialTarget(service: string, account: string): string {
+  const digest = createHash('sha256').update(service).update('\0').update(account).digest('hex');
+  return `Kyberion.Secret.v1.${digest}`;
 }
 
 // 2. Local File Secret Provider (Fallback for Headless Linux/Windows)
@@ -563,6 +620,12 @@ export class EnvSecretProvider implements SecretProvider {
 // the seam policy's `default_chains` (secret-provider.json) with this constant
 // as the hermetic fallback.
 const SECRET_BUILTIN_ORDER = [
+  // External managers are opt-in (unavailable until configured) and, once
+  // configured, take precedence over the local stores.
+  HASHICORP_VAULT_PROVIDER_ID,
+  AWS_SECRETS_MANAGER_PROVIDER_ID,
+  GCP_SECRET_MANAGER_PROVIDER_ID,
+  ONEPASSWORD_PROVIDER_ID,
   'mac_keychain',
   'windows_credential_manager',
   'file_secrets',
@@ -610,6 +673,7 @@ export function registerBuiltinSecretProviders(): void {
     new WindowsCredentialManagerSecretProvider(),
     new FileSecretProvider(),
     new EnvSecretProvider(),
+    ...createExternalSecretProviders(),
   ]) {
     registerSecretProvider(provider, { provenance: 'builtin', source: 'secret-bridge' });
   }
@@ -630,7 +694,7 @@ export async function fetchSecret(service: string, account: string): Promise<str
  */
 export function fetchOsKeychainSecretSync(service: string, account: string): string | null {
   if (!isMacOS()) return null;
-  return memoizedKeychainRead(service, account, () => {
+  return memoizedNativeSecretRead(service, account, () => {
     const result = safeExecResult(
       'security',
       ['find-generic-password', '-a', account, '-s', service, '-w'],
@@ -641,13 +705,38 @@ export function fetchOsKeychainSecretSync(service: string, account: string): str
   });
 }
 
+export type NativeSecretBackendId = 'os_keychain' | 'windows_credential_manager';
+
+export interface NativeSecretRead {
+  value: string;
+  backend: NativeSecretBackendId;
+}
+
+/** Read only the current platform's OS-native secret store; never falls through to files or env. */
+export function readNativeSecretSync(service: string, account: string): NativeSecretRead | null {
+  if (isMacOS()) {
+    const value = fetchOsKeychainSecretSync(service, account);
+    return value ? { value, backend: 'os_keychain' } : null;
+  }
+  if (isWindows()) {
+    const value = new WindowsCredentialManagerSecretProvider().getSync(service, account);
+    return value ? { value, backend: 'windows_credential_manager' } : null;
+  }
+  return null;
+}
+
+/** Platform-neutral convenience wrapper for the OS-native secret store. */
+export function fetchNativeSecretSync(service: string, account: string): string | null {
+  return readNativeSecretSync(service, account)?.value ?? null;
+}
+
 /**
  * Synchronous lookup for secret-guard fallthrough. Prefer async {@link fetchSecret}
  * for new call sites. Never logs the value.
  */
 export function fetchSecretSync(service: string, account: string): string | null {
-  const keychainValue = fetchOsKeychainSecretSync(service, account);
-  if (keychainValue) return keychainValue;
+  const nativeValue = fetchNativeSecretSync(service, account);
+  if (nativeValue) return nativeValue;
 
   if (getRegisteredEnvBool('KYBERION_ALLOW_FILE_SECRETS') === true) {
     try {

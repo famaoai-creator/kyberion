@@ -73,6 +73,27 @@ afterEach(() => {
 });
 
 describe('browser onboarding', () => {
+  it('retains persona bindings on re-onboarding and refuses an implicit bound-handle rename', async () => {
+    const { applyBrowserOnboarding, applyBrowserOnboardingSettingsPatch } =
+      await import('./browser-onboarding.js');
+    await applyBrowserOnboarding(validDraft());
+    const file = path.join(PROFILE_ROOT, 'agent-identity.json');
+    const previous = JSON.parse(String(safeReadFile(file)));
+    const bindings = {
+      version: 1,
+      persona_id: previous.agent_id,
+      accountable_human_id: 'user:owner',
+      personal_nhi_id: previous.nhi_id,
+      tenant_bindings: [],
+    };
+    safeWriteFile(file, JSON.stringify({ ...previous, persona_identity_bindings: bindings }));
+    await applyBrowserOnboarding(validDraft());
+    expect(JSON.parse(String(safeReadFile(file))).persona_identity_bindings).toEqual(bindings);
+    await expect(
+      applyBrowserOnboardingSettingsPatch({ identity: { agent_id: 'renamed-agent' } })
+    ).rejects.toThrow(/clear persona bindings/);
+    expect(JSON.parse(String(safeReadFile(file))).agent_id).toBe(previous.agent_id);
+  });
   it('previews governed effects without writing profile artifacts', async () => {
     const { previewBrowserOnboarding } = await import('./browser-onboarding.js');
     const preview = previewBrowserOnboarding(validDraft());

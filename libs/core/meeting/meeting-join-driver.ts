@@ -21,6 +21,7 @@ import { abortableAudioChunks } from './meeting-session-types.js';
 import { nowIso } from '../foundation/time.js';
 import type { AudioBus } from '../voice/audio-bus.js';
 import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
+import { resolveSeamDefaultProvider } from '../seam-provider-selection.js';
 import {
   findMeetingPlatform,
   matchMeetingPlatformHost,
@@ -145,8 +146,13 @@ export function validateMeetingTarget(
  * Registry
  * ------------------------------------------------------------------ */
 
+export const MEETING_JOIN_DRIVER_SEAM = 'meeting-join-driver';
+
+/** Hermetic fallback when the governed policy cannot be read. */
+export const BUILTIN_DEFAULT_MEETING_JOIN_DRIVER = 'chrome-extension';
+
 const meetingJoinDriverSeam = createSeam<MeetingJoinDriver>({
-  key: 'meeting-join-driver',
+  key: MEETING_JOIN_DRIVER_SEAM,
   multiplicity: 'named',
   catalog: coreSeamCatalog,
   owner: 'libs/core/meeting/meeting-join-driver.ts',
@@ -162,6 +168,21 @@ export function registerMeetingJoinDriver(driver: MeetingJoinDriver): () => void
 
 export function getMeetingJoinDriver(driver_id: string): MeetingJoinDriver | undefined {
   return meetingJoinDriverSeam.getOptional(driver_id);
+}
+
+/**
+ * The driver id to use when the caller names none: the saved seam default
+ * (`seam select default meeting-join-driver=<id>`) → the governed policy
+ * default (knowledge/product/governance/seam-provider-selection/meeting-join-driver.json)
+ * → `chrome-extension`. Drivers load on demand, so availability is still
+ * checked by the caller's probe.
+ */
+export function resolveDefaultMeetingJoinDriverId(): string {
+  return (
+    resolveSeamDefaultProvider(MEETING_JOIN_DRIVER_SEAM, {
+      builtin: [BUILTIN_DEFAULT_MEETING_JOIN_DRIVER],
+    })?.provider ?? BUILTIN_DEFAULT_MEETING_JOIN_DRIVER
+  );
 }
 
 /**

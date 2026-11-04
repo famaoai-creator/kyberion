@@ -4,6 +4,7 @@ import {
   createSeamLifecycle,
   type SeamProviderMetadata,
 } from '../seam.js';
+import { resolveSeamDefaultProvider } from '../seam-provider-selection.js';
 import type { KnowledgeContext } from './knowledge-context.js';
 
 export interface KnowledgeRecord {
@@ -66,8 +67,22 @@ export function registerKnowledgeAdapter(
   return registrations.register(id, adapter, metadata);
 }
 
+/**
+ * `id` wins; without one, a registered saved seam default
+ * (`seam select default knowledge-adapter=<id>`) or governed policy default
+ * is used, else the seam's own rule (the single registered adapter; ambiguous
+ * when several are registered).
+ */
 export function resolveKnowledgeAdapter(id?: string): KnowledgeAdapter {
-  return knowledgeAdapterSeam.get(id);
+  if (id) return knowledgeAdapterSeam.get(id);
+  const registered = new Set(knowledgeAdapterSeam.list().map((entry) => entry.id));
+  const fallback =
+    registered.size > 0
+      ? resolveSeamDefaultProvider('knowledge-adapter', {
+          eligible: (candidate) => registered.has(candidate),
+        })
+      : null;
+  return knowledgeAdapterSeam.get(fallback?.provider);
 }
 
 export function listKnowledgeAdapters(): KnowledgeAdapter[] {

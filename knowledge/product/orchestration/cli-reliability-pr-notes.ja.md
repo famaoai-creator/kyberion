@@ -53,7 +53,7 @@ ticket 対応は commit title ではなく commit body の R0x marker で読む�
    verdict **approve-with-conditions**。C1 = focused provenance test + full
    `pnpm run ci` が clean lane で通ること。
 2. **full `pnpm run ci` 未実行**: この worktree では ticket 別 focused test のみ。
-   「CI 検証済み」とは呼ばない。merge 前に `pnpm check -- --scope pr` + `pnpm run ci` 必須。
+   「CI 検証済み」とは呼ばない。merge 前に `pnpm check -- --changed` + `pnpm run ci` 必須。
 3. **P09/P25 real backend**: Apple Vision OCR / 実 STT backend の正常系は R15
    macOS native lane へ defer。hermetic smoke は「分類される拒否」の境界を
    証明するのみで、実 transcript/OCR 成功を主張しない (env-blocked と表示)。

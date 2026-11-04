@@ -10,8 +10,9 @@
  *
  * Selection: an explicit provider (`--provider`, else KYBERION_INGRESS_PROVIDER)
  * is used as-is and fails with its readiness reason when not ready; without
- * one, the first live provider in catalog order whose readiness is `ready`
- * wins. The chosen route and the reason are part of the result.
+ * one, a saved seam default (`seam select default public-ingress-provider=<id>`)
+ * is used when it is live and ready, else the first live provider in catalog
+ * order whose readiness is `ready` wins (a saved default never fails the call). The chosen route and the reason are part of the result.
  */
 import { pathToFileURL } from 'node:url';
 import { hostNodePlatform } from '../platform-facts.js';
@@ -19,6 +20,7 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeStat } from '../secure-io.js';
+import { savedSeamDefaultFor } from '../seam-provider-selection.js';
 import {
   IngressError,
   type IngressNetworkClass,
@@ -284,9 +286,24 @@ export async function selectPublicIngressProvider(
   }
 
   const candidates = await listPublicIngressCandidates({ platform: options.platform });
-  const index = candidates.findIndex(
-    (candidate) => candidate.status === 'live' && candidate.readiness.status === 'ready'
-  );
+  const isReady = (candidate: PublicIngressCandidate) =>
+    candidate.status === 'live' && candidate.readiness.status === 'ready';
+  const saved = savedSeamDefaultFor('public-ingress-provider');
+  const savedCandidate = saved
+    ? candidates.find((candidate) => candidate.provider_id === saved.provider)
+    : undefined;
+  if (saved && savedCandidate && isReady(savedCandidate)) {
+    return {
+      provider: await loadPublicIngressProvider(
+        getPublicIngressProviderDescriptor(savedCandidate.provider_id)!
+      ),
+      candidate: savedCandidate,
+      route: 'default',
+      reason: `saved seam default (${saved.layer}) ${saved.provider}`,
+      candidates,
+    };
+  }
+  const index = candidates.findIndex(isReady);
   if (index < 0) {
     throw new IngressError(
       'INGRESS_NO_READY_PROVIDER',

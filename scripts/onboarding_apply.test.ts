@@ -52,6 +52,20 @@ const FIXTURE_REASONING = {
 };
 
 describe('onboarding_apply', () => {
+  it('all onboarding entrypoints use the shared governed agent profile writer', () => {
+    for (const file of [
+      'scripts/onboarding_apply.ts',
+      'scripts/onboarding_wizard.ts',
+      'libs/core/browser/browser-onboarding.ts',
+      'libs/core/integrations/slack-onboarding.ts',
+    ]) {
+      expect(read(file)).toContain('writePersonalAgentIdentityAtPath(');
+    }
+    expect(read('scripts/onboarding_wizard.ts')).toContain('personalAgentIdentityRevision(');
+    expect(read('libs/core/integrations/slack-onboarding.ts')).not.toMatch(
+      /safeWriteFile\(\s*path\.join\(root, 'agent-identity\.json'/
+    );
+  });
   it('offers one reviewed development grant with a reusable candidate branch and no direct main push', () => {
     const input = buildDelegationInput(new Date('2026-10-22T00:00:00.000Z'), {
       remote: 'git@github.com:fixture/repo.git',

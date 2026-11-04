@@ -496,6 +496,10 @@
       "types": "./dist/analysis/observability-gate.d.ts",
       "default": "./dist/analysis/observability-gate.js"
     },
+    "./analysis/trace-exporter": {
+      "types": "./dist/analysis/trace-exporter.d.ts",
+      "default": "./dist/analysis/trace-exporter.js"
+    },
     "./analysis/trace": {
       "types": "./dist/analysis/trace.d.ts",
       "default": "./dist/analysis/trace.js"
@@ -4400,6 +4404,10 @@
       "types": "./dist/organization/nhi-session-admission.d.ts",
       "default": "./dist/organization/nhi-session-admission.js"
     },
+    "./persona-identity": {
+      "types": "./dist/persona-identity.d.ts",
+      "default": "./dist/persona-identity.js"
+    },
     "./personal-identity-state": {
       "types": "./dist/personal-identity-state.d.ts",
       "default": "./dist/personal-identity-state.js"
@@ -5760,6 +5768,10 @@
       "types": "./dist/tool/runtime-health-history.d.ts",
       "default": "./dist/tool/runtime-health-history.js"
     },
+    "./runtime-readiness": {
+      "types": "./dist/runtime-readiness.d.ts",
+      "default": "./dist/runtime-readiness.js"
+    },
     "./runtime-supervisor": {
       "types": "./dist/tool/runtime-supervisor.d.ts",
       "default": "./dist/tool/runtime-supervisor.js"
@@ -5928,6 +5940,10 @@
       "types": "./dist/seam-provider-selection.d.ts",
       "default": "./dist/seam-provider-selection.js"
     },
+    "./seam-selection-defaults": {
+      "types": "./dist/seam-selection-defaults.d.ts",
+      "default": "./dist/seam-selection-defaults.js"
+    },
     "./seam-selection-rules": {
       "types": "./dist/seam-selection-rules.d.ts",
       "default": "./dist/seam-selection-rules.js"
@@ -5987,6 +6003,10 @@
     "./secret/secret-introduction": {
       "types": "./dist/secret/secret-introduction.d.ts",
       "default": "./dist/secret/secret-introduction.js"
+    },
+    "./secret/external-secret-providers": {
+      "types": "./dist/secret/external-secret-providers.d.ts",
+      "default": "./dist/secret/external-secret-providers.js"
     },
     "./secret/provider-registry": {
       "types": "./dist/secret/provider-registry.d.ts",
@@ -8239,6 +8259,18 @@
     "./vcs/cwd-scope": {
       "types": "./dist/vcs/cwd-scope.d.ts",
       "default": "./dist/vcs/cwd-scope.js"
+    },
+    "./vcs/vcs-backend": {
+      "types": "./dist/vcs/vcs-backend.d.ts",
+      "default": "./dist/vcs/vcs-backend.js"
+    },
+    "./vcs/local-git-backend": {
+      "types": "./dist/vcs/local-git-backend.d.ts",
+      "default": "./dist/vcs/local-git-backend.js"
+    },
+    "./vcs/memory-vcs-backend": {
+      "types": "./dist/vcs/memory-vcs-backend.d.ts",
+      "default": "./dist/vcs/memory-vcs-backend.js"
     },
     "./governance/authenticated-personal-approvals": {
       "types": "./dist/governance/authenticated-personal-approvals.d.ts",

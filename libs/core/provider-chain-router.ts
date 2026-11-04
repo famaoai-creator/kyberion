@@ -203,6 +203,37 @@ export class ProviderChainRouter<TProvider extends { id?: string }, TRequest> {
   }
 
   /**
+   * A saved seam default (seam-selection-defaults.ts) that wins a no-purpose
+   * decision leads the policy's default chain instead of replacing it, so the
+   * rest of the chain keeps its governed order. Rules and pins keep their
+   * governedScope behaviour (null = not a saved-default decision).
+   */
+  private async savedDefaultLead(
+    request: TRequest,
+    entryRequest: Omit<ResolveSeamProviderOptions, 'candidates'>
+  ): Promise<string[] | null> {
+    const options: ResolveSeamProviderOptions = {
+      ...entryRequest,
+      candidates: await this.spec.eligibility(request),
+    };
+    const preview = explainSeamProviderDecision(options);
+    if (
+      preview.strategy !== 'default' ||
+      !preview.default_source ||
+      preview.default_source === 'policy' ||
+      preview.default_source === 'caller'
+    ) {
+      return null;
+    }
+    const decision = resolveSeamProviderDecision(options);
+    if (!decision.provider_id) return null;
+    logger.info(
+      `${this.spec.label} provider '${decision.provider_id}' leads the chain (${decision.strategy}): ${decision.rationale}`
+    );
+    return [decision.provider_id];
+  }
+
+  /**
    * Provider ids to try, best first. Explicit preferences keep their order and
    * skip selection entirely; governed entries rank or lead per governedScope;
    * everything else follows the policy's default chain, then the rest of the
@@ -225,10 +256,19 @@ export class ProviderChainRouter<TProvider extends { id?: string }, TRequest> {
 
     let lead: string[] = [];
     if (preferred.length === 0 && entry.kind === 'governed') {
-      if (spec.governedScope !== 'lead' || entry.request.purpose) {
-        return this.governedIds(request, entry.request);
+      const governed = {
+        ...entry.request,
+        ...(spec.defaultOrderKey ? { defaultOrderKey: spec.defaultOrderKey(request) } : {}),
+      };
+      if (governed.purpose) return this.governedIds(request, governed);
+      const savedLead = await this.savedDefaultLead(request, governed);
+      if (savedLead) {
+        lead = savedLead;
+      } else if (spec.governedScope !== 'lead') {
+        return this.governedIds(request, governed);
+      } else {
+        lead = await this.ruleLead(request, governed);
       }
-      lead = await this.ruleLead(request, entry.request);
     }
 
     const head = [...lead, ...preferred, ...this.defaultOrder(request)];
