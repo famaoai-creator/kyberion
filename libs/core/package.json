@@ -496,6 +496,10 @@
       "types": "./dist/analysis/observability-gate.d.ts",
       "default": "./dist/analysis/observability-gate.js"
     },
+    "./analysis/trace-exporter": {
+      "types": "./dist/analysis/trace-exporter.d.ts",
+      "default": "./dist/analysis/trace-exporter.js"
+    },
     "./analysis/trace": {
       "types": "./dist/analysis/trace.d.ts",
       "default": "./dist/analysis/trace.js"
@@ -5760,6 +5764,10 @@
       "types": "./dist/tool/runtime-health-history.d.ts",
       "default": "./dist/tool/runtime-health-history.js"
     },
+    "./runtime-readiness": {
+      "types": "./dist/runtime-readiness.d.ts",
+      "default": "./dist/runtime-readiness.js"
+    },
     "./runtime-supervisor": {
       "types": "./dist/tool/runtime-supervisor.d.ts",
       "default": "./dist/tool/runtime-supervisor.js"
@@ -5987,6 +5995,10 @@
     "./secret/secret-introduction": {
       "types": "./dist/secret/secret-introduction.d.ts",
       "default": "./dist/secret/secret-introduction.js"
+    },
+    "./secret/external-secret-providers": {
+      "types": "./dist/secret/external-secret-providers.d.ts",
+      "default": "./dist/secret/external-secret-providers.js"
     },
     "./secret/provider-registry": {
       "types": "./dist/secret/provider-registry.d.ts",
