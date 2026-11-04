@@ -112,7 +112,8 @@ export function KnowledgeWorkspace({
   const select = (key: string) => {
     setSelectedKey(key);
     const params = new URLSearchParams(searchParams.toString());
-    params.set('section', 'knowledge');
+    // On /library the tab is the route; the console still keys on `section`.
+    if (!browseOnly) params.set('section', 'knowledge');
     params.set('candidateKey', key);
     params.delete('request');
     params.delete('storageChannel');
@@ -473,14 +474,11 @@ export function KnowledgeWorkspace({
               body={uxText('chronos_learning_check_only', locale)}
             />
           ) : null}
-          {browseOnly ? (
-            <Callout
-              tone="info"
-              title={browseOnly.title}
-              action={{ label: browseOnly.label, href: browseOnly.href }}
-            />
-          ) : null}
-          {selected.learning && !browseOnly ? (
+          {/* Curating a scoped learning candidate and registering an approved
+              one are not queue decisions: they happen here, in the library
+              (the queue's "open" links to this card). Only approve/reject of a
+              queued candidate lives in あなた待ち. */}
+          {selected.learning ? (
             <KnowledgeLearningPanel
               key={selected.candidateKey + ':' + (selected.learning.payloadDigest || '')}
               candidate={selected}
@@ -563,7 +561,7 @@ export function KnowledgeWorkspace({
             <NeedsYouLink reason="knowledge" locale={locale} />
           ) : (
             <>
-              {canDecide && !browseOnly ? (
+              {canDecide ? (
                 <WsTextareaField
                   id="chronos-knowledge-note"
                   label={uxTextOr('chronos_ws_decision_note_label', 'Decision note', locale)}
@@ -573,7 +571,7 @@ export function KnowledgeWorkspace({
                   rows={2}
                 />
               ) : null}
-              {!selected.learning && !browseOnly ? (
+              {!selected.learning ? (
                 <div className="flex flex-wrap gap-2">
                   <Button
                     label={uxText('chronos_register_knowledge', locale)}
@@ -599,7 +597,7 @@ export function KnowledgeWorkspace({
               ) : null}
             </>
           )}
-          {!localAdmin && !browseOnly ? (
+          {!localAdmin ? (
             <p className="kb-text kb-text--muted">
               {uxText('chronos_localadmin_required', locale)}
             </p>

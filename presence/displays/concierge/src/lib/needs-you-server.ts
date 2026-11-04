@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { resolveSurfaceBrowserUrl } from '@agent/core/surface/surface-url';
 import { withExecutionContext } from '@agent/core/authority';
 import {
   listMemoryPromotionCandidates,
@@ -9,6 +8,7 @@ import type { NeedsYouKnowledgeInput, NeedsYouSourceData } from '@agent/core/sur
 import {
   NEEDS_YOU_READ_LIMIT,
   needsYouKnowledgeFromCandidate,
+  readNeedsYouFailures,
 } from '@agent/core/surface/needs-you-sources';
 import { invokeSurfaceOperation } from '@agent/core/surface/surface-operation-registry';
 import { readConciergeHome } from './headless-projections';
@@ -30,14 +30,17 @@ import {
  * fed to the one builder in `@agent/core/surface/needs-you`.
  */
 
-/** A scoped SOP is curated in the knowledge library, not decided from the queue. */
-function learningReviewUrl(candidate: MemoryCandidate): string | undefined {
+/**
+ * A scoped SOP is curated in the knowledge library, not decided from the queue:
+ * the card links straight to its row in `/library?tab=knowledge` on this
+ * origin (a same-origin path, so it never bounces through another surface).
+ */
+export function learningReviewUrl(candidate: MemoryCandidate): string | undefined {
   if (!(candidate.scope && candidate.proposed_memory_kind === 'sop')) return undefined;
-  const url = new URL(resolveSurfaceBrowserUrl('chronos'));
-  url.searchParams.set('section', 'knowledge');
-  url.searchParams.set('candidateKey', needsYouKnowledgeFromCandidate(candidate).candidateKey!);
-  if (candidate.scope.tenant_slug) url.searchParams.set('tenant', candidate.scope.tenant_slug);
-  return url.href;
+  const params = new URLSearchParams({ tab: 'knowledge' });
+  params.set('candidateKey', needsYouKnowledgeFromCandidate(candidate).candidateKey!);
+  if (candidate.scope.tenant_slug) params.set('tenant', candidate.scope.tenant_slug);
+  return `/library?${params.toString()}`;
 }
 
 /** Undecided memory candidates the viewer may see, newest first. */
@@ -54,7 +57,15 @@ export function readConciergeNeedsYou(viewer: ConciergeViewerContext): NeedsYouS
   return {
     approvals: home.approval_queue,
     outcomes: home.outcome_feed,
-    failures: home.exception_feed,
+    // Uncapped, stable-id failure reader shared with MCP (the home summary's
+    // exception feed is capped at 20 with index ids). The shell authenticated
+    // the viewer, so its personal tier is admitted here.
+    failures: withExecutionContext('sovereign_concierge', () =>
+      readNeedsYouFailures(
+        { ...toSurfaceAuthorizationContext(viewer), tierAccess: [...viewer.tierAccess] },
+        { includePersonal: true }
+      )
+    ),
     clarifications: listHygieneInquiries(viewer),
     knowledge: listConciergeMemoryQueue(viewer),
   };
@@ -97,7 +108,8 @@ export function conciergeNeedsYouViews(
 }
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' };
-const NARROWING_PARAMS = ['tenant', 'organization_id', 'project_id'] as const;
+/** The non-narrowing inputs `needs-you.list` declares. */
+const LIST_PARAMS = ['reason', 'overdue', 'cursor', 'limit'] as const;
 
 /**
  * `GET /api/v1/needs-you[/summary]`. The viewer and the shell's company
@@ -128,12 +140,24 @@ export function handleNeedsYouRequest(
   } catch (error) {
     return conciergeErrorResponse(error);
   }
+  // One narrowing rule on HTTP and MCP (review M4): an explicit narrowing — the
+  // selected company, `organization_id`, `project_id` — keeps only items tagged
+  // with exactly that value. Untagged items belong to the system view, as in
+  // `applyTenantSelection`. The viewer above is already narrowed; this also
+  // drops the untagged ones the readers admit by scope.
   const input: Record<string, string> = {};
-  for (const [key, value] of params) {
-    // The narrowing is already applied to the viewer above.
-    if ((NARROWING_PARAMS as readonly string[]).includes(key)) continue;
-    if (operation === 'needs-you.summary') continue;
-    input[key] = value;
+  if (resolved.selection.mode === 'tenant') input.tenant = resolved.selection.tenant_slug;
+  for (const key of ['organization_id', 'project_id'] as const) {
+    const value = params.get(key)?.trim();
+    if (value) input[key] = value;
+  }
+  // Only keys the operation declares reach its strict schema; anything else
+  // (a cache-buster, a stray UI parameter) is ignored, not a 400 (review L3).
+  if (operation === 'needs-you.list') {
+    for (const key of LIST_PARAMS) {
+      const value = params.get(key);
+      if (value !== null) input[key] = value;
+    }
   }
   const result = invokeSurfaceOperation(operation, input, {
     viewer: toSurfaceAuthorizationContext(viewer),
