@@ -163,3 +163,49 @@ describe('speech-to-text selection: language and operator rules', () => {
     expect(resolveSpeechToTextBridge({ context: { language: 'ja' } }).name).toBe('mlx_whisper');
   });
 });
+
+describe('speech-to-text selection: saved seam default', () => {
+  beforeEach(() => {
+    record.mockClear();
+    safeRmSync(dir, { recursive: true, force: true });
+    vi.stubEnv('MISSION_ID', '');
+    vi.stubEnv('KYBERION_STT_COMMAND', '');
+    vi.stubEnv('KYBERION_SEAM_SELECTION_RULES_PATH', rulesFile);
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    resetSpeechToTextBridge();
+    safeRmSync(dir, { recursive: true, force: true });
+  });
+
+  it('chooses the saved default over the priority default when nothing explicit is given', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'speech-to-text-bridge=mlx_whisper');
+    expect(shouldSelectSpeechToTextBridges({ bridges: ALL })).toBe(true);
+    expect(resolveSpeechToTextBridge({ bridges: ALL }).name).toBe('mlx_whisper');
+    const { decision } = selectSpeechToTextBridges({ bridges: ALL });
+    expect(decision).toMatchObject({ strategy: 'default', default_source: 'env' });
+  });
+
+  it('keeps a purpose and the KYBERION_STT_COMMAND priority order above the saved default', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'speech-to-text-bridge=mlx_whisper');
+    expect(resolveSpeechToTextBridge({ purpose: 'latency', bridges: ALL }).name).toBe(
+      'fluid-audio-parakeet'
+    );
+    const shell = fake('shell', 201, { timestamps: false, granularity: 'none' });
+    vi.stubEnv('KYBERION_STT_COMMAND', 'whisper-cli');
+    expect(resolveSpeechToTextBridge({ bridges: [shell, ...ALL.slice(0, 3)] }).name).toBe('shell');
+    vi.stubEnv('KYBERION_STT_COMMAND', '');
+    expect(resolveSpeechToTextBridge({ bridges: [shell, ...ALL.slice(0, 3)] }).name).toBe(
+      'mlx_whisper'
+    );
+  });
+
+  it('falls back to the policy default when the saved default cannot run the task', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'speech-to-text-bridge=mlx_whisper');
+    const { bridges, decision } = selectSpeechToTextBridges({
+      bridges: [parakeet, whisperkit],
+    });
+    expect(bridges[0]!.name).toBe('whisperkit-cli');
+    expect(decision.default_source).toBe('policy');
+  });
+});

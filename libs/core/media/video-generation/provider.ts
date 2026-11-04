@@ -20,6 +20,7 @@ import {
   type SeamProviderCandidate,
 } from '../../seam-provider-selection.js';
 import { matchSeamSelectionRule } from '../../seam-selection-rules.js';
+import { savedSeamDefaultFor } from '../../seam-provider-selection.js';
 import { sleep } from '../../async-utils.js';
 import { stopExternalOperationForVerification } from '../../governance/external-operation.js';
 import { governVideoProvider } from './admission.js';
@@ -371,8 +372,9 @@ function videoSelectionContext(params: VideoGenerationParams): Record<string, st
  * Purpose-driven video provider choice (seam `video-generation-provider`).
  * A named backend (backend_id / video_adf.engine.backend_id) always wins.
  * With a purpose, eligible backends are ranked by the governed policy; without
- * one, only an operator rule matching the request picks a backend (a mission
- * pin it produced is reused) — otherwise the request is returned unchanged. The choice is written
+ * one, an operator rule matching the request picks a backend (a mission
+ * pin it produced is reused), else an eligible saved seam default
+ * (seam-selection-defaults) — otherwise the request is returned unchanged. The choice is written
  * back as `backend_id`, so submission, job refresh and artifact collection all
  * address the same backend.
  */
@@ -382,7 +384,11 @@ export async function applyVideoProviderSelection<T extends VideoGenerationParam
   if (explicitVideoBackendId(params)) return params;
   const purpose = textParam(params, 'purpose');
   const context = videoSelectionContext(params);
-  if (!purpose && !matchSeamSelectionRule(VIDEO_GENERATION_PROVIDER_SEAM, { context })) {
+  if (
+    !purpose &&
+    !matchSeamSelectionRule(VIDEO_GENERATION_PROVIDER_SEAM, { context }) &&
+    !savedSeamDefaultFor(VIDEO_GENERATION_PROVIDER_SEAM)
+  ) {
     return params;
   }
   if (purpose) {
@@ -400,10 +406,18 @@ export async function applyVideoProviderSelection<T extends VideoGenerationParam
     context,
     decisionKey: purpose || 'default',
   };
-  // A matching rule whose backends are all ineligible leaves the request unchanged.
+  // A matching rule whose backends are all ineligible, or an ineligible saved
+  // default, leaves the request unchanged (policy/builtin default applies).
   if (!purpose) {
     const preview = explainSeamProviderDecision(options);
-    if (preview.strategy !== 'rule' && preview.strategy !== 'pinned') return params;
+    const savedDefaultWins =
+      preview.strategy === 'default' &&
+      preview.default_source !== undefined &&
+      preview.default_source !== 'policy' &&
+      preview.default_source !== 'caller';
+    if (preview.strategy !== 'rule' && preview.strategy !== 'pinned' && !savedDefaultWins) {
+      return params;
+    }
   }
   const decision = resolveSeamProviderDecision(options);
   if (!decision.provider_id) {

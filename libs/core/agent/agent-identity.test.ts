@@ -1,4 +1,5 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as writerLease from '../writer-lease.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeAppendFileSync, safeExistsSync, safeMkdir, safeRmSync } from '../secure-io.js';
 import { withExecutionContext } from '../authority.js';
@@ -65,6 +66,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   if (previousMissionRole === undefined) delete process.env.MISSION_ROLE;
   else process.env.MISSION_ROLE = previousMissionRole;
   if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
@@ -220,6 +222,57 @@ describe('agent-identity — fail-closed execution-context gate', () => {
 // ---------------------------------------------------------------------------
 
 describe('agent-identity — accountable ownership and uniqueness', () => {
+  it('revokes admitted sessions on accountability transfer without removing ordinary runtimes or identity provenance', () => {
+    const issued = issueTestIdentity('transfer-session-agent');
+    withExecutionContext('mission_controller', () => {
+      bindRuntimeInstance({ nhiId: issued.nhi_id, instanceId: 'runtime-worker', pid: 4242 });
+      bindRuntimeInstance({
+        nhiId: issued.nhi_id,
+        instanceId: 'nhi-session:old-owner',
+        sessionId: 'kns1.old',
+      });
+      const unchanged = getAgentIdentity(issued.nhi_id);
+      new AgentIdentityJournal({ journalPath: currentJournalPath }).append(
+        AGENT_IDENTITY_OPS.accountabilityReassigned,
+        {
+          nhi_id: issued.nhi_id,
+          previous_accountable_human_id: 'human:founder',
+          accountable_human_id: 'human:founder',
+          reason: 'same owner',
+          reassigned_at: new Date().toISOString(),
+        }
+      );
+      expect(getAgentIdentity(issued.nhi_id)).toEqual(unchanged);
+      reassignAgentIdentityAccountability({
+        nhiId: issued.nhi_id,
+        expectedAccountableHumanId: 'human:founder',
+        accountableHumanId: 'human:next',
+        reason: 'transfer',
+      });
+      expect(getAgentIdentity(issued.nhi_id)?.runtime_instances).toEqual([
+        expect.objectContaining({ instance_id: 'runtime-worker', pid: 4242 }),
+      ]);
+      reassignAgentIdentityAccountability({
+        nhiId: issued.nhi_id,
+        expectedAccountableHumanId: 'human:next',
+        accountableHumanId: 'human:founder',
+        reason: 'transfer back',
+      });
+    });
+    const restored = new AgentIdentityJournal({ journalPath: currentJournalPath }).restore()
+      .identities[issued.nhi_id];
+    expect(restored).toMatchObject({
+      nhi_id: issued.nhi_id,
+      created_at: issued.created_at,
+      affiliation: issued.affiliation,
+      accountable_human_id: issued.accountable_human_id,
+      lifecycle_status: 'active',
+    });
+    expect(restored.runtime_instances).toEqual([
+      expect.objectContaining({ instance_id: 'runtime-worker', pid: 4242 }),
+    ]);
+  });
+
   it('journals accountable transfers without changing identity/home and fences stale and retired transfers', () => {
     const original = issueTestIdentity('accountable-transfer', {
       accountableHumanId: 'user:owner',
@@ -324,6 +377,42 @@ describe('agent-identity — accountable ownership and uniqueness', () => {
       )
     ).toThrow(AgentIdentityFormatError);
   });
+
+  it('ensure preserves history but rejects explicit tenant and accountability conflicts', () => {
+    const record = issueTestIdentity('bounded-agent', {
+      affiliation: { tenant_slug: 'company-a' },
+    });
+    const parameters = { slug: 'bounded-agent', organizationId: 'demo-org' };
+    expect(() =>
+      ensureAgentIdentityProvisioned({ ...parameters, affiliation: { tenant_slug: 'company-b' } })
+    ).toThrow(AgentIdentityConflictError);
+    expect(() =>
+      ensureAgentIdentityProvisioned({ ...parameters, accountableHumanId: 'user:someone-else' })
+    ).toThrow(AgentIdentityConflictError);
+    expect(getAgentIdentity(record.nhi_id)).toEqual(record);
+  });
+
+  it.each(['suspend', 'retire'] as const)(
+    'ensure does not resurrect or stamp a known %s identity',
+    (operation) => {
+      const record = issueTestIdentity('revoked-agent');
+      withExecutionContext('mission_controller', () =>
+        operation === 'suspend'
+          ? suspendAgentIdentity(record.nhi_id)
+          : retireAgentIdentity(record.nhi_id, 'synthetic test')
+      );
+      const parameters = { slug: 'revoked-agent', organizationId: 'demo-org' };
+      expect(() => ensureAgentIdentityProvisioned(parameters)).toThrow(AgentIdentityConflictError);
+      expect(ensureAgentIdentityBestEffort(parameters)).toEqual({
+        nhi_id: null,
+        record: null,
+        recorded: false,
+      });
+      expect(getAgentIdentity(record.nhi_id)?.lifecycle_status).toBe(
+        operation === 'suspend' ? 'suspended' : 'retired'
+      );
+    }
+  );
 
   it('persists canonical tenant affiliation separately from the organization id', () => {
     const record = issueTestIdentity('tenant-affiliated-agent', {
@@ -496,6 +585,84 @@ describe('agent-identity — lifecycle and restart replay', () => {
 // ---------------------------------------------------------------------------
 
 describe('agent-identity — runtime instance binding', () => {
+  it.each(['suspend', 'suspend-reactivate', 'retire'] as const)(
+    'fences a %s between the binding precheck and writer-lease acquisition',
+    (interruption) => {
+      const issued = issueTestIdentity('interrupted-binding');
+      const original = writerLease.withFencedWriterLeaseSync;
+      const spy = vi
+        .spyOn(writerLease, 'withFencedWriterLeaseSync')
+        .mockImplementationOnce((options) => {
+          spy.mockRestore();
+          withExecutionContext('mission_controller', () => {
+            if (interruption === 'retire') retireAgentIdentity(issued.nhi_id, 'incident');
+            else {
+              suspendAgentIdentity(issued.nhi_id, 'incident');
+              if (interruption === 'suspend-reactivate') activateAgentIdentity(issued.nhi_id);
+            }
+          });
+          return original(options);
+        });
+      expect(() =>
+        withExecutionContext('mission_controller', () =>
+          bindRuntimeInstance({
+            nhiId: issued.nhi_id,
+            instanceId: 'nhi-session:late',
+            sessionId: 'kns1.late',
+          })
+        )
+      ).toThrow('identity changed before binding');
+      const restored = new AgentIdentityJournal({ journalPath: currentJournalPath }).restore();
+      expect(restored.identities[issued.nhi_id].lifecycle_status).toBe(
+        interruption === 'retire' ? 'retired' : interruption === 'suspend' ? 'suspended' : 'active'
+      );
+      expect(restored.identities[issued.nhi_id].runtime_instances).toBeUndefined();
+    }
+  );
+
+  it('ignores a delayed bind event while suspended, even after reactivation and replay', () => {
+    const issued = issueTestIdentity('delayed-binding');
+    withExecutionContext('mission_controller', () => {
+      suspendAgentIdentity(issued.nhi_id, 'incident');
+      new AgentIdentityJournal({ journalPath: currentJournalPath }).append(
+        AGENT_IDENTITY_OPS.instanceBound,
+        {
+          nhi_id: issued.nhi_id,
+          instance_id: 'nhi-session:late',
+          session_id: 'kns1.late',
+          bound_at: new Date().toISOString(),
+          activate_provisioned: true,
+        }
+      );
+      activateAgentIdentity(issued.nhi_id);
+    });
+    expect(getAgentIdentity(issued.nhi_id)?.runtime_instances).toBeUndefined();
+  });
+
+  it('allocates monotonic sequences for alternating journal writers', () => {
+    const issued = issueTestIdentity('multi-writer');
+    const first = new AgentIdentityJournal({ journalPath: currentJournalPath });
+    const second = new AgentIdentityJournal({ journalPath: currentJournalPath });
+    first.restore();
+    second.restore();
+    withExecutionContext('mission_controller', () => {
+      const a = first.append(AGENT_IDENTITY_OPS.identityActivated, {
+        nhi_id: issued.nhi_id,
+        activated_at: new Date().toISOString(),
+      });
+      const b = second.append(AGENT_IDENTITY_OPS.identitySuspended, {
+        nhi_id: issued.nhi_id,
+        suspended_at: new Date().toISOString(),
+      });
+      const c = first.append(AGENT_IDENTITY_OPS.identityActivated, {
+        nhi_id: issued.nhi_id,
+        activated_at: new Date().toISOString(),
+      });
+      expect([b.seq, c.seq]).toEqual([a.seq + 1, a.seq + 2]);
+      expect(getAgentIdentityRevision(issued.nhi_id)).toBe(c.seq);
+    });
+  });
+
   it('binding an instance activates a provisioned identity and records the instance', () => {
     const issued = issueTestIdentity('instance-agent');
     const bound = withExecutionContext('mission_controller', () =>

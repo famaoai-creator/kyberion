@@ -148,7 +148,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion ops alerts`                   | `pnpm ops:alerts`                 | Triage undelivered alerts                                                                                                                      |
 | `pnpm kyberion organization identity`        |                                   | Inspect humans, agents and the local owner                                                                                                     |
 | `pnpm kyberion packet`                       |                                   | Render an operator packet or status report                                                                                                     |
-| `pnpm kyberion pr preflight`                 |                                   | Run the pull-request readiness gates for changed paths without creating a PR                                                                   |
+| `pnpm kyberion pr preflight`                 |                                   | Run the pull-request readiness gates and affected tests for changed paths without creating a PR                                                |
 | `pnpm kyberion pr shadow-report`             |                                   | Compare the gate's shadow verdicts on pull requests with what the operator actually did.                                                       |
 | `pnpm kyberion procedure golden`             |                                   | Show procedure success-check status or backfill golden scenarios                                                                               |
 | `pnpm kyberion project-trust`                |                                   | Show project trust requests — **[readiness]**                                                                                                  |
@@ -376,7 +376,7 @@ Repository build, test, generator and gate scripts for contributors.
 | `pnpm kyberion build repo`                          | `pnpm build:repo`                          | Compile repository TypeScript                                              |
 | `pnpm kyberion build ui`                            | `pnpm build:ui`                            | Build the UI apps                                                          |
 | `pnpm kyberion chat local`                          |                                            | Start an interactive local-LLM chat with tool use.                         |
-| `pnpm kyberion check`                               | `pnpm check`                               | Run repository checks (pnpm check -- --scope pr before a PR)               |
+| `pnpm kyberion check`                               | `pnpm check`                               | Run repository checks (pnpm check -- --changed before a PR)                |
 | `pnpm kyberion check apple-fm`                      | `pnpm check:apple-fm`                      | Check on-device Apple Intelligence availability                            |
 | `pnpm kyberion check backend-conformance`           |                                            | Check reasoning backend conformance                                        |
 | `pnpm kyberion check chronos-perf`                  |                                            | Check Chronos performance baseline (browser)                               |

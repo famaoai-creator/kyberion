@@ -15,6 +15,7 @@ import type { VideoFrameBus } from '../video/video-frame-bus.js';
 import { platform } from '../platform.js';
 import { takeScreenshot } from './os-automation.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import { savedSeamDefaultFor } from '../seam-provider-selection.js';
 
 export const SCREEN_CAPTURE_BRIDGE_ID = 'screen-capture-bridge' as const;
 
@@ -36,8 +37,10 @@ export interface ScreenCaptureBackendAdapter {
   capture(input: ScreenCaptureBackendInput): Promise<void> | void;
 }
 
+export const SCREEN_CAPTURE_BACKEND_SEAM = 'screen.capture-backend';
+
 const screenCaptureBackendSeam = createSeam<ScreenCaptureBackendAdapter>({
-  key: 'screen.capture-backend',
+  key: SCREEN_CAPTURE_BACKEND_SEAM,
   multiplicity: 'named',
   catalog: coreSeamCatalog,
   owner: 'libs/core/virtual/screen-capture-bridge.ts',
@@ -267,12 +270,18 @@ async function resolveScreenCaptureBackend(
     const probe = await backend.probe();
     return { backend, ...probe };
   }
+  // A saved seam default (`seam select default screen.capture-backend=<id>`)
+  // is tried first but, unlike an explicit preferred_backend, never fails the
+  // call: an unsupported or unavailable saved default falls through to the
+  // priority order below.
+  const saved = savedSeamDefaultFor(SCREEN_CAPTURE_BACKEND_SEAM)?.provider;
   const candidates = backends
-    .filter((entry) => entry.backend_id !== 'stub')
+    .filter((entry) => entry.backend_id !== 'stub' || entry.backend_id === saved)
     .filter((entry) => entry.platforms.includes('*') || entry.platforms.includes(process.platform))
     .filter((entry) => !entry.supports || entry.supports(input))
     .sort(
       (left, right) =>
+        Number(right.backend_id === saved) - Number(left.backend_id === saved) ||
         (right.priority ?? 0) - (left.priority ?? 0) ||
         left.backend_id.localeCompare(right.backend_id)
     );

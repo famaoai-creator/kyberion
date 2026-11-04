@@ -16,10 +16,14 @@
  */
 
 import { matchSeamSelectionRule } from '@agent/core/seam-selection-rules';
-import { getSeamSelectionPolicy } from '@agent/core/seam-provider-selection';
+import {
+  getSeamSelectionPolicy,
+  resolveSeamDefaultProvider,
+} from '@agent/core/seam-provider-selection';
 import {
   detectTextLanguage,
   normalizeLanguageTag,
+  resolveVoiceEngineForPlatform,
   selectVoiceTtsEngine,
   unmetVoiceTtsRequirements,
   VOICE_TTS_ENGINE_SEAM,
@@ -65,6 +69,41 @@ export interface VoiceEngineRouting {
   warnings: string[];
   /** Set when the identity guard leaves no engine that can run the request. */
   blocked?: string;
+}
+
+/** True when `engineId` resolves to itself (known, active, runs on this platform). */
+function isRunnableVoiceEngine(engineId: string): boolean {
+  try {
+    return resolveVoiceEngineForPlatform(engineId).engine_id === engineId;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether a caller named an engine: an empty value or `auto` means "not named". */
+export function isNamedVoiceEngineId(engineId: unknown): engineId is string {
+  const id = typeof engineId === 'string' ? engineId.trim() : '';
+  return Boolean(id) && id !== 'auto';
+}
+
+/**
+ * Engine id for a caller that named none (voice-tts-engine seam). With a
+ * domain default (e.g. a selected voice profile's `default_engine_id`) only
+ * that applies; otherwise the generic saved seam default when it can run
+ * here, then the policy default, then `builtin`.
+ */
+export function resolveDefaultVoiceEngineId(
+  options: { domainDefault?: string; builtin?: string } = {}
+): string {
+  const domain = options.domainDefault?.trim();
+  if (domain) return domain;
+  const builtin = options.builtin ?? 'local_say';
+  return (
+    resolveSeamDefaultProvider(VOICE_TTS_ENGINE_SEAM, {
+      eligible: isRunnableVoiceEngine,
+      builtin: [builtin],
+    })?.provider ?? builtin
+  );
 }
 
 function summarize(

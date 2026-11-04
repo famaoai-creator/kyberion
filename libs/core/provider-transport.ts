@@ -23,7 +23,7 @@
  */
 
 import { createProviderRegistry, type ProviderRegistry } from './provider-registry.js';
-import { getSeamSelectionPolicy, type SeamSelectionPolicy } from './seam-provider-selection.js';
+import { resolveSeamDefaultOrder } from './seam-provider-selection.js';
 import type { SeamProviderMetadata } from './seam.js';
 
 export const PROVIDER_TRANSPORT_SEAM = 'provider-transport';
@@ -100,13 +100,12 @@ export function getProviderTransport(id: string): ProviderTransport | undefined 
   return registry.get(id);
 }
 
-function policy(): SeamSelectionPolicy | undefined {
-  return getSeamSelectionPolicy(PROVIDER_TRANSPORT_SEAM);
-}
-
-/** First transport named by the governed default chain, when one is registered. */
+/**
+ * First registered transport of the default order: saved seam default
+ * (`KYBERION_SEAM_DEFAULTS` / scope layers) → governed `default_chains.default`.
+ */
 function governedDefault(): ProviderTransport | undefined {
-  const chain = policy()?.default_chains?.default ?? [];
+  const chain = resolveSeamDefaultOrder(PROVIDER_TRANSPORT_SEAM);
   for (const id of chain) {
     const transport = registry.get(id);
     if (transport) return transport;
@@ -116,8 +115,8 @@ function governedDefault(): ProviderTransport | undefined {
 
 /**
  * Resolve the transport for an invocation. Order:
- * explicit selector → governed `default_chains.default` → `loopback` →
- * first registered. An explicit selector that resolves to nothing throws —
+ * explicit selector → saved seam default → governed `default_chains.default` →
+ * `loopback` → first registered. An explicit selector that resolves to nothing throws —
  * silent fallback would hide a mis-pinned provider.
  */
 export function resolveProviderTransport(selector?: string): ProviderTransport {

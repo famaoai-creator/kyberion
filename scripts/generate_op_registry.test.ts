@@ -124,8 +124,8 @@ describe('generate_op_registry discovery output', () => {
     expect(
       operations.some((item) => item.input_schema?.['x-kyberion-contract'] === 'legacy-open')
     ).toBe(false);
-    // Every op now validates against an authored schema (LEGACY_OPEN_OPERATION_IDS
-    // is empty), so no inferred-legacy contract may reappear in discovery.
+    // #1388 authored every remaining op's input schema, so no inferred
+    // contract may come back.
     expect(
       operations.some((item) => item.input_schema?.['x-kyberion-contract'] === 'inferred-legacy')
     ).toBe(false);

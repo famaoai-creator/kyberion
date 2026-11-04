@@ -8,8 +8,10 @@ import {
   hashArtifactForReview,
   inferArtifactReviewKind,
   loadArtifactReviewReceipt,
+  receiptToArtifactReviewDecision,
   validateArtifactReviewReceipt,
   type ArtifactReviewReceipt,
+  type ArtifactReviewIndependencePolicy,
 } from './artifact-review.js';
 import * as pathResolver from '../path-resolver.js';
 import { safeRmSync, safeWriteFile } from '../secure-io.js';
@@ -43,6 +45,119 @@ function receipt(overrides: Partial<ArtifactReviewReceipt> = {}): ArtifactReview
 }
 
 describe('artifact review contract', () => {
+  const evaluate = (options: Partial<Parameters<typeof evaluateArtifactReviews>[0]> = {}) => {
+    const value = receipt();
+    return evaluateArtifactReviews({
+      artifacts: [value.artifact],
+      reviews: [receiptToArtifactReviewDecision(value)],
+      requiredReviewerRoles: ['code-reviewer'],
+      implementerAgentIds: ['implementation-agent'],
+      requireIndependence: true,
+      ...options,
+    });
+  };
+
+  it('preserves legacy receipt readability and admission without claiming authenticated assurance', () => {
+    const legacy = JSON.parse(JSON.stringify(receipt()));
+    expect(validateArtifactReviewReceipt(legacy).valid).toBe(true);
+    expect(evaluate({ reviews: [receiptToArtifactReviewDecision(legacy)] })).toMatchObject({
+      ready: true,
+      reasons: [],
+      independence_assurance: 'legacy_actor_claim',
+    });
+    expect(evaluate({ independencePolicy: 'legacy_actor_claim' })).toEqual(evaluate());
+  });
+
+  it.each([undefined, false, true])(
+    'strict policy fails closed regardless of requireIndependence=%s',
+    (requireIndependence) => {
+      expect(
+        evaluate({ independencePolicy: 'authenticated_execution', requireIndependence })
+      ).toMatchObject({
+        ready: false,
+        reasons: ['authenticated reviewer execution provenance is unavailable'],
+        independence_assurance: 'unverified',
+      });
+    }
+  );
+
+  it.each(['unknown', '', null])(
+    'rejects unsupported policy %s instead of falling back',
+    (policy) => {
+      expect(
+        evaluate({
+          independencePolicy: policy as ArtifactReviewIndependencePolicy,
+          requireIndependence: false,
+        })
+      ).toMatchObject({
+        ready: false,
+        reasons: ['unsupported artifact review independence policy'],
+        independence_assurance: 'unverified',
+      });
+    }
+  );
+
+  it('does not vacuously grant strict independence for empty evidence', () => {
+    expect(
+      evaluate({
+        artifacts: [],
+        reviews: [],
+        requiredReviewerRoles: [],
+        independencePolicy: 'authenticated_execution',
+      })
+    ).toMatchObject({ ready: false, independence_assurance: 'unverified' });
+    expect(evaluate({ artifacts: [], reviews: [], requiredReviewerRoles: [] })).toMatchObject({
+      independence_assurance: 'unverified',
+    });
+  });
+
+  it('labels non-independent and independence-not-requested evaluations accurately', () => {
+    const decision = receiptToArtifactReviewDecision(receipt());
+    expect(evaluate({ reviews: [{ ...decision, independence_verified: false }] })).toMatchObject({
+      ready: false,
+      independence_assurance: 'unverified',
+    });
+    expect(
+      evaluate({ reviews: [{ ...decision, reviewer_agent_id: 'implementation-agent' }] })
+    ).toMatchObject({ ready: false, independence_assurance: 'unverified' });
+    expect(evaluate({ requireIndependence: false })).toMatchObject({
+      ready: true,
+      independence_assurance: 'not_required',
+    });
+  });
+
+  it.each([
+    ['alias-a', 'alias-b', 'runtime-shared'],
+    ['kyberion://agent/fixture/producer', 'kyberion://agent/fixture/reviewer', 'runtime-shared'],
+    ['kyberion://agent/fixture/actor', 'kyberion://agent/fixture/actor', 'runtime-new'],
+    ['kyberion://agent/fixture/producer', 'kyberion://agent/fixture/reviewer', undefined],
+  ])(
+    'never upgrades actor or runtime claims to proof (%s, %s, %s)',
+    (producer, reviewer, runtime) => {
+      const decision = {
+        ...receiptToArtifactReviewDecision(receipt()),
+        reviewer_agent_id: reviewer,
+        independence_verified: true,
+        // Extra JS input fields must not become a trusted attestation pathway.
+        independence_assurance: 'authenticated_execution',
+        execution_provenance: {
+          authenticated: true,
+          canonical_actor_id: reviewer,
+          runtime_id: runtime,
+          accountable_human_id: 'user:shared-owner',
+          session_id: 'claimed-session',
+        },
+      };
+      expect(
+        evaluate({
+          reviews: [decision],
+          implementerAgentIds: [producer],
+          independencePolicy: 'authenticated_execution',
+        })
+      ).toMatchObject({ ready: false, independence_assurance: 'unverified' });
+    }
+  );
+
   it('builds verdict and reviewer independence from structured findings', () => {
     const built = buildArtifactReviewReceipt({
       reviewId: 'review-built',

@@ -4,7 +4,8 @@
  * Every operation delegates to the secure-io primitives callers used before
  * the seam existed, so tier, tenant, symlink and audit checks are unchanged.
  * Importing this module installs `local-fs` on the storage-backend seam
- * (wrapped to the async contract via `toAsyncStorageBackend`).
+ * (wrapped to the async contract via `toAsyncStorageBackend`) and the core
+ * default-order resolver (saved seam default → governed chain).
  */
 
 import {
@@ -15,9 +16,12 @@ import {
   safeReaddir,
 } from '../secure-io.js';
 import { streamTextLines } from '../jsonl-read.js';
+import { resolveSeamDefaultOrder } from '../seam-provider-selection.js';
 import {
   LOCAL_STORAGE_BACKEND_ID,
+  STORAGE_BACKEND_SEAM,
   registerStorageBackend,
+  setStorageBackendDefaultOrderResolver,
   type SyncStorageBackend,
 } from '@agent/kernel/storage/storage-backend';
 
@@ -47,3 +51,10 @@ registerStorageBackend(localStorageBackend, {
   provenance: 'builtin',
   source: 'libs/core/storage/local-storage-backend.ts',
 });
+
+// No-selector order for the kernel seam: saved seam default
+// (`KYBERION_SEAM_DEFAULTS="storage-backend=<id>"` / scope layers) → governed
+// `default_chains.default` → builtin `local-fs`.
+setStorageBackendDefaultOrderResolver(() =>
+  resolveSeamDefaultOrder(STORAGE_BACKEND_SEAM, { builtin: [LOCAL_STORAGE_BACKEND_ID] })
+);
