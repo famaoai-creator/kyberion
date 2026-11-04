@@ -10,6 +10,7 @@ import {
   toSurfaceAuthorizationContext,
 } from '../../../../lib/viewer-context';
 import { conciergeSetupChecklistReaders } from '../../../../lib/setup-checklist-server';
+import { handleNeedsYouRequest } from '../../../../lib/needs-you-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,9 +22,16 @@ const NO_STORE = { 'Cache-Control': 'private, no-store' };
  * are MCP tools (`kyberion.<domain>.<verb>`). `/api/v1/operations` lists them.
  */
 export async function GET(req: NextRequest, ctx: { params: Promise<{ operation: string[] }> }) {
+  const segments = (await ctx.params).operation ?? [];
+  // One needs-you count (review L1): `/api/v1/needs-you/list|summary` answer
+  // exactly like `/api/v1/needs-you[/summary]` — the shell's reader with
+  // personal approvals and the company selection — never the bare MCP reader.
+  if (segments.length === 2 && segments[0] === 'needs-you') {
+    if (segments[1] === 'list') return handleNeedsYouRequest(req, 'needs-you.list');
+    if (segments[1] === 'summary') return handleNeedsYouRequest(req, 'needs-you.summary');
+  }
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
-  const segments = (await ctx.params).operation ?? [];
   if (segments.length === 1 && segments[0] === 'operations') {
     return NextResponse.json(
       { ok: true, operations: listSurfaceOperations() },
