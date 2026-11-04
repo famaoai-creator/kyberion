@@ -710,6 +710,17 @@ type OutcomeObjective =
   OrganizationOperatingModelView['control_plane']['outcome_accounting']['objectives'][number];
 type OutcomeKeyResult = NonNullable<OutcomeObjective['key_results']>[number];
 
+/**
+ * ARIA value of a KR progressbar. An unmeasured KR has no value (an
+ * indeterminate progressbar) and is announced by its status label, never as 0%.
+ */
+export function krProgressAria(
+  percent: number | undefined,
+  statusLabel: string
+): { 'aria-valuenow'?: number; 'aria-valuetext'?: string } {
+  return percent === undefined ? { 'aria-valuetext': statusLabel } : { 'aria-valuenow': percent };
+}
+
 function KeyResultRow({ kr, locale }: { kr: OutcomeKeyResult; locale: SupportedLocale }) {
   const bcp47 = localeToBcp47(locale);
   const number = new Intl.NumberFormat(bcp47, { maximumFractionDigits: 2 });
@@ -755,7 +766,7 @@ function KeyResultRow({ kr, locale }: { kr: OutcomeKeyResult; locale: SupportedL
           role="progressbar"
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-valuenow={reading.percent ?? 0}
+          {...krProgressAria(reading.percent, uxText(`ux_b_kr_status_${reading.status}`, locale))}
           aria-label={kr.title}
         >
           <span className="org-kr__fill" style={{ width: `${reading.percent ?? 0}%` }} />
@@ -906,6 +917,16 @@ function OrganizationAggregate({
       {unreadable > 0 ? (
         <p className="kb-text kb-text--muted">
           {uxMessage('ux_b_org_aggregate_partial', { count: unreadable }, '', locale)}
+        </p>
+      ) : null}
+      {tenants.length > shown.length ? (
+        <p className="kb-text kb-text--muted" role="note">
+          {uxMessage(
+            'ux_b_org_aggregate_truncated',
+            { shown: shown.length, total: tenants.length },
+            '',
+            locale
+          )}
         </p>
       ) : null}
       <Table

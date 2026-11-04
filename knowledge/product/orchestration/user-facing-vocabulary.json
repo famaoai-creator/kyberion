@@ -13304,9 +13304,9 @@
     },
     "concierge": {
       "ux_b_reason_axis_max": {
-        "en": "A risk axis is at its maximum: {axes}",
-        "ja": "影響範囲・取り消しにくさ・機密性・確信度のうち、最大の軸があります: {axes}",
-        "qps-ploc": "⟦Ȧ řïşķ ȧẋïş ïş ȧŧ ïŧş ɱȧẋïɱůɱ: {axes} ŀőřėɱ ïṗşůɱ ⟧"
+        "en": "A risk axis is at its maximum",
+        "ja": "影響範囲・取り消しにくさ・機密性・確信度のうち、最大の軸があります",
+        "qps-ploc": "⟦Ȧ řïşķ ȧẋïş ïş ȧŧ ïŧş ɱȧẋïɱůɱ ŀőřėɱ ïṗş⟧"
       },
       "ux_b_reason_irreversible": {
         "en": "Hard to undo",
@@ -13314,14 +13314,14 @@
         "qps-ploc": "⟦Ħȧřḓ ŧő ůñḓő ŀőř⟧"
       },
       "ux_b_reason_never_auto": {
-        "en": "Always decided by a person: {classes}",
-        "ja": "常に人が決める種類の操作です: {classes}",
-        "qps-ploc": "⟦Ȧŀẇȧẏş ḓėƈïḓėḓ ƀẏ ȧ ṗėřşőñ: {classes} ŀőřėɱ ïṗşůɱ ⟧"
+        "en": "Always decided by a person",
+        "ja": "常に人が決める種類の操作です",
+        "qps-ploc": "⟦Ȧŀẇȧẏş ḓėƈïḓėḓ ƀẏ ȧ ṗėřşőñ ŀőřėɱ ïṗ⟧"
       },
       "ux_b_reason_high_risk_path": {
-        "en": "Changes protected files: {paths}",
-        "ja": "重要なファイルを変更します: {paths}",
-        "qps-ploc": "⟦Ƈħȧñɠėş ṗřőŧėƈŧėḓ ƒïŀėş: {paths} ŀőřėɱ ïṗşů⟧"
+        "en": "Changes {count} protected file(s)",
+        "ja": "重要なファイルを {count} 件変更します",
+        "qps-ploc": "⟦Ƈħȧñɠėş {count} ṗřőŧėƈŧėḓ ƒïŀė(ş) ŀőřėɱ ïṗşůɱ⟧"
       },
       "ux_b_reason_requested": {
         "en": "The agent asked for your judgment",
@@ -19962,6 +19962,16 @@
         "en": "The proposed work starts as described.",
         "ja": "提案どおりに作業が始まります。",
         "qps-ploc": "⟦Ŧħė ṗřőṗőşėḓ ẇőřķ şŧȧřŧş ȧş ḓėşƈřïƀėḓ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ux_b_detail_reason": {
+        "en": "Reason as recorded",
+        "ja": "判断理由（記録のまま）",
+        "qps-ploc": "⟦Řėȧşőñ ȧş řėƈőřḓėḓ ŀőřėɱ⟧"
+      },
+      "ux_b_org_aggregate_truncated": {
+        "en": "These totals cover the first {shown} of {total} tenants. Choose a tenant in the scope selector above to see the others.",
+        "ja": "この合計は {total} テナントのうち最初の {shown} テナント分です。ほかのテナントは上の範囲の選択から開いてください。",
+        "qps-ploc": "⟦Ŧħėşė ŧőŧȧŀş ƈőṽėř ŧħė ƒïřşŧ {shown} őƒ {total} ŧėñȧñŧş. Ƈħőőşė ȧ ŧėñȧñŧ ïñ ŧħė şƈőṗė şėŀėƈŧőř ȧƀőṽė ŧő şėė ŧħė őŧħėřş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
       }
     },
     "onboarding": {

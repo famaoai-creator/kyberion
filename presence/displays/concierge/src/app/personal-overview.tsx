@@ -197,7 +197,8 @@ export function PersonalOverview({ locale }: { locale: 'en' | 'ja' }) {
             <Button
               label={frontDeskText('decide_reject', locale)}
               variant="danger"
-              disabled={busyId !== null}
+              // Rejecting an expired request still clears it; a resolved one is final.
+              disabled={busyId !== null || item.brief?.state === 'resolved'}
               onClick={() => void decide(item, 'rejected')}
             />
           </div>
