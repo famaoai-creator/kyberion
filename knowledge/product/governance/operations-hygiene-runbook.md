@@ -22,6 +22,15 @@ gate. Run `libs/core/workforce/artifact-review.test.ts` and
 The [assurance migration contract](./review-independence-assurance.md) defines the
 current opt-in policy, missing capture boundaries, and historical proof requirements.
 
+Historical runtime-binding references are metadata only, never evidence of
+authenticated authorship. Use the strict reference reader with the expected
+tenant; do not rebuild a reference from today's identity projection or silently
+skip corrupt journal records. An unavailable diagnostic reference leaves legacy
+admission unchanged and must not be promoted into authenticated assurance. Run
+`libs/core/agent/agent-identity.test.ts` and
+`libs/core/organization/nhi-session-admission.test.ts` for history changes, including
+no-op rebinds, release/reassignment, malformed journals and credential exclusion.
+
 ## Checkout and canonical implementation drift
 
 Before changing a shared capability, record the checkout root, HEAD SHA/date,
