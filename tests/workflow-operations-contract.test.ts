@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
-import { safeReadFile } from '@agent/core';
+import { safeReadFile } from '@agent/core/secure-io';
 
 interface WorkflowJob {
   'runs-on'?: string;
@@ -21,6 +21,58 @@ function read(relPath: string): string {
 }
 
 describe('Workflow operations contract', () => {
+  it('merges complete main coverage shards before enforcing the unchanged global floor', () => {
+    const ci = yaml.load(read('.github/workflows/ci.yml')) as {
+      jobs: Record<
+        string,
+        {
+          name?: string;
+          if?: string;
+          needs?: string[];
+          strategy?: { 'fail-fast'?: boolean; matrix?: { shard?: number[] } };
+          steps: Array<{ name?: string; run?: string; with?: Record<string, unknown> }>;
+        }
+      >;
+    };
+    const shards = ci.jobs['core-coverage-shards'];
+    expect(shards.if).toContain("github.event_name != 'pull_request'");
+    expect(shards.if).toContain("github.event_name != 'merge_group'");
+    expect(shards.strategy?.['fail-fast']).toBe(false);
+    expect(shards.strategy?.matrix?.shard).toEqual([1, 2, 3, 4, 5, 6]);
+    const command = shards.steps.find((step) => step.name === 'Run core coverage shard')!.run!;
+    expect(command).toContain('--suite core --coverage --shard=${{ matrix.shard }}/6');
+    expect(command).toContain('--reporter=blob');
+    expect(command).toContain('--outputFile.blob=coverage-blobs/shard-${{ matrix.shard }}.json');
+    for (const metric of ['lines', 'functions', 'branches', 'statements']) {
+      expect(command).toContain(`--coverage.thresholds.${metric}=0`);
+    }
+    const aggregate = ci.jobs['core-coverage'];
+    expect(aggregate.name).toBe('test (core)');
+    expect(aggregate.if).toContain('always()');
+    expect(aggregate.if).toContain("github.event_name != 'pull_request'");
+    expect(aggregate.if).toContain("github.event_name != 'merge_group'");
+    expect(aggregate.needs).toEqual(['build-artifacts', 'core-coverage-shards']);
+    const requireSuccess = aggregate.steps.find(
+      (step) => step.name === 'Require every coverage shard to succeed'
+    )!;
+    expect(requireSuccess.run).toContain(
+      'test "$BUILD_RESULT" = success && test "$SHARD_RESULT" = success'
+    );
+    const complete = aggregate.steps.find(
+      (step) => step.name === 'Require all six coverage blobs'
+    )!.run!;
+    expect(complete).toContain('for shard in 1 2 3 4 5 6');
+    expect(complete).toContain('test -s "coverage-blobs/shard-${shard}.json"');
+    const merge = aggregate.steps.find(
+      (step) => step.name === 'Merge coverage and enforce original global thresholds'
+    )!.run!;
+    expect(merge).toContain('pnpm exec vitest --merge-reports=coverage-blobs --coverage');
+    expect(merge).not.toContain('--coverage.thresholds');
+    expect(read('vitest.config.mts')).toMatch(
+      /lines: 67,[\s\S]*functions: 69,[\s\S]*branches: 52,[\s\S]*statements: 65/
+    );
+  });
+
   it('keeps contract-semver and env-registry on the PR gate set', () => {
     const gates = JSON.parse(read('knowledge/product/governance/ci-gates.json')) as {
       gates: Array<{ id: string; scope: string }>;
@@ -164,7 +216,7 @@ describe('Workflow operations contract', () => {
   it('ends the main CI jobs with the failure-triage summary over their captured output', () => {
     const tee = '2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"';
     for (const [file, jobs] of [
-      ['.github/workflows/ci.yml', 2],
+      ['.github/workflows/ci.yml', 4],
       // R15: gates / static / test-core / test-extra / cli-reliability each end
       // with the shared failure-triage action.
       ['.github/workflows/pr-validation.yml', 5],
