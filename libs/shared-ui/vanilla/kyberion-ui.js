@@ -1181,6 +1181,11 @@ function navList(ctx, items, source) {
     text.appendChild(el(ctx, 'span', 'kb-nav-rail__label', item.label));
     if (item.hint) text.appendChild(el(ctx, 'span', 'kb-nav-rail__hint', item.hint));
     link.appendChild(text);
+    if (typeof item.badge === 'string' && item.badge) {
+      const badge = el(ctx, 'span', 'kb-nav-rail__badge', item.badge);
+      badge.setAttribute('aria-label', item.badge_label || item.badge);
+      link.appendChild(badge);
+    }
     li.appendChild(link);
     target.appendChild(li);
   }

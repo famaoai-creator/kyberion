@@ -117,7 +117,7 @@ export function readWorkItemMissionAlignment(authorized: WorkItem, uncertain = f
           missionId,
           status,
           href:
-            '/?section=approvals&request=' +
+            '/inbox?reason=approval&request=' +
             encodeURIComponent(record.id) +
             '&mission=' +
             encodeURIComponent(missionId),

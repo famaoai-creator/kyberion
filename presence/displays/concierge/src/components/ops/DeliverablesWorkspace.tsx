@@ -82,16 +82,32 @@ function reviewLabel(verdict: string | undefined, locale: SupportedLocale): stri
   return verdict;
 }
 
+/** Where decisions about this content are made (a link to あなた待ち). */
+export interface WorkspaceDecisionPointer {
+  href: string;
+  title: string;
+  label: string;
+  /** Browse-mode list heading and description (the decision wording does not apply). */
+  heading?: string;
+  description?: string;
+}
+
 export function DeliverablesWorkspace({
   tenant,
   organizationId,
   projectId,
   onOpenMission,
+  browseOnly,
 }: {
   tenant?: string;
   organizationId?: string;
   projectId?: string;
   onOpenMission?: (missionId: string) => void;
+  /**
+   * 資料 › 成果物 (MSN-SHELL-IA §1): browse only. The review decision lives in
+   * あなた待ち, so this renders a pointer there instead of the review controls.
+   */
+  browseOnly?: WorkspaceDecisionPointer;
 }) {
   const locale = useChronosLocale();
   const pathname = usePathname();
@@ -180,8 +196,8 @@ export function DeliverablesWorkspace({
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(18rem,0.9fr)_minmax(0,1.5fr)]">
       <Section
-        title={uxText('chronos_deliverables_preview_title', locale)}
-        description={uxText('chronos_deliverables_description', locale)}
+        title={browseOnly?.heading ?? uxText('chronos_deliverables_preview_title', locale)}
+        description={browseOnly?.description ?? uxText('chronos_deliverables_description', locale)}
       >
         <div className="flex flex-wrap gap-2">
           <Badge label={scopeLabel} tone="accent" />
@@ -242,7 +258,10 @@ export function DeliverablesWorkspace({
       </Section>
 
       {selected ? (
-        <Section title={selected.kind} description={uxText('chronos_preview_review', locale)}>
+        <Section
+          title={selected.kind}
+          description={browseOnly ? undefined : uxText('chronos_preview_review', locale)}
+        >
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill
               status={reviewStatus(selected.reviewVerdict)}
