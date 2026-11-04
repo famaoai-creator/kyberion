@@ -1,0 +1,77 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "meeting-join-driver",
+      "default_provider": "chrome-extension",
+      "fallback_purpose": "attended",
+      "traits": {
+        "admission": "How reliably the meeting platform admits the session (bot detection rejects automated browsers).",
+        "unattended": "Runs with no operator-loaded browser extension or signed-in browser.",
+        "real_meeting": "Joins a real remote meeting (the stub and in-room drivers do not)."
+      },
+      "providers": {
+        "chrome-extension": {
+          "traits": { "admission": 0.9, "unattended": 0.2, "real_meeting": 1 },
+          "trait_basis": {
+            "admission": "declared",
+            "unattended": "declared",
+            "real_meeting": "declared"
+          },
+          "evidence": [
+            "libs/core/browser/chrome-extension-meeting-driver.ts (drives the operator's signed-in Chrome through the Meet Copilot extension over a loopback WS; exists because Playwright/CDP sessions are rejected by Google Meet's bot detection)",
+            "libs/actuators/meeting-actuator/src/meeting-session.ts (runRegisteredJoinDriver runtime default before this policy: 'chrome-extension'; join_backend 'auto' also maps to it)"
+          ]
+        },
+        "browser-playwright": {
+          "traits": { "admission": 0.4, "unattended": 0.9, "real_meeting": 1 },
+          "trait_basis": {
+            "admission": "declared",
+            "unattended": "declared",
+            "real_meeting": "declared"
+          },
+          "evidence": [
+            "libs/actuators/meeting-browser-driver/src/index.ts (Playwright/CDP browser driver; unattended, but subject to platform bot detection)",
+            "scripts/meeting_participate.ts (previous CLI --driver default before this policy)"
+          ]
+        },
+        "in-room": {
+          "traits": { "admission": 1, "unattended": 1, "real_meeting": 0 },
+          "trait_basis": {
+            "admission": "declared",
+            "unattended": "declared",
+            "real_meeting": "declared"
+          },
+          "evidence": [
+            "libs/core/in-room-meeting-driver.ts (supported_platforms ['in_room']: local microphone/speaker for a physical-room meeting, no URL)"
+          ]
+        },
+        "stub": {
+          "traits": { "admission": 1, "unattended": 1, "real_meeting": 0 },
+          "trait_basis": {
+            "admission": "declared",
+            "unattended": "declared",
+            "real_meeting": "declared"
+          },
+          "evidence": [
+            "libs/core/meeting/meeting-join-driver.ts (StubMeetingJoinDriver over a StubAudioBus; tests and the CLI fallback when the chosen driver is unavailable)"
+          ]
+        }
+      },
+      "purposes": {
+        "attended": {
+          "description": "Join a real remote meeting as the operator's delegate with the best admission odds.",
+          "weights": { "real_meeting": 0.6, "admission": 0.4 }
+        },
+        "unattended": {
+          "description": "Join a real remote meeting with no operator browser or extension present.",
+          "weights": { "real_meeting": 0.5, "unattended": 0.5 }
+        }
+      },
+      "default_chains": {
+        "default": ["chrome-extension", "browser-playwright"]
+      }
+    }
+  ]
+}

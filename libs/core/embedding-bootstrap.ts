@@ -11,7 +11,7 @@ import {
   GeminiEmbeddingBackend,
   isGeminiEmbeddingAvailable,
 } from './provider/gemini-embedding-backend.js';
-import { getSeamSelectionPolicy } from './seam-provider-selection.js';
+import { resolveSeamDefaultOrder } from './seam-provider-selection.js';
 import { logger } from './core.js';
 
 interface EmbeddingCandidate {
@@ -37,15 +37,9 @@ const EMBEDDING_CANDIDATES: Record<string, EmbeddingCandidate> = {
 /** Hermetic order when the policy file is absent or unreadable. */
 const EMBEDDING_BUILTIN_ORDER = ['mlx', 'gemini', 'local-hash-embedding'] as const;
 
+/** Saved seam default first, then the policy's default chain (builtin when no policy). */
 function candidateOrder(): readonly string[] {
-  try {
-    const chain = getSeamSelectionPolicy(EMBEDDING_BACKEND_SEAM)?.default_chains?.['default'];
-    if (chain?.length) return chain;
-  } catch {
-    // The policy directory may be absent in isolated test environments;
-    // fall through to the builtin ordering.
-  }
-  return EMBEDDING_BUILTIN_ORDER;
+  return resolveSeamDefaultOrder(EMBEDDING_BACKEND_SEAM, { builtin: EMBEDDING_BUILTIN_ORDER });
 }
 
 export function installEmbeddingBackendIfAvailable(): boolean {

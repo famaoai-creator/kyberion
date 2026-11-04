@@ -1,8 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from '../secure-io.js';
-import { createScreenCaptureBridge, SCREEN_CAPTURE_BRIDGE_ID } from './screen-capture-bridge.js';
+import {
+  createScreenCaptureBridge,
+  registerScreenCaptureBackend,
+  SCREEN_CAPTURE_BRIDGE_ID,
+} from './screen-capture-bridge.js';
 import { StubVideoFrameBus } from '../video/video-frame-bus.js';
 
 describe('createScreenCaptureBridge', () => {
@@ -103,5 +107,53 @@ describe('createScreenCaptureBridge', () => {
 
     expect(frames).toHaveLength(2);
     expect(frames[0].bytes).toBeGreaterThan(0);
+  });
+});
+
+describe('screen.capture-backend saved seam default', () => {
+  const disposers: Array<() => void> = [];
+  function fake(id: string, priority: number, available: boolean): void {
+    disposers.push(
+      registerScreenCaptureBackend({
+        backend_id: id,
+        platforms: ['*'],
+        priority,
+        probe: () => ({ available, ...(available ? {} : { reason: `${id} off` }) }),
+        capture: () => undefined,
+      })
+    );
+  }
+  afterEach(() => {
+    while (disposers.length) disposers.pop()!();
+    vi.unstubAllEnvs();
+  });
+
+  it('keeps the priority order with no saved default', async () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', '');
+    fake('fake-high', 10_000, true);
+    fake('fake-low', 1, true);
+    expect((await createScreenCaptureBridge().probe()).backend).toBe('fake-high');
+  });
+
+  it('tries the saved default first', async () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'screen.capture-backend=fake-low');
+    fake('fake-high', 10_000, true);
+    fake('fake-low', 1, true);
+    expect((await createScreenCaptureBridge().probe()).backend).toBe('fake-low');
+  });
+
+  it('an explicit preferred_backend still wins', async () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'screen.capture-backend=fake-low');
+    fake('fake-low', 1, true);
+    const probe = await createScreenCaptureBridge({ preferred_backend: 'stub' }).probe();
+    expect(probe.backend).toBe('stub');
+  });
+
+  it('an unavailable saved default falls back without failing', async () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'screen.capture-backend=fake-off');
+    fake('fake-high', 10_000, true);
+    fake('fake-off', 1, false);
+    const probe = await createScreenCaptureBridge().probe();
+    expect(probe).toMatchObject({ backend: 'fake-high', available: true });
   });
 });

@@ -205,3 +205,58 @@ beforeEach(() => {
   preferencesReadiness.mockReset();
   preferencesReadiness.mockReturnValue({ status: 'missing' });
 });
+
+describe('streaming STT seam: generic saved seam default', () => {
+  beforeEach(() => {
+    record.mockClear();
+    safeRmSync(dir, { recursive: true, force: true });
+    vi.stubEnv('MISSION_ID', '');
+    vi.stubEnv('KYBERION_STREAMING_STT_BRIDGE', '');
+    vi.stubEnv('KYBERION_SEAM_SELECTION_RULES_PATH', rulesFile);
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    resetStreamingSttBridges();
+    safeRmSync(dir, { recursive: true, force: true });
+  });
+
+  it('runs governed selection for the saved default when no engine preference is set', () => {
+    fakeBridge('mlx_whisper', { local_only: true, languages: ['ja'] });
+    const synthetic = { requires: { allowSynthetic: true } };
+    expect(selectStreamingSttBridge(synthetic)).toMatchObject({
+      bridge_id: 'stub',
+      source: 'default',
+    });
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'streaming-stt-bridge=mlx_whisper');
+    const selected = selectStreamingSttBridge(synthetic);
+    expect(selected).toMatchObject({ bridge_id: 'mlx_whisper', source: 'selected' });
+    expect(selected.decision?.default_source).toBe('env');
+  });
+
+  it('keeps explicit ids and the engine preference above the generic saved default', () => {
+    fakeBridge('mlx_whisper', { local_only: true, languages: ['ja'] });
+    fakeBridge('remote', { local_only: false, languages: ['ja'] });
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'streaming-stt-bridge=mlx_whisper');
+    expect(selectStreamingSttBridge({ bridgeId: 'stub' })).toMatchObject({
+      bridge_id: 'stub',
+      source: 'explicit',
+    });
+    vi.stubEnv('KYBERION_STREAMING_STT_BRIDGE', 'auto');
+    expect(selectStreamingSttBridge().bridge_id).toBe('mlx_whisper');
+    preferencesReadiness.mockReturnValue({
+      status: 'ready',
+      preferences: { version: '1.0.0', streaming_stt_bridge: 'remote' },
+    });
+    expect(selectStreamingSttBridge().bridge_id).toBe('remote');
+  });
+
+  it('falls back to the policy default when the saved default cannot run the task', () => {
+    fakeBridge('mlx_whisper', { local_only: true, languages: ['ja'] });
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'streaming-stt-bridge=mlx_whisper');
+    const selected = selectStreamingSttBridge({
+      requires: { allowSynthetic: true, language: 'en' },
+    });
+    expect(selected.bridge_id).toBe('stub');
+    expect(selected.decision?.default_source).toBe('policy');
+  });
+});
