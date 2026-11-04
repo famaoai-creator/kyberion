@@ -866,6 +866,9 @@ function claimWorkItemInternal(input: ClaimWorkItemInput): {
     created_at: now,
     renewed_at: now,
     ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
+    ...(idempotencyKey && input.payloadHash?.trim()
+      ? { payload_hash: input.payloadHash.trim() }
+      : {}),
     ...(typeof input.expectedVersion === 'number'
       ? { expected_version: input.expectedVersion }
       : {}),

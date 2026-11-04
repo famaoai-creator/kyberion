@@ -428,6 +428,12 @@
       "note": "Surface runtime state (surface-runtime.ts) — load-bearing for running surfaces."
     },
     {
+      "path": "active/shared/runtime/delegation-idempotency",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "R5 delegation idempotency reservations (libs/core/delegation-idempotency.ts): one JSON per idempotency key holding the payload hash and the terminal DelegationResult used for replay; tenant scopes nest under tenants/<slug>/. Deleting a terminal reservation re-enables execution for that key, so removal is a reviewed decision."
+    },
+    {
       "path": "active/shared/runtime/task-sessions",
       "artifact_class": "state",
       "action": "review_required",
