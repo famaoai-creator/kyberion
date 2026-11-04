@@ -67,7 +67,7 @@ customer/
 
 `tenants/` is the tenant **profile** directory for this stance — it overrides
 `knowledge/personal/tenants/` (see `tenantProfileDir()` in
-`libs/core/tenant-registry.ts`). It declares which tenants exist and where their
+`libs/core/organization/tenant-registry.ts`). It declares which tenants exist and where their
 knowledge roots are. It is **not** where a tenant's customer records go.
 
 ## Quickstart

@@ -23,7 +23,7 @@ phase: [onboarding, alignment, execution]
 A. 共通土台         前提 → 導入とビルド → first-win → readiness
 B. 主体と identity  stance を決める → identity を保存 → baseline を all_clear へ
 C. テナント運用     tenant registry → context binding → activation → first-work
-D. 完了確認         vital-check → baseline-check
+D. 完了確認         kyberion vital → baseline-check
 E. 組織の運営       purpose → service / operation → cadence / decision → 定常実行と状態確認
                     → 目標と KR → project → mission / work item → 進捗の計測
 ```
@@ -198,7 +198,7 @@ identity の保存先は stance で決まる。baseline の L3 も同じ場所�
 stance を決める。
 
 - 自分として使う（ルート 1）: `KYBERION_CUSTOMER` を設定しない。保存先は `knowledge/personal/`。
-- 顧客・会社として使う: 先に `pnpm stance:switch <customer-slug>` で stance を切り替える。保存先は
+- 顧客・会社として使う: 先に `pnpm stance:switch <customer-slug> && source active/shared/runtime/customer.env` で stance を切り替える(source しないと後続コマンドは `knowledge/personal/` を使う)。保存先は
   `customer/{customer-slug}/`。ルート 2 の `pnpm onboarding company` はこの overlay を作るので、
   ルート 2 では上の「ルート 2 の実行順」に従い、company stance でもう一度 identity を保存する。
 
@@ -581,7 +581,7 @@ pnpm mission start <mission-id>
 ### Step 9: 完了を確認する（D）
 
 ```bash
-pnpm pipeline vital-check
+pnpm kyberion vital
 pnpm pipeline --input pipelines/baseline-check.json
 ```
 
@@ -759,7 +759,7 @@ identity をやり直す場合は `pnpm onboarding reset` を使い、生成物�
 
 - `pnpm env:bootstrap` と `pnpm kyberion doctor` が成功している
 - アクティブな profile に identity と onboarding summary が保存されている
-- `pnpm pipeline vital-check` が成功し、baseline-check が `all_clear` である
+- `pnpm kyberion vital` が `Overall: healthy` で、baseline-check が `all_clear` である
 
 ルート 2・3 ではさらに:
 

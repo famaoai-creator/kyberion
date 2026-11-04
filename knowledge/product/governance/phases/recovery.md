@@ -17,7 +17,7 @@ This phase ensures the agent has a solid physical foundation before attempting a
 This phase is triggered by the **Phase Detection Protocol** under two distinct circumstances:
 
 1. **Infrastructure Damage**: The `baseline-check` pipeline returns `status: "needs_recovery"` (failure in L0, L1, or L2).
-2. **Stale Lock Detection**: The `baseline-check` pipeline detects an interrupted mission lock (e.g., `.kyberion.lock` or `active/shared/runtime/locks/`).
+2. **Interrupted Mission**: A mission was left `active` when its session ended (list them with `node dist/scripts/mission_controller.js list active`). `baseline-check` does not detect this; check it once L0–L2 are stable.
 
 ---
 
@@ -65,7 +65,7 @@ Once the infrastructure (L0-L2) is stable, the agent handles aborted missions.
 
 ### 1. Lock-Based Recovery Priority
 
-- Read `.kyberion.lock` (or runtime lock files) to instantly identify the interrupted `mission_id`.
+- Run `node dist/scripts/mission_controller.js list active` to identify the interrupted `mission_id`.
 - **Action**: `node dist/scripts/mission_controller.js resume`
 
 ### 2. Context Reconstruction

@@ -65,7 +65,7 @@ agent-actuator の `a2a` を利用し、以下の合成 context で worker agent
 - 依存: [relationship-graph-protocol.md](relationship-graph-protocol.md)
 - 上位: [negotiation-protocol.md](negotiation-protocol.md)
 - 実行: agent-actuator `a2a` + voice-actuator
-- パイプライン: [pipelines/negotiation-rehearsal.json](../pipeline-templates/negotiation-rehearsal.json)
+- パイプライン: [knowledge/product/pipeline-templates/negotiation-rehearsal.json](../pipeline-templates/negotiation-rehearsal.json)
 
 ---
 

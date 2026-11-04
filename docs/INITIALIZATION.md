@@ -30,7 +30,7 @@ pnpm kyberion setup report --persona first-time-user
 pnpm surfaces reconcile
 
 # Choose a stance, then save the identity (Step 3)
-pnpm stance:switch <customer-slug>   # only when working as a customer / company
+pnpm stance:switch <customer-slug> && source active/shared/runtime/customer.env   # only when working as a customer / company
 pnpm onboarding
 
 # Bring the baseline to all_clear (Step 4)
@@ -100,7 +100,7 @@ How each stage maps to a step of the standard flow:
   - The `dist/` directory is created.
   - The Chronos (`presence/displays/chronos-mirror-v2/.next/`) and concierge UIs are built (`build:ui`).
   - Runtime contracts between workspaces are rebuilt.
-- **Build steps**: `build:packages` -> `build:actuators` -> terminal-hud -> `build:repo` -> `build:bundle` -> knowledge index manifest -> `build:ui`. To rebuild only the UI, use `pnpm build:ui`.
+- **Build steps** (`scripts/build_repository.ts`): clean `dist/` -> packages (`tsc -b tsconfig.packages.json`) -> repository (`tsc -b tsconfig.json`, which includes the actuators) -> bundles -> knowledge index manifest -> `build:ui` -> source-shadow check. To rebuild only the UI, use `pnpm build:ui`.
 
 ### Stage 3: Prerequisite toolchain check
 
@@ -191,7 +191,7 @@ generated registries, validation, and security boundaries), follow the
 Where the identity is saved, and where baseline-check L3 looks, depends on the active stance. Decide **before saving the identity**.
 
 - Use as yourself: leave `KYBERION_CUSTOMER` unset. The destination is `knowledge/personal/`.
-- Use as a customer / company: switch with `pnpm stance:switch <customer-slug>` (create the overlay first with `pnpm stance:create <customer-slug>` if it does not exist). The destination is `customer/{slug}/`.
+- Use as a customer / company: switch with `pnpm stance:switch <customer-slug> && source active/shared/runtime/customer.env` (the switch only writes that env file; without sourcing it later commands still use `knowledge/personal/`; create the overlay first with `pnpm stance:create <customer-slug>` if it does not exist). The destination is `customer/{slug}/`.
 
 ### Stage 7: Soul infusion (identity)
 
@@ -259,17 +259,19 @@ To start as an AI company, `pnpm onboarding company --vertical <vertical> --slug
 To confirm onboarding completed correctly, run:
 
 ```bash
-pnpm pipeline vital-check
+pnpm kyberion vital
 pnpm pipeline --input pipelines/baseline-check.json
 ```
 
-**Expected output (example)**:
+**Expected `pnpm kyberion vital` output (excerpt)**:
 
-- [OK] Physical Foundation (node_modules)
-- [OK] System Build (dist)
-- [OK] Sovereign Identity
-- [OK] Sovereign Vision
-- [OK] Onboarding Summary
+- ✅ Sovereign Identity: OK
+- ✅ Agent Identity: OK
+- ✅ Sovereign Vision: OK
+- ✅ Onboarding Summary: OK
+- Overall: healthy
+
+(`pnpm pipeline vital-check` is a lighter log-only pipeline; it does not check identity or the onboarding summary and never fails.)
 
 You are done when the baseline-check `status` is `all_clear`.
 

@@ -41,7 +41,7 @@ Collection protocol:
 
 Minimum evidence refs:
 
-- 30-day run summary using [`templates/production-evidence-30day-ops.md`](./templates/production-evidence-30day-ops.md) or a linked operator-controlled artifact with the same fields.
+- 30-day run summary using [`docs/operator/templates/production-evidence-30day-ops.md`](./templates/production-evidence-30day-ops.md) or a linked operator-controlled artifact with the same fields.
 - Trace files or trace bundle covering the window.
 - Incident summary, including a statement when there were no incidents.
 
@@ -62,7 +62,7 @@ Minimum evidence refs:
 - GitHub issue URL.
 - GitHub PR URL.
 - Review or merge record showing the contribution merged within 7 days of contributor start.
-- Completed [`templates/production-evidence-external-contribution.md`](./templates/production-evidence-external-contribution.md) or equivalent notes.
+- Completed [`docs/operator/templates/production-evidence-external-contribution.md`](./templates/production-evidence-external-contribution.md) or equivalent notes.
 
 ## EV-FDE-DEPLOY
 
@@ -79,7 +79,7 @@ Collection protocol:
 
 Minimum evidence refs:
 
-- Deployment summary or postmortem using [`templates/production-evidence-fde-deployment.md`](./templates/production-evidence-fde-deployment.md) or equivalent notes.
+- Deployment summary or postmortem using [`docs/operator/templates/production-evidence-fde-deployment.md`](./templates/production-evidence-fde-deployment.md) or equivalent notes.
 - Customer overlay evidence with secrets excluded.
 - Mission, pipeline, trace, or screenshot artifacts proving the deployment scenario ran.
 - Statement that no fork was required, or a rejected status explaining why verification is blocked.

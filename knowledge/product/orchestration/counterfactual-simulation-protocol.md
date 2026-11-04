@@ -56,7 +56,7 @@ last_updated: 2026-04-17
 
 - 前提: [hypothesis-tree-protocol.md](hypothesis-tree-protocol.md)
 - 実行枠: [execution-boundary-profiles.json](../governance/execution-boundary-profiles.json)
-- パイプライン: [pipelines/counterfactual-branch.json](../pipeline-templates/counterfactual-branch.json)
+- パイプライン: [knowledge/product/pipeline-templates/counterfactual-branch.json](../pipeline-templates/counterfactual-branch.json)
 
 ---
 

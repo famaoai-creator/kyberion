@@ -51,7 +51,7 @@ for the additive implementation and remaining migration work.
 
 ## 5. Surface
 
-A human-facing entrance, each with one role: **Concierge** (what do I decide?), **Presence Studio** (what are we doing together?), **Chronos Mirror** (control tower), the audit monitor, the hands-on mirror, the terminal home (`pnpm kyberion`), chat bridges, and the local capture **pads** (`pnpm pads`). Surfaces show state and take requests; they do not own missions.
+A human-facing entrance, each with one role: **Concierge** (what do I decide?), **Presence Studio** (what are we doing together?), the operations console (Concierge `/ops`, formerly **Chronos Mirror**), the audit monitor, the hands-on mirror, the terminal home (`pnpm kyberion`), chat bridges, and the local capture **pads** (`pnpm pads`). Surfaces show state and take requests; they do not own missions.
 
 - Glossary: [Surfaces and channels](./GLOSSARY.md#surfaces-and-channels) (Surface, Display, Presence, Satellite, Bridge/Gateway/Channel, Pad, Concierge, Front Desk)
 - Map: [SURFACES](./SURFACES.md) · Start with `pnpm kyberion`

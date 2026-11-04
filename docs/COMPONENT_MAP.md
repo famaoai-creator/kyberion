@@ -79,7 +79,7 @@ The concept map explains how those ideas fit together logically.
 | `dots/`                                                         | Resident-agent charters: standing responsibilities (goal, attention triggers, authority role, notification routing) for always-on agents (catalog: `dots/README.md`, model: `knowledge/product/architecture/resident-dot-model.md`)                                                                | Declare or inspect resident agents                                                                  |
 | `plugins/`                                                      | Runtime guardrails and telemetry; skill plugins install via `pnpm plugin:install`                                                                                                                                                                                                                  | Inspect policy enforcement and instrumentation                                                      |
 | `satellites/`                                                   | External bridges and native helpers: chat bridges (`slack-bridge`, `telegram-bridge`, `discord-bridge`, `imessage-bridge`), `voice-hub`, `fluid-audio-cli` (Swift FluidAudio STT bridge), `macos-camera` (Swift camera-capture helper), `shared/` (bridge poll loop and child supervision helpers) | Connect Kyberion to Slack, Telegram, Discord, iMessage, voice, or macOS hardware                    |
-| `presence/`                                                     | Background sensing and control surfaces: `bridge/` (nexus daemon, channel registry), `sensors/`, `displays/` (concierge, presence-studio, chronos-mirror-v2, operator-surface, computer-surface, terminal-hud)                                                                                     | Inspect pulse, sensors, bridges, and the UI surfaces (map: `docs/SURFACES.md`)                      |
+| `presence/`                                                     | Background sensing and control surfaces: `bridge/` (nexus daemon, channel registry), `sensors/`, `displays/` (concierge, presence-studio, chronos-mirror-v2 (redirect only), operator-surface, computer-surface, customer-room, a2ui-host, terminal-hud (Ink TUI))                                 | Inspect pulse, sensors, bridges, and the UI surfaces (map: `docs/SURFACES.md`)                      |
 | `customer/`                                                     | Stance overlay (historical name)                                                                                                                                                                                                                                                                   | Layer one stance's identity/config over `knowledge/personal/` — not where a tenant's customers live |
 | `templates/`                                                    | Reusable scaffolds and document templates                                                                                                                                                                                                                                                          | Start a new skill, pipeline, onboarding profile, or document from a template                        |
 | `tests/`                                                        | Cross-cutting tests (unit tests are colocated with their source)                                                                                                                                                                                                                                   | Run smoke and integration coverage                                                                  |
@@ -88,7 +88,7 @@ The concept map explains how those ideas fit together logically.
 | `evidence/`                                                     | Tracked evidence fixtures (e.g. `evidence/browser/`); mission evidence itself lives under `active/missions/`                                                                                                                                                                                       | Find checked-in proof artifacts                                                                     |
 | `vision/`                                                       | Sovereign vision documents (`_default.md`, `_template.md`) that frame top-level decision principles                                                                                                                                                                                                | Read or author the corporate purpose / golden rules                                                 |
 | `migration/`                                                    | One-shot scripts run once per upgrade when a release changes a state schema (see `migration/README.md`)                                                                                                                                                                                            | Upgrade existing user state after a breaking release                                                |
-| `retired/`                                                      | Archived code removed from the active build (`actuators/`, `libs/`, `pipelines/`) kept for reference                                                                                                                                                                                               | Check how a retired component worked; never wire it back in                                         |
+| `retired/`                                                      | Archived code removed from the active build (`actuators/`, `libs-core/`, `libs/`, `libs-shared-media/`, `pipelines/`, `pipeline-templates/`, `governance-pipelines/`, `knowledge/`, `scripts/`, `tests/`; index: `retired/README.md`) kept for reference                                           | Check how a retired component worked; never wire it back in                                         |
 | `vault/`                                                        | Mount points (`vault/mounts/`) for externally mounted secret/data volumes; contents are not tracked                                                                                                                                                                                                | Attach a governed external data mount                                                               |
 | `tools/`                                                        | Standalone helper projects outside the pnpm build: `adf-replay-extension` (browser bridge), `apple-intelligence-bridge`, `meet-copilot-extension`, `windows-native-image-generator`                                                                                                                | Build or install a native / browser helper                                                          |
 | `changelog.d/`                                                  | Changelog fragments — one file per user-visible PR; never edit `CHANGELOG.md` directly (see `changelog.d/README.md`)                                                                                                                                                                               | Add release-note text for your PR                                                                   |
@@ -194,8 +194,8 @@ Runtime/package hygiene for this layer is enforced by `pnpm run check -- --scope
 - `satellites/voice-hub/`
 - `presence/bridge/nexus-daemon.ts`
 - `presence/bridge/terminal/` (terminal bridge)
-- `presence/displays/chronos-mirror-v2/` (control tower, port 3000)
-- `presence/displays/concierge/` (CEO secretary, port 3050)
+- `presence/displays/concierge/` (CEO secretary, port 3050; the operations console — formerly Chronos — is served at `/ops`, its API at `/api/ops`)
+- `presence/displays/chronos-mirror-v2/` (compatibility redirect on port 3000: `/api/*` → Concierge `/api/ops/*`, other paths → `/ops`; only `/api/healthz` is served locally)
 - `presence/displays/presence-studio/` (companion workbench, port 3031)
 - `presence/displays/computer-surface/` (local mirror, port 3040)
 - `presence/displays/operator-surface/` (read-only audit monitor, port 3331)
@@ -212,23 +212,23 @@ Current delivery model:
 - channel bridges or control surfaces deliver/render those updates
 - delivery observability lives under `active/shared/observability/channels/`
 
-Chronos access modes:
+Operations console (Concierge `/ops`) access modes:
 
 - `readonly`
   - observer mode for health, missions, runtimes, outbox, and diagnostics
 - `localadmin`
   - operator mode for deterministic mission/runtime/surface control actions
 
-Every route except `/api/healthz` resolves a `ViewerContext` fail-closed (viewer role + allowed tenant set; `src/lib/viewer-context.ts` + `src/middleware.ts`). Headless operation manifests also declare `required_permissions` and are evaluated through the shared `SurfaceAuthorizationContext`; client-supplied `tenant` parameters can only narrow the viewer's allowed set. `KYBERION_VIEWER_SCOPE=off|warn|enforce` is retained for migration telemetry, but unregistered tenant expansion is denied in every mode(`warn` audits before denial); see `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`, including how to set `KYBERION_LOCALHOST_AUTOADMIN=false` to require tokens even on loopback. This is a self-hosted/FDE internal authorization boundary, not hosted SaaS account management.
+Every route except `/api/healthz` resolves a `ViewerContext` fail-closed (viewer role + allowed tenant set; `presence/displays/concierge/src/lib/viewer-context.ts` + `src/proxy.ts`). Headless operation manifests also declare `required_permissions` and are evaluated through the shared `SurfaceAuthorizationContext`; client-supplied `tenant` parameters can only narrow the viewer's allowed set. `KYBERION_VIEWER_SCOPE=off|warn|enforce` is retained for migration telemetry, but unregistered tenant expansion is denied in every mode(`warn` audits before denial); see `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`, including how to set `KYBERION_LOCALHOST_AUTOADMIN=false` to require tokens even on loopback. This is a self-hosted/FDE internal authorization boundary, not hosted SaaS account management.
 
-Local Chronos boot:
+Local operations-console boot (`pnpm chronos:dev` now starts only the port-3000 redirect app; the console itself runs inside Concierge):
 
 ```bash
 export KYBERION_LOCALHOST_AUTOADMIN=true   # loopback auto-admin; set false to require tokens
-pnpm chronos:dev
+pnpm surfaces reconcile                    # starts concierge (3050) → open /ops
 ```
 
-Chronos does not directly own mission state. It delegates to:
+The operations console does not directly own mission state. It delegates to:
 
 - `mission_controller`
 - `agent-runtime-supervisor`
@@ -318,7 +318,7 @@ This list is the major groups only — the full, generated catalog of all actuat
 
 ### `libs/shared-*`
 
-Workspace packages shared across actuators and surfaces: `libs/shared-media` (media primitives), `libs/shared-nerve` (reflex engine and nerve-system helpers), `libs/shared-network` (network primitives), `libs/shared-vision` (vision helpers), `libs/shared-ui` (Kyberion UI kit: React components and A2UI renderer for the `kyberion-base` catalog, plus a vanilla renderer).
+Workspace packages shared across actuators and surfaces: `libs/shared-media` (media primitives), `libs/shared-nerve` (reflex engine and nerve-system helpers), `libs/shared-network` (network primitives), `libs/shared-mobile` (device-agnostic mobile runtime: frame sources, input injection, live mirror), `libs/shared-vision` (vision helpers), `libs/shared-ui` (Kyberion UI kit: React components and A2UI renderer for the `kyberion-base` catalog, plus a vanilla renderer).
 
 ### Channel and service boundary
 
@@ -326,7 +326,7 @@ Kyberion uses four separate concepts here:
 
 - `gateway`
   - receives external events
-  - examples: `satellites/slack-bridge`, `satellites/imessage-bridge`, `satellites/telegram-bridge`, `chronos-mirror-v2` API routes
+  - examples: `satellites/slack-bridge`, `satellites/imessage-bridge`, `satellites/telegram-bridge`, Concierge `/api/ops` routes
 - `service binding`
   - resolves authenticated service access from governed secrets
   - examples: `libs/core/service/service-binding.ts`, `service-actuator`

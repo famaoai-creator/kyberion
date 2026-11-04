@@ -105,7 +105,7 @@ Mission proposals flow through the evidence ladder, not direct execution:
 
 - Partial builds (`pnpm --filter @agent/core` alone, or `build:repo` alone)
   leave dist targets missing — run the full `pnpm exec tsc -b tsconfig.json`
-  plus `build:bundle`; `scripts/check_stale_dist.js` must report OK before
+  plus `build:bundle`; `node dist/scripts/check_stale_dist.js` must report OK before
   trusting integration results. Daemons run the bundle, not source.
 - A running supervisor executes the bundle it started with — merged code
   reaches the daemon via the `stale_code` heartbeat → governed restart path,

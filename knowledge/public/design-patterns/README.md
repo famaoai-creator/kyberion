@@ -147,16 +147,12 @@ PPTX パターンでは、テーマとは別に `page_layouts` でページ単�
 PowerPoint としてそのまま利用できるテンプレート群は次で管理する。
 
 - マニフェスト: `knowledge/public/design-patterns/presentation/pptx-template-library.json`
-- 一括生成: `pnpm exec tsx scripts/generate_pptx_template_library.ts`
-- 出力先: `active/shared/exports/pptx-template-library/`
 
 ## XLSX Template Library
 
 Excel テンプレート群は次で管理する。
 
 - マニフェスト: `knowledge/public/design-patterns/spreadsheet/xlsx-template-library.json`
-- 一括生成: `pnpm exec tsx scripts/generate_xlsx_template_library.ts`
-- 出力先: `active/shared/exports/xlsx-template-library/`
 
 ## Common Themes
 
