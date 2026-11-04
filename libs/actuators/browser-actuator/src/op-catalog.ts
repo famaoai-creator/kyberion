@@ -206,6 +206,9 @@ const BROWSER_EXTRA_CONTRACTS: Record<string, InputSchema> = {
     type: 'object',
     properties: {
       export_as: { type: 'string' },
+      from: { type: 'string' },
+      handoff: {},
+      source: { type: 'string' },
       path: { type: 'string' },
       reload_after_import: { type: 'boolean' },
       target_url: { type: 'string' },
@@ -259,7 +262,11 @@ const BROWSER_EXTRA_CONTRACTS: Record<string, InputSchema> = {
     additionalProperties: false,
   },
   wait_ref: BROWSER_REF_SCHEMA,
-  close_session: BROWSER_EMPTY_SCHEMA,
+  close_session: {
+    type: 'object',
+    properties: { export_trace_as: { type: 'string' } },
+    additionalProperties: false,
+  },
   if: BROWSER_CONTROL_SCHEMA,
   pause_for_operator: {
     type: 'object',
