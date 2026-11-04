@@ -7,6 +7,19 @@ import {
 afterEach(() => vi.unstubAllEnvs());
 
 describe('original pipeline policy environment', () => {
+  it('restores NHI enforcement independently of identity and fails safe for historical snapshots', () => {
+    vi.stubEnv('KYBERION_NHI_ACTOR', ' enforce ');
+    const captured = capturePipelineResumePolicyEnvironment();
+    expect(
+      restorePipelineResumePolicyEnvironment(captured.policy_env, { KYBERION_NHI_ACTOR: 'off' })
+        .KYBERION_NHI_ACTOR
+    ).toBe('enforce');
+    expect(
+      restorePipelineResumePolicyEnvironment({}, { KYBERION_NHI_ACTOR: 'off' }).KYBERION_NHI_ACTOR
+    ).toBe('enforce');
+    vi.stubEnv('KYBERION_NHI_ACTOR', 'kyberion://agent/fixture/haru');
+    expect(capturePipelineResumePolicyEnvironment().policy_env.KYBERION_NHI_ACTOR).toBe('warn');
+  });
   it('captures non-secret policy selectors but never serializes temporary elevation', () => {
     vi.stubEnv('KYBERION_PROVIDER_EGRESS_POLICY_PATH', 'original-strict-policy.json');
     vi.stubEnv('KYBERION_ALLOW_UNSAFE_SHELL', '0');

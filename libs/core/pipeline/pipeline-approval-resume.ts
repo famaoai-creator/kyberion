@@ -216,7 +216,6 @@ export function resumePipelineRunAfterApproval(
       KYBERION_SUDO_KEY: '',
       KYBERION_CUSTOMER: scope.customer_stance ?? '',
       KYBERION_VIEWER_PRINCIPAL: scope.viewer_principal ?? '',
-      KYBERION_NHI_ACTOR: scope.nhi_id ?? '',
       KYBERION_NHI_ID: originalAuthority.nhi_id,
       KYBERION_AGENT_ID: originalAuthority.agent_id,
       KYBERION_TASK_GRANTS_PATH: originalAuthority.task_grants_path,

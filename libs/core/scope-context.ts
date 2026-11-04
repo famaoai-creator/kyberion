@@ -3,6 +3,7 @@ import path from 'node:path';
 import { isScopeEnvOnly, transportedScopeLineage } from './foundation/scope-resolution-mode.js';
 export { withScopeEnvOnly } from './foundation/scope-resolution-mode.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { resolveClaimedNhiId } from './nhi-id.js';
 import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
@@ -302,7 +303,12 @@ export function resolveScopeResolution(
     ...values,
     customer_stance: input.customer_stance || envText(env, 'KYBERION_CUSTOMER'),
     viewer_principal: input.viewer_principal || envText(env, 'KYBERION_VIEWER_PRINCIPAL'),
-    nhi_id: input.nhi_id || envText(env, 'KYBERION_NHI_ACTOR'),
+    nhi_id:
+      input.nhi_id ||
+      resolveClaimedNhiId(
+        getRegisteredEnvText('KYBERION_NHI_ID', { env, preserveEmpty: true }),
+        envText(env, 'KYBERION_NHI_ACTOR')
+      ),
   });
   return { scope, provenance, knowledge_roots: knowledgeRoots(scope) };
 }

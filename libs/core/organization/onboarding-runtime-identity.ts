@@ -3,12 +3,16 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
 import { resolveActiveProfileRoot } from '../profile-root.js';
-import { loadPersonalAgentIdentityAtPath } from '../personal-identity-state.js';
+import { readPersonalAgentIdentityStrictAtPath as loadPersonalAgentIdentityAtPath } from '../personal-identity-state.js';
 import { getAgentIdentity, deriveAgentNhiId } from '../agent/agent-identity.js';
 import { parseNhiId } from '../nhi-id.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
+import { resolvePersonaIdentity, personaIdentityBindingsSchema } from '../persona-identity.js';
 import { getPluginExecutionContext } from '../shell/sandbox-policy.js';
-import { findLiveSessionAdmission, NHI_SESSION_ENV } from './nhi-session-admission.js';
+import {
+  findLiveSessionAdmission,
+  claimedNhiIdentity,
+  claimedSessionId,
+} from './nhi-session-admission.js';
 import { resolveMemberByPrincipal } from './member-registry.js';
 import type { CharterScope } from '../governance/accountability-charter.js';
 
@@ -36,6 +40,16 @@ export function onboardingAgentIdentityParameters(
   const previous = loadPersonalAgentIdentityAtPath(
     path.join(resolveActiveProfileRoot(), 'agent-identity.json')
   );
+  if (previous?.persona_identity_bindings !== undefined) {
+    const bindings = personaIdentityBindingsSchema.parse(previous.persona_identity_bindings);
+    if (bindings.accountable_human_id !== accountableId)
+      throw new Error('Installed persona accountability mismatch.');
+    if (
+      previous.agent_id !== agentId &&
+      (bindings.personal_nhi_id || bindings.tenant_bindings.length)
+    )
+      throw new Error('Explicitly clear persona bindings before changing the persona handle.');
+  }
   if (previous?.agent_id === agentId && typeof previous.nhi_id === 'string') {
     const parsed = parseNhiId(previous.nhi_id);
     const registered = getAgentIdentity(previous.nhi_id);
@@ -71,8 +85,8 @@ export function inspectInstalledOnboardingRuntime(scope: CharterScope): Installe
         // the ambient personal profile: the process must claim an nhi_id that
         // carries a live, governed runtime-instance binding for the claimed
         // session token (issued by the nhi-session admission ceremony).
-        const claimedNhi = getRegisteredEnvText('KYBERION_NHI_ACTOR')?.trim();
-        const sessionId = getRegisteredEnvText(NHI_SESSION_ENV)?.trim();
+        const claimedNhi = claimedNhiIdentity();
+        const sessionId = claimedSessionId();
         if (!claimedNhi || !parseNhiId(claimedNhi) || !sessionId)
           return { ready: false, reason: 'session_admission_required' };
         const admitted = getAgentIdentity(claimedNhi);
@@ -83,11 +97,20 @@ export function inspectInstalledOnboardingRuntime(scope: CharterScope): Installe
         const ownerId = `user:${owner.member_id}`;
         if (admitted.accountable_human_id !== ownerId)
           return { ready: false, reason: 'agent_accountability_mismatch' };
+        // A profile mapping is optional for old installations, but when present
+        // it must agree with the admitted actor. It can never create admission.
+        const profile = loadPersonalAgentIdentityAtPath(
+          path.join(resolveActiveProfileRoot(), 'agent-identity.json')
+        );
         if (
-          admitted.affiliation.tenant_slug !== scope.tenant_slug &&
-          admitted.affiliation.organization_id !== scope.tenant_slug
+          profile?.persona_identity_bindings !== undefined &&
+          resolvePersonaIdentity(profile, {
+            kind: 'tenant',
+            accountableHumanId: ownerId,
+            tenantSlug: scope.tenant_slug,
+          })?.nhi_id !== admitted.nhi_id
         )
-          return { ready: false, reason: 'agent_tenant_mismatch' };
+          return { ready: false, reason: 'persona_identity_mismatch' };
         return {
           ready: true,
           ownerId,
@@ -101,13 +124,18 @@ export function inspectInstalledOnboardingRuntime(scope: CharterScope): Installe
       );
       if (!profile) return { ready: false, reason: 'onboarding_agent_identity_required' };
       const profileId =
-        typeof profile.nhi_id === 'string'
-          ? profile.nhi_id
-          : typeof profile.agent_id === 'string' && parseNhiId(profile.agent_id)
-            ? profile.agent_id
-            : typeof profile.agent_id === 'string'
-              ? deriveAgentNhiId(profile.agent_id)
-              : null;
+        profile.persona_identity_bindings !== undefined
+          ? resolvePersonaIdentity(profile, {
+              kind: 'person',
+              accountableHumanId: `user:${owner.member_id}`,
+            })?.nhi_id
+          : typeof profile.nhi_id === 'string'
+            ? profile.nhi_id
+            : typeof profile.agent_id === 'string' && parseNhiId(profile.agent_id)
+              ? profile.agent_id
+              : typeof profile.agent_id === 'string'
+                ? deriveAgentNhiId(profile.agent_id)
+                : null;
       const agent = profileId ? getAgentIdentity(profileId) : null;
       if (!agent || !['active', 'provisioned'].includes(agent.lifecycle_status))
         return { ready: false, reason: 'registered_non_suspended_agent_required' };

@@ -9,6 +9,11 @@ import { listServiceOnboardingCatalogEntries } from '@agent/core/service/service
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import {
+  writePersonalAgentIdentityAtPath,
+  readPersonalAgentIdentityStrictAtPath,
+  personalAgentIdentityRevision,
+} from '@agent/core/personal-identity-state';
+import {
   resolveOnboardingFlowPolicy,
   resolveOnboardingText,
   type LocalizedOnboardingText,
@@ -396,6 +401,9 @@ function buildSummaryMarkdown(state: OnboardingState): string {
 }
 
 async function runIdentityPhase(state: OnboardingState, print: Print): Promise<void> {
+  const agentRevision = withExecutionContext('sovereign_concierge', () =>
+    personalAgentIdentityRevision(readPersonalAgentIdentityStrictAtPath(agentIdentityPath()))
+  );
   const flowPolicy = resolveOnboardingFlowPolicy();
   print(`\n🧬 Phase 1 — ${pt(flowPolicy.phase_titles.identity)}\n`);
   const identity = buildIdentityFromState(state);
@@ -498,19 +506,23 @@ async function runIdentityPhase(state: OnboardingState, print: Print): Promise<v
     'onboarding-my-vision'
   );
 
-  await writeJsonArtifact(
-    agentIdentityPath(),
-    {
-      agent_id: identity.agent_id,
-      version: '1.0.0',
-      role: 'Ecosystem Architect / Senior Partner',
-      owner: identity.name,
-      trust_tier: 'sovereign',
-      persona: identity.persona,
-      created_at: state.created_at,
-      description: `The primary autonomous entity of the Kyberion Ecosystem for ${identity.name}.`,
-    },
-    'onboarding-agent-identity'
+  withExecutionContext('sovereign_concierge', () =>
+    withSensitivePathMediation(() =>
+      writePersonalAgentIdentityAtPath(
+        agentIdentityPath(),
+        {
+          agent_id: identity.agent_id,
+          version: '1.0.0',
+          role: 'Ecosystem Architect / Senior Partner',
+          owner: identity.name,
+          trust_tier: 'sovereign',
+          persona: identity.persona,
+          created_at: state.created_at,
+          description: `The primary autonomous entity of the Kyberion Ecosystem for ${identity.name}.`,
+        },
+        agentRevision
+      )
+    )
   );
 
   state.identity = identity;
