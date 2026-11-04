@@ -8260,6 +8260,26 @@
       "types": "./dist/vcs/memory-vcs-backend.d.ts",
       "default": "./dist/vcs/memory-vcs-backend.js"
     },
+    "./vcs/vcs-host": {
+      "types": "./dist/vcs/vcs-host.d.ts",
+      "default": "./dist/vcs/vcs-host.js"
+    },
+    "./vcs/vcs-host-verbs": {
+      "types": "./dist/vcs/vcs-host-verbs.d.ts",
+      "default": "./dist/vcs/vcs-host-verbs.js"
+    },
+    "./vcs/gh-cli-host-provider": {
+      "types": "./dist/vcs/gh-cli-host-provider.d.ts",
+      "default": "./dist/vcs/gh-cli-host-provider.js"
+    },
+    "./vcs/github-rest-host-provider": {
+      "types": "./dist/vcs/github-rest-host-provider.d.ts",
+      "default": "./dist/vcs/github-rest-host-provider.js"
+    },
+    "./vcs/memory-vcs-host-provider": {
+      "types": "./dist/vcs/memory-vcs-host-provider.d.ts",
+      "default": "./dist/vcs/memory-vcs-host-provider.js"
+    },
     "./governance/authenticated-personal-approvals": {
       "types": "./dist/governance/authenticated-personal-approvals.d.ts",
       "default": "./dist/governance/authenticated-personal-approvals.js"

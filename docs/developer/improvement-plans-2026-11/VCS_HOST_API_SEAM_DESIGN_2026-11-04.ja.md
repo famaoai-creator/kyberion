@@ -3,7 +3,7 @@ title: VCS host API seam の設計 (gh CLI 依存の抽象化)
 tags: [design, seam, vcs, github, distributed-runtime]
 last_updated: 2026-11-04
 kind: design
-status: planned
+status: partial
 ---
 
 # VCS host API seam の設計
@@ -36,7 +36,7 @@ repository metadata) の typed-verb seam `vcs-host` を新設する**。`vcs-bac
 caller (publication-host / actuators / scripts)
   │  ghPrCreate / ghPrMerge / ghPrView / ghPrChecks …   ← 公開 API は維持 (facade)
   ▼
-vcs-host verb 層 (libs/core/vcs/host/verbs.ts)
+vcs-host verb 層 (libs/core/vcs/vcs-host-verbs.ts)
   │  引数検証 (assertNotFlagLike, cwd scope) / effect 構築 / snapshot 再照合
   │  governVcsHostOperation(operationId, effect, execute, mutation)  ← 既存 operationId を維持
   │  出力 sanitize (sanitizeGhOutput 相当を全 provider の error/text に適用)
@@ -57,21 +57,21 @@ VcsHostProvider (seam: vcs-host, resolve-one)
 export const VCS_HOST_SEAM = 'vcs-host';
 
 export interface VcsRepositoryRef {
-  host: string; // github.com / GHES hostname
-  owner: string;
-  name: string;
+  slug: string; // owner/name
   url: string; // canonical https URL (既存 ghPrRepository と同じ正規化)
+  host: string; // github.com / GHES hostname
 }
 
 export interface VcsHostProvider {
   readonly id: string;
-  /** remote URL / hostname をこの provider が扱えるか。安価・同期・副作用なし。 */
-  supports(repository: VcsRepositoryRef): boolean;
-  /** 認証が使えるか (token 登録済み、gh auth 済み)。readiness と diagnose に使う。 */
+  /** この runtime で使えるか (gh バイナリ有無 / token 登録有無)。安価・同期・副作用なし。 */
+  isAvailable(ctx: VcsHostCallContext): boolean;
+  /** 認証が通るか (gh auth status / GET /user)。diagnose 用で選択には使わない。 */
   authStatus(ctx: VcsHostCallContext): Promise<VcsHostAuthStatus>;
 
   // read
-  repository(ctx, cwd: string): Promise<VcsRepositoryRef>;
+  repository(ctx): Promise<VcsRepositoryRef>; // cwd は ctx に含む
+  commitSha(ctx, repo, ref: string): Promise<string>; // PR source/base の remote 照合用
   defaultBranch(ctx, repo: VcsRepositoryRef): Promise<string>;
   visibility(ctx, repo: VcsRepositoryRef): Promise<'public' | 'private' | 'internal'>;
   prView(ctx, repo, ref: string): Promise<VcsPullRequestSnapshot>;
@@ -110,7 +110,7 @@ VH-01 が最大の制約で、gh 系公開関数は現在すべて同期。
    actuator は ADF op handler が async を許すか確認したうえで移す。
 3. **段階 3**: 同期 gh 関数を deprecated の thin wrapper にし、`gh-cli` provider 経由だけが
    残ることを AST check で強制する (`safeExec('gh'` / `run('gh'` の直接呼び出しを
-   `libs/core/vcs/host/providers/gh-cli.ts` 以外で禁止)。
+   `libs/core/vcs/gh-cli-host-provider.ts` と同期 `github.ts` 以外で禁止)。
 
 同期 API の上で REST を同期実行する経路は作らない (ブロッキング I/O と timeout 管理の
 二重化を避ける)。`github-rest` は段階 2 以降の async 呼び出し側でだけ選べる。
@@ -125,10 +125,12 @@ VH-01 が最大の制約で、gh 系公開関数は現在すべて同期。
 | `github-rest` | 0.9      | 0           | 1        | token 登録が必要。container / remote runtime 向け。 |
 | `memory`      | 0        | 1           | 1        | test 専用。default chain 外。                       |
 
-- `default_chains.default = ["gh-cli", "github-rest"]`。`supports()` と `authStatus()` が
-  通った最初の provider を使う。両方失敗した場合は fail-closed (`[VCS_HOST_UNAVAILABLE]`)。
-- 明示指定は `KYBERION_VCS_HOST_PROVIDER` (env-registry 登録、`KYBERION_SEAM_DEFAULTS`
-  と同じ優先順位)。明示指定は egress policy や approval を緩めない。
+- `default_chains.default = ["gh-cli", "github-rest"]`。`isAvailable()` が真の最初の
+  provider を使う (gh-cli は `gh --version` を process 内で 1 回だけ確認、github-rest は token
+  登録の有無)。どれも使えなければ fail-closed (`[VCS_HOST_UNAVAILABLE]`)。
+  ネットワークを伴う `authStatus()` は選択に使わない。
+- 明示指定は呼び出しの `provider` option、運用者の既定は既存の `KYBERION_SEAM_DEFAULTS`
+  (`vcs-host=github-rest`)。新しい env は追加しない。明示指定は egress policy や approval を緩めない。
 - `vcs-backend.json` の `remote_execute` purpose の説明から「VCS host API」を削除し、
   `vcs-backend.ts` の doc comment の「github-api later」を `vcs-host` への参照に置き換える (VH-06)。
 
@@ -139,16 +141,17 @@ VH-01 が最大の制約で、gh 系公開関数は現在すべて同期。
 | VH-A1 | operationId (`vcs:github:read` / `vcs:pr_create` / `vcs:pr_merge`) と effect の形は provider に依らず同一。approval hash は provider 切替で変わらない (provider id は effect に入れない)。 |
 | VH-A2 | merge は承認時の snapshot を execute 直前に再取得して hash 照合し、さらに host 側の head 一致条件を必ず付ける。どちらかが欠ける provider は登録時に拒否する。                              |
 | VH-A3 | provider が返す全テキスト (PR body の echo、error message) は verb 層で sanitize されてから log・artifact・CLI 出力に出る。                                                                |
-| VH-A4 | `github-rest` の通信は `secureFetch` 経由のみ。GHES の private host は `kyberion_allow_local_network` を明示 opt-in した場合だけ許可し、既定では拒否する。                                 |
+| VH-A4 | `github-rest` の通信は `secureFetch` 経由のみ。local-network 上の GHES は `secureFetch` が拒否する (opt-in は未実装・スコープ外)。                                                         |
 | VH-A5 | token は登録済み env からのみ取得し、request header 以外 (URL・effect・trace・audit) に現れない。trace exporter には provider id と status だけを渡す。                                    |
-| VH-A6 | `memory` provider は default chain に入らず、vitest 外で選択されたら起動時に拒否する。                                                                                                     |
+| VH-A6 | `memory` provider は builtin 登録されず default chain にも入らない。test が明示登録したときだけ選択できる。                                                                                |
 | VH-A7 | 同じ fixture に対する `gh-cli` と `github-rest` の正規化結果が一致する契約テストを 1 本の suite で両 provider に流す (`memory` は fixture 供給元)。                                        |
 
 ## readiness との接続
 
 #1390 の `runtime-readiness-check` seam に `vcs-host` check を **登録しない**。forge の
 可用性はランタイムの ready 条件ではない (PR を作らない runtime も ready であるべき)。
-代わりに `pnpm doctor` に provider ごとの `authStatus()` を表示する。
+provider ごとの認証確認は `vcsHostAuthStatus()` で取得できる。`pnpm doctor` への表示は未実装 (doctor が
+ネットワーク probe を伴うため、表示形式と test の hermetic 化を別途決める)。
 
 ## スコープ外
 
@@ -156,13 +159,15 @@ VH-01 が最大の制約で、gh 系公開関数は現在すべて同期。
 - issue / release / comment 操作。現在の呼び出し側が使っていないため verb を追加しない。
 - mission repo (`mission-git.ts`) の扱い。`vcs-backend` 同様この seam の対象外。
 
-## 実装順序
+## 実装状況
 
-1. `libs/core/vcs/host/` に契約・registry (`createProviderRegistry`)・`gh-cli` provider を追加。
-   既存 `github.ts` の関数本体を provider に移し、`github.ts` は facade として re-export する。
-   登録手続き一式 (SEAM_ROLES、bindings、package.json exports、policy JSON + index、
-   env-registry、changelog.d、CAPABILITY_SEAMS.md 再生成) を同じ PR で行う。
-2. `memory` provider と VH-A7 契約テスト。
-3. async verb と `github-rest` provider (secureFetch)。VH-A1〜A5 のテスト。
-4. 呼び出し側の async 移行 (段階 2)。`publication-host.ts` が最後。
-5. 同期 wrapper の deprecate と AST check (段階 3)。
+| 段階 | 内容                                                                                                                                                | 状況   |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 1    | 契約・registry (`vcs-host.ts`)、`gh-cli` provider、登録手続き一式 (SEAM_ROLES、bindings、exports、policy + index、changelog.d、CAPABILITY_SEAMS.md) | 完了   |
+| 2    | `memory` provider と VH-A7 契約テスト (`vcs-host.test.ts`: gh-cli と github-rest の正規化一致)                                                      | 完了   |
+| 3    | async verb (`vcs-host-verbs.ts`) と `github-rest` provider。VH-A1 (sync 経路と effect 完全一致)・A2・A3・A5 のテスト                                | 完了   |
+| 4    | 呼び出し側の async 移行。`publication-host.ts` は `runExternalOperationSync` → `runExternalOperation` を伴うため最後                                | 未着手 |
+| 5    | 同期 gh 関数の deprecate と `gh` 直接呼び出しを禁止する AST check                                                                                   | 未着手 |
+
+段階 1 では既存 `github.ts` の関数本体を移さず、同期 verb をそのまま残した。段階 4 で呼び出し側が
+async verb へ移ったあと、段階 5 で同期 verb を thin wrapper にする。

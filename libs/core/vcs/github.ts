@@ -79,6 +79,11 @@ export function withPrPublicationBodySource<T>(tier: PrBodySourceTier, action: (
   );
 }
 
+/** Provenance installed by {@link withPrPublicationBodySource}, if any (read-only). */
+export function currentPrPublicationBodySource(): PrBodySourceTier | undefined {
+  return publicationBodySource.getStore();
+}
+
 export interface GhDiagnostic {
   status:
     | 'ready'

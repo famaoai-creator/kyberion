@@ -41,7 +41,7 @@
           "weights": { "fidelity": 0.6, "zero_config": 0.3, "distributed": 0.1 }
         },
         "remote_execute": {
-          "description": "Run the same verbs against a workspace owned by another node (VCS host API or remote executor).",
+          "description": "Run the same git verbs against a checkout owned by another node (remote executor). Forge APIs (PRs, checks) are the separate vcs-host seam.",
           "weights": { "fidelity": 0.2, "zero_config": 0.1, "distributed": 0.7 }
         }
       },
