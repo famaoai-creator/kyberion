@@ -154,7 +154,10 @@ const SYSTEM_EXTRA_CONTRACTS: Record<string, SystemOpSpec['input_schema']> = {
     properties: {
       application: { type: 'string' },
       capture_mode: { type: 'string' },
+      display_index: { type: 'number' },
+      display_name: { type: 'string' },
       export_as: { type: 'string' },
+      path: { type: 'string' },
       window_match_policy: { type: 'string' },
       window_title: { type: 'string' },
     },
@@ -174,7 +177,9 @@ const SYSTEM_EXTRA_CONTRACTS: Record<string, SystemOpSpec['input_schema']> = {
     type: 'object',
     properties: {
       capability: { type: 'string' },
+      dir: { type: 'string' },
       export_as: { type: 'string' },
+      kind: { type: 'string' },
       path: { type: 'string' },
       retry: { type: 'object' },
       allow_symlink_leaf: { type: 'boolean' },
@@ -574,6 +579,7 @@ const SYSTEM_EXTRA_CONTRACTS: Record<string, SystemOpSpec['input_schema']> = {
     type: 'object',
     properties: {
       export_as: { type: 'string' },
+      language: { type: 'string' },
       rate: { type: 'number' },
       retry: { type: 'object' },
       text: { type: 'string' },
@@ -624,7 +630,7 @@ const SYSTEM_EXTRA_CONTRACTS: Record<string, SystemOpSpec['input_schema']> = {
   log: { type: 'object', properties: { message: { type: 'string' } }, additionalProperties: false },
   if: {
     type: 'object',
-    properties: { condition: { type: 'string' }, else: { type: 'array' }, then: { type: 'array' } },
+    properties: { condition: {}, else: { type: 'array' }, then: { type: 'array' } },
     required: ['condition'],
     additionalProperties: false,
   },

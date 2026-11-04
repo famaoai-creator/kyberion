@@ -99,6 +99,9 @@ const MEDIA_MIGRATION_SCHEMA: InputSchema = {
     sketch: { type: 'string' },
     slides: { type: 'array' },
     source: { type: 'string' },
+    storyline_from: { type: 'string' },
+    manifest_path: { type: 'string' },
+    pptx_from: { type: 'string' },
     story: {},
     stamp: { type: 'string' },
     subtitle_shape: { type: ['string', 'integer'] },
@@ -190,7 +193,6 @@ const MEDIA_EXTRA_OPS = [
   'xlsx_render',
 ] as const;
 const MEDIA_REQUIRED_INPUTS: Record<string, string[]> = {
-  document_digest: ['path'],
   docx_extract: ['path'],
   json_read: ['path'],
   pdf_delete_pages: ['path', 'delete'],
@@ -207,7 +209,6 @@ const MEDIA_REQUIRED_INPUTS: Record<string, string[]> = {
   pptx_extract: ['path'],
   pptx_package_check: ['path'],
   pptx_package_diff: ['before', 'after'],
-  pptx_slide_text: ['path'],
   xlsx_extract: ['path'],
   apply_pattern: ['pattern_path'],
   deck_from_html: ['html'],
@@ -217,7 +218,7 @@ const MEDIA_REQUIRED_INPUTS: Record<string, string[]> = {
   pptx_patch_paragraphs: ['path', 'paragraph_replacements'],
   pptx_replace_slides: ['path', 'out', 'replace_index', 'slides'],
   save_brand_to_confidential: ['brand_name', 'tenant_slug'],
-  write_file: ['path', 'content'],
+  write_file: ['path'],
 };
 const MEDIA_EXTRA_CONTRACTS: Record<string, InputSchema> = Object.fromEntries(
   MEDIA_EXTRA_OPS.map((op) => [

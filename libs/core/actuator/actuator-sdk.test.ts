@@ -283,7 +283,7 @@ describe('actuator SDK', () => {
     });
   });
 
-  it('uses the catalog-provided legacy contract for runtime pipeline operations', async () => {
+  it('enforces the authored catalog contract for migrated runtime pipeline operations', async () => {
     const actuator = defineCatalogBackedActuator({
       id: 'media-actuator',
       describeOps: () => [
@@ -293,6 +293,7 @@ describe('actuator SDK', () => {
           input_schema: {
             type: 'object',
             required: ['ref'],
+            properties: { ref: { type: 'string' } },
             additionalProperties: false,
           },
         }),
@@ -301,6 +302,9 @@ describe('actuator SDK', () => {
     });
 
     await expect(actuator.dispatch('apply_pattern', { legacy_ref: '@e1' })).resolves.toMatchObject({
+      ok: false,
+    });
+    await expect(actuator.dispatch('apply_pattern', { ref: '@e1' })).resolves.toMatchObject({
       ok: true,
       output: { status: 'ok' },
     });

@@ -28,6 +28,8 @@ const SESSION_PROPERTIES = {
   meeting_id: { type: 'string' },
   series_id: { type: 'string' },
   passcode: { type: 'string' },
+  python_bin: { type: 'string' },
+  screenshot_path: { type: 'string' },
   text: { type: 'string' },
   duration_sec: { type: 'number' },
   transcript_path: { type: 'string' },
@@ -119,6 +121,12 @@ function schemaFor(op: string): Record<string, unknown> {
           'audio_bridge',
           'mode',
           'node',
+          'provider_profile_id',
+          'execution_profile_id',
+          'url_policy',
+          'python_bin',
+          'screenshot_path',
+          'mission_id',
           'export_as'
         ),
         additionalProperties: false,
@@ -134,6 +142,12 @@ function schemaFor(op: string): Record<string, unknown> {
           'duration_sec',
           'transcript_path',
           'join_backend',
+          'meeting_id',
+          'audio_bridge',
+          'mode',
+          'node',
+          'provider_profile_id',
+          'execution_profile_id',
           'mission_id',
           'export_as'
         ),
@@ -142,7 +156,21 @@ function schemaFor(op: string): Record<string, unknown> {
     case 'status':
       return {
         type: 'object',
-        properties: pick('platform', 'meeting_id', 'mission_id', 'export_as'),
+        properties: pick(
+          'platform',
+          'provider',
+          'url',
+          'meeting_id',
+          'passcode',
+          'audio_bridge',
+          'mode',
+          'node',
+          'provider_profile_id',
+          'execution_profile_id',
+          'url_policy',
+          'mission_id',
+          'export_as'
+        ),
         additionalProperties: false,
       };
     case 'speak':
@@ -162,7 +190,17 @@ function schemaFor(op: string): Record<string, unknown> {
     case 'leave':
       return {
         type: 'object',
-        properties: pick('platform', 'meeting_id', 'export_as'),
+        properties: pick(
+          'platform',
+          'provider',
+          'meeting_id',
+          'audio_bridge',
+          'mode',
+          'node',
+          'provider_profile_id',
+          'execution_profile_id',
+          'export_as'
+        ),
         additionalProperties: false,
       };
     case 'resolve_next_target':

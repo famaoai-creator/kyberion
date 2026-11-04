@@ -52,7 +52,13 @@ const ORCHESTRATOR_CONTRACTS: Record<string, InputSchema> = {
   },
   run_execution_plan_set: {
     type: 'object',
-    properties: { export_as: { type: 'string' }, from: { type: 'string' } },
+    properties: {
+      export_as: { type: 'string' },
+      from: { type: 'string' },
+      job_id: {},
+      name: { type: 'string' },
+      steps: { type: 'array' },
+    },
     additionalProperties: false,
   },
   task_plan_to_next_tasks: {

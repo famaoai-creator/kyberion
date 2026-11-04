@@ -43,8 +43,12 @@ const VIDEO_COMPOSITION_CONTRACTS: Record<string, InputSchema> = {
   },
   await_video_composition_job: {
     type: 'object',
-    properties: { job_id: { type: 'string' }, timeout_ms: { type: 'number' } },
-    required: ['job_id'],
+    properties: {
+      job_id: { type: 'string' },
+      job_ticket_path: { type: 'string' },
+      timeout_ms: { type: 'number' },
+    },
+    anyOf: [{ required: ['job_id'] }, { required: ['job_ticket_path'] }],
     additionalProperties: false,
   },
   cancel_video_composition_job: {
