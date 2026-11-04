@@ -6,17 +6,24 @@
  * An implementer (or a dedicated preflight agent) runs this before `git push`
  * so the branch reaches CI with the same evidence `pr create` would demand:
  * the PR title policy, `pnpm check -- --changed` (every pr gate plus the
- * full-only gates whose `paths` match the changed files), and — when a body
- * file is given — the KL-03 Knowledge-in-PR check. Nothing here talks to gh.
+ * full-only gates whose `paths` match the changed files), the affected tests
+ * (checklist step 3.5: `vitest run --changed <base>` for code plus the tests
+ * that read changed data / doc files, see lib/affected-tests.ts), and — when a
+ * body file is given — the KL-03 Knowledge-in-PR check. Nothing here talks to gh.
  */
 
 import {
   parsePublishArgs,
   PRE_PR_READINESS_CHECKLIST,
+  resolveKnowledgeDiffBase,
   resolvePublishTitle,
   runKnowledgeReadinessGate,
   runPrePrReadiness,
 } from './publish_pull_request.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExec, safeExecResult } from '@agent/core/secure-io';
+import { collectChangedFiles, type GitRunner } from './run_checks.js';
+import { describeAffectedTestPlan, planAffectedTests } from './lib/affected-tests.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { guardCliArgsNormalized, type CliGuardSpec } from './lib/cli-guard.js';
 
@@ -31,18 +38,76 @@ export const PREFLIGHT_PR_CLI: CliGuardSpec = {
     { flag: '--base', value: '<branch>' },
     { flag: '--mission-root', value: '<path>' },
     { flag: '--check-jobs', value: '<1..6>' },
+    { flag: '--skip-affected-tests' },
   ],
 };
+
+const gitRunner: GitRunner = (args) =>
+  safeExecResult('git', ['-c', 'core.quotePath=false', ...args], {
+    cwd: pathResolver.rootDir(),
+    timeoutMs: 60_000,
+  });
+
+export interface AffectedTestsDeps {
+  git?: GitRunner;
+  /** Runs `pnpm <args>` and throws on failure. */
+  run?: (args: string[]) => void;
+}
+
+/**
+ * Checklist step 3.5: run the tests that import a changed file (vitest
+ * `--changed`) and the tests that read a changed data / doc file. Throws on
+ * the first failing run; reports what it selected so "0 files" is visible.
+ */
+export function runAffectedTests(
+  print: Print,
+  base?: string,
+  deps: AffectedTestsDeps = {}
+): { codeRun: boolean; readerTests: string[] } {
+  const git = deps.git ?? gitRunner;
+  const run =
+    deps.run ??
+    ((args: string[]) => {
+      safeExec('pnpm', args, { cwd: pathResolver.rootDir(), timeoutMs: 1_800_000 });
+    });
+  const changed = collectChangedFiles(base, git);
+  const plan = planAffectedTests(changed, git);
+  for (const line of describeAffectedTestPlan(plan)) print(line);
+  const codeRun = plan.codeFiles.length > 0;
+  if (codeRun) {
+    run(['exec', 'vitest', 'run', '--changed', changed.mergeBase, '--passWithNoTests']);
+  }
+  if (plan.readerTests.length > 0) {
+    run(['exec', 'vitest', 'run', '--passWithNoTests', ...plan.readerTests]);
+  }
+  if (!codeRun && plan.readerTests.length === 0) {
+    print(
+      '[pr:affected-tests] No affected tests selected (no code change and no test reads the changed files).'
+    );
+  } else {
+    print('[pr:affected-tests] Affected tests passed.');
+  }
+  return { codeRun, readerTests: plan.readerTests };
+}
 
 export async function main(argv: string[], print: Print = () => undefined): Promise<void> {
   const guarded = guardCliArgsNormalized(argv, PREFLIGHT_PR_CLI, print);
   if (guarded.handled) return;
-  const options = parsePublishArgs(guarded.argv);
+  const skipAffectedTests = guarded.argv.includes('--skip-affected-tests');
+  const options = parsePublishArgs(guarded.argv.filter((arg) => arg !== '--skip-affected-tests'));
 
   const title = resolvePublishTitle(options.title);
   print(`[pr:preflight] PR title OK: ${title}`);
 
   runPrePrReadiness(print, options.checkJobs, options.base);
+
+  if (skipAffectedTests) {
+    print(
+      '[pr:preflight] Affected tests skipped (--skip-affected-tests): record them as not run in the PR Test plan.'
+    );
+  } else {
+    runAffectedTests(print, options.base ? resolveKnowledgeDiffBase(options.base) : undefined);
+  }
 
   if (options.bodyFile) {
     runKnowledgeReadinessGate(options);
