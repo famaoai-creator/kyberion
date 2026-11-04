@@ -15,7 +15,7 @@
 
 import { createProviderRegistry } from '../provider-registry.js';
 import type { SeamProviderMetadata } from '../seam.js';
-import { getSeamSelectionPolicy } from '../seam-provider-selection.js';
+import { resolveSeamDefaultOrder } from '../seam-provider-selection.js';
 
 export const EVENT_BUS_SEAM = 'event-bus';
 /** Builtin default provider id; also the governed `default_provider`. */
@@ -58,7 +58,8 @@ export function resetEventBuses(): void {
 
 /**
  * Resolve the bus for a caller. An explicit selector always wins; without one
- * the governed `default_chains.default` ordering picks the first registered
+ * the saved seam default (`KYBERION_SEAM_DEFAULTS` / scope layers) then the
+ * governed `default_chains.default` ordering picks the first registered
  * provider, falling back to `local-process` then to whatever is registered.
  * Throws when nothing is registered — local-process is installed by importing
  * `local-event-bus.ts`.
@@ -79,9 +80,7 @@ export function resolveEventBus(selector?: string): EventBus {
     }
     return bus;
   }
-  const chain = getSeamSelectionPolicy(EVENT_BUS_SEAM)?.default_chains?.default ?? [
-    LOCAL_EVENT_BUS_ID,
-  ];
+  const chain = resolveSeamDefaultOrder(EVENT_BUS_SEAM, { builtin: [LOCAL_EVENT_BUS_ID] });
   for (const id of chain) {
     const bus = eventBusRegistry.get(id);
     if (bus) return bus;

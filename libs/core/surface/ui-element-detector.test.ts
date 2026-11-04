@@ -123,6 +123,26 @@ describe('ui-element-detector seam', () => {
     expect(result.candidates).toHaveLength(1);
   });
 
+  it('honors a saved seam default without a purpose; explicit wins; ineligible falls back', async () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'ui-element-detector=ocr_text');
+    const { ocr } = fakeOcr([
+      { text: 'Go', confidence: 80, boundingBox: { x: 0.02, y: 0.05, width: 0.02, height: 0.02 } },
+    ]);
+    useDetectors(ocr);
+    const request = { image_path: 'screen.png', image_size: IMAGE, dom_elements: DOM };
+    const saved = await detectUiElements(request);
+    expect(saved.detectors_run).toEqual(['ocr_text']);
+    expect(saved.decision?.strategy).toBe('default');
+
+    const explicit = await detectUiElements(request, { detectors: ['browser_dom'] });
+    expect(explicit.detectors_run).toEqual(['browser_dom']);
+
+    // browser_dom needs a snapshot: without one the saved default is ineligible.
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'ui-element-detector=browser_dom');
+    const fallback = await detectUiElements({ image_path: 'screen.png', image_size: IMAGE });
+    expect(fallback.detectors_run).toEqual(['ocr_text']);
+  });
+
   it('runs every explicitly listed detector for fusion', async () => {
     const { ocr } = fakeOcr([
       { text: 'Go', confidence: 80, boundingBox: { x: 0.02, y: 0.05, width: 0.02, height: 0.02 } },

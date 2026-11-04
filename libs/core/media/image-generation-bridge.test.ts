@@ -178,6 +178,30 @@ describe('AdaptivePolicyRouter', () => {
     expect(provider.id).toBe('local_flux');
   });
 
+  it('lets a saved seam default lead the mode chain; explicit wins, ineligible falls back', async () => {
+    const router = new AdaptivePolicyRouter([
+      mockComfyUI,
+      mockLocalDiffusion,
+      mockLocalFlux,
+      mockLlmApi,
+    ]);
+    // The governed policy and saved defaults are read from disk.
+    mocks.safeExistsSync.mockImplementation(mocks.actualSafeExistsSync);
+    try {
+      vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'image-generation-provider=llm_api');
+      expect((await router.selectProvider({ prompt: 'a cat' })).id).toBe('llm_api');
+      expect(
+        (await router.selectProvider({ prompt: 'a cat', providerPreference: ['comfyui'] })).id
+      ).toBe('comfyui');
+
+      vi.mocked(mockLlmApi.isAvailable).mockResolvedValue(false);
+      expect((await router.selectProvider({ prompt: 'a cat' })).id).toBe('local_flux');
+    } finally {
+      vi.unstubAllEnvs();
+      mocks.safeExistsSync.mockReset();
+    }
+  });
+
   it('routes to Apple Image Playground before local engines when native is available', async () => {
     const apple = {
       id: 'apple_playground',

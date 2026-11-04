@@ -21,7 +21,11 @@ import {
   stringParam,
 } from './voice-loopback-helpers.js';
 import { registerVoiceLoopbackSttAdapter } from './voice-stt-backend-adapters.js';
-import { routeVoiceEngine } from './voice-engine-selection.js';
+import {
+  isNamedVoiceEngineId,
+  resolveDefaultVoiceEngineId,
+  routeVoiceEngine,
+} from './voice-engine-selection.js';
 
 import { compileSchema } from '@agent/core/foundation';
 
@@ -331,13 +335,17 @@ export async function speakLocal(params: Record<string, unknown>): Promise<any> 
   const explicitLanguage = String(params.language || '')
     .trim()
     .toLowerCase();
-  const namedEngineId = String(params.engine_id || '').trim();
-  const requestedEngineId = namedEngineId || 'local_say';
+  // engine_id 'auto' (or none) = not named: saved seam default → policy
+  // default → local_say, subject to governed selection; a named engine wins.
+  const engineNamed = isNamedVoiceEngineId(params.engine_id);
+  const requestedEngineId = engineNamed
+    ? String(params.engine_id).trim()
+    : resolveDefaultVoiceEngineId({ builtin: 'local_say' });
   const baselineEngine = resolveVoiceEngineForPlatform(requestedEngineId);
   const routing = routeVoiceEngine({
     text,
     baselineEngine,
-    explicit: Boolean(namedEngineId),
+    explicit: engineNamed,
     purpose: typeof params.purpose === 'string' ? params.purpose : undefined,
     language: explicitLanguage,
     requires: {

@@ -71,6 +71,10 @@
           "pattern": "^[a-z][a-z0-9_]*$",
           "description": "Purpose used to rank eligible providers when no purpose is given and the default provider cannot run the task."
         },
+        "allow_saved_default": {
+          "type": "boolean",
+          "description": "false: saved seam defaults (KYBERION_SEAM_DEFAULTS and the project/organization/tenant/operator layers, libs/core/seam-selection-defaults.ts) are ignored for this seam. Use for security engines (authn/authz) whose provider must change only through explicit configuration, purposes or audited operator rules. Default true."
+        },
         "default_chains": {
           "type": "object",
           "description": "Baseline provider orderings keyed by a domain discriminator (e.g. \"mode:accurate\", \"platform:apple_silicon\"); 'default' is the catch-all. Used when no explicit preference, purpose, pin or rule applies. Eligibility still decides membership; unlisted providers trail in registration order.",

@@ -1,0 +1,40 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "calendar-provider",
+      "default_provider": "google-workspace",
+      "fallback_purpose": "schedule",
+      "traits": {
+        "operation_coverage": "Share of calendar operations (list, calendars, free/busy, insert, update, delete) the bridge implements.",
+        "setup_ease": "How little operator setup the provider CLI needs before it is ready."
+      },
+      "providers": {
+        "google-workspace": {
+          "traits": { "operation_coverage": 1, "setup_ease": 0.7 },
+          "trait_basis": { "operation_coverage": "declared", "setup_ease": "declared" },
+          "evidence": [
+            "libs/core/meeting/calendar-provider-bridge.ts (google-workspace builtin via the gws service preset; the hardcoded default before this policy)"
+          ]
+        },
+        "m365": {
+          "traits": { "operation_coverage": 1, "setup_ease": 0.6 },
+          "trait_basis": { "operation_coverage": "declared", "setup_ease": "declared" },
+          "evidence": [
+            "libs/core/meeting/calendar-provider-bridge.ts (m365 builtin via the Microsoft 365 service preset, with Graph event/free-busy normalizers)"
+          ]
+        }
+      },
+      "purposes": {
+        "schedule": {
+          "description": "Read and write the operator's calendar through whichever provider covers the operations.",
+          "weights": { "operation_coverage": 0.7, "setup_ease": 0.3 }
+        }
+      },
+      "default_chains": {
+        "default": ["google-workspace", "m365"]
+      }
+    }
+  ]
+}

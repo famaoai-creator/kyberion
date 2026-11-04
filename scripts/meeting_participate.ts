@@ -8,7 +8,8 @@
  * Wiring uses the small abstractions in `@agent/core`:
  *
  *   resolveAudioBus()                    → BlackHole / PulseAudio / stub
- *   getMeetingJoinDriver(driver_id)      → browser-playwright by default
+ *   getMeetingJoinDriver(driver_id)      → --driver, else the saved seam
+ *                                          default, else browser-playwright
  *   selectStreamingSttBridge()           → stub, or a real bridge when the
  *                                          transport needs real STT (seam policy)
  *   getStreamingTtsBridge()              → stub or KYBERION_TTS_COMMAND
@@ -35,6 +36,11 @@ import {
   type MeetingJoinDriver,
   type MeetingJoinPlatform,
 } from '@agent/core/meeting/meeting-join-driver';
+import { savedSeamDefaultFor } from '@agent/core/seam-provider-selection';
+
+const MEETING_JOIN_DRIVER_SEAM = 'meeting-join-driver';
+/** This CLI's fallback when neither --driver nor a saved seam default is set. */
+const CLI_FALLBACK_DRIVER = 'browser-playwright';
 import { installMeetingParticipationDriver as installMeetingJoinDriverModule } from '@agent/core/meeting/meeting-driver-module-loader';
 import { selectStreamingSttBridge } from '@agent/core/voice/streaming-stt-bridge';
 import { getStreamingTtsBridge } from '@agent/core/voice/streaming-tts-bridge';
@@ -303,7 +309,11 @@ async function main(args: string[] = []): Promise<void> {
     .option('display-name', { type: 'string', default: 'Kyberion' })
     .option('persona', { type: 'string', default: 'an attentive meeting participant' })
     .option('voice-profile-id', { type: 'string' })
-    .option('driver', { type: 'string', default: 'browser-playwright' })
+    .option('driver', {
+      type: 'string',
+      describe:
+        'Meeting join driver (default: saved meeting-join-driver seam default, else browser-playwright)',
+    })
     .option('audio-bus', { type: 'string' })
     .option('transport-mode', {
       type: 'string',
@@ -408,7 +418,16 @@ async function main(args: string[] = []): Promise<void> {
     );
     // 同席モード (--driver in-room): the meeting is in the physical room, so
     // no meeting URL is required and the platform is forced to in_room.
-    const inRoom = String(argv.driver) === 'in-room' || argv.platform === 'in_room';
+    // --driver, else a saved meeting-join-driver seam default, else this CLI's
+    // own fallback. The CLI keeps browser-playwright (not the runtime policy
+    // default chrome-extension): the extension driver probes unavailable
+    // without the installed extension, and loadDriver would then silently
+    // degrade a working Playwright session to the stub.
+    const driverId =
+      typeof argv.driver === 'string' && argv.driver.trim()
+        ? argv.driver.trim()
+        : (savedSeamDefaultFor(MEETING_JOIN_DRIVER_SEAM)?.provider ?? CLI_FALLBACK_DRIVER);
+    const inRoom = driverId === 'in-room' || argv.platform === 'in_room';
     const meetingUrl =
       typeof argv['meeting-url'] === 'string' && argv['meeting-url']
         ? String(argv['meeting-url'])
@@ -445,7 +464,7 @@ async function main(args: string[] = []): Promise<void> {
       );
     }
 
-    const driver = await loadDriver(String(argv.driver), {
+    const driver = await loadDriver(driverId, {
       headed: Boolean(argv.headed),
       accountSlug: String(argv['account-slug']),
       microphoneDevice:
