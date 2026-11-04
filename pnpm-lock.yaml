@@ -27,7 +27,7 @@ overrides:
   picomatch: 4.0.4
   tinyglobby: 0.2.17
   tmp: 0.2.7
-  undici: ^6.28.0
+  undici@<6.28.0: ^6.28.0
   ws: ^8.22.0
   '@slack/bolt>path-to-regexp': 8.4.2
   router>path-to-regexp: 8.4.2
@@ -116,7 +116,7 @@ importers:
         version: link:presence/displays/terminal-hud
       '@slack/bolt':
         specifier: ^5.1.0
-        version: 5.1.0(@types/express@5.0.6)(supports-color@7.2.0)(undici@6.29.1)
+        version: 5.1.0(@types/express@5.0.6)(supports-color@7.2.0)(undici@7.30.1)
       '@slack/web-api':
         specifier: ^8.2.0
         version: 8.2.0
@@ -1057,7 +1057,7 @@ importers:
         version: link:../../libs/core
       '@slack/bolt':
         specifier: ^5.1.0
-        version: 5.1.0(@types/express@5.0.6)(supports-color@7.2.0)(undici@6.29.1)
+        version: 5.1.0(@types/express@5.0.6)(supports-color@7.2.0)(undici@7.30.1)
       uuid:
         specifier: ^14.0.3
         version: 14.0.3
@@ -2558,7 +2558,7 @@ packages:
     resolution: {integrity: sha512-F9T+FKbtsYRKV23X8l6WW1fx7ncqsMufg+HLA4ffHf/MvZSCvPunFw576ekmY0Q03kgTAIByTKDJxnM+wn1okg==}
     engines: {node: '>=20', npm: '>=9.6.4'}
     peerDependencies:
-      undici: ^6.28.0
+      undici: ^7.0.0 || ^8.0.0
 
   '@slack/types@3.2.0':
     resolution: {integrity: sha512-IN4gdtlzQt8UJoj+1v+qAHeR4TxHO0KMlIs841SFfDQAcFFnsrWaGsEAE4goxVt8O/JOAFaGGdrFTzhNBop/Fg==}
@@ -5801,6 +5801,10 @@ packages:
     resolution: {integrity: sha512-EvRlUt/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA==}
     engines: {node: '>=18.17'}
 
+  undici@7.30.1:
+    resolution: {integrity: sha512-03KrMbjIFDWQR5RNPrSw3bd1r12JpyFQl9/yxjUbJtqkjmllqC5lFjZh6ujeuJCKr8EOQvRW872Oy/az+nLYxg==}
+    engines: {node: '>=20.18.1'}
+
   unicode-properties@1.4.1:
     resolution: {integrity: sha512-CLjCCLQ6UuMxWnbIylkisbRj31qxHPAurvena/0iwSVbQ2G1VY5/HjV0IRabOEbDHlzZlRdCrD4NhB0JtU40Pg==}
 
@@ -7477,11 +7481,11 @@ snapshots:
       '@peculiar/asn1-x509': 2.11.0
       '@peculiar/x509': 1.14.3
 
-  '@slack/bolt@5.1.0(@types/express@5.0.6)(supports-color@7.2.0)(undici@6.29.1)':
+  '@slack/bolt@5.1.0(@types/express@5.0.6)(supports-color@7.2.0)(undici@7.30.1)':
     dependencies:
       '@slack/logger': 5.0.0
       '@slack/oauth': 4.0.0
-      '@slack/socket-mode': 3.1.0(undici@6.29.1)
+      '@slack/socket-mode': 3.1.0(undici@7.30.1)
       '@slack/types': 3.2.0
       '@slack/web-api': 8.2.0
       '@types/express': 5.0.6
@@ -7505,13 +7509,13 @@ snapshots:
       '@types/node': 26.6.5
       jsonwebtoken: 9.0.3
 
-  '@slack/socket-mode@3.1.0(undici@6.29.1)':
+  '@slack/socket-mode@3.1.0(undici@7.30.1)':
     dependencies:
       '@slack/logger': 5.0.0
       '@slack/web-api': 8.2.0
       '@types/node': 26.6.5
       eventemitter3: 5.0.4
-      undici: 6.29.1
+      undici: 7.30.1
 
   '@slack/types@3.2.0': {}
 
@@ -9802,7 +9806,7 @@ snapshots:
       saxes: 6.0.0
       symbol-tree: 3.2.4
       tough-cookie: 6.0.1
-      undici: 6.29.1
+      undici: 7.30.1
       w3c-xmlserializer: 5.0.0
       webidl-conversions: 8.0.1
       whatwg-mimetype: 5.0.0
@@ -11216,6 +11220,8 @@ snapshots:
   undici-types@8.9.0: {}
 
   undici@6.29.1: {}
+
+  undici@7.30.1: {}
 
   unicode-properties@1.4.1:
     dependencies:
