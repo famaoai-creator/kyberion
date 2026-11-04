@@ -325,6 +325,42 @@ describe('agent-identity — accountable ownership and uniqueness', () => {
     ).toThrow(AgentIdentityFormatError);
   });
 
+  it('ensure preserves history but rejects explicit tenant and accountability conflicts', () => {
+    const record = issueTestIdentity('bounded-agent', {
+      affiliation: { tenant_slug: 'company-a' },
+    });
+    const parameters = { slug: 'bounded-agent', organizationId: 'demo-org' };
+    expect(() =>
+      ensureAgentIdentityProvisioned({ ...parameters, affiliation: { tenant_slug: 'company-b' } })
+    ).toThrow(AgentIdentityConflictError);
+    expect(() =>
+      ensureAgentIdentityProvisioned({ ...parameters, accountableHumanId: 'user:someone-else' })
+    ).toThrow(AgentIdentityConflictError);
+    expect(getAgentIdentity(record.nhi_id)).toEqual(record);
+  });
+
+  it.each(['suspend', 'retire'] as const)(
+    'ensure does not resurrect or stamp a known %s identity',
+    (operation) => {
+      const record = issueTestIdentity('revoked-agent');
+      withExecutionContext('mission_controller', () =>
+        operation === 'suspend'
+          ? suspendAgentIdentity(record.nhi_id)
+          : retireAgentIdentity(record.nhi_id, 'synthetic test')
+      );
+      const parameters = { slug: 'revoked-agent', organizationId: 'demo-org' };
+      expect(() => ensureAgentIdentityProvisioned(parameters)).toThrow(AgentIdentityConflictError);
+      expect(ensureAgentIdentityBestEffort(parameters)).toEqual({
+        nhi_id: null,
+        record: null,
+        recorded: false,
+      });
+      expect(getAgentIdentity(record.nhi_id)?.lifecycle_status).toBe(
+        operation === 'suspend' ? 'suspended' : 'retired'
+      );
+    }
+  );
+
   it('persists canonical tenant affiliation separately from the organization id', () => {
     const record = issueTestIdentity('tenant-affiliated-agent', {
       affiliation: { tenant_slug: 'acme-corp', project_id: 'project-x' },

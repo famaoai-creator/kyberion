@@ -1,6 +1,7 @@
 /** NHI session-admission ceremony + org-scope consumption. */
 import { expect, it, vi } from 'vitest';
 import { useOnboardingAuthorityFixture } from '../../../tests/helpers/onboarding-authority-fixture.js';
+import { safeWriteFile } from '../secure-io.js';
 
 const f = useOnboardingAuthorityFixture();
 
@@ -13,6 +14,7 @@ function installOrgAgent() {
       kind: 'agent',
       slug: 'org-agent',
       organizationId: ORG_TENANT,
+      affiliation: { tenant_slug: ORG_TENANT },
       displayName: 'Synthetic org agent',
       accountableHumanId: 'user:owner',
     })
@@ -27,7 +29,7 @@ async function runtimeIdentity() {
 }
 
 function claimSession(nhiId?: string, session?: string) {
-  vi.stubEnv('KYBERION_NHI_ACTOR', nhiId ?? '');
+  vi.stubEnv('KYBERION_NHI_ID', nhiId);
   vi.stubEnv('KYBERION_NHI_SESSION', session ?? '');
 }
 
@@ -246,4 +248,97 @@ it('keeps the person-scope profile path unchanged', async () => {
   claimSession();
   const result = f.run(() => inspect.inspectInstalledOnboardingRuntime({ kind: 'person' }));
   expect(result).toMatchObject({ ready: true, agentActive: true });
+});
+
+it('does not infer tenant affiliation from an organization name or override a foreign tenant', async () => {
+  const api = await admissionApi();
+  const principal = { ...f.principal, tenantSlugs: [ORG_TENANT] as string[] };
+  for (const [slug, tenant] of [
+    ['legacy-agent', undefined],
+    ['foreign-agent', 'fixture-b'],
+  ] as const) {
+    const agent = f.governIdentity(() =>
+      f.identities.issueAgentIdentity({
+        kind: 'agent',
+        slug,
+        organizationId: ORG_TENANT,
+        accountableHumanId: 'user:owner',
+        ...(tenant ? { affiliation: { tenant_slug: tenant } } : {}),
+      })
+    );
+    expect(() =>
+      f.run(() =>
+        api.requestNhiSessionAdmission(principal, {
+          nhi_id: agent.nhi_id,
+          tenant_slug: ORG_TENANT,
+        })
+      )
+    ).toThrow(/not affiliated/);
+  }
+});
+
+it('preserves policy mode while selecting an explicit identity and supports legacy URI claims', async () => {
+  const api = await admissionApi();
+  const agent = installOrgAgent();
+  vi.stubEnv('KYBERION_NHI_ACTOR', 'enforce');
+  claimSession(agent.nhi_id);
+  expect(api.claimedNhiIdentity()).toBe(agent.nhi_id);
+  expect(process.env.KYBERION_NHI_ACTOR).toBe('enforce');
+  claimSession();
+  expect(api.claimedNhiIdentity()).toBeUndefined();
+  vi.stubEnv('KYBERION_NHI_ACTOR', agent.nhi_id);
+  expect(api.claimedNhiIdentity()).toBe(agent.nhi_id);
+  vi.stubEnv('KYBERION_NHI_ID', 'invalid');
+  expect(api.claimedNhiIdentity()).toBeUndefined();
+  vi.stubEnv('KYBERION_NHI_ID', '');
+  expect(api.claimedNhiIdentity()).toBeUndefined();
+});
+
+it('consumes an attested legacy session only in its approved tenant, never through org-name inference', async () => {
+  const api = await admissionApi();
+  const legacy = f.governIdentity(() =>
+    f.identities.issueAgentIdentity({
+      kind: 'agent',
+      slug: 'legacy-bound',
+      organizationId: 'unrelated-org',
+      accountableHumanId: 'user:owner',
+    })
+  );
+  f.governIdentity(() =>
+    f.identities.bindRuntimeInstance({
+      nhiId: legacy.nhi_id,
+      instanceId: `${api.ADMISSION_INSTANCE_PREFIX}legacy`,
+      sessionId: 'kns1.legacy-fixture',
+      tenantSlug: ORG_TENANT,
+      expiresAt: new Date(Date.now() + 60000).toISOString(),
+    })
+  );
+  expect(
+    api.findLiveSessionAdmission(legacy.nhi_id, 'kns1.legacy-fixture', ORG_TENANT)
+  ).toBeDefined();
+  expect(
+    api.findLiveSessionAdmission(legacy.nhi_id, 'kns1.legacy-fixture', 'fixture-b')
+  ).toBeUndefined();
+  expect(api.listNhiSessionAdmissions({ tenant_slug: 'fixture-b' })).toHaveLength(0);
+});
+
+it('does not ignore a malformed profile when consuming an otherwise valid tenant admission', async () => {
+  const api = await admissionApi();
+  const inspect = await runtimeIdentity();
+  const agent = installOrgAgent();
+  const principal = { ...f.principal, tenantSlugs: [ORG_TENANT] as string[] };
+  const request = f.run(() =>
+    api.requestNhiSessionAdmission(principal, { nhi_id: agent.nhi_id, tenant_slug: ORG_TENANT })
+  );
+  approveAdmission(api.NHI_SESSION_ADMISSION_CHANNEL, request.request_id);
+  const applied = f.run(() =>
+    api.applyNhiSessionAdmission(principal, ORG_TENANT, request.request_id)
+  );
+  claimSession(agent.nhi_id, applied.session_id);
+  f.run(() => safeWriteFile(`${f.root}/knowledge/personal/agent-identity.json`, '{invalid'));
+  expect(f.run(() => inspect.inspectInstalledOnboardingRuntime(SCOPE))).toMatchObject({
+    ready: false,
+    reason: 'runtime_identity_unavailable',
+  });
+  claimSession();
 });

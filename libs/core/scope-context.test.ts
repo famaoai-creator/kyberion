@@ -18,6 +18,21 @@ import {
 } from './scope-context.js';
 
 describe('scope-context', () => {
+  it('separates the NHI selector from policy mode and respects explicit clearing', () => {
+    const id = 'kyberion://agent/fixture/haru';
+    const options = { includePersisted: false, inferFromMission: false, inferFromCwd: false };
+    expect(
+      resolveScopeContext({}, { KYBERION_NHI_ID: id, KYBERION_NHI_ACTOR: 'enforce' }, options)
+        .nhi_id
+    ).toBe(id);
+    expect(
+      resolveScopeContext({}, { KYBERION_NHI_ACTOR: 'enforce' }, options).nhi_id
+    ).toBeUndefined();
+    expect(resolveScopeContext({}, { KYBERION_NHI_ACTOR: id }, options).nhi_id).toBe(id);
+    expect(
+      resolveScopeContext({}, { KYBERION_NHI_ID: '', KYBERION_NHI_ACTOR: id }, options).nhi_id
+    ).toBeUndefined();
+  });
   it('invalidates the process scope after governed write and clear operations', () => {
     const file = pathResolver.sharedTmp('scope-cache-write-clear-test.env');
     for (const name of [

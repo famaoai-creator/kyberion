@@ -10,6 +10,11 @@ import type { VcsCommandRunner } from '@agent/core/vcs/git';
 import yargs from 'yargs';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
+import {
+  writePersonalAgentIdentityAtPath,
+  readPersonalAgentIdentityStrictAtPath,
+  personalAgentIdentityRevision,
+} from '@agent/core/personal-identity-state';
 import { ensureAgentIdentityProvisioned } from '@agent/core/agent/agent-identity';
 import {
   ensureOwnerMember,
@@ -417,6 +422,10 @@ export async function writeText(filePath: string, content: string, lockName: str
 
 export async function applyIdentity(input: ApplyInput, now: string) {
   const profileDir = profileRoot();
+  const agentProfilePath = path.join(profileDir, 'agent-identity.json');
+  const agentProfileRevision = withExecutionContext('sovereign_concierge', () =>
+    personalAgentIdentityRevision(readPersonalAgentIdentityStrictAtPath(agentProfilePath))
+  );
   const id = input.identity;
   assertInstalledAgentHandle(id.agent_id);
   // Identity setup provisions a reviewed identity; only its separate signed
@@ -467,20 +476,22 @@ export async function applyIdentity(input: ApplyInput, now: string) {
     'onboarding-my-vision'
   );
 
-  await writeJson(
-    path.join(profileDir, 'agent-identity.json'),
-    {
-      agent_id: id.agent_id,
-      nhi_id: agent.nhi_id,
-      version: '1.0.0',
-      role: 'Ecosystem Architect / Senior Partner',
-      owner: id.name,
-      trust_tier: 'sovereign',
-      persona,
-      created_at: now,
-      description: `The primary autonomous entity of the Kyberion Ecosystem for ${id.name}.`,
-    },
-    'onboarding-agent-identity'
+  withExecutionContext('sovereign_concierge', () =>
+    writePersonalAgentIdentityAtPath(
+      path.join(profileDir, 'agent-identity.json'),
+      {
+        agent_id: id.agent_id,
+        nhi_id: agent.nhi_id,
+        version: '1.0.0',
+        role: 'Ecosystem Architect / Senior Partner',
+        owner: id.name,
+        trust_tier: 'sovereign',
+        persona,
+        created_at: now,
+        description: `The primary autonomous entity of the Kyberion Ecosystem for ${id.name}.`,
+      },
+      agentProfileRevision
+    )
   );
   withExecutionContext('sovereign_concierge', () => {
     const owner = ensureOwnerMember();
