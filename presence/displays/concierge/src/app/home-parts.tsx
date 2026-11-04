@@ -3,8 +3,12 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Button, Callout, EmptyState, KbChart, Section, Skeleton } from '@agent/shared-ui';
-import type { ConciergeMessageKey } from '../lib/i18n';
-import type { OrgReadiness, OrgReadinessStepId } from '../lib/org-readiness-view';
+import { frontDeskText, type ConciergeLocale, type ConciergeMessageKey } from '../lib/i18n';
+import {
+  SETUP_CHECKLIST_ANCHORS,
+  type SetupChecklist as SetupChecklistData,
+  type SetupChecklistStepId,
+} from '@agent/core/surface/setup-checklist-model';
 import {
   NEEDS_YOU_REASONS,
   barPercent,
@@ -207,57 +211,62 @@ function Delta({ t, delta }: { t: HomeTranslate; delta: ReturnType<typeof window
 // 1. Setup checklist (only while incomplete)
 // ---------------------------------------------------------------------------
 
+/** The step labels 設定 › はじめに uses, so Home and settings name steps alike. */
 const SETUP_STEP_KEYS = {
-  organization: 'setup.org_ready_organization',
-  members: 'setup.org_ready_members',
-  connections: 'setup.org_ready_connections',
-  charter: 'setup.org_ready_charter',
-} as const satisfies Record<OrgReadinessStepId, ConciergeMessageKey>;
+  identity: 'ia_settings_step_identity',
+  reasoning: 'ia_settings_step_reasoning',
+  autonomy: 'ia_settings_step_autonomy',
+  notifications: 'ia_settings_step_notifications',
+  first_project: 'ia_settings_step_first_project',
+  budget: 'ia_settings_step_budget',
+  trial_mission: 'ia_settings_step_trial_mission',
+} as const satisfies Record<SetupChecklistStepId, string>;
 
+/**
+ * The remaining setup steps, in the required order, each opening its
+ * settings card (`/settings#<anchor>`). Hidden once the checklist is done.
+ */
 export function SetupChecklist({
   t,
-  organizations,
+  locale,
+  checklist,
 }: {
   t: HomeTranslate;
-  organizations: OrgReadiness[];
+  locale: ConciergeLocale;
+  checklist: SetupChecklistData;
 }) {
-  const pending = organizations.filter((org) => !org.all_done);
-  if (pending.length === 0) return null;
-  const done = pending.reduce((sum, org) => sum + org.done, 0);
-  const total = pending.reduce((sum, org) => sum + org.total, 0);
+  if (checklist.complete) return null;
+  const open = checklist.steps.filter((step) => step.status !== 'done');
+  if (open.length === 0) return null;
   return (
     <Tile
       span="full"
       testId="home-setup"
       title={t('ia_home_setup_title')}
-      description={t('ia_home_setup_lead', { done, total })}
+      description={t('ia_home_setup_lead', { done: checklist.done, total: checklist.total })}
     >
       <progress
         className="kb-home__progress"
-        value={done}
-        max={total}
+        value={checklist.done}
+        max={checklist.total}
         aria-label={t('ia_home_setup_progress_label')}
       />
-      {pending.map((org) => (
-        <ol className="kb-home__steps" key={org.tenant_slug} aria-label={org.tenant_slug}>
-          {org.steps
-            .filter((step) => !step.done)
-            .map((step) => {
-              const key = SETUP_STEP_KEYS[step.id as OrgReadinessStepId];
-              const label = key ? t(key) : '';
-              if (!label) return null;
-              return (
-                <li key={step.id}>
-                  <Link className="kb-home__step" href={settingsHref(step.href)}>
-                    <span className="kb-home__step-mark" aria-hidden="true" />
-                    <span>{label}</span>
-                    <span className="kb-home__link">{t('setup.org_ready_go')} →</span>
-                  </Link>
-                </li>
-              );
-            })}
-        </ol>
-      ))}
+      <ol className="kb-home__steps">
+        {open.map((step) => (
+          <li key={step.id}>
+            <Link className="kb-home__step" href={settingsHref(`#${step.anchor}`)}>
+              <span className="kb-home__step-mark" aria-hidden="true" />
+              <span>
+                {frontDeskText(
+                  SETUP_STEP_KEYS[step.id] as Parameters<typeof frontDeskText>[0],
+                  locale
+                )}
+              </span>
+              <span className="kb-home__link">{t('setup.org_ready_go')} →</span>
+            </Link>
+          </li>
+        ))}
+      </ol>
     </Tile>
   );
 }
@@ -686,7 +695,10 @@ export function KeyResultsTile({ t, home, onRetry, bcp47 = 'en' }: TileProps) {
 // ---------------------------------------------------------------------------
 
 export function CostTile({ t, home, onRetry, bcp47 = 'en' }: TileProps) {
-  const setBudget = { label: t('ia_home_cost_set_budget'), href: '/settings#budget' };
+  const setBudget = {
+    label: t('ia_home_cost_set_budget'),
+    href: settingsHref(`#${SETUP_CHECKLIST_ANCHORS.budget}`),
+  };
   return (
     <Tile
       span="half"

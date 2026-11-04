@@ -6,7 +6,8 @@ import { localeToBcp47 } from '@agent/core/locale-normalize';
 import { frontDeskFetch } from '../lib/front-desk-fetch';
 import { TENANT_CHANGED_EVENT } from '../lib/tenant-context';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
-import { parseOrgReadiness, type OrgReadiness } from '../lib/org-readiness-view';
+import { SETUP_CHECKLIST_PATH, parseSetupChecklistResponse } from '../lib/setup-checklist-client';
+import type { SetupChecklist as SetupChecklistData } from '@agent/core/surface/setup-checklist-model';
 import {
   loadFailureFromStatus,
   parseHomeDashboard,
@@ -73,7 +74,8 @@ function useLoadable<T>(
   return { ...state, reload };
 }
 
-const parseReadiness = (body: unknown): OrgReadiness[] | null => parseOrgReadiness(body) ?? null;
+const parseChecklist = (body: unknown): SetupChecklistData | null =>
+  parseSetupChecklistResponse(body) ?? null;
 
 /**
  * ホーム — the situation at a glance (MSN-SHELL-IA-20261105 contract §3):
@@ -104,7 +106,9 @@ export default function HomePage() {
     parseNeedsYouSummary,
     version
   );
-  const readiness = useLoadable<OrgReadiness[]>('/api/org-readiness', parseReadiness, version);
+  // Setup steps come from the one settings checklist (`setup.checklist`), so
+  // Home and 設定 › はじめに always agree and link to the same cards.
+  const checklist = useLoadable<SetupChecklistData>(SETUP_CHECKLIST_PATH, parseChecklist, version);
   const translate = t as HomeTranslate;
   const bcp47 = localeToBcp47(locale);
   const updated =
@@ -126,8 +130,8 @@ export default function HomePage() {
         }
       />
       <div className="kb-home__grid">
-        {readiness.state === 'ready' ? (
-          <SetupChecklist t={translate} organizations={readiness.data} />
+        {checklist.state === 'ready' ? (
+          <SetupChecklist t={translate} locale={locale} checklist={checklist.data} />
         ) : null}
         <NeedsYouTile t={translate} bcp47={bcp47} summary={needs} onRetry={needs.reload} />
         <AgentsTile t={translate} home={home} onRetry={home.reload} />
