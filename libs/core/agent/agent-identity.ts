@@ -261,6 +261,8 @@ const instanceBoundPayloadSchema = z
     bound_at: z.string(),
     expires_at: z.string().optional(),
     tenant_slug: z.string().optional(),
+    /** First bind activates atomically, without a separate resurrection window. */
+    activate_provisioned: z.literal(true).optional(),
   })
   .strict();
 
@@ -320,6 +322,7 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.accountabilityReassigned, {
     if (
       !existing ||
       existing.lifecycle_status === 'retired' ||
+      existing.accountable_human_id === payload.accountable_human_id ||
       existing.accountable_human_id !== payload.previous_accountable_human_id
     )
       return state;
@@ -327,13 +330,24 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.accountabilityReassigned, {
       identities: {
         ...state.identities,
         [payload.nhi_id]: {
-          ...existing,
+          ...withoutAdmissionInstances(existing),
           accountable_human_id: payload.accountable_human_id,
         },
       },
     };
   },
 });
+
+/** Revocation preserves ordinary runtimes and never rewrites historical ownership. */
+function withoutAdmissionInstances(existing: AgentIdentityRecord): AgentIdentityRecord {
+  const next = { ...existing };
+  const retained = (existing.runtime_instances ?? []).filter(
+    (entry) => !entry.instance_id.startsWith('nhi-session:')
+  );
+  if (retained.length > 0) next.runtime_instances = retained;
+  else delete next.runtime_instances;
+  return next;
+}
 
 agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.identitySuspended, {
   model: agentIdentityModel,
@@ -342,15 +356,13 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.identitySuspended, {
     const existing = state.identities[payload.nhi_id];
     if (!existing || existing.lifecycle_status === 'suspended') return state;
     if (existing.lifecycle_status === 'retired') return state;
-    const suspended: AgentIdentityRecord = { ...existing, lifecycle_status: 'suspended' };
+    const suspended: AgentIdentityRecord = {
+      ...withoutAdmissionInstances(existing),
+      lifecycle_status: 'suspended',
+    };
     // Suspension kills session-admission bindings ('nhi-session:' prefix is the
     // admission-ceremony convention): reactivation must never resurrect a
     // token issued before the incident — re-admission requires fresh approval.
-    const sessions = (existing.runtime_instances ?? []).filter(
-      (entry) => !entry.instance_id.startsWith('nhi-session:')
-    );
-    if (sessions.length > 0) suspended.runtime_instances = sessions;
-    else delete suspended.runtime_instances;
     return { identities: { ...state.identities, [payload.nhi_id]: suspended } };
   },
 });
@@ -379,7 +391,12 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.instanceBound, {
   schema: instanceBoundPayloadSchema,
   apply: (state, payload) => {
     const existing = state.identities[payload.nhi_id];
-    if (!existing || existing.lifecycle_status === 'retired') return state;
+    if (
+      !existing ||
+      (existing.lifecycle_status !== 'active' &&
+        !(existing.lifecycle_status === 'provisioned' && payload.activate_provisioned))
+    )
+      return state;
     const instance: AgentRuntimeInstanceBinding = {
       instance_id: payload.instance_id,
       bound_at: payload.bound_at,
@@ -402,7 +419,11 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.instanceBound, {
     return {
       identities: {
         ...state.identities,
-        [payload.nhi_id]: { ...existing, runtime_instances: nextInstances },
+        [payload.nhi_id]: {
+          ...existing,
+          lifecycle_status: 'active' as const,
+          runtime_instances: nextInstances,
+        },
       },
     };
   },
@@ -460,8 +481,6 @@ export class AgentIdentityJournal {
     return this.journalPath;
   }
   private readonly now: () => string;
-  private seqLoaded = false;
-  private seq = 0;
 
   constructor(options: AgentIdentityJournalOptions) {
     this.journalPath = assertSafeRepositoryPath(pathResolver.rootResolve(options.journalPath), {
@@ -471,14 +490,22 @@ export class AgentIdentityJournal {
   }
 
   /** Validate, stamp seq/ts, and append. Refused during restore (no mutation while replaying). */
-  append(opName: string, payload: unknown): JournalEventEnvelope {
-    this.ensureSeqLoaded();
+  append(
+    opName: string,
+    payload: unknown,
+    fence?: { nhiId: string; revision: number }
+  ): JournalEventEnvelope {
     const envelope = appendValidatedJournalEvent({
       kernel: this.kernel,
       opName,
       payload,
       journalPath: this.journalPath,
-      seq: this.seq,
+      seq: () => this.readJournal().maxSeq + 1,
+      assertPreconditions: () => {
+        if (fence && this.revision(fence.nhiId) !== fence.revision) {
+          throw new AgentIdentityConflictError(fence.nhiId, 'identity changed before binding');
+        }
+      },
       now: this.now,
       ...(agentIdentityStoreAccess.getStore()
         ? {
@@ -505,15 +532,12 @@ export class AgentIdentityJournal {
           payload: validated,
         }),
     });
-    this.seq += 1;
     return envelope;
   }
 
   /** Reconstruct state purely from the journal: validate -> silent replay. No side effects. */
   restore(): AgentIdentityState {
     const read = this.readJournal();
-    this.seq = read.maxSeq + 1;
-    this.seqLoaded = true;
     return runInRestoreMode(() => {
       const states = this.kernel.project(read.events);
       return (states.get('agent_identity') as AgentIdentityState) ?? initialAgentIdentityState();
@@ -526,12 +550,6 @@ export class AgentIdentityJournal {
       const payload = event.payload as { nhi_id?: unknown };
       return payload?.nhi_id === nhiId ? Math.max(revision, event.seq) : revision;
     }, -1);
-  }
-
-  private ensureSeqLoaded(): void {
-    if (this.seqLoaded) return;
-    this.seq = this.readJournal().maxSeq + 1;
-    this.seqLoaded = true;
   }
 
   private readJournal(): AgentIdentityReadResult {
@@ -695,7 +713,11 @@ export function resetAgentIdentityServiceForTests(
   journalExplicitlyScoped = journalPath !== AGENT_IDENTITY_JOURNAL_PATH;
 }
 
-function appendGoverned(opName: string, payload: unknown): void {
+function appendGoverned(
+  opName: string,
+  payload: unknown,
+  fence?: { nhiId: string; revision: number }
+): void {
   if (isVitestProcess() && !journalExplicitlyScoped) {
     throw new Error(
       '[agent-identity] refusing to write the governed default journal under vitest — ' +
@@ -709,7 +731,7 @@ function appendGoverned(opName: string, payload: unknown): void {
   // active/shared/coordination/ sees it too, regardless of which allowlisted
   // role the caller's own context was scoped to.
   withExecutionContext('mission_controller', () => {
-    getDefaultJournal().append(opName, payload);
+    getDefaultJournal().append(opName, payload, fence);
   });
 }
 
@@ -957,6 +979,8 @@ export function retireAgentIdentity(nhiId: string, reason: string): AgentIdentit
 
 export interface BindRuntimeInstanceParams {
   nhiId: string;
+  /** Approval-bound change fence; any intervening identity event requires fresh consent. */
+  expectedIdentityRevision?: number;
   /** In-memory runtime id — the agent-registry AgentRecord agentId. */
   instanceId: string;
   pid?: number;
@@ -976,6 +1000,7 @@ export interface BindRuntimeInstanceParams {
  */
 export function bindRuntimeInstance(params: BindRuntimeInstanceParams): AgentIdentityRecord {
   assertAgentIdentityGovernedContext('bindRuntimeInstance');
+  const revision = params.expectedIdentityRevision ?? getAgentIdentityRevision(params.nhiId);
   const existing = requireIdentity(params.nhiId);
   if (existing.lifecycle_status === 'retired') {
     throw new AgentIdentityLifecycleError(params.nhiId, 'cannot bind an instance: retired');
@@ -983,24 +1008,35 @@ export function bindRuntimeInstance(params: BindRuntimeInstanceParams): AgentIde
   if (existing.lifecycle_status === 'suspended') {
     throw new AgentIdentityLifecycleError(params.nhiId, 'cannot bind an instance: suspended');
   }
-  if (existing.lifecycle_status === 'provisioned') {
-    appendGoverned(AGENT_IDENTITY_OPS.identityActivated, {
+  const boundAt = nowIso();
+  appendGoverned(
+    AGENT_IDENTITY_OPS.instanceBound,
+    {
       nhi_id: params.nhiId,
-      activated_at: nowIso(),
-    });
-  }
-  appendGoverned(AGENT_IDENTITY_OPS.instanceBound, {
-    nhi_id: params.nhiId,
-    instance_id: params.instanceId,
-    ...(params.pid !== undefined ? { pid: params.pid } : {}),
-    ...(params.sessionId ? { session_id: params.sessionId } : {}),
-    ...(params.provider ? { provider: params.provider } : {}),
-    ...(params.modelId ? { model_id: params.modelId } : {}),
-    ...(params.expiresAt ? { expires_at: params.expiresAt } : {}),
-    ...(params.tenantSlug ? { tenant_slug: params.tenantSlug } : {}),
-    bound_at: nowIso(),
-  });
-  return requireIdentity(params.nhiId);
+      instance_id: params.instanceId,
+      ...(params.pid !== undefined ? { pid: params.pid } : {}),
+      ...(params.sessionId ? { session_id: params.sessionId } : {}),
+      ...(params.provider ? { provider: params.provider } : {}),
+      ...(params.modelId ? { model_id: params.modelId } : {}),
+      ...(params.expiresAt ? { expires_at: params.expiresAt } : {}),
+      ...(params.tenantSlug ? { tenant_slug: params.tenantSlug } : {}),
+      bound_at: boundAt,
+      ...(existing.lifecycle_status === 'provisioned' ? { activate_provisioned: true } : {}),
+    },
+    { nhiId: params.nhiId, revision }
+  );
+  const result = requireIdentity(params.nhiId);
+  if (
+    result.lifecycle_status !== 'active' ||
+    !result.runtime_instances?.some(
+      (entry) =>
+        entry.instance_id === params.instanceId &&
+        entry.bound_at === boundAt &&
+        entry.session_id === (params.sessionId || undefined)
+    )
+  )
+    throw new AgentIdentityLifecycleError(params.nhiId, 'instance binding stopped or changed');
+  return result;
 }
 
 /**
