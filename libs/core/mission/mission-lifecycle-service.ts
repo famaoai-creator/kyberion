@@ -227,6 +227,8 @@ export const GOVERNED_PASSTHROUGH_VERBS = {
   grantMissionAccess: 'grant-access',
   grantMissionSudo: 'grant-sudo',
   approveScopeChange: 'scope-approve',
+  syncProjectLedger: 'sync-project-ledger',
+  syncProjectLedgerIfLinked: 'sync-project-ledger',
 } as const;
 
 export type GovernedPassthroughMethod = keyof typeof GOVERNED_PASSTHROUGH_VERBS;
@@ -263,6 +265,14 @@ export interface MissionLifecycleArchiveOptions extends MissionLifecycleVerbOpti
   missionId?: string;
   /** Policy-driven sweep only: preview candidates without moving anything. */
   dryRun?: boolean;
+  /**
+   * Policy-driven sweep only: receives the matched candidates before any
+   * mission moves, so a surface can render its own preview (the CLI prints a
+   * table). The library itself never writes to stdout.
+   */
+  onCandidates?: NonNullable<
+    Parameters<MissionLifecycleUnderlyingSystem['purgeMissions']>[1]
+  >['onCandidates'];
 }
 
 /**
@@ -498,7 +508,12 @@ export function buildMissionLifecycleService(
           const archiveOne = overrides?.archiveMissionById ?? archiveMissionById;
           return archiveOne(targeted);
         }
-        return resolveSystem(explicitSystem).purgeMissions(options?.dryRun ?? false);
+        const dryRun = options?.dryRun ?? false;
+        return options?.onCandidates
+          ? resolveSystem(explicitSystem).purgeMissions(dryRun, {
+              onCandidates: options.onCandidates,
+            })
+          : resolveSystem(explicitSystem).purgeMissions(dryRun);
       });
     },
 

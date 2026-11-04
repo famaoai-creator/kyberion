@@ -103,13 +103,13 @@ function writeFocusedMissionId(missionId: string): void {
 
 // ─── Project ledger helpers (bind ROOT_DIR) ───────────────────────────────────
 async function syncProjectLedger(id: string): Promise<unknown> {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  return missionSystem.syncProjectLedger(id);
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  return missionLifecycleService.syncProjectLedger(id);
 }
 
 async function syncProjectLedgerIfLinked(id: string): Promise<unknown> {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  return missionSystem.syncProjectLedgerIfLinked(id);
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  return missionLifecycleService.syncProjectLedgerIfLinked(id);
 }
 
 async function reassignMissionProject(
@@ -660,13 +660,16 @@ export function formatPurgeCandidateTable(
 }
 
 async function purgeMissions(dryRun: boolean = false): Promise<void> {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
   // AL-01: purgeMissions now returns a structured PurgeMissionsResult; the
   // CLI router's context type is (dryRun?) => Awaitable<void> and never
   // consumed a return value, so drop it here to keep the thin-router contract.
   // The library returns rows and never writes to stdout (G08); the human
   // table is rendered here, before any archive log lines.
-  await missionSystem.purgeMissions(dryRun, {
+  // Routed through the governed archive sweep so `purge` gets the same
+  // execution-context gate and audit record as `archive`.
+  await missionLifecycleService.archive({
+    dryRun,
     onCandidates: (candidates) => {
       for (const line of formatPurgeCandidateTable(ROOT_DIR, candidates)) {
         printOutput(line);
