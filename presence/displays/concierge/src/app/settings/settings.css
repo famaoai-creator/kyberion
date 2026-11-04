@@ -478,3 +478,37 @@
     justify-content: flex-start;
   }
 }
+
+/* 連携 › SSO: the embedded legacy form, given field rhythm inside the card. */
+.kb-settings .settings-sso > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-3);
+}
+
+.kb-settings .settings-sso h3,
+.kb-settings .settings-sso p,
+.kb-settings .settings-sso ul {
+  margin: 0;
+}
+
+.kb-settings .settings-sso label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  max-width: 32rem;
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.kb-settings .settings-sso input {
+  padding: var(--kb-ui-space-2) var(--kb-ui-space-3);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-sm);
+  background: var(--kb-ui-surface);
+  color: inherit;
+  font: inherit;
+}
+
+.kb-settings .settings-sso code {
+  overflow-wrap: anywhere;
+}

@@ -266,7 +266,7 @@ export function BudgetCard({
             <SettingMeta
               locale={locale}
               defaultValue={text('ia_settings_budget_default_value')}
-              effect={text('ia_settings_card_budget_desc')}
+              effect={text('ia_settings_step_budget_why')}
             />
           </div>
         </>
