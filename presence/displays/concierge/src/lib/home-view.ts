@@ -94,7 +94,7 @@ export function inboxHref(filter?: { reason?: NeedsYouReason; overdue?: boolean 
 export type MissionOpenState = keyof HomeDashboard['missions']['open'];
 
 export function workHref(state?: MissionOpenState): string {
-  return state ? `/work?tab=missions&state=${state}` : '/work';
+  return state ? `/work?tab=missions&status=${state}&view=list` : '/work';
 }
 
 export function missionHref(missionId: string): string {

@@ -28,7 +28,7 @@ describe('home view helpers', () => {
     expect(inboxHref()).toBe('/inbox');
     expect(inboxHref({ reason: 'review' })).toBe('/inbox?reason=review');
     expect(inboxHref({ overdue: true })).toBe('/inbox?overdue=1');
-    expect(workHref('paused')).toBe('/work?tab=missions&state=paused');
+    expect(workHref('paused')).toBe('/work?tab=missions&status=paused&view=list');
     expect(settingsHref('#settings-invites')).toBe('/settings#settings-invites');
     expect(settingsHref('javascript:alert(1)')).toBe('/settings');
   });
