@@ -13,6 +13,10 @@ import { currentScopeEnvelope } from '../scope-envelope.js';
 import { resolveScopeContext } from '../scope-context.js';
 import { assertVcsCwdScope } from './cwd-scope.js';
 import { vcsDefaultRunner, type VcsCommandResult, type VcsCommandRunner } from './vcs-backend.js';
+// Side-effect: install the governed default `local-git` backend so core consumers
+// of these verbs resolve a backend without an explicit bindings import (same
+// pattern as entry-ledger.ts / writer-lease.ts).
+import './local-git-backend.js';
 
 export type { VcsCommandResult, VcsCommandRunner } from './vcs-backend.js';
 
