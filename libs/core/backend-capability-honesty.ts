@@ -119,22 +119,36 @@ export interface BackendCapabilityHonestyOptions {
   liveScenarioRecords?: readonly BackendLiveScenarioRecord[];
 }
 
+function liveRecordModel(record: BackendLiveScenarioRecord): string {
+  return record.served_model && record.served_model !== 'unreported'
+    ? record.served_model
+    : record.model_requested || 'default';
+}
+
 /**
  * `${mode}::${scenario}` → models that passed / failed it. Same shape as the
- * judge evidence map. `not_run` and `unreported` are not evidence either way,
- * and a run the reasoning chain says another mode served is a substitution —
- * it says nothing about the mode under test.
+ * judge evidence map, with one difference: only the LATEST run per
+ * (mode, model) counts. A live run is a point-in-time measurement of a
+ * provider that changes; an old failure superseded by a newer pass is history,
+ * not a standing contradiction. `not_run` and `unreported` are not evidence
+ * either way (a turn another mode served is already scored `unreported` by the
+ * runner).
  */
 function liveScenarioEvidence(
   records: readonly BackendLiveScenarioRecord[]
 ): Map<string, { passed: string[]; failed: string[] }> {
-  const evidence = new Map<string, { passed: string[]; failed: string[] }>();
+  const latest = new Map<string, BackendLiveScenarioRecord>();
   for (const record of records) {
-    if (record.served_mode && record.served_mode !== record.mode) continue;
-    const model =
-      record.served_model && record.served_model !== 'unreported'
-        ? record.served_model
-        : record.model_requested || 'default';
+    const key = `${record.mode}::${liveRecordModel(record)}`;
+    const current = latest.get(key);
+    const at = record.finished_at || record.started_at || '';
+    if (!current || at >= (current.finished_at || current.started_at || '')) {
+      latest.set(key, record);
+    }
+  }
+  const evidence = new Map<string, { passed: string[]; failed: string[] }>();
+  for (const record of latest.values()) {
+    const model = liveRecordModel(record);
     for (const result of record.scenarios) {
       if (result.outcome !== 'pass' && result.outcome !== 'fail') continue;
       const key = `${record.mode}::${result.scenario}`;
