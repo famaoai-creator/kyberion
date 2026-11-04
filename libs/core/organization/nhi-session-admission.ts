@@ -34,6 +34,7 @@ import { approvalPresentedDigestMatches } from '../governance/approval-presentat
 import {
   bindRuntimeInstance,
   getAgentIdentity,
+  getAgentIdentityRevision,
   listAgentIdentities,
   parseNhiId,
   releaseRuntimeInstance,
@@ -68,6 +69,8 @@ export interface NhiSessionAdmissionPlan {
   version: 1;
   kind: 'nhi_session_admission';
   nhi_id: string;
+  /** Fences lifecycle/accountability changes, including suspend/reactivate ABA. */
+  identity_revision: number;
   tenant_slug: string;
   accountable_id: string;
   initiated_by: string;
@@ -139,12 +142,14 @@ export function requestNhiSessionAdmission(
   const ttl = input.ttl_seconds ?? DEFAULT_ADMISSION_TTL_SECONDS;
   if (!Number.isFinite(ttl) || ttl <= 0 || ttl > MAX_ADMISSION_TTL_SECONDS)
     deny(`ttl_seconds must be within 1..${MAX_ADMISSION_TTL_SECONDS}`);
+  const identityRevision = getAgentIdentityRevision(input.nhi_id);
   assertOrgAdmissionTarget(principal, input.tenant_slug, input.nhi_id, options);
   const now = options.now ?? new Date();
   const plan: NhiSessionAdmissionPlan = {
     version: 1,
     kind: 'nhi_session_admission',
     nhi_id: input.nhi_id,
+    identity_revision: identityRevision,
     tenant_slug: input.tenant_slug,
     accountable_id: principal.accountableId,
     initiated_by: principal.requesterId,
@@ -205,7 +210,8 @@ function readPlan(
   principal: NhiSessionAdmissionPrincipal,
   tenantSlug: string,
   id: string,
-  options: Options
+  options: Options,
+  checks: { lifecycle?: boolean } = {}
 ): { record: ApprovalRequestRecord; plan: NhiSessionAdmissionPlan } {
   const record = loadApprovalRequest(NHI_SESSION_ADMISSION_CHANNEL, id);
   if (!record?.sourceText || record.channel !== NHI_SESSION_ADMISSION_CHANNEL)
@@ -224,7 +230,7 @@ function readPlan(
     deny('request outside selected tenant scope');
   if (record.scope?.tier !== 'confidential' || record.scope?.tenant_slug !== plan.tenant_slug)
     deny('approval storage scope does not match plan');
-  assertOrgAdmissionTarget(principal, plan.tenant_slug, plan.nhi_id, options);
+  assertOrgAdmissionTarget(principal, plan.tenant_slug, plan.nhi_id, options, checks);
   if (
     plan.accountable_id !== principal.accountableId ||
     !plan.initiated_by ||
@@ -265,24 +271,43 @@ function assertHumanApproved(record: ApprovalRequestRecord, plan: NhiSessionAdmi
   });
 }
 
+function assertAdmissionIdentityUnchanged(plan: NhiSessionAdmissionPlan): void {
+  // Legacy plans have no fence. They must be requested and reviewed again,
+  // never upgraded by guessing the revision the human meant to approve.
+  if (
+    !Number.isSafeInteger(plan.identity_revision) ||
+    plan.identity_revision < 0 ||
+    getAgentIdentityRevision(plan.nhi_id) !== plan.identity_revision
+  )
+    deny('NHI changed since request; request fresh session admission');
+}
+
 export function nhiSessionAdmissionStatus(
   principal: NhiSessionAdmissionPrincipal,
   tenantSlug: string,
   id: string,
   options: Options = {}
 ) {
-  const { record, plan } = readPlan(principal, tenantSlug, id, options);
+  const { record, plan } = readPlan(principal, tenantSlug, id, options, { lifecycle: false });
   let can_apply = false;
   try {
     assertHumanApproved(record, plan);
+    assertAdmissionIdentityUnchanged(plan);
     can_apply = !record.applyClaim && !record.applyResult;
   } catch {
     /* status is visible; no authority is inferred */
   }
+  const instance = getAgentIdentity(plan.nhi_id)?.runtime_instances?.find(
+    (entry) => entry.instance_id === record.applyResult?.auditRef
+  );
+  const liveReceipt =
+    instance?.session_id &&
+    findLiveSessionAdmission(plan.nhi_id, instance.session_id, plan.tenant_slug, options.now)
+      ?.instance_id === instance.instance_id;
   return {
     ...requestReceipt(record, plan),
     status:
-      record.applyResult?.result === 'success'
+      record.applyResult?.result === 'success' && liveReceipt
         ? 'applied'
         : record.applyClaim
           ? 'reconciliation_required'
@@ -307,6 +332,7 @@ export function applyNhiSessionAdmission(
 ) {
   const { record, plan } = readPlan(principal, tenantSlug, id, options);
   assertHumanApproved(record, plan);
+  assertAdmissionIdentityUnchanged(plan);
   const claimed = claimApprovalApply('mission_controller', {
     channel: record.channel,
     requestId: record.id,
@@ -315,27 +341,51 @@ export function applyNhiSessionAdmission(
   });
   const instanceId = `${ADMISSION_INSTANCE_PREFIX}${randomUUID()}`;
   const sessionId = `${ADMISSION_SESSION_PREFIX}${randomUUID().replace(/-/g, '')}`;
-  const bound = withExecutionContext('mission_controller', () =>
-    bindRuntimeInstance({
-      nhiId: plan.nhi_id,
-      instanceId,
-      sessionId,
-      provider: options.provider ?? 'operator-session',
-      ...(options.modelId ? { modelId: options.modelId } : {}),
-      expiresAt: plan.expires_at,
-      tenantSlug: plan.tenant_slug,
-    })
-  );
-  recordApprovalApplyResult('mission_controller', {
-    channel: record.channel,
-    requestId: record.id,
-    claimId: claimed.applyClaim.claimId,
-    applyResult: {
-      result: 'success',
-      appliedAt: (options.now ?? new Date()).toISOString(),
-      appliedBy: principal.requesterId,
-    },
-  });
+  let bound: AgentIdentityRecord;
+  try {
+    bound = withExecutionContext('mission_controller', () =>
+      bindRuntimeInstance({
+        nhiId: plan.nhi_id,
+        expectedIdentityRevision: plan.identity_revision,
+        instanceId,
+        sessionId,
+        provider: options.provider ?? 'operator-session',
+        ...(options.modelId ? { modelId: options.modelId } : {}),
+        expiresAt: plan.expires_at,
+        tenantSlug: plan.tenant_slug,
+      })
+    );
+    recordApprovalApplyResult('mission_controller', {
+      channel: record.channel,
+      requestId: record.id,
+      claimId: claimed.applyClaim.claimId,
+      applyResult: {
+        result: 'success',
+        appliedAt: (options.now ?? new Date()).toISOString(),
+        appliedBy: principal.requesterId,
+        auditRef: instanceId,
+      },
+    });
+    // Claim, identity journal and result are separate durable stores. A
+    // revocation while recording the result must not produce a success token.
+    assertOrgAdmissionTarget(principal, plan.tenant_slug, plan.nhi_id, options);
+    if (!findLiveSessionAdmission(plan.nhi_id, sessionId, plan.tenant_slug))
+      deny('session binding stopped before admission completed');
+  } catch (error) {
+    // Keep the once-only claim for reconciliation, but do not leave an
+    // undisclosed live session after a failed result write or final check.
+    try {
+      withExecutionContext('mission_controller', () =>
+        releaseRuntimeInstance(plan.nhi_id, instanceId, 'admission_incomplete')
+      );
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        '[NHI_SESSION_ADMISSION] admission and cleanup incomplete; reconciliation required'
+      );
+    }
+    throw error;
+  }
   return {
     ok: true as const,
     nhi_id: plan.nhi_id,
@@ -425,7 +475,7 @@ export function findLiveSessionAdmission(
   now: Date = new Date()
 ): AgentRuntimeInstanceBinding | undefined {
   const agent = getAgentIdentity(nhiId);
-  if (!agent || ['suspended', 'retired'].includes(agent.lifecycle_status)) return undefined;
+  if (!agent || agent.lifecycle_status !== 'active') return undefined;
   // Legacy identities without affiliation may consume only their already-approved
   // exact tenant session. An explicit foreign affiliation is never overridden.
   if (agent.affiliation.tenant_slug && !agentIdentityMatchesTenant(agent, tenantSlug))

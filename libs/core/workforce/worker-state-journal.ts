@@ -110,7 +110,10 @@ export interface AppendValidatedJournalEventOptions<TEnvelope> {
   readonly opName: string;
   readonly payload: unknown;
   readonly journalPath: string;
-  readonly seq: number;
+  /** A factory allocates a fresh sequence inside the journal writer lease. */
+  readonly seq: number | (() => number);
+  /** Read-only domain checks, evaluated under the same lease as the append. */
+  readonly assertPreconditions?: () => void;
   readonly now?: () => string;
   readonly buildEnvelope: (context: JournalAppendContext) => TEnvelope;
   /** Narrow store IO scope for the lease and append; the lock stays with the caller. */
@@ -128,11 +131,6 @@ export function appendValidatedJournalEvent<TEnvelope>(
   assertNotDuringRestore('appendValidatedJournalEvent');
   const journalPath = assertSafeRepositoryPath(options.journalPath, { allowMissingLeaf: true });
   const validated = options.kernel.validatePayload(options.opName, options.payload);
-  const envelope = options.buildEnvelope({
-    seq: options.seq,
-    ts: (options.now ?? nowIso)(),
-    payload: validated,
-  });
   const leasePath = assertSafeRepositoryPath(
     path.join(path.dirname(journalPath), 'writer-lease.json'),
     { allowMissingLeaf: true }
@@ -143,6 +141,12 @@ export function appendValidatedJournalEvent<TEnvelope>(
     leasePath,
     ...(options.storeAccess ? { withinLock: options.storeAccess } : {}),
     fn: () => {
+      options.assertPreconditions?.();
+      const envelope = options.buildEnvelope({
+        seq: typeof options.seq === 'function' ? options.seq() : options.seq,
+        ts: (options.now ?? nowIso)(),
+        payload: validated,
+      });
       const currentJournalPath = assertSafeRepositoryPath(journalPath, {
         allowMissingLeaf: true,
       });

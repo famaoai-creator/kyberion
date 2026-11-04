@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-03
+last_updated: 2026-11-04
 ---
 
 # Operations Hygiene Runbook
@@ -25,6 +25,43 @@ regenerate derived catalogs after rebuilding the rebased source. Existing
 diff; they do not prove that an arbitrary starting checkout was current. This
 checkout comparison is a required operational preflight, not a new claim made
 by those automated checks.
+
+## NHI lifecycle and session-admission fencing
+
+Allocate identity-journal sequence numbers and check the expected identity revision
+inside the same writer lease as append. Initial activation and instance binding are
+one event; a delayed bind must never lift a suspension. Admission plans bind the
+human's approval to the identity revision, so any intervening identity event,
+including suspend/reactivate or accountability transfer/back, requires a fresh
+request and human review. Legacy plans without a revision are not upgraded in place.
+
+Upgrade all identity-journal writers together: stop admission, runtime managers and
+other writers, upgrade/rebuild them, then restart only the new version. Mixed-version
+rolling operation and rollback to an old writer are unsupported: old writers cache
+sequence numbers and their strict schemas cannot read the atomic initial-binding
+payload. Do not rewrite historical events. Replay deliberately ignores bindings
+recorded while suspended; those bindings remain absent after reactivation and need
+fresh admission. Accountability transfer also revokes existing admission bindings,
+including when ownership later returns to the original human; ordinary runtime
+bindings and historical ownership events are retained. These are tightenings of
+historical unsafe behavior, not restoration of prior authority.
+
+Approval claim, binding and apply receipt are a saga across separate stores, not a
+crash-atomic transaction. A bind/read or receipt failure attempts to release only
+the newly generated instance, retains the once-only claim, and never returns a
+session token. Preserve both original and cleanup errors if cleanup also fails.
+An uncertain write, process crash or cleanup failure requires reconciliation:
+inspect the approval and `pnpm onboarding nhi-session list --tenant <tenant>`,
+revoke an incomplete admission by its exact instance, then request fresh approval.
+Never clear claims, reuse an old approval or overwrite its immutable result.
+`applied` status requires both a success receipt and its currently live instance;
+otherwise a claimed request is `reconciliation_required`, including receipts whose
+bindings have since expired or been revoked. A receipt does not prove token delivery.
+
+Gates: agent-identity lease-interleaving and alternating-writer tests, session-admission
+ABA/legacy-plan tests, post-append and uncertain-result compensation tests, live-before-
+expiry control and suspension/replay regressions. These synthetic gates do not establish
+that a real organization has been onboarded or admitted.
 
 ## Private task source preparation and local test boundaries
 
