@@ -546,7 +546,7 @@ export function KnowledgeWorkspace({
           {!selected.learning && selected.status === 'queued' ? (
             // Approving or rejecting a queued candidate happens in あなた待ち
             // (IA contract §2); registering an approved one stays here.
-            <NeedsYouLink reason="knowledge" locale={locale === 'ja' ? 'ja' : 'en'} />
+            <NeedsYouLink reason="knowledge" locale={locale} />
           ) : (
             <>
               {canDecide ? (

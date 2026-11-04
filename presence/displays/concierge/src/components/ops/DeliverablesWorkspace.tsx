@@ -327,7 +327,7 @@ export function DeliverablesWorkspace({
             />
           ) : null}
           {/* Browsing only: the review decision lives in あなた待ち (IA contract §2). */}
-          <NeedsYouLink reason="review" locale={locale === 'ja' ? 'ja' : 'en'} />
+          <NeedsYouLink reason="review" locale={locale} />
         </Section>
       ) : loading ? null : (
         <Section>
