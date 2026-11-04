@@ -88,10 +88,13 @@ describe('R5 delegation failover guard', () => {
     await expect(run(() => target.delegateTask('task'))).resolves.toBe(LONG);
   });
 
-  it('with a key, fails over only on provably pre-start failures', async () => {
+  it('with a key, fails over only on a structural pre-start proof', async () => {
     const preStart = chain(
       async () => {
-        throw new Error('401 unauthorized: login required');
+        throw Object.assign(new Error('spawn claude ENOENT'), {
+          code: 'ENOENT',
+          syscall: 'spawn claude',
+        });
       },
       async () => LONG
     );
@@ -100,7 +103,18 @@ describe('R5 delegation failover guard', () => {
       run(() => preStart.delegateTask('task', undefined, { idempotencyKey: keyA }))
     ).resolves.toBe(LONG);
 
-    // The auth failure demoted the primary provider; start the next case clean.
+    clearProviderHealth();
+    // An auth-looking message proves nothing: agentic CLIs print it after tools ran.
+    const authFallback = vi.fn(async () => LONG);
+    const authMessage = chain(async () => {
+      throw new Error('401 unauthorized: login required');
+    }, authFallback);
+    const keyAuth = deriveDelegationIdempotencyKey({ workItemId: `w-${randomUUID()}`, attempt: 1 });
+    await expect(
+      run(() => authMessage.delegateTask('task', undefined, { idempotencyKey: keyAuth }))
+    ).rejects.toThrow('[execution-started]');
+    expect(authFallback).not.toHaveBeenCalled();
+
     clearProviderHealth();
     const fallback = vi.fn(async () => LONG);
     const unknown = chain(async () => {

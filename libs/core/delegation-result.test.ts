@@ -5,8 +5,13 @@ vi.mock('./secret/secret-guard.js', () => ({
     if (text.includes('BINDING-REFUSED')) throw new Error('[CREDENTIAL_BINDING_REQUIRED] test');
     return text.split('sk-live-SECRET-0042').join('[REDACTED_SECRET]');
   },
+  // Host redaction also masks secrets a plugin frame was never granted.
   redactActiveSecretsForHostLog: (text: string) =>
-    text.split('sk-live-SECRET-0042').join('[REDACTED_SECRET]'),
+    text
+      .split('sk-live-SECRET-0042')
+      .join('[REDACTED_SECRET]')
+      .split('sk-host-UNGRANTED-77')
+      .join('[REDACTED_SECRET]'),
 }));
 
 import {
@@ -16,6 +21,7 @@ import {
   delegationExecutionStartedFromError,
   delegationResultText,
   DelegationExecutionStartedError,
+  DelegationNotStartedError,
   DelegationTerminalError,
   markDelegationExecutionStarted,
   markErrorExecutionStarted,
@@ -57,6 +63,12 @@ describe('R2 DelegationResult', () => {
     );
     const failed = buildFailedDelegationResult(new Error('401 unauthorized sk-live-SECRET-0042'));
     expect(failed.error?.message).toBe('401 unauthorized [REDACTED_SECRET]');
+  });
+
+  it('masks secrets maskActiveSecrets skips (ungranted in a plugin frame)', () => {
+    expect(buildCompletedDelegationResult('x sk-host-UNGRANTED-77').output_text).toBe(
+      'x [REDACTED_SECRET]'
+    );
   });
 
   it('never fails the delegation when masking is refused; falls back to host redaction', () => {
@@ -110,13 +122,21 @@ describe('R2 DelegationResult', () => {
 });
 
 describe('R5 execution-start signal', () => {
-  it('infers pre-start only for refusals that never ran anything', () => {
-    expect(delegationExecutionStartedFromError(new Error('spawn codex ENOENT'))).toBe(false);
-    expect(delegationExecutionStartedFromError(new Error('401 unauthorized'))).toBe(false);
-    expect(delegationExecutionStartedFromError(new Error('[SUBAGENT_UNAVAILABLE] none'))).toBe(
+  it('infers pre-start only from structural evidence, never from message text', () => {
+    const spawnFailure = Object.assign(new Error('spawn codex ENOENT'), {
+      code: 'ENOENT',
+      syscall: 'spawn codex',
+    });
+    expect(delegationExecutionStartedFromError(spawnFailure)).toBe(false);
+    expect(delegationExecutionStartedFromError(new DelegationNotStartedError('refused'))).toBe(
       false
     );
-    expect(delegationExecutionStartedFromError(new Error('provider unavailable'))).toBeUndefined();
+    // Agentic CLIs print these after running tools: message text proves nothing.
+    expect(delegationExecutionStartedFromError(new Error('spawn codex ENOENT'))).toBeUndefined();
+    expect(delegationExecutionStartedFromError(new Error('401 unauthorized'))).toBeUndefined();
+    expect(
+      delegationExecutionStartedFromError(new Error('[SUBAGENT_UNAVAILABLE] none'))
+    ).toBeUndefined();
     expect(
       delegationExecutionStartedFromError(markErrorExecutionStarted(new Error('401 unauthorized')))
     ).toBe(true);
