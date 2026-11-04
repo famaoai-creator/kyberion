@@ -941,7 +941,11 @@ export function compileBrowserRecordingToPipeline(
     }
     const op =
       directRefOp ?? normalizeBrowserPipelineOp(resolveBrowserRecordingPipelineOp(action.op));
-    const validation = validateOpInput('browser', op, { ...action, ...params });
+    // Validate the op contract only. `original_op` / `needs_selector` are
+    // draft-review markers (provenance and an unresolved-selector flag), not
+    // op inputs, and the authored contracts reject unknown properties.
+    const { original_op: _originalOp, needs_selector: _needsSelector, ...opInput } = params;
+    const validation = validateOpInput('browser', op, opInput);
     if (!validation.valid) {
       const { errors } = validation as { valid: false; errors: string[] };
       throw new Error(
