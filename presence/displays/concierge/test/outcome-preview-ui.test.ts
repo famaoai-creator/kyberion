@@ -4,9 +4,12 @@ import {
   installFakeDom,
   fireEvent,
 } from '../../../../libs/shared-ui/vanilla/fake-dom.test-support.js';
-import type { ConciergeSummary } from '../src/lib/summary-event';
 import { storeFrontDeskToken } from '../src/lib/front-desk-auth-token';
 import { TENANT_CHANGED_EVENT } from '../src/lib/tenant-context';
+
+// Outcome-preview request ownership in the real `/inbox` page (MSN-SHELL-IA):
+// the decision queue moved from `/` to `/inbox`, which reads the unified
+// needs-you API. The preview invariants are unchanged.
 
 const watch = vi.hoisted(() => ({
   onSummary: (_event: MessageEvent) => {},
@@ -31,11 +34,29 @@ vi.mock('../src/lib/i18n', () => ({
   frontDeskText: (key: string) => key,
   conciergeText: (key: string) => key,
 }));
+// The inbox reads its filters from the URL (`?reason=&overdue=`).
+const nav = vi.hoisted(() => ({ query: '' }));
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(nav.query),
+  usePathname: () => '/inbox',
+}));
 vi.mock('../src/app/outcome-files', () => ({ OutcomeFiles: () => null }));
 vi.mock('../src/app/review-checkin', () => ({ ReviewCheckin: () => null }));
-import ConciergePage from '../src/app/front-desk-inbox';
+import InboxPage from '../src/app/inbox/page';
 
-const item = (entry_id: string) => ({
+interface OutcomeRecord {
+  entry_id: string;
+  title: string;
+  summary: string;
+  artifact_paths: string[];
+  status: string;
+  updated_at: string;
+}
+interface QueueState {
+  outcome_feed: OutcomeRecord[];
+  approval_tenants: string[];
+}
+const item = (entry_id: string): OutcomeRecord => ({
   entry_id,
   title: 'Outcome ' + entry_id,
   summary: 'Review',
@@ -43,17 +64,40 @@ const item = (entry_id: string) => ({
   status: 'unread',
   updated_at: '2026-10-10T00:00:00Z',
 });
-const summary = (): ConciergeSummary => ({
-  generated_at: '2026-10-10T00:00:00Z',
-  briefing: {
-    sentence_ja: 'Ready',
-    counts: { active_missions: 0, pending_approvals: 0, unread_outcomes: 2, exceptions: 0 },
-  },
-  intent_inbox: [],
-  approval_queue: [],
-  outcome_feed: [item('A'), item('B')],
-  exception_feed: [],
-});
+const summary = (): QueueState => ({ outcome_feed: [item('A'), item('B')], approval_tenants: [] });
+const needsYouItems = (state: QueueState) => [
+  ...state.approval_tenants.map((tenant) => ({
+    id: 'approval:inbox/' + tenant,
+    reason: 'approval',
+    title: { text: tenant },
+    requester: { label: { text: 'agent' }, agent: true },
+    tenant_slug: tenant,
+    waiting_since: '2026-10-10T00:00:00Z',
+    overdue: false,
+    actions: ['approve', 'reject', 'later'],
+    group_size: 1,
+    approval: {
+      id: tenant,
+      tenant_slug: tenant,
+      title: tenant,
+      channel: 'email',
+      storage_channel: 'inbox',
+      reason: 'Review',
+      requested_at: '2026-10-10T00:00:00Z',
+    },
+  })),
+  ...state.outcome_feed.map((outcome) => ({
+    id: 'review:' + outcome.entry_id,
+    reason: 'review',
+    title: { text: outcome.title },
+    requester: { label: { text: 'agent' }, agent: true },
+    waiting_since: outcome.updated_at,
+    overdue: false,
+    actions: ['approve', 'request_changes', 'reject', 'later', 'open'],
+    group_size: 1,
+    outcome,
+  })),
+];
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const preview = (id: string, text = 'content-' + id) =>
@@ -75,6 +119,7 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
+const PREVIEW_URL = /^\/api\/outcomes\/([^/]+)\/preview$/;
 let dom: ReturnType<typeof installFakeDom>;
 let client: typeof import('react-dom/client');
 let unmount: (() => void) | undefined;
@@ -103,6 +148,7 @@ beforeAll(async () => {
 beforeEach(() => {
   token = null;
   storageFails = false;
+  nav.query = '';
   vi.clearAllMocks();
 });
 afterEach(() => {
@@ -114,20 +160,40 @@ afterEach(() => {
 afterAll(() => dom.restore());
 const flush = () =>
   act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
   });
 function mount(strict = false, initial = summary()) {
   let summaryFailed = false;
+  let state = initial;
   const requests: Array<
     ReturnType<typeof deferred<Response>> & { id: string; signal?: AbortSignal | null }
   > = [];
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
-      if (url === '/api/summary')
-        return summaryFailed ? json({ ok: false }, 500) : json({ ok: true, summary: initial });
-      const match = /^\/api\/outcomes\/([^/]+)\/preview$/.exec(url);
+      if (url.startsWith('/api/v1/needs-you/summary'))
+        return summaryFailed
+          ? json({ ok: false }, 500)
+          : json({
+              ok: true,
+              total: needsYouItems(state).length,
+              overdue: 0,
+              byReason: {
+                approval: state.approval_tenants.length,
+                decision: 0,
+                review: state.outcome_feed.length,
+                knowledge: 0,
+                clarification: 0,
+                failure: 0,
+              },
+            });
+      if (url.startsWith('/api/v1/needs-you')) {
+        if (summaryFailed) return json({ ok: false }, 500);
+        const reason = new URLSearchParams(url.split('?')[1] ?? '').get('reason');
+        const items = needsYouItems(state).filter((entry) => !reason || entry.reason === reason);
+        return json({ ok: true, items, total: items.length });
+      }
+      const match = PREVIEW_URL.test(url) ? url.match(PREVIEW_URL) : null;
       if (match) {
         const pending = deferred<Response>();
         requests.push({ ...pending, id: decodeURIComponent(match[1]), signal: init?.signal });
@@ -144,13 +210,13 @@ function mount(strict = false, initial = summary()) {
     act(() =>
       root.render(
         strict
-          ? createElement(StrictMode, null, createElement(ConciergePage))
-          : createElement(ConciergePage)
+          ? createElement(StrictMode, null, createElement(InboxPage))
+          : createElement(InboxPage)
       )
     );
   render();
   unmount = () => act(() => root.unmount());
-  const card = (id: string) => container.querySelector('[id="decide-outcome-' + id + '"]');
+  const card = (id: string) => container.querySelector('[id="inbox-review:' + id + '"]');
   const control = (id: string, label?: string) => {
     const found = card(id)
       ?.querySelectorAll('button')
@@ -166,8 +232,12 @@ function mount(strict = false, initial = summary()) {
     act(() => {
       fireEvent(control(id, label), 'click');
     });
-  const update = (value: ConciergeSummary) =>
-    act(() => watch.onSummary({ data: JSON.stringify(value) } as MessageEvent));
+  // A summary event makes the page re-read the queue; deliver it and let the read land.
+  const update = async (value: QueueState) => {
+    state = value;
+    act(() => watch.onSummary({ data: '{}' } as MessageEvent));
+    await flush();
+  };
   const failSummary = async () => {
     summaryFailed = true;
     await act(() => watch.refresh(new AbortController().signal));
@@ -175,12 +245,11 @@ function mount(strict = false, initial = summary()) {
   const recoverSummary = () => {
     summaryFailed = false;
   };
-  const tab = (id: string) =>
-    act(() => {
-      const button = container.querySelector('[data-tab-id="' + id + '"]');
-      if (!button) throw Error('Missing tab ' + id);
-      fireEvent(button, 'click');
-    });
+  // Filters live in the URL: change the query and re-render.
+  const filter = (query: string) => {
+    nav.query = query;
+    render();
+  };
   return {
     container,
     requests,
@@ -191,7 +260,7 @@ function mount(strict = false, initial = summary()) {
     render,
     failSummary,
     recoverSummary,
-    tab,
+    filter,
   };
 }
 
@@ -239,10 +308,7 @@ describe('outcome preview request ownership in the real page', () => {
     const response = preview('A');
     Object.defineProperty(response, 'json', { configurable: true, value: () => body.promise });
     m.requests[0].resolve(response);
-    await flush();
-    expect(m.control('A').getAttribute('disabled')).toBeNull();
     m.click('A');
-    expect(m.control('A').textContent).toBe('action_open');
     m.click('A');
     expect(m.requests).toHaveLength(2);
     body.resolve({
@@ -251,14 +317,14 @@ describe('outcome preview request ownership in the real page', () => {
         entry_id: 'A',
         total: 1,
         shown: 1,
-        files: [{ name: 'old', kind: 'text', content: 'old-body' }],
+        files: [{ name: 'A.txt', kind: 'text', content: 'old-body' }],
       },
     });
     await flush();
     expect(m.container.textContent).not.toContain('old-body');
-    m.requests[1].resolve(preview('A', 'new-body'));
+    m.requests[1].resolve(preview('A', 'fresh-body'));
     await flush();
-    expect(m.container.textContent).toContain('new-body');
+    expect(m.container.textContent).toContain('fresh-body');
   });
   it('handles two clicks before a React commit as open then close', async () => {
     const m = mount();
@@ -309,22 +375,20 @@ describe('outcome preview request ownership in the real page', () => {
       if (change === 'artifacts') next.outcome_feed[0].artifact_paths = ['replacement.txt'];
       if (change === 'removal') next.outcome_feed.shift();
       if (change === 'defer') m.click('A', 'decide_later');
-      else m.update(next);
+      else await m.update(next);
       expect(m.requests[0].signal?.aborted).toBe(true);
       m.requests[0].resolve(preview('A'));
       await flush();
       expect(m.container.textContent).not.toContain('content-A');
     }
   );
-  it('preserves a preview across equivalent summary snapshots', async () => {
+  it('preserves a preview across equivalent queue snapshots', async () => {
     const m = mount();
     await flush();
     m.click('A');
     m.requests[0].resolve(preview('A'));
     await flush();
-    const next = summary();
-    next.generated_at = '2026-10-10T01:00:00Z';
-    m.update(next);
+    await m.update(summary());
     expect(m.container.textContent).toContain('content-A');
     expect(m.requests).toHaveLength(1);
   });
@@ -376,15 +440,6 @@ describe('outcome preview request ownership in the real page', () => {
   });
 });
 
-const approval = (tenant_slug: string): ConciergeSummary['approval_queue'][number] => ({
-  id: tenant_slug,
-  tenant_slug,
-  title: tenant_slug,
-  channel: 'email',
-  storage_channel: 'inbox',
-  reason: 'Review',
-  requested_at: '2026-10-10T00:00:00Z',
-});
 it('clears completed content immediately when selecting another preview', async () => {
   const m = mount();
   await flush();
@@ -395,49 +450,34 @@ it('clears completed content immediately when selecting another preview', async 
   expect(m.container.textContent).not.toContain('content-A');
   expect(m.card('B')?.querySelector('[aria-busy="true"]')).toBeTruthy();
 });
-it.each(['kind', 'tenant'])(
-  'clears a pending preview when the %s filter changes',
-  async (filter) => {
-    const initial = summary();
-    initial.approval_queue = [approval('alpha'), approval('beta')];
-    const m = mount(false, initial);
-    await flush();
-    m.click('A');
-    m.tab(filter === 'kind' ? 'approval' : 'alpha');
-    expect(m.requests[0].signal?.aborted).toBe(true);
-    m.requests[0].resolve(preview('A'));
-    await flush();
-    expect(m.container.textContent).not.toContain('content-A');
-    m.tab('all');
-    expect(m.container.textContent).not.toContain('content-A');
-  }
-);
-it('invalidates a preview when a refreshed queue changes the effective tenant filter', async () => {
+it('clears a pending preview when the reason filter changes', async () => {
   const initial = summary();
-  initial.approval_queue = [approval('alpha')];
+  initial.approval_tenants = ['alpha'];
   const m = mount(false, initial);
   await flush();
-  act(() => fireEvent(dom.windowEvents, TENANT_CHANGED_EVENT, { detail: { tenant: 'alpha' } }));
   m.click('A');
-  const next = summary();
-  next.approval_queue = [approval('alpha'), approval('beta')];
-  m.update(next);
-  expect(m.card('A')).toBeNull();
+  m.filter('reason=approval');
+  await flush();
   expect(m.requests[0].signal?.aborted).toBe(true);
   m.requests[0].resolve(preview('A'));
   await flush();
   expect(m.container.textContent).not.toContain('content-A');
+  m.filter('');
+  await flush();
+  expect(m.container.textContent).not.toContain('content-A');
 });
-it('drops a preview when a failed summary hides the queue, including after recovery', async () => {
+it('drops a preview when a failed read hides the queue, including after recovery', async () => {
   const m = mount();
   await flush();
   m.click('A');
   await m.failSummary();
-  expect(m.container.textContent).toContain('home.load_unavailable');
+  expect(m.container.textContent).toContain('ia_inbox_load_error');
+  expect(m.card('A')).toBeNull();
   expect(m.requests[0].signal?.aborted).toBe(true);
   m.requests[0].resolve(preview('A'));
   await flush();
-  m.update(summary());
+  m.recoverSummary();
+  await m.update(summary());
   expect(m.container.textContent).not.toContain('content-A');
   expect(m.control('A').textContent).toBe('action_open');
 });
@@ -455,9 +495,9 @@ it('recovers the decision queue through a read-only retry without stale preview 
   await flush();
   expect(m.card('A')).not.toBeNull();
   expect(m.control('A').textContent).toBe('action_open');
-  expect(m.container.textContent).not.toContain('home.load_unavailable');
+  expect(m.container.textContent).not.toContain('ia_inbox_load_error');
 });
-it('offers an explicit ask action when no decision is waiting', async () => {
+it('offers an explicit ask action when nothing is waiting', async () => {
   const empty = summary();
   empty.outcome_feed = [];
   const m = mount(false, empty);

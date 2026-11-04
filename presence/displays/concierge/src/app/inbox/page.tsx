@@ -18,6 +18,7 @@ import { renderDisplayText } from '../../lib/decision-brief-view';
 import { formatApprovalFailure } from '../../lib/approval-failure';
 import { useOutcomePreview } from '../../lib/use-outcome-preview';
 import { startSummaryWatch } from '../../lib/summary-watch';
+import { InboxCheckin, ResponseStatusPanel } from './inbox-advisories';
 import {
   INBOX_REASONS,
   fetchNeedsYouPage,
@@ -122,7 +123,12 @@ function InboxView() {
         setNextCursor(page.nextCursor);
         setLoadError(false);
       } catch {
-        if (!signal?.aborted) setLoadError(true);
+        // A failed read hides the queue (no acting on a stale list) and shows
+        // the read-only retry; the open preview is dropped with it.
+        if (!signal?.aborted) {
+          setLoadError(true);
+          setItems(null);
+        }
       }
     },
     [filterKey]
@@ -197,13 +203,15 @@ function InboxView() {
       setNotice({ text: message });
       await refresh();
     } catch (error) {
+      // Never show a raw error: approvals format the governed failure, the
+      // other kinds map their helper's failure to a localized sentence.
       setNotice({
         text:
           decision.kind === 'approval'
             ? formatApprovalFailure(error, locale)
-            : error instanceof Error
-              ? error.message
-              : String(error),
+            : error instanceof Error && error.message === 'note_required'
+              ? c('ia_inbox_error_note_required')
+              : c(`ia_inbox_error_${decision.kind}`),
         error: true,
       });
     } finally {
@@ -396,6 +404,9 @@ function InboxView() {
           </ul>
         </Disclosure>
       ) : null}
+
+      <InboxCheckin />
+      <ResponseStatusPanel />
     </div>
   );
 }

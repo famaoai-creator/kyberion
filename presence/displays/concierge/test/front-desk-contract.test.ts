@@ -72,54 +72,45 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     expect(me).not.toContain('tenantSlugs: ');
   });
 
-  it('FD-04: `/` renders the 決める queue from front_desk decide_* vocabulary, defers client-side only, and never blocks on window dialogs', () => {
-    const page = read('src/app/front-desk-inbox.tsx');
+  it('FD-04: `/inbox` renders the one queue from front_desk decide_* vocabulary, defers client-side only, and never blocks on window dialogs', () => {
+    // MSN-SHELL-IA: the queue moved from `/` to `/inbox` (page + card).
+    const page = [read('src/app/inbox/page.tsx'), read('src/app/inbox/needs-you-card.tsx')].join(
+      '\n'
+    );
     const decideView = read('src/lib/decide-view.ts');
 
-    // Header row: h1 = nav_decide, lead paragraph = decide_lead, filter chips
-    // built from decide_filter_all + presentKinds (plan §2.1/FD-04).
-    expect(page).toContain("frontDeskText('nav_decide', locale)");
-    expect(page).toContain("frontDeskText('decide_lead', locale)");
-    expect(page).toContain("frontDeskText('decide_filter_all', locale)");
-    expect(page).toContain('presentKinds(countsByKind)');
-    expect(page).toContain('groupDecideQueue(');
+    // Header: the needs-you title and lead; filter chips are the reasons
+    // the unified summary reports (one count definition).
+    expect(page).toContain("c('ia_inbox_title')");
+    expect(page).toContain("c('ia_inbox_lead')");
+    expect(page).toContain("c('ia_inbox_filter_all')");
     expect(page).toContain('deriveCardFields(');
 
-    // Per-kind action labels are the front_desk:decide_* keys via
-    // frontDeskText, not hardcoded strings or the old home.* pane labels.
-    expect(page).toContain("frontDeskText('decide_approve', locale)");
-    expect(page).toContain("frontDeskText('decide_reject', locale)");
-    expect(page).toContain("frontDeskText('decide_continue', locale)");
-    expect(page).toContain("frontDeskText('decide_stop', locale)");
-    expect(page).toContain("frontDeskText('decide_remember', locale)");
-    expect(page).toContain("frontDeskText('decide_forget', locale)");
-    expect(page).toContain("frontDeskText('decide_receive', locale)");
-    expect(page).toContain("frontDeskText('decide_return', locale)");
-    expect(page).toContain("frontDeskText('decide_later', locale)");
-    expect(page).toContain("frontDeskText('decide_empty', locale)");
+    // Per-kind action labels are the front_desk:decide_* keys, not hardcoded
+    // strings or the old home.* pane labels.
+    for (const key of [
+      'decide_approve',
+      'decide_reject',
+      'decide_continue',
+      'decide_stop',
+      'decide_remember',
+      'decide_forget',
+      'decide_receive',
+      'decide_return',
+      'decide_later',
+    ])
+      expect(page).toContain(`f('${key}')`);
     expect(page).toContain("frontDeskText('decide_deferred', locale");
     expect(page).toContain("frontDeskText('decide_undefer', locale)");
-    expect(page).toContain("frontDeskText('decide_by', locale");
 
-    // decide_by ("決める人") comes from the shared identity contract, not a
-    // hardcoded name — same shape as front-desk-rail.tsx's /api/me fetch.
-    expect(page).toContain('fetch(`/api/me');
-    expect(page).toContain('fetch(`/api/front-desk/nav');
-    expect(page).toContain('role_labels');
-
-    // decide_later is client-side only: the handlers that move an id into
-    // `deferredIds` never call fetch(), and the deferred section persists to
-    // localStorage rather than the server.
-    const deferItemBody = page.slice(
-      page.indexOf('const deferItem = React.useCallback'),
-      page.indexOf('const undeferItem = React.useCallback')
+    // あとで (set aside) is client-side only: the handler never calls fetch(),
+    // and the set-aside list persists to localStorage rather than the server.
+    const setAsideBody = page.slice(
+      page.indexOf('const setAside = (item: NeedsYouItem'),
+      page.indexOf('const decide = async')
     );
-    const undeferItemBody = page.slice(
-      page.indexOf('const undeferItem = React.useCallback'),
-      page.indexOf('const [kindFilter,')
-    );
-    expect(deferItemBody).not.toContain('fetch(');
-    expect(undeferItemBody).not.toContain('fetch(');
+    expect(setAsideBody).toContain('storeDeferred(next)');
+    expect(setAsideBody).not.toContain('fetch(');
     expect(page).toContain('front-desk.deferred');
     expect(page).not.toContain('window.prompt');
     expect(page).not.toContain('window.confirm');
