@@ -287,3 +287,27 @@ describe('publication preview binding', () => {
     expect(computeApprovalPayloadHash(effect)).toMatch(/^[0-9a-f]{64}$/u);
   });
 });
+
+describe('default action parsing', () => {
+  const subject = (summary: string) =>
+    prCreate({ title: 'Approval required: x', summary, details: summary });
+
+  it('reads the default action on the next line or the same line', () => {
+    for (const summary of [
+      'Default action:\n- draft_only; nothing sent',
+      'Default action: - draft-only',
+    ]) {
+      const brief = buildDecisionBrief(subject(summary));
+      expect(brief.recommendation).toEqual({
+        key: 'ux_a_default_action',
+        params: { action: 'draft-only' },
+      });
+    }
+  });
+
+  it('stays linear on long whitespace runs (CodeQL js/polynomial-redos)', () => {
+    const started = Date.now();
+    buildDecisionBrief(subject(`Default action:${'\t'.repeat(50_000)}x`));
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+});
