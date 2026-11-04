@@ -25,7 +25,8 @@
  *   remaining scenarios are `not_run` rather than failures; reset_continue is
  *   also `not_run` unless follow_up showed continuity to lose.
  * - A failing or unreported scenario is retried once; the first attempt's
- *   outcome is kept in `first_try`, so a flaky pass stays visible.
+ *   outcome is kept in `first_try`, so a flaky pass stays visible. An abort
+ *   that ignored the signal is never retried: that delegation is still running.
  * - abort is judged on the provider's own promise after the AbortSignal, not
  *   on the delegation handle's state (see scenarioAbort).
  * - `served_model` is what the caller can prove the provider served; absent
@@ -178,8 +179,14 @@ interface ScenarioContext {
 const RECALL_PROMPT =
   'What exact word did I ask you to reply with in my very first message of this conversation? Reply with just that word.';
 
+/** Opening of RECALL_PROMPT: an answer carrying it copied the prompt. */
+const RECALL_PROMPT_HEAD = 'What exact word did I ask you';
+
 /** How much text besides the word an answer may carry and still count as "the word". */
 const WORD_ANSWER_SLACK_CHARS = 40;
+
+/** Looser cap for the recall answer, whose prompt cannot leak the word. */
+const RECALL_ANSWER_SLACK_CHARS = 240;
 
 /**
  * Prompt-echo markers. An answer that repeats the instruction has not been
@@ -270,9 +277,13 @@ async function scenarioFollowUp(ctx: ScenarioContext): Promise<Attempt> {
   }
   const recall = await askForWord(ctx, RECALL_PROMPT);
   if (!('answer' in recall)) return recall;
-  const recalled = judgeWordAnswer(recall.answer, m1);
-  if (recalled === 'echo') return echoAttempt(recall.answer);
-  const ok = recalled === 'word';
+  // The recall prompt does not contain M1, so an echo of it cannot produce the
+  // word: a verbose but correct recall ("you asked for M1-…") is a pass. The
+  // strict judgeWordAnswer stays on the "Reply with exactly" turns, whose
+  // prompt does carry the word.
+  const ok =
+    recall.answer.includes(m1) &&
+    recall.answer.trim().length <= m1.length + RECALL_ANSWER_SLACK_CHARS;
   return {
     outcome: ok ? 'pass' : 'fail',
     detail: ok
@@ -312,8 +323,10 @@ async function scenarioResetContinue(ctx: ScenarioContext): Promise<Attempt> {
   }
   const recall = await askForWord(ctx, RECALL_PROMPT);
   if (!('answer' in recall)) return { ...recall, continuity_after_reset: 'unreported' };
-  if (PROMPT_ECHO_PATTERN.test(recall.answer)) {
-    // An echo proves nothing about what the session still holds.
+  if (recall.answer.includes(RECALL_PROMPT_HEAD)) {
+    // A copy of the recall prompt proves nothing about what the session still
+    // holds. (A verbose answer that merely mentions "your first message" is
+    // still an answer.)
     return {
       outcome: 'unreported',
       detail: 'the post-reset recall answer repeats the prompt, so retention cannot be judged',
@@ -546,7 +559,10 @@ async function runAttempt(name: LiveScenarioName, ctx: ScenarioContext): Promise
 }
 
 /** A judged failure or an undetermined outcome earns one more attempt. */
-function retryable(outcome: LiveScenarioOutcome): boolean {
+function retryable(name: LiveScenarioName, outcome: LiveScenarioOutcome): boolean {
+  // An abort `fail` means the provider ignored the signal and is still running;
+  // a retry would start a second delegation nothing can stop.
+  if (name === 'abort' && outcome === 'fail') return false;
   return outcome === 'fail' || outcome === 'unreported';
 }
 
@@ -559,7 +575,7 @@ async function runScenario(
   let attempt = await runAttempt(name, ctx);
   let attempts = 1;
   let firstTry: LiveScenarioOutcome | undefined;
-  while (retryable(attempt.outcome) && attempts <= retries) {
+  while (retryable(name, attempt.outcome) && attempts <= retries) {
     firstTry ??= attempt.outcome;
     attempt = await runAttempt(name, ctx);
     attempts += 1;

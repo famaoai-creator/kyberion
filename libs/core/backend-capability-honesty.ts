@@ -119,6 +119,16 @@ export interface BackendCapabilityHonestyOptions {
   liveScenarioRecords?: readonly BackendLiveScenarioRecord[];
 }
 
+/**
+ * Model identity a live run is attributed to (the latest-wins grouping key).
+ *
+ * Follow-up: a run with no requested model groups as 'default', separately
+ * from runs that named the same model explicitly, so an old failing
+ * 'default' run is not superseded by a newer passing run that named the
+ * provider's default model (and vice versa). Resolving 'default' to the
+ * provider's concrete default model needs a served-model source no backend
+ * exposes yet.
+ */
 function liveRecordModel(record: BackendLiveScenarioRecord): string {
   return record.served_model && record.served_model !== 'unreported'
     ? record.served_model
