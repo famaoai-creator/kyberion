@@ -4,8 +4,9 @@
  * Once a delegation's execution has started on a backend, side effects may
  * exist (files edited, commands run). Such a delegation is never retried in
  * place nor re-run on another failover candidate; its failure is reported
- * with `allowFailover: false`. Failures that provably happened before start
- * (auth, missing binary, unsupported capability, …) may still fail over.
+ * with `allowFailover: false`. Only failures with a structural pre-start
+ * proof (an explicit `executionStarted: false` marker, a spawn ENOENT) may
+ * still fail over — never a verdict inferred from the message text.
  *
  * Kept out of reasoning-backend.ts so the failover chain only calls into it.
  */
@@ -137,7 +138,9 @@ export function runGuarded<O extends DelegationGuardOptions>(
           Object.assign(error, { failureClass: started.failureClass });
         }
       } else if (keyed || executed) {
-        // With a key, any failure the guard did not mark is provably pre-start.
+        // With a key, the guard converts every attempt failure lacking a
+        // structural pre-start proof, so an unmarked aggregate means nothing
+        // was dispatched (or every attempt failed to spawn).
         markErrorExecutionStarted(
           error,
           executed || delegationExecutionStartedFromError(error) === true
