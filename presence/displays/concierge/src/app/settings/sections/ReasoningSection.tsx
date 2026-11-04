@@ -111,6 +111,13 @@ export function ReasoningSection({ locale }: { locale: ConciergeLocale }) {
               effect={text('ia_settings_card_reasoning_effect')}
             />
           </div>
+          {!snapshot && !message ? (
+            <div className="settings-row-block">
+              <p className="kb-text kb-text--muted" role="status">
+                {text('ia_settings_reasoning_loading')}
+              </p>
+            </div>
+          ) : null}
           {snapshot && selectable.length === 0 ? (
             <div className="settings-row-block">
               <p className="kb-text kb-text--muted">{text('ia_settings_reasoning_none_ready')}</p>
