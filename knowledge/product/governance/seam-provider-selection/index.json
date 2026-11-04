@@ -24,6 +24,7 @@
     "lease-backend",
     "event-bus",
     "vcs-backend",
+    "vcs-host",
     "trace-exporter",
     "judgment-backend",
     "screen.capture-backend",

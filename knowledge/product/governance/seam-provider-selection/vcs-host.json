@@ -1,0 +1,85 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "vcs-host",
+      "default_provider": "gh-cli",
+      "fallback_purpose": "publish",
+      "traits": {
+        "fidelity": "Results identical to the established GitHub CLI behaviour the governed publication flow was reviewed against.",
+        "zero_config": "Works with no operator opt-in or extra configuration.",
+        "headless": "Runs without a host binary or interactive login (containers, remote workers)."
+      },
+      "providers": {
+        "gh-cli": {
+          "traits": {
+            "fidelity": 1,
+            "zero_config": 1,
+            "headless": 0
+          },
+          "trait_basis": {
+            "fidelity": "declared",
+            "zero_config": "declared",
+            "headless": "declared"
+          },
+          "evidence": [
+            "libs/core/vcs/gh-cli-host-provider.ts (fixed gh argv mirroring the sync github.ts verbs, including --match-head-commit on merge; available when `gh --version` succeeds)"
+          ]
+        },
+        "github-rest": {
+          "traits": {
+            "fidelity": 0.9,
+            "zero_config": 0,
+            "headless": 1
+          },
+          "trait_basis": {
+            "fidelity": "declared",
+            "zero_config": "declared",
+            "headless": "declared"
+          },
+          "evidence": [
+            "libs/core/vcs/github-rest-host-provider.ts (GitHub REST/GraphQL via governed secureFetch; available only when GH_TOKEN/GITHUB_TOKEN is registered; merge sends the approved head as `sha`)",
+            "libs/core/vcs/vcs-host.test.ts (shared contract suite: gh-cli and github-rest normalize the same forge fixture identically)"
+          ]
+        },
+        "memory": {
+          "traits": {
+            "fidelity": 0,
+            "zero_config": 1,
+            "headless": 1
+          },
+          "trait_basis": {
+            "fidelity": "declared",
+            "zero_config": "declared",
+            "headless": "declared"
+          },
+          "evidence": [
+            "libs/core/vcs/memory-vcs-host-provider.ts (in-process forge for hermetic tests; never registered by default and never in the default chain)"
+          ]
+        }
+      },
+      "purposes": {
+        "publish": {
+          "description": "Create, inspect and merge pull requests for the active checkout under governed approval.",
+          "weights": {
+            "fidelity": 0.6,
+            "zero_config": 0.3,
+            "headless": 0.1
+          }
+        },
+        "headless_publish": {
+          "description": "The same operations from a runtime without the gh binary (container or remote worker).",
+          "weights": {
+            "fidelity": 0.2,
+            "zero_config": 0.1,
+            "headless": 0.7
+          }
+        }
+      },
+      "default_chains": {
+        "default": ["gh-cli", "github-rest"]
+      }
+    }
+  ]
+}
