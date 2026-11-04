@@ -103,6 +103,9 @@ import {
   parseMissionApprovalResponse,
   parseMissionProposalResponse,
 } from '../../lib/ops/agent-mutation-response';
+/** The flagged legacy grid (`NEXT_PUBLIC_CHRONOS_LEGACY_WORKSPACE=1`) is the only reader of the moved sections' data. */
+const OPS_LEGACY_WORKSPACE = process.env.NEXT_PUBLIC_CHRONOS_LEGACY_WORKSPACE === '1';
+
 export default function ChronosMirrorV2() {
   return (
     <Suspense fallback={null}>
@@ -253,6 +256,8 @@ function ChronosMirrorV2Content() {
   }, [locale]);
 
   useEffect(() => {
+    // MSN-SHELL-IA: only the legacy grid still shows this; /ops sections don't.
+    if (!OPS_LEGACY_WORKSPACE) return undefined;
     let cancelled = false;
     void fetch(
       opsApiPath(
@@ -286,6 +291,8 @@ function ChronosMirrorV2Content() {
   }, [deliverablesQuery, deliverablesRefreshTick, tenant, organizationId, projectId]);
 
   useEffect(() => {
+    // MSN-SHELL-IA: only the legacy grid still shows this; /ops sections don't.
+    if (!OPS_LEGACY_WORKSPACE) return undefined;
     let cancelled = false;
     const params = new URLSearchParams();
     params.set('limit', '24');
@@ -383,6 +390,8 @@ function ChronosMirrorV2Content() {
   }, [tenant]);
 
   useEffect(() => {
+    // MSN-SHELL-IA: only the legacy grid still shows this; /ops sections don't.
+    if (!OPS_LEGACY_WORKSPACE) return undefined;
     let cancelled = false;
     void fetch(
       opsApiPath(
@@ -1005,7 +1014,7 @@ function ChronosMirrorV2Content() {
   const webLayout = webDesignSystem.layout;
   // Keep the former sidebar + embedded pane available for an explicit rollback
   // while the simplified screen model is the only default operator path.
-  const legacyWorkspaceEnabled = process.env.NEXT_PUBLIC_CHRONOS_LEGACY_WORKSPACE === '1';
+  const legacyWorkspaceEnabled = OPS_LEGACY_WORKSPACE;
   const isLightTheme = themeMode === 'light';
   const shellTextClass = isLightTheme ? 'text-[var(--kb-text-primary)]' : 'kb-text-primary';
   const shellMutedClass = isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'kb-text-muted';
