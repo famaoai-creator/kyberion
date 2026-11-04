@@ -245,7 +245,8 @@ function approvalBrief(
   }
 }
 
-function toApprovalItem(
+/** One pending approval as the approval queue shows it (brief, digest, assurance). */
+export function toCeoApprovalItem(
   approval: OperatorHomeSummary['pendingApprovals'][number],
   sources: CeoApprovalBriefSources = {}
 ): CeoApprovalItem {
@@ -301,7 +302,7 @@ export function composeCeoSurfaceSummary(input: {
   const { home } = input;
   const intentInbox = home.activeMissions.map(toIntentItem);
   const approvalQueue = home.pendingApprovals.map((approval) =>
-    toApprovalItem(approval, input.approvalBriefSources)
+    toCeoApprovalItem(approval, input.approvalBriefSources)
   );
   const outcomeFeed: CeoOutcomeItem[] = home.inboxEntries.map((entry) => ({
     entry_id: entry.entry_id,

@@ -386,7 +386,7 @@ export function ApprovalsWorkspace({
             </Disclosure>
           ) : null}
           {/* Read-only detail: the decision lives in あなた待ち (IA contract §2). */}
-          <NeedsYouLink reason="approval" locale={locale === 'ja' ? 'ja' : 'en'} />
+          <NeedsYouLink reason="approval" locale={locale} />
         </Section>
       ) : (
         <Section>

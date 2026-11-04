@@ -12,7 +12,15 @@
  */
 
 import { withExecutionContext } from '../authority.js';
-import { buildCeoSurfaceSummary } from '../ceo-surface-summary.js';
+import {
+  notificationMatchesScope,
+  toCeoApprovalItem,
+  type CeoApprovalItem,
+} from '../ceo-surface-summary.js';
+import { listInboxEntries } from '../deliverable-inbox.js';
+import { listApprovalRequests } from '../governance/approval-store.js';
+import { readApprovalPublicationPreview } from './approval-publication-preview.js';
+import { listSurfaceNotificationsAcrossChannels } from './surface-ux.js';
 import {
   listMemoryPromotionCandidates,
   memoryPromotionCandidateKey,
@@ -23,7 +31,9 @@ import { loadState } from '../mission/mission-state.js';
 import { createLogger } from '../logger.js';
 import type {
   NeedsYouClarificationInput,
+  NeedsYouFailureInput,
   NeedsYouKnowledgeInput,
+  NeedsYouOutcomeInput,
   NeedsYouSourceData,
 } from './needs-you.js';
 import type { SurfaceAuthorizationContext } from './surface-authorization.js';
@@ -132,28 +142,79 @@ function guarded<T>(label: string, read: () => T[]): T[] {
   }
 }
 
-/** Default reader: approval store, deliverable inbox, memory queue, hygiene report, notifications. */
-export function readNeedsYouSources(viewer: SurfaceAuthorizationContext): NeedsYouSourceData {
+function approvalsFor(viewer: SurfaceAuthorizationContext): CeoApprovalItem[] {
+  const tiers = tiersOf(viewer);
+  return listApprovalRequests({ status: 'pending' })
+    .filter((record) => {
+      const tier = record.scope?.tier as Tier | undefined;
+      const tenant = record.scope?.tenant_slug;
+      // Personal approvals need an owner-authenticated reader (the shell's).
+      if (!tier || !tiers.includes(tier)) return false;
+      return tenant ? tenantAllowed(viewer, tenant) : tier === 'public';
+    })
+    .map((record) =>
+      toCeoApprovalItem(record, { publicationPreview: readApprovalPublicationPreview })
+    );
+}
+
+function outcomesFor(viewer: SurfaceAuthorizationContext): NeedsYouOutcomeInput[] {
+  return listInboxEntries({ status: ['unread', 'read'], limit: NEEDS_YOU_READ_LIMIT })
+    .filter((entry) => Boolean(entry.tenant_slug) && tenantAllowed(viewer, entry.tenant_slug))
+    .map((entry) => ({
+      entry_id: entry.entry_id,
+      title: entry.title,
+      summary: entry.summary,
+      artifact_paths: entry.artifact_paths,
+      ...(entry.mission_id ? { mission_id: entry.mission_id } : {}),
+      status: entry.status,
+      updated_at: entry.updated_at,
+      ...(entry.kind ? { kind: entry.kind } : {}),
+      ...(entry.tenant_slug ? { tenant_slug: entry.tenant_slug } : {}),
+    }));
+}
+
+const FAILURE_STATUSES = new Set(['attention', 'blocked', 'failed', 'error']);
+
+function failuresFor(viewer: SurfaceAuthorizationContext): NeedsYouFailureInput[] {
   const tenantSlugs = viewer.tenantSlugs === 'all' ? 'all' : [...viewer.tenantSlugs];
-  const summary = withExecutionContext(
-    'sovereign_concierge',
-    () =>
-      buildCeoSurfaceSummary({
-        scope: {
-          tiers: tiersOf(viewer),
-          tenantSlugs,
-          organizationIds: viewer.organizationIds === 'all' ? 'all' : [...viewer.organizationIds],
-          projectIds: viewer.projectIds === 'all' ? 'all' : [...viewer.projectIds],
-        },
-        limit: NEEDS_YOU_READ_LIMIT,
-      }),
-    undefined,
-    Array.isArray(tenantSlugs) && tenantSlugs.length === 1 ? tenantSlugs[0] : undefined
-  );
+  return listSurfaceNotificationsAcrossChannels()
+    .filter((notification) => FAILURE_STATUSES.has(String(notification.status || '').toLowerCase()))
+    .filter((notification) =>
+      notificationMatchesScope(notification, { tiers: tiersOf(viewer), tenantSlugs })
+    )
+    .map((notification, index) => {
+      const tenant = String(
+        (notification.scope as Record<string, unknown> | undefined)?.tenant_slug ||
+          notification.tenant_slug ||
+          ''
+      );
+      return {
+        id: String(notification.request_id || notification.id || `exception-${index + 1}`),
+        title: String(notification.title || ''),
+        text: String(notification.text || ''),
+        surface: String(notification.surface || 'presence'),
+        created_at: String(notification.created_at || ''),
+        ...(tenant ? { tenant_slug: tenant } : {}),
+      };
+    });
+}
+
+/**
+ * Default reader: approval store, deliverable inbox, memory queue, hygiene
+ * report, notifications — each read directly, never through the operator
+ * home summary (which also reads the NHI ledger, a grant MCP does not hold).
+ */
+export function readNeedsYouSources(viewer: SurfaceAuthorizationContext): NeedsYouSourceData {
   return {
-    approvals: summary.approval_queue,
-    outcomes: summary.outcome_feed,
-    failures: summary.exception_feed,
+    approvals: guarded('approval store', () =>
+      withExecutionContext('sovereign_concierge', () => approvalsFor(viewer))
+    ),
+    outcomes: guarded('deliverable inbox', () =>
+      withExecutionContext('sovereign_concierge', () => outcomesFor(viewer))
+    ),
+    failures: guarded('notifications', () =>
+      withExecutionContext('sovereign_concierge', () => failuresFor(viewer))
+    ),
     knowledge: guarded('memory queue', () => knowledgeFor(viewer)),
     clarifications: guarded('mission hygiene', () => clarificationsFor(viewer)),
   };

@@ -49,7 +49,7 @@ export function MissionIntelligenceApprovalsPanel({ context }: { context: Record
           )}
         >
           {/* Pending approvals are decided in あなた待ち only (IA contract §2). */}
-          <NeedsYouLink reason="approval" locale={locale === 'ja' ? 'ja' : 'en'} />
+          <NeedsYouLink reason="approval" locale={locale} />
         </Panel>
 
         <Panel
