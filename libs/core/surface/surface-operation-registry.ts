@@ -29,11 +29,18 @@ import {
   type WorkspaceGraph,
   type WorkspaceGraphSources,
 } from './workspace-graph.js';
+import {
+  buildSetupChecklist,
+  collectSetupChecklistSignals,
+  type SetupChecklistReaders,
+} from './setup-checklist.js';
 
 export interface SurfaceOperationContext {
   viewer: SurfaceAuthorizationContext;
   /** Test seam; production reads the governed stores. */
   sources?: WorkspaceGraphSources;
+  /** Test seam for `setup.checklist`; production reads the governed stores. */
+  setupReaders?: SetupChecklistReaders;
 }
 
 export interface SurfaceOperationDescriptor {
@@ -191,6 +198,16 @@ const operations = [
       items: listGraphNodes(viewerGraph(ctx), { q: input.q, limit: input.limit ?? 30 }),
     }),
   },
+  {
+    id: 'setup.checklist',
+    title: 'Setup checklist',
+    description:
+      'The first-run setup sequence (identity & tenant, reasoning backend, autonomy & approval policy, notification channel, first project, budget, trial mission) with progress and the settings card that completes each step.',
+    policy: readPolicy('setup.checklist'),
+    input: z.object({}).strict(),
+    run: (ctx: SurfaceOperationContext) =>
+      buildSetupChecklist(collectSetupChecklistSignals(viewerGraph(ctx), ctx.setupReaders)),
+  } satisfies SurfaceOperation<Record<string, never>>,
 ] as const;
 
 class OperationNotFound extends Error {}

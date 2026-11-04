@@ -189,6 +189,16 @@
       "band": "discover"
     },
     {
+      "name": "kyberion.setup.checklist",
+      "description": "First-run setup checklist progress in the caller scope: each step, whether it is done, and the settings card that completes it.",
+      "category": "workspace",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover"
+    },
+    {
       "name": "kyberion.capability.list",
       "description": "List available Kyberion actuator capabilities.",
       "category": "capability",
