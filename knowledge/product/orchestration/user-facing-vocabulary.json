@@ -20877,6 +20877,51 @@
         "en": "Pick an entry to read what was learned and where it came from.",
         "ja": "項目を選ぶと、学んだ内容とその出どころを読めます。",
         "qps-ploc": "⟦Ṗïƈķ ȧñ ėñŧřẏ ŧő řėȧḓ ẇħȧŧ ẇȧş ŀėȧřñėḓ ȧñḓ ẇħėřė ïŧ ƈȧɱė ƒřőɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ia_shell_work_plan_open": {
+        "en": "Plan a mission",
+        "ja": "ミッションを計画",
+        "qps-ploc": "⟦Ṗŀȧñ ȧ ɱïşşïőñ ŀőřė⟧"
+      },
+      "ia_shell_work_plan_close": {
+        "en": "Close planning",
+        "ja": "計画を閉じる",
+        "qps-ploc": "⟦Ƈŀőşė ṗŀȧññïñɠ ŀőřė⟧"
+      },
+      "ia_shell_plan_request_required": {
+        "en": "Write the request first.",
+        "ja": "依頼文を入力してください。",
+        "qps-ploc": "⟦Ẇřïŧė ŧħė řėɋůėşŧ ƒïřşŧ. ŀőřėɱ ï⟧"
+      },
+      "ia_shell_plan_preview_required": {
+        "en": "Check the plan first.",
+        "ja": "先に「計画を確認」を押して、計画を確認してください。",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ṗŀȧñ ƒïřşŧ. ŀőřėɱ ⟧"
+      },
+      "ia_shell_plan_preview_stale": {
+        "en": "You changed the inputs. Check the plan again before starting.",
+        "ja": "入力を変えたので、もう一度計画を確認してください。",
+        "qps-ploc": "⟦Ẏőů ƈħȧñɠėḓ ŧħė ïñṗůŧş. Ƈħėƈķ ŧħė ṗŀȧñ ȧɠȧïñ ƀėƒőřė şŧȧřŧïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "ia_shell_plan_failed": {
+        "en": "The plan could not be checked. Try again in a moment.",
+        "ja": "計画を確認できませんでした。少し待ってからもう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė ṗŀȧñ ƈőůŀḓ ñőŧ ƀė ƈħėƈķėḓ. Ŧřẏ ȧɠȧïñ ïñ ȧ ɱőɱėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ia_shell_plan_start_failed": {
+        "en": "The mission could not be started. Check the plan again and retry.",
+        "ja": "ミッションを開始できませんでした。計画を確認し直してからもう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė ɱïşşïőñ ƈőůŀḓ ñőŧ ƀė şŧȧřŧėḓ. Ƈħėƈķ ŧħė ṗŀȧñ ȧɠȧïñ ȧñḓ řėŧřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_shell_plan_started": {
+        "en": "The mission has started.",
+        "ja": "ミッションを開始しました。",
+        "qps-ploc": "⟦Ŧħė ɱïşşïőñ ħȧş şŧȧřŧėḓ. ŀőřėɱ ï⟧"
+      },
+      "ia_shell_plan_open_mission": {
+        "en": "Open the mission",
+        "ja": "ミッションを開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė ɱïşşïőñ ŀőřėɱ⟧"
       }
     },
     "onboarding": {
