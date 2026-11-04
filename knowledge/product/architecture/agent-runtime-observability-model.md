@@ -1,7 +1,7 @@
 ---
 title: 'Agent Runtime Observability Model'
 kind: evergreen
-last_updated: 2026-10-05
+last_updated: 2026-11-04
 ---
 
 # Agent Runtime Observability Model
@@ -37,10 +37,10 @@ always be visible in the trace and execution receipt when a native runtime
 is used.
 
 4. `surface / control API`
-   Exposes snapshots and recovery controls to Chronos Mirror v2 and other operator surfaces.
+   Exposes snapshots and recovery controls to the operations console (Concierge `/ops`) and other operator surfaces.
 
 5. `surface runtime controller`
-   Owns durable startup, PID tracking, and reconcile semantics for long-running gateways and control surfaces such as Slack Bridge, Chronos Mirror, Nexus Daemon, and Terminal Bridge.
+   Owns durable startup, PID tracking, and reconcile semantics for long-running gateways and control surfaces such as Slack Bridge, Concierge (which hosts the operations console), Nexus Daemon, and Terminal Bridge.
 
 ## Snapshot Contract
 
@@ -113,11 +113,13 @@ There are three refresh modes:
 
 ## Surface Integration
 
-Chronos Mirror v2 and future operator surfaces should consume:
+The operations console (Concierge `/ops`) and future operator surfaces should consume:
 
-- `GET /api/agents`
-- `POST /api/agents { action: "snapshot" }`
-- `POST /api/agents { action: "refresh" }`
-- `POST /api/agents { action: "restart" }`
+- `GET /api/ops/agents`
+- `POST /api/ops/agents { action: "snapshot" }`
+- `POST /api/ops/agents { action: "refresh" }`
+- `POST /api/ops/agents { action: "restart" }`
+
+(The legacy Chronos origin on port 3000 308-redirects `/api/agents` to these routes.)
 
 This keeps human control surfaces thin while the lifecycle layer remains the single authority.

@@ -9,6 +9,7 @@ applies_to:
   - imessage-bridge
   - discord-bridge
   - telegram-bridge
+  - concierge
   - chronos-mirror-v2
   - nexus-daemon
   - terminal-bridge
@@ -17,7 +18,7 @@ tags:
   - lifecycle
   - surface
   - gateway
-last_updated: 2026-10-05
+last_updated: 2026-11-04
 ---
 
 # Runtime Surface Lifecycle Model
@@ -34,7 +35,7 @@ This model defines how long-running human-facing surfaces and supporting bridges
 
 2. `ui`
    Interactive control surface or workspace application.
-   Examples: `chronos-mirror-v2`
+   Examples: `concierge` (hosts the operations console at `/ops`), `chronos-mirror-v2` (now only a compatibility redirect to Concierge `/ops`)
 
 3. `service`
    Supporting background bridge or daemon used by runtime routing.
@@ -58,7 +59,7 @@ This model defines how long-running human-facing surfaces and supporting bridges
   - `shutdownPolicy`
   - `startupMode`
 - `slack-bridge`, `imessage-bridge`, `discord-bridge`, `telegram-bridge`, and `nexus-daemon` are `background` services.
-- `chronos-mirror-v2` is a `workspace-app` and may require a prior build.
+- `concierge` and `chronos-mirror-v2` are `workspace-app` surfaces and may require a prior build. `chronos-mirror-v2` (port 3000) only redirects to Concierge `/ops` and `/api/ops/*`, so the operations console needs `concierge` running.
 
 ## Shutdown Rules
 

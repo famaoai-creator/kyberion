@@ -4,7 +4,7 @@ category: Standards
 tags: [standards, testing, best, practices, ace]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-10-05
+last_updated: 2026-11-04
 kind: evergreen
 ---
 
@@ -24,9 +24,9 @@ kind: evergreen
 - **Auto-Retry**: 一時的なエラーに対し、CI上での自動再試行（最大3回）を設定。
 - **Quarantine Logic**: 頻繁に落ちるテストは、修正されるまでメインパイプラインから「検疫」し、報告させる。
 
-## 3. エビデンスとしての活用 (Chronos Mirror 連携)
+## 3. エビデンスとしての活用 (運用画面連携)
 
-- テスト失敗時の「動画（Video）」と「トレース（Trace）」を自動で Chronos Mirror のミッションログに添付し、ACEでのデバッグ判断材料とする。
+- テスト失敗時の「動画（Video）」と「トレース（Trace）」を自動で運用画面 (Concierge `/ops`) のミッションログに添付し、ACEでのデバッグ判断材料とする。
 
 ---
 

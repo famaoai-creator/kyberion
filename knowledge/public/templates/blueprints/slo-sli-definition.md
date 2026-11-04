@@ -4,7 +4,7 @@ category: Templates
 tags: [templates, blueprints, slo, sli, definition]
 importance: 4
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-11-04
 ---
 
 # Blueprint: SLO/SLI Definition
@@ -32,4 +32,4 @@ last_updated: 2026-03-06
 ## 3. Monitoring & Alerting rules [L3]
 
 - 3.1 Critical Alert Triggers
-- 3.2 Dashboard Path (Chronos Mirror link)
+- 3.2 Dashboard Path (operations console link: Concierge `/ops`)

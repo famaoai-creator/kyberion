@@ -105,7 +105,9 @@ If the speaker is someone other than the operator, Kyberion should preserve that
 
 For a shared channel, declare it a `team` channel in `KYBERION_SURFACE_CHANNEL_MODES` (`tenant_slug`, `max_tier`, `approvers`). Kyberion then answers only when @mentioned or inside a thread it already joined, resolves each speaker to an organization member (`pnpm organization member link-identity <member-id> --slack <user-id>`), and lets only the channel's approvers decide approvals.
 
-### Chronos Mirror
+### Operations console (Concierge `/ops`, formerly Chronos Mirror)
+
+Open `http://127.0.0.1:3050/ops`. The old Chronos port 3000 only redirects here.
 
 Use when you want:
 
@@ -114,9 +116,9 @@ Use when you want:
 - intervention points
 - delivery inspection
 - project, track, gate, and mission-seed control
-- the Discussion Room (`/?section=discussion`): a facilitated multi-agent discussion, or a Dialogue Room goal card worked out with you, that ends in a decision brief and approval-gated WorkItems / mission start
+- the Discussion Room (`/ops?section=discussion`): a facilitated multi-agent discussion, or a Dialogue Room goal card worked out with you, that ends in a decision brief and approval-gated WorkItems / mission start
 
-Chronos is the control surface.
+The operations console is the control surface.
 It explains and intervenes, but it does not replace the durable control plane.
 
 ### Concierge (秘書室)
@@ -450,9 +452,9 @@ For distillation and other structured reasoning tasks, see:
 
 Those flows are policy-driven. The operator should not need to pick a specific CLI provider when `wisdom-policy.json` already defines the profile and adapter.
 
-## 5. Chronos Mental Model
+## 5. Operations Console Mental Model
 
-Chronos is easiest to understand as a control tower.
+The operations console (Concierge `/ops`, formerly Chronos) is easiest to understand as a control tower.
 
 It helps answer:
 
@@ -462,7 +464,7 @@ It helps answer:
 4. What needs approval or intervention?
 5. What artifact or result came out?
 
-Chronos is not a general chat app and not a raw process monitor.
+The operations console is not a general chat app and not a raw process monitor.
 
 ## 6. Presence Studio Mental Model
 
@@ -639,11 +641,12 @@ A dot never grants itself authority: it acts under an existing role and the
 autonomous-ops gate decides, per action, between run / notify / veto window /
 human decision. See [resident-dot-model](../knowledge/product/architecture/resident-dot-model.md).
 
-### Chronos
+### Operations console
 
 ```bash
 export KYBERION_LOCALHOST_AUTOADMIN=true
-pnpm chronos:dev
+pnpm surfaces reconcile        # starts Concierge (3050); open /ops
+# pnpm chronos:dev only starts the port-3000 redirect to Concierge /ops
 ```
 
 ### Capability discovery

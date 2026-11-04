@@ -3,7 +3,7 @@ title: Operator Surface Strategy (CLI + Governed Operator Web)
 category: Architecture
 tags: [ui, surface, operator, cli, web, strategy]
 importance: 8
-last_updated: 2026-10-12
+last_updated: 2026-11-04
 ---
 
 # Operator Surface Strategy
@@ -33,7 +33,7 @@ missions, spawn agents, execute reasoning, change credentials or grant authority
 | Primary   | `claude` / `codex` / `gemini` CLI + `pnpm pipeline` | Operators, agents     | Yes — primary entry                                       |
 | Primary   | `mission_controller` CLI                            | Operators             | Yes — mission lifecycle                                   |
 | Secondary | Operator Web                                        | Operators, leadership | Observation; scoped administrator selection settings only |
-| Secondary | `chronos-mirror-v2` (presence display)              | Stakeholders          | No — passive feed                                         |
+| Secondary | Operations console (Concierge `/ops`)               | Operators             | Scoped — behind Concierge viewer and mutation gates       |
 | Tertiary  | Mobile / WebView surfaces (handoff target)          | Operators in motion   | Limited — handoff-imported sessions                       |
 | Forbidden | Public-facing web admin UI                          | —                     | Never                                                     |
 
@@ -123,7 +123,8 @@ the surface explains the purpose, then shows the runnable command.
 
 | Existing                               | Role                                                                                          |
 | -------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `presence/displays/chronos-mirror-v2/` | Ambient status / wallboard (passive)                                                          |
+| `presence/displays/concierge/` `/ops`  | Operations console (missions, work items, deliverables, diagnostics, surface control)         |
+| `presence/displays/chronos-mirror-v2/` | Compatibility redirect only (port 3000 → Concierge `/ops`, `/api/ops/*`); serves no UI        |
 | `presence/displays/computer-surface/`  | Computer-use bridging (input/output to a remote GUI session) — **not** a Kyberion operator UI |
 | `presence/displays/presence-studio/`   | Authoring surface for presence content; not for mission control                               |
 
@@ -149,7 +150,7 @@ job is to make filesystem + audit-chain readable.
 When the MOS is finally built:
 
 - Stack: Next.js 15 + React 19 + Tailwind, mirroring
-  `chronos-mirror-v2`'s tooling.
+  Concierge's (`presence/displays/concierge`) tooling.
 - Data layer: a thin loader that reads filesystem with `secure-io`'s
   read APIs only; no `safeWriteFile` import in the app at all.
 - Audit-chain rendering: stream-parse `system-ledger.jsonl` server-side,
@@ -231,4 +232,4 @@ Will the deployment serve >5 stakeholder personas (CEO, compliance, ops,
 - [`kyberion-canonical-concept-index.md`](kyberion-canonical-concept-index.md)
 - [`kyberion-intent-catalog.md`](kyberion-intent-catalog.md)
 - [`multi-tenant-operations.md`](multi-tenant-operations.md)
-- [`../../../presence/displays/chronos-mirror-v2/`](../../../presence/displays/chronos-mirror-v2)
+- [`../../../presence/displays/concierge/src/app/ops/`](../../../presence/displays/concierge/src/app/ops) (operations console; `presence/displays/chronos-mirror-v2` only redirects here)

@@ -65,7 +65,7 @@ Most agent frameworks stop at "execute". Kyberion closes the loop:
 | **Mission**        | One unit of work with its own git repo, state and evidence; survives 24h+ runs.                                                                                                                                       |
 | **ADF / pipeline** | Declarative, schema-validated plan format (sub-pipelines, `on_error` recovery). Ready-made ones live in [`pipelines/`](./pipelines/README.md).                                                                        |
 | **Actuator**       | A governed capability module (browser, file, voice, code, …). Full list: [catalog](./CAPABILITIES_GUIDE.md).                                                                                                          |
-| **Surface**        | A human-facing entrance: Chronos, Concierge, Presence Studio, terminal HUD, chat bridges, capture pads.                                                                                                               |
+| **Surface**        | A human-facing entrance: Concierge (including the operations console at `/ops`), Presence Studio, terminal HUD, chat bridges, capture pads.                                                                           |
 | **Tier & tenant**  | `personal/` → `confidential/` → `public/` knowledge, scoped per tenant; nothing leaks downward.                                                                                                                       |
 | **Stance**         | `customer/{slug}/` overlay that swaps identity, connections and policy for the entity you act as — without forks. Not a tenant ([how they differ](./knowledge/product/architecture/stance-tenant-customer-model.md)). |
 
@@ -108,7 +108,7 @@ pnpm pipeline --input pipelines/verify-session.json
 | Voice first-win | macOS only (native TTS; not available in Docker) | ~5min        | `pnpm pipeline --input pipelines/voice-hello.json` | Run after the browser smoke                                             |
 | Docker          | Docker Desktop                                   | ~10min build | `docker compose --profile deploy up`               | Headless services only — voice/GUI actuators need the native macOS path |
 
-**Not sure where to go next?** `pnpm kyberion setup report --persona first-time-user` is the entry guide: it tells you whether to start with Chronos, the concierge, the voice path, or a messaging surface, and whether auth/setup is still blocking that route. If a browser, voice, or media actuator is missing a local dependency, check it with `pnpm deps:check --actuator browser` (or `voice`, `media-generation`).
+**Not sure where to go next?** `pnpm kyberion setup report --persona first-time-user` is the entry guide: it tells you whether to start with the concierge (or its operations console), the voice path, or a messaging surface, and whether auth/setup is still blocking that route. If a browser, voice, or media actuator is missing a local dependency, check it with `pnpm deps:check --actuator browser` (or `voice`, `media-generation`).
 
 Already have onboarding JSON? Skip the wizard: `pnpm onboarding apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run` (copy and edit the template, then rerun without `--dry-run`).
 
@@ -157,21 +157,21 @@ PPTX and video are authored as semantic briefs; a single style cascade and text-
 
 Pick the entrance that fits the moment. All of them share the same missions, approvals and audit chain.
 
-| Entrance                        | Use it when                                                      | Start                                    |
-| ------------------------------- | ---------------------------------------------------------------- | ---------------------------------------- |
-| **Terminal home / HUD**         | You live in a shell and want the next action.                    | `pnpm kyberion` · `pnpm tui`             |
-| **Concierge / Presence Studio** | You want a front desk: ask, decide, follow progress.             | `pnpm surfaces reconcile`                |
-| **Chronos**                     | You supervise: intervene, review artifacts, audit.               | `pnpm chronos:dev`                       |
-| **Chat bridges & voice**        | You are in Slack / Telegram / Discord / iMessage, or hands-free. | [`docs/SURFACES.md`](./docs/SURFACES.md) |
-| **Capture pads**                | You have something on your desk: a sketch, notes, a file.        | `pnpm pads`                              |
+| Entrance                        | Use it when                                                      | Start                                        |
+| ------------------------------- | ---------------------------------------------------------------- | -------------------------------------------- |
+| **Terminal home / HUD**         | You live in a shell and want the next action.                    | `pnpm kyberion` · `pnpm tui`                 |
+| **Concierge / Presence Studio** | You want a front desk: ask, decide, follow progress.             | `pnpm surfaces reconcile`                    |
+| **Operations console**          | You supervise: intervene, review artifacts, audit.               | Concierge `/ops` (`pnpm surfaces reconcile`) |
+| **Chat bridges & voice**        | You are in Slack / Telegram / Discord / iMessage, or hands-free. | [`docs/SURFACES.md`](./docs/SURFACES.md)     |
+| **Capture pads**                | You have something on your desk: a sketch, notes, a file.        | `pnpm pads`                                  |
 
 ## Surfaces — one role per screen
 
-Each surface answers one question and shows its role in the header. The two human-facing surfaces (Concierge and Presence Studio) share one five-item rail — ホーム / 頼む / 決める / 進み具合 / 設定 — so they read as a single front desk. Full role map, ports and access rules: [`docs/SURFACES.md`](./docs/SURFACES.md).
+Each surface answers one question and shows its role in the header. The two human-facing surfaces (Concierge and Presence Studio) share one grouped rail — 仕事 / 組織 / 資料・学習 / 管理 — so they read as a single front desk. Full role map, ports and access rules: [`docs/SURFACES.md`](./docs/SURFACES.md).
 
 <table>
   <tr>
-    <td align="center" width="33%"><a href="./presence/displays/chronos-mirror-v2/"><img src="./docs/assets/surfaces/chronos.jpg" alt="Chronos Mirror — control tower home with tenant scope, view switcher, next action and per-mission agent status" width="100%" /></a><br /><strong>Chronos Mirror</strong> · <code>:3000</code><br /><sub>Control tower: what is the system doing, where should I intervene?</sub></td>
+    <td align="center" width="33%"><a href="./presence/displays/concierge/"><img src="./docs/assets/surfaces/chronos.jpg" alt="Operations console (formerly Chronos Mirror) — home with tenant scope, view switcher, next action and per-mission agent status" width="100%" /></a><br /><strong>Operations console</strong> · <code>:3050/ops</code><br /><sub>What is the system doing, where should I intervene? (formerly Chronos Mirror; <code>:3000</code> now redirects here)</sub></td>
     <td align="center" width="33%"><a href="./presence/displays/concierge/"><img src="./docs/assets/surfaces/concierge.jpg" alt="Concierge — the ホーム (Home) page on the shared kyberion-base design system: next action, response status and the five-item rail" width="100%" /></a><br /><strong>Concierge</strong> · <code>:3050</code><br /><sub>CEO secretary: what do I need to decide right now? (決める · 設定)</sub></td>
     <td align="center" width="33%"><a href="./presence/displays/presence-studio/"><img src="./docs/assets/surfaces/presence-studio.jpg" alt="Presence Studio — the ホーム (Home) page: today's briefing, the ask box with request chips, what needs your decision and progress, behind the shared five-item rail" width="100%" /></a><br /><strong>Presence Studio</strong> · <code>:3031</code><br /><sub>Companion: what are we working on together, by voice or text? (ホーム · 頼む · 進み具合)</sub></td>
   </tr>
@@ -188,7 +188,7 @@ Beyond the screens, Slack / Telegram / Discord / iMessage bridges share one appr
 
 ### Shared UI (A2UI kyberion-base)
 
-All 5 UI surfaces above render from one design system: the `kyberion-base` A2UI catalog (`ui:*` component types with JSON Schema props), one token-driven stylesheet (`kyberion-ui.css`), and two renderers — React (`@agent/shared-ui`) for the three Next.js surfaces and a dependency-free vanilla DOM renderer for the two static-HTML surfaces. Every component ships in both light/dark themes and `en`/`ja` locales. See every component at once in Presence Studio's `/ui-gallery`:
+The UI surfaces above render from one design system: the `kyberion-base` A2UI catalog (`ui:*` component types with JSON Schema props), one token-driven stylesheet (`kyberion-ui.css`), and two renderers — React (`@agent/shared-ui`) for the three Next.js surfaces and a dependency-free vanilla DOM renderer for the two static-HTML surfaces. Every component ships in both light/dark themes and `en`/`ja` locales. See every component at once in Presence Studio's `/ui-gallery`:
 
 <a href="./presence/displays/presence-studio/"><img src="./docs/assets/surfaces/ui-gallery.jpg" alt="UI gallery — every kyberion-base component (page header, nav rail, tabs, next action, table, charts, forms, status pills) in light and dark, English and Japanese" width="100%" /></a>
 
@@ -196,7 +196,7 @@ Details, schema and CSS sources: [`docs/developer/design/DESIGN_SYSTEM.md`](./do
 
 ```bash
 pnpm surfaces reconcile              # start the surfaces declared in active-surfaces.json
-pnpm chronos:dev                     # or run the control tower alone
+pnpm --dir presence/displays/concierge dev   # or run Concierge alone (operations console at /ops)
 pnpm tui                             # terminal HUD (pnpm tui --once for a non-interactive snapshot)
 ```
 

@@ -1,5 +1,7 @@
 # Kyberion プロジェクト構造解析レポート
 
+> **スナップショット**: 2026-06-22 時点（`05e5d2c1`）の解析であり、以降の変更は反映していない。現在の構成は [`docs/COMPONENT_MAP.md`](./COMPONENT_MAP.md)、実装状況は [`docs/developer/improvement-plans-2026-08/README.ja.md`](./developer/improvement-plans-2026-08/README.ja.md) を参照する。
+
 作成日: 2026-06-22 / 対象リビジョン: `05e5d2c1`（commit 総数 1,236）
 
 ---

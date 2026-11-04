@@ -100,7 +100,7 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 - **目的**: 依存関係をコンパイルし、実行可能な JavaScript を生成します。`env:bootstrap`、`doctor`、`onboard` の一部など、後続コマンドの多くが `dist/` を使うため、この Stage を先に済ませます。
 - **物理的変化**:
   - `dist/` ディレクトリが生成されます。
-  - Chronos（`presence/displays/chronos-mirror-v2/.next/`）と concierge の UI がビルドされます（`build:ui`）。
+  - concierge の UI（運用コンソール `/ops` を含む）と、chronos-mirror-v2 の互換リダイレクトアプリがビルドされます（`build:ui`）。
   - workspace 間の runtime contract が再構築されます。
 - **ステップ構成**: `build:packages` → `build:actuators` → terminal-hud → `build:repo` → `build:bundle` → knowledge index manifest → `build:ui`。
   UI だけを作り直す場合は `pnpm build:ui` を使います。

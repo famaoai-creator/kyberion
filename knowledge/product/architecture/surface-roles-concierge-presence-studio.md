@@ -73,3 +73,7 @@ The recommendations above were carried out as follows:
 - **One read API.** `libs/core/surface/surface-operation-registry.ts` declares each operation once. Concierge serves it at `/api/v1/<domain>/<verb>` and the MCP server as `kyberion.<id>`. The read model is `libs/core/surface/workspace-graph.ts`, run as the read-only role `workspace_graph_reader`.
 - **One sign-in.** The `kyberion_session` cookie is shared across ports on the same host, and all three surfaces read the operator-wide OIDC settings in system scope.
 - **Installation-scope settings** are authorized by owner identity and assurance; see [installation-owner-authorization](../governance/installation-owner-authorization.md).
+
+## Update — operations console moved into Concierge (MSN-KYBERION-SERVER-20261104)
+
+The Chronos column above describes the state at investigation time. Since PR #1367 the operations console (operations, surface control, diagnostics, deliverables, knowledge, discussion) is served by Concierge at `/ops` (`/ops?section=…`, `/ops/discussion`) with its API at `/api/ops/*`, behind Concierge's viewer and mutation gates. `presence/displays/chronos-mirror-v2` (`:3000`) is now only a compatibility redirect: `/api/healthz` is served locally, `/api/<path>` returns 308 to Concierge `/api/ops/<path>`, `/discussion` to `/ops/discussion`, everything else to `/ops`, and it authorizes nothing. So operator-facing work now runs in two processes, Concierge and Presence Studio.

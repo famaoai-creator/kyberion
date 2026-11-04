@@ -113,7 +113,7 @@ PPTX/XLSX 個別の DesignProtocol を汎用 `DocumentDesignProtocol<T>` に昇�
 - [ ] **5.4** media-actuator のパイプラインログを Trace 形式に移行
 - [ ] **5.5** mission_controller の checkpoint/evidence を Trace に統合
 - [ ] **5.6** `artifact` タイプ — スクリーンショット、生成ファイルを Trace 内に参照として保持
-- [ ] **5.7** Chronos Mirror v2 に Trace ビューア追加 — Mission 単位でのスパンツリー表示
+- [ ] **5.7** 運用コンソール（concierge `/ops`、旧 Chronos Mirror v2）に Trace ビューア追加 — Mission 単位でのスパンツリー表示
 - [ ] **5.8** distill フェーズが Trace データから自動的にサマリーを生成
 
 ### Acceptance Criteria

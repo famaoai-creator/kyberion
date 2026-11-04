@@ -4,7 +4,7 @@ category: Templates
 tags: [templates, reporting, master, slide, structure, ace]
 importance: 4
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-11-04
 ---
 
 # Master Slide Structure (Marp Standard)
@@ -20,7 +20,7 @@ last_updated: 2026-03-06
 
 1. **Title**: ミッション名と担当エージェント・ロール。
 2. **Executive Summary**: 3点集約（CEO Rule of 3）。
-3. **Evidence Snapshot**: `ux-visualizer` や `Chronos Mirror` の最新キャプチャの埋め込み。
+3. **Evidence Snapshot**: `ux-visualizer` や運用画面 (Concierge `/ops`) の最新キャプチャの埋め込み。
 4. **ACE Consensus**: 意思決定のハッシュ証跡と合意の要約。
 5. **Call to Action**: Lord への問い（承認・継続・停止の判断）。
 

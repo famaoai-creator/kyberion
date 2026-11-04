@@ -2984,7 +2984,7 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Per-surface public origins for the OIDC redirect URI, as comma-separated surface=origin pairs (e.g. \"concierge=https://desk.example.com,chronos-mirror-v2=https://ops.example.com\"). Overrides KYBERION_OIDC_PUBLIC_BASE_URL for the named surface.",
+      "description": "Per-surface public origins for the OIDC redirect URI, as comma-separated surface=origin pairs (e.g. \"concierge=https://desk.example.com,operator-surface=https://audit.example.com\"). Overrides KYBERION_OIDC_PUBLIC_BASE_URL for the named surface.",
       "documented": true,
       "subsystem": "identity"
     },

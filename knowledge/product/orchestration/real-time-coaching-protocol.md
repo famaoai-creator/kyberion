@@ -4,7 +4,7 @@ category: Orchestration
 tags: [orchestration, coaching, presence, voice, realtime]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-04-17
+last_updated: 2026-11-04
 ---
 
 # Real-time Coaching Surface Protocol
@@ -30,7 +30,7 @@ last_updated: 2026-04-17
 
 ## 3. Hint 出力
 
-Presence Studio / Chronos Mirror の側面パネルに、以下のような短い hint を表示する:
+Presence Studio / 運用画面 (Concierge `/ops`) の側面パネルに、以下のような短い hint を表示する:
 
 ```
 [12:34:52] 沈黙 4 秒。同意ではない可能性。確認質問を検討。
@@ -62,7 +62,7 @@ Presence Studio / Chronos Mirror の側面パネルに、以下のような短�
 ## 7. 関連
 
 - 実行: voice-actuator + presence-actuator
-- 表示: Presence Studio, Chronos Mirror
+- 表示: Presence Studio, 運用画面 (Concierge `/ops`)
 - 依存: [relationship-graph-protocol.md](relationship-graph-protocol.md)
 - 倫理: [governance/governance-policy.md](../governance/governance-policy.md)
 

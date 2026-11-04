@@ -4,7 +4,7 @@ category: Orchestration
 tags: [orchestration, voice, interface, protocol]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-11-04
 ---
 
 # Voice Interface Protocol (VIP)
@@ -13,7 +13,7 @@ last_updated: 2026-03-06
 
 ## 1. 音声対話の美学 (Voice Aesthetics)
 
-- **簡潔さ (Brevity)**: 音声応答は、原則として 3フレーズ（約30秒以内）に収める。詳細なデータは「Chronos Mirror をご覧ください」と誘導する。
+- **簡潔さ (Brevity)**: 音声応答は、原則として 3フレーズ（約30秒以内）に収める。詳細なデータは「運用画面 (Concierge の `/ops`) をご覧ください」と誘導する。
 - **即応性 (Low Latency)**: ローカル LLM (Gemma) を活用し、思考の待ち時間を 1秒以内に抑える。
 - **確認の徹底 (Confirmation)**: 破壊的な操作（ファイルの削除、高額APIの実行）は、必ず「実行してよろしいですか？」と音声で再確認する。
 

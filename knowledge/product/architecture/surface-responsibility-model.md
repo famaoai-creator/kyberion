@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, surface, presence, chronos, ceo, responsibilities]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-10-05
+last_updated: 2026-11-04
 kind: evergreen
 ---
 
@@ -58,7 +58,7 @@ It should not become:
 
 ### 3.2 Chronos
 
-Chronos is the management control plane.
+Chronos is the management control plane. It is served as the operations console inside Concierge (`presence/displays/concierge`, port 3050) at `/ops` (`/ops?section=…`) with its API at `/api/ops/*`; the old `chronos-mirror-v2` app on port 3000 only redirects there (MSN-KYBERION-SERVER-20261104).
 
 Its job is to:
 
@@ -108,7 +108,7 @@ enforced by tests; the single exception is inbox read/accept marking.
 The computer surface (`presence/displays/computer-surface`, port 3040) is the
 **hands mirror**: a passive live view of what Kyberion's browser/terminal
 executors are doing right now (A2UI state sink). It never initiates work;
-control lives in Chronos and Presence Studio.
+control lives in Chronos (Concierge `/ops`) and Presence Studio.
 
 ### 3.4 Thread-First Messaging
 

@@ -98,7 +98,7 @@ How each stage maps to a step of the standard flow:
 - **Purpose**: compile the dependencies and produce runnable JavaScript. Many later commands (`env:bootstrap`, `doctor`, parts of `onboarding`) use `dist/`, so do this stage first.
 - **Physical changes**:
   - The `dist/` directory is created.
-  - The Chronos (`presence/displays/chronos-mirror-v2/.next/`) and concierge UIs are built (`build:ui`).
+  - The concierge UI (including the operations console at `/ops`) and the chronos-mirror-v2 compatibility redirect app are built (`build:ui`).
   - Runtime contracts between workspaces are rebuilt.
 - **Build steps**: `build:packages` -> `build:actuators` -> terminal-hud -> `build:repo` -> `build:bundle` -> knowledge index manifest -> `build:ui`. To rebuild only the UI, use `pnpm build:ui`.
 

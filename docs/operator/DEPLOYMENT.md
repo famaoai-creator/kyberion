@@ -3,7 +3,7 @@ title: Kyberion Deployment Runbook
 category: Operator
 tags: [deployment, install, runbook, fde]
 importance: 9
-last_updated: 2026-07-02
+last_updated: 2026-11-04
 ---
 
 # Kyberion Deployment Runbook
@@ -95,8 +95,10 @@ pnpm env:bootstrap --manifest meeting-participation-runtime
 For interactive use:
 
 ```bash
-pnpm chronos:dev            # opens browser surface at http://127.0.0.1:3000
+pnpm surfaces reconcile     # starts enabled surfaces, incl. Concierge at http://127.0.0.1:3050 (operations console at /ops)
 ```
+
+The operations console (formerly Chronos Mirror v2) lives in Concierge: pages at `/ops`, API at `/api/ops/*`. For Concierge alone, run `pnpm --dir presence/displays/concierge dev`. `pnpm chronos:dev` now starts only the compatibility app on port 3000, which 308-redirects old URLs to Concierge `/ops` and serves `/api/healthz`.
 
 For background services:
 

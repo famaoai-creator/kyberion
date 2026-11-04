@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, presence, layer]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-10-04
+last_updated: 2026-11-04
 ---
 
 # Presence Layer: Sensors, Displays, and Intervention
@@ -71,15 +71,15 @@ The **Nexus Daemon** (`presence/bridge/nexus-daemon.ts`) can physically inject s
 
 ## 4. Slack and Chronos responsibilities
 
-The Presence Layer now distinguishes clearly between Slack and Chronos Mirror v2:
+The Presence Layer now distinguishes clearly between Slack and the operations console (Chronos, served by Concierge at `/ops`; `chronos-mirror-v2` on port 3000 only redirects there):
 
 - **Slack** is primarily a channel sensor and channel endpoint.
-- **Chronos Mirror v2** is an authenticated interactive control surface.
+- **The operations console** (Concierge `/ops`, gateway agent `chronos-mirror`) is an authenticated interactive control surface.
 - Both should be described through explicit channel ports and optional Surface Agents.
 
 Slack should normalize ingress and deliver egress. It should not own mission authority.
 
-Chronos Mirror v2 may hold a cached runtime handle for UX efficiency, but it should not become the durable source of truth for mission state. Durable coordination belongs in:
+The operations console may hold a cached runtime handle for UX efficiency, but it should not become the durable source of truth for mission state. Durable coordination belongs in:
 
 - `active/shared/coordination/chronos/`
 - `active/shared/observability/chronos/`

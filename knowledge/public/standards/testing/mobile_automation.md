@@ -4,7 +4,7 @@ category: Standards
 tags: [standards, testing, mobile, automation]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-10-05
+last_updated: 2026-11-04
 kind: evergreen
 ---
 
@@ -58,7 +58,7 @@ appId: com.example.app
 ### C. CI/CD 統合 (GitHub Actions)
 
 - macOS runner を使用し、`Maestro Cloud` またはローカルシミュレータをバックグラウンドで起動して実行する。
-- 失敗時には、自動で `.mp4` 動画とスクリーンショットを `evidence/` へ保存し、Chronos Mirror に掲示する。
+- 失敗時には、自動で `.mp4` 動画とスクリーンショットを `evidence/` へ保存し、運用画面 (Concierge `/ops`) に掲示する。
 
 ---
 

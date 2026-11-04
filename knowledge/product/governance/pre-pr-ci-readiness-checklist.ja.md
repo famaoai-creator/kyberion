@@ -112,8 +112,8 @@ gh pr checks <number> --watch
   (c) 呼び出しセッションが委任先 NHI として admission されていること — `pnpm onboarding nhi-session`
   系の承認で発行される env pair（`KYBERION_NHI_ACTOR` 等）を付けて実行する。slug を env に書くだけでは
   委任されない（セッション証明が要る）。
-- **`pnpm kyberion pr create --help` を実行しない**。ヘルプは表示されず、そのまま readiness gate と
-  PR 作成が走る。オプションはこの文書で確認する。
+- **`pnpm kyberion pr create --help` は使い方を表示するだけ**(CU-01 以降。gh・git・readiness gate は呼ばれず、PR は作られない)。
+  手順の正本はこの文書である。
 - **push を先に行う**。`pr create` は push しない。未 push だと `No commits between main and <branch>` で失敗する。
 - **draft がデフォルト**。レビューに出すときは `--no-draft` を付けるか、作成後に `gh pr ready <number>` を実行する。
 - **`gh pr create` を直接使うのは例外**。使う場合も手順 1〜6 と 8 は省略せず、`--title` と `--body-file` を渡す。

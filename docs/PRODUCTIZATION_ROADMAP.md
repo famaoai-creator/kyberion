@@ -9,6 +9,8 @@ last_updated: 2026-09-30
 
 # Kyberion Productization Roadmap — OSS, Managed SaaS & FDE
 
+> **Status source**: this roadmap states direction and phases. Current implementation status lives in [`docs/developer/improvement-plans-2026-08/README.ja.md`](./developer/improvement-plans-2026-08/README.ja.md) (see also [`docs/documentation-source-map.json`](./documentation-source-map.json)).
+
 「研究プロトタイプ」から「**OSS / self-hosted と managed SaaS の双方で安全に使われ、導入支援 / FDE も成立する**」までの距離を、実装可能な単位に分解した計画。
 
 ## 0. 戦略前提
