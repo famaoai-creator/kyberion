@@ -193,6 +193,62 @@ export async function vcsHostPrChecks(
   return summarizePrChecks(rows, params.ignore);
 }
 
+export interface VcsHostPrChecksWaitResult extends PrChecksResult {
+  waited_ms: number;
+  timed_out: boolean;
+}
+
+const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Poll until every check reaches a terminal bucket or `timeoutMs` elapses —
+ * same semantics as the sync `ghPrChecksWait`: 'none' is not terminal, a few
+ * consecutive transient failures are tolerated, and a timeout returns the last
+ * observed state with `timed_out: true` (callers fail closed on it).
+ */
+export async function vcsHostPrChecksWait(
+  params: {
+    ref: string;
+    ignore?: string[];
+    intervalMs?: number;
+    timeoutMs?: number;
+  } & VcsHostCallOptions,
+  sleep: (ms: number) => Promise<void> = defaultSleep
+): Promise<VcsHostPrChecksWaitResult> {
+  const intervalMs = Math.max(1000, params.intervalMs ?? 15_000);
+  const timeoutMs = params.timeoutMs ?? 20 * 60_000;
+  const started = Date.now();
+  const perCallTimeoutMs = Math.min(60_000, timeoutMs);
+  const maxConsecutiveErrors = 3;
+  let consecutiveErrors = 0;
+  let last: PrChecksResult = { state: 'none', checks: [], failing: [], pending: [] };
+  for (;;) {
+    const elapsed = Date.now() - started;
+    if (elapsed >= timeoutMs) break;
+    try {
+      last = await vcsHostPrChecks({
+        ...params,
+        timeoutMs: Math.min(perCallTimeoutMs, Math.max(1000, timeoutMs - elapsed)),
+      });
+      consecutiveErrors = 0;
+    } catch (error) {
+      consecutiveErrors += 1;
+      if (consecutiveErrors >= maxConsecutiveErrors) {
+        throw new Error(
+          `[VCS_GH_WAIT_FAILED] pr checks ${params.ref}: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+    }
+    if (last.state !== 'pending' && last.state !== 'none') break;
+    await sleep(Math.min(intervalMs, Math.max(0, timeoutMs - (Date.now() - started))));
+  }
+  const timedOut =
+    (last.state === 'pending' || last.state === 'none') && Date.now() - started >= timeoutMs;
+  return { ...last, waited_ms: Date.now() - started, timed_out: timedOut };
+}
+
 export async function vcsHostPrQueued(
   params: { number: number } & VcsHostCallOptions
 ): Promise<boolean> {
