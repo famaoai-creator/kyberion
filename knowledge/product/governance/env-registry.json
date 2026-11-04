@@ -4779,7 +4779,7 @@
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "HashiCorp Vault base URL (e.g. https://vault.internal:8200). With KYBERION_VAULT_TOKEN it opts the hashicorp_vault secret provider in, ahead of the local keychain/file/env stores.",
+      "description": "HashiCorp Vault base URL (e.g. https://<vault-host>:8200). With KYBERION_VAULT_TOKEN it opts the hashicorp_vault secret provider in, ahead of the local keychain/file/env stores.",
       "documented": true,
       "subsystem": "secrets"
     },
