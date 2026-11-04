@@ -12,6 +12,7 @@ import {
 } from '@agent/core/surface/workspace-query';
 import { useChronosLocale } from '../../lib/ops/hooks';
 import { uxText } from '../../lib/ops/ux-vocabulary';
+import { stripIdPrefix } from '@agent/core/surface/display-humanize';
 
 const record = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -300,7 +301,7 @@ export function WorkspaceOverview() {
                   <ul>
                     {data.work.items.slice(0, 5).map((item) => (
                       <li key={item.id}>
-                        {item.title} · {item.status}
+                        <span title={item.title}>{stripIdPrefix(item.title)}</span> · {item.status}
                       </li>
                     ))}
                   </ul>
