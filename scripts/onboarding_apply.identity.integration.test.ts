@@ -170,7 +170,7 @@ describe('CLI identity provisioning with actual NHI and signed authority stores'
           : f.identities.retireAgentIdentity(installed, 'Synthetic retirement')
       );
       await expect(onboarding.applyIdentity(raw, new Date().toISOString())).rejects.toThrow(
-        'suspended, retired'
+        `conflict: identity is ${status}`
       );
       expect(f.identities.getAgentIdentity(installed)?.lifecycle_status).toBe(status);
       expect(
