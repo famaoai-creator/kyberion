@@ -45,8 +45,10 @@ export function createGhCliVcsHostProvider(
   options: { run?: VcsCommandRunner } = {}
 ): VcsHostProvider {
   // Resolve the default lazily so a test double installed on secure-io is honoured.
+  // This provider only ever runs `gh`; spawning the literal keeps the child's
+  // entry point resolvable for role-assumption reachability (RN-03).
   const run: VcsCommandRunner =
-    options.run ?? ((command, args, opts) => safeExecResult(command, args, opts));
+    options.run ?? ((_command, args, opts) => safeExecResult('gh', args, opts));
   // Only a positive probe is cached: a gh installed later in the process is picked up.
   let available = false;
 
