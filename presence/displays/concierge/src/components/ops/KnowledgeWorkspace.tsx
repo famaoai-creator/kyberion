@@ -4,6 +4,7 @@ import { opsApiPath } from '../../lib/ops/ops-api-path';
 import * as React from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { KnowledgeLearningPanel, learningStateLabel } from './KnowledgeLearningPanel';
+import { NeedsYouLink } from '../needs-you-link';
 import { knowledgeSelectionAfterRefresh } from '../../lib/ops/knowledge-selection';
 import { workspaceQuery, workspaceSelectionFromQuery } from '@agent/core/surface/workspace-query';
 import {
@@ -287,9 +288,7 @@ export function KnowledgeWorkspace({
     }
   };
 
-  const mutateLegacy = async (
-    action: 'memory_promote_candidate' | 'memory_approve_candidate' | 'memory_reject_candidate'
-  ) => {
+  const mutateLegacy = async (action: 'memory_promote_candidate' | 'memory_reject_candidate') => {
     const candidate = selected;
     if (
       !candidate ||
@@ -332,7 +331,6 @@ export function KnowledgeWorkspace({
     }
   };
   const promote = () => mutateLegacy('memory_promote_candidate');
-  const approve = () => mutateLegacy('memory_approve_candidate');
   const reject = () => mutateLegacy('memory_reject_candidate');
 
   const recordFeedback = async (verdict: 'useful' | 'not_useful') => {
@@ -545,49 +543,48 @@ export function KnowledgeWorkspace({
               </div>
             </div>
           ) : null}
-          {canDecide ? (
-            <WsTextareaField
-              id="chronos-knowledge-note"
-              label={uxTextOr('chronos_ws_decision_note_label', 'Decision note', locale)}
-              value={decisionNote}
-              onChange={setDecisionNote}
-              placeholder={uxText('chronos_decision_note', locale)}
-              rows={2}
-            />
-          ) : null}
-          {!selected.learning ? (
-            <div className="flex flex-wrap gap-2">
-              {selected.ratification_required && selected.status === 'queued' ? (
-                <Button
-                  label={uxText('chronos_approve_candidate', locale)}
-                  variant="primary"
-                  disabled={busy || !fresh || !localAdmin}
-                  onClick={() => void approve()}
-                />
-              ) : (
-                <Button
-                  label={uxText('chronos_register_knowledge', locale)}
-                  variant="primary"
-                  disabled={
-                    busy ||
-                    !fresh ||
-                    !localAdmin ||
-                    selected.status === 'rejected' ||
-                    selected.status === 'promoted'
-                  }
-                  onClick={() => void promote()}
-                />
-              )}
+          {!selected.learning && selected.status === 'queued' ? (
+            // Approving or rejecting a queued candidate happens in あなた待ち
+            // (IA contract §2); registering an approved one stays here.
+            <NeedsYouLink reason="knowledge" locale={locale === 'ja' ? 'ja' : 'en'} />
+          ) : (
+            <>
               {canDecide ? (
-                <Button
-                  label={uxText('chronos_reject_candidate', locale)}
-                  variant="danger"
-                  disabled={busy || !fresh || !localAdmin}
-                  onClick={() => void reject()}
+                <WsTextareaField
+                  id="chronos-knowledge-note"
+                  label={uxTextOr('chronos_ws_decision_note_label', 'Decision note', locale)}
+                  value={decisionNote}
+                  onChange={setDecisionNote}
+                  placeholder={uxText('chronos_decision_note', locale)}
+                  rows={2}
                 />
               ) : null}
-            </div>
-          ) : null}
+              {!selected.learning ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    label={uxText('chronos_register_knowledge', locale)}
+                    variant="primary"
+                    disabled={
+                      busy ||
+                      !fresh ||
+                      !localAdmin ||
+                      selected.status === 'rejected' ||
+                      selected.status === 'promoted'
+                    }
+                    onClick={() => void promote()}
+                  />
+                  {canDecide ? (
+                    <Button
+                      label={uxText('chronos_reject_candidate', locale)}
+                      variant="danger"
+                      disabled={busy || !fresh || !localAdmin}
+                      onClick={() => void reject()}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          )}
           {!localAdmin ? (
             <p className="kb-text kb-text--muted">
               {uxText('chronos_localadmin_required', locale)}
