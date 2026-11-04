@@ -1126,7 +1126,7 @@ function reviewTargetCascadeGuard(missionPath: string): (taskId: string) => bool
 }
 
 export interface RecordArtifactReviewResult {
-  /** Whether the receipt (as recorded) satisfies independence + no-blocking-findings. */
+  /** Whether the receipt satisfies legacy actor-claim separation + no-blocking-findings. */
   status: 'recorded' | 'blocked';
   /** Whether the review task itself was auto-completed as a result. */
   taskCompleted: boolean;
@@ -1142,12 +1142,12 @@ export interface RecordArtifactReviewResult {
  * counterpart to `recordEvidence` that `isReviewTaskSatisfied`
  * (mission-lifecycle.ts) requires before a review-kind task can complete.
  *
- * Independence is not self-declared by the caller: `implementer_agent_ids`
- * is computed from who ACTUALLY recorded evidence for the reviewed task in
- * this mission's own execution ledger, so a reviewer that happens to be the
- * same actor who did the implementation is a hard failure
- * (`evaluation.ready === false`), not a self-reported flag a caller could
- * fabricate.
+ * The legacy separation check derives `implementer_agent_ids` from this
+ * mission's execution ledger rather than accepting the list from the reviewer.
+ * Matching actor labels fail, but ledger actor IDs and reviewerAgentId remain
+ * attribution claims, not authenticated actor/execution provenance. Different
+ * labels can still name the same actor or runtime. See artifact-review.ts's
+ * explicit assurance and opt-in authenticated_execution policy.
  */
 export async function recordArtifactReview(args: {
   missionId: string;
