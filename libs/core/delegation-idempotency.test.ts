@@ -13,6 +13,7 @@ import {
 } from './delegation-idempotency.js';
 import { DelegationTerminalError, markDelegationExecutionStarted } from './delegation-result.js';
 import { safeWriteFile } from './secure-io.js';
+import { logger } from './core.js';
 
 function freshKey(): string {
   return deriveDelegationIdempotencyKey({ workItemId: `witem-${randomUUID()}`, attempt: 1 });
@@ -256,8 +257,14 @@ describe('R5 delegation idempotency', () => {
       runIdempotentDelegation({ instruction: 'x', options: { idempotencyKey }, execute })
     ).rejects.toThrow('[DELEGATION_INTERRUPTED]');
     expect(execute).not.toHaveBeenCalled();
+    // The late owner finds its record already settled: that inconsistency is an error log.
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
     release?.('late');
     await abandoned;
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('already settled by another caller')
+    );
+    errorSpy.mockRestore();
   });
 
   it('never judges another host by local pid; a fresh lease is waited on with a bounded wait', async () => {

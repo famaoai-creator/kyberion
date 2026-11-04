@@ -307,14 +307,37 @@ function interruptedResult(reason: string): DelegationResult {
   );
 }
 
-/** Why an in-flight record's owner is gone, or undefined while it may still run. */
+/** Same-host liveness probes spawn `ps`; reuse a verdict for one short poll window. */
+const LIVENESS_CACHE_MS = 2000;
+const livenessCache = new Map<string, { alive: boolean; at: number }>();
+
+function recordedProcessAliveCached(pid: number, startMarker: string | undefined): boolean {
+  const cacheKey = `${pid}\u0000${startMarker ?? ''}`;
+  const cached = livenessCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < LIVENESS_CACHE_MS) return cached.alive;
+  const alive = isRecordedProcessAlive(pid, startMarker);
+  livenessCache.set(cacheKey, { alive, at: Date.now() });
+  return alive;
+}
+
+/**
+ * Why an in-flight record's owner is gone, or undefined while it may still run.
+ * May spawn a process probe: call it OUTSIDE the reservation lock.
+ *
+ * Follow-up (not handled): heartbeat expiry compares another host's
+ * `heartbeat_at` with the local clock, so clock skew larger than the lease
+ * can misjudge a live remote owner as gone (safe direction: interrupted, no
+ * re-run). Tenant offboarding does not yet walk
+ * `delegation-idempotency/tenants/<slug>/` — registering it as a partitioned
+ * runtime root is a tier-guard / security-policy change left for follow-up.
+ */
 function ownerGoneReason(record: DelegationReservation): string | undefined {
   if (record.owner_instance === OWNER_INSTANCE) {
     // This module instance owns it but no longer tracks it in-process.
     return 'the owning execution was lost in this process';
   }
   if (record.owner_host === currentHost()) {
-    return isRecordedProcessAlive(record.owner_pid, record.owner_start_marker)
+    return recordedProcessAliveCached(record.owner_pid, record.owner_start_marker)
       ? undefined
       : 'the owning process exited';
   }
@@ -330,12 +353,29 @@ type ReserveOutcome =
   | { kind: 'replay'; record: DelegationReservation }
   | { kind: 'wait' };
 
+/** Same in-flight record (owner and reservation), ignoring heartbeat refreshes. */
+function sameInFlightRecord(a: DelegationReservation, b: DelegationReservation): boolean {
+  return (
+    a.status === 'in_flight' &&
+    b.status === 'in_flight' &&
+    a.owner_instance === b.owner_instance &&
+    a.reserved_at === b.reserved_at
+  );
+}
+
 function reserve(
   filePath: string,
   idempotencyKey: string,
   payloadHash: string,
   principal: string | undefined
 ): ReserveOutcome {
+  // Probe the owner's liveness before taking the lock: a `ps` spawn must
+  // never run while other callers (and the owner's heartbeat) wait on it.
+  const peeked = readReservation(filePath);
+  const peekedGone =
+    peeked?.status === 'in_flight' && peeked.payload_hash === payloadHash
+      ? ownerGoneReason(peeked)
+      : undefined;
   return withLockSync(lockId(filePath), () => {
     const existing = readReservation(filePath);
     if (existing && existing.status !== 'released') {
@@ -347,7 +387,9 @@ function reserve(
         );
       }
       if (existing.status === 'terminal') return { kind: 'replay', record: existing };
-      const gone = ownerGoneReason(existing);
+      // Only act on the verdict probed for this very record; if it changed
+      // between the peek and the lock, poll again rather than probe here.
+      const gone = peeked && sameInFlightRecord(peeked, existing) ? peekedGone : undefined;
       if (!gone) return { kind: 'wait' };
       // In-flight is assumed started: settle as interrupted, never adopt.
       const settled: DelegationReservation = {
@@ -383,29 +425,63 @@ function reserve(
 }
 
 const UPDATE_ATTEMPTS = 3;
+/** A heartbeat is best-effort: one attempt with a short lock wait, never retried. */
+const HEARTBEAT_LOCK_TIMEOUT_MS = 1000;
+
+type UpdateKind = 'heartbeat' | 'settle';
 
 /**
- * Owner-side transition of its own in-flight record. Retried; on persistent
- * failure the record stays `in_flight` with an assumed start, which every
- * later reader settles as interrupted — fail closed, never a re-run.
+ * Owner-side transition of its own in-flight record. Settling is retried; on
+ * persistent failure the record stays `in_flight` with an assumed start,
+ * which every later reader settles as interrupted — fail closed, never a
+ * re-run. A heartbeat is a single short attempt.
  */
 function update(
   filePath: string,
+  kind: UpdateKind,
   mutate: (record: DelegationReservation) => DelegationReservation
 ): boolean {
+  const attempts = kind === 'heartbeat' ? 1 : UPDATE_ATTEMPTS;
   let lastError: unknown;
-  for (let attempt = 1; attempt <= UPDATE_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
-      return withLockSync(lockId(filePath), () => {
-        const current = readReservation(filePath);
-        if (!current || current.owner_instance !== OWNER_INSTANCE) return false;
-        if (current.status !== 'in_flight') return false;
-        writeReservation(filePath, mutate(current));
-        return true;
-      });
+      let settledElsewhere: DelegationReservation | null | undefined;
+      const written = withLockSync(
+        lockId(filePath),
+        () => {
+          const current = readReservation(filePath);
+          if (
+            !current ||
+            current.owner_instance !== OWNER_INSTANCE ||
+            current.status !== 'in_flight'
+          ) {
+            settledElsewhere = current;
+            return false;
+          }
+          writeReservation(filePath, mutate(current));
+          return true;
+        },
+        kind === 'heartbeat' ? HEARTBEAT_LOCK_TIMEOUT_MS : undefined
+      );
+      if (!written && kind === 'settle') {
+        logger.error(
+          `[delegation-idempotency] owner outcome not recorded — the reservation was already settled by another caller (${
+            settledElsewhere ? `status=${settledElsewhere.status}` : 'record missing'
+          }), so replays of this key may disagree with this call's result | inspect the reservation and the delegation trace before reusing the key | evidence: ${filePath}`
+        );
+      }
+      return written;
     } catch (error) {
       lastError = error;
     }
+  }
+  if (kind === 'heartbeat') {
+    logger.warn(
+      `[delegation-idempotency] heartbeat skipped — reservation lock busy or unwritable | the next heartbeat retries | evidence: ${
+        lastError instanceof Error ? lastError.message : String(lastError)
+      }`
+    );
+    return false;
   }
   logger.error(
     `[delegation-idempotency] reservation transition failed after ${UPDATE_ATTEMPTS} attempts — the key stays in-flight and will replay as interrupted, never re-run | check runtime store permissions, then settle the record by hand | evidence: ${
@@ -533,7 +609,7 @@ async function executeReserved(
   const keys = new Set(activeKeys.getStore() ?? []);
   keys.add(idempotencyKey);
   const heartbeat = setInterval(() => {
-    update(filePath, (record) => ({ ...record, heartbeat_at: nowIso() }));
+    update(filePath, 'heartbeat', (record) => ({ ...record, heartbeat_at: nowIso() }));
   }, timing.heartbeatMs);
   heartbeat.unref?.();
   try {
@@ -542,7 +618,7 @@ async function executeReserved(
         try {
           const value = await input.execute();
           const result = buildCompletedDelegationResult(value, tracker.metadata);
-          update(filePath, (record) => ({
+          update(filePath, 'settle', (record) => ({
             ...record,
             status: 'terminal',
             completed_at: nowIso(),
@@ -554,9 +630,9 @@ async function executeReserved(
           const provenNotStarted =
             !tracker.started && delegationExecutionStartedFromError(error) === false;
           if (provenNotStarted) {
-            update(filePath, (record) => ({ ...record, status: 'released' }));
+            update(filePath, 'settle', (record) => ({ ...record, status: 'released' }));
           } else {
-            update(filePath, (record) => ({
+            update(filePath, 'settle', (record) => ({
               ...record,
               status: 'terminal',
               completed_at: nowIso(),
@@ -578,6 +654,7 @@ async function executeReserved(
 /** Test seam: forget in-process in-flight joins (the durable store is untouched). */
 export function resetDelegationIdempotencyForTests(): void {
   inFlight.clear();
+  livenessCache.clear();
   timing = { ...DEFAULT_TIMING };
   hostOverride = undefined;
 }
