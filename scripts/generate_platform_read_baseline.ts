@@ -9,11 +9,13 @@
  *   pnpm generate:platform-read-baseline
  *
  * `--check` fails when the fixture drifts without rewriting it.
+ *
+ * The scan roots are all readable under the governed read boundary, so the
+ * walk goes through secure-io rather than raw fs.
  */
-/* eslint-disable no-restricted-imports, no-restricted-syntax -- repo-wide scanner; same rationale as generate_governance_import_baseline */
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core/secure-io';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 const rootDir = pathResolver.rootDir();
@@ -49,23 +51,22 @@ function normalize(relPath: string): string {
 }
 
 function walk(dirPath: string, relativeBase = ''): string[] {
-  if (!fs.existsSync(dirPath)) return [];
-  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+  if (!safeExistsSync(dirPath)) return [];
   const files: string[] = [];
-  for (const entry of entries) {
-    const absPath = path.join(dirPath, entry.name);
-    const relPath = relativeBase ? path.join(relativeBase, entry.name) : entry.name;
+  for (const name of safeReaddir(dirPath)) {
+    const absPath = path.join(dirPath, name);
+    const relPath = relativeBase ? path.join(relativeBase, name) : name;
     const norm = normalize(relPath);
     if (
       IGNORED_DIR_PARTS.some((part) => `/${norm}/`.includes(part) || norm.includes(part.slice(1)))
     ) {
       continue;
     }
-    if (entry.isDirectory()) {
+    if (safeLstat(absPath).isDirectory()) {
       files.push(...walk(absPath, relPath));
       continue;
     }
-    if (!codeFileRe.test(entry.name) || entry.name.endsWith('.d.ts')) continue;
+    if (!codeFileRe.test(name) || name.endsWith('.d.ts')) continue;
     if (testFileRe.test(norm)) continue;
     files.push(norm);
   }
@@ -76,7 +77,7 @@ export function scanPlatformReadBaseline(): { allowed_raw_platform_files: string
   const offenders: string[] = [];
   for (const root of scanRoots) {
     for (const relPath of walk(path.join(rootDir, root), root)) {
-      const content = fs.readFileSync(path.join(rootDir, relPath), 'utf8');
+      const content = String(safeReadFile(path.join(rootDir, relPath), { encoding: 'utf8' }));
       if (rawPlatformReadRe.test(content)) offenders.push(relPath);
     }
   }
