@@ -30,6 +30,7 @@ import type {
   SimulationResult,
   SynthesizedPersona,
 } from '../reasoning/reasoning-backend.js';
+import { withRedactedProviderOutput } from './provider-output-redaction.js';
 
 export interface CopilotAcpReasoningBackendOptions {
   command?: string;
@@ -95,6 +96,11 @@ export class CopilotAcpReasoningBackend implements ReasoningBackend {
   }
 
   private async complete(systemPrompt: string, userPrompt: string): Promise<string> {
+    // Output exit: the answer and any stderr-bearing error are redacted.
+    return withRedactedProviderOutput(() => this.completeUnredacted(systemPrompt, userPrompt));
+  }
+
+  private async completeUnredacted(systemPrompt: string, userPrompt: string): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     if (getActiveSandboxPolicy()) {
       throw new Error(

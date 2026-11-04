@@ -427,6 +427,34 @@ const PROVIDER_CREDENTIAL_ENV_KEYS: Readonly<Record<ProviderId, readonly string[
  * authority signal — a role the child should run as under SYSTEM_ROLE — so it
  * is excluded from the KYBERION_* passthrough below, like SYSTEM_ROLE.
  */
+/**
+ * Values of every provider's declared credential env vars in `env` and in the
+ * current task's bound provider environments — the extra needles output-exit
+ * redaction masks, because a CLI reads its key straight from env without it
+ * ever entering the secret-guard active-secret registry. Values of 8 chars or
+ * fewer are skipped (same floor as the registry).
+ */
+export function providerCredentialEnvValues(env: NodeJS.ProcessEnv = process.env): string[] {
+  const values = new Set<string>();
+  for (const provider of Object.keys(PROVIDER_CREDENTIAL_ENV_KEYS) as ProviderId[]) {
+    let bound: NodeJS.ProcessEnv | undefined;
+    try {
+      bound = resolveTaskProviderEnvironment(provider);
+    } catch {
+      // A binding without this provider's environment contributes no values.
+    }
+    const sources = [env, bound];
+    for (const source of sources) {
+      if (!source) continue;
+      for (const key of PROVIDER_CREDENTIAL_ENV_KEYS[provider]) {
+        const value = source[key];
+        if (typeof value === 'string' && value.length > 8) values.add(value);
+      }
+    }
+  }
+  return [...values];
+}
+
 const KYBERION_PREFIX = 'KYBERION_';
 const EXCLUDED_AUTHORITY_ENV_KEYS: ReadonlySet<string> = new Set(['KYBERION_DELEGATED_ROLE']);
 const ADDITIONAL_KYBERION_STYLE_KEYS = ['MISSION_ID'] as const;
