@@ -8,7 +8,13 @@ import { readTextFile } from '../foundation/text.js';
 import { assertSafeRepositoryPath, safeExecResult } from '../secure-io.js';
 import { findMissionPath, pathResolver } from '../path-resolver.js';
 import { getWorkItem } from '../workforce/work-coordination.js';
-import { loadArtifactReviewReceipt } from '../workforce/artifact-review.js';
+import {
+  evaluateArtifactReviews,
+  loadArtifactReviewReceipt,
+  receiptToArtifactReviewDecision,
+  type ArtifactReviewIndependenceAssurance,
+  type ArtifactReviewIndependencePolicy,
+} from '../workforce/artifact-review.js';
 import { loadMissionNextTaskObjectsAtPath } from '../mission/mission-next-task-reader.js';
 import { validateMissionArtifactReviewGate } from '../mission/mission-governance.js';
 import {
@@ -31,6 +37,8 @@ export interface PreparedDevelopmentInput {
   dryRun?: boolean;
   /** Continuous development requires actual hash-bound source bytes; legacy manual preparation remains compatible. */
   requireSourceDiff?: boolean;
+  /** Explicit migration policy; omission retains legacy actor-claim admission. */
+  independencePolicy?: ArtifactReviewIndependencePolicy;
 }
 export interface DevelopmentLoopPorts {
   snapshot(): VcsDevelopmentPr;
@@ -206,7 +214,12 @@ export function verifyPreparedWorkItemReview(
   pr: VcsDevelopmentPr,
   ci: VcsDevelopmentCiProof,
   options: { missionGate?: boolean; run?: VcsCommandRunner } = {}
-): { ok: boolean; reason?: string; reviewedBaseSha?: string } {
+): {
+  ok: boolean;
+  reason?: string;
+  reviewedBaseSha?: string;
+  independence_assurance?: ArtifactReviewIndependenceAssurance;
+} {
   try {
     const item = getWorkItem(input.workItemId);
     if (
@@ -250,13 +263,25 @@ export function verifyPreparedWorkItemReview(
       receipt.review_task_id !== input.reviewTaskId ||
       receipt.review_target_task_id !== item.context.task_id ||
       receipt.reviewer.agent_id !== task.assigned_to.agent_id ||
-      receipt.reviewer.agent_id === item.assignee_peer_id ||
-      !receipt.reviewer.independence_verified ||
-      !receipt.reviewer.independent_from.includes(item.assignee_peer_id) ||
-      receipt.verdict !== 'approved' ||
-      receipt.findings.some((f) => f.severity === 'blocking')
+      !receipt.reviewer.independent_from.includes(item.assignee_peer_id)
     )
       throw new Error('Independent reviewer identity and approval are required');
+    const reviewEvaluation = evaluateArtifactReviews({
+      // The manifest reader below verifies these bytes against the receipt hash.
+      artifacts: [receipt.artifact],
+      reviews: [receiptToArtifactReviewDecision(receipt)],
+      requiredReviewerRoles: [],
+      implementerAgentIds: [item.assignee_peer_id],
+      requireIndependence: true,
+      independencePolicy: input.independencePolicy,
+    });
+    if (!reviewEvaluation.ready) {
+      return {
+        ok: false,
+        reason: reviewEvaluation.reasons.join('; '),
+        independence_assurance: reviewEvaluation.independence_assurance,
+      };
+    }
     if (options.missionGate !== false) {
       const gate = validateMissionArtifactReviewGate({ missionId, missionPath });
       if (!gate.ok) throw new Error(gate.reason);
@@ -314,7 +339,11 @@ export function verifyPreparedWorkItemReview(
     };
     if (Object.entries(expected).some(([k, v]) => manifest[k] !== v))
       throw new Error('Review manifest does not bind current revision and CI policy');
-    return { ok: true, reviewedBaseSha: String(manifest.base_sha) };
+    return {
+      ok: true,
+      reviewedBaseSha: String(manifest.base_sha),
+      independence_assurance: reviewEvaluation.independence_assurance,
+    };
   } catch (error) {
     return {
       ok: false,

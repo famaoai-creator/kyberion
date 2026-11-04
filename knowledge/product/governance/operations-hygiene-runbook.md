@@ -7,6 +7,21 @@ last_updated: 2026-11-04
 
 # Operations Hygiene Runbook
 
+## Review independence assurance
+
+Keep admission policy separate from evidence strength. Artifact-review v1 actor
+labels and its historical `independence_verified` boolean are legacy claims,
+not authenticated execution provenance. Never upgrade them by joining mutable
+runtime bindings or comparing accountable humans. Preserve legacy operation
+explicitly during migration; an authenticated-execution requirement must fail
+closed without trusted durable producer and reviewer attestations.
+
+Use the common artifact-review evaluator rather than a direct boolean acceptance
+gate. Run `libs/core/workforce/artifact-review.test.ts` and
+`libs/core/vcs/development-review-integration.test.ts` after changing admission.
+The [assurance migration contract](./review-independence-assurance.md) defines the
+current opt-in policy, missing capture boundaries, and historical proof requirements.
+
 ## Checkout and canonical implementation drift
 
 Before changing a shared capability, record the checkout root, HEAD SHA/date,
