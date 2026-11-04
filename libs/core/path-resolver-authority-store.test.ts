@@ -247,22 +247,34 @@ describe('primary-checkout authority store resolution', () => {
   });
 
   it('creates the first approval directory in a primary whose real path differs from its spelling', async () => {
-    // The tmp primary is reached through a symlinked prefix on macOS
-    // (/var -> /private/var); mkdirGuarded compares each parent's canonical
-    // path with the checked one, so the ancestor must be spelled back under
-    // the logical primary root or the first mkdir is refused.
+    // The primary is reached through a symlink (deliberately, so this holds on
+    // every platform, not only where tmpdir itself is symlinked). mkdirGuarded
+    // compares each parent's canonical path with the checked one, so the
+    // ancestor must be spelled back under the logical primary root or the
+    // first mkdir is refused.
+    const linkedPrimary = path.join(tmp, 'primary-link');
+    symlinkSync(primary, linkedPrimary);
+    const linkedWorktree = path.join(tmp, 'worktrees', 'wt-linked');
+    makeCheckout(linkedWorktree);
+    const gitDir = path.join(linkedPrimary, '.git', 'worktrees', 'wt-linked');
+    mkdirSync(gitDir, { recursive: true });
+    writeFileSync(path.join(gitDir, 'commondir'), '../..\n');
+    writeFileSync(path.join(linkedWorktree, '.git'), `gitdir: ${gitDir}\n`);
     mkdirSync(path.join(primary, 'active', 'shared', 'coordination'), { recursive: true });
-    await loadResolver(worktree);
+
+    const resolver = await loadResolver(linkedWorktree);
+    expect(resolver.primaryCheckoutRootDir()).toBe(linkedPrimary);
     const guard = await import('./secure-io-path-guard.js');
     const requests = path.join(
-      primary,
+      linkedPrimary,
       'active/shared/coordination/channels/external-operation/approvals/requests'
     );
     const checked = guard.canonicalGuardPath(requests, 'follow');
+    expect(checked).toBe(requests);
     guard.mkdirGuarded(requests, checked, requests);
     expect(existsSync(requests)).toBe(true);
     // The ancestor walk creates nothing outside the authority stores.
-    const inbox = path.join(primary, 'active/shared/coordination/inbox/x');
+    const inbox = path.join(linkedPrimary, 'active/shared/coordination/inbox/x');
     expect(() => guard.mkdirGuarded(inbox, inbox, inbox)).toThrow();
     expect(existsSync(path.join(primary, 'active/shared/coordination/inbox'))).toBe(false);
   });
