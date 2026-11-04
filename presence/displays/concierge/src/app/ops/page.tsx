@@ -30,23 +30,14 @@ import {
   KbInterventionPanel,
 } from '../../components/ops/A2UIComponentLibrary';
 import { FocusedOperatorView } from '../../components/ops/FocusedOperatorView';
-import { SovereignChat } from '../../components/ops/SovereignChat';
 import { AgentPanel } from '../../components/ops/AgentPanel';
-import { FirstRunBanner } from '../../components/ops/FirstRunBanner';
 import { IdentityBadge } from '../../components/ops/IdentityBadge';
 import { MissionIntelligence } from '../../components/ops/MissionIntelligence';
-import { MissionJourneySummary } from '../../components/ops/MissionJourneySummary';
 import { ChronosOffice } from '../../components/ops/ChronosOffice';
-import { WorkItemsWorkspace } from '../../components/ops/WorkItemsWorkspace';
 import { SurfaceControlWorkspace } from '../../components/ops/SurfaceControlWorkspace';
-import { OrganizationOperatingModel } from '../../components/ops/OrganizationOperatingModel';
-import { CloudflareOsPanel } from '../../components/ops/CloudflareOsPanel';
 import { HeadlessA2UIWorkspace } from '../../components/ops/HeadlessA2UIWorkspace';
-import { ApprovalsWorkspace } from '../../components/ops/ApprovalsWorkspace';
-import { DeliverablesWorkspace } from '../../components/ops/DeliverablesWorkspace';
-import { KnowledgeWorkspace } from '../../components/ops/KnowledgeWorkspace';
 import { DiagnosticsAttentionSummary } from '../../components/ops/DiagnosticsAttentionSummary';
-import { ChronosTenantScope, useChronosTenant } from '../../components/ops/ChronosTenantScope';
+import { useChronosTenant } from '../../components/ops/ChronosTenantScope';
 import {
   MISSION_CYCLE,
   OPERATOR_SCENARIO_PRESETS,
@@ -65,6 +56,7 @@ import {
   CONSOLE_SECTIONS,
   buildPlanPreviewSignature,
   resolveConsoleSectionParam,
+  OPS_DEFAULT_SECTION,
   buildQuickActionGroups,
   buildStatusCards,
   isPlanPreviewStale,
@@ -74,6 +66,9 @@ import {
   type ConsoleSectionId,
 } from './chronos-page-config';
 import { ChronosMirrorShell } from './ChronosMirrorShell';
+import { resolveIaRedirect } from '../../lib/ia-routes';
+import { withSelectedTenant } from '../../lib/tenant-context';
+import { entityHref } from '../../lib/workspace-view';
 import {
   nextChronosThemeMode,
   resolveChronosThemeMode,
@@ -485,11 +480,13 @@ function ChronosMirrorV2Content() {
 
   const [a2uiActionNotice, setA2uiActionNotice] = useState<string | null>(null);
   const sectionFromUrl = searchParams.get('section');
-  // UI-07: `?section=` addresses a section inside the five nav groups;
-  // retired ids (e.g. `governance`) resolve through CHRONOS_SECTION_ALIASES.
-  const initialSection: ConsoleSectionId = resolveConsoleSectionParam(sectionFromUrl) ?? 'home';
+  // MSN-SHELL-IA §1: `?section=` addresses one of the four operations
+  // sections; sections that moved to a top-level destination are redirected
+  // by proxy.ts and never render here.
+  const initialSection: ConsoleSectionId =
+    resolveConsoleSectionParam(sectionFromUrl) ?? OPS_DEFAULT_SECTION;
   const [consoleSection, setConsoleSection] = useState<ConsoleSectionId>(initialSection);
-  const [surfaceOrigin, setSurfaceOrigin] = useState<ConsoleContentSection>('home');
+  const [surfaceOrigin, setSurfaceOrigin] = useState<ConsoleContentSection>(OPS_DEFAULT_SECTION);
 
   useEffect(() => {
     const resolved = resolveConsoleSectionParam(sectionFromUrl);
@@ -498,9 +495,18 @@ function ChronosMirrorV2Content() {
 
   const openConsoleSection = useCallback(
     (requested: ConsoleSectionId) => {
-      const section = resolveConsoleSectionParam(requested) ?? 'home';
+      // A section that moved out of the console opens its new destination.
+      const moved = resolveIaRedirect(
+        pathname,
+        `?${new URLSearchParams({ ...Object.fromEntries(searchParams.entries()), section: requested })}`
+      );
+      if (moved) {
+        router.push(moved);
+        return;
+      }
+      const section = resolveConsoleSectionParam(requested) ?? OPS_DEFAULT_SECTION;
       if (section === 'surface') {
-        setSurfaceOrigin('home');
+        setSurfaceOrigin(OPS_DEFAULT_SECTION);
       }
       setConsoleSection(section);
       setSurface(null);
@@ -512,7 +518,7 @@ function ChronosMirrorV2Content() {
       // organization / project params are preserved).
       if (section !== 'surface') {
         const params = new URLSearchParams(searchParams.toString());
-        if (section === 'home') params.delete('section');
+        if (section === OPS_DEFAULT_SECTION) params.delete('section');
         else params.set('section', section);
         const query = params.toString();
         router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
@@ -837,14 +843,11 @@ function ChronosMirrorV2Content() {
   const handleOperatorViewOpen = useCallback(
     (targetId: string, missionId: string | null = null) => {
       if (targetId === 'mission-control-plane' && missionId) {
-        setConsoleSection('missions');
-        setFocusedOperatorView(null);
-        setFocusedOperatorMissionId(null);
-        setMissionIntelligenceFocus('mission-control-plane');
-        setMissionIntelligenceFocusedMissionId(missionId);
+        // Missions live under 仕事 now: open the mission's own page.
+        router.push(withSelectedTenant(entityHref('mission', missionId), tenant || null));
         return;
       }
-      setSurfaceOrigin(consoleSection === 'surface' ? 'home' : consoleSection);
+      setSurfaceOrigin(consoleSection === 'surface' ? OPS_DEFAULT_SECTION : consoleSection);
       setConsoleSection('surface');
       setFocusedOperatorView(targetId);
       setMissionIntelligenceFocus(null);
@@ -852,12 +855,12 @@ function ChronosMirrorV2Content() {
       setFocusedOperatorMissionId(targetId === 'mission-control-plane' ? missionId : null);
       setSurface(null);
     },
-    [consoleSection]
+    [consoleSection, router, tenant]
   );
 
   const handleScenarioOpen = useCallback(
     (targetId: string, surfaceMode: 'mission-intelligence' | 'focused-operator') => {
-      setSurfaceOrigin(consoleSection === 'surface' ? 'home' : consoleSection);
+      setSurfaceOrigin(consoleSection === 'surface' ? OPS_DEFAULT_SECTION : consoleSection);
       setConsoleSection('surface');
       if (surfaceMode === 'mission-intelligence') {
         setMissionIntelligenceFocus(targetId);
@@ -1208,23 +1211,13 @@ function ChronosMirrorV2Content() {
     KbArtifactTile,
     KbInterventionPanel,
     FocusedOperatorView,
-    SovereignChat,
     AgentPanel,
-    FirstRunBanner,
     IdentityBadge,
     MissionIntelligence,
-    MissionJourneySummary,
     ChronosOffice,
-    WorkItemsWorkspace,
     SurfaceControlWorkspace,
-    OrganizationOperatingModel,
-    CloudflareOsPanel,
     HeadlessA2UIWorkspace,
-    ApprovalsWorkspace,
-    DeliverablesWorkspace,
-    KnowledgeWorkspace,
     DiagnosticsAttentionSummary,
-    ChronosTenantScope,
     MISSION_CYCLE,
     OPERATOR_SCENARIO_PRESETS,
     OPERATOR_VIEW_LINKS,

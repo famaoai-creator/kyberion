@@ -127,6 +127,46 @@
   gap: var(--kb-ui-space-2);
 }
 
+/* ---------------------------------------------------------------- page -- */
+
+/* Page frame (MSN-SHELL-IA §5): every page wraps its content in one
+ * `.kb-page` with a width class — `default` 1280 for lists and detail,
+ * `wide` 1440 for dashboards and boards, `form` 720 for settings forms and
+ * intake. The title-to-content gap is space-6 (32); cards sit space-5 (24)
+ * apart. Children may not overflow the page horizontally (mobile 390). */
+.kb-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-5);
+  width: 100%;
+  max-width: 1280px;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.kb-page[data-width='wide'] {
+  max-width: 1440px;
+}
+
+.kb-page[data-width='form'] {
+  max-width: 720px;
+}
+
+.kb-page > * {
+  min-width: 0;
+}
+
+.kb-page > .kb-page-header {
+  margin-bottom: var(--kb-ui-space-2);
+}
+
+/* Section titles inside a page use one scale (`lg`); the page title is `xxl`. */
+.kb-page__section-title {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-lg);
+  font-weight: 600;
+}
+
 /* ---------------------------------------------------- display controls -- */
 
 .kb-display-controls {
@@ -256,6 +296,22 @@
 .kb-nav-rail__item[aria-current='page'] .kb-nav-rail__hint,
 .kb-nav-rail__item[data-active='true'] .kb-nav-rail__hint {
   color: var(--kb-ui-accent-text);
+}
+
+/* Count badge after the label (needs-you total); hidden when absent. */
+.kb-nav-rail__badge {
+  flex: none;
+  align-self: center;
+  margin-left: auto;
+  min-width: 1.75em;
+  padding: 0 var(--kb-ui-space-2);
+  border-radius: 999px;
+  background: var(--kb-ui-accent);
+  color: var(--kb-ui-text-on-accent);
+  font-size: var(--kb-ui-font-size-xs);
+  font-weight: 700;
+  line-height: 1.6;
+  text-align: center;
 }
 
 /* Brand slot: logo (or a token-colored mark) + name / subtitle. */

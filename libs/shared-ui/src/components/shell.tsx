@@ -147,6 +147,11 @@ function NavRailItem({ item }: { item: KbNavItem }) {
         <span className="kb-nav-rail__label">{item.label}</span>
         {item.hint ? <span className="kb-nav-rail__hint">{item.hint}</span> : null}
       </span>
+      {typeof item.badge === 'string' && item.badge ? (
+        <span className="kb-nav-rail__badge" aria-label={item.badge_label || item.badge}>
+          {item.badge}
+        </span>
+      ) : null}
     </>
   );
   const common = {

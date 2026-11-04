@@ -18,6 +18,7 @@ import {
   resolveFrontDeskMenu,
   type FrontDeskRole,
   type FrontDeskAvailableSurfaces,
+  type FrontDeskMenuPlacement,
   type FrontDeskSurfacePorts,
 } from '@agent/core/front-desk-nav';
 
@@ -34,6 +35,8 @@ export interface FrontDeskNavItem {
   external: boolean;
   allowed: boolean;
   min_role: FrontDeskRole;
+  /** `footer` items are pinned at the rail bottom (設定). */
+  placement: FrontDeskMenuPlacement;
 }
 
 export interface FrontDeskNavPayload {
@@ -95,7 +98,7 @@ export function buildFrontDeskNavPayload(
     current_surface: 'concierge',
     items: menu.map((item) => ({
       id: item.id,
-      group_label: tr(item.group_key),
+      group_label: item.group_key ? tr(item.group_key) : '',
       icon: item.icon,
       scope_query_style: item.scope_query_style,
       label: tr(item.label_key),
@@ -104,6 +107,7 @@ export function buildFrontDeskNavPayload(
       external: item.external,
       allowed: item.allowed,
       min_role: item.min_role,
+      placement: item.placement ?? 'main',
     })),
     help: {
       label: tr(FRONT_DESK_HELP_LINK.label_key),
