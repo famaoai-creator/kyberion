@@ -17,6 +17,13 @@ import {
   withSensitivePathMediation,
 } from '../secure-io.js';
 import { SecretProvider, RegistryEntry } from './secret-types.js';
+import {
+  AWS_SECRETS_MANAGER_PROVIDER_ID,
+  GCP_SECRET_MANAGER_PROVIDER_ID,
+  HASHICORP_VAULT_PROVIDER_ID,
+  ONEPASSWORD_PROVIDER_ID,
+  createExternalSecretProviders,
+} from './external-secret-providers.js';
 import { keychainReaderAccessSwiftLines, keychainSwiftArgs } from './keychain-access.js';
 import {
   memoizedNativeSecretRead,
@@ -613,6 +620,12 @@ export class EnvSecretProvider implements SecretProvider {
 // the seam policy's `default_chains` (secret-provider.json) with this constant
 // as the hermetic fallback.
 const SECRET_BUILTIN_ORDER = [
+  // External managers are opt-in (unavailable until configured) and, once
+  // configured, take precedence over the local stores.
+  HASHICORP_VAULT_PROVIDER_ID,
+  AWS_SECRETS_MANAGER_PROVIDER_ID,
+  GCP_SECRET_MANAGER_PROVIDER_ID,
+  ONEPASSWORD_PROVIDER_ID,
   'mac_keychain',
   'windows_credential_manager',
   'file_secrets',
@@ -660,6 +673,7 @@ export function registerBuiltinSecretProviders(): void {
     new WindowsCredentialManagerSecretProvider(),
     new FileSecretProvider(),
     new EnvSecretProvider(),
+    ...createExternalSecretProviders(),
   ]) {
     registerSecretProvider(provider, { provenance: 'builtin', source: 'secret-bridge' });
   }

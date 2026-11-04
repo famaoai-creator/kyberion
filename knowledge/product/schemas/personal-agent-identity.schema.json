@@ -20,6 +20,30 @@
       "pattern": "^kyberion://agent/[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$",
       "description": "FD-10: the durable NI-01 identity (`agent-identity.ts`) this agent_id is linked to. Populated best-effort by browser-onboarding.ts via `ensureAgentIdentityBestEffort` — never required, since onboarding must never fail on an identity-ledger write it cannot make yet."
     },
+    "persona_identity_bindings": {
+      "type": "object",
+      "description": "Conversational persona links only. No execution authority, session admission or information-sharing permission is conferred. Current ledger state is revalidated on use.",
+      "additionalProperties": false,
+      "required": ["version", "persona_id", "accountable_human_id", "tenant_bindings"],
+      "properties": {
+        "version": { "const": 1 },
+        "persona_id": { "type": "string", "minLength": 1 },
+        "accountable_human_id": { "type": "string", "minLength": 1 },
+        "personal_nhi_id": { "$ref": "#/properties/nhi_id" },
+        "tenant_bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["tenant_slug", "nhi_id"],
+            "properties": {
+              "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+              "nhi_id": { "$ref": "#/properties/nhi_id" }
+            }
+          }
+        }
+      }
+    },
     "trust_tier": {
       "type": "string",
       "deprecated": true,

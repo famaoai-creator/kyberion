@@ -53,6 +53,7 @@ import {
   describeGeneratedBackend,
   musicBackendIdForProvider,
   resolveMusicProviderPurpose,
+  resolveMusicSavedDefaultProvider,
   resolveMusicRequestedFormat,
   resolveMusicProviderPreference,
   resolveMusicBridgeRequest,
@@ -119,7 +120,13 @@ async function handlePromptBasedGeneration(action: string, params: any) {
   let hasProviderReceipt = false;
   try {
     if (action === 'generate_video') params = await applyVideoProviderSelection(params);
-    const prepared = preparePromptBasedGeneration(action, params);
+    // A saved music-generation-provider default (no backend_id / purpose)
+    // routes to the direct bridge like a purpose does.
+    const savedMusicDefault =
+      action === 'generate_music' ? await resolveMusicSavedDefaultProvider(params) : undefined;
+    const prepared = preparePromptBasedGeneration(action, params, {
+      directMusic: Boolean(savedMusicDefault),
+    });
     if (
       action === 'generate_image' &&
       !prepared.workflow &&
@@ -190,13 +197,17 @@ async function handlePromptBasedGeneration(action: string, params: any) {
 
     if (action === 'generate_music') {
       const backend = resolveGenerationBackend(action, prepared.params);
-      // A purpose without a named backend routes to the direct bridge, which
-      // ranks the local providers; no purpose keeps the ComfyUI default.
+      // A purpose or an eligible saved seam default without a named backend
+      // routes to the direct bridge, which ranks / leads the local providers;
+      // otherwise the ComfyUI default stays.
       const musicPurpose = resolveMusicProviderPurpose(prepared.params);
-      if (isDirectMusicGenerationBackend(backend) || musicPurpose) {
+      if (isDirectMusicGenerationBackend(backend) || musicPurpose || savedMusicDefault) {
         const { generateMusic } = await import('@agent/core/media/music-generation-bridge');
         const bridgeRequest = resolveMusicBridgeRequest(prepared.params);
-        const format = musicPurpose ? resolveMusicRequestedFormat(prepared.params) : undefined;
+        const format =
+          musicPurpose || savedMusicDefault
+            ? resolveMusicRequestedFormat(prepared.params)
+            : undefined;
         const bridgeRes = await generateMusic({
           prompt: bridgeRequest.prompt,
           ...(bridgeRequest.durationSec !== undefined

@@ -108,7 +108,7 @@ function inspectIdentity(
           KYBERION_PROJECT_ID: scope.project_id ?? '',
           KYBERION_TASK_ID: scope.task_id ?? '',
           MISSION_ID: scope.mission_id ?? '',
-          KYBERION_NHI_ACTOR: scope.nhi_id ?? '',
+          KYBERION_NHI_ID: scope.nhi_id ?? '',
           KYBERION_CUSTOMER: scope.customer_stance ?? '',
           KYBERION_VIEWER_PRINCIPAL: scope.viewer_principal ?? '',
           SYSTEM_ROLE: getRegisteredEnvText('SYSTEM_ROLE'),
@@ -202,7 +202,7 @@ export function canonicalAuthorityCommand(root: string, argv: string[]): string 
     KYBERION_PROJECT_ID: scope.project_id ?? '',
     KYBERION_TASK_ID: scope.task_id ?? '',
     MISSION_ID: scope.mission_id ?? '',
-    KYBERION_NHI_ACTOR: scope.nhi_id ?? '',
+    KYBERION_NHI_ID: scope.nhi_id ?? '',
     KYBERION_VIEWER_PRINCIPAL: scope.viewer_principal ?? '',
   };
   return `cd ${quote(root)} && ${Object.entries(env)

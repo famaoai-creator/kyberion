@@ -13,8 +13,12 @@
  *      of the governed policy (one file per seam under
  *      knowledge/product/governance/seam-provider-selection/), using measured
  *      operator trait values where they exist;
- *   5. default — no purpose means the seam default; if the default cannot run
- *      the task, the policy's `fallback_purpose` ranks the eligible ones.
+ *   5. default — no purpose means the default: the caller's configured
+ *      default, else a saved seam default (seam-selection-defaults.ts:
+ *      env > project > organization > tenant > operator), else the policy
+ *      default (first eligible provider of `default_chains`, else
+ *      `default_provider`); if none can run the task, the policy's
+ *      `fallback_purpose` ranks the eligible ones.
  * Every decision is written to the audit chain and, with a decision key
  * inside a mission, pinned so replays reproduce it.
  */
@@ -28,6 +32,11 @@ import {
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { loadRegistryDirectory, type RegistryDirectoryOptions } from './registry-directory.js';
+import {
+  resolveSavedSeamDefault,
+  type SavedSeamDefault,
+  type SeamDefaultLayer,
+} from './seam-selection-defaults.js';
 import {
   getSeamTraitOverrides,
   matchSeamSelectionRule,
@@ -63,6 +72,8 @@ export interface SeamSelectionPolicy {
    * chains routers used to hardcode.
    */
   default_chains?: Record<string, string[]>;
+  /** false: saved seam defaults never apply to this seam (security engines). */
+  allow_saved_default?: boolean;
 }
 
 export interface SeamProviderCandidate {
@@ -94,6 +105,8 @@ export interface SeamProviderDecision {
   purpose?: string;
   context?: Record<string, string>;
   rule_id?: string;
+  /** Where the default came from when the default led the decision. */
+  default_source?: 'caller' | SeamDefaultLayer | 'policy';
   eligible: string[];
   excluded: Array<{ id: string; unmet: string[] }>;
   scores: SeamProviderScore[];
@@ -116,8 +129,10 @@ export interface ResolveSeamProviderOptions {
   pin?: boolean;
   /** Record the decision to the audit chain. Default true. */
   record?: boolean;
-  /** Ignore operator rules and measured overrides (calibration / explain baselines). */
+  /** Ignore operator rules, saved defaults and measured overrides (calibration / explain baselines). */
   ignoreOperatorOverlay?: boolean;
+  /** `default_chains` key ordering the default and the rest (e.g. `mode:accurate`); 'default' otherwise. */
+  defaultOrderKey?: string;
 }
 
 export interface SeamSelectionEntryOptions {
@@ -131,6 +146,8 @@ export interface SeamSelectionEntryOptions {
   /** Saved operator defaults may opt into governed selection without a purpose. */
   selectForDefault?: boolean;
   decisionKey?: string;
+  /** Do not consult saved seam defaults (seam-selection-defaults.ts). */
+  ignoreSavedDefault?: boolean;
 }
 
 export type SeamSelectionEntry =
@@ -150,8 +167,15 @@ export function resolveSeamSelectionEntry(options: SeamSelectionEntryOptions): S
   const context =
     options.context && Object.keys(options.context).length ? options.context : undefined;
   const defaultProvider = purpose ? undefined : options.defaultProvider?.trim() || undefined;
+  // A saved seam default is an explicit human choice: it opts the call into
+  // governed selection (audited, pinnable) just like a purpose would.
+  const saved =
+    purpose || defaultProvider || options.ignoreSavedDefault
+      ? null
+      : savedSeamDefaultFor(options.seam);
   const select =
     Boolean(purpose) ||
+    Boolean(saved) ||
     Boolean(options.selectForDefault && defaultProvider) ||
     Boolean(matchSeamSelectionRule(options.seam, { purpose, context })) ||
     (options.defaultEligible === false &&
@@ -191,6 +215,89 @@ export function getSeamSelectionPolicy(seam: string): SeamSelectionPolicy | null
 
 export function listSeamSelectionPurposes(seam: string): string[] {
   return Object.keys(getSeamSelectionPolicy(seam)?.purposes ?? {}).sort();
+}
+
+/**
+ * The saved seam default for a seam, unless its policy opts out
+ * (`allow_saved_default: false`). A missing policy directory does not block
+ * saved defaults.
+ */
+export function savedSeamDefaultFor(seam: string): SavedSeamDefault | null {
+  try {
+    if (getSeamSelectionPolicy(seam)?.allow_saved_default === false) return null;
+  } catch {
+    // Policy directory unavailable: fall through to the saved layers.
+  }
+  return resolveSavedSeamDefault(seam);
+}
+
+/**
+ * The policy's baseline provider order for a request: `default_chains[key]`,
+ * else `default_chains.default`, else just `[default_provider]`.
+ */
+export function seamPolicyDefaultChain(policy: SeamSelectionPolicy, key?: string): string[] {
+  const chains = policy.default_chains;
+  if (key && chains?.[key]?.length) return [...chains[key]];
+  if (chains?.default?.length) return [...chains.default];
+  return policy.default_provider ? [policy.default_provider] : [];
+}
+
+export interface SeamDefaultOrderOptions {
+  /** `default_chains` key for this request (e.g. `mode:accurate`). */
+  orderKey?: string;
+  /** Used only when the seam has no governed policy (hermetic tests, minimal checkouts). */
+  builtin?: readonly string[];
+  /** Skip the saved default layer (calibration baselines). */
+  ignoreSavedDefault?: boolean;
+}
+
+/**
+ * Baseline provider order for seams that walk a chain themselves (storage,
+ * lease, event bus, vcs, transport, embedding, …): the saved seam default
+ * first, then the policy's default chain (or the builtin order when there is
+ * no policy). Eligibility and explicit selectors stay with the caller.
+ */
+export function resolveSeamDefaultOrder(
+  seam: string,
+  options: SeamDefaultOrderOptions = {}
+): string[] {
+  let base: string[] = [];
+  try {
+    const policy = getSeamSelectionPolicy(seam);
+    if (policy) base = seamPolicyDefaultChain(policy, options.orderKey);
+  } catch {
+    // Policy directory unavailable (isolated tests): builtin order applies.
+  }
+  if (base.length === 0) base = [...(options.builtin ?? [])];
+  const saved = options.ignoreSavedDefault ? null : savedSeamDefaultFor(seam);
+  const head = saved ? [saved.provider] : [];
+  return [...head, ...base].filter((id, index, all) => all.indexOf(id) === index);
+}
+
+/**
+ * The default provider id for seams that pick one implementation (no chain):
+ * saved default → policy default chain head → `default_provider` → builtin.
+ * Returns the source so callers can log/explain it.
+ */
+export function resolveSeamDefaultProvider(
+  seam: string,
+  options: SeamDefaultOrderOptions & { eligible?: (id: string) => boolean } = {}
+): { provider: string; source: SeamDefaultLayer | 'policy' | 'builtin' } | null {
+  const ok = options.eligible ?? (() => true);
+  const saved = options.ignoreSavedDefault ? null : savedSeamDefaultFor(seam);
+  if (saved && ok(saved.provider)) return { provider: saved.provider, source: saved.layer };
+  try {
+    const policy = getSeamSelectionPolicy(seam);
+    if (policy) {
+      const chain = seamPolicyDefaultChain(policy, options.orderKey);
+      const hit = chain.find(ok);
+      if (hit) return { provider: hit, source: 'policy' };
+    }
+  } catch {
+    // fall through to builtin
+  }
+  const builtin = (options.builtin ?? []).find(ok);
+  return builtin ? { provider: builtin, source: 'builtin' } : null;
 }
 
 /** Product profiles with the operator's measured trait values applied. */
@@ -282,17 +389,25 @@ function decide(
   const excluded = options.candidates
     .filter((c) => !c.eligible)
     .map((c) => ({ id: c.id, unmet: c.unmet ?? [] }));
-  const configuredDefault = purpose ? undefined : options.defaultProvider?.trim();
+  const callerDefault = purpose ? undefined : options.defaultProvider?.trim() || undefined;
+  const saved: SavedSeamDefault | null =
+    purpose || callerDefault || options.ignoreOperatorOverlay ? null : savedSeamDefaultFor(seam);
+  const configuredDefault = callerDefault ?? saved?.provider;
+  const configuredSource: 'caller' | SeamDefaultLayer | undefined = callerDefault
+    ? 'caller'
+    : saved?.layer;
+  const configuredLabel =
+    configuredSource && configuredSource !== 'caller'
+      ? `saved default (${configuredSource})`
+      : 'configured default';
   const configuredCandidate = configuredDefault
     ? options.candidates.find((candidate) => candidate.id === configuredDefault)
     : undefined;
   const defaultNote =
     configuredDefault && !configuredCandidate
-      ? "configured default '" + configuredDefault + "' is not registered"
+      ? `${configuredLabel} '${configuredDefault}' is not registered`
       : configuredCandidate && !configuredCandidate.eligible
-        ? "configured default '" +
-          configuredDefault +
-          "' cannot run this task (" +
+        ? `${configuredLabel} '${configuredDefault}' cannot run this task (` +
           (configuredCandidate.unmet?.join(', ') || 'ineligible') +
           ')'
         : undefined;
@@ -331,20 +446,35 @@ function decide(
 
   const withOverlay = !options.ignoreOperatorOverlay;
   const profiles = effectiveSeamProviderProfiles(policy, withOverlay);
-  const defaultProvider =
-    configuredDefault && configuredCandidate?.eligible
-      ? configuredDefault
-      : policy.default_provider;
-  const defaultLabel =
-    defaultProvider === configuredDefault ? 'configured default' : 'seam default';
+  // Policy default: the first eligible provider of the default chain for this
+  // request (chains list platform/host-specific providers first and rely on
+  // eligibility), else the declared `default_provider`.
+  const chain = seamPolicyDefaultChain(policy, options.defaultOrderKey);
+  // With a purpose the declared default stays the score tie-break (stable
+  // across platforms); the chain only orders the remaining ties.
+  const policyDefault = purpose
+    ? policy.default_provider
+    : (chain.find((id) => eligible.includes(id)) ?? policy.default_provider);
+  const useConfigured = Boolean(configuredDefault && configuredCandidate?.eligible);
+  const defaultProvider = useConfigured ? configuredDefault! : policyDefault;
+  const defaultSource: 'caller' | SeamDefaultLayer | 'policy' = useConfigured
+    ? configuredSource!
+    : 'policy';
+  const defaultLabel = useConfigured ? configuredLabel : 'seam default';
   const defaultEligible = eligible.includes(defaultProvider);
+  const chainIndex = (id: string) => {
+    const index = chain.indexOf(id);
+    return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+  };
   // Without a purpose the default leads; if it cannot run the task the
   // policy's fallback purpose ranks what can.
   const rankingPurposeName =
     purpose ?? (!defaultEligible ? policy.fallback_purpose : undefined) ?? undefined;
   const rankingPurpose = rankingPurposeName ? policy.purposes[rankingPurposeName] : undefined;
   const tieBreak = (a: string, b: string) =>
-    Number(b === defaultProvider) - Number(a === defaultProvider) || a.localeCompare(b);
+    Number(b === defaultProvider) - Number(a === defaultProvider) ||
+    chainIndex(a) - chainIndex(b) ||
+    a.localeCompare(b);
   const scores = rankingPurpose
     ? eligible
         .map((id) => scoreCandidate(profiles, rankingPurpose, id))
@@ -413,12 +543,14 @@ function decide(
         provider_id: defaultProvider,
         ranked: leading([defaultProvider]),
         strategy: 'default',
+        default_source: defaultSource,
         rationale: `no purpose given; ${defaultLabel} '${defaultProvider}'${suffix}`,
       };
     }
     if (!rankingPurpose) {
       return unresolved(
-        `the seam default '${policy.default_provider}' cannot run this task and no purpose was given`
+        `the seam default '${policy.default_provider}' cannot run this task and no purpose was given` +
+          suffix
       );
     }
     const winner = scores[0]!;

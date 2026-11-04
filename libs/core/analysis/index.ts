@@ -2,5 +2,6 @@
 export * from './analysis-config.js';
 export * from './analysis-contract.js';
 export * from './observability-gate.js';
+export * from './trace-exporter.js';
 export * from './trace-schema.js';
 export * from './trace.js';

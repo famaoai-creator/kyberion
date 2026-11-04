@@ -254,6 +254,14 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/event/event-bus.ts',
     consumers: ['libs/core/event/local-event-bus.ts', 'libs/core/event/memory-event-bus.ts'],
   },
+  'runtime-readiness-check': {
+    declaration: 'libs/core/runtime-readiness.ts',
+    consumers: ['presence/displays/concierge/src/app/api/readyz/route.ts'],
+  },
+  'trace-exporter': {
+    declaration: 'libs/core/analysis/trace-exporter.ts',
+    consumers: ['libs/core/analysis/trace.ts'],
+  },
   'vcs-backend': {
     declaration: 'libs/core/vcs/vcs-backend.ts',
     consumers: [

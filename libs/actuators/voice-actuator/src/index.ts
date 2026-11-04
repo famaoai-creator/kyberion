@@ -72,7 +72,7 @@ import {
   normalizeVoiceActionInput,
   verifyTtsLoopback,
 } from './voice-action-helpers.js';
-import { routeVoiceEngine } from './voice-engine-selection.js';
+import { isNamedVoiceEngineId, routeVoiceEngine } from './voice-engine-selection.js';
 import { transcribeVoiceSample } from './voice-transcribe.js';
 import {
   normalizeAudioSample,
@@ -1008,11 +1008,13 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
   ) as VoiceArtifactFormat;
   // engine_id 'auto' (or none) = not named: the profile default, subject to
   // governed selection (voice-tts-engine seam); a named engine always wins.
-  const namedEngineId = String(input.engine?.engine_id || '').trim();
-  const engineNamed = Boolean(namedEngineId) && namedEngineId !== 'auto';
+  // profile_ref is required here, so the profile's default_engine_id (a
+  // domain saved default) always outranks the generic saved seam default.
+  const engineNamed = isNamedVoiceEngineId(input.engine?.engine_id);
   const requestedEngineId =
-    (engineNamed ? namedEngineId : String(profile.default_engine_id || '').trim()) ||
-    profile.default_engine_id;
+    (engineNamed
+      ? String(input.engine!.engine_id).trim()
+      : String(profile.default_engine_id || '').trim()) || profile.default_engine_id;
   const defaultEngine = getVoiceEngineRecord(profile.default_engine_id);
   let engine = resolveVoiceEngineForPlatform(requestedEngineId);
   const personalVoiceMode = String(

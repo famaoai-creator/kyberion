@@ -3,6 +3,7 @@
  * Polymorphic compute execution driver interface and registry for Kyberion Compute Seam.
  */
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '@agent/core/seam';
+import { resolveSeamDefaultProvider } from '@agent/core/seam-provider-selection';
 
 export type ComputeProviderType = 'local' | 'colab' | (string & {});
 
@@ -126,8 +127,10 @@ export abstract class BaseComputeDriver implements ComputeDriver {
 }
 
 /** Polymorphic Registry of Compute Drivers */
+const COMPUTE_EXECUTION_PROVIDER_SEAM = 'compute-execution-provider';
+
 const computeDriverSeam = createSeam<ComputeDriver>({
-  key: 'compute-execution-provider',
+  key: COMPUTE_EXECUTION_PROVIDER_SEAM,
   multiplicity: 'named',
   catalog: coreSeamCatalog,
   owner: 'libs/actuators/compute-actuator/src/compute-driver.ts',
@@ -178,7 +181,28 @@ export function listComputeProviders(): string[] {
   return computeDriverSeam.list().map((entry) => entry.id);
 }
 
-export function getComputeDriver(provider: string = 'local'): ComputeDriver {
+/** Hermetic fallback when neither a saved default nor the seam policy names a provider. */
+const BUILTIN_COMPUTE_PROVIDER = 'local';
+
+/**
+ * Provider used when a call names none: the saved seam default
+ * (KYBERION_SEAM_DEFAULTS / project / organization / tenant / operator) when
+ * it is registered, else the compute-execution-provider policy default, else
+ * 'local'.
+ */
+export function resolveDefaultComputeProvider(): string {
+  const registered = new Set(listComputeProviders());
+  return (
+    resolveSeamDefaultProvider(COMPUTE_EXECUTION_PROVIDER_SEAM, {
+      eligible: (id) => registered.has(id),
+      builtin: [BUILTIN_COMPUTE_PROVIDER],
+    })?.provider ?? BUILTIN_COMPUTE_PROVIDER
+  );
+}
+
+export function getComputeDriver(
+  provider: string = resolveDefaultComputeProvider()
+): ComputeDriver {
   const driver: unknown = computeDriverSeam.getOptional(provider);
   if (!driver) {
     throw new Error(
@@ -219,5 +243,5 @@ export function resolveDriverForJob(jobId: string, explicitProvider?: string): C
     );
   }
   if (owners[0]) return owners[0].implementation;
-  return getComputeDriver('local');
+  return getComputeDriver(resolveDefaultComputeProvider());
 }

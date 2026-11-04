@@ -1,0 +1,73 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "judgment-backend",
+      "default_provider": "builtin-rules",
+      "fallback_purpose": "privacy",
+      "traits": {
+        "accuracy": "How often the provider picks the right option on unambiguous typed questions (choice / score / noul).",
+        "latency": "Wall-clock per judge() call once the provider is warm.",
+        "privacy": "How little the judged state travels: local-only providers score highest, external APIs lowest. The hard floor is still the provider egress gate, not this trait.",
+        "zero_config": "Works with no operator opt-in, model download, resident worker or API key."
+      },
+      "providers": {
+        "builtin-rules": {
+          "traits": { "accuracy": 0.6, "latency": 1, "privacy": 1, "zero_config": 1 },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared",
+            "zero_config": "declared"
+          },
+          "evidence": [
+            "libs/core/reasoning/judgment-backend.ts (BUILTIN_JUDGMENT_PROVIDER: always present, local-only, never calibrated; the floor selectJudgmentBackend degrades to)",
+            "libs/core/organization/organization-operating-model-persistence.ts (registerOrganizationWorkJudgment: regex rule table, 5/6 on the JUDGMENT-SEAM-20260921 unambiguous set)"
+          ]
+        },
+        "laya-mlx": {
+          "traits": { "accuracy": 0.85, "latency": 0.9, "privacy": 1, "zero_config": 0.2 },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared",
+            "zero_config": "declared"
+          },
+          "evidence": [
+            "libs/core/laya-mlx-judgment-backend.ts (egress 'local-only', deterministic open-weights encoder on MLX; 24 ms p50 warm, 6/6 with option descriptions; resident Python worker, opt-in via KYBERION_JUDGMENT_PROVIDERS)"
+          ]
+        },
+        "typesafe-jev": {
+          "traits": { "accuracy": 0.65, "latency": 0.6, "privacy": 0, "zero_config": 0.3 },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared",
+            "zero_config": "declared"
+          },
+          "evidence": [
+            "libs/core/typesafe-jev-judgment-backend.ts (egress 'external-api', hosted System One API; 235-278 ms over the network, 4/6 on the same set, non-deterministic; API key + opt-in via KYBERION_JUDGMENT_PROVIDERS)"
+          ]
+        }
+      },
+      "purposes": {
+        "accuracy": {
+          "description": "Typed questions where picking the right option matters more than latency or setup.",
+          "weights": { "accuracy": 1 }
+        },
+        "speed": {
+          "description": "Hot-path judgments where per-call latency matters most.",
+          "weights": { "latency": 1 }
+        },
+        "privacy": {
+          "description": "Prefer that the judged state never leaves the machine; the egress gate still enforces the tier floor.",
+          "weights": { "privacy": 0.7, "accuracy": 0.3 }
+        }
+      },
+      "default_chains": {
+        "default": ["laya-mlx", "typesafe-jev", "builtin-rules"]
+      }
+    }
+  ]
+}

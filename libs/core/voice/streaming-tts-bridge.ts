@@ -339,7 +339,14 @@ export function resolveStreamingTtsBridge(
 ): StreamingTextToSpeechBridge {
   const explicit =
     options.bridgeId?.trim() || getRegisteredEnvText('KYBERION_STREAMING_TTS_BRIDGE')?.trim();
-  if (explicit) return getStreamingTtsBridge(explicit);
+  // 'auto' is not an explicit choice: it falls through to selection (as in STT).
+  if (explicit && explicit !== 'auto') {
+    const explicitEntry = resolveSeamSelectionEntry({
+      seam: STREAMING_TTS_SEAM,
+      explicitProvider: explicit,
+    });
+    if (explicitEntry.kind === 'explicit') return getStreamingTtsBridge(explicitEntry.providerId);
+  }
   const savedDefault = options.purpose?.trim()
     ? undefined
     : enginePreference('streaming_tts_bridge');
@@ -352,6 +359,7 @@ export function resolveStreamingTtsBridge(
   const context = { ...(language ? { language } : {}), ...(options.context ?? {}) };
   const entry = resolveSeamSelectionEntry({
     seam: STREAMING_TTS_SEAM,
+    explicitProvider: explicit,
     purpose: options.purpose,
     context,
     defaultProvider: savedDefault,

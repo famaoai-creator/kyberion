@@ -27,6 +27,43 @@ export const LOCAL_STORAGE_BACKEND_ID = 'local-fs';
  */
 const DEFAULT_STORAGE_BACKEND_CHAIN: readonly string[] = [LOCAL_STORAGE_BACKEND_ID];
 
+/**
+ * Supplies the no-selector resolution order (e.g. saved seam default →
+ * governed chain). Registered from `@agent/core` so kernel stays free of core
+ * imports; when none is registered (kernel-only / hermetic) the builtin
+ * constant applies unchanged.
+ */
+export type StorageBackendDefaultOrderResolver = () => readonly string[];
+
+let defaultOrderResolver: StorageBackendDefaultOrderResolver | undefined;
+let resolvingDefaultOrder = false;
+
+/** Install the default-order resolver; returns a restore function. */
+export function setStorageBackendDefaultOrderResolver(
+  resolver: StorageBackendDefaultOrderResolver | undefined
+): () => void {
+  const previous = defaultOrderResolver;
+  defaultOrderResolver = resolver;
+  return () => {
+    defaultOrderResolver = previous;
+  };
+}
+
+function storageBackendDefaultOrder(): readonly string[] {
+  // Re-entrant calls (the resolver itself persisting through this seam) and
+  // resolver failures fall back to the builtin chain.
+  if (!defaultOrderResolver || resolvingDefaultOrder) return DEFAULT_STORAGE_BACKEND_CHAIN;
+  resolvingDefaultOrder = true;
+  try {
+    const order = defaultOrderResolver();
+    return order.length > 0 ? order : DEFAULT_STORAGE_BACKEND_CHAIN;
+  } catch {
+    return DEFAULT_STORAGE_BACKEND_CHAIN;
+  } finally {
+    resolvingDefaultOrder = false;
+  }
+}
+
 /** Local minimal metadata — independent of `@agent/core` seam types. */
 export type SeamProviderProvenance = 'builtin' | 'plugin' | 'tenant-overlay' | 'generated';
 
@@ -185,7 +222,8 @@ export function resetStorageBackends(): void {
 
 /**
  * Resolve the backend for a caller. An explicit selector always wins; without
- * one the default chain (`['local-fs']`) picks the first registered provider,
+ * one the default order (registered resolver — saved seam default → governed
+ * chain — else the builtin `['local-fs']`) picks the first registered provider,
  * then falls back to whatever is registered. Throws when nothing is
  * registered — local-fs is installed by importing
  * `@agent/core/storage/local-storage-backend` (core consumers get that via
@@ -204,7 +242,7 @@ export function resolveStorageBackend(selector?: string): AsyncStorageBackend {
     }
     return backend;
   }
-  for (const id of DEFAULT_STORAGE_BACKEND_CHAIN) {
+  for (const id of storageBackendDefaultOrder()) {
     const backend = storageBackends.get(id);
     if (backend) return backend;
   }

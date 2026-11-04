@@ -1,4 +1,9 @@
 import * as path from 'node:path';
+import {
+  writePersonalAgentIdentityAtPath,
+  readPersonalAgentIdentityStrictAtPath,
+  personalAgentIdentityRevision,
+} from '../personal-identity-state.js';
 import { pathResolver } from '../path-resolver.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
@@ -318,6 +323,9 @@ function persistOnboardingIdentity(state: OnboardingState): void {
   const now = nowIso();
   withExecutionContext('sovereign_concierge', () => {
     const root = profileRoot();
+    const agentRevision = personalAgentIdentityRevision(
+      readPersonalAgentIdentityStrictAtPath(path.join(root, 'agent-identity.json'))
+    );
     safeMkdir(root, { recursive: true });
     safeWriteFile(
       path.join(root, 'my-identity.json'),
@@ -336,21 +344,18 @@ function persistOnboardingIdentity(state: OnboardingState): void {
       )
     );
     safeWriteFile(path.join(root, 'my-vision.md'), `# Sovereign Vision\n\n${vision}\n`);
-    safeWriteFile(
+    writePersonalAgentIdentityAtPath(
       path.join(root, 'agent-identity.json'),
-      JSON.stringify(
-        {
-          agent_id: agentId,
-          version: '1.0.0',
-          role: 'Ecosystem Architect / Senior Partner',
-          owner: name,
-          trust_tier: 'sovereign',
-          created_at: now,
-          description: `The primary autonomous entity of the Kyberion Ecosystem for ${name}.`,
-        },
-        null,
-        2
-      )
+      {
+        agent_id: agentId,
+        version: '1.0.0',
+        role: 'Ecosystem Architect / Senior Partner',
+        owner: name,
+        trust_tier: 'sovereign',
+        created_at: now,
+        description: `The primary autonomous entity of the Kyberion Ecosystem for ${name}.`,
+      },
+      agentRevision
     );
   });
 }
