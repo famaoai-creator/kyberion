@@ -137,6 +137,16 @@ describe('pr preflight', () => {
       expect(output.join('\n')).toContain('No affected tests selected');
     });
 
+    it('runs the affected tests with the CI locale, not the operator language', () => {
+      mocks.safeExec.mockReturnValue('');
+      runAffectedTests(() => undefined, undefined, { git: fakeGit(['libs/core/a.ts']) });
+      expect(mocks.safeExec).toHaveBeenCalledWith(
+        'pnpm',
+        ['exec', 'vitest', 'run', '--changed', 'abc123', '--passWithNoTests'],
+        expect.objectContaining({ env: { LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8', CI: 'true' } })
+      );
+    });
+
     it('fails preflight when an affected test run fails', () => {
       expect(() =>
         runAffectedTests(() => undefined, undefined, {
