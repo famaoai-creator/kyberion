@@ -345,7 +345,12 @@ export function buildNeedsYouQueue(
   const now = options.now ?? Date.now();
   const keep = (item: NeedsYouItem) => narrowNeedsYouItem(item, options.viewer, options.narrowing);
 
-  const approvals = [...data.approvals]
+  // One record read through two views (e.g. the personal aggregate) is one
+  // record: dedupe before folding, or it would inflate the group's count.
+  const uniqueApprovals = new Map(
+    data.approvals.map((item) => [`${item.storage_channel}/${item.id}`, item] as const)
+  );
+  const approvals = [...uniqueApprovals.values()]
     .filter((item) => approvalOpen(item, now))
     .sort(compareDecisionUrgency)
     .map((item) => fromApproval(item, now))
