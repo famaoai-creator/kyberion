@@ -103,13 +103,13 @@ function writeFocusedMissionId(missionId: string): void {
 
 // ─── Project ledger helpers (bind ROOT_DIR) ───────────────────────────────────
 async function syncProjectLedger(id: string): Promise<unknown> {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  return missionSystem.syncProjectLedger(id);
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  return missionLifecycleService.syncProjectLedger(id);
 }
 
 async function syncProjectLedgerIfLinked(id: string): Promise<unknown> {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  return missionSystem.syncProjectLedgerIfLinked(id);
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  return missionLifecycleService.syncProjectLedgerIfLinked(id);
 }
 
 async function reassignMissionProject(
@@ -152,18 +152,18 @@ async function reassignMissionProject(
 
 // ─── Mission seal / distill wrappers ─────────────────────────────────────────
 async function sealMission(id: string): Promise<unknown> {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  return missionSystem.sealMission(id);
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  return missionLifecycleService.sealMission(id);
 }
 
 async function distillMission(id: string): Promise<void> {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  return missionSystem.distillMission(id);
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  return missionLifecycleService.distillMission(id);
 }
 
 async function dispatchMissionTickets(id: string): Promise<void> {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  const result = await missionSystem.dispatchMissionTickets(
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  const result = await missionLifecycleService.dispatchMissionTickets(
     id,
     resolveMissionTicketDispatchOptionsFromArgv()
   );
@@ -334,13 +334,13 @@ async function startMission(
 // earlier in this file (lines 97-104), delegating to mission-project-ledger.ts
 
 async function delegateMission(id: string, agentId: string, a2aMessageId: string) {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  return missionSystem.delegateMission(id, agentId, a2aMessageId);
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  return missionLifecycleService.delegateMission(id, agentId, a2aMessageId);
 }
 
 async function importMission(id: string, remoteUrl: string) {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  return missionSystem.importMission(id, remoteUrl);
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  return missionLifecycleService.importMission(id, remoteUrl);
 }
 
 async function verifyMission(id: string, result: 'verified' | 'rejected', note: string) {
@@ -477,13 +477,13 @@ async function pauseMission(id: string, note?: string, decidedBy?: HumanDecidedB
 }
 
 async function cancelMission(id: string, note?: string, decidedBy?: HumanDecidedBy) {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  return missionSystem.cancelMission(id, note, decidedBy);
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  return missionLifecycleService.cancelMission(id, note, decidedBy);
 }
 
 async function repairLegacyMissionState(id: string, note?: string) {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  return missionSystem.repairLegacyMissionState(id, note);
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  return missionLifecycleService.repairLegacyMissionState(id, note);
 }
 
 async function recordTask(
@@ -491,8 +491,8 @@ async function recordTask(
   description: string,
   details: Record<string, unknown> = {}
 ) {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  return missionSystem.recordTask(missionId, description, details);
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  return missionLifecycleService.recordTask(missionId, description, details);
 }
 
 async function recordEvidence(
@@ -506,9 +506,9 @@ async function recordEvidence(
   provider?: string,
   taskBinding?: import('@agent/core/mission/mission-task-evidence-binding').TaskEvidenceBinding
 ) {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
   const { TraceContext, persistTrace } = await import('@agent/core/trace');
-  const result = await missionSystem.recordEvidence(
+  const result = await missionLifecycleService.recordEvidence(
     missionId,
     taskId,
     note,
@@ -547,8 +547,8 @@ async function recordArtifactReview(
   specialistRoles?: string[],
   provider?: string
 ) {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  const result = await missionSystem.recordArtifactReview(
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  const result = await missionLifecycleService.recordArtifactReview(
     missionId,
     reviewTaskId,
     reviewerAgentId,
@@ -624,8 +624,8 @@ async function reconcileExistingWork(
   dryRun = false,
   approvalRequestId?: string
 ) {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  const result = await missionSystem.reconcileExistingWork(
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  const result = await missionLifecycleService.reconcileExistingWork(
     missionId,
     manifestPath,
     dryRun,
@@ -636,8 +636,8 @@ async function reconcileExistingWork(
 }
 
 async function reenterMissionFromReview(missionId: string) {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  const result = await missionSystem.reenterMissionFromReview(missionId);
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  const result = await missionLifecycleService.reenterMissionFromReview(missionId);
   printOutput(JSON.stringify(result, null, 2));
   return result;
 }
@@ -660,13 +660,16 @@ export function formatPurgeCandidateTable(
 }
 
 async function purgeMissions(dryRun: boolean = false): Promise<void> {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
   // AL-01: purgeMissions now returns a structured PurgeMissionsResult; the
   // CLI router's context type is (dryRun?) => Awaitable<void> and never
   // consumed a return value, so drop it here to keep the thin-router contract.
   // The library returns rows and never writes to stdout (G08); the human
   // table is rendered here, before any archive log lines.
-  await missionSystem.purgeMissions(dryRun, {
+  // Routed through the governed archive sweep so `purge` gets the same
+  // execution-context gate and audit record as `archive`.
+  await missionLifecycleService.archive({
+    dryRun,
     onCandidates: (candidates) => {
       for (const line of formatPurgeCandidateTable(ROOT_DIR, candidates)) {
         printOutput(line);
@@ -1129,9 +1132,8 @@ export async function handoffMission(
 }
 
 async function grantMissionAccess(missionId: string, serviceId: string, ttl: number = 30) {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  assertCanGrantMissionAuthority();
-  return missionSystem.grantMissionAccess(missionId, serviceId, ttl);
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  return missionLifecycleService.grantMissionAccess(missionId, serviceId, ttl);
 }
 
 async function resolveGate(missionId: string, gateFile?: string): Promise<string> {
@@ -1360,9 +1362,8 @@ async function gateFail(missionId: string, gateFile?: string, note?: string): Pr
 }
 
 async function grantMissionSudo(missionId: string, on: boolean = true, ttl: number = 15) {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  assertCanGrantMissionAuthority();
-  return missionSystem.grantMissionSudo(missionId, on, ttl);
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  return missionLifecycleService.grantMissionSudo(missionId, on, ttl);
 }
 
 async function approveScopeChange(
@@ -1375,13 +1376,10 @@ async function approveScopeChange(
     approvalRequestId?: string;
   }
 ): Promise<void> {
-  const { missionSystem } = await import('@agent/core/mission/mission-system');
-  // The approval-mediated path validates the human approval inside
-  // approveScopeChange; SUDO is only required for the direct path.
-  if (!options?.approvalRequestId?.trim()) {
-    assertCanGrantMissionAuthority();
-  }
-  return missionSystem.approveScopeChange(missionId, options);
+  const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  // Authority (SUDO for the direct path; recorded human approval for the
+  // approval-mediated path) is enforced by the governed facade.
+  return missionLifecycleService.approveScopeChange(missionId, options);
 }
 
 /**
