@@ -9,7 +9,19 @@ import {
 import { safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from '@agent/core/secure-io';
 import { defineCatalog, nowIso, writeJson, type GovernedCatalog } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
-import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
+import {
+  draftRoleFromIntent,
+  loadRoleDraftInventory,
+  type RoleDraftDomainDefaults,
+  type RoleIntentDraft,
+  type RoleIntentDraftResult,
+} from '@agent/core/organization/role-intent-draft';
+import {
+  currentProcessArgv,
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+} from './lib/harness.js';
 
 type Print = (value: unknown) => void;
 
@@ -127,6 +139,7 @@ type OrgCommand =
       kind: 'role-promote';
       options: Partial<OrgRolePromoteOptions> & { roleId: string; authorityRoleId: string };
     }
+  | { kind: 'role-draft'; options: { intent: string; json: boolean } }
   | { kind: 'help' };
 
 const DEFAULT_PERSONA: Persona = 'analyst';
@@ -209,6 +222,7 @@ function helpText(): string {
     'Usage:',
     '  pnpm organization role create --name <display-name> --domain <domain> [--authority <authority-role-id>]',
     '  pnpm organization role promote --role <role-id> --authority <authority-role-id>',
+    '  pnpm organization role draft --from-intent "<one sentence>" [--json]',
     '',
     'Options:',
     '  --name <name>                 Display name for the new role.',
@@ -229,6 +243,8 @@ function helpText(): string {
     '  --delegate-role <role>        Repeatable allowed delegate team role.',
     '  --approval-id <uuid>          Approved human request required for security-policy writes.',
     '  --dry-run                     Print the planned change set without writing.',
+    '  --from-intent <sentence>      (draft) Describe the role in one sentence; prints a draft only.',
+    '  --json                        (draft) Print the draft envelope as JSON.',
   ].join('\n');
 }
 
@@ -236,6 +252,20 @@ function parseArgs(argv: string[]): OrgCommand {
   const args = [...argv];
   if (!args.length || args[0] === 'help' || args[0] === '--help' || args[0] === '-h') {
     return { kind: 'help' };
+  }
+
+  if (args[0] === 'role' && args[1] === 'draft') {
+    let intent: string | undefined;
+    let json = false;
+    for (let i = 2; i < args.length; i++) {
+      const arg = args[i];
+      if (arg === '--from-intent') intent = args[++i];
+      else if (arg === '--json') json = true;
+      else if (arg === '--help' || arg === '-h') return { kind: 'help' };
+      else if (arg.startsWith('--')) throw new Error(`Unknown option: ${arg}`);
+    }
+    if (intent === undefined) throw new Error('--from-intent "<sentence>" is required');
+    return { kind: 'role-draft', options: { intent, json } };
   }
 
   if (args[0] !== 'role' || args[1] !== 'create') {
@@ -1005,6 +1035,139 @@ function printResult(result: Record<string, unknown>, print: Print): void {
   print(JSON.stringify(result, null, 2));
 }
 
+function shellQuote(value: string): string {
+  return /^[A-Za-z0-9_./:@=-]+$/.test(value) ? value : `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+/** The governed `role create` argv that commits a draft; the draft itself writes nothing. */
+export function roleCreateArgsFromDraft(draft: RoleIntentDraft): string[] {
+  const args = ['--name', draft.name, '--domain', draft.domain, '--persona', draft.persona];
+  args.push('--autonomy', draft.autonomy_level, '--description', draft.description);
+  if (draft.ownership_scope) args.push('--ownership-scope', draft.ownership_scope);
+  for (const value of draft.required_capabilities) args.push('--capability', value);
+  for (const value of draft.scope_classes) args.push('--scope-class', value);
+  for (const value of draft.allowed_actuators) args.push('--actuator', value);
+  for (const value of draft.tier_access) args.push('--tier', value);
+  if (draft.escalation_parent_team_role) {
+    args.push('--parent-team-role', draft.escalation_parent_team_role);
+  }
+  for (const value of draft.allowed_delegate_team_roles) args.push('--delegate-role', value);
+  return args;
+}
+
+function roleDraftNextCommands(draft: RoleIntentDraft): { preview: string; commit: string } {
+  const base = ['pnpm', 'organization', 'role', 'create', ...roleCreateArgsFromDraft(draft)]
+    .map(shellQuote)
+    .join(' ');
+  return {
+    preview: `${base} --dry-run`,
+    commit: `${base} --approval-id <approved-request-id>`,
+  };
+}
+
+function roleDraftDomainDefaults(): Record<string, RoleDraftDomainDefaults> {
+  return Object.fromEntries(
+    Object.entries(DOMAIN_TEMPLATES).map(([domain, template]) => [
+      domain,
+      {
+        persona: (['analyst', 'worker', 'mission_owner'].includes(template.persona)
+          ? template.persona
+          : 'analyst') as RoleDraftDomainDefaults['persona'],
+        autonomy_level: template.autonomyLevel,
+        escalation_parent_team_role: template.escalationParentTeamRole,
+      },
+    ])
+  );
+}
+
+function renderRoleDraft(result: RoleIntentDraftResult): string {
+  if (result.status === 'failed') {
+    return [
+      `Role draft failed (${result.failure.class}): ${result.failure.message}`,
+      ...result.warnings.map((warning) => `warning: ${warning}`),
+      `next: ${result.failure.next}`,
+    ].join('\n');
+  }
+  const { draft } = result;
+  const list = (values: string[]) => (values.length ? values.join(', ') : '(none)');
+  const next = roleDraftNextCommands(draft);
+  const lines = [
+    `Role draft ${result.draft_id} (not created — draft only)`,
+    `  name:          ${draft.name} (team role id: ${draft.team_role_id})`,
+    `  domain:        ${draft.domain}`,
+    `  persona:       ${draft.persona}`,
+    `  autonomy:      ${draft.autonomy_level}`,
+    `  description:   ${draft.description}`,
+    ...(draft.ownership_scope ? [`  ownership:     ${draft.ownership_scope}`] : []),
+    `  capabilities:  ${list(draft.required_capabilities)}`,
+    `  scope classes: ${list(draft.scope_classes)}`,
+    `  actuators:     ${list(draft.allowed_actuators)}`,
+    `  tiers:         ${list(draft.tier_access)}`,
+    ...(draft.escalation_parent_team_role
+      ? [`  escalates to:  ${draft.escalation_parent_team_role}`]
+      : []),
+    `  delegates to:  ${list(draft.allowed_delegate_team_roles)}`,
+    '  write scopes:  domain template defaults (applied by role create)',
+    '',
+    `Dropped (not in the governed inventory): ${
+      result.dropped.length
+        ? result.dropped
+            .map((entry) => `${entry.field}=${entry.value} (${entry.reason})`)
+            .join('; ')
+        : '(none)'
+    }`,
+    ...(result.fallbacks.length
+      ? [
+          `Fallbacks: ${result.fallbacks
+            .map((entry) => `${entry.field}: ${entry.rejected} -> ${entry.used}`)
+            .join('; ')}`,
+        ]
+      : []),
+    `Missing connections: ${
+      result.missing_connections.length
+        ? result.missing_connections
+            .map(
+              (entry) =>
+                `${entry.actuator}${entry.prerequisites.length ? ` (needs ${entry.prerequisites.join(', ')})` : ''}`
+            )
+            .join('; ')
+        : '(none)'
+    }`,
+    ...result.warnings.map((warning) => `warning: ${warning}`),
+    '',
+    'Next — preview, then commit with an approved security-policy request:',
+    `  ${next.preview}`,
+    `  ${next.commit}`,
+  ];
+  return lines.join('\n');
+}
+
+async function runRoleDraft(
+  options: { intent: string; json: boolean },
+  print: Print
+): Promise<void> {
+  const inventory = loadRoleDraftInventory({
+    domains: roleDraftDomainDefaults(),
+    defaultDomain: 'default',
+  });
+  const result = await draftRoleFromIntent({ intent: options.intent, inventory });
+  if (options.json) {
+    print(
+      JSON.stringify(
+        result.status === 'drafted'
+          ? { ...result, next_commands: roleDraftNextCommands(result.draft) }
+          : result,
+        null,
+        2
+      )
+    );
+  } else {
+    print(renderRoleDraft(result));
+  }
+  // Failure is still a printed result; the exit code carries it to shells.
+  if (result.status === 'failed') throw new ScriptExitError(1);
+}
+
 export async function main(
   argv = currentProcessArgv().slice(2),
   print: Print = () => undefined
@@ -1012,6 +1175,10 @@ export async function main(
   const command = parseArgs(argv);
   if (command.kind === 'help') {
     print(helpText());
+    return;
+  }
+  if (command.kind === 'role-draft') {
+    await runRoleDraft(command.options, print);
     return;
   }
 
