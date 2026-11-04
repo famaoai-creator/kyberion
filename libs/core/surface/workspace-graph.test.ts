@@ -366,6 +366,7 @@ describe('surface operation registry', () => {
       'workspace.list',
       'workspace.get',
       'workspace.search',
+      'setup.checklist',
     ]);
     expect(ops.find((o) => o.id === 'workspace.get')?.inputSchema).toMatchObject({
       type: 'object',

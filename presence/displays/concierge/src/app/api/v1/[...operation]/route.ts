@@ -9,6 +9,7 @@ import {
   resolveConciergeViewer,
   toSurfaceAuthorizationContext,
 } from '../../../../lib/viewer-context';
+import { conciergeSetupChecklistReaders } from '../../../../lib/setup-checklist-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,6 +42,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ operation: 
     surfaceOperationInputFromQuery(req.nextUrl.searchParams),
     {
       viewer: toSurfaceAuthorizationContext(resolved.context),
+      ...(id === 'setup.checklist' ? { setupReaders: conciergeSetupChecklistReaders } : {}),
     }
   );
   return NextResponse.json(result, { status: result.ok ? 200 : result.status, headers: NO_STORE });
