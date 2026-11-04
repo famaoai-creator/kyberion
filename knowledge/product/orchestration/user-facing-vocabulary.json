@@ -20122,6 +20122,11 @@
         "en": "No workspace is selected, so choose where this goes.",
         "ja": "ワークスペースが選ばれていないため、登録先を選んでください。",
         "qps-ploc": "⟦Ñő ẇőřķşṗȧƈė ïş şėŀėƈŧėḓ, şő ƈħőőşė ẇħėřė ŧħïş ɠőėş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_shell_scope_current": {
+        "en": "{workspace}. Change it with the workspace switcher.",
+        "ja": "{workspace}(切り替えはワークスペースの選択から)",
+        "qps-ploc": "⟦{workspace}. Ƈħȧñɠė ïŧ ẇïŧħ ŧħė ẇőřķşṗȧƈė şẇïŧƈħėř. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       }
     },
     "onboarding": {

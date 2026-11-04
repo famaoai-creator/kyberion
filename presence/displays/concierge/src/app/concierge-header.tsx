@@ -61,14 +61,20 @@ export function ConciergeHeader() {
       linkComponent={outerActions.linkComponent}
       navigate={outerActions.navigate}
     >
-      <PageHeader
-        title={t('header.title')}
-        subtitle={t('header.tagline')}
-        role_badge={{ label: t('header.role_badge'), role: 'concierge' }}
-        actions={[{ label: t('dock.title'), action: { id: OPEN_DOCK_ACTION }, variant: 'primary' }]}
-      >
-        <DisplayControls id="display-controls" theme={theme} locale={locale} />
-      </PageHeader>
+      {/* MSN-SHELL-IA §5: the surface bar, not a page title — every page
+          renders its own PageHeader at the one page-title scale. */}
+      <div className="concierge-header">
+        <PageHeader
+          title={t('header.title')}
+          subtitle={t('header.tagline')}
+          role_badge={{ label: t('header.role_badge'), role: 'concierge' }}
+          actions={[
+            { label: t('dock.title'), action: { id: OPEN_DOCK_ACTION }, variant: 'primary' },
+          ]}
+        >
+          <DisplayControls id="display-controls" theme={theme} locale={locale} />
+        </PageHeader>
+      </div>
     </A2UIActionProvider>
   );
 }
