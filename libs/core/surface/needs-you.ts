@@ -52,7 +52,9 @@ export const NEEDS_YOU_REASONS = [
 export type NeedsYouReason = (typeof NEEDS_YOU_REASONS)[number];
 
 /** The actions a card may offer; each item lists only those that apply. */
-export type NeedsYouAction = 'approve' | 'reject' | 'request_changes' | 'later' | 'open';
+/** `mark_handled` closes a customer-decision hand-off the operator has dealt with. */
+export type NeedsYouAction =
+  'approve' | 'reject' | 'request_changes' | 'mark_handled' | 'later' | 'open';
 
 /** An item without a deadline becomes overdue after waiting this long. */
 export const NEEDS_YOU_OVERDUE_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
@@ -216,14 +218,19 @@ function fromOutcome(item: NeedsYouOutcomeInput, now: number): NeedsYouItem {
   return {
     id: `${decision ? 'decision' : 'review'}:${item.entry_id}`,
     reason: decision ? 'decision' : 'review',
-    title: text(item.title, decision ? 'ia_inbox_decision_title' : 'ia_inbox_review_title'),
+    // A hand-off title carries the raw agenda id; the card names it instead.
+    title: decision
+      ? { key: 'ia_inbox_decision_title' }
+      : text(item.title, 'ia_inbox_review_title'),
     requester: decision ? { label: { key: 'ia_inbox_requester_customer' }, agent: false } : AGENT,
     ...(item.mission_id ? { mission_id: item.mission_id } : {}),
     ...(item.tenant_slug ? { tenant_slug: item.tenant_slug } : {}),
     ...(item.updated_at ? { waiting_since: item.updated_at } : {}),
     overdue: isOverdue(undefined, item.updated_at, now),
+    // A hand-off is closed by the operator once dealt with (`/api/outcomes/[id]`
+    // accepted, with a human receipt); nothing else resolves it.
     actions: decision
-      ? ['open', 'later']
+      ? ['mark_handled', 'open', 'later']
       : [
           'approve',
           'request_changes',

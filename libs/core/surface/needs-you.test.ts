@@ -147,6 +147,11 @@ describe('needs-you count definition', () => {
         'review:o-unread',
       ].sort()
     );
+    // H2: a customer-decision hand-off can be closed by the operator, and its
+    // title never shows the raw agenda id.
+    const decision = items.find((item) => item.id === 'decision:INBOX-CDH-1')!;
+    expect(decision.actions).toEqual(['mark_handled', 'open', 'later']);
+    expect(decision.title).toEqual({ key: 'ia_inbox_decision_title' });
     const summary = summarizeNeedsYou(items);
     expect(summary).toMatchObject({
       ok: true,
