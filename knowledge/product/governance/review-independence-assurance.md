@@ -93,3 +93,38 @@ unknown policy, canonical-looking IDs, aliases, same or absent runtime claims,
 and prevention of publication under strict policy. Future positive attestation
 tests must exercise actual trusted capture and persisted verification, including
 historical evaluation after release and distinct NHIs with one accountable human.
+
+## Historical binding metadata prerequisite
+
+`captureRuntimeBindingReference` and `resolveRuntimeBindingReference` expose a
+secret-free consistency reference to an effective identity-journal binding. The
+reference contains the canonical NHI, journal sequence and a SHA-256 fingerprint
+of an explicit metadata projection. Historical lookup requires the expected
+tenant and preserves the accountable human at binding time after release,
+retirement or reassignment. Rebinding the same instance has a separate sequence;
+a redundant same-content event does not replace the effective binding.
+
+This reader rejects malformed lines, unknown operations, invalid payloads,
+unsupported versions, gaps, duplicate or unsafe sequences and ineffective binds.
+It does not change the existing tolerant identity projection. Organization runtime
+inspection adds `runtimeBindingHistory` with either `available` / `metadata_only`
+and a reference, or explicit `unavailable`; person scope invents no binding.
+History failure does not change the existing live-admission decision.
+The strict scan avoids whole-file text buffering, but retains validated events
+for the existing replay API: replay memory remains proportional to journal history.
+
+**This is not an authenticated execution receipt.** The fingerprint is unkeyed,
+not a signature, and a journal writer can fabricate records and fingerprints.
+The projection intentionally excludes session credentials and provider/model
+hints. It does not detect changes to excluded fields. A binding prefix does not
+prove the human admission ceremony occurred. Instance IDs remain attribution,
+not host-established runtime incarnations. Lookup is not a current authorization
+check, and a historical reference cannot authorize a session or satisfy review
+independence. No capture of task/artifact authorship, independent issuer, immutable
+external retention, or strong reviewer completion is introduced. The strict
+`authenticated_execution` policy therefore remains unavailable as before.
+
+Regression coverage additionally lives in `agent/agent-identity.test.ts` and
+`organization/nhi-session-admission.test.ts` under `libs/core`: historical survival,
+rebindings, same-human distinct NHIs, mismatched references/scopes, strict corrupt
+history rejection, token-free diagnostics and unchanged legacy admission.

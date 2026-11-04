@@ -4,7 +4,12 @@ import { createHash } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
 import { resolveActiveProfileRoot } from '../profile-root.js';
 import { readPersonalAgentIdentityStrictAtPath as loadPersonalAgentIdentityAtPath } from '../personal-identity-state.js';
-import { getAgentIdentity, deriveAgentNhiId } from '../agent/agent-identity.js';
+import {
+  getAgentIdentity,
+  deriveAgentNhiId,
+  captureRuntimeBindingReference,
+  type RuntimeBindingReference,
+} from '../agent/agent-identity.js';
 import { parseNhiId } from '../nhi-id.js';
 import { resolvePersonaIdentity, personaIdentityBindingsSchema } from '../persona-identity.js';
 import { getPluginExecutionContext } from '../shell/sandbox-policy.js';
@@ -63,7 +68,16 @@ export function onboardingAgentIdentityParameters(
 }
 
 export type InstalledOnboardingRuntime =
-  | { ready: true; ownerId: string; agentId: string; agentActive: boolean; scope: CharterScope }
+  | {
+      ready: true;
+      ownerId: string;
+      agentId: string;
+      agentActive: boolean;
+      scope: CharterScope;
+      runtimeBindingHistory?:
+        | { status: 'available'; assurance: 'metadata_only'; reference: RuntimeBindingReference }
+        | { status: 'unavailable' };
+    }
   | { ready: false; reason: string };
 
 export function inspectInstalledOnboardingRuntime(scope: CharterScope): InstalledOnboardingRuntime {
@@ -111,12 +125,30 @@ export function inspectInstalledOnboardingRuntime(scope: CharterScope): Installe
           })?.nhi_id !== admitted.nhi_id
         )
           return { ready: false, reason: 'persona_identity_mismatch' };
+        // Diagnostic only: strict history failure must not change legacy admission.
+        let runtimeBindingHistory: Extract<
+          InstalledOnboardingRuntime,
+          { ready: true }
+        >['runtimeBindingHistory'] = { status: 'unavailable' };
+        try {
+          const reference = captureRuntimeBindingReference({
+            nhiId: admitted.nhi_id,
+            instanceId: binding.instance_id,
+            sessionId,
+            tenantSlug: scope.tenant_slug,
+          });
+          if (reference)
+            runtimeBindingHistory = { status: 'available', assurance: 'metadata_only', reference };
+        } catch {
+          /* Explicitly unavailable; never promote a tolerant replay into proof. */
+        }
         return {
           ready: true,
           ownerId,
           agentId: admitted.nhi_id,
           agentActive: admitted.lifecycle_status === 'active',
           scope: structuredClone(scope),
+          runtimeBindingHistory,
         };
       }
       const profile = loadPersonalAgentIdentityAtPath(
