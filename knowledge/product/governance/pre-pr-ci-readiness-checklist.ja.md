@@ -238,8 +238,8 @@ PR 本文の Test plan に明記する。
 
 - **`0 test files` / `No test files found` は検証済みではない**。`origin/main` が無い・古い checkout では
   変更が 0 件と判定される。`git fetch origin main` してから再実行する。
-- **データファイルは import graph に乗らない**。`knowledge/` や actuator `manifest.json` などの JSON / YAML
-  だけを変えた場合、それを実行時に読むテスト（registry の件数・順序を固定したテストなど）は選ばれない。
+- **データファイルと文書は import graph に乗らない**。`knowledge/` や actuator `manifest.json` などの JSON / YAML、
+  `AGENTS.md`・`CONTRIBUTING.md` などの Markdown だけを変えた場合、それを実行時に読むテスト（registry の件数・順序を固定したテスト、文書の文言を検査する contract test など）は選ばれない。
   `grep -rln "<ファイル名か registry 名>" --include=*.test.ts libs scripts tests` で読み手のテストを探して流す。
 
 4. 例外表の残りの追加確認（gate では表現できない手順）を実行し、生成物 drift があれば同じ commit に含める。
