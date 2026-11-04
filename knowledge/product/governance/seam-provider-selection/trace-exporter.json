@@ -1,0 +1,38 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "trace-exporter",
+      "default_provider": "otlp-http",
+      "fallback_purpose": "observe",
+      "traits": {
+        "interoperability": "Speaks a vendor-neutral wire format any monitoring backend can ingest.",
+        "zero_config": "Works with no operator opt-in or extra configuration.",
+        "fidelity": "Preserves the full Kyberion span tree, events and attributes."
+      },
+      "providers": {
+        "otlp-http": {
+          "traits": { "interoperability": 1, "zero_config": 0.3, "fidelity": 0.9 },
+          "trait_basis": {
+            "interoperability": "declared",
+            "zero_config": "declared",
+            "fidelity": "declared"
+          },
+          "evidence": [
+            "libs/core/analysis/trace.ts (exportTraceOtlp: OTLP/HTTP JSON to OTEL_EXPORTER_OTLP_ENDPOINT, egress-scope checked; enabled only when the endpoint is configured)"
+          ]
+        }
+      },
+      "purposes": {
+        "observe": {
+          "description": "Ship finalized traces to the operator's monitoring backend (OTel collector, Datadog, CloudWatch, ...). Fan-out: every enabled exporter receives each trace; the chain fixes delivery order only.",
+          "weights": { "interoperability": 0.5, "zero_config": 0.2, "fidelity": 0.3 }
+        }
+      },
+      "default_chains": {
+        "default": ["otlp-http"]
+      }
+    }
+  ]
+}

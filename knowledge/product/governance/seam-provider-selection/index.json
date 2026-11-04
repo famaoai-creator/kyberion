@@ -23,6 +23,7 @@
     "provider-transport",
     "lease-backend",
     "event-bus",
-    "vcs-backend"
+    "vcs-backend",
+    "trace-exporter"
   ]
 }

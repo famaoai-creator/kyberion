@@ -434,6 +434,18 @@ export {
   traceLogDir,
   exportTraceOtlp,
 } from './analysis/trace.js';
+export {
+  TRACE_EXPORTER_SEAM,
+  OTLP_HTTP_TRACE_EXPORTER_ID,
+  registerTraceExporter,
+  listTraceExporters,
+  getTraceExporter,
+  resetTraceExporters,
+  orderedTraceExporters,
+  exportTraceToBackends,
+  createMemoryTraceExporter,
+} from './analysis/trace-exporter.js';
+export type { TraceExporter, TraceExportOutcome } from './analysis/trace-exporter.js';
 
 export { createActuatorTrace, finalizeActuatorTrace } from './actuator/actuator-trace.js';
 
