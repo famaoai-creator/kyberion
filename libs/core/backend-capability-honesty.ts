@@ -10,7 +10,13 @@ import { providerIdForReasoningIdentifier } from './provider/provider-egress-gat
 import {
   loadModelRoleFitnessRecords,
   normalizeFitnessProviderId,
+  type ModelRoleFitnessRecord,
 } from './reasoning/model-role-fitness.js';
+import {
+  loadBackendLiveScenarioRecords,
+  type BackendLiveScenarioRecord,
+  type LiveScenarioName,
+} from './backend-live-scenarios.js';
 
 /**
  * TC-17: is what we DECLARE about a backend what we have MEASURED?
@@ -27,6 +33,11 @@ import {
  * applied to backends: a claim contradicted by evidence fails; a claim with
  * no evidence is reported, because "unproven" is a fact worth seeing and not
  * a defect worth blocking on.
+ *
+ * The same reconciliation covers the declared `session_continuity` and
+ * `abort` capabilities, measured by the opt-in live scenario runs
+ * (`backend-live-scenarios.ts`). A declared capability a recorded run failed
+ * is a violation; with no recorded run it stays `unproven`.
  */
 export type CapabilityClaimVerdict = 'confirmed' | 'contradicted' | 'unproven' | 'unmeasurable';
 
@@ -41,8 +52,27 @@ export interface UtilityFitClaim {
   detail?: string;
 }
 
+/**
+ * Declared boolean capabilities a live scenario run can measure
+ * (`backend-live-scenarios.ts`): `follow_up` asks the backend to recall the
+ * first turn, `abort` cancels a running delegation.
+ */
+export type MeasuredBackendCapability = 'session_continuity' | 'abort';
+
+export interface BackendCapabilityClaim {
+  mode: string;
+  capability: MeasuredBackendCapability;
+  /** What the provider descriptor declares. */
+  declared: boolean;
+  verdict: CapabilityClaimVerdict;
+  /** Live scenario whose outcome evidences this capability. */
+  evidence_scenario: LiveScenarioName;
+  evidence_models: string[];
+  detail?: string;
+}
+
 export type BackendHonestyViolationKind =
-  'policy_mode_without_profile' | 'contradicted_utility_fit';
+  'policy_mode_without_profile' | 'contradicted_utility_fit' | 'contradicted_capability';
 
 export interface BackendHonestyViolation {
   kind: BackendHonestyViolationKind;
@@ -59,6 +89,8 @@ export interface BackendCapabilityHonestyReport {
   claims: UtilityFitClaim[];
   /** Claims asserting judgement ability with nothing measured behind them. */
   unproven_claim_count: number;
+  /** Declared session/abort capabilities checked against live scenario runs. */
+  capability_claims: BackendCapabilityClaim[];
   violations: BackendHonestyViolation[];
 }
 
@@ -74,6 +106,82 @@ const UTILITY_FIT_EVIDENCE_ROLE: Partial<Record<BackendUtilityFit, string>> = {
   judge: 'reviewer',
 };
 
+/** Which live scenario evidences which declared capability. */
+const CAPABILITY_EVIDENCE_SCENARIO: Record<MeasuredBackendCapability, LiveScenarioName> = {
+  session_continuity: 'follow_up',
+  abort: 'abort',
+};
+
+export interface BackendCapabilityHonestyOptions {
+  /** Test seam: fitness records (defaults to the recorded journal). */
+  fitnessRecords?: readonly ModelRoleFitnessRecord[];
+  /** Test seam: live scenario runs (defaults to the runtime store). */
+  liveScenarioRecords?: readonly BackendLiveScenarioRecord[];
+}
+
+/**
+ * `${mode}::${scenario}` → models that passed / failed it. Same shape as the
+ * judge evidence map. `not_run` and `unreported` are not evidence either way,
+ * and a run the reasoning chain says another mode served is a substitution —
+ * it says nothing about the mode under test.
+ */
+function liveScenarioEvidence(
+  records: readonly BackendLiveScenarioRecord[]
+): Map<string, { passed: string[]; failed: string[] }> {
+  const evidence = new Map<string, { passed: string[]; failed: string[] }>();
+  for (const record of records) {
+    if (record.served_mode && record.served_mode !== record.mode) continue;
+    const model =
+      record.served_model && record.served_model !== 'unreported'
+        ? record.served_model
+        : record.model_requested || 'default';
+    for (const result of record.scenarios) {
+      if (result.outcome !== 'pass' && result.outcome !== 'fail') continue;
+      const key = `${record.mode}::${result.scenario}`;
+      const bucket = evidence.get(key) || { passed: [], failed: [] };
+      const target = result.outcome === 'pass' ? bucket.passed : bucket.failed;
+      if (!target.includes(model)) target.push(model);
+      evidence.set(key, bucket);
+    }
+  }
+  return evidence;
+}
+
+function capabilityClaim(
+  mode: string,
+  capability: MeasuredBackendCapability,
+  declared: boolean,
+  bucket: { passed: string[]; failed: string[] } | undefined
+): BackendCapabilityClaim {
+  const scenario = CAPABILITY_EVIDENCE_SCENARIO[capability];
+  const base = { mode, capability, declared, evidence_scenario: scenario };
+  if (!bucket || (bucket.passed.length === 0 && bucket.failed.length === 0)) {
+    return { ...base, verdict: 'unproven', evidence_models: [] };
+  }
+  if (declared) {
+    if (bucket.failed.length > 0) {
+      return {
+        ...base,
+        verdict: 'contradicted',
+        evidence_models: bucket.failed,
+        detail: `${bucket.failed.join(', ')} failed the ${scenario} live scenario`,
+      };
+    }
+    return { ...base, verdict: 'confirmed', evidence_models: bucket.passed };
+  }
+  // Declared unsupported: a measured pass means the declaration under-claims.
+  // That is drift worth seeing, never a safety violation.
+  if (bucket.passed.length > 0) {
+    return {
+      ...base,
+      verdict: 'contradicted',
+      evidence_models: bucket.passed,
+      detail: `declared unsupported, but ${bucket.passed.join(', ')} passed the ${scenario} live scenario`,
+    };
+  }
+  return { ...base, verdict: 'confirmed', evidence_models: bucket.failed };
+}
+
 function loadPolicyModes(): string[] {
   const policyPath = pathResolver.knowledge('product/governance/reasoning-backend-policy.json');
   if (!safeExistsSync(policyPath)) return [];
@@ -81,13 +189,15 @@ function loadPolicyModes(): string[] {
   return Array.isArray(policy.allowed_modes) ? [...policy.allowed_modes] : [];
 }
 
-export function buildBackendCapabilityHonestyReport(): BackendCapabilityHonestyReport {
+export function buildBackendCapabilityHonestyReport(
+  options: BackendCapabilityHonestyOptions = {}
+): BackendCapabilityHonestyReport {
   const policyModes = loadPolicyModes();
   const policyModeSet = new Set(policyModes);
   const declaredModes = Object.keys(BACKEND_CAPABILITY_PROFILES);
 
   const fitnessByProviderRole = new Map<string, { passed: string[]; failed: string[] }>();
-  for (const record of loadModelRoleFitnessRecords()) {
+  for (const record of options.fitnessRecords ?? loadModelRoleFitnessRecords()) {
     const provider = normalizeFitnessProviderId(
       record.provider?.trim() || providerIdForReasoningIdentifier(record.backend) || record.backend
     );
@@ -169,6 +279,33 @@ export function buildBackendCapabilityHonestyReport(): BackendCapabilityHonestyR
     }
   }
 
+  const liveEvidence = liveScenarioEvidence(
+    options.liveScenarioRecords ?? loadBackendLiveScenarioRecords()
+  );
+  const capabilityClaims: BackendCapabilityClaim[] = [];
+  for (const mode of declaredModes) {
+    const profile = BACKEND_CAPABILITY_PROFILES[mode as keyof typeof BACKEND_CAPABILITY_PROFILES];
+    for (const capability of Object.keys(
+      CAPABILITY_EVIDENCE_SCENARIO
+    ) as MeasuredBackendCapability[]) {
+      const declared = profile.capabilities[capability];
+      const claim = capabilityClaim(
+        mode,
+        capability,
+        declared,
+        liveEvidence.get(`${mode}::${CAPABILITY_EVIDENCE_SCENARIO[capability]}`)
+      );
+      capabilityClaims.push(claim);
+      if (declared && claim.verdict === 'contradicted') {
+        violations.push({
+          kind: 'contradicted_capability',
+          mode,
+          detail: `${mode} declares '${capability}', but ${claim.evidence_models.join(', ')} failed the ${claim.evidence_scenario} live scenario.`,
+        });
+      }
+    }
+  }
+
   for (const mode of policyModes) {
     if (!declaredModes.includes(mode)) {
       violations.push({
@@ -185,6 +322,7 @@ export function buildBackendCapabilityHonestyReport(): BackendCapabilityHonestyR
     unreachable_profiles: declaredModes.filter((mode) => !policyModeSet.has(mode)).sort(),
     claims,
     unproven_claim_count: claims.filter((claim) => claim.verdict === 'unproven').length,
+    capability_claims: capabilityClaims,
     violations,
   };
 }
@@ -205,6 +343,19 @@ export function formatBackendCapabilityHonestyReport(
     if (claim.verdict === 'unmeasurable') continue;
     lines.push(
       `  ${claim.mode.padEnd(16)} ${claim.fit.padEnd(10)} ${claim.verdict.padEnd(13)}` +
+        (claim.evidence_models.length > 0 ? ` via ${claim.evidence_models.join(', ')}` : '') +
+        (claim.detail ? `  (${claim.detail})` : '')
+    );
+  }
+  const measured = report.capability_claims.filter((claim) => claim.verdict !== 'unproven');
+  lines.push('');
+  lines.push(
+    `declared session/abort capabilities (live scenarios): measured=${measured.length} ` +
+      `unproven=${report.capability_claims.length - measured.length}`
+  );
+  for (const claim of measured) {
+    lines.push(
+      `  ${claim.mode.padEnd(16)} ${claim.capability.padEnd(18)} declared=${String(claim.declared).padEnd(5)} ${claim.verdict.padEnd(13)}` +
         (claim.evidence_models.length > 0 ? ` via ${claim.evidence_models.join(', ')}` : '') +
         (claim.detail ? `  (${claim.detail})` : '')
     );

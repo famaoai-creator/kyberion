@@ -5,7 +5,9 @@
  * model turn (binary/version/help) from capabilities that remain adapter
  * declarations (abort/session continuity/input modalities). This keeps the matrix
  * useful in CI and prevents a successful `--help` call from overstating a
- * provider capability.
+ * provider capability. Abort and session continuity are measured — with real
+ * model turns, opt-in only — by `backend-live-scenarios.ts`; this matrix keeps
+ * reporting them as `declared`.
  */
 
 import path from 'node:path';
@@ -348,7 +350,9 @@ function capabilityEvidence(
     status: help.status === 'verified' ? 'declared' : 'unavailable',
     evidence:
       help.status === 'verified'
-        ? 'Profile declaration retained; this capability needs a model-turn probe.'
+        ? capability === 'session_continuity' || capability === 'abort'
+          ? 'Profile declaration retained; measured only by the opt-in live scenarios (backend-live-scenarios.ts).'
+          : 'Profile declaration retained; this capability needs a model-turn probe.'
         : 'CLI help was unavailable, so the profile declaration is not live evidence.',
   };
 }
