@@ -12,7 +12,9 @@
  * "is my endpoint configured?"), and the governed policy
  * (`seam-provider-selection/trace-exporter.json` `default_chains.default`)
  * only fixes the delivery order — exporters outside the chain still run,
- * after the chained ones, in registration order.
+ * after the chained ones, in registration order. A saved seam default
+ * (`KYBERION_SEAM_DEFAULTS="trace-exporter=<id>"` / scope layers) is delivered
+ * to first; it never disables the other enabled exporters.
  *
  * Builtins: `otlp-http` (registered by trace.ts; enabled when
  * `OTEL_EXPORTER_OTLP_ENDPOINT` is set). Datadog / CloudWatch / Sentry
@@ -24,7 +26,7 @@
 
 import { createProviderRegistry } from '../provider-registry.js';
 import type { SeamProviderMetadata } from '../seam.js';
-import { getSeamSelectionPolicy } from '../seam-provider-selection.js';
+import { resolveSeamDefaultOrder } from '../seam-provider-selection.js';
 import { createLogger } from '../logger.js';
 import type { Trace } from './trace.js';
 
@@ -74,12 +76,17 @@ export function resetTraceExporters(): void {
   traceExporterRegistry.reset();
 }
 
-/** Registered exporters in governed delivery order (chain first, then the rest). */
+/**
+ * Registered exporters in delivery order: saved seam default first, then the
+ * governed chain, then the rest in registration order.
+ */
 export function orderedTraceExporters(): TraceExporter[] {
   const registered = traceExporterRegistry.list();
-  const chain = getSeamSelectionPolicy(TRACE_EXPORTER_SEAM)?.default_chains?.default ?? [
-    OTLP_HTTP_TRACE_EXPORTER_ID,
-  ];
+  // A saved seam default only moves that exporter to the front of delivery;
+  // it never disables the others (fan-out seam).
+  const chain = resolveSeamDefaultOrder(TRACE_EXPORTER_SEAM, {
+    builtin: [OTLP_HTTP_TRACE_EXPORTER_ID],
+  });
   const ordered: TraceExporter[] = [];
   for (const id of chain) {
     const exporter = registered.find((candidate) => candidate.id === id);

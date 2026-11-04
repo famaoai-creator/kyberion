@@ -494,6 +494,40 @@ describe('authz providers — allow-all / deny-all', () => {
   });
 });
 
+describe('authz seam — saved seam default', () => {
+  const query: AuthzQuery = {
+    principal: principal(),
+    operation: { operationId: 'surface.read', effect: 'read' },
+    resource: { tenantSlug: 'default' },
+  };
+
+  it('selects an eligible saved default when no purpose is given', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'authz-policy-engine=deny-all');
+    const resolution = authorizeWithPolicyEngine(query, { deps: { env: {} } });
+    expect(resolution.decision.provider_id).toBe('deny-all');
+    expect(resolution.decision.default_source).toBe('env');
+    expect(resolution.authorization.allowed).toBe(false);
+  });
+
+  it('lets a purpose and an explicit provider set win over the saved default', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'authz-policy-engine=deny-all');
+    expect(
+      authorizeWithPolicyEngine(query, { providerIds: ['role-scope'], deps: { env: {} } }).decision
+        .provider_id
+    ).toBe('role-scope');
+    expect(
+      authorizeWithPolicyEngine(query, { purpose: 'test', deps: { env: { VITEST: '1' } } }).decision
+        .provider_id
+    ).toBe('allow-all');
+  });
+
+  it('cannot fail open: an ineligible saved allow-all falls back to the policy default', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'authz-policy-engine=allow-all');
+    const resolution = authorizeWithPolicyEngine(query, { deps: { env: { VITEST: '' } } });
+    expect(resolution.decision.provider_id).toBe('role-scope');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // assertAuthorizedWithPolicyEngine
 // ---------------------------------------------------------------------------

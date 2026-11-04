@@ -14,6 +14,7 @@ import {
   getStorageBackend,
   registerStorageBackend,
   resolveStorageBackend,
+  setStorageBackendDefaultOrderResolver,
   toAsyncStorageBackend,
   type SyncStorageBackend,
 } from './storage-backend.js';
@@ -71,6 +72,38 @@ describe('storage-backend seam', () => {
   it('exposes async methods on the governed default', async () => {
     const backend = resolveStorageBackend();
     await expect(backend.exists('/')).resolves.toBeTypeOf('boolean');
+  });
+  it('uses an injected default-order resolver and restores the builtin chain', () => {
+    const restore = setStorageBackendDefaultOrderResolver(() => [
+      'not-registered',
+      MEMORY_STORAGE_BACKEND_ID,
+    ]);
+    try {
+      expect(resolveStorageBackend().id).toBe(MEMORY_STORAGE_BACKEND_ID);
+      expect(resolveStorageBackend(LOCAL_STORAGE_BACKEND_ID).id).toBe(LOCAL_STORAGE_BACKEND_ID);
+    } finally {
+      restore();
+    }
+    expect(resolveStorageBackend().id).toBe(LOCAL_STORAGE_BACKEND_ID);
+  });
+
+  it('falls back to the builtin chain when the resolver is empty, throws or re-enters', () => {
+    const cases: Array<() => readonly string[]> = [
+      () => [],
+      () => {
+        throw new Error('policy unavailable');
+      },
+      // Re-entrant: the inner call must use the builtin chain, not recurse.
+      () => [resolveStorageBackend().id],
+    ];
+    for (const resolver of cases) {
+      const restore = setStorageBackendDefaultOrderResolver(resolver);
+      try {
+        expect(resolveStorageBackend().id).toBe(LOCAL_STORAGE_BACKEND_ID);
+      } finally {
+        restore();
+      }
+    }
   });
 });
 

@@ -28,7 +28,7 @@
 
 import { createProviderRegistry } from '../provider-registry.js';
 import type { SeamProviderMetadata } from '../seam.js';
-import { getSeamSelectionPolicy } from '../seam-provider-selection.js';
+import { resolveSeamDefaultOrder } from '../seam-provider-selection.js';
 
 export const LEASE_BACKEND_SEAM = 'lease-backend';
 /** Builtin default provider id; also the governed `default_provider`. */
@@ -92,7 +92,8 @@ export function resetLeaseBackends(): void {
 
 /**
  * Resolve the backend for a caller. An explicit selector always wins; without
- * one the governed `default_chains.default` ordering picks the first
+ * one the saved seam default (`KYBERION_SEAM_DEFAULTS` / scope layers) then the
+ * governed `default_chains.default` ordering picks the first
  * registered provider, falling back to `local-file-lock` then to whatever is
  * registered. Throws when nothing is registered — local-file-lock is
  * installed by importing `local-lease-backend.ts`, which writer-lease does.
@@ -113,9 +114,7 @@ export function resolveLeaseBackend(selector?: string): LeaseBackend {
     }
     return backend;
   }
-  const chain = getSeamSelectionPolicy(LEASE_BACKEND_SEAM)?.default_chains?.default ?? [
-    LOCAL_LEASE_BACKEND_ID,
-  ];
+  const chain = resolveSeamDefaultOrder(LEASE_BACKEND_SEAM, { builtin: [LOCAL_LEASE_BACKEND_ID] });
   for (const id of chain) {
     const backend = leaseBackendRegistry.get(id);
     if (backend) return backend;
