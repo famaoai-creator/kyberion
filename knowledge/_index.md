@@ -31,6 +31,7 @@
 
 ## 📁 product/architecture
 - [AI-Run Meetings Use Case](./product/architecture/meeting-facilitator-use-case.md) (public | Unknown)
+- [Actor identity and responsibility model](./product/architecture/actor-identity-and-responsibility-model.md) (public | Unknown)
 - [Actuator Contract Map](./product/architecture/actuator-contract-map.md) (public | Ecosystem Architect)
 - [Actuator Operation Taxonomy](./product/architecture/actuator-op-taxonomy.md) (public | Ecosystem Architect)
 - [Agent Collaboration View](./product/architecture/agent-collaboration-view.md) (public | Ecosystem Architect)

@@ -77,16 +77,34 @@ Intent ──resolves to an Execution Shape──┬─ direct_reply / actuator_
 
 A WorkItem is the shared record, not a sixth kind of work: a mission owns one WorkItem (`deriveMissionOwnershipItemId`), and each dispatched mission task becomes a WorkItem whose source is `mission:<mission_id>:<task_id>`. "Operation" is unrelated to this ladder — it means an actuator op (`domain:action`); `routine_operation` and `service_operation` are Work Shape values.
 
+### Actor identity and responsibility
+
+- **Conversational persona**: the human-facing name and conversational window,
+  such as Haru. It is not a credential or execution authority.
+- **Durable NHI**: a ledger-backed non-human identity with an accountable human,
+  lifecycle, and affiliation. Personal work and each tenant use separate identities.
+- **Organization participation**: durable membership and responsibility assignments
+  within a tenant, distinct from access grants and per-task roles.
+- **Expertise / capability profile**: worker suitability, distinct from identity,
+  authority, and the task's implementer or reviewer assignment.
+- **Independent reviewer**: a genuinely separate, traceable reviewer; another
+  alias, session, or profile for the implementer does not establish independence.
+
+The [actor identity and responsibility model](../knowledge/product/architecture/actor-identity-and-responsibility-model.md)
+defines the persona-to-NHI mapping, governed commands, compatibility boundaries,
+and remaining runtime migration. Delegation stays bounded by existing authority;
+it does not confer approval or permission to share across tenants.
+
 ### Role terms
 
 Four role words exist. Use the qualified name; never write a bare "role" or "persona" in new docs.
 
-| Term           | What it decides                                                           | Values / source                                                                                                                             |
-| -------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Persona        | The execution identity class of the running process                       | `sovereign`, `ecosystem_architect`, `mission_owner`, `worker`, `analyst`, `unknown` (`Persona` in `libs/core/types.ts`, `KYBERION_PERSONA`) |
-| Authority Role | Which paths and actuators a process may write to                          | `SYSTEM_ROLE` / `MISSION_ROLE`, `knowledge/product/governance/authority-role-index.json`                                                    |
-| Org Role       | The org-chart role a mission is assigned at activation (`--persona` flag) | a role directory under `knowledge/product/roles/` (the default `worker` has none); see [Team Role vs. Org Role](#team-role-vs-org-role)     |
-| Team Role      | The per-task execution role inside a mission team                         | `owner`, `planner`, `implementer`, `reviewer`, …; see [Team Role vs. Org Role](#team-role-vs-org-role)                                      |
+| Term                                      | What it decides                                                                     | Values / source                                                                                                                                                       |
+| ----------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Execution Persona (legacy API: `Persona`) | The execution identity class of the running process, not the conversational persona | `sovereign`, `ecosystem_architect`, `mission_owner`, `worker`, `analyst`, `unknown` (`Persona` in `libs/core/types.ts`, `KYBERION_PERSONA`; `libs/core/authority.ts`) |
+| Authority Role                            | Which paths and actuators a process may write to                                    | `SYSTEM_ROLE` / `MISSION_ROLE`, `knowledge/product/governance/authority-role-index.json`                                                                              |
+| Org Role                                  | The org-chart role a mission is assigned at activation (`--persona` flag)           | a role directory under `knowledge/product/roles/` (the default `worker` has none); see [Team Role vs. Org Role](#team-role-vs-org-role)                               |
+| Team Role                                 | The per-task execution role inside a mission team                                   | `owner`, `planner`, `implementer`, `reviewer`, …; see [Team Role vs. Org Role](#team-role-vs-org-role)                                                                |
 
 The `--persona` flag selects an **Org Role**, not a `Persona`; the flag name is historical.
 

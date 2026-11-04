@@ -1067,7 +1067,7 @@ function resolveDefaultAccountableHumanId(): string {
 
 /**
  * Governed resolve-or-issue: return the existing identity for
- * `<org>/<slug>` regardless of its params/status, or issue a fresh
+ * `<org>/<slug>` only while usable and compatible with explicit identity bounds, or issue a fresh
  * 'provisioned' one. Accountable human resolution: explicit param > the
  * organization profile's `accountable_human_resource_id` (falling back to the
  * owner member when that is unset or still the legacy `human:operator`
@@ -1079,7 +1079,22 @@ export function ensureAgentIdentityProvisioned(
   const organizationId = resolveAgentIdentityOrganizationId(params.organizationId);
   const nhiId = buildNhiId(organizationId, params.slug);
   const existing = getAgentIdentity(nhiId);
-  if (existing) return existing;
+  if (existing) {
+    if (['suspended', 'retired'].includes(existing.lifecycle_status))
+      throw new AgentIdentityConflictError(nhiId, `identity is ${existing.lifecycle_status}`);
+    if (
+      (params.kind !== undefined && params.kind !== existing.kind) ||
+      (params.accountableHumanId !== undefined &&
+        params.accountableHumanId.trim() !== existing.accountable_human_id) ||
+      (params.affiliation?.tenant_slug !== undefined &&
+        params.affiliation.tenant_slug !== existing.affiliation.tenant_slug)
+    )
+      throw new AgentIdentityConflictError(
+        nhiId,
+        'explicit kind, accountability or tenant affiliation mismatch'
+      );
+    return existing;
+  }
   const accountableHumanId =
     params.accountableHumanId?.trim() || resolveDefaultAccountableHumanId();
   return issueAgentIdentity({
@@ -1130,7 +1145,13 @@ export function ensureAgentIdentityBestEffort(
         error instanceof Error ? error.message : String(error)
       }`
     );
-    return { nhi_id: nhiId, record: null, recorded: false };
+    // A known conflicting/revoked identity must not be stamped onto a new
+    // runtime as if this were merely a missing journal write permission.
+    return {
+      nhi_id: error instanceof AgentIdentityConflictError ? null : nhiId,
+      record: null,
+      recorded: false,
+    };
   }
 }
 

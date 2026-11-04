@@ -20,6 +20,8 @@ import {
   loadPersonalIdentityAtPath,
   writePersonalAgentIdentityAtPath,
   writePersonalIdentityAtPath,
+  personalAgentIdentityRevision,
+  readPersonalAgentIdentityStrictAtPath,
 } from '../personal-identity-state.js';
 import {
   loadOperatorProviderPreferencesAtPath,
@@ -283,6 +285,10 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
       () => {
         const now = nowIso();
         const artifacts: string[] = [];
+        const initialAgentPath = path.join(profileRoot(), 'agent-identity.json');
+        const initialAgentRevision = personalAgentIdentityRevision(
+          readPersonalAgentIdentityStrictAtPath(initialAgentPath)
+        );
         const identityPath = path.join(profileRoot(), 'my-identity.json');
         const existingIdentity = loadPersonalIdentityAtPath(identityPath) || {};
         writePersonalIdentityAtPath(identityPath, {
@@ -324,15 +330,19 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
         )
           throw new Error('Installed agent accountability mismatch.');
         const agentPath = path.join(profileRoot(), 'agent-identity.json');
-        writePersonalAgentIdentityAtPath(agentPath, {
-          agent_id: draft.identity.agent_id,
-          version: '1.0.0',
-          role: 'Ecosystem Architect / Senior Partner',
-          owner: draft.identity.name,
-          trust_tier: 'sovereign',
-          ...(ensuredAgent.nhi_id ? { nhi_id: ensuredAgent.nhi_id } : {}),
-          created_at: now,
-        });
+        writePersonalAgentIdentityAtPath(
+          agentPath,
+          {
+            agent_id: draft.identity.agent_id,
+            version: '1.0.0',
+            role: 'Ecosystem Architect / Senior Partner',
+            owner: draft.identity.name,
+            trust_tier: 'sovereign',
+            ...(ensuredAgent.nhi_id ? { nhi_id: ensuredAgent.nhi_id } : {}),
+            created_at: now,
+          },
+          initialAgentRevision
+        );
         artifacts.push(agentPath);
 
         const providerPath = onboardingPath('provider-preferences.json');
@@ -533,18 +543,26 @@ export async function applyBrowserOnboardingSettingsPatch(input: unknown): Promi
           )
             throw new Error('Installed agent accountability mismatch.');
           // A new handle must not keep the previous handle's durable NHI link.
-          const { nhi_id: _previousNhiId, ...keptAgent } = existingAgent || {};
-          writePersonalAgentIdentityAtPath(agentPath, {
-            version: '1.0.0',
-            role: 'Ecosystem Architect / Senior Partner',
-            owner: String(identity.name || 'user'),
-            trust_tier: 'sovereign',
-            created_at: now,
-            ...keptAgent,
-            agent_id: agentId,
-            ...(ensuredAgent.nhi_id ? { nhi_id: ensuredAgent.nhi_id } : {}),
-            updated_at: now,
-          });
+          const {
+            nhi_id: _previousNhiId,
+            persona_identity_bindings: _previousPersonaBindings,
+            ...keptAgent
+          } = existingAgent || {};
+          writePersonalAgentIdentityAtPath(
+            agentPath,
+            {
+              version: '1.0.0',
+              role: 'Ecosystem Architect / Senior Partner',
+              owner: String(identity.name || 'user'),
+              trust_tier: 'sovereign',
+              created_at: now,
+              ...keptAgent,
+              agent_id: agentId,
+              ...(ensuredAgent.nhi_id ? { nhi_id: ensuredAgent.nhi_id } : {}),
+              updated_at: now,
+            },
+            personalAgentIdentityRevision(existingAgent)
+          );
           artifacts.push(agentPath);
         }
 
