@@ -15,7 +15,7 @@ import {
   safeStat,
   safeWriteFile,
 } from '../secure-io.js';
-import { validateOpInput } from '../pipeline/op-input-contracts.js';
+import { getOpInputContract, validateOpInput } from '../pipeline/op-input-contracts.js';
 import {
   resolveBrowserRecordingPipelineOp,
   normalizeBrowserPipelineOp,
@@ -882,6 +882,12 @@ const PLAYWRIGHT_DIRECT_REF_OPS: Record<string, string> = {
   wait_for_ref: 'wait_ref',
 };
 
+function executableOpParams(op: string, params: Record<string, unknown>): Record<string, unknown> {
+  const declared = getOpInputContract('browser', op)?.schema.properties;
+  if (!declared || typeof declared !== 'object') return params;
+  return Object.fromEntries(Object.entries(params).filter(([key]) => key in declared));
+}
+
 /**
  * Deterministically crystallize an (ideally approved) recording into a
  * browser-pipeline.schema-conformant **draft** ADF.
@@ -941,7 +947,12 @@ export function compileBrowserRecordingToPipeline(
     }
     const op =
       directRefOp ?? normalizeBrowserPipelineOp(resolveBrowserRecordingPipelineOp(action.op));
-    const validation = validateOpInput('browser', op, { ...action, ...params });
+    // Draft params carry review annotations (original_op, needs_selector,
+    // classification, selection, …) next to the executable inputs, and the
+    // browser contracts reject unknown keys. Validate the executable
+    // projection — the params the target op declares — so required inputs
+    // and their types are still enforced without rejecting the annotations.
+    const validation = validateOpInput('browser', op, executableOpParams(op, params));
     if (!validation.valid) {
       const { errors } = validation as { valid: false; errors: string[] };
       throw new Error(

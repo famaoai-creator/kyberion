@@ -10,15 +10,15 @@
  * Use `--check` in CI-adjacent flows to fail when the fixture drifts without
  * rewriting it.
  *
- * Direct node:fs is intentional here: the scanner must walk the whole
- * repository including paths the secure-io read boundary refuses (the same
- * reason tests/governance-import-baseline.test.ts uses node:fs). Registered
- * in governance-import-baseline.json.
+ * The scan goes through secure-io: every directory it walks is readable under
+ * the governed read boundary (tier roots such as knowledge/personal and
+ * knowledge/confidential, and runtime roots such as active/ and vault/, are
+ * skipped below), so it needs no raw-fs exemption from
+ * libs/core/security-boundary.contract.test.ts.
  */
-/* eslint-disable no-restricted-imports, no-restricted-syntax -- repo-wide import scanner; see file header */
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeLstat, safeReadFile, safeReaddir } from '@agent/core/secure-io';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 const rootDir = pathResolver.rootDir();
@@ -48,21 +48,21 @@ const CHILD_PATTERN =
   /from\s+['"](?:node:)?child_process['"]|require\(\s*['"](?:node:)?child_process['"]\s*\)/;
 
 function walk(dirPath: string, relativeBase = ''): string[] {
-  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
   const files: string[] = [];
 
-  for (const entry of entries) {
-    if (IGNORED_DIRS.has(entry.name)) continue;
-    const absPath = path.join(dirPath, entry.name);
-    const relPath = relativeBase ? path.join(relativeBase, entry.name) : entry.name;
+  for (const name of safeReaddir(dirPath)) {
+    if (IGNORED_DIRS.has(name)) continue;
+    const absPath = path.join(dirPath, name);
+    const relPath = relativeBase ? path.join(relativeBase, name) : name;
+    // Tier roots are skipped before any metadata read: secure-io refuses them.
+    if (relPath === 'knowledge/confidential' || relPath === 'knowledge/personal') continue;
 
-    if (entry.isDirectory()) {
-      if (relPath === 'knowledge/confidential' || relPath === 'knowledge/personal') continue;
+    if (safeLstat(absPath).isDirectory()) {
       files.push(...walk(absPath, relPath));
       continue;
     }
 
-    if (CODE_EXTENSIONS.has(path.extname(entry.name))) {
+    if (CODE_EXTENSIONS.has(path.extname(name))) {
       if (EXCLUDED_FILES.has(relPath)) continue;
       if (relPath.endsWith('.d.ts')) continue;
       files.push(relPath);
@@ -80,7 +80,7 @@ function findRestrictedImports(pattern: RegExp): string[] {
   const files = walk(rootDir);
   const matches: string[] = [];
   for (const relPath of files) {
-    const content = fs.readFileSync(path.join(rootDir, relPath), 'utf8');
+    const content = String(safeReadFile(path.join(rootDir, relPath), { encoding: 'utf8' }));
     if (pattern.test(content)) matches.push(relPath);
   }
   return normalize(matches);
