@@ -231,8 +231,13 @@ pnpm exec vitest run --changed origin/main          # コード: import graph �
 # データ・文書: 変更ファイルのパス・basename を test source から固定文字列検索して選ぶ（preflight が表示する）
 ```
 
-preflight はどのテストを選んだかを表示し、何も選ばれなければ `No affected tests selected` と書く（通過とは書かない）。
-1 ファイルの読み手が 40 を超える場合（`README.md` など）は選択せず、所有 suite を流すよう表示する。
+preflight は選んだテストと vitest の集計（`Test Files … passed (N)`）を表示し、実行ファイル数が 0 なら
+`0 test files ran` と書く（通過とは書かない）。対象は CI の test suite（`scripts/test_suite.ts` の `TEST_SUITES`）が
+実行するパスに限る。次は `NOT RUN` として表示されるので Test plan に記録する: `package.json` や vitest / vite の設定を
+変えた場合（vitest の `--changed` が全テストを再実行するため、所有 suite を `pnpm test -- --suite <name>` で流す）、
+1 つの検索語が 40 を超えるテストに当たる場合（`README.md` など。その語だけを捨て、パスで見つかった読み手は残す）、
+CI suite 外の読み手（`presence/displays/**` の package suite など）。テストは CI と同じ環境
+（`LANG=C.UTF-8`、`CI=true`、`KYBERION_TEST_LEAK_STRICT=1`、persona / role なし）で実行する。
 `--skip-affected-tests` で省略した場合は Test plan に未実行と記録する。
 
 `vitest run --changed <ref>` は `<ref>...HEAD` の commit 済み変更と staged / unstaged の変更（拡張子を問わない）を集め、
