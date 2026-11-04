@@ -142,7 +142,8 @@ function workspaceItemId(pathname: string): string | null {
  * showing the raw key; anything else passes through unchanged.
  */
 const RAIL_KEY = /^front_desk:([a-z0-9_]+)$/;
-export function railLabel(text: string, locale: ConciergeLocale): string {
+export function railLabel(text: string | undefined, locale: ConciergeLocale): string {
+  if (typeof text !== 'string') return '';
   const match = text.match(RAIL_KEY);
   if (!match) return text;
   const resolved = frontDeskText(match[1] as FrontDeskMessageKey, locale);
