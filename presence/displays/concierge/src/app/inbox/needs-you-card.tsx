@@ -403,7 +403,16 @@ export function NeedsYouCard({
       <Section title={itemTitle(item, locale, t)} headingLevel={3}>
         <div className="decide-card-meta">
           <Badge label={c(`ia_inbox_reason_${item.reason}`)} tone={REASON_TONES[item.reason]} />
-          {item.overdue ? <Badge label={c('ia_inbox_overdue_badge')} tone="danger" /> : null}
+          {item.overdue ? (
+            <Badge
+              label={c(
+                item.deadline && Date.parse(item.deadline) < Date.now()
+                  ? 'ia_inbox_overdue_badge'
+                  : 'ia_inbox_waiting_long_badge'
+              )}
+              tone="danger"
+            />
+          ) : null}
           {item.group_size > 1 ? (
             <Badge label={c('ux_a_brief_same_count', { count: item.group_size })} tone="neutral" />
           ) : null}
