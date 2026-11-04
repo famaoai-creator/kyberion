@@ -376,7 +376,7 @@ Repository build, test, generator and gate scripts for contributors.
 | `pnpm kyberion build repo`                          | `pnpm build:repo`                          | Compile repository TypeScript                                              |
 | `pnpm kyberion build ui`                            | `pnpm build:ui`                            | Build the UI apps                                                          |
 | `pnpm kyberion chat local`                          |                                            | Start an interactive local-LLM chat with tool use.                         |
-| `pnpm kyberion check`                               | `pnpm check`                               | Run repository checks (pnpm check -- --scope pr before a PR)               |
+| `pnpm kyberion check`                               | `pnpm check`                               | Run repository checks (pnpm check -- --changed before a PR)                |
 | `pnpm kyberion check apple-fm`                      | `pnpm check:apple-fm`                      | Check on-device Apple Intelligence availability                            |
 | `pnpm kyberion check backend-conformance`           |                                            | Check reasoning backend conformance                                        |
 | `pnpm kyberion check chronos-perf`                  |                                            | Check Chronos performance baseline (browser)                               |
