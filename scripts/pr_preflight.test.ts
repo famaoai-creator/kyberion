@@ -19,6 +19,7 @@ vi.mock('@agent/core/knowledge/pr-knowledge-readiness', async (importOriginal) =
 }));
 
 import { main, runAffectedTests } from './pr_preflight.js';
+import { ciTestPaths } from './lib/affected-tests.js';
 
 describe('pr preflight', () => {
   beforeEach(() => vi.resetAllMocks());
@@ -108,7 +109,7 @@ describe('pr preflight', () => {
         run: (args) => runs.push(args),
       });
       expect(runs).toEqual([
-        ['exec', 'vitest', 'run', '--changed', 'abc123', '--passWithNoTests'],
+        ['exec', 'vitest', 'run', '--changed', 'abc123', '--passWithNoTests', ...ciTestPaths()],
         [
           'exec',
           'vitest',
@@ -142,7 +143,7 @@ describe('pr preflight', () => {
       runAffectedTests(() => undefined, undefined, { git: fakeGit(['libs/core/a.ts']) });
       expect(mocks.safeExec).toHaveBeenCalledWith(
         'pnpm',
-        ['exec', 'vitest', 'run', '--changed', 'abc123', '--passWithNoTests'],
+        ['exec', 'vitest', 'run', '--changed', 'abc123', '--passWithNoTests', ...ciTestPaths()],
         expect.objectContaining({
           env: {
             LANG: 'C.UTF-8',

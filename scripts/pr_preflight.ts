@@ -95,7 +95,15 @@ export function runAffectedTests(
   for (const line of describeAffectedTestPlan(plan)) print(line);
   const codeRun = plan.codeFiles.length > 0;
   if (codeRun) {
-    run(['exec', 'vitest', 'run', '--changed', changed.mergeBase, '--passWithNoTests']);
+    run([
+      'exec',
+      'vitest',
+      'run',
+      '--changed',
+      changed.mergeBase,
+      '--passWithNoTests',
+      ...plan.ciPaths,
+    ]);
   }
   if (plan.readerTests.length > 0) {
     run(['exec', 'vitest', 'run', '--passWithNoTests', ...plan.readerTests]);
