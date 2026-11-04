@@ -44,15 +44,19 @@ function classify(result: VcsCommandResult): VcsHostErrorCode {
 export function createGhCliVcsHostProvider(
   options: { run?: VcsCommandRunner } = {}
 ): VcsHostProvider {
-  const run = options.run ?? safeExecResult;
-  let available: boolean | undefined;
+  // Resolve the default lazily so a test double installed on secure-io is honoured.
+  const run: VcsCommandRunner =
+    options.run ?? ((command, args, opts) => safeExecResult(command, args, opts));
+  // Only a positive probe is cached: a gh installed later in the process is picked up.
+  let available = false;
 
+  const execOptions = (ctx: VcsHostCallContext) => ({
+    cwd: ctx.cwd,
+    ...(Object.keys(ctx.env).length > 0 ? { env: ctx.env } : {}),
+    ...(ctx.timeoutMs ? { timeoutMs: ctx.timeoutMs } : {}),
+  });
   const gh = (ctx: VcsHostCallContext, args: string[], label: string): string => {
-    const result = run('gh', args, {
-      cwd: ctx.cwd,
-      ...(Object.keys(ctx.env).length > 0 ? { env: ctx.env } : {}),
-      ...(ctx.timeoutMs ? { timeoutMs: ctx.timeoutMs } : {}),
-    });
+    const result = run('gh', args, execOptions(ctx));
     if (result.error || result.status !== 0)
       throw new VcsHostError(classify(result), `gh ${label} failed`);
     return result.stdout;
@@ -71,17 +75,14 @@ export function createGhCliVcsHostProvider(
   return {
     id: GH_CLI_VCS_HOST_ID,
     isAvailable() {
-      if (available === undefined) {
+      if (!available) {
         const result = run('gh', ['--version'], {});
         available = !result.error && result.status === 0;
       }
       return available;
     },
     async authStatus(ctx) {
-      const result = run('gh', ['auth', 'status'], {
-        cwd: ctx.cwd,
-        ...(Object.keys(ctx.env).length > 0 ? { env: ctx.env } : {}),
-      });
+      const result = run('gh', ['auth', 'status'], execOptions(ctx));
       return { ok: !result.error && result.status === 0, detail: classify(result) };
     },
     async repository(ctx) {
@@ -155,7 +156,7 @@ export function createGhCliVcsHostProvider(
       const result = run(
         'gh',
         ['pr', 'checks', ref, '--repo', repo.url, '--json', 'name,state,bucket,link'],
-        { cwd: ctx.cwd, ...(Object.keys(ctx.env).length > 0 ? { env: ctx.env } : {}) }
+        execOptions(ctx)
       );
       const raw = (result.stdout || '').trim();
       if (!raw) {
