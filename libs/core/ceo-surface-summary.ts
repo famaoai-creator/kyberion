@@ -18,6 +18,13 @@ import { t, type VocabularyKey } from './t.js';
 import { nowIso } from './foundation/time.js';
 import { computeApprovalPresentedDigest } from './governance/approval-presentation.js';
 import { requiredDecisionAssurance } from './governance/approval-human-decision.js';
+import {
+  buildDecisionBrief,
+  type DecisionBrief,
+  type PublicationPreview,
+} from './surface/decision-brief.js';
+import { decisionReasonText } from './surface/decision-reason-text.js';
+import { readApprovalPublicationPreview } from './surface/approval-publication-preview.js';
 
 export interface CeoIntentItem {
   mission_id: string;
@@ -46,6 +53,16 @@ export interface CeoApprovalItem {
   review_scope?: string;
   evidence?: Array<{ label: string; ref: string }>;
   min_assurance?: 'A0' | 'A1' | 'A2' | 'A3';
+  /** What to decide, why, and what each answer does — display only (see `decision-brief.ts`). */
+  brief?: DecisionBrief;
+}
+
+/** Display-only enrichment for approval briefs; absent in pure callers and tests. */
+export interface CeoApprovalBriefSources {
+  publicationPreview?(
+    record: OperatorHomeSummary['pendingApprovals'][number]
+  ): PublicationPreview | undefined;
+  now?: number;
 }
 
 export interface CeoOutcomeItem {
@@ -207,11 +224,32 @@ function toIntentItem(mission: OperatorHomeSummary['activeMissions'][number]): C
   };
 }
 
+function approvalBrief(
+  approval: OperatorHomeSummary['pendingApprovals'][number],
+  sources: CeoApprovalBriefSources
+): DecisionBrief | undefined {
+  if (!approval?.id || !approval.title) return undefined;
+  try {
+    const publication = sources.publicationPreview?.(approval);
+    return buildDecisionBrief(approval, {
+      ...(publication ? { publication } : {}),
+      ...(sources.now !== undefined ? { now: sources.now } : {}),
+      reasonText: decisionReasonText,
+    });
+  } catch {
+    // Display only: a record the brief cannot read keeps its title and reason.
+    return undefined;
+  }
+}
+
 function toApprovalItem(
-  approval: OperatorHomeSummary['pendingApprovals'][number]
+  approval: OperatorHomeSummary['pendingApprovals'][number],
+  sources: CeoApprovalBriefSources = {}
 ): CeoApprovalItem {
   const record = approval as Record<string, any>;
+  const brief = approvalBrief(approval, sources);
   return {
+    ...(brief ? { brief } : {}),
     ...(approval.decisionCard?.evidence?.length
       ? { evidence: approval.decisionCard.evidence.map(({ label, ref }) => ({ label, ref })) }
       : {}),
@@ -255,10 +293,13 @@ export function composeCeoSurfaceSummary(input: {
   home: OperatorHomeSummary;
   notifications: Array<Record<string, any>>;
   now?: string;
+  approvalBriefSources?: CeoApprovalBriefSources;
 }): CeoSurfaceSummary {
   const { home } = input;
   const intentInbox = home.activeMissions.map(toIntentItem);
-  const approvalQueue = home.pendingApprovals.map(toApprovalItem);
+  const approvalQueue = home.pendingApprovals.map((approval) =>
+    toApprovalItem(approval, input.approvalBriefSources)
+  );
   const outcomeFeed: CeoOutcomeItem[] = home.inboxEntries.map((entry) => ({
     entry_id: entry.entry_id,
     title: entry.title,
@@ -351,6 +392,8 @@ export function buildCeoSurfaceSummary(
     scope?: OperatorHomeScopeFilter;
     limit?: number;
     approvalSnapshot?: OperatorHomeSummary['pendingApprovals'];
+    /** Overrides how approval briefs read display-only enrichment (e.g. under a tenant context). */
+    approvalBriefSources?: CeoApprovalBriefSources;
   } = {}
 ): CeoSurfaceSummary {
   const home = collectOperatorHomeSummary({
@@ -366,5 +409,11 @@ export function buildCeoSurfaceSummary(
   } catch {
     notifications = [];
   }
-  return composeCeoSurfaceSummary({ home, notifications });
+  return composeCeoSurfaceSummary({
+    home,
+    notifications,
+    approvalBriefSources: input.approvalBriefSources ?? {
+      publicationPreview: readApprovalPublicationPreview,
+    },
+  });
 }

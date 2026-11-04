@@ -1,7 +1,8 @@
 'use client';
 
 import type { KbTableCell, KbTone } from '@agent/core/surface/a2ui-catalog';
-import { Badge, Callout, Code, EmptyState, KbLink, Metric, Section } from '@agent/shared-ui';
+import { Badge, Callout, EmptyState, KbLink, Metric, Section } from '@agent/shared-ui';
+import { CommandDisclosure } from './CommandDisclosure';
 import { ChronosInline, ChronosMeta } from './chronos-ui';
 import { uxMessage, uxText, type SupportedLocale } from '../../lib/ops/ux-vocabulary';
 import type {
@@ -369,10 +370,11 @@ export function CustomerDecisionLearningView({
                 </Section>
               ) : null}
 
-              <Code
-                title={uxText('chronos_cd_how_to_act', locale)}
-                language="shell"
-                code={customerDecisionLearningCommands(tenant, organizationId, learning).join('\n')}
+              <CommandDisclosure
+                label={uxText('chronos_cd_how_to_act', locale)}
+                command={customerDecisionLearningCommands(tenant, organizationId, learning).join(
+                  '\n'
+                )}
               />
             </>
           )

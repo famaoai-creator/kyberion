@@ -64,8 +64,12 @@ export function deriveCardFields(entry: DecideQueueEntry): DecideCardFields {
       return {
         // A reason that merely repeats the title says nothing — leave the
         // column out rather than showing the same words twice.
+        // With a decision brief the card shows its why/impact sections; the raw
+        // reason (often the machine summary) stays out of the body.
         why:
-          entry.item.reason && entry.item.reason.trim() !== entry.item.title.trim()
+          !entry.item.brief &&
+          entry.item.reason &&
+          entry.item.reason.trim() !== entry.item.title.trim()
             ? entry.item.reason
             : undefined,
         effectLabelKey: 'decide_effect_approval',

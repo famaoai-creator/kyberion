@@ -1,0 +1,314 @@
+/* Work-item kanban board (`/w/work_item` and the console 作業ボード).
+   Tokens only (`--kb-ui-*`); no color literals. Not under components/ops, so
+   the console scope plugin leaves it global — every class is `wb-` prefixed. */
+
+.wb-board-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-3);
+  min-width: 0;
+}
+
+.wb-toggle {
+  display: inline-flex;
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  overflow: hidden;
+  align-self: flex-start;
+}
+
+.wb-toggle__option {
+  padding: var(--kb-ui-space-1) var(--kb-ui-space-3);
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+  background: var(--kb-ui-surface);
+  border: 0;
+  cursor: pointer;
+}
+
+.wb-toggle__option + .wb-toggle__option {
+  border-left: 1px solid var(--kb-ui-border);
+}
+
+.wb-toggle__option[aria-pressed='true'] {
+  color: var(--kb-ui-accent-text);
+  background: var(--kb-ui-accent-soft);
+  font-weight: 600;
+}
+
+.wb-toggle__option:focus-visible,
+.wb-card__title:focus-visible,
+.wb-collapsed > summary:focus-visible,
+.wb-card__more > summary:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+}
+
+.wb-hint {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+}
+
+.wb-board {
+  display: flex;
+  gap: var(--kb-ui-space-2);
+  overflow-x: auto;
+  padding-bottom: var(--kb-ui-space-2);
+  align-items: flex-start;
+}
+
+.wb-column {
+  flex: 1 1 14rem;
+  min-width: 13rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  min-height: 8rem;
+  padding: var(--kb-ui-space-2);
+  background: var(--kb-ui-surface-sunken);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-lg);
+}
+
+.wb-column[data-empty='true'] {
+  flex: 0 1 7.5rem;
+  min-width: 6.5rem;
+  min-height: 5rem;
+}
+
+.wb-column[data-drop='true'] {
+  border-color: var(--kb-ui-accent);
+  background: var(--kb-ui-accent-soft);
+}
+
+.wb-column__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kb-ui-space-2);
+  margin: 0;
+  padding: var(--kb-ui-space-1) var(--kb-ui-space-1) 0;
+  font-size: var(--kb-ui-font-size-sm);
+  font-weight: 600;
+  color: var(--kb-ui-text);
+}
+
+.wb-column__count {
+  min-width: 1.5rem;
+  padding: 0 var(--kb-ui-space-2);
+  text-align: center;
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-badge-fg, var(--kb-ui-text-muted));
+  background: var(--kb-ui-badge-bg, var(--kb-ui-surface-sunken));
+  border: 1px solid var(--kb-ui-badge-border, var(--kb-ui-border));
+  border-radius: 999px;
+}
+
+.wb-column__empty {
+  margin: 0;
+  padding: var(--kb-ui-space-3) var(--kb-ui-space-1);
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-subtle);
+  text-align: center;
+}
+
+.wb-column__cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wb-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  padding: var(--kb-ui-space-3);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  box-shadow: var(--kb-ui-shadow-sm);
+  min-width: 0;
+}
+
+.wb-card[draggable='true'] {
+  cursor: grab;
+}
+
+.wb-card[data-saving='true'] {
+  opacity: 0.6;
+}
+
+.wb-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--kb-ui-space-2);
+}
+
+.wb-card__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: var(--kb-ui-font-size-md);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--kb-ui-text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+a.wb-card__title:hover {
+  color: var(--kb-ui-accent-text);
+  text-decoration: underline;
+}
+
+.wb-card__summary {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  margin: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  line-height: 1.5;
+  color: var(--kb-ui-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.wb-card__lineage {
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-muted);
+}
+
+.wb-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--kb-ui-space-1) var(--kb-ui-space-2);
+  margin: 0;
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-subtle);
+}
+
+.wb-card__more {
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-muted);
+}
+
+.wb-card__more > summary {
+  cursor: pointer;
+  color: var(--kb-ui-accent-text);
+}
+
+.wb-card__more p {
+  margin: var(--kb-ui-space-1) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.wb-card__full {
+  white-space: pre-wrap;
+  max-height: 16rem;
+  overflow: auto;
+}
+
+.wb-card__id {
+  font-family: var(--kb-ui-font-mono);
+  color: var(--kb-ui-text-subtle);
+}
+
+.wb-card__move-select.kb-input {
+  width: auto;
+  max-width: 100%;
+  min-height: 0;
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-xs);
+  padding-top: var(--kb-ui-space-1);
+  padding-bottom: var(--kb-ui-space-1);
+}
+
+.wb-collapsed {
+  padding: var(--kb-ui-space-2) var(--kb-ui-space-3);
+  border: 1px dashed var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+}
+
+.wb-collapsed > summary {
+  cursor: pointer;
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+}
+
+.wb-collapsed > .wb-column__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  margin-top: var(--kb-ui-space-2);
+}
+
+.wb-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media print {
+  .wb-board {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  .wb-card__move,
+  .wb-toggle {
+    display: none;
+  }
+}
+
+/* List layout: status groups stacked, cards in a responsive grid. */
+.wb-board[data-layout='list'] {
+  flex-direction: column;
+  align-items: stretch;
+  overflow-x: visible;
+}
+
+.wb-board[data-layout='list'] .wb-column {
+  min-height: 0;
+}
+
+.wb-board[data-layout='list'] .wb-column__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+}
+
+.wb-card__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kb-ui-space-1) var(--kb-ui-space-3);
+  font-size: var(--kb-ui-font-size-xs);
+}
+
+.wb-card__links a,
+.wb-card__links button {
+  padding: 0;
+  font: inherit;
+  color: var(--kb-ui-accent-text);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.wb-card__links a:hover,
+.wb-card__links button:hover {
+  text-decoration: underline;
+}

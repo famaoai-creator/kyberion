@@ -1667,15 +1667,20 @@ describe('organization operating model', () => {
       safeMkdir(path.dirname(ledgerFile), { recursive: true });
       safeWriteFile(
         ledgerFile,
-        JSON.stringify({
-          scope: 'org',
-          organization_id: organizationId,
-          objective_id: 'obj-rollup',
-          kr_id: 'kr-rollup',
-          value: 60,
-          progress: 0.75,
-          measured_at: '2026-10-24T01:00:00.000Z',
-        }) + '\n'
+        [
+          { value: 40, progress: 0.4, measured_at: '2026-10-23T01:00:00.000Z' },
+          { value: 60, progress: 0.75, measured_at: '2026-10-24T01:00:00.000Z' },
+        ]
+          .map((row) =>
+            JSON.stringify({
+              scope: 'org',
+              organization_id: organizationId,
+              objective_id: 'obj-rollup',
+              kr_id: 'kr-rollup',
+              ...row,
+            })
+          )
+          .join('\n') + '\n'
       );
 
       const view = buildOrganizationManagementView({
@@ -1690,8 +1695,15 @@ describe('organization operating model', () => {
       expect(entry?.key_results).toEqual([
         expect.objectContaining({
           kr_id: 'kr-rollup',
+          target: 100,
+          direction: 'increase',
+          value: 60,
           progress: 0.75,
           measured_at: '2026-10-24T01:00:00.000Z',
+          history: [
+            { value: 40, progress: 0.4, measured_at: '2026-10-23T01:00:00.000Z' },
+            { value: 60, progress: 0.75, measured_at: '2026-10-24T01:00:00.000Z' },
+          ],
         }),
       ]);
       expect(entry?.projects).toEqual([

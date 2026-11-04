@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildOrganizationFlowProps,
+  krProgressAria,
   organizationHealthLabel,
   organizationReadinessLabel,
   organizationInterventionCommand,
@@ -55,5 +56,11 @@ describe('OrganizationOperatingModel structure flow (UI-07 wave 3b)', () => {
       { from: 'domain:d', to: 'capability:c' },
       { from: 'capability:c', to: 'service:s' },
     ]);
+  });
+
+  it('never announces an unmeasured key result as 0%', () => {
+    expect(krProgressAria(undefined, '未計測')).toEqual({ 'aria-valuetext': '未計測' });
+    expect(krProgressAria(undefined, '未計測')).not.toHaveProperty('aria-valuenow');
+    expect(krProgressAria(40, 'on track')).toEqual({ 'aria-valuenow': 40 });
   });
 });

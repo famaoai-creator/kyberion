@@ -13,13 +13,15 @@ import {
 export const dynamic = 'force-dynamic';
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
-const COMPANY_HOME_LIMIT = 5;
+/** Pending decisions listed per company; the rest stay one company switch away. */
+const COMPANY_HOME_LIMIT = 20;
 /** Each request reads one home per company, so it gets its own, smaller bucket. */
 const PERSONAL_SUMMARY_RATE_LIMIT = 20;
 
 /**
  * The personal (個人) view: a per-company summary of the viewer's allowed
- * companies (plus the company-less card for all-company viewers). Served only
+ * companies (plus the company-less card for all-company viewers), with each
+ * company's pending decisions read through a viewer narrowed to that company. Served only
  * while the server-resolved selection is personal, so a company view never
  * fetches other companies' counts.
  */

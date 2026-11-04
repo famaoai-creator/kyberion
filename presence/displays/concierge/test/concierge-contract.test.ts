@@ -29,6 +29,23 @@ describe('concierge surface contract', () => {
     expect(decision).not.toMatch(/setTimeout|setInterval/);
   });
 
+  it('dispatches personal-view decisions exactly like the company queue', () => {
+    // The personal (all-company) inbox decides through the same tenant-scoped
+    // route with the same presented digest and passkey branch — no retry.
+    const client = safeReadFile(
+      path.join(appDir, 'src/lib/approval-decision-client.ts')
+    ).toString();
+    expect(client).toContain('if (!response.ok) throw await readApprovalResponseFailure(response)');
+    expect(client.match(/await fetch\(/g)).toHaveLength(1);
+    expect(client.match(/await decideWithPasskey\(/g)).toHaveLength(1);
+    expect(client.match(/presentedDigest: item.presented_digest/g)).toHaveLength(2);
+    expect(client).toContain("if (item.min_assurance === 'A3')");
+    expect(client).not.toMatch(/setTimeout|setInterval/);
+    const overview = safeReadFile(path.join(appDir, 'src/app/personal-overview.tsx')).toString();
+    expect(overview).toContain('await postApprovalDecision(item, decision)');
+    expect(overview).toContain('formatApprovalFailure(error, locale)');
+  });
+
   it('declares its role tagline in the layout header', () => {
     const layout = fs.readFileSync(path.join(appDir, 'src/app/layout.tsx'), 'utf8');
     const header = fs.readFileSync(path.join(appDir, 'src/app/concierge-header.tsx'), 'utf8');

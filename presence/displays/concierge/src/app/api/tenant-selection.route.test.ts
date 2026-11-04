@@ -320,6 +320,8 @@ describe('/api/personal-summary', () => {
     expect(body.system).toEqual({
       counts: { active_missions: 0, pending_approvals: 1, unread_outcomes: 0, exceptions: 0 },
       headline: 'System runtime upgrade',
+      // The personal view lists pending decisions, read from the company-less scope only.
+      approvals: [expect.objectContaining({ id: 's-1', title: 'System runtime upgrade' })],
     });
     state.viewer = viewer(['acme', 'beta']);
     const explicit = (await (await personalGET(request('/api/personal-summary'))).json()) as {

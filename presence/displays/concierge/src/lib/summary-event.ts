@@ -1,4 +1,5 @@
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { parseDecisionBrief, type DecisionBrief } from './decision-brief-view';
 
 export type ConciergeSummary = {
   generated_at: string;
@@ -35,6 +36,8 @@ export type ConciergeSummary = {
     min_assurance?: string;
     review_scope?: string;
     evidence?: Array<{ label: string; ref: string }>;
+    /** Plain-language decision brief (server-derived, display only). */
+    brief?: DecisionBrief;
   }>;
   outcome_feed: Array<{
     entry_id: string;
@@ -164,6 +167,13 @@ export function parseConciergeSummaryValue(value: unknown): ConciergeSummary | n
     !isSummaryItemArray(value.exception_feed, ['id', 'title', 'text', 'surface', 'created_at'])
   ) {
     return null;
+  }
+  // A malformed brief is dropped, never trusted: the card falls back to its title.
+  for (const item of value.approval_queue as Array<Record<string, unknown>>) {
+    if (item.brief === undefined) continue;
+    const brief = parseDecisionBrief(item.brief);
+    if (brief) item.brief = brief;
+    else delete item.brief;
   }
   return value as ConciergeSummary;
 }

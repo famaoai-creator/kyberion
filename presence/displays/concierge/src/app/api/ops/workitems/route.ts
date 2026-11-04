@@ -9,6 +9,7 @@ import {
   type WorkVisibilityScope,
   type WorkVisibilityView,
 } from '@agent/core/workforce/work-visibility';
+import { invalidateWorkspaceGraphCache } from '@agent/core/surface/surface-operation-registry';
 import { guardOpsRequest, requireOpsAccess } from '../../../../lib/ops/ops-request-guard';
 import {
   resolveOpsViewerForRequest,
@@ -84,6 +85,8 @@ export function GET(req: NextRequest) {
     });
     return NextResponse.json({
       ok: true,
+      // Lets the board hide move controls from readonly viewers; POST stays the gate.
+      accessRole: viewer.role,
       statuses: CHRONOS_WORK_ITEM_STATUSES,
       scope: projection.scope,
       view: projection.view,
@@ -182,6 +185,8 @@ export async function POST(req: NextRequest) {
     const updated = withViewerExecutionContext(viewer, () =>
       updateWorkItem({ itemId, status: input.status })
     );
+    // The workspace graph (/w boards) caches its join briefly; a move must show at once.
+    invalidateWorkspaceGraphCache();
     return NextResponse.json({ ok: true, item: updated });
   } catch (error) {
     return viewerErrorResponse(
