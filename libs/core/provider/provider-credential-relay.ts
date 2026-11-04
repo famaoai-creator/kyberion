@@ -320,8 +320,20 @@ export interface PreparedProviderCredentialRelay {
   readonly relay: CredentialRelayHandle;
 }
 
+let failClosedPathsAnnounced = false;
+
+/** Once per process: name the launch paths that run without an API key. */
+function announceFailClosedPaths(): void {
+  if (failClosedPathsAnnounced) return;
+  failClosedPathsAnnounced = true;
+  logger.warn(
+    `[credential-relay] ${PROVIDER_CREDENTIAL_RELAY_ENV_VAR} is on — claude/codex delegations use the loopback relay; these paths run WITHOUT ANTHROPIC_API_KEY/OPENAI_API_KEY (own login or no auth): agent-adapter codex exec / claude -p, codex app-server harness, ACP mediator, claude-agent SDK, herdr pane agents, pty shells, process-actuator | next: use OAuth logins for those paths or unset the flag | evidence: api-credential-proof-boundary.md launch-site table`
+  );
+}
+
 function relayRouteFor(provider: ProviderId, baseEnv: NodeJS.ProcessEnv): RelayRoute | undefined {
   if (!isProviderCredentialRelayEnabled(baseEnv)) return undefined;
+  announceFailClosedPaths();
   return RELAY_ROUTES[provider];
 }
 
