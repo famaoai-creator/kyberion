@@ -13,6 +13,11 @@ import { currentScopeEnvelope } from '../scope-envelope.js';
 import { resolveScopeContext } from '../scope-context.js';
 import { assertVcsCwdScope } from './cwd-scope.js';
 import { vcsDefaultRunner, type VcsCommandResult, type VcsCommandRunner } from './vcs-backend.js';
+// The typed verbs default to `vcsDefaultRunner`, which resolves the governed
+// backend chain (`local-git` first). Load the builtin here so every consumer
+// of the verb surface gets it registered — otherwise a caller that never
+// imported local-git-backend hits `[VCS_BACKEND] no backend registered`.
+import './local-git-backend.js';
 
 export type { VcsCommandResult, VcsCommandRunner } from './vcs-backend.js';
 
