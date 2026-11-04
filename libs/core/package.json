@@ -6792,6 +6792,14 @@
       "types": "./dist/surface/surface-operation-registry.d.ts",
       "default": "./dist/surface/surface-operation-registry.js"
     },
+    "./surface/needs-you": {
+      "types": "./dist/surface/needs-you.d.ts",
+      "default": "./dist/surface/needs-you.js"
+    },
+    "./surface/needs-you-sources": {
+      "types": "./dist/surface/needs-you-sources.d.ts",
+      "default": "./dist/surface/needs-you-sources.js"
+    },
     "./surface/workspace-graph": {
       "types": "./dist/surface/workspace-graph.d.ts",
       "default": "./dist/surface/workspace-graph.js"

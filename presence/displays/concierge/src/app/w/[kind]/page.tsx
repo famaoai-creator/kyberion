@@ -21,7 +21,9 @@ import {
   actorDisplayName,
   type BoardCard,
 } from '../../../components/work-board/work-item-board';
+import { NeedsYouLink } from '../../../components/needs-you-link';
 import {
+  approvalNeedsDecision,
   decodeRouteSegment,
   entityHref,
   isWorkspaceKind,
@@ -131,7 +133,11 @@ function KindList({ t, kind }: { t: Translate; kind: GraphEntityKind }) {
       ? lastReady.current.items
       : null;
   const listReady = list.state === 'ready' || stale !== null;
-  const items = list.state === 'ready' ? list.data.items : (stale ?? []);
+  const loaded = list.state === 'ready' ? list.data.items : (stale ?? []);
+  // Pending approvals are listed and decided only in あなた待ち (IA contract §1:
+  // no duplicated lists); this list keeps the decided history.
+  const items =
+    kind === 'approval' ? loaded.filter((item) => !approvalNeedsDecision(item.status)) : loaded;
   const facets = statusFacets(items);
   const shown = status ? items.filter((item) => item.status === status) : items;
   const narrowing = narrowingEntries(query);
@@ -148,6 +154,7 @@ function KindList({ t, kind }: { t: Translate; kind: GraphEntityKind }) {
       <WorkspaceCrumbs t={t} lineage={[]} current={kindsLabel(t, kind)} />
       <PageHeader title={kindsLabel(t, kind)} subtitle={t(`ws_about_${kind}`)} />
       {summary.state === 'ready' ? <DegradedNotice t={t} degraded={summary.data.degraded} /> : null}
+      {kind === 'approval' ? <NeedsYouLink reason="approval" locale={locale} /> : null}
       {narrowing.length ? (
         <Callout
           tone="info"
