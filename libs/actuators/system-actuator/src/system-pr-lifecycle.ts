@@ -3,8 +3,6 @@ import { safeExecResult, safeWriteFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { logger } from '@agent/core/core';
 import {
-  ghPrChecks,
-  ghPrMerge,
   gitAdd,
   gitCheckRefFormat,
   gitCheckout,
@@ -14,6 +12,9 @@ import {
   gitPush,
   type VcsCommandResult,
 } from '@agent/core/vcs';
+import { vcsHostPrChecks, vcsHostPrMerge } from '@agent/core/vcs/vcs-host-verbs';
+import { createGhCliVcsHostProvider } from '@agent/core/vcs/gh-cli-host-provider';
+import type { VcsHostCallOptions } from '@agent/core/vcs/vcs-host';
 import { main as publishPullRequest } from '../../../../scripts/publish_pull_request.js';
 
 export interface StandardPrLifecycleParams {
@@ -82,9 +83,15 @@ export async function runStandardPrLifecycle(
   if (!url)
     throw new Error('[PR_LIFECYCLE_URL_MISSING] Governed publisher did not return a PR URL.');
   if (params.auto_merge === true) {
+    // The governed default exec resolves the vcs-host seam (gh-cli or
+    // github-rest); an injected exec keeps driving the gh CLI it was built for.
+    const host: VcsHostCallOptions =
+      exec === safeExecResult
+        ? { cwd }
+        : { cwd, git: exec, hostProvider: createGhCliVcsHostProvider({ run: exec }) };
     let checks;
     try {
-      checks = ghPrChecks({ ref: url, cwd }, exec);
+      checks = await vcsHostPrChecks({ ...host, ref: url });
     } catch (error) {
       throw new Error(
         `[PR_LIFECYCLE_COMMAND_FAILED] gh pr checks: ${error instanceof Error ? error.message : String(error)}`
@@ -100,10 +107,13 @@ export async function runStandardPrLifecycle(
           (checks.pending.length ? `; pending: ${checks.pending.join(', ')}` : '')
       );
     }
-    assertOk(
-      ghPrMerge({ ref: url, method: 'merge', deleteBranch: true, cwd }, exec),
-      'gh pr merge'
-    );
+    try {
+      await vcsHostPrMerge({ ...host, ref: url, method: 'merge', deleteBranch: true });
+    } catch (error) {
+      throw new Error(
+        `[PR_LIFECYCLE_COMMAND_FAILED] pr merge: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
     assertOk(gitCheckout(cwd, 'main', {}, exec), 'git checkout main');
     assertOk(gitPull(cwd, { remote: 'origin', ref: 'main' }, exec), 'git pull --ff-only');
   }
