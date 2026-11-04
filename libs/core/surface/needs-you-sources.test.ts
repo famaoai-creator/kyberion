@@ -26,7 +26,7 @@ vi.mock('../knowledge/memory-promotion-queue.js', async (importOriginal) => ({
 }));
 vi.mock('../mission/mission-hygiene.js', () => ({ collectMissionHygieneReport: mocks.hygiene }));
 
-import { readNeedsYouSources } from './needs-you-sources.js';
+import { readNeedsYouFailures, readNeedsYouSources } from './needs-you-sources.js';
 
 function record(id: string, scope: Record<string, string> | undefined) {
   return {
@@ -107,5 +107,38 @@ describe('default needs-you reader (MCP)', () => {
     const data = readNeedsYouSources(viewer);
     expect(data.approvals).toEqual([]);
     expect(data.outcomes).toEqual([]);
+  });
+});
+
+describe('readNeedsYouFailures (review M2)', () => {
+  function failure(index: number, extra: Record<string, unknown> = {}) {
+    return {
+      status: 'failed',
+      surface: 'presence',
+      title: `Broke ${index}`,
+      created_at: `2026-11-05T10:${String(index % 60).padStart(2, '0')}:00.000Z`,
+      scope: { tenant_slug: 'famao-ai', tier: 'confidential' },
+      ...extra,
+    };
+  }
+
+  it('is uncapped and gives different id-less failures different, stable ids', () => {
+    const notifications = Array.from({ length: 25 }, (_, index) => failure(index));
+    mocks.notifications.mockReturnValue(notifications);
+    const first = readNeedsYouFailures(viewer);
+    expect(first).toHaveLength(25);
+    expect(new Set(first.map((item) => item.id)).size).toBe(25);
+    mocks.notifications.mockReturnValue([...notifications].reverse());
+    const again = readNeedsYouFailures(viewer);
+    expect(new Set(again.map((item) => item.id))).toEqual(new Set(first.map((item) => item.id)));
+  });
+
+  it('admits the personal tier only for an authenticated caller', () => {
+    mocks.notifications.mockReturnValue([
+      failure(1, { scope: { tenant_slug: 'famao-ai', tier: 'personal' } }),
+    ]);
+    const owner = { ...viewer, tierAccess: ['personal', 'confidential', 'public'] };
+    expect(readNeedsYouFailures(owner)).toHaveLength(0);
+    expect(readNeedsYouFailures(owner, { includePersonal: true })).toHaveLength(1);
   });
 });
