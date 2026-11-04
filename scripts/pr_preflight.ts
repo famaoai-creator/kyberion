@@ -21,7 +21,7 @@ import {
   runPrePrReadiness,
 } from './publish_pull_request.js';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExec, safeExecResult } from '@agent/core/secure-io';
+import { safeExecResult, safeExistsSync } from '@agent/core/secure-io';
 import { collectChangedFiles, type GitRunner } from './run_checks.js';
 import { describeAffectedTestPlan, planAffectedTests } from './lib/affected-tests.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -50,72 +50,146 @@ const gitRunner: GitRunner = (args) =>
 
 /**
  * The CI test environment (checklist locale row): the GitHub-hosted runner's
- * locale (C.UTF-8), CI mode, and no operator persona / role. Without this the
+ * locale (C.UTF-8), CI mode, strict leak checking (as the test workflows set
+ * it), and no operator persona / role / mission / sudo. Without this the
  * operator's profile leaks into the run — e.g. `KYBERION_PERSONA=sovereign`
  * makes locale resolution read the personal identity language (`ja`), and
  * tests asserting the default English vocabulary fail locally but pass in CI.
- * Empty values override the inherited ones (safeExec applies extra env last).
+ * Empty values override the inherited ones (safeExecResult applies extra env
+ * last; getRegisteredEnv treats '' as unset).
  */
 export const AFFECTED_TESTS_ENV = {
   LANG: 'C.UTF-8',
   LC_ALL: 'C.UTF-8',
   CI: 'true',
+  KYBERION_TEST_LEAK_STRICT: '1',
   KYBERION_PERSONA: '',
   MISSION_ROLE: '',
+  MISSION_ID: '',
+  KYBERION_SUDO: '',
 } as const;
+
+export interface VitestRunResult {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+}
 
 export interface AffectedTestsDeps {
   git?: GitRunner;
-  /** Runs `pnpm <args>` and throws on failure. */
-  run?: (args: string[]) => void;
+  /** Runs vitest with these arguments (the part after `vitest`). */
+  vitest?: (args: string[]) => VitestRunResult;
+  exists?: (file: string) => boolean;
+}
+
+/** Same budget as scripts/test_suite.ts: broad runs stream for 20min+. */
+const VITEST_TIMEOUT_MS = 2_400_000;
+const VITEST_MAX_OUTPUT_MB = 50;
+
+function runVitest(args: string[]): VitestRunResult {
+  const entry = pathResolver.rootResolve('node_modules/vitest/vitest.mjs');
+  return safeExecResult(process.execPath, [entry, ...args], {
+    cwd: pathResolver.rootDir(),
+    env: AFFECTED_TESTS_ENV,
+    timeoutMs: VITEST_TIMEOUT_MS,
+    maxOutputMB: VITEST_MAX_OUTPUT_MB,
+  });
+}
+
+const ANSI_PATTERN = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'gu');
+
+/** Vitest summary lines (Test Files / Tests / No test files) and the test file count. */
+export function summarizeVitestOutput(output: string): { lines: string[]; testFiles: number } {
+  const lines = output
+    .replace(ANSI_PATTERN, '')
+    .split('\n')
+    .map((line) => line.trim());
+  const summary = lines.filter(
+    (line) => /^(?:Test Files|Tests)\s/u.test(line) || line.includes('No test files found')
+  );
+  const files = lines
+    .map((line) => /^Test Files\s.*\((\d+)\)\s*$/u.exec(line))
+    .find((match) => match !== null);
+  return { lines: summary, testFiles: files ? Number(files[1]) : 0 };
+}
+
+export interface AffectedTestsResult {
+  testFiles: number;
+  readerTests: string[];
+  /** Selections that could not be run, with the reason (record in the Test plan). */
+  notRun: string[];
 }
 
 /**
  * Checklist step 3.5: run the tests that import a changed file (vitest
- * `--changed`) and the tests that read a changed data / doc file. Throws on
- * the first failing run; reports what it selected so "0 files" is visible.
+ * `--changed`, limited to the CI suites) and the tests that read a changed
+ * data / doc file. Throws on a failing run. Reports how many test files ran,
+ * so an empty selection is never shown as a pass.
  */
 export function runAffectedTests(
   print: Print,
   base?: string,
   deps: AffectedTestsDeps = {}
-): { codeRun: boolean; readerTests: string[] } {
+): AffectedTestsResult {
   const git = deps.git ?? gitRunner;
-  const run =
-    deps.run ??
-    ((args: string[]) => {
-      safeExec('pnpm', args, {
-        cwd: pathResolver.rootDir(),
-        timeoutMs: 1_800_000,
-        env: AFFECTED_TESTS_ENV,
-      });
-    });
+  const vitest = deps.vitest ?? runVitest;
+  const exists = deps.exists ?? ((file: string) => safeExistsSync(pathResolver.rootResolve(file)));
   const changed = collectChangedFiles(base, git);
-  const plan = planAffectedTests(changed, git);
+  const plan = planAffectedTests(changed, git, exists);
   for (const line of describeAffectedTestPlan(plan)) print(line);
-  const codeRun = plan.codeFiles.length > 0;
-  if (codeRun) {
-    run([
-      'exec',
-      'vitest',
-      'run',
-      '--changed',
-      changed.mergeBase,
-      '--passWithNoTests',
-      ...plan.ciPaths,
-    ]);
+
+  const notRun: string[] = [];
+  let testFiles = 0;
+  const runSelection = (label: string, args: string[]) => {
+    print(`[pr:affected-tests] ${label}: vitest ${args.join(' ')}`);
+    const result = vitest(args);
+    const output = `${result.stdout}\n${result.stderr}`;
+    const summary = summarizeVitestOutput(output);
+    for (const line of summary.lines) print(`[pr:affected-tests]   ${line}`);
+    if (result.status !== 0) {
+      const tail = output.trim().split('\n').slice(-40).join('\n');
+      throw new Error(
+        `[pr:affected-tests] ${label} tests failed (exit ${String(result.status)})\n${tail}`
+      );
+    }
+    testFiles += summary.testFiles;
+  };
+
+  if (plan.codeFiles.length > 0 || plan.deletedCodeFiles.length > 0) {
+    if (plan.rerunTriggers.length > 0) {
+      notRun.push(
+        `code tests: ${plan.rerunTriggers.join(', ')} changed, so vitest --changed would rerun every test; run the owning suites (pnpm test -- --suite <name>) instead`
+      );
+    } else {
+      runSelection('code', [
+        'run',
+        '--changed',
+        changed.mergeBase,
+        '--passWithNoTests',
+        ...plan.ciPaths,
+      ]);
+    }
   }
   if (plan.readerTests.length > 0) {
-    run(['exec', 'vitest', 'run', '--passWithNoTests', ...plan.readerTests]);
+    runSelection('readers', ['run', '--passWithNoTests', ...plan.readerTests]);
   }
-  if (!codeRun && plan.readerTests.length === 0) {
+  const broad = plan.readers.filter((reader) => reader.tooBroad).map((reader) => reader.file);
+  if (broad.length > 0) notRun.push(`readers of ${broad.join(', ')}: too broad to select`);
+  if (plan.nonCiReaderTests.length > 0) {
+    notRun.push(`${plan.nonCiReaderTests.length} reader test(s) outside the CI suites`);
+  }
+
+  for (const reason of notRun) print(`[pr:affected-tests] NOT RUN — ${reason}`);
+  if (testFiles === 0) {
     print(
-      '[pr:affected-tests] No affected tests selected (no code change and no test reads the changed files).'
+      '[pr:affected-tests] 0 test files ran — no test verified this change; record that in the PR Test plan.'
     );
   } else {
-    print('[pr:affected-tests] Affected tests passed.');
+    print(
+      `[pr:affected-tests] Affected tests passed (${testFiles} test file(s))${notRun.length > 0 ? '; see NOT RUN above' : ''}.`
+    );
   }
-  return { codeRun, readerTests: plan.readerTests };
+  return { testFiles, readerTests: plan.readerTests, notRun };
 }
 
 export async function main(argv: string[], print: Print = () => undefined): Promise<void> {

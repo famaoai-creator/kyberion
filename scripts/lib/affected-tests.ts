@@ -68,21 +68,44 @@ export function ciTestPaths(): string[] {
   return [...paths].sort();
 }
 
+/**
+ * Whether a CI suite selects `file`. Vitest positional filters are
+ * case-insensitive substring matches on the file path, so `tests/` also
+ * selects e.g. `libs/x/__tests__/a.test.ts`; mirror that, not a prefix test.
+ */
 export function isCiTest(file: string, paths: readonly string[] = ciTestPaths()): boolean {
-  return paths.some((entry) => (entry.endsWith('/') ? file.startsWith(entry) : file === entry));
+  const lower = file.toLowerCase();
+  return paths.some((entry) => lower.includes(entry.toLowerCase()));
+}
+
+/**
+ * Vitest's default `forceRerunTriggers`: when one of these changes,
+ * `--changed` selects every test instead of the related ones.
+ */
+export function isVitestRerunTrigger(file: string): boolean {
+  return (
+    /(?:^|\/)package\.json$/u.test(file) || /(?:^|\/)(?:vitest|vite)\.config\.[^/]+$/u.test(file)
+  );
 }
 
 export interface ReaderMatch {
   file: string;
   needles: string[];
   tests: string[];
-  /** True when the needles matched too many tests to be a useful selection. */
+  /** Needles dropped because each matched too many tests to identify readers. */
+  broadNeedles: string[];
+  /** True when every needle was too broad, so nothing could be selected. */
   tooBroad: boolean;
 }
 
 export interface AffectedTestPlan {
   base: string;
+  /** Changed code files that still exist (vitest resolves importers from these). */
   codeFiles: string[];
+  /** Changed code files that were deleted (their importers changed too, or the build breaks). */
+  deletedCodeFiles: string[];
+  /** Changed files that make vitest `--changed` rerun every test. */
+  rerunTriggers: string[];
   dataFiles: string[];
   readers: ReaderMatch[];
   /** Deduplicated reader tests to run (excludes too-broad matches and non-CI tests). */
@@ -151,14 +174,32 @@ export function findReaderTests(needles: readonly string[], git: GitRunner): str
 
 export function planAffectedTests(
   changed: { base: string; files: readonly string[] },
-  git: GitRunner
+  git: GitRunner,
+  exists: (file: string) => boolean = () => true
 ): AffectedTestPlan {
-  const codeFiles = changed.files.filter(isCodeFile);
+  const allCode = changed.files.filter(isCodeFile);
+  const codeFiles = allCode.filter((file) => exists(file));
+  const deletedCodeFiles = allCode.filter((file) => !exists(file));
+  const rerunTriggers = changed.files.filter(isVitestRerunTrigger);
   const dataFiles = dataFilesOf(changed.files);
   const readers: ReaderMatch[] = dataFiles.map((file) => {
     const needles = readerNeedles(file);
-    const tests = findReaderTests(needles, git);
-    return { file, needles, tests, tooBroad: tests.length > MAX_READERS_PER_FILE };
+    // Judge each needle on its own: a common basename must not discard the
+    // exact-path readers found by the other needles.
+    const broadNeedles: string[] = [];
+    const tests = new Set<string>();
+    for (const needle of needles) {
+      const hits = findReaderTests([needle], git);
+      if (hits.length > MAX_READERS_PER_FILE) broadNeedles.push(needle);
+      else for (const hit of hits) tests.add(hit);
+    }
+    return {
+      file,
+      needles,
+      tests: [...tests].sort(),
+      broadNeedles,
+      tooBroad: broadNeedles.length === needles.length,
+    };
   });
   const ciPaths = ciTestPaths();
   const selected = [
@@ -169,6 +210,8 @@ export function planAffectedTests(
   return {
     base: changed.base,
     codeFiles,
+    deletedCodeFiles,
+    rerunTriggers,
     dataFiles,
     readers,
     readerTests,
@@ -188,12 +231,24 @@ export function describeAffectedTestPlan(plan: AffectedTestPlan): string[] {
       `[pr:affected-tests]   not run (outside the CI test suites): ${plan.nonCiReaderTests.join(', ')}`
     );
   }
+  if (plan.deletedCodeFiles.length > 0) {
+    lines.push(
+      `[pr:affected-tests]   deleted code (selected through their changed importers): ${plan.deletedCodeFiles.join(', ')}`
+    );
+  }
   for (const reader of plan.readers) {
     if (reader.tooBroad) {
       lines.push(
-        `[pr:affected-tests]   ${reader.file}: ${reader.tests.length} readers — too broad to select, run the suite that owns it`
+        `[pr:affected-tests]   ${reader.file}: every needle matches > ${MAX_READERS_PER_FILE} tests — too broad to select, run the suite that owns it`
       );
-    } else if (reader.tests.length > 0) {
+      continue;
+    }
+    if (reader.broadNeedles.length > 0) {
+      lines.push(
+        `[pr:affected-tests]   ${reader.file}: ignored broad needle(s) ${reader.broadNeedles.join(', ')}`
+      );
+    }
+    if (reader.tests.length > 0) {
       lines.push(`[pr:affected-tests]   ${reader.file} → ${reader.tests.join(', ')}`);
     }
   }

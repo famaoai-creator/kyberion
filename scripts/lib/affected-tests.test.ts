@@ -3,6 +3,7 @@ import {
   ciTestPaths,
   dataFilesOf,
   isCiTest,
+  isVitestRerunTrigger,
   findReaderTests,
   isCodeFile,
   MAX_READERS_PER_FILE,
@@ -80,5 +81,37 @@ describe('affected tests planning', () => {
     );
     expect(plan.readerTests).toEqual(['tests/a.test.ts']);
     expect(plan.nonCiReaderTests).toEqual(['presence/displays/concierge/test/b.test.ts']);
+  });
+
+  it('drops only the broad needle and keeps exact-path readers', () => {
+    const many = Array.from({ length: MAX_READERS_PER_FILE + 1 }, (_, i) => `tests/t${i}.test.ts`);
+    const file = 'knowledge/public/locales/messages.ja.json';
+    const plan = planAffectedTests({ base: 'origin/main', files: [file] }, (args) =>
+      args.includes('messages.ja.json') ? ok(many.join('\n')) : ok('tests/locale.test.ts\n')
+    );
+    const reader = plan.readers[0]!;
+    expect(reader.broadNeedles).toEqual(['messages.ja.json']);
+    expect(reader.tooBroad).toBe(false);
+    expect(plan.readerTests).toEqual(['tests/locale.test.ts']);
+  });
+
+  it('flags vitest rerun triggers and separates deleted code files', () => {
+    expect(isVitestRerunTrigger('package.json')).toBe(true);
+    expect(isVitestRerunTrigger('libs/core/package.json')).toBe(true);
+    expect(isVitestRerunTrigger('vitest.config.mts')).toBe(true);
+    expect(isVitestRerunTrigger('scripts/package-json.ts')).toBe(false);
+    const plan = planAffectedTests(
+      { base: 'origin/main', files: ['libs/core/gone.ts', 'libs/core/kept.ts', 'package.json'] },
+      () => ok(''),
+      (file) => file !== 'libs/core/gone.ts'
+    );
+    expect(plan.codeFiles).toEqual(['libs/core/kept.ts']);
+    expect(plan.deletedCodeFiles).toEqual(['libs/core/gone.ts']);
+    expect(plan.rerunTriggers).toEqual(['package.json']);
+  });
+
+  it('matches CI suite paths like vitest filters (case-insensitive substring)', () => {
+    expect(isCiTest('libs/shared-x/tests/a.test.ts', ['tests/'])).toBe(true);
+    expect(isCiTest('Scripts/A.test.ts', ['scripts/'])).toBe(true);
   });
 });

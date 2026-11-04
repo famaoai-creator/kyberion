@@ -3,6 +3,7 @@ import { pathResolver } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
+  safeExecResult: vi.fn(),
   safeReadFile: vi.fn(),
   checkPrKnowledgeReadiness: vi.fn(),
 }));
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
   safeExec: mocks.safeExec,
+  safeExecResult: mocks.safeExecResult,
   safeReadFile: mocks.safeReadFile,
 }));
 
@@ -18,7 +20,8 @@ vi.mock('@agent/core/knowledge/pr-knowledge-readiness', async (importOriginal) =
   checkPrKnowledgeReadiness: mocks.checkPrKnowledgeReadiness,
 }));
 
-import { main, runAffectedTests } from './pr_preflight.js';
+import { main, PREFLIGHT_PR_CLI, runAffectedTests } from './pr_preflight.js';
+import { PUBLISH_PR_CLI } from './publish_pull_request.js';
 import { ciTestPaths } from './lib/affected-tests.js';
 
 describe('pr preflight', () => {
@@ -81,6 +84,12 @@ describe('pr preflight', () => {
     expect(mocks.safeExec).not.toHaveBeenCalled();
   });
 
+  it('accepts --skip-affected-tests only on preflight, not on pr create', () => {
+    const flags = (spec: typeof PREFLIGHT_PR_CLI) => spec.options.map((option) => option.flag);
+    expect(flags(PREFLIGHT_PR_CLI)).toContain('--skip-affected-tests');
+    expect(flags(PUBLISH_PR_CLI)).not.toContain('--skip-affected-tests');
+  });
+
   describe('affected tests (checklist step 3.5)', () => {
     type GitArgs = string[];
     const fakeGit =
@@ -99,6 +108,13 @@ describe('pr preflight', () => {
         throw new Error(`unexpected git ${args.join(' ')}`);
       };
 
+    const passed = (files: number) => ({
+      status: 0,
+      stdout: ` Test Files  ${files} passed (${files})\n      Tests  ${files * 3} passed (${files * 3})\n`,
+      stderr: '',
+    });
+    const always = () => true;
+
     it('runs vitest --changed for code and the reader tests for changed docs', () => {
       const runs: string[][] = [];
       const output: string[] = [];
@@ -106,65 +122,101 @@ describe('pr preflight', () => {
         git: fakeGit(['libs/core/a.ts', 'CONTRIBUTING.md'], {
           'CONTRIBUTING.md': ['tests/good-first-issue-guidance-contract.test.ts'],
         }),
-        run: (args) => runs.push(args),
+        vitest: (args) => {
+          runs.push(args);
+          return passed(2);
+        },
+        exists: always,
       });
       expect(runs).toEqual([
-        ['exec', 'vitest', 'run', '--changed', 'abc123', '--passWithNoTests', ...ciTestPaths()],
-        [
-          'exec',
-          'vitest',
-          'run',
-          '--passWithNoTests',
-          'tests/good-first-issue-guidance-contract.test.ts',
-        ],
+        ['run', '--changed', 'abc123', '--passWithNoTests', ...ciTestPaths()],
+        ['run', '--passWithNoTests', 'tests/good-first-issue-guidance-contract.test.ts'],
       ]);
       expect(result).toEqual({
-        codeRun: true,
+        testFiles: 4,
         readerTests: ['tests/good-first-issue-guidance-contract.test.ts'],
+        notRun: [],
       });
-      expect(output.join('\n')).toContain(
-        'CONTRIBUTING.md → tests/good-first-issue-guidance-contract.test.ts'
-      );
+      const log = output.join('\n');
+      expect(log).toContain('CONTRIBUTING.md → tests/good-first-issue-guidance-contract.test.ts');
+      expect(log).toContain('Test Files  2 passed (2)');
+      expect(log).toContain('Affected tests passed (4 test file(s))');
     });
 
-    it('says so when nothing is selected instead of reporting a pass', () => {
-      const runs: string[][] = [];
+    it('never reports a pass when no test file ran', () => {
       const output: string[] = [];
       runAffectedTests((v) => output.push(String(v)), undefined, {
-        git: fakeGit(['changelog.d/x.md']),
-        run: (args) => runs.push(args),
+        git: fakeGit(['libs/core/a.ts']),
+        vitest: () => ({
+          status: 0,
+          stdout: 'No test files found, exiting with code 0\n',
+          stderr: '',
+        }),
+        exists: always,
+      });
+      const log = output.join('\n');
+      expect(log).toContain('0 test files ran');
+      expect(log).not.toContain('Affected tests passed');
+    });
+
+    it('does not run the code selection when a vitest rerun trigger changed', () => {
+      const runs: string[][] = [];
+      const output: string[] = [];
+      const result = runAffectedTests((v) => output.push(String(v)), undefined, {
+        git: fakeGit(['libs/core/a.ts', 'package.json']),
+        vitest: (args) => {
+          runs.push(args);
+          return passed(1);
+        },
+        exists: always,
       });
       expect(runs).toEqual([]);
-      expect(output.join('\n')).toContain('No affected tests selected');
+      expect(result.notRun[0]).toContain('package.json changed');
+      expect(output.join('\n')).toContain('NOT RUN — code tests');
     });
 
-    it('runs the affected tests in the CI environment, not the operator profile', () => {
-      mocks.safeExec.mockReturnValue('');
-      runAffectedTests(() => undefined, undefined, { git: fakeGit(['libs/core/a.ts']) });
-      expect(mocks.safeExec).toHaveBeenCalledWith(
-        'pnpm',
-        ['exec', 'vitest', 'run', '--changed', 'abc123', '--passWithNoTests', ...ciTestPaths()],
-        expect.objectContaining({
-          env: {
-            LANG: 'C.UTF-8',
-            LC_ALL: 'C.UTF-8',
-            CI: 'true',
-            KYBERION_PERSONA: '',
-            MISSION_ROLE: '',
-          },
-        })
-      );
+    it('runs vitest in the CI environment, not the operator profile', () => {
+      mocks.safeExecResult.mockReturnValue(passed(1));
+      {
+        runAffectedTests(() => undefined, undefined, {
+          git: fakeGit(['libs/core/a.ts']),
+          exists: always,
+        });
+        expect(mocks.safeExecResult).toHaveBeenCalledWith(
+          process.execPath,
+          [
+            expect.stringContaining('vitest.mjs'),
+            'run',
+            '--changed',
+            'abc123',
+            '--passWithNoTests',
+            ...ciTestPaths(),
+          ],
+          expect.objectContaining({
+            env: {
+              LANG: 'C.UTF-8',
+              LC_ALL: 'C.UTF-8',
+              CI: 'true',
+              KYBERION_TEST_LEAK_STRICT: '1',
+              KYBERION_PERSONA: '',
+              MISSION_ROLE: '',
+              MISSION_ID: '',
+              KYBERION_SUDO: '',
+            },
+            maxOutputMB: 50,
+          })
+        );
+      }
     });
 
-    it('fails preflight when an affected test run fails', () => {
+    it('fails preflight with the vitest output tail when a run fails', () => {
       expect(() =>
         runAffectedTests(() => undefined, undefined, {
           git: fakeGit(['libs/core/a.ts']),
-          run: () => {
-            throw new Error('vitest failed');
-          },
+          vitest: () => ({ status: 1, stdout: 'FAIL tests/x.test.ts\n', stderr: '' }),
+          exists: always,
         })
-      ).toThrow('vitest failed');
+      ).toThrow(/code tests failed \(exit 1\)[\s\S]*FAIL tests\/x\.test\.ts/u);
     });
   });
 });
