@@ -181,6 +181,15 @@ describe('needs-you count definition', () => {
     expect(summary.oldestWaitingSince).toBe(iso(-3 * HOUR));
   });
 
+  it('dedupes an approval read through two views before folding', () => {
+    const items = buildNeedsYouQueue(
+      { ...EMPTY, approvals: [approval('a1'), approval('a1'), approval('a2')] },
+      { viewer: ALL, now: NOW }
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]!.group_size).toBe(2);
+  });
+
   it('dedupes the same record read twice', () => {
     const items = buildNeedsYouQueue(
       {
