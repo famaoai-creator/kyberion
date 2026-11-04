@@ -46,6 +46,8 @@ interface PublishOptions {
   skipReadiness: boolean;
   missionRoot?: string;
   checkJobs?: number;
+  /** preflight only (PREFLIGHT_PR_CLI): skip checklist step 3.5. */
+  skipAffectedTests?: boolean;
 }
 
 function readHeadSubject(): string {
@@ -121,6 +123,7 @@ export function parsePublishArgs(argv: string[]): PublishOptions {
     else if (arg === '--draft') options.draft = true;
     else if (arg === '--fill') options.fill = true;
     else if (arg === '--skip-readiness') options.skipReadiness = true;
+    else if (arg === '--skip-affected-tests') options.skipAffectedTests = true;
     else if (arg === '--mission-root') options.missionRoot = argv[++i];
     else if (arg === '--check-jobs') {
       if (options.checkJobs !== undefined)
