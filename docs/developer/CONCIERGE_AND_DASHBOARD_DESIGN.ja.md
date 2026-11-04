@@ -6,6 +6,8 @@
 
 > **⚠️ 現況(2026-08-02 更新)**: 本文書が記述する Express 版 concierge(port 3033、`server.ts` + `static/index.html`)は [CONCIERGE_SECRETARY_UX_PLAN_2026-08-02](./improvement-plans-2026-08/CONCIERGE_SECRETARY_UX_PLAN_2026-08-02.ja.md) の CS-01/CS-02 で会話(2経路フェイルオーバー)・音声(Web Speech Tier 0 / voice-hub Tier 1)を Next.js 版へ移植のうえ、**CS-05 で削除済み**。現行の唯一の concierge は **Next.js 版(port 3050、healthPath `/api/summary`)** で、`knowledge/product/governance/surfaces/concierge.json` が正。本文書は歴史記録+設計資産(§1 の二経路設計、§4 の 3D アバター設計)として保存されている。2.5D アバターの再導入は §4 とともに将来オプション。
 
+> **⚠️ 現況(2026-11-04 更新)**: §2 のダッシュボード(旧 chronos-mirror-v2、port 3000)は MSN-KYBERION-SERVER-20261104 で Concierge の運用コンソール(`/ops`、API `/api/ops/*`、port 3050)に統合された。チャート・A2UI レジストリ・AgentPanel は `presence/displays/concierge/src/components/ops/` にある。`presence/displays/chronos-mirror-v2` は旧 URL を Concierge へ 308 転送する互換アプリだけになっている。§3・§5 のビルド・検証記録は当時のもの。
+
 ---
 
 ## 1. 秘書コンシェルジェ surface
@@ -53,7 +55,7 @@
 
 ---
 
-## 2. ダッシュボードの視覚化(chronos-mirror-v2)
+## 2. ダッシュボードの視覚化(当時 chronos-mirror-v2、現 Concierge `/ops`)
 
 ### 設計判断 — 依存追加なしの self-contained SVG
 
@@ -74,7 +76,7 @@ chronos にはチャートライブラリが無く CSP も無い。既存 `Focus
 
 ### 実装ファイル
 
-- `presence/displays/chronos-mirror-v2/src/components/KyberionCharts.tsx` — `KyberionDonut` / `KyberionBarChart` / `KyberionStackedBar` / `KyberionSparkline`(すべて self-contained SVG、props 駆動、数値は number で渡す = sanitizeProps 安全)。
+- `presence/displays/concierge/src/components/ops/KyberionCharts.tsx`(当時 `presence/displays/chronos-mirror-v2/src/components/`)— `KyberionDonut` / `KyberionBarChart` / `KyberionStackedBar` / `KyberionSparkline`(すべて self-contained SVG、props 駆動、数値は number で渡す = sanitizeProps 安全)。
 - `A2UIComponentLibrary.tsx` の `A2UI_COMPONENT_REGISTRY` に 4 種を登録。
 - `AgentPanel.tsx` の health 表示(text pills, :294-296)にドーナツを併設(実適用の実証)。
 
@@ -129,7 +131,7 @@ chronos にはチャートライブラリが無く CSP も無い。既存 `Focus
 1. `pnpm build`(全体ビルド)
 2. `pnpm surfaces reconcile`(manifest を surface レジストリへ登録)、または直接 `PRESENCE_CONCIERGE_PORT=3033 node dist/presence/displays/concierge/server.js`
 3. ブラウザで `http://127.0.0.1:3033` を開く。会話するには voice-hub(:3032)を起動しておく(`VOICE_HUB_PORT=3032` で voice-hub server)。voice-hub 未起動でも UI・アバターは動作し、送信時に明確なガイドを返す。
-4. チャートは chronos-mirror-v2(`pnpm chronos:dev` or ビルド済み)の Agent Registry パネルで確認できる。
+4. チャートは Concierge の運用コンソール(`http://127.0.0.1:3050/ops`)の Agent Registry パネルで確認できる(当時は chronos-mirror-v2 を `pnpm chronos:dev` で起動していた)。
 
 ### 既知の制約・今後
 

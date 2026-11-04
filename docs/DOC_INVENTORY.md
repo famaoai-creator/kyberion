@@ -8,6 +8,8 @@ last_updated: 2026-05-07
 
 # Documentation Inventory & Audit
 
+> **Snapshot (2026-05)**: this audit is historical. For which document is canonical today, use [`docs/documentation-source-map.json`](./documentation-source-map.json); for current status, [`docs/developer/improvement-plans-2026-08/README.ja.md`](./developer/improvement-plans-2026-08/README.ja.md).
+
 > **注記:** 本文書は 2026-05-07 時点のスナップショット（歴史的記録）であり、最新の状態を反映していません。現在の docs の地図は [docs/README.md](./README.md)（各文書の役割と正本）です。以降の変更例: `INITIALIZATION.md` は英語が正本で `INITIALIZATION.ja.md` を併置、`OPERATIONS_READINESS_MATRIX.md` は `docs/user/` に一本化、`CLI_REFERENCE.md` はコマンド manifest から生成。
 
 A scrutiny pass over `docs/` and high-level `knowledge/public/` to:

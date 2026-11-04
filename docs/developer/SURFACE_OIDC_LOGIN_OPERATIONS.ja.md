@@ -1,12 +1,12 @@
 ---
 title: サーフェス OIDC ログイン 運用手順
 tags: [surfaces, authentication, oidc, sso, google, entra, multi-tenant]
-last_updated: 2026-10-09
+last_updated: 2026-11-04
 ---
 
 # サーフェス OIDC ログイン 運用手順
 
-リモート(非 loopback)のブラウザから 5 つの UI サーフェスを使うための、標準 OIDC(Authorization Code + PKCE)ログインです。未認証のブラウザが生の `{"error":"Unauthorized."}` を見て止まる代わりに、共通のログイン画面へ誘導されます。
+リモート(非 loopback)のブラウザから 4 つの UI サーフェスを使うための、標準 OIDC(Authorization Code + PKCE)ログインです。未認証のブラウザが生の `{"error":"Unauthorized."}` を見て止まる代わりに、共通のログイン画面へ誘導されます。
 
 > この機構は OSS / self-hosted の内部認可です。hosted account management や SaaS のユーザー管理ではありません。認可(誰が何を見られるか)は従来どおり member registry と tenant scope が決めます。ログインは「本人確認」だけを足します。
 
@@ -21,13 +21,13 @@ last_updated: 2026-10-09
 | SSO でサインインできたが member に紐付いていない                | セッションを発行しない。画面に IdP の `issuer` / `subject` を表示し、管理者に紐付けてもらう |
 | member が停止された                                             | 次のリクエストから拒否(cookie は無状態だが、リクエストごとに member registry を引き直す)    |
 
-> **注意(Next.js 系の 3 面)**: Next.js 15 以降は `NextRequest.ip` が無く、`KYBERION_TRUST_PROXY=1`(`x-real-ip` / `x-forwarded-for` を必ず上書きする信頼できるプロキシの背後)でない限り、同じマシンのブラウザでも loopback と判定されません(従来からの仕様。CHANGELOG 参照)。その場合、ローカルでもログイン画面(またはアクセストークン)が必要です。`KYBERION_TRUST_PROXY=1` をプロキシ無しで有効にすると `X-Forwarded-For: 127.0.0.1` の偽装で loopback になりすませるため、プロキシ無しでは有効にしないでください。Express 系の 2 面(presence-studio / computer-surface)はソケットの接続元で判定するため影響を受けません。
+> **注意(Next.js 系の 2 面)**: Next.js 15 以降は `NextRequest.ip` が無く、`KYBERION_TRUST_PROXY=1`(`x-real-ip` / `x-forwarded-for` を必ず上書きする信頼できるプロキシの背後)でない限り、同じマシンのブラウザでも loopback と判定されません(従来からの仕様。CHANGELOG 参照)。その場合、ローカルでもログイン画面(またはアクセストークン)が必要です。`KYBERION_TRUST_PROXY=1` をプロキシ無しで有効にすると `X-Forwarded-For: 127.0.0.1` の偽装で loopback になりすませるため、プロキシ無しでは有効にしないでください。Express 系の 2 面(presence-studio / computer-surface)はソケットの接続元で判定するため影響を受けません。
 
-> **レート制限と `/logout`**: Next.js 系の 3 面は `/login` と `/auth/*` をクライアント毎 120 回/分・面全体 600 回/分で制限します(超過は 429 + `Retry-After`)。クライアントを区別できる接続元 IP は `KYBERION_TRUST_PROXY=1` のとき(または Express 系の 2 面)だけ得られます。それが無いと全員が同一の `shared` とみなされ、**面全体の上限(600 回/分)だけ**が適用されます(1 人の連打で全員が締め出されないため)。loopback は制限対象外です。`/logout` は `Sec-Fetch-Site` が `same-origin` / `none` のときだけセッションを破棄します(`cross-site` と `same-site`=兄弟サブドメインは無視)。ヘッダが無い古いブラウザでは `Origin` / `Referer` が自分以外のホストなら無視します。無視した場合は 403 で「他のサイトからのサインアウト要求は無視しました」と表示します(サインイン状態は維持されます)。
+> **レート制限と `/logout`**: Next.js 系の 2 面は `/login` と `/auth/*` をクライアント毎 120 回/分・面全体 600 回/分で制限します(超過は 429 + `Retry-After`)。クライアントを区別できる接続元 IP は `KYBERION_TRUST_PROXY=1` のとき(または Express 系の 2 面)だけ得られます。それが無いと全員が同一の `shared` とみなされ、**面全体の上限(600 回/分)だけ**が適用されます(1 人の連打で全員が締め出されないため)。loopback は制限対象外です。`/logout` は `Sec-Fetch-Site` が `same-origin` / `none` のときだけセッションを破棄します(`cross-site` と `same-site`=兄弟サブドメインは無視)。ヘッダが無い古いブラウザでは `Origin` / `Referer` が自分以外のホストなら無視します。無視した場合は 403 で「他のサイトからのサインアウト要求は無視しました」と表示します(サインイン状態は維持されます)。
 
 ### ローカルでも IdP でサインインする
 
-Next.js 系の 3 面は同じマシンのブラウザを loopback と判定できませんが、**IdP でサインインすればローカルでも使えます**(新しいトークン入力の入口は追加していません。concierge の従来の `/signin` はそのまま使えます)。
+Next.js 系の 2 面は同じマシンのブラウザを loopback と判定できませんが、**IdP でサインインすればローカルでも使えます**(新しいトークン入力の入口は追加していません。concierge の従来の `/signin` はそのまま使えます)。
 
 1. IdP のクライアントに、使うサーフェスのリダイレクト URI `http://localhost:<port>/auth/callback` を登録します(ポートは下の表。Google は `127.0.0.1` の IP 表記を受け付けないので `localhost`)。
 2. `KYBERION_OIDC_ISSUER` / `KYBERION_OIDC_CLIENT_ID` / `KYBERION_OIDC_CLIENT_SECRET` / `KYBERION_SESSION_SECRET` を設定して起動します。`KYBERION_OIDC_PUBLIC_BASE_URL` は不要です。
@@ -35,7 +35,7 @@ Next.js 系の 3 面は同じマシンのブラウザを loopback と判定で�
 
 `localhost` 系の origin に限って Host から戻り先を決めるのは、IdP がブラウザを利用者自身のマシンへ戻すだけで、外部ホストへのリダイレクトにできないためです。`localhost.evil.example` のような名前は対象外です。
 
-対象サーフェス: `concierge` / `chronos-mirror-v2` / `operator-surface` / `presence-studio` / `computer-surface`(ログイン処理は `libs/core/surface/surface-auth-routes.ts` の 1 実装を共有)。
+対象サーフェス: `concierge` / `operator-surface` / `presence-studio` / `computer-surface`(ログイン処理は `libs/core/surface/surface-auth-routes.ts` の 1 実装を共有)。運用コンソール(旧 Chronos)は Concierge の `/ops` に統合されたため、Concierge のログインがそのまま適用されます。`chronos-mirror-v2`(ポート 3000)は Concierge へ 308 で転送するだけの互換アプリで、`/login` を持ちません。
 
 ## 仕組み
 
@@ -96,20 +96,19 @@ pnpm organization first-run status          # まだ開いているか
 | `KYBERION_OIDC_CLIENT_SECRET`    | IdP による | Google / Entra の Web クライアントは必須。secret store に置く                                                                                                                                                                       |
 | `KYBERION_SESSION_SECRET`        | ✅         | セッション cookie の署名鍵(**32 バイト以上**のランダム値。短い値は「未設定」扱い)。secret store に置く                                                                                                                              |
 | `KYBERION_OIDC_PUBLIC_BASE_URL`  | リモートで | サーフェスの公開 origin(`https://…`)。リダイレクト URI は `<origin>/auth/callback`。Host ヘッダーは信用しません。`localhost` / `127.0.0.1` / `[::1]` の origin からのアクセスは、これが無くてもその origin を使います(ローカル利用) |
-| `KYBERION_OIDC_PUBLIC_BASE_URLS` | 任意       | サーフェスごとの公開 origin。`concierge=https://desk.example.com,chronos-mirror-v2=https://ops.example.com` のように指定                                                                                                            |
+| `KYBERION_OIDC_PUBLIC_BASE_URLS` | 任意       | サーフェスごとの公開 origin。`concierge=https://desk.example.com,operator-surface=https://ops.example.com` のように指定                                                                                                             |
 | `KYBERION_OIDC_SCOPES`           | 任意       | 既定 `openid`。`email` などが要るならここに追加(member の紐付けは `iss`+`sub` なので不要)                                                                                                                                           |
 | `KYBERION_OIDC_PROVIDER_LABEL`   | 任意       | ボタン表示名(例 `Google` / `Microsoft`)。既定 `SSO`                                                                                                                                                                                 |
 | `KYBERION_SESSION_TTL_SECONDS`   | 任意       | セッション寿命。既定 28800(8 時間)、最小 60                                                                                                                                                                                         |
 
 サーフェスごとの既定ポートと、IdP に登録するリダイレクト URI(公開 origin を使う場合はそれに読み替え):
 
-| サーフェス        | サーフェス ID       | ポート | リダイレクト URI(ローカル検証用)      |
-| ----------------- | ------------------- | ------ | ------------------------------------- |
-| concierge         | `concierge`         | 3050   | `http://localhost:3050/auth/callback` |
-| chronos-mirror-v2 | `chronos-mirror-v2` | 3000   | `http://localhost:3000/auth/callback` |
-| presence-studio   | `presence-studio`   | 3031   | `http://localhost:3031/auth/callback` |
-| computer-surface  | `computer-surface`  | 3040   | `http://localhost:3040/auth/callback` |
-| operator-surface  | `operator-surface`  | 3331   | `http://localhost:3331/auth/callback` |
+| サーフェス       | サーフェス ID      | ポート | リダイレクト URI(ローカル検証用)      |
+| ---------------- | ------------------ | ------ | ------------------------------------- |
+| concierge        | `concierge`        | 3050   | `http://localhost:3050/auth/callback` |
+| presence-studio  | `presence-studio`  | 3031   | `http://localhost:3031/auth/callback` |
+| computer-surface | `computer-surface` | 3040   | `http://localhost:3040/auth/callback` |
+| operator-surface | `operator-surface` | 3331   | `http://localhost:3331/auth/callback` |
 
 IdP への通信は `secureFetch`(egress policy と監査)を通ります。Google(`accounts.google.com` / `oauth2.googleapis.com` / `www.googleapis.com`)と Microsoft(`login.microsoftonline.com`)のホストは、`knowledge/product/governance/egress-policy.json` の `manual_allowed_domains` に**既定で登録済み**です。別の IdP(Keycloak、Okta など)を使う場合は、そのホストを同じ一覧に追加してください(`mode: enforce` ではこれが無いとログインできません)。
 

@@ -3,7 +3,7 @@ title: Kyberion in 1 Hour
 category: Developer
 tags: [tour, onboarding, architecture, c-2]
 importance: 10
-last_updated: 2026-06-24
+last_updated: 2026-11-04
 ---
 
 # Kyberion in 1 Hour
@@ -94,7 +94,7 @@ Code: `libs/core/secure-io.ts`, `libs/core/tier-guard.ts`, `knowledge/`.
 OTel-inspired structured tracing per pipeline run. Captures spans, events, artifacts, knowledge references.
 
 - Persisted as JSONL under `active/shared/logs/traces/` (or `customer/{slug}/logs/traces/` when active).
-- Read by Chronos (the operator viewer), distillation (failure → reusable hint), and the error classifier.
+- Read by the operations console (Concierge `/ops`, formerly Chronos), distillation (failure → reusable hint), and the error classifier.
 
 Code: `libs/core/analysis/trace.ts`, `docs/developer/TRACE_MIGRATION_TEMPLATE.md`.
 
@@ -199,7 +199,8 @@ kyberion/
 │
 ├── presence/               # User-facing surfaces
 │   ├── displays/
-│   │   ├── chronos-mirror-v2/       # main browser surface
+│   │   ├── concierge/               # main browser surface (desk + operations console at /ops)
+│   │   ├── chronos-mirror-v2/       # compatibility redirects to Concierge /ops (port 3000)
 │   │   ├── presence-studio/         # voice / multimodal surface
 │   │   ├── operator-surface/        # operator dashboard
 │   │   └── computer-surface/        # screen sharing

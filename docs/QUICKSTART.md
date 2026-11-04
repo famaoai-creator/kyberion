@@ -163,7 +163,7 @@ Wait for a surface's health to become `healthy` in `pnpm surfaces status` before
 Choose the surface for the task (full role map: [SURFACES](./SURFACES.md)):
 
 - **Make a request, review a decision, or receive a deliverable:** Concierge at `http://127.0.0.1:3050`. Start here for everyday work. Complete the profile in Settings when prompted, then describe the outcome you want. On a fresh install with no owner yet, run `pnpm organization first-run code` on the host first and open the printed `/setup/first-run` URL once ([operations](./developer/SURFACE_OIDC_LOGIN_OPERATIONS.ja.md)). For browser sign-in without an external IdP, run `node --import ./scripts/ts-loader.mjs scripts/dev_oidc_idp.ts setup` then `pnpm surfaces enable --surface dev-idp` and link the dev subject to your member (same operations doc, "ローカル検証用の開発 IdP").
-- **Inspect a runtime or investigate a failure:** Chronos at `http://127.0.0.1:3000`.
+- **Inspect a runtime or investigate a failure:** the operations console at `http://127.0.0.1:3050/ops` (the old Chronos URL `:3000` redirects there).
 - **Try voice and live transcripts:** Presence Studio at `http://127.0.0.1:3031`, with a healthy `voice-hub` and the voice prerequisites reported by `pnpm kyberion doctor --runtime voice`.
 - **Use a terminal control view:** `pnpm tui`.
 
@@ -171,7 +171,7 @@ These are the default registry URLs. The setup report probes the configured loca
 
 External messaging bridges such as Slack are optional and disabled by default. Their missing credentials do not block local Concierge use, and `reconcile` deliberately skips disabled surfaces. Set up a bridge only when you need that channel; inspect `pnpm surfaces setup`, then explicitly opt in with `pnpm surfaces enable --surface slack-bridge` once its prerequisites are ready.
 
-Do not launch `pnpm agent-runtime:supervisor` or `pnpm mission:orchestrator` as startup daemons. They are one-shot workers that require a `--request` or `--event` payload; managed execution dispatches them as needed. `pnpm chronos:dev` is for developing Chronos alone and is not the complete startup path.
+Do not launch `pnpm agent-runtime:supervisor` or `pnpm mission:orchestrator` as startup daemons. They are one-shot workers that require a `--request` or `--event` payload; managed execution dispatches them as needed. `pnpm chronos:dev` only starts the port-3000 compatibility redirect to Concierge `/ops`; it is not a startup path.
 
 Scheduled pipelines fire only while the Chronos scheduler runs as an OS service. Setup never installs resident services by itself; when the setup report lists **Resident services [pending]**, register this checkout's scheduler and daemon watchdog with `pnpm kyberion scheduler reconcile` (dry-run plan) and then `pnpm kyberion scheduler reconcile --apply`. It installs checkout-scoped units, migrates a legacy unit of this checkout, never touches another checkout's units, and is safe to rerun.
 

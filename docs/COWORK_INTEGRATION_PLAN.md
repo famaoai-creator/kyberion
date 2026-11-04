@@ -1,5 +1,7 @@
 # Kyberion × Claude Cowork 連携強化 実装計画
 
+> **位置づけ**: 2026-06-22 時点の実装計画。現在の実装状況は [`docs/developer/improvement-plans-2026-08/README.ja.md`](./developer/improvement-plans-2026-08/README.ja.md) を参照する。
+
 作成日: 2026-06-22 / 対象リビジョン: `05e5d2c1`
 優先3軸: **(A) 知識・記憶の双方向同期** / **(B) 監査・承認の統合** / **(C) Kyberion 結果の Cowork 集約**
 

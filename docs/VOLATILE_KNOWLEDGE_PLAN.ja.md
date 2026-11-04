@@ -1,5 +1,7 @@
 # 揮発的ナレッジ層（Volatile Knowledge / Working Memory）導入計画
 
+> **現在の状況**: 本書は設計と実装計画。実装状況は [`docs/developer/improvement-plans-2026-08/README.ja.md`](./developer/improvement-plans-2026-08/README.ja.md) を参照する。
+
 > **この文書の役割**: 「永続化される `knowledge/`」と「揮発的だが今この瞬間に必要な作業知識（MEMORY / NOW / アクションアイテム / 進捗）」を、**スコープ × ライフタイム**で第一級にモデル化する設計と、その**フル実装計画**。
 > **対象読者**: 実装を担当するエージェント（sonnet 4.7 を想定）。本書だけで着手できる粒度を目指す。
 > **位置づけ**: `docs/ROADMAP.md`（索引）とは独立した実装計画。完成後は ROADMAP の一覧へ1行追加する（§9 保守）。

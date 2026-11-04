@@ -8,6 +8,8 @@ last_updated: 2026-07-13
 
 # Task Scenario Roadmap
 
+> **Status source**: last reviewed 2026-07-13. Current implementation status lives in [`docs/developer/improvement-plans-2026-08/README.ja.md`](./developer/improvement-plans-2026-08/README.ja.md); treat statuses here as historical.
+
 この文書は、Kyberion の `TaskScenario` レイヤーを「業務成果物」単位で使うための実装ロードマップです。
 
 `USE_CASES.md` は引き続き広い自動化カタログの canonical source です。

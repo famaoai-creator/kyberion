@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, ux, surface, mission, chronos, presence, intent]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-10-05
+last_updated: 2026-11-04
 kind: evergreen
 ---
 
@@ -173,7 +173,7 @@ Purpose:
 
 Examples:
 
-- Chronos Mirror
+- the operations console (Chronos, Concierge `/ops`)
 
 ### Work Surface
 
@@ -225,7 +225,7 @@ Emphasize:
 - inspectability
 - project and mission control context
 
-Chronos is the control tower, not the chat front-end.
+Chronos is the control tower, not the chat front-end. It is served as the operations console inside Concierge at `/ops`; the old `chronos-mirror-v2` port 3000 only redirects there.
 
 ### Presence Studio
 

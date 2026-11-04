@@ -15,3 +15,8 @@ origin (`resolveSurfaceBrowserUrl('concierge')`), keeping the query string,
 method and body. Authorization happens on Concierge: the `/api/ops` routes
 resolve the Concierge viewer, and localadmin writes pass the Concierge
 mutation gate (same origin or a configured operator token).
+
+Any other page path also redirects to `/ops`. If the Concierge URL cannot be
+resolved, the redirect answers `503` with a JSON error instead. The route
+handlers now live in `presence/displays/concierge/src/app/api/ops/`; the
+redirect rules are in `src/proxy.ts` of this app.

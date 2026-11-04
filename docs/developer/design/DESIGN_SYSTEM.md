@@ -30,14 +30,15 @@ pnpm check -- --only ui-ux
 
 This script automatically generates and updates the following files:
 
-1. `presence/displays/chronos-mirror-v2/src/app/globals.css` (legacy `--kb-*` block + `--kb-ui-*` block)
+1. `presence/displays/concierge/src/app/ops/globals.css` (operations console, formerly Chronos Mirror: legacy `--kb-*` block + `--kb-ui-*` block)
 2. `presence/displays/operator-surface/src/app/globals.css` (legacy + UI block)
 3. `presence/displays/presence-studio/static/design-tokens.css` (legacy + UI block)
 4. `presence/displays/computer-surface/static/design-tokens.css` (legacy + UI block)
 5. `presence/displays/concierge/src/app/kyberion-ui-tokens.css` (UI block only — concierge themes the legacy `--kb-*` vars at runtime via `/api/theme`)
-6. `kyberion-ui.css` next to each of the five token files above (component stylesheet)
-7. `presence/displays/chronos-mirror-v2/tailwind.config.cjs`
-8. `knowledge/public/design-patterns/media-templates/themes.json` (+ `themes/themes.json`)
+6. `presence/displays/customer-room/static/kyberion-ui-tokens.css` and `scripts/lib/pad-ui/design-tokens.css` (local pads)
+7. `kyberion-ui.css` next to each surface's token file (component stylesheet)
+8. `presence/displays/concierge/tailwind.config.cjs`
+9. `knowledge/public/design-patterns/media-templates/themes.json` (+ `themes/themes.json`)
 
 The UI block is delimited by `/* kyberion-ui tokens: ... */` … `/* end kyberion-ui tokens */`. Light values are the `:root` default; dark values apply under `@media (prefers-color-scheme: dark)` guarded by `:root:not([data-theme="light"])`, and again under `:root[data-theme="dark"]`. `[data-density="compact"|"comfortable"]` switches the `--kb-ui-font-size-*` scale for a subtree.
 
@@ -140,7 +141,7 @@ Selection is not wired into the Surfaces' display preferences yet. Evaluate with
 Tenant-specific branding overlays the canonical tokens through one shared resolver:
 
 - **Resolver**: `libs/core/organization/tenant-design-resolver.ts` (`resolveTenantDesign({ customerId | brandName | designSystemId })`). Sources: `customer/<slug>/design/tenant-override.json` (bound customers) and `knowledge/confidential/<tenant>/design/tenant-override.json` (+ `theme.json`, `layout-templates.json`, `assets/logo.png`).
-- **Consumers**: media-actuator (PPTX/theme packs), video content briefs (VDS-07), and chronos-mirror `/api/tenant-design` (css_vars for UI theming; guarded by the standard chronos API auth).
+- **Consumers**: media-actuator (PPTX/theme packs), video content briefs (VDS-07), and the operations console `/api/ops/tenant-design` in Concierge (css_vars for UI theming; guarded by the console's viewer auth; the old Chronos `/api/tenant-design` URL redirects there).
 - **Tier isolation (acceptance 4, pinned by tests)**: with no tenant context the resolver returns `source: 'default'` and never reads confidential values into the result; non-matching contexts do not fall through to another tenant. See `tenant-design-resolver.test.ts` (DS-02 tier isolation suite).
 
 To onboard a tenant's branding: place `tenant-override.json` (matchers + branding + `theme_pack_path`) under the tenant's confidential design directory — no code changes required.

@@ -6,7 +6,7 @@ authority: reference
 phase: [alignment, execution, review]
 tags: [mission, orchestration, events, a2a, supervisor, control-plane]
 owner: ecosystem_architect
-last_updated: 2026-10-05
+last_updated: 2026-11-04
 ---
 
 # Mission Orchestration Control Plane
@@ -183,7 +183,7 @@ Current surfaces:
 
 ## Chronos Access Model
 
-Chronos Mirror v2 is not a mission authority. It is a local control surface with two access levels:
+The operations console (Chronos, served by Concierge at `/ops` with its API at `/api/ops/*`; the old `chronos-mirror-v2` port 3000 only redirects there) is not a mission authority. It is a local control surface with two access levels:
 
 - `readonly`
   - mapped to `chronos_operator`

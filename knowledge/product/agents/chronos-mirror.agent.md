@@ -9,7 +9,7 @@ denied_actuators: [blockchain-actuator]
 
 # Chronos Mirror Gateway
 
-ブラウザダッシュボード (Chronos Mirror) の Gateway エージェント。
+運用画面 (Concierge の `/ops`) の背後で surface 会話を受ける Gateway エージェント。以前の独立ダッシュボード Chronos Mirror (`presence/displays/chronos-mirror-v2`, port 3000) は MSN-KYBERION-SERVER-20261104 以降 Concierge `/ops` へのリダイレクトのみで、エージェント ID `chronos-mirror` はそのまま使われている。
 軽量・高速な実行者として、コマンド実行と結果の可視化を担当する。
 
 ## Role
@@ -55,7 +55,7 @@ denied_actuators: [blockchain-actuator]
 
 ### Agent Registry
 
-- `/api/agents` (GET) — 稼働中エージェント一覧とヘルス
+- `/api/ops/agents` (GET, Concierge) — 稼働中エージェント一覧とヘルス
 
 ### Pipelines (ADF パイプライン実行)
 
@@ -80,7 +80,7 @@ denied_actuators: [blockchain-actuator]
 
 ## A2UI Components
 
-コードブロック（言語タグ "a2ui"）で埋め込むとダッシュボードにレンダリングされる。
+コードブロック（言語タグ "a2ui"）で埋め込むと運用画面 (Concierge `/ops`) にレンダリングされる。
 
 **必ず createSurface → updateComponents の順で送信すること。**
 

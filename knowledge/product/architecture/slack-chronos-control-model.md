@@ -4,13 +4,15 @@ category: Architecture
 tags: [architecture, slack, chronos, control-plane, observability]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-10-05
+last_updated: 2026-11-04
 kind: evergreen
 ---
 
 # Slack and Chronos Control Model
 
-This document defines how Slack ingress, agent notification, Chronos Mirror v2, and channel feedback should be organized after the mission/control and runtime changes introduced in 2026-03-15.
+This document defines how Slack ingress, agent notification, the operations console (Chronos, now served by Concierge at `/ops`), and channel feedback should be organized after the mission/control and runtime changes introduced in 2026-03-15.
+
+> Since MSN-KYBERION-SERVER-20261104 (PR #1367) the operations console lives inside Concierge (`presence/displays/concierge`, port 3050): pages at `/ops`, API at `/api/ops/*`. `presence/displays/chronos-mirror-v2` (port 3000) is only a compatibility redirect to those routes and authorizes nothing. "Chronos" below refers to that console and its gateway agent `chronos-mirror`; the `chronos_gateway` role and `active/shared/*/chronos/` paths keep their names.
 
 The goal is to separate four concerns that had started to blur together:
 
@@ -27,7 +29,7 @@ After the service-binding cleanup, a fifth concern is explicit:
 
 Slack is a channel, not a mission owner.
 
-Chronos Mirror v2 is a control surface, not the authoritative mission controller.
+The operations console (Concierge `/ops`) is a control surface, not the authoritative mission controller.
 
 The authoritative ownership model remains:
 
@@ -168,9 +170,9 @@ This is what makes the response explainable later.
 
 Slack egress should be treated as channel delivery, not as local system execution.
 
-## 4. Chronos Mirror v2 model
+## 4. Operations console (Chronos) model
 
-Chronos Mirror v2 should be modeled as an interactive control plane and display surface.
+The operations console (Concierge `/ops`, formerly Chronos Mirror v2) should be modeled as an interactive control plane and display surface.
 
 It is responsible for:
 
@@ -253,8 +255,8 @@ The intended mapping is:
 
 - `slack-bridge`
   - Slack ingress gateway
-- `chronos-mirror-v2`
-  - Chronos control gateway
+- Concierge `/ops` + `/api/ops/*` (agent `chronos-mirror`)
+  - Chronos control gateway (`chronos-mirror-v2` on port 3000 only redirects here)
 - `slack-surface-agent`
   - Slack conversation handler
 - `presence-actuator`
@@ -302,7 +304,7 @@ Minimum streams:
 The current implementation still contains legacy paths such as:
 
 - `active/shared/last_response.json`
-- route-local orchestration inside Chronos API handlers
+- route-local orchestration inside the operations-console API handlers (Concierge `/api/ops/*`)
 
 These are transitional compatibility points.
 

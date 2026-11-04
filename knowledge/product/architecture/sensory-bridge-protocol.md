@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, sensory, bridge, protocol]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-10-05
+last_updated: 2026-11-04
 kind: evergreen
 ---
 
@@ -33,7 +33,7 @@ graph LR
     subgraph Hub [Incarnation Layer]
         H1[Terminal Hub API]
         H2[Kyberion CLI / Ink]
-        H3[Chronos Mirror v2]
+        H3[Operations console - Concierge /ops]
     end
 
     S1 & S2 & S3 -->|GUSP v1.0| B1
@@ -101,7 +101,9 @@ All sensors must normalize incoming events into the canonical runtime journal:
 - perform TUI-safe input delivery
 - strip ANSI output and persist session-scoped response envelopes
 
-### 3.4 Chronos Mirror v2
+### 3.4 Operations console (Chronos, Concierge `/ops`)
+
+Served by Concierge at `/ops` with its API at `/api/ops/*`; `presence/displays/chronos-mirror-v2` (port 3000) only redirects there.
 
 - provide the authenticated interactive control surface
 - expose structured agent output and delegation summaries

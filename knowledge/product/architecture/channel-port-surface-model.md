@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, channels, ports, surface-agents, slack, chronos]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-10-05
+last_updated: 2026-11-04
 kind: evergreen
 scope: repository
 authority: reference
@@ -17,7 +17,7 @@ status: active
 
 # Channel, Port, and Surface Agent Model
 
-This document defines a general interaction model for external systems such as Slack, Chronos Mirror v2, voice hubs, and future channels.
+This document defines a general interaction model for external systems such as Slack, the operations console (Chronos, served by Concierge at `/ops`), voice hubs, and future channels.
 
 It extends the mission/control model with a clear answer to four questions:
 
@@ -45,7 +45,7 @@ The human-facing or external-system-facing layer.
 Examples:
 
 - Slack
-- Chronos Mirror v2
+- the operations console (Concierge `/ops`; formerly Chronos Mirror v2)
 - voice hubs
 - future email or webhook endpoints
 
@@ -219,7 +219,7 @@ It should be treated as:
 
 ### 5.2 Chronos Surface Agent
 
-Chronos Mirror v2 should use a **Chronos Surface Agent**.
+The operations console (Concierge `/ops`) should use a **Chronos Surface Agent** (gateway agent id `chronos-mirror`).
 
 Role:
 
@@ -267,7 +267,7 @@ Supporting runtime components:
 - delivery actuator: `libs/actuators/presence-actuator`
 - service binding: `libs/core/service/service-binding.ts`
 
-### 6.2 Chronos Mirror v2
+### 6.2 Operations console (Chronos)
 
 Channel:
 
@@ -294,7 +294,7 @@ Surface Agent:
 
 Supporting runtime components:
 
-- control gateway: `presence/displays/chronos-mirror-v2`
+- control gateway: Concierge `/ops` pages and `/api/ops/*` routes (`presence/displays/concierge`); `presence/displays/chronos-mirror-v2` on port 3000 only 308-redirects old URLs there
 - delivery path: `presence-actuator` or UI-local response rendering
 - service binding: only when Chronos needs downstream authenticated service access
 
