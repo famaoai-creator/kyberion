@@ -251,6 +251,31 @@ A gate that times out on busy runs:
 
 ## §2 Runtime stores and retention
 
+### Native secret backends
+
+Platform-specific credential access belongs in `secret-bridge.ts`. Callers that
+need an out-of-repository secret use `readNativeSecretSync` when they require a
+synchronous result, or `fetchSecret` for async access; they must not call the
+macOS-only `fetchOsKeychainSecretSync` as a generic OS-store reader. The shared
+reader selects macOS Keychain or Windows Credential Manager and returns the
+backend identity with the value when callers need to report provenance.
+Windows Credential Manager targets must encode both `service` and `account`
+into a stable, collision-resistant target name: Credential Manager keys entries
+by target, not by `(target, username)`. Keep the username check on every read
+and delete. When migrating the legacy service-only target, read or remove it
+only when its stored username exactly matches the requested account; never
+expose or delete a different account's value.
+
+When changing a native backend, verify that `fetchSecretSync` reaches it,
+mutations invalidate the per-operation native-secret cache, and consumers such
+as backup passphrase resolution do not fall through to an in-repository copy
+when a native value exists. Keep values off process arguments and test Windows
+Credential Manager through a mocked PowerShell boundary; a live probe may use
+only a fresh, non-secret lookup identity. Regression gates:
+`secret-bridge.os-keychain.test.ts`,
+`foundation/secret-resolution-session.test.ts`, and
+`scripts/lib/backup-passphrase.test.ts`.
+
 ### VCS publication across Git worktrees
 
 Publication provenance must inspect every new reachable commit, including each

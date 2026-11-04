@@ -21,9 +21,9 @@ import { runWindowsPointerActions } from '../windows-os-automation.js';
 
 /**
  * Live smoke of the Windows UI Automation path. Two targets, each brought to the
- * foreground and captured from the primary screen: classic Notepad (a Win32 Edit,
- * which the runner's UIA may only report as a Pane: at least one unlabelled
- * editable element inside the window) and a WPF window with native UIA
+ * foreground and captured from the primary screen: a WinForms TextBox (a native
+ * Edit control exposed as an unlabelled editable element inside the window) and
+ * a WPF window with native UIA
  * providers (a labelled Button, a CheckBox and an unlabelled editable TextBox).
  * The third case clicks the WPF window's OK button through its Set-of-Marks mark
  * (detector -> fuseSetOfMarks -> saveMarks -> resolveMarkTarget -> the
@@ -61,22 +61,39 @@ public static class KyberionUiaSmoke {
 }
 '@`;
 
-// Starts a new Notepad and prints its pid and main window handle, polling for
-// the window until the UIA_SMOKE_WAIT_MS deadline (not a fixed iteration count).
-const LAUNCH_SCRIPT = `$ErrorActionPreference = 'Stop'
+// Opens a WinForms window with an unlabelled native TextBox on an STA child
+// process. Packaged Notepad activation can block without a window on hosted
+// Windows Server runners, so the smoke owns a deterministic native Edit target.
+const WINFORMS_LAUNCH_SCRIPT = `$ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+${WIN32_TYPE}
+$forms = @'
+Add-Type -AssemblyName System.Windows.Forms
+$form = New-Object System.Windows.Forms.Form
+$form.Text = $env:UIA_SMOKE_TITLE
+$form.Width = 420
+$form.Height = 220
+$form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
+$editor = New-Object System.Windows.Forms.TextBox
+$editor.Multiline = $true
+$editor.Dock = [System.Windows.Forms.DockStyle]::Fill
+$editor.AccessibleName = ''
+$form.Controls.Add($editor)
+[void]$form.ShowDialog()
+'@
+$encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($forms))
 $watch = [System.Diagnostics.Stopwatch]::StartNew()
-$before = @(Get-Process -Name notepad -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
-$started = Start-Process -FilePath notepad.exe -PassThru
-$target = $null
-while ($null -eq $target -and $watch.ElapsedMilliseconds -lt [int]$env:UIA_SMOKE_WAIT_MS) {
+$process = Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile', '-NonInteractive', '-STA', '-EncodedCommand', $encoded) -PassThru
+$hwnd = [IntPtr]::Zero
+while ($hwnd -eq [IntPtr]::Zero -and -not $process.HasExited -and $watch.ElapsedMilliseconds -lt [int]$env:UIA_SMOKE_WAIT_MS) {
   Start-Sleep -Milliseconds 200
-  $target = Get-Process -Name notepad -ErrorAction SilentlyContinue | Where-Object { $before -notcontains $_.Id -and $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
+  $hwnd = [KyberionUiaSmoke]::FindWindow([NullString]::Value, $env:UIA_SMOKE_TITLE)
 }
-$pids = @($started.Id)
-$hwnd = 0
-if ($null -ne $target) { $pids += $target.Id; $hwnd = $target.MainWindowHandle.ToInt64() }
-[Console]::Out.WriteLine((@{ pids = $pids; hwnd = $hwnd; elapsed_ms = $watch.ElapsedMilliseconds } | ConvertTo-Json -Compress))`;
+[uint32]$ownerPid = 0
+if ($hwnd -ne [IntPtr]::Zero) { [void][KyberionUiaSmoke]::GetWindowThreadProcessId($hwnd, [ref]$ownerPid) }
+$childExited = $process.HasExited
+$childExitCode = if ($childExited) { $process.ExitCode } else { $null }
+[Console]::Out.WriteLine((@{ pids = @($process.Id, [int]$ownerPid); hwnd = $hwnd.ToInt64(); child_exited = $childExited; child_exit_code = $childExitCode; elapsed_ms = $watch.ElapsedMilliseconds } | ConvertTo-Json -Compress))`;
 
 // Opens a WPF window titled UIA_SMOKE_TITLE (Button "OK", CheckBox, TextBox) in
 // a separate STA powershell.exe that stays open until killed; WPF has native UIA
@@ -284,7 +301,7 @@ async function detectLive(target: LiveTarget): Promise<LiveResult> {
       snapshot = await detector.readSnapshot(request);
     } catch (error) {
       // Windows UIA can exceed the detector's production timeout while the
-      // hosted runner is starting Notepad or compiling the PowerShell walker.
+      // hosted runner is starting the target window or compiling the PowerShell walker.
       // This is a live smoke test, so retry the whole focus/capture/read cycle
       // before treating a transient runner stall as a regression.
       outcome = `snapshot read failed: ${String(error)}`;
@@ -418,22 +435,26 @@ function launchWithRetry(
 describe.skipIf(!LIVE)('os_accessibility live smoke on Windows (UI Automation)', () => {
   const shotDir = pathResolver.sharedTmp('uia-live-smoke');
 
-  it('finds the Notepad editor as an unlabelled editable element', async () => {
+  it('finds the WinForms editor as an unlabelled editable element', async () => {
     safeMkdir(shotDir, { recursive: true });
     let pids: number[] = [];
     try {
-      const launched = launchWithRetry(LAUNCH_SCRIPT, {}, 'notepad');
+      const title = `Kyberion UIA editor smoke ${process.pid}`;
+      const launched = launchWithRetry(
+        WINFORMS_LAUNCH_SCRIPT,
+        { UIA_SMOKE_TITLE: title },
+        'editor'
+      );
       const launch = launched.launch;
       pids = launched.pids;
-      expect(Number(launch.hwnd), 'Notepad main window did not appear').toBeGreaterThan(0);
+      expect(Number(launch.hwnd), 'WinForms editor window did not appear').toBeGreaterThan(0);
       const { within } = await detectLive({
-        label: 'notepad',
+        label: 'editor',
         hwnd: Number(launch.hwnd),
-        application: 'notepad',
-        shotPath: path.join(shotDir, `notepad-${process.pid}.png`),
+        application: 'powershell',
+        shotPath: path.join(shotDir, `editor-${process.pid}.png`),
       });
-      // Classic Notepad on the runner exposes its editor (a Win32 Edit, possibly only
-      // as a Pane) but no menu or title-bar buttons, so only the editor is required.
+      // WinForms exposes a native Edit control without an accessibility name.
       const editable = within.filter((candidate) => candidate.editable);
       expect(editable.length).toBeGreaterThanOrEqual(1);
       expect(editable.filter((candidate) => candidate.label)).toEqual([]);

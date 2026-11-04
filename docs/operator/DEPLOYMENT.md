@@ -469,8 +469,9 @@ tar czf /backup/kyberion-active-$(date +%F).tar.gz active/
 
 Kyberion state that is intentionally outside git must be backed up before
 decommissioning, host migration, or dependency patch automation. Store the
-backup passphrase once in the OS keychain through the secret actuator (hidden
-prompt; the value never touches argv, a plist or a repo file), then run
+backup passphrase once in the OS-native secret manager through the secret
+actuator (macOS Keychain or Windows Credential Manager; hidden prompt; the
+value never touches argv, a plist or a repo file), then run
 backups without it on the command line:
 
 ```bash
@@ -509,7 +510,7 @@ The passphrase is resolved in this order:
    instead of falling back.
 2. `KYBERION_BACKUP_PASSPHRASE` in the running process — a manual override.
 3. The secret identity `kyberion-backup` / `PASSPHRASE`: an external resolver
-   (`KYBERION_SECRET_RESOLVER_COMMAND`) or the OS keychain (service
+   (`KYBERION_SECRET_RESOLVER_COMMAND`) or the OS-native secret manager (service
    `kyberion-backup`, account `passphrase`).
 
 The secret must live outside the repository. `vault/` and
@@ -528,15 +529,18 @@ can read the login keychain. Do not put the passphrase in the launchd plist's
 `EnvironmentVariables`: the installer refuses to forward it
 (`[POLICY_VIOLATION]`), and `pnpm kyberion scheduler reconcile` rewrites the
 plist carrying only the forwardable chronos variables, so a hand-added value
-is dropped on the next reconcile. On a
-host without a keychain (Linux, Windows services), configure an external
-resolver or set `KYBERION_BACKUP_PASSPHRASE` in the service manager's secret
-mechanism (systemd `LoadCredential=`/`EnvironmentFile=` outside the checkout).
+is dropped on the next reconcile. A Windows scheduled task can read the
+Credential Manager entry when it runs under the same Windows account that
+introduced the passphrase. If the task runs as another account, configure an
+external resolver or supply `KYBERION_BACKUP_PASSPHRASE` through that account's
+protected service secret mechanism. Linux hosts can use an external resolver or
+`KYBERION_BACKUP_PASSPHRASE` in the service manager's secret mechanism (systemd
+`LoadCredential=`/`EnvironmentFile=` outside the checkout).
 
 Restore into a clean Kyberion checkout or staging root:
 
 ```bash
-# Same host (keychain holds the passphrase):
+# Same host (OS-native secret manager holds the passphrase):
 pnpm backup restore /Volumes/backup/kyberion-2026-07-04.tar.gz.enc --target /path/to/clean/kyberion --verify-baseline
 # New host: introduce the passphrase from your password manager first, or override once:
 KYBERION_BACKUP_PASSPHRASE='from-your-password-manager' \
@@ -627,7 +631,7 @@ pnpm peer:migrate-tenant-runtime -- --plan active/shared/runtime/migrations/peer
 Backups containing `vault/`, `knowledge/confidential/`, or confidential
 mission/project state must remain encrypted. Do not store
 `KYBERION_BACKUP_PASSPHRASE`, audit-chain keys, or SaaS auth encryption keys in
-the archive itself; keep the backup passphrase in the OS keychain (via
+the archive itself; keep the backup passphrase in the OS-native secret manager (via
 `secret introduce`) with an offline copy in the operator password manager, and
 the other keys in the password manager or hardware key escrow. The scheduled job definition is `pipelines/backup-daily.json` and uses
 the same `pnpm backup create --scope all --encrypt` command.
