@@ -16,8 +16,10 @@ vi.mock('@agent/core/core', async (importOriginal) => {
   return { ...actual, logger: { ...actual.logger, warn: mocks.warn } };
 });
 
+import { isRoleAssumptionAllowed, resetRoleAssumptionPolicyCache } from '@agent/core/authority';
 import {
   createConcurrencyLimit,
+  CUSTOMER_DECISION_READER_ROLE,
   createFacadeReader,
   facadeArgs,
   FACADE_CHILD_CONCURRENCY,
@@ -75,12 +77,20 @@ describe('customer-decision facade child (CD-12)', () => {
     mocks.warn.mockReset();
   });
 
-  it('binds the child to the tenant, bounded by the server role, with no sudo or mission', () => {
+  it('runs under a role that may read the decision ledger, which the server role may not', () => {
+    // Regression: bounding the child by SYSTEM_ROLE=concierge refused
+    // decision_ledger and broke every /ops customer-decision view.
+    resetRoleAssumptionPolicyCache();
+    expect(isRoleAssumptionAllowed(CUSTOMER_DECISION_READER_ROLE, 'decision_ledger')).toBe(true);
+    expect(isRoleAssumptionAllowed('concierge', 'decision_ledger')).toBe(false);
+  });
+
+  it('binds the child to the tenant, bounded by its reader role, with no sudo or mission', () => {
     const env = overviewChildEnv('acme');
-    // H1: never unbounded — the child runs as SYSTEM_ROLE=concierge, a worker.
+    // H1: never unbounded — the child runs as its own narrow system role, a worker.
     expect(env).toMatchObject({
       KYBERION_TENANT: 'acme',
-      SYSTEM_ROLE: 'concierge',
+      SYSTEM_ROLE: CUSTOMER_DECISION_READER_ROLE,
       KYBERION_PERSONA: 'worker',
       KYBERION_DELEGATED_ROLE: '',
     });
@@ -152,7 +162,7 @@ describe('customer-decision facade child (CD-12)', () => {
     expect(String(args[0]).endsWith(OVERVIEW_FACADE_SCRIPT)).toBe(true);
     expect(args.slice(1)).toEqual(facadeArgs('case', 'acme', 'case-a'));
     expect(options.env).toEqual(overviewChildEnv('acme'));
-    expect(options.env.SYSTEM_ROLE).toBe('concierge');
+    expect(options.env.SYSTEM_ROLE).toBe(CUSTOMER_DECISION_READER_ROLE);
     expect(options.env).not.toHaveProperty('PATH');
     expect(options.timeoutMs).toBeGreaterThan(0);
     expect(options.maxOutputMB).toBeGreaterThan(0);

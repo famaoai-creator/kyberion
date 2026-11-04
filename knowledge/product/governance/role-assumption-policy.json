@@ -230,6 +230,10 @@
         "sovereign_concierge"
       ],
       "rationale": "ecosystem_architect, mission_controller, sovereign_concierge: reachable per the RN-02 analysis (scripts/analyze_role_assumptions.ts --write-report) (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable. RN-01: voice_hub traces observed sovereign_concierge (libs/core tool-runtime-policy)."
+    },
+    "customer_decision_reader": {
+      "may_assume": ["decision_ledger"],
+      "rationale": "Read-only customer-decision facade child of the Kyberion server: Concierge's /api/ops/customer-decisions overview, case and learning routes (presence/displays/concierge/src/lib/ops/customer-decision-overview-facade.ts) run dist/scripts/customer_decision_overview.js, which dispatches only the read-only `overview` verb (summary | --case <id> --detail | --learning), with --tenant bound by the server's viewer scope, under governedWorkerEnv('customer_decision_reader'). The facade reads the tenant decision ledger as decision_ledger and otherwise reaches only shared tenant-bound roles. Keeping the ledger role in this one-purpose child is why the Kyberion server itself never assumes decision_ledger; bounding the facade by SYSTEM_ROLE=concierge refused decision_ledger and broke every /ops customer-decision view. The writer verbs stay in scripts/customer_decision.ts, which this entry does not import."
     }
   }
 }
