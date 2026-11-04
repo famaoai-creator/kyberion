@@ -2752,3 +2752,70 @@ button.org-stat .kb-metric__description {
   font-size: var(--kb-ui-font-size-xs);
   color: var(--kb-ui-text-muted);
 }
+
+/* Operator CLI behind a disclosure: wrapping monospace and a copy button. */
+.chronos-command {
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-muted);
+}
+
+.chronos-command > summary {
+  cursor: pointer;
+  color: var(--kb-ui-accent-text);
+}
+
+.chronos-command > summary:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+}
+
+.chronos-command__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  margin-top: var(--kb-ui-space-1);
+}
+
+.chronos-command__code {
+  margin: 0;
+  padding: var(--kb-ui-space-2);
+  font-family: var(--kb-ui-font-mono);
+  font-size: var(--kb-ui-font-size-xs);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--kb-ui-text);
+  background: var(--kb-ui-surface-sunken);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-sm);
+}
+
+.chronos-command__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+}
+
+.chronos-command__note {
+  color: var(--kb-ui-text-muted);
+}
+
+.org-intervention__reason {
+  display: block;
+  color: var(--kb-ui-text);
+}
+
+.org-intervention__id {
+  display: block;
+  font-family: var(--kb-ui-font-mono);
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-subtle);
+  overflow-wrap: anywhere;
+}
+
+.org-intervention__action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--kb-ui-space-1);
+}

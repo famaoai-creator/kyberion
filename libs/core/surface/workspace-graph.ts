@@ -33,6 +33,7 @@ import {
   type DecisionBrief,
   type PublicationPreview,
 } from './decision-brief.js';
+import { decisionReasonText } from './decision-reason-text.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
 import {
   authorizeSurfaceOperation,
@@ -570,6 +571,7 @@ export function collectWorkspaceGraph(
         ...(publication ? { publication } : {}),
         names: (id) => actorLabels.get(id),
         now: nowMs,
+        reasonText: decisionReasonText,
       });
     } catch {
       // Display only: the node keeps its title and summary.

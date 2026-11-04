@@ -115,3 +115,75 @@ export function sumAccounting(
   }
   return total;
 }
+
+/** Reconciliation codes the core reports (`OrganizationCatalogReconciliation`), each with a sentence. */
+const RECONCILIATION_CODES: ReadonlySet<string> = new Set([
+  'missing_capabilities',
+  'missing_services',
+  'orphan_capabilities',
+  'orphan_services',
+  'services_without_state',
+  'stale_services',
+  'invalid_runbook_refs',
+  'missing_operation_services',
+  'operations_without_state',
+  'overdue_operations',
+  'missing_incident_services',
+  'missing_incident_operations',
+  'missing_decision_cadences',
+  'pending_decisions',
+  'missing_project_refs',
+  'invalid_execution_refs',
+  'invalid_evidence_refs',
+]);
+
+export type InterventionAction = 'operations' | 'decisions' | 'project';
+
+export interface InterventionPresentation {
+  /** Concierge vocabulary key + params for the human reason. */
+  reason: { key: string; params?: Record<string, string> };
+  /** Where a person handles it: a console section, or the project page. */
+  action: InterventionAction;
+}
+
+const RECONCILIATION_REASON = /^([a-z_]+) requires operator attention\.?$/u;
+const INCIDENT_REASON = /^Incident is ([\w-]+)\.?$/u;
+const DECISION_REASON = /^Decision is ([\w-]+)\.?$/u;
+
+/**
+ * An intervention point as a person reads it. The core's reason is a machine
+ * sentence (`overdue_operations requires operator attention.`); map its code
+ * to a localized sentence, and the kind to the place it is handled.
+ */
+export function interventionPresentation(point: {
+  kind: string;
+  reason: string;
+}): InterventionPresentation {
+  const action: InterventionAction =
+    point.kind === 'decision' ? 'decisions' : point.kind === 'project' ? 'project' : 'operations';
+  const code = point.reason.match(RECONCILIATION_REASON)?.[1];
+  if (code && RECONCILIATION_CODES.has(code)) {
+    return { reason: { key: `ux_b_intervention_${code}` }, action };
+  }
+  const incident = point.reason.match(INCIDENT_REASON)?.[1];
+  if (incident) {
+    return {
+      reason: {
+        key: 'ux_b_intervention_incident',
+        params: { status: incident.replace(/_/gu, ' ') },
+      },
+      action,
+    };
+  }
+  const decision = point.reason.match(DECISION_REASON)?.[1];
+  if (decision) {
+    return {
+      reason: {
+        key: 'ux_b_intervention_decision',
+        params: { status: decision.replace(/_/gu, ' ') },
+      },
+      action,
+    };
+  }
+  return { reason: { key: 'ux_b_intervention_generic' }, action };
+}

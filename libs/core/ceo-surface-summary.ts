@@ -23,6 +23,7 @@ import {
   type DecisionBrief,
   type PublicationPreview,
 } from './surface/decision-brief.js';
+import { decisionReasonText } from './surface/decision-reason-text.js';
 import { readApprovalPublicationPreview } from './surface/approval-publication-preview.js';
 
 export interface CeoIntentItem {
@@ -233,6 +234,7 @@ function approvalBrief(
     return buildDecisionBrief(approval, {
       ...(publication ? { publication } : {}),
       ...(sources.now !== undefined ? { now: sources.now } : {}),
+      reasonText: decisionReasonText,
     });
   } catch {
     // Display only: a record the brief cannot read keeps its title and reason.

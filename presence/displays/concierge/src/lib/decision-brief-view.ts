@@ -59,7 +59,8 @@ function isDisplayText(value: unknown): value is DisplayText {
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
   if (typeof record.text === 'string') return true;
-  if (typeof record.key !== 'string' || !record.key.startsWith('ux_a_')) return false;
+  // Brief keys are concierge vocabulary: `ux_a_*` copy and `ux_b_reason_*` gate reasons.
+  if (typeof record.key !== 'string' || !/^ux_[ab]_/u.test(record.key)) return false;
   if (record.params === undefined) return true;
   return (
     typeof record.params === 'object' &&

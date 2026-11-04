@@ -13303,6 +13303,186 @@
       }
     },
     "concierge": {
+      "ux_b_reason_axis_max": {
+        "en": "A risk axis is at its maximum: {axes}",
+        "ja": "影響範囲・取り消しにくさ・機密性・確信度のうち、最大の軸があります: {axes}",
+        "qps-ploc": "⟦Ȧ řïşķ ȧẋïş ïş ȧŧ ïŧş ɱȧẋïɱůɱ: {axes} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ux_b_reason_irreversible": {
+        "en": "Hard to undo",
+        "ja": "取り消しにくい操作です",
+        "qps-ploc": "⟦Ħȧřḓ ŧő ůñḓő ŀőř⟧"
+      },
+      "ux_b_reason_never_auto": {
+        "en": "Always decided by a person: {classes}",
+        "ja": "常に人が決める種類の操作です: {classes}",
+        "qps-ploc": "⟦Ȧŀẇȧẏş ḓėƈïḓėḓ ƀẏ ȧ ṗėřşőñ: {classes} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ux_b_reason_high_risk_path": {
+        "en": "Changes protected files: {paths}",
+        "ja": "重要なファイルを変更します: {paths}",
+        "qps-ploc": "⟦Ƈħȧñɠėş ṗřőŧėƈŧėḓ ƒïŀėş: {paths} ŀőřėɱ ïṗşů⟧"
+      },
+      "ux_b_reason_requested": {
+        "en": "The agent asked for your judgment",
+        "ja": "エージェント自身が人の判断を求めました",
+        "qps-ploc": "⟦Ŧħė ȧɠėñŧ ȧşķėḓ ƒőř ẏőůř ĵůḓɠɱėñŧ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_b_reason_budget": {
+        "en": "Expected cost exceeds the budget cap",
+        "ja": "費用が予算の上限を超える見込みです",
+        "qps-ploc": "⟦Ėẋṗėƈŧėḓ ƈőşŧ ėẋƈėėḓş ŧħė ƀůḓɠėŧ ƈȧṗ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ux_b_reason_score": {
+        "en": "Risk score {score}/{max}",
+        "ja": "リスク点数 {score}/{max}",
+        "qps-ploc": "⟦Řïşķ şƈőřė {score}/{max} ŀőřėɱ ï⟧"
+      },
+      "ux_b_intervention_missing_capabilities": {
+        "en": "A domain names a capability that is not defined.",
+        "ja": "ドメインが、定義されていないケイパビリティを参照しています。",
+        "qps-ploc": "⟦Ȧ ḓőɱȧïñ ñȧɱėş ȧ ƈȧṗȧƀïŀïŧẏ ŧħȧŧ ïş ñőŧ ḓėƒïñėḓ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "ux_b_intervention_missing_services": {
+        "en": "A capability names a service that is not defined.",
+        "ja": "ケイパビリティが、定義されていないサービスを参照しています。",
+        "qps-ploc": "⟦Ȧ ƈȧṗȧƀïŀïŧẏ ñȧɱėş ȧ şėřṽïƈė ŧħȧŧ ïş ñőŧ ḓėƒïñėḓ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "ux_b_intervention_orphan_capabilities": {
+        "en": "A capability belongs to no domain.",
+        "ja": "どのドメインにも属さないケイパビリティがあります。",
+        "qps-ploc": "⟦Ȧ ƈȧṗȧƀïŀïŧẏ ƀėŀőñɠş ŧő ñő ḓőɱȧïñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_b_intervention_orphan_services": {
+        "en": "A service belongs to no capability or domain.",
+        "ja": "どこにも属さないサービスがあります。",
+        "qps-ploc": "⟦Ȧ şėřṽïƈė ƀėŀőñɠş ŧő ñő ƈȧṗȧƀïŀïŧẏ őř ḓőɱȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ux_b_intervention_services_without_state": {
+        "en": "A service has never reported its state.",
+        "ja": "状態がまだ記録されていないサービスがあります。",
+        "qps-ploc": "⟦Ȧ şėřṽïƈė ħȧş ñėṽėř řėṗőřŧėḓ ïŧş şŧȧŧė. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ux_b_intervention_stale_services": {
+        "en": "A service has not reported its state recently.",
+        "ja": "しばらく状態が更新されていないサービスがあります。",
+        "qps-ploc": "⟦Ȧ şėřṽïƈė ħȧş ñőŧ řėṗőřŧėḓ ïŧş şŧȧŧė řėƈėñŧŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ux_b_intervention_invalid_runbook_refs": {
+        "en": "An operation points at a runbook that does not exist.",
+        "ja": "定常運用が、存在しない手順書を参照しています。",
+        "qps-ploc": "⟦Ȧñ őṗėřȧŧïőñ ṗőïñŧş ȧŧ ȧ řůñƀőőķ ŧħȧŧ ḓőėş ñőŧ ėẋïşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ux_b_intervention_missing_operation_services": {
+        "en": "An operation names a service that is not defined.",
+        "ja": "定常運用が、定義されていないサービスを参照しています。",
+        "qps-ploc": "⟦Ȧñ őṗėřȧŧïőñ ñȧɱėş ȧ şėřṽïƈė ŧħȧŧ ïş ñőŧ ḓėƒïñėḓ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "ux_b_intervention_operations_without_state": {
+        "en": "An operation has never recorded a run.",
+        "ja": "まだ一度も実行記録がない定常運用があります。",
+        "qps-ploc": "⟦Ȧñ őṗėřȧŧïőñ ħȧş ñėṽėř řėƈőřḓėḓ ȧ řůñ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ux_b_intervention_overdue_operations": {
+        "en": "An operation is past its due time.",
+        "ja": "期限を過ぎた定常運用があります。",
+        "qps-ploc": "⟦Ȧñ őṗėřȧŧïőñ ïş ṗȧşŧ ïŧş ḓůė ŧïɱė. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_b_intervention_missing_incident_services": {
+        "en": "An incident names a service that is not defined.",
+        "ja": "インシデントが、定義されていないサービスを参照しています。",
+        "qps-ploc": "⟦Ȧñ ïñƈïḓėñŧ ñȧɱėş ȧ şėřṽïƈė ŧħȧŧ ïş ñőŧ ḓėƒïñėḓ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "ux_b_intervention_missing_incident_operations": {
+        "en": "An incident names an operation that is not defined.",
+        "ja": "インシデントが、定義されていない定常運用を参照しています。",
+        "qps-ploc": "⟦Ȧñ ïñƈïḓėñŧ ñȧɱėş ȧñ őṗėřȧŧïőñ ŧħȧŧ ïş ñőŧ ḓėƒïñėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ux_b_intervention_missing_decision_cadences": {
+        "en": "A decision names a cadence that is not defined.",
+        "ja": "意思決定が、定義されていない会議体を参照しています。",
+        "qps-ploc": "⟦Ȧ ḓėƈïşïőñ ñȧɱėş ȧ ƈȧḓėñƈė ŧħȧŧ ïş ñőŧ ḓėƒïñėḓ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ux_b_intervention_pending_decisions": {
+        "en": "A decision is waiting for a person.",
+        "ja": "人の判断を待っている意思決定があります。",
+        "qps-ploc": "⟦Ȧ ḓėƈïşïőñ ïş ẇȧïŧïñɠ ƒőř ȧ ṗėřşőñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_b_intervention_missing_project_refs": {
+        "en": "The organization names a project that does not exist.",
+        "ja": "組織が、存在しないプロジェクトを参照しています。",
+        "qps-ploc": "⟦Ŧħė őřɠȧñïẑȧŧïőñ ñȧɱėş ȧ ṗřőĵėƈŧ ŧħȧŧ ḓőėş ñőŧ ėẋïşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ux_b_intervention_invalid_execution_refs": {
+        "en": "An operation has no valid execution target.",
+        "ja": "実行先が正しく設定されていない定常運用があります。",
+        "qps-ploc": "⟦Ȧñ őṗėřȧŧïőñ ħȧş ñő ṽȧŀïḓ ėẋėƈůŧïőñ ŧȧřɠėŧ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ux_b_intervention_invalid_evidence_refs": {
+        "en": "A record points at evidence that does not exist.",
+        "ja": "存在しない証跡を参照している記録があります。",
+        "qps-ploc": "⟦Ȧ řėƈőřḓ ṗőïñŧş ȧŧ ėṽïḓėñƈė ŧħȧŧ ḓőėş ñőŧ ėẋïşŧ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "ux_b_intervention_incident": {
+        "en": "An incident is still {status}.",
+        "ja": "インシデントが「{status}」のままです。",
+        "qps-ploc": "⟦Ȧñ ïñƈïḓėñŧ ïş şŧïŀŀ {status}. ŀőřėɱ ïṗşů⟧"
+      },
+      "ux_b_intervention_decision": {
+        "en": "A decision is waiting ({status}).",
+        "ja": "意思決定が判断を待っています（{status}）。",
+        "qps-ploc": "⟦Ȧ ḓėƈïşïőñ ïş ẇȧïŧïñɠ ({status}). ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_b_intervention_generic": {
+        "en": "This needs an operator's attention.",
+        "ja": "運用担当の対応が必要です。",
+        "qps-ploc": "⟦Ŧħïş ñėėḓş ȧñ őṗėřȧŧőř'ş ȧŧŧėñŧïőñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_b_intervention_col_item": {
+        "en": "What needs attention",
+        "ja": "対応が必要なこと",
+        "qps-ploc": "⟦Ẇħȧŧ ñėėḓş ȧŧŧėñŧïőñ ŀőřėɱ ⟧"
+      },
+      "ux_b_intervention_col_action": {
+        "en": "What to do",
+        "ja": "次にやること",
+        "qps-ploc": "⟦Ẇħȧŧ ŧő ḓő ŀőř⟧"
+      },
+      "ux_b_action_open_operations": {
+        "en": "Check in Operations",
+        "ja": "運用で確認する",
+        "qps-ploc": "⟦Ƈħėƈķ ïñ Őṗėřȧŧïőñş ŀőřėɱ ⟧"
+      },
+      "ux_b_action_open_decisions": {
+        "en": "Check in Decisions",
+        "ja": "判断で確認する",
+        "qps-ploc": "⟦Ƈħėƈķ ïñ Ḓėƈïşïőñş ŀőřėɱ⟧"
+      },
+      "ux_b_action_open_project": {
+        "en": "Open the project",
+        "ja": "プロジェクトを開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė ṗřőĵėƈŧ ŀőřėɱ⟧"
+      },
+      "ux_b_command_show": {
+        "en": "Show command",
+        "ja": "コマンドを表示",
+        "qps-ploc": "⟦Şħőẇ ƈőɱɱȧñḓ ŀőř⟧"
+      },
+      "ux_b_command_copy": {
+        "en": "Copy",
+        "ja": "コピー",
+        "qps-ploc": "⟦Ƈőṗẏ ŀőř⟧"
+      },
+      "ux_b_command_copied": {
+        "en": "Copied",
+        "ja": "コピーしました",
+        "qps-ploc": "⟦Ƈőṗïėḓ ŀőř⟧"
+      },
+      "ux_b_command_copy_failed": {
+        "en": "Could not copy; select the text instead.",
+        "ja": "コピーできませんでした。文字を選択してコピーしてください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈőṗẏ; şėŀėƈŧ ŧħė ŧėẋŧ ïñşŧėȧḓ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
       "ux_b_card_open_mission": {
         "en": "Open mission",
         "ja": "ミッションを開く",
