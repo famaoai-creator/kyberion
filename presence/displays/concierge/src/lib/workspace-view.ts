@@ -212,9 +212,9 @@ export function approvalNeedsDecision(status: string | undefined): boolean {
   return status === 'pending' || status === 'needs_review';
 }
 
-/** The Inbox card of a pending approval on Concierge `/` (the Decide queue). */
+/** The card of a pending approval in あなた待ち (`/inbox`, the one needs-you queue). */
 export function inboxHrefForApproval(id: string): string {
-  return `/#decide-approval-${encodeURIComponent(id)}`;
+  return `/inbox?reason=approval#decide-approval-${encodeURIComponent(id)}`;
 }
 
 export type WorkspaceLoadError = 'signin' | 'forbidden' | 'not_found' | 'failed';

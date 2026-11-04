@@ -33,6 +33,7 @@ import {
 } from '../../lib/needs-you-client';
 import {
   NeedsYouCard,
+  cardAnchor,
   REASON_TONES,
   formatWhen,
   itemTitle,
@@ -344,7 +345,7 @@ function InboxView() {
               eyebrow={`${t('decide.next_eyebrow')} · ${c(`ia_inbox_reason_${next.reason}`)}`}
               title={itemTitle(next, locale, tt)}
               reason={total > 1 ? t('decide.next_more', { count: total - 1 }) : undefined}
-              primary={{ label: t('decide.next_review'), href: `#inbox-${next.id}` }}
+              primary={{ label: t('decide.next_review'), href: `#${cardAnchor(next)}` }}
             />
           ) : null}
           <div className="decide-list">
