@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   readHome: vi.fn(),
   hygiene: vi.fn(),
   memory: vi.fn(),
+  failures: vi.fn(),
 }));
 
 vi.mock('../../../../lib/viewer-context', async (importOriginal) => ({
@@ -18,6 +19,10 @@ vi.mock('@agent/core/organization/tenant-registry', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/organization/tenant-registry')>()),
   listTenantProfileSlugs: () => ['acme', 'famao-ai'],
 }));
+vi.mock('@agent/core/surface/needs-you-sources', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/surface/needs-you-sources')>()),
+  readNeedsYouFailures: mocks.failures,
+}));
 vi.mock('@agent/core/knowledge/memory-promotion-queue', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/knowledge/memory-promotion-queue')>()),
   listMemoryPromotionCandidates: mocks.memory,
@@ -25,6 +30,7 @@ vi.mock('@agent/core/knowledge/memory-promotion-queue', async (importOriginal) =
 
 import { GET as LIST } from './route.js';
 import { GET as SUMMARY } from './summary/route.js';
+import { GET as CATCH_ALL } from '../[...operation]/route.js';
 
 function viewer(tenantSlugs: string[] | 'all') {
   return {
@@ -70,6 +76,7 @@ beforeEach(() => {
   for (const mock of Object.values(mocks)) mock.mockReset();
   mocks.hygiene.mockReturnValue([]);
   mocks.memory.mockReturnValue([]);
+  mocks.failures.mockReturnValue([]);
   // A reader that returns too much: the builder must still drop what the viewer cannot see.
   mocks.readHome.mockReturnValue({
     approval_queue: [
@@ -160,5 +167,45 @@ describe('GET /api/v1/needs-you', () => {
     mocks.resolveViewer.mockReturnValue({ context: viewer('all') });
     const response = await LIST(request('?reason=everything'));
     expect(response.status).toBe(400);
+  });
+
+  it('ignores query keys the operation does not declare (review L3)', async () => {
+    mocks.resolveViewer.mockReturnValue({ context: viewer('all') });
+    const response = await LIST(request('?reason=approval&_=1730800000'));
+    expect(response.status).toBe(200);
+  });
+
+  it('a selected company keeps only items tagged with it, as MCP does (review M4)', async () => {
+    mocks.resolveViewer.mockReturnValue({ context: viewer(['famao-ai', 'acme']) });
+    mocks.failures.mockReturnValue([
+      {
+        id: 'f-untagged',
+        title: 'Broke',
+        text: '',
+        surface: 'presence',
+        created_at: '2026-11-05T10:00:00.000Z',
+      },
+      {
+        id: 'f-acme',
+        title: 'Broke',
+        text: '',
+        surface: 'presence',
+        created_at: '2026-11-05T10:00:00.000Z',
+        tenant_slug: 'acme',
+      },
+    ]);
+    const body = await (await LIST(request('?tenant=acme&reason=failure'))).json();
+    expect(body.items.map((item: { id: string }) => item.id)).toEqual(['failure:f-acme']);
+  });
+
+  it('the v1 catch-all answers needs-you with the same count (review L1)', async () => {
+    mocks.resolveViewer.mockReturnValue({ context: viewer(['famao-ai']) });
+    const direct = await (await SUMMARY(request('/summary'))).json();
+    const viaCatchAll = await (
+      await CATCH_ALL(request('/summary'), {
+        params: Promise.resolve({ operation: ['needs-you', 'summary'] }),
+      })
+    ).json();
+    expect(viaCatchAll).toEqual(direct);
   });
 });
