@@ -25,7 +25,7 @@ import {
   withSelectedTenant,
 } from '../lib/tenant-context';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
-import { frontDeskText } from '../lib/i18n';
+import { frontDeskText, type ConciergeLocale, type FrontDeskMessageKey } from '../lib/i18n';
 import { getStoredFrontDeskToken, isLoopbackHostname } from '../lib/front-desk-auth-token';
 
 /**
@@ -133,6 +133,20 @@ function workspaceItemId(pathname: string): string | null {
   if (pathname !== '/w' && !pathname.startsWith('/w/')) return null;
   const kind = pathname.split('/')[2];
   return kind ? (WORKSPACE_RAIL_IDS[kind] ?? 'home') : 'home';
+}
+
+/**
+ * A label the server could not resolve comes back as its own key
+ * (`front_desk:ia_nav_home`) — e.g. a runtime whose knowledge root predates
+ * a new destination. Render it from the client-bundled catalog instead of
+ * showing the raw key; anything else passes through unchanged.
+ */
+const RAIL_KEY = /^front_desk:([a-z0-9_]+)$/;
+export function railLabel(text: string, locale: ConciergeLocale): string {
+  const match = text.match(RAIL_KEY);
+  if (!match) return text;
+  const resolved = frontDeskText(match[1] as FrontDeskMessageKey, locale);
+  return resolved && resolved !== text && resolved !== match[1] ? resolved : '';
 }
 
 /** Rail id that carries the needs-you count badge. */
@@ -423,6 +437,11 @@ function FrontDeskRailContent() {
   const badgeText = needsYouBadgeText(needsYouTotal);
   const railItems = (nav?.items || [])
     .filter((item) => item.allowed)
+    .map((item) => ({
+      ...item,
+      label: railLabel(item.label, locale),
+      sublabel: railLabel(item.sublabel, locale),
+    }))
     .map((item) => ({
       placement: item.placement ?? 'main',
       ...(item.id === NEEDS_YOU_RAIL_ID && badgeText

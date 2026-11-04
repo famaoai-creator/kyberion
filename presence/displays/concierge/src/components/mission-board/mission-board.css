@@ -50,10 +50,7 @@
 }
 
 .mb-card {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  display: block;
   padding: var(--kb-ui-space-3) var(--kb-ui-space-4);
   border: 1px solid var(--kb-ui-border);
   border-radius: var(--kb-ui-radius-md);
@@ -62,6 +59,13 @@
   font-size: var(--kb-ui-font-size-sm);
   text-decoration: none;
   overflow-wrap: anywhere;
+}
+
+.mb-card__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .mb-card:hover {
