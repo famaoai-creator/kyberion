@@ -417,6 +417,10 @@ export function NeedsYouCard({
             <Badge label={c('ux_a_brief_same_count', { count: item.group_size })} tone="neutral" />
           ) : null}
           {item.requester.agent ? <Badge label={c('ia_inbox_agent_badge')} tone="neutral" /> : null}
+          {item.knowledge ? (
+            // Plain-language tier label; the internal tier code never renders.
+            <Badge label={t(`memory.tier.${item.knowledge.sensitivity_tier}`)} tone="neutral" />
+          ) : null}
           <span className="decide-by-badge">{c('ia_inbox_asked_by', { name: requester })}</span>
           {item.tenant_slug ? <Badge label={item.tenant_slug} tone="info" /> : null}
           <BriefStateBadge brief={brief} locale={locale} />
