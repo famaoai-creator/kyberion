@@ -40,6 +40,7 @@ import {
   summarizePrChecks,
   vcsHostAuthStatus,
   vcsHostPrChecks,
+  vcsHostPrChecksWait,
   vcsHostPrCreate,
   vcsHostPrList,
   vcsHostPrMerge,
@@ -363,6 +364,51 @@ describe('governed vcs-host verbs', () => {
     expect(String(error)).not.toContain('ghp_leakedtoken');
     expect(error).toBeInstanceOf(VcsHostError);
     expect((error as VcsHostError).code).toBe('auth');
+  });
+
+  it('waits for checks to reach a terminal state', async () => {
+    const forge = memory();
+    const pull = forge.state.pulls[0];
+    pull.checks = [{ name: 'build', bucket: 'pending' }];
+    let sleeps = 0;
+    const result = await vcsHostPrChecksWait({ ...opts, ref: '7', intervalMs: 1000 }, async () => {
+      sleeps += 1;
+      pull.checks = [{ name: 'build', bucket: 'pass' }];
+    });
+    expect(sleeps).toBe(1);
+    expect(result).toMatchObject({ state: 'success', timed_out: false });
+  });
+
+  it('times out fail-closed with the last observed pending state', async () => {
+    const forge = memory();
+    forge.state.pulls[0].checks = [{ name: 'build', bucket: 'pending' }];
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const result = await vcsHostPrChecksWait(
+        { ...opts, ref: '7', intervalMs: 1000, timeoutMs: 5000 },
+        async (ms) => {
+          vi.setSystemTime(Date.now() + Math.max(ms, 1000));
+        }
+      );
+      expect(result).toMatchObject({ state: 'pending', timed_out: true });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('aborts the wait after consecutive provider failures', async () => {
+    const forge = memory();
+    forge.prChecks = async () => {
+      throw new VcsHostError('unavailable', 'down');
+    };
+    await expect(
+      vcsHostPrChecksWait({ ...opts, ref: '7', intervalMs: 1000 }, async () => undefined)
+    ).rejects.toThrow(/VCS_GH_WAIT_FAILED/);
+  });
+
+  it('prefers an injected provider instance over seam resolution', async () => {
+    const injected = createMemoryVcsHostProvider({ id: 'injected', repository: REPO });
+    expect(resolveVcsHostProvider({ hostProvider: injected, provider: 'gh-cli' })).toBe(injected);
   });
 
   it('reports auth status per provider', async () => {

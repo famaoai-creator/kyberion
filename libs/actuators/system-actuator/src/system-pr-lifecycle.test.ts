@@ -4,6 +4,7 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('@agent/core/governance/external-operation', async (original) => ({
   ...(await original<typeof import('@agent/core/governance/external-operation')>()),
   runExternalOperationSync: (_input: object, execute: () => unknown) => execute(),
+  runExternalOperation: (_input: object, execute: () => Promise<unknown>) => execute(),
 }));
 import { runStandardPrLifecycle, type PrLifecycleDependencies } from './system-pr-lifecycle.js';
 const url = 'https://github.com/owner/repo/pull/123';
@@ -44,6 +45,8 @@ function setup(
                     url,
                     headRefOid: 'a'.repeat(40),
                     baseRefOid: 'b'.repeat(40),
+                    headRefName: 'feature/test',
+                    baseRefName: 'main',
                   })
                 : command === 'git' && args[0] === 'diff'
                   ? args.includes('--cached')
@@ -156,7 +159,18 @@ describe('standard PR lifecycle with fully mocked effects', () => {
         (command === 'git' && ['checkout', 'pull'].includes(args[0]))
     );
     expect(lifecycle.slice(-4).map(([c, a]) => [c, a])).toEqual([
-      ['gh', ['pr', 'checks', url, '--json', 'name,state,bucket,link']],
+      [
+        'gh',
+        [
+          'pr',
+          'checks',
+          url,
+          '--repo',
+          'https://github.com/owner/repo',
+          '--json',
+          'name,state,bucket,link',
+        ],
+      ],
       [
         'gh',
         [
