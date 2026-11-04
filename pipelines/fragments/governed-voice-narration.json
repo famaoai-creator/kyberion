@@ -16,7 +16,7 @@
       "op": "media:pptx_slide_text",
       "produces": { "channel": "slide_scripts", "type": "PptxSlides" },
       "params": {
-        "source": "{{pptx_path}}"
+        "path": "{{pptx_path}}"
       }
     },
     {
