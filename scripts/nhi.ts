@@ -36,10 +36,32 @@ import {
   type AgentIdentityLifecycleStatus,
 } from '@agent/core/agent/agent-identity';
 import { withExecutionContext } from '@agent/core/authority';
+import * as path from 'node:path';
+import { resolveActiveProfileRoot } from '@agent/core/profile-root';
+import { readJson } from '@agent/core/foundation/json';
+import {
+  loadPersonalAgentIdentityAtPath,
+  personalAgentIdentityRevision,
+} from '@agent/core/personal-identity-state';
+import {
+  validatePersonaIdentityBindings,
+  writePersonaIdentityBindingsAtPath,
+} from '@agent/core/persona-identity';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Args = {
-  command: 'issue' | 'list' | 'show' | 'suspend' | 'resume' | 'retire' | 'help';
+  command:
+    | 'issue'
+    | 'list'
+    | 'show'
+    | 'suspend'
+    | 'resume'
+    | 'retire'
+    | 'persona-bind'
+    | 'persona-show'
+    | 'help';
+  bindingsFile?: string;
+  expectedRevision?: string;
   nhiId?: string;
   slug?: string;
   organizationId?: string;
@@ -59,7 +81,16 @@ type Args = {
 function parseArgs(argv: string[]): Args {
   const [command = 'help', ...rest] = argv;
   const result: Args = {
-    command: (['issue', 'list', 'show', 'suspend', 'resume', 'retire'].includes(command)
+    command: ([
+      'issue',
+      'list',
+      'show',
+      'suspend',
+      'resume',
+      'retire',
+      'persona-bind',
+      'persona-show',
+    ].includes(command)
       ? command
       : 'help') as Args['command'],
     apply: false,
@@ -68,6 +99,8 @@ function parseArgs(argv: string[]): Args {
   for (let i = 0; i < rest.length; i += 1) {
     const arg = rest[i];
     if (arg === '--apply') result.apply = true;
+    else if (arg === '--bindings') result.bindingsFile = rest[++i];
+    else if (arg === '--expected-revision') result.expectedRevision = rest[++i];
     else if (arg === '--json') result.json = true;
     else if (arg === '--organization-id' || arg === '--org') result.organizationId = rest[++i];
     else if (arg === '--tenant-slug' || arg === '--tenant') result.tenantSlug = rest[++i];
@@ -98,6 +131,8 @@ function usage(): string {
     '  list    [--organization-id <org>] [--status provisioned|active|suspended|retired]',
     '          [--kind agent|service]',
     '  show    <nhi-id>',
+    '  persona-show   (current profile bindings; descriptive only)',
+    '  persona-bind --bindings <json-file> [--apply --expected-revision <preview-revision>] (replace map; no grants)',
     '  suspend <nhi-id> [--reason <r>] --apply',
     '  resume  <nhi-id> --apply',
     '  retire  <nhi-id> --reason <r> --apply   (terminal — the slug can never be re-issued)',
@@ -123,6 +158,38 @@ export function main(argv: string[] = [], print: (value: unknown) => void = () =
   const args = parseArgs(argv);
   if (args.command === 'help') {
     print(usage());
+    return;
+  }
+
+  if (args.command === 'persona-show' || args.command === 'persona-bind') {
+    const result = withExecutionContext('sovereign_concierge', () => {
+      const file = path.join(resolveActiveProfileRoot(), 'agent-identity.json');
+      const profile = loadPersonalAgentIdentityAtPath(file);
+      if (!profile)
+        throw new Error('Existing persona profile required; complete reviewed onboarding first.');
+      if (args.command === 'persona-show')
+        return {
+          persona_id: profile.agent_id,
+          bindings: profile.persona_identity_bindings ?? null,
+          legacy_nhi_id: profile.nhi_id ?? null,
+          note: 'Descriptive links only; lifecycle, affiliation, admission and authority are checked separately.',
+        };
+      if (!args.bindingsFile) throw new Error('persona-bind requires --bindings <json-file>.');
+      const input = readJson<unknown>(args.bindingsFile);
+      const bindings = validatePersonaIdentityBindings(profile, input);
+      if (args.apply) {
+        if (!args.expectedRevision)
+          throw new Error('--apply requires --expected-revision from a reviewed preview.');
+        writePersonaIdentityBindingsAtPath(file, bindings, args.expectedRevision);
+      }
+      return {
+        status: args.apply ? 'bound' : 'dry-run',
+        bindings,
+        expected_revision: personalAgentIdentityRevision(profile),
+        note: 'Complete map replacement. No identity, membership, session admission, approval or grant was created.',
+      };
+    });
+    print(JSON.stringify(result, null, 2));
     return;
   }
 
