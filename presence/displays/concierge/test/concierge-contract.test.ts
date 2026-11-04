@@ -499,8 +499,15 @@ describe('concierge surface contract', () => {
     // The page renders the checklist and attention items jump to their section.
     expect(setupPage).toContain('<SettingsReadiness');
     expect(readiness).toContain("t('setup.readiness_title')");
-    expect(setupPage).toContain('const sectionOrder = SETTINGS_CARD_SECTION_ORDER');
+    // MSN-SHELL-IA: categories render in the fixed IA order; the first-run
+    // ordering only drives the checklist's "next to open" pointer.
+    expect(setupPage).toContain('SETTINGS_SECTION_ORDER.map((category)');
     expect(setupPage).not.toContain('orderSectionsForFirstRun(setup.diagnostics)');
+    const checklistCard = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/SetupChecklistCard.tsx'),
+      'utf8'
+    );
+    expect(checklistCard).toContain('orderSectionsForFirstRun(readiness)');
     expect(setupPage).toContain('createSettingsNavigation');
     const navigation = safeReadFile(path.join(appDir, 'src/app/settings/settings-navigation.ts'), {
       encoding: 'utf8',
@@ -809,7 +816,11 @@ describe('concierge surface contract', () => {
     // The setup section shows status chips, decides via inline confirm only,
     // and carries the trust caveat (third-party code runs only after approval).
     expect(pluginsSection).toContain('id="setup-plugins"');
-    expect(pluginsSection).toContain("t('setup.plugins_caveat')");
+    // The lead no longer claims "no terminal needed": installing is a
+    // terminal step (shown behind a command disclosure), approval is here.
+    expect(pluginsSection).toContain("'ia_settings_plugins_lead'");
+    expect(pluginsSection).toContain('pnpm plugin:install');
+    expect(pluginsSection).not.toContain("t('setup.plugins_description')");
     expect(pluginsSection).toContain("'setup.plugin_confirm_approve'");
     expect(pluginsSection).toContain("'setup.plugin_confirm_deny'");
     expect(setupPage).not.toContain('window.confirm');

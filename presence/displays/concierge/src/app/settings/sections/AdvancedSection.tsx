@@ -130,8 +130,6 @@ export function AdvancedSection({
           'management.tenant_role': setMgmt('tenant_role'),
           'management.agent_id': setMgmt('agent_id'),
           'management.agent_display_name': setMgmt('agent_display_name'),
-          'management.agent_provider': setMgmt('agent_provider'),
-          'management.agent_model_id': setMgmt('agent_model_id'),
           'governance.preset': (value) => {
             setConfigPresetId(asText(value));
             setConfigInputs({});
@@ -186,8 +184,6 @@ export function AdvancedSection({
                   ['tenant_role', 'setup.tenant_role', undefined],
                   ['agent_id', 'setup.agent_id', undefined],
                   ['agent_display_name', 'setup.agent_display_name', undefined],
-                  ['agent_provider', 'setup.agent_provider', 'codex-cli'],
-                  ['agent_model_id', 'setup.agent_model', '<model-id>'],
                 ] as Array<[keyof ManagementState, ConciergeMessageKey, string | undefined]>
               ).map(([field, labelKey, placeholder]) => (
                 <SettingRow key={field} label={t(labelKey)}>
@@ -201,6 +197,18 @@ export function AdvancedSection({
                   />
                 </SettingRow>
               ))}
+              {/* The engine and model are chosen in one place (エージェントと自律度);
+                  the saved values are sent back unchanged. */}
+              <SettingRow
+                label={frontDeskText('ia_settings_advanced_agent_engine', locale)}
+                description={frontDeskText('ia_settings_advanced_agent_engine_desc', locale)}
+              >
+                <Button
+                  label={frontDeskText('ia_settings_advanced_agent_engine_action', locale)}
+                  variant="ghost"
+                  onClick={() => onJumpToSection('#settings-reasoning')}
+                />
+              </SettingRow>
               <p className="kb-text kb-text--caption">
                 {t('setup.agent_registry_count', {
                   count: setup.agent_management.durable_identities.length,
