@@ -45,8 +45,11 @@ export function createGhCliVcsHostProvider(
   options: { run?: VcsCommandRunner } = {}
 ): VcsHostProvider {
   // Resolve the default lazily so a test double installed on secure-io is honoured.
+  // The default runner only ever launches the external `gh` binary: the literal
+  // command keeps it out of the role-assumption analysis' "child may run
+  // Kyberion code under the inherited SYSTEM_ROLE" set.
   const run: VcsCommandRunner =
-    options.run ?? ((command, args, opts) => safeExecResult(command, args, opts));
+    options.run ?? ((_command, args, opts) => safeExecResult('gh', args, opts));
   // Only a positive probe is cached: a gh installed later in the process is picked up.
   let available = false;
 
