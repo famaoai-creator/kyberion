@@ -17653,11 +17653,6 @@
         "ja": "セットアップの進み具合",
         "qps-ploc": "⟦Şėŧůṗ ṗřőɠřėşş ŀőřė⟧"
       },
-      "ia_home_setup_done": {
-        "en": "Done",
-        "ja": "完了",
-        "qps-ploc": "⟦Ḓőñė ŀőř⟧"
-      },
       "ia_home_needs_title": {
         "en": "Needs you",
         "ja": "あなた待ち",
@@ -17948,6 +17943,11 @@
         "ja": "まだ計測されていません",
         "qps-ploc": "⟦Ñőŧ ɱėȧşůřėḓ ẏėŧ ŀőřėɱ⟧"
       },
+      "ia_home_kr_target": {
+        "en": "Not measured yet · target {target}",
+        "ja": "まだ計測されていません・目標 {target}",
+        "qps-ploc": "⟦Ñőŧ ɱėȧşůřėḓ ẏėŧ · ŧȧřɠėŧ {target} ŀőřėɱ ïṗşůɱ⟧"
+      },
       "ia_home_kr_bar_label": {
         "en": "{title}: {progress}",
         "ja": "{title}: {progress}",
@@ -18063,15 +18063,15 @@
         "ja": "最近の成果物",
         "qps-ploc": "⟦Řėƈėñŧ ḓėŀïṽėřȧƀŀėş ŀőřėɱ ⟧"
       },
-      "ia_home_deliverables_untitled": {
-        "en": "{kind} file",
-        "ja": "{kind} ファイル",
-        "qps-ploc": "⟦{kind} ƒïŀė ŀőř⟧"
-      },
       "ia_home_deliverables_from": {
         "en": "From: {mission}",
         "ja": "元のミッション: {mission}",
         "qps-ploc": "⟦Ƒřőɱ: {mission} ŀőřė⟧"
+      },
+      "ia_home_deliverables_dated": {
+        "en": "Deliverable from {date}",
+        "ja": "{date} の成果物",
+        "qps-ploc": "⟦Ḓėŀïṽėřȧƀŀė ƒřőɱ {date} ŀőřėɱ ï⟧"
       },
       "ia_home_deliverables_open": {
         "en": "Open Library",

@@ -125,11 +125,12 @@ describe('composeHomeDashboard', () => {
     expect(home.missions.throughputTotal).toBe(3);
     expect(home.missions.throughputPrevious).toBe(1);
     expect(home.missions.open).toEqual({ active: 2, planned: 1, paused: 1, failed: 2 });
-    expect(home.health.failureRate.slice(5)).toEqual([0, 0.333]);
-    expect(home.health.failureRate[0]).toBeNull();
+    // Trailing 7-day windows: F (failed) and E (6h) leave the window after
+    // day 3; nothing finished in the window ending 2 days ago.
+    expect(home.health.failureRate).toEqual([0.5, 0.5, 0.5, 0, null, 0, 0.25]);
     expect(home.health.failureRateCurrent).toBe(0.25);
     expect(home.health.failureRatePrevious).toBe(0.5);
-    expect(home.health.durationHours.slice(5)).toEqual([10, 3]);
+    expect(home.health.durationHours).toEqual([6, 6, 6, 6, null, 10, 4]);
     expect(home.health.durationCurrent).toBe(4);
     expect(home.health.durationPrevious).toBe(6);
   });
@@ -256,6 +257,7 @@ describe('display titles', () => {
     expect(deliverableDisplayTitle({ kind: 'pdf', path: 'a/b/final_report.pdf' })).toBe(
       'final report'
     );
+    expect(deliverableDisplayTitle({ kind: 'report', path: 'out/2026-10-24.md' })).toBe('');
   });
 });
 
