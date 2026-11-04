@@ -24,6 +24,13 @@ describe('settings IA: single homes and redirects', () => {
     expect(redirect).toHaveBeenLastCalledWith('/settings#settings-sso');
   });
 
+  it('decides approvals only in /inbox: settings governance shows the count and a link', () => {
+    const governance = read('src/app/settings/sections/GovernanceSection.tsx');
+    expect(governance).toContain('<NeedsYouLink reason="approval"');
+    expect(governance).not.toContain('decideWithPasskey');
+    expect(governance).not.toContain('pending_approvals');
+  });
+
   it('keeps the unclaimed-install bootstrap at /setup/first-run', () => {
     expect(fs.existsSync(path.join(appDir, 'src/app/setup/first-run/page.tsx'))).toBe(true);
     expect(read('src/app/setup/first-run/page.tsx')).not.toContain('redirect(');
