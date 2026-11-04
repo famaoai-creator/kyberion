@@ -640,6 +640,11 @@ const secretRedactionNeedles = (
  * Masks active secrets (and `extraSecrets`) in one string value, including
  * their JSON-escaped forms. Use on values, not on a JSON-stringified
  * aggregate — see `redactSecretsDeep` (secret-redaction.ts).
+ *
+ * Limits: only exact and JSON-escaped forms match — base64, URL-encoded, hex
+ * or otherwise transformed values are not detected; values at or below
+ * `minLength` (default 5) are skipped, and the registry itself only holds
+ * values longer than 8 characters.
  */
 export const redactSecretValuesInText = (
   text: string,
@@ -687,13 +692,30 @@ export const createSecretStreamRedactor = (
   return {
     push(chunk: string): string {
       const needles = secretRedactionNeedles(options.extraSecrets, options.minLength);
-      let buffer = pending + chunk;
-      for (const needle of needles) {
-        if (buffer.includes(needle)) buffer = buffer.split(needle).join(replacement);
+      // Work on the UNMASKED buffer: masking first would let a short secret A
+      // inside a longer secret B consume B's prefix, so B's split remainder
+      // would later be emitted in clear.
+      const raw = pending + chunk;
+      let cut = raw.length - heldSuffixLength(raw, needles);
+      // Never cut through a complete occurrence: move the cut to its start.
+      let moved = true;
+      while (moved) {
+        moved = false;
+        for (const needle of needles) {
+          for (let at = raw.indexOf(needle); at !== -1; at = raw.indexOf(needle, at + 1)) {
+            if (at < cut && at + needle.length > cut) {
+              cut = at;
+              moved = true;
+            }
+          }
+        }
       }
-      const held = heldSuffixLength(buffer, needles);
-      pending = buffer.slice(buffer.length - held);
-      return buffer.slice(0, buffer.length - held);
+      pending = raw.slice(cut);
+      let emit = raw.slice(0, cut);
+      for (const needle of needles) {
+        if (emit.includes(needle)) emit = emit.split(needle).join(replacement);
+      }
+      return emit;
     },
     flush(): string {
       const rest = redactSecretValuesInText(pending, options);

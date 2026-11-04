@@ -1,6 +1,10 @@
 import { getSubagentCapabilityProfile } from '../subagent-capability-profiles.js';
 import { resolveTaskProviderEnvironment } from '../foundation/credential-binding.js';
 import { credentialExecutionIdentity } from '../foundation/credential-binding.js';
+import {
+  PROVIDER_CREDENTIAL_RELAY_ENV_VAR,
+  isProviderCredentialRelayEnabled,
+} from '../foundation/env.js';
 import { assertIsolatedProviderHome } from './provider-auth-home.js';
 import {
   listCliReasoningProviderDescriptors,
@@ -408,25 +412,17 @@ const PROVIDER_CREDENTIAL_ENV_KEYS: Readonly<Record<ProviderId, readonly string[
 };
 
 /**
- * Kyberion's own config vars — always needed by a child kyberion-aware
- * process. Deliberately EXCLUDES `MISSION_ROLE` / `SYSTEM_ROLE` (SO-03):
- * those are authority signals `resolveRole()` (authority.ts) reads to
- * decide whether the CURRENT process is the mission owner/orchestrator
- * (see orchestrator-session.ts's fail-closed gate). If the calling process
- * is itself running under `MISSION_ROLE=mission_controller` (e.g. inside a
- * surface OrchestratorSession's execution context) and that value passed
- * through unchanged to a spawned provider CLI delegation, the delegation's
- * own in-process code (or anything it shells back out to) would inherit
- * mission-owner authority it was never granted — the exact leak the
- * multi-provider co-execution contract's "owner authority is never
- * projected into worker delegations" invariant forbids. A delegation that
- * legitimately needs a role tag must have one assigned to it explicitly on
- * its own path, never inherited from its parent's env.
- *
- * `KYBERION_DELEGATED_ROLE` (DR-01, authority.ts) is the same kind of
- * authority signal — a role the child should run as under SYSTEM_ROLE — so it
- * is excluded from the KYBERION_* passthrough below, like SYSTEM_ROLE.
+ * Credential vars of CLI backends outside {@link ProviderId} (copilot ACP,
+ * GitHub tokens it accepts, the Kyberion-scoped Grok key) that output-exit
+ * redaction also masks.
  */
+const OUTPUT_REDACTION_EXTRA_CREDENTIAL_ENV_KEYS: readonly string[] = [
+  'COPILOT_PROVIDER_API_KEY',
+  'GH_TOKEN',
+  'GITHUB_TOKEN',
+  'KYBERION_GROK_API_KEY',
+];
+
 /**
  * Values of every provider's declared credential env vars in `env` and in the
  * current task's bound provider environments — the extra needles output-exit
@@ -436,6 +432,10 @@ const PROVIDER_CREDENTIAL_ENV_KEYS: Readonly<Record<ProviderId, readonly string[
  */
 export function providerCredentialEnvValues(env: NodeJS.ProcessEnv = process.env): string[] {
   const values = new Set<string>();
+  for (const key of OUTPUT_REDACTION_EXTRA_CREDENTIAL_ENV_KEYS) {
+    const value = env[key];
+    if (typeof value === 'string' && value.length > 8) values.add(value);
+  }
   for (const provider of Object.keys(PROVIDER_CREDENTIAL_ENV_KEYS) as ProviderId[]) {
     let bound: NodeJS.ProcessEnv | undefined;
     try {
@@ -455,6 +455,26 @@ export function providerCredentialEnvValues(env: NodeJS.ProcessEnv = process.env
   return [...values];
 }
 
+/**
+ * Kyberion's own config vars — always needed by a child kyberion-aware
+ * process. Deliberately EXCLUDES `MISSION_ROLE` / `SYSTEM_ROLE` (SO-03):
+ * those are authority signals `resolveRole()` (authority.ts) reads to
+ * decide whether the CURRENT process is the mission owner/orchestrator
+ * (see orchestrator-session.ts's fail-closed gate). If the calling process
+ * is itself running under `MISSION_ROLE=mission_controller` (e.g. inside a
+ * surface OrchestratorSession's execution context) and that value passed
+ * through unchanged to a spawned provider CLI delegation, the delegation's
+ * own in-process code (or anything it shells back out to) would inherit
+ * mission-owner authority it was never granted — the exact leak the
+ * multi-provider co-execution contract's "owner authority is never
+ * projected into worker delegations" invariant forbids. A delegation that
+ * legitimately needs a role tag must have one assigned to it explicitly on
+ * its own path, never inherited from its parent's env.
+ *
+ * `KYBERION_DELEGATED_ROLE` (DR-01, authority.ts) is the same kind of
+ * authority signal — a role the child should run as under SYSTEM_ROLE — so it
+ * is excluded from the KYBERION_* passthrough below, like SYSTEM_ROLE.
+ */
 const KYBERION_PREFIX = 'KYBERION_';
 const EXCLUDED_AUTHORITY_ENV_KEYS: ReadonlySet<string> = new Set(['KYBERION_DELEGATED_ROLE']);
 const ADDITIONAL_KYBERION_STYLE_KEYS = ['MISSION_ID'] as const;
@@ -500,6 +520,13 @@ export function buildProviderChildEnv({
     baseEnv = bound;
   }
   if (!bound && isProviderEnvAllowlistDisabled(baseEnv)) {
+    // Full inheritance would hand the child the raw key the relay exists to
+    // withhold, so the two settings are refused together (fail closed).
+    if (isProviderCredentialRelayEnabled(baseEnv)) {
+      throw new Error(
+        `[CREDENTIAL_RELAY_CONFLICT] ${PROVIDER_ENV_ALLOWLIST_ESCAPE_HATCH_VAR}=0 (full env inheritance) cannot be combined with ${PROVIDER_CREDENTIAL_RELAY_ENV_VAR}=1 — the raw provider key would reach the child | next: unset one of the two | evidence: provider=${provider}`
+      );
+    }
     return { ...baseEnv };
   }
 

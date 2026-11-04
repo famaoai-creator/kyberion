@@ -166,6 +166,42 @@ describe('startCredentialRelay', () => {
     expect(seen).toHaveLength(0);
   });
 
+  it('strips headers named in the Connection header before forwarding', async () => {
+    const relay = track(
+      await startCredentialRelay({
+        protocol: 'anthropic',
+        credential: REAL_ANTHROPIC,
+        upstream: upstreamUrl,
+      })
+    );
+    const { port } = new URL(relay.baseUrl);
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = http.request(
+        {
+          host: '127.0.0.1',
+          port: Number(port),
+          method: 'POST',
+          path: '/v1/messages',
+          headers: {
+            'x-api-key': relay.placeholder,
+            connection: 'keep-alive, x-hop-only',
+            'x-hop-only': 'must-not-forward',
+            'x-end-to-end': 'kept',
+          },
+        },
+        (res) => {
+          res.resume();
+          res.on('end', () => resolve(res.statusCode ?? 0));
+        }
+      );
+      req.on('error', reject);
+      req.end('{}');
+    });
+    expect(status).toBe(200);
+    expect(seen[0].headers['x-hop-only']).toBeUndefined();
+    expect(seen[0].headers['x-end-to-end']).toBe('kept');
+  });
+
   it('refuses a plain-http non-loopback upstream', async () => {
     await expect(
       startCredentialRelay({
