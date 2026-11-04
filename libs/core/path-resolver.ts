@@ -342,6 +342,9 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/grants/',
   // Browser bridge pull mailbox (browser/browser-bridge-mailbox.ts), tier/tenant partitioned.
   'shared/runtime/browser-bridge-mailbox/',
+  // Saved seam provider defaults (seam-selection-defaults.ts): operator file and tier/tenant partitions.
+  'shared/runtime/seam-selection/defaults.json',
+  'shared/runtime/seam-selection-defaults/',
   // Customer decision invite links (customer-decision/invite.ts), tier/tenant partitioned.
   'shared/runtime/customer-decision-invites/',
   // Tier/tenant-partitioned resource-usage ledgers (metrics.ts

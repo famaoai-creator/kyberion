@@ -937,6 +937,12 @@
       "note": "G02: operator seam selection rules (libs/core/seam-selection-rules.ts rules.json) — operator judgment, never auto-deleted."
     },
     {
+      "path": "active/shared/runtime/seam-selection-defaults",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Saved seam provider defaults per tenant / organization / project (libs/core/seam-selection-defaults.ts), tier/tenant partitioned — human judgment, never auto-deleted; offboarded with the tenant."
+    },
+    {
       "path": "active/shared/runtime/delegations",
       "artifact_class": "state",
       "action": "review_required",

@@ -9,6 +9,15 @@
  *   pnpm kyberion seam select rules set --seam S --rule-id R [--purpose P] [--context k=v,...] --prefer a,b [--evidence path] [--note text]
  *   pnpm kyberion seam select rules remove --rule-id R
  *   pnpm kyberion seam select apply-measurements --report <report.json> [--traits t1,t2] [--providers a,b]
+ *   pnpm kyberion seam select defaults list [--seam S] [--tenant T] [--organization O] [--project P]
+ *   pnpm kyberion seam select defaults set --seam S --provider P [--layer operator|tenant|organization|project] [--tenant T] [--organization O] [--project P] [--note text]
+ *   pnpm kyberion seam select defaults unset --seam S [--layer ...] [--tenant T] [--organization O] [--project P]
+ *
+ * Saved defaults (seam-selection-defaults.ts) apply when a call names no
+ * provider and no purpose: env KYBERION_SEAM_DEFAULTS > project >
+ * organization > tenant > operator > policy default. The operator layer lives
+ * beside the rules; tenant/organization/project layers live in the tenant's
+ * partition under active/shared/runtime/seam-selection-defaults/.
  *
  * Rules and measured traits are written to the operator overlay
  * (active/shared/runtime/seam-selection/rules.json) under the
@@ -22,9 +31,21 @@ import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import {
   explainSeamProviderDecision,
   getSeamSelectionPolicy,
+  seamPolicyDefaultChain,
   listSeamSelectionPolicies,
   type SeamProviderCandidate,
 } from '@agent/core/seam-provider-selection';
+import {
+  listSavedSeamDefaultLayers,
+  readSeamDefaultLayer,
+  seamDefaultsOperatorPath,
+  seamDefaultsScopePath,
+  setSeamDefault,
+  unsetSeamDefault,
+  type SeamDefaultSavedLayer,
+  type SeamDefaultScope,
+  type SeamDefaultTarget,
+} from '@agent/core/seam-selection-defaults';
 import {
   listSeamSelectionRules,
   removeSeamSelectionRule,
@@ -77,6 +98,61 @@ function requireSeam(seam: unknown): string {
   return id;
 }
 
+const SAVED_LAYERS: readonly SeamDefaultSavedLayer[] = [
+  'operator',
+  'tenant',
+  'organization',
+  'project',
+];
+
+function optionalText(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function defaultsScopeFlags(argv: Record<string, unknown>): SeamDefaultScope | undefined {
+  const scope: SeamDefaultScope = {
+    ...(optionalText(argv.tenant) ? { tenant_slug: optionalText(argv.tenant) } : {}),
+    ...(optionalText(argv.organization)
+      ? { organization_id: optionalText(argv.organization) }
+      : {}),
+    ...(optionalText(argv.project) ? { project_id: optionalText(argv.project) } : {}),
+  };
+  return Object.keys(scope).length ? scope : undefined;
+}
+
+/** --layer defaults to the most specific layer the flags name, else operator. */
+function defaultsTarget(argv: Record<string, unknown>): SeamDefaultTarget {
+  const scope = defaultsScopeFlags(argv) ?? {};
+  const requested = optionalText(argv.layer);
+  if (requested && !SAVED_LAYERS.includes(requested as SeamDefaultSavedLayer)) {
+    throw new ScriptExitError(1, `--layer must be one of: ${SAVED_LAYERS.join(', ')}`);
+  }
+  const layer: SeamDefaultSavedLayer =
+    (requested as SeamDefaultSavedLayer | undefined) ??
+    (scope.project_id
+      ? 'project'
+      : scope.organization_id
+        ? 'organization'
+        : scope.tenant_slug
+          ? 'tenant'
+          : 'operator');
+  if (layer === 'tenant' && !scope.tenant_slug) {
+    throw new ScriptExitError(1, '--layer tenant needs --tenant');
+  }
+  if (layer === 'organization' && !scope.organization_id) {
+    throw new ScriptExitError(1, '--layer organization needs --organization');
+  }
+  if (layer === 'project' && !scope.project_id) {
+    throw new ScriptExitError(1, '--layer project needs --project');
+  }
+  return {
+    layer,
+    ...(layer !== 'operator' && scope.tenant_slug ? { tenant_slug: scope.tenant_slug } : {}),
+    ...(layer === 'organization' ? { organization_id: scope.organization_id } : {}),
+    ...(layer === 'project' ? { project_id: scope.project_id } : {}),
+  };
+}
+
 function readJsonArg(file: unknown, label: string): unknown {
   if (typeof file !== 'string' || !file.trim())
     throw new ScriptExitError(1, `${label} is required`);
@@ -101,6 +177,7 @@ export const runSeamSelection = defineScript({
       .command('calibrate', 'Run every candidate on the same input and write a comparison report')
       .command('rules', 'rules list | set | remove')
       .command('apply-measurements', 'Record measured trait values from a calibration report')
+      .command('defaults', 'defaults list | set | unset (saved per-seam default provider)')
       .option('seam', { type: 'string' })
       .option('purpose', { type: 'string' })
       .option('context', { type: 'string', describe: 'key=value[,key=value]' })
@@ -114,6 +191,14 @@ export const runSeamSelection = defineScript({
       .option('note', { type: 'string' })
       .option('report', { type: 'string' })
       .option('traits', { type: 'string' })
+      .option('provider', { type: 'string', describe: 'defaults set: provider id' })
+      .option('layer', {
+        type: 'string',
+        describe: 'defaults: operator | tenant | organization | project',
+      })
+      .option('tenant', { type: 'string' })
+      .option('organization', { type: 'string' })
+      .option('project', { type: 'string' })
       .parseSync();
     const [command, sub] = argv._.map(String);
 
@@ -136,6 +221,7 @@ export const runSeamSelection = defineScript({
             })),
             rules_path: pathResolver.toRepoRelative(seamSelectionRulesPath()),
             rules: listSeamSelectionRules(),
+            defaults_path: pathResolver.toRepoRelative(seamDefaultsOperatorPath()),
           },
           null,
           2
@@ -273,6 +359,94 @@ export const runSeamSelection = defineScript({
       throw new ScriptExitError(1, `unknown rules subcommand '${sub}' (list | set | remove)`);
     }
 
+    if (command === 'defaults') {
+      if (!sub || sub === 'list') {
+        const scope = defaultsScopeFlags(argv);
+        const policies = argv.seam
+          ? [getSeamSelectionPolicy(requireSeam(argv.seam))!]
+          : listSeamSelectionPolicies();
+        context.print(
+          JSON.stringify(
+            {
+              scope: scope ?? 'current',
+              seams: policies.map((policy) => {
+                const layers = listSavedSeamDefaultLayers(policy.seam_id, scope);
+                return {
+                  seam: policy.seam_id,
+                  effective: layers[0]
+                    ? { provider: layers[0].provider, layer: layers[0].layer }
+                    : { provider: policy.default_provider, layer: 'policy' },
+                  policy_default: policy.default_provider,
+                  policy_chain: seamPolicyDefaultChain(policy),
+                  layers,
+                };
+              }),
+            },
+            null,
+            2
+          )
+        );
+        return;
+      }
+      if (sub === 'set' || sub === 'unset') {
+        const seam = requireSeam(argv.seam);
+        const target = defaultsTarget(argv);
+        if (sub === 'set') {
+          const provider = optionalText(argv.provider);
+          const policy = getSeamSelectionPolicy(seam)!;
+          if (!provider || !policy.providers[provider]) {
+            throw new ScriptExitError(
+              1,
+              `--provider must be one of: ${Object.keys(policy.providers).join(', ')}`
+            );
+          }
+          const result = await withExecutionContextAsync(OPERATOR_ROLE, () =>
+            setSeamDefault({
+              seam,
+              provider,
+              ...target,
+              ...(argv.note ? { note: String(argv.note) } : {}),
+            })
+          );
+          context.print(
+            JSON.stringify(
+              {
+                saved: pathResolver.toRepoRelative(result.path),
+                seam,
+                ...target,
+                entry: result.entry,
+              },
+              null,
+              2
+            )
+          );
+          return;
+        }
+        const removed = await withExecutionContextAsync(OPERATOR_ROLE, () =>
+          unsetSeamDefault({ seam, ...target })
+        );
+        const filePath =
+          target.layer === 'operator'
+            ? seamDefaultsOperatorPath()
+            : seamDefaultsScopePath(target.tenant_slug);
+        context.print(
+          JSON.stringify(
+            {
+              removed,
+              seam,
+              ...target,
+              path: pathResolver.toRepoRelative(filePath),
+              remaining: Object.keys(readSeamDefaultLayer(target)),
+            },
+            null,
+            2
+          )
+        );
+        return;
+      }
+      throw new ScriptExitError(1, `unknown defaults subcommand '${sub}' (list | set | unset)`);
+    }
+
     if (command === 'apply-measurements') {
       const report = readJsonArg(argv.report, '--report') as SeamCalibrationReport;
       const policy = getSeamSelectionPolicy(report.seam);
@@ -313,7 +487,7 @@ export const runSeamSelection = defineScript({
 
     throw new ScriptExitError(
       1,
-      `unknown command '${command}' (list | explain | calibrate | rules | apply-measurements)`
+      `unknown command '${command}' (list | explain | calibrate | rules | apply-measurements | defaults)`
     );
   },
 });
