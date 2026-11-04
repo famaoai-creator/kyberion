@@ -174,6 +174,17 @@ diagnostic workaround. Gates: `github-diagnostics.test.ts` and `gh-status.test.t
    on `pipefail`, so the step still fails). End the job with the `Triage failure` step
    (`if: failure()`, `uses: ./.github/actions/ci-failure-triage`).
 
+**Core coverage on main and scheduled runs.** Keep the serial core suite split across six
+isolated runners, using Vitest's blob reporter to retain coverage maps and test outcomes.
+Shard commands may disable only the four percentage checks locally; the aggregate uses the
+unchanged root coverage configuration and native `--merge-reports --coverage` to enforce the
+global floor. Never average shard percentages. Require successful build and all shard jobs,
+plus exactly the six expected nonempty blobs before merging, so a missing, failed, cancelled,
+or timed-out shard cannot produce a green partial report. Keep PR/merge-group core tests owned
+by `pr-validation.yml`. The workflow operations contract guards this wiring; when upgrading
+Vitest, compare unsharded and merged summaries on complementary branches and an untested file,
+and verify both threshold and test failures remain failures.
+
 ### CI failure triage — who acts on what
 
 A red job writes a **CI failure triage** section to its job summary. The section lists each failure

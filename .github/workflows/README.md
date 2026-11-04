@@ -62,8 +62,8 @@ The `ci-workflow-contract` gate (`scripts/check_ci_workflow_contract.ts`, scope 
 **One owner per suite on pull requests.** `pr-validation.yml` owns the PR run of the core suite
 (6 shards), the actuator suite, the pr-scope gates (`pnpm run check -- --scope pr`, including the
 governance boundary tests in the `registration-tests` gate), lint, typecheck and format. On
-`pull_request` events `ci.yml` skips its `core`/`actuators` matrix entries and its lint/format/
-typecheck steps, and `cross-os.yml` skips the Linux core shards and boundary tests; all of them
+`pull_request` and `merge_group` events `ci.yml` skips its core coverage jobs,
+`actuators` matrix entry and lint/format/typecheck steps, and `cross-os.yml` skips the Linux core shards and boundary tests; all of them
 still run on `main` pushes and on the weekly schedule. Before adding a test step to a workflow,
 check which workflow already owns that suite for pull requests.
 
@@ -85,7 +85,16 @@ check which workflow already owns that suite for pull requests.
 **Suite sharding.** `ci.yml` shards `scripts` (3-ways) and `integration` (2-ways) through vitest
 `--shard=N/M` passed as `pnpm test -- --suite <s> --shard=N/M` — the dispatcher forwards Vitest
 options unchanged. `pr-validation.yml` shards the core suite 6-ways the same way. Sharded matrix
-entries carry a `shard` key so job names stay distinct (`test (scripts, 1/3)`).
+entries carry a `shard` key so job names stay distinct (`test (scripts, 1/3)`). On main pushes
+and schedules, `core-coverage-shards` runs the serial core suite across six isolated runners.
+Each uploads a Vitest blob with its coverage map. `core-coverage` (`test (core)`) requires all
+six successful shards and all six blobs, then merges with the unchanged root coverage thresholds.
+Only shard commands set thresholds to zero; the final report enforces the original global floor.
+This preserves combined coverage, rather than incorrectly averaging shard percentages.
+The aggregate retains the previous `test (core)` check name (verified against main CI run
+[41786019725](https://github.com/famaoai-creator/kyberion/actions/runs/41786019725/job/126429524302));
+PR/merge-group coverage remains skipped and the six existing PR core checks stay unchanged.
+No branch-protection or ruleset settings are changed by this workflow update.
 
 **Vitest transform cache.** `vitest.config.mts` sets `fsModuleCache: true`
 (`node_modules/.vitest-cache`, content-hashed). `setup-kyberion` restores that directory from
