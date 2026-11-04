@@ -74,6 +74,8 @@ describe('buildPersonalAggregate', () => {
         display_name: 'Acme',
         counts: { active_missions: 1, pending_approvals: 2, unread_outcomes: 0, exceptions: 0 },
         headline: 'Approve the acme budget',
+        // The pending decisions come from the acme-only read, so they are acme's.
+        approvals: [expect.objectContaining({ id: 'acme-1', tenant_slug: 'acme' })],
       },
       {
         tenant_slug: 'beta',

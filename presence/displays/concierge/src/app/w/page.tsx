@@ -14,6 +14,7 @@ import {
   type WorkspaceGraphSummary,
 } from '../../lib/workspace-view';
 import {
+  ApprovalBriefsProvider,
   DegradedNotice,
   EntityList,
   KindEmptyState,
@@ -53,70 +54,73 @@ export default function WorkspaceOverviewPage() {
   );
 
   return (
-    <div className="ws-page">
-      <PageHeader title={t('ws_overview_title')} subtitle={t('ws_overview_lead')} />
-      {summary.state === 'loading' ? <LoadingState t={t} /> : null}
-      {summary.state === 'error' ? (
-        <LoadErrorState t={t} error={summary.error} onRetry={summary.reload} />
-      ) : null}
-      {summary.state === 'ready' ? (
-        <>
-          <DegradedNotice t={t} degraded={summary.data.degraded} />
-          <Section title={t('ws_attention_title')} description={t('ws_attention_lead')}>
-            {summary.data.attention.length ? (
+    <ApprovalBriefsProvider>
+      <div className="ws-page">
+        <PageHeader title={t('ws_overview_title')} subtitle={t('ws_overview_lead')} />
+        {summary.state === 'loading' ? <LoadingState t={t} /> : null}
+        {summary.state === 'error' ? (
+          <LoadErrorState t={t} error={summary.error} onRetry={summary.reload} />
+        ) : null}
+        {summary.state === 'ready' ? (
+          <>
+            <DegradedNotice t={t} degraded={summary.data.degraded} />
+            <Section title={t('ws_attention_title')} description={t('ws_attention_lead')}>
+              {summary.data.attention.length ? (
+                <EntityList
+                  t={t}
+                  items={summary.data.attention}
+                  labels={labels}
+                  showKind
+                  groupSame
+                  label={t('ws_attention_title')}
+                />
+              ) : (
+                <EmptyState
+                  title={t('ws_attention_empty_title')}
+                  body={t('ws_attention_empty_body')}
+                />
+              )}
+            </Section>
+            <Section title={t('ws_counts_title')}>
+              <ul className="ws-counts">
+                {COUNTED_KINDS.map((kind) => (
+                  <li key={kind}>
+                    <a className="ws-count" href={kindListHref(kind)}>
+                      <span className="ws-count__value">{summary.data.counts[kind] ?? 0}</span>
+                      <span className="ws-count__label">{kindsLabel(t, kind)}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+            <Section title={t('ws_structure_title')} description={t('ws_structure_lead')}>
+              <StructureTree t={t} tenants={summary.data.tenants} />
+            </Section>
+          </>
+        ) : null}
+        <Section
+          title={t('ws_recent_missions_title')}
+          actions={[{ label: t('ws_view_all'), href: kindListHref('mission') }]}
+        >
+          {missions.state === 'loading' ? <LoadingState t={t} /> : null}
+          {missions.state === 'error' ? (
+            <LoadErrorState t={t} error={missions.error} onRetry={missions.reload} />
+          ) : null}
+          {missions.state === 'ready' ? (
+            missions.data.items.length ? (
               <EntityList
                 t={t}
-                items={summary.data.attention}
+                items={missions.data.items}
                 labels={labels}
-                showKind
-                label={t('ws_attention_title')}
+                label={t('ws_recent_missions_title')}
               />
             ) : (
-              <EmptyState
-                title={t('ws_attention_empty_title')}
-                body={t('ws_attention_empty_body')}
-              />
-            )}
-          </Section>
-          <Section title={t('ws_counts_title')}>
-            <ul className="ws-counts">
-              {COUNTED_KINDS.map((kind) => (
-                <li key={kind}>
-                  <a className="ws-count" href={kindListHref(kind)}>
-                    <span className="ws-count__value">{summary.data.counts[kind] ?? 0}</span>
-                    <span className="ws-count__label">{kindsLabel(t, kind)}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </Section>
-          <Section title={t('ws_structure_title')} description={t('ws_structure_lead')}>
-            <StructureTree t={t} tenants={summary.data.tenants} />
-          </Section>
-        </>
-      ) : null}
-      <Section
-        title={t('ws_recent_missions_title')}
-        actions={[{ label: t('ws_view_all'), href: kindListHref('mission') }]}
-      >
-        {missions.state === 'loading' ? <LoadingState t={t} /> : null}
-        {missions.state === 'error' ? (
-          <LoadErrorState t={t} error={missions.error} onRetry={missions.reload} />
-        ) : null}
-        {missions.state === 'ready' ? (
-          missions.data.items.length ? (
-            <EntityList
-              t={t}
-              items={missions.data.items}
-              labels={labels}
-              label={t('ws_recent_missions_title')}
-            />
-          ) : (
-            <KindEmptyState t={t} kind="mission" />
-          )
-        ) : null}
-      </Section>
-    </div>
+              <KindEmptyState t={t} kind="mission" />
+            )
+          ) : null}
+        </Section>
+      </div>
+    </ApprovalBriefsProvider>
   );
 }
 

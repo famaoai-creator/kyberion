@@ -135,17 +135,21 @@ export function OrganizationDashboard() {
       {!data && failure?.key !== key ? <p role="status">{t('loading')}</p> : null}
       {data ? (
         <div className="grid gap-4">
-          <div className="flex flex-wrap gap-2">
-            <Badge label={t('viewer') + ': ' + data.viewer.id} />
-            <Badge label={t('role') + ': ' + data.viewer.role} />
-            <Badge label={t('tenant') + ': ' + scopeText(data.viewer.tenants)} />
-            <Badge label={t('organization') + ': ' + scopeText(data.viewer.organizations)} />
-            <Badge label={t('project') + ': ' + scopeText(data.viewer.projects)} />
-            {data.selection.operation_id ? (
-              <Badge label={t('operation') + ': ' + data.selection.operation_id} />
-            ) : null}
-            <Badge label={t('tier') + ': ' + data.viewer.tiers.join(', ')} />
-          </div>
+          {/* Who is viewing and with which grants is internal detail: on request only. */}
+          <details className="chronos-viewer-details chronos-viewer-details--inline">
+            <summary>{uxText('ux_b_ops_viewer_details', locale)}</summary>
+            <div className="flex flex-wrap gap-2">
+              <Badge label={t('viewer') + ': ' + data.viewer.id} />
+              <Badge label={t('role') + ': ' + data.viewer.role} />
+              <Badge label={t('tenant') + ': ' + scopeText(data.viewer.tenants)} />
+              <Badge label={t('organization') + ': ' + scopeText(data.viewer.organizations)} />
+              <Badge label={t('project') + ': ' + scopeText(data.viewer.projects)} />
+              {data.selection.operation_id ? (
+                <Badge label={t('operation') + ': ' + data.selection.operation_id} />
+              ) : null}
+              <Badge label={t('tier') + ': ' + data.viewer.tiers.join(', ')} />
+            </div>
+          </details>
           <p>
             {t('updated')}{' '}
             <time dateTime={data.generatedAt}>
