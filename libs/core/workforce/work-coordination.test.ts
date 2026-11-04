@@ -358,7 +358,13 @@ describe('work coordination', () => {
     expect(claim('hash-a').lease.lease_id).toBe(first.lease.lease_id);
     // Backward compatible: a replay without a hash still matches.
     expect(claim().lease.lease_id).toBe(first.lease.lease_id);
-    expect(() => claim('hash-b')).toThrowError(/lease/i);
+    // Same key, different payload: a typed idempotency conflict, not a busy lease.
+    expect(() => claim('hash-b')).toThrowError(/different payload/);
+    try {
+      claim('hash-b');
+    } catch (error) {
+      expect((error as { code?: string }).code).toBe('idempotency_conflict');
+    }
   });
 
   it('claims, releases, and hands off leases with version checks', () => {

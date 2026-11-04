@@ -64,20 +64,21 @@ export interface DelegationResultExtras {
   served_model?: string;
 }
 
-/**
- * Mask active secrets without ever failing the delegation. `maskActiveSecrets`
- * refuses outside a trusted credential binding (tenant scopes); fall back to
- * the host redaction, which masks every active secret (over-masking is safe).
- */
+/** Mask active secrets without ever failing the delegation (over-masking is safe). */
 function maskSecrets(text: string): string {
+  // maskActiveSecrets honours task credential bindings and plugin grants;
+  // the host redaction then masks every active secret, so nothing ungranted
+  // inside a plugin frame survives into persisted records.
+  let masked = text;
   try {
-    return maskActiveSecrets(text);
+    masked = maskActiveSecrets(masked);
   } catch {
-    try {
-      return redactActiveSecretsForHostLog(text);
-    } catch {
-      return text ? '[REDACTED_SECRET_MASKING_UNAVAILABLE]' : text;
-    }
+    // refused outside a trusted binding — the host redaction below still applies
+  }
+  try {
+    return redactActiveSecretsForHostLog(masked);
+  } catch {
+    return masked ? '[REDACTED_SECRET_MASKING_UNAVAILABLE]' : masked;
   }
 }
 
@@ -337,33 +338,33 @@ export function markErrorExecutionStarted<E>(error: E, started = true): E {
   return error;
 }
 
-const PRE_START_CLASSES: ReadonlySet<ReasoningFailureClass> = new Set([
-  'auth',
-  'entitlement',
-  'capability',
-  'capacity',
-  'policy',
-  'request',
-]);
-
 /**
  * Whether a delegation failure provably happened before execution started.
  * `true` = started, `false` = never started, `undefined` = unknown.
  *
- * Explicit markers win; otherwise only refusals that a provider returns
- * before running anything (auth, entitlement, missing binary, unsupported
- * capability, context limit, policy/request rejection) count as pre-start.
+ * Only structural evidence counts — never the message text, because agentic
+ * CLIs print "unauthorized" / "unsupported" / "policy" after running tools:
+ * - an explicit `executionStarted` marker (set by a typed refusal raised
+ *   before dispatch, or by a backend), or
+ * - a spawn failure (`code: 'ENOENT'`, `syscall: 'spawn …'`): the process
+ *   never existed.
  */
 export function delegationExecutionStartedFromError(error: unknown): boolean | undefined {
   const explicit = hintsOf(error).executionStarted;
   if (typeof explicit === 'boolean') return explicit;
-  const message = reasoningFailureMessage(error);
-  const code = error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined;
-  if (
-    code === 'ENOENT' ||
-    /\bENOENT\b|command not found|not installed|binary (?:is )?missing/i.test(message)
-  )
+  if (!error || typeof error !== 'object') return undefined;
+  const { code, syscall } = error as { code?: unknown; syscall?: unknown };
+  if (code === 'ENOENT' && (syscall === undefined || String(syscall).startsWith('spawn'))) {
     return false;
-  if (PRE_START_CLASSES.has(classifyReasoningFailure(error).class)) return false;
+  }
   return undefined;
+}
+
+/** A typed refusal raised before anything was dispatched (provably pre-start). */
+export class DelegationNotStartedError extends Error {
+  readonly executionStarted = false;
+  constructor(message: string) {
+    super(message);
+    this.name = 'DelegationNotStartedError';
+  }
 }

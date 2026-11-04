@@ -4,11 +4,15 @@ import {
   computeDelegationPayloadHash,
   DelegationIdempotencyConflictError,
   deriveDelegationIdempotencyKey,
+  configureDelegationIdempotencyForTests,
+  delegationIdempotencyOwnerForTests,
+  delegationReservationPathForTests,
   loadDelegationReservation,
   resetDelegationIdempotencyForTests,
   runIdempotentDelegation,
 } from './delegation-idempotency.js';
 import { DelegationTerminalError, markDelegationExecutionStarted } from './delegation-result.js';
+import { safeWriteFile } from './secure-io.js';
 
 function freshKey(): string {
   return deriveDelegationIdempotencyKey({ workItemId: `witem-${randomUUID()}`, attempt: 1 });
@@ -126,14 +130,17 @@ describe('R5 delegation idempotency', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it('releases the reservation when the failure provably happened before start', async () => {
+  it('releases the reservation only on a structural pre-start proof', async () => {
     const idempotencyKey = freshKey();
     await expect(
       runIdempotentDelegation({
         instruction: 'x',
         options: { idempotencyKey },
         execute: async () => {
-          throw new Error('spawn claude ENOENT');
+          throw Object.assign(new Error('spawn claude ENOENT'), {
+            code: 'ENOENT',
+            syscall: 'spawn claude',
+          });
         },
       })
     ).rejects.toThrow('ENOENT');
@@ -147,6 +154,25 @@ describe('R5 delegation idempotency', () => {
     ).resolves.toBe('second try ran');
   });
 
+  it('never releases on a message-classified failure (agentic CLIs print these after tools)', async () => {
+    const idempotencyKey = freshKey();
+    await expect(
+      runIdempotentDelegation({
+        instruction: 'x',
+        options: { idempotencyKey },
+        execute: async () => {
+          throw new Error('401 unauthorized: login required');
+        },
+      })
+    ).rejects.toThrow('401');
+    expect(loadDelegationReservation(idempotencyKey)?.status).toBe('terminal');
+    const execute = vi.fn(async () => 'must not run');
+    await expect(
+      runIdempotentDelegation({ instruction: 'x', options: { idempotencyKey }, execute })
+    ).rejects.toBeInstanceOf(DelegationTerminalError);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it('replays a failure after start instead of re-running it', async () => {
     const idempotencyKey = freshKey();
     await expect(
@@ -155,7 +181,7 @@ describe('R5 delegation idempotency', () => {
         options: { idempotencyKey },
         execute: async () => {
           markDelegationExecutionStarted();
-          throw new Error('401 unauthorized mid-run');
+          throw new Error('mid-run failure');
         },
       })
     ).rejects.toThrow('mid-run');
@@ -173,38 +199,164 @@ describe('R5 delegation idempotency', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it('treats an unknown start state as started (conservative)', async () => {
+  it('persists the assumed start before execute() runs', async () => {
     const idempotencyKey = freshKey();
-    await expect(
-      runIdempotentDelegation({
-        instruction: 'x',
-        options: { idempotencyKey },
-        execute: async () => {
-          throw new Error('provider crashed');
-        },
-      })
-    ).rejects.toThrow('provider crashed');
+    let seen: unknown;
+    await runIdempotentDelegation({
+      instruction: 'x',
+      options: { idempotencyKey },
+      execute: async () => {
+        seen = loadDelegationReservation(idempotencyKey);
+        return 'ok';
+      },
+    });
+    expect(seen).toMatchObject({ status: 'in_flight', started_at: expect.any(String) });
+  });
+
+  it('settles an owner that crashed mid-execution as interrupted — no re-run without a start mark', async () => {
+    const idempotencyKey = freshKey();
+    const now = new Date().toISOString();
+    seedInFlight(idempotencyKey, {
+      owner_pid: 2_147_000_000,
+      owner_instance: 'crashed-instance',
+      owner_host: delegationIdempotencyOwnerForTests().host,
+      heartbeat_at: now,
+      started_at: now,
+    });
+    const execute = vi.fn(async () => 'must not run');
+    const replay = runIdempotentDelegation({
+      instruction: 'x',
+      options: { idempotencyKey },
+      execute,
+    });
+    await expect(replay).rejects.toBeInstanceOf(DelegationTerminalError);
+    await replay.catch((error: DelegationTerminalError) => {
+      expect(error.delegationResult).toMatchObject({
+        status: 'incomplete',
+        incomplete_reason: 'interrupted',
+        error: { allowFailover: false },
+      });
+    });
+    expect(execute).not.toHaveBeenCalled();
     expect(loadDelegationReservation(idempotencyKey)?.status).toBe('terminal');
   });
 
-  it('adopts a stale reservation of this pid that never started', async () => {
+  it('settles a lost in-process execution as interrupted, never adopting it', async () => {
     const idempotencyKey = freshKey();
-    let release!: (value: string) => void;
+    let release: ((value: string) => void) | undefined;
     const abandoned = runIdempotentDelegation({
       instruction: 'x',
       options: { idempotencyKey },
       execute: () => new Promise<string>((resolve) => (release = resolve)),
     });
-    // Simulate a lost in-process entry (e.g. a recycled pid after a crash).
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
     resetDelegationIdempotencyForTests();
+    const execute = vi.fn(async () => 'must not run');
     await expect(
-      runIdempotentDelegation({
-        instruction: 'x',
-        options: { idempotencyKey },
-        execute: async () => 'adopted',
-      })
-    ).resolves.toBe('adopted');
-    release('late');
+      runIdempotentDelegation({ instruction: 'x', options: { idempotencyKey }, execute })
+    ).rejects.toThrow('[DELEGATION_INTERRUPTED]');
+    expect(execute).not.toHaveBeenCalled();
+    release?.('late');
     await abandoned;
   });
+
+  it('never judges another host by local pid; a fresh lease is waited on with a bounded wait', async () => {
+    configureDelegationIdempotencyForTests({ pollMs: 5, maxWaitMs: 40 });
+    const idempotencyKey = freshKey();
+    const now = new Date().toISOString();
+    seedInFlight(idempotencyKey, {
+      owner_pid: 2_147_000_000,
+      owner_instance: 'remote-instance',
+      owner_host: 'another-host.example',
+      heartbeat_at: now,
+      started_at: now,
+    });
+    const execute = vi.fn(async () => 'must not run');
+    await expect(
+      runIdempotentDelegation({ instruction: 'x', options: { idempotencyKey }, execute })
+    ).rejects.toThrow('[DELEGATION_IDEMPOTENCY_WAIT_TIMEOUT]');
+    expect(execute).not.toHaveBeenCalled();
+    expect(loadDelegationReservation(idempotencyKey)?.status).toBe('in_flight');
+  });
+
+  it('settles another host whose heartbeat lease expired as interrupted', async () => {
+    configureDelegationIdempotencyForTests({ leaseMs: 1000 });
+    const idempotencyKey = freshKey();
+    const stale = new Date(Date.now() - 60_000).toISOString();
+    seedInFlight(idempotencyKey, {
+      owner_pid: process.pid,
+      owner_instance: 'remote-instance',
+      owner_host: 'another-host.example',
+      heartbeat_at: stale,
+      started_at: stale,
+    });
+    const execute = vi.fn(async () => 'must not run');
+    await expect(
+      runIdempotentDelegation({ instruction: 'x', options: { idempotencyKey }, execute })
+    ).rejects.toThrow('stopped heartbeating');
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('waits on a live owner with the same pid but another module instance', async () => {
+    configureDelegationIdempotencyForTests({ pollMs: 5, maxWaitMs: 40 });
+    const idempotencyKey = freshKey();
+    const now = new Date().toISOString();
+    seedInFlight(idempotencyKey, {
+      owner_pid: process.pid,
+      owner_instance: 'other-module-instance',
+      owner_host: delegationIdempotencyOwnerForTests().host,
+      heartbeat_at: now,
+      started_at: now,
+    });
+    const execute = vi.fn(async () => 'must not run');
+    await expect(
+      runIdempotentDelegation({ instruction: 'x', options: { idempotencyKey }, execute })
+    ).rejects.toThrow('[DELEGATION_IDEMPOTENCY_WAIT_TIMEOUT]');
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('lets a joiner abort on its own signal while the first execution continues', async () => {
+    const idempotencyKey = freshKey();
+    let release: ((value: string) => void) | undefined;
+    const first = runIdempotentDelegation({
+      instruction: 'x',
+      options: { idempotencyKey },
+      execute: () => new Promise<string>((resolve) => (release = resolve)),
+    });
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    const controller = new AbortController();
+    const joiner = runIdempotentDelegation({
+      instruction: 'x',
+      options: { idempotencyKey, signal: controller.signal },
+      execute: async () => 'unused',
+    });
+    controller.abort(new Error('joiner stopped'));
+    await expect(joiner).rejects.toThrow('joiner stopped');
+    release?.('first done');
+    await expect(first).resolves.toBe('first done');
+  });
+
+  it('fails closed on an unreadable reservation', async () => {
+    const idempotencyKey = freshKey();
+    safeWriteFile(delegationReservationPathForTests(idempotencyKey), '{not json', { mkdir: true });
+    const execute = vi.fn(async () => 'must not run');
+    await expect(
+      runIdempotentDelegation({ instruction: 'x', options: { idempotencyKey }, execute })
+    ).rejects.toThrow('[DELEGATION_RESERVATION_UNREADABLE]');
+    expect(execute).not.toHaveBeenCalled();
+  });
 });
+
+function seedInFlight(idempotencyKey: string, owner: Record<string, unknown>): void {
+  const record = {
+    kind: 'delegation_reservation',
+    idempotency_key: idempotencyKey,
+    payload_hash: computeDelegationPayloadHash({ instruction: 'x', options: { idempotencyKey } }),
+    status: 'in_flight',
+    reserved_at: owner.started_at,
+    ...owner,
+  };
+  safeWriteFile(delegationReservationPathForTests(idempotencyKey), JSON.stringify(record), {
+    mkdir: true,
+  });
+}

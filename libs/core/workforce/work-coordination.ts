@@ -33,6 +33,7 @@ import {
 } from './work-effect-transitions.js';
 import { applyWorkItemFilters, sortItems } from './work-coordination-query.js';
 import {
+  assertClaimPayloadReplayable,
   assertOriginalWorkItemIdentity,
   assertVersion,
   assertWorkItemTenantRegistered,
@@ -830,6 +831,7 @@ function claimWorkItemInternal(input: ClaimWorkItemInput): {
   }
   const existingLease = activeLeaseForItem(current.item_id);
   const idempotencyKey = input.idempotencyKey?.trim();
+  if (existingLease) assertClaimPayloadReplayable(existingLease, input);
   if (existingLease && canReplayWorkItemClaim(current, existingLease, input)) {
     return { item: current, lease: existingLease, ...(advisory ? { advisory } : {}) };
   }

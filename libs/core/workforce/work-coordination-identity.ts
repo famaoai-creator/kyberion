@@ -148,6 +148,28 @@ export function canReplayWorkItemClaim(
   );
 }
 
+/**
+ * R5: the same claim idempotency key with a different payload hash is a
+ * conflicting request, not a busy lease — fail with `idempotency_conflict`.
+ */
+export function assertClaimPayloadReplayable(lease: WorkLease, input: ClaimWorkItemInput): void {
+  const idempotencyKey = input.idempotencyKey?.trim();
+  const payloadHash = input.payloadHash?.trim();
+  if (
+    idempotencyKey &&
+    lease.idempotency_key === idempotencyKey &&
+    payloadHash &&
+    lease.payload_hash &&
+    lease.payload_hash !== payloadHash
+  ) {
+    throw new WorkCoordinationError(
+      'idempotency_conflict',
+      `claim idempotency key reused with a different payload: ${lease.item_id}`,
+      { item_id: lease.item_id, lease_id: lease.lease_id }
+    );
+  }
+}
+
 const WORK_ITEM_SCHEMA_PATH = pathResolver.rootResolve(
   'knowledge/product/schemas/governed-work-item.schema.json'
 );

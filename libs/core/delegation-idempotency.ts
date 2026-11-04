@@ -10,9 +10,10 @@
  * - same key + same hash while in flight → join the first execution
  *   (in-process: the same promise; cross-process: wait for its record);
  * - same key + same hash after terminal → replay the stored result;
- * - the reservation is released only when the failure provably happened
- *   before execution started — an unknown start state is treated as started,
- *   because side effects may exist.
+ * - an in-flight reservation is assumed started (persisted before execute());
+ *   it is released only when the failure provably happened before start (an
+ *   explicit marker or a structural spawn failure). A dead or silent owner's
+ *   record settles as `incomplete/interrupted` — never adopted, never re-run.
  *
  * Reservations are durable state under
  * `active/shared/runtime/delegation-idempotency/` (tenant scopes nest under
@@ -20,6 +21,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomUUID } from 'node:crypto';
+import * as os from 'node:os';
 import { logger } from './core.js';
 import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
 import { withLockSync } from './foundation/lock-utils.js';
@@ -29,7 +31,10 @@ import { pathResolver } from './path-resolver.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { readJson } from './foundation/json.js';
-import { isPidAlive } from './workforce/workspace-process-identity.js';
+import {
+  isRecordedProcessAlive,
+  processStartMarker,
+} from './workforce/workspace-process-identity.js';
 import { writeDelegationHostLeaf } from './delegated-task-observability.js';
 import {
   buildCompletedDelegationResult,
@@ -44,7 +49,6 @@ import {
 /** Reservation store root, relative to `active/shared/` (runtime state floor). */
 export const DELEGATION_IDEMPOTENCY_STORE_SUBPATH = 'runtime/delegation-idempotency';
 
-const POLL_INTERVAL_MS = 250;
 /** Identifies this module instance so a recycled pid never adopts a reservation. */
 const OWNER_INSTANCE = randomUUID();
 
@@ -129,6 +133,13 @@ export function computeDelegationPayloadHash(input: {
   return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 }
 
+/**
+ * Durable reservation. `started_at` is written BEFORE execution begins: an
+ * in-flight record is assumed started (side effects may exist) unless the
+ * owner later proves a pre-start failure and releases it. A dead owner's
+ * in-flight record therefore settles as `incomplete/interrupted` — never a
+ * re-run.
+ */
 export interface DelegationReservation {
   kind: 'delegation_reservation';
   idempotency_key: string;
@@ -137,24 +148,77 @@ export interface DelegationReservation {
   reserved_at: string;
   owner_pid: number;
   owner_instance: string;
-  started_at?: string;
+  /** Host the owner runs on; another host's pid is never probed locally. */
+  owner_host: string;
+  /** `ps lstart` (or platform equivalent) of the owner; guards pid reuse. */
+  owner_start_marker?: string;
+  /** Owner heartbeat; a stale heartbeat from another host means the owner is gone. */
+  heartbeat_at: string;
+  /** Principal (mission / organization / project) the key is namespaced by. */
+  principal?: string;
+  /** Assumed start, persisted before execute(). */
+  started_at: string;
   completed_at?: string;
   result?: DelegationResult;
+}
+
+interface IdempotencyTiming {
+  pollMs: number;
+  /** Upper bound a joiner waits on another live owner before a typed timeout. */
+  maxWaitMs: number;
+  heartbeatMs: number;
+  /** A heartbeat older than this from another host means the owner is gone. */
+  leaseMs: number;
+}
+
+const DEFAULT_TIMING: IdempotencyTiming = {
+  pollMs: 250,
+  maxWaitMs: 60 * 60 * 1000,
+  heartbeatMs: 30 * 1000,
+  leaseMs: 5 * 60 * 1000,
+};
+let timing: IdempotencyTiming = { ...DEFAULT_TIMING };
+let hostOverride: string | undefined;
+let ownStartMarker: string | undefined | null = null;
+
+function currentHost(): string {
+  return hostOverride ?? os.hostname();
+}
+
+function selfStartMarker(): string | undefined {
+  if (ownStartMarker === null) ownStartMarker = processStartMarker(process.pid);
+  return ownStartMarker;
 }
 
 function scopeTenantSlug(): string | undefined {
   return currentResourceAccessScope()?.tenantSlug ?? resolvePolicyIdentityContext().tenantSlug;
 }
 
-function keyDigest(idempotencyKey: string): string {
-  return createHash('sha256').update(idempotencyKey).digest('hex').slice(0, 40);
+/** Mission / organization / project principal that namespaces a key, when known. */
+function scopePrincipal(): string | undefined {
+  const scope = currentResourceAccessScope();
+  const missionId = resolvePolicyIdentityContext().missionId;
+  const parts = [
+    missionId ? `mission:${missionId}` : '',
+    scope?.organizationId ? `org:${scope.organizationId}` : '',
+    scope?.projectId ? `project:${scope.projectId}` : '',
+  ].filter(Boolean);
+  return parts.length ? parts.join('/') : undefined;
 }
 
-function reservationPath(idempotencyKey: string, tenantSlug: string | undefined): string {
+function keyDigest(value: string): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, 40);
+}
+
+function reservationPath(
+  idempotencyKey: string,
+  tenantSlug: string | undefined,
+  principal: string | undefined
+): string {
   const relative = physicalScopedPath(
     DELEGATION_IDEMPOTENCY_STORE_SUBPATH,
     tenantSlug ? { tenant_slug: tenantSlug } : {},
-    `${keyDigest(idempotencyKey)}.json`
+    `${keyDigest(`${principal ?? ''}\u0000${idempotencyKey}`)}.json`
   );
   return assertSafeRepositoryPath(pathResolver.shared(relative), { allowMissingLeaf: true });
 }
@@ -169,31 +233,46 @@ function isReservation(value: unknown): value is DelegationReservation {
     (record.status === 'in_flight' ||
       record.status === 'terminal' ||
       record.status === 'released') &&
-    typeof record.owner_pid === 'number'
+    typeof record.owner_pid === 'number' &&
+    typeof record.started_at === 'string'
   );
 }
 
+class DelegationReservationUnreadableError extends Error {
+  readonly executionStarted = false;
+  constructor(filePath: string) {
+    super(
+      `[DELEGATION_RESERVATION_UNREADABLE] reservation exists but cannot be read — refusing to execute | inspect or remove ${filePath} after confirming the earlier execution's outcome | evidence: ${filePath}`
+    );
+  }
+}
+
+/** Absent → null. Present but unreadable → throws: never treated as "never started". */
 function readReservation(filePath: string): DelegationReservation | null {
   if (!safeExistsSync(filePath)) return null;
+  let parsed: unknown;
   try {
-    const parsed = readJson<unknown>(filePath);
-    if (isReservation(parsed)) return parsed;
+    parsed = readJson<unknown>(filePath);
   } catch {
-    // fall through: an unreadable reservation is reported and treated as absent
+    throw new DelegationReservationUnreadableError(filePath);
   }
-  logger.warn(
-    `[delegation-idempotency] reservation unreadable — treating as absent | inspect or remove the file | evidence: ${filePath}`
-  );
-  return null;
+  if (!isReservation(parsed)) throw new DelegationReservationUnreadableError(filePath);
+  return parsed;
 }
 
 function writeReservation(filePath: string, record: DelegationReservation): void {
   writeDelegationHostLeaf(filePath, `${JSON.stringify(record, null, 2)}\n`);
 }
 
-/** Read the stored reservation for a key in the current tenant scope. */
+function lockId(filePath: string): string {
+  return `delegation-idempotency:${keyDigest(filePath)}`;
+}
+
+/** Read the stored reservation for a key in the current tenant/principal scope. */
 export function loadDelegationReservation(idempotencyKey: string): DelegationReservation | null {
-  const record = readReservation(reservationPath(idempotencyKey, scopeTenantSlug()));
+  const record = readReservation(
+    reservationPath(idempotencyKey, scopeTenantSlug(), scopePrincipal())
+  );
   return record && record.idempotency_key === idempotencyKey ? record : null;
 }
 
@@ -217,15 +296,33 @@ function replay(record: DelegationReservation): string {
   throw new DelegationTerminalError(result, { executionStarted: true });
 }
 
-function interruptedResult(): DelegationResult {
+function interruptedResult(reason: string): DelegationResult {
   return buildFailedDelegationResult(
     Object.assign(
       new Error(
-        '[DELEGATION_INTERRUPTED] the owning process exited after execution started; outcome unknown and side effects may exist — not re-running'
+        `[DELEGATION_INTERRUPTED] ${reason}; execution was assumed started, outcome unknown and side effects may exist — not re-running`
       ),
       { executionStarted: true }
     )
   );
+}
+
+/** Why an in-flight record's owner is gone, or undefined while it may still run. */
+function ownerGoneReason(record: DelegationReservation): string | undefined {
+  if (record.owner_instance === OWNER_INSTANCE) {
+    // This module instance owns it but no longer tracks it in-process.
+    return 'the owning execution was lost in this process';
+  }
+  if (record.owner_host === currentHost()) {
+    return isRecordedProcessAlive(record.owner_pid, record.owner_start_marker)
+      ? undefined
+      : 'the owning process exited';
+  }
+  // Another host: local pid probes say nothing; only the heartbeat lease does.
+  const heartbeat = Date.parse(record.heartbeat_at);
+  return Number.isFinite(heartbeat) && Date.now() - heartbeat <= timing.leaseMs
+    ? undefined
+    : `the owner on ${record.owner_host} stopped heartbeating`;
 }
 
 type ReserveOutcome =
@@ -233,8 +330,13 @@ type ReserveOutcome =
   | { kind: 'replay'; record: DelegationReservation }
   | { kind: 'wait' };
 
-function reserve(filePath: string, idempotencyKey: string, payloadHash: string): ReserveOutcome {
-  return withLockSync(`delegation-idempotency:${keyDigest(filePath)}`, () => {
+function reserve(
+  filePath: string,
+  idempotencyKey: string,
+  payloadHash: string,
+  principal: string | undefined
+): ReserveOutcome {
+  return withLockSync(lockId(filePath), () => {
     const existing = readReservation(filePath);
     if (existing && existing.status !== 'released') {
       if (existing.payload_hash !== payloadHash) {
@@ -245,70 +347,125 @@ function reserve(filePath: string, idempotencyKey: string, payloadHash: string):
         );
       }
       if (existing.status === 'terminal') return { kind: 'replay', record: existing };
-      // An in-process execution is joined through `inFlight` before we get
-      // here, so an in-flight record owned by this pid is stale (a recycled
-      // pid, or a dropped in-process entry). Only another live pid is waited on.
-      const ownerAlive = existing.owner_pid !== process.pid && isPidAlive(existing.owner_pid);
-      if (ownerAlive) return { kind: 'wait' };
-      if (existing.started_at) {
-        // The owner died mid-execution: record the unknown outcome, never re-run.
-        const settled: DelegationReservation = {
-          ...existing,
-          status: 'terminal',
-          completed_at: nowIso(),
-          result: interruptedResult(),
-        };
-        writeReservation(filePath, settled);
-        return { kind: 'replay', record: settled };
-      }
-      // A dead owner that never started: adopt the reservation below.
+      const gone = ownerGoneReason(existing);
+      if (!gone) return { kind: 'wait' };
+      // In-flight is assumed started: settle as interrupted, never adopt.
+      const settled: DelegationReservation = {
+        ...existing,
+        status: 'terminal',
+        completed_at: nowIso(),
+        result: interruptedResult(gone),
+      };
+      writeReservation(filePath, settled);
+      return { kind: 'replay', record: settled };
     }
+    // Absent, or released after a proven pre-start failure: reserve, with the
+    // start assumed and persisted before execute() is ever called.
+    const now = nowIso();
+    const startMarker = selfStartMarker();
     const record: DelegationReservation = {
       kind: 'delegation_reservation',
       idempotency_key: idempotencyKey,
       payload_hash: payloadHash,
       status: 'in_flight',
-      reserved_at: nowIso(),
+      reserved_at: now,
       owner_pid: process.pid,
       owner_instance: OWNER_INSTANCE,
+      owner_host: currentHost(),
+      ...(startMarker ? { owner_start_marker: startMarker } : {}),
+      heartbeat_at: now,
+      ...(principal ? { principal } : {}),
+      started_at: now,
     };
     writeReservation(filePath, record);
     return { kind: 'reserved', record };
   });
 }
 
+const UPDATE_ATTEMPTS = 3;
+
+/**
+ * Owner-side transition of its own in-flight record. Retried; on persistent
+ * failure the record stays `in_flight` with an assumed start, which every
+ * later reader settles as interrupted — fail closed, never a re-run.
+ */
 function update(
   filePath: string,
   mutate: (record: DelegationReservation) => DelegationReservation
-): void {
-  try {
-    withLockSync(`delegation-idempotency:${keyDigest(filePath)}`, () => {
-      const current = readReservation(filePath);
-      if (!current || current.owner_instance !== OWNER_INSTANCE) return;
-      writeReservation(filePath, mutate(current));
-    });
-  } catch (error) {
-    logger.warn(
-      `[delegation-idempotency] reservation update failed — a replay may not see this outcome | check runtime store permissions | evidence: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
+): boolean {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= UPDATE_ATTEMPTS; attempt++) {
+    try {
+      return withLockSync(lockId(filePath), () => {
+        const current = readReservation(filePath);
+        if (!current || current.owner_instance !== OWNER_INSTANCE) return false;
+        if (current.status !== 'in_flight') return false;
+        writeReservation(filePath, mutate(current));
+        return true;
+      });
+    } catch (error) {
+      lastError = error;
+    }
   }
+  logger.error(
+    `[delegation-idempotency] reservation transition failed after ${UPDATE_ATTEMPTS} attempts — the key stays in-flight and will replay as interrupted, never re-run | check runtime store permissions, then settle the record by hand | evidence: ${
+      lastError instanceof Error ? lastError.message : String(lastError)
+    }`
+  );
+  return false;
+}
+
+function abortReason(signal: AbortSignal): unknown {
+  return signal.reason ?? new Error('aborted');
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (signal?.aborted) return reject(signal.reason ?? new Error('aborted'));
+    if (signal?.aborted) return reject(abortReason(signal));
     const timer = setTimeout(() => {
       signal?.removeEventListener('abort', onAbort);
       resolve();
     }, ms);
     const onAbort = () => {
       clearTimeout(timer);
-      reject(signal?.reason ?? new Error('aborted'));
+      reject(abortReason(signal!));
     };
     signal?.addEventListener('abort', onAbort, { once: true });
   });
+}
+
+/** A joiner stops waiting on its own signal; the joined execution continues. */
+function raceSignal<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(abortReason(signal));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(abortReason(signal));
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      }
+    );
+  });
+}
+
+function waitTimeout(idempotencyKey: string): DelegationTerminalError {
+  return new DelegationTerminalError(
+    buildFailedDelegationResult(
+      Object.assign(
+        new Error(
+          `[DELEGATION_IDEMPOTENCY_WAIT_TIMEOUT] key "${idempotencyKey}" is still in flight on its owner after ${timing.maxWaitMs}ms timed out waiting — not re-running`
+        ),
+        { executionStarted: true }
+      )
+    ),
+    { executionStarted: true }
+  );
 }
 
 export interface IdempotentDelegationInput {
@@ -323,6 +480,9 @@ export interface IdempotentDelegationInput {
  * Run `execute` at most once per `options.idempotencyKey`. Without a key this
  * is a transparent pass-through. Nested idempotent layers for the same key
  * (e.g. a role-aware wrapper around a failover chain) pass through as well.
+ *
+ * With a key, the returned text is the secret-masked stored text — the same
+ * value every joiner and every later replay receives.
  */
 export async function runIdempotentDelegation(input: IdempotentDelegationInput): Promise<string> {
   const idempotencyKey = input.options?.idempotencyKey?.trim();
@@ -330,9 +490,11 @@ export async function runIdempotentDelegation(input: IdempotentDelegationInput):
 
   const payloadHash = computeDelegationPayloadHash(input);
   const tenantSlug = scopeTenantSlug();
-  const filePath = reservationPath(idempotencyKey, tenantSlug);
-  const mapKey = `${tenantSlug ?? ''}\u0000${idempotencyKey}`;
+  const principal = scopePrincipal();
+  const filePath = reservationPath(idempotencyKey, tenantSlug, principal);
+  const mapKey = `${tenantSlug ?? ''}\u0000${principal ?? ''}\u0000${idempotencyKey}`;
   const signal = input.options?.signal;
+  const waitDeadline = Date.now() + timing.maxWaitMs;
 
   for (;;) {
     const joined = inFlight.get(mapKey);
@@ -344,12 +506,13 @@ export async function runIdempotentDelegation(input: IdempotentDelegationInput):
           payloadHash
         );
       }
-      return joined.promise;
+      return raceSignal(joined.promise, signal);
     }
-    const outcome = reserve(filePath, idempotencyKey, payloadHash);
+    const outcome = reserve(filePath, idempotencyKey, payloadHash, principal);
     if (outcome.kind === 'replay') return replay(outcome.record);
     if (outcome.kind === 'wait') {
-      await sleep(POLL_INTERVAL_MS, signal);
+      if (Date.now() >= waitDeadline) throw waitTimeout(idempotencyKey);
+      await sleep(timing.pollMs, signal);
       continue;
     }
     const promise = executeReserved(filePath, idempotencyKey, input);
@@ -369,31 +532,33 @@ async function executeReserved(
 ): Promise<string> {
   const keys = new Set(activeKeys.getStore() ?? []);
   keys.add(idempotencyKey);
-  let startedPersisted = false;
-  return activeKeys.run(keys, () =>
-    runWithDelegationExecutionTracker(
-      async (tracker) => {
+  const heartbeat = setInterval(() => {
+    update(filePath, (record) => ({ ...record, heartbeat_at: nowIso() }));
+  }, timing.heartbeatMs);
+  heartbeat.unref?.();
+  try {
+    return await activeKeys.run(keys, () =>
+      runWithDelegationExecutionTracker(async (tracker) => {
         try {
           const value = await input.execute();
+          const result = buildCompletedDelegationResult(value, tracker.metadata);
           update(filePath, (record) => ({
             ...record,
             status: 'terminal',
-            ...(record.started_at ? {} : { started_at: nowIso() }),
             completed_at: nowIso(),
-            result: buildCompletedDelegationResult(value, tracker.metadata),
+            result,
           }));
-          return value;
+          return result.output_text;
         } catch (error) {
-          const started = tracker.started || delegationExecutionStartedFromError(error) !== false;
-          if (!started) {
-            // Provably pre-start (auth, missing binary, …): free the key so a
-            // retry with the same payload may execute.
+          // Release only on a proof that nothing ran; everything else replays.
+          const provenNotStarted =
+            !tracker.started && delegationExecutionStartedFromError(error) === false;
+          if (provenNotStarted) {
             update(filePath, (record) => ({ ...record, status: 'released' }));
           } else {
             update(filePath, (record) => ({
               ...record,
               status: 'terminal',
-              ...(record.started_at ? {} : { started_at: nowIso() }),
               completed_at: nowIso(),
               result: buildFailedDelegationResult(
                 markErrorExecutionStarted(error),
@@ -403,17 +568,35 @@ async function executeReserved(
           }
           throw error;
         }
-      },
-      () => {
-        if (startedPersisted) return;
-        startedPersisted = true;
-        update(filePath, (record) => ({ ...record, started_at: nowIso() }));
-      }
-    )
-  );
+      })
+    );
+  } finally {
+    clearInterval(heartbeat);
+  }
 }
 
 /** Test seam: forget in-process in-flight joins (the durable store is untouched). */
 export function resetDelegationIdempotencyForTests(): void {
   inFlight.clear();
+  timing = { ...DEFAULT_TIMING };
+  hostOverride = undefined;
+}
+
+/** Test seam: shrink waits/leases and fake the host name. */
+export function configureDelegationIdempotencyForTests(
+  overrides: Partial<IdempotencyTiming> & { host?: string }
+): void {
+  const { host, ...rest } = overrides;
+  timing = { ...timing, ...rest };
+  if (host !== undefined) hostOverride = host;
+}
+
+/** Test seam: the identity stamped on reservations owned by this module instance. */
+export function delegationIdempotencyOwnerForTests(): { instance: string; host: string } {
+  return { instance: OWNER_INSTANCE, host: currentHost() };
+}
+
+/** Test seam: where the reservation for `idempotencyKey` lives in the current scope. */
+export function delegationReservationPathForTests(idempotencyKey: string): string {
+  return reservationPath(idempotencyKey, scopeTenantSlug(), scopePrincipal());
 }
