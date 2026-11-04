@@ -13,11 +13,7 @@ import {
   gitDiff,
   gitLog,
   gitStatus,
-  ghPrChecks,
-  ghPrChecksWait,
-  ghPrList,
   ghPrView,
-  ghRepoDefaultBranch,
   ghVersion,
   runPreparedVcsDevelopment,
   gitCheckout,
@@ -35,6 +31,12 @@ import {
   type VcsHostMutation,
 } from '@agent/core/vcs/publication-host';
 import type { VcsCommandResult } from '@agent/core/vcs/git';
+import {
+  vcsHostDefaultBranch,
+  vcsHostPrChecks,
+  vcsHostPrChecksWait,
+  vcsHostPrList,
+} from '@agent/core/vcs/vcs-host-verbs';
 
 export type VcsOp =
   | 'status'
@@ -336,17 +338,19 @@ export async function handleAction(
       return {
         op: valid.op,
         cwd,
-        result: ghPrList({ state: params.state, limit: params.limit, cwd }, runGhResult),
+        // vcs-host seam: gh-cli by default, github-rest where gh is absent.
+        result: await vcsHostPrList({ state: params.state, limit: params.limit, cwd }),
       };
     }
     case 'pr_checks': {
       const shared = { ref: params.ref, cwd, ignore: params.ignore_checks };
       const result = params.watch
-        ? await ghPrChecksWait(
-            { ...shared, intervalMs: params.interval_ms, timeoutMs: params.timeout_ms },
-            runGhResult
-          )
-        : ghPrChecks(shared, runGhResult);
+        ? await vcsHostPrChecksWait({
+            ...shared,
+            intervalMs: params.interval_ms,
+            timeoutMs: params.timeout_ms,
+          })
+        : await vcsHostPrChecks(shared);
       return { op: valid.op, cwd, result };
     }
     case 'pr_merge': {
@@ -364,7 +368,7 @@ export async function handleAction(
       return {
         op: valid.op,
         cwd,
-        result: { default_branch: ghRepoDefaultBranch({ cwd }, runGhResult) },
+        result: { default_branch: await vcsHostDefaultBranch({ cwd }) },
       };
     }
     case 'gh_status': {
