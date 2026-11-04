@@ -55,6 +55,7 @@ jobs:
           path: |
             dist/
             libs/core/dist/
+            libs/kernel/dist/
             libs/shared-*/dist/
             presence/displays/terminal-hud/dist/
             plugins/dist/
