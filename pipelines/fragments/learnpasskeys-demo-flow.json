@@ -40,7 +40,7 @@
       "id": "wait_after_create_nav",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 2000 }
+      "params": { "ms": 2000 }
     },
     {
       "id": "accept_cookies",
@@ -54,7 +54,7 @@
       "id": "wait_after_cookies",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 1000 }
+      "params": { "ms": 1000 }
     },
     {
       "id": "click_show_register",
@@ -66,7 +66,7 @@
       "id": "wait_after_show_register",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 1000 }
+      "params": { "ms": 1000 }
     },
     {
       "id": "click_select_data",
@@ -78,7 +78,7 @@
       "id": "wait_after_select_data",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 1000 }
+      "params": { "ms": 1000 }
     },
     {
       "id": "click_gen_register_options",
@@ -90,7 +90,7 @@
       "id": "wait_after_gen_register_options",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 1500 }
+      "params": { "ms": 1500 }
     },
     {
       "id": "click_use_register_options",
@@ -102,7 +102,7 @@
       "id": "wait_after_use_register_options",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 1500 }
+      "params": { "ms": 1500 }
     },
     {
       "id": "click_start_credential_creation",
@@ -114,7 +114,7 @@
       "id": "wait_credential_creation",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 3000 }
+      "params": { "ms": 3000 }
     },
     {
       "id": "click_send_attestation",
@@ -126,7 +126,7 @@
       "id": "wait_after_attestation",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 2000 }
+      "params": { "ms": 2000 }
     },
     {
       "id": "log_create_done",
@@ -144,7 +144,7 @@
       "id": "wait_after_read_nav",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 2000 }
+      "params": { "ms": 2000 }
     },
     {
       "id": "click_show_auth",
@@ -156,7 +156,7 @@
       "id": "wait_after_show_auth",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 1000 }
+      "params": { "ms": 1000 }
     },
     {
       "id": "click_gen_auth_options",
@@ -168,7 +168,7 @@
       "id": "wait_after_gen_auth_options",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 1500 }
+      "params": { "ms": 1500 }
     },
     {
       "id": "click_use_auth_options",
@@ -180,7 +180,7 @@
       "id": "wait_after_use_auth_options",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 1500 }
+      "params": { "ms": 1500 }
     },
     {
       "id": "click_signin_passkey",
@@ -192,7 +192,7 @@
       "id": "wait_signin",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 3000 }
+      "params": { "ms": 3000 }
     },
     {
       "id": "click_verify_auth_response",
@@ -204,7 +204,7 @@
       "id": "wait_after_verify",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 2000 }
+      "params": { "ms": 2000 }
     },
     {
       "id": "log_auth_done",
@@ -222,7 +222,7 @@
       "id": "wait_after_delete_nav",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 2000 }
+      "params": { "ms": 2000 }
     },
     {
       "id": "click_show_delete",
@@ -236,7 +236,7 @@
       "id": "wait_after_show_delete",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 1000 }
+      "params": { "ms": 1000 }
     },
     {
       "id": "click_delete_data",
@@ -248,7 +248,7 @@
       "id": "wait_after_delete",
       "role": "sink",
       "op": "wait",
-      "params": { "duration": 2000 }
+      "params": { "ms": 2000 }
     },
     {
       "id": "log_complete",

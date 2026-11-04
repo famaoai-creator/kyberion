@@ -23,7 +23,11 @@ const STT_HANDLER_PARAMS: Record<string, InputSchema> = {
 const VOICE_CONTRACTS: Record<string, InputSchema> = {
   health: {
     type: 'object',
-    properties: { export_as: { type: 'string' } },
+    properties: {
+      action: { type: 'string' },
+      export_as: { type: 'string' },
+      requested_mode: { type: 'string' },
+    },
     additionalProperties: false,
   },
   list_voices: {
@@ -34,15 +38,19 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
   list_audio_routes: {
     type: 'object',
     properties: {
+      action: { type: 'string' },
       bus: { type: 'string' },
       export_as: { type: 'string' },
+      params: { type: 'object' },
     },
     additionalProperties: false,
   },
   probe_audio_route: {
     type: 'object',
     properties: {
+      action: { type: 'string' },
       bus: { type: 'string' },
+      params: { type: 'object' },
       expected_device_label: { type: 'string' },
       input_device_uid: { type: 'string' },
       output_device_uid: { type: 'string' },
@@ -120,9 +128,14 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
   collect_and_register_voice_profile: {
     type: 'object',
     properties: {
+      action: { type: 'string' },
+      dry_run: { type: 'boolean' },
       language: { type: 'string' },
+      policy: { type: 'object', additionalProperties: true },
+      profile: { type: 'object', additionalProperties: true },
       profile_id: { type: 'string' },
       profile_path: { type: 'string' },
+      request_id: { type: 'string' },
       samples: { type: 'array' },
     },
     additionalProperties: false,
@@ -140,6 +153,7 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
   generate_voice: {
     type: 'object',
     properties: {
+      action: { type: 'string' },
       dry_run: { type: 'boolean' },
       request_id: { type: 'string' },
       text: { type: 'string' },
@@ -160,10 +174,14 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
     type: 'object',
     required: ['request_id', 'sample_id'],
     properties: {
+      action: { type: 'string' },
+      prompt_display_hold_ms: { type: 'number' },
+      recording_countdown_sec: { type: 'number' },
       dry_run: { type: 'boolean' },
       duration_sec: { type: 'number' },
       language: { type: 'string' },
       output_path: { type: 'string' },
+      prompt_text: { type: 'string' },
       request_id: { type: 'string' },
       sample_id: { type: 'string' },
     },
@@ -173,7 +191,14 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
     type: 'object',
     required: ['request_id', 'sample_id', 'output_path'],
     properties: {
+      action: { type: 'string' },
       dry_run: { type: 'boolean' },
+      duration_sec: { type: 'number' },
+      max_repair_attempts: { type: 'number' },
+      prompt_display_hold_ms: { type: 'number' },
+      prompt_text: { type: 'string' },
+      recording_countdown_sec: { type: 'number' },
+      repair_duration_sec: { type: 'number' },
       language: { type: 'string' },
       output_path: { type: 'string' },
       request_id: { type: 'string' },
@@ -197,6 +222,8 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
     required: ['text'],
     properties: {
       engine_id: { type: 'string' },
+      speed: { type: 'number' },
+      style: { type: 'string' },
       language: { type: 'string' },
       local_only: { type: 'boolean' },
       purpose: { type: 'string' },
@@ -209,6 +236,7 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
   verify_tts_loopback: {
     type: 'object',
     properties: {
+      action: { type: 'string' },
       audio_route: { type: 'object' },
       dry_run: { type: 'boolean' },
       expected_text: { type: 'string' },
@@ -216,6 +244,7 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
       language: { type: 'string' },
       mission_id: { type: 'string' },
       operator_confirmed: { type: 'boolean' },
+      params: { type: 'object' },
       persistence: { type: 'object' },
       quality: { type: 'object' },
       request_id: { type: 'string' },
