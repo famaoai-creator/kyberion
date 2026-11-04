@@ -49,11 +49,20 @@ const gitRunner: GitRunner = (args) =>
   });
 
 /**
- * The GitHub-hosted runner's locale (C.UTF-8) and CI mode (checklist locale row). Without it the
- * operator's identity language leaks into the run (e.g. `ja`), and tests that
- * assert the default English vocabulary fail locally while passing in CI.
+ * The CI test environment (checklist locale row): the GitHub-hosted runner's
+ * locale (C.UTF-8), CI mode, and no operator persona / role. Without this the
+ * operator's profile leaks into the run — e.g. `KYBERION_PERSONA=sovereign`
+ * makes locale resolution read the personal identity language (`ja`), and
+ * tests asserting the default English vocabulary fail locally but pass in CI.
+ * Empty values override the inherited ones (safeExec applies extra env last).
  */
-export const AFFECTED_TESTS_ENV = { LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8', CI: 'true' } as const;
+export const AFFECTED_TESTS_ENV = {
+  LANG: 'C.UTF-8',
+  LC_ALL: 'C.UTF-8',
+  CI: 'true',
+  KYBERION_PERSONA: '',
+  MISSION_ROLE: '',
+} as const;
 
 export interface AffectedTestsDeps {
   git?: GitRunner;
