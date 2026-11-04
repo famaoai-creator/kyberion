@@ -44,7 +44,7 @@ git worktree add -b <prefix>/<topic>-<yyyymmdd> ../kyberion-<topic> origin/main
 # 1〜4. 実装・commit のあと、PR 前確認（下の「エージェント必須手順」）
 git diff --name-only origin/main...HEAD
 pnpm check -- --changed     # pr gate 全部 + 変更パスに該当する full-only gate
-pnpm exec vitest related --run $(git diff --name-only origin/main...HEAD -- '*.ts')   # 変更ファイルを import するテスト
+pnpm exec vitest run --changed origin/main   # 影響テスト（未 commit の変更も含む）
 
 # 4.5 ミッション作業なら、学びを同じ PR に入れる（verify → distill → curate → promote --target-root）
 #    手順は phases/execution.md の「Ship the learnings in the same PR as the code」。
@@ -226,14 +226,21 @@ CI の `lint-and-validate`（`--scope full`）でしか落ちなかった op-reg
 3.5 **影響テストを実行する**（gate は test suite を実行しない）:
 
 ```bash
-pnpm exec vitest related --run $(git diff --name-only origin/main...HEAD -- '*.ts')
+pnpm exec vitest run --changed origin/main
 ```
 
-`vitest related` は変更ファイルを（間接的にも）import するテストファイルを全体で実行する。直近 PR で
+`vitest run --changed <ref>` は `<ref>...HEAD` の commit 済み変更と staged / unstaged の変更（拡張子を問わない）を集め、
+それらを（間接的にも）import するテストファイルを全体で実行する（`vitest related` と同じ選択）。直近 PR で
 PR 自身が起こした CI 失敗の最多分類は、この範囲のテストを流していなかったことによる（下の「よく落ちる gate」の
-registry 件数・順序固定テスト、`vi.mock` の export 不足、hermetic fixture の不足）。`libs/core` のように広く
+`vi.mock` の export 不足、hermetic fixture の不足、env / global state の漏れ）。`libs/core` のように広く
 import される module を変えた場合は対象が多くなるが、省略しない。時間が許さない場合は未実行として
 PR 本文の Test plan に明記する。
+
+- **`0 test files` / `No test files found` は検証済みではない**。`origin/main` が無い・古い checkout では
+  変更が 0 件と判定される。`git fetch origin main` してから再実行する。
+- **データファイルは import graph に乗らない**。`knowledge/` や actuator `manifest.json` などの JSON / YAML
+  だけを変えた場合、それを実行時に読むテスト（registry の件数・順序を固定したテストなど）は選ばれない。
+  `grep -rln "<ファイル名か registry 名>" --include=*.test.ts libs scripts tests` で読み手のテストを探して流す。
 
 4. 例外表の残りの追加確認（gate では表現できない手順）を実行し、生成物 drift があれば同じ commit に含める。
 5. push 後は `gh pr checks <number>` で確認し、**pending を pass と数えない**。
@@ -265,7 +272,7 @@ GitHub の web 画面は merge driver を使わないので、衝突表示が出
 - [ ] `git status --short --branch` と差分一覧で、別作業・秘密情報・生成済み `dist/`・不要な runtime state が混ざっていない。
 - [ ] `git diff --check` が成功している。
 - [ ] `pnpm check -- --changed`（または `pnpm kyberion pr preflight`）が緑。`--scope pr` だけの成功で代用していない（CI の `lint-and-validate` が full-only gate を実行する）。
-- [ ] `pnpm exec vitest related --run <変更 .ts>` が緑（または未実行理由を Test plan に記載）。
+- [ ] `pnpm exec vitest run --changed origin/main` が緑で 0 件ではない（データだけの変更は grep で探した読み手のテストも緑）。未実行なら理由を Test plan に記載。
 - [ ] 例外表のうち `--changed` が自動選択しない行が緑（または N/A）。
 - [ ] 実装と生成物の変更が同じ commit に含まれている。
 - [ ] PR の base が `main`（または `develop`）で、タイトルが PR 全体を表す Conventional Commit になっている。
@@ -333,10 +340,10 @@ PR scopeには `vocabulary-types` が含まれないため、PR scopeの成功�
 | `build:actuators` / TS2345                                                                                                                     | source path typecheck は通るが dist export 経由で型不一致                                                                                                                                             | core build 後に `build:actuators`。呼び出し側の型を `GenerationBackend` など実際の公開型に合わせる                                                                                                                                                                                                                                                                                                |
 | component-inventory drift                                                                                                                      | CAPABILITIES / global index が manifest と不一致                                                                                                                                                      | `pnpm kyberion sync component-inventory`                                                                                                                                                                                                                                                                                                                                                          |
 | CodeQL（PR の code scanning）                                                                                                                  | 変更行のアラートだけが出る。sink を移すと既存アラートが「新規」になる。汎用 `safeExec*` に `sh`/`bash`/`cmd` + `-c` を渡すと全呼び出し元が指摘される                                                  | 手元の CodeQL CLI でテストを含めて解析して確かめる。シェル実行は `safeExecShellScript*` を使う。移動しただけの既存アラートは根拠を書いて扱いを決める                                                                                                                                                                                                                                              |
-| registry 件数・順序を固定したテスト（`generate_op_registry`、service harness、mission template catalog、subagent 定義、voice engine 順序）     | op / service / template / engine を 1 件追加したが、件数や並びを直書きしたテストを流していない（#1353 #1388 #1355 #1338: `to have a length of 658 but got 659`）                                      | 手順 3.5 の `vitest related`。生成物を追加したら `grep -rn "toHaveLength\|length).toBe" <registry の test>` で件数固定を探し、件数ではなく内容で検証する形に直す                                                                                                                                                                                                                                  |
+| registry 件数・順序を固定したテスト（`generate_op_registry`、service harness、mission template catalog、subagent 定義、voice engine 順序）     | op / service / template / engine を 1 件追加したが、件数や並びを直書きしたテストを流していない（#1353 #1388 #1355 #1338: `to have a length of 658 but got 659`）                                      | import graph に乗らないため手順 3.5 だけでは選ばれない。registry / catalog / manifest にエントリを追加したら `grep -rn "toHaveLength\|length).toBe" <registry の test>` で件数固定を探し、件数ではなく内容で検証する形に直す                                                                                                                                                                      |
 | `vi.mock` に新しい export が無い                                                                                                               | mock 対象 module に export を足したが、その module を `vi.mock` するテストの factory を更新していない（#1345: `No "pathResolver" export is defined on the mock`）                                     | `grep -rln "vi.mock('.*<module>" --include=*.test.ts` で mock 側を列挙して流す。`importOriginal` で既存 export を引き継ぐ                                                                                                                                                                                                                                                                         |
-| hermetic fixture に新しい registry / knowledge ディレクトリが無い                                                                              | 新しい `knowledge/product/governance/<dir>/` を registry-directory で読むようにしたが、knowledge を一時ディレクトリへ写す fixture が写していない（#1368: `registry directory not found: /tmp/kyb-…`） | 新ディレクトリを読む module を import するテストを `vitest related` で流し、fixture のコピー対象を同じ PR で更新する                                                                                                                                                                                                                                                                              |
-| concept-consolidation budget（`env_direct_read_budget` / `json_state_write_budget` / `runtime_path_literal_budget` など、`lint-and-validate`） | 新規ファイルで `KYBERION_PERSONA` 等の直読み、`safeWriteFile(JSON.stringify(...))`、`active/shared/runtime/` 文字列を書いた。`--scope pr` には含まれない（#1391）                                     | `--changed` が `libs/**` の変更で自動選択する。budget を上げず、`readConfiguredActorIdentity`、`writeJson`、`RUNTIME_STATE_PATHS` を使う                                                                                                                                                                                                                                                          |
+| hermetic fixture に新しい registry / knowledge ディレクトリが無い                                                                              | 新しい `knowledge/product/governance/<dir>/` を registry-directory で読むようにしたが、knowledge を一時ディレクトリへ写す fixture が写していない（#1368: `registry directory not found: /tmp/kyb-…`） | 新ディレクトリを読む module を import するテストを手順 3.5 で流し、fixture のコピー対象を同じ PR で更新する                                                                                                                                                                                                                                                                                       |
+| concept-consolidation budget（`env_direct_read_budget` / `json_state_write_budget` / `runtime_path_literal_budget` など、`lint-and-validate`） | 新規ファイルで `KYBERION_PERSONA` 等の直読み、`safeWriteFile(JSON.stringify(...))`、`active/shared/runtime/` 文字列を書いた。`--scope pr` には含まれない（#1391）                                     | `--changed` が `libs/**`・`scripts/**`・`presence/**`・`satellites/**` の変更で自動選択する。budget を上げず、`readConfiguredActorIdentity`、`writeJson`、`RUNTIME_STATE_PATHS` を使う                                                                                                                                                                                                            |
 | process env / global state の漏れ                                                                                                              | テストが `SYSTEM_ROLE` などの process env や module state を戻さず後続テストを壊す（#1367 `ROLE_ASSUMPTION_DENIED`、#1349 #1353 overlay の残留）                                                      | `vi.stubEnv` + `vi.unstubAllEnvs()`、`afterEach` で reset。影響面を共有するテストをファイル全体で流す（例外表「モジュール全体に効く状態」）                                                                                                                                                                                                                                                       |
 | ESLint（`static-checks`）                                                                                                                      | lint-staged を通らない commit（`--no-verify`、GitHub API / web での commit）で未使用変数などが残った（#1356）                                                                                         | hook を通さず commit した場合は push 前に `pnpm exec eslint --max-warnings 0 <変更ファイル>` と `prettier --check` を実行する                                                                                                                                                                                                                                                                     |
 
