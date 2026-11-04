@@ -1,5 +1,6 @@
 /** Single ownership contract for compiler outputs, cleanup and freshness checks. */
 export const PACKAGE_BUILD_OUTPUTS = [
+  { id: 'libs/kernel', sourceRoot: 'libs/kernel/src', excludeTests: true },
   { id: 'libs/core', sourceRoot: 'libs/core', excludeTests: true },
   { id: 'libs/shared-ui', sourceRoot: 'libs/shared-ui/src', excludeTests: true },
   { id: 'libs/shared-media', sourceRoot: 'libs/shared-media/src', excludeTests: false },

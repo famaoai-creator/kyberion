@@ -1,6 +1,6 @@
 ---
 title: 'Kyberion Development Practices — Hard-Won Rules for Changing This Repo'
-last_updated: 2026-10-19
+last_updated: 2026-11-04
 ---
 
 # Kyberion Development Practices — Hard-Won Rules for Changing This Repo
@@ -294,6 +294,11 @@ not drop silently.
   records; it never searches other worktrees or arbitrary user buildinfo files.
   The physical source-shadow guard sees ignored and untracked JS/declarations/maps,
   with exact documented exceptions for intentional source inputs.
+  A new workspace package that emits a dist (e.g. libs/kernel) is registered in
+  PACKAGE_BUILD_OUTPUTS and in the build-artifact upload paths of ci.yml,
+  pr-validation.yml and cross-os.yml in the same PR: downstream jobs restore
+  that artifact instead of rebuilding, so an unlisted dist fails only at
+  runtime there (tests/build-output-ownership.test.ts enforces both).
 - **An incremental build is not a clean build.** TypeScript can retain obsolete
   outputs after deletion/rename, or trust buildinfo after a partial output wipe.
   Freshness checks verify input hashes, required emits and obsolete outputs;
