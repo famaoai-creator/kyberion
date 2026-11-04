@@ -93,15 +93,14 @@ export function runAffectedTests(
 export async function main(argv: string[], print: Print = () => undefined): Promise<void> {
   const guarded = guardCliArgsNormalized(argv, PREFLIGHT_PR_CLI, print);
   if (guarded.handled) return;
-  const skipAffectedTests = guarded.argv.includes('--skip-affected-tests');
-  const options = parsePublishArgs(guarded.argv.filter((arg) => arg !== '--skip-affected-tests'));
+  const options = parsePublishArgs(guarded.argv);
 
   const title = resolvePublishTitle(options.title);
   print(`[pr:preflight] PR title OK: ${title}`);
 
   runPrePrReadiness(print, options.checkJobs, options.base);
 
-  if (skipAffectedTests) {
+  if (options.skipAffectedTests) {
     print(
       '[pr:preflight] Affected tests skipped (--skip-affected-tests): record them as not run in the PR Test plan.'
     );
