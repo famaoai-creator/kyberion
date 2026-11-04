@@ -29,8 +29,36 @@ body {
   flex-direction: column;
   gap: var(--kb-ui-space-5);
   width: 100%;
-  max-width: 1100px;
+  /* MSN-SHELL-IA §5: the column is as wide as the widest page frame
+     (`.kb-page[data-width='wide']`); each page picks its own width. */
+  max-width: 1440px;
+  min-width: 0;
   margin: 0 auto;
+}
+
+.concierge-column > * {
+  min-width: 0;
+}
+
+/* 資料 › 資料の取込: the form keeps the form width inside the wide page. */
+.library-form {
+  width: 100%;
+  max-width: 720px;
+}
+
+/* The surface bar above every page: brand at section scale, so the page's own
+   title is the single `xxl` heading on screen. */
+.concierge-header .kb-page-header {
+  align-items: center;
+  padding-bottom: var(--kb-ui-space-3);
+}
+
+.concierge-header .kb-page-header__title {
+  font-size: var(--kb-ui-font-size-lg);
+}
+
+.concierge-header .kb-page-header__subtitle {
+  font-size: var(--kb-ui-font-size-sm);
 }
 
 /* ------------------------------------------------------ 決める (decide) -- */
