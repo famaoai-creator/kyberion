@@ -73,6 +73,9 @@ export interface CeoOutcomeItem {
   mission_id?: string;
   status: string;
   updated_at: string;
+  /** Inbox entry kind (`customer_decision_handoff` …), when the writer set one. */
+  kind?: string;
+  tenant_slug?: string;
 }
 
 export interface CeoExceptionItem {
@@ -308,6 +311,8 @@ export function composeCeoSurfaceSummary(input: {
     mission_id: entry.mission_id,
     status: entry.status,
     updated_at: entry.updated_at,
+    ...(entry.kind ? { kind: entry.kind } : {}),
+    ...(entry.tenant_slug ? { tenant_slug: entry.tenant_slug } : {}),
   }));
   const exceptionFeed: CeoExceptionItem[] = input.notifications
     .filter((notification) =>
