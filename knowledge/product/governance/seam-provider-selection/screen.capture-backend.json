@@ -1,0 +1,64 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "screen.capture-backend",
+      "default_provider": "platform",
+      "fallback_purpose": "fidelity",
+      "traits": {
+        "fidelity": "Whether the capture is a real image of the requested screen or window (a placeholder scores 0).",
+        "coverage": "How many capture requests it can serve (focused window, multi-display index, every host platform).",
+        "zero_config": "Works with no extra host permission or tool beyond the platform layer."
+      },
+      "providers": {
+        "os-automation": {
+          "traits": { "fidelity": 1, "coverage": 0.3, "zero_config": 0.6 },
+          "trait_basis": {
+            "fidelity": "declared",
+            "coverage": "declared",
+            "zero_config": "declared"
+          },
+          "evidence": [
+            "libs/core/virtual/screen-capture-bridge.ts (os-automation backend: darwin only, priority 200, supports only an explicit display_index in screen mode; takeScreenshot via os-automation.ts)"
+          ]
+        },
+        "platform": {
+          "traits": { "fidelity": 1, "coverage": 0.8, "zero_config": 0.8 },
+          "trait_basis": {
+            "fidelity": "declared",
+            "coverage": "declared",
+            "zero_config": "declared"
+          },
+          "evidence": [
+            "libs/core/virtual/screen-capture-bridge.ts (platform backend: every platform, priority 100, screen + focused_window through libs/core/platform.ts OSDriver; probe = hasScreenCapture capability)"
+          ]
+        },
+        "stub": {
+          "traits": { "fidelity": 0, "coverage": 1, "zero_config": 1 },
+          "trait_basis": {
+            "fidelity": "declared",
+            "coverage": "declared",
+            "zero_config": "declared"
+          },
+          "evidence": [
+            "libs/core/virtual/screen-capture-bridge.ts (stub backend: priority -1000, writes a placeholder PNG; floor when no real backend probes available)"
+          ]
+        }
+      },
+      "purposes": {
+        "fidelity": {
+          "description": "Capture a real image of the screen; prefer backends that produce the actual pixels.",
+          "weights": { "fidelity": 0.8, "coverage": 0.2 }
+        },
+        "hermetic": {
+          "description": "Tests and offline runs that must not touch the host display.",
+          "weights": { "zero_config": 1 }
+        }
+      },
+      "default_chains": {
+        "default": ["os-automation", "platform", "stub"]
+      }
+    }
+  ]
+}

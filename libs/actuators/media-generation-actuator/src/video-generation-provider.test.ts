@@ -267,6 +267,30 @@ describe('purpose-driven video provider selection', () => {
     const square = { prompt: 'x', aspect_ratio: '1:1' };
     expect(await applyVideoProviderSelection(square)).toBe(square);
   });
+
+  it('applies an eligible saved seam default without a purpose; explicit and ineligible keep their path', async () => {
+    withKeys('OPENAI_API_KEY');
+    vi.stubEnv(
+      'KYBERION_SEAM_DEFAULTS',
+      'video-generation-provider=media-generation.openai.sora-2'
+    );
+    const saved = await applyVideoProviderSelection({ prompt: 'x' });
+    expect(saved.backend_id).toBe('media-generation.openai.sora-2');
+    expect(mocks.record.mock.calls.at(-1)?.[0]?.metadata).toEqual(
+      expect.objectContaining({ strategy: 'default', decision_key: 'default' })
+    );
+
+    const named = { prompt: 'x', backend_id: 'media-generation.runway.gen4.5' };
+    expect(await applyVideoProviderSelection(named)).toBe(named);
+
+    // Veo has no credential here, so the saved default is ineligible.
+    vi.stubEnv(
+      'KYBERION_SEAM_DEFAULTS',
+      'video-generation-provider=media-generation.google.veo-3.1'
+    );
+    const plain = { prompt: 'x' };
+    expect(await applyVideoProviderSelection(plain)).toBe(plain);
+  });
 });
 vi.mock('@agent/core/governance/external-operation', () => ({
   runExternalOperation: vi.fn(async (_input, execute) => execute()),

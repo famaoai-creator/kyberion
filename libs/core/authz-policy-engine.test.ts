@@ -501,12 +501,11 @@ describe('authz seam — saved seam default', () => {
     resource: { tenantSlug: 'default' },
   };
 
-  it('selects an eligible saved default when no purpose is given', () => {
+  it('ignores saved defaults: the policy opts out (allow_saved_default: false)', () => {
     vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'authz-policy-engine=deny-all');
     const resolution = authorizeWithPolicyEngine(query, { deps: { env: {} } });
-    expect(resolution.decision.provider_id).toBe('deny-all');
-    expect(resolution.decision.default_source).toBe('env');
-    expect(resolution.authorization.allowed).toBe(false);
+    expect(resolution.decision.provider_id).toBe('role-scope');
+    expect(resolution.decision.default_source).not.toBe('env');
   });
 
   it('lets a purpose and an explicit provider set win over the saved default', () => {

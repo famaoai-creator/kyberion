@@ -15,7 +15,7 @@ import {
   type SeamProviderMetadata,
 } from '../seam.js';
 import { resolveSeamDefaultProvider } from '../seam-provider-selection.js';
-import { resolveSavedSeamDefault } from '../seam-selection-defaults.js';
+import { savedSeamDefaultFor } from '../seam-provider-selection.js';
 
 export interface WebSearchHit {
   title: string;
@@ -123,7 +123,7 @@ export function resolveWebSearchRuntime(preference?: string): WebSearchRuntimeBr
   }
   // A saved seam default is a deliberate (audited) operator opt-in, so it may
   // name a service-backed provider; it only needs to be registered.
-  const saved = resolveSavedSeamDefault(webSearchRuntimeSeam.key);
+  const saved = savedSeamDefaultFor(webSearchRuntimeSeam.key);
   const savedBridge = saved && bridges.find((bridge) => bridge.bridge_id === saved.provider);
   if (savedBridge) return savedBridge;
   // Otherwise policy default → builtin, among offline-safe providers only.

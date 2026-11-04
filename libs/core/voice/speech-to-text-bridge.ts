@@ -54,7 +54,7 @@ import {
   resolveSeamProviderDecision,
   type SeamProviderDecision,
 } from '../seam-provider-selection.js';
-import { resolveSavedSeamDefault } from '../seam-selection-defaults.js';
+import { savedSeamDefaultFor } from '../seam-provider-selection.js';
 import { runExternalOperation } from '../governance/external-operation.js';
 import {
   primaryLanguageSubtag,
@@ -340,7 +340,7 @@ export function listSpeechToTextCandidates(
  */
 function envConfiguredDefault(bridges: SpeechToTextBridge[]): string | undefined {
   if (!envText(process.env, 'KYBERION_STT_COMMAND')?.trim()) return undefined;
-  if (!resolveSavedSeamDefault(SPEECH_TO_TEXT_SEAM)) return undefined;
+  if (!savedSeamDefaultFor(SPEECH_TO_TEXT_SEAM)) return undefined;
   return highestPriorityBridge(bridges)?.name;
 }
 
