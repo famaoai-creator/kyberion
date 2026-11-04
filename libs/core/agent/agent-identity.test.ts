@@ -799,3 +799,214 @@ describe('agent-identity — listing and best-effort helpers', () => {
     ).toThrow(/refusing to write the governed default journal under vitest/);
   });
 });
+
+// Historical binding metadata is deliberately separate from live authorization.
+describe('runtime binding history references', () => {
+  function fixture(slug = 'history-agent') {
+    const identity = issueTestIdentity(slug, { affiliation: { tenant_slug: 'fixture-a' } });
+    const input = {
+      nhiId: identity.nhi_id,
+      instanceId: 'runtime-fixture',
+      sessionId: 'synthetic-session-secret',
+      tenantSlug: 'fixture-a',
+    };
+    withExecutionContext('mission_controller', () => bindRuntimeInstance(input));
+    const journal = new AgentIdentityJournal({ journalPath: currentJournalPath });
+    const reference = journal.captureRuntimeBindingReference(input)!;
+    expect(reference).toBeDefined();
+    return { identity, input, journal, reference };
+  }
+
+  it('keeps historical identity/accountability after release, reassignment and retirement without secrets', () => {
+    const { identity, input, journal, reference } = fixture();
+    const original = journal.resolveRuntimeBindingReference(reference, 'fixture-a');
+    expect(original).toMatchObject({
+      assurance: 'metadata_only',
+      nhi_id: identity.nhi_id,
+      accountable_human_id: 'human:founder',
+      instance_id: input.instanceId,
+    });
+    expect(JSON.stringify({ reference, original })).not.toContain(input.sessionId);
+    expect(original).not.toHaveProperty('session_id');
+    withExecutionContext('mission_controller', () => {
+      releaseRuntimeInstance(identity.nhi_id, input.instanceId);
+      reassignAgentIdentityAccountability({
+        nhiId: identity.nhi_id,
+        expectedAccountableHumanId: 'human:founder',
+        accountableHumanId: 'human:next',
+        reason: 'fixture',
+      });
+      retireAgentIdentity(identity.nhi_id, 'fixture');
+    });
+    expect(journal.captureRuntimeBindingReference(input)).toBeUndefined();
+    expect(
+      new AgentIdentityJournal({ journalPath: currentJournalPath }).resolveRuntimeBindingReference(
+        reference,
+        'fixture-a'
+      )
+    ).toEqual(original);
+  });
+
+  it('distinguishes rebindings and distinct NHIs sharing an accountable human', () => {
+    const first = fixture();
+    const original = first.journal.resolveRuntimeBindingReference(first.reference, 'fixture-a');
+    const replacement = { ...first.input, sessionId: 'new-synthetic-secret' };
+    withExecutionContext('mission_controller', () => bindRuntimeInstance(replacement));
+    const next = first.journal.captureRuntimeBindingReference(replacement)!;
+    expect(next.journal_seq).toBeGreaterThan(first.reference.journal_seq);
+    expect(next.sha256).not.toBe(first.reference.sha256);
+    expect(first.journal.captureRuntimeBindingReference(first.input)).toBeUndefined();
+    expect(first.journal.resolveRuntimeBindingReference(first.reference, 'fixture-a')).toEqual(
+      original
+    );
+    const second = fixture('another-history-agent');
+    expect(second.reference.nhi_id).not.toBe(first.reference.nhi_id);
+    expect(
+      second.journal.resolveRuntimeBindingReference(second.reference, 'fixture-a')
+        ?.accountable_human_id
+    ).toBe(original?.accountable_human_id);
+  });
+
+  it('rejects foreign scope, NHI, sequence, malformed reference and fingerprint mismatch', () => {
+    const { journal, reference, input } = fixture();
+    expect(journal.resolveRuntimeBindingReference(reference, 'fixture-b')).toBeUndefined();
+    for (const changes of [
+      { nhi_id: 'kyberion://agent/demo-org/foreign' },
+      { journal_seq: 0 },
+      { journal_seq: -1 },
+      { journal_seq: 1.5 },
+      { journal_seq: Number.MAX_SAFE_INTEGER + 1 },
+      { sha256: '0'.repeat(64) },
+      { version: 2 },
+      { extra: true },
+    ])
+      expect(
+        journal.resolveRuntimeBindingReference(
+          { ...reference, ...changes } as typeof reference,
+          'fixture-a'
+        )
+      ).toBeUndefined();
+    expect(
+      journal.captureRuntimeBindingReference({ ...input, sessionId: 'wrong' })
+    ).toBeUndefined();
+    expect(
+      journal.captureRuntimeBindingReference({ ...input, tenantSlug: 'fixture-b' })
+    ).toBeUndefined();
+  });
+
+  it.each([
+    'malformed',
+    'unknown-op',
+    'invalid-payload',
+    'duplicate',
+    'gap',
+    'version',
+    'unsafe-seq',
+  ])('refuses %s history without changing tolerant restore or leaking input', (defect) => {
+    const { journal, reference, identity } = fixture();
+    const next = reference.journal_seq + 1;
+    const event = {
+      v: defect === 'version' ? 2 : 1,
+      seq:
+        defect === 'duplicate'
+          ? reference.journal_seq
+          : defect === 'gap'
+            ? next + 1
+            : defect === 'unsafe-seq'
+              ? Number.MAX_SAFE_INTEGER + 1
+              : next,
+      ts: '2026-11-04T00:00:00.000Z',
+      op: defect === 'unknown-op' ? 'unknown' : AGENT_IDENTITY_OPS.identityActivated,
+      payload:
+        defect === 'invalid-payload'
+          ? { session_id: 'must-not-leak' }
+          : { nhi_id: identity.nhi_id, activated_at: '2026-11-04T00:00:00.000Z' },
+    };
+    safeAppendFileSync(
+      pathResolver.rootResolve(currentJournalPath),
+      defect === 'malformed' ? '{"session_id":"must-not-leak"\n' : `${JSON.stringify(event)}\n`
+    );
+    expect(() => journal.resolveRuntimeBindingReference(reference, 'fixture-a')).toThrow(
+      '[RUNTIME_BINDING_HISTORY] journal history unavailable'
+    );
+    expect(() => journal.restore()).not.toThrow();
+  });
+
+  it('does not project a no-op bind on a suspended identity into historical metadata', () => {
+    const { journal, input, reference } = fixture();
+    withExecutionContext('mission_controller', () => suspendAgentIdentity(input.nhiId, 'fixture'));
+    const ignored = journal.append(AGENT_IDENTITY_OPS.instanceBound, {
+      nhi_id: input.nhiId,
+      instance_id: input.instanceId,
+      tenant_slug: input.tenantSlug,
+      bound_at: '2026-11-04T00:00:00.000Z',
+      session_id: input.sessionId,
+    });
+    expect(journal.captureRuntimeBindingReference(input)).toBeUndefined();
+    expect(
+      journal.resolveRuntimeBindingReference(
+        { ...reference, journal_seq: ignored.seq },
+        'fixture-a'
+      )
+    ).toBeUndefined();
+  });
+});
+
+it('keeps the original effective reference across a redundant same-content bind', () => {
+  const identity = issueTestIdentity('redundant-binding', {
+    affiliation: { tenant_slug: 'fixture-a' },
+  });
+  const input = {
+    nhiId: identity.nhi_id,
+    instanceId: 'runtime-fixture',
+    sessionId: 'synthetic-secret',
+    tenantSlug: 'fixture-a',
+  };
+  const record = withExecutionContext('mission_controller', () => bindRuntimeInstance(input));
+  const journal = new AgentIdentityJournal({ journalPath: currentJournalPath });
+  const reference = journal.captureRuntimeBindingReference(input)!;
+  withExecutionContext('mission_controller', () =>
+    reassignAgentIdentityAccountability({
+      nhiId: identity.nhi_id,
+      expectedAccountableHumanId: 'human:founder',
+      accountableHumanId: 'human:next',
+      reason: 'fixture',
+    })
+  );
+  const duplicate = journal.append(AGENT_IDENTITY_OPS.instanceBound, {
+    nhi_id: input.nhiId,
+    ...record.runtime_instances![0],
+  });
+  expect(journal.captureRuntimeBindingReference(input)).toEqual(reference);
+  expect(journal.resolveRuntimeBindingReference(reference, 'fixture-a')?.accountable_human_id).toBe(
+    'human:founder'
+  );
+  expect(
+    journal.resolveRuntimeBindingReference(
+      { ...reference, journal_seq: duplicate.seq },
+      'fixture-a'
+    )
+  ).toBeUndefined();
+});
+
+it('does not fall back to an old reference when a newer effective binding has invalid metadata', () => {
+  const identity = issueTestIdentity('invalid-current-history', {
+    affiliation: { tenant_slug: 'fixture-a' },
+  });
+  const input = {
+    nhiId: identity.nhi_id,
+    instanceId: 'runtime-fixture',
+    sessionId: 'synthetic-secret',
+    tenantSlug: 'fixture-a',
+  };
+  const record = withExecutionContext('mission_controller', () => bindRuntimeInstance(input));
+  const journal = new AgentIdentityJournal({ journalPath: currentJournalPath });
+  const reference = journal.captureRuntimeBindingReference(input)!;
+  journal.append(AGENT_IDENTITY_OPS.instanceBound, {
+    nhi_id: input.nhiId,
+    ...record.runtime_instances![0],
+    expires_at: 'invalid-date',
+  });
+  expect(journal.captureRuntimeBindingReference(input)).toBeUndefined();
+  expect(journal.resolveRuntimeBindingReference(reference, 'fixture-a')).toBeDefined();
+});
