@@ -11,15 +11,23 @@
  * - A verdict is read from the backend's RETURNED ANSWER, never from the
  *   prompt text: every prompt of the form "Reply with exactly: M1-x" contains
  *   the word being checked for, so a check that sees the prompt passes always.
+ *   The word must be the answer (or sit in a short one); an answer that
+ *   repeats the prompt is an echo and fails.
  * - A follow-up answer that still carries the first turn's word is a replayed
  *   transcript (stale/echo), not a fresh answer, and fails.
- * - `unreported` means the outcome could not be determined (empty answer,
- *   unreadable workspace, a delegation that settled before it could be
- *   cancelled). It is never counted as a pass.
+ * - `fail` is only a judged wrong answer or observed misbehaviour. A thrown
+ *   error or timeout (rate limit, auth, network) is `unreported`: it says
+ *   nothing about the capability, and must not become a standing contradiction.
+ * - `unreported` means the outcome could not be determined (error, empty
+ *   answer, unreadable workspace, a delegation that settled before it could be
+ *   aborted, a turn another mode served). It is never counted as a pass.
  * - When `first` does not pass, nothing after it measured anything, so the
- *   remaining scenarios are `not_run` rather than failures.
- * - A failing scenario is retried once; the first attempt's outcome is kept in
- *   `first_try`, so a flaky pass stays visible.
+ *   remaining scenarios are `not_run` rather than failures; reset_continue is
+ *   also `not_run` unless follow_up showed continuity to lose.
+ * - A failing or unreported scenario is retried once; the first attempt's
+ *   outcome is kept in `first_try`, so a flaky pass stays visible.
+ * - abort is judged on the provider's own promise after the AbortSignal, not
+ *   on the delegation handle's state (see scenarioAbort).
  * - `served_model` is what the caller can prove the provider served; absent
  *   that evidence it is `'unreported'`, never the requested model.
  *
@@ -66,6 +74,8 @@ export interface LiveScenarioResult {
   /** Tail of the backend's own answer (never the prompt), for audit. */
   answer_excerpt?: string;
   duration_ms: number;
+  /** Serving modes sampled during the final attempt, when the caller supplies servedMode. */
+  served_modes?: string[];
   /** reset_continue only: what the backend remembered after resetSession(). */
   continuity_after_reset?: 'lost' | 'retained' | 'unreported';
 }
@@ -80,7 +90,11 @@ export interface BackendLiveScenarioRecord {
   model_requested?: string;
   /** Model the provider proved it served; `'unreported'` when unproven. */
   served_model: string;
-  /** Mode the reasoning chain says served the calls (a failover is a substitution). */
+  /**
+   * Last mode the reasoning chain reported serving. Per-scenario samples live
+   * in `served_modes`; a scenario any turn of which another mode served is
+   * scored `unreported`.
+   */
   served_mode?: string;
   started_at: string;
   finished_at: string;
@@ -101,7 +115,7 @@ export interface RunBackendLiveScenariosOptions {
   now?: () => string;
   /** Per-turn ceiling for prompt/delegate calls. */
   turnTimeoutMs?: number;
-  /** How long a cancelled delegation may take to reach a terminal state. */
+  /** Grace window for an aborted delegation to stop after the abort signal. */
   abortTimeoutMs?: number;
   /** Delay between starting the long delegation and cancelling it. */
   abortStartDelayMs?: number;
@@ -109,7 +123,7 @@ export interface RunBackendLiveScenariosOptions {
   retries?: number;
   /** Evidence of the served model, when the caller has any. */
   servedModel?: () => string | undefined;
-  /** Evidence of the served mode (e.g. the reasoning chain's last-served marker). */
+  /** Evidence of the served mode (e.g. the chain's last-served marker), sampled after every call. */
   servedMode?: () => string | undefined;
   /** Test seam: scratch workspace for the artifact scenario. */
   createWorkspace?: () => LiveScenarioWorkspace;
@@ -156,31 +170,80 @@ interface ScenarioContext {
   options: RunBackendLiveScenariosOptions;
   words: { m1: string; m2: string; m3: string };
   turn: (prompt: string) => Promise<string>;
+  /** Serving modes sampled during the current attempt (see servedMode). */
+  servedModes: Set<string>;
+  sampleServedMode: () => void;
 }
 
-/** Ask one turn; a non-string or blank answer is something we cannot judge. */
+const RECALL_PROMPT =
+  'What exact word did I ask you to reply with in my very first message of this conversation? Reply with just that word.';
+
+/** How much text besides the word an answer may carry and still count as "the word". */
+const WORD_ANSWER_SLACK_CHARS = 40;
+
+/**
+ * Prompt-echo markers. An answer that repeats the instruction has not been
+ * shown to comply — it copied the prompt, which already contains the word.
+ */
+const PROMPT_ECHO_PATTERN = /reply with (?:exactly|just)|first message of this conversation/iu;
+
+export type WordJudgement = 'word' | 'echo' | 'absent';
+
+/**
+ * Judge an answer against the requested word, from the answer alone. The word
+ * must BE the answer (after trimming quotes/punctuation) or sit in a short
+ * answer; an answer that repeats the prompt is an echo, never a pass.
+ */
+export function judgeWordAnswer(answer: string, word: string): WordJudgement {
+  if (PROMPT_ECHO_PATTERN.test(answer)) return 'echo';
+  const stripped = answer.trim().replace(/^[\s"'`*.:]+|[\s"'`*.:!]+$/gu, '');
+  if (stripped === word) return 'word';
+  if (answer.includes(word) && answer.trim().length <= word.length + WORD_ANSWER_SLACK_CHARS) {
+    return 'word';
+  }
+  return 'absent';
+}
+
+/**
+ * Ask one turn. A thrown error or timeout (rate limit, auth, network) says
+ * nothing about the capability, so it is `unreported`, never `fail`; a blank
+ * answer is likewise something we cannot judge.
+ */
 async function askForWord(
   ctx: ScenarioContext,
   prompt: string
 ): Promise<{ answer: string } | Attempt> {
+  let answer: string;
   try {
-    const answer = await ctx.turn(prompt);
-    if (typeof answer !== 'string' || answer.trim() === '') {
-      return { outcome: 'unreported', detail: 'the backend returned an empty answer' };
-    }
-    return { answer };
+    answer = await ctx.turn(prompt);
   } catch (error) {
-    return { outcome: 'fail', detail: `the turn failed: ${errorText(error)}` };
+    return { outcome: 'unreported', detail: `the turn errored, not judged: ${errorText(error)}` };
+  } finally {
+    ctx.sampleServedMode();
   }
+  if (typeof answer !== 'string' || answer.trim() === '') {
+    return { outcome: 'unreported', detail: 'the backend returned an empty answer' };
+  }
+  return { answer };
+}
+
+function echoAttempt(answer: string): Attempt {
+  return {
+    outcome: 'fail',
+    detail: 'the answer repeats the prompt instead of answering it',
+    answer_excerpt: excerpt(answer),
+  };
 }
 
 async function scenarioFirst(ctx: ScenarioContext): Promise<Attempt> {
-  const reply = await askForWord(ctx, `Reply with exactly: ${ctx.words.m1}`);
+  const { m1 } = ctx.words;
+  const reply = await askForWord(ctx, `Reply with exactly: ${m1}`);
   if (!('answer' in reply)) return reply;
-  const ok = reply.answer.includes(ctx.words.m1);
+  const judged = judgeWordAnswer(reply.answer, m1);
+  if (judged === 'echo') return echoAttempt(reply.answer);
   return {
-    outcome: ok ? 'pass' : 'fail',
-    detail: ok ? `answered ${ctx.words.m1}` : `answered without ${ctx.words.m1}`,
+    outcome: judged === 'word' ? 'pass' : 'fail',
+    detail: judged === 'word' ? `answered ${m1}` : `answered without ${m1}`,
     answer_excerpt: excerpt(reply.answer),
   };
 }
@@ -196,19 +259,20 @@ async function scenarioFollowUp(ctx: ScenarioContext): Promise<Attempt> {
       answer_excerpt: excerpt(reply.answer),
     };
   }
-  if (!reply.answer.includes(m2)) {
+  const judged = judgeWordAnswer(reply.answer, m2);
+  if (judged === 'echo') return echoAttempt(reply.answer);
+  if (judged !== 'word') {
     return {
       outcome: 'fail',
       detail: `the follow-up answered without ${m2}`,
       answer_excerpt: excerpt(reply.answer),
     };
   }
-  const recall = await askForWord(
-    ctx,
-    'What exact word did I ask you to reply with in my very first message of this conversation? Reply with just that word.'
-  );
+  const recall = await askForWord(ctx, RECALL_PROMPT);
   if (!('answer' in recall)) return recall;
-  const ok = recall.answer.includes(m1);
+  const recalled = judgeWordAnswer(recall.answer, m1);
+  if (recalled === 'echo') return echoAttempt(recall.answer);
+  const ok = recalled === 'word';
   return {
     outcome: ok ? 'pass' : 'fail',
     detail: ok
@@ -225,12 +289,20 @@ async function scenarioResetContinue(ctx: ScenarioContext): Promise<Attempt> {
   try {
     await ctx.backend.resetSession();
   } catch (error) {
-    return { outcome: 'fail', detail: `resetSession() threw: ${errorText(error)}` };
+    return {
+      outcome: 'unreported',
+      detail: `resetSession() errored, not judged: ${errorText(error)}`,
+      continuity_after_reset: 'unreported',
+    };
   }
   const { m1, m3 } = ctx.words;
   const fresh = await askForWord(ctx, `Reply with exactly: ${m3}`);
   if (!('answer' in fresh)) return { ...fresh, continuity_after_reset: 'unreported' };
-  if (!fresh.answer.includes(m3)) {
+  const freshJudged = judgeWordAnswer(fresh.answer, m3);
+  if (freshJudged === 'echo') {
+    return { ...echoAttempt(fresh.answer), continuity_after_reset: 'unreported' };
+  }
+  if (freshJudged !== 'word') {
     return {
       outcome: 'fail',
       detail: `after resetSession() the backend answered without ${m3}: it cannot continue`,
@@ -238,11 +310,17 @@ async function scenarioResetContinue(ctx: ScenarioContext): Promise<Attempt> {
       continuity_after_reset: 'unreported',
     };
   }
-  const recall = await askForWord(
-    ctx,
-    'What exact word did I ask you to reply with in my very first message of this conversation? Reply with just that word.'
-  );
+  const recall = await askForWord(ctx, RECALL_PROMPT);
   if (!('answer' in recall)) return { ...recall, continuity_after_reset: 'unreported' };
+  if (PROMPT_ECHO_PATTERN.test(recall.answer)) {
+    // An echo proves nothing about what the session still holds.
+    return {
+      outcome: 'unreported',
+      detail: 'the post-reset recall answer repeats the prompt, so retention cannot be judged',
+      answer_excerpt: excerpt(recall.answer),
+      continuity_after_reset: 'unreported',
+    };
+  }
   const retained = recall.answer.includes(m1);
   return {
     outcome: retained ? 'fail' : 'pass',
@@ -254,51 +332,95 @@ async function scenarioResetContinue(ctx: ScenarioContext): Promise<Attempt> {
   };
 }
 
+function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof Error && error.name === 'AbortError') ||
+    /abort|cancel/iu.test(errorText(error))
+  );
+}
+
+type AbortSettlement = { kind: 'resolved' } | { kind: 'rejected'; error: unknown };
+
+/**
+ * Abort is measured below the handle. Every `delegateTaskHandle` in the repo
+ * is `createDelegationHandle`, whose `cancel()` marks the record cancelled and
+ * makes `join()` refuse the result whether or not the provider stopped — the
+ * handle's terminal state is true by construction and proves nothing. What
+ * decides whether work stops is whether the provider honours the AbortSignal
+ * the handle forwards to `delegateTask`, so this drives that same call with
+ * its own signal and watches the provider's own promise:
+ * - rejects with an abort error within the grace window → pass;
+ * - still running after the grace window → fail (the signal was ignored);
+ * - settled before the abort, resolved after it, or rejected for another
+ *   reason → unreported (abort was not shown either way).
+ * A provider-side kill callback (`createDelegationHandle`'s `cancel` input)
+ * is not observable through the handle; no provider supplies one today.
+ * `delegateTaskHandle` presence still gates the scenario: without it the
+ * backend offers callers no cancel surface at all.
+ */
 async function scenarioAbort(ctx: ScenarioContext): Promise<Attempt> {
   if (typeof ctx.backend.delegateTaskHandle !== 'function') {
     return { outcome: 'not_run', detail: 'the backend exposes no delegateTaskHandle()' };
   }
-  const abortTimeoutMs = ctx.options.abortTimeoutMs ?? DEFAULT_ABORT_TIMEOUT_MS;
-  let handle;
+  const graceMs = ctx.options.abortTimeoutMs ?? DEFAULT_ABORT_TIMEOUT_MS;
+  const controller = new AbortController();
+  let settlement: AbortSettlement | undefined;
+  let observed: Promise<void>;
   try {
-    handle = ctx.backend.delegateTaskHandle(
-      'Count slowly from 1 to 10000, one number per line, explaining each number in a full paragraph. Do not stop early.',
-      undefined,
-      { ...(ctx.options.model ? { model: ctx.options.model } : {}) }
-    );
+    observed = ctx.backend
+      .delegateTask(
+        'Count slowly from 1 to 10000, one number per line, explaining each number in a full paragraph. Do not stop early.',
+        undefined,
+        { signal: controller.signal, ...(ctx.options.model ? { model: ctx.options.model } : {}) }
+      )
+      .then(
+        () => {
+          settlement = { kind: 'resolved' };
+        },
+        (error: unknown) => {
+          settlement = { kind: 'rejected', error };
+        }
+      );
   } catch (error) {
-    return { outcome: 'fail', detail: `delegateTaskHandle() threw: ${errorText(error)}` };
-  }
-  // Settle the join promise up front so a late provider rejection is observed.
-  const joined = handle.join().then(
-    () => 'resolved' as const,
-    () => 'rejected' as const
-  );
-  await delay(ctx.options.abortStartDelayMs ?? DEFAULT_ABORT_START_DELAY_MS);
-  if (handle.status().status !== 'started') {
     return {
       outcome: 'unreported',
-      detail: `the delegation settled (${handle.status().status}) before it could be cancelled, so abort was not exercised`,
+      detail: `delegateTask() errored, not judged: ${errorText(error)}`,
     };
   }
-  try {
-    await withTimeout(handle.cancel('backend live scenario: abort'), abortTimeoutMs, 'cancel()');
-  } catch (error) {
-    return { outcome: 'fail', detail: `cancel() did not settle: ${errorText(error)}` };
+  await delay(ctx.options.abortStartDelayMs ?? DEFAULT_ABORT_START_DELAY_MS);
+  ctx.sampleServedMode();
+  const before = settlement as AbortSettlement | undefined;
+  if (before) {
+    return {
+      outcome: 'unreported',
+      detail: `the delegation ${before.kind} before it could be aborted, so abort was not exercised`,
+    };
   }
-  const status = handle.status().status;
-  let joinOutcome: 'resolved' | 'rejected' | 'pending';
+  controller.abort('backend live scenario: abort');
   try {
-    joinOutcome = await withTimeout(joined, abortTimeoutMs, 'join()');
+    await withTimeout(observed, graceMs, 'aborted delegation');
   } catch {
-    joinOutcome = 'pending';
+    // Still pending after the grace window.
   }
-  const ok = status === 'cancelled' && joinOutcome === 'rejected';
+  const after = settlement as AbortSettlement | undefined;
+  if (!after) {
+    return {
+      outcome: 'fail',
+      detail: `the provider was still running ${graceMs}ms after the abort signal: it ignored the signal`,
+    };
+  }
+  if (after.kind === 'rejected' && isAbortError(after.error)) {
+    return {
+      outcome: 'pass',
+      detail: 'the provider stopped and rejected with an abort error within the grace window',
+    };
+  }
   return {
-    outcome: ok ? 'pass' : 'fail',
-    detail: ok
-      ? `cancel() reached the cancelled terminal state and join() refused the result`
-      : `after cancel() status=${status}, join() ${joinOutcome}`,
+    outcome: 'unreported',
+    detail:
+      after.kind === 'resolved'
+        ? 'the delegation completed after the abort signal; whether it stopped cannot be shown'
+        : `the delegation failed after the abort signal for another reason: ${errorText(after.error)}`,
   };
 }
 
@@ -333,6 +455,7 @@ async function scenarioArtifact(ctx: ScenarioContext): Promise<Attempt> {
   const fileName = `artifact-${ctx.words.m1}.txt`;
   const expected = `HELLO-${ctx.words.m1}`;
   const target = path.join(workspace.path, fileName);
+  const controller = new AbortController();
   try {
     let answer: string;
     try {
@@ -342,6 +465,7 @@ async function scenarioArtifact(ctx: ScenarioContext): Promise<Attempt> {
           `Scratch workspace: ${workspace.path}`,
           {
             permission_mode: 'edit',
+            signal: controller.signal,
             ...(ctx.options.model ? { model: ctx.options.model } : {}),
           }
         ),
@@ -349,7 +473,12 @@ async function scenarioArtifact(ctx: ScenarioContext): Promise<Attempt> {
         'artifact delegation'
       );
     } catch (error) {
-      return { outcome: 'fail', detail: `the artifact delegation failed: ${errorText(error)}` };
+      return {
+        outcome: 'unreported',
+        detail: `the artifact delegation errored, not judged: ${errorText(error)}`,
+      };
+    } finally {
+      ctx.sampleServedMode();
     }
     let content: string | undefined;
     try {
@@ -370,6 +499,8 @@ async function scenarioArtifact(ctx: ScenarioContext): Promise<Attempt> {
       ...answerExcerpt,
     };
   } finally {
+    // Stop a still-running delegation before its workspace disappears.
+    controller.abort('backend live scenario: artifact finished');
     workspace.release();
   }
 }
@@ -394,24 +525,43 @@ const EXECUTION_ORDER: readonly LiveScenarioName[] = [
   'reset_continue',
 ];
 
+async function runAttempt(name: LiveScenarioName, ctx: ScenarioContext): Promise<Attempt> {
+  ctx.servedModes.clear();
+  const attempt = await SCENARIOS[name](ctx).catch((error): Attempt => ({
+    outcome: 'unreported',
+    detail: `scenario errored, not judged: ${errorText(error)}`,
+  }));
+  const sampled = [...ctx.servedModes];
+  const foreign = sampled.filter((mode) => mode !== ctx.options.mode);
+  if (foreign.length > 0 && (attempt.outcome === 'pass' || attempt.outcome === 'fail')) {
+    // A turn served by another mode (failover) measures that mode, not this one.
+    return {
+      ...attempt,
+      outcome: 'unreported',
+      detail: `served by ${foreign.join(', ')} instead of ${ctx.options.mode}; ${attempt.detail}`,
+      served_modes: sampled,
+    };
+  }
+  return sampled.length > 0 ? { ...attempt, served_modes: sampled } : attempt;
+}
+
+/** A judged failure or an undetermined outcome earns one more attempt. */
+function retryable(outcome: LiveScenarioOutcome): boolean {
+  return outcome === 'fail' || outcome === 'unreported';
+}
+
 async function runScenario(
   name: LiveScenarioName,
   ctx: ScenarioContext,
   retries: number
 ): Promise<LiveScenarioResult> {
   const started = Date.now();
-  let attempt = await SCENARIOS[name](ctx).catch((error): Attempt => ({
-    outcome: 'fail',
-    detail: `scenario threw: ${errorText(error)}`,
-  }));
+  let attempt = await runAttempt(name, ctx);
   let attempts = 1;
   let firstTry: LiveScenarioOutcome | undefined;
-  while (attempt.outcome === 'fail' && attempts <= retries) {
+  while (retryable(attempt.outcome) && attempts <= retries) {
     firstTry ??= attempt.outcome;
-    attempt = await SCENARIOS[name](ctx).catch((error): Attempt => ({
-      outcome: 'fail',
-      detail: `scenario threw: ${errorText(error)}`,
-    }));
+    attempt = await runAttempt(name, ctx);
     attempts += 1;
   }
   return {
@@ -433,19 +583,42 @@ export async function runBackendLiveScenarios(
   const nonce = options.nonce ?? randomBytes(4).toString('hex');
   const turnTimeoutMs = options.turnTimeoutMs ?? DEFAULT_TURN_TIMEOUT_MS;
   const retries = Math.max(0, options.retries ?? 1);
+  let lastServedMode: string | undefined;
+  const servedModes = new Set<string>();
   const ctx: ScenarioContext = {
     backend,
     options,
     words: { m1: `M1-${nonce}`, m2: `M2-${nonce}`, m3: `M3-${nonce}` },
-    turn: (prompt) =>
-      withTimeout(
-        backend.prompt(prompt, {
-          context_mode: 'continue',
-          ...(options.model ? { model: options.model } : {}),
-        }),
-        turnTimeoutMs,
-        'turn'
-      ),
+    servedModes,
+    sampleServedMode: () => {
+      let sampled: string | undefined;
+      try {
+        sampled = options.servedMode?.()?.trim() || undefined;
+      } catch {
+        // Evidence accessors are best effort; absence is simply no sample.
+      }
+      if (sampled) {
+        servedModes.add(sampled);
+        lastServedMode = sampled;
+      }
+    },
+    turn: async (prompt) => {
+      const controller = new AbortController();
+      try {
+        return await withTimeout(
+          backend.prompt(prompt, {
+            context_mode: 'continue',
+            signal: controller.signal,
+            ...(options.model ? { model: options.model } : {}),
+          }),
+          turnTimeoutMs,
+          'turn'
+        );
+      } finally {
+        // A timed-out turn must not keep running behind the next one.
+        controller.abort('backend live scenario: turn settled');
+      }
+    },
   };
 
   const results = new Map<LiveScenarioName, LiveScenarioResult>();
@@ -461,17 +634,28 @@ export async function runBackendLiveScenarios(
       });
       continue;
     }
+    const followUp = results.get('follow_up');
+    if (name === 'reset_continue' && followUp && followUp.outcome !== 'pass') {
+      // "Continuity lost after reset" means nothing unless continuity held before it.
+      results.set(name, {
+        scenario: name,
+        outcome: 'not_run',
+        attempts: 0,
+        detail: `follow_up did not pass (${followUp.outcome}), so a reset has no continuity to drop`,
+        duration_ms: 0,
+      });
+      continue;
+    }
     results.set(name, await runScenario(name, ctx, retries));
   }
 
   let servedModel: string | undefined;
-  let servedMode: string | undefined;
   try {
     servedModel = options.servedModel?.()?.trim() || undefined;
-    servedMode = options.servedMode?.()?.trim() || undefined;
   } catch {
     // Evidence accessors are best effort; their absence is 'unreported'.
   }
+  const servedMode = lastServedMode;
 
   return {
     version: '1.0.0',
