@@ -48,6 +48,13 @@ const gitRunner: GitRunner = (args) =>
     timeoutMs: 60_000,
   });
 
+/**
+ * The GitHub-hosted runner's locale (C.UTF-8) and CI mode (checklist locale row). Without it the
+ * operator's identity language leaks into the run (e.g. `ja`), and tests that
+ * assert the default English vocabulary fail locally while passing in CI.
+ */
+export const AFFECTED_TESTS_ENV = { LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8', CI: 'true' } as const;
+
 export interface AffectedTestsDeps {
   git?: GitRunner;
   /** Runs `pnpm <args>` and throws on failure. */
@@ -68,7 +75,11 @@ export function runAffectedTests(
   const run =
     deps.run ??
     ((args: string[]) => {
-      safeExec('pnpm', args, { cwd: pathResolver.rootDir(), timeoutMs: 1_800_000 });
+      safeExec('pnpm', args, {
+        cwd: pathResolver.rootDir(),
+        timeoutMs: 1_800_000,
+        env: AFFECTED_TESTS_ENV,
+      });
     });
   const changed = collectChangedFiles(base, git);
   const plan = planAffectedTests(changed, git);
