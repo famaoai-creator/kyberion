@@ -30,7 +30,8 @@ import {
   readVcsDevelopmentRepository,
 } from '../vcs/development-proof.js';
 import { gitRun, gitFetch } from '../vcs/git.js';
-import { ghPrList } from '../vcs/github.js';
+import type { PrListEntry } from '../vcs/github.js';
+import { vcsHostPrList } from '../vcs/vcs-host-verbs.js';
 import { runVcsMutationWithWorktreeGovernance } from '../vcs/governance-host.js';
 import { vcsHostInvocationId, type VcsHostMutation } from '../vcs/publication-host.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
@@ -99,7 +100,12 @@ export interface MissionDevelopmentDeps {
   board?: typeof writeMissionNextTasks;
   artifact?: typeof writeDispatchArtifact;
   dispatch?: (state: MissionState, options: MissionWorkItemDispatchOptions) => Promise<unknown>;
-  prs?: typeof ghPrList;
+  prs?: (params: {
+    cwd: string;
+    state: 'open';
+    head: string;
+    limit: number;
+  }) => PrListEntry[] | Promise<PrListEntry[]>;
   pr?: typeof readVcsDevelopmentPr;
   ci?: typeof readVcsDevelopmentCiProof;
   repository?: typeof readVcsDevelopmentRepository;
@@ -428,7 +434,7 @@ export async function advanceMissionDevelopment(
           throw new Error('Development repository differs from the reviewed plan');
         const refs = progress.pr_number
           ? []
-          : (deps.prs ?? ghPrList)({ cwd, state: 'open', head: branch, limit: 100 });
+          : await (deps.prs ?? vcsHostPrList)({ cwd, state: 'open', head: branch, limit: 100 });
         if (refs.length > 1) throw new Error('Ambiguous development PR');
         if (!progress.pr_number && refs[0]) {
           if (refs[0].headRefOid !== head)
