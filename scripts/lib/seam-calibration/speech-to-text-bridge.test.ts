@@ -91,6 +91,9 @@ describe('speech-to-text-bridge calibration adapter', () => {
     expect(candidates).toEqual([
       { id: 'mlx_whisper', eligible: true, unmet: [] },
       { id: 'shell', eligible: false, unmet: ['language (ja)'] },
+      // The stub is always a live selection candidate — excluded by default
+      // because synthetic output requires explicit opt-in.
+      { id: 'stub', eligible: false, unmet: ['synthetic output not allowed'] },
     ]);
   });
 
