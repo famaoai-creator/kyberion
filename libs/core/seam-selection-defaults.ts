@@ -37,17 +37,16 @@ import { withLockSync } from './foundation/lock-utils.js';
 import { isValidTenantSlug } from './foundation/scope.js';
 import { nowIso } from './foundation/time.js';
 import type { ScopeContext } from './foundation/scope-context-validation.js';
-import { PARTITIONED_RUNTIME_STATE_ROOTS } from './foundation/runtime-state-roots.js';
+import {
+  PARTITIONED_RUNTIME_STATE_ROOTS,
+  RUNTIME_STATE_PATHS,
+} from './foundation/runtime-state-roots.js';
+import { writeJson } from './foundation/json.js';
+import { readConfiguredActorIdentity } from './identity-context-bridge.js';
 import { pathResolver } from './path-resolver.js';
 import { currentScope } from './scope-context.js';
 import { storagePartitionSegments } from './storage-layout.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeMkdir,
-  safeWriteFile,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 
 export type SeamDefaultLayer = 'env' | 'project' | 'organization' | 'tenant' | 'operator';
 
@@ -104,7 +103,7 @@ const ENV_NAME = 'KYBERION_SEAM_DEFAULTS';
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 const SEAM_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const SCOPED_ROOT = PARTITIONED_RUNTIME_STATE_ROOTS.seam_selection_defaults;
-const OPERATOR_RELATIVE = 'active/shared/runtime/seam-selection/defaults.json';
+const OPERATOR_RELATIVE = RUNTIME_STATE_PATHS['seamSelection.operatorDefaults'];
 
 const catalogs = new Map<string, ReturnType<typeof defineCatalog<SeamDefaultsFile>>>();
 function catalogAt(filePath: string) {
@@ -297,9 +296,8 @@ export function resolveSavedSeamDefault(
 }
 
 function actor(): string {
-  return (
-    getRegisteredEnvText('KYBERION_PERSONA') || getRegisteredEnvText('MISSION_ROLE') || 'operator'
-  );
+  const { persona, role } = readConfiguredActorIdentity();
+  return persona || role || 'operator';
 }
 
 function targetPath(target: SeamDefaultTarget): string {
@@ -356,7 +354,7 @@ function updateLayer(
     catalogAt(filePath).validate(out, filePath);
     const dir = path.dirname(filePath);
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    safeWriteFile(filePath, `${JSON.stringify(out, null, 2)}\n`, { encoding: 'utf8' });
+    writeJson(filePath, out);
     return { path: filePath, changed: true };
   });
 }
