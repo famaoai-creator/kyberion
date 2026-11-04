@@ -4,6 +4,15 @@
   "description": "Canonical registry of KYBERION_* environment variables (OP-05). Regenerate with pnpm generate:env-registry; curated fields are preserved.",
   "entries": [
     {
+      "name": "KYBERION_1PASSWORD_VAULT",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "Opts the read-only onepassword secret provider in; values resolve as op://<vault>/<service>/<account> through the signed-in op CLI.",
+      "documented": true,
+      "subsystem": "secrets"
+    },
+    {
       "name": "KYBERION_A2A_SECRET",
       "category": "secret",
       "type": "string",
@@ -584,6 +593,15 @@
       "required": false,
       "description": "Set to 1 so scheduled gate callers (daemon watchdog restart, auto-checkpoint) route an operator-bound autonomous-ops verdict through the HITL decision loop (routeAutonomousDecision): one decision card per daemon/job, reused while pending. Unset keeps the report-only behavior.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_AWS_SECRETS_PREFIX",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "Opts the read-only aws_secrets_manager secret provider in; secret id = <prefix><service>, payload = JSON object keyed by account. Auth comes from the aws CLI (instance role / profile).",
+      "documented": true,
+      "subsystem": "secrets"
     },
     {
       "name": "KYBERION_AXE_BIN",
@@ -1639,6 +1657,15 @@
       "required": false,
       "description": "Human-override signature policy: warn observes missing or invalid gate signatures while enforce rejects them.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_GCP_SECRETS_PROJECT",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "Opts the read-only gcp_secret_manager secret provider in for this GCP project; secret name = kyberion-<service>, payload = JSON object keyed by account. Auth comes from gcloud (workload identity).",
+      "documented": true,
+      "subsystem": "secrets"
     },
     {
       "name": "KYBERION_GEMINI_API_KEY",
@@ -4746,6 +4773,51 @@
       "description": "VAD backend id used by the voice loop; `energy` is built in and unavailable or unknown neural backends degrade to energy with a surfaced reason.",
       "documented": true,
       "subsystem": "voice"
+    },
+    {
+      "name": "KYBERION_VAULT_ADDR",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "HashiCorp Vault base URL (e.g. https://<vault-host>:8200). With KYBERION_VAULT_TOKEN it opts the hashicorp_vault secret provider in, ahead of the local keychain/file/env stores.",
+      "documented": true,
+      "subsystem": "secrets"
+    },
+    {
+      "name": "KYBERION_VAULT_KV_MOUNT",
+      "category": "tuning",
+      "type": "string",
+      "required": false,
+      "description": "KV v2 mount used by the hashicorp_vault secret provider (default: secret).",
+      "documented": true,
+      "subsystem": "secrets"
+    },
+    {
+      "name": "KYBERION_VAULT_NAMESPACE",
+      "category": "tuning",
+      "type": "string",
+      "required": false,
+      "description": "Optional Vault Enterprise namespace sent as X-Vault-Namespace by the hashicorp_vault secret provider.",
+      "documented": true,
+      "subsystem": "secrets"
+    },
+    {
+      "name": "KYBERION_VAULT_PATH_PREFIX",
+      "category": "tuning",
+      "type": "string",
+      "required": false,
+      "description": "Path prefix under the KV v2 mount; each service is stored at <mount>/data/<prefix>/<service> (default: kyberion).",
+      "documented": true,
+      "subsystem": "secrets"
+    },
+    {
+      "name": "KYBERION_VAULT_TOKEN",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "HashiCorp Vault token for the hashicorp_vault secret provider. Prefer injecting it from the runtime (workload identity / agent sidecar) rather than a file.",
+      "documented": true,
+      "subsystem": "secrets"
     },
     {
       "name": "KYBERION_VIDEO_COMPOSITION_TEMPLATE_REGISTRY_PATH",

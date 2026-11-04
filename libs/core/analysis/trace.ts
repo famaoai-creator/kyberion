@@ -19,6 +19,12 @@ import {
   type ExactTelemetryAttributes,
   type TraceSpanKind,
 } from './trace-schema.js';
+import {
+  OTLP_HTTP_TRACE_EXPORTER_ID,
+  exportTraceToBackends,
+  getTraceExporter,
+  registerTraceExporter,
+} from './trace-exporter.js';
 
 export interface TraceEvent {
   name: string;
@@ -380,9 +386,10 @@ export function persistTrace(trace: Trace, opts?: { dir?: string; localOnly?: bo
     _persistedAt: nowIso(),
   };
   appendJsonLine(file, record);
-  // OTLP is explicitly opt-in. Local JSONL persistence remains synchronous
-  // and authoritative; exporter failure must never change pipeline outcome.
-  if (!opts?.localOnly) void exportTraceOtlp(safeTrace).catch(() => undefined);
+  // Exporters (OTLP and any registered trace-exporter provider) are opt-in.
+  // Local JSONL persistence remains synchronous and authoritative; exporter
+  // failure must never change pipeline outcome.
+  if (!opts?.localOnly) void exportTraceToBackends(safeTrace).catch(() => undefined);
   return file;
 }
 
@@ -490,6 +497,19 @@ export async function exportTraceOtlp(trace: Trace): Promise<boolean> {
   });
   if (!response.ok) throw new Error(`OTLP export failed with HTTP ${response.status}`);
   return true;
+}
+
+// Builtin `otlp-http` provider on the trace-exporter seam. Guarded so a
+// module re-evaluation (vi.resetModules) does not double-register.
+if (!getTraceExporter(OTLP_HTTP_TRACE_EXPORTER_ID)) {
+  registerTraceExporter(
+    {
+      id: OTLP_HTTP_TRACE_EXPORTER_ID,
+      isEnabled: () => Boolean(getRegisteredEnvText('OTEL_EXPORTER_OTLP_ENDPOINT')?.trim()),
+      export: exportTraceOtlp,
+    },
+    { provenance: 'builtin', source: 'analysis/trace' }
+  );
 }
 
 /**

@@ -63,6 +63,32 @@ function ajv(): ReturnType<typeof createAjv> {
   return ajvInstance;
 }
 
+/**
+ * Recorded-target fields a ref-capable browser op accepts next to `ref`: the
+ * runtime resolves `{role, name}` against the live page and corroborates it
+ * with `dom_path` (fail-closed for `high_risk` and secret fills) — see
+ * browser-actuator `resolveRefOrRecordedTarget`. Crystallized recordings
+ * (`compileBrowserRecordingToPipeline`) emit exactly these.
+ */
+const RECORDED_REF_TARGET_PROPERTIES = {
+  name: { type: 'string' },
+  role: { type: 'string' },
+  dom_path: { type: 'string' },
+  high_risk: { type: 'boolean' },
+} as const;
+
+/** Recorded option/toggle choice carried by a crystallized `select_ref` step. */
+const BROWSER_RECORDED_SELECTION_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['kind'],
+  properties: {
+    kind: { enum: ['option', 'toggle'] },
+    label: { type: 'string' },
+    checked: { type: 'boolean' },
+  },
+} as const;
+
 const INPUT_CONTRACTS: ContractCatalog = {
   browser: {
     goto: {
@@ -113,10 +139,8 @@ const INPUT_CONTRACTS: ContractCatalog = {
           selector: { type: 'string', minLength: 1 },
           ref: { type: 'string', minLength: 1 },
           element_name: { type: 'string' },
-          name: { type: 'string' },
-          role: { type: 'string' },
-          dom_path: { type: 'string' },
-          high_risk: { type: 'boolean' },
+          ...RECORDED_REF_TARGET_PROPERTIES,
+          selection: BROWSER_RECORDED_SELECTION_SCHEMA,
           timeout: { type: 'number', minimum: 1 },
           wait_for_navigation: { type: 'boolean' },
         },
@@ -164,8 +188,11 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           selector: { type: 'string', minLength: 1 },
           ref: { type: 'string', minLength: 1 },
+          ...RECORDED_REF_TARGET_PROPERTIES,
           text: { type: 'string' },
           field: { type: 'string' },
+          classification: { enum: ['user_input', 'secret_ref'] },
+          secret_ref: { type: 'string', minLength: 1 },
           timeout: { type: 'number', minimum: 1 },
         },
         additionalProperties: false,
@@ -180,6 +207,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           selector: { type: 'string', minLength: 1 },
           ref: { type: 'string', minLength: 1 },
+          ...RECORDED_REF_TARGET_PROPERTIES,
           key: { type: 'string', minLength: 1 },
           timeout: { type: 'number', minimum: 1 },
         },
@@ -194,6 +222,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           selector: { type: 'string', minLength: 1 },
           ref: { type: 'string', minLength: 1 },
+          ...RECORDED_REF_TARGET_PROPERTIES,
           state: { type: 'string' },
           timeout: { type: 'number', minimum: 1 },
           duration: { type: 'number', minimum: 0 },
