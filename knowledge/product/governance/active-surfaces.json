@@ -141,18 +141,6 @@
       "enabled": false
     },
     {
-      "id": "generation-schedule",
-      "kind": "service",
-      "description": "Recurring generation schedule tick service managed by surface-runtime.",
-      "command": "node",
-      "args": ["dist/scripts/run_generation_schedule_daemon.js"],
-      "cwd": ".",
-      "shutdownPolicy": "detached",
-      "startupMode": "background",
-      "ownerType": "surface-runtime-manifest",
-      "enabled": false
-    },
-    {
       "id": "imessage-bridge",
       "kind": "service",
       "description": "Managed macOS Messages bridge for declared iMessage sending and governed runtime supervision",
