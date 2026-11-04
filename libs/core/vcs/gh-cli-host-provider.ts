@@ -45,8 +45,9 @@ export function createGhCliVcsHostProvider(
   options: { run?: VcsCommandRunner } = {}
 ): VcsHostProvider {
   // Resolve the default lazily so a test double installed on secure-io is honoured.
+  // The binary is pinned: this provider only ever executes `gh`.
   const run: VcsCommandRunner =
-    options.run ?? ((command, args, opts) => safeExecResult(command, args, opts));
+    options.run ?? ((_command, args, opts) => safeExecResult('gh', args, opts));
   // Only a positive probe is cached: a gh installed later in the process is picked up.
   let available = false;
 
@@ -218,6 +219,16 @@ export function createGhCliVcsHostProvider(
       if (!Number.isInteger(number))
         throw new VcsHostError('invalid', 'gh pr create: no pull request URL in output');
       return { number, url };
+    },
+    async prFields(ctx, repo, ref, fields) {
+      return json<Record<string, unknown>>(
+        ctx,
+        ['pr', 'view', ref, '--repo', repo.url, '--json', fields.join(',')],
+        'pr view'
+      );
+    },
+    async githubApiGet(ctx, repo, path) {
+      return api<unknown>(ctx, repo, path ? `/${path}` : '');
     },
     async prMerge(ctx, repo, input) {
       const args = [
