@@ -16,6 +16,12 @@ import {
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
 import { prepareSessionGitIndex } from '../session-git-index.js';
+import {
+  applyProviderCredentialRelay,
+  prepareProviderCredentialRelay,
+  providerCredentialRelayApplies,
+  type PreparedProviderCredentialRelay,
+} from './provider-credential-relay.js';
 
 export const SESSION_GIT_INDEX_ENV_VAR = 'KYBERION_SESSION_GIT_INDEX';
 
@@ -28,6 +34,8 @@ export interface BuildDelegationSpawnEnvInput {
   profile?: ProviderPermissionProfileName;
   /** Defaults to `process.env`. */
   baseEnv?: NodeJS.ProcessEnv;
+  /** Credential relay started by {@link buildDelegationSpawnEnvWithRelay}; closed on dispose. */
+  credentialRelay?: PreparedProviderCredentialRelay | null;
 }
 
 export interface DelegationSpawnEnv {
@@ -55,30 +63,80 @@ export function isSessionGitIndexEnabled(baseEnv?: NodeJS.ProcessEnv): boolean {
 }
 
 export function buildDelegationSpawnEnv(input: BuildDelegationSpawnEnvInput): DelegationSpawnEnv {
-  const env: NodeJS.ProcessEnv = {
-    ...buildProviderChildEnv({
+  const providerEnv = buildProviderChildEnv({
+    provider: input.provider,
+    ...(input.baseEnv ? { baseEnv: input.baseEnv } : {}),
+  });
+  // Opt-in (default OFF): the child gets a loopback relay base URL and a
+  // per-turn placeholder key instead of the raw API key; torn down on dispose.
+  const closeRelay = (): void => input.credentialRelay?.relay.close();
+  let env: NodeJS.ProcessEnv;
+  try {
+    env = {
+      ...applyProviderCredentialRelay({
+        provider: input.provider,
+        env: providerEnv,
+        ...(input.baseEnv ? { baseEnv: input.baseEnv } : {}),
+        prepared: input.credentialRelay ?? null,
+      }),
+      ...childDelegationEnv(),
+    };
+  } catch (error) {
+    closeRelay();
+    throw error;
+  }
+  if (input.profile !== 'implementer' || !isSessionGitIndexEnabled(input.baseEnv)) {
+    return { env, dispose: closeRelay };
+  }
+  let index: ReturnType<typeof prepareSessionGitIndex>;
+  try {
+    index = prepareSessionGitIndex({
+      sessionId: input.sessionId,
+      ...(input.cwd ? { cwd: input.cwd } : {}),
+    });
+  } catch (error) {
+    closeRelay();
+    throw error;
+  }
+  if (!index) return { env, dispose: closeRelay };
+  const gitIndex = index;
+  let childPid: number | undefined;
+  return {
+    env: { ...env, ...gitIndex.env },
+    attachChild: (pid) => {
+      childPid = pid;
+      gitIndex.attachChild?.(pid);
+    },
+    dispose: () => {
+      closeRelay();
+      gitIndex.dispose(childPid !== undefined ? { childPid } : undefined);
+    },
+  };
+}
+
+/**
+ * Launch-site variant that starts the opt-in loopback credential relay
+ * (`KYBERION_PROVIDER_CREDENTIAL_RELAY`, default OFF) before building the
+ * env, so an API-key-mode claude/codex child gets a placeholder key and a
+ * relay base URL; the relay is torn down by `dispose()` (turn end). When no
+ * relay applies the env is returned synchronously (no extra event-loop turn
+ * before spawn), so callers await only a returned Promise.
+ */
+export function buildDelegationSpawnEnvWithRelay(
+  input: BuildDelegationSpawnEnvInput
+): DelegationSpawnEnv | Promise<DelegationSpawnEnv> {
+  const relayInput = {
+    provider: input.provider,
+    credentialEnv: buildProviderChildEnv({
       provider: input.provider,
       ...(input.baseEnv ? { baseEnv: input.baseEnv } : {}),
     }),
-    ...childDelegationEnv(),
+    ...(input.baseEnv ? { baseEnv: input.baseEnv } : {}),
   };
-  if (input.profile !== 'implementer' || !isSessionGitIndexEnabled(input.baseEnv)) {
-    return { env, dispose: () => undefined };
-  }
-  const index = prepareSessionGitIndex({
-    sessionId: input.sessionId,
-    ...(input.cwd ? { cwd: input.cwd } : {}),
-  });
-  if (!index) return { env, dispose: () => undefined };
-  let childPid: number | undefined;
-  return {
-    env: { ...env, ...index.env },
-    attachChild: (pid) => {
-      childPid = pid;
-      index.attachChild?.(pid);
-    },
-    dispose: () => index.dispose(childPid !== undefined ? { childPid } : undefined),
-  };
+  if (!providerCredentialRelayApplies(relayInput)) return buildDelegationSpawnEnv(input);
+  return prepareProviderCredentialRelay(relayInput).then((credentialRelay) =>
+    buildDelegationSpawnEnv({ ...input, credentialRelay })
+  );
 }
 
 /**

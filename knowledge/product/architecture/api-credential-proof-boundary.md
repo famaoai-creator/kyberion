@@ -1,7 +1,7 @@
 ---
 title: Credential lifecycle, allocation, and execution boundaries
 tags: [reasoning, credentials, tenant, architecture, extensibility, verification]
-last_updated: 2026-11-01
+last_updated: 2026-11-05
 ---
 
 # Credential lifecycle, allocation, and execution boundaries
@@ -103,6 +103,37 @@ expiry, claim and stored key version before subsequent managed API consumption.
 Revocation blocks new local bindings and subsequent managed sends; rotation
 invalidates an old binding. Already-sent requests are not cancelled. External
 binders and spawned CLI sessions retain their own revocation boundaries.
+
+### Provider CLI children: output redaction and the credential relay
+
+Every provider CLI reasoning backend redacts at its output exits: final answer
+text, each streamed chunk, structured results, native-subagent metadata, and
+errors that embed child stderr (`libs/core/provider/provider-output-redaction.ts`).
+The needles are the secret-guard active-secret registry plus every provider's
+credential env value, because a CLI reads its key from env without registering it.
+Redaction walks values (`redactSecretsDeep`, depth/size-bounded, cycle-safe, fail
+closed with a marker) instead of matching a stringified aggregate; each value is
+also matched in its JSON-escaped form so a multi-line key (PEM) re-emitted inside
+a JSON string is caught. Streams hold back only a suffix that could begin a
+secret, so a key split across chunks is still masked.
+
+`KYBERION_PROVIDER_CREDENTIAL_RELAY=1` (default off) keeps the raw API key out of
+the child env for API-key mode `claude` (`ANTHROPIC_API_KEY`) and `codex`
+(`OPENAI_API_KEY`) delegations. The launch site (`buildDelegationSpawnEnvWithRelay`)
+starts a 127.0.0.1 relay on an ephemeral port that holds the real key. The child
+gets `*_BASE_URL` pointing at the relay and a per-turn `kyb-relay-<uuid>`
+placeholder. The relay accepts only the current placeholder on a loopback `Host`
+within the upstream base path. It swaps in the real credential header, forwards
+over TLS (plain HTTP only to a loopback upstream), streams the response back, and
+is closed when the spawn env is disposed at turn end. An operator-set
+`ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` becomes the upstream. A sync launch site
+that cannot start a relay drops the key instead (fail closed).
+
+Out of scope: OAuth-login CLIs whose session lives in their own home or keychain
+(claude/codex/grok/devin logins). No API-key var is present, so no relay starts.
+Follow-up work: Bedrock SigV4 signing, Vertex token minting, WebSocket upgrades,
+and proxy support for the relay's own upstream hop. Readiness probes (`--version`,
+auth status) still use the plain allowlisted env.
 
 ## Readiness and failure attribution
 

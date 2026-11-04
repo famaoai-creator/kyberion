@@ -22,6 +22,7 @@ import {
   newDelegationSessionId,
   spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
+import { withRedactedProviderOutput } from './provider-output-redaction.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
 import type {
@@ -403,6 +404,14 @@ export class GeminiCliBackend implements ReasoningBackend {
   }
 
   private async spawnCli(args: string[], profile?: ProviderPermissionProfileName): Promise<string> {
+    // Output exit: the answer and any stderr-bearing error are redacted.
+    return withRedactedProviderOutput(() => this.spawnCliMetered(args, profile));
+  }
+
+  private async spawnCliMetered(
+    args: string[],
+    profile?: ProviderPermissionProfileName
+  ): Promise<string> {
     const started = Date.now();
     const promptChars = args[args.indexOf('-p') + 1]?.length ?? 0;
     const capture = { stdout: '', requestNotSent: true };
@@ -513,7 +522,14 @@ export function buildGeminiCliBackendFromEnv(
 export const GEMINI_STDIN_PROMPT_INSTRUCTION =
   'Answer the request given on stdin. Return exactly one JSON object.';
 
-export async function runGeminiCliQuery<T>(params: {
+export async function runGeminiCliQuery<T>(
+  params: Parameters<typeof runGeminiCliQueryRaw<T>>[0]
+): Promise<T> {
+  // Output exit: the parsed answer and any stderr-bearing error are redacted.
+  return withRedactedProviderOutput(() => runGeminiCliQueryRaw(params));
+}
+
+async function runGeminiCliQueryRaw<T>(params: {
   systemPrompt: string;
   userPrompt: string;
   schema: ZodType<T>;

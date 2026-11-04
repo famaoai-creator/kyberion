@@ -25,6 +25,13 @@ import {
   spawnWithDelegationEnv,
 } from '../provider/provider-spawn-env.js';
 import {
+  redactProviderOutputError,
+  redactProviderOutputStream,
+  redactProviderOutputText,
+  redactProviderOutputValue,
+  withRedactedProviderOutput,
+} from '../provider/provider-output-redaction.js';
+import {
   buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
@@ -287,12 +294,16 @@ export class ShellGrokCliBackend implements ReasoningBackend {
       if (!nativeInfo || typeof nativeInfo !== 'object') {
         throw new Error('[SUBAGENT_UNAVAILABLE] Grok ACP returned no native subagent metadata.');
       }
-      this.lastHarnessSubagentInfo = { ...(nativeInfo as Record<string, unknown>) };
-      return response.text;
+      this.lastHarnessSubagentInfo = redactProviderOutputValue({
+        ...(nativeInfo as Record<string, unknown>),
+      });
+      return redactProviderOutputText(response.text);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw error;
-      throw new Error(`[SUBAGENT_UNAVAILABLE] Grok ACP harness failed: ${message}`);
+      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw redactProviderOutputError(error);
+      throw redactProviderOutputError(
+        new Error(`[SUBAGENT_UNAVAILABLE] Grok ACP harness failed: ${message}`)
+      );
     } finally {
       release();
     }
@@ -335,7 +346,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
 
   /** Stream Grok's Anthropic-compatible text deltas for live voice replies. */
   streamPrompt(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream {
-    return this.streamPromptFromCli(prompt, options);
+    return redactProviderOutputStream(this.streamPromptFromCli(prompt, options));
   }
 
   private async *streamPromptFromCli(
@@ -547,10 +558,20 @@ export class ShellGrokCliBackend implements ReasoningBackend {
         `[shell-grok-cli] schema validation failed: ${parsed.error.message}. Structured: ${JSON.stringify(structured).slice(0, 500)}`
       );
     }
-    return parsed.data;
+    return redactProviderOutputValue(parsed.data);
   }
 
   private spawnCli(
+    args: string[],
+    stdin: string,
+    signal?: AbortSignal,
+    profile?: ProviderPermissionProfileName
+  ): Promise<string> {
+    // Output exit: the answer and any stderr-bearing error are redacted.
+    return withRedactedProviderOutput(() => this.spawnCliRaw(args, stdin, signal, profile));
+  }
+
+  private spawnCliRaw(
     args: string[],
     stdin: string,
     signal?: AbortSignal,

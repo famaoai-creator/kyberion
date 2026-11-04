@@ -28,7 +28,7 @@ import { cliOptionValue } from '../cli-guard.js';
 import { memoizedCliSpawnSync } from '../provider/provider-discovery.js';
 import * as readline from 'node:readline';
 import {
-  buildDelegationSpawnEnv,
+  buildDelegationSpawnEnvWithRelay,
   newDelegationSessionId,
   spawnWithDelegationEnv,
 } from '../provider/provider-spawn-env.js';
@@ -50,6 +50,12 @@ import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { resolveProviderCliCommand } from '../provider/provider-managed-env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
+import {
+  redactProviderOutputError,
+  redactProviderOutputStream,
+  redactProviderOutputValue,
+  withRedactedProviderOutput,
+} from '../provider/provider-output-redaction.js';
 import { cliOutputFormat, parseClaudeCliUsage, recordCliUsage } from '../cli-usage-metering.js';
 import { isClaudeCliAuthenticated } from '../provider/claude-cli-auth-status.js';
 import {
@@ -604,7 +610,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
    * voice loop begin sentence-level TTS before the whole answer is complete.
    */
   streamPrompt(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream {
-    return this.streamPromptFromCli(prompt, options);
+    return redactProviderOutputStream(this.streamPromptFromCli(prompt, options));
   }
 
   private async *streamPromptFromCli(
@@ -633,7 +639,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     let meteringStatus: 'success' | 'error' = 'error';
     let requestNotSent = false;
     // Keep the same provider-scoped child environment as the batch path.
-    const spawnEnv = buildDelegationSpawnEnv({
+    const pendingSpawnEnv = buildDelegationSpawnEnvWithRelay({
       provider: 'claude',
       sessionId: newDelegationSessionId('claude'),
       profile: resolveEffectiveProviderPermissionProfile(
@@ -641,6 +647,8 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
         options?.advisory ? 'planner' : undefined
       ),
     });
+    // Await only when a credential relay had to start (no extra tick otherwise).
+    const spawnEnv = pendingSpawnEnv instanceof Promise ? await pendingSpawnEnv : pendingSpawnEnv;
     const child = spawnWithDelegationEnv(spawnEnv, () =>
       spawn(this.bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -865,12 +873,16 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
           '[SUBAGENT_UNAVAILABLE] claude CLI session returned no native subagent metadata.'
         );
       }
-      this.lastHarnessSubagentInfo = { ...(nativeInfo as Record<string, unknown>) };
-      return response.text;
+      this.lastHarnessSubagentInfo = redactProviderOutputValue({
+        ...(nativeInfo as Record<string, unknown>),
+      });
+      return await withRedactedProviderOutput(async () => response.text);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw error;
-      throw new Error(`[SUBAGENT_UNAVAILABLE] claude CLI harness failed: ${message}`);
+      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw redactProviderOutputError(error);
+      throw redactProviderOutputError(
+        new Error(`[SUBAGENT_UNAVAILABLE] claude CLI harness failed: ${message}`)
+      );
     } finally {
       release();
     }
@@ -1035,7 +1047,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
         `[shell-claude-cli] schema validation failed: ${parsed.error.message}. Structured: ${JSON.stringify(structured).slice(0, 500)}`
       );
     }
-    return parsed.data;
+    return redactProviderOutputValue(parsed.data);
   }
 
   /**
@@ -1046,6 +1058,16 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
    * window) SIGKILL'd, not just abandoned.
    */
   private async spawnCli(
+    args: string[],
+    stdin: string,
+    signal?: AbortSignal,
+    profile?: ProviderPermissionProfileName
+  ): Promise<string> {
+    // Output exit: the answer and any stderr-bearing error are redacted.
+    return withRedactedProviderOutput(() => this.spawnCliRaw(args, stdin, signal, profile));
+  }
+
+  private async spawnCliRaw(
     args: string[],
     stdin: string,
     signal?: AbortSignal,
@@ -1071,11 +1093,13 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       // XP-02: minimal allowlisted env (no cross-provider credential
       // leakage); SA-05: one delegation hop deeper than us; WS-02: private git
       // index for implementer delegations.
-      const spawnEnv = buildDelegationSpawnEnv({
+      const pendingSpawnEnv = buildDelegationSpawnEnvWithRelay({
         provider: 'claude',
         sessionId: newDelegationSessionId('claude'),
         ...(profile ? { profile } : {}),
       });
+      // Await only when a credential relay had to start (no extra tick otherwise).
+      const spawnEnv = pendingSpawnEnv instanceof Promise ? await pendingSpawnEnv : pendingSpawnEnv;
       const child = spawnWithDelegationEnv(spawnEnv, () =>
         spawn(this.bin, cliArgs, {
           stdio: ['pipe', 'pipe', 'pipe'],
