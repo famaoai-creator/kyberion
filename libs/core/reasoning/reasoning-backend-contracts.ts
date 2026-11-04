@@ -388,6 +388,14 @@ export interface ReasoningCallOptions {
   constrainedSampling?: ConstrainedSampling;
   /** DH-06: append a metadata-only visibility receipt before provider execution. */
   prompt_visibility?: ReasoningPromptVisibilityContext;
+  /**
+   * R5: caller-supplied idempotency key for `delegateTask` (see
+   * `deriveDelegationIdempotencyKey`). The same key with the same normalized
+   * payload runs at most once — concurrent calls join, later calls replay the
+   * stored result; a different payload under the same key is a typed conflict.
+   * With a key, a failure whose start state is unknown never fails over.
+   */
+  idempotencyKey?: string;
 }
 
 /**

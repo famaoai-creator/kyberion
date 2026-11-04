@@ -126,10 +126,14 @@ export function canReplayWorkItemClaim(
   input: ClaimWorkItemInput
 ): boolean {
   const idempotencyKey = input.idempotencyKey?.trim();
+  const payloadHash = input.payloadHash?.trim();
   return Boolean(
     !input.requireNewLease &&
     idempotencyKey &&
     lease.idempotency_key === idempotencyKey &&
+    // R5: same key with a different payload is never a replay. Backward
+    // compatible: compared only when both the lease and the input carry a hash.
+    (!payloadHash || !lease.payload_hash || lease.payload_hash === payloadHash) &&
     lease.holder_peer_id === input.actorPeerId &&
     lease.holder_user_id === input.actorUserId &&
     lease.purpose === input.purpose &&
