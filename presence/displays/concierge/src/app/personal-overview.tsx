@@ -6,7 +6,7 @@ import * as React from 'react';
 import { Badge, Button, Callout, Disclosure, Section, Skeleton } from '@agent/shared-ui';
 import { compareDecisionUrgency, groupByDecision } from '@agent/core/surface/decision-brief';
 import { conciergeText, frontDeskText } from '../lib/i18n';
-import { postApprovalDecision } from '../lib/approval-decision-client';
+import { postApprovalDecision } from '../lib/needs-you-client';
 import { formatApprovalFailure } from '../lib/approval-failure';
 import { parseDecisionBrief, renderDisplayText } from '../lib/decision-brief-view';
 import type { ConciergeSummary } from '../lib/summary-event';

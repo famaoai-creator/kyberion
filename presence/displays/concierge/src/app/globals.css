@@ -1175,3 +1175,46 @@ body {
   color: var(--kb-ui-text-muted);
   font-size: var(--kb-ui-font-size-xs);
 }
+
+/* あなた待ち / Needs you (/inbox) — stream B, MSN-SHELL-IA-20261105. Tokens only. */
+.inbox-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-5);
+}
+
+.inbox-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-2) var(--kb-ui-space-4);
+}
+
+.inbox-summary__total {
+  font-size: var(--kb-ui-font-size-lg);
+  font-weight: 600;
+}
+
+.inbox-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  min-width: 0;
+}
+
+.inbox-review-scope {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.inbox-card .kb-section {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.inbox-elsewhere {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-2) var(--kb-ui-space-4);
+}
