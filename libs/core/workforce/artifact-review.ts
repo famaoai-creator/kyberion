@@ -9,6 +9,11 @@ import type { DeliverableKind } from '../deliverable-quality.js';
 
 export type ArtifactReviewVerdict = 'approved' | 'changes_requested' | 'rejected';
 
+/** Legacy claims remain usable during migration, but are never authentication proof. */
+export type ArtifactReviewIndependencePolicy = 'legacy_actor_claim' | 'authenticated_execution';
+export type ArtifactReviewIndependenceAssurance =
+  'not_required' | 'legacy_actor_claim' | 'unverified';
+
 export interface ArtifactReviewBinding {
   path: string;
   sha256: string;
@@ -30,6 +35,7 @@ export interface ArtifactReviewDecision {
   reviewer_role: string;
   reviewer_roles?: string[];
   reviewer_agent_id?: string;
+  /** Historical actor-label comparison only; not authenticated execution provenance. */
   independence_verified?: boolean;
   verdict: ArtifactReviewVerdict;
   findings: ArtifactReviewFinding[];
@@ -48,6 +54,7 @@ export interface ArtifactReviewReceipt {
     team_role: 'reviewer' | 'qa';
     specialist_roles: string[];
     independent_from: string[];
+    /** v1 compatibility field: unequal claimed actor IDs, not authenticated provenance. */
     independence_verified: boolean;
   };
   verdict: ArtifactReviewVerdict;
@@ -60,6 +67,8 @@ export interface ArtifactReviewEvaluation {
   ready: boolean;
   reasons: string[];
   review_ids: string[];
+  /** Separates legacy admission from authenticated independence; never inferred from IDs. */
+  independence_assurance: ArtifactReviewIndependenceAssurance;
 }
 
 export interface ArtifactReviewReceiptInput {
@@ -228,8 +237,25 @@ export function evaluateArtifactReviews(input: {
   requiredReviewerRoles: string[];
   implementerAgentIds?: string[];
   requireIndependence?: boolean;
+  /** Strict mode requires authenticated execution evidence even if requireIndependence is false.
+   * No current receipt carries that evidence; strict mode therefore fails closed.
+   * Omission preserves the v1 admission policy, not a claim of stronger assurance.
+   */
+  independencePolicy?: ArtifactReviewIndependencePolicy;
 }): ArtifactReviewEvaluation {
   const reasons: string[] = [];
+  const policy =
+    input.independencePolicy === undefined ? 'legacy_actor_claim' : input.independencePolicy;
+  const requireIndependence = input.requireIndependence || policy !== 'legacy_actor_claim';
+  if (policy === 'authenticated_execution') {
+    // Neither a canonical-looking actor ID, a caller-supplied boolean, nor a
+    // mutable current runtime binding proves who produced/reviewed these bytes.
+    // Do not add a caller-controlled proof flag here. A future verifier must
+    // consume durable attestations minted at authenticated execution boundaries.
+    reasons.push('authenticated reviewer execution provenance is unavailable');
+  } else if (policy !== 'legacy_actor_claim') {
+    reasons.push('unsupported artifact review independence policy');
+  }
   const currentHashes = new Map(
     input.artifacts.map((artifact) => [artifact.path, artifact.sha256])
   );
@@ -245,7 +271,7 @@ export function evaluateArtifactReviews(input: {
     if (review.verdict !== 'approved') {
       reasons.push(`review ${review.review_id} is ${review.verdict}`);
     }
-    if (input.requireIndependence) {
+    if (requireIndependence) {
       if (!review.independence_verified) {
         reasons.push(`review ${review.review_id} has no verified reviewer independence`);
       }
@@ -274,5 +300,16 @@ export function evaluateArtifactReviews(input: {
     ready: reasons.length === 0,
     reasons,
     review_ids: input.reviews.map((review) => review.review_id),
+    independence_assurance: !requireIndependence
+      ? 'not_required'
+      : policy === 'legacy_actor_claim' &&
+          input.reviews.length > 0 &&
+          input.reviews.every(
+            (review) =>
+              review.independence_verified &&
+              !(review.reviewer_agent_id && implementers.has(review.reviewer_agent_id))
+          )
+        ? 'legacy_actor_claim'
+        : 'unverified',
   };
 }
