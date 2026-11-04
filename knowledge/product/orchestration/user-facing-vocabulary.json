@@ -20079,9 +20079,9 @@
         "qps-ploc": "⟦{count} ẇȧïŧïñɠ ŀőřė⟧"
       },
       "ia_inbox_overdue_count": {
-        "en": "{count} overdue",
-        "ja": "{count} 件が期限切れ",
-        "qps-ploc": "⟦{count} őṽėřḓůė ŀőřė⟧"
+        "en": "{count} overdue or waiting long",
+        "ja": "{count} 件が期限切れ・長く待っています",
+        "qps-ploc": "⟦{count} őṽėřḓůė őř ẇȧïŧïñɠ ŀőñɠ ŀőřėɱ ïṗşů⟧"
       },
       "ia_inbox_open_mission": {
         "en": "Open the related mission",
@@ -20182,6 +20182,11 @@
         "en": "How this is counted",
         "ja": "件数の数え方",
         "qps-ploc": "⟦Ħőẇ ŧħïş ïş ƈőůñŧėḓ ŀőřėɱ ⟧"
+      },
+      "ia_inbox_waiting_long_badge": {
+        "en": "Waiting a long time",
+        "ja": "長く待っています",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ȧ ŀőñɠ ŧïɱė ŀőřėɱ ⟧"
       }
     },
     "onboarding": {
