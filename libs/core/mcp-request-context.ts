@@ -1,5 +1,6 @@
 import { normalizeEventScope, type EventScope } from './event-scope.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { resolveClaimedNhiId } from './nhi-id.js';
 
 export type McpCallerRole = 'operator' | 'agent' | 'cowork' | 'service' | 'unknown';
 
@@ -80,7 +81,13 @@ export function resolveMcpRequestContext(input: McpRequestContextInput = {}): Mc
     throw new Error(`[MCP_SCOPE_REQUIRED] tier '${tier}' requires a server-bound tenant`);
   }
 
-  const nhiId = clean(envText(env, 'KYBERION_MCP_NHI') || envText(env, 'KYBERION_NHI_ACTOR'));
+  const nhiId = clean(
+    envText(env, 'KYBERION_MCP_NHI') ||
+      resolveClaimedNhiId(
+        getRegisteredEnvText('KYBERION_NHI_ID', { env, preserveEmpty: true }),
+        envText(env, 'KYBERION_NHI_ACTOR')
+      )
+  );
   const scope = normalizeEventScope({
     scope_kind: input.task_id
       ? 'task'

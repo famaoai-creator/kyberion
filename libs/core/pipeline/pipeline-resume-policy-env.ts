@@ -3,6 +3,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 /** Non-secret policy selectors only. Temporary elevation and proof keys are
  * never serialized into journals or replayed by an approval callback. */
 export const PIPELINE_RESUME_POLICY_ENV_KEYS = [
+  'KYBERION_NHI_ACTOR',
   'KYBERION_ALLOW_FILE_SECRETS',
   'KYBERION_ALLOW_LOCAL_NETWORK',
   'KYBERION_ALLOW_STUB_FALLBACK',
@@ -53,7 +54,18 @@ export function capturePipelineResumePolicyEnvironment(): {
 } {
   return {
     policy_env: Object.fromEntries(
-      PIPELINE_RESUME_POLICY_ENV_KEYS.map((key) => [key, getRegisteredEnvText(key) ?? ''])
+      PIPELINE_RESUME_POLICY_ENV_KEYS.map((key) => {
+        const value = getRegisteredEnvText(key);
+        const mode = value?.trim();
+        return [
+          key,
+          key === 'KYBERION_NHI_ACTOR'
+            ? mode === 'off' || mode === 'enforce'
+              ? mode
+              : 'warn'
+            : (value ?? ''),
+        ];
+      })
     ),
     unsupported_policy_env: Object.keys(process.env)
       .filter(
@@ -70,6 +82,9 @@ export function restorePipelineResumePolicyEnvironment(
 ): NodeJS.ProcessEnv {
   const env = { ...base };
   for (const key of Object.keys(env)) if (controlKey(key)) delete env[key];
-  for (const key of PIPELINE_RESUME_POLICY_ENV_KEYS) env[key] = source[key] ?? '';
+  for (const key of PIPELINE_RESUME_POLICY_ENV_KEYS)
+    // Historical journals did not capture this mode. Never inherit an
+    // approving runtime's weaker setting or silently assume historical warn.
+    env[key] = source[key] ?? (key === 'KYBERION_NHI_ACTOR' ? 'enforce' : '');
   return env;
 }

@@ -123,6 +123,7 @@ export * from './knowledge/reusable-learning.js';
 export * from './knowledge/knowledge-reuse-contract.js';
 
 export * from './shortcut-bridge.js';
+export * from './persona-identity.js';
 
 export * from './information-assets/types.js';
 export * from './information-assets/catalog.js';

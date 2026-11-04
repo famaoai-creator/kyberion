@@ -43,3 +43,12 @@ export function parseNhiId(nhiId: string): { organization_id: string; slug: stri
   const [organizationId, slug] = nhiId.slice(NHI_ID_PREFIX.length).split('/');
   return { organization_id: organizationId, slug };
 }
+
+/** An explicitly empty/invalid canonical selector clears identity, never revives a legacy claim. */
+export function resolveClaimedNhiId(
+  canonical: string | undefined,
+  legacy?: string
+): string | undefined {
+  const selected = canonical !== undefined ? canonical.trim() : legacy?.trim();
+  return selected && parseNhiId(selected) ? selected : undefined;
+}
