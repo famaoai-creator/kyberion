@@ -194,4 +194,55 @@ describe('primary-checkout authority store resolution', () => {
       resolver.isAuthorityStoreRelativePath('active/shared/coordination/channels/slack/outbox')
     ).toBe(false);
   });
+
+  it('names only the fixed ancestors of the authority stores, never their siblings', async () => {
+    const resolver = await loadResolver(worktree);
+    for (const rel of [
+      'active',
+      'active/shared',
+      'active/shared/coordination',
+      'active/shared/observability',
+      'active/shared/runtime',
+      'knowledge',
+      'knowledge/personal',
+      'knowledge/confidential',
+      'knowledge/confidential/acme',
+    ]) {
+      expect(resolver.isAuthorityStoreAncestorRelativePath(rel)).toBe(true);
+    }
+    for (const rel of [
+      '',
+      'active/shared/coordination/channels',
+      'active/shared/coordination/inbox',
+      'active/shared/runtime/other',
+      'knowledge/public',
+      'knowledge/confidential/acme/notes',
+    ]) {
+      expect(resolver.isAuthorityStoreAncestorRelativePath(rel)).toBe(false);
+    }
+  });
+
+  it('lets a linked worktree resolve the first approval path when the primary has no channels/', async () => {
+    // A primary checkout whose active/shared/coordination exists but has never
+    // held an approval: the missing-ancestor walk climbs past channels/ and
+    // used to refuse the existence probe of coordination/ as outside the repo.
+    mkdirSync(path.join(primary, 'active', 'shared', 'coordination'), { recursive: true });
+    await loadResolver(worktree);
+    const guard = await import('./secure-io-path-guard.js');
+    const requests = path.join(
+      primary,
+      'active/shared/coordination/channels/external-operation/approvals/requests'
+    );
+    for (const mode of ['follow', 'leaf'] as const) {
+      expect(guard.canonicalGuardPath(requests, mode)).toBe(requests);
+    }
+    expect(guard.entryExists(path.join(primary, 'active/shared/coordination'))).toBe(true);
+    // Non-authority paths in the primary stay outside: the ancestor probe grants nothing.
+    expect(() =>
+      guard.entryExists(path.join(primary, 'active/shared/coordination/inbox'))
+    ).toThrow();
+    expect(() =>
+      guard.canonicalGuardPath(path.join(primary, 'active/shared/coordination/inbox/x'), 'leaf')
+    ).toThrow();
+  });
 });

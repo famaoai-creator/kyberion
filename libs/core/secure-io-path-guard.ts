@@ -62,6 +62,9 @@ export function entryExists(p: string): boolean {
       stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
     else if (insidePrimaryAuthority(candidate) !== undefined)
       stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
+    // Existence only: the walk toward an authority store passes its fixed ancestors.
+    else if (isPrimaryAuthorityAncestor(candidate))
+      stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
     else throw Object.assign(new Error('path is outside the repository'), { code: 'EOUTSIDE' });
   } catch (error) {
     if (errnoCode(error) === 'ENOTDIR') return false;
@@ -240,6 +243,25 @@ function insidePrimaryAuthority(candidate: string): string | undefined {
     pathResolver.isAuthorityStoreRelativePath(rel.split(path.sep).join('/'))
     ? rel
     : undefined;
+}
+
+/**
+ * True when `candidate` is one of the fixed directories above a primary
+ * checkout authority store (e.g. `active/shared/coordination`). Used ONLY by
+ * the existence probe of the missing-ancestor walk: knowing that such a
+ * directory exists lets a linked worktree resolve the first approval path in a
+ * primary checkout that has no `channels/` yet. It never admits a read, write
+ * or listing of the directory itself.
+ */
+function isPrimaryAuthorityAncestor(candidate: string): boolean {
+  const primary = pathResolver.primaryCheckoutRootDir();
+  if (primary === pathResolver.rootDir()) return false;
+  const abs = path.resolve(candidate);
+  const rel = isInside(path.resolve(primary), abs) ?? isInside(realPrimaryRoot().real, abs);
+  return (
+    rel !== undefined &&
+    pathResolver.isAuthorityStoreAncestorRelativePath(rel.split(path.sep).join('/'))
+  );
 }
 
 /**
