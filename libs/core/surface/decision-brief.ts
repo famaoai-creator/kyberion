@@ -179,7 +179,7 @@ function ifSilent(record: DecisionBriefSubject): DisplayText {
 
 /** `Default action:\n- draft-only; …` → `draft-only`, or undefined for `unknown`. */
 function defaultAction(summary: string): string | undefined {
-  const match = /Default action:\s*\n?\s*-\s*([a-z_-]+)/iu.exec(summary);
+  const match = /Default action:[ \t]*(?:\r?\n[ \t]*)?-[ \t]*([a-z_-]+)/iu.exec(summary);
   const value = match?.[1]?.toLowerCase().replace(/_/gu, '-');
   return value && value !== 'unknown' ? value : undefined;
 }
