@@ -8,6 +8,7 @@ import * as pathResolver from '../path-resolver.js';
 import { tenantProfilePath } from '../organization/tenant-registry.js';
 import {
   buildMissionLifecycleService,
+  GOVERNED_PASSTHROUGH_VERBS,
   MissionLifecycleGovernedError,
   type MissionLifecycleUnderlyingSystem,
 } from './mission-lifecycle-service.js';
@@ -52,7 +53,13 @@ function makeStubSystem(): MissionLifecycleUnderlyingSystem {
       candidates: [],
       archived: [],
     })) as any,
-  };
+    ...Object.fromEntries(
+      Object.keys(GOVERNED_PASSTHROUGH_VERBS).map((method) => [
+        method,
+        vi.fn(async () => ({ via: method })),
+      ])
+    ),
+  } as MissionLifecycleUnderlyingSystem;
 }
 
 let previousMissionRole: string | undefined;
@@ -619,5 +626,91 @@ describe('mission-lifecycle-service — prerequisite gate on start', () => {
       `[MISSION_PREREQUISITES_UNMET] Mission ${childBlocked} cannot start: ${missingPre} (not found)`
     );
     expect(fs.existsSync(pathResolver.missionDir(childBlocked, 'public'))).toBe(false);
+  });
+});
+
+describe('mission-lifecycle-service — governed passthrough verbs', () => {
+  const missionId = 'msn-passthrough-001';
+  const methods = Object.keys(GOVERNED_PASSTHROUGH_VERBS) as Array<
+    keyof typeof GOVERNED_PASSTHROUGH_VERBS
+  >;
+
+  it.each(methods)('%s fails closed outside the mission_controller context', async (method) => {
+    const system = makeStubSystem();
+    const facade = buildMissionLifecycleService(system);
+    await expect(
+      (facade[method] as (...a: unknown[]) => Promise<unknown>)(missionId)
+    ).rejects.toThrow(MissionLifecycleGovernedError);
+    expect(system[method]).not.toHaveBeenCalled();
+  });
+
+  it('forwards arguments verbatim and records one shaped audit entry per call', async () => {
+    const system = makeStubSystem();
+    const facade = buildMissionLifecycleService(system);
+    const recordSpy = vi.spyOn(auditChain, 'record');
+    recordSpy.mockClear();
+
+    const result = await withExecutionContext('mission_controller', () =>
+      facade.recordEvidence(missionId, 'task-1', 'done', ['a.md'], 'implementer', 'agent-x')
+    );
+
+    expect(result).toEqual({ via: 'recordEvidence' });
+    expect(system.recordEvidence).toHaveBeenCalledWith(
+      missionId,
+      'task-1',
+      'done',
+      ['a.md'],
+      'implementer',
+      'agent-x'
+    );
+    expect(recordSpy).toHaveBeenCalledTimes(1);
+    expect(recordSpy.mock.results[0]!.value.metadata).toMatchObject({
+      surface: 'cli',
+      verb: 'record-evidence',
+      mission: 'MSN-PASSTHROUGH-001',
+    });
+  });
+
+  it('forSurface tags the audit record with the calling surface', async () => {
+    const facade = buildMissionLifecycleService(makeStubSystem());
+    const recordSpy = vi.spyOn(auditChain, 'record');
+    recordSpy.mockClear();
+
+    await withExecutionContext('mission_controller', () =>
+      facade.forSurface({ surface: 'slack' }).cancelMission(missionId, 'stop')
+    );
+
+    expect(recordSpy.mock.results[0]!.value.metadata).toMatchObject({
+      surface: 'slack',
+      verb: 'cancel',
+    });
+  });
+
+  it('enforces mission-authority for grant verbs inside the facade, for every surface', async () => {
+    const system = makeStubSystem();
+    const facade = buildMissionLifecycleService(system);
+    const previousSudo = process.env.KYBERION_SUDO;
+    delete process.env.KYBERION_SUDO;
+    try {
+      await expect(
+        withExecutionContext('mission_controller', () =>
+          facade.forSurface({ surface: 'slack' }).grantMissionSudo(missionId, true, 15)
+        )
+      ).rejects.toThrow();
+      expect(system.grantMissionSudo).not.toHaveBeenCalled();
+    } finally {
+      if (previousSudo !== undefined) process.env.KYBERION_SUDO = previousSudo;
+    }
+  });
+
+  it('lets an approval-mediated scope change through to the verb (approval validated there)', async () => {
+    const system = makeStubSystem();
+    const facade = buildMissionLifecycleService(system);
+    await withExecutionContext('mission_controller', () =>
+      facade.approveScopeChange(missionId, { approvalRequestId: 'APR-1' })
+    );
+    expect(system.approveScopeChange).toHaveBeenCalledWith(missionId, {
+      approvalRequestId: 'APR-1',
+    });
   });
 });
