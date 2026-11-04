@@ -14,15 +14,40 @@ const mocks = vi.hoisted(() => ({
     costComplete: true,
   })),
   deliverables: vi.fn((): unknown[] => []),
+  roles: [] as string[],
 }));
 
 vi.mock('./ops/su-surface-data', () => ({
-  buildMissionHistoryItems: mocks.missions,
+  projectMissionHistoryItems: () => mocks.missions(),
   collectCostSummary: mocks.cost,
+}));
+vi.mock('@agent/core/mission/mission-state', () => ({
+  listMissionsInSearchDirs: () => [{ missionId: 'MSN-ANY' }],
+  loadState: () => ({ mission_id: 'MSN-ANY' }),
+}));
+vi.mock('@agent/core/mission-lookup', () => ({
+  readOrNullOnMissionRefusal: (fn: () => unknown) => fn(),
+}));
+vi.mock('@agent/core/authority', () => ({
+  withExecutionContext: (role: string, fn: () => unknown) => {
+    mocks.roles.push(role);
+    return fn();
+  },
+}));
+// Admission stand-in: tenant rows only for a viewer of that tenant.
+vi.mock('@agent/core/surface/workspace-graph', () => ({
+  WORKSPACE_GRAPH_READER_ROLE: 'workspace_graph_reader',
+  viewerAdmitsNode: (
+    viewer: { tenantSlugs: string[] | 'all' },
+    node: { tenantSlug?: string; tier?: string }
+  ) =>
+    viewer.tenantSlugs === 'all' ||
+    (node.tenantSlug ? viewer.tenantSlugs.includes(node.tenantSlug) : node.tier === 'public'),
 }));
 vi.mock('./ops/deliverable-inbox', () => ({ collectDeliverableInbox: mocks.deliverables }));
 vi.mock('./ops/ops-viewer', () => ({
   withViewerExecutionContext: (_viewer: unknown, fn: () => unknown) => fn(),
+  toSurfaceAuthorizationContext: (viewer: unknown) => viewer,
 }));
 vi.mock('@agent/core/agent/agent-activity-board', () => ({
   buildAgentActivityBoard: mocks.board,
@@ -51,12 +76,14 @@ function mission(
   status: string,
   updatedHoursAgo: number,
   durationHours = 2,
-  goalSummary = `Goal of ${id}`
+  goalSummary = `Goal of ${id}`,
+  tenantSlug = 'acme'
 ) {
   return {
     missionId: id,
     status,
     tier: 'confidential',
+    tenantSlug,
     artifactKinds: [],
     artifactCount: 0,
     updatedAt: hoursAgo(updatedHoursAgo),
@@ -240,11 +267,16 @@ describe('collectHomeDashboard', () => {
   });
 
   it('reads each source once, scoped to the viewer', () => {
-    mocks.missions.mockReturnValue([mission('MSN-A', 'active', 1)]);
+    mocks.missions.mockReturnValue([
+      mission('MSN-A', 'active', 1),
+      mission('MSN-OTHER', 'active', 1, 2, 'Other tenant', 'beta'),
+    ]);
+    mocks.roles.length = 0;
     const home = collectHomeDashboard(viewer(['acme']), NOW);
     expect(home.unavailable).toEqual([]);
-    expect(mocks.missions).toHaveBeenCalledTimes(1);
-    expect(mocks.missions).toHaveBeenCalledWith(expect.objectContaining({ tenantSlugs: ['acme'] }));
+    // Missions are read as the workspace graph reader, then admitted per viewer.
+    expect(mocks.roles).toContain('workspace_graph_reader');
+    expect(home.missions.open.active).toBe(1);
     expect(mocks.cost).toHaveBeenCalledWith(
       expect.objectContaining({ missionIds: ['MSN-A'], scopeFilter: { tenant_slugs: ['acme'] } })
     );
