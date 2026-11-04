@@ -328,7 +328,7 @@ export function kindNextStep(
     case 'work_item':
       return { label: t('ws_ask_for_work'), onClick: openDock };
     case 'approval':
-      return { label: t('ws_open_inbox'), href: '/' };
+      return { label: t('ws_open_inbox'), href: '/inbox?reason=approval' };
     default:
       return undefined;
   }
