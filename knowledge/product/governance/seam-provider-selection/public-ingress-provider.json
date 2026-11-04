@@ -1,0 +1,76 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "public-ingress-provider",
+      "default_provider": "tailscale-funnel",
+      "fallback_purpose": "stable_url",
+      "traits": {
+        "stable_url": "Whether the public URL survives restarts, so webhook senders need not be re-pointed.",
+        "zero_config": "Works without an account, zone, or stored secret.",
+        "maturity": "Live adapter shipped (1) versus planned descriptor only (0)."
+      },
+      "providers": {
+        "tailscale-funnel": {
+          "traits": { "stable_url": 1, "zero_config": 0.4, "maturity": 1 },
+          "trait_basis": {
+            "stable_url": "declared",
+            "zero_config": "declared",
+            "maturity": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/public-ingress-providers.json (tailscale-funnel: status live, stable_url true; needs the Tailscale client logged in with Funnel granted)",
+            "libs/core/ingress/providers/tailscale-funnel.ts"
+          ]
+        },
+        "cloudflared-quick": {
+          "traits": { "stable_url": 0, "zero_config": 1, "maturity": 0 },
+          "trait_basis": {
+            "stable_url": "declared",
+            "zero_config": "declared",
+            "maturity": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/public-ingress-providers.json (cloudflared-quick: status planned, ephemeral trycloudflare.com URL, no account)"
+          ]
+        },
+        "cloudflared-named": {
+          "traits": { "stable_url": 1, "zero_config": 0.1, "maturity": 0 },
+          "trait_basis": {
+            "stable_url": "declared",
+            "zero_config": "declared",
+            "maturity": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/public-ingress-providers.json (cloudflared-named: status planned, stable hostname; needs a zone + CLOUDFLARED_TUNNEL_CREDENTIALS)"
+          ]
+        },
+        "ngrok": {
+          "traits": { "stable_url": 0.3, "zero_config": 0.3, "maturity": 0 },
+          "trait_basis": {
+            "stable_url": "declared",
+            "zero_config": "declared",
+            "maturity": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/public-ingress-providers.json (ngrok: status planned, NGROK_AUTHTOKEN; stable only with a reserved domain)"
+          ]
+        }
+      },
+      "purposes": {
+        "stable_url": {
+          "description": "Webhook receivers and shared links that must keep the same public URL across restarts.",
+          "weights": { "stable_url": 0.6, "maturity": 0.4 }
+        },
+        "quick_share": {
+          "description": "A throwaway public URL with the least setup.",
+          "weights": { "zero_config": 0.7, "maturity": 0.3 }
+        }
+      },
+      "default_chains": {
+        "default": ["tailscale-funnel", "cloudflared-quick", "cloudflared-named", "ngrok"]
+      }
+    }
+  ]
+}

@@ -72,6 +72,8 @@ export interface SeamSelectionPolicy {
    * chains routers used to hardcode.
    */
   default_chains?: Record<string, string[]>;
+  /** false: saved seam defaults never apply to this seam (security engines). */
+  allow_saved_default?: boolean;
 }
 
 export interface SeamProviderCandidate {
@@ -170,7 +172,7 @@ export function resolveSeamSelectionEntry(options: SeamSelectionEntryOptions): S
   const saved =
     purpose || defaultProvider || options.ignoreSavedDefault
       ? null
-      : resolveSavedSeamDefault(options.seam);
+      : savedSeamDefaultFor(options.seam);
   const select =
     Boolean(purpose) ||
     Boolean(saved) ||
@@ -216,6 +218,20 @@ export function listSeamSelectionPurposes(seam: string): string[] {
 }
 
 /**
+ * The saved seam default for a seam, unless its policy opts out
+ * (`allow_saved_default: false`). A missing policy directory does not block
+ * saved defaults.
+ */
+export function savedSeamDefaultFor(seam: string): SavedSeamDefault | null {
+  try {
+    if (getSeamSelectionPolicy(seam)?.allow_saved_default === false) return null;
+  } catch {
+    // Policy directory unavailable: fall through to the saved layers.
+  }
+  return resolveSavedSeamDefault(seam);
+}
+
+/**
  * The policy's baseline provider order for a request: `default_chains[key]`,
  * else `default_chains.default`, else just `[default_provider]`.
  */
@@ -253,7 +269,7 @@ export function resolveSeamDefaultOrder(
     // Policy directory unavailable (isolated tests): builtin order applies.
   }
   if (base.length === 0) base = [...(options.builtin ?? [])];
-  const saved = options.ignoreSavedDefault ? null : resolveSavedSeamDefault(seam);
+  const saved = options.ignoreSavedDefault ? null : savedSeamDefaultFor(seam);
   const head = saved ? [saved.provider] : [];
   return [...head, ...base].filter((id, index, all) => all.indexOf(id) === index);
 }
@@ -268,7 +284,7 @@ export function resolveSeamDefaultProvider(
   options: SeamDefaultOrderOptions & { eligible?: (id: string) => boolean } = {}
 ): { provider: string; source: SeamDefaultLayer | 'policy' | 'builtin' } | null {
   const ok = options.eligible ?? (() => true);
-  const saved = options.ignoreSavedDefault ? null : resolveSavedSeamDefault(seam);
+  const saved = options.ignoreSavedDefault ? null : savedSeamDefaultFor(seam);
   if (saved && ok(saved.provider)) return { provider: saved.provider, source: saved.layer };
   try {
     const policy = getSeamSelectionPolicy(seam);
@@ -375,9 +391,7 @@ function decide(
     .map((c) => ({ id: c.id, unmet: c.unmet ?? [] }));
   const callerDefault = purpose ? undefined : options.defaultProvider?.trim() || undefined;
   const saved: SavedSeamDefault | null =
-    purpose || callerDefault || options.ignoreOperatorOverlay
-      ? null
-      : resolveSavedSeamDefault(seam);
+    purpose || callerDefault || options.ignoreOperatorOverlay ? null : savedSeamDefaultFor(seam);
   const configuredDefault = callerDefault ?? saved?.provider;
   const configuredSource: 'caller' | SeamDefaultLayer | undefined = callerDefault
     ? 'caller'

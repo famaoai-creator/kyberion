@@ -201,12 +201,11 @@ describe('authn seam — saved seam default', () => {
     ],
   };
 
-  it('leads with an eligible saved default when no purpose is given', () => {
+  it('ignores saved defaults: the policy opts out (allow_saved_default: false)', () => {
     vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'authn-principal-resolver=env-token');
     const resolution = resolveAuthnPrincipal(request, { deps });
-    expect(resolution.decision.provider_id).toBe('env-token');
-    expect(resolution.decision.default_source).toBe('env');
-    expect(resolution.principal.provider).toBe('env-token');
+    expect(resolution.decision.provider_id).not.toBe('env-token');
+    expect(resolution.decision.default_source).not.toBe('env');
   });
 
   it('lets an explicit provider set win over the saved default', () => {

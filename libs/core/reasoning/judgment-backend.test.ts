@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   applyCalibrationTemperature,
   BUILTIN_JUDGMENT_PROVIDER,
@@ -44,6 +44,7 @@ function stubBackend(overrides: Partial<JudgmentBackend> = {}): JudgmentBackend 
 
 afterEach(() => {
   resetJudgmentBackends();
+  vi.unstubAllEnvs();
 });
 
 describe('judgment-backend seam', () => {
@@ -290,5 +291,42 @@ describe('organization work confidence separates clear from ambiguous', () => {
     expect(result.signals?.strong_shapes).toEqual(
       expect.arrayContaining(['incident_response', 'governance_cadence', 'routine_operation'])
     );
+  });
+});
+
+describe('judgment-backend saved seam default', () => {
+  function registerPair(): void {
+    registerOrganizationWorkJudgment();
+    registerJudgmentBackend(stubBackend({ judgment_id: 'stub-a' }));
+    registerJudgmentBackend(stubBackend({ judgment_id: 'stub-b' }));
+  }
+  const request = { state: '公開資料', questions: [QUESTION], tier: 'public' as const };
+
+  it('keeps registration order with no saved default', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', '');
+    registerPair();
+    expect(selectJudgmentBackend(request).backend.judgment_id).toBe('stub-a');
+  });
+
+  it('tries the saved default first', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'judgment-backend=stub-b');
+    registerPair();
+    expect(selectJudgmentBackend(request).backend.judgment_id).toBe('stub-b');
+  });
+
+  it('a saved builtin-rules default skips the model providers', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', `judgment-backend=${BUILTIN_JUDGMENT_PROVIDER}`);
+    registerPair();
+    const selection = selectJudgmentBackend(request);
+    expect(selection.backend.judgment_id).toBe(BUILTIN_JUDGMENT_PROVIDER);
+    expect(selection.reason).toMatch(/saved seam default/);
+  });
+
+  it('an ineligible saved default falls back (filters stay authoritative)', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'judgment-backend=stub-b');
+    registerOrganizationWorkJudgment();
+    registerJudgmentBackend(stubBackend({ judgment_id: 'stub-a' }));
+    registerJudgmentBackend(stubBackend({ judgment_id: 'stub-b', supports: () => false }));
+    expect(selectJudgmentBackend(request).backend.judgment_id).toBe('stub-a');
   });
 });

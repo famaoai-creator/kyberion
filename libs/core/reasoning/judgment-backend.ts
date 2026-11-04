@@ -51,7 +51,7 @@ import { checkProviderEgress, type ProviderEgressLabel } from '../provider/provi
 import { pathResolver } from '../path-resolver.js';
 import { readJsonIfPresent } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
-import { resolveSavedSeamDefault } from '../seam-selection-defaults.js';
+import { savedSeamDefaultFor } from '../seam-provider-selection.js';
 import type { TierLevel } from '../types.js';
 
 const logger = createLogger('judgment-backend');
@@ -313,7 +313,7 @@ export interface JudgmentSelection {
  */
 export function selectJudgmentBackend(request: JudgmentRequest): JudgmentSelection {
   const builtin = judgmentSeam.getOptional(BUILTIN_JUDGMENT_PROVIDER);
-  const saved = resolveSavedSeamDefault(JUDGMENT_BACKEND_SEAM)?.provider;
+  const saved = savedSeamDefaultFor(JUDGMENT_BACKEND_SEAM)?.provider;
   const registered = judgmentSeam
     .list()
     .map((entry) => entry.implementation)

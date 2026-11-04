@@ -14,6 +14,7 @@ import {
   createSeamLifecycle,
   type SeamProviderMetadata,
 } from '../seam.js';
+import { resolveSeamDefaultProvider } from '../seam-provider-selection.js';
 
 export interface CalendarEventSummary {
   end: string;
@@ -483,11 +484,27 @@ function registerBuiltinCalendarProviders(): void {
   builtinsRegistered = true;
 }
 
+/** Hermetic fallback when the governed policy cannot be read. */
+const BUILTIN_DEFAULT_CALENDAR_PROVIDER = 'google-workspace';
+
+/**
+ * Calendar provider used when the caller names none: the saved seam default
+ * (`seam select default calendar-provider=<id>`, when registered) → the
+ * governed policy default chain → `google-workspace`.
+ */
+export function resolveDefaultCalendarProviderId(): CalendarProviderId {
+  const registered = new Set(listCalendarProviders().map((entry) => entry.provider_id));
+  return (resolveSeamDefaultProvider('calendar-provider', {
+    eligible: (id) => registered.has(id),
+    builtin: [BUILTIN_DEFAULT_CALENDAR_PROVIDER],
+  })?.provider ?? BUILTIN_DEFAULT_CALENDAR_PROVIDER) as CalendarProviderId;
+}
+
 export function normalizeCalendarProviderId(provider?: unknown): CalendarProviderId {
   const id =
     typeof provider === 'string' && provider.trim()
       ? provider.trim().toLowerCase()
-      : 'google-workspace';
+      : resolveDefaultCalendarProviderId();
   return resolveCalendarProvider(id).provider_id;
 }
 
@@ -508,7 +525,7 @@ export function resolveCalendarProvider(
   provider?: CalendarProviderId | string
 ): CalendarProviderBridge {
   registerBuiltinCalendarProviders();
-  const wanted = String(provider || 'google-workspace')
+  const wanted = String(provider || resolveDefaultCalendarProviderId())
     .trim()
     .toLowerCase() as CalendarProviderId;
   const bridge = listCalendarProviders().find((entry) => entry.provider_id === wanted);

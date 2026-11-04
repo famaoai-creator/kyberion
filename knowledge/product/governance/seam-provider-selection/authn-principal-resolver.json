@@ -4,6 +4,7 @@
   "seams": [
     {
       "seam_id": "authn-principal-resolver",
+      "allow_saved_default": false,
       "default_provider": "registry-token",
       "fallback_purpose": "local_dev",
       "traits": {
