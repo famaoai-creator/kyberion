@@ -51,8 +51,9 @@
 <!-- How did you verify? List concrete commands run. Follow knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md -->
 
 ```bash
-# Required before open:
-pnpm check -- --scope pr
+# Required before open (CI runs pr + full-only gates; --changed selects both for your diff):
+pnpm check -- --changed
+pnpm exec vitest run --changed origin/main   # affected tests (vitest related); "0 test files" is not evidence
 # Plus any exception-table rows for your changed paths (actuator rebaseline, env-registry, build:actuators, …)
 ```
 
@@ -71,7 +72,7 @@ N/A.
 
 ## Checklist
 
-- [ ] Followed [`pre-pr-ci-readiness-checklist.ja.md`](../knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md) (standard `pnpm check -- --scope pr` + exception-table rows)
+- [ ] Followed [`pre-pr-ci-readiness-checklist.ja.md`](../knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md) (standard `pnpm check -- --changed` + affected tests + exception-table rows)
 - [ ] Mission / workitem references are included when applicable
 - [ ] Evidence paths or trace IDs are included when applicable
 - [ ] Tests added (or existing tests updated)
