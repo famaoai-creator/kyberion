@@ -12,7 +12,7 @@
  * signals for a server-resolved viewer; every reader is injectable for tests.
  */
 
-import { getInstalledReasoningMode } from '../reasoning/reasoning-bootstrap.js';
+import { readInstalledReasoningMode } from '../reasoning/installed-reasoning-mode.js';
 import { loadSpendPolicy, resolveSpendPolicyForTenant } from '../spend-guard.js';
 import { loadNotificationPreferences } from './operator-notifications.js';
 import { findActiveCharter } from '../governance/accountability-charter-registry.js';
@@ -29,7 +29,7 @@ export interface SetupChecklistReaders {
 }
 
 export const defaultSetupChecklistReaders: SetupChecklistReaders = {
-  reasoningMode: () => getInstalledReasoningMode() ?? 'not-installed',
+  reasoningMode: () => readInstalledReasoningMode() ?? 'not-installed',
   charterInForce: (tenant, now) =>
     findActiveCharter({ kind: 'organization', tenant_slug: tenant }, now) !== null,
   notificationChannel: () => Boolean(loadNotificationPreferences().default_channel),

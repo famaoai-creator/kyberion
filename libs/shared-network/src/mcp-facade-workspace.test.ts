@@ -17,6 +17,8 @@ describe('MCP workspace facade', () => {
       'kyberion.workspace.get',
       'kyberion.workspace.search',
       'kyberion.setup.checklist',
+      'kyberion.needs-you.list',
+      'kyberion.needs-you.summary',
     ]);
   });
 
