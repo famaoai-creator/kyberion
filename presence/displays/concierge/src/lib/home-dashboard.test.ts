@@ -64,6 +64,7 @@ vi.mock('@agent/core/foundation', () => ({ getRegisteredEnvText: () => '' }));
 import {
   collectHomeDashboard,
   composeHomeDashboard,
+  countsOnlyHomeDashboard,
   deliverableDisplayTitle,
   missionDisplayTitle,
 } from './home-dashboard';
@@ -101,6 +102,29 @@ const viewer = (tenantSlugs: string[] | 'all' = 'all') =>
     tierAccess: ['public', 'confidential'],
     source: 'loopback',
   }) as never;
+
+describe('countsOnlyHomeDashboard (personal view, review M3)', () => {
+  it('keeps the counts and drops every company title', () => {
+    const home = composeHomeDashboard({
+      now: NOW,
+      failed: [],
+      missions: [
+        mission('MSN-K', 'paused', 5),
+        mission('MSN-L', 'failed', 6),
+        mission('MSN-H', 'active', 1),
+      ],
+    });
+    expect(home.missions.blocked.length).toBeGreaterThan(0);
+    const personal = countsOnlyHomeDashboard(home);
+    expect(personal.missions.open).toEqual(home.missions.open);
+    expect(personal.missions.blockedTotal).toBe(home.missions.blockedTotal);
+    expect(personal.missions.blocked).toEqual([]);
+    expect(personal.krs.items).toEqual([]);
+    expect(personal.deliverables).toEqual([]);
+    expect(personal.withheld).toEqual(['krs', 'deliverables']);
+    expect(JSON.stringify(personal)).not.toContain('Goal of');
+  });
+});
 
 describe('composeHomeDashboard', () => {
   it('buckets throughput, failure rate and duration over the last 7 days vs the 7 before', () => {

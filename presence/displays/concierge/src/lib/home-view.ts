@@ -97,6 +97,19 @@ export function workHref(state?: MissionOpenState): string {
   return state ? `/work?tab=missions&status=${state}&view=list` : '/work';
 }
 
+/**
+ * Stopped missions are both paused and failed: the mission state board, whose
+ * 入力待ち・停滞 column holds exactly those (a status filter takes only one).
+ */
+export function stoppedMissionsHref(): string {
+  return '/work?tab=missions&view=board';
+}
+
+/** One deliverable, opened on its row in 資料. */
+export function deliverableHref(artifactId: string): string {
+  return `/library?${new URLSearchParams({ tab: 'deliverables', artifact: artifactId }).toString()}`;
+}
+
 export function missionHref(missionId: string): string {
   return `/w/mission/${encodeURIComponent(missionId)}`;
 }

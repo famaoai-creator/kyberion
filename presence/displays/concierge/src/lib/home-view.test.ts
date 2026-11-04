@@ -6,6 +6,8 @@ import {
   settingsHref,
   windowDelta,
   workHref,
+  stoppedMissionsHref,
+  deliverableHref,
 } from './home-view';
 
 describe('home view helpers', () => {
@@ -38,5 +40,10 @@ describe('home view helpers', () => {
     expect(barPercent(1, 1000)).toBe(2);
     expect(barPercent(5, 10)).toBe(50);
     expect(barPercent(3, 0)).toBe(0);
+  });
+
+  it('drills stopped missions to the state board and a deliverable to its row (review UX-L5)', () => {
+    expect(stoppedMissionsHref()).toBe('/work?tab=missions&view=board');
+    expect(deliverableHref('ART 1')).toBe('/library?tab=deliverables&artifact=ART+1');
   });
 });
