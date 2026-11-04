@@ -98,20 +98,43 @@ export function WorkItemBoard<T extends BoardCard>({
   const [dropTarget, setDropTarget] = React.useState<string | null>(null);
   const movable = canMove && Boolean(onMove);
 
-  // A server refresh that already shows the moved status retires the override.
+  // Moves the server confirmed: the next refresh is authoritative for them.
+  const settledRef = React.useRef<Set<string>>(new Set());
+  // The card whose move control gets keyboard focus back after its move.
+  const [focusCard, setFocusCard] = React.useState<string | null>(null);
+  const moveControls = React.useRef<Map<string, HTMLSelectElement>>(new Map());
+
+  // A refresh retires an override once it shows the moved status, or once the
+  // server confirmed the move (then its status wins, even if another operator
+  // moved the card meanwhile), so a stale optimistic column never sticks.
   React.useEffect(() => {
+    const settled = settledRef.current;
     setOverrides((current) => {
       const next = { ...current };
       let changed = false;
       for (const card of cards) {
-        if (next[card.id] !== undefined && next[card.id] === card.status) {
+        if (next[card.id] === undefined) continue;
+        if (next[card.id] === card.status || settled.has(card.id)) {
           delete next[card.id];
+          settled.delete(card.id);
           changed = true;
         }
       }
       return changed ? next : current;
     });
   }, [cards]);
+
+  // The moved card remounts in its new column, so the Dialog's own focus
+  // restore lands on a detached control; put focus back on the moved card's
+  // control once its save ends (a disabled control cannot take focus).
+  React.useEffect(() => {
+    if (!focusCard || saving === focusCard) return;
+    const timer = setTimeout(() => {
+      moveControls.current.get(focusCard)?.focus();
+      setFocusCard(null);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [focusCard, saving, overrides]);
 
   const effective = React.useMemo(
     () =>
@@ -143,9 +166,12 @@ export function WorkItemBoard<T extends BoardCard>({
     const { card, to } = pending;
     setPending(null);
     setSaving(card.id);
+    setFocusCard(card.id);
+    settledRef.current.delete(card.id);
     setOverrides((current) => ({ ...current, [card.id]: to }));
     try {
       await onMove(card, to);
+      settledRef.current.add(card.id);
     } catch {
       setOverrides((current) => {
         const next = { ...current };
@@ -196,11 +222,8 @@ export function WorkItemBoard<T extends BoardCard>({
         </div>
         {described.summary ? <p className="wb-card__summary">{described.summary}</p> : null}
         {lineage.length ? (
-          <p
-            className="wb-card__lineage"
-            aria-label={t('ux_b_lineage_label')}
-            title={lineage.map((ref) => ref.id).join(' › ')}
-          >
+          <p className="wb-card__lineage">
+            <span className="wb-visually-hidden">{t('ux_b_lineage_label')}: </span>
             {lineage.map((ref) => ref.label).join(' › ')}
           </p>
         ) : null}
@@ -229,6 +252,10 @@ export function WorkItemBoard<T extends BoardCard>({
               {t('ux_b_card_move_label')}: {title}
             </span>
             <select
+              ref={(element) => {
+                if (element) moveControls.current.set(card.id, element);
+                else moveControls.current.delete(card.id);
+              }}
               className="kb-input kb-select wb-card__move-select"
               value=""
               disabled={saving === card.id}

@@ -331,12 +331,20 @@ export function buildDecisionBrief(
   }
 
   const why: DisplayText[] = [...(known?.why ?? [])];
+  const reasonDetails: DecisionBriefDetail[] = [];
   const reasonTexts = [justification?.reason, ...(card?.riskReasons ?? [])];
   for (const reason of reasonTexts) {
     const localized = reason ? options.reasonText?.(reason) : undefined;
     if (localized) {
+      // The localized line carries no paths or codes; the stored reason
+      // stays whole behind the details disclosure.
+      if (reason && !reasonDetails.some((row) => row.value === reason))
+        reasonDetails.push({ labelKey: 'ux_b_detail_reason', value: reason });
       const sameLine = (entry: DisplayText) =>
-        'key' in entry && 'key' in localized && entry.key === localized.key;
+        'key' in entry &&
+        'key' in localized &&
+        entry.key === localized.key &&
+        JSON.stringify(entry.params ?? {}) === JSON.stringify(localized.params ?? {});
       if (!why.some(sameLine)) why.push(localized);
       continue;
     }
@@ -392,7 +400,7 @@ export function buildDecisionBrief(
     requester,
     state: briefState(record, now),
     groupKey,
-    details: machineDetails(record, effectId),
+    details: [...machineDetails(record, effectId), ...reasonDetails],
   };
 }
 

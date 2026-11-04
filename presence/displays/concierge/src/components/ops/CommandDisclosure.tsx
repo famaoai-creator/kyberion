@@ -13,6 +13,12 @@ import { uxText } from '../../lib/ops/ux-vocabulary';
 export function CommandDisclosure({ command, label }: { command: string; label?: string }) {
   const locale = useChronosLocale();
   const [copy, setCopy] = React.useState<'idle' | 'copied' | 'failed'>('idle');
+  // "Copied" goes back to "Copy" after a moment, so a second copy reads fresh.
+  React.useEffect(() => {
+    if (copy !== 'copied') return;
+    const timer = setTimeout(() => setCopy('idle'), 2000);
+    return () => clearTimeout(timer);
+  }, [copy]);
   const onCopy = async () => {
     try {
       await navigator.clipboard.writeText(command);
@@ -32,11 +38,13 @@ export function CommandDisclosure({ command, label }: { command: string; label?:
           <button type="button" className="kb-btn kb-btn--ghost" onClick={() => void onCopy()}>
             {uxText(copy === 'copied' ? 'ux_b_command_copied' : 'ux_b_command_copy', locale)}
           </button>
-          {copy === 'failed' ? (
-            <span role="status" className="chronos-command__note">
-              {uxText('ux_b_command_copy_failed', locale)}
-            </span>
-          ) : null}
+          <span role="status" className="chronos-command__note">
+            {copy === 'failed'
+              ? uxText('ux_b_command_copy_failed', locale)
+              : copy === 'copied'
+                ? uxText('ux_b_command_copied', locale)
+                : ''}
+          </span>
         </div>
       </div>
     </details>
