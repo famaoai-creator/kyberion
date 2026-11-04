@@ -50,6 +50,11 @@ the ingest ceremony is the only sanctioned way into
   to PNG/JPEG** with their page position.
 - `media:document_digest { path, ocr? }` → Markdown with page markers, heuristic
   tables and metadata.
+- **Unreadable pages** (unmapped-font text layer, or a vector-only diagram): `kyberion read`
+  drops the garbage glyphs and, when asked, draws the page with pdf.js (`pdf-parse`
+  `getScreenshot` — no `pdftoppm` / LibreOffice, so it works in the managed runtime too).
+  `--images <dir>` saves `page-N-render.png` for `pnpm kyberion see`; `--ocr` also OCRs it.
+  OCR loses diagram structure (arrows, who-pays-whom) — look at the image for figures.
 - `ocr: true` (or `{ enabled, language, mode, min_area_ratio }`) OCRs the images on
   each page — pasted tables, charts, screenshots. Images under 3% of the page (logos)
   are skipped. OCR is local-only by default (`training_use: 'local_only'`, Apple Vision /
