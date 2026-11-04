@@ -378,8 +378,8 @@ export function KnowledgeWorkspace({
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(18rem,0.9fr)_minmax(0,1.5fr)]">
       <Section
-        title={uxText('chronos_knowledge_title', locale)}
-        description={uxText('chronos_knowledge_description', locale)}
+        title={browseOnly?.heading ?? uxText('chronos_knowledge_title', locale)}
+        description={browseOnly?.description ?? uxText('chronos_knowledge_description', locale)}
       >
         <div className="flex flex-wrap gap-2">
           <Badge label={scopeLabel} tone="accent" />

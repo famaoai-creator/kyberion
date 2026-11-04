@@ -87,6 +87,9 @@ export interface WorkspaceDecisionPointer {
   href: string;
   title: string;
   label: string;
+  /** Browse-mode list heading and description (the decision wording does not apply). */
+  heading?: string;
+  description?: string;
 }
 
 export function DeliverablesWorkspace({
@@ -218,8 +221,8 @@ export function DeliverablesWorkspace({
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(18rem,0.9fr)_minmax(0,1.5fr)]">
       <Section
-        title={uxText('chronos_deliverables_preview_title', locale)}
-        description={uxText('chronos_deliverables_description', locale)}
+        title={browseOnly?.heading ?? uxText('chronos_deliverables_preview_title', locale)}
+        description={browseOnly?.description ?? uxText('chronos_deliverables_description', locale)}
       >
         <div className="flex flex-wrap gap-2">
           <Badge label={scopeLabel} tone="accent" />
@@ -280,7 +283,10 @@ export function DeliverablesWorkspace({
       </Section>
 
       {selected ? (
-        <Section title={selected.kind} description={uxText('chronos_preview_review', locale)}>
+        <Section
+          title={selected.kind}
+          description={browseOnly ? undefined : uxText('chronos_preview_review', locale)}
+        >
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill
               status={reviewStatus(selected.reviewVerdict)}

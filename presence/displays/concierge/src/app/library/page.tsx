@@ -63,6 +63,8 @@ function Library() {
               href: inboxHref('knowledge'),
               title: t('ia_shell_library_knowledge_where'),
               label: t('ia_shell_open_inbox'),
+              heading: t('ia_shell_library_tab_knowledge'),
+              description: t('ia_shell_library_knowledge_hint'),
             }}
           />
         </div>
@@ -82,6 +84,8 @@ function Library() {
               href: inboxHref('review'),
               title: t('ia_shell_library_review_where'),
               label: t('ia_shell_open_inbox'),
+              heading: t('ia_shell_library_tab_deliverables'),
+              description: t('ia_shell_library_deliverables_hint'),
             }}
           />
         </div>

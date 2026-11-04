@@ -20132,6 +20132,16 @@
         "en": "Home",
         "ja": "ホーム",
         "qps-ploc": "⟦Ħőɱė ŀőř⟧"
+      },
+      "ia_shell_library_deliverables_hint": {
+        "en": "Pick a deliverable to read what was delivered.",
+        "ja": "成果物を選ぶと、納品された中身を読めます。",
+        "qps-ploc": "⟦Ṗïƈķ ȧ ḓėŀïṽėřȧƀŀė ŧő řėȧḓ ẇħȧŧ ẇȧş ḓėŀïṽėřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ia_shell_library_knowledge_hint": {
+        "en": "Pick an entry to read what was learned and where it came from.",
+        "ja": "項目を選ぶと、学んだ内容とその出どころを読めます。",
+        "qps-ploc": "⟦Ṗïƈķ ȧñ ėñŧřẏ ŧő řėȧḓ ẇħȧŧ ẇȧş ŀėȧřñėḓ ȧñḓ ẇħėřė ïŧ ƈȧɱė ƒřőɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
       }
     },
     "onboarding": {
