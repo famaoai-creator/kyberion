@@ -215,6 +215,12 @@ export interface VcsHostCallOptions {
   timeoutMs?: number;
   /** Explicit provider id; never relaxes approval or egress policy. */
   provider?: string;
+  /**
+   * Explicit provider instance (dependency injection for callers that already
+   * own a runner, e.g. an actuator's governed exec). Wins over `provider`.
+   * Never relaxes approval or egress policy: the verb layer still governs.
+   */
+  hostProvider?: VcsHostProvider;
   /** git runner for local facts; defaults to the governed vcs-backend. */
   git?: VcsCommandRunner;
 }
@@ -241,6 +247,7 @@ export function resolveVcsHostProvider(
   options: VcsHostCallOptions = {},
   ctx: VcsHostCallContext = vcsHostCallContext(options)
 ): VcsHostProvider {
+  if (options.hostProvider) return options.hostProvider;
   const explicit = options.provider?.trim();
   if (explicit) {
     const provider = vcsHostRegistry.get(explicit);
