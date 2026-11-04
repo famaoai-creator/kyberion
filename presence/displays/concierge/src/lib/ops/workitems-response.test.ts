@@ -42,6 +42,13 @@ describe('work items response boundary', () => {
     expect(parseWorkItemMutationResponse({ ok: true, item })).toEqual({ ok: true, item });
   });
 
+  it('keeps a known access role and drops an unknown one', () => {
+    expect(parseWorkItemsResponse({ ...valid, accessRole: 'localadmin' })?.accessRole).toBe(
+      'localadmin'
+    );
+    expect(parseWorkItemsResponse({ ...valid, accessRole: 'root' })?.accessRole).toBeUndefined();
+  });
+
   it.each([
     ['not ok', { ...valid, ok: false }],
     ['invalid status list', { ...valid, statuses: [1] }],

@@ -8,6 +8,8 @@ import {
   type HeadlessResourceDescriptor,
 } from '@agent/core/headless-surface-contract';
 import { buildCeoSurfaceSummary, type CeoSurfaceSummary } from '@agent/core/ceo-surface-summary';
+import { withExecutionContext } from '@agent/core/authority';
+import { readApprovalPublicationPreview } from '@agent/core/surface/approval-publication-preview';
 import { conciergeApprovalSnapshot } from './personal-approval-server';
 import type { OperatorHomeScopeFilter } from '@agent/core/surface/operator-home-summary';
 import type { A2UIMessage } from '@agent/core/a2ui';
@@ -169,6 +171,27 @@ export function authorizeConciergeOperation(
   if (!decision.allowed) throw new ConciergeViewerError(403, decision.reason);
 }
 
+/**
+ * Display-only PR preview for a `vcs:pr_create` brief. The record already
+ * passed the viewer's scope filter; the review artifact is read only for a
+ * tenant inside the viewer's scope, under that tenant's context (the reader
+ * itself checks the file is in the record's own tenant floor and matches its
+ * content hash).
+ */
+function conciergePublicationPreview(viewer: ConciergeViewerContext) {
+  return (record: Parameters<typeof readApprovalPublicationPreview>[0]) => {
+    const tenant = record.scope?.tenant_slug;
+    if (!tenant || (viewer.tenantSlugs !== 'all' && !viewer.tenantSlugs.includes(tenant)))
+      return undefined;
+    return withExecutionContext(
+      'sovereign_concierge',
+      () => readApprovalPublicationPreview(record),
+      undefined,
+      tenant
+    );
+  };
+}
+
 export function readConciergeHome(
   viewer: ConciergeViewerContext,
   query: {
@@ -196,6 +219,7 @@ export function readConciergeHome(
       scope,
       limit: query.limit || 20,
       approvalSnapshot: snapshot,
+      approvalBriefSources: { publicationPreview: conciergePublicationPreview(viewer) },
     });
     for (const item of summary.approval_queue) {
       const record = snapshot.find(

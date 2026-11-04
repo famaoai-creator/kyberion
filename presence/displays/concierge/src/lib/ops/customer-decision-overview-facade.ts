@@ -1,11 +1,11 @@
-import { serverChildEnv } from '../server-child-env';
+import { governedWorkerEnv } from '../server-child-env';
 /**
  * CD-12: how Chronos reads a tenant's customer-decision overview, case
  * detail and learning view without gaining any reach into
  * `knowledge/confidential/<tenant>/decisions/`.
  *
  * Chronos never reads the case stores itself. It runs the built governed
- * facade (`dist/scripts/customer_decision.js overview --tenant <t> … --json`,
+ * facade (`dist/scripts/customer_decision_overview.js overview --tenant <t> … --json`,
  * a fixed argv per view kind, see {@link facadeArgs}) as a child process,
  * bound to the resolved viewer tenant, exactly as the
  * customer room does (presence/displays/customer-room/src/server/facade.ts):
@@ -13,8 +13,11 @@ import { serverChildEnv } from '../server-child-env';
  * persona, sudo and mission keys blanked and KYBERION_TENANT set to the one
  * tenant the viewer resolved to. The facade assumes its own narrow
  * tenant-bound roles and refuses a `--tenant` other than the bound one, so a
- * child for tenant A can never print tenant B. The child is bounded by the
- * server's own role (SYSTEM_ROLE=concierge, lib/server-child-env.ts).
+ * child for tenant A can never print tenant B. The child is bounded by its own
+ * narrow system role (SYSTEM_ROLE=customer_decision_reader, which may assume
+ * decision_ledger), never by the server's role — the concierge policy does
+ * not grant decision_ledger, so a concierge-bounded child cannot read the
+ * ledger at all.
  *
  * Responses are bounded: a timeout and an output cap on the child, a short
  * per-view cache (`kind:tenant:arg`) plus in-flight sharing so polling cards
@@ -42,7 +45,10 @@ import {
   type CustomerDecisionLearningViewData,
 } from './customer-decision-learning-response';
 
-export const OVERVIEW_FACADE_SCRIPT = 'dist/scripts/customer_decision.js';
+/** The system role of the read-only customer-decision facade child. */
+export const CUSTOMER_DECISION_READER_ROLE = 'customer_decision_reader';
+
+export const OVERVIEW_FACADE_SCRIPT = 'dist/scripts/customer_decision_overview.js';
 export const OVERVIEW_FACADE_TIMEOUT_MS = 15_000;
 export const OVERVIEW_FACADE_MAX_OUTPUT_MB = 2;
 export const OVERVIEW_CACHE_TTL_MS = 15_000;
@@ -73,9 +79,11 @@ export const OVERVIEW_CHILD_CLEARED_ENV = [
  */
 export function overviewChildEnv(tenant: string): Record<string, string | undefined> {
   const root = getRegisteredEnvText('KYBERION_ROOT');
-  // H1: the child runs bounded by the server's role assumption policy
-  // (SYSTEM_ROLE=concierge), never unbounded without a SYSTEM_ROLE.
-  return serverChildEnv({
+  // H1: the child is never unbounded. It runs under its own narrow system
+  // role, which may assume decision_ledger (the tenant ledger read) — the
+  // server itself (SYSTEM_ROLE=concierge) must not, and a child bounded by
+  // the concierge policy is refused that role.
+  return governedWorkerEnv(CUSTOMER_DECISION_READER_ROLE, {
     ...Object.fromEntries(OVERVIEW_CHILD_CLEARED_ENV.map((key) => [key, ''])),
     KYBERION_TENANT: tenant,
     ...(root ? { KYBERION_ROOT: root } : {}),

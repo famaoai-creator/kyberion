@@ -31,9 +31,18 @@ import {
   kindLabel,
   kindNextStep,
   kindsLabel,
+  ApprovalBriefsProvider,
+  nodeTitle,
+  useApprovalBriefs,
   roleLabel,
   type Translate,
 } from '../../workspace-parts';
+import {
+  actorDisplayName,
+  cardSummary,
+  parseDecisionBrief,
+} from '../../../../lib/decision-brief-view';
+import { DecisionBriefBlock } from '../../../decision-brief';
 import '../../workspace.css';
 
 export default function WorkspaceEntityPage() {
@@ -52,7 +61,11 @@ export default function WorkspaceEntityPage() {
       </div>
     );
   }
-  return <EntityDetail t={t} kind={kind} id={id} />;
+  return (
+    <ApprovalBriefsProvider>
+      <EntityDetail t={t} kind={kind} id={id} />
+    </ApprovalBriefsProvider>
+  );
 }
 
 /**
@@ -63,6 +76,7 @@ function EntityDetail({ t, kind, id }: { t: Translate; kind: GraphEntityKind; id
   const { locale } = useConciergeI18n();
   const entity = useWorkspaceResource<GraphEntityView>(workspaceApiPath('get', { kind, id }));
   const summary = useWorkspaceResource<WorkspaceGraphSummary>(workspaceApiPath('summary'));
+  const approvalBriefs = useApprovalBriefs();
 
   if (entity.state === 'loading')
     return (
@@ -93,6 +107,12 @@ function EntityDetail({ t, kind, id }: { t: Translate; kind: GraphEntityKind; id
 
   const view = entity.data;
   const { node } = view;
+  const brief =
+    node.kind === 'approval'
+      ? (approvalBriefs.get(node.id) ?? parseDecisionBrief(node.brief))
+      : undefined;
+  const title = nodeTitle(node, locale, brief);
+  const summaryText = cardSummary(node.summary, 600);
   const facts = [
     { label: t('ws_fact_id'), value: node.id, mono: true },
     ...(node.tier ? [{ label: t('ws_fact_tier'), value: node.tier }] : []),
@@ -106,8 +126,8 @@ function EntityDetail({ t, kind, id }: { t: Translate; kind: GraphEntityKind; id
 
   return (
     <div className="ws-page">
-      <WorkspaceCrumbs t={t} lineage={view.lineage} current={node.label} />
-      <PageHeader title={node.label} subtitle={t(`ws_about_${node.kind}`)} />
+      <WorkspaceCrumbs t={t} lineage={view.lineage} current={title} />
+      <PageHeader title={title} subtitle={t(`ws_about_${node.kind}`)} />
       <div className="ws-entity-meta">
         <Badge label={kindLabel(t, node.kind)} tone="accent" />
         <EntityStatus kind={node.kind} status={node.status} />
@@ -122,9 +142,13 @@ function EntityDetail({ t, kind, id }: { t: Translate; kind: GraphEntityKind; id
               <p className="ws-text">{view.goal}</p>
             </Section>
           ) : null}
-          {node.summary && node.summary !== node.label ? (
+          {brief ? (
             <Section title={t('ws_summary_title')}>
-              <p className="ws-text">{node.summary}</p>
+              <DecisionBriefBlock brief={brief} locale={locale} showAsk={false} />
+            </Section>
+          ) : summaryText.short && node.summary !== node.label ? (
+            <Section title={t('ws_summary_title')}>
+              <p className="ws-text">{summaryText.full}</p>
             </Section>
           ) : null}
           {CONTAINABLE_KINDS[node.kind].length ? <Contents t={t} view={view} /> : null}
@@ -245,6 +269,7 @@ function TaskList({ t, tasks }: { t: Translate; tasks: readonly GraphNode[] }) {
 }
 
 function People({ t, actors }: { t: Translate; actors: GraphEntityView['actors'] }) {
+  const { locale } = useConciergeI18n();
   return (
     <Section title={t('ws_people_title')} description={t('ws_people_lead')}>
       {actors.length ? (
@@ -254,7 +279,13 @@ function People({ t, actors }: { t: Translate; actors: GraphEntityView['actors']
               {actor.known ? (
                 <a href={entityHref('actor', actor.actorId)}>{actor.label}</a>
               ) : (
-                <span>{actor.label}</span>
+                <span>
+                  {actorDisplayName(
+                    actor.actorId,
+                    locale,
+                    actor.label !== actor.actorId ? actor.label : undefined
+                  )}
+                </span>
               )}
               <span className="ws-chips">
                 <Badge label={roleLabel(t, actor.role)} tone="neutral" />

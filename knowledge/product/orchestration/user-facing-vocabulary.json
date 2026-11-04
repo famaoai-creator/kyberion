@@ -13303,6 +13303,456 @@
       }
     },
     "concierge": {
+      "ux_b_reason_axis_max": {
+        "en": "A risk axis is at its maximum",
+        "ja": "影響範囲・取り消しにくさ・機密性・確信度のうち、最大の軸があります",
+        "qps-ploc": "⟦Ȧ řïşķ ȧẋïş ïş ȧŧ ïŧş ɱȧẋïɱůɱ ŀőřėɱ ïṗş⟧"
+      },
+      "ux_b_reason_irreversible": {
+        "en": "Hard to undo",
+        "ja": "取り消しにくい操作です",
+        "qps-ploc": "⟦Ħȧřḓ ŧő ůñḓő ŀőř⟧"
+      },
+      "ux_b_reason_never_auto": {
+        "en": "Always decided by a person",
+        "ja": "常に人が決める種類の操作です",
+        "qps-ploc": "⟦Ȧŀẇȧẏş ḓėƈïḓėḓ ƀẏ ȧ ṗėřşőñ ŀőřėɱ ïṗ⟧"
+      },
+      "ux_b_reason_high_risk_path": {
+        "en": "Changes {count} protected file(s)",
+        "ja": "重要なファイルを {count} 件変更します",
+        "qps-ploc": "⟦Ƈħȧñɠėş {count} ṗřőŧėƈŧėḓ ƒïŀė(ş) ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_b_reason_requested": {
+        "en": "The agent asked for your judgment",
+        "ja": "エージェント自身が人の判断を求めました",
+        "qps-ploc": "⟦Ŧħė ȧɠėñŧ ȧşķėḓ ƒőř ẏőůř ĵůḓɠɱėñŧ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_b_reason_budget": {
+        "en": "Expected cost exceeds the budget cap",
+        "ja": "費用が予算の上限を超える見込みです",
+        "qps-ploc": "⟦Ėẋṗėƈŧėḓ ƈőşŧ ėẋƈėėḓş ŧħė ƀůḓɠėŧ ƈȧṗ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ux_b_reason_score": {
+        "en": "Risk score {score}/{max}",
+        "ja": "リスク点数 {score}/{max}",
+        "qps-ploc": "⟦Řïşķ şƈőřė {score}/{max} ŀőřėɱ ï⟧"
+      },
+      "ux_b_intervention_missing_capabilities": {
+        "en": "A domain names a capability that is not defined.",
+        "ja": "ドメインが、定義されていないケイパビリティを参照しています。",
+        "qps-ploc": "⟦Ȧ ḓőɱȧïñ ñȧɱėş ȧ ƈȧṗȧƀïŀïŧẏ ŧħȧŧ ïş ñőŧ ḓėƒïñėḓ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "ux_b_intervention_missing_services": {
+        "en": "A capability names a service that is not defined.",
+        "ja": "ケイパビリティが、定義されていないサービスを参照しています。",
+        "qps-ploc": "⟦Ȧ ƈȧṗȧƀïŀïŧẏ ñȧɱėş ȧ şėřṽïƈė ŧħȧŧ ïş ñőŧ ḓėƒïñėḓ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "ux_b_intervention_orphan_capabilities": {
+        "en": "A capability belongs to no domain.",
+        "ja": "どのドメインにも属さないケイパビリティがあります。",
+        "qps-ploc": "⟦Ȧ ƈȧṗȧƀïŀïŧẏ ƀėŀőñɠş ŧő ñő ḓőɱȧïñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_b_intervention_orphan_services": {
+        "en": "A service belongs to no capability or domain.",
+        "ja": "どこにも属さないサービスがあります。",
+        "qps-ploc": "⟦Ȧ şėřṽïƈė ƀėŀőñɠş ŧő ñő ƈȧṗȧƀïŀïŧẏ őř ḓőɱȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ux_b_intervention_services_without_state": {
+        "en": "A service has never reported its state.",
+        "ja": "状態がまだ記録されていないサービスがあります。",
+        "qps-ploc": "⟦Ȧ şėřṽïƈė ħȧş ñėṽėř řėṗőřŧėḓ ïŧş şŧȧŧė. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ux_b_intervention_stale_services": {
+        "en": "A service has not reported its state recently.",
+        "ja": "しばらく状態が更新されていないサービスがあります。",
+        "qps-ploc": "⟦Ȧ şėřṽïƈė ħȧş ñőŧ řėṗőřŧėḓ ïŧş şŧȧŧė řėƈėñŧŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ux_b_intervention_invalid_runbook_refs": {
+        "en": "An operation points at a runbook that does not exist.",
+        "ja": "定常運用が、存在しない手順書を参照しています。",
+        "qps-ploc": "⟦Ȧñ őṗėřȧŧïőñ ṗőïñŧş ȧŧ ȧ řůñƀőőķ ŧħȧŧ ḓőėş ñőŧ ėẋïşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ux_b_intervention_missing_operation_services": {
+        "en": "An operation names a service that is not defined.",
+        "ja": "定常運用が、定義されていないサービスを参照しています。",
+        "qps-ploc": "⟦Ȧñ őṗėřȧŧïőñ ñȧɱėş ȧ şėřṽïƈė ŧħȧŧ ïş ñőŧ ḓėƒïñėḓ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "ux_b_intervention_operations_without_state": {
+        "en": "An operation has never recorded a run.",
+        "ja": "まだ一度も実行記録がない定常運用があります。",
+        "qps-ploc": "⟦Ȧñ őṗėřȧŧïőñ ħȧş ñėṽėř řėƈőřḓėḓ ȧ řůñ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ux_b_intervention_overdue_operations": {
+        "en": "An operation is past its due time.",
+        "ja": "期限を過ぎた定常運用があります。",
+        "qps-ploc": "⟦Ȧñ őṗėřȧŧïőñ ïş ṗȧşŧ ïŧş ḓůė ŧïɱė. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_b_intervention_missing_incident_services": {
+        "en": "An incident names a service that is not defined.",
+        "ja": "インシデントが、定義されていないサービスを参照しています。",
+        "qps-ploc": "⟦Ȧñ ïñƈïḓėñŧ ñȧɱėş ȧ şėřṽïƈė ŧħȧŧ ïş ñőŧ ḓėƒïñėḓ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "ux_b_intervention_missing_incident_operations": {
+        "en": "An incident names an operation that is not defined.",
+        "ja": "インシデントが、定義されていない定常運用を参照しています。",
+        "qps-ploc": "⟦Ȧñ ïñƈïḓėñŧ ñȧɱėş ȧñ őṗėřȧŧïőñ ŧħȧŧ ïş ñőŧ ḓėƒïñėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ux_b_intervention_missing_decision_cadences": {
+        "en": "A decision names a cadence that is not defined.",
+        "ja": "意思決定が、定義されていない会議体を参照しています。",
+        "qps-ploc": "⟦Ȧ ḓėƈïşïőñ ñȧɱėş ȧ ƈȧḓėñƈė ŧħȧŧ ïş ñőŧ ḓėƒïñėḓ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ux_b_intervention_pending_decisions": {
+        "en": "A decision is waiting for a person.",
+        "ja": "人の判断を待っている意思決定があります。",
+        "qps-ploc": "⟦Ȧ ḓėƈïşïőñ ïş ẇȧïŧïñɠ ƒőř ȧ ṗėřşőñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_b_intervention_missing_project_refs": {
+        "en": "The organization names a project that does not exist.",
+        "ja": "組織が、存在しないプロジェクトを参照しています。",
+        "qps-ploc": "⟦Ŧħė őřɠȧñïẑȧŧïőñ ñȧɱėş ȧ ṗřőĵėƈŧ ŧħȧŧ ḓőėş ñőŧ ėẋïşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ux_b_intervention_invalid_execution_refs": {
+        "en": "An operation has no valid execution target.",
+        "ja": "実行先が正しく設定されていない定常運用があります。",
+        "qps-ploc": "⟦Ȧñ őṗėřȧŧïőñ ħȧş ñő ṽȧŀïḓ ėẋėƈůŧïőñ ŧȧřɠėŧ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ux_b_intervention_invalid_evidence_refs": {
+        "en": "A record points at evidence that does not exist.",
+        "ja": "存在しない証跡を参照している記録があります。",
+        "qps-ploc": "⟦Ȧ řėƈőřḓ ṗőïñŧş ȧŧ ėṽïḓėñƈė ŧħȧŧ ḓőėş ñőŧ ėẋïşŧ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "ux_b_intervention_incident": {
+        "en": "An incident is still {status}.",
+        "ja": "インシデントが「{status}」のままです。",
+        "qps-ploc": "⟦Ȧñ ïñƈïḓėñŧ ïş şŧïŀŀ {status}. ŀőřėɱ ïṗşů⟧"
+      },
+      "ux_b_intervention_decision": {
+        "en": "A decision is waiting ({status}).",
+        "ja": "意思決定が判断を待っています（{status}）。",
+        "qps-ploc": "⟦Ȧ ḓėƈïşïőñ ïş ẇȧïŧïñɠ ({status}). ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_b_intervention_generic": {
+        "en": "This needs an operator's attention.",
+        "ja": "運用担当の対応が必要です。",
+        "qps-ploc": "⟦Ŧħïş ñėėḓş ȧñ őṗėřȧŧőř'ş ȧŧŧėñŧïőñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_b_intervention_col_item": {
+        "en": "What needs attention",
+        "ja": "対応が必要なこと",
+        "qps-ploc": "⟦Ẇħȧŧ ñėėḓş ȧŧŧėñŧïőñ ŀőřėɱ ⟧"
+      },
+      "ux_b_intervention_col_action": {
+        "en": "What to do",
+        "ja": "次にやること",
+        "qps-ploc": "⟦Ẇħȧŧ ŧő ḓő ŀőř⟧"
+      },
+      "ux_b_action_open_operations": {
+        "en": "Check in Operations",
+        "ja": "運用で確認する",
+        "qps-ploc": "⟦Ƈħėƈķ ïñ Őṗėřȧŧïőñş ŀőřėɱ ⟧"
+      },
+      "ux_b_action_open_decisions": {
+        "en": "Check in Decisions",
+        "ja": "判断で確認する",
+        "qps-ploc": "⟦Ƈħėƈķ ïñ Ḓėƈïşïőñş ŀőřėɱ⟧"
+      },
+      "ux_b_action_open_project": {
+        "en": "Open the project",
+        "ja": "プロジェクトを開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė ṗřőĵėƈŧ ŀőřėɱ⟧"
+      },
+      "ux_b_command_show": {
+        "en": "Show command",
+        "ja": "コマンドを表示",
+        "qps-ploc": "⟦Şħőẇ ƈőɱɱȧñḓ ŀőř⟧"
+      },
+      "ux_b_command_copy": {
+        "en": "Copy",
+        "ja": "コピー",
+        "qps-ploc": "⟦Ƈőṗẏ ŀőř⟧"
+      },
+      "ux_b_command_copied": {
+        "en": "Copied",
+        "ja": "コピーしました",
+        "qps-ploc": "⟦Ƈőṗïėḓ ŀőř⟧"
+      },
+      "ux_b_command_copy_failed": {
+        "en": "Could not copy; select the text instead.",
+        "ja": "コピーできませんでした。文字を選択してコピーしてください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈőṗẏ; şėŀėƈŧ ŧħė ŧėẋŧ ïñşŧėȧḓ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ux_b_card_open_mission": {
+        "en": "Open mission",
+        "ja": "ミッションを開く",
+        "qps-ploc": "⟦Őṗėñ ɱïşşïőñ ŀőř⟧"
+      },
+      "ux_b_board_view_label": {
+        "en": "Layout",
+        "ja": "表示形式",
+        "qps-ploc": "⟦Ŀȧẏőůŧ ŀőř⟧"
+      },
+      "ux_b_board_view_board": {
+        "en": "Board",
+        "ja": "ボード",
+        "qps-ploc": "⟦Ƀőȧřḓ ŀőř⟧"
+      },
+      "ux_b_board_view_list": {
+        "en": "List",
+        "ja": "一覧",
+        "qps-ploc": "⟦Ŀïşŧ ŀőř⟧"
+      },
+      "ux_b_board_label": {
+        "en": "Work items by status",
+        "ja": "状態別のワークアイテム",
+        "qps-ploc": "⟦Ẇőřķ ïŧėɱş ƀẏ şŧȧŧůş ŀőřėɱ ⟧"
+      },
+      "ux_b_board_column_empty": {
+        "en": "Nothing here",
+        "ja": "なし",
+        "qps-ploc": "⟦Ñőŧħïñɠ ħėřė ŀőř⟧"
+      },
+      "ux_b_board_collapsed_count": {
+        "en": "{label} ({count})",
+        "ja": "{label}（{count}件）",
+        "qps-ploc": "⟦{label} ({count}) ŀőřėɱ⟧"
+      },
+      "ux_b_board_other": {
+        "en": "Other statuses",
+        "ja": "その他の状態",
+        "qps-ploc": "⟦Őŧħėř şŧȧŧůşėş ŀőřė⟧"
+      },
+      "ux_b_board_readonly": {
+        "en": "You can view this board. Changing a status needs operator access.",
+        "ja": "このボードは閲覧のみです。状態の変更には運用担当の権限が必要です。",
+        "qps-ploc": "⟦Ẏőů ƈȧñ ṽïėẇ ŧħïş ƀőȧřḓ. Ƈħȧñɠïñɠ ȧ şŧȧŧůş ñėėḓş őṗėřȧŧőř ȧƈƈėşş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ux_b_card_move_label": {
+        "en": "Change status",
+        "ja": "状態を変更",
+        "qps-ploc": "⟦Ƈħȧñɠė şŧȧŧůş ŀőřė⟧"
+      },
+      "ux_b_card_move_placeholder": {
+        "en": "Change status…",
+        "ja": "状態を変更…",
+        "qps-ploc": "⟦Ƈħȧñɠė şŧȧŧůş… ŀőřė⟧"
+      },
+      "ux_b_card_details": {
+        "en": "Details",
+        "ja": "詳細",
+        "qps-ploc": "⟦Ḓėŧȧïŀş ŀőř⟧"
+      },
+      "ux_b_card_deliverable": {
+        "en": "Deliverable: {path}",
+        "ja": "成果物: {path}",
+        "qps-ploc": "⟦Ḓėŀïṽėřȧƀŀė: {path} ŀőřėɱ ⟧"
+      },
+      "ux_b_card_unassigned": {
+        "en": "Unassigned",
+        "ja": "未割当",
+        "qps-ploc": "⟦Ůñȧşşïɠñėḓ ŀőř⟧"
+      },
+      "ux_b_card_updated": {
+        "en": "Updated {age}",
+        "ja": "{age}に更新",
+        "qps-ploc": "⟦Ůṗḓȧŧėḓ {age} ŀőřė⟧"
+      },
+      "ux_b_lineage_label": {
+        "en": "Project and mission",
+        "ja": "プロジェクトとミッション",
+        "qps-ploc": "⟦Ṗřőĵėƈŧ ȧñḓ ɱïşşïőñ ŀőřėɱ ⟧"
+      },
+      "ux_b_priority_urgent": {
+        "en": "Urgent",
+        "ja": "至急",
+        "qps-ploc": "⟦Ůřɠėñŧ ŀőř⟧"
+      },
+      "ux_b_priority_high": {
+        "en": "High",
+        "ja": "高",
+        "qps-ploc": "⟦Ħïɠħ ŀőř⟧"
+      },
+      "ux_b_priority_normal": {
+        "en": "Normal",
+        "ja": "通常",
+        "qps-ploc": "⟦Ñőřɱȧŀ ŀőř⟧"
+      },
+      "ux_b_priority_low": {
+        "en": "Low",
+        "ja": "低",
+        "qps-ploc": "⟦Ŀőẇ ŀőř⟧"
+      },
+      "ux_b_move_confirm_title": {
+        "en": "Change the status?",
+        "ja": "状態を変更しますか",
+        "qps-ploc": "⟦Ƈħȧñɠė ŧħė şŧȧŧůş? ŀőřėɱ⟧"
+      },
+      "ux_b_move_confirm_message": {
+        "en": "\"{title}\" moves from {from} to {to}.",
+        "ja": "「{title}」を「{from}」から「{to}」に移します。",
+        "qps-ploc": "⟦\"{title}\" ɱőṽėş ƒřőɱ {from} ŧő {to}. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ux_b_move_confirm": {
+        "en": "Move",
+        "ja": "移動する",
+        "qps-ploc": "⟦Ɱőṽė ŀőř⟧"
+      },
+      "ux_b_move_cancel": {
+        "en": "Cancel",
+        "ja": "やめる",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "ux_b_move_saving": {
+        "en": "Saving…",
+        "ja": "保存中…",
+        "qps-ploc": "⟦Şȧṽïñɠ… ŀőř⟧"
+      },
+      "ux_b_move_failed": {
+        "en": "\"{title}\" could not be moved, so it went back to its column.",
+        "ja": "「{title}」の状態を変更できなかったため、元の列に戻しました。",
+        "qps-ploc": "⟦\"{title}\" ƈőůŀḓ ñőŧ ƀė ɱőṽėḓ, şő ïŧ ẇėñŧ ƀȧƈķ ŧő ïŧş ƈőŀůɱñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "ux_b_ops_viewer_details": {
+        "en": "Viewer details",
+        "ja": "閲覧範囲の詳細",
+        "qps-ploc": "⟦Ṽïėẇėř ḓėŧȧïŀş ŀőřė⟧"
+      },
+      "ux_b_org_tenant_choice": {
+        "en": "Tenant to show",
+        "ja": "表示するテナント",
+        "qps-ploc": "⟦Ŧėñȧñŧ ŧő şħőẇ ŀőřė⟧"
+      },
+      "ux_b_org_all_tenants": {
+        "en": "All tenants",
+        "ja": "すべてのテナント",
+        "qps-ploc": "⟦Ȧŀŀ ŧėñȧñŧş ŀőř⟧"
+      },
+      "ux_b_org_aggregate_title": {
+        "en": "Total across {count} tenants",
+        "ja": "{count}テナントの合計",
+        "qps-ploc": "⟦Ŧőŧȧŀ ȧƈřőşş {count} ŧėñȧñŧş ŀőřėɱ ïṗş⟧"
+      },
+      "ux_b_org_aggregate_body": {
+        "en": "Choose a tenant to see its purpose and objectives.",
+        "ja": "テナントを選ぶと、その組織の目的と目標が見られます。",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ŧėñȧñŧ ŧő şėė ïŧş ṗůřṗőşė ȧñḓ őƀĵėƈŧïṽėş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ux_b_org_aggregate_partial": {
+        "en": "{count} tenants could not be read and are not counted.",
+        "ja": "{count}テナントは読み込めなかったため、合計に含めていません。",
+        "qps-ploc": "⟦{count} ŧėñȧñŧş ƈőůŀḓ ñőŧ ƀė řėȧḓ ȧñḓ ȧřė ñőŧ ƈőůñŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ux_b_org_no_tenants": {
+        "en": "No tenant is available to you yet.",
+        "ja": "閲覧できるテナントがまだありません。",
+        "qps-ploc": "⟦Ñő ŧėñȧñŧ ïş ȧṽȧïŀȧƀŀė ŧő ẏőů ẏėŧ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_b_org_stat_incidents": {
+        "en": "Open incidents",
+        "ja": "未解決のインシデント",
+        "qps-ploc": "⟦Őṗėñ ïñƈïḓėñŧş ŀőřė⟧"
+      },
+      "ux_b_org_stat_overdue": {
+        "en": "Overdue operations",
+        "ja": "期限切れの定常運用",
+        "qps-ploc": "⟦Őṽėřḓůė őṗėřȧŧïőñş ŀőřėɱ⟧"
+      },
+      "ux_b_org_stat_decisions": {
+        "en": "Pending decisions",
+        "ja": "判断待ち",
+        "qps-ploc": "⟦Ṗėñḓïñɠ ḓėƈïşïőñş ŀőřėɱ⟧"
+      },
+      "ux_b_org_stat_open": {
+        "en": "Open",
+        "ja": "開く",
+        "qps-ploc": "⟦Őṗėñ ŀőř⟧"
+      },
+      "ux_b_org_objectives_title": {
+        "en": "Objectives and key results",
+        "ja": "目標と成果指標",
+        "qps-ploc": "⟦Őƀĵėƈŧïṽėş ȧñḓ ķėẏ řėşůŀŧş ŀőřėɱ ïṗ⟧"
+      },
+      "ux_b_kr_values": {
+        "en": "Baseline {baseline} → now {current} → target {target}",
+        "ja": "開始 {baseline} → 現在 {current} → 目標 {target}",
+        "qps-ploc": "⟦Ƀȧşėŀïñė {baseline} → ñőẇ {current} → ŧȧřɠėŧ {target} ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ux_b_kr_values_no_baseline": {
+        "en": "Now {current} → target {target}",
+        "ja": "現在 {current} → 目標 {target}",
+        "qps-ploc": "⟦Ñőẇ {current} → ŧȧřɠėŧ {target} ŀőřėɱ ïṗşů⟧"
+      },
+      "ux_b_kr_direction_increase": {
+        "en": "Higher is better",
+        "ja": "大きいほど良い",
+        "qps-ploc": "⟦Ħïɠħėř ïş ƀėŧŧėř ŀőřėɱ⟧"
+      },
+      "ux_b_kr_direction_decrease": {
+        "en": "Lower is better",
+        "ja": "小さいほど良い",
+        "qps-ploc": "⟦Ŀőẇėř ïş ƀėŧŧėř ŀőřė⟧"
+      },
+      "ux_b_kr_direction_maintain": {
+        "en": "Keep at target",
+        "ja": "目標値を維持",
+        "qps-ploc": "⟦Ķėėṗ ȧŧ ŧȧřɠėŧ ŀőřė⟧"
+      },
+      "ux_b_kr_measured": {
+        "en": "Measured {date}",
+        "ja": "{date}に計測",
+        "qps-ploc": "⟦Ɱėȧşůřėḓ {date} ŀőřė⟧"
+      },
+      "ux_b_kr_trend_up": {
+        "en": "Better than the last measurement",
+        "ja": "前回より改善",
+        "qps-ploc": "⟦Ƀėŧŧėř ŧħȧñ ŧħė ŀȧşŧ ɱėȧşůřėɱėñŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "ux_b_kr_trend_down": {
+        "en": "Worse than the last measurement",
+        "ja": "前回より悪化",
+        "qps-ploc": "⟦Ẇőřşė ŧħȧñ ŧħė ŀȧşŧ ɱėȧşůřėɱėñŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "ux_b_kr_trend_flat": {
+        "en": "Same as the last measurement",
+        "ja": "前回と同じ",
+        "qps-ploc": "⟦Şȧɱė ȧş ŧħė ŀȧşŧ ɱėȧşůřėɱėñŧ ŀőřėɱ ïṗş⟧"
+      },
+      "ux_b_kr_progress": {
+        "en": "{percent}% of target",
+        "ja": "目標の{percent}%",
+        "qps-ploc": "⟦{percent}% őƒ ŧȧřɠėŧ ŀőřėɱ ⟧"
+      },
+      "ux_b_kr_status_met": {
+        "en": "Met",
+        "ja": "達成",
+        "qps-ploc": "⟦Ɱėŧ ŀőř⟧"
+      },
+      "ux_b_kr_status_on_track": {
+        "en": "On track",
+        "ja": "順調",
+        "qps-ploc": "⟦Őñ ŧřȧƈķ ŀőř⟧"
+      },
+      "ux_b_kr_status_at_risk": {
+        "en": "At risk",
+        "ja": "要注意",
+        "qps-ploc": "⟦Ȧŧ řïşķ ŀőř⟧"
+      },
+      "ux_b_kr_status_off_track": {
+        "en": "Behind",
+        "ja": "遅れ",
+        "qps-ploc": "⟦Ƀėħïñḓ ŀőř⟧"
+      },
+      "ux_b_kr_status_unmeasured": {
+        "en": "Not measured",
+        "ja": "未計測",
+        "qps-ploc": "⟦Ñőŧ ɱėȧşůřėḓ ŀőř⟧"
+      },
+      "ux_b_objective_no_krs": {
+        "en": "No key results are set for this objective.",
+        "ja": "この目標には成果指標がまだありません。",
+        "qps-ploc": "⟦Ñő ķėẏ řėşůŀŧş ȧřė şėŧ ƒőř ŧħïş őƀĵėƈŧïṽė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
       "setup.oauth_operation_title": {
         "en": "Connection progress",
         "ja": "接続の進捗",
@@ -19072,6 +19522,456 @@
         "en": "Connection details",
         "ja": "接続の詳細",
         "qps-ploc": "⟦Ƈőññėƈŧïőñ ḓėŧȧïŀş ŀőřėɱ⟧"
+      },
+      "ux_a_brief_ask": {
+        "en": "What you're asked to decide",
+        "ja": "決めてほしいこと",
+        "qps-ploc": "⟦Ẇħȧŧ ẏőů'řė ȧşķėḓ ŧő ḓėƈïḓė ŀőřėɱ ïṗ⟧"
+      },
+      "ux_a_brief_why": {
+        "en": "Why it needs you",
+        "ja": "なぜ必要か",
+        "qps-ploc": "⟦Ẇħẏ ïŧ ñėėḓş ẏőů ŀőřėɱ⟧"
+      },
+      "ux_a_brief_impact": {
+        "en": "What each answer does",
+        "ja": "影響",
+        "qps-ploc": "⟦Ẇħȧŧ ėȧƈħ ȧñşẇėř ḓőėş ŀőřėɱ ⟧"
+      },
+      "ux_a_brief_on_approve": {
+        "en": "If you approve",
+        "ja": "承認すると",
+        "qps-ploc": "⟦Ïƒ ẏőů ȧṗṗřőṽė ŀőřė⟧"
+      },
+      "ux_a_brief_on_reject": {
+        "en": "If you reject",
+        "ja": "却下すると",
+        "qps-ploc": "⟦Ïƒ ẏőů řėĵėƈŧ ŀőřė⟧"
+      },
+      "ux_a_brief_if_silent": {
+        "en": "If nobody answers",
+        "ja": "何もしなければ",
+        "qps-ploc": "⟦Ïƒ ñőƀőḓẏ ȧñşẇėřş ŀőřėɱ⟧"
+      },
+      "ux_a_brief_options": {
+        "en": "Your options",
+        "ja": "選択肢",
+        "qps-ploc": "⟦Ẏőůř őṗŧïőñş ŀőř⟧"
+      },
+      "ux_a_brief_recommend": {
+        "en": "Recommended",
+        "ja": "推奨",
+        "qps-ploc": "⟦Řėƈőɱɱėñḓėḓ ŀőř⟧"
+      },
+      "ux_a_brief_deadline": {
+        "en": "Deadline",
+        "ja": "期限",
+        "qps-ploc": "⟦Ḓėȧḓŀïñė ŀőř⟧"
+      },
+      "ux_a_brief_deadline_none": {
+        "en": "No deadline — it waits for you",
+        "ja": "期限なし（判断するまで待ちます）",
+        "qps-ploc": "⟦Ñő ḓėȧḓŀïñė — ïŧ ẇȧïŧş ƒőř ẏőů ŀőřėɱ ïṗşů⟧"
+      },
+      "ux_a_brief_requester": {
+        "en": "Requested by",
+        "ja": "依頼元",
+        "qps-ploc": "⟦Řėɋůėşŧėḓ ƀẏ ŀőř⟧"
+      },
+      "ux_a_brief_details": {
+        "en": "Details (technical)",
+        "ja": "詳細（技術情報）",
+        "qps-ploc": "⟦Ḓėŧȧïŀş (ŧėƈħñïƈȧŀ) ŀőřėɱ ⟧"
+      },
+      "ux_a_brief_reversible_yes": {
+        "en": "Can be undone later",
+        "ja": "あとから取り消せます",
+        "qps-ploc": "⟦Ƈȧñ ƀė ůñḓőñė ŀȧŧėř ŀőřėɱ ⟧"
+      },
+      "ux_a_brief_reversible_no": {
+        "en": "Cannot be undone",
+        "ja": "取り消せません",
+        "qps-ploc": "⟦Ƈȧññőŧ ƀė ůñḓőñė ŀőřėɱ⟧"
+      },
+      "ux_a_brief_risk": {
+        "en": "Risk: {level}",
+        "ja": "リスク：{level}",
+        "qps-ploc": "⟦Řïşķ: {level} ŀőřė⟧"
+      },
+      "ux_a_risk_low": {
+        "en": "low",
+        "ja": "低",
+        "qps-ploc": "⟦ŀőẇ ŀőř⟧"
+      },
+      "ux_a_risk_medium": {
+        "en": "medium",
+        "ja": "中",
+        "qps-ploc": "⟦ɱėḓïůɱ ŀőř⟧"
+      },
+      "ux_a_risk_high": {
+        "en": "high",
+        "ja": "高",
+        "qps-ploc": "⟦ħïɠħ ŀőř⟧"
+      },
+      "ux_a_risk_critical": {
+        "en": "critical",
+        "ja": "重大",
+        "qps-ploc": "⟦ƈřïŧïƈȧŀ ŀőř⟧"
+      },
+      "ux_a_brief_same_count": {
+        "en": "{count} identical requests",
+        "ja": "同じ依頼が {count} 件",
+        "qps-ploc": "⟦{count} ïḓėñŧïƈȧŀ řėɋůėşŧş ŀőřėɱ ïṗ⟧"
+      },
+      "ux_a_brief_same_lead": {
+        "en": "Deciding here decides only this one. The other identical requests are listed below.",
+        "ja": "ここでの判断はこの1件だけに記録されます。同じ内容のほかの依頼は下に並んでいます。",
+        "qps-ploc": "⟦Ḓėƈïḓïñɠ ħėřė ḓėƈïḓėş őñŀẏ ŧħïş őñė. Ŧħė őŧħėř ïḓėñŧïƈȧŀ řėɋůėşŧş ȧřė ŀïşŧėḓ ƀėŀőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "ux_a_brief_state_pending": {
+        "en": "Waiting for you",
+        "ja": "判断待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ẏőů ŀőřė⟧"
+      },
+      "ux_a_brief_state_resolved": {
+        "en": "Already handled",
+        "ja": "対応済み",
+        "qps-ploc": "⟦Ȧŀřėȧḓẏ ħȧñḓŀėḓ ŀőřė⟧"
+      },
+      "ux_a_brief_state_expired": {
+        "en": "Expired",
+        "ja": "期限切れ",
+        "qps-ploc": "⟦Ėẋṗïřėḓ ŀőř⟧"
+      },
+      "ux_a_show_more": {
+        "en": "Show more",
+        "ja": "続きを表示",
+        "qps-ploc": "⟦Şħőẇ ɱőřė ŀőř⟧"
+      },
+      "ux_a_detail_request_id": {
+        "en": "Request ID",
+        "ja": "依頼 ID",
+        "qps-ploc": "⟦Řėɋůėşŧ ÏḒ ŀőř⟧"
+      },
+      "ux_a_detail_title": {
+        "en": "Original title",
+        "ja": "元の件名",
+        "qps-ploc": "⟦Őřïɠïñȧŀ ŧïŧŀė ŀőřė⟧"
+      },
+      "ux_a_detail_effect": {
+        "en": "Operation",
+        "ja": "操作",
+        "qps-ploc": "⟦Őṗėřȧŧïőñ ŀőř⟧"
+      },
+      "ux_a_detail_requested_by": {
+        "en": "Requester ID",
+        "ja": "依頼元 ID",
+        "qps-ploc": "⟦Řėɋůėşŧėř ÏḒ ŀőř⟧"
+      },
+      "ux_a_detail_channel": {
+        "en": "Kind / channel",
+        "ja": "種類 / チャネル",
+        "qps-ploc": "⟦Ķïñḓ / ƈħȧññėŀ ŀőřė⟧"
+      },
+      "ux_a_detail_summary": {
+        "en": "Original summary",
+        "ja": "元の要約",
+        "qps-ploc": "⟦Őřïɠïñȧŀ şůɱɱȧřẏ ŀőřėɱ⟧"
+      },
+      "ux_a_detail_more": {
+        "en": "Full record text",
+        "ja": "記録の全文",
+        "qps-ploc": "⟦Ƒůŀŀ řėƈőřḓ ŧėẋŧ ŀőřėɱ⟧"
+      },
+      "ux_a_actor_pipeline": {
+        "en": "Automation (pipeline)",
+        "ja": "自動処理（パイプライン）",
+        "qps-ploc": "⟦Ȧůŧőɱȧŧïőñ (ṗïṗėŀïñė) ŀőřėɱ ⟧"
+      },
+      "ux_a_actor_publication": {
+        "en": "Automation (PR publishing)",
+        "ja": "自動処理（PR 公開）",
+        "qps-ploc": "⟦Ȧůŧőɱȧŧïőñ (ṖŘ ṗůƀŀïşħïñɠ) ŀőřėɱ ïṗ⟧"
+      },
+      "ux_a_actor_system": {
+        "en": "Automation (system)",
+        "ja": "自動処理（システム）",
+        "qps-ploc": "⟦Ȧůŧőɱȧŧïőñ (şẏşŧėɱ) ŀőřėɱ ⟧"
+      },
+      "ux_a_actor_automation": {
+        "en": "Automation",
+        "ja": "自動処理",
+        "qps-ploc": "⟦Ȧůŧőɱȧŧïőñ ŀőř⟧"
+      },
+      "ux_a_actor_agent": {
+        "en": "Agent: {name}",
+        "ja": "エージェント：{name}",
+        "qps-ploc": "⟦Ȧɠėñŧ: {name} ŀőřė⟧"
+      },
+      "ux_a_actor_dot": {
+        "en": "Agent proposal: {name}",
+        "ja": "エージェントの提案：{name}",
+        "qps-ploc": "⟦Ȧɠėñŧ ṗřőṗőşȧŀ: {name} ŀőřėɱ ï⟧"
+      },
+      "ux_a_pr_create_ask": {
+        "en": "Open the pull request \"{title}\" on {repo}?",
+        "ja": "{repo} に PR「{title}」を作成してよいですか",
+        "qps-ploc": "⟦Őṗėñ ŧħė ṗůŀŀ řėɋůėşŧ \"{title}\" őñ {repo}? ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ux_a_pr_create_ask_generic": {
+        "en": "Open a pull request (a request to merge changes) on the repository?",
+        "ja": "リポジトリに PR（変更の取り込み依頼）を作成してよいですか",
+        "qps-ploc": "⟦Őṗėñ ȧ ṗůŀŀ řėɋůėşŧ (ȧ řėɋůėşŧ ŧő ɱėřɠė ƈħȧñɠėş) őñ ŧħė řėṗőşïŧőřẏ? ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ux_a_pr_create_why": {
+        "en": "An automated run prepared changes; publishing them to GitHub needs a person's approval.",
+        "ja": "自動処理が変更を用意しました。GitHub に公開する前に人の承認が必要です。",
+        "qps-ploc": "⟦Ȧñ ȧůŧőɱȧŧėḓ řůñ ṗřėṗȧřėḓ ƈħȧñɠėş; ṗůƀŀïşħïñɠ ŧħėɱ ŧő ƓïŧĦůƀ ñėėḓş ȧ ṗėřşőñ'ş ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "ux_a_pr_branch": {
+        "en": "Branch {head} → {base}",
+        "ja": "ブランチ {head} → {base}",
+        "qps-ploc": "⟦Ƀřȧñƈħ {head} → {base} ŀőřėɱ ï⟧"
+      },
+      "ux_a_pr_draft": {
+        "en": "It is opened as a draft.",
+        "ja": "下書きとして作成されます。",
+        "qps-ploc": "⟦Ïŧ ïş őṗėñėḓ ȧş ȧ ḓřȧƒŧ. ŀőřėɱ ï⟧"
+      },
+      "ux_a_pr_create_on_approve": {
+        "en": "The pull request is opened on {repo} and visible to everyone with access. Nothing is merged yet.",
+        "ja": "{repo} に PR が作成され、アクセスできる人に見えるようになります。まだ取り込み（マージ）はされません。",
+        "qps-ploc": "⟦Ŧħė ṗůŀŀ řėɋůėşŧ ïş őṗėñėḓ őñ {repo} ȧñḓ ṽïşïƀŀė ŧő ėṽėřẏőñė ẇïŧħ ȧƈƈėşş. Ñőŧħïñɠ ïş ɱėřɠėḓ ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "ux_a_pr_create_on_approve_generic": {
+        "en": "The pull request is opened and visible to everyone with access. Nothing is merged yet.",
+        "ja": "PR が作成され、アクセスできる人に見えるようになります。まだ取り込み（マージ）はされません。",
+        "qps-ploc": "⟦Ŧħė ṗůŀŀ řėɋůėşŧ ïş őṗėñėḓ ȧñḓ ṽïşïƀŀė ŧő ėṽėřẏőñė ẇïŧħ ȧƈƈėşş. Ñőŧħïñɠ ïş ɱėřɠėḓ ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "ux_a_pr_create_on_reject": {
+        "en": "No pull request is opened. The prepared changes stay where they are.",
+        "ja": "PR は作成されません。用意された変更はそのまま残ります。",
+        "qps-ploc": "⟦Ñő ṗůŀŀ řėɋůėşŧ ïş őṗėñėḓ. Ŧħė ṗřėṗȧřėḓ ƈħȧñɠėş şŧȧẏ ẇħėřė ŧħėẏ ȧřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "ux_a_pr_merge_ask": {
+        "en": "Merge the pull request?",
+        "ja": "PR を取り込んで（マージして）よいですか",
+        "qps-ploc": "⟦Ɱėřɠė ŧħė ṗůŀŀ řėɋůėşŧ? ŀőřėɱ ï⟧"
+      },
+      "ux_a_pr_merge_on_approve": {
+        "en": "The changes are merged into the target branch.",
+        "ja": "変更が取り込み先のブランチに反映されます。",
+        "qps-ploc": "⟦Ŧħė ƈħȧñɠėş ȧřė ɱėřɠėḓ ïñŧő ŧħė ŧȧřɠėŧ ƀřȧñƈħ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ux_a_push_ask": {
+        "en": "Push the changes to the remote repository?",
+        "ja": "変更をリモートのリポジトリに送って（プッシュして）よいですか",
+        "qps-ploc": "⟦Ṗůşħ ŧħė ƈħȧñɠėş ŧő ŧħė řėɱőŧė řėṗőşïŧőřẏ? ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ux_a_push_on_approve": {
+        "en": "The changes are sent to the remote repository.",
+        "ja": "変更がリモートのリポジトリに送られます。",
+        "qps-ploc": "⟦Ŧħė ƈħȧñɠėş ȧřė şėñŧ ŧő ŧħė řėɱőŧė řėṗőşïŧőřẏ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ux_a_vcs_on_reject": {
+        "en": "Nothing is sent. The changes stay local.",
+        "ja": "何も送られません。変更は手元に残ります。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş şėñŧ. Ŧħė ƈħȧñɠėş şŧȧẏ ŀőƈȧŀ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ux_a_attest_ask": {
+        "en": "Allow {tenant}'s confidential material to be sent to {provider}?",
+        "ja": "{tenant} の機密情報を {provider} に送ってよいですか",
+        "qps-ploc": "⟦Ȧŀŀőẇ {tenant}'ş ƈőñƒïḓėñŧïȧŀ ɱȧŧėřïȧŀ ŧő ƀė şėñŧ ŧő {provider}? ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ux_a_attest_on_approve": {
+        "en": "{tenant}'s confidential and personal material may be sent to {provider} until the attestation expires.",
+        "ja": "期限が切れるまで、{tenant} の機密・個人情報を {provider} に送れるようになります。",
+        "qps-ploc": "⟦{tenant}'ş ƈőñƒïḓėñŧïȧŀ ȧñḓ ṗėřşőñȧŀ ɱȧŧėřïȧŀ ɱȧẏ ƀė şėñŧ ŧő {provider} ůñŧïŀ ŧħė ȧŧŧėşŧȧŧïőñ ėẋṗïřėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "ux_a_attest_on_reject": {
+        "en": "Nothing is sent to {provider}.",
+        "ja": "{provider} には送られません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş şėñŧ ŧő {provider}. ŀőřėɱ ïṗşů⟧"
+      },
+      "ux_a_secret_ask": {
+        "en": "Change ({mutation}) the credential \"{secret}\" for {service}?",
+        "ja": "{service} の認証情報「{secret}」を変更（{mutation}）してよいですか",
+        "qps-ploc": "⟦Ƈħȧñɠė ({mutation}) ŧħė ƈřėḓėñŧïȧŀ \"{secret}\" ƒőř {service}? ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "ux_a_secret_on_approve": {
+        "en": "The credential changes; work that uses {service} picks up the new value.",
+        "ja": "認証情報が変わり、{service} を使う作業に反映されます。",
+        "qps-ploc": "⟦Ŧħė ƈřėḓėñŧïȧŀ ƈħȧñɠėş; ẇőřķ ŧħȧŧ ůşėş {service} ṗïƈķş ůṗ ŧħė ñėẇ ṽȧŀůė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "ux_a_secret_on_reject": {
+        "en": "The credential stays as it is.",
+        "ja": "認証情報はそのままです。",
+        "qps-ploc": "⟦Ŧħė ƈřėḓėñŧïȧŀ şŧȧẏş ȧş ïŧ ïş. ŀőřėɱ ïṗşů⟧"
+      },
+      "ux_a_mission_verb_ask": {
+        "en": "Run \"{verb}\" on mission {mission}?",
+        "ja": "ミッション {mission} を「{verb}」してよいですか",
+        "qps-ploc": "⟦Řůñ \"{verb}\" őñ ɱïşşïőñ {mission}? ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_a_mission_verb_on_approve": {
+        "en": "The mission moves on ({verb}).",
+        "ja": "ミッションが次に進みます（{verb}）。",
+        "qps-ploc": "⟦Ŧħė ɱïşşïőñ ɱőṽėş őñ ({verb}). ŀőřėɱ ïṗşů⟧"
+      },
+      "ux_a_mission_verb_on_reject": {
+        "en": "The mission stays where it is.",
+        "ja": "ミッションはそのままです。",
+        "qps-ploc": "⟦Ŧħė ɱïşşïőñ şŧȧẏş ẇħėřė ïŧ ïş. ŀőřėɱ ïṗşů⟧"
+      },
+      "ux_a_generic_ask": {
+        "en": "Allow \"{action}\"?",
+        "ja": "「{action}」を実行してよいですか",
+        "qps-ploc": "⟦Ȧŀŀőẇ \"{action}\"? ŀőřėɱ⟧"
+      },
+      "ux_a_generic_ask_unnamed": {
+        "en": "Allow the requested operation?",
+        "ja": "依頼された操作を実行してよいですか",
+        "qps-ploc": "⟦Ȧŀŀőẇ ŧħė řėɋůėşŧėḓ őṗėřȧŧïőñ? ŀőřėɱ ïṗşů⟧"
+      },
+      "ux_a_generic_why": {
+        "en": "This operation cannot proceed automatically, so it waits for a person.",
+        "ja": "自動では進められない操作のため、人の判断を待っています。",
+        "qps-ploc": "⟦Ŧħïş őṗėřȧŧïőñ ƈȧññőŧ ṗřőƈėėḓ ȧůŧőɱȧŧïƈȧŀŀẏ, şő ïŧ ẇȧïŧş ƒőř ȧ ṗėřşőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "ux_a_generic_on_approve": {
+        "en": "The requested operation runs.",
+        "ja": "依頼された操作が実行されます。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧėḓ őṗėřȧŧïőñ řůñş. ŀőřėɱ ïṗş⟧"
+      },
+      "ux_a_generic_on_reject": {
+        "en": "The operation does not run, and the requester is told it was rejected.",
+        "ja": "操作は実行されず、依頼元に却下が伝わります。",
+        "qps-ploc": "⟦Ŧħė őṗėřȧŧïőñ ḓőėş ñőŧ řůñ, ȧñḓ ŧħė řėɋůėşŧėř ïş ŧőŀḓ ïŧ ẇȧş řėĵėƈŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "ux_a_default_action": {
+        "en": "Default if declined: {action}",
+        "ja": "見送った場合の既定：{action}",
+        "qps-ploc": "⟦Ḓėƒȧůŀŧ ïƒ ḓėƈŀïñėḓ: {action} ŀőřėɱ ïṗş⟧"
+      },
+      "ux_a_decide_if_silent": {
+        "en": "The work stays on hold until you decide.",
+        "ja": "判断するまで作業は止まったままです。",
+        "qps-ploc": "⟦Ŧħė ẇőřķ şŧȧẏş őñ ħőŀḓ ůñŧïŀ ẏőů ḓėƈïḓė. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ux_a_veto_if_silent": {
+        "en": "It goes ahead at {deadline} unless you object.",
+        "ja": "異議がなければ {deadline} に進みます。",
+        "qps-ploc": "⟦Ïŧ ɠőėş ȧħėȧḓ ȧŧ {deadline} ůñŀėşş ẏőů őƀĵėƈŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ux_a_veto_if_silent_window": {
+        "en": "It goes ahead {minutes} minutes after you are notified, unless you object.",
+        "ja": "通知から {minutes} 分たつと、異議がなければ進みます。",
+        "qps-ploc": "⟦Ïŧ ɠőėş ȧħėȧḓ {minutes} ɱïñůŧėş ȧƒŧėř ẏőů ȧřė ñőŧïƒïėḓ, ůñŀėşş ẏőů őƀĵėƈŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "ux_a_veto_on_reject": {
+        "en": "The proposal stops and does not run.",
+        "ja": "提案は止まり、実行されません。",
+        "qps-ploc": "⟦Ŧħė ṗřőṗőşȧŀ şŧőṗş ȧñḓ ḓőėş ñőŧ řůñ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ux_a_hygiene_ask": {
+        "en": "This request has stalled. Continue it or withdraw it?",
+        "ja": "止まっているこの依頼を、続けますか、取り下げますか",
+        "qps-ploc": "⟦Ŧħïş řėɋůėşŧ ħȧş şŧȧŀŀėḓ. Ƈőñŧïñůė ïŧ őř ẇïŧħḓřȧẇ ïŧ? ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ux_a_hygiene_on_continue": {
+        "en": "The mission starts again.",
+        "ja": "ミッションが再開されます。",
+        "qps-ploc": "⟦Ŧħė ɱïşşïőñ şŧȧřŧş ȧɠȧïñ. ŀőřėɱ ïṗ⟧"
+      },
+      "ux_a_hygiene_on_stop": {
+        "en": "The mission is withdrawn; its record is kept.",
+        "ja": "ミッションは取り下げられ、記録は残ります。",
+        "qps-ploc": "⟦Ŧħė ɱïşşïőñ ïş ẇïŧħḓřȧẇñ; ïŧş řėƈőřḓ ïş ķėṗŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ux_a_memory_ask": {
+        "en": "Keep this learning for future work?",
+        "ja": "この学びを今後の作業のために残しますか",
+        "qps-ploc": "⟦Ķėėṗ ŧħïş ŀėȧřñïñɠ ƒőř ƒůŧůřė ẇőřķ? ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ux_a_memory_on_keep": {
+        "en": "Future work can use it.",
+        "ja": "今後の作業で参照されます。",
+        "qps-ploc": "⟦Ƒůŧůřė ẇőřķ ƈȧñ ůşė ïŧ. ŀőřėɱ ï⟧"
+      },
+      "ux_a_memory_on_forget": {
+        "en": "It is not kept.",
+        "ja": "記憶には残りません。",
+        "qps-ploc": "⟦Ïŧ ïş ñőŧ ķėṗŧ. ŀőřė⟧"
+      },
+      "ux_a_outcome_ask": {
+        "en": "Accept this deliverable?",
+        "ja": "この成果物を受け取りますか",
+        "qps-ploc": "⟦Ȧƈƈėṗŧ ŧħïş ḓėŀïṽėřȧƀŀė? ŀőřėɱ ï⟧"
+      },
+      "ux_a_outcome_on_accept": {
+        "en": "It is recorded as received.",
+        "ja": "受け取り済みとして記録されます。",
+        "qps-ploc": "⟦Ïŧ ïş řėƈőřḓėḓ ȧş řėƈėïṽėḓ. ŀőřėɱ ïṗ⟧"
+      },
+      "ux_a_outcome_on_return": {
+        "en": "It goes back to its owner with your note.",
+        "ja": "コメントを付けて担当に戻ります。",
+        "qps-ploc": "⟦Ïŧ ɠőėş ƀȧƈķ ŧő ïŧş őẇñėř ẇïŧħ ẏőůř ñőŧė. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ux_a_exception_ask": {
+        "en": "Something stopped. Check what happened.",
+        "ja": "作業が止まりました。内容を確認してください。",
+        "qps-ploc": "⟦Şőɱėŧħïñɠ şŧőṗṗėḓ. Ƈħėƈķ ẇħȧŧ ħȧṗṗėñėḓ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ux_a_personal_title": {
+        "en": "Waiting for you, across your organizations",
+        "ja": "すべての所属先で、あなたの判断を待っているもの",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ẏőů, ȧƈřőşş ẏőůř őřɠȧñïẑȧŧïőñş ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ux_a_personal_lead": {
+        "en": "Sorted by deadline and urgency. Each decision is recorded under its own organization's permissions.",
+        "ja": "期限と緊急度の順に並べています。判断はそれぞれの所属先の権限で記録されます。",
+        "qps-ploc": "⟦Şőřŧėḓ ƀẏ ḓėȧḓŀïñė ȧñḓ ůřɠėñƈẏ. Ėȧƈħ ḓėƈïşïőñ ïş řėƈőřḓėḓ ůñḓėř ïŧş őẇñ őřɠȧñïẑȧŧïőñ'ş ṗėřɱïşşïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "ux_a_personal_empty": {
+        "en": "Nothing is waiting for you.",
+        "ja": "判断を待っているものはありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş ẇȧïŧïñɠ ƒőř ẏőů. ŀőřėɱ ïṗ⟧"
+      },
+      "ux_a_personal_open_tenant": {
+        "en": "Open {name}",
+        "ja": "{name} を開く",
+        "qps-ploc": "⟦Őṗėñ {name} ŀőř⟧"
+      },
+      "ux_a_personal_others": {
+        "en": "Other items in {name}: {active} in progress · {exceptions} need attention · {outcomes} new deliverables",
+        "ja": "{name} のその他：進行中 {active} · 要対応 {exceptions} · 新しい成果 {outcomes}",
+        "qps-ploc": "⟦Őŧħėř ïŧėɱş ïñ {name}: {active} ïñ ṗřőɠřėşş · {exceptions} ñėėḓ ȧŧŧėñŧïőñ · {outcomes} ñėẇ ḓėŀïṽėřȧƀŀėş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "ux_a_personal_more": {
+        "en": "{name} has {count} more waiting — open it to see them all.",
+        "ja": "{name} にはほかに {count} 件あります。開くとすべて見られます。",
+        "qps-ploc": "⟦{name} ħȧş {count} ɱőřė ẇȧïŧïñɠ — őṗėñ ïŧ ŧő şėė ŧħėɱ ȧŀŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "ux_a_checkin_summary": {
+        "en": "Check my records (read-only)",
+        "ja": "自分の記録を点検（読み取り専用）",
+        "qps-ploc": "⟦Ƈħėƈķ ɱẏ řėƈőřḓş (řėȧḓ-őñŀẏ) ŀőřėɱ ïṗş⟧"
+      },
+      "ux_a_proposal_on_approve": {
+        "en": "The proposed work starts as described.",
+        "ja": "提案どおりに作業が始まります。",
+        "qps-ploc": "⟦Ŧħė ṗřőṗőşėḓ ẇőřķ şŧȧřŧş ȧş ḓėşƈřïƀėḓ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ux_b_detail_reason": {
+        "en": "Reason as recorded",
+        "ja": "判断理由（記録のまま）",
+        "qps-ploc": "⟦Řėȧşőñ ȧş řėƈőřḓėḓ ŀőřėɱ⟧"
+      },
+      "ux_b_org_aggregate_truncated": {
+        "en": "These totals cover the first {shown} of {total} tenants. Choose a tenant in the scope selector above to see the others.",
+        "ja": "この合計は {total} テナントのうち最初の {shown} テナント分です。ほかのテナントは上の範囲の選択から開いてください。",
+        "qps-ploc": "⟦Ŧħėşė ŧőŧȧŀş ƈőṽėř ŧħė ƒïřşŧ {shown} őƒ {total} ŧėñȧñŧş. Ƈħőőşė ȧ ŧėñȧñŧ ïñ ŧħė şƈőṗė şėŀėƈŧőř ȧƀőṽė ŧő şėė ŧħė őŧħėřş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
       }
     },
     "onboarding": {

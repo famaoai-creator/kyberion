@@ -158,3 +158,89 @@ it('renders a recoverable failure for malformed successful payloads', async () =
   const { container } = await mount();
   expect(container.querySelector('[role="alert"]')?.textContent).toContain('件数は不明');
 });
+
+it('shows the organization outcomes for the selected tenant, with readable titles and console links', async () => {
+  navigation.search = 'tenant=acme&organization_id=sales';
+  const dashboard = data('scope', 'MSN-CONT-B737332D594E: テスト計画に沿って実行する');
+  dashboard.selection = {
+    kind: 'organization',
+    tenant_slug: 'acme',
+    organization_id: 'sales',
+  } as never;
+  const view = {
+    organization_id: 'sales',
+    purpose: {
+      name: 'Sales',
+      purpose: 'Grow.',
+      approval_state: 'approved',
+      objectives: [{ objective_id: 'obj-1', title: '売上を伸ばす' }],
+    },
+    operational_state: { status: 'active' },
+    domains: [],
+    capabilities: [],
+    services: [],
+    service_states: [],
+    operations: [],
+    operation_states: [],
+    incidents: [],
+    decisions: [],
+    solution_projects: [],
+    learning_candidates: [],
+    reconciliation: {
+      status: 'ok',
+      overdue_operations: [],
+      stale_services: [],
+      pending_decisions: [],
+    },
+    control_plane: {
+      accounting: {
+        active_projects: 0,
+        active_services: 0,
+        healthy_services: 0,
+        degraded_or_critical_services: 0,
+        active_operations: 1,
+        overdue_operations: 1,
+        open_incidents: 0,
+        pending_decisions: 2,
+      },
+      intervention_points: [],
+      outcome_accounting: {
+        objectives: [
+          {
+            objective_id: 'obj-1',
+            title: '売上を伸ばす',
+            coverage: 'linked',
+            key_results: [
+              {
+                kr_id: 'kr-1',
+                title: '新規契約数',
+                target: 10,
+                value: 6,
+                progress: 0.6,
+                direction: 'increase',
+              },
+            ],
+          },
+        ],
+      },
+    },
+    readiness: { purpose: 'approved', operational_state: 'available', pending_human_decisions: 2 },
+  };
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: unknown) =>
+      String(input).includes('/organization-operating-model')
+        ? new Response(JSON.stringify({ view }))
+        : new Response(JSON.stringify(dashboard))
+    )
+  );
+  const { container } = await mount();
+  await act(async () => undefined);
+  expect(container.textContent).toContain('テスト計画に沿って実行する');
+  expect(container.textContent).not.toContain('MSN-CONT-B737332D594E:');
+  expect(container.textContent).toContain('新規契約数');
+  expect(container.textContent).toContain('目標の60%');
+  const links = [...container.querySelectorAll('a.org-stat')].map((a) => a.getAttribute('href'));
+  expect(links.every((href) => href?.startsWith('/ops?'))).toBe(true);
+  expect(links.some((href) => href?.includes('section=approvals'))).toBe(true);
+});

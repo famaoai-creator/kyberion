@@ -1,6 +1,8 @@
 'use client';
-import { opsApiPath } from '../../lib/ops/ops-api-path';
+import { opsApiPath, opsPagePath } from '../../lib/ops/ops-api-path';
 import { InformationAssetsPanel } from './InformationAssetsPanel';
+import { OrganizationOutcomeSnapshot } from './OrganizationOperatingModel';
+import { stripIdPrefix } from '@agent/core/surface/display-humanize';
 
 import * as React from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -18,6 +20,14 @@ import type {
 import { parseOrganizationDashboard } from '../../lib/ops/organization-dashboard-response';
 import { useChronosLocale } from '../../lib/ops/hooks';
 import { uxText } from '../../lib/ops/ux-vocabulary';
+
+/** A console section for the dashboard's selection (`workspaceSectionHref` targets `/`). */
+function consoleSectionHref(
+  section: string,
+  selection: Parameters<typeof workspaceSectionHref>[1]
+): string {
+  return opsPagePath(workspaceSectionHref(section, selection));
+}
 
 /** Scope keys also guard rendering, so a prior response cannot flash in another view. */
 export function OrganizationDashboard() {
@@ -135,17 +145,21 @@ export function OrganizationDashboard() {
       {!data && failure?.key !== key ? <p role="status">{t('loading')}</p> : null}
       {data ? (
         <div className="grid gap-4">
-          <div className="flex flex-wrap gap-2">
-            <Badge label={t('viewer') + ': ' + data.viewer.id} />
-            <Badge label={t('role') + ': ' + data.viewer.role} />
-            <Badge label={t('tenant') + ': ' + scopeText(data.viewer.tenants)} />
-            <Badge label={t('organization') + ': ' + scopeText(data.viewer.organizations)} />
-            <Badge label={t('project') + ': ' + scopeText(data.viewer.projects)} />
-            {data.selection.operation_id ? (
-              <Badge label={t('operation') + ': ' + data.selection.operation_id} />
-            ) : null}
-            <Badge label={t('tier') + ': ' + data.viewer.tiers.join(', ')} />
-          </div>
+          {/* Who is viewing and with which grants is internal detail: on request only. */}
+          <details className="chronos-viewer-details chronos-viewer-details--inline">
+            <summary>{uxText('ux_b_ops_viewer_details', locale)}</summary>
+            <div className="flex flex-wrap gap-2">
+              <Badge label={t('viewer') + ': ' + data.viewer.id} />
+              <Badge label={t('role') + ': ' + data.viewer.role} />
+              <Badge label={t('tenant') + ': ' + scopeText(data.viewer.tenants)} />
+              <Badge label={t('organization') + ': ' + scopeText(data.viewer.organizations)} />
+              <Badge label={t('project') + ': ' + scopeText(data.viewer.projects)} />
+              {data.selection.operation_id ? (
+                <Badge label={t('operation') + ': ' + data.selection.operation_id} />
+              ) : null}
+              <Badge label={t('tier') + ': ' + data.viewer.tiers.join(', ')} />
+            </div>
+          </details>
           <p>
             {t('updated')}{' '}
             <time dateTime={data.generatedAt}>
@@ -157,12 +171,24 @@ export function OrganizationDashboard() {
               <Metric key={status} label={t(status)} value={data.counts[status]} />
             ))}
           </div>
+          {/* Organization-wide outcomes: not for a project or personal ("mine") view,
+              which the operating-model route refuses or does not cover. */}
+          {mode !== 'mine' && !data.selection.project_id ? (
+            <OrganizationOutcomeSnapshot
+              tenant={data.selection.tenant_slug || undefined}
+              organizationId={data.selection.organization_id || undefined}
+              hrefs={{
+                operations: consoleSectionHref('operations', data.selection),
+                decisions: consoleSectionHref('approvals', data.selection),
+              }}
+            />
+          ) : null}
           <h3>{t('next')}</h3>
           {data.attention.length ? (
             <ul className="grid gap-3">
               {data.attention.map((item) => (
                 <li key={item.id}>
-                  <strong>{item.title}</strong> · {t(item.status)}
+                  <strong title={item.title}>{stripIdPrefix(item.title)}</strong> · {t(item.status)}
                   <p>{t('action_' + item.status)}</p>
                 </li>
               ))}
@@ -171,17 +197,17 @@ export function OrganizationDashboard() {
             <p>{t('empty')}</p>
           )}
           {data.attentionTotal > data.attention.length ? <p>{t('limited')}</p> : null}
-          <a className="kb-link" href={workspaceSectionHref('work-items', data.selection)}>
+          <a className="kb-link" href={consoleSectionHref('work-items', data.selection)}>
             {t('open_work')}
           </a>
           {mode === 'mine' ? (
             <p>{t('mine_hint')}</p>
           ) : (
             <>
-              <a className="kb-link" href={workspaceSectionHref('approvals', data.selection)}>
+              <a className="kb-link" href={consoleSectionHref('approvals', data.selection)}>
                 {t('open_decisions')}
               </a>
-              <a className="kb-link" href={workspaceSectionHref('deliverables', data.selection)}>
+              <a className="kb-link" href={consoleSectionHref('deliverables', data.selection)}>
                 {t('open_resources')}
               </a>
             </>
