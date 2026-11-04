@@ -9716,9 +9716,9 @@
         "qps-ploc": "⟦Őṗėñ ȧ ƓïŧĦůƀ ṗůŀŀ řėɋůėşŧ ȧƒŧėř ŧħė řėȧḓïñėşş ɠȧŧėş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
       "cli_cmd_script_pr_preflight": {
-        "en": "Run the pull-request readiness gates for changed paths without creating a PR",
-        "ja": "PR を作成せずに、変更パスに応じた PR 準備ゲートを実行",
-        "qps-ploc": "⟦Řůñ ŧħė ṗůŀŀ-řėɋůėşŧ řėȧḓïñėşş ɠȧŧėş ƒőř ƈħȧñɠėḓ ṗȧŧħş ẇïŧħőůŧ ƈřėȧŧïñɠ ȧ ṖŘ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+        "en": "Run the pull-request readiness gates and affected tests for changed paths without creating a PR",
+        "ja": "PR を作成せずに、変更パスに応じた PR 準備ゲートと影響テストを実行",
+        "qps-ploc": "⟦Řůñ ŧħė ṗůŀŀ-řėɋůėşŧ řėȧḓïñėşş ɠȧŧėş ȧñḓ ȧƒƒėƈŧėḓ ŧėşŧş ƒőř ƈħȧñɠėḓ ṗȧŧħş ẇïŧħőůŧ ƈřėȧŧïñɠ ȧ ṖŘ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
       },
       "cli_cmd_script_check_commit_subject": {
         "en": "Check the HEAD commit subject",

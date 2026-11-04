@@ -57,7 +57,7 @@ pnpm check:pr-title -- --title "<type>(<scope>): <summary>"
 cp .github/PULL_REQUEST_TEMPLATE.md active/shared/tmp/public/shared/pr-body-<topic>.md
 #    → Summary / Type / Area / Test plan（実行したコマンドと結果）/ Knowledge / 該当チェック欄を埋める
 
-# 6.5 push 前に preflight を通す（PR は作らない。title 検査 + `check --changed` + Knowledge 検査）
+# 6.5 push 前に preflight を通す（PR は作らない。title 検査 + `check --changed` + 影響テスト + Knowledge 検査）
 pnpm kyberion pr preflight \
   --title "<type>(<scope>): <summary>" \
   --body-file active/shared/tmp/public/shared/pr-body-<topic>.md
@@ -223,11 +223,17 @@ CI の `lint-and-validate`（`--scope full`）でしか落ちなかった op-reg
 `pr` scope の `registration-tests` gate は、`tests/` の登録・境界ラチェット（shared-tmp allowlist、mission lookup、
 `node:fs` / `child_process` / managed process の allowlist、package boundary など）を実行する。
 
-3.5 **影響テストを実行する**（gate は test suite を実行しない）:
+3.5 **影響テストを実行する**（gate は test suite を実行しない）。`pnpm kyberion pr preflight` が次の 2 つを自動で実行する
+（`scripts/lib/affected-tests.ts`）。単独で回すときは同じものを手で実行する:
 
 ```bash
-pnpm exec vitest run --changed origin/main
+pnpm exec vitest run --changed origin/main          # コード: import graph で選ばれるテスト
+# データ・文書: 変更ファイルのパス・basename を test source から固定文字列検索して選ぶ（preflight が表示する）
 ```
+
+preflight はどのテストを選んだかを表示し、何も選ばれなければ `No affected tests selected` と書く（通過とは書かない）。
+1 ファイルの読み手が 40 を超える場合（`README.md` など）は選択せず、所有 suite を流すよう表示する。
+`--skip-affected-tests` で省略した場合は Test plan に未実行と記録する。
 
 `vitest run --changed <ref>` は `<ref>...HEAD` の commit 済み変更と staged / unstaged の変更（拡張子を問わない）を集め、
 それらを（間接的にも）import するテストファイルを全体で実行する（`vitest related` と同じ選択）。直近 PR で
@@ -240,7 +246,8 @@ PR 本文の Test plan に明記する。
   変更が 0 件と判定される。`git fetch origin main` してから再実行する。
 - **データファイルと文書は import graph に乗らない**。`knowledge/` や actuator `manifest.json` などの JSON / YAML、
   `AGENTS.md`・`CONTRIBUTING.md` などの Markdown だけを変えた場合、それを実行時に読むテスト（registry の件数・順序を固定したテスト、文書の文言を検査する contract test など）は選ばれない。
-  `grep -rln "<ファイル名か registry 名>" --include=*.test.ts libs scripts tests` で読み手のテストを探して流す。
+  preflight はこの読み手をパス文字列で探す。registry 名やディレクトリ名でしか参照されない読み手は見つからないので、
+  その場合は `grep -rln "<registry 名>" --include=*.test.ts libs scripts tests` で補う。
 
 4. 例外表の残りの追加確認（gate では表現できない手順）を実行し、生成物 drift があれば同じ commit に含める。
 5. push 後は `gh pr checks <number>` で確認し、**pending を pass と数えない**。
