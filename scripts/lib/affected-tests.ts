@@ -17,6 +17,7 @@
 
 import * as path from 'node:path';
 import type { GitRunner } from '../run_checks.js';
+import { TEST_SUITES } from '../test_suite.js';
 
 /** Extensions vitest follows through the import graph. */
 const CODE_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.jsx']);
@@ -53,6 +54,24 @@ const IGNORED_FILES = new Set(['knowledge/_index.md', 'pnpm-lock.yaml']);
 /** A needle that matches more test files than this identifies nothing. */
 export const MAX_READERS_PER_FILE = 40;
 
+/**
+ * Paths the CI test suites run (scripts/test_suite.ts TEST_SUITES, flags
+ * dropped). Affected tests are limited to these: the root vitest config also
+ * matches tests CI never runs (e.g. presence/displays/** package suites with
+ * their own environments), and a failure there says nothing about CI.
+ */
+export function ciTestPaths(): string[] {
+  const paths = new Set<string>();
+  for (const entries of Object.values(TEST_SUITES)) {
+    for (const entry of entries as readonly string[]) if (!entry.startsWith('-')) paths.add(entry);
+  }
+  return [...paths].sort();
+}
+
+export function isCiTest(file: string, paths: readonly string[] = ciTestPaths()): boolean {
+  return paths.some((entry) => (entry.endsWith('/') ? file.startsWith(entry) : file === entry));
+}
+
 export interface ReaderMatch {
   file: string;
   needles: string[];
@@ -66,8 +85,12 @@ export interface AffectedTestPlan {
   codeFiles: string[];
   dataFiles: string[];
   readers: ReaderMatch[];
-  /** Deduplicated reader tests to run (excludes too-broad matches). */
+  /** Deduplicated reader tests to run (excludes too-broad matches and non-CI tests). */
   readerTests: string[];
+  /** Reader tests outside the CI test suites (reported, not run). */
+  nonCiReaderTests: string[];
+  /** Path filters for the code run (the CI test suite paths). */
+  ciPaths: string[];
 }
 
 export function isCodeFile(file: string): boolean {
@@ -137,10 +160,21 @@ export function planAffectedTests(
     const tests = findReaderTests(needles, git);
     return { file, needles, tests, tooBroad: tests.length > MAX_READERS_PER_FILE };
   });
-  const readerTests = [
+  const ciPaths = ciTestPaths();
+  const selected = [
     ...new Set(readers.filter((reader) => !reader.tooBroad).flatMap((reader) => reader.tests)),
   ].sort();
-  return { base: changed.base, codeFiles, dataFiles, readers, readerTests };
+  const readerTests = selected.filter((test) => isCiTest(test, ciPaths));
+  const nonCiReaderTests = selected.filter((test) => !isCiTest(test, ciPaths));
+  return {
+    base: changed.base,
+    codeFiles,
+    dataFiles,
+    readers,
+    readerTests,
+    nonCiReaderTests,
+    ciPaths,
+  };
 }
 
 /** Human-readable summary lines for the preflight log. */
@@ -149,6 +183,11 @@ export function describeAffectedTestPlan(plan: AffectedTestPlan): string[] {
     `[pr:affected-tests] ${plan.codeFiles.length} code file(s) → vitest run --changed ${plan.base}`,
     `[pr:affected-tests] ${plan.dataFiles.length} data/doc file(s) → ${plan.readerTests.length} reader test file(s)`,
   ];
+  if (plan.nonCiReaderTests.length > 0) {
+    lines.push(
+      `[pr:affected-tests]   not run (outside the CI test suites): ${plan.nonCiReaderTests.join(', ')}`
+    );
+  }
   for (const reader of plan.readers) {
     if (reader.tooBroad) {
       lines.push(
