@@ -33612,6 +33612,11 @@
         "en": "← Back to Settings › Workspace & organization",
         "ja": "← 設定 › ワークスペースと組織 に戻る",
         "qps-ploc": "⟦← Ƀȧƈķ ŧő Şėŧŧïñɠş › Ẇőřķşṗȧƈė & őřɠȧñïẑȧŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ia_settings_reasoning_loading": {
+        "en": "Reading the engines available on this computer…",
+        "ja": "この PC で使えるエンジンを確認しています…",
+        "qps-ploc": "⟦Řėȧḓïñɠ ŧħė ėñɠïñėş ȧṽȧïŀȧƀŀė őñ ŧħïş ƈőɱṗůŧėř… ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       }
     },
     "operator": {
