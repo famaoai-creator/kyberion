@@ -51,6 +51,7 @@ import { checkProviderEgress, type ProviderEgressLabel } from '../provider/provi
 import { pathResolver } from '../path-resolver.js';
 import { readJsonIfPresent } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
+import { resolveSavedSeamDefault } from '../seam-selection-defaults.js';
 import type { TierLevel } from '../types.js';
 
 const logger = createLogger('judgment-backend');
@@ -179,8 +180,10 @@ export interface JudgmentBackend {
   judge(request: JudgmentRequest): Promise<readonly JudgmentAnswer[]>;
 }
 
+export const JUDGMENT_BACKEND_SEAM = 'judgment-backend';
+
 const judgmentSeam = createSeam<JudgmentBackend>({
-  key: 'judgment-backend',
+  key: JUDGMENT_BACKEND_SEAM,
   multiplicity: 'named',
   catalog: coreSeamCatalog,
   owner: 'libs/core/reasoning/judgment-backend.ts',
@@ -302,18 +305,38 @@ export interface JudgmentSelection {
 
 /**
  * Pick the provider that may see `tier` material and can answer every
- * question asked. Registration order decides between equals; the built-in
- * provider is the floor and is returned with a reason when nothing else
- * qualifies.
+ * question asked. A saved seam default (`seam select default
+ * judgment-backend=<id>`) is tried first; otherwise registration order
+ * decides between equals; the built-in provider is the floor and is returned
+ * with a reason when nothing else qualifies. The saved default never bypasses
+ * the image / question / egress filters below.
  */
 export function selectJudgmentBackend(request: JudgmentRequest): JudgmentSelection {
   const builtin = judgmentSeam.getOptional(BUILTIN_JUDGMENT_PROVIDER);
-  const candidates = judgmentSeam
+  const saved = resolveSavedSeamDefault(JUDGMENT_BACKEND_SEAM)?.provider;
+  const registered = judgmentSeam
     .list()
     .map((entry) => entry.implementation)
     .filter((backend) => backend.judgment_id !== BUILTIN_JUDGMENT_PROVIDER);
+  const candidates = saved
+    ? [
+        ...registered.filter((backend) => backend.judgment_id === saved),
+        ...registered.filter((backend) => backend.judgment_id !== saved),
+      ]
+    : registered;
 
   const needsImage = stateHasImage(request.state);
+  if (
+    saved === BUILTIN_JUDGMENT_PROVIDER &&
+    builtin &&
+    (!needsImage || builtin.acceptsImages) &&
+    request.questions.every((question) => builtin.supports(question))
+  ) {
+    return {
+      backend: builtin,
+      reason: `selected '${BUILTIN_JUDGMENT_PROVIDER}' (saved seam default) for tier=${request.tier}`,
+    };
+  }
   const rejected: string[] = [];
   for (const backend of candidates) {
     if (needsImage && !backend.acceptsImages) {

@@ -5936,6 +5936,10 @@
       "types": "./dist/seam-provider-selection.d.ts",
       "default": "./dist/seam-provider-selection.js"
     },
+    "./seam-selection-defaults": {
+      "types": "./dist/seam-selection-defaults.d.ts",
+      "default": "./dist/seam-selection-defaults.js"
+    },
     "./seam-selection-rules": {
       "types": "./dist/seam-selection-rules.d.ts",
       "default": "./dist/seam-selection-rules.js"

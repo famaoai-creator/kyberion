@@ -464,6 +464,8 @@ export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   grants: 'tenant_runtime_state',
   // Short-lived extension requests/responses (≤60 min lifetime): purge with the tenant.
   browser_bridge_mailbox: 'tenant_runtime_state',
+  // Tenant/organization/project seam provider defaults: tenant configuration, purge with the tenant.
+  seam_selection_defaults: 'tenant_runtime_state',
 } as const satisfies Record<TenantRuntimePartitionKey, OffboardTargetKind | 'not_offboarded'>;
 
 /**

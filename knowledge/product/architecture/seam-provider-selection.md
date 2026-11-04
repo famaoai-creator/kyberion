@@ -21,9 +21,11 @@ tags:
     vad,
     governance,
     audit,
+    saved-defaults,
+    tenant,
   ]
 owner: ecosystem_architect
-last_updated: 2026-09-22
+last_updated: 2026-11-04
 ---
 
 # Seam Provider Selection
@@ -64,18 +66,80 @@ and tests (`pnpm kyberion` does not forward it). CLI:
 4. **Purpose ranking.** `Σ weight(purpose, trait) × trait(provider)` using the
    policy's declared traits, replaced by the operator's **measured** values
    where they exist (the rationale prints each basis).
-5. **Default.** No purpose → the seam default (or the caller's own current
-   choice). If that cannot run the task, the policy's `fallback_purpose`
-   ranks what can.
+5. **Default.** No purpose → the caller's own configured default (a domain
+   store such as engine-runtime-preferences or the voice profile), else the
+   **saved seam default** (next section), else the policy default — the
+   first _eligible_ provider of `default_chains[<order key>]` /
+   `default_chains.default`, else `default_provider`. If none can run the
+   task, the policy's `fallback_purpose` ranks what can. The rest of
+   `ranked` follows the policy chain order.
 
 Every decision is recorded in the audit chain (`action: provider_selection`,
 operation `<seam>/<provider>`, with eligible / excluded / scores / ranked /
 rule / rationale). Seams that walk a fallback chain use `decision.ranked`.
 
+## Saved defaults — "use X for this seam unless told otherwise"
+
+A human can save a default provider per seam, layered by scope
+(`libs/core/seam-selection-defaults.ts`). The first layer that names the seam
+wins:
+
+| Layer          | Where                                                                                                 |
+| -------------- | ----------------------------------------------------------------------------------------------------- |
+| `env`          | `KYBERION_SEAM_DEFAULTS="seam=provider;seam2=provider"` (process-level; CI, direct runs)              |
+| `project`      | scope partition file, `projects[<project_id>]`                                                        |
+| `organization` | scope partition file, `organizations[<organization_id>]`                                              |
+| `tenant`       | scope partition file, `defaults`                                                                      |
+| `operator`     | `active/shared/runtime/seam-selection/defaults.json` (beside the rules)                               |
+| (policy)       | `default_chains` / `default_provider` of the governed policy — the shared baseline, not a saved layer |
+
+The scope partition file is
+`active/shared/runtime/seam-selection-defaults/<tier>/<tenant|shared>/defaults.json`
+(`confidential/<tenant>` with a tenant, `public/shared` without), a registered
+partitioned runtime-state root: tier-guard applies the tenant's permissions,
+another tenant never sees it, and tenant offboarding purges it. The scope
+comes from `currentScope()` (`KYBERION_TENANT` / organization / project).
+
+Semantics — a saved default is **soft**:
+
+- it applies only when the call names no provider and no purpose; mission
+  pins and operator rules still win (a rule with an empty `when` _forces_ a
+  provider even over purposes — that is what rules are for, not defaults);
+- eligibility always decides; an ineligible saved default falls back to the
+  policy default and the rationale says why
+  (`saved default (tenant) 'x' cannot run this task (…)`);
+- a saved default opts the call into governed selection, so the choice is
+  audited (`default_source` in the decision) and pinned inside a mission;
+- an unreadable layer (no permission, invalid file) is skipped with one
+  warning; selection never breaks because of an overlay.
+
+```bash
+pnpm kyberion seam select defaults list [--seam S] [--tenant T] [--organization O] [--project P]
+pnpm kyberion seam select defaults set --seam ocr-provider --provider tesseract            # operator
+pnpm kyberion seam select defaults set --seam ocr-provider --provider llm_api --tenant acme # tenant
+pnpm kyberion seam select defaults set --seam lease-backend --provider local-file-lock \
+     --tenant acme --project billing                                                       # project
+pnpm kyberion seam select defaults unset --seam ocr-provider --tenant acme
+```
+
+`--layer` defaults to the most specific layer the flags name. Providers are
+validated against the policy's `providers`. Changes are audited
+(`action: seam_selection_default_change`).
+
+Consumers get this for free through `resolveSeamSelectionEntry` /
+`resolveSeamProviderDecision` and `ProviderChainRouter` (the saved default
+_leads_ the policy chain). Seams that walk their own chain or pick a single
+implementation use `resolveSeamDefaultOrder(seam, { orderKey, builtin })` /
+`resolveSeamDefaultProvider(seam, { eligible, builtin })`; the `builtin`
+constant is only the hermetic fallback when no policy is present — never a
+second source of truth. `seam-policy-consistency.test.ts` keeps
+`default_provider` inside `default_chains.default` and every policy in
+`index.json`.
+
 **Compatibility contract.** Callers select only when a purpose is given, an
 operator rule **matches this request**, or the default cannot run the task.
-Otherwise routing is byte-for-byte what it was (rules that exist but do not
-match change nothing). An explicitly named provider always wins.
+A saved seam default also opts in. Otherwise routing is byte-for-byte what it
+was (rules that exist but do not match change nothing). An explicitly named provider always wins.
 
 ## When no rule is known: calibrate, then let a human decide
 
@@ -147,9 +211,10 @@ turns them into `measured` values for their own environment.
 
 1. Give its providers capability declarations the caller can check.
 2. Add `knowledge/product/governance/seam-provider-selection/<seam>.json`
-   (`seam_id`, `default_provider`, optional `fallback_purpose`, `traits`,
-   `providers` with traits + basis + evidence, `purposes`) and append the id
-   to `index.json`.
+   (`seam_id`, `default_provider`, `default_chains.default` when the order
+   matters, optional `fallback_purpose`, `traits`, `providers` with traits +
+   basis + evidence, `purposes`) and append the id to `index.json`. Never
+   copy the default into code except as the `builtin` hermetic fallback.
 3. In the caller, build `{ id, eligible, unmet }` candidates and call
    `resolveSeamProviderDecision({ seam, candidates, purpose, context, decisionKey })`
    only under the compatibility contract above; write the chosen id back
