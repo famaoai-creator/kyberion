@@ -20712,6 +20712,26 @@
         "en": "Waiting a long time",
         "ja": "長く待っています",
         "qps-ploc": "⟦Ẇȧïŧïñɠ ȧ ŀőñɠ ŧïɱė ŀőřėɱ ⟧"
+      },
+      "ia_inbox_error_review": {
+        "en": "The review could not be recorded. Nothing was changed; try again.",
+        "ja": "レビューを記録できませんでした。変更はされていません。もう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė řėṽïėẇ ƈőůŀḓ ñőŧ ƀė řėƈőřḓėḓ. Ñőŧħïñɠ ẇȧş ƈħȧñɠėḓ; ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_inbox_error_note_required": {
+        "en": "Write what should change before requesting changes.",
+        "ja": "修正を依頼するときは、直してほしい点を書いてください。",
+        "qps-ploc": "⟦Ẇřïŧė ẇħȧŧ şħőůŀḓ ƈħȧñɠė ƀėƒőřė řėɋůėşŧïñɠ ƈħȧñɠėş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_inbox_error_knowledge": {
+        "en": "The knowledge decision could not be recorded. Nothing was changed; try again.",
+        "ja": "ナレッジの判断を記録できませんでした。変更はされていません。もう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė ķñőẇŀėḓɠė ḓėƈïşïőñ ƈőůŀḓ ñőŧ ƀė řėƈőřḓėḓ. Ñőŧħïñɠ ẇȧş ƈħȧñɠėḓ; ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "ia_inbox_error_clarification": {
+        "en": "The request could not be updated. Nothing was changed; try again.",
+        "ja": "依頼を更新できませんでした。変更はされていません。もう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƈőůŀḓ ñőŧ ƀė ůṗḓȧŧėḓ. Ñőŧħïñɠ ẇȧş ƈħȧñɠėḓ; ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       }
     },
     "onboarding": {
