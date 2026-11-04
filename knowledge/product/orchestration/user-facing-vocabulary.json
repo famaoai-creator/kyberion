@@ -17654,14 +17654,14 @@
         "qps-ploc": "⟦ẇȧïŧïñɠ ƒőř ẏőůř ḓėƈïşïőñ ŀőřėɱ ïṗ⟧"
       },
       "ia_home_needs_overdue": {
-        "en": "{count} overdue",
-        "ja": "{count} 件が期限切れ",
-        "qps-ploc": "⟦{count} őṽėřḓůė ŀőřė⟧"
+        "en": "{count} overdue or waiting long",
+        "ja": "{count} 件が期限切れ・長く待っています",
+        "qps-ploc": "⟦{count} őṽėřḓůė őř ẇȧïŧïñɠ ŀőñɠ ŀőřėɱ ïṗşů⟧"
       },
       "ia_home_needs_none_overdue": {
-        "en": "Nothing overdue",
-        "ja": "期限切れはありません",
-        "qps-ploc": "⟦Ñőŧħïñɠ őṽėřḓůė ŀőřė⟧"
+        "en": "Nothing overdue or waiting long",
+        "ja": "期限切れや長く待っているものはありません",
+        "qps-ploc": "⟦Ñőŧħïñɠ őṽėřḓůė őř ẇȧïŧïñɠ ŀőñɠ ŀőřėɱ ïṗşů⟧"
       },
       "ia_home_needs_oldest": {
         "en": "Oldest has waited since {time}",
