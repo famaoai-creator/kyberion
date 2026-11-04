@@ -22,6 +22,7 @@ import {
   type A2UILinkProps,
 } from '@agent/shared-ui';
 import { ChronosMirrorLegacySections } from './ChronosMirrorLegacySections';
+import { NeedsYouLink } from '../../components/needs-you-link';
 import {
   CHRONOS_ACTIONS,
   CHRONOS_NAV_GROUPS,
@@ -57,15 +58,6 @@ const CONNECTION_REVIEW_LABEL_KEY: Record<string, string> = {
   hold: 'chronos_connection_state_hold',
   delete: 'chronos_connection_state_deleted',
 };
-
-/** Ask-why reason categories for a declined deliverable (category → label key). */
-const DELIVERABLE_REASON_KEYS: ReadonlyArray<readonly [string, string]> = [
-  ['incorrect_content', 'chronos_dl_reason_incorrect_content'],
-  ['wrong_direction', 'chronos_dl_reason_wrong_direction'],
-  ['quality', 'chronos_dl_reason_quality'],
-  ['scope', 'chronos_dl_reason_scope'],
-  ['other', 'chronos_dl_reason_other'],
-];
 
 function connectionReviewLabel(action: unknown, locale: SupportedLocale): string {
   const key =
@@ -161,14 +153,6 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
     deliverablesError,
     deliverablesQuery,
     setDeliverablesQuery,
-    selectedDeliverableId,
-    setSelectedDeliverableId,
-    deliverableReviewComment,
-    setDeliverableReviewComment,
-    deliverableReviewBusy,
-    deliverableReviewError,
-    setDeliverableReviewError,
-    deliverableAskWhyVerdict,
     operatorHomeSummary,
     operatorHomeError,
     missionHistory,
@@ -207,7 +191,6 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
     openDeliverableAsset,
     runPlanPreview,
     approvePlanAndStart,
-    submitDeliverableReview,
     submitConnectionReview,
     handleOperatorViewOpen,
     handleScenarioOpen,
@@ -1029,119 +1012,15 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
                         ]
                           .filter(Boolean)
                           .join(' · ')}
-                        onSelect={() => {
-                          setSelectedDeliverableId(item.artifactId);
-                          setDeliverableReviewError(null);
-                        }}
+                        onSelect={() => openDeliverableAsset(item)}
                         onOpen={() => openDeliverableAsset(item)}
                         onPreview={() => openDeliverableAsset(item)}
                       />
                     ))
                   )}
                 </div>
-                {selectedDeliverableId
-                  ? (() => {
-                      const selected = deliverables.find(
-                        (item: any) => item.artifactId === selectedDeliverableId
-                      );
-                      if (!selected) {
-                        return (
-                          <p className="kb-text kb-text--muted">
-                            {uxText('chronos_dl_selected_not_found', locale)}
-                          </p>
-                        );
-                      }
-                      return (
-                        <Section
-                          headingLevel={3}
-                          title={selected.artifactId}
-                          description={
-                            selected.reviewVerdict
-                              ? `${uxText('chronos_updated', locale)}: ${selected.reviewVerdict}`
-                              : uxText('chronos_not_reviewed', locale)
-                          }
-                        >
-                          <p className="kb-text">{selected.previewText || selected.kind}</p>
-                          <label className="kb-field" data-control="textarea">
-                            <span className="kb-field__label">
-                              {uxText('chronos_review_comment', locale)}
-                            </span>
-                            <textarea
-                              className="kb-input kb-textarea"
-                              rows={3}
-                              value={deliverableReviewComment}
-                              onChange={(event) => setDeliverableReviewComment(event.target.value)}
-                            />
-                          </label>
-                          {deliverableReviewError ? (
-                            <Callout tone="danger" title={deliverableReviewError} />
-                          ) : null}
-                          {deliverableAskWhyVerdict ? (
-                            <Callout
-                              tone="warning"
-                              title={uxText('chronos_dl_ask_why_title', locale)}
-                            >
-                              <ChronosInline>
-                                {DELIVERABLE_REASON_KEYS.map(([category, key]) => (
-                                  <Button
-                                    key={category}
-                                    disabled={deliverableReviewBusy}
-                                    label={uxTextStatic(key, locale)}
-                                    onClick={() =>
-                                      submitDeliverableReview(deliverableAskWhyVerdict, {
-                                        reasonCategory: category,
-                                      })
-                                    }
-                                  />
-                                ))}
-                                <Button
-                                  variant="ghost"
-                                  disabled={deliverableReviewBusy}
-                                  label={uxText('chronos_dl_reason_skip', locale)}
-                                  onClick={() =>
-                                    submitDeliverableReview(deliverableAskWhyVerdict, {
-                                      skipAskWhy: true,
-                                    })
-                                  }
-                                />
-                              </ChronosInline>
-                            </Callout>
-                          ) : null}
-                          <ChronosInline>
-                            <Button
-                              variant="primary"
-                              disabled={deliverableReviewBusy}
-                              label={uxText('chronos_approve', locale)}
-                              onClick={() => submitDeliverableReview('accept')}
-                            />
-                            <Button
-                              disabled={deliverableReviewBusy}
-                              label={uxText('chronos_request_changes', locale)}
-                              onClick={() => submitDeliverableReview('request-changes')}
-                            />
-                            <Button
-                              variant="danger"
-                              disabled={deliverableReviewBusy}
-                              label={uxText('chronos_reject', locale)}
-                              onClick={() => submitDeliverableReview('reject')}
-                            />
-                          </ChronosInline>
-                          <span className="chronos-meta" data-mono="true">
-                            {uxMessage(
-                              'chronos_dl_version',
-                              { version: selected.reviewVersion || 1 },
-                              'version {version}',
-                              locale
-                            )}
-                            {selected.reviewCurrentArtifactId &&
-                            selected.reviewCurrentArtifactId !== selected.artifactId
-                              ? ` · ${selected.reviewCurrentArtifactId}`
-                              : ''}
-                          </span>
-                        </Section>
-                      );
-                    })()
-                  : null}
+                {/* Deciding a deliverable happens in あなた待ち only (IA contract §2). */}
+                <NeedsYouLink reason="review" locale={locale} />
               </Section>
             </div>
           ) : null}

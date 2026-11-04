@@ -20497,6 +20497,221 @@
         "en": "These totals cover the first {shown} of {total} tenants. Choose a tenant in the scope selector above to see the others.",
         "ja": "この合計は {total} テナントのうち最初の {shown} テナント分です。ほかのテナントは上の範囲の選択から開いてください。",
         "qps-ploc": "⟦Ŧħėşė ŧőŧȧŀş ƈőṽėř ŧħė ƒïřşŧ {shown} őƒ {total} ŧėñȧñŧş. Ƈħőőşė ȧ ŧėñȧñŧ ïñ ŧħė şƈőṗė şėŀėƈŧőř ȧƀőṽė ŧő şėė ŧħė őŧħėřş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "ia_inbox_title": {
+        "en": "Needs you",
+        "ja": "あなた待ち",
+        "qps-ploc": "⟦Ñėėḓş ẏőů ŀőř⟧"
+      },
+      "ia_inbox_lead": {
+        "en": "Everything waiting for your decision or check, most urgent first. Decide here and the work moves on.",
+        "ja": "あなたの判断や確認を待っているものです。急ぎの順に並んでいます。ここで決めれば、仕事はそのまま先へ進みます。",
+        "qps-ploc": "⟦Ėṽėřẏŧħïñɠ ẇȧïŧïñɠ ƒőř ẏőůř ḓėƈïşïőñ őř ƈħėƈķ, ɱőşŧ ůřɠėñŧ ƒïřşŧ. Ḓėƈïḓė ħėřė ȧñḓ ŧħė ẇőřķ ɱőṽėş őñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "ia_inbox_count_definition": {
+        "en": "Open items that have not expired, with identical requests counted once, within the scope you are viewing. Every screen shows this same number.",
+        "ja": "未決で期限が切れていないものを、同じ依頼は1件にまとめ、いま見ている範囲だけで数えています。どの画面でも同じ数を表示します。",
+        "qps-ploc": "⟦Őṗėñ ïŧėɱş ŧħȧŧ ħȧṽė ñőŧ ėẋṗïřėḓ, ẇïŧħ ïḓėñŧïƈȧŀ řėɋůėşŧş ƈőůñŧėḓ őñƈė, ẇïŧħïñ ŧħė şƈőṗė ẏőů ȧřė ṽïėẇïñɠ. Ėṽėřẏ şƈřėėñ şħőẇş ŧħïş şȧɱė ñůɱƀėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+      },
+      "ia_inbox_filter_label": {
+        "en": "Filter by reason",
+        "ja": "理由で絞り込む",
+        "qps-ploc": "⟦Ƒïŀŧėř ƀẏ řėȧşőñ ŀőřėɱ⟧"
+      },
+      "ia_inbox_filter_all": {
+        "en": "All",
+        "ja": "すべて",
+        "qps-ploc": "⟦Ȧŀŀ ŀőř⟧"
+      },
+      "ia_inbox_filter_overdue": {
+        "en": "Overdue",
+        "ja": "期限切れ・長く待っているもの",
+        "qps-ploc": "⟦Őṽėřḓůė ŀőř⟧"
+      },
+      "ia_inbox_filter_clear": {
+        "en": "Clear filters",
+        "ja": "絞り込みを解除",
+        "qps-ploc": "⟦Ƈŀėȧř ƒïŀŧėřş ŀőřė⟧"
+      },
+      "ia_inbox_reason_approval": {
+        "en": "Approvals",
+        "ja": "承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ŀőř⟧"
+      },
+      "ia_inbox_reason_decision": {
+        "en": "Customer decisions",
+        "ja": "お客さまの決定",
+        "qps-ploc": "⟦Ƈůşŧőɱėř ḓėƈïşïőñş ŀőřėɱ⟧"
+      },
+      "ia_inbox_reason_review": {
+        "en": "Deliverable reviews",
+        "ja": "成果物の確認",
+        "qps-ploc": "⟦Ḓėŀïṽėřȧƀŀė řėṽïėẇş ŀőřėɱ ⟧"
+      },
+      "ia_inbox_reason_knowledge": {
+        "en": "Knowledge candidates",
+        "ja": "ナレッジ候補",
+        "qps-ploc": "⟦Ķñőẇŀėḓɠė ƈȧñḓïḓȧŧėş ŀőřėɱ ⟧"
+      },
+      "ia_inbox_reason_clarification": {
+        "en": "Stalled requests",
+        "ja": "止まっている依頼",
+        "qps-ploc": "⟦Şŧȧŀŀėḓ řėɋůėşŧş ŀőřėɱ⟧"
+      },
+      "ia_inbox_reason_failure": {
+        "en": "Failures",
+        "ja": "失敗・停止",
+        "qps-ploc": "⟦Ƒȧïŀůřėş ŀőř⟧"
+      },
+      "ia_inbox_requester_agent": {
+        "en": "Agent (Kyberion)",
+        "ja": "エージェント(Kyberion)",
+        "qps-ploc": "⟦Ȧɠėñŧ (Ķẏƀėřïőñ) ŀőřėɱ⟧"
+      },
+      "ia_inbox_requester_customer": {
+        "en": "Customer",
+        "ja": "お客さま",
+        "qps-ploc": "⟦Ƈůşŧőɱėř ŀőř⟧"
+      },
+      "ia_inbox_agent_badge": {
+        "en": "Agent",
+        "ja": "エージェント",
+        "qps-ploc": "⟦Ȧɠėñŧ ŀőř⟧"
+      },
+      "ia_inbox_asked_by": {
+        "en": "Asked by {name}",
+        "ja": "依頼元: {name}",
+        "qps-ploc": "⟦Ȧşķėḓ ƀẏ {name} ŀőřė⟧"
+      },
+      "ia_inbox_overdue_badge": {
+        "en": "Overdue",
+        "ja": "期限切れ",
+        "qps-ploc": "⟦Őṽėřḓůė ŀőř⟧"
+      },
+      "ia_inbox_waiting_since": {
+        "en": "Waiting since {value}",
+        "ja": "{value}から待っています",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ şïñƈė {value} ŀőřėɱ ⟧"
+      },
+      "ia_inbox_oldest": {
+        "en": "Oldest wait: {value}",
+        "ja": "最も長く待っているもの: {value}",
+        "qps-ploc": "⟦Őŀḓėşŧ ẇȧïŧ: {value} ŀőřėɱ ⟧"
+      },
+      "ia_inbox_total": {
+        "en": "{count} waiting",
+        "ja": "{count} 件が待っています",
+        "qps-ploc": "⟦{count} ẇȧïŧïñɠ ŀőřė⟧"
+      },
+      "ia_inbox_overdue_count": {
+        "en": "{count} overdue or waiting long",
+        "ja": "{count} 件が期限切れ・長く待っています",
+        "qps-ploc": "⟦{count} őṽėřḓůė őř ẇȧïŧïñɠ ŀőñɠ ŀőřėɱ ïṗşů⟧"
+      },
+      "ia_inbox_open_mission": {
+        "en": "Open the related mission",
+        "ja": "関連するミッションを開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė řėŀȧŧėḓ ɱïşşïőñ ŀőřėɱ ï⟧"
+      },
+      "ia_inbox_decision_title": {
+        "en": "A customer reply needs you",
+        "ja": "お客さまの回答に対応が必要です",
+        "qps-ploc": "⟦Ȧ ƈůşŧőɱėř řėṗŀẏ ñėėḓş ẏőů ŀőřėɱ ïṗ⟧"
+      },
+      "ia_inbox_decision_ask": {
+        "en": "The customer answered outside the options or asked a question. Read the case and reply.",
+        "ja": "お客さまが選択肢以外の回答や質問をしています。案件を開いて内容を確認し、対応してください。",
+        "qps-ploc": "⟦Ŧħė ƈůşŧőɱėř ȧñşẇėřėḓ őůŧşïḓė ŧħė őṗŧïőñş őř ȧşķėḓ ȧ ɋůėşŧïőñ. Řėȧḓ ŧħė ƈȧşė ȧñḓ řėṗŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "ia_inbox_decision_open": {
+        "en": "Open the case",
+        "ja": "案件を開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė ƈȧşė ŀőřė⟧"
+      },
+      "ia_inbox_review_title": {
+        "en": "A deliverable is ready for your check",
+        "ja": "成果物の確認をお願いします",
+        "qps-ploc": "⟦Ȧ ḓėŀïṽėřȧƀŀė ïş řėȧḓẏ ƒőř ẏőůř ƈħėƈķ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_inbox_knowledge_title": {
+        "en": "A learning to keep",
+        "ja": "残しておく学びの候補",
+        "qps-ploc": "⟦Ȧ ŀėȧřñïñɠ ŧő ķėėṗ ŀőřėɱ⟧"
+      },
+      "ia_inbox_clarification_title": {
+        "en": "A request has stopped",
+        "ja": "止まっている依頼があります",
+        "qps-ploc": "⟦Ȧ řėɋůėşŧ ħȧş şŧőṗṗėḓ ŀőřėɱ ⟧"
+      },
+      "ia_inbox_failure_title": {
+        "en": "Something stopped and needs a person",
+        "ja": "止まった作業があり、人の確認が必要です",
+        "qps-ploc": "⟦Şőɱėŧħïñɠ şŧőṗṗėḓ ȧñḓ ñėėḓş ȧ ṗėřşőñ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_inbox_group_expand": {
+        "en": "Show all {count} identical requests",
+        "ja": "同じ依頼 {count} 件をすべて表示",
+        "qps-ploc": "⟦Şħőẇ ȧŀŀ {count} ïḓėñŧïƈȧŀ řėɋůėşŧş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_inbox_empty_title": {
+        "en": "Nothing is waiting for you",
+        "ja": "いまあなたを待っているものはありません",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş ẇȧïŧïñɠ ƒőř ẏőů ŀőřėɱ ïṗ⟧"
+      },
+      "ia_inbox_empty_reason": {
+        "en": "New approvals, reviews and questions appear here, most urgent first, as soon as they arrive.",
+        "ja": "新しい承認・確認・質問が届くと、ここに急ぎの順で並びます。",
+        "qps-ploc": "⟦Ñėẇ ȧṗṗřőṽȧŀş, řėṽïėẇş ȧñḓ ɋůėşŧïőñş ȧṗṗėȧř ħėřė, ɱőşŧ ůřɠėñŧ ƒïřşŧ, ȧş şőőñ ȧş ŧħėẏ ȧřřïṽė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "ia_inbox_empty_filtered": {
+        "en": "Nothing matches this filter.",
+        "ja": "この絞り込みに当てはまるものはありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ɱȧŧƈħėş ŧħïş ƒïŀŧėř. ŀőřėɱ ïṗş⟧"
+      },
+      "ia_inbox_load_more": {
+        "en": "Show more",
+        "ja": "さらに表示",
+        "qps-ploc": "⟦Şħőẇ ɱőřė ŀőř⟧"
+      },
+      "ia_inbox_load_error": {
+        "en": "The queue could not be loaded. Try again.",
+        "ja": "一覧を読み込めませんでした。もう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė ɋůėůė ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. Ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ia_inbox_loading": {
+        "en": "Loading what needs you…",
+        "ja": "あなた待ちを読み込んでいます…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ẇħȧŧ ñėėḓş ẏőů… ŀőřėɱ ï⟧"
+      },
+      "ia_inbox_elsewhere": {
+        "en": "{count} waiting for your decision",
+        "ja": "{count} 件があなたの判断を待っています",
+        "qps-ploc": "⟦{count} ẇȧïŧïñɠ ƒőř ẏőůř ḓėƈïşïőñ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_inbox_elsewhere_none": {
+        "en": "Nothing here is waiting for your decision.",
+        "ja": "ここであなたの判断を待っているものはありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ħėřė ïş ẇȧïŧïñɠ ƒőř ẏőůř ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ia_inbox_elsewhere_link": {
+        "en": "Decide in Needs you",
+        "ja": "あなた待ちで判断する",
+        "qps-ploc": "⟦Ḓėƈïḓė ïñ Ñėėḓş ẏőů ŀőřėɱ ⟧"
+      },
+      "ia_inbox_elsewhere_lead": {
+        "en": "Decisions are made in one place, Needs you. This view only browses.",
+        "ja": "判断は「あなた待ち」の1か所で行います。この画面は閲覧用です。",
+        "qps-ploc": "⟦Ḓėƈïşïőñş ȧřė ɱȧḓė ïñ őñė ṗŀȧƈė, Ñėėḓş ẏőů. Ŧħïş ṽïėẇ őñŀẏ ƀřőẇşėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_inbox_count_how": {
+        "en": "How this is counted",
+        "ja": "件数の数え方",
+        "qps-ploc": "⟦Ħőẇ ŧħïş ïş ƈőůñŧėḓ ŀőřėɱ ⟧"
+      },
+      "ia_inbox_waiting_long_badge": {
+        "en": "Waiting a long time",
+        "ja": "長く待っています",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ȧ ŀőñɠ ŧïɱė ŀőřėɱ ⟧"
       }
     },
     "onboarding": {
