@@ -19984,9 +19984,9 @@
         "qps-ploc": "⟦Ėṽėřẏŧħïñɠ ẇȧïŧïñɠ ƒőř ẏőůř ḓėƈïşïőñ őř ƈħėƈķ, ɱőşŧ ůřɠėñŧ ƒïřşŧ. Ḓėƈïḓė ħėřė ȧñḓ ŧħė ẇőřķ ɱőṽėş őñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
       },
       "ia_inbox_count_definition": {
-        "en": "Counted: open items that have not expired, identical requests counted once, within the scope you are viewing.",
-        "ja": "件数の数え方: 未決で期限が切れていないものを、同じ依頼は1件にまとめて、いま見ている範囲だけで数えています。",
-        "qps-ploc": "⟦Ƈőůñŧėḓ: őṗėñ ïŧėɱş ŧħȧŧ ħȧṽė ñőŧ ėẋṗïřėḓ, ïḓėñŧïƈȧŀ řėɋůėşŧş ƈőůñŧėḓ őñƈė, ẇïŧħïñ ŧħė şƈőṗė ẏőů ȧřė ṽïėẇïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+        "en": "Open items that have not expired, with identical requests counted once, within the scope you are viewing. Every screen shows this same number.",
+        "ja": "未決で期限が切れていないものを、同じ依頼は1件にまとめ、いま見ている範囲だけで数えています。どの画面でも同じ数を表示します。",
+        "qps-ploc": "⟦Őṗėñ ïŧėɱş ŧħȧŧ ħȧṽė ñőŧ ėẋṗïřėḓ, ẇïŧħ ïḓėñŧïƈȧŀ řėɋůėşŧş ƈőůñŧėḓ őñƈė, ẇïŧħïñ ŧħė şƈőṗė ẏőů ȧřė ṽïėẇïñɠ. Ėṽėřẏ şƈřėėñ şħőẇş ŧħïş şȧɱė ñůɱƀėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
       },
       "ia_inbox_filter_label": {
         "en": "Filter by reason",
@@ -20177,6 +20177,11 @@
         "en": "Decisions are made in one place, Needs you. This view only browses.",
         "ja": "判断は「あなた待ち」の1か所で行います。この画面は閲覧用です。",
         "qps-ploc": "⟦Ḓėƈïşïőñş ȧřė ɱȧḓė ïñ őñė ṗŀȧƈė, Ñėėḓş ẏőů. Ŧħïş ṽïėẇ őñŀẏ ƀřőẇşėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_inbox_count_how": {
+        "en": "How this is counted",
+        "ja": "件数の数え方",
+        "qps-ploc": "⟦Ħőẇ ŧħïş ïş ƈőůñŧėḓ ŀőřėɱ ⟧"
       }
     },
     "onboarding": {
