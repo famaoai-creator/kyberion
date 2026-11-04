@@ -30,10 +30,11 @@ describe('workspace hrefs', () => {
   });
 
   it('builds list hrefs with only set narrowing', () => {
-    expect(kindListHref('mission')).toBe('/w/mission');
-    expect(kindListHref('mission', { tenant: 'acme', project_id: '' })).toBe(
-      '/w/mission?tenant=acme'
-    );
+    // MSN-SHELL-IA §1: list pages live under the top-level destinations.
+    expect(kindListHref('mission')).toBe('/work');
+    expect(kindListHref('mission', { tenant: 'acme', project_id: '' })).toBe('/work?tenant=acme');
+    expect(kindListHref('work_item', { tenant: 'acme' })).toBe('/work?tab=items&tenant=acme');
+    expect(kindListHref('actor')).toBe('/org?tab=people');
   });
 
   it('links pending approvals to their Inbox card', () => {
