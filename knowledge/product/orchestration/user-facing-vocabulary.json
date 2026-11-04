@@ -14979,9 +14979,9 @@
         "qps-ploc": "⟦Şȧṽė ṗřőƒïŀė ȧñḓ ƈőññėƈŧïőñ ṗřėṗȧřȧŧïőñ ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
       "setup.management_title": {
-        "en": "2. Tenant, vision, and Kyberion agent",
-        "ja": "2. テナント・ビジョン・Kyberionエージェント",
-        "qps-ploc": "⟦2. Ŧėñȧñŧ, ṽïşïőñ, ȧñḓ Ķẏƀėřïőñ ȧɠėñŧ ŀőřėɱ ïṗşůɱ ⟧"
+        "en": "Tenant, vision, and Kyberion agent",
+        "ja": "テナント・ビジョン・Kyberionエージェント",
+        "qps-ploc": "⟦Ŧėñȧñŧ, ṽïşïőñ, ȧñḓ Ķẏƀėřïőñ ȧɠėñŧ ŀőřėɱ ïṗşůɱ⟧"
       },
       "setup.management_description": {
         "en": "Manage the tenant context, secretary vision, and the Kyberion agent bound to this personal profile.",
@@ -15539,9 +15539,9 @@
         "qps-ploc": "⟦Ñőŧïƒïƈȧŧïőñ şėŧŧïñɠş şȧṽėḓ. ŀőřėɱ ïṗş⟧"
       },
       "setup.operations_title": {
-        "en": "6. Secretary operations",
-        "ja": "6. 秘書業務の入口",
-        "qps-ploc": "⟦6. Şėƈřėŧȧřẏ őṗėřȧŧïőñş ŀőřėɱ ï⟧"
+        "en": "Secretary operations",
+        "ja": "秘書業務の入口",
+        "qps-ploc": "⟦Şėƈřėŧȧřẏ őṗėřȧŧïőñş ŀőřėɱ ⟧"
       },
       "setup.operations_description": {
         "en": "Bring approvals, scheduling, and email into one personal entry point.",
@@ -30689,9 +30689,9 @@
         "qps-ploc": "⟦Řėɠïşŧėř ŧħėşė řėḓïřėƈŧ ŮŘÏş ẇïŧħ ẏőůř ïḓėñŧïŧẏ ṗřőṽïḓėř: ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
       "sso_egress_hint": {
-        "en": "Identity providers other than Google and Microsoft must be allowed in knowledge/product/governance/egress-policy.json.",
-        "ja": "Google と Microsoft 以外の IdP は、knowledge/product/governance/egress-policy.json で通信先を許可する必要があります。",
-        "qps-ploc": "⟦Ïḓėñŧïŧẏ ṗřőṽïḓėřş őŧħėř ŧħȧñ Ɠőőɠŀė ȧñḓ Ɱïƈřőşőƒŧ ɱůşŧ ƀė ȧŀŀőẇėḓ ïñ ķñőẇŀėḓɠė/ṗřőḓůƈŧ/ɠőṽėřñȧñƈė/ėɠřėşş-ṗőŀïƈẏ.ĵşőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+        "en": "Identity providers other than Google and Microsoft must first be allowed in the network egress policy by an administrator on the Kyberion computer.",
+        "ja": "Google と Microsoft 以外の IdP は、管理者が Kyberion を動かしている PC の通信先許可ポリシーに追加する必要があります。",
+        "qps-ploc": "⟦Ïḓėñŧïŧẏ ṗřőṽïḓėřş őŧħėř ŧħȧñ Ɠőőɠŀė ȧñḓ Ɱïƈřőşőƒŧ ɱůşŧ ƒïřşŧ ƀė ȧŀŀőẇėḓ ïñ ŧħė ñėŧẇőřķ ėɠřėşş ṗőŀïƈẏ ƀẏ ȧñ ȧḓɱïñïşŧřȧŧőř őñ ŧħė Ķẏƀėřïőñ ƈőɱṗůŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
       },
       "sso_link_title": {
         "en": "Link your identity provider account",
@@ -30724,9 +30724,9 @@
         "qps-ploc": "⟦Ŀïñķïñɠ ïş ñőŧ ȧṽȧïŀȧƀŀė ẏėŧ. Şȧṽė ŧħė ŞŞŐ şėŧŧïñɠş ƒïřşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
       "sso_link_hint": {
-        "en": "After signing in with your identity provider, bind the issuer and subject shown on screen to your member under Settings › Organization and members.",
-        "ja": "IdP でサインインしたら、画面に表示される issuer と subject を「設定 › 組織とメンバー」で自分に紐付けてください。",
-        "qps-ploc": "⟦Ȧƒŧėř şïɠñïñɠ ïñ ẇïŧħ ẏőůř ïḓėñŧïŧẏ ṗřőṽïḓėř, ƀïñḓ ŧħė ïşşůėř ȧñḓ şůƀĵėƈŧ şħőẇñ őñ şƈřėėñ ŧő ẏőůř ɱėɱƀėř ůñḓėř Şėŧŧïñɠş › Őřɠȧñïẑȧŧïőñ ȧñḓ ɱėɱƀėřş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
+        "en": "After signing in with your identity provider, bind the issuer and subject shown on screen to your member under Settings › Workspace & organization.",
+        "ja": "IdP でサインインしたら、画面に表示される issuer と subject を「設定 › ワークスペースと組織」で自分に紐付けてください。",
+        "qps-ploc": "⟦Ȧƒŧėř şïɠñïñɠ ïñ ẇïŧħ ẏőůř ïḓėñŧïŧẏ ṗřőṽïḓėř, ƀïñḓ ŧħė ïşşůėř ȧñḓ şůƀĵėƈŧ şħőẇñ őñ şƈřėėñ ŧő ẏőůř ɱėɱƀėř ůñḓėř Şėŧŧïñɠş › Ẇőřķşṗȧƈė & őřɠȧñïẑȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
       },
       "sso_error_field": {
         "en": "Invalid value: {field}",

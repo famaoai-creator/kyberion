@@ -58,4 +58,14 @@ describe('settings IA: single homes and redirects', () => {
       '/settings#settings-sso'
     );
   });
+
+  it('serves the checklist through the shared v1 route with concierge charter mediation only', () => {
+    const route = read('src/app/api/v1/[...operation]/route.ts');
+    expect(route).toContain(
+      "...(id === 'setup.checklist' ? { setupReaders: conciergeSetupChecklistReaders } : {})"
+    );
+    const readers = read('src/lib/setup-checklist-server.ts');
+    expect(readers).toContain("withExecutionContext('sovereign_concierge'");
+    expect(readers.match(/withExecutionContext\(/g)).toHaveLength(1);
+  });
 });
