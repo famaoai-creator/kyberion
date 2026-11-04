@@ -18,6 +18,8 @@ import {
   settingsHref,
   windowDelta,
   workHref,
+  stoppedMissionsHref,
+  deliverableHref,
   type HomeAgentState,
   type HomeDashboard,
   type HomeLoadFailure,
@@ -139,6 +141,16 @@ function HomeState({
 }) {
   if (home.state === 'loading') return <Loading t={t} />;
   if (home.state === 'error') return <LoadFailure t={t} failure={home.failure} onRetry={onRetry} />;
+  if (home.data.withheld?.includes(section))
+    return (
+      <div className="kb-home__failure" data-failure="withheld">
+        <Callout
+          tone="info"
+          title={t('ia_home_tile_withheld_title')}
+          body={t('ia_home_tile_withheld_body')}
+        />
+      </div>
+    );
   if (home.data.unavailable.includes(section))
     return (
       <div className="kb-home__failure" data-failure="unavailable">
@@ -521,7 +533,7 @@ export function MissionsTile({ t, home, onRetry, bcp47 = 'en' }: TileProps) {
                     ))}
                   </ul>
                   {missions.blockedTotal > missions.blocked.length ? (
-                    <Link className="kb-home__note" href={workHref('paused')}>
+                    <Link className="kb-home__note" href={stoppedMissionsHref()}>
                       {t('ia_home_missions_blocked_more', {
                         count: fmtNumber(bcp47, missions.blockedTotal - missions.blocked.length),
                       })}
@@ -704,7 +716,7 @@ export function CostTile({ t, home, onRetry, bcp47 = 'en' }: TileProps) {
       span="half"
       testId="home-cost"
       title={t('ia_home_cost_title')}
-      action={{ label: t('ia_home_agents_open'), href: '/ops?section=operations' }}
+      action={{ label: t('ia_home_cost_open'), href: '/ops?section=diagnostics' }}
     >
       <HomeState t={t} home={home} section="cost" onRetry={onRetry}>
         {(data) => {
@@ -804,7 +816,7 @@ export function DeliverablesTile({ t, home, onRetry, bcp47 = 'en' }: TileProps) 
             <ul className="kb-home__list">
               {data.deliverables.map((item) => (
                 <li key={item.id}>
-                  <Link href="/library" className="kb-home__list-row">
+                  <Link href={deliverableHref(item.id)} className="kb-home__list-row">
                     <span className="kb-home__list-title">
                       {item.title ||
                         t('ia_home_deliverables_dated', {
