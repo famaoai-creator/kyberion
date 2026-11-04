@@ -32,6 +32,7 @@ import {
   StatusPill,
 } from '@agent/shared-ui';
 import { WsPreformatted, WsSelectTable, WsTextareaField, WsTitleCell } from './ChronosWsParts';
+import type { WorkspaceDecisionPointer } from './DeliverablesWorkspace';
 import { useChronosLocale } from '../../lib/ops/hooks';
 import { uxText, uxTextOr, type SupportedLocale } from '../../lib/ops/ux-vocabulary';
 import {
@@ -59,10 +60,16 @@ export function KnowledgeWorkspace({
   tenant,
   organizationId,
   projectId,
+  browseOnly,
 }: {
   tenant?: string;
   organizationId?: string;
   projectId?: string;
+  /**
+   * 資料 › ナレッジ (MSN-SHELL-IA §1): browse only. Candidate decisions live in
+   * あなた待ち, so the decision controls are replaced by a pointer there.
+   */
+  browseOnly?: WorkspaceDecisionPointer;
 }) {
   const locale = useChronosLocale();
   const [items, setItems] = React.useState<Candidate[]>([]);
@@ -468,7 +475,14 @@ export function KnowledgeWorkspace({
               body={uxText('chronos_learning_check_only', locale)}
             />
           ) : null}
-          {selected.learning ? (
+          {browseOnly ? (
+            <Callout
+              tone="info"
+              title={browseOnly.title}
+              action={{ label: browseOnly.label, href: browseOnly.href }}
+            />
+          ) : null}
+          {selected.learning && !browseOnly ? (
             <KnowledgeLearningPanel
               key={selected.candidateKey + ':' + (selected.learning.payloadDigest || '')}
               candidate={selected}
@@ -545,7 +559,7 @@ export function KnowledgeWorkspace({
               </div>
             </div>
           ) : null}
-          {canDecide ? (
+          {canDecide && !browseOnly ? (
             <WsTextareaField
               id="chronos-knowledge-note"
               label={uxTextOr('chronos_ws_decision_note_label', 'Decision note', locale)}
@@ -555,7 +569,7 @@ export function KnowledgeWorkspace({
               rows={2}
             />
           ) : null}
-          {!selected.learning ? (
+          {!selected.learning && !browseOnly ? (
             <div className="flex flex-wrap gap-2">
               {selected.ratification_required && selected.status === 'queued' ? (
                 <Button
@@ -588,7 +602,7 @@ export function KnowledgeWorkspace({
               ) : null}
             </div>
           ) : null}
-          {!localAdmin ? (
+          {!localAdmin && !browseOnly ? (
             <p className="kb-text kb-text--muted">
               {uxText('chronos_localadmin_required', locale)}
             </p>

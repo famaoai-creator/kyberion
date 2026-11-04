@@ -19972,6 +19972,156 @@
         "en": "These totals cover the first {shown} of {total} tenants. Choose a tenant in the scope selector above to see the others.",
         "ja": "この合計は {total} テナントのうち最初の {shown} テナント分です。ほかのテナントは上の範囲の選択から開いてください。",
         "qps-ploc": "⟦Ŧħėşė ŧőŧȧŀş ƈőṽėř ŧħė ƒïřşŧ {shown} őƒ {total} ŧėñȧñŧş. Ƈħőőşė ȧ ŧėñȧñŧ ïñ ŧħė şƈőṗė şėŀėƈŧőř ȧƀőṽė ŧő şėė ŧħė őŧħėřş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "ia_shell_tabs_label": {
+        "en": "Sections of this page",
+        "ja": "このページの表示",
+        "qps-ploc": "⟦Şėƈŧïőñş őƒ ŧħïş ṗȧɠė ŀőřėɱ ⟧"
+      },
+      "ia_shell_work_title": {
+        "en": "Work",
+        "ja": "仕事",
+        "qps-ploc": "⟦Ẇőřķ ŀőř⟧"
+      },
+      "ia_shell_work_subtitle": {
+        "en": "Where each mission stands, and the work assigned to people and agents.",
+        "ja": "ミッションの状態と、人やエージェントに割り当てた作業です。",
+        "qps-ploc": "⟦Ẇħėřė ėȧƈħ ɱïşşïőñ şŧȧñḓş, ȧñḓ ŧħė ẇőřķ ȧşşïɠñėḓ ŧő ṗėőṗŀė ȧñḓ ȧɠėñŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "ia_shell_work_tab_missions": {
+        "en": "Missions",
+        "ja": "ミッション",
+        "qps-ploc": "⟦Ɱïşşïőñş ŀőř⟧"
+      },
+      "ia_shell_work_tab_items": {
+        "en": "Work items",
+        "ja": "作業",
+        "qps-ploc": "⟦Ẇőřķ ïŧėɱş ŀőř⟧"
+      },
+      "ia_shell_mission_board_label": {
+        "en": "Missions by state",
+        "ja": "状態別のミッション",
+        "qps-ploc": "⟦Ɱïşşïőñş ƀẏ şŧȧŧė ŀőřėɱ⟧"
+      },
+      "ia_shell_mission_col_in_progress": {
+        "en": "In progress",
+        "ja": "進行中",
+        "qps-ploc": "⟦Ïñ ṗřőɠřėşş ŀőř⟧"
+      },
+      "ia_shell_mission_col_waiting": {
+        "en": "Waiting or stalled",
+        "ja": "入力待ち・停滞",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ őř şŧȧŀŀėḓ ŀőřėɱ⟧"
+      },
+      "ia_shell_mission_col_review": {
+        "en": "Waiting for review",
+        "ja": "レビュー待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř řėṽïėẇ ŀőřėɱ⟧"
+      },
+      "ia_shell_mission_col_done": {
+        "en": "Done",
+        "ja": "完了",
+        "qps-ploc": "⟦Ḓőñė ŀőř⟧"
+      },
+      "ia_shell_mission_col_empty": {
+        "en": "Nothing here right now.",
+        "ja": "いまはありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ħėřė řïɠħŧ ñőẇ. ŀőřėɱ ï⟧"
+      },
+      "ia_shell_mission_col_more": {
+        "en": "{count} more in the list view",
+        "ja": "ほか {count} 件(一覧表示で確認できます)",
+        "qps-ploc": "⟦{count} ɱőřė ïñ ŧħė ŀïşŧ ṽïėẇ ŀőřėɱ ïṗş⟧"
+      },
+      "ia_shell_org_title": {
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "ia_shell_org_subtitle": {
+        "en": "Goals and key results, projects, and the people and agents doing the work.",
+        "ja": "目標と成果指標、プロジェクト、仕事をする人とエージェントです。",
+        "qps-ploc": "⟦Ɠőȧŀş ȧñḓ ķėẏ řėşůŀŧş, ṗřőĵėƈŧş, ȧñḓ ŧħė ṗėőṗŀė ȧñḓ ȧɠėñŧş ḓőïñɠ ŧħė ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "ia_shell_org_tab_overview": {
+        "en": "Overview",
+        "ja": "概要",
+        "qps-ploc": "⟦Őṽėřṽïėẇ ŀőř⟧"
+      },
+      "ia_shell_org_tab_projects": {
+        "en": "Projects",
+        "ja": "プロジェクト",
+        "qps-ploc": "⟦Ṗřőĵėƈŧş ŀőř⟧"
+      },
+      "ia_shell_org_tab_people": {
+        "en": "People and agents",
+        "ja": "人とエージェント",
+        "qps-ploc": "⟦Ṗėőṗŀė ȧñḓ ȧɠėñŧş ŀőřėɱ⟧"
+      },
+      "ia_shell_org_edit": {
+        "en": "Edit organization",
+        "ja": "組織を編集",
+        "qps-ploc": "⟦Ėḓïŧ őřɠȧñïẑȧŧïőñ ŀőřėɱ⟧"
+      },
+      "ia_shell_library_title": {
+        "en": "Library",
+        "ja": "資料",
+        "qps-ploc": "⟦Ŀïƀřȧřẏ ŀőř⟧"
+      },
+      "ia_shell_library_subtitle": {
+        "en": "Delivered work, the knowledge it produced, and documents to add.",
+        "ja": "納品された成果物、そこから得たナレッジ、取り込む資料です。",
+        "qps-ploc": "⟦Ḓėŀïṽėřėḓ ẇőřķ, ŧħė ķñőẇŀėḓɠė ïŧ ṗřőḓůƈėḓ, ȧñḓ ḓőƈůɱėñŧş ŧő ȧḓḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ia_shell_library_tab_deliverables": {
+        "en": "Deliverables",
+        "ja": "成果物",
+        "qps-ploc": "⟦Ḓėŀïṽėřȧƀŀėş ŀőř⟧"
+      },
+      "ia_shell_library_tab_knowledge": {
+        "en": "Knowledge",
+        "ja": "ナレッジ",
+        "qps-ploc": "⟦Ķñőẇŀėḓɠė ŀőř⟧"
+      },
+      "ia_shell_library_tab_ingest": {
+        "en": "Add a document",
+        "ja": "資料の取込",
+        "qps-ploc": "⟦Ȧḓḓ ȧ ḓőƈůɱėñŧ ŀőřė⟧"
+      },
+      "ia_shell_library_review_where": {
+        "en": "Accepting a deliverable or asking for changes happens in Needs you.",
+        "ja": "成果物の受け入れや修正の依頼は「あなた待ち」で行います。",
+        "qps-ploc": "⟦Ȧƈƈėṗŧïñɠ ȧ ḓėŀïṽėřȧƀŀė őř ȧşķïñɠ ƒőř ƈħȧñɠėş ħȧṗṗėñş ïñ Ñėėḓş ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_shell_library_knowledge_where": {
+        "en": "Approving or rejecting a knowledge candidate happens in Needs you.",
+        "ja": "ナレッジ候補の承認や却下は「あなた待ち」で行います。",
+        "qps-ploc": "⟦Ȧṗṗřőṽïñɠ őř řėĵėƈŧïñɠ ȧ ķñőẇŀėḓɠė ƈȧñḓïḓȧŧė ħȧṗṗėñş ïñ Ñėėḓş ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_shell_open_inbox": {
+        "en": "Open Needs you",
+        "ja": "あなた待ちを開く",
+        "qps-ploc": "⟦Őṗėñ Ñėėḓş ẏőů ŀőřė⟧"
+      },
+      "ia_shell_ops_title": {
+        "en": "Operations",
+        "ja": "運用",
+        "qps-ploc": "⟦Őṗėřȧŧïőñş ŀőř⟧"
+      },
+      "ia_shell_ops_subtitle": {
+        "en": "Agents at work, screens, diagnostics and discussions.",
+        "ja": "稼働中のエージェント、画面、診断、ディスカッションです。",
+        "qps-ploc": "⟦Ȧɠėñŧş ȧŧ ẇőřķ, şƈřėėñş, ḓïȧɠñőşŧïƈş ȧñḓ ḓïşƈůşşïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ia_shell_scope_destination": {
+        "en": "Files into {workspace}. Change it with the workspace switcher.",
+        "ja": "登録先は {workspace} です。切り替えはワークスペースの選択から行います。",
+        "qps-ploc": "⟦Ƒïŀėş ïñŧő {workspace}. Ƈħȧñɠė ïŧ ẇïŧħ ŧħė ẇőřķşṗȧƈė şẇïŧƈħėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ia_shell_scope_pick": {
+        "en": "No workspace is selected, so choose where this goes.",
+        "ja": "ワークスペースが選ばれていないため、登録先を選んでください。",
+        "qps-ploc": "⟦Ñő ẇőřķşṗȧƈė ïş şėŀėƈŧėḓ, şő ƈħőőşė ẇħėřė ŧħïş ɠőėş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       }
     },
     "onboarding": {
@@ -32872,6 +33022,81 @@
         "en": "Walk through purpose, requirements, quality needs, how to split the work, and budget and timing before development starts.",
         "ja": "開発を始める前に、目的、要件、品質の希望、作業の分け方、予算と時期を順に確認します。",
         "qps-ploc": "⟦Ẇȧŀķ ŧħřőůɠħ ṗůřṗőşė, řėɋůïřėɱėñŧş, ɋůȧŀïŧẏ ñėėḓş, ħőẇ ŧő şṗŀïŧ ŧħė ẇőřķ, ȧñḓ ƀůḓɠėŧ ȧñḓ ŧïɱïñɠ ƀėƒőřė ḓėṽėŀőṗɱėñŧ şŧȧřŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "ia_nav_home": {
+        "en": "Home",
+        "ja": "ホーム",
+        "qps-ploc": "⟦Ħőɱė ŀőř⟧"
+      },
+      "ia_nav_home_sub": {
+        "en": "Everything at a glance",
+        "ja": "全体をひと目で",
+        "qps-ploc": "⟦Ėṽėřẏŧħïñɠ ȧŧ ȧ ɠŀȧñƈė ŀőřėɱ ï⟧"
+      },
+      "ia_nav_inbox": {
+        "en": "Needs you",
+        "ja": "あなた待ち",
+        "qps-ploc": "⟦Ñėėḓş ẏőů ŀőř⟧"
+      },
+      "ia_nav_inbox_sub": {
+        "en": "Approvals, decisions and reviews",
+        "ja": "承認・判断・確認",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş, ḓėƈïşïőñş ȧñḓ řėṽïėẇş ŀőřėɱ ïṗşů⟧"
+      },
+      "ia_nav_work": {
+        "en": "Work",
+        "ja": "仕事",
+        "qps-ploc": "⟦Ẇőřķ ŀőř⟧"
+      },
+      "ia_nav_work_sub": {
+        "en": "Missions and work items",
+        "ja": "ミッションと作業",
+        "qps-ploc": "⟦Ɱïşşïőñş ȧñḓ ẇőřķ ïŧėɱş ŀőřėɱ ï⟧"
+      },
+      "ia_nav_org": {
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "ia_nav_org_sub": {
+        "en": "Goals, projects and people",
+        "ja": "目標・プロジェクト・人",
+        "qps-ploc": "⟦Ɠőȧŀş, ṗřőĵėƈŧş ȧñḓ ṗėőṗŀė ŀőřėɱ ïṗ⟧"
+      },
+      "ia_nav_library": {
+        "en": "Library",
+        "ja": "資料",
+        "qps-ploc": "⟦Ŀïƀřȧřẏ ŀőř⟧"
+      },
+      "ia_nav_library_sub": {
+        "en": "Deliverables, knowledge and intake",
+        "ja": "成果物・ナレッジ・取込",
+        "qps-ploc": "⟦Ḓėŀïṽėřȧƀŀėş, ķñőẇŀėḓɠė ȧñḓ ïñŧȧķė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_nav_ops": {
+        "en": "Operations",
+        "ja": "運用",
+        "qps-ploc": "⟦Őṗėřȧŧïőñş ŀőř⟧"
+      },
+      "ia_nav_ops_sub": {
+        "en": "Agents, screens and diagnostics",
+        "ja": "エージェント・画面・診断",
+        "qps-ploc": "⟦Ȧɠėñŧş, şƈřėėñş ȧñḓ ḓïȧɠñőşŧïƈş ŀőřėɱ ïṗşů⟧"
+      },
+      "ia_nav_settings": {
+        "en": "Settings",
+        "ja": "設定",
+        "qps-ploc": "⟦Şėŧŧïñɠş ŀőř⟧"
+      },
+      "ia_nav_settings_sub": {
+        "en": "Setup and preferences",
+        "ja": "初期設定と各種設定",
+        "qps-ploc": "⟦Şėŧůṗ ȧñḓ ṗřėƒėřėñƈėş ŀőřėɱ ⟧"
+      },
+      "ia_nav_badge_aria": {
+        "en": "{count} items need you",
+        "ja": "あなた待ち {count} 件",
+        "qps-ploc": "⟦{count} ïŧėɱş ñėėḓ ẏőů ŀőřėɱ ï⟧"
       }
     },
     "operator": {

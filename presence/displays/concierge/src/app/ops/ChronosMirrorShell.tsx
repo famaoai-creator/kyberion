@@ -1,6 +1,5 @@
 'use client';
 
-import type { ClientMissionHistoryEntry } from '../../lib/ops/mission-history-response';
 import { DiscussionRoom } from '../../components/ops/DiscussionRoom';
 import { Suspense, useCallback, type CSSProperties, type ReactNode } from 'react';
 import Link from 'next/link';
@@ -9,29 +8,23 @@ import {
   Button,
   Callout,
   KeyValue,
-  List,
   Metric,
+  PageHeader,
   Section,
   Table,
   TextField,
-  Textarea,
-  isKbStatus,
-  Select,
   StatusPill,
   Tabs,
   type A2UILinkProps,
 } from '@agent/shared-ui';
 import { ChronosMirrorLegacySections } from './ChronosMirrorLegacySections';
+import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import {
   CHRONOS_ACTIONS,
   CHRONOS_NAV_GROUPS,
-  chronosNavGroupFor,
   type ConsoleContentSection,
   type ConsoleSectionId,
 } from './chronos-page-config';
-import { ChronosHome } from '../../components/ops/ChronosHome';
-import { WorkspaceOverview } from '../../components/ops/WorkspaceOverview';
-import { OrganizationDashboard } from '../../components/ops/OrganizationDashboard';
 import { humanizeMissionId } from '../../components/ops/ChronosOffice';
 import { ChronosKbI18n } from '../../components/ops/chronos-kb-i18n';
 import { ChronosFieldScope, ChronosInline, ChronosToolbar } from '../../components/ops/chronos-ui';
@@ -57,15 +50,6 @@ const CONNECTION_REVIEW_LABEL_KEY: Record<string, string> = {
   hold: 'chronos_connection_state_hold',
   delete: 'chronos_connection_state_deleted',
 };
-
-/** Ask-why reason categories for a declined deliverable (category → label key). */
-const DELIVERABLE_REASON_KEYS: ReadonlyArray<readonly [string, string]> = [
-  ['incorrect_content', 'chronos_dl_reason_incorrect_content'],
-  ['wrong_direction', 'chronos_dl_reason_wrong_direction'],
-  ['quality', 'chronos_dl_reason_quality'],
-  ['scope', 'chronos_dl_reason_scope'],
-  ['other', 'chronos_dl_reason_other'],
-];
 
 function connectionReviewLabel(action: unknown, locale: SupportedLocale): string {
   const key =
@@ -114,19 +98,20 @@ function customPropertiesOnly(style: unknown): CSSProperties | undefined {
 }
 
 /**
- * The console's content frame: keeps the `kb-app-shell` / `chronos-shell`
- * class contract the console stylesheet targets, without a nav column or a
- * nested `<main>` (Concierge's shell owns both).
+ * The console's content frame (MSN-SHELL-IA §5): one `.kb-page` inside
+ * Concierge's shell — no second `.kb-app-shell__main` and no forced density,
+ * so /ops has the same frame, padding and density as every other page. The
+ * `chronos-shell` / `data-role` hooks stay for the console stylesheet.
  */
 function OpsShellFrame({ style, children }: { style?: unknown; children: ReactNode }) {
   return (
     <div
-      className="kb-app-shell chronos-shell"
-      data-density="compact"
+      className="kb-page chronos-shell"
+      data-width="wide"
       data-role="chronos-mirror-v2"
       style={customPropertiesOnly(style)}
     >
-      <div className="kb-app-shell__main">{children}</div>
+      {children}
     </div>
   );
 }
@@ -134,58 +119,15 @@ function OpsShellFrame({ style, children }: { style?: unknown; children: ReactNo
 export function ChronosMirrorShell({ model }: { model: ViewModel }) {
   const {
     locale,
-    tenant,
-    organizationId,
-    projectId,
     agentPanelOpen,
     setAgentPanelOpen,
-    missionIntelligenceFocus,
-    setMissionIntelligenceFocus,
-    missionIntelligenceFocusedMissionId,
-    setMissionIntelligenceFocusedMissionId,
     tenantCssVars,
     setTenantCssVars,
     setTenantLabel,
-    planRequestText,
-    setPlanRequestText,
-    planMissionType,
-    setPlanMissionType,
-    planPersona,
-    setPlanPersona,
-    planTier,
-    setPlanTier,
-    planPreview,
-    planPreviewError,
-    planPreviewBusy,
-    deliverables,
-    deliverablesError,
-    deliverablesQuery,
-    setDeliverablesQuery,
-    selectedDeliverableId,
-    setSelectedDeliverableId,
-    deliverableReviewComment,
-    setDeliverableReviewComment,
-    deliverableReviewBusy,
-    deliverableReviewError,
-    setDeliverableReviewError,
-    deliverableAskWhyVerdict,
-    operatorHomeSummary,
-    operatorHomeError,
-    missionHistory,
-    missionHistoryError,
-    missionHistoryQuery,
-    setMissionHistoryQuery,
-    missionHistoryStatus,
-    setMissionHistoryStatus,
-    missionHistoryTier,
-    setMissionHistoryTier,
     selectedMissionId,
     setSelectedMissionId,
     costSummary,
     costSummaryError,
-    planApprovalBusy,
-    planApprovalMessage,
-    setPlanApprovalMessage,
     connections,
     connectionsError,
     setConnectionsError,
@@ -196,38 +138,13 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
     setConnectionReviewNote,
     selectedConnectionId,
     setSelectedConnectionId,
-    showCleanedDeliverables,
-    setShowCleanedDeliverables,
-    planPreviewIsStale,
-    handleReady,
-    handleA2UIMessage,
     consoleSection,
     surfaceOrigin,
     openConsoleSection,
-    openDeliverableAsset,
-    runPlanPreview,
-    approvePlanAndStart,
-    submitDeliverableReview,
     submitConnectionReview,
-    handleOperatorViewOpen,
     handleScenarioOpen,
-    cleanedDeliverableCount,
-    visibleDeliverables,
-    homeCounters,
-    missionTitles,
-    KbArtifactTile,
-    KbInterventionPanel,
-    SovereignChat,
     AgentPanel,
-    FirstRunBanner,
     IdentityBadge,
-    MissionIntelligence,
-    MissionJourneySummary,
-    CloudflareOsPanel,
-    ApprovalsWorkspace,
-    DeliverablesWorkspace,
-    KnowledgeWorkspace,
-    ChronosTenantScope,
     chronosSpeechLocale,
     uxMessage,
     uxText,
@@ -235,21 +152,10 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
     CONSOLE_SECTIONS,
   } = model;
 
-  const activeGroupId = chronosNavGroupFor(
-    consoleSection as ConsoleSectionId,
-    surfaceOrigin as ConsoleContentSection
-  );
-  const activeGroup =
-    CHRONOS_NAV_GROUPS.find((group) => group.id === activeGroupId) ?? CHRONOS_NAV_GROUPS[0];
+  const { t } = useConciergeI18n();
   const activeSubSection: ConsoleContentSection =
     consoleSection === 'surface' ? surfaceOrigin : consoleSection;
-  const pendingApprovals = Number(operatorHomeSummary?.counts?.pendingApprovals || 0);
-  const groupTabs = CHRONOS_NAV_GROUPS.map((group) => ({
-    id: group.id,
-    label: uxText(group.labelKey, locale),
-    ...(group.id === 'decide' && pendingApprovals > 0 ? { count: pendingApprovals } : {}),
-  }));
-  const subTabs = activeGroup.sections.map((sectionId) => {
+  const sectionTabs = CHRONOS_NAV_GROUPS[0].sections.map((sectionId) => {
     const section = (CONSOLE_SECTIONS as Array<{ id: string; labelKey: string }>).find(
       (entry) => entry.id === sectionId
     );
@@ -285,186 +191,29 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
             second app shell. Tenant design overrides (customerId / brandName
             deep links) only: `--*` custom properties, anything else dropped. */}
         <OpsShellFrame style={tenantCssVars}>
-          {/* The Concierge shell owns the page title, locale and theme; the
-              console keeps only its own controls in one compact toolbar. */}
-          <div className="chronos-header chronos-header--embedded">
-            <ChronosTenantScope compact />
-            <div className="chronos-header__controls">
-              <IdentityBadge />
-              <Button
-                label={uxText('chronos_agent_runtimes', locale)}
-                onClick={() => setAgentPanelOpen(true)}
-              />
-            </div>
-          </div>
+          {/* One page title (the shell header carries the product identity);
+              the scope comes from the shell's workspace switcher. */}
+          <PageHeader
+            title={t('ia_shell_ops_title')}
+            subtitle={t('ia_shell_ops_subtitle')}
+            actions={[
+              {
+                label: uxText('chronos_agent_runtimes', locale),
+                onClick: () => setAgentPanelOpen(true),
+              },
+            ]}
+          >
+            <IdentityBadge />
+          </PageHeader>
 
           <div className="chronos-nav">
             <Tabs
-              items={groupTabs}
-              active={activeGroup.id}
-              label={uxText('chronos_nav_groups_label', locale)}
-              onSelect={(groupId) => {
-                const group = CHRONOS_NAV_GROUPS.find((entry) => entry.id === groupId);
-                if (group) openConsoleSection(group.sections[0]);
-              }}
+              items={sectionTabs}
+              active={activeSubSection}
+              label={uxText('chronos_group_operate', locale)}
+              onSelect={(sectionId) => openConsoleSection(sectionId as ConsoleSectionId)}
             />
-            {subTabs.length > 1 ? (
-              <Tabs
-                variant="secondary"
-                items={subTabs}
-                active={activeSubSection}
-                label={uxText(activeGroup.labelKey, locale)}
-                onSelect={(sectionId) => openConsoleSection(sectionId as ConsoleSectionId)}
-              />
-            ) : null}
           </div>
-
-          {consoleSection === 'home' ? (
-            <>
-              <OrganizationDashboard />
-              <WorkspaceOverview />
-              <ChronosHome
-                tenant={tenant}
-                summary={operatorHomeSummary}
-                summaryError={operatorHomeError}
-                counters={homeCounters}
-                missionTitles={missionTitles}
-                onOpenScenario={(targetId) => handleScenarioOpen(targetId, 'mission-intelligence')}
-                onOpenMission={(missionId) =>
-                  handleOperatorViewOpen('mission-control-plane', missionId)
-                }
-              />
-              <MissionJourneySummary
-                summary={operatorHomeSummary}
-                onOpenMissions={() => openConsoleSection('missions')}
-                onOpenOperations={() => openConsoleSection('operations')}
-              />
-              <CloudflareOsPanel missionId={selectedMissionId} />
-              <FirstRunBanner />
-            </>
-          ) : null}
-
-          {consoleSection === 'missions' ? (
-            <Section
-              title={uxText('chronos_missions_history_title', locale)}
-              description={uxText('chronos_missions_history_eyebrow', locale)}
-            >
-              <ChronosFieldScope
-                onChange={(name, value) => {
-                  const text = typeof value === 'string' ? value : '';
-                  if (name === 'mission_history_query') setMissionHistoryQuery(text);
-                  else if (name === 'mission_history_status') setMissionHistoryStatus(text);
-                  else if (name === 'mission_history_tier') setMissionHistoryTier(text);
-                }}
-              >
-                <ChronosToolbar>
-                  <TextField
-                    name="mission_history_query"
-                    type="search"
-                    label={uxText('chronos_search', locale)}
-                    hide_label
-                    placeholder={uxText('chronos_search', locale)}
-                    value={missionHistoryQuery}
-                  />
-                  <Select
-                    name="mission_history_status"
-                    label={uxText('chronos_col_status', locale)}
-                    hide_label
-                    value={missionHistoryStatus}
-                    options={[
-                      { value: '', label: uxText('chronos_mh_all_statuses', locale) },
-                      { value: 'completed', label: uxText('chronos_status_completed', locale) },
-                      { value: 'active', label: uxText('chronos_status_active', locale) },
-                      { value: 'paused', label: uxText('chronos_status_paused', locale) },
-                      { value: 'failed', label: uxText('chronos_status_failed', locale) },
-                    ]}
-                  />
-                  <Select
-                    name="mission_history_tier"
-                    label={uxText('chronos_data_level_field', locale)}
-                    hide_label
-                    value={missionHistoryTier}
-                    options={[
-                      { value: '', label: uxText('chronos_all_tiers', locale) },
-                      { value: 'public', label: uxText('chronos_tier_public', locale) },
-                      { value: 'confidential', label: uxText('chronos_tier_confidential', locale) },
-                      { value: 'personal', label: uxText('chronos_tier_personal', locale) },
-                    ]}
-                  />
-                </ChronosToolbar>
-              </ChronosFieldScope>
-              {missionHistoryError ? <Callout tone="danger" title={missionHistoryError} /> : null}
-              <div className="chronos-scroll-area chronos-scroll">
-                <Table
-                  columns={[
-                    { key: 'mission', label: uxText('chronos_col_mission', locale) },
-                    { key: 'status', label: uxText('chronos_col_status', locale), width: '8rem' },
-                    { key: 'type', label: uxText('chronos_mission_type', locale) },
-                    { key: 'artifacts', label: uxText('chronos_mission_artifacts', locale) },
-                    { key: 'tier', label: uxText('chronos_mission_tier', locale) },
-                    { key: 'updated', label: uxText('chronos_updated', locale), mono: true },
-                  ]}
-                  row_key="id"
-                  empty={uxText('chronos_mh_no_match', locale)}
-                  rows={missionHistory.map((mission: ClientMissionHistoryEntry) => {
-                    const typeLabel =
-                      mission.missionType === 'product_delivery'
-                        ? uxText('chronos_mission_type_product_delivery', locale)
-                        : mission.missionType || '-';
-                    return {
-                      id: mission.missionId,
-                      mission: (
-                        <span className="chronos-mission-cell">
-                          <button
-                            type="button"
-                            className="chronos-mission-cell__title"
-                            aria-pressed={selectedMissionId === mission.missionId}
-                            onClick={() => {
-                              setSelectedMissionId(mission.missionId);
-                              setMissionIntelligenceFocusedMissionId(mission.missionId);
-                            }}
-                          >
-                            {mission.goalSummary ||
-                              mission.intentText ||
-                              (mission.missionType === 'product_delivery'
-                                ? typeLabel
-                                : humanizeMissionId(mission.missionId))}
-                          </button>
-                          <span className="chronos-mission-cell__id">
-                            {mission.missionId}
-                            {mission.tenantSlug || mission.tenantId
-                              ? ` · ${mission.tenantSlug || mission.tenantId}`
-                              : ''}
-                          </span>
-                          {mission.successCondition ? (
-                            <span className="chronos-meta">{mission.successCondition}</span>
-                          ) : null}
-                          <span className="chronos-meta">
-                            {uxText('mission:mission_distillation_label', locale)}:{' '}
-                            {uxText(
-                              `mission:mission_distillation_${mission.distillationDisclosure ?? 'unknown'}`,
-                              locale
-                            )}
-                          </span>
-                        </span>
-                      ),
-                      status: isKbStatus(mission.status)
-                        ? { status: mission.status }
-                        : mission.status || '-',
-                      type: typeLabel,
-                      artifacts: `${mission.artifactCount || 0}${
-                        mission.artifactKinds?.length
-                          ? ` · ${mission.artifactKinds.slice(0, 3).join(', ')}`
-                          : ''
-                      }`,
-                      tier: mission.tier || '-',
-                      updated: mission.updatedAt || mission.startedAt || '-',
-                    };
-                  })}
-                />
-              </div>
-            </Section>
-          ) : null}
 
           {consoleSection === 'diagnostics' ? (
             <div className="chronos-two-col">
@@ -786,415 +535,10 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
             </div>
           ) : null}
 
-          {consoleSection === 'missions' ? (
-            <div className="chronos-two-col">
-              <Section
-                title={uxText('chronos_mission_plan_title', locale)}
-                description={uxText('chronos_plan_description', locale)}
-                actions={[
-                  {
-                    label: planPreviewBusy
-                      ? uxText('chronos_previewing', locale)
-                      : uxText('chronos_preview', locale),
-                    disabled: planPreviewBusy,
-                    onClick: () => runPlanPreview(),
-                  },
-                  {
-                    label: planApprovalBusy
-                      ? uxText('chronos_starting', locale)
-                      : uxText('chronos_approve_start', locale),
-                    variant: 'primary',
-                    disabled: planApprovalBusy || !planPreview || planPreviewIsStale,
-                    onClick: () => approvePlanAndStart(),
-                  },
-                ]}
-              >
-                {planPreview && planPreviewIsStale ? (
-                  <Callout tone="warning" title={uxText('chronos_preview_stale', locale)} />
-                ) : null}
-                <ChronosFieldScope
-                  onChange={(name, value) => {
-                    const text = typeof value === 'string' ? value : '';
-                    if (name === 'plan_request') setPlanRequestText(text);
-                    else if (name === 'plan_mission_type') setPlanMissionType(text);
-                    else if (name === 'plan_persona') setPlanPersona(text);
-                    else if (
-                      name === 'plan_tier' &&
-                      (text === 'personal' || text === 'confidential' || text === 'public')
-                    )
-                      setPlanTier(text);
-                  }}
-                >
-                  <Textarea
-                    name="plan_request"
-                    label={uxText('chronos_plan_request_label', locale)}
-                    placeholder={uxText('chronos_plan_request_placeholder', locale)}
-                    rows={4}
-                    value={planRequestText}
-                  />
-                  <div className="chronos-form-row">
-                    <TextField
-                      name="plan_mission_type"
-                      label={uxText('chronos_mission_type_field', locale)}
-                      value={planMissionType}
-                    />
-                    <TextField
-                      name="plan_persona"
-                      label={uxText('chronos_persona_field', locale)}
-                      value={planPersona}
-                    />
-                    <Select
-                      name="plan_tier"
-                      label={uxText('chronos_data_level_field', locale)}
-                      value={planTier}
-                      options={[
-                        { value: 'personal', label: uxText('chronos_tier_personal', locale) },
-                        {
-                          value: 'confidential',
-                          label: uxText('chronos_tier_confidential', locale),
-                        },
-                        { value: 'public', label: uxText('chronos_tier_public', locale) },
-                      ]}
-                    />
-                  </div>
-                </ChronosFieldScope>
-                {planPreviewError ? <Callout tone="danger" title={planPreviewError} /> : null}
-                {planApprovalMessage ? (
-                  <Callout tone="success" title={planApprovalMessage} />
-                ) : null}
-                {planPreview ? (
-                  <>
-                    <Section
-                      headingLevel={3}
-                      title={planPreview.goal?.summary || uxText('chronos_mission_goal', locale)}
-                      description={planPreview.goal?.successCondition}
-                    >
-                      <KeyValue
-                        items={[
-                          {
-                            label: uxText('chronos_plan_delivery_mode', locale),
-                            value: planPreview.delivery?.mode || '-',
-                            mono: true,
-                          },
-                          {
-                            label: uxText('chronos_plan_clarification', locale),
-                            value: planPreview.delivery?.clarificationNeeded
-                              ? uxText('chronos_plan_clarification_needed', locale)
-                              : uxText('chronos_plan_clarification_clear', locale),
-                          },
-                          {
-                            label: uxText('chronos_plan_execution', locale),
-                            value: planPreview.execution?.shape || '-',
-                            mono: true,
-                          },
-                          {
-                            label: uxText('chronos_plan_confidence', locale),
-                            value: `${Math.round((Number(planPreview.confidence) || 0) * 100)}%`,
-                          },
-                        ]}
-                      />
-                      {Array.isArray(planPreview.execution?.clarificationQuestions) &&
-                      planPreview.execution.clarificationQuestions.length > 0 ? (
-                        <KbInterventionPanel
-                          reason={uxText('chronos_plan_clarification_reason', locale)}
-                          isBlocking
-                          options={planPreview.execution.clarificationQuestions.map(
-                            (question: any) => ({
-                              label: question.question,
-                              variant: 'neutral' as const,
-                              value: question.id,
-                            })
-                          )}
-                          onSelectOption={(option: { label: string }) => {
-                            setPlanRequestText(
-                              (current: string) =>
-                                `${current.trimEnd()}\n\n${uxText('chronos_plan_clarification_answer_prefix', locale)}${option.label}\n→ `
-                            );
-                            setPlanApprovalMessage(
-                              uxText('chronos_plan_clarification_appended', locale)
-                            );
-                          }}
-                        />
-                      ) : null}
-                    </Section>
-                    <Section
-                      headingLevel={3}
-                      title={uxText('chronos_plan_team_title', locale)}
-                      description={uxMessage(
-                        'chronos_plan_team_counts',
-                        {
-                          assignments: planPreview.team?.assignments?.length || 0,
-                          roles:
-                            planPreview.team?.team_governance?.composition?.required_roles
-                              ?.length || 0,
-                        },
-                        '{assignments} assignments · {roles} required roles',
-                        locale
-                      )}
-                    >
-                      <List
-                        items={(planPreview.team?.assignments || [])
-                          .slice(0, 5)
-                          .map((assignment: any) => ({
-                            title: assignment.team_role,
-                            meta: `${assignment.agent_id || uxText('chronos_plan_unfilled', locale)}${
-                              assignment.status ? ` · ${assignment.status}` : ''
-                            }`,
-                          }))}
-                      />
-                      <h4 className="chronos-feed__title">
-                        {uxText('chronos_plan_workflow_steps', locale)}
-                      </h4>
-                      <List
-                        variant="timeline"
-                        items={(planPreview.workflow || []).slice(0, 5).map((step: any) => ({
-                          title: step.label,
-                          meta: step.description,
-                        }))}
-                      />
-                    </Section>
-                  </>
-                ) : null}
-              </Section>
-
-              <Section
-                title={uxText('chronos_deliverables_preview_title', locale)}
-                description={uxText('chronos_deliverables_description', locale)}
-              >
-                <ChronosFieldScope
-                  onChange={(name, value) => {
-                    if (name === 'deliverables_query')
-                      setDeliverablesQuery(typeof value === 'string' ? value : '');
-                  }}
-                >
-                  <ChronosToolbar>
-                    <TextField
-                      name="deliverables_query"
-                      type="search"
-                      label={uxText('chronos_search', locale)}
-                      hide_label
-                      placeholder={uxText('chronos_search', locale)}
-                      value={deliverablesQuery}
-                    />
-                    {cleanedDeliverableCount > 0 ? (
-                      <Button
-                        variant="ghost"
-                        label={uxMessage(
-                          showCleanedDeliverables
-                            ? 'chronos_dl_hide_cleaned'
-                            : 'chronos_dl_show_cleaned',
-                          { count: cleanedDeliverableCount },
-                          '{count} cleaned-up record(s)',
-                          locale
-                        )}
-                        onClick={() => setShowCleanedDeliverables((current: boolean) => !current)}
-                      />
-                    ) : null}
-                  </ChronosToolbar>
-                </ChronosFieldScope>
-                {deliverablesError ? <Callout tone="danger" title={deliverablesError} /> : null}
-                <div className="chronos-scroll-area chronos-scroll chronos-stack">
-                  {visibleDeliverables.length === 0 ? (
-                    <p className="kb-text kb-text--muted">
-                      {deliverables.length === 0
-                        ? uxText('chronos_deliverables_empty', locale)
-                        : uxText('chronos_dl_none_live', locale)}
-                    </p>
-                  ) : (
-                    visibleDeliverables.map((item: any) => (
-                      <KbArtifactTile
-                        key={item.artifactId}
-                        type={item.kind}
-                        path={item.path || item.externalRef || item.artifactId}
-                        missionId={item.missionId}
-                        updatedAt={item.updatedAt}
-                        missing={item.missing}
-                        previewContent={[
-                          item.previewText || item.kind,
-                          item.integratedSummary ? `summary: ${item.integratedSummary}` : '',
-                          ...(item.roleSections || []).map(
-                            (section: { role: string; summary: string }) =>
-                              `${section.role}: ${section.summary}`
-                          ),
-                          item.reviewVerdict ? `review: ${item.reviewVerdict}` : '',
-                          item.reviewVersion ? `v${item.reviewVersion}` : '',
-                          item.supersededCount
-                            ? uxMessage(
-                                'chronos_dl_superseded',
-                                { count: item.supersededCount },
-                                '+{count} older record(s) for the same file',
-                                locale
-                              )
-                            : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                        onSelect={() => {
-                          setSelectedDeliverableId(item.artifactId);
-                          setDeliverableReviewError(null);
-                        }}
-                        onOpen={() => openDeliverableAsset(item)}
-                        onPreview={() => openDeliverableAsset(item)}
-                      />
-                    ))
-                  )}
-                </div>
-                {selectedDeliverableId
-                  ? (() => {
-                      const selected = deliverables.find(
-                        (item: any) => item.artifactId === selectedDeliverableId
-                      );
-                      if (!selected) {
-                        return (
-                          <p className="kb-text kb-text--muted">
-                            {uxText('chronos_dl_selected_not_found', locale)}
-                          </p>
-                        );
-                      }
-                      return (
-                        <Section
-                          headingLevel={3}
-                          title={selected.artifactId}
-                          description={
-                            selected.reviewVerdict
-                              ? `${uxText('chronos_updated', locale)}: ${selected.reviewVerdict}`
-                              : uxText('chronos_not_reviewed', locale)
-                          }
-                        >
-                          <p className="kb-text">{selected.previewText || selected.kind}</p>
-                          <label className="kb-field" data-control="textarea">
-                            <span className="kb-field__label">
-                              {uxText('chronos_review_comment', locale)}
-                            </span>
-                            <textarea
-                              className="kb-input kb-textarea"
-                              rows={3}
-                              value={deliverableReviewComment}
-                              onChange={(event) => setDeliverableReviewComment(event.target.value)}
-                            />
-                          </label>
-                          {deliverableReviewError ? (
-                            <Callout tone="danger" title={deliverableReviewError} />
-                          ) : null}
-                          {deliverableAskWhyVerdict ? (
-                            <Callout
-                              tone="warning"
-                              title={uxText('chronos_dl_ask_why_title', locale)}
-                            >
-                              <ChronosInline>
-                                {DELIVERABLE_REASON_KEYS.map(([category, key]) => (
-                                  <Button
-                                    key={category}
-                                    disabled={deliverableReviewBusy}
-                                    label={uxTextStatic(key, locale)}
-                                    onClick={() =>
-                                      submitDeliverableReview(deliverableAskWhyVerdict, {
-                                        reasonCategory: category,
-                                      })
-                                    }
-                                  />
-                                ))}
-                                <Button
-                                  variant="ghost"
-                                  disabled={deliverableReviewBusy}
-                                  label={uxText('chronos_dl_reason_skip', locale)}
-                                  onClick={() =>
-                                    submitDeliverableReview(deliverableAskWhyVerdict, {
-                                      skipAskWhy: true,
-                                    })
-                                  }
-                                />
-                              </ChronosInline>
-                            </Callout>
-                          ) : null}
-                          <ChronosInline>
-                            <Button
-                              variant="primary"
-                              disabled={deliverableReviewBusy}
-                              label={uxText('chronos_approve', locale)}
-                              onClick={() => submitDeliverableReview('accept')}
-                            />
-                            <Button
-                              disabled={deliverableReviewBusy}
-                              label={uxText('chronos_request_changes', locale)}
-                              onClick={() => submitDeliverableReview('request-changes')}
-                            />
-                            <Button
-                              variant="danger"
-                              disabled={deliverableReviewBusy}
-                              label={uxText('chronos_reject', locale)}
-                              onClick={() => submitDeliverableReview('reject')}
-                            />
-                          </ChronosInline>
-                          <span className="chronos-meta" data-mono="true">
-                            {uxMessage(
-                              'chronos_dl_version',
-                              { version: selected.reviewVersion || 1 },
-                              'version {version}',
-                              locale
-                            )}
-                            {selected.reviewCurrentArtifactId &&
-                            selected.reviewCurrentArtifactId !== selected.artifactId
-                              ? ` · ${selected.reviewCurrentArtifactId}`
-                              : ''}
-                          </span>
-                        </Section>
-                      );
-                    })()
-                  : null}
-              </Section>
-            </div>
-          ) : null}
-
-          {consoleSection === 'missions' ? (
-            <MissionIntelligence
-              tenant={tenant}
-              workspace="missions"
-              focusedView={missionIntelligenceFocus}
-              focusedMissionId={selectedMissionId || missionIntelligenceFocusedMissionId}
-              onClearFocus={() => {
-                setMissionIntelligenceFocus(null);
-                setMissionIntelligenceFocusedMissionId(null);
-              }}
-              showMissionIntelligenceLabel
-              onOpenWorkspace={(target: ConsoleSectionId) => openConsoleSection(target)}
-            />
-          ) : null}
-
-          {consoleSection === 'deliverables' ? (
-            <DeliverablesWorkspace
-              tenant={tenant || undefined}
-              organizationId={organizationId || undefined}
-              projectId={projectId || undefined}
-              onOpenMission={(missionId: string) =>
-                handleOperatorViewOpen('mission-control-plane', missionId)
-              }
-            />
-          ) : null}
-
-          {consoleSection === 'approvals' ? (
-            <ApprovalsWorkspace
-              tenant={tenant || undefined}
-              organizationId={organizationId || undefined}
-              projectId={projectId || undefined}
-            />
-          ) : null}
-
           {consoleSection === 'discussion' ? <DiscussionRoom embedded /> : null}
-
-          {consoleSection === 'knowledge' ? (
-            <KnowledgeWorkspace
-              tenant={tenant || undefined}
-              organizationId={organizationId || undefined}
-              projectId={projectId || undefined}
-            />
-          ) : null}
 
           <ChronosMirrorLegacySections model={model} />
 
-          {consoleSection === 'home' ? (
-            <SovereignChat onA2UIMessage={handleA2UIMessage} onReady={handleReady} />
-          ) : null}
           <AgentPanel isOpen={agentPanelOpen} onClose={() => setAgentPanelOpen(false)} />
         </OpsShellFrame>
       </ChronosUiProviders>

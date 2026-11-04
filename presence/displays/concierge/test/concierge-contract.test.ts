@@ -658,7 +658,7 @@ describe('concierge surface contract', () => {
 
   it('runs document intake as an explicit one-shot ingest ceremony (CS-03)', () => {
     const route = fs.readFileSync(path.join(appDir, 'src/app/api/ingest/route.ts'), 'utf8');
-    const page = fs.readFileSync(path.join(appDir, 'src/app/ingest/page.tsx'), 'utf8');
+    const page = fs.readFileSync(path.join(appDir, 'src/app/library/ingest-panel.tsx'), 'utf8');
     // FD-00c: the header's own nav links (Home / 資料の取込 / Setup) moved to
     // the shared front-desk rail — see test/front-desk-contract.test.ts for
     // the rail's own ingest-reachability assertion.

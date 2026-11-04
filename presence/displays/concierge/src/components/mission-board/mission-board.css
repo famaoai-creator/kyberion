@@ -1,0 +1,82 @@
+/* /work mission state board. Tokens only (`--kb-ui-*`); every class is `mb-`
+   prefixed. The board scrolls horizontally inside itself, never the page. */
+
+.mb-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(13rem, 1fr));
+  gap: var(--kb-ui-space-4);
+  overflow-x: auto;
+  min-width: 0;
+  padding-bottom: var(--kb-ui-space-2);
+}
+
+.mb-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-3);
+  min-width: 0;
+  padding: var(--kb-ui-space-4);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-lg);
+  background: var(--kb-ui-surface-sunken);
+}
+
+.mb-column__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--kb-ui-space-2);
+}
+
+.mb-column__title {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-md);
+  font-weight: 600;
+}
+
+.mb-column__count {
+  font-size: var(--kb-ui-font-size-xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.mb-column__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mb-card {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  padding: var(--kb-ui-space-3) var(--kb-ui-space-4);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  background: var(--kb-ui-surface);
+  color: var(--kb-ui-text);
+  font-size: var(--kb-ui-font-size-sm);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.mb-card:hover {
+  border-color: var(--kb-ui-accent);
+}
+
+.mb-card:focus-visible,
+.mb-column__more:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+}
+
+.mb-column__empty,
+.mb-column__more {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+}

@@ -4,6 +4,7 @@ import { frontDeskFetch as fetch } from './front-desk-fetch';
 
 import * as React from 'react';
 import { workspaceSelectionFromQuery } from '@agent/core/surface/workspace-query';
+import { readSelectedTenant } from './tenant-context';
 import type { ConciergeMessageKey } from './i18n';
 import { parseSetupResponse } from './setup-response';
 import {
@@ -126,7 +127,9 @@ export function useIngestFlow() {
             ? ''
             : catalog.some((item) => item.tenant_slug === previous.tenant)
               ? previous.tenant
-              : catalog.find((item) => item.tenant_slug === setup.tenant.active_slug)
+              : // The shell's workspace selection wins over the server's default tenant.
+                catalog.find((item) => item.tenant_slug === readSelectedTenant())?.tenant_slug ||
+                catalog.find((item) => item.tenant_slug === setup.tenant.active_slug)
                   ?.tenant_slug ||
                 catalog[0]?.tenant_slug ||
                 '';

@@ -51,10 +51,12 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     // eslint-disable-next-line no-misleading-character-class
     expect(rail).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}]/u);
     expect(rail).toContain('aria-current');
-    // 資料の取込 (ingest) stays reachable from the rail, labelled with the
-    // existing header.ingest key, now that the header dropped its own link.
+    // 資料の取込 (ingest) lives under 資料 (/library?tab=ingest); its old
+    // route still marks that destination. 設定 is pinned in the rail footer.
     expect(rail).toContain("pathname === '/ingest'");
     expect(rail).toContain('group_label: item.group_label');
+    expect(rail).toContain('footer_items');
+    expect(rail).toContain('/api/v1/needs-you/summary');
   });
 
   it('guards /api/me and /api/front-desk/nav with the shared viewer resolver and no-store', () => {
@@ -359,7 +361,7 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
 });
 
 describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
-  it('returns grouped existing rail items with ja labels, relative concierge hrefs, and absolute presence-studio hrefs', async () => {
+  it('returns the seven top-level destinations with ja labels and relative concierge hrefs', async () => {
     vi.resetModules();
     vi.doMock('@agent/core/front-desk-nav', async () => {
       const actual = await vi.importActual<typeof import('@agent/core/front-desk-nav')>(
@@ -380,57 +382,36 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
 
     expect(payload.ok).toBe(true);
     expect(payload.current_surface).toBe('concierge');
-    expect(payload.items).toHaveLength(20);
     expect(payload.items.map((item) => item.id)).toEqual([
-      'decide',
-      'ask',
-      'missions',
-      'work-items',
-      'approvals',
-      'overview',
-      'organizations',
-      'projects',
-      'actors',
-      'deliverables',
-      'ingest',
-      'knowledge',
-      'discussion',
-      'first-job',
-      'help',
-      'organization',
-      'operations',
-      'surface-control',
-      'diagnostics',
+      'home',
+      'inbox',
+      'work',
+      'org',
+      'library',
+      'ops',
       'settings',
     ]);
-    // The operations console (former Chronos) is a local /ops destination.
-    for (const id of ['deliverables', 'knowledge', 'discussion', 'operations', 'diagnostics']) {
-      expect(payload.items.find((item) => item.id === id)?.href).toBe(`/ops?section=${id}`);
-      expect(payload.items.find((item) => item.id === id)?.external).toBe(false);
-    }
-
     const byId = Object.fromEntries(payload.items.map((item) => [item.id, item]));
-    expect(byId.decide.label).toBe('受信箱');
-    expect(byId.overview.label).toBe('全体像');
-    expect(byId.overview.group_label).toBe('組織');
-
-    // Decide, organization management, and settings are local Concierge destinations.
-    expect(byId.decide.external).toBe(false);
-    expect(byId.decide.href).toBe('/');
-    expect(byId.settings.external).toBe(false);
-    expect(byId.settings.href).toBe('/settings');
-    expect(byId.organization.external).toBe(false);
-    expect(byId.organization.href).toBe('/management');
-    expect(byId.organization.scope_query_style).toBe('camel');
-
-    // The workspace pages are local Concierge destinations.
-    for (const id of ['missions', 'work-items', 'approvals', 'overview', 'organizations']) {
-      expect(byId[id].external).toBe(false);
-      expect(byId[id].href.startsWith('/w')).toBe(true);
+    expect(byId.home.label).toBe('ホーム');
+    expect(byId.inbox.label).toBe('あなた待ち');
+    expect(byId.work.label).toBe('仕事');
+    expect(byId.org.label).toBe('組織');
+    expect(byId.library.label).toBe('資料');
+    expect(byId.ops.label).toBe('運用');
+    expect(byId.settings.label).toBe('設定');
+    // Ungrouped; 設定 is pinned to the rail footer.
+    expect(payload.items.every((item) => item.group_label === '')).toBe(true);
+    expect(payload.items.filter((item) => item.placement === 'footer').map((i) => i.id)).toEqual([
+      'settings',
+    ]);
+    // Every destination is a local Concierge route.
+    for (const item of payload.items) {
+      expect(item.external, item.id).toBe(false);
+      expect(item.href.startsWith('/'), item.id).toBe(true);
     }
-    // ask is hosted on presence-studio: absolute, same-tab.
-    expect(byId.ask.external).toBe(true);
-    expect(byId.ask.href).toBe('http://127.0.0.1:4031/ask');
+    expect(byId.ops.href).toBe('/ops');
+    expect(byId.ops.scope_query_style).toBe('snake');
+    expect(byId.org.scope_query_style).toBe('camel');
 
     vi.doUnmock('@agent/core/front-desk-nav');
   });

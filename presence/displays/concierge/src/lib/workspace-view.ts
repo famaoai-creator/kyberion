@@ -5,6 +5,7 @@
  * `libs/core/surface/workspace-graph.ts`; only its types are imported here,
  * so this module stays client-safe.
  */
+import { iaListHref } from './ia-routes';
 import type {
   GraphActorLink,
   GraphEntityKind,
@@ -47,10 +48,13 @@ export function entityHref(kind: GraphEntityKind, id: string): string {
 
 /** A list page, optionally narrowed by scope query parameters. */
 export function kindListHref(kind: GraphEntityKind, narrow: WorkspaceListNarrowing = {}): string {
-  const query = new URLSearchParams();
+  // MSN-SHELL-IA §1: list pages live under the top-level destinations now
+  // (`/w/<kind>` only redirects there), so in-app links point straight at them.
+  const [path, fixed = ''] = (iaListHref(kind) ?? `/w/${kind}`).split('?');
+  const query = new URLSearchParams(fixed);
   for (const [key, value] of Object.entries(narrow)) if (value) query.set(key, value);
   const search = query.toString();
-  return `/w/${kind}${search ? `?${search}` : ''}`;
+  return `${path}${search ? `?${search}` : ''}`;
 }
 
 /** Route segments may arrive encoded or decoded depending on the router; decode once, safely. */
