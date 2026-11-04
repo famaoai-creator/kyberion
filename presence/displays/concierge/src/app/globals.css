@@ -40,6 +40,12 @@ body {
   min-width: 0;
 }
 
+/* 資料 › 資料の取込: the form keeps the form width inside the wide page. */
+.library-form {
+  width: 100%;
+  max-width: 720px;
+}
+
 /* The surface bar above every page: brand at section scale, so the page's own
    title is the single `xxl` heading on screen. */
 .concierge-header .kb-page-header {
