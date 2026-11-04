@@ -109,6 +109,16 @@ function legacyEntry(item: NeedsYouItem): DecideQueueEntry | null {
   return null;
 }
 
+/**
+ * The card's anchor. Approvals keep the legacy `decide-approval-<id>` anchor
+ * so existing deep links (`inboxHrefForApproval`) land on the card.
+ */
+export function cardAnchor(item: NeedsYouItem): string {
+  return item.approval
+    ? `decide-approval-${encodeURIComponent(item.approval.id)}`
+    : `inbox-${item.id}`;
+}
+
 export function itemTitle(
   item: NeedsYouItem,
   locale: ConciergeLocale,
@@ -389,7 +399,7 @@ export function NeedsYouCard({
 
   const outcome = item.outcome;
   return (
-    <div id={`inbox-${item.id}`} className="decide-card inbox-card" data-reason={item.reason}>
+    <div id={cardAnchor(item)} className="decide-card inbox-card" data-reason={item.reason}>
       <Section title={itemTitle(item, locale, t)} headingLevel={3}>
         <div className="decide-card-meta">
           <Badge label={c(`ia_inbox_reason_${item.reason}`)} tone={REASON_TONES[item.reason]} />

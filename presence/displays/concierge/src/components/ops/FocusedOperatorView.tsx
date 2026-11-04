@@ -1,4 +1,5 @@
 'use client';
+import { NeedsYouLink } from '../needs-you-link';
 
 import { opsApiPath } from '../../lib/ops/ops-api-path';
 import { useEffect, useMemo, useState } from 'react';
@@ -1146,13 +1147,8 @@ export function FocusedOperatorView({
                   </ChronosToolbar>
                 </Callout>
               ) : (
-                <Callout
-                  tone="info"
-                  title={uxText('chronos_fov_terminal_approval', locale)}
-                  body={uxText('chronos_fov_terminal_approval_detail', locale)}
-                >
-                  <Code code={`pnpm kyberion approve ${request.id}`} language="shell" />
-                </Callout>
+                // The decision is made in あなた待ち, never by a CLI command on screen.
+                <NeedsYouLink reason="approval" locale={locale === 'ja' ? 'ja' : 'en'} />
               )}
             </Section>
           ))
