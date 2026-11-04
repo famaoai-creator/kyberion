@@ -98,8 +98,10 @@ export function stripMachineText(input: string | undefined | null): StripMachine
   const lines = text
     .split(/\r?\n/u)
     .map((line) => line.replace(/[ \t]+/gu, ' ').trim())
-    // A list line whose object was removed ("- Created") says nothing.
-    .filter((line) => line !== '' && !/^[-*•]\s*(?:\w+)?\s*[:：]?$/u.test(line));
+    // A list line whose object was removed ("- Created") says nothing. Runs
+    // of whitespace are already single spaces here, so the pattern needs no
+    // nested `\s*` (which backtracks polynomially on long tab runs).
+    .filter((line) => line !== '' && !/^[-*•] ?\w* ?[:：]?$/u.test(line));
   const joined = lines
     .join(' ')
     // Brackets whose content was removed.
