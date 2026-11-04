@@ -6792,6 +6792,14 @@
       "types": "./dist/surface/surface-operation-registry.d.ts",
       "default": "./dist/surface/surface-operation-registry.js"
     },
+    "./surface/setup-checklist": {
+      "types": "./dist/surface/setup-checklist.d.ts",
+      "default": "./dist/surface/setup-checklist.js"
+    },
+    "./surface/setup-checklist-model": {
+      "types": "./dist/surface/setup-checklist-model.d.ts",
+      "default": "./dist/surface/setup-checklist-model.js"
+    },
     "./surface/workspace-graph": {
       "types": "./dist/surface/workspace-graph.d.ts",
       "default": "./dist/surface/workspace-graph.js"

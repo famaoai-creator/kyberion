@@ -304,7 +304,9 @@ export function MembersSection({
           description={frontDeskText('settings_member_sso_help', locale)}
         >
           <p className="kb-text kb-text--muted">
-            <GuardedAnchor href="/setup/sso">{frontDeskText('sso_title', locale)}</GuardedAnchor>
+            <GuardedAnchor href="/settings#settings-sso">
+              {frontDeskText('sso_title', locale)}
+            </GuardedAnchor>
           </p>
           {members.map((member) => {
             const form = ssoForm(member.member_id);
