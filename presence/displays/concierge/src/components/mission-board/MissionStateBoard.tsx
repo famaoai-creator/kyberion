@@ -62,7 +62,7 @@ export function MissionStateBoard({
                 {column.missions.map((mission) => (
                   <li key={mission.id}>
                     <a className="mb-card" href={mission.href} title={mission.label}>
-                      {mission.label}
+                      <span className="mb-card__title">{mission.label}</span>
                     </a>
                   </li>
                 ))}

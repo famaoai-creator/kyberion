@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { currentItemId, needsYouBadgeText, needsYouBadgeTotal } from '../src/app/front-desk-rail';
+import {
+  currentItemId,
+  needsYouBadgeText,
+  needsYouBadgeTotal,
+  railLabel,
+} from '../src/app/front-desk-rail';
 
 describe('front-desk rail current destination (MSN-SHELL-IA §1)', () => {
   it.each([
@@ -64,5 +69,14 @@ describe('needs-you rail badge', () => {
     expect(needsYouBadgeText(0)).toBeUndefined();
     expect(needsYouBadgeText(7)).toBe('7');
     expect(needsYouBadgeText(120)).toBe('99+');
+  });
+});
+
+describe('rail label fallback', () => {
+  it('renders an unresolved server key from the bundled catalog and passes text through', () => {
+    expect(railLabel('front_desk:ia_nav_home', 'ja')).toBe('ホーム');
+    expect(railLabel('front_desk:ia_nav_settings', 'en')).toBe('Settings');
+    expect(railLabel('仕事', 'ja')).toBe('仕事');
+    expect(railLabel('front_desk:no_such_key_zz', 'ja')).toBe('');
   });
 });
