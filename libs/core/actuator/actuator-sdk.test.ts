@@ -4,7 +4,6 @@ import {
   buildSingleOpPipelinePayload,
   defineActuator,
   defineCatalogBackedActuator,
-  defineLegacyPipelineActuator,
   planActuatorDryRun,
   resolveCliActionKind,
   runAdfActuatorPipeline,
@@ -85,9 +84,7 @@ describe('actuator SDK', () => {
     // steps:[{type, op, params}]}; the kind lives on the step, so a wrapped
     // capture must resolve to capture for --dry-run to actually run it.
     expect(
-      resolveCliActionKind(
-        buildSingleOpPipelinePayload('read', { path: 'a' }, 'capture')
-      )
+      resolveCliActionKind(buildSingleOpPipelinePayload('read', { path: 'a' }, 'capture'))
     ).toBe('capture');
     expect(
       resolveCliActionKind(
@@ -199,32 +196,6 @@ describe('actuator SDK', () => {
     });
   });
 
-  it('adapts a legacy pipeline handler behind the execute operation', async () => {
-    const seen: unknown[] = [];
-    const actuator = defineLegacyPipelineActuator({
-      id: 'legacy-demo',
-      handleAction: (input) => {
-        seen.push(input);
-        return { result: 'ok' };
-      },
-    });
-
-    await expect(
-      actuator.dispatch(
-        'execute',
-        { op: 'demo:run', type: 'transform', params: { value: 1 } },
-        { request_id: 'r1' }
-      )
-    ).resolves.toMatchObject({ ok: true, output: { result: 'ok' } });
-    expect(seen).toEqual([
-      {
-        action: 'pipeline',
-        steps: [{ type: 'transform', op: 'demo:run', params: { value: 1 } }],
-        context: { request_id: 'r1' },
-      },
-    ]);
-  });
-
   it('enforces authored catalog schemas before dispatching the legacy handler', async () => {
     const seen: unknown[] = [];
     const actuator = defineCatalogBackedActuator({
@@ -312,7 +283,7 @@ describe('actuator SDK', () => {
     });
   });
 
-  it('uses the catalog-provided legacy contract for runtime pipeline operations', async () => {
+  it('enforces the authored catalog contract for migrated runtime pipeline operations', async () => {
     const actuator = defineCatalogBackedActuator({
       id: 'media-actuator',
       describeOps: () => [
@@ -322,6 +293,7 @@ describe('actuator SDK', () => {
           input_schema: {
             type: 'object',
             required: ['ref'],
+            properties: { ref: { type: 'string' } },
             additionalProperties: false,
           },
         }),
@@ -330,6 +302,9 @@ describe('actuator SDK', () => {
     });
 
     await expect(actuator.dispatch('apply_pattern', { legacy_ref: '@e1' })).resolves.toMatchObject({
+      ok: false,
+    });
+    await expect(actuator.dispatch('apply_pattern', { ref: '@e1' })).resolves.toMatchObject({
       ok: true,
       output: { status: 'ok' },
     });

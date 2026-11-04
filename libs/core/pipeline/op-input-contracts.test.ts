@@ -77,13 +77,6 @@ describe('op-input-contracts', () => {
     }
   });
 
-  it('keeps legacy operation envelopes open until their typed migration', () => {
-    expect(validateOpInput('file', 'read', { path: 'a.txt', export_as: 'content' })).toEqual({
-      valid: true,
-    });
-    expect(validateOpInput('file', 'read', { path: 'a.txt', typo: true })).toEqual({ valid: true });
-  });
-
   it('accepts governed pipeline metadata without reopening the operation envelope', () => {
     expect(
       validateOpInput('system', 'probe_active_profile', {
@@ -93,6 +86,117 @@ describe('op-input-contracts', () => {
         _step_id: 'probe-profile',
       })
     ).toEqual({ valid: true });
+  });
+
+  describe('typed system contracts', () => {
+    it('accepts the audited shell params and rejects the legacy `command` key', () => {
+      expect(
+        validateOpInput('system', 'shell', {
+          cmd: 'pnpm build',
+          env: { FOO: 'bar' },
+          retry: { maxRetries: 2 },
+          timeout_ms: 30_000,
+          export_as: 'out',
+        })
+      ).toEqual({ valid: true });
+      const result = validateOpInput('system', 'shell', { command: 'pnpm build' });
+      expect(result.valid).toBe(false);
+      if (!result.valid) expect(result.errors.join(' ')).toMatch(/cmd|additional/);
+    });
+
+    it('accepts the full exec param space and rejects unknown keys', () => {
+      expect(
+        validateOpInput('system', 'exec', {
+          command: 'pnpm',
+          args: ['build'],
+          env: {},
+          cwd: 'libs',
+          timeout_ms: 5000,
+          input: 'y\n',
+          allow_error: true,
+          retry: {},
+          export_as: 'result',
+        })
+      ).toEqual({ valid: true });
+      const result = validateOpInput('system', 'exec', { command: 'ls', typo: true });
+      expect(result.valid).toBe(false);
+    });
+
+    it('accepts file-io ops with their delegated param space', () => {
+      expect(
+        validateOpInput('system', 'write_file', {
+          path: 'active/shared/tmp/a.txt',
+          content: 'hi',
+          format: 'text',
+          export_as: 'wrote',
+        })
+      ).toEqual({ valid: true });
+      expect(
+        validateOpInput('system', 'write_artifact', {
+          output_path: 'active/shared/tmp/b.txt',
+          from: 'last_capture',
+        })
+      ).toEqual({ valid: true });
+      expect(
+        validateOpInput('system', 'read_file', {
+          path: 'a.txt',
+          format: 'text',
+          export_as: 'content',
+        })
+      ).toEqual({ valid: true });
+    });
+
+    it('accepts `ms` or `duration_ms` for wait and rejects other keys', () => {
+      expect(validateOpInput('system', 'wait', { ms: 1000 })).toEqual({ valid: true });
+      expect(validateOpInput('system', 'wait', { duration_ms: 1000 })).toEqual({ valid: true });
+      expect(validateOpInput('system', 'wait', { seconds: 1 }).valid).toBe(false);
+    });
+
+    it('still accepts governed metadata alongside strict system params', () => {
+      expect(
+        validateOpInput('system', 'read_json', {
+          path: 'a/b.json',
+          _step_id: 'read-step',
+          _facets: {},
+        })
+      ).toEqual({ valid: true });
+    });
+  });
+
+  describe('typed file contracts', () => {
+    it('rejects unknown keys on strict file ops', () => {
+      const result = validateOpInput('file', 'read', { path: 'a.txt', typo: true });
+      expect(result.valid).toBe(false);
+    });
+
+    it('accepts audited capture/export params', () => {
+      expect(
+        validateOpInput('file', 'tail', { path: 'a.log', pos_key: 'p', export_as: 'tail' })
+      ).toEqual({ valid: true });
+      expect(
+        validateOpInput('file', 'search', { path: 'src', pattern: 'x', export_as: 'hits' })
+      ).toEqual({ valid: true });
+    });
+
+    it('accepts either path or output_path on write_file/write_artifact', () => {
+      expect(validateOpInput('file', 'write_file', { output_path: 'o.txt' })).toEqual({
+        valid: true,
+      });
+      expect(validateOpInput('file', 'write_artifact', { path: 'o.txt', data: {} })).toEqual({
+        valid: true,
+      });
+      expect(validateOpInput('file', 'write_file', {})).toEqual(
+        expect.objectContaining({ valid: false })
+      );
+    });
+
+    it('accepts audited append params and rejects the write_file append flag', () => {
+      expect(
+        validateOpInput('file', 'append', { path: 'a.txt', content: 'x', newline: false })
+      ).toEqual({ valid: true });
+      const result = validateOpInput('file', 'write_file', { path: 'a.txt', append: true });
+      expect(result.valid).toBe(false);
+    });
   });
 
   describe('resolveOpAccessClaims (KD-07)', () => {

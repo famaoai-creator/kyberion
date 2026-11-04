@@ -42,6 +42,18 @@ export interface OpInputContract {
 
 type ContractCatalog = Record<OpInputDomain, Record<string, OpInputContract>>;
 
+/**
+ * Pipeline execution attaches these governed, non-user fields to every
+ * operation so routing/facets can survive the actuator boundary. They are
+ * merged into compiled validators (here and in the actuator SDK) without
+ * weakening the authored operation contract for any other top-level key.
+ */
+export const PIPELINE_EXECUTION_METADATA_PROPERTIES: Record<string, unknown> = {
+  _facets: {},
+  _reasoning_policy: {},
+  _step_id: {},
+};
+
 // Lazily created so that importing this catalog (which every pipeline entry
 // point does) does not pull ajv into the startup path; ajv is only needed once
 // an op input is actually validated.
@@ -61,8 +73,13 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['url'],
         properties: {
           url: { type: 'string', minLength: 1 },
+          waitUntil: {
+            type: 'string',
+            enum: ['load', 'domcontentloaded', 'commit', 'networkidle'],
+          },
+          onboarding_isolated_navigation: { type: 'boolean' },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     open_tab: {
@@ -73,8 +90,17 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['url'],
         properties: {
           url: { type: 'string', minLength: 1 },
+          tab_id: { type: 'string', minLength: 1 },
+          select: { type: 'boolean' },
+          waitUntil: {
+            type: 'string',
+            enum: ['load', 'domcontentloaded', 'commit', 'networkidle'],
+          },
+          record_trace: { type: 'boolean' },
+          keep_alive: { type: 'boolean' },
+          onboarding_isolated_navigation: { type: 'boolean' },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     click: {
@@ -87,8 +113,14 @@ const INPUT_CONTRACTS: ContractCatalog = {
           selector: { type: 'string', minLength: 1 },
           ref: { type: 'string', minLength: 1 },
           element_name: { type: 'string' },
+          name: { type: 'string' },
+          role: { type: 'string' },
+          dom_path: { type: 'string' },
+          high_risk: { type: 'boolean' },
+          timeout: { type: 'number', minimum: 1 },
+          wait_for_navigation: { type: 'boolean' },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     query_elements: {
@@ -104,7 +136,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           exact: { type: 'boolean' },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     click_first_match: {
@@ -120,7 +152,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           exact: { type: 'boolean' },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     fill: {
@@ -133,8 +165,10 @@ const INPUT_CONTRACTS: ContractCatalog = {
           selector: { type: 'string', minLength: 1 },
           ref: { type: 'string', minLength: 1 },
           text: { type: 'string' },
+          field: { type: 'string' },
+          timeout: { type: 'number', minimum: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     press: {
@@ -147,8 +181,9 @@ const INPUT_CONTRACTS: ContractCatalog = {
           selector: { type: 'string', minLength: 1 },
           ref: { type: 'string', minLength: 1 },
           key: { type: 'string', minLength: 1 },
+          timeout: { type: 'number', minimum: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     wait: {
@@ -156,12 +191,14 @@ const INPUT_CONTRACTS: ContractCatalog = {
       examples: [{ selector: '#ready-state' }],
       schema: {
         type: 'object',
-        anyOf: [{ required: ['selector'] }, { required: ['ref'] }],
         properties: {
           selector: { type: 'string', minLength: 1 },
           ref: { type: 'string', minLength: 1 },
+          state: { type: 'string' },
+          timeout: { type: 'number', minimum: 1 },
+          duration: { type: 'number', minimum: 0 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     snapshot: {
@@ -172,8 +209,10 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           url: { type: 'string', minLength: 1 },
           title: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
+          max_elements: { type: 'integer', minimum: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     extract_text_ref: {
@@ -182,8 +221,15 @@ const INPUT_CONTRACTS: ContractCatalog = {
       schema: {
         type: 'object',
         required: ['ref'],
-        properties: { ref: { type: 'string', minLength: 1 }, export_as: { type: 'string' } },
-        additionalProperties: true,
+        properties: {
+          ref: { type: 'string', minLength: 1 },
+          name: { type: 'string' },
+          role: { type: 'string' },
+          dom_path: { type: 'string' },
+          high_risk: { type: 'boolean' },
+          export_as: { type: 'string' },
+        },
+        additionalProperties: false,
       },
     },
     session_health: {
@@ -192,7 +238,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
       schema: {
         type: 'object',
         properties: { export_as: { type: 'string' } },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     action_trail: {
@@ -201,11 +247,16 @@ const INPUT_CONTRACTS: ContractCatalog = {
       schema: {
         type: 'object',
         properties: {
-          limit: { type: 'integer', minimum: 1, maximum: 2000 },
+          limit: {
+            anyOf: [
+              { type: 'string', minLength: 1 },
+              { type: 'integer', minimum: 1, maximum: 2000 },
+            ],
+          },
           from: { type: 'string' },
           export_as: { type: 'string' },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     watchdog_events: {
@@ -262,8 +313,15 @@ const INPUT_CONTRACTS: ContractCatalog = {
       schema: {
         type: 'object',
         required: ['ref'],
-        properties: { ref: { type: 'string', minLength: 1 } },
-        additionalProperties: true,
+        properties: {
+          ref: { type: 'string', minLength: 1 },
+          name: { type: 'string' },
+          role: { type: 'string' },
+          dom_path: { type: 'string' },
+          high_risk: { type: 'boolean' },
+          timeout: { type: 'number', minimum: 1 },
+        },
+        additionalProperties: false,
       },
     },
     scroll: {
@@ -272,7 +330,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
       schema: {
         type: 'object',
         properties: { delta: { type: 'object' }, x: { type: 'number' }, y: { type: 'number' } },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     fill_secret_ref: {
@@ -284,8 +342,12 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           ref: { type: 'string', minLength: 1 },
           secret_ref: { type: 'string', minLength: 1 },
+          name: { type: 'string' },
+          role: { type: 'string' },
+          dom_path: { type: 'string' },
+          timeout: { type: 'number', minimum: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     export_failure_bundle: {
@@ -293,8 +355,12 @@ const INPUT_CONTRACTS: ContractCatalog = {
       examples: [{ path: 'active/shared/tmp/browser/failure.json' }],
       schema: {
         type: 'object',
-        properties: { path: { type: 'string' }, export_as: { type: 'string' } },
-        additionalProperties: true,
+        properties: {
+          path: { type: 'string' },
+          from: { type: 'string' },
+          export_as: { type: 'string' },
+        },
+        additionalProperties: false,
       },
     },
     content: {
@@ -309,7 +375,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           // Recorded on the action trail for Playwright export hints; not required input.
           content_excerpt: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
   },
@@ -322,8 +388,9 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['path'],
         properties: {
           path: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
       accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
@@ -335,8 +402,9 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['path'],
         properties: {
           path: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
       accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
@@ -348,8 +416,9 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['path'],
         properties: {
           path: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
       accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
@@ -361,8 +430,9 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['path'],
         properties: {
           path: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
       // Single-level directory listing (safeReaddir) — not recursive.
       accesses: [{ kind: 'file', operation: 'read', pathParam: 'path', recursive: false }],
@@ -375,8 +445,9 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['path'],
         properties: {
           path: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
       accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
@@ -388,8 +459,9 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['path'],
         properties: {
           path: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
       accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
@@ -402,8 +474,9 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           path: { type: 'string', minLength: 1 },
           pattern: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
       // rg recurses through the target subtree by default.
       accesses: [{ kind: 'file', operation: 'read', pathParam: 'path', recursive: true }],
@@ -416,8 +489,10 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['path'],
         properties: {
           path: { type: 'string', minLength: 1 },
+          pos_key: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
       accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
@@ -432,7 +507,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           content: {},
           from: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     write_file: {
@@ -440,7 +515,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
       examples: [{ path: 'knowledge/product/note.txt', content: 'hello' }],
       schema: {
         type: 'object',
-        required: ['path'],
+        anyOf: [{ required: ['path'] }, { required: ['output_path'] }],
         properties: {
           path: { type: 'string', minLength: 1 },
           output_path: { type: 'string', minLength: 1 },
@@ -448,7 +523,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           data: {},
           from: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     write_artifact: {
@@ -464,7 +539,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           data: {},
           from: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     append: {
@@ -479,7 +554,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           from: { type: 'string', minLength: 1 },
           newline: { type: 'boolean' },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     delete: {
@@ -490,8 +565,9 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['path'],
         properties: {
           path: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     mkdir: {
@@ -502,8 +578,9 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['path'],
         properties: {
           path: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     copy: {
@@ -516,7 +593,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           from: { type: 'string', minLength: 1 },
           to: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     move: {
@@ -529,7 +606,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           from: { type: 'string', minLength: 1 },
           to: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
   },
@@ -599,7 +676,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           capture_mode: { enum: ['screen', 'focused_window'] },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     exec: {
@@ -611,20 +688,31 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           command: { type: 'string', minLength: 1 },
           args: { type: 'array', items: { type: 'string' } },
+          env: { type: 'object' },
+          cwd: { type: 'string', minLength: 1 },
+          timeout_ms: { type: 'number', minimum: 0 },
+          input: { type: 'string', minLength: 1 },
+          allow_error: { type: 'boolean' },
+          retry: { type: 'object' },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     shell: {
       summary: 'Execute a shell command under policy.',
-      examples: [{ command: 'pnpm build' }],
+      examples: [{ cmd: 'pnpm build' }],
       schema: {
         type: 'object',
-        required: ['command'],
+        required: ['cmd'],
         properties: {
-          command: { type: 'string', minLength: 1 },
+          cmd: { type: 'string', minLength: 1 },
+          env: { type: 'object' },
+          retry: { type: 'object' },
+          timeout_ms: { type: 'number', minimum: 0 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     macos_automation_probe: {
@@ -636,7 +724,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     probe_active_profile: {
@@ -649,7 +737,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           path: { type: 'string', minLength: 1 },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
       accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
@@ -663,7 +751,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           export_as: { type: 'string', minLength: 1 },
           apply: { type: 'boolean' },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     reconcile_unclassified_errors: {
@@ -675,7 +763,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     reconcile_unhandled_intents: {
@@ -687,7 +775,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     cost_report: {
@@ -702,7 +790,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           last_days: { type: 'number', minimum: 1 },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     audit_verify: {
@@ -717,7 +805,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           allow_legacy_unkeyed: { type: ['boolean', 'string'] },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     summarize_memory_promotion_queue: {
@@ -733,7 +821,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           output_path: { type: 'string', minLength: 1 },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     summarize_task_model_routing: {
@@ -748,7 +836,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           output_path: { type: 'string', minLength: 1 },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     open_url: {
@@ -759,8 +847,10 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['url'],
         properties: {
           url: { type: 'string', minLength: 1 },
+          retry: { type: 'object' },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     open_file: {
@@ -771,8 +861,10 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['path'],
         properties: {
           path: { type: 'string', minLength: 1 },
+          retry: { type: 'object' },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     read_file: {
@@ -783,8 +875,11 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['path'],
         properties: {
           path: { type: 'string', minLength: 1 },
+          format: { type: 'string', minLength: 1 },
+          from: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
       accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
@@ -796,8 +891,9 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['path'],
         properties: {
           path: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
       accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
@@ -809,11 +905,14 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['path'],
         properties: {
           path: { type: 'string', minLength: 1 },
+          output_path: { type: 'string', minLength: 1 },
           content: {},
           data: {},
           from: { type: 'string', minLength: 1 },
+          format: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     write_artifact: {
@@ -828,8 +927,10 @@ const INPUT_CONTRACTS: ContractCatalog = {
           content: {},
           data: {},
           from: { type: 'string', minLength: 1 },
+          format: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     write_json: {
@@ -840,9 +941,11 @@ const INPUT_CONTRACTS: ContractCatalog = {
         required: ['path'],
         properties: {
           path: { type: 'string', minLength: 1 },
-          data: {},
+          content: {},
+          from: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     notify: {
@@ -857,7 +960,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           text: { type: 'string', minLength: 1 },
           subtitle: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     app_quit: {
@@ -869,7 +972,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           application: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     process_kill: {
@@ -882,8 +985,9 @@ const INPUT_CONTRACTS: ContractCatalog = {
           pid: { type: 'number', minimum: 1 },
           name: { type: 'string', minLength: 1 },
           signal: { type: 'string', minLength: 1 },
+          retry: { type: 'object' },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     mkdir: {
@@ -895,7 +999,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           path: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     copy: {
@@ -908,7 +1012,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           from: { type: 'string', minLength: 1 },
           to: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     move: {
@@ -921,7 +1025,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           from: { type: 'string', minLength: 1 },
           to: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     delete: {
@@ -933,7 +1037,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           path: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     wait: {
@@ -943,8 +1047,9 @@ const INPUT_CONTRACTS: ContractCatalog = {
         type: 'object',
         properties: {
           ms: { type: 'number', minimum: 0 },
+          duration_ms: { type: 'number', minimum: 0 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
   },
@@ -993,7 +1098,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           cursor_path_seam: { type: 'string', minLength: 1 },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     parse_document: {
@@ -1037,7 +1142,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     normalize_card: {
@@ -1073,7 +1178,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           now: { type: 'string' },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     dedup: {
@@ -1099,7 +1204,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           now: { type: 'string' },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     // DA-05: the explicit ingest ceremony (Hybrid Sovereign Ledger) — the
@@ -1177,7 +1282,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           now: { type: 'string' },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
     // Scheduled meeting-page digest. Generic: the tenant and the job arrive
@@ -1324,7 +1429,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
           },
           export_as: { type: 'string', minLength: 1 },
         },
-        additionalProperties: true,
+        additionalProperties: false,
       },
     },
   },
@@ -1342,7 +1447,15 @@ function getValidator(domain: OpInputDomain, op: string): ValidateFunction | nul
   const key = opKey(domain, op);
   const cached = validatorCache.get(key);
   if (cached) return cached;
-  const validate = ajv().compile(contract.schema);
+  const schema = contract.schema as Record<string, unknown>;
+  const properties =
+    schema.type === 'object' &&
+    schema.properties &&
+    typeof schema.properties === 'object' &&
+    !Array.isArray(schema.properties)
+      ? { ...schema.properties, ...PIPELINE_EXECUTION_METADATA_PROPERTIES }
+      : schema.properties;
+  const validate = ajv().compile(properties ? { ...schema, properties } : contract.schema);
   validatorCache.set(key, validate);
   return validate;
 }
