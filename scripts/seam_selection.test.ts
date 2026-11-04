@@ -299,4 +299,69 @@ describe('seam_selection CLI', () => {
       registerSeamCalibrationAdapter(ocrProviderCalibrationAdapter);
     }
   });
+
+  it('defaults set / list / unset round-trips a layered saved default', async () => {
+    const { seamDefaultsOperatorPath, seamDefaultsScopePath } =
+      await import('@agent/core/seam-selection-defaults');
+    const tenant = 'acme-seamcli';
+    const cleanup = () => {
+      safeRmSync(seamDefaultsOperatorPath(), { force: true });
+      safeRmSync(seamDefaultsScopePath(tenant), { force: true });
+    };
+    cleanup();
+    try {
+      await runSeamSelection([
+        'defaults',
+        'set',
+        '--seam',
+        'ocr-provider',
+        '--provider',
+        'tesseract',
+      ]);
+      expect(lastPrintedJson(logSpy)).toMatchObject({
+        layer: 'operator',
+        entry: { provider: 'tesseract' },
+      });
+      await runSeamSelection([
+        'defaults',
+        'set',
+        '--seam',
+        'ocr-provider',
+        '--provider',
+        'llm_api',
+        '--tenant',
+        tenant,
+      ]);
+      expect(lastPrintedJson(logSpy)).toMatchObject({ layer: 'tenant', tenant_slug: tenant });
+
+      await runSeamSelection(['defaults', 'list', '--seam', 'ocr-provider', '--tenant', tenant]);
+      const listed = lastPrintedJson<{
+        seams: Array<{ effective: { provider: string; layer: string }; layers: unknown[] }>;
+      }>(logSpy);
+      expect(listed.seams[0]!.effective).toEqual({ provider: 'llm_api', layer: 'tenant' });
+      expect(listed.seams[0]!.layers).toHaveLength(2);
+
+      await runSeamSelection(['defaults', 'unset', '--seam', 'ocr-provider', '--tenant', tenant]);
+      expect(lastPrintedJson(logSpy)).toMatchObject({ removed: true, layer: 'tenant' });
+
+      process.exitCode = undefined;
+      await runSeamSelection(['defaults', 'set', '--seam', 'ocr-provider', '--provider', 'nope']);
+      expect(process.exitCode).toBe(1);
+      process.exitCode = undefined;
+      await runSeamSelection([
+        'defaults',
+        'set',
+        '--seam',
+        'ocr-provider',
+        '--provider',
+        'tesseract',
+        '--layer',
+        'project',
+      ]);
+      expect(process.exitCode).toBe(1);
+      process.exitCode = undefined;
+    } finally {
+      cleanup();
+    }
+  });
 });

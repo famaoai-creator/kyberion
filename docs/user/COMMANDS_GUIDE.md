@@ -179,9 +179,14 @@ pnpm kyberion seam select rules list
 pnpm kyberion seam select rules set --seam <seam> --rule-id <id> --prefer providerA,providerB
 pnpm kyberion seam select rules remove --rule-id <id>
 pnpm kyberion seam select calibrate --seam <seam> --input input.json
+pnpm kyberion seam select defaults list
+pnpm kyberion seam select defaults set --seam <seam> --provider <provider> [--tenant <t>] [--organization <o>] [--project <p>]
+pnpm kyberion seam select defaults unset --seam <seam> [--tenant <t>] [--organization <o>] [--project <p>]
 ```
 
 Rules are stored in the operator overlay `active/shared/runtime/seam-selection/rules.json`, and every change is audited.
+
+A saved default (`defaults set`) picks the provider whenever you name none and give no purpose. Without flags it applies to the whole installation; `--tenant`, `--organization` or `--project` scope it, and the most specific one wins. `KYBERION_SEAM_DEFAULTS="seam=provider"` overrides it for one process. A default that cannot run the task is skipped, and `seam select explain` shows which default was used and why.
 
 ## Working next to another agent: co-session
 

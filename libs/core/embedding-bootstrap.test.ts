@@ -13,6 +13,13 @@ vi.mock('./mlx-embedding-backend.js', async () => {
   };
 });
 
+vi.mock('./provider/gemini-embedding-backend.js', async () => {
+  const actual = await vi.importActual<typeof import('./provider/gemini-embedding-backend.js')>(
+    './provider/gemini-embedding-backend.js'
+  );
+  return { ...actual, isGeminiEmbeddingAvailable: () => false };
+});
+
 describe('embedding-bootstrap', () => {
   beforeEach(() => {
     resetEmbeddingBackend();
@@ -56,5 +63,29 @@ describe('embedding-bootstrap', () => {
 
     const backend = getEmbeddingBackend();
     expect(backend).toBeNull();
+  });
+
+  describe('saved seam default', () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it('installs the saved default ahead of the policy chain', () => {
+      vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'embedding-backend=local-hash-embedding');
+      vi.mocked(isMlxAvailable).mockReturnValue(true);
+      expect(installEmbeddingBackendIfAvailable()).toBe(true);
+      expect(getEmbeddingBackend()?.name).toBe('local-hash-embedding');
+    });
+
+    it('falls back to the policy chain when the saved default is unavailable', () => {
+      vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'embedding-backend=gemini');
+      vi.mocked(isMlxAvailable).mockReturnValue(true);
+      expect(installEmbeddingBackendIfAvailable()).toBe(true);
+      expect(getEmbeddingBackend()?.name).toBe('mlx');
+    });
+
+    it('still honors the disable flag over a saved default', () => {
+      vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'embedding-backend=local-hash-embedding');
+      process.env.KYBERION_DISABLE_EMBEDDINGS = '1';
+      expect(installEmbeddingBackendIfAvailable()).toBe(false);
+    });
   });
 });

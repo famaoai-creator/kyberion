@@ -28,7 +28,9 @@ describe('Good first issue guidance contract', () => {
     // c24b90cc3 ("docs: simplify pre-pr validation checklist") deliberately
     // replaced `pnpm validate` with the narrower pre-PR command; assert the
     // command CONTRIBUTING.md actually asks contributors to run.
-    expect(contributing).toContain('pnpm check -- --scope pr');
+    // The pre-PR command is `pnpm check -- --changed` (pr + full-only gates for
+    // the diff, what CI runs); tests/pre-pr-entrypoint-command.test.ts owns it.
+    expect(contributing).toContain('pnpm check -- --changed');
     expect(contributing).toContain('one small file cluster');
     expect(contributing).toContain('one validation command');
   });

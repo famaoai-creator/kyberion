@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   listWebSearchRuntimeBridges,
   registerWebSearchRuntimeBridge,
@@ -79,5 +79,31 @@ describe('web-search-runtime seam', () => {
         .map((b) => b.bridge_id)
         .sort()
     ).toEqual(['rustxng', 'stub']);
+  });
+
+  describe('saved seam default', () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it('honors a saved default (even service-backed) when no provider is given', () => {
+      vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'web-search-runtime=rustxng');
+      registerWebSearchRuntimeBridge(bridge('stub'));
+      registerWebSearchRuntimeBridge(bridge('rustxng', RESTRICTED));
+      expect(resolveWebSearchRuntime().bridge_id).toBe('rustxng');
+      expect(resolveWebSearchRuntime('auto').bridge_id).toBe('rustxng');
+    });
+
+    it('lets an explicit provider win over the saved default', () => {
+      vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'web-search-runtime=rustxng');
+      registerWebSearchRuntimeBridge(bridge('stub'));
+      registerWebSearchRuntimeBridge(bridge('rustxng', RESTRICTED));
+      expect(resolveWebSearchRuntime('stub').bridge_id).toBe('stub');
+    });
+
+    it('falls back to the offline default when the saved default is not registered', () => {
+      vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'web-search-runtime=missing');
+      registerWebSearchRuntimeBridge(bridge('a-extension'));
+      registerWebSearchRuntimeBridge(bridge('stub'));
+      expect(resolveWebSearchRuntime().bridge_id).toBe('stub');
+    });
   });
 });
