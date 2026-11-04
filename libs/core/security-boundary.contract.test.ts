@@ -17,6 +17,10 @@ const ALLOWLIST: Record<string, string> = {
   'scripts/capability_discovery_entry.mjs': 'Build-independent read-only discovery',
   'scripts/bundle_entrypoints.mjs': 'Compiler bundling bootstrap',
   'scripts/write_core_dist_scope.mjs': 'Compiler output package-scope bootstrap',
+  'scripts/generate_governance_import_baseline.ts':
+    'Repo-wide fs-import scanner for the governance-import baseline fixture',
+  'scripts/generate_platform_read_baseline.ts':
+    'Repo-wide process.platform / os.platform() scanner for the platform-read baseline fixture',
   'scripts/git_merge_regenerate.mjs': 'Git merge-driver bootstrap before compiled artifacts exist',
   'scripts/agy_profile_controller.ts':
     'Existing host profile manager outside governed repository storage',
