@@ -28,6 +28,12 @@ import { readJson } from '../foundation/json.js';
 import { listProjectRecords } from '../project/project-registry.js';
 import { safeExistsSync, safeReaddir } from '../secure-io.js';
 import { listWorkItems } from '../workforce/work-coordination.js';
+import {
+  buildDecisionBrief,
+  type DecisionBrief,
+  type PublicationPreview,
+} from './decision-brief.js';
+import { decisionReasonText } from './decision-reason-text.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
 import {
   authorizeSurfaceOperation,
@@ -74,6 +80,8 @@ export interface GraphNode extends GraphRef {
   actors?: GraphActorLink[];
   /** Small display facts (counts, kind, priority). Never secrets. */
   facts?: Record<string, string | number | boolean>;
+  /** Approvals: what to decide and what each answer does, in plain words (display only). */
+  brief?: DecisionBrief;
 }
 
 export interface WorkspaceGraph {
@@ -136,6 +144,8 @@ export interface WorkspaceGraphSources {
   };
   workItems(): WorkItem[];
   approvals(): ApprovalRequestRecord[];
+  /** The PR a pending `vcs:pr_create` request would open (display only; optional). */
+  approvalPublication?(record: ApprovalRequestRecord): PublicationPreview | undefined;
   agents(): Array<{
     nhi_id: string;
     display_name: string;
@@ -288,6 +298,10 @@ export function defaultWorkspaceGraphSources(): WorkspaceGraphSources {
       }),
     workItems: () => read(() => listWorkItems()),
     approvals: () => read(() => listApprovalRequests()),
+    // No `approvalPublication`: the PR review artifact sits in a tenant's
+    // confidential artifact floor, which this never-tenant-bound reader may not
+    // read. Briefs here use the generic PR sentence; viewer-scoped surfaces
+    // (the Concierge summary) add the PR's repository and title.
     agents: () => read(() => listAgentIdentities()),
     members: () =>
       read(() =>
@@ -472,7 +486,8 @@ export function collectWorkspaceGraph(
     });
   }
 
-  for (const approval of attempt('approvals', () => sources.approvals(), [])) {
+  const approvalRecords = attempt('approvals', () => sources.approvals(), []);
+  for (const approval of approvalRecords) {
     const scope = approvalScope(approval);
     const mission = scope.missionId ? nodes.get(key('mission', scope.missionId)) : undefined;
     put({
@@ -543,6 +558,24 @@ export function collectWorkspaceGraph(
     node.actors = node.actors.map((link) =>
       actorLabels.has(link.actorId) ? { ...link, label: actorLabels.get(link.actorId)! } : link
     );
+  }
+  // Approvals read as a decision, not as their machine title and summary.
+  const nowMs = now().getTime();
+  for (const approval of approvalRecords) {
+    const node = nodes.get(key('approval', approval.id));
+    if (!node) continue;
+    try {
+      const publication =
+        approval.status === 'pending' ? sources.approvalPublication?.(approval) : undefined;
+      node.brief = buildDecisionBrief(approval, {
+        ...(publication ? { publication } : {}),
+        names: (id) => actorLabels.get(id),
+        now: nowMs,
+        reasonText: decisionReasonText,
+      });
+    } catch {
+      // Display only: the node keeps its title and summary.
+    }
   }
   return { generatedAt: now().toISOString(), nodes: [...nodes.values()], degraded };
 }

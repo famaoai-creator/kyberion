@@ -574,6 +574,20 @@ the request lifetime. Exercise delayed fetch/body/error permutations, same-entry
 revision changes, unchanged summary refreshes and timeout recovery in
 `presence/displays/concierge/test/outcome-preview-ui.test.ts`; history must stay untouched.
 
+**Server child roles.** Every child the Kyberion server (Concierge) spawns gets an explicit
+`SYSTEM_ROLE` through `presence/displays/concierge/src/lib/server-child-env.ts`; never spawn one
+unbounded. When a child needs a role the server itself must not hold (a writer, or a ledger role
+such as `decision_ledger`), do not add that role to the server's `may_assume` and do not clear
+`SYSTEM_ROLE`. Give the child its own one-purpose entry script that dispatches only the verbs the
+server calls (e.g. `scripts/customer_decision_overview.ts`, `scripts/dot_lifecycle_worker.ts`), a
+narrow system role granting just the roles that entry reaches, a reachability workspace entry in
+`scripts/lib/role-assumption-workspace.ts`, and a regenerated
+`role-assumption-unresolved-baseline.json` (`--print-unresolved-baseline`, never hand edits). Pin
+it with a test that the server role is refused the role and the child role is allowed it
+(`isRoleAssumptionAllowed`), and one that the entry cannot import the writer CLI. A child
+bounded by the server role only shows up as a denied assumption at run time: check the route
+against real data, not only mocked spawns.
+
 **Review checklist** (when a PR adds a loop or a spawn): in-flight guard, signal handlers, stopped
 heartbeat, child deadline, `'error'` listener, test with a mocked child.
 

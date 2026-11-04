@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { resolveSurfaceBrowserUrl } from '@agent/core/surface/surface-url';
+import { resolveSurfaceBrowserUrl, resolveSurfaceUrl } from '@agent/core/surface/surface-url';
 
 /**
  * Chronos compatibility app (MSN-KYBERION-SERVER-20261104). The operations
@@ -38,12 +38,56 @@ export function chronosRedirectTarget(
   return new URL(path + (search || ''), conciergeOrigin).toString();
 }
 
+const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
+
+/** Hostname of a `Host` header value (`localhost:3000`, `[::1]:3000`), lowercased. */
+export function hostHeaderHostname(host: string | null | undefined): string | null {
+  const value = String(host || '')
+    .trim()
+    .toLowerCase();
+  if (!value) return null;
+  try {
+    return new URL(`http://${value}`).hostname;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Session cookies are host-scoped, so a browser that reached Chronos on
+ * `localhost:3000` must land on `localhost:<concierge port>`, not on the
+ * registry default `127.0.0.1:<port>`. Only the loopback hostname is ever taken
+ * from the request, and only when no public / override origin was declared
+ * (browser origin === registry service origin, itself loopback). Any other Host
+ * is ignored, so the redirect target can never point off-box (open-redirect
+ * safety).
+ */
+export function conciergeOriginForRequest(
+  browserOrigin: string,
+  serviceOrigin: string,
+  requestHost: string | null | undefined
+): string {
+  const browser = new URL(browserOrigin);
+  if (browser.origin !== new URL(serviceOrigin).origin) return browserOrigin;
+  if (!LOOPBACK_HOSTNAMES.has(browser.hostname)) return browserOrigin;
+  const incoming = hostHeaderHostname(requestHost);
+  if (!incoming || !LOOPBACK_HOSTNAMES.has(incoming) || incoming === browser.hostname) {
+    return browserOrigin;
+  }
+  browser.hostname = incoming;
+  return browser.origin;
+}
+
 export function proxy(request: NextRequest): NextResponse {
   const { pathname, search } = request.nextUrl;
   if (pathname === CHRONOS_HEALTH_PATH) return NextResponse.next();
   let origin: string;
   try {
-    origin = resolveSurfaceBrowserUrl('concierge');
+    origin = conciergeOriginForRequest(
+      resolveSurfaceBrowserUrl('concierge'),
+      resolveSurfaceUrl('concierge'),
+      request.headers.get('host')
+    );
   } catch {
     return NextResponse.json(
       {

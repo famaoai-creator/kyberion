@@ -1,6 +1,5 @@
 'use client';
 
-import { normalizeLocale } from '@agent/core/locale-normalize';
 import type { ClientMissionHistoryEntry } from '../../lib/ops/mission-history-response';
 import { DiscussionRoom } from '../../components/ops/DiscussionRoom';
 import { Suspense, useCallback, type CSSProperties, type ReactNode } from 'react';
@@ -17,8 +16,6 @@ import {
   TextField,
   Textarea,
   isKbStatus,
-  KB_FORM_ACTIONS,
-  PageHeader,
   Select,
   StatusPill,
   Tabs,
@@ -232,7 +229,6 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
     KnowledgeWorkspace,
     ChronosTenantScope,
     chronosSpeechLocale,
-    setChronosLocalePreference,
     uxMessage,
     uxText,
     TenantDesignBridge,
@@ -260,7 +256,7 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
     return { id: sectionId, label: uxText(section?.labelKey || sectionId, locale) };
   });
 
-  // kb buttons (NextAction, …) and the header's form controls report here.
+  // kb buttons (NextAction, …) report here.
   const handleUiAction = useCallback(
     (actionId: string, payload?: Record<string, unknown>) => {
       if (actionId === CHRONOS_ACTIONS.openSection && typeof payload?.section === 'string') {
@@ -270,13 +266,9 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
         typeof payload?.targetId === 'string'
       ) {
         handleScenarioOpen(payload.targetId, 'mission-intelligence');
-      } else if (actionId === KB_FORM_ACTIONS.fieldChange && payload) {
-        if (payload.name === 'locale' && normalizeLocale(payload.value)) {
-          setChronosLocalePreference(normalizeLocale(payload.value)!);
-        }
       }
     },
-    [handleScenarioOpen, openConsoleSection, setChronosLocalePreference]
+    [handleScenarioOpen, openConsoleSection]
   );
 
   return (
@@ -293,36 +285,17 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
             second app shell. Tenant design overrides (customerId / brandName
             deep links) only: `--*` custom properties, anything else dropped. */}
         <OpsShellFrame style={tenantCssVars}>
-          <div className="chronos-header">
-            <PageHeader
-              title={uxText('chronos_cb_role', locale)}
-              subtitle={uxText('chronos_surface_role_tagline', locale)}
-              role_badge={{
-                label: uxText('chronos_shell_role_badge', locale),
-                role: 'chronos-mirror-v2',
-              }}
-            >
-              <div className="chronos-header__controls">
-                {/* No theme control here: the Concierge shell owns the theme
-                    (設定 › 表示) and the console follows it. */}
-                <Select
-                  name="locale"
-                  label={uxText('chronos_locale_label', locale)}
-                  hide_label
-                  value={locale}
-                  options={[
-                    { value: 'ja', label: uxText('chronos_locale_ja', locale) },
-                    { value: 'en', label: uxText('chronos_locale_en', locale) },
-                  ]}
-                />
-                <IdentityBadge />
-                <Button
-                  label={uxText('chronos_agent_runtimes', locale)}
-                  onClick={() => setAgentPanelOpen(true)}
-                />
-              </div>
-            </PageHeader>
+          {/* The Concierge shell owns the page title, locale and theme; the
+              console keeps only its own controls in one compact toolbar. */}
+          <div className="chronos-header chronos-header--embedded">
             <ChronosTenantScope compact />
+            <div className="chronos-header__controls">
+              <IdentityBadge />
+              <Button
+                label={uxText('chronos_agent_runtimes', locale)}
+                onClick={() => setAgentPanelOpen(true)}
+              />
+            </div>
           </div>
 
           <div className="chronos-nav">

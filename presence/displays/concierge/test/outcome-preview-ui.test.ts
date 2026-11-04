@@ -27,7 +27,10 @@ vi.mock('../src/lib/summary-watch', () => ({
 vi.mock('../src/lib/use-concierge-i18n', () => ({
   useConciergeI18n: () => ({ locale: 'en', t: (key: string) => key }),
 }));
-vi.mock('../src/lib/i18n', () => ({ frontDeskText: (key: string) => key }));
+vi.mock('../src/lib/i18n', () => ({
+  frontDeskText: (key: string) => key,
+  conciergeText: (key: string) => key,
+}));
 vi.mock('../src/app/outcome-files', () => ({ OutcomeFiles: () => null }));
 vi.mock('../src/app/review-checkin', () => ({ ReviewCheckin: () => null }));
 import ConciergePage from '../src/app/page';
