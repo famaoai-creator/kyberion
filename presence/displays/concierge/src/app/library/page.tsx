@@ -1,11 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { PageHeader } from '@agent/shared-ui';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import { useShellScope } from '../../lib/shell-scope';
 import { withSelectedTenant } from '../../lib/tenant-context';
+import { entityHref } from '../../lib/workspace-view';
 import { IA_LIBRARY_TABS, resolveIaTab, type IaLibraryTab } from '../../lib/ia-routes';
 import { DeliverablesWorkspace } from '../../components/ops/DeliverablesWorkspace';
 import { KnowledgeWorkspace } from '../../components/ops/KnowledgeWorkspace';
@@ -31,6 +32,7 @@ export default function LibraryPage() {
 
 function Library() {
   const { t } = useConciergeI18n();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const scope = useShellScope();
   const tab = resolveIaTab<IaLibraryTab>(IA_LIBRARY_TABS, searchParams?.get('tab') ?? null);
@@ -71,6 +73,11 @@ function Library() {
             tenant={scope.tenant || undefined}
             organizationId={scope.organizationId || undefined}
             projectId={scope.projectId || undefined}
+            onOpenMission={(missionId: string) =>
+              router.push(
+                withSelectedTenant(entityHref('mission', missionId), scope.tenant || null)
+              )
+            }
             browseOnly={{
               href: inboxHref('review'),
               title: t('ia_shell_library_review_where'),
