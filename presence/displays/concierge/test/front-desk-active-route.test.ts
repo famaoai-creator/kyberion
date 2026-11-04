@@ -78,5 +78,6 @@ describe('rail label fallback', () => {
     expect(railLabel('front_desk:ia_nav_settings', 'en')).toBe('Settings');
     expect(railLabel('仕事', 'ja')).toBe('仕事');
     expect(railLabel('front_desk:no_such_key_zz', 'ja')).toBe('');
+    expect(railLabel(undefined, 'ja')).toBe('');
   });
 });
