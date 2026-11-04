@@ -9,7 +9,7 @@
 import { runExternalOperation } from '../governance/external-operation.js';
 import { isDelegableExternalOperation } from '../governance/external-operation-target.js';
 import { computeApprovalPayloadHash } from '../governance/approval-store.js';
-import { safeReadFile } from '../secure-io.js';
+import { safeExecResult, safeReadFile } from '../secure-io.js';
 import { assertNotFlagLike } from './git-arguments.js';
 import {
   currentPrPublicationBodySource,
@@ -19,7 +19,10 @@ import {
   type PrChecksResult,
   type PrListEntry,
 } from './github.js';
+import type { VcsCommandRunner } from './vcs-backend.js';
+import { createGhCliVcsHostProvider } from './gh-cli-host-provider.js';
 import {
+  parseVcsPrFields,
   resolveVcsHostProvider,
   vcsHostCallContext,
   VcsHostError,
@@ -34,7 +37,6 @@ import {
   type VcsRepositoryRef,
   type VcsRepositoryVisibility,
 } from './vcs-host.js';
-import './gh-cli-host-provider.js';
 import './github-rest-host-provider.js';
 
 // ─── Governed verbs ──────────────────────────────────────────────────────────
@@ -50,25 +52,34 @@ function sanitizedError(error: unknown): Error {
   return new Error(sanitizeGhOutput(error instanceof Error ? error.message : String(error)));
 }
 
+/**
+ * Sanitize at the provider boundary only. Governance errors raised by
+ * admission (`ExternalOperationApprovalRequired`, policy stops, outcome
+ * verification) must keep their class so trusted hosts can branch on them.
+ */
+async function fromProvider<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (error) {
+    throw sanitizedError(error);
+  }
+}
+
 async function governedRead<T>(
   operation: string,
   effect: Record<string, unknown>,
   execute: () => Promise<T>
 ): Promise<T> {
-  try {
-    return await runExternalOperation(
-      {
-        operationId: READ_OPERATION_ID,
-        effect: { operation, ...effect },
-        requiresApproval: false,
-        delegable: isDelegableExternalOperation(READ_OPERATION_ID),
-      },
-      execute,
-      () => 'succeeded'
-    );
-  } catch (error) {
-    throw sanitizedError(error);
-  }
+  return runExternalOperation(
+    {
+      operationId: READ_OPERATION_ID,
+      effect: { operation, ...effect },
+      requiresApproval: false,
+      delegable: isDelegableExternalOperation(READ_OPERATION_ID),
+    },
+    () => fromProvider(execute),
+    () => 'succeeded'
+  );
 }
 
 interface Bound {
@@ -146,6 +157,84 @@ export async function vcsHostPrView(
   return governedRead('pr_view', { repository: repo, ref: params.ref }, () =>
     bound.provider.prView(bound.ctx, repo, params.ref)
   );
+}
+
+/**
+ * gh-`--json`-shaped PR projection (`fields` is the gh comma list, limited to
+ * `VCS_PR_FIELDS`), for consumers that parse gh field names directly.
+ */
+export async function vcsHostPrViewFields(
+  params: { ref: string; fields: string } & VcsHostCallOptions
+): Promise<Record<string, unknown>> {
+  assertNotFlagLike(params.ref, 'pr ref');
+  const fields = parseVcsPrFields(params.fields);
+  const bound = bind(params);
+  const repo = await boundRepository(bound);
+  return governedRead('pr_fields', { repository: repo, ref: params.ref, fields }, () =>
+    bound.provider.prFields(bound.ctx, repo, params.ref, fields)
+  );
+}
+
+/** Read-only GitHub REST paths under `repos/{slug}/` the verb layer admits. */
+const GITHUB_API_READ_PATHS: readonly RegExp[] = [
+  /^$/,
+  /^commits\/[^\s?]+$/,
+  /^git\/trees\/[a-f0-9]{40,64}$/,
+  /^branches\/[^\s/?]+\/protection\/required_status_checks$/,
+  /^rules\/branches\/[^\s/?]+$/,
+  /^commits\/[a-f0-9]{40,64}\/check-runs\?per_page=100&filter=latest$/,
+  /^actions\/runs\?head_sha=[a-f0-9]{40,64}&per_page=100$/,
+  /^contents\/\.github\/workflows\/[^\s/?]+\?ref=[a-f0-9]{40,64}$/,
+];
+
+/**
+ * Governed GitHub REST GET for promotion evidence (branch protection,
+ * rulesets, trees, check runs, workflow runs and contents). The path is
+ * relative to `repos/{slug}/` and must match the reviewed allowlist; with
+ * `allowMissing` a 404 resolves to `null` instead of throwing.
+ */
+export async function vcsHostGithubApiGet<T = unknown>(
+  params: { path: string; allowMissing?: boolean } & VcsHostCallOptions
+): Promise<T | null> {
+  // Dot segments (literal or percent-encoded) would let URL normalization
+  // climb out of `repos/{slug}/` past the allowlist.
+  const traversal =
+    /%2e|%2f|\\/i.test(params.path) ||
+    params.path.split(/[/?]/).some((segment) => segment === '.' || segment === '..');
+  if (traversal || !GITHUB_API_READ_PATHS.some((pattern) => pattern.test(params.path)))
+    throw new Error('[VCS_TYPED_VERB_REQUIRED] GitHub API path is not an admitted read');
+  const bound = bind(params);
+  if (!bound.provider.githubApiGet)
+    throw new VcsHostError('invalid', `provider ${bound.provider.id} has no GitHub API capability`);
+  const get = bound.provider.githubApiGet.bind(bound.provider);
+  const repo = await boundRepository(bound);
+  try {
+    return (await governedRead('github_api_get', { repository: repo, path: params.path }, () =>
+      get(bound.ctx, repo, params.path)
+    )) as T;
+  } catch (error) {
+    if (params.allowMissing && error instanceof VcsHostError && error.code === 'not_found')
+      return null;
+    throw error;
+  }
+}
+
+/**
+ * Bridge for callers that still take a `VcsCommandRunner` dependency: the
+ * governed default (`safeExecResult` or none) resolves the seam, while an
+ * injected runner drives a gh-cli provider (and local git) built on it.
+ */
+export function vcsHostOptionsForRunner(
+  options: { cwd?: string; env?: Record<string, string | undefined>; timeoutMs?: number },
+  run?: VcsCommandRunner
+): VcsHostCallOptions {
+  const base: VcsHostCallOptions = {
+    ...(options.cwd !== undefined ? { cwd: options.cwd } : {}),
+    ...(options.env ? { env: options.env } : {}),
+    ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
+  };
+  if (!run || run === safeExecResult) return base;
+  return { ...base, git: run, hostProvider: createGhCliVcsHostProvider({ run }) };
 }
 
 export async function vcsHostPrList(
@@ -353,35 +442,33 @@ export async function vcsHostPrCreate(params: VcsHostPrCreateParams): Promise<Vc
       : {}),
     draft: params.draft === true,
   };
-  try {
-    return await runExternalOperation(
-      {
-        operationId: 'vcs:pr_create',
-        effect,
-        requiresApproval: true,
-        delegable: isDelegableExternalOperation('vcs:pr_create'),
-      },
-      async () => {
-        if (
-          computeApprovalPayloadHash(await snapshot()) !== computeApprovalPayloadHash(bound0) ||
-          (params.bodyFile && String(safeReadFile(params.bodyFile, { encoding: 'utf8' })) !== body)
-        )
-          throw new Error(
-            '[VCS_SNAPSHOT_CHANGED] PR source, base or review text changed before creation'
-          );
-        return provider.prCreate(ctx, repo, {
+  return runExternalOperation(
+    {
+      operationId: 'vcs:pr_create',
+      effect,
+      requiresApproval: true,
+      delegable: isDelegableExternalOperation('vcs:pr_create'),
+    },
+    async () => {
+      if (
+        computeApprovalPayloadHash(await snapshot()) !== computeApprovalPayloadHash(bound0) ||
+        (params.bodyFile && String(safeReadFile(params.bodyFile, { encoding: 'utf8' })) !== body)
+      )
+        throw new Error(
+          '[VCS_SNAPSHOT_CHANGED] PR source, base or review text changed before creation'
+        );
+      return fromProvider(() =>
+        provider.prCreate(ctx, repo, {
           title,
           body,
           base,
           head,
           draft: params.draft === true,
-        });
-      },
-      (result) => (Number.isInteger(result?.number) && result.number > 0 ? 'succeeded' : 'unknown')
-    );
-  } catch (error) {
-    throw sanitizedError(error);
-  }
+        })
+      );
+    },
+    (result) => (Number.isInteger(result?.number) && result.number > 0 ? 'succeeded' : 'unknown')
+  );
 }
 
 export interface VcsHostPrMergeParams extends VcsHostCallOptions {
@@ -428,34 +515,32 @@ export async function vcsHostPrMerge(params: VcsHostPrMergeParams): Promise<VcsP
     throw new Error('[VCS_SNAPSHOT_UNAVAILABLE] PR belongs to a different repository');
   const method = params.method || 'merge';
   const deleteBranch = params.deleteBranch !== false;
-  try {
-    return await runExternalOperation(
-      {
-        operationId: 'vcs:pr_merge',
-        effect: {
-          repository: repo,
-          repository_visibility: await visibilityOf(bound, repo),
-          ...snap,
-          method,
-          deleteBranch,
-        },
-        requiresApproval: true,
-        delegable: isDelegableExternalOperation('vcs:pr_merge'),
+  return runExternalOperation(
+    {
+      operationId: 'vcs:pr_merge',
+      effect: {
+        repository: repo,
+        repository_visibility: await visibilityOf(bound, repo),
+        ...snap,
+        method,
+        deleteBranch,
       },
-      async () => {
-        if (computeApprovalPayloadHash(await snapshot()) !== computeApprovalPayloadHash(snap))
-          throw new Error('[VCS_SNAPSHOT_CHANGED] PR changed before merge');
-        return provider.prMerge(ctx, repo, {
+      requiresApproval: true,
+      delegable: isDelegableExternalOperation('vcs:pr_merge'),
+    },
+    async () => {
+      if (computeApprovalPayloadHash(await snapshot()) !== computeApprovalPayloadHash(snap))
+        throw new Error('[VCS_SNAPSHOT_CHANGED] PR changed before merge');
+      return fromProvider(() =>
+        provider.prMerge(ctx, repo, {
           number: snap.number,
           method,
           deleteBranch,
           expectedHeadSha: snap.headRefOid,
           headRefName: snap.headRefName,
-        });
-      },
-      (result) => (result?.merged === true ? 'succeeded' : 'unknown')
-    );
-  } catch (error) {
-    throw sanitizedError(error);
-  }
+        })
+      );
+    },
+    (result) => (result?.merged === true ? 'succeeded' : 'unknown')
+  );
 }
