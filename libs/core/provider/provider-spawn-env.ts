@@ -20,6 +20,7 @@ import {
   applyProviderCredentialRelay,
   prepareProviderCredentialRelay,
   providerCredentialRelayApplies,
+  providerHasCredentialRelayRoute,
   type PreparedProviderCredentialRelay,
 } from './provider-credential-relay.js';
 
@@ -63,15 +64,16 @@ export function isSessionGitIndexEnabled(baseEnv?: NodeJS.ProcessEnv): boolean {
 }
 
 export function buildDelegationSpawnEnv(input: BuildDelegationSpawnEnvInput): DelegationSpawnEnv {
-  const providerEnv = buildProviderChildEnv({
-    provider: input.provider,
-    ...(input.baseEnv ? { baseEnv: input.baseEnv } : {}),
-  });
   // Opt-in (default OFF): the child gets a loopback relay base URL and a
   // per-turn placeholder key instead of the raw API key; torn down on dispose.
+  // Every step that can throw runs inside the guard so a started relay never leaks.
   const closeRelay = (): void => input.credentialRelay?.relay.close();
   let env: NodeJS.ProcessEnv;
   try {
+    const providerEnv = buildProviderChildEnv({
+      provider: input.provider,
+      ...(input.baseEnv ? { baseEnv: input.baseEnv } : {}),
+    });
     env = {
       ...applyProviderCredentialRelay({
         provider: input.provider,
@@ -125,6 +127,10 @@ export function buildDelegationSpawnEnv(input: BuildDelegationSpawnEnvInput): De
 export function buildDelegationSpawnEnvWithRelay(
   input: BuildDelegationSpawnEnvInput
 ): DelegationSpawnEnv | Promise<DelegationSpawnEnv> {
+  // Flag off or no relay route: no extra env build, no relay, synchronous.
+  if (!providerHasCredentialRelayRoute(input.provider, input.baseEnv)) {
+    return buildDelegationSpawnEnv(input);
+  }
   const relayInput = {
     provider: input.provider,
     credentialEnv: buildProviderChildEnv({
@@ -134,6 +140,7 @@ export function buildDelegationSpawnEnvWithRelay(
     ...(input.baseEnv ? { baseEnv: input.baseEnv } : {}),
   };
   if (!providerCredentialRelayApplies(relayInput)) return buildDelegationSpawnEnv(input);
+  // buildDelegationSpawnEnv closes the relay itself if it throws.
   return prepareProviderCredentialRelay(relayInput).then((credentialRelay) =>
     buildDelegationSpawnEnv({ ...input, credentialRelay })
   );

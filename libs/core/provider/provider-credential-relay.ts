@@ -31,10 +31,14 @@ import * as http from 'node:http';
 import * as https from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { logger } from '../core.js';
-import { getRegisteredEnvBool } from '../foundation/env.js';
+import {
+  PROVIDER_CREDENTIAL_RELAY_ENV_VAR,
+  isProviderCredentialRelayEnabled,
+} from '../foundation/env.js';
+import { resolveTaskProviderEnvironment } from '../foundation/credential-binding.js';
 import type { ProviderId } from './provider-permission-profiles.js';
 
-export const PROVIDER_CREDENTIAL_RELAY_ENV_VAR = 'KYBERION_PROVIDER_CREDENTIAL_RELAY';
+export { PROVIDER_CREDENTIAL_RELAY_ENV_VAR, isProviderCredentialRelayEnabled };
 export const CREDENTIAL_RELAY_PLACEHOLDER_PREFIX = 'kyb-relay-';
 
 export type CredentialRelayProtocol = 'anthropic' | 'openai';
@@ -75,10 +79,22 @@ const HOP_BY_HOP_HEADERS = new Set([
 const CREDENTIAL_HEADERS = new Set(['authorization', 'x-api-key', 'api-key']);
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
 
-export function isProviderCredentialRelayEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return (
-    getRegisteredEnvBool(PROVIDER_CREDENTIAL_RELAY_ENV_VAR, { env, defaultValue: false }) === true
-  );
+/** Idle socket timeout for the relay's upstream hop (streams keep it alive). */
+export const CREDENTIAL_RELAY_UPSTREAM_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+/** At most one rejection warning per relay per this window. */
+const REJECT_WARN_INTERVAL_MS = 30_000;
+
+/** Header names a `Connection` header lists are hop-by-hop too (RFC 9110 §7.6.1). */
+function connectionListedHeaders(headers: http.IncomingHttpHeaders): Set<string> {
+  const raw = headers.connection;
+  const listed = new Set<string>();
+  for (const value of Array.isArray(raw) ? raw : raw ? [raw] : []) {
+    for (const token of value.split(',')) {
+      const name = token.trim().toLowerCase();
+      if (name) listed.add(name);
+    }
+  }
+  return listed;
 }
 
 export interface CredentialRelayHandle {
@@ -154,6 +170,8 @@ export async function startCredentialRelay(
   const inflight = new Set<http.ClientRequest>();
   let closed = false;
   let port = 0;
+  let lastRejectWarnAt = 0;
+  let suppressedRejects = 0;
 
   const reject = (
     res: http.ServerResponse,
@@ -161,9 +179,16 @@ export async function startCredentialRelay(
     reason: string,
     req: http.IncomingMessage
   ) => {
-    logger.warn(
-      `[credential-relay] rejected ${req.method ?? '?'} request — ${reason} | next: the child CLI must use the relay base URL and the per-turn placeholder | evidence: status ${status}`
-    );
+    const now = Date.now();
+    if (now - lastRejectWarnAt >= REJECT_WARN_INTERVAL_MS) {
+      logger.warn(
+        `[credential-relay] rejected ${req.method ?? '?'} request — ${reason} | next: the child CLI must use the relay base URL and the per-turn placeholder | evidence: status ${status}${suppressedRejects ? `, ${suppressedRejects} earlier rejection(s) not logged` : ''}`
+      );
+      lastRejectWarnAt = now;
+      suppressedRejects = 0;
+    } else {
+      suppressedRejects += 1;
+    }
     res.writeHead(status, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ error: { type: 'credential_relay_rejected', message: reason } }));
   };
@@ -185,9 +210,15 @@ export async function startCredentialRelay(
     }
 
     const headers: http.OutgoingHttpHeaders = {};
+    const requestConnectionListed = connectionListedHeaders(req.headers);
     for (const [name, value] of Object.entries(req.headers)) {
       const lower = name.toLowerCase();
-      if (value === undefined || HOP_BY_HOP_HEADERS.has(lower) || CREDENTIAL_HEADERS.has(lower)) {
+      if (
+        value === undefined ||
+        HOP_BY_HOP_HEADERS.has(lower) ||
+        CREDENTIAL_HEADERS.has(lower) ||
+        requestConnectionListed.has(lower)
+      ) {
         continue;
       }
       headers[lower] = value;
@@ -208,8 +239,16 @@ export async function startCredentialRelay(
       },
       (upstreamRes) => {
         const responseHeaders: http.OutgoingHttpHeaders = {};
+        const responseConnectionListed = connectionListedHeaders(upstreamRes.headers);
         for (const [name, value] of Object.entries(upstreamRes.headers)) {
-          if (value === undefined || HOP_BY_HOP_HEADERS.has(name.toLowerCase())) continue;
+          const lower = name.toLowerCase();
+          if (
+            value === undefined ||
+            HOP_BY_HOP_HEADERS.has(lower) ||
+            responseConnectionListed.has(lower)
+          ) {
+            continue;
+          }
           responseHeaders[name] = value;
         }
         res.writeHead(upstreamRes.statusCode ?? 502, responseHeaders);
@@ -217,6 +256,9 @@ export async function startCredentialRelay(
       }
     );
     inflight.add(forward);
+    forward.setTimeout(CREDENTIAL_RELAY_UPSTREAM_IDLE_TIMEOUT_MS, () => {
+      forward.destroy(new Error('upstream idle timeout'));
+    });
     forward.once('close', () => inflight.delete(forward));
     forward.on('error', (error) => {
       logger.warn(
@@ -252,6 +294,9 @@ export async function startCredentialRelay(
   port = address.port;
   // A leaked relay must not keep the parent alive; live sockets still do.
   server.unref();
+  logger.debug(
+    `[credential-relay] started on 127.0.0.1:${port} (protocol=${input.protocol}, upstream=${upstream.protocol}//${upstream.host}${basePath})`
+  );
 
   return {
     baseUrl: `http://127.0.0.1:${port}${basePath}`,
@@ -278,6 +323,33 @@ export interface PreparedProviderCredentialRelay {
 function relayRouteFor(provider: ProviderId, baseEnv: NodeJS.ProcessEnv): RelayRoute | undefined {
   if (!isProviderCredentialRelayEnabled(baseEnv)) return undefined;
   return RELAY_ROUTES[provider];
+}
+
+/**
+ * Operator- or tenant-configured upstream base URL. When the task has a bound
+ * provider environment, only that environment may name the upstream — a
+ * tenant credential is never routed to the operator's gateway.
+ */
+function configuredUpstreamFor(
+  provider: ProviderId,
+  route: RelayRoute,
+  baseEnv: NodeJS.ProcessEnv
+): string | undefined {
+  let bound: NodeJS.ProcessEnv | undefined;
+  try {
+    bound = resolveTaskProviderEnvironment(provider);
+  } catch {
+    bound = undefined;
+  }
+  return (bound ?? baseEnv)[route.baseUrlEnvKey]?.trim() || undefined;
+}
+
+/** Cheap pre-check: flag on and `provider` has a relay route (no env build). */
+export function providerHasCredentialRelayRoute(
+  provider: ProviderId,
+  baseEnv: NodeJS.ProcessEnv = process.env
+): boolean {
+  return relayRouteFor(provider, baseEnv) !== undefined;
 }
 
 /** True when {@link prepareProviderCredentialRelay} would start a relay. */
@@ -307,7 +379,7 @@ export async function prepareProviderCredentialRelay(input: {
   if (!route) return null;
   const credential = input.credentialEnv[route.credentialEnvKey];
   if (!credential) return null;
-  const configuredUpstream = baseEnv[route.baseUrlEnvKey]?.trim();
+  const configuredUpstream = configuredUpstreamFor(input.provider, route, baseEnv);
   const relay = await startCredentialRelay({
     protocol: route.protocol,
     credential,

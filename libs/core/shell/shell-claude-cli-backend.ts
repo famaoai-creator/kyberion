@@ -1004,6 +1004,16 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     userPrompt: string;
     schema: ZodType<T>;
   }): Promise<T> {
+    // Output exit: parse the raw envelope first, then redact the parsed value
+    // (masking raw JSON could break parsing on an unquoted secret).
+    return withRedactedProviderOutput(() => this.runStructuredUnredacted(params));
+  }
+
+  private async runStructuredUnredacted<T>(params: {
+    systemPrompt: string;
+    userPrompt: string;
+    schema: ZodType<T>;
+  }): Promise<T> {
     assertReasoningEgressAllowed(this.name);
     const jsonSchema = z.toJSONSchema(params.schema) as Record<string, unknown>;
     if ('$schema' in jsonSchema) delete jsonSchema['$schema'];
@@ -1021,7 +1031,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       ...this.extraArgs,
     ];
 
-    const stdout = await this.spawnCli(args, params.userPrompt);
+    const stdout = await this.spawnCliRaw(args, params.userPrompt);
     let cliResult: any;
     try {
       cliResult = parseSafeJsonInput(stdout, 'Claude CLI response');
@@ -1047,7 +1057,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
         `[shell-claude-cli] schema validation failed: ${parsed.error.message}. Structured: ${JSON.stringify(structured).slice(0, 500)}`
       );
     }
-    return redactProviderOutputValue(parsed.data);
+    return parsed.data;
   }
 
   /**

@@ -11,6 +11,7 @@
  * than returned unredacted.
  */
 
+import { logger } from '../core.js';
 import { redactSecretValuesInText, type SecretValueRedactionOptions } from './secret-guard.js';
 
 export const REDACTION_DEPTH_LIMIT_MARKER = '[REDACTED_DEPTH_LIMIT]';
@@ -84,5 +85,11 @@ export function redactSecretsDeep<T>(value: T, options: DeepSecretRedactionOptio
     }
   };
 
-  return walk(value, 0) as T;
+  const out = walk(value, 0) as T;
+  if (visited > maxNodes) {
+    logger.warn(
+      `[secret-redaction] node cap reached — ${visited - maxNodes} value(s) replaced by ${REDACTION_SIZE_LIMIT_MARKER} | next: raise maxNodes for this exit or shrink the payload | evidence: maxNodes=${maxNodes}`
+    );
+  }
+  return out;
 }
