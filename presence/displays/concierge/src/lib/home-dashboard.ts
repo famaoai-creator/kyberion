@@ -17,17 +17,26 @@ import { buildAgentActivityBoard } from '@agent/core/agent/agent-activity-board'
 import { listAgentRuntimeSnapshots } from '@agent/core/agent/agent-runtime-supervisor';
 import { resolveCompany } from '@agent/core/company';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { withExecutionContext } from '@agent/core/authority';
+import { listMissionsInSearchDirs, loadState } from '@agent/core/mission/mission-state';
+import { readOrNullOnMissionRefusal } from '@agent/core/mission-lookup';
+import type { MissionState } from '@agent/core/mission/mission-types';
 import { buildOrganizationManagementView } from '@agent/core/organization/organization-operating-model-management';
 import { humanizeSummary, stripIdPrefix } from '@agent/core/surface/display-humanize';
+import { WORKSPACE_GRAPH_READER_ROLE, viewerAdmitsNode } from '@agent/core/surface/workspace-graph';
 import { krView, type KrDirection, type KrStatus } from '../components/ops/organization-outcome';
 import { collectDeliverableInbox, type DeliverableInboxItem } from './ops/deliverable-inbox';
 import {
-  buildMissionHistoryItems,
   collectCostSummary,
+  projectMissionHistoryItems,
   type CostSummary,
   type MissionHistoryEntry,
 } from './ops/su-surface-data';
-import { withViewerExecutionContext, type ViewerContext } from './ops/ops-viewer';
+import {
+  toSurfaceAuthorizationContext,
+  withViewerExecutionContext,
+  type ViewerContext,
+} from './ops/ops-viewer';
 
 export const HOME_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -344,9 +353,42 @@ export function collectHomeDashboard(viewer: ViewerContext, now = Date.now()): H
   const organizationIds = scopeList(viewer.organizationIds);
   const projectIds = scopeList(viewer.projectIds);
 
-  const missions = read('missions', () =>
-    buildMissionHistoryItems({ tenantSlugs, organizationIds, projectIds, limit: 100_000 })
-  );
+  // Missions are read exactly like the workspace graph (`/api/v1/workspace/*`,
+  // `/w`): the governed listing as the read-only graph reader, then row-level
+  // admission for this viewer (`viewerAdmitsNode`). So the counts here match
+  // the rest of the shell. The chronos execution role cannot list tenant
+  // mission roots (tenant-scope policy), which left the ops readers short.
+  const authorization = toSurfaceAuthorizationContext(viewer);
+  const missions = (() => {
+    try {
+      const states = withExecutionContext(
+        WORKSPACE_GRAPH_READER_ROLE,
+        () =>
+          listMissionsInSearchDirs().flatMap(({ missionId }): MissionState[] => {
+            const state = readOrNullOnMissionRefusal(() => loadState(missionId));
+            return state ? [state] : [];
+          }),
+        undefined,
+        ''
+      );
+      return projectMissionHistoryItems(states, [], { limit: 100_000 }).filter((mission) =>
+        viewerAdmitsNode(authorization, {
+          kind: 'mission',
+          id: mission.missionId,
+          label: mission.missionId,
+          status: mission.status,
+          tier: mission.tier,
+          ...(mission.tenantSlug ? { tenantSlug: mission.tenantSlug } : {}),
+          ...(mission.organizationId ? { organizationId: mission.organizationId } : {}),
+          ...(mission.projectId ? { projectId: mission.projectId } : {}),
+          missionId: mission.missionId,
+        })
+      );
+    } catch {
+      failed.push('missions');
+      return undefined;
+    }
+  })();
   const agentEntries = read('agents', () => {
     const board = buildAgentActivityBoard({
       tenant: tenantSlugs === 'all' || tenantSlugs.length !== 1 ? undefined : tenantSlugs[0],
