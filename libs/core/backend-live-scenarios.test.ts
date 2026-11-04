@@ -31,7 +31,7 @@ type AbortBehaviour =
 
 interface StubBehaviour {
   /** Answer the session-recall question with the first word. */
-  remembers?: boolean;
+  remembers?: boolean | 'verbose';
   /** Echo the whole transcript at the end of every answer (stale replay). */
   echoesTranscript?: boolean;
   /** Return the prompt itself as the answer. */
@@ -100,7 +100,12 @@ function stubSessionBackend(behaviour: StubBehaviour, files: Map<string, string>
       if (behaviour.refuses) return 'I will not echo arbitrary strings.';
       let answer: string;
       if (RECALL.test(prompt)) {
-        answer = behaviour.remembers ? (history[0] ?? 'nothing') : 'I do not know.';
+        answer =
+          behaviour.remembers === 'verbose'
+            ? `In your first message of this conversation you asked me to reply with ${history[0] ?? 'nothing'}.`
+            : behaviour.remembers
+              ? (history[0] ?? 'nothing')
+              : 'I do not know.';
       } else {
         const word = /Reply with exactly: (\S+)/u.exec(prompt)?.[1] ?? '';
         if (word.startsWith('M2-') && followUpFailures > 0) {
@@ -280,6 +285,18 @@ describe('backend live scenarios (MSN-HARNESS-ADOPT R1)', () => {
     expect(seen.signals[0]?.aborted).toBe(true);
   });
 
+  it('passes a verbose but correct recall: the recall prompt cannot leak the word', async () => {
+    const record = await harness({ ...HEALTHY, remembers: 'verbose' }).run();
+    const followUp = outcome(record, 'follow_up');
+    expect(followUp).toMatchObject({ outcome: 'pass', attempts: 1 });
+    expect(followUp.answer_excerpt).toContain(`asked me to reply with M1-${NONCE}`);
+    // After the reset the same verbose style no longer names M1: continuity lost.
+    expect(outcome(record, 'reset_continue')).toMatchObject({
+      outcome: 'pass',
+      continuity_after_reset: 'lost',
+    });
+  });
+
   it('retries a failing scenario once and keeps first_try', async () => {
     const record = await harness({ ...HEALTHY, followUpFailuresBeforePass: 1 }).run();
     expect(outcome(record, 'follow_up')).toMatchObject({
@@ -311,7 +328,9 @@ describe('backend live scenarios (MSN-HARNESS-ADOPT R1)', () => {
     const record = await harness({ ...HEALTHY, abort: 'ignores-signal' }).run();
     const abort = outcome(record, 'abort');
     expect(abort.outcome).not.toBe('pass');
-    expect(abort).toMatchObject({ outcome: 'fail', first_try: 'fail', attempts: 2 });
+    // Not retried: the first delegation is still running, a retry would start a second one.
+    expect(abort).toMatchObject({ outcome: 'fail', attempts: 1 });
+    expect(abort.first_try).toBeUndefined();
     expect(abort.detail).toMatch(/ignored the signal/u);
   });
 
