@@ -185,6 +185,44 @@ describe('authn seam — registry and selection', () => {
   });
 });
 
+describe('authn seam — saved seam default', () => {
+  const request = {
+    credential: { type: 'bearer' as const, token: 'api-secret' },
+    serverTenant: 'default',
+  };
+  const deps = {
+    env: { KYBERION_API_TOKEN: 'api-secret' },
+    registrations: [
+      {
+        token_hash: hashToken('api-secret'),
+        role: 'localadmin' as const,
+        tenant_slugs: ['default'],
+      },
+    ],
+  };
+
+  it('leads with an eligible saved default when no purpose is given', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'authn-principal-resolver=env-token');
+    const resolution = resolveAuthnPrincipal(request, { deps });
+    expect(resolution.decision.provider_id).toBe('env-token');
+    expect(resolution.decision.default_source).toBe('env');
+    expect(resolution.principal.provider).toBe('env-token');
+  });
+
+  it('lets an explicit provider set win over the saved default', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'authn-principal-resolver=env-token');
+    const resolution = resolveAuthnPrincipal(request, { deps, providerIds: ['registry-token'] });
+    expect(resolution.decision.provider_id).toBe('registry-token');
+  });
+
+  it('cannot fail open: an ineligible saved stub falls back to the policy default', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'authn-principal-resolver=stub');
+    const resolution = resolveAuthnPrincipal(request, { deps });
+    expect(resolution.decision.provider_id).toBe('registry-token');
+    expect(resolution.principal.provider).toBe('registry-token');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // stub
 // ---------------------------------------------------------------------------

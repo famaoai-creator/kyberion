@@ -119,4 +119,15 @@ describe('purpose-driven browser runtime selection', () => {
     ).toBeUndefined();
     expect(record).not.toHaveBeenCalled();
   });
+
+  it('applies a saved seam default without a purpose, capability-checked', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'browser-automation-runtime=lightpanda');
+    expect(selectBrowserAutomationRuntime(READ_ONLY, {})).toBe('lightpanda');
+    // Explicit still wins.
+    expect(
+      selectBrowserAutomationRuntime(READ_ONLY, { browser_runtime: 'playwright-chromium' })
+    ).toBeUndefined();
+    // Ineligible saved default (pipeline needs screenshots) falls back to chromium.
+    expect(selectBrowserAutomationRuntime(WITH_SCREENSHOT, {})).toBe('playwright-chromium');
+  });
 });
