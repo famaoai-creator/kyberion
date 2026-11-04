@@ -55,7 +55,7 @@ export function TrialMissionCard({ locale }: { locale: ConciergeLocale }) {
           variant="primary"
           onClick={() => window.dispatchEvent(new CustomEvent('concierge:open-dock'))}
         />
-        <Button label={text('ia_settings_card_trial_work')} variant="ghost" href="/w/mission" />
+        <Button label={text('ia_settings_card_trial_work')} variant="ghost" href="/work" />
       </div>
     </Card>
   );
