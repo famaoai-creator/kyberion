@@ -35,6 +35,7 @@ import {
 import {
   NeedsYouCard,
   cardAnchor,
+  resolveInboxAnchor,
   REASON_TONES,
   formatWhen,
   itemTitle,
@@ -100,6 +101,7 @@ function InboxView() {
   const [total, setTotal] = React.useState(0);
   const [nextCursor, setNextCursor] = React.useState<string | undefined>();
   const [loadError, setLoadError] = React.useState(false);
+  const [loadMoreError, setLoadMoreError] = React.useState(false);
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<{ text: string; error?: boolean } | null>(null);
   const [deferred, setDeferred] = React.useState<Set<string>>(new Set());
@@ -146,12 +148,14 @@ function InboxView() {
 
   const loadMore = async () => {
     if (!nextCursor) return;
+    setLoadMoreError(false);
     try {
       const page = await fetchNeedsYouPage(filters, nextCursor);
       setItems((current) => [...(current ?? []), ...page.items]);
       setNextCursor(page.nextCursor);
     } catch {
-      setLoadError(true);
+      // The loaded cards stay; the failed page is announced next to its button.
+      setLoadMoreError(true);
     }
   };
 
@@ -219,8 +223,35 @@ function InboxView() {
     }
   };
 
+  // A deep link (`/inbox#decide-approval-<id>`) lands on its card once the
+  // queue has loaded: reveal a set-aside card, use a folded group's lead card.
+  const landedHash = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!items || typeof window === 'undefined') return;
+    const hash = window.location.hash;
+    if (!hash || landedHash.current === hash) return;
+    const landing = resolveInboxAnchor(items, deferred, hash);
+    if (!landing) return;
+    if (landing.reveal) {
+      const revealId = landing.reveal;
+      setDeferred((previous) => {
+        const next = new Set(previous);
+        next.delete(revealId);
+        storeDeferred(next);
+        return next;
+      });
+      return;
+    }
+    landedHash.current = hash;
+    const element = document.getElementById(landing.scrollTo);
+    element?.scrollIntoView({ block: 'start' });
+    element?.focus?.({ preventScroll: true });
+  }, [items, deferred]);
+
   const visible = (items ?? []).filter((item) => !deferred.has(item.id));
   const setAsideItems = (items ?? []).filter((item) => deferred.has(item.id));
+  // "N more" counts what is still waiting here: the total minus the cards set aside.
+  const waitingCount = Math.max(0, total - setAsideItems.length);
 
   const outcomeItems = visible.flatMap((item) => (item.outcome ? [item.outcome] : []));
   const previewHook = useOutcomePreview(outcomeItems, filterKey);
@@ -352,7 +383,9 @@ function InboxView() {
             <NextAction
               eyebrow={`${t('decide.next_eyebrow')} · ${c(`ia_inbox_reason_${next.reason}`)}`}
               title={itemTitle(next, locale, tt)}
-              reason={total > 1 ? t('decide.next_more', { count: total - 1 }) : undefined}
+              reason={
+                waitingCount > 1 ? t('decide.next_more', { count: waitingCount - 1 }) : undefined
+              }
               primary={{ label: t('decide.next_review'), href: `#${cardAnchor(next)}` }}
             />
           ) : null}
@@ -364,6 +397,7 @@ function InboxView() {
                 locale={locale}
                 t={tt}
                 busy={busyId === item.id}
+                isBusy={(id) => busyId === id}
                 onDecide={decide}
                 onLater={(target) => setAside(target, true)}
                 preview={preview}
@@ -376,6 +410,11 @@ function InboxView() {
               variant="secondary"
               onClick={() => void loadMore()}
             />
+          ) : null}
+          {loadMoreError ? (
+            <div role="alert">
+              <Callout tone="danger" title={c('ia_inbox_load_more_error')} />
+            </div>
           ) : null}
         </>
       )}
