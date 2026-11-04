@@ -288,6 +288,18 @@ describe('mission-lifecycle-service — shared audit record', () => {
 });
 
 describe('mission-lifecycle-service — archive verb (AL-03)', () => {
+  it('forwards onCandidates to the sweep so a surface can render its own preview', async () => {
+    const system = makeStubSystem();
+    const facade = buildMissionLifecycleService(system);
+    const onCandidates = vi.fn();
+
+    await withExecutionContext('mission_controller', () =>
+      facade.archive({ dryRun: true, onCandidates })
+    );
+
+    expect(system.purgeMissions).toHaveBeenCalledWith(true, { onCandidates });
+  });
+
   it('routes the policy-driven sweep to the underlying purgeMissions with the dry-run flag', async () => {
     const system = makeStubSystem();
     const facade = buildMissionLifecycleService(system);
