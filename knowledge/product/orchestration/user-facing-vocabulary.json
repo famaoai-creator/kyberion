@@ -33602,6 +33602,16 @@
         "en": "Start a customer decision",
         "ja": "顧客との意思決定を始める",
         "qps-ploc": "⟦Şŧȧřŧ ȧ ƈůşŧőɱėř ḓėƈïşïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "ia_settings_meta_label": {
+        "en": "About this setting",
+        "ja": "この設定について",
+        "qps-ploc": "⟦Ȧƀőůŧ ŧħïş şėŧŧïñɠ ŀőřėɱ⟧"
+      },
+      "ia_settings_back_to_settings": {
+        "en": "← Back to Settings › Workspace & organization",
+        "ja": "← 設定 › ワークスペースと組織 に戻る",
+        "qps-ploc": "⟦← Ƀȧƈķ ŧő Şėŧŧïñɠş › Ẇőřķşṗȧƈė & őřɠȧñïẑȧŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       }
     },
     "operator": {
