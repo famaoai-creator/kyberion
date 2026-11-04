@@ -39,7 +39,7 @@ function Library() {
   const inboxHref = (reason: string) =>
     withSelectedTenant(`/inbox?reason=${reason}`, scope.tenant || null);
   return (
-    <div className="kb-page" data-width={tab === 'ingest' ? 'form' : 'wide'}>
+    <div className="kb-page" data-width="wide">
       <PageHeader title={t('ia_shell_library_title')} subtitle={t('ia_shell_library_subtitle')} />
       <DestinationTabs
         label={t('ia_shell_tabs_label')}
@@ -51,7 +51,10 @@ function Library() {
         ]}
       />
       {tab === 'ingest' ? (
-        <IngestPanel />
+        // Intake is a form: 720 wide, aligned with the tabs (MSN-SHELL-IA §5).
+        <div className="library-form">
+          <IngestPanel />
+        </div>
       ) : tab === 'knowledge' ? (
         <div className="kb-ops">
           <KnowledgeWorkspace
