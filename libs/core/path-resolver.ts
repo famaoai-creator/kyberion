@@ -119,6 +119,24 @@ export function isAuthorityStoreRelativePath(repoRelative: string): boolean {
 }
 
 /**
+ * The fixed directories above the authority stores (`active`, `active/shared`,
+ * `active/shared/coordination`, `knowledge/confidential/<tenant>`, …). They are
+ * NOT authority state and grant nothing; secure-io's missing-ancestor probe may
+ * only test that they exist, so the first approval in a primary checkout that
+ * has no `channels/` yet can still be created from a linked worktree.
+ */
+const AUTHORITY_STORE_ANCESTOR_PATTERNS: readonly RegExp[] = [
+  /^active(?:\/shared(?:\/(?:coordination|observability|runtime))?)?$/,
+  /^knowledge(?:\/personal|\/confidential(?:\/[^/]+)?)?$/,
+];
+
+/** True when a repo-relative path is a strict ancestor directory of an authority store. */
+export function isAuthorityStoreAncestorRelativePath(repoRelative: string): boolean {
+  const rel = repoRelative.split(path.sep).join('/');
+  return AUTHORITY_STORE_ANCESTOR_PATTERNS.some((pattern) => pattern.test(rel));
+}
+
+/**
  * Redirect a resolved absolute path to the primary checkout when it names
  * shared authority state. Applied AFTER vitestLivePath() so test sandboxing
  * wins (its output is a `vitest-live/` path that matches no authority
@@ -1137,6 +1155,7 @@ export const pathResolver = {
   isPathInsideOrEqual,
   primaryCheckoutRootDir,
   isAuthorityStoreRelativePath,
+  isAuthorityStoreAncestorRelativePath,
   storeRelativePath,
   isWithinGovernedRoots,
 };
