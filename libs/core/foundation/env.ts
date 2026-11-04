@@ -174,7 +174,54 @@ const CHILD_PROCESS_ENV_KEYS = [
   'no_proxy',
 ] as const;
 
-/** Build the least-privilege environment passed to provider child processes. */
+/** Opt-in loopback credential relay flag (provider/provider-credential-relay.ts). */
+export const PROVIDER_CREDENTIAL_RELAY_ENV_VAR = 'KYBERION_PROVIDER_CREDENTIAL_RELAY';
+
+/**
+ * API-key vars whose raw value must never reach a child while the relay flag
+ * is on: only relay-aware launch sites (`buildDelegationSpawnEnvWithRelay`)
+ * may hand the child a placeholder instead.
+ */
+export const RELAY_MANAGED_CREDENTIAL_ENV_KEYS: readonly string[] = [
+  'ANTHROPIC_API_KEY',
+  'OPENAI_API_KEY',
+];
+
+/** Relay flag is on in `env` (or, fail closed, in this process's env). */
+export function isProviderCredentialRelayEnabled(
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  const on = (source: Record<string, string | undefined>) =>
+    getRegisteredEnvBool(PROVIDER_CREDENTIAL_RELAY_ENV_VAR, {
+      env: source,
+      defaultValue: false,
+    }) === true;
+  return on(env) || (env !== process.env && on(process.env));
+}
+
+/**
+ * Fail closed for launch sites that cannot start a relay: with the relay flag
+ * on, drop the relay-managed raw API keys from `childEnv` (the child then
+ * uses its own login, or fails to authenticate). Flag off ⇒ returned as is.
+ */
+export function withoutRelayManagedCredentials<T extends Record<string, string | undefined>>(
+  childEnv: T,
+  flagEnv: Record<string, string | undefined> = process.env
+): T {
+  if (!isProviderCredentialRelayEnabled(flagEnv)) return childEnv;
+  if (!RELAY_MANAGED_CREDENTIAL_ENV_KEYS.some((key) => childEnv[key] !== undefined)) {
+    return childEnv;
+  }
+  const out = { ...childEnv };
+  for (const key of RELAY_MANAGED_CREDENTIAL_ENV_KEYS) delete out[key];
+  return out;
+}
+
+/**
+ * Build the least-privilege environment passed to provider child processes.
+ * With the credential relay flag on, the relay-managed raw API keys are
+ * dropped (these launch sites start no relay).
+ */
 export function safeChildEnv(
   env: Record<string, string | undefined> = process.env
 ): Record<string, string> {
@@ -183,5 +230,5 @@ export function safeChildEnv(
     const value = env[key];
     if (value) childEnv[key] = value;
   }
-  return childEnv;
+  return withoutRelayManagedCredentials(childEnv, env);
 }

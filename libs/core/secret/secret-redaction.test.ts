@@ -109,4 +109,19 @@ describe('createSecretStreamRedactor', () => {
     expect(redactor.push('plain text.')).toBe('plain text.');
     expect(redactor.flush()).toBe('');
   });
+
+  it('masks a longer secret B whole when it contains a shorter secret A across a chunk boundary', () => {
+    const inner = 'inner-secret-AAAA';
+    const outer = `outer-prefix-${inner}-outer-suffix-BBBB`;
+    const redactor = createSecretStreamRedactor({ extraSecrets: [inner, outer] });
+    const split = outer.indexOf(inner) + inner.length; // chunk ends right after A
+    const emitted = [
+      redactor.push(`x ${outer.slice(0, split)}`),
+      redactor.push(`${outer.slice(split)} y`),
+    ];
+    const all = emitted.join('') + redactor.flush();
+    expect(all).toBe('x [REDACTED_SECRET] y');
+    expect(all).not.toContain('outer-suffix');
+    for (const chunk of emitted) expect(chunk).not.toContain('outer-prefix');
+  });
 });

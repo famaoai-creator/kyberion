@@ -109,31 +109,57 @@ binders and spawned CLI sessions retain their own revocation boundaries.
 Every provider CLI reasoning backend redacts at its output exits: final answer
 text, each streamed chunk, structured results, native-subagent metadata, and
 errors that embed child stderr (`libs/core/provider/provider-output-redaction.ts`).
-The needles are the secret-guard active-secret registry plus every provider's
-credential env value, because a CLI reads its key from env without registering it.
-Redaction walks values (`redactSecretsDeep`, depth/size-bounded, cycle-safe, fail
-closed with a marker) instead of matching a stringified aggregate; each value is
-also matched in its JSON-escaped form so a multi-line key (PEM) re-emitted inside
-a JSON string is caught. Streams hold back only a suffix that could begin a
-secret, so a key split across chunks is still masked.
+The needles are the secret-guard active-secret registry plus credential env values:
+every provider's declared key, `COPILOT_PROVIDER_API_KEY`, `GH_TOKEN` and
+`GITHUB_TOKEN`. A CLI reads its key from env without registering it.
+Redaction walks parsed values (`redactSecretsDeep`, depth/size-bounded,
+cycle-safe, fail closed with a marker, warning when the node cap is hit). Parsed
+outputs are redacted after parsing, never as raw JSON. Each value is also matched
+in its JSON-escaped form, so a multi-line key (PEM) inside a JSON string is caught.
+Streams work on the unmasked buffer and hold back any suffix that could begin a
+secret. A key split across chunks, or a longer secret containing a shorter one,
+is masked whole.
+
+Limits: only exact and JSON-escaped forms match. Base64, URL-encoded, hex or
+otherwise transformed values are not detected. Registry values of 8 characters
+or fewer are not registered, and the masking floor skips values of 5 or fewer.
 
 `KYBERION_PROVIDER_CREDENTIAL_RELAY=1` (default off) keeps the raw API key out of
 the child env for API-key mode `claude` (`ANTHROPIC_API_KEY`) and `codex`
-(`OPENAI_API_KEY`) delegations. The launch site (`buildDelegationSpawnEnvWithRelay`)
+(`OPENAI_API_KEY`). A relay-aware launch site (`buildDelegationSpawnEnvWithRelay`)
 starts a 127.0.0.1 relay on an ephemeral port that holds the real key. The child
-gets `*_BASE_URL` pointing at the relay and a per-turn `kyb-relay-<uuid>`
-placeholder. The relay accepts only the current placeholder on a loopback `Host`
-within the upstream base path. It swaps in the real credential header, forwards
-over TLS (plain HTTP only to a loopback upstream), streams the response back, and
-is closed when the spawn env is disposed at turn end. An operator-set
-`ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` becomes the upstream. A sync launch site
-that cannot start a relay drops the key instead (fail closed).
+gets `*_BASE_URL` pointing at the relay and a `kyb-relay-<uuid>` placeholder. The
+relay accepts only that placeholder on a loopback `Host` within the upstream base
+path. It strips hop-by-hop and `Connection`-listed headers, swaps in the real
+credential and forwards over TLS (plain HTTP only to a loopback upstream). It
+streams the response back with an idle timeout and rate-limited rejection
+warnings, and closes when the spawn env is disposed. The upstream is the task's
+bound provider environment `*_BASE_URL` when a credential binding exists. Without
+a binding it is the operator's, and otherwise the provider default.
+
+Covered launch sites with the flag on:
+
+| Launch site                                                                                                              | Behaviour                                                           |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| shell-claude-cli `spawnCli` / `streamPrompt` (per turn)                                                                  | relay                                                               |
+| codex-cli-query `spawnCli` (per turn)                                                                                    | relay                                                               |
+| claude-cli-session-adapter (native subagent session)                                                                     | relay for the session lifetime, closed when the session child exits |
+| every other `buildDelegationSpawnEnv` caller (grok, gemini, agy, cursor, devin, opencode)                                | not relay providers; env unchanged                                  |
+| any sync `buildDelegationSpawnEnv` claude/codex caller                                                                   | key dropped (fail closed, warning)                                  |
+| `safeChildEnv` callers: agent-adapter codex exec / claude `-p`, codex app-server adapter (codex native-subagent harness) | key dropped (fail closed)                                           |
+| ACP mediator (`sanitizeEnvForChild`)                                                                                     | key dropped (fail closed)                                           |
+| claude-agent SDK queries (strict and non-strict)                                                                         | key dropped (fail closed)                                           |
+| `KYBERION_PROVIDER_ENV_ALLOWLIST=0` with the relay flag                                                                  | refused (`[CREDENTIAL_RELAY_CONFLICT]`)                             |
+
+"Key dropped" means those children must use their own login, or they fail to
+authenticate. They never receive the raw key.
 
 Out of scope: OAuth-login CLIs whose session lives in their own home or keychain
 (claude/codex/grok/devin logins). No API-key var is present, so no relay starts.
-Follow-up work: Bedrock SigV4 signing, Vertex token minting, WebSocket upgrades,
-and proxy support for the relay's own upstream hop. Readiness probes (`--version`,
-auth status) still use the plain allowlisted env.
+Follow-up work: relay support for the fail-closed sites above, Bedrock SigV4
+signing, Vertex token minting, WebSocket upgrades, and proxy support for the
+relay's own upstream hop. Readiness probes (`--version`, auth status) still use
+the plain allowlisted env.
 
 ## Readiness and failure attribution
 
