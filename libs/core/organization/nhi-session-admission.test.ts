@@ -1,7 +1,7 @@
 /** NHI session-admission ceremony + org-scope consumption. */
 import { afterEach, expect, it, vi } from 'vitest';
 import { useOnboardingAuthorityFixture } from '../../../tests/helpers/onboarding-authority-fixture.js';
-import { safeWriteFile } from '../secure-io.js';
+import { safeWriteFile, safeAppendFileSync } from '../secure-io.js';
 
 const f = useOnboardingAuthorityFixture();
 afterEach(() => vi.restoreAllMocks());
@@ -300,6 +300,11 @@ it('runs request → human approval → apply, and the admitted session satisfie
     agentId: agent.nhi_id,
     agentActive: true,
     ownerId: 'user:owner',
+    runtimeBindingHistory: {
+      status: 'available',
+      assurance: 'metadata_only',
+      reference: { version: 1, nhi_id: agent.nhi_id },
+    },
   });
 });
 
@@ -445,6 +450,25 @@ it('keeps the person-scope profile path unchanged', async () => {
   claimSession();
   const result = f.run(() => inspect.inspectInstalledOnboardingRuntime({ kind: 'person' }));
   expect(result).toMatchObject({ ready: true, agentActive: true });
+  expect(result).not.toHaveProperty('runtimeBindingHistory');
+});
+
+it('reports strict binding history unavailable without breaking legacy live admission', async () => {
+  const { agent, api, principal, request } = await approvedAdmission();
+  const applied = f.run(() =>
+    api.applyNhiSessionAdmission(principal, ORG_TENANT, request.request_id)
+  );
+  const inspect = await runtimeIdentity();
+  claimSession(agent.nhi_id, applied.session_id);
+  const initial = f.run(() => inspect.inspectInstalledOnboardingRuntime(SCOPE));
+  expect(initial).toMatchObject({ ready: true, runtimeBindingHistory: { status: 'available' } });
+  expect(JSON.stringify(initial)).not.toContain(applied.session_id);
+  f.run(() => safeAppendFileSync(f.identities.agentIdentityJournalResourcePath(), '{broken\n'));
+  expect(f.run(() => inspect.inspectInstalledOnboardingRuntime(SCOPE))).toMatchObject({
+    ready: true,
+    runtimeBindingHistory: { status: 'unavailable' },
+  });
+  claimSession();
 });
 
 it('does not infer tenant affiliation from an organization name or override a foreign tenant', async () => {
