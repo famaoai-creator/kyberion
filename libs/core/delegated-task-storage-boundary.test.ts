@@ -26,12 +26,14 @@ const keys = [
   'KYBERION_AGENT_TIER',
   'KYBERION_DELEGATION_STORE_DIR',
   'KYBERION_DELEGATION_TRACE_PATH',
+  'KYBERION_DELEGATION_NOTIFICATIONS_PATH',
 ] as const;
 const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 const savedRoot = process.env.KYBERION_ROOT;
 
 let io: typeof import('./secure-io.js');
 let delegations: typeof import('./delegated-task-observability.js');
+let notifications: typeof import('./mission/delegation-notifications.js');
 let withExecutionContext = initialContext;
 
 function bind(role: string | undefined, tenant: string | undefined): void {
@@ -64,6 +66,7 @@ beforeAll(async () => {
   io = await import('./secure-io.js');
   ({ withExecutionContext } = await import('./authority.js'));
   delegations = await import('./delegated-task-observability.js');
+  notifications = await import('./mission/delegation-notifications.js');
   expect((await import('./path-resolver.js')).rootDir()).toBe(ROOT);
 }, 120_000);
 
@@ -152,5 +155,51 @@ describe('delegation partitions use real secure-io tier and tenant boundaries', 
         .listActiveDelegatedTaskRecords(8, { tenants: [TENANT] })
         .map((record) => record.delegation_id)
     ).toEqual([trace.trace_id]);
+  });
+
+  it("keeps a tenant's background notification in its partition; other tenants are refused", () => {
+    bind('chronos_gateway', TENANT);
+    const trace = delegations.startDelegatedTaskTrace({
+      owner: 'boundary-owner',
+      instruction: 'tenant secret background',
+      background: true,
+    });
+    delegations.completeDelegatedTaskTrace(trace, { resultSummary: 'tenant secret result' });
+    const queueFile = path.join(ROOT, STORE, 'confidential', TENANT, 'notifications.jsonl');
+    expect(notifications.delegationNotificationsPath()).toBe(queueFile);
+    expect(notifications.listDelegationNotifications()).toEqual([
+      expect.objectContaining({ delegation_id: trace.trace_id, tenant_slug: TENANT }),
+    ]);
+    // The caller's own role cannot read or forge the queue directly.
+    expect(() => io.safeReadFile(queueFile, { encoding: 'utf8' })).toThrow();
+    expect(() => io.safeWriteFile(queueFile, 'forged')).toThrow();
+    expect(io.safeExistsSync(path.join(ROOT, STORE, 'system', 'notifications.jsonl'))).toBe(false);
+
+    bind('chronos_gateway', OTHER);
+    expect(notifications.listDelegationNotifications()).toEqual([]);
+    expect(notifications.claimPendingDelegationNotifications()).toEqual([]);
+    expect(() => io.safeReadFile(queueFile, { encoding: 'utf8' })).toThrow();
+    // A process bound to another tenant cannot bind the store role to this one,
+    // and its own binding of the store role does not reach this partition.
+    expect(() =>
+      withExecutionContext(
+        'delegation_record_store',
+        () => io.safeReadFile(queueFile, { encoding: 'utf8' }),
+        undefined,
+        TENANT
+      )
+    ).toThrow('ROLE_TENANT_SCOPE_MISMATCH');
+    withExecutionContext(
+      'delegation_record_store',
+      () => expect(() => io.safeReadFile(queueFile, { encoding: 'utf8' })).toThrow(),
+      undefined,
+      OTHER
+    );
+
+    bind('chronos_gateway', undefined);
+    expect(
+      notifications.claimPendingDelegationNotifications().map((row) => row.delegation_id)
+    ).toEqual([trace.trace_id]);
+    expect(notifications.claimPendingDelegationNotifications()).toEqual([]);
   });
 });
