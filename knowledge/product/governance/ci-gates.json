@@ -127,6 +127,15 @@
       "rationale": "Ratchets how many core modules secure-io, path-resolver, logger and every foundation/contracts module pull in at runtime (measured on libs/core/dist), so domain rules cannot silently make the base layer heavier."
     },
     {
+      "id": "store-catalog",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_store_catalog.ts"],
+      "baseline": "scripts/check_store_catalog.baseline.json",
+      "owner": "architecture",
+      "rationale": "Keeps the store catalog (one declaration per governed store with its system/tenant/person custodian) aligned with the runtime-state roots, storage floors and store-scoped role paths it will replace, and ratchets the unscoped-legacy stores down."
+    },
+    {
       "id": "package-dependency-graph",
       "scope": "pr",
       "executable": "node",
