@@ -1,7 +1,10 @@
-/** Explicit standalone VCS host: request human decisions without asserting presence. */
+/** Explicit standalone VCS host: request human decisions without asserting presence.
+ * PR mutations run through the governed vcs-host seam (gh-cli by default,
+ * github-rest where gh is absent); push stays on the git vcs-backend. */
 import { pathResolver } from '../path-resolver.js';
-import { ghPrCreate, ghPrMerge } from './github.js';
+import type { ghPrCreate, ghPrMerge } from './github.js';
 import { gitPush, type VcsCommandResult, type VcsCommandRunner } from './git.js';
+import { vcsHostOptionsForRunner, vcsHostPrCreate, vcsHostPrMerge } from './vcs-host-verbs.js';
 import { computeApprovalPayloadHash } from '../governance/approval-store.js';
 import {
   ExternalOperationApprovalRequired,
@@ -45,13 +48,13 @@ export function vcsHostInvocationId(mutation: VcsHostMutation): string {
   return computeApprovalPayloadHash({ operation: mutation.operation, params: withoutCredentials });
 }
 
-export function runVcsMutationWithApproval(
+export async function runVcsMutationWithApproval(
   mutation: VcsHostMutation,
   invocationId: string,
   print: (value: unknown) => void,
   runner?: VcsCommandRunner,
   options: { authority?: 'standalone' | 'existing_only' } = {}
-): VcsCommandResult {
+): Promise<VcsCommandResult> {
   const operationId = vcsHostOperationId(mutation.operation);
   const label = mutation.operation === 'pr_create' ? '[pr:publish]' : `[vcs:${mutation.operation}]`;
   const scope = currentScopeEnvelope()?.identity ?? resolveScopeContext();
@@ -59,16 +62,31 @@ export function runVcsMutationWithApproval(
     ? { kind: 'organization' as const, tenant_slug: scope.tenant_slug }
     : { kind: 'person' as const };
   let review: ReturnType<typeof writeScopedArtifact> | undefined;
-  const execute = (): VcsCommandResult => {
-    if (mutation.operation === 'pr_create')
-      return runner ? ghPrCreate(mutation.params, runner) : ghPrCreate(mutation.params);
-    if (mutation.operation === 'pr_merge')
-      return runner ? ghPrMerge(mutation.params, runner) : ghPrMerge(mutation.params);
-    return runner
-      ? gitPush(mutation.params.cwd, mutation.params, runner)
-      : gitPush(mutation.params.cwd, mutation.params);
+  const execute = async (): Promise<VcsCommandResult> => {
+    if (mutation.operation === 'push')
+      return runner
+        ? gitPush(mutation.params.cwd, mutation.params, runner)
+        : gitPush(mutation.params.cwd, mutation.params);
+    const host = vcsHostOptionsForRunner(
+      {
+        cwd: mutation.params.cwd,
+        env: mutation.params.env,
+        timeoutMs: mutation.params.timeoutMs,
+      },
+      runner
+    );
+    // The seam returns typed receipts; keep the established command envelope
+    // (gh printed the PR URL on stdout) for existing callers.
+    if (mutation.operation === 'pr_create') {
+      const { cwd: _cwd, env: _env, timeoutMs: _timeout, ...params } = mutation.params;
+      const created = await vcsHostPrCreate({ ...params, ...host });
+      return { stdout: created.url, stderr: '', status: 0 };
+    }
+    const { cwd: _cwd, env: _env, timeoutMs: _timeout, ...params } = mutation.params;
+    await vcsHostPrMerge({ ...params, ...host });
+    return { stdout: '', stderr: '', status: 0 };
   };
-  const withHostAuthority = (): VcsCommandResult => {
+  const withHostAuthority = (): Promise<VcsCommandResult> => {
     if (options.authority === 'existing_only') return execute();
     return withInstalledOnboardingAuthority(
       invocationId,
@@ -94,7 +112,7 @@ export function runVcsMutationWithApproval(
     );
   };
   try {
-    return withPrPublicationRuntime(
+    return await withPrPublicationRuntime(
       standingScope,
       invocationId,
       () =>
@@ -154,7 +172,7 @@ export function publishWithApproval(
   invocationId: string,
   print: (value: unknown) => void,
   runner?: VcsCommandRunner
-): VcsCommandResult {
+): Promise<VcsCommandResult> {
   return runVcsMutationWithApproval(
     { operation: 'pr_create', params: publication },
     invocationId,
