@@ -1,8 +1,9 @@
 /**
  * Pure model of the `/work` mission state board (MSN-SHELL-IA §1): every
  * mission falls in exactly one of five columns, derived from its lifecycle
- * status (`libs/core/mission/mission-status.ts`). The columns use the same
- * split as the home dashboard's mission tile, so the counts agree.
+ * status (`libs/core/mission/mission-status.ts`). 計画中 and 進行中 match the
+ * home dashboard's mission tile; the tile shows paused and failed apart,
+ * while the board groups them (with unknown states) under 入力待ち・停滞.
  *
  *   計画中           planned (agreed and queued to run)
  *   進行中           active

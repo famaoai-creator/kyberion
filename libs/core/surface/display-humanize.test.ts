@@ -114,6 +114,7 @@ describe('readableMissionName', () => {
     ['MSN-FOLLOWUP-UX', 'FOLLOWUP UX'],
     ['MSN-LX3K2', 'MSN-LX3K2'],
     ['MSN-20261030', 'MSN-20261030'],
+    ['MSN-X-99999999', 'X 99999999'],
     ['', ''],
   ])('%s → %s', (id, name) => {
     expect(readableMissionName(id)).toBe(name);
