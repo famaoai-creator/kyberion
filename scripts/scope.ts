@@ -7,7 +7,56 @@ import {
   writeScopeEnv,
 } from '@agent/core/scope-context';
 import type { ScopeContextInput } from '@agent/core/scope-context';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { inspectAssetScopeRead } from '@agent/core/governance/asset-scope-inspection';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import type { ScriptContext } from './lib/harness.js';
+
+/** Diagnose current read policy and asset attribution without changing scope. */
+function runScopeInspectCli(context: Pick<ScriptContext, 'argv' | 'json' | 'print'>): void {
+  const args = context.argv.filter((arg) => arg !== '--json');
+  if (
+    args.length !== 2 ||
+    args[0] !== 'inspect' ||
+    !args[1]?.trim() ||
+    args[1].startsWith('-') ||
+    context.argv.filter((arg) => arg === '--json').length > 1
+  ) {
+    throw new ScriptExitError(2, 'Usage: pnpm scope inspect <path> [--json]');
+  }
+  // Selection flags are never translated into a trusted read ceiling.
+  const inspection = inspectAssetScopeRead(args[1]);
+  if (context.json) {
+    context.print({
+      ...inspection,
+      limits: {
+        decision: 'read_policy_only',
+        existence: 'undetermined',
+        full_io_admission: 'not_evaluated',
+        target_content: 'not_returned',
+        ceiling_comparison: 'not_requested',
+      },
+    });
+    return;
+  }
+  context.print(`read policy=${inspection.decision.allowed ? 'allowed' : 'denied'}`);
+  context.print(`reason=${inspection.decision.reason ?? '(unspecified)'}`);
+  const shadow = inspection.shadow;
+  if ('resolution' in shadow && shadow.resolution.status === 'resolved') {
+    const address = shadow.resolution.address;
+    context.print(`store=${address.store}`);
+    context.print(`location=${address.location}`);
+    context.print(`custody=${address.custody.kind}:${address.custody.ref}`);
+    context.print(`tier=${address.tier}`);
+  } else if ('resolution' in shadow && shadow.resolution.status === 'unresolved') {
+    context.print(`asset=unresolved (${shadow.resolution.reason})`);
+  } else {
+    context.print('asset=unavailable');
+  }
+  context.print('trusted ceiling comparison=not requested');
+  context.print(
+    'existence=undetermined; full IO admission=not evaluated; no target content output'
+  );
+}
 
 function value(args: string[], flag: string): string | undefined {
   const index = args.indexOf(flag);
@@ -32,6 +81,10 @@ export const main = defineScript({
   run(context) {
     const args = context.positional;
     const command = args[0] || 'show';
+    if (command === 'inspect') {
+      runScopeInspectCli(context);
+      return;
+    }
     if (command === 'operator') {
       writeScopeEnv({ tier: 'personal' });
       context.print(
@@ -79,7 +132,7 @@ export const main = defineScript({
       return;
     }
     throw new Error(
-      'Usage: pnpm scope show [--json] | pnpm scope operator | pnpm scope use --tier <tier> [--tenant <slug>] [--organization <id>] [--project <id>] [--mission <id>] [--task <id>] | pnpm scope push | pnpm scope pop | pnpm scope clear'
+      'Usage: pnpm scope show [--json] | pnpm scope inspect <path> [--json] | pnpm scope operator | pnpm scope use --tier <tier> [--tenant <slug>] [--organization <id>] [--project <id>] [--mission <id>] [--task <id>] | pnpm scope push | pnpm scope pop | pnpm scope clear'
     );
   },
 });

@@ -3814,6 +3814,17 @@
       "group": "inspect"
     },
     {
+      "id": "script.scope.inspect",
+      "module": "scripts/scope.ts",
+      "args": ["inspect"],
+      "command": "scope inspect",
+      "noun": "scope",
+      "verb": "inspect",
+      "audience": "operator",
+      "description": "cli_cmd_scope_inspect",
+      "group": "inspect"
+    },
+    {
       "id": "script.scratch.promote",
       "script": "scratch:promote",
       "command": "scratch promote",
