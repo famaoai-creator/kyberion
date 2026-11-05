@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import {
   FailoverReasoningBackend,
   stubReasoningBackend,
@@ -9,6 +10,11 @@ import {
   withReasoningPayloadScope,
   type ReasoningPayloadScope,
 } from '../reasoning/reasoning-egress-scope.js';
+import {
+  abortAnsweringWrapper,
+  classifyMeasuredAbortRejection,
+  measurementAbortReason,
+} from '../reasoning/reasoning-abort-measurement.js';
 import type {
   ReasoningProviderConformanceCheck,
   ReasoningProviderConformanceEvidence,
@@ -83,11 +89,6 @@ export interface ReasoningBackendConformanceOptions {
 
 function statusIsAcceptable(status: ReasoningConformanceStatus): boolean {
   return status !== 'failed';
-}
-
-function isAbortError(error: unknown): boolean {
-  const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-  return /abort|cancel/i.test(message);
 }
 
 function isNonNegativeFiniteNumber(value: unknown): value is number {
@@ -209,12 +210,72 @@ async function runEgressProbe(
 }
 
 /**
+ * Abort is probed with an already-aborted signal, so the backend under test
+ * must be the provider adapter itself (see reasoning-abort-measurement.ts):
+ * - a failover chain (`buildTaskReasoningBackend`, `installReasoningBackends`)
+ *   rejects an aborted call in its own pre-flight guard before any provider
+ *   runs -> `unavailable`, never `verified`;
+ * - a rejection that is or quotes the probe's own reason was forwarded by a
+ *   wrapper (`bindReasoningRequestTimeout` rethrows the caller reason) ->
+ *   `unavailable`;
+ * - only a provider-produced abort error is `verified`; completing the call is
+ *   `failed`.
+ */
+async function runAbortCheck(backend: ReasoningBackend): Promise<ReasoningConformanceCheck> {
+  const wrapper = abortAnsweringWrapper(backend);
+  if (wrapper) {
+    return {
+      name: 'abort',
+      status: 'unavailable',
+      evidence:
+        `the backend is a ${wrapper} chain whose own pre-flight guard answers an already-aborted call, ` +
+        'so the provider was never asked; pass the provider adapter itself, not a chain',
+    };
+  }
+  const reason = measurementAbortReason('reasoning-conformance', randomBytes(4).toString('hex'));
+  const controller = new AbortController();
+  controller.abort(reason);
+  try {
+    await backend.prompt('conformance abort probe', { signal: controller.signal });
+    return {
+      name: 'abort',
+      status: 'failed',
+      evidence: 'backend completed an already-aborted call; cancellation was ignored',
+    };
+  } catch (error) {
+    const rejection = classifyMeasuredAbortRejection(error, reason);
+    if (rejection === 'forwarded') {
+      return {
+        name: 'abort',
+        status: 'unavailable',
+        evidence:
+          'the rejection is the probe signal reason forwarded by a wrapper, not the provider stopping; pass the provider adapter without the request-timeout wrapper',
+      };
+    }
+    return {
+      name: 'abort',
+      status: rejection === 'abort' ? 'verified' : 'failed',
+      evidence:
+        rejection === 'abort'
+          ? 'backend propagated the abort signal'
+          : error instanceof Error
+            ? error.message
+            : String(error),
+    };
+  }
+}
+
+/**
  * Execute the provider-neutral portion of the backend contract.
  *
  * `live: false` never sends a model turn to a non-stub backend. Such checks
  * are reported as unavailable rather than being silently counted as passed.
  * Live provider tests remain opt-in and must be run by the caller with an
  * appropriate credential and egress scope.
+ *
+ * Measurement callers pass the provider adapter itself (a runtime bundle's
+ * `backend`), not a failover chain or a request-timeout-bound backend: those
+ * answer the abort probe for the provider (see `runAbortCheck`).
  */
 export async function runReasoningBackendConformance(
   backend: ReasoningBackend,
@@ -304,26 +365,7 @@ export async function runReasoningBackendConformance(
     });
   }
 
-  const controller = new AbortController();
-  controller.abort(new Error('conformance abort'));
-  try {
-    await backend.prompt('conformance abort probe', { signal: controller.signal });
-    checks.push({
-      name: 'abort',
-      status: 'failed',
-      evidence: 'backend completed an already-aborted call; cancellation was ignored',
-    });
-  } catch (error) {
-    checks.push({
-      name: 'abort',
-      status: isAbortError(error) ? 'verified' : 'failed',
-      evidence: isAbortError(error)
-        ? 'backend propagated the abort signal'
-        : error instanceof Error
-          ? error.message
-          : String(error),
-    });
-  }
+  checks.push(await runAbortCheck(backend));
 
   checks.push({
     name: 'failover',
