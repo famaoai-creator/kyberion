@@ -1,5 +1,5 @@
 import { clamp } from '@agent/core/foundation/text';
-import { segmentWords } from '@agent/core/locale-normalize';
+import { segmentWords } from '@agent/core/foundation/locale-normalize';
 
 export interface AudioTextComparison {
   expected_normalized: string;

@@ -419,7 +419,7 @@
       "paths": [
         "knowledge/product/orchestration/user-facing-vocabulary.json",
         "knowledge/product/schemas/user-facing-vocabulary.schema.json",
-        "libs/core/locale-normalize.ts",
+        "libs/core/foundation/locale-normalize.ts",
         "libs/core/knowledge/vocabulary-*",
         "libs/shared-ui/vanilla/kyberion-ui-vocabulary.js",
         "scripts/generate_vocabulary_types.ts",
@@ -441,7 +441,7 @@
       "paths": [
         "knowledge/product/orchestration/user-facing-vocabulary.json",
         "knowledge/product/schemas/user-facing-vocabulary.schema.json",
-        "libs/core/message-format.ts",
+        "libs/core/foundation/message-format.ts",
         "libs/core/knowledge/vocabulary-*",
         "scripts/generate_pseudo_locale.ts"
       ],

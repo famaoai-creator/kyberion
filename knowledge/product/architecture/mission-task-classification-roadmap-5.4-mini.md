@@ -196,8 +196,8 @@ pnpm build
 
 **Files in scope:**
 
-- Add `libs/core/execution-shape.ts`
-- Add `libs/core/execution-shape.test.ts`
+- Add `libs/core/contracts/execution-shape.ts`
+- Add `libs/core/contracts/execution-shape.test.ts`
 - Modify `libs/core/intent/intent-contract.ts`
 - Modify `libs/core/workforce/work-design.ts`
 - Modify `libs/core/mission/mission-workflow-catalog.ts`
@@ -221,7 +221,7 @@ Provide a pure normalization function and a workflow projection function. The pr
 **Verification:**
 
 ```bash
-pnpm exec vitest run libs/core/execution-shape.test.ts libs/core/intent/intent-contract.test.ts libs/core/workforce/work-design.test.ts libs/core/mission/mission-workflow-catalog.test.ts
+pnpm exec vitest run libs/core/contracts/execution-shape.test.ts libs/core/intent/intent-contract.test.ts libs/core/workforce/work-design.test.ts libs/core/mission/mission-workflow-catalog.test.ts
 pnpm --filter @agent/core typecheck
 pnpm build
 ```

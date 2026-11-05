@@ -1,6 +1,6 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
+import { matchesAnyTextRule, type TextMatchRule } from './foundation/text-rule-matcher.js';
 import type { ContextualIntentFrame } from './contextual-intent-frame.js';
 import { clamp } from './foundation/text.js';
 

@@ -11,7 +11,7 @@ import { approvalStoreRoots, type ApprovalRequestRecord } from './approval-store
 import { readJsonLines } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
 import { resolveLocale } from '../locale.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import { pathResolver } from '../path-resolver.js';
 import { t } from '../t.js';
 

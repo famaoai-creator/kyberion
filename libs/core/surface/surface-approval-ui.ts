@@ -18,7 +18,7 @@ import {
   REJECTION_REASON_CATEGORIES,
   normalizeRejectionReasonCategory,
   type RejectionReasonCategory,
-} from '../rejection-reason.js';
+} from '../contracts/rejection-reason.js';
 import {
   renderIntentAuthorityLabel,
   renderIntentOutcomeLabel,

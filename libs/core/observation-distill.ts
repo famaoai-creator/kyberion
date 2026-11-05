@@ -8,7 +8,7 @@
  * and HTTP-response (network) observation families.
  */
 
-import { htmlToPreviewText } from './html-sanitize.js';
+import { htmlToPreviewText } from './foundation/html-sanitize.js';
 
 export interface DistillTextOptions {
   maxHeadLines?: number;

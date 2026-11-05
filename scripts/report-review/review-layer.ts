@@ -29,7 +29,7 @@ import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { getUiMessageBundle } from '@agent/core';
 import { resolveLocale } from '@agent/core/locale';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile, safeReaddir } from '@agent/core/secure-io';
 import type { VocabularyKey } from '@agent/core/t';

@@ -2,8 +2,8 @@ import path from 'node:path';
 import AjvModule from 'ajv';
 import { describe, expect, it } from 'vitest';
 import { createNextActionContract, validateNextActionContract } from './next-action-contract.js';
-import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { pathResolver } from '../path-resolver.js';
+import { compileSchemaFromPath } from '../schema-loader.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 

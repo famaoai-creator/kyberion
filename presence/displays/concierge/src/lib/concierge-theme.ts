@@ -12,7 +12,7 @@
  * Values are per-viewer conveniences only; every storage access is wrapped
  * in try/catch and falls back to the defaults.
  */
-import { normalizeLocale } from '@agent/core/locale-normalize';
+import { normalizeLocale } from '@agent/core/foundation/locale-normalize';
 import { CONCIERGE_LOCALES, type ConciergeLocale } from './i18n';
 
 export type ConciergeThemePreference = 'system' | 'light' | 'dark';

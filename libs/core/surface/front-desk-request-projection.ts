@@ -1,5 +1,5 @@
 import type { IntentResolutionContract } from '../intent/intent-resolution-contract-parser.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import { t } from '../t.js';
 import type { SurfaceConversationResult } from './channel-surface.js';
 

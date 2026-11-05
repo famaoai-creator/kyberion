@@ -896,9 +896,9 @@
       "types": "./dist/compaction-copy-recovery.d.ts",
       "default": "./dist/compaction-copy-recovery.js"
     },
-    "./computer-interaction-outcome": {
-      "types": "./dist/computer-interaction-outcome.d.ts",
-      "default": "./dist/computer-interaction-outcome.js"
+    "./contracts/computer-interaction-outcome": {
+      "types": "./dist/contracts/computer-interaction-outcome.d.ts",
+      "default": "./dist/contracts/computer-interaction-outcome.js"
     },
     "./computer-surface": {
       "types": "./dist/virtual/computer-surface.d.ts",
@@ -1556,9 +1556,9 @@
       "types": "./dist/error-classifier-judgment.d.ts",
       "default": "./dist/error-classifier-judgment.js"
     },
-    "./evidence": {
-      "types": "./dist/evidence.d.ts",
-      "default": "./dist/evidence.js"
+    "./contracts/evidence": {
+      "types": "./dist/contracts/evidence.d.ts",
+      "default": "./dist/contracts/evidence.js"
     },
     "./event-scope": {
       "types": "./dist/event-scope.d.ts",
@@ -1576,9 +1576,9 @@
       "types": "./dist/event/memory-event-bus.d.ts",
       "default": "./dist/event/memory-event-bus.js"
     },
-    "./execution-bounds": {
-      "types": "./dist/execution-bounds.d.ts",
-      "default": "./dist/execution-bounds.js"
+    "./contracts/execution-bounds": {
+      "types": "./dist/contracts/execution-bounds.d.ts",
+      "default": "./dist/contracts/execution-bounds.js"
     },
     "./execution-feedback": {
       "types": "./dist/execution-feedback.d.ts",
@@ -2040,9 +2040,9 @@
       "types": "./dist/history-search-index.d.ts",
       "default": "./dist/history-search-index.js"
     },
-    "./html-sanitize": {
-      "types": "./dist/html-sanitize.d.ts",
-      "default": "./dist/html-sanitize.js"
+    "./foundation/html-sanitize": {
+      "types": "./dist/foundation/html-sanitize.d.ts",
+      "default": "./dist/foundation/html-sanitize.js"
     },
     "./html-to-markdown": {
       "types": "./dist/html-to-markdown.d.ts",
@@ -2348,9 +2348,9 @@
       "types": "./dist/jsonl-read.d.ts",
       "default": "./dist/jsonl-read.js"
     },
-    "./judge-route": {
-      "types": "./dist/judge-route.d.ts",
-      "default": "./dist/judge-route.js"
+    "./contracts/judge-route": {
+      "types": "./dist/contracts/judge-route.d.ts",
+      "default": "./dist/contracts/judge-route.js"
     },
     "./judgment-assist": {
       "types": "./dist/reasoning/judgment-assist.d.ts",
@@ -2640,9 +2640,9 @@
       "types": "./dist/locale.d.ts",
       "default": "./dist/locale.js"
     },
-    "./locale-normalize": {
-      "types": "./dist/locale-normalize.d.ts",
-      "default": "./dist/locale-normalize.js"
+    "./foundation/locale-normalize": {
+      "types": "./dist/foundation/locale-normalize.d.ts",
+      "default": "./dist/foundation/locale-normalize.js"
     },
     "./lock-utils": {
       "types": "./dist/lock-utils.d.ts",
@@ -3012,9 +3012,9 @@
       "types": "./dist/mesh/peer-runtime-recovery.d.ts",
       "default": "./dist/mesh/peer-runtime-recovery.js"
     },
-    "./message-format": {
-      "types": "./dist/message-format.d.ts",
-      "default": "./dist/message-format.js"
+    "./foundation/message-format": {
+      "types": "./dist/foundation/message-format.d.ts",
+      "default": "./dist/foundation/message-format.js"
     },
     "./metrics": {
       "types": "./dist/metrics.d.ts",
@@ -3784,9 +3784,9 @@
       "types": "./dist/next-action.d.ts",
       "default": "./dist/next-action.js"
     },
-    "./next-action-contract": {
-      "types": "./dist/next-action-contract.d.ts",
-      "default": "./dist/next-action-contract.js"
+    "./contracts/next-action-contract": {
+      "types": "./dist/contracts/next-action-contract.d.ts",
+      "default": "./dist/contracts/next-action-contract.js"
     },
     "./nhi-lifecycle-governance": {
       "types": "./dist/nhi-lifecycle-governance.d.ts",
@@ -3812,9 +3812,9 @@
       "types": "./dist/ocr-bridge.d.ts",
       "default": "./dist/ocr-bridge.js"
     },
-    "./ocr-types": {
-      "types": "./dist/ocr-types.d.ts",
-      "default": "./dist/ocr-types.js"
+    "./contracts/ocr-types": {
+      "types": "./dist/contracts/ocr-types.d.ts",
+      "default": "./dist/contracts/ocr-types.js"
     },
     "./onboarding-apply-input": {
       "types": "./dist/organization/onboarding-apply-input.d.ts",
@@ -4220,9 +4220,9 @@
       "types": "./dist/path-tenant-attribution.d.ts",
       "default": "./dist/path-tenant-attribution.js"
     },
-    "./pcm-wav": {
-      "types": "./dist/pcm-wav.d.ts",
-      "default": "./dist/pcm-wav.js"
+    "./foundation/pcm-wav": {
+      "types": "./dist/foundation/pcm-wav.d.ts",
+      "default": "./dist/foundation/pcm-wav.js"
     },
     "./pdf-protocol": {
       "types": "./dist/contracts/pdf-protocol.d.ts",
@@ -5344,9 +5344,9 @@
       "types": "./dist/reflex-terminal.d.ts",
       "default": "./dist/reflex-terminal.js"
     },
-    "./rejection-reason": {
-      "types": "./dist/rejection-reason.d.ts",
-      "default": "./dist/rejection-reason.js"
+    "./contracts/rejection-reason": {
+      "types": "./dist/contracts/rejection-reason.d.ts",
+      "default": "./dist/contracts/rejection-reason.js"
     },
     "./relationship-graph-store": {
       "types": "./dist/relationship-graph-store.d.ts",
@@ -5880,9 +5880,9 @@
       "types": "./dist/share-grant-live-sessions.d.ts",
       "default": "./dist/share-grant-live-sessions.js"
     },
-    "./shared-business-types": {
-      "types": "./dist/shared-business-types.d.ts",
-      "default": "./dist/shared-business-types.js"
+    "./contracts/shared-business-types": {
+      "types": "./dist/contracts/shared-business-types.d.ts",
+      "default": "./dist/contracts/shared-business-types.js"
     },
     "./shell": {
       "types": "./dist/shell/index.d.ts",
@@ -6704,9 +6704,9 @@
       "types": "./dist/ui-component-registry.d.ts",
       "default": "./dist/ui-component-registry.js"
     },
-    "./text-escaping": {
-      "types": "./dist/text-escaping.d.ts",
-      "default": "./dist/text-escaping.js"
+    "./foundation/text-escaping": {
+      "types": "./dist/foundation/text-escaping.d.ts",
+      "default": "./dist/foundation/text-escaping.js"
     },
     "./tier-guard": {
       "types": "./dist/tier-guard.d.ts",
@@ -7304,9 +7304,9 @@
       "types": "./dist/search/web-search-runtime-bridge.d.ts",
       "default": "./dist/search/web-search-runtime-bridge.js"
     },
-    "./wire-error": {
-      "types": "./dist/wire-error.d.ts",
-      "default": "./dist/wire-error.js"
+    "./contracts/wire-error": {
+      "types": "./dist/contracts/wire-error.d.ts",
+      "default": "./dist/contracts/wire-error.js"
     },
     "./work-coordination": {
       "types": "./dist/workforce/work-coordination.d.ts",

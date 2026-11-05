@@ -90,7 +90,7 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { logger } from './core.js';
-import { segmentWords } from './locale-normalize.js';
+import { segmentWords } from './foundation/locale-normalize.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { appendJsonLine, parseSafeJsonObjectValue, readJsonLines } from './foundation/json.js';

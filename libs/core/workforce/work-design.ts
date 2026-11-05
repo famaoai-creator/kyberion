@@ -8,7 +8,7 @@ import type {
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
-import { DEFAULT_SPECIALIST_ID } from '../specialist-ids.js';
+import { DEFAULT_SPECIALIST_ID } from '../contracts/specialist-ids.js';
 import { memoryCandidateMatchesOutcomeId } from '../knowledge/memory-promotion-queue.js';
 import { listDistillCandidateRecords } from '../knowledge/distill-candidate-registry.js';
 import {
@@ -22,7 +22,7 @@ import {
   normalizeExecutionShape,
   projectExecutionShapeToWorkflowShape,
   type WorkflowExecutionShape,
-} from '../execution-shape.js';
+} from '../contracts/execution-shape.js';
 import { resolveWorkScopeDecision, type WorkScopeDecision } from './work-scope-decision.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import type { ArtifactKind } from './artifact-registry.js';

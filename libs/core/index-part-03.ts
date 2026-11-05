@@ -301,7 +301,7 @@ export * from './reconcile-ops.js';
 
 export * from './report-ops.js';
 
-export * from './execution-bounds.js';
+export * from './contracts/execution-bounds.js';
 
 export * from './intent/intent-handoff.js';
 

@@ -2,7 +2,7 @@ import path from 'node:path';
 import { logger } from '../core.js';
 import { readJson } from '../foundation/json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
-import { matchesAllowedOrigin } from '../origin-policy.js';
+import { matchesAllowedOrigin } from '../foundation/origin-policy.js';
 import { pathResolver } from '../path-resolver.js';
 import { delegateStructured, getReasoningBackend } from '../reasoning/reasoning-backend.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
@@ -14,7 +14,7 @@ import {
 } from './procedure-types.js';
 import { isDesktopPromotionPending } from '../virtual/desktop-promotion-transaction.js';
 import { clamp } from '../foundation/text.js';
-import { segmentKeywordTerms } from '../locale-normalize.js';
+import { segmentKeywordTerms } from '../foundation/locale-normalize.js';
 
 const PROCEDURES_PATH = 'knowledge/product/orchestration/procedures.json';
 /** User-local substrate-neutral overlay. This path is intentionally ignored by git. */

@@ -90,7 +90,7 @@ import type {
 } from '@agent/core/browser/browser-extension-bridge';
 import type { ProcedureEntry } from '@agent/core/knowledge/procedure-types';
 import { nowIso } from '@agent/core/foundation';
-import { formatWireError } from '@agent/core/wire-error';
+import { formatWireError } from '@agent/core/contracts/wire-error';
 import { parseBrowserBridgeMessage } from './browser-bridge-input.js';
 import {
   InspectionHandoffError,

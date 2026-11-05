@@ -5,7 +5,7 @@ import { frontDeskFetch as fetch } from '../lib/front-desk-fetch';
 
 import * as React from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { renderMessage } from '@agent/core/message-format';
+import { renderMessage } from '@agent/core/foundation/message-format';
 import { A2UIActionProvider, Dialog, NavRail, useA2UIActions } from '@agent/shared-ui';
 import {
   railSelectionValue,

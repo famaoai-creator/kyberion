@@ -1,6 +1,6 @@
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
-import { normalizeLocale, type SupportedLocale } from '../locale-normalize.js';
+import { normalizeLocale, type SupportedLocale } from '../foundation/locale-normalize.js';
 
 /**
  * UX-03 Task 3 / I18N-02: operator-facing onboarding strings carry

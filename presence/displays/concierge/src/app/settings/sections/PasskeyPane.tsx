@@ -4,7 +4,7 @@ import { frontDeskFetch as fetch } from '../../../lib/front-desk-fetch';
 
 import * as React from 'react';
 import { Button, SettingsGroup } from '@agent/shared-ui';
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import type { ConciergeLocale } from '../../../lib/i18n';
 import {
   parsePasskeyList,

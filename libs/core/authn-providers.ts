@@ -64,7 +64,7 @@ import {
   enforceNhiActorPolicy,
   resolveNhiActorMode,
 } from './nhi-actor-verification.js';
-import { parseNhiId } from './nhi-id.js';
+import { parseNhiId } from './contracts/nhi-id.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { secretGuard } from './secret/secret-guard.js';
 import {

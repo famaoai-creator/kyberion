@@ -9,7 +9,7 @@ import {
   type NavigationSession,
 } from './conversation-navigation.js';
 import { t } from '@agent/core/t';
-import { normalizeLocale } from '@agent/core/locale-normalize';
+import { normalizeLocale } from '@agent/core/foundation/locale-normalize';
 import { pathResolver } from '@agent/core/path-resolver';
 import { logger } from '@agent/core/core';
 import { runSurfaceMessageConversation } from '@agent/core/surface/channel-surface';

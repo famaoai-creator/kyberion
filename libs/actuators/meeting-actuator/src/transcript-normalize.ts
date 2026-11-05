@@ -8,8 +8,8 @@
  * Pure functions only — no IO, no LLM.
  */
 
-import { stripTags } from '@agent/core/html-sanitize';
-import { decodeEntities } from '@agent/core/text-escaping';
+import { stripTags } from '@agent/core/foundation/html-sanitize';
+import { decodeEntities } from '@agent/core/foundation/text-escaping';
 
 export interface NormalizedCue {
   startSec: number;

@@ -14,7 +14,7 @@ import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { withExecutionContext } from '../governance.js';
 import { buildSlackApprovalBlocks } from '../integrations/slack-approval-ui.js';
-import { detectTextLocale } from '../locale-normalize.js';
+import { detectTextLocale } from '../foundation/locale-normalize.js';
 import { t } from '../t.js';
 import {
   formatSteeringRejection,

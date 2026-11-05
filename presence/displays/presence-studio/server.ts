@@ -9,7 +9,7 @@ import * as presenceStudioData from './presence-studio-runtime-data.js';
 // `installReasoningBackends()` itself honors `KYBERION_REASONING_BACKEND=stub`.
 import { appendJsonLine, nowIso, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
-import { localeToBcp47, normalizeLocale } from '@agent/core/locale-normalize';
+import { localeToBcp47, normalizeLocale } from '@agent/core/foundation/locale-normalize';
 import { resolveLocale } from '@agent/core/locale';
 import {
   ensureOwnerMember,

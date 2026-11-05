@@ -9,7 +9,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from './secure-io.js';
-import { SPECIALIST_IDS } from './specialist-ids.js';
+import { SPECIALIST_IDS } from './contracts/specialist-ids.js';
 import type { ArtifactRecord } from './workforce/artifact-record.js';
 import type { ProjectRecord } from './project/project-registry.js';
 import type { ProjectTrackRecord } from './project/project-track-registry.js';

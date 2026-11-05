@@ -9,7 +9,7 @@ import {
   SUPPORTED_LOCALES,
   buildUiMessageBundle,
   createBrowserVocabularyResolver,
-} from '../locale-normalize.js';
+} from '../foundation/locale-normalize.js';
 
 afterEach(() => {
   _resetVocabularyCatalogCacheForTests();

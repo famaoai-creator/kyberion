@@ -2,7 +2,7 @@
  * Drawing XML generator for XLSX packages
  */
 import type { XlsxDrawing, XlsxDrawingElement } from '@agent/core/contracts/xlsx-protocol';
-import { escapeXml as escXml } from '@agent/core/text-escaping';
+import { escapeXml as escXml } from '@agent/core/foundation/text-escaping';
 
 function anchorPosXml(
   pos: { col: number; colOffset: number; row: number; rowOffset: number },

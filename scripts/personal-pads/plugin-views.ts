@@ -14,7 +14,7 @@
  * and executed in Chronos only.
  */
 import type { LocalPadContext } from '../lib/local-artifact-pad.js';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
 import {
   listManagedPlugins,

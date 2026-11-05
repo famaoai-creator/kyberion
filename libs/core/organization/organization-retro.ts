@@ -16,8 +16,8 @@ import {
   evaluateBudgetThrottle,
   type OrgBudgetEvaluation,
 } from '../governance/org-budget-governor.js';
-import { localeToBcp47, type SupportedLocale } from '../locale-normalize.js';
-import type { MessageParams } from '../message-format.js';
+import { localeToBcp47, type SupportedLocale } from '../foundation/locale-normalize.js';
+import type { MessageParams } from '../foundation/message-format.js';
 import type { VocabularyKey } from '../knowledge/vocabulary-keys.generated.js';
 import { pathResolver } from '../path-resolver.js';
 import { t } from '../t.js';

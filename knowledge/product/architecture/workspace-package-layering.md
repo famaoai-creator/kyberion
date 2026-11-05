@@ -39,6 +39,23 @@ libs/shared-*  (video, media, voice, vision, interaction, network, ui, ...)
 - The package graph is generated, never hand-drawn
   (gate `package-dependency-graph` → `docs/developer/architecture/dependency-graph.mmd`).
 
+## Inside core: foundation and contracts first
+
+Core itself is layered `foundation → contracts → domain → orchestration`
+(`knowledge/product/governance/module-layer-boundaries.json`, gate `module-boundaries`).
+
+- `libs/core/foundation/` holds dependency-free utilities (text escaping, HTML sanitising,
+  locale vocabulary, message formatting, PCM/WAV, origin matching, ...). A foundation module
+  imports nothing above foundation.
+- `libs/core/contracts/` holds shared vocabularies, ids and contract types (OCR types, NHI ids,
+  rejection reasons, risky-op ids, execution shape/bounds, wire errors, evidence, judge
+  route, ...). It may import foundation only; `contracts/**` is declared as the contracts layer.
+- A flat `libs/core/<name>.ts` that imports no other core module is a candidate for one of the
+  two. Move it only when its content is generic (utility) or a shared vocabulary (contract);
+  a dependency-free module with domain meaning (mission lookup, working principles, ...) stays
+  with its domain. The public subpath follows the file (`@agent/core/foundation/<name>`,
+  `@agent/core/contracts/<name>`).
+
 ## Placement guide
 
 | Package              | Holds                                                                                               | Stays in core instead                                                |
