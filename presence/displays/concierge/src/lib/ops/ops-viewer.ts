@@ -78,6 +78,9 @@ export function toSurfaceAuthorizationContext(viewer: ViewerContext): SurfaceAut
     source: viewer.source,
     ...(viewer.principal ? { principal: viewer.principal } : {}),
     ...(viewer.memberId ? { memberId: viewer.memberId } : {}),
+    // A projection never drops a scope field: without it the system selection
+    // loses its company-less records in every reader of this context.
+    ...(viewer.includeUntenanted ? { includeUntenanted: true } : {}),
   };
 }
 

@@ -10,6 +10,7 @@ import {
   SETTINGS_SECTION_ELEMENT_ID,
   SETTINGS_SECTION_ORDER,
   filterSettingsCards,
+  settingsSearchTerms,
   orderSectionsForFirstRun,
   settingsCategoryOf,
   type SettingsReadinessItem,
@@ -83,6 +84,20 @@ describe('settings IA catalog', () => {
     expect(filterSettingsCards('zzzz-no-match', ja)).toEqual([]);
     const en = (key: Parameters<typeof frontDeskText>[0]) => frontDeskText(key, 'en');
     expect(filterSettingsCards('budget', en).map((card) => card.id)).toContain('settings-budget');
+  });
+
+  it('segments a Japanese query into words instead of splitting on spaces', () => {
+    const ja = (key: Parameters<typeof frontDeskText>[0]) => frontDeskText(key, 'ja');
+    const ids = (query: string) => filterSettingsCards(query, ja).map((card) => card.id);
+    // No space between words: 「費用の上限」/「推論エンジンとモデル」 still match.
+    expect(ids('費用上限')).toContain('settings-budget');
+    expect(ids('推論モデル')).toContain('settings-reasoning');
+    // A particle never has to appear in the label.
+    expect(ids('通知の時間帯')).toContain('setup-notifications');
+    // Every term must match (AND), so an unrelated term still excludes.
+    expect(ids('費用マイク')).toEqual([]);
+    expect(settingsSearchTerms('費用上限')).toEqual(['費用', '上限']);
+    expect(settingsSearchTerms('・')).toEqual(['・']);
   });
 });
 
