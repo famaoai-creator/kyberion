@@ -215,6 +215,7 @@ import {
   OFFBOARDING_EXPORT_SUBDIR,
   PHYSICAL_LEGACY_TENANT_STATE_ROOTS,
   TENANT_RUNTIME_PARTITION_TARGET_KINDS,
+  DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH,
   verifyScopeOffboarded,
 } from './scope-offboarding.js';
 import { TENANT_RUNTIME_PARTITION_ROOTS } from './storage-layout.js';
@@ -1537,6 +1538,57 @@ describe('tenant offboarding — delegation trace and records (partitioned + leg
         .filter((event) => event.event === 'SCOPE_OFFBOARD_SOFT_DELETE')
         .map((event) => event.kind)
     ).toEqual(expect.arrayContaining(['tenant_delegations', 'delegation_legacy_record']));
+  });
+
+  it('exports, then prunes the tenant rows of the legacy notification queue (audited); the partition queue goes with the partition', () => {
+    seed();
+    const LEGACY_QUEUE = 'active/shared/runtime/delegations/notifications.jsonl';
+    writeLines(`${ROOT}/confidential/${TENANT}/notifications.jsonl`, [
+      { notification_id: 'p-1', delegation_id: `d-${TENANT}`, tenant_slug: TENANT },
+    ]);
+    writeLines(LEGACY_QUEUE, [
+      { notification_id: 'n-1', delegation_id: 'x-1', tenant_slug: TENANT, claimed: true },
+      { notification_id: 'n-2', delegation_id: 'x-2', mission_id: TENANT_MISSION },
+      // Attributed only by its delegation, whose record sits in the tenant partition.
+      { notification_id: 'n-3', delegation_id: `d-${TENANT}` },
+      { notification_id: 'n-4', delegation_id: `d-${OTHER}`, tenant_slug: OTHER },
+      { notification_id: 'n-5', delegation_id: 'x-5' },
+    ]);
+    expect(DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH).toBe(LEGACY_QUEUE);
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.delegations_legacy).toEqual({ matched: 6, removed: 0 });
+    expect(lines(LEGACY_QUEUE)).toHaveLength(5);
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-11-05T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(result.verification).toMatchObject({ clean: true });
+    expect(lines(LEGACY_QUEUE).map((row) => row.notification_id)).toEqual(['n-4', 'n-5']);
+    const exportDir = `${result.export_path}/delegations-legacy-removed`;
+    expect(lines(`${exportDir}/notifications.jsonl`).map((row) => row.notification_id)).toEqual([
+      'n-1',
+      'n-2',
+      'n-3',
+    ]);
+    expect(fs.existsSync(abs(`${ROOT}/confidential/${TENANT}/notifications.jsonl`))).toBe(false);
+    expect(
+      lines(`${result.export_path}/${ROOT}/confidential/${TENANT}/notifications.jsonl`).map(
+        (row) => row.notification_id
+      )
+    ).toEqual(['p-1']);
+    const prunes = auditEvents().filter(
+      (event) => event.event === 'SCOPE_OFFBOARD_DELEGATION_NOTIFICATION_PRUNE'
+    );
+    expect(prunes.map((event) => [event.path, event.removed_lines, event.kept_lines])).toEqual([
+      [LEGACY_QUEUE, 3, 2],
+    ]);
+    expect(prunes[0]).toMatchObject({ approved_by: 'operator@example', scope_id: TENANT });
   });
 
   it('reports legacy delegation rows and records still attributed to the tenant as leftovers', () => {
