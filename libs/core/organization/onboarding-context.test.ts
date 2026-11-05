@@ -28,7 +28,7 @@ function seedFixture(): void {
     recursive: true,
   });
   safeWriteFile(
-    path.join(rootDir, 'knowledge', 'personal', 'stances', 'acme-ai', 'organization-profile.json'),
+    path.join(rootDir, 'knowledge', 'confidential', 'acme-ai', 'organization-profile.json'),
     JSON.stringify({
       version: '1.0.0',
       organization_id: 'org-acme-ai',

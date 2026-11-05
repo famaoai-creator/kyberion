@@ -65,10 +65,10 @@ describe('okr-tracker', () => {
   });
 
   it('skips an invalid higher-priority overlay and resolves the next candidate', () => {
-    safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential/acme`, { recursive: true });
     safeMkdir(`${tmpRoot}/knowledge/product/governance`, { recursive: true });
     safeWriteFile(
-      `${tmpRoot}/customer/acme/okr.json`,
+      `${tmpRoot}/knowledge/confidential/acme/okr.json`,
       JSON.stringify({ company_id: 'acme', tenant_slug: 'acme', objectives: 'invalid' })
     );
     safeWriteFile(
@@ -99,13 +99,16 @@ describe('okr-tracker', () => {
   });
 
   it('rejects a symlinked customer overlay before reading it', () => {
-    safeMkdir(`${tmpRoot}/customer`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential`, { recursive: true });
     safeMkdir(`${tmpRoot}/outside`, { recursive: true });
     safeWriteFile(
       `${tmpRoot}/outside/okr.json`,
       JSON.stringify({ company_id: 'outside', tenant_slug: 'outside', objectives: [] })
     );
-    safeSymlinkSync(`${tmpRoot}/outside/okr.json`, `${tmpRoot}/customer/acme/okr.json`);
+    safeSymlinkSync(
+      `${tmpRoot}/outside/okr.json`,
+      `${tmpRoot}/knowledge/confidential/acme/okr.json`
+    );
 
     expect(() => resolveOkrTracker('acme', tmpRoot)).toThrow('[RESOURCE_PATH_SYMLINK]');
   });

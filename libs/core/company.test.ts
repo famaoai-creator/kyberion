@@ -13,15 +13,14 @@ describe('company', () => {
     }
   });
 
-  it('resolves a company aggregate from customer overlay files', () => {
-    safeMkdir(`${tmpRoot}/customer/acme/organization`, { recursive: true });
+  it('resolves a company aggregate from the tenant home', () => {
     safeMkdir(`${tmpRoot}/knowledge/confidential/acme/organization`, { recursive: true });
     safeMkdir(`${tmpRoot}/knowledge/confidential/acme/finance`, { recursive: true });
     safeMkdir(`${tmpRoot}/knowledge/confidential/acme/governance`, { recursive: true });
     safeMkdir(`${tmpRoot}/vision`, { recursive: true });
 
     safeWriteFile(
-      `${tmpRoot}/customer/acme/customer.json`,
+      `${tmpRoot}/knowledge/confidential/acme/company.json`,
       JSON.stringify(
         {
           slug: 'acme',
@@ -33,18 +32,7 @@ describe('company', () => {
       )
     );
     safeWriteFile(
-      `${tmpRoot}/customer/acme/identity.json`,
-      JSON.stringify(
-        {
-          name: 'Sovereign Aki',
-          language: 'ja',
-        },
-        null,
-        2
-      )
-    );
-    safeWriteFile(
-      `${tmpRoot}/customer/acme/organization-profile.json`,
+      `${tmpRoot}/knowledge/confidential/acme/organization-profile.json`,
       JSON.stringify(
         {
           version: '1.0.0',
@@ -65,17 +53,17 @@ describe('company', () => {
       )
     );
     safeWriteFile(
-      `${tmpRoot}/customer/acme/vision.md`,
+      `${tmpRoot}/knowledge/confidential/acme/vision.md`,
       `# ACME Vision\n\n## Soul\n- Build with intention\n\n## Steering\n- Prefer clarity over cleverness\n\n## Destination\n- Make the company legible to agents\n`
     );
     safeWriteFile(
-      `${tmpRoot}/customer/acme/org-chart.json`,
+      `${tmpRoot}/knowledge/confidential/acme/org-chart.json`,
       JSON.stringify(
         {
           version: '1.0.0',
           organization_id: 'acme',
           name: 'ACME Org Chart',
-          source_kind: 'customer',
+          source_kind: 'confidential',
           source_path: 'placeholder',
           domains: [
             { domain_id: 'leadership_strategy', name: 'Leadership & Strategy', role_ids: ['ceo'] },
@@ -166,11 +154,10 @@ describe('company', () => {
 
     expect(company.company_id).toBe('acme');
     expect(company.name).toBe('ACME Inc.');
-    expect(company.sovereign).toBe('Sovereign Aki');
-    expect(company.customer_ref.exists).toBe(true);
-    expect(company.identity_ref.exists).toBe(true);
+    expect(company.sovereign).toBe('Aki');
+    expect(company.company_ref.exists).toBe(true);
     expect(company.organization_profile_ref.data?.organization_id).toBe('acme');
-    expect(company.vision_ref.source_kind).toBe('customer');
+    expect(company.vision_ref.source_kind).toBe('tenant');
     expect(company.vision_ref.sections.soul).toEqual(['Build with intention']);
     expect(company.org_chart_ref.data?.positions[0].role_id).toBe('ceo');
     expect(company.financial_ref.exists).toBe(true);
@@ -206,8 +193,7 @@ describe('company', () => {
 
     expect(company.company_id).toBe('missing');
     expect(company.name).toBe('Default Kyberion Organization Profile');
-    expect(company.customer_ref.exists).toBe(false);
-    expect(company.identity_ref.exists).toBe(false);
+    expect(company.company_ref.exists).toBe(false);
     expect(company.organization_profile_ref.data).not.toBeNull();
     expect(company.vision_ref.source_kind).toBe('global');
     expect(company.org_chart_ref.exists).toBe(true);
@@ -224,11 +210,13 @@ describe('company', () => {
   });
 
   it('does not project primitive or array company components', () => {
-    safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential/acme`, { recursive: true });
     safeMkdir(`${tmpRoot}/vision`, { recursive: true });
     safeMkdir(`${tmpRoot}/knowledge/product/governance`, { recursive: true });
-    safeWriteFile(`${tmpRoot}/customer/acme/customer.json`, JSON.stringify(['invalid']));
-    safeWriteFile(`${tmpRoot}/customer/acme/identity.json`, JSON.stringify('invalid'));
+    safeWriteFile(
+      `${tmpRoot}/knowledge/confidential/acme/company.json`,
+      JSON.stringify(['invalid'])
+    );
     safeWriteFile(`${tmpRoot}/vision/_default.md`, '# Default Vision');
     safeWriteFile(
       `${tmpRoot}/knowledge/product/governance/decision-rights.json`,
@@ -244,13 +232,12 @@ describe('company', () => {
 
     const company = resolveCompany('acme', tmpRoot);
 
-    expect(company.customer_ref).toMatchObject({ exists: true, data: null });
-    expect(company.identity_ref).toMatchObject({ exists: true, data: null });
+    expect(company.company_ref).toMatchObject({ exists: true, data: null });
   });
 
-  it('does not read a customer component after the JSON leaf becomes a directory', () => {
-    safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
-    safeMkdir(`${tmpRoot}/customer/acme/customer.json`);
+  it('does not read a company component after the JSON leaf becomes a directory', () => {
+    safeMkdir(`${tmpRoot}/knowledge/confidential/acme`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential/acme/company.json`);
     safeMkdir(`${tmpRoot}/vision`, { recursive: true });
     safeMkdir(`${tmpRoot}/knowledge/product/governance`, { recursive: true });
     safeWriteFile(`${tmpRoot}/vision/_default.md`, '# Default Vision');
@@ -268,7 +255,7 @@ describe('company', () => {
 
     const company = resolveCompany('acme', tmpRoot);
 
-    expect(company.customer_ref).toMatchObject({ exists: true, data: null });
+    expect(company.company_ref).toMatchObject({ exists: true, data: null });
   });
 
   it('rejects tenant values that could escape the customer scope', () => {

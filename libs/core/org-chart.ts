@@ -24,7 +24,7 @@ export interface OrganizationOrgChart {
   version: string;
   organization_id: string;
   name: string;
-  source_kind: 'customer' | 'confidential' | 'public' | 'derived';
+  source_kind: 'confidential' | 'public' | 'derived';
   source_path: string;
   domains: OrganizationOrgChartDomain[];
   positions: OrganizationOrgChartPosition[];
@@ -43,11 +43,6 @@ const DEFAULT_ORG_CHART_CANDIDATES: Array<{
   buildPath: (baseDir: string, tenantSlug: string) => string;
   sourceKind: Exclude<OrganizationOrgChart['source_kind'], 'derived'>;
 }> = [
-  {
-    buildPath: (baseDir, tenantSlug) =>
-      path.join(baseDir, 'customer', tenantSlug, 'org-chart.json'),
-    sourceKind: 'customer',
-  },
   {
     buildPath: (baseDir, tenantSlug) =>
       path.join(

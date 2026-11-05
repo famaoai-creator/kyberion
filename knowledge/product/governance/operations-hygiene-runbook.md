@@ -50,6 +50,20 @@ credential-allocation unit, grant and dispatch integration suites for broker
 changes. A stale permission result is distinct from proof of secret-byte access;
 secure-io's sensitive-path mediation remains an independent boundary.
 
+## Strict cross-tenant conflict reads
+
+A uniqueness/conflict check must distinguish an absent binding file from a
+failed read. Thread strict mode through the lowest governed file reader:
+malformed JSON, schema errors, unsafe paths and denied I/O must propagate to the
+conflict caller, which refuses the write. Logging and returning an empty list is
+appropriate only for non-strict discovery; it must not turn unknown bindings
+into permission to reuse a channel. Preserve the existing tenant-bound read role.
+
+`customer-channel-binding.test.ts` and `scripts/customer_channel.test.ts` run in
+`registration-tests`. Their regressions cover strict/non-strict reads and real
+bind attempts against malformed/schema-invalid other-tenant data, asserting
+the target's existing bytes remain unchanged.
+
 ## Checkout and canonical implementation drift
 
 Before changing a shared capability, record the checkout root, HEAD SHA/date,

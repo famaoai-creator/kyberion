@@ -97,15 +97,15 @@ describe('org-chart', () => {
   });
 
   it('loads an explicit org chart when present', () => {
-    safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential/acme`, { recursive: true });
     safeWriteFile(
-      `${tmpRoot}/customer/acme/org-chart.json`,
+      `${tmpRoot}/knowledge/confidential/acme/org-chart.json`,
       JSON.stringify(
         {
           version: '1.0.0',
           organization_id: 'acme',
           name: 'ACME Org Chart',
-          source_kind: 'customer',
+          source_kind: 'confidential',
           source_path: 'placeholder',
           domains: [
             { domain_id: 'leadership_strategy', name: 'Leadership & Strategy', role_ids: ['ceo'] },
@@ -127,22 +127,22 @@ describe('org-chart', () => {
 
     const chart = resolveOrganizationOrgChart('acme', tmpRoot);
 
-    expect(chart.source_kind).toBe('customer');
+    expect(chart.source_kind).toBe('confidential');
     expect(chart.name).toBe('ACME Org Chart');
     expect(chart.positions).toHaveLength(1);
     expect(chart.domains[0].role_ids).toEqual(['ceo']);
   });
 
   it('skips a schema-invalid explicit chart and derives a safe fallback', () => {
-    safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential/acme`, { recursive: true });
     safeWriteFile(
-      `${tmpRoot}/customer/acme/org-chart.json`,
+      `${tmpRoot}/knowledge/confidential/acme/org-chart.json`,
       JSON.stringify({
         version: '1.0.0',
         organization_id: 'acme',
         name: 'Invalid ACME Org Chart',
-        source_kind: 'customer',
-        source_path: 'customer/acme/org-chart.json',
+        source_kind: 'confidential',
+        source_path: 'knowledge/confidential/acme/org-chart.json',
         domains: [],
         positions: [{ role_id: 'ceo' }],
       })
@@ -168,15 +168,15 @@ describe('org-chart', () => {
   });
 
   it('fails closed for an invalid tenant slug', () => {
-    safeMkdir(`${tmpRoot}/customer`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential`, { recursive: true });
     safeWriteFile(
-      `${tmpRoot}/customer/secret/org-chart.json`,
+      `${tmpRoot}/knowledge/confidential/secret/org-chart.json`,
       JSON.stringify({
         version: '1.0.0',
         organization_id: 'secret',
         name: 'Secret Org Chart',
-        source_kind: 'customer',
-        source_path: 'customer/secret/org-chart.json',
+        source_kind: 'confidential',
+        source_path: 'knowledge/confidential/secret/org-chart.json',
         domains: [],
         positions: [],
       })
@@ -190,7 +190,7 @@ describe('org-chart', () => {
   });
 
   it('derives a safe fallback when the customer chart is a symlink', () => {
-    safeMkdir(`${tmpRoot}/customer`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential`, { recursive: true });
     safeMkdir(`${tmpRoot}/outside`, { recursive: true });
     safeWriteFile(
       `${tmpRoot}/outside/org-chart.json`,
@@ -198,13 +198,16 @@ describe('org-chart', () => {
         version: '1.0.0',
         organization_id: 'outside',
         name: 'Outside Org Chart',
-        source_kind: 'customer',
+        source_kind: 'confidential',
         source_path: 'outside/org-chart.json',
         domains: [],
         positions: [],
       })
     );
-    safeSymlinkSync(`${tmpRoot}/outside/org-chart.json`, `${tmpRoot}/customer/acme/org-chart.json`);
+    safeSymlinkSync(
+      `${tmpRoot}/outside/org-chart.json`,
+      `${tmpRoot}/knowledge/confidential/acme/org-chart.json`
+    );
 
     const chart = resolveOrganizationOrgChart('acme', tmpRoot);
 

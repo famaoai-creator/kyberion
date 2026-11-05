@@ -41,6 +41,7 @@ export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
   execution_metrics: 'active/shared/runtime/execution-metrics',
   tenant_ledger: 'active/shared/runtime/tenant-ledger',
   tenant_approvals: 'active/shared/runtime/tenant-approvals',
+  tenant_audit_mirror: 'active/shared/runtime/audit-mirror',
 } as const;
 
 export const STORAGE_FLOOR_ROOTS = {
@@ -68,6 +69,14 @@ export const TENANT_LEDGER_ROOT_PATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_l
  * runtime `approvals` store).
  */
 export const TENANT_APPROVAL_ROOT_PATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals;
+
+/**
+ * Root of the per-tenant audit chain mirrors (governance/audit-chain.ts):
+ * `confidential/<tenant>/audit-<date>.jsonl`, a copy of every master entry that
+ * carries that tenant, written only as `audit_mirror_writer`. Registered in
+ * storage-layout.ts PARTITIONED_RUNTIME_LEDGER_ROOTS — not a state root.
+ */
+export const TENANT_AUDIT_MIRROR_ROOT_PATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_audit_mirror;
 
 /**
  * The shared inter-process lock directory (foundation/lock-utils.ts LOCK_ROOT);

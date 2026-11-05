@@ -71,7 +71,7 @@ describe('AI company onboarding', () => {
     });
     expect(result.status).toBe('ready');
     const profile = JSON.parse(
-      safeReadFile(`${rootDir}/knowledge/personal/stances/acme-ai/organization-profile.json`, {
+      safeReadFile(`${rootDir}/knowledge/confidential/acme-ai/organization-profile.json`, {
         encoding: 'utf8',
       }) as string
     );
@@ -111,7 +111,7 @@ describe('AI company onboarding', () => {
       })
     ).toThrow("Tenant 'acme-prod' already belongs to 'Another Company'");
     expect(
-      safeExistsSync(`${rootDir}/knowledge/personal/stances/acme-ai/organization-profile.json`)
+      safeExistsSync(`${rootDir}/knowledge/confidential/acme-prod/organization-profile.json`)
     ).toBe(false);
     expect(
       safeExistsSync(
