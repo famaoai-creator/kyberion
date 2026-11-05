@@ -25,7 +25,7 @@ export function useOnboardingAuthorityFixture() {
   let approvals: typeof import('@agent/core/governance/approval-store');
   let charters: typeof import('@agent/core/governance/accountability-charter-registry');
   let surfaceAuthn: typeof import('@agent/core/surface/surface-authn');
-  let browser: typeof import('@agent/core/authn-providers');
+  let browser: typeof import('@agent/core/authn/authn-providers');
   let identities: typeof import('@agent/core/agent/agent-identity');
   let personalIdentity: typeof import('@agent/core/personal-identity-state');
   let installedId = '';
@@ -71,7 +71,7 @@ export function useOnboardingAuthorityFixture() {
     approvals = await import('@agent/core/governance/approval-store');
     charters = await import('@agent/core/governance/accountability-charter-registry');
     api = await import('@agent/core/organization/onboarding-authority');
-    browser = await import('@agent/core/authn-providers');
+    browser = await import('@agent/core/authn/authn-providers');
     surfaceAuthn = await import('@agent/core/surface/surface-authn');
     identities = await import('@agent/core/agent/agent-identity');
     personalIdentity = await import('@agent/core/personal-identity-state');

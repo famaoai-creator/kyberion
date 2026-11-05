@@ -29,7 +29,10 @@ vi.mock('../organization/member-registry.js', async (original) => ({
   readMemberProfile: (id: string) =>
     registry.members.find((member) => member.member_id === id) ?? null,
 }));
-import { mintBrowserSessionToken, verifiedBrowserSessionIdentity } from '../authn-providers.js';
+import {
+  mintBrowserSessionToken,
+  verifiedBrowserSessionIdentity,
+} from '../authn/authn-providers.js';
 import { resolveAuthnSurfaceViewerScope } from './surface-authn.js';
 import {
   resolveBrowserHumanRequestIdentity,

@@ -22,9 +22,9 @@
  * `createRemoteProviderFacade` (`libs/core/provider/remote-provider-facade.ts`).
  */
 
-import { createProviderRegistry, type ProviderRegistry } from './provider-registry.js';
-import { resolveSeamDefaultOrder } from './seam-provider-selection.js';
-import type { SeamProviderMetadata } from './seam.js';
+import { createProviderRegistry, type ProviderRegistry } from '../provider-registry.js';
+import { resolveSeamDefaultOrder } from '../seam-provider-selection.js';
+import type { SeamProviderMetadata } from '../seam.js';
 
 export const PROVIDER_TRANSPORT_SEAM = 'provider-transport';
 export const LOOPBACK_TRANSPORT_ID = 'loopback';
@@ -80,8 +80,8 @@ export class ProviderTransportError extends Error {
 
 const registry: ProviderRegistry<ProviderTransport> = createProviderRegistry<ProviderTransport>({
   seam: PROVIDER_TRANSPORT_SEAM,
-  owner: 'libs/core/provider-transport.ts',
-  source: 'libs/core/provider-transport.ts',
+  owner: 'libs/core/provider/provider-transport.ts',
+  source: 'libs/core/provider/provider-transport.ts',
   missingIdError: 'provider transport requires an id',
 });
 

@@ -63,7 +63,7 @@ import '@agent/core/runtime-readiness';
 import '@agent/core/search/web-search-runtime-bridge';
 import '@agent/core/voice/audio-playback';
 import '@agent/core/provider/provider-backend-resolver';
-import '@agent/core/provider-transport';
+import '@agent/core/provider/provider-transport';
 import '@agent/core/provider/loopback-transport';
 import '@agent/core/provider/remote-provider-facade';
 import '@agent/core/voice/speech-to-text-bridge';

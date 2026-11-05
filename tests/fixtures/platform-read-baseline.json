@@ -20,7 +20,7 @@
     "libs/core/in-room-meeting-driver.ts",
     "libs/core/local-ipc.ts",
     "libs/core/macos-permission-warmup.ts",
-    "libs/core/media/native-tts.ts",
+    "libs/shared-voice/src/native-tts.ts",
     "libs/core/mic-capture.ts",
     "libs/core/platform-command-adapters.ts",
     "libs/core/platform-facts.ts",

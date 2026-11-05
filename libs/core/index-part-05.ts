@@ -378,7 +378,7 @@ export * from './seam-calibration.js';
 
 export * from './authn-principal-resolver.js';
 
-export * from './authn-providers.js';
+export * from './authn/authn-providers.js';
 
 export * from './authz-policy-engine.js';
 

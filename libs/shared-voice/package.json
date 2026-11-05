@@ -126,6 +126,10 @@
     "./voice-workbench": {
       "types": "./dist/voice-workbench.d.ts",
       "default": "./dist/voice-workbench.js"
+    },
+    "./native-tts": {
+      "types": "./dist/native-tts.d.ts",
+      "default": "./dist/native-tts.js"
     }
   },
   "scripts": {

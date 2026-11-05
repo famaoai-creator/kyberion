@@ -17,7 +17,7 @@ import {
   resetSurfaceAuthRateLimitForTests,
   startSurfaceIdentityLink,
 } from './surface-auth-routes.js';
-import { mintBrowserSessionToken, verifyBrowserSessionToken } from '../authn-providers.js';
+import { mintBrowserSessionToken, verifyBrowserSessionToken } from '../authn/authn-providers.js';
 import { resolveAuthnPrincipal } from '../authn-principal-resolver.js';
 import { readMemberProfile } from '../organization/member-registry.js';
 import {

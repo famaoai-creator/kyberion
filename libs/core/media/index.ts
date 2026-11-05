@@ -7,7 +7,6 @@ export * from './image-dhash.js';
 export * from './media-backend-registry.js';
 export * from './native-op-mapping.js';
 export * from './native-subagent-adopter.js';
-export * from './native-tts.js';
 // skipped './pdf-utils.js' (all exports shadowed)
 export { generatePptxWithDesign } from './pptx-utils.js';
 export { extractTablesFromPage } from './protocol-to-markdown.js';

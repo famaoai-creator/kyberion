@@ -139,7 +139,7 @@ import {
   withExternalOperationPipelineRun,
 } from '@agent/core/governance/external-operation';
 import { safeExec } from '@agent/core/secure-io';
-import { speak } from '@agent/core/media/native-tts';
+import { speak } from '@agent/shared-voice/native-tts';
 import { createVirtualAudioOutputPlaybackBridge } from '@agent/core/virtual/virtual-audio-output-playback-bridge';
 import {
   registerSpeechToTextBridge,

@@ -36,7 +36,7 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/managed-process.ts',
   'libs/core/mlx-embedding-backend.ts',
   'libs/shared-media/src/native-speech-listen-bridge.ts',
-  'libs/core/media/native-tts.ts',
+  'libs/shared-voice/src/native-tts.ts',
   'libs/core/programmatic-tool-calling.ts',
   'libs/core/provider/provider-discovery.ts',
   'libs/core/shell/pty-engine.ts',

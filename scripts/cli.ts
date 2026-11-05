@@ -19,9 +19,12 @@ import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index
 import { renderStatus } from '@agent/core/ux-vocabulary';
 import { t as coreT } from '@agent/core/t';
 import type { VocabularyKey } from '@agent/core/t';
-import { loadMobileAppProfileIndex, loadWebAppProfileIndex } from '@agent/core/app-profiles';
+import {
+  loadMobileAppProfileIndex,
+  loadWebAppProfileIndex,
+} from '@agent/core/app-profile-index-loader';
 import { loadStateAtPath } from '@agent/core/mission/mission-state';
-import type { MobileAppProfileIndex } from '@agent/core/app-profiles';
+import type { MobileAppProfileIndex } from '@agent/core/types';
 import * as path from 'node:path';
 import { isMacOS, isWindows } from '@agent/core/platform';
 import chalk from 'chalk';
