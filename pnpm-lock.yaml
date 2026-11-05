@@ -78,6 +78,9 @@ importers:
       '@agent/kernel':
         specifier: workspace:*
         version: link:libs/kernel
+      '@agent/shared-interaction':
+        specifier: workspace:*
+        version: link:libs/shared-interaction
       '@agent/shared-media':
         specifier: workspace:*
         version: link:libs/shared-media
@@ -786,6 +789,12 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  libs/shared-interaction:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../core
+
   libs/shared-media:
     dependencies:
       '@agent/core':
@@ -887,6 +896,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../core
+      '@agent/shared-interaction':
+        specifier: workspace:*
+        version: link:../shared-interaction
 
   presence/bridge/terminal:
     dependencies:

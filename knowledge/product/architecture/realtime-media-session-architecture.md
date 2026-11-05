@@ -501,7 +501,7 @@ language/personal-voice settings fingerprint, and the text.
 ## 14. Conversation Engine (2026-10-04)
 
 The turn-taking machine is a voice adapter over the generic Interaction
-Controller in `libs/core/interaction/` (`ConversationEngine`). The engine
+Controller in `libs/shared-interaction/src/` (`ConversationEngine`). The engine
 consumes modality-neutral events (`speech_onset`, `speech_offset`,
 `transcript_partial`, `transcript_final`, `output_started`, `output_ended`,
 `reaction_started`, `reaction_ended`, `tick`; legacy `vad_*`/`stt_*`/`tts_*`
