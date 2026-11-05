@@ -67,7 +67,7 @@ import {
   safeRmSync,
 } from '@agent/core/secure-io';
 import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
-import { listenNativeSpeech } from '@agent/core/media/native-speech-listen-bridge';
+import { listenNativeSpeech } from '@agent/shared-media/native-speech-listen-bridge';
 import { buildNativeTtsCommand } from '@agent/core/media/native-tts';
 import { normalizeEventScope } from '@agent/core/event-scope';
 import { recordVoiceSample } from '@agent/core/voice/voice-sample-recorder';

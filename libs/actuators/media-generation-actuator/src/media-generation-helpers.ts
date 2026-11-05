@@ -9,7 +9,7 @@ import { retry, sleep, getRetryDefaults } from '@agent/core/async-utils';
 import {
   compileMusicGenerationADF,
   buildMusicPromptFromAdf,
-} from '@agent/core/media/music-workflow-compiler';
+} from '@agent/shared-media/music-workflow-compiler';
 import {
   compileImageGenerationADF,
   compileVideoGenerationADF,
@@ -19,11 +19,11 @@ import {
   listMediaBackends,
   resolveMediaBackendForPlatform,
 } from '@agent/core/media/media-backend-registry';
-import { listImageGenerationProviders } from '@agent/core/media/image-generation-bridge';
+import { listImageGenerationProviders } from '@agent/shared-media/image-generation-bridge';
 import {
   listMusicGenerationCandidates,
   listMusicGenerationProviders,
-} from '@agent/core/media/music-generation-bridge';
+} from '@agent/shared-media/music-generation-bridge';
 import { savedSeamDefaultFor } from '@agent/core/seam-provider-selection';
 import {
   resolveCreativeDesign,

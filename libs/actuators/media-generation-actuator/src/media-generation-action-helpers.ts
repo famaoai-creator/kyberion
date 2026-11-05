@@ -134,7 +134,7 @@ async function handlePromptBasedGeneration(action: string, params: any) {
       !prepared.params.image_adf
     ) {
       const { generateImage, imageGenerationBackendIdForProvider } =
-        await import('@agent/core/media/image-generation-bridge');
+        await import('@agent/shared-media/image-generation-bridge');
       const backend = resolveGenerationBackend(action, prepared.params);
       const bridgeRes = await generateImage({
         prompt: typeof prepared.params.prompt === 'string' ? prepared.params.prompt : '',
@@ -202,7 +202,7 @@ async function handlePromptBasedGeneration(action: string, params: any) {
       // otherwise the ComfyUI default stays.
       const musicPurpose = resolveMusicProviderPurpose(prepared.params);
       if (isDirectMusicGenerationBackend(backend) || musicPurpose || savedMusicDefault) {
-        const { generateMusic } = await import('@agent/core/media/music-generation-bridge');
+        const { generateMusic } = await import('@agent/shared-media/music-generation-bridge');
         const bridgeRequest = resolveMusicBridgeRequest(prepared.params);
         const format =
           musicPurpose || savedMusicDefault

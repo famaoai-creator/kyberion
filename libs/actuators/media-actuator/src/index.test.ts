@@ -54,7 +54,7 @@ vi.mock('./media-ocr.js', () => ({
 
 import { handleAction } from './index.js';
 import type { MediaAction } from './media-pipeline-helpers.js';
-import type { PptxDesignProtocol, PptxElement } from '@agent/core/media/media-contracts';
+import type { PptxDesignProtocol, PptxElement } from '@agent/shared-media/media-contracts';
 
 function decodeXmlEntities(value: string): string {
   return value

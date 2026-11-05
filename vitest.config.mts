@@ -201,7 +201,11 @@ export default defineConfig({
         replacement: path.resolve(rootDir, './libs/kernel/src/$1'),
       },
       {
-        find: '@agent/shared-media',
+        find: /^@agent\/shared-media\/(.*)$/,
+        replacement: path.resolve(rootDir, './libs/shared-media/src/$1'),
+      },
+      {
+        find: /^@agent\/shared-media$/,
         replacement: path.resolve(rootDir, './libs/shared-media/src/index.ts'),
       },
       {
