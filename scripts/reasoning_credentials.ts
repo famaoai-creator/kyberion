@@ -14,7 +14,8 @@ import { withSecretResolutionSession } from '@agent/core/foundation/secret-resol
 import { credentialExecutionIdentity } from '@agent/core/foundation/credential-binding';
 import { readJsonIfPresent, writeJson } from '@agent/core/foundation/json';
 import { hasHelpFlag } from './lib/cli-guard.js';
-import { physicalScopedPath } from '@agent/core/physical-namespace';
+import { partitionedScopedPath } from '@agent/core/physical-namespace';
+import { PARTITIONED_RUNTIME_STATE_ROOTS } from '@agent/core/storage-layout';
 import { currentScope } from '@agent/core/scope-context';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { runSecretCli } from './secret_introduce.js';
@@ -40,11 +41,20 @@ function withCredentialAuthority<T>(run: () => T | Promise<T>): Promise<T> {
   );
 }
 
-function verificationPath(provider: string): string {
-  return physicalScopedPath(
-    pathResolver.shared('runtime/health/api-verification'),
-    currentScope(),
-    `${requireReasoningApiProvider(provider).mode}.json`
+/**
+ * Proof location in the registered `api_verification` root:
+ * `<root>/<tier>/<tenant>/…` for a tenant scope (tier-guarded, offboarded with
+ * the tenant), `<root>/system/…` for operator scope. Proofs are only accepted
+ * for 15 minutes, so pre-migration `tenants/<slug>/` copies are not read back;
+ * tenant offboarding still removes them (PHYSICAL_LEGACY_TENANT_STATE_ROOTS).
+ */
+export function verificationPath(provider: string): string {
+  return pathResolver.rootResolve(
+    partitionedScopedPath(
+      PARTITIONED_RUNTIME_STATE_ROOTS.api_verification,
+      currentScope(),
+      `${requireReasoningApiProvider(provider).mode}.json`
+    )
   );
 }
 
