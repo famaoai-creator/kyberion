@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-04
+last_updated: 2026-11-05
 ---
 
 # Operations Hygiene Runbook
@@ -993,6 +993,23 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
   `libs/core/mission/mission-tier-scan.test.ts`,
   `scripts/watch_tenant_drift.test.ts` (bound-partition probe),
   `libs/actuators/system-actuator/src/system-pipeline-path.test.ts` (bound `list_missions`).
+- **Viewer scope projections never drop scope fields; tenant admission goes through
+  `admitsTenant`.** A function that copies a server-resolved viewer into another shape
+  (`toSurfaceAuthorizationContext`, an event `scopeFilter`, a store query) carries every scope
+  field — `tenantSlugs`, `includeUntenanted`, organization, project, tier — or the receiving reader
+  silently loses records: the shell's system selection (`tenantSlugs: []` +
+  `includeUntenanted`) undercounted company-less missions, agents, cost and deliverables on Home
+  while needs-you showed them (2026-11, PR #1407). Row-level tenant admission is one predicate,
+  `admitsTenant(context, tenantSlug)` in `libs/core/surface/surface-authorization.ts` (`'all'`
+  admits; a company-less record only with `includeUntenanted`; otherwise membership) — never a
+  hand-rolled `tenantSlugs.includes(...)` per reader. `includeUntenanted` is server-resolved only
+  (never a request parameter) and never widens the named tenants. The personal view's per-company
+  fan-out reads through `companyFanoutViews` + `readCompanyFanoutHome`
+  (`presence/displays/concierge/src/lib/company-fanout-*.ts`); its short per-viewer cache is
+  cleared by every needs-you mutation route via `withCompanyFanoutInvalidation`. Gates:
+  `tests/viewer-untenanted-admission-contract.test.ts` (system and single-company admission
+  across `readConciergeHome`, `collectHomeDashboard` and needs-you),
+  `tests/company-fanout-invalidation-boundary.test.ts`.
 
 **Procedure:**
 
