@@ -3,9 +3,12 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { MetricsCollector } from './metrics.js';
 import { pathResolver } from './path-resolver.js';
 import { physicalScopedPath } from './physical-namespace.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { normalizeEventScope } from './event-scope.js';
+import { tenantRuntimePartitionOf } from './storage-layout.js';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   GENERATION_COST_SETTLEMENT_ROOT,
+  generationCostSettlementRelativePath,
   listGenerationCostSettlements,
   loadGenerationCostSettlementAtPath,
   settleGenerationProviderCost,
@@ -115,7 +118,7 @@ describe('generation cost settlement', () => {
     );
     const filePath = path.join(
       testRoot,
-      physicalScopedPath(GENERATION_COST_SETTLEMENT_ROOT, tenantScope, `${jobId}.json`)
+      generationCostSettlementRelativePath(jobId, normalizeEventScope(tenantScope))
     );
 
     expect(
@@ -144,7 +147,7 @@ describe('generation cost settlement', () => {
     );
     const filePath = path.join(
       testRoot,
-      physicalScopedPath(GENERATION_COST_SETTLEMENT_ROOT, tenantScope, `${jobId}.json`)
+      generationCostSettlementRelativePath(jobId, normalizeEventScope(tenantScope))
     );
     safeWriteFile(filePath, JSON.stringify({ ...settlement, unexpected: true }));
     expect(() => loadGenerationCostSettlementAtPath(filePath, { rootDir: testRoot })).toThrow(
@@ -161,6 +164,86 @@ describe('generation cost settlement', () => {
     } finally {
       safeRmSync(directoryPath, { recursive: true, force: true });
     }
+  });
+
+  it('writes tenant settlements into the registered <tier>/<tenant> partition (offboarding/backup visible)', () => {
+    const jobId = 'generation-job-partitioned';
+    const scope = { ...tenantScope, organization_id: 'org-a', project_id: 'proj-x' };
+    settleGenerationProviderCost(
+      {
+        job_id: jobId,
+        action: 'generate_video',
+        status: 'succeeded',
+        scope,
+        result: { actual_cost_usd: 0.5 },
+      },
+      { rootDir: testRoot, metricsCollector: new MetricsCollector({ metricsDir }) }
+    );
+    const relative = generationCostSettlementRelativePath(jobId, normalizeEventScope(scope));
+    expect(relative).toBe(
+      `${GENERATION_COST_SETTLEMENT_ROOT}/confidential/tenant-a/organizations/org-a/projects/proj-x/${jobId}.json`
+    );
+    expect(safeExistsSync(path.join(testRoot, relative))).toBe(true);
+    expect(tenantRuntimePartitionOf(relative)).toMatchObject({
+      key: 'generation_cost_settlements',
+      tier: 'confidential',
+      tenant: 'tenant-a',
+    });
+    expect(
+      generationCostSettlementRelativePath(
+        'system-job',
+        normalizeEventScope({ scope_kind: 'system', tier: 'public' })
+      )
+    ).toBe(`${GENERATION_COST_SETTLEMENT_ROOT}/system/system-job.json`);
+  });
+
+  it('reads a pre-migration settlement and moves it to the partition on the next write', () => {
+    const jobId = 'generation-job-legacy';
+    const legacyRelative = physicalScopedPath(
+      GENERATION_COST_SETTLEMENT_ROOT,
+      tenantScope,
+      `${jobId}.json`
+    );
+    const legacy = {
+      kind: 'generation-cost-settlement',
+      settlement_id: `generation:${jobId}`,
+      job_id: jobId,
+      action: 'generate_video',
+      status: 'unavailable',
+      currency: 'USD',
+      scope: normalizeEventScope(tenantScope),
+      observed_at: '2026-08-01T00:00:00.000Z',
+      source: 'provider-reported',
+    };
+    safeMkdir(path.dirname(path.join(testRoot, legacyRelative)), { recursive: true });
+    safeWriteFile(path.join(testRoot, legacyRelative), JSON.stringify(legacy));
+
+    // Still listed, and an unpriced re-settle returns it rather than a duplicate.
+    expect(listGenerationCostSettlements({ rootDir: testRoot })).toEqual([legacy]);
+    const job = {
+      job_id: jobId,
+      action: 'generate_video',
+      status: 'succeeded',
+      scope: tenantScope,
+    };
+    expect(settleGenerationProviderCost(job, { rootDir: testRoot })).toEqual(legacy);
+
+    // A priced settle writes the partitioned copy and drops the legacy one.
+    const settled = settleGenerationProviderCost(
+      { ...job, result: { actual_cost_usd: 0.4 } },
+      { rootDir: testRoot, metricsCollector: new MetricsCollector({ metricsDir }) }
+    );
+    expect(settled.status).toBe('settled');
+    expect(safeExistsSync(path.join(testRoot, legacyRelative))).toBe(false);
+    expect(
+      safeExistsSync(
+        path.join(
+          testRoot,
+          generationCostSettlementRelativePath(jobId, normalizeEventScope(tenantScope))
+        )
+      )
+    ).toBe(true);
+    expect(listGenerationCostSettlements({ rootDir: testRoot })).toEqual([settled]);
   });
 
   it('rejects an external settlement root before writing provider cost', () => {

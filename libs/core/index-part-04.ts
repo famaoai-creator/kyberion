@@ -277,7 +277,10 @@ export type {
   DelegatedTaskWorkerHandler,
   DelegatedTaskWorkerProcessSpec,
   DelegationHandle,
+  DelegatedTaskOutcome,
 } from './delegated-task-observability.js';
+export * from './delegation-result.js';
+export * from './delegation-idempotency.js';
 
 export type {
   DelegationSlotOptions,

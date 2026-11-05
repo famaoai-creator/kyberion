@@ -472,6 +472,41 @@ describe('AL-04 tenant/project offboarding', () => {
     ]);
   });
 
+  it('removes <base>/tenants/<slug> for every learning base and pre-migration legacy root', () => {
+    // Real writers of the physical layout: memory.tenantRoot / physicalScopedPath
+    // on 'active/shared/runtime', the feedback loop, and pre-migration copies of
+    // stores that now live in registered partitions.
+    const leaves = [
+      'active/shared/runtime/tenants/tenant-alpha/memory/promotion-queue.jsonl',
+      'active/shared/runtime/feedback-loop/tenants/tenant-alpha/ledger.jsonl',
+      'active/shared/observability/tenants/tenant-alpha/events.jsonl',
+      'active/shared/coordination/tenants/tenant-alpha/state.json',
+      'active/shared/runtime/media-generation/cost-settlements/tenants/tenant-alpha/job-1.json',
+      'active/shared/runtime/health/api-verification/tenants/tenant-alpha/anthropic.json',
+      'active/shared/runtime/front-desk-execution/tenants/tenant-alpha/wi-1.json',
+      'active/shared/coordination/channels/concierge/conversations/tenants/tenant-alpha/c.json',
+      // Another tenant's tree is never claimed.
+      'active/shared/runtime/tenants/tenant-beta/memory/promotion-queue.jsonl',
+    ];
+    for (const leaf of leaves) writeJson(abs(leaf), { leaf });
+
+    const learning = collectScopeTargets('tenant', 'tenant-alpha').filter(
+      (target) => target.kind === 'tenant_learning_tree'
+    );
+    expect(learning.map((target) => target.path).sort()).toEqual(
+      [
+        'active/shared/coordination/channels/concierge/conversations/tenants/tenant-alpha',
+        'active/shared/coordination/tenants/tenant-alpha',
+        'active/shared/observability/tenants/tenant-alpha',
+        'active/shared/runtime/front-desk-execution/tenants/tenant-alpha',
+        'active/shared/runtime/feedback-loop/tenants/tenant-alpha',
+        'active/shared/runtime/health/api-verification/tenants/tenant-alpha',
+        'active/shared/runtime/media-generation/cost-settlements/tenants/tenant-alpha',
+        'active/shared/runtime/tenants/tenant-alpha',
+      ].sort()
+    );
+  });
+
   it('fails closed for overlapping project namespaces and unsafe scope IDs', () => {
     writeJson(
       abs(
@@ -1029,6 +1064,9 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
       'active/shared/runtime/autonomy-learning',
       'active/shared/runtime/external-operations',
       'active/shared/runtime/grants',
+      'active/shared/runtime/delegation-idempotency',
+      'active/shared/runtime/media-generation/cost-settlements',
+      'active/shared/runtime/health/api-verification',
     ];
     // Durable receipts: review-required, never auto-offboarded.
     const kept = [

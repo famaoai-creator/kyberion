@@ -43,7 +43,7 @@ function validateEvidenceLease(value: unknown): void {
     !['active', 'released', 'expired'].includes(String(value.status)) ||
     !['expires_at', 'created_at', 'renewed_at'].every((key) => evidenceTimestamp(value[key])) ||
     (value.released_at !== undefined && !evidenceTimestamp(value.released_at)) ||
-    !['holder_user_id', 'idempotency_key', 'previous_lease_id'].every(
+    !['holder_user_id', 'idempotency_key', 'payload_hash', 'previous_lease_id'].every(
       (key) => value[key] === undefined || evidenceString(value[key])
     ) ||
     (value.expected_version !== undefined &&

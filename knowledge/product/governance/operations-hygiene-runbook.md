@@ -441,6 +441,36 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
    new name. A name there means a store was created through a dynamic path the gate cannot see; add
    its catalog entry by hand.
 
+### Tenant-partitioned runtime state
+
+- A new runtime store that keeps per-tenant records under `active/shared/runtime/` registers its
+  root in `PARTITIONED_RUNTIME_STATE_ROOTS` (`libs/core/foundation/runtime-state-roots.ts`) and
+  lays files out as `<root>/<tier>/<tenant>/…` through `storagePartitionSegments` (untenanted
+  records under `system/`). Mirror `<root>/personal/` and `<root>/confidential/` in
+  `security-policy.json` `tenant_scope.protected_prefixes`, add the prefixes to the
+  `storage-layout.test.ts` expectation, and decide its offboarding disposition in
+  `TENANT_RUNTIME_PARTITION_TARGET_KINDS` (the `satisfies` clause fails to compile until you do).
+- Build those paths with `partitionedScopedPath(root, scope, …)` (`libs/core/physical-namespace.ts`),
+  which keeps the scope's entity segments (`organizations/<id>/…`) below the partition. Do not use
+  `physicalScopedPath` (`<base>/tenants/<slug>/…`) for new tenant state under
+  `active/shared/runtime/`: that layout is invisible to tier-guard's tenant check, backup/restore
+  and `TENANT_RUNTIME_PARTITION_ROOTS` (`tenantRuntimePartitionOf` cannot classify it), so it is
+  only offboarded when its base is hand-listed in `scope-offboarding.ts`
+  (`PHYSICAL_SCHEDULE_ROOT`, `PHYSICAL_PRESENCE_ROOT`, `PHYSICAL_TENANT_LEARNING_ROOTS`).
+- Migrating a legacy `tenants/<slug>` store: register the root, write only the partitioned path,
+  keep a read fallback to the legacy copy while it may still hold live data (remove the legacy copy
+  on the next write — `generation-cost-settlement.ts`), or skip the fallback when the data is
+  short-lived (`scripts/reasoning_credentials.ts` proofs expire in 15 minutes). Add the old base to
+  `PHYSICAL_LEGACY_TENANT_STATE_ROOTS` so offboarding still removes leftovers. A store whose current
+  layout is already registered and only detects legacy copies for operator-reviewed migration
+  (`dot-state-paths.ts`) is a documented `bases` exception instead.
+- Gates: `tests/tenant-runtime-store-registration.test.ts` (every `physicalScopedPath` base under
+  `active/shared/runtime/` must be an offboarding `PHYSICAL_*` base; dynamic bases and deliberate
+  exceptions go in `tests/fixtures/tenant-runtime-store-allowlist.json` with a reason),
+  `storage-layout.test.ts` (protected prefixes), `scope-offboarding.test.ts` (one disposition per
+  registered root; the tenant-state purge test), and the store's own partition test (e.g.
+  `delegation-idempotency.test.ts`, `generation-cost-settlement.test.ts`).
+
 ### Immutable scoped evidence attempts
 
 - Use `writeScopedArtifactAttempt` / `readScopedArtifactAttempt` in `libs/core/workforce/artifact-store.ts` for immutable, repeatable evidence. Keep the full evaluation binding in the parent key and keep the effect identity stable across evaluation revisions. Use the existing owner scope, artifact class and index; never introduce a parallel ledger or put tenant evidence in the system partition.
@@ -1020,6 +1050,18 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
 **Non-public reasoning scopes declare `training_use`.** A `withReasoningPayloadScope` scope with tier `confidential` or `personal` names its `training_use` explicitly. An omitted posture falls back to `local_only` inside the egress gate, which denies every external backend (claude-cli included), and callers used to report that as a generic backend failure. Choose the posture from what the call sends: `no_training` for tenant working material that may reach a provider the tenant attested (as peer auto-reply drafting does), and an explicit `local_only` for personal material or anything that must stay on this host. Never weaken the gate to make a call pass. Report an egress denial as its own status (`egress_denied`) with the denial's `next:` step (`isReasoningEgressDenial`, `reasoningEgressDenialNext`), not as `backend_unavailable`. Gates: `ReasoningPayloadScope` makes the field required at the type level, and `tests/reasoning-payload-scope-training-use.test.ts` (registration-tests) statically backstops untyped and dynamic call sites. Its allowlist stays empty.
 
 **Explicit attachment facts.** Under an explicitly processor-scoped charter, the trusted send boundary supplies a non-negative integer `attachment_count`. Text-only leaf calls declare zero; image calls declare the number of outgoing images. Missing facts fail closed rather than implying zero. Generic task/pipeline envelopes must not invent a count before the concrete payload is known. When adding a processor scope, cover missing, negative and fractional counts and preserve task backend/egress restrictions. Gates: `reasoning-egress-scope.test.ts`, `media/image-description-bridge.test.ts` and `visual-review.test.ts`.
+
+**Delegation execution-start reporting (R5).** A keyed `delegateTask` failure whose start
+state is unknown counts as started: no retry, no failover, a terminal replay. A backend opts in to
+precise reporting by wrapping its `delegateTask` body in `runStartReportingDelegation`
+(`libs/core/delegation-execution-tracker.ts`) — only when EVERY dispatch path reports its start:
+a pure completion call, a tool loop that calls `markDelegationExecutionStarted()` before its first
+tool, or a CLI spawned through `spawnWithDelegationEnv` (which marks once a child pid exists).
+An SDK or adapter that spawns or runs tools elsewhere (claude-agent, copilot-acp, agy native
+subagents) stays unwrapped, so its failures keep the conservative at-most-once verdict. Report
+measured usage / served model with `reportDelegationResultMetadata`; never zero-fill. Gates:
+`reasoning-backend.delegation-guard.test.ts`, `provider-spawn-env.test.ts`,
+`anthropic-reasoning-backend.test.ts`, `delegation-idempotency.test.ts`.
 
 **Host bookkeeping inside advisory execution.** A dot wake may stop before the provider call with
 `SANDBOX_WRITE_DENIED` on `observability/delegations.jsonl`: the planner's read-only sandbox also
