@@ -191,6 +191,23 @@ scope は拒否する。scope の一般的な deny-only 動作や非同期利用
 G1 の完全な `decide`、G2 の専用ロール削除、system/person scope への拡張ではない。
 既存モジュール内に置くことで公開 subpath と foundation の依存モジュール数を増やさない。
 
+### 操作上限の共通判定と実 guard での採用（2026-11-06）
+
+最新 split ブランチの S1 検証修正 `f8b5a3b67` を merge `2e3623c36` で取り込んだ後、
+`foundation/resource-access-scope.ts` に純粋関数 `decideResourceAccess` を実装した。
+正準パスと5操作を検証し、exact path・append-only・metadata 祖先探索・単一要素 prefix の
+上限を判定する。不明な実行時の操作値は metadata や prefix の許可に読み替えず拒否する。
+
+ResourceAccessScope の全上限交差と、DOT の実 capability guard がこの関数を使用する。
+DOT の発行済み scope は domain operation ごとの read/append/mkdir/metadata の違いを
+既に表しているため、末尾の独自の操作分岐を削除した。private issuer の真正性・寿命と
+root の一致検査、通常の role/tenant/内容検査は保持する。3つの domain operation の
+操作行列と不正操作・対象外パスを実 grant で検証する。
+
+これは G1 の操作上限判定の共通化であり、カタログによる管理者・発行者・ロール・内容の
+完全な `decide` や G2 のロール削除を完了したものではない。保存先の移行を前提にせず、
+新しい公開 subpath や foundation の runtime import も増やさない。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |

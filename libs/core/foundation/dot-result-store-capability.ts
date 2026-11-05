@@ -4,6 +4,7 @@ import { isValidTenantSlug } from './scope.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from './runtime-state-roots.js';
 import {
   createSynchronousResourceGrantIssuer,
+  decideResourceAccess,
   type ResourceAccessScope,
   type ResourceAccessOperation,
 } from './resource-access-scope.js';
@@ -21,11 +22,7 @@ export interface DotResultStoreBinding {
   file: string;
 }
 export type DotResultStoreOperation = 'append_result' | 'append_report_marker' | 'read_state';
-interface ActiveBinding {
-  binding: DotResultStoreBinding;
-  operation: DotResultStoreOperation;
-}
-const grants = createSynchronousResourceGrantIssuer<ActiveBinding>('DOT_RESULT_CAPABILITY');
+const grants = createSynchronousResourceGrantIssuer<DotResultStoreBinding>('DOT_RESULT_CAPABILITY');
 const ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 function normalized(input: DotResultStoreBinding): DotResultStoreBinding {
   const plain = (value: object): boolean =>
@@ -105,7 +102,7 @@ export function withDotResultStoreCapability<T>(
     mkdirExact: directories,
     metadataExact: [binding.file],
   };
-  return grants.run(Object.freeze({ binding, operation }), scope, internalFn);
+  return grants.run(binding, scope, internalFn);
 }
 /** Pure mandatory guard; structural lookalikes and expired asynchronous contexts fail closed. */
 export function isDotResultStoreCapability(
@@ -114,19 +111,6 @@ export function isDotResultStoreCapability(
 ): boolean {
   const grant = grants.resolve(scope);
   if (!grant) return false;
-  const { binding, operation } = grant.binding;
-  if (binding.rootDir !== request.rootDir) return false;
-  const expected = grant.scope;
-  if (request.operation === 'read')
-    return operation === 'read_state' && request.target === binding.file;
-  if (request.operation === 'append')
-    return operation !== 'read_state' && request.target === binding.file;
-  if (request.operation === 'mkdir') return expected.mkdirExact.includes(request.target);
-  if (request.operation === 'metadata')
-    return (
-      request.target === binding.file ||
-      request.target === '' ||
-      binding.file.startsWith(request.target + '/')
-    );
-  return false;
+  if (grant.binding.rootDir !== request.rootDir) return false;
+  return decideResourceAccess(grant.scope, request.target, request.operation).allowed;
 }

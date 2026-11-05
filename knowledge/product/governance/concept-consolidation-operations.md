@@ -64,6 +64,13 @@ Promise/thenable を返す保存処理は拒否し、正常終了・例外とも
 closure/accessor が token を保持しても、戻り値が呼出元へ渡る前に
 失効する。これは権限の付与・保存先の正規化・内容検査の代替ではない。
 
+操作と対象パスの上限は純粋関数 `decideResourceAccess(scope, target, operation)` を使う。
+`read/write/append/mkdir/metadata` 以外の実行時の値は、name prefix や metadata の照合より
+先に拒否する。空の対象パスは metadata の祖先探索にのみ使える。`resourceAccessDenial` は
+すべての外側 scope にこの判定を適用し、scope が無い場合は従来どおり制約なしの `null` を返す。
+DOT guard は private issuer と root を検証した後、発行済みの scope の操作判定を共有する。
+関数単体の許可を発行証拠や最終認可として使わない。ロール・tenant・内容の検査は引き続き必要。
+
 ## 再増加の検出
 
 `check_concept_consolidation.ts` は context env、JSON serialization at write、runtime literal、limiter/tracker 宣言、重複 export 型名、CLI parser の6指標を測る。comments・テスト・生成コード・build 出力を除外し、ファイル単位の上限と重複型名ごとのサイトを検査する。payload と永続状態の全てを静的に証明するものではなく、指標とレビューを併用する。新しい duplicate 名は古い duplicate を削って相殺できない。
