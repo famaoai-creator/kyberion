@@ -12,9 +12,11 @@ import {
   gitPush,
   type VcsCommandResult,
 } from '@agent/core/vcs';
-import { vcsHostPrChecks, vcsHostPrMerge } from '@agent/core/vcs/vcs-host-verbs';
-import { createGhCliVcsHostProvider } from '@agent/core/vcs/gh-cli-host-provider';
-import type { VcsHostCallOptions } from '@agent/core/vcs/vcs-host';
+import {
+  vcsHostOptionsForRunner,
+  vcsHostPrChecks,
+  vcsHostPrMerge,
+} from '@agent/core/vcs/vcs-host-verbs';
 import { main as publishPullRequest } from '../../../../scripts/publish_pull_request.js';
 
 export interface StandardPrLifecycleParams {
@@ -85,10 +87,7 @@ export async function runStandardPrLifecycle(
   if (params.auto_merge === true) {
     // The governed default exec resolves the vcs-host seam (gh-cli or
     // github-rest); an injected exec keeps driving the gh CLI it was built for.
-    const host: VcsHostCallOptions =
-      exec === safeExecResult
-        ? { cwd }
-        : { cwd, git: exec, hostProvider: createGhCliVcsHostProvider({ run: exec }) };
+    const host = vcsHostOptionsForRunner({ cwd }, exec);
     let checks;
     try {
       checks = await vcsHostPrChecks({ ...host, ref: url });

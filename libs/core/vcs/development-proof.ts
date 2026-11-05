@@ -1,16 +1,17 @@
-/** Promotion facts read through the canonical, read-only gh transport. No
- * caller-supplied check names or pass flags are accepted as CI authority. */
-import { safeExecResult } from '../secure-io.js';
+/** Promotion facts read through the governed, read-only vcs-host seam
+ * (gh-cli by default, github-rest where gh is absent). No caller-supplied
+ * check names or pass flags are accepted as CI authority. An explicit `run`
+ * keeps driving a gh CLI built on that runner (tests, injected transports). */
 import { computeApprovalPayloadHash } from '../governance/approval-store.js';
-import {
-  diagnoseGhResult,
-  ghMust,
-  ghPrView,
-  ghPrQueued,
-  ghRun,
-  type GhCallOptions,
-} from './github.js';
+import type { GhCallOptions } from './github.js';
 import type { VcsCommandRunner } from './git.js';
+import {
+  vcsHostGithubApiGet,
+  vcsHostOptionsForRunner,
+  vcsHostPrQueued,
+  vcsHostPrViewFields,
+  vcsHostRepository,
+} from './vcs-host-verbs.js';
 
 export interface VcsDevelopmentRevision {
   repository: string;
@@ -85,21 +86,19 @@ interface Metadata {
   truncated: boolean;
 }
 
-export function readVcsDevelopmentPr(
+export async function readVcsDevelopmentPr(
   ref: string,
   options: GhCallOptions,
-  run: VcsCommandRunner = safeExecResult
-): VcsDevelopmentPr {
-  const row = ghPrView(
-    {
-      ...options,
-      ref,
-      fields:
-        'number,url,state,isDraft,headRefOid,baseRefOid,headRefName,baseRefName,mergedAt,mergeCommit,autoMergeRequest',
-    },
-    run
-  ) as unknown as PrRow;
-  const repository = readVcsDevelopmentRepository(options, run);
+  run?: VcsCommandRunner
+): Promise<VcsDevelopmentPr> {
+  const host = vcsHostOptionsForRunner(options, run);
+  const row = (await vcsHostPrViewFields({
+    ...host,
+    ref,
+    fields:
+      'number,url,state,isDraft,headRefOid,baseRefOid,headRefName,baseRefName,mergedAt,mergeCommit,autoMergeRequest',
+  })) as unknown as PrRow;
+  const repository = await readVcsDevelopmentRepository(options, run);
   if (
     !Number.isInteger(row.number) ||
     row.number <= 0 ||
@@ -122,75 +121,64 @@ export function readVcsDevelopmentPr(
     state: row.state.toLowerCase() as VcsDevelopmentPr['state'],
     queued:
       row.state === 'OPEN' &&
-      (Boolean(row.autoMergeRequest) ||
-        ghPrQueued(
-          {
-            ...options,
-            owner: repository.slug.split('/')[0],
-            name: repository.slug.split('/')[1],
-            number: row.number,
-            hostname: repository.host,
-          },
-          run
-        )),
+      (Boolean(row.autoMergeRequest) || (await vcsHostPrQueued({ ...host, number: row.number }))),
     draft: row.isDraft === true,
     ...(sha.test(row.mergeCommit?.oid ?? '') ? { mergeCommitSha: row.mergeCommit.oid } : {}),
   };
 }
-export function readVcsDevelopmentRepository(
+export async function readVcsDevelopmentRepository(
   options: GhCallOptions,
-  run: VcsCommandRunner = safeExecResult
-): { url: string; slug: string; host: string } {
-  const row = JSON.parse(ghMust(['repo', 'view', '--json', 'nameWithOwner,url'], options, run)) as {
-    url: string;
-    nameWithOwner: string;
-  };
-  const url = new URL(String(row.url));
-  if (
-    url.protocol !== 'https:' ||
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash ||
-    !/^[\w.-]+\/[\w.-]+$/.test(row.nameWithOwner) ||
-    url.pathname.replace(/^\//, '').replace(/\/$/, '') !== row.nameWithOwner
-  )
-    throw new Error('[VCS_DEVELOPMENT_REPOSITORY] Verified repository required');
-  return { url: `${url.origin}/${row.nameWithOwner}`, slug: row.nameWithOwner, host: url.host };
+  run?: VcsCommandRunner
+): Promise<{ url: string; slug: string; host: string }> {
+  let repo;
+  try {
+    // Canonical https identity, validated by the verb layer (no credentials,
+    // query or fragment; path equals owner/name).
+    repo = await vcsHostRepository(vcsHostOptionsForRunner(options, run));
+  } catch (error) {
+    // Cause text is already sanitized by the verb layer.
+    throw new Error(
+      `[VCS_DEVELOPMENT_REPOSITORY] Verified repository required: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+  const url = new URL(repo.url);
+  return { url: `${url.origin}/${repo.slug}`, slug: repo.slug, host: url.host };
 }
 
 /** Owner-administered branch requirements, actual App identity and immutable
  * base workflow bytes form the policy floor. A workflow edited by the PR may
  * not manufacture its own successful same-name check. */
-export function readVcsDevelopmentCiProof(
+export async function readVcsDevelopmentCiProof(
   pr: VcsDevelopmentPr,
   options: GhCallOptions,
-  run: VcsCommandRunner = safeExecResult
-): VcsDevelopmentCiProof {
-  const repo = readVcsDevelopmentRepository(options, run);
+  run?: VcsCommandRunner
+): Promise<VcsDevelopmentCiProof> {
+  const repo = await readVcsDevelopmentRepository(options, run);
   if (repo.url !== pr.repository)
     throw new Error('[VCS_DEVELOPMENT_REPOSITORY] PR repository changed');
-  const api = <T = Metadata>(suffix: string, missingAllowed = false): T => {
-    const result = ghRun(
-      ['api', `repos/${repo.slug}/${suffix}`, '--hostname', repo.host],
-      options,
-      run
-    );
-    if (result.status !== 0 || result.error) {
-      if (missingAllowed && diagnoseGhResult(result).status === 'missing_resource')
-        return null as T;
+  const host = vcsHostOptionsForRunner(options, run);
+  const api = async <T = Metadata>(suffix: string, missingAllowed = false): Promise<T> => {
+    try {
+      return (await vcsHostGithubApiGet<T>({
+        ...host,
+        path: suffix,
+        allowMissing: missingAllowed,
+      })) as T;
+    } catch {
       throw new Error(
         '[VCS_DEVELOPMENT_CI] Cannot verify current CI requirements or check provenance'
       );
     }
-    return JSON.parse(result.stdout);
   };
   try {
-    const classic = api(
+    const classic = await api(
       `branches/${encodeURIComponent(pr.baseBranch)}/protection/required_status_checks`,
       true
     );
-    const rules = api<Rule[]>(`rules/branches/${encodeURIComponent(pr.baseBranch)}`, true) ?? [];
+    const rules =
+      (await api<Rule[]>(`rules/branches/${encodeURIComponent(pr.baseBranch)}`, true)) ?? [];
     if (!Array.isArray(rules)) throw new Error('Invalid rules');
     const strict =
       classic?.strict === true ||
@@ -249,8 +237,8 @@ export function readVcsDevelopmentCiProof(
       verificationPolicy: 'github-scripts-and-root-files-v1',
     });
     const base = { policyDigest, requiredChecks: unique.map((check) => check.name) };
-    const beforeTree = api(`git/trees/${pr.baseSha}`),
-      afterTree = api(`git/trees/${pr.headSha}`);
+    const beforeTree = await api(`git/trees/${pr.baseSha}`),
+      afterTree = await api(`git/trees/${pr.headSha}`);
     if (
       !Array.isArray(beforeTree.tree) ||
       !Array.isArray(afterTree.tree) ||
@@ -277,14 +265,14 @@ export function readVcsDevelopmentCiProof(
         };
     }
 
-    const checks = api(`commits/${pr.headSha}/check-runs?per_page=100&filter=latest`);
+    const checks = await api(`commits/${pr.headSha}/check-runs?per_page=100&filter=latest`);
     if (
       !Array.isArray(checks.check_runs) ||
       checks.total_count > checks.check_runs.length ||
       checks.check_runs.length >= 100
     )
       throw new Error('Truncated check evidence');
-    const runs = api(`actions/runs?head_sha=${pr.headSha}&per_page=100`);
+    const runs = await api(`actions/runs?head_sha=${pr.headSha}&per_page=100`);
     if (
       !Array.isArray(runs.workflow_runs) ||
       runs.total_count > runs.workflow_runs.length ||
@@ -331,8 +319,8 @@ export function readVcsDevelopmentCiProof(
           continue;
         }
         const encoded = workflowPath.split('/').map(encodeURIComponent).join('/');
-        const before = api(`contents/${encoded}?ref=${pr.baseSha}`),
-          after = api(`contents/${encoded}?ref=${pr.headSha}`);
+        const before = await api(`contents/${encoded}?ref=${pr.baseSha}`),
+          after = await api(`contents/${encoded}?ref=${pr.headSha}`);
         if (
           before.type !== 'file' ||
           after.type !== 'file' ||
@@ -370,11 +358,11 @@ export function readVcsDevelopmentCiProof(
 
 /** Squash promotion must retain the original reviewed baseline as its one parent.
  * Never use the moving PR baseRefOid to authenticate post-merge CI sources. */
-export function readVcsDevelopmentMergedCiProof(
+export async function readVcsDevelopmentMergedCiProof(
   pr: VcsDevelopmentPr,
   options: GhCallOptions,
-  run: VcsCommandRunner = safeExecResult
-): VcsDevelopmentCiProof {
+  run?: VcsCommandRunner
+): Promise<VcsDevelopmentCiProof> {
   const unavailable = (): VcsDevelopmentCiProof => ({
     state: 'unverified',
     policyDigest: '',
@@ -383,15 +371,12 @@ export function readVcsDevelopmentMergedCiProof(
   });
   if (!pr.mergeCommitSha || !sha.test(pr.baseSha)) return unavailable();
   try {
-    const repo = readVcsDevelopmentRepository(options, run);
+    const repo = await readVcsDevelopmentRepository(options, run);
     if (repo.url !== pr.repository) return unavailable();
-    const commit = JSON.parse(
-      ghMust(
-        ['api', `repos/${repo.slug}/commits/${pr.mergeCommitSha}`, '--hostname', repo.host],
-        options,
-        run
-      )
-    ) as { sha: string; parents: Array<{ sha: string }> };
+    const commit = (await vcsHostGithubApiGet<{ sha: string; parents: Array<{ sha: string }> }>({
+      ...vcsHostOptionsForRunner(options, run),
+      path: `commits/${pr.mergeCommitSha}`,
+    })) as { sha: string; parents: Array<{ sha: string }> };
     if (
       commit.sha !== pr.mergeCommitSha ||
       !Array.isArray(commit.parents) ||
@@ -399,7 +384,7 @@ export function readVcsDevelopmentMergedCiProof(
       commit.parents[0].sha !== pr.baseSha
     )
       return unavailable();
-    return readVcsDevelopmentCiProof({ ...pr, headSha: pr.mergeCommitSha }, options, run);
+    return await readVcsDevelopmentCiProof({ ...pr, headSha: pr.mergeCommitSha }, options, run);
   } catch {
     return unavailable();
   }

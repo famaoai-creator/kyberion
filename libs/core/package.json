@@ -8463,6 +8463,10 @@
     "./information-assets/collector-capture": {
       "types": "./dist/information-assets/collector-capture.d.ts",
       "default": "./dist/information-assets/collector-capture.js"
+    },
+    "./provider-runtime-requirements": {
+      "types": "./dist/provider-runtime-requirements.d.ts",
+      "default": "./dist/provider-runtime-requirements.js"
     }
   },
   "dependencies": {
