@@ -280,6 +280,42 @@ export function segmentWords(text: unknown, locale?: unknown): string[] {
   return out;
 }
 
+const SPACELESS_SCRIPT_CHAR = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
+const HIRAGANA_ONLY = /^[\p{Script=Hiragana}ー]+$/u;
+const HAN_ONLY = /^\p{Script=Han}+$/u;
+
+/**
+ * Keyword terms for substring / keyword matching (query terms, trigger
+ * phrases, cue overlap). Whitespace-separated chunks without spaceless-script
+ * characters are kept verbatim, so English matching keeps its historical
+ * substring semantics ("deploy" still matches "deployment", "v1.2" stays one
+ * term). A chunk in a spaceless script is segmented with {@link segmentWords}
+ * instead of staying one sentence-long term that never matches; hiragana-only
+ * segments (particles, auxiliaries such as を / して) and one-character
+ * non-kanji segments are dropped because they match almost anything, while a
+ * single kanji is meaningful and kept. When segmentation leaves nothing (a
+ * kana-only word such as まとめ), the whole chunk is kept.
+ *
+ * Use {@link segmentWords} directly for set-similarity (Jaccard) scoring,
+ * where every word — single CJK characters included — counts on both sides.
+ */
+export function segmentKeywordTerms(text: unknown, locale?: unknown): string[] {
+  const out: string[] = [];
+  for (const chunk of String(text ?? '').split(/\s+/u)) {
+    if (!chunk) continue;
+    if (!SPACELESS_SCRIPT_CHAR.test(chunk)) {
+      out.push(chunk);
+      continue;
+    }
+    const terms = segmentWords(chunk, locale).filter(
+      (term) => HAN_ONLY.test(term) || (term.length > 1 && !HIRAGANA_ONLY.test(term))
+    );
+    if (terms.length > 0) out.push(...terms);
+    else out.push(chunk);
+  }
+  return out;
+}
+
 export type BrowserVocabularyEntry = Record<string, string>;
 
 export interface BrowserVocabularyCatalog {
