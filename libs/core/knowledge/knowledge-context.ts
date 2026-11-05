@@ -55,7 +55,9 @@ export function resolveKnowledgeContext(input: KnowledgeContextInput): Knowledge
   if (!RETENTIONS.has(retention)) {
     throw new Error(`[KNOWLEDGE_CONTEXT_INVALID] unsupported retention '${retention}'`);
   }
-  const trainingUse = input.training_use || 'local_only';
+  // Public knowledge may be used for training; anything above public stays local_only.
+  const trainingUse =
+    input.training_use || (input.tier === 'public' ? 'training_eligible' : 'local_only');
   if (!TRAINING_USE.has(trainingUse)) {
     throw new Error(`[KNOWLEDGE_CONTEXT_INVALID] unsupported training_use '${trainingUse}'`);
   }

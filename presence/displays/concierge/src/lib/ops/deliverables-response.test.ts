@@ -36,4 +36,19 @@ describe('deliverables response boundary', () => {
       )
     ).toBeUndefined();
   });
+
+  it('carries the open-inbox flag that routes a decision to あなた待ち (review M1)', () => {
+    const parsed = parseDeliverablesResponse({
+      deliverables: [{ ...item, awaitingInboxDecision: true }, item],
+      accessRole: 'localadmin',
+    });
+    expect(parsed?.deliverables[0].awaitingInboxDecision).toBe(true);
+    expect(parsed?.deliverables[1]).not.toHaveProperty('awaitingInboxDecision');
+    expect(
+      parseDeliverablesResponse({
+        deliverables: [{ ...item, awaitingInboxDecision: 'yes' }],
+        accessRole: 'readonly',
+      })
+    ).toBeUndefined();
+  });
 });

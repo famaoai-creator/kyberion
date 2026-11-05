@@ -31,6 +31,7 @@ import {
   newDelegationSessionId,
   spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
+import { withRedactedProviderOutput } from './provider-output-redaction.js';
 import { resolveProviderCliCommand } from './provider-managed-env.js';
 import {
   buildProviderChildEnv,
@@ -73,6 +74,7 @@ import type {
   DecomposedTaskPlan,
   ReasoningCallOptions,
 } from '../reasoning/reasoning-backend.js';
+import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });
@@ -202,10 +204,22 @@ export class DevinCliReasoningBackend implements ReasoningBackend {
     return this.runStructured(structuredReasoningSpecs.decomposeIntoTasks, input);
   }
 
-  async delegateTask(
+  delegateTask(
     instruction: string,
     context?: string,
     options?: ReasoningCallOptions
+  ): Promise<string> {
+    // R5: every dispatch path spawns through spawnWithDelegationEnv, which
+    // marks the start once a child exists — an earlier failure is pre-start.
+    return runStartReportingDelegation(() =>
+      this.dispatchDelegatedTask(instruction, context, options)
+    );
+  }
+
+  private async dispatchDelegatedTask(
+    instruction: string,
+    context: string | undefined,
+    options: ReasoningCallOptions | undefined
   ): Promise<string> {
     const profile = options?.advisory ? 'explorer' : normalizePermissionProfile(options?.profile);
     return this.complete(
@@ -246,6 +260,22 @@ export class DevinCliReasoningBackend implements ReasoningBackend {
   }
 
   private async complete(
+    systemPrompt: string,
+    userPrompt: string,
+    options?: {
+      profile?: ProviderPermissionProfileName;
+      signal?: AbortSignal;
+      model?: string;
+      shapeHint?: string;
+    }
+  ): Promise<string> {
+    // Output exit: the answer and any stderr-bearing error are redacted.
+    return withRedactedProviderOutput(() =>
+      this.completeUnredacted(systemPrompt, userPrompt, options)
+    );
+  }
+
+  private async completeUnredacted(
     systemPrompt: string,
     userPrompt: string,
     options?: {

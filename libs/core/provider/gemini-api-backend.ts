@@ -39,6 +39,7 @@ import type {
   SynthesizedPersona,
   CritiqueResult,
 } from '../reasoning/reasoning-backend.js';
+import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
 
 export const GEMINI_API_DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 /** Default Gemini API model: provider-config.json runtime_defaults['gemini-default'] (RS-02). */
@@ -630,7 +631,10 @@ export class GeminiApiBackend implements ReasoningBackend {
   }
 
   async delegateTask(instruction: string, context?: string): Promise<string> {
-    return this.prompt(`Task: ${instruction}\nContext: ${context ?? 'none'}`);
+    // R5: a pure completion — nothing executes locally, so a failure is pre-start.
+    return runStartReportingDelegation(() =>
+      this.prompt(`Task: ${instruction}\nContext: ${context ?? 'none'}`)
+    );
   }
 }
 

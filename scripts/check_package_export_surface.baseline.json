@@ -1,7 +1,7 @@
 {
   "version": 1,
   "packages": {
-    "libs/core": 1953,
+    "libs/core": 1958,
     "libs/kernel": 4,
     "libs/shared-interaction": 9,
     "libs/shared-media": 75,

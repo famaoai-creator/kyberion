@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Button, Callout } from '@agent/shared-ui';
+import { Button, Callout, PageHeader } from '@agent/shared-ui';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import { TENANT_CHANGED_EVENT, tenantFromChangeEvent } from '../../lib/tenant-context';
 import { parseSettingsMe } from '../../lib/settings-types';
@@ -397,11 +397,8 @@ export default function ManagementPage() {
     notice === 'forbidden' ||
     (data !== null && !data.canManage);
   return (
-    <main className="settings-page management-page">
-      <header>
-        <h1 className="kb-text kb-text--title">{t('management.title')}</h1>
-        <p className="kb-text kb-text--muted">{t('management.description')}</p>
-      </header>
+    <div className="kb-page settings-page management-page" data-width="default">
+      <PageHeader title={t('management.title')} subtitle={t('management.description')} />
       <nav className="settings-inline-actions" aria-label={t('management.navigation')}>
         <Button label={t('management.settings')} href={'/settings?' + scopeQuery(scope)} />
         {missions ? <Button label={t('management.missions')} href={missions} /> : null}
@@ -480,6 +477,6 @@ export default function ManagementPage() {
           }}
         />
       ) : null}
-    </main>
+    </div>
   );
 }

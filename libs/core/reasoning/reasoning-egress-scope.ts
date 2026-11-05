@@ -41,9 +41,7 @@ const logger = createLogger('reasoning-egress');
 export type ReasoningTrainingUse =
   'local_only' | 'no_training' | 'zero_retention' | 'training_eligible';
 
-export interface ReasoningPayloadScope {
-  /** Most sensitive tier represented in what will be sent. */
-  tier: 'public' | 'confidential' | 'personal';
+interface ReasoningPayloadScopeBase {
   /** Tenant the material belongs to, when above public. */
   tenant_slug?: string;
   /** What is being sent, recorded on denial. */
@@ -52,11 +50,56 @@ export interface ReasoningPayloadScope {
   categories?: Array<'routine_business' | 'personal_data' | 'sensitive_business' | 'unknown'>;
   /** Number of attached inputs; required for explicitly scoped processors. */
   attachment_count?: number;
-  /** Maximum provider data-use posture. Defaults to local_only. */
-  training_use?: ReasoningTrainingUse;
   external_egress?: 'allow' | 'deny';
   allowed_reasoning_backends?: readonly string[];
 }
+
+/**
+ * Public material. An omitted `training_use` means `training_eligible`:
+ * public material may be used for provider training (decided 2026-11-05).
+ */
+export interface PublicReasoningPayloadScope extends ReasoningPayloadScopeBase {
+  /** Most sensitive tier represented in what will be sent. */
+  tier: 'public';
+  /** Maximum provider data-use posture. Defaults to training_eligible. */
+  training_use?: ReasoningTrainingUse;
+}
+
+/**
+ * Tenant or personal material: `training_use` is REQUIRED. An omitted posture
+ * defaults to `local_only` in the gate, which denies every external backend
+ * (claude-cli included) — callers then reported that as a generic backend
+ * failure. Declaring it at the type level makes the posture a deliberate
+ * choice; a caller that truly needs local-only says `'local_only'` explicitly.
+ * `tests/reasoning-payload-scope-training-use.test.ts` backstops untyped and
+ * dynamic call sites.
+ */
+/**
+ * The posture a scope gets when it declares none. Public material may be used
+ * for training; anything above public keeps the fail-closed `local_only`
+ * (typed callers must declare it; this default only covers untyped callers).
+ */
+export function defaultReasoningTrainingUse(tier: string | undefined): ReasoningTrainingUse {
+  return tier === 'public' ? 'training_eligible' : 'local_only';
+}
+
+/** The posture the gate applies: the declared one, else the tier default. */
+export function effectiveReasoningTrainingUse(scope: {
+  tier?: string;
+  training_use?: ReasoningTrainingUse;
+}): ReasoningTrainingUse {
+  return scope.training_use ?? defaultReasoningTrainingUse(scope.tier);
+}
+
+export interface NonPublicReasoningPayloadScope extends ReasoningPayloadScopeBase {
+  /** Most sensitive tier represented in what will be sent. */
+  tier: 'confidential' | 'personal';
+  /** Maximum provider data-use posture, declared explicitly. */
+  training_use: ReasoningTrainingUse;
+}
+
+export type ReasoningPayloadScope = PublicReasoningPayloadScope | NonPublicReasoningPayloadScope;
+export type ReasoningPayloadTier = ReasoningPayloadScope['tier'];
 
 const scopeStorage = new AsyncLocalStorage<ReasoningPayloadScope>();
 
@@ -99,6 +142,32 @@ export class ReasoningEgressDeniedError extends Error {
     super(`[REASONING_EGRESS_DENIED] ${reason}`);
     this.name = 'ReasoningEgressDeniedError';
   }
+}
+
+/**
+ * True when `error` — or a failover/wrapper error whose message embeds one —
+ * is a reasoning egress denial rather than a backend fault. Failover chains
+ * fold candidate errors into a plain Error, so the message tag is the stable
+ * signal, not the class.
+ */
+export function isReasoningEgressDenial(error: unknown): boolean {
+  if (error instanceof ReasoningEgressDeniedError) return true;
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /\[REASONING_EGRESS_(?:DENIED|SCOPE_REQUIRED)\]/u.test(message);
+}
+
+/** The `next: …` step a denial message carries, when it carries one. */
+export function reasoningEgressDenialNext(error: unknown): string | undefined {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  // Split instead of a regex: an overlapping `\s*` / `[^|]+?` pattern backtracks
+  // polynomially on long whitespace runs in untrusted provider error text.
+  // The first segment precedes any `|`, so it can never be the `next:` field.
+  const segment = message
+    .split('|')
+    .slice(1)
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('next:') && part.length > 'next:'.length);
+  return segment;
 }
 
 let tenantRegistryRootForTests: string | undefined;
@@ -288,9 +357,19 @@ export function assertReasoningEgressAllowedAtEndpoint(
   // A local endpoint is safe even when the adapter uses a provider-neutral
   // runtime name such as `openai-compatible`.
   if (localEndpoint) return;
-  if ((scope.training_use ?? 'local_only') === 'local_only') {
+  if (effectiveReasoningTrainingUse(scope) === 'local_only') {
+    // Untyped or dynamic callers can still omit training_use. The gate keeps
+    // the fail-closed default but says so, so the denial is diagnosable.
+    const declared = scope.training_use !== undefined;
+    const tenant = scope.tenant_slug?.trim();
+    const provider = providerIdForReasoningIdentifier(backendName) ?? '<id>';
     throw new ReasoningEgressDeniedError(
-      `training_use 'local_only' forbids sending ${scope.tier} material to external backend ${backendName}`
+      `training_use 'local_only' forbids sending ${scope.tier} material to external backend ${backendName} — ` +
+        (declared
+          ? 'the payload scope declares local_only, so only a local backend may receive it'
+          : 'the payload scope declares no training_use, which defaults to local_only') +
+        ` | next: declare training_use explicitly on the payload scope ('no_training' for tenant material sent to an attested provider), use a local backend, or attest the tenant via 'pnpm onboarding llm attest --tenant ${tenant || '<slug>'} --provider ${provider} --training-use none --request-approval'` +
+        ` | evidence: tier=${scope.tier} tenant=${tenant || '(none)'} backend=${backendName} training_use=${declared ? 'local_only' : 'local_only(default)'}${scope.purpose ? ` purpose=${scope.purpose}` : ''}`
     );
   }
   if (scope.training_use === 'zero_retention') {

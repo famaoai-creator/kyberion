@@ -493,13 +493,25 @@ export async function runBackgroundReviewFork(
     role: input.callOptions?.role || 'background_review',
   };
   try {
+    // A mission snapshot is tenant working material and may reach a provider
+    // the tenant attested as no-training. A task-session snapshot is the
+    // operator's own conversation (personal tier) and never leaves this host.
     const raw = await withReasoningPayloadScope(
-      {
-        tier: input.missionId ? 'confidential' : 'personal',
-        tenant_slug: getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || undefined,
-        purpose: 'background review snapshot',
-        attachment_count: 0,
-      },
+      input.missionId
+        ? {
+            tier: 'confidential',
+            tenant_slug: getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || undefined,
+            purpose: 'background review snapshot',
+            attachment_count: 0,
+            training_use: 'no_training',
+          }
+        : {
+            tier: 'personal',
+            tenant_slug: getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || undefined,
+            purpose: 'background review snapshot',
+            attachment_count: 0,
+            training_use: 'local_only',
+          },
       async () => {
         const prompt = buildForkPrompt(input);
         const context = await buildBackgroundReviewKnowledgeContext(

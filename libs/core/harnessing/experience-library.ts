@@ -14,6 +14,9 @@ import { logger } from '../core.js';
 import { appendJsonLine } from '../foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeReadFile } from '../secure-io.js';
 import { nowIso } from '../foundation/time.js';
+import { segmentKeywordTerms } from '../locale-normalize.js';
+
+const SPACELESS_SCRIPT_CHAR = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
 
 export interface LessonInput {
   /** The work shape / situation this lesson applies to. */
@@ -86,8 +89,10 @@ export function lookupLessons(opts: {
   if (!safeExistsSync(file)) return [];
   // Cue query: token-set overlap (word boundaries, not substrings — 'art'
   // must not hit 'start'). Stopwords are dropped or they match everything.
-  // ASCII-only tokens: non-ASCII (e.g. Japanese) cue text tokenizes to an
-  // empty set and matches nothing — a known limitation, documented here.
+  // ASCII runs keep their historical `[a-z0-9_-]` word split; spaceless-script
+  // text (Japanese, Chinese) is segmented with the shared ICU segmenter
+  // (`segmentKeywordTerms`) so a Japanese cue matches Japanese lessons word by
+  // word instead of tokenizing to nothing.
   const STOPWORDS = new Set([
     'the',
     'and',
@@ -130,13 +135,16 @@ export function lookupLessons(opts: {
     'who',
     'what',
   ]);
-  const tokenize = (v: string) =>
-    new Set(
-      v
-        .toLowerCase()
-        .split(/[^a-z0-9_-]+/)
-        .filter((t) => t.length >= 3 && !STOPWORDS.has(t))
+  const tokenize = (v: string) => {
+    const lower = v.toLowerCase();
+    const tokens = new Set(
+      lower.split(/[^a-z0-9_-]+/).filter((t) => t.length >= 3 && !STOPWORDS.has(t))
     );
+    for (const term of segmentKeywordTerms(lower)) {
+      if (SPACELESS_SCRIPT_CHAR.test(term)) tokens.add(term);
+    }
+    return tokens;
+  };
   const cueProvided = opts.cue !== undefined && opts.cue !== '';
   const briefTokens = cueProvided ? tokenize(opts.cue) : new Set<string>();
   let asOfMs: number | null = null;

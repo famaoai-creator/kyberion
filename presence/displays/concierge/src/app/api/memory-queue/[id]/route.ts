@@ -1,3 +1,4 @@
+import { withCompanyFanoutInvalidation } from '../../../../lib/company-fanout-cache';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   listMemoryPromotionCandidates,
@@ -32,7 +33,7 @@ type MemoryDecision = (typeof ALLOWED_DECISIONS)[number];
 
 const CANDIDATE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{2,127}$/;
 
-export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+async function handlePost(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
   const resolved = resolveConciergeViewer(req);
@@ -169,3 +170,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     return NextResponse.json({ ok: false, error: t('api.memory.failed') }, { status: 500 });
   }
 }
+
+/** A needs-you mutation: the personal fan-out cache never serves the decided item again. */
+export const POST = withCompanyFanoutInvalidation(handlePost);

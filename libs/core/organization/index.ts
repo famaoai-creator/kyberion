@@ -88,6 +88,7 @@ export * from './organization-operation-run-recording.js';
 export * from './organization-operation-runtime.js';
 export * from './organization-profile.js';
 export * from './role-assumption-trace.js';
+export * from './role-intent-draft.js';
 export * from './team-composition-obligations.js';
 export * from './team-decision-support-metrics.js';
 export type {

@@ -20,32 +20,105 @@ export type FrontDeskOptionalSurfaceId = 'chronos-mirror-v2' | 'operator-surface
 export type FrontDeskSurfaceId = FrontDeskPrimarySurfaceId | FrontDeskOptionalSurfaceId;
 export type FrontDeskAvailableSurfaces = Partial<Record<FrontDeskOptionalSurfaceId, string>>;
 
+/**
+ * Where an item renders on the rail: `main` (top, in catalog order) or
+ * `footer` (pinned at the rail bottom so it stays visible without scrolling,
+ * MSN-SHELL-IA §1/§4: 設定 at 1440×1000).
+ */
+export type FrontDeskMenuPlacement = 'main' | 'footer';
+
 export interface FrontDeskMenuItem {
   id: string;
-  group_key: string;
+  /** Optional rail group heading; the seven top-level destinations are ungrouped. */
+  group_key?: string;
   icon: string;
   label_key: string;
   sublabel_key: string;
   surface: FrontDeskSurfaceId;
   path: string;
   min_role: FrontDeskRole;
+  placement?: FrontDeskMenuPlacement;
 }
 
 /**
- * The rail reads as one product: everyday work, the organization's
- * structure (one Concierge workspace, `/w`), materials, then management.
+ * MSN-SHELL-IA-20261105 §1 — exactly seven top-level destinations. Every
+ * other surface lives under one of them (tabs) or redirects to it
+ * (`presence/displays/concierge/src/lib/ia-routes.ts`). Role gates are the
+ * ones the folded-in destinations carried before.
  */
 export const FRONT_DESK_MENU: readonly FrontDeskMenuItem[] = [
   {
-    id: 'decide',
-    label_key: 'front_desk:nav_decide',
-    sublabel_key: 'front_desk:nav_decide_sub',
+    id: 'home',
+    label_key: 'front_desk:ia_nav_home',
+    sublabel_key: 'front_desk:ia_nav_home_sub',
     surface: 'concierge',
     path: '/',
+    min_role: 'viewer',
+    icon: 'home',
+  },
+  {
+    id: 'inbox',
+    label_key: 'front_desk:ia_nav_inbox',
+    sublabel_key: 'front_desk:ia_nav_inbox_sub',
+    surface: 'concierge',
+    path: '/inbox',
     min_role: 'approver',
-    group_key: 'front_desk:nav_group_work',
     icon: 'approval',
   },
+  {
+    id: 'work',
+    label_key: 'front_desk:ia_nav_work',
+    sublabel_key: 'front_desk:ia_nav_work_sub',
+    surface: 'concierge',
+    path: '/work',
+    min_role: 'viewer',
+    icon: 'mission',
+  },
+  {
+    id: 'org',
+    label_key: 'front_desk:ia_nav_org',
+    sublabel_key: 'front_desk:ia_nav_org_sub',
+    surface: 'concierge',
+    path: '/org',
+    min_role: 'viewer',
+    icon: 'user',
+  },
+  {
+    id: 'library',
+    label_key: 'front_desk:ia_nav_library',
+    sublabel_key: 'front_desk:ia_nav_library_sub',
+    surface: 'concierge',
+    path: '/library',
+    min_role: 'viewer',
+    icon: 'book',
+  },
+  {
+    id: 'ops',
+    label_key: 'front_desk:ia_nav_ops',
+    sublabel_key: 'front_desk:ia_nav_ops_sub',
+    surface: 'concierge',
+    path: '/ops',
+    min_role: 'owner',
+    icon: 'chart',
+  },
+  {
+    id: 'settings',
+    label_key: 'front_desk:ia_nav_settings',
+    sublabel_key: 'front_desk:ia_nav_settings_sub',
+    surface: 'concierge',
+    path: '/settings',
+    min_role: 'owner',
+    icon: 'settings',
+    placement: 'footer',
+  },
+] as const;
+
+/**
+ * Destinations other screens still link to (hearing completion, component
+ * groups, Studio pages) but that the rail does not list: the seven
+ * top-level destinations replaced them as navigation entries.
+ */
+export const FRONT_DESK_LINKED_DESTINATIONS: readonly FrontDeskMenuItem[] = [
   {
     id: 'ask',
     label_key: 'front_desk:nav_ask',
@@ -54,116 +127,6 @@ export const FRONT_DESK_MENU: readonly FrontDeskMenuItem[] = [
     path: '/ask',
     min_role: 'approver',
     group_key: 'front_desk:nav_group_work',
-    icon: 'chat',
-  },
-  {
-    id: 'missions',
-    label_key: 'front_desk:nav_missions',
-    sublabel_key: 'front_desk:nav_missions_sub',
-    surface: 'concierge',
-    path: '/w/mission',
-    min_role: 'viewer',
-    group_key: 'front_desk:nav_group_work',
-    icon: 'mission',
-  },
-  {
-    id: 'work-items',
-    label_key: 'front_desk:nav_work_items',
-    sublabel_key: 'front_desk:nav_work_items_sub',
-    surface: 'concierge',
-    path: '/w/work_item',
-    min_role: 'viewer',
-    group_key: 'front_desk:nav_group_work',
-    icon: 'check',
-  },
-  {
-    id: 'approvals',
-    label_key: 'front_desk:nav_approvals',
-    sublabel_key: 'front_desk:nav_approvals_sub',
-    surface: 'concierge',
-    path: '/w/approval',
-    min_role: 'viewer',
-    group_key: 'front_desk:nav_group_work',
-    icon: 'approval',
-  },
-  {
-    id: 'overview',
-    label_key: 'front_desk:nav_overview',
-    sublabel_key: 'front_desk:nav_overview_sub',
-    surface: 'concierge',
-    path: '/w',
-    min_role: 'viewer',
-    group_key: 'front_desk:nav_group_organization',
-    icon: 'home',
-  },
-  {
-    id: 'organizations',
-    label_key: 'front_desk:nav_org_list',
-    sublabel_key: 'front_desk:nav_org_list_sub',
-    surface: 'concierge',
-    path: '/w/organization',
-    min_role: 'viewer',
-    group_key: 'front_desk:nav_group_organization',
-    icon: 'user',
-  },
-  {
-    id: 'projects',
-    label_key: 'front_desk:nav_projects',
-    sublabel_key: 'front_desk:nav_projects_sub',
-    surface: 'concierge',
-    path: '/w/project',
-    min_role: 'viewer',
-    group_key: 'front_desk:nav_group_organization',
-    icon: 'folder',
-  },
-  {
-    id: 'actors',
-    label_key: 'front_desk:nav_actors',
-    sublabel_key: 'front_desk:nav_actors_sub',
-    surface: 'concierge',
-    path: '/w/actor',
-    min_role: 'viewer',
-    group_key: 'front_desk:nav_group_organization',
-    icon: 'user',
-  },
-  {
-    id: 'deliverables',
-    label_key: 'front_desk:nav_deliverables',
-    sublabel_key: 'front_desk:nav_deliverables_sub',
-    surface: 'concierge',
-    path: '/ops?section=deliverables',
-    min_role: 'viewer',
-    group_key: 'front_desk:nav_group_resources',
-    icon: 'folder',
-  },
-  {
-    id: 'ingest',
-    label_key: 'front_desk:nav_ingest',
-    sublabel_key: 'front_desk:nav_ingest_sub',
-    surface: 'concierge',
-    path: '/ingest',
-    min_role: 'operator',
-    group_key: 'front_desk:nav_group_resources',
-    icon: 'folder',
-  },
-  {
-    id: 'knowledge',
-    label_key: 'front_desk:nav_knowledge',
-    sublabel_key: 'front_desk:nav_knowledge_sub',
-    surface: 'concierge',
-    path: '/ops?section=knowledge',
-    min_role: 'viewer',
-    group_key: 'front_desk:nav_group_resources',
-    icon: 'book',
-  },
-  {
-    id: 'discussion',
-    label_key: 'front_desk:nav_discussion',
-    sublabel_key: 'front_desk:nav_discussion_sub',
-    surface: 'concierge',
-    path: '/ops?section=discussion',
-    min_role: 'viewer',
-    group_key: 'front_desk:nav_group_resources',
     icon: 'chat',
   },
   {
@@ -187,65 +150,7 @@ export const FRONT_DESK_MENU: readonly FrontDeskMenuItem[] = [
     icon: 'help',
   },
   {
-    id: 'organization',
-    label_key: 'front_desk:nav_organization',
-    sublabel_key: 'front_desk:nav_organization_sub',
-    surface: 'concierge',
-    path: '/management',
-    min_role: 'owner',
-    group_key: 'front_desk:nav_group_manage',
-    icon: 'user',
-  },
-  {
-    id: 'operations',
-    label_key: 'front_desk:nav_operations',
-    sublabel_key: 'front_desk:nav_operations_sub',
-    surface: 'concierge',
-    path: '/ops?section=operations',
-    min_role: 'owner',
-    group_key: 'front_desk:nav_group_manage',
-    icon: 'settings',
-  },
-  {
-    id: 'surface-control',
-    label_key: 'front_desk:nav_surfaces',
-    sublabel_key: 'front_desk:nav_surfaces_sub',
-    surface: 'concierge',
-    path: '/ops?section=surface-control',
-    min_role: 'owner',
-    group_key: 'front_desk:nav_group_manage',
-    icon: 'settings',
-  },
-  {
-    id: 'diagnostics',
-    label_key: 'front_desk:nav_diagnostics',
-    sublabel_key: 'front_desk:nav_diagnostics_sub',
-    surface: 'concierge',
-    path: '/ops?section=diagnostics',
-    min_role: 'owner',
-    group_key: 'front_desk:nav_group_manage',
-    icon: 'chart',
-  },
-  {
-    id: 'settings',
-    label_key: 'front_desk:nav_settings',
-    sublabel_key: 'front_desk:nav_settings_sub',
-    surface: 'concierge',
-    path: '/settings',
-    min_role: 'owner',
-    group_key: 'front_desk:nav_group_manage',
-    icon: 'settings',
-  },
-] as const;
-
-/**
- * Destinations other screens still link to (hearing completion, component
- * groups) but that the rail no longer lists: the workspace pages on
- * Concierge replaced them as navigation entries.
- */
-export const FRONT_DESK_LINKED_DESTINATIONS: readonly FrontDeskMenuItem[] = [
-  {
-    id: 'home',
+    id: 'home-studio',
     label_key: 'front_desk:nav_home',
     sublabel_key: 'front_desk:nav_home_sub',
     surface: 'presence-studio',

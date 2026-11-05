@@ -1,9 +1,9 @@
 'use client';
-import { opsPagePath } from '../../lib/ops/ops-api-path';
 import * as React from 'react';
 import { Button } from '@agent/shared-ui';
 import { uxText, type SupportedLocale } from '../../lib/ops/ux-vocabulary';
 import type { ClientWorkItem, ClientMissionAdmission } from '../../lib/ops/workitems-response';
+import { inboxHrefForApproval } from '../../lib/inbox-links';
 
 /** Requesting approval is visibly distinct from completing or starting the work. */
 export function WorkItemMissionAlignmentAction({
@@ -51,14 +51,7 @@ export function WorkItemMissionAlignmentAction({
           {' · '}
           {admission.requestId}
           {' · '}
-          <a
-            href={
-              opsPagePath('?section=approvals&request=') +
-              encodeURIComponent(admission.requestId) +
-              '&mission=' +
-              encodeURIComponent(admission.missionId)
-            }
-          >
+          <a href={inboxHrefForApproval(admission.requestId, { missionId: admission.missionId })}>
             {uxText('chronos_action_route_to_approvals', locale)}
           </a>
         </div>

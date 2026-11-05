@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-04
+last_updated: 2026-11-05
 ---
 
 # Operations Hygiene Runbook
@@ -440,6 +440,36 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
 5. **Check the janitor report.** `uncoveredRuntimeDirs` / `uncoveredRuntimeFiles` must not list the
    new name. A name there means a store was created through a dynamic path the gate cannot see; add
    its catalog entry by hand.
+
+### Tenant-partitioned runtime state
+
+- A new runtime store that keeps per-tenant records under `active/shared/runtime/` registers its
+  root in `PARTITIONED_RUNTIME_STATE_ROOTS` (`libs/core/foundation/runtime-state-roots.ts`) and
+  lays files out as `<root>/<tier>/<tenant>/…` through `storagePartitionSegments` (untenanted
+  records under `system/`). Mirror `<root>/personal/` and `<root>/confidential/` in
+  `security-policy.json` `tenant_scope.protected_prefixes`, add the prefixes to the
+  `storage-layout.test.ts` expectation, and decide its offboarding disposition in
+  `TENANT_RUNTIME_PARTITION_TARGET_KINDS` (the `satisfies` clause fails to compile until you do).
+- Build those paths with `partitionedScopedPath(root, scope, …)` (`libs/core/physical-namespace.ts`),
+  which keeps the scope's entity segments (`organizations/<id>/…`) below the partition. Do not use
+  `physicalScopedPath` (`<base>/tenants/<slug>/…`) for new tenant state under
+  `active/shared/runtime/`: that layout is invisible to tier-guard's tenant check, backup/restore
+  and `TENANT_RUNTIME_PARTITION_ROOTS` (`tenantRuntimePartitionOf` cannot classify it), so it is
+  only offboarded when its base is hand-listed in `scope-offboarding.ts`
+  (`PHYSICAL_SCHEDULE_ROOT`, `PHYSICAL_PRESENCE_ROOT`, `PHYSICAL_TENANT_LEARNING_ROOTS`).
+- Migrating a legacy `tenants/<slug>` store: register the root, write only the partitioned path,
+  keep a read fallback to the legacy copy while it may still hold live data (remove the legacy copy
+  on the next write — `generation-cost-settlement.ts`), or skip the fallback when the data is
+  short-lived (`scripts/reasoning_credentials.ts` proofs expire in 15 minutes). Add the old base to
+  `PHYSICAL_LEGACY_TENANT_STATE_ROOTS` so offboarding still removes leftovers. A store whose current
+  layout is already registered and only detects legacy copies for operator-reviewed migration
+  (`dot-state-paths.ts`) is a documented `bases` exception instead.
+- Gates: `tests/tenant-runtime-store-registration.test.ts` (every `physicalScopedPath` base under
+  `active/shared/runtime/` must be an offboarding `PHYSICAL_*` base; dynamic bases and deliberate
+  exceptions go in `tests/fixtures/tenant-runtime-store-allowlist.json` with a reason),
+  `storage-layout.test.ts` (protected prefixes), `scope-offboarding.test.ts` (one disposition per
+  registered root; the tenant-state purge test), and the store's own partition test (e.g.
+  `delegation-idempotency.test.ts`, `generation-cost-settlement.test.ts`).
 
 ### Immutable scoped evidence attempts
 
@@ -993,6 +1023,23 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
   `libs/core/mission/mission-tier-scan.test.ts`,
   `scripts/watch_tenant_drift.test.ts` (bound-partition probe),
   `libs/actuators/system-actuator/src/system-pipeline-path.test.ts` (bound `list_missions`).
+- **Viewer scope projections never drop scope fields; tenant admission goes through
+  `admitsTenant`.** A function that copies a server-resolved viewer into another shape
+  (`toSurfaceAuthorizationContext`, an event `scopeFilter`, a store query) carries every scope
+  field — `tenantSlugs`, `includeUntenanted`, organization, project, tier — or the receiving reader
+  silently loses records: the shell's system selection (`tenantSlugs: []` +
+  `includeUntenanted`) undercounted company-less missions, agents, cost and deliverables on Home
+  while needs-you showed them (2026-11, PR #1407). Row-level tenant admission is one predicate,
+  `admitsTenant(context, tenantSlug)` in `libs/core/surface/surface-authorization.ts` (`'all'`
+  admits; a company-less record only with `includeUntenanted`; otherwise membership) — never a
+  hand-rolled `tenantSlugs.includes(...)` per reader. `includeUntenanted` is server-resolved only
+  (never a request parameter) and never widens the named tenants. The personal view's per-company
+  fan-out reads through `companyFanoutViews` + `readCompanyFanoutHome`
+  (`presence/displays/concierge/src/lib/company-fanout-*.ts`); its short per-viewer cache is
+  cleared by every needs-you mutation route via `withCompanyFanoutInvalidation`. Gates:
+  `tests/viewer-untenanted-admission-contract.test.ts` (system and single-company admission
+  across `readConciergeHome`, `collectHomeDashboard` and needs-you),
+  `tests/company-fanout-invalidation-boundary.test.ts`.
 
 **Procedure:**
 
@@ -1017,7 +1064,21 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
 
 ## §7 LLM and provider calls
 
+**Non-public reasoning scopes declare `training_use`.** A `withReasoningPayloadScope` scope with tier `confidential` or `personal` names its `training_use` explicitly. An omitted posture falls back to `local_only` inside the egress gate, which denies every external backend (claude-cli included), and callers used to report that as a generic backend failure. Choose the posture from what the call sends: `no_training` for tenant working material that may reach a provider the tenant attested (as peer auto-reply drafting does), and an explicit `local_only` for personal material or anything that must stay on this host. Never weaken the gate to make a call pass. Report an egress denial as its own status (`egress_denied`) with the denial's `next:` step (`isReasoningEgressDenial`, `reasoningEgressDenialNext`), not as `backend_unavailable`. Public material may be used for provider training: a `public` scope that declares no posture is `training_eligible` (`effectiveReasoningTrainingUse`, decided 2026-11-05), and the same default applies to explicitly public OCR requests and knowledge contexts. An explicit `local_only` on public material is still honoured. Gates: `ReasoningPayloadScope` makes the field required at the type level, and `tests/reasoning-payload-scope-training-use.test.ts` (registration-tests) statically backstops untyped and dynamic call sites. Its allowlist stays empty.
+
 **Explicit attachment facts.** Under an explicitly processor-scoped charter, the trusted send boundary supplies a non-negative integer `attachment_count`. Text-only leaf calls declare zero; image calls declare the number of outgoing images. Missing facts fail closed rather than implying zero. Generic task/pipeline envelopes must not invent a count before the concrete payload is known. When adding a processor scope, cover missing, negative and fractional counts and preserve task backend/egress restrictions. Gates: `reasoning-egress-scope.test.ts`, `media/image-description-bridge.test.ts` and `visual-review.test.ts`.
+
+**Delegation execution-start reporting (R5).** A keyed `delegateTask` failure whose start
+state is unknown counts as started: no retry, no failover, a terminal replay. A backend opts in to
+precise reporting by wrapping its `delegateTask` body in `runStartReportingDelegation`
+(`libs/core/delegation-execution-tracker.ts`) — only when EVERY dispatch path reports its start:
+a pure completion call, a tool loop that calls `markDelegationExecutionStarted()` before its first
+tool, or a CLI spawned through `spawnWithDelegationEnv` (which marks once a child pid exists).
+An SDK or adapter that spawns or runs tools elsewhere (claude-agent, copilot-acp, agy native
+subagents) stays unwrapped, so its failures keep the conservative at-most-once verdict. Report
+measured usage / served model with `reportDelegationResultMetadata`; never zero-fill. Gates:
+`reasoning-backend.delegation-guard.test.ts`, `provider-spawn-env.test.ts`,
+`anthropic-reasoning-backend.test.ts`, `delegation-idempotency.test.ts`.
 
 **Host bookkeeping inside advisory execution.** A dot wake may stop before the provider call with
 `SANDBOX_WRITE_DENIED` on `observability/delegations.jsonl`: the planner's read-only sandbox also

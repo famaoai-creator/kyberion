@@ -223,7 +223,7 @@ describe('FD-01 GET /api/me composition', () => {
 });
 
 describe('FD-00 GET /api/front-desk/nav composition (mirrors the route in server.ts)', () => {
-  it('resolves grouped existing routes with ja labels and the manifest-driven concierge port', () => {
+  it('resolves the seven top-level destinations with ja labels and the manifest-driven concierge port', () => {
     const viewer = resolvePresenceStudioViewerContext(fakeRequest({ remoteAddress: '127.0.0.1' }));
     const role = frontDeskRoleFromViewer({ role: toFrontDeskViewerScope(viewer).role });
     const ports = readFrontDeskSurfacePorts();
@@ -237,61 +237,31 @@ describe('FD-00 GET /api/front-desk/nav composition (mirrors the route in server
     );
 
     expect(items.map((item) => item.id)).toEqual([
-      'decide',
-      'ask',
-      'missions',
-      'work-items',
-      'approvals',
-      'overview',
-      'organizations',
-      'projects',
-      'actors',
-      'deliverables',
-      'ingest',
-      'knowledge',
-      'discussion',
-      'first-job',
-      'help',
-      'organization',
-      'operations',
-      'surface-control',
-      'diagnostics',
+      'home',
+      'inbox',
+      'work',
+      'org',
+      'library',
+      'ops',
       'settings',
     ]);
     expect(items.map((item) => item.label)).toEqual([
-      '受信箱',
-      '依頼する',
-      'ミッション',
-      'ワークアイテム',
-      '承認',
-      '全体像',
+      'ホーム',
+      'あなた待ち',
+      '仕事',
       '組織',
-      'プロジェクト',
-      '人とエージェント',
-      '成果物',
-      '資料の取込',
-      'ナレッジ',
-      'ディスカッション',
-      'はじめての仕事',
-      '使い方を見る',
-      '組織の編集',
-      'エージェント運用',
-      '画面の管理',
-      '診断',
+      '資料',
+      '運用',
       '設定',
     ]);
-    // The operations console (former Chronos) is served by Concierge under /ops.
-    expect(items.find((item) => item.id === 'knowledge')?.href).toBe(
-      'http://127.0.0.1:4050/ops?section=knowledge'
-    );
-    // decide/settings live on concierge — the port must come from the
-    // (mocked) manifest, never a hardcoded literal.
-    expect(items.find((item) => item.id === 'decide')?.href).toBe('http://127.0.0.1:4050/');
+    // Every top-level destination is served by Concierge; the port comes from
+    // the (mocked) manifest, never a hardcoded literal.
+    expect(items.find((item) => item.id === 'ops')?.href).toBe('http://127.0.0.1:4050/ops');
+    expect(items.find((item) => item.id === 'inbox')?.href).toBe('http://127.0.0.1:4050/inbox');
     expect(items.find((item) => item.id === 'settings')?.href).toBe(
       'http://127.0.0.1:4050/settings'
     );
-    expect(items.find((item) => item.id === 'ask')?.external).toBe(false);
-    expect(items.find((item) => item.id === 'overview')?.href).toBe('http://127.0.0.1:4050/w');
+    expect(items.every((item) => item.external)).toBe(true);
     expect(FRONT_DESK_HELP_LINK.path).toBe('/help');
   });
 });
