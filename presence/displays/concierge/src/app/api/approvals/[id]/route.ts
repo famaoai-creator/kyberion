@@ -1,3 +1,4 @@
+import { withCompanyFanoutInvalidation } from '../../../../lib/company-fanout-cache';
 import { requireConciergeInstallationAccess } from '../../../../lib/installation-access';
 import { scopedLearningApprovalVisibleToViewer } from '../../../../lib/scoped-learning-approval-visibility';
 import { onboardingApprovalMember } from '../../../../lib/onboarding-authority-server';
@@ -22,7 +23,7 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+async function handlePost(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
   // FD-07: a failed viewer resolution is a hard stop — the request never
@@ -127,3 +128,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     return conciergeErrorResponse(error, 500);
   }
 }
+
+/** A needs-you mutation: the personal fan-out cache never serves the decided item again. */
+export const POST = withCompanyFanoutInvalidation(handlePost);

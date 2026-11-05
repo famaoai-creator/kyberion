@@ -1,3 +1,4 @@
+import { withCompanyFanoutInvalidation } from '../../../../lib/company-fanout-cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@agent/core/core';
 import {
@@ -45,7 +46,7 @@ type PluginDecision = (typeof ALLOWED_DECISIONS)[number];
 // Mirrors normalizePluginId in libs/core/plugin-managed-install.ts.
 const PLUGIN_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
 
-export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+async function handlePost(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
   const resolved = resolveConciergeViewer(req);
@@ -191,3 +192,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     return NextResponse.json({ ok: false, error: t('api.plugin.failed') }, { status: 500 });
   }
 }
+
+/** A needs-you mutation: the personal fan-out cache never serves the decided item again. */
+export const POST = withCompanyFanoutInvalidation(handlePost);

@@ -31,6 +31,11 @@ vi.mock('@agent/core/knowledge/memory-promotion-queue', async (importOriginal) =
 import { GET as LIST } from './route.js';
 import { GET as SUMMARY } from './summary/route.js';
 import { GET as CATCH_ALL } from '../[...operation]/route.js';
+import {
+  COMPANY_FANOUT_TTL_MS,
+  invalidateCompanyFanoutCache,
+  withCompanyFanoutInvalidation,
+} from '../../../../lib/company-fanout-cache.js';
 
 function viewer(tenantSlugs: string[] | 'all') {
   return {
@@ -73,6 +78,7 @@ function request(query = ''): NextRequest {
 }
 
 beforeEach(() => {
+  invalidateCompanyFanoutCache();
   for (const mock of Object.values(mocks)) mock.mockReset();
   mocks.hygiene.mockReturnValue([]);
   mocks.memory.mockReturnValue([]);
@@ -161,6 +167,43 @@ describe('GET /api/v1/needs-you', () => {
       [],
     ]);
     expect(mocks.readHome.mock.calls[3]![0].includeUntenanted).toBe(true);
+  });
+
+  it('the personal view reuses the per-company homes briefly, until a needs-you mutation', async () => {
+    mocks.resolveViewer.mockReturnValue({ context: viewer('all') });
+    expect((await (await SUMMARY(request('/summary'))).json()).total).toBe(2);
+    expect(mocks.readHome).toHaveBeenCalledTimes(4);
+    // The inbox polls list + summary: the second read within the TTL is cached.
+    await LIST(request());
+    expect(mocks.readHome).toHaveBeenCalledTimes(4);
+    expect(COMPANY_FANOUT_TTL_MS).toBeLessThanOrEqual(10_000);
+    // A decision lands (the route handlers are wrapped): the decided approval
+    // is gone from the store and must not come back from the cache.
+    mocks.readHome.mockReturnValue({
+      approval_queue: [approval('a1', 'acme')],
+      outcome_feed: [],
+      exception_feed: [],
+    });
+    await withCompanyFanoutInvalidation(async () => 'decided')();
+    expect((await (await SUMMARY(request('/summary'))).json()).total).toBe(1);
+    expect(mocks.readHome).toHaveBeenCalledTimes(8);
+  });
+
+  it('never shares a cached fan-out read between viewers', async () => {
+    mocks.resolveViewer.mockReturnValue({ context: viewer('all') });
+    await SUMMARY(request('/summary'));
+    mocks.resolveViewer.mockReturnValue({
+      context: { ...viewer('all'), principalId: 'human:someone-else' },
+    });
+    await SUMMARY(request('/summary'));
+    expect(mocks.readHome).toHaveBeenCalledTimes(8);
+  });
+
+  it('a company selection is never served from the fan-out cache', async () => {
+    mocks.resolveViewer.mockReturnValue({ context: viewer(['famao-ai', 'acme']) });
+    await SUMMARY(request('/summary?tenant=acme'));
+    await SUMMARY(request('/summary?tenant=acme'));
+    expect(mocks.readHome).toHaveBeenCalledTimes(2);
   });
 
   it('reads company-less failures only in the view that admits untenanted records', async () => {
