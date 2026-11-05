@@ -1,5 +1,6 @@
 import { nowIso } from '../foundation/time.js';
-import { getReasoningBackend } from './reasoning-backend.js';
+import { buildTaskReasoningBackend } from './reasoning-bootstrap.js';
+import type { ReasoningBackend, ReasoningCallOptions } from './reasoning-backend-contracts.js';
 import { providerIdForReasoningIdentifier } from '../provider/provider-egress-gate.js';
 import { resolveModelProvider } from './reasoning-model-routing.js';
 import {
@@ -29,12 +30,56 @@ export interface RunModelRoleFitnessProbesResult {
   evaluations: Array<RoleFitnessEvaluation & { recorded: boolean }>;
 }
 
+/**
+ * Per-probe ceiling. The runner bounds every probe itself and builds its
+ * backend with `requestTimeout: 'caller'` and this as `timeoutMs`: through
+ * the route's request wrapper (and the default chain's 60s route limit) a
+ * slow-but-correct model's probe was cut off and silently dropped, so the
+ * measurement depended on the wrapper, not the model.
+ */
+export const ROLE_FITNESS_PROBE_TIMEOUT_MS = 180_000;
+
+/** The measurement backend: caller-bounded, so no route wrapper answers for the model. */
+function buildRoleFitnessBackend(): ReasoningBackend {
+  return buildTaskReasoningBackend({
+    requestTimeout: 'caller',
+    timeoutMs: ROLE_FITNESS_PROBE_TIMEOUT_MS,
+  });
+}
+
+async function promptWithin(
+  backend: ReasoningBackend,
+  prompt: string,
+  options: ReasoningCallOptions,
+  timeoutMs: number
+): Promise<string> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error(`[ROLE_FITNESS_PROBE_TIMEOUT] probe exceeded ${timeoutMs}ms`);
+      controller.abort(error);
+      reject(error);
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([
+      backend.prompt(prompt, { ...options, signal: controller.signal }),
+      timedOut,
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function runModelRoleFitnessProbes(input: {
   modelId: string;
   provider?: string;
   teamRole?: string;
   /** Evaluate without writing to the journal (dry run). */
   record?: boolean;
+  /** Per-probe ceiling (default {@link ROLE_FITNESS_PROBE_TIMEOUT_MS}). */
+  probeTimeoutMs?: number;
 }): Promise<RunModelRoleFitnessProbesResult> {
   const probes = listRoleFitnessProbes(input.teamRole);
   const base: RunModelRoleFitnessProbesResult = {
@@ -46,7 +91,16 @@ export async function runModelRoleFitnessProbes(input: {
   };
   if (probes.length === 0) return base;
 
-  const backend = getReasoningBackend();
+  let backend: ReasoningBackend;
+  try {
+    backend = buildRoleFitnessBackend();
+  } catch (error) {
+    return {
+      ...base,
+      status: 'backend_unavailable',
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
   if (backend.name === 'stub') return { ...base, status: 'backend_unavailable' };
 
   // A backend that silently ignores the requested model would answer as
@@ -77,10 +131,15 @@ export async function runModelRoleFitnessProbes(input: {
   for (const probe of probes) {
     let raw = '';
     try {
-      raw = await backend.prompt(probe.prompt, { model: input.modelId });
+      raw = await promptWithin(
+        backend,
+        probe.prompt,
+        { model: input.modelId },
+        input.probeTimeoutMs ?? ROLE_FITNESS_PROBE_TIMEOUT_MS
+      );
     } catch {
-      // An unreachable model is not a failing model: record nothing rather
-      // than blame the model for the transport.
+      // An unreachable (or timed-out) model is not a failing model: record
+      // nothing rather than blame the model for the transport.
       continue;
     }
     const evaluation = evaluateRoleFitnessResponse(probe, raw, threshold);
