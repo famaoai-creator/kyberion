@@ -21,7 +21,7 @@ import {
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { ledger } from '../ledger.js';
-import { withLock } from '../lock-utils.js';
+import { withLock } from '../foundation/lock-utils.js';
 import { evaluateAutonomousOpsAction } from '../governance/autonomous-ops-gate.js';
 import { buildDecisionCard } from '../governance/decision-card.js';
 import {

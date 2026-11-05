@@ -5,13 +5,13 @@ import {
   listGovernedArtifacts,
   readGovernedArtifactJson,
   writeGovernedArtifactJson,
-} from '@agent/core/artifacts';
+} from '@agent/core/workforce/artifact-store';
 import {
   loadArtifactRecord,
   saveArtifactRecord,
   type ArtifactRecord,
 } from '@agent/core/workforce/artifact-record';
-import type { GovernedArtifactRole } from '@agent/core/artifacts';
+import type { GovernedArtifactRole } from '@agent/core/workforce/artifact-store';
 import type { RejectionReasonCategory } from '@agent/core/contracts/rejection-reason';
 import { nowIso } from '@agent/core/foundation';
 

@@ -37,7 +37,7 @@ import {
   resolveKnowledgeScopeSet,
   assertKnowledgePathInScope,
 } from '@agent/core/knowledge/knowledge-scope';
-import { loadKnowledgeUsageAggregate } from '@agent/core/knowledge-feedback-loop';
+import { loadKnowledgeUsageAggregate } from '@agent/core/knowledge/knowledge-feedback-loop';
 import { loadAnalysisConfigAtPath } from '@agent/core/analysis/analysis-config';
 import { segmentWords } from '@agent/core/foundation/locale-normalize';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';

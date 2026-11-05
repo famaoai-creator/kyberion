@@ -3,7 +3,7 @@ import type { Request, RequestHandler } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
 import { logger } from '@agent/core/core';
-import { fixedWindowLimiter } from '@agent/core/rate-limit';
+import { fixedWindowLimiter } from '@agent/core/foundation/rate-limit';
 import { loadRuntimeControlPolicy } from '@agent/core/runtime-control-policy';
 import {
   extractSurfaceBearerToken,

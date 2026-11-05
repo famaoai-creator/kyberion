@@ -14,7 +14,7 @@ import {
   safeExistsSync,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolvePipelineContextValues } from '@agent/core/logic-utils';
+import { resolvePipelineContextValues } from '@agent/core/pipeline/logic-utils';
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { isRecord, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';

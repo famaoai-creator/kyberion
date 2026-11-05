@@ -54,7 +54,7 @@ import { installShellStreamingTtsBridgeFromEnv } from '@agent/core/shell/shell-s
 import { loadEnvironmentManifest, verifyReady } from '@agent/core/environment-capability';
 import { resolveAudioBus } from '@agent/core/voice/audio-bus-resolver';
 import { resolveMeetingParticipationRuntimePlan } from '@agent/core/meeting/meeting-participation-runtime-plan';
-import { TraceContext, finalizeAndPersist } from '@agent/core/trace';
+import { TraceContext, finalizeAndPersist } from '@agent/core/analysis/trace';
 import { logger } from '@agent/core/core';
 import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import { setRegisteredEnv } from '@agent/core/foundation';

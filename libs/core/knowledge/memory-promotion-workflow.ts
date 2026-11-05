@@ -1,5 +1,5 @@
 import { recordScopedLearningPublicationConsumption } from './scoped-learning-approval.js';
-import { withLock } from '../lock-utils.js';
+import { withLock } from '../foundation/lock-utils.js';
 import { createHash } from 'node:crypto';
 import {
   createDistillCandidateRecord,

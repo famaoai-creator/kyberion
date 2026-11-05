@@ -26,7 +26,7 @@ import {
   evaluateCondition,
   resolveWriteArtifactSpec,
   resolveRequiredStringParam,
-} from '@agent/core/logic-utils';
+} from '@agent/core/pipeline/logic-utils';
 import { validateOpInput } from '@agent/core/pipeline/op-input-contracts';
 import { processUntrustedContent } from '@agent/core/untrusted-content';
 import { skipAdfStep } from '@agent/core/pipeline/adf-engine';

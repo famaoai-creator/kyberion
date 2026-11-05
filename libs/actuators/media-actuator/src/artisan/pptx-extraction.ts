@@ -1,4 +1,4 @@
-import * as pptxUtils from '@agent/core/pptx-utils';
+import * as pptxUtils from '@agent/core/media/pptx-utils';
 import { runGovernedCommand } from '@agent/core/command-runner';
 import { parseOoxmlCorePropertiesXml } from '@agent/core/media/ooxml-core-props';
 import type { ExtractionMode, ExtractionOptions, ExtractionResult } from './extraction-engine.js';

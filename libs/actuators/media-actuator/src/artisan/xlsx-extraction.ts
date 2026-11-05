@@ -1,4 +1,4 @@
-import * as xlsxUtils from '@agent/core/xlsx-utils';
+import * as xlsxUtils from '@agent/core/media/xlsx-utils';
 import { decodeEntities } from '@agent/core/foundation/text-escaping';
 import { runGovernedCommand } from '@agent/core/command-runner';
 import type {
