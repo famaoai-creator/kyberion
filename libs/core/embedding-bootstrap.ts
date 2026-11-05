@@ -12,11 +12,17 @@ import {
   isGeminiEmbeddingAvailable,
 } from './provider/gemini-embedding-backend.js';
 import { resolveSeamDefaultOrder } from './seam-provider-selection.js';
+import {
+  unmetRuntimeRequirements,
+  type ProviderRuntimeRequirement,
+} from './provider-runtime-requirements.js';
 import { logger } from './core.js';
 
 interface EmbeddingCandidate {
   isAvailable(): boolean;
   create(): EmbeddingBackend | null;
+  /** Declarative host requirements; the isAvailable probe stays authoritative. */
+  runtime_requirements?: ProviderRuntimeRequirement;
 }
 
 /**
@@ -26,13 +32,37 @@ interface EmbeddingCandidate {
  * backend, though bootstrap resets before iterating).
  */
 const EMBEDDING_CANDIDATES: Record<string, EmbeddingCandidate> = {
-  mlx: { isAvailable: isMlxAvailable, create: () => new MlxEmbeddingBackend() },
+  mlx: {
+    isAvailable: isMlxAvailable,
+    create: () => new MlxEmbeddingBackend(),
+    // isMlxAvailable = isMacOS && mlx_embed.py present (repo-constant) → the
+    // declarative mirror is a darwin-only host requirement.
+    runtime_requirements: { platforms: ['darwin'] },
+  },
   gemini: {
     isAvailable: isGeminiEmbeddingAvailable,
     create: () => new GeminiEmbeddingBackend(),
+    // Credential-bound (tenant credential binding, not a plain env var) —
+    // the probe stays the only honest availability signal.
   },
   'local-hash-embedding': { isAvailable: () => true, create: () => getEmbeddingBackend() },
 };
+
+/**
+ * Selection candidates (id, eligible, unmet) for diagnosis — runtime
+ * requirements first, the candidate's own availability probe second.
+ */
+export function listEmbeddingBackendCandidates(): Array<{
+  id: string;
+  eligible: boolean;
+  unmet: string[];
+}> {
+  return Object.entries(EMBEDDING_CANDIDATES).map(([id, candidate]) => {
+    const unmet = unmetRuntimeRequirements(candidate.runtime_requirements);
+    if (unmet.length === 0 && !candidate.isAvailable()) unmet.push('unavailable');
+    return { id, eligible: unmet.length === 0, unmet };
+  });
+}
 
 /** Hermetic order when the policy file is absent or unreadable. */
 const EMBEDDING_BUILTIN_ORDER = ['mlx', 'gemini', 'local-hash-embedding'] as const;
@@ -56,7 +86,15 @@ export function installEmbeddingBackendIfAvailable(): boolean {
 
   for (const id of candidateOrder()) {
     const candidate = EMBEDDING_CANDIDATES[id];
-    if (!candidate?.isAvailable()) continue;
+    if (!candidate?.isAvailable()) {
+      const unmet = candidate ? unmetRuntimeRequirements(candidate.runtime_requirements) : [];
+      if (candidate && unmet.length > 0) {
+        logger.debug(
+          `[embedding-bootstrap] skipped candidate '${id}' — unmet: ${unmet.join(', ')}`
+        );
+      }
+      continue;
+    }
     const backend = candidate.create();
     if (!backend) continue;
     registerEmbeddingBackend(backend);
