@@ -580,11 +580,14 @@ export function OrganizationOperatingModel({
           </Section>
 
           {tenant && !projectId ? (
-            <CustomerDecisionCard
-              tenant={tenant}
-              organizationId={view.organization_id}
-              learningCandidates={view.learning_candidates}
-            />
+            // `#customer-decisions` is the target of the あなた待ち decision card.
+            <div id="customer-decisions">
+              <CustomerDecisionCard
+                tenant={tenant}
+                organizationId={view.organization_id}
+                learningCandidates={view.learning_candidates}
+              />
+            </div>
           ) : null}
 
           <ChronosToolbar>

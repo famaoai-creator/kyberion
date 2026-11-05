@@ -63,6 +63,8 @@ cache/
 outputs/
 /archive/
 work/
+# The Concierge /work route is source, not a runtime work dir.
+!presence/displays/concierge/src/app/work/
 temp_ppt/
 tests/_tmp/
 tests/_tmp_integration/

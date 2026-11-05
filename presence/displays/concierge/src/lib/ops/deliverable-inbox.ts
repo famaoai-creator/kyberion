@@ -43,6 +43,11 @@ export interface DeliverableInboxItem {
   /** CE-07: role-separated claims carried from the governed inbox record. */
   roleSections?: DeliverableInboxEntry['role_sections'];
   integratedSummary?: string;
+  /**
+   * The governed deliverable inbox holds an open entry (unread / read) for this
+   * artifact: the operator decides it in あなた待ち, not on the artifact.
+   */
+  awaitingInboxDecision?: boolean;
 }
 
 export interface DeliverableInboxQuery {
@@ -254,6 +259,9 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
           ?.current_artifact_id,
         roleSections: linkedInbox?.role_sections,
         integratedSummary: linkedInbox?.integrated_summary,
+        ...(linkedInbox && (linkedInbox.status === 'unread' || linkedInbox.status === 'read')
+          ? { awaitingInboxDecision: true }
+          : {}),
       } satisfies DeliverableInboxItem;
     })
     .filter((item) => (missionId ? item.missionId?.toUpperCase() === missionId : true))
