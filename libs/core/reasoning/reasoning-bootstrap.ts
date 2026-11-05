@@ -170,6 +170,16 @@ export interface InstallReasoningOptions {
   maxCompletionTokens?: number;
   /** Per-request timeout for HTTP-based backends (e.g. OpenAI-compatible). */
   timeoutMs?: number;
+  /**
+   * Who bounds each request. `'route'` (default) races every prompt /
+   * delegateTask against the route's `limits.timeoutMs` and rejects as soon as
+   * the caller's signal fires, without waiting for the provider. `'caller'`
+   * (task-local construction only) leaves that wrapper off and lets
+   * `timeoutMs` override the route limit for the provider adapters: for
+   * measurement callers (live conformance) that bound every call themselves
+   * and must observe what the provider does after an abort, not the wrapper.
+   */
+  requestTimeout?: 'route' | 'caller';
   /** Pre-built Anthropic client (applies only to `anthropic` mode). */
   anthropicClient?: Anthropic;
   /** Force install even if stub would be chosen otherwise (for tests). */

@@ -17,6 +17,7 @@ import type {
   ReasoningCallOptions,
 } from './reasoning/reasoning-backend-contracts.js';
 import { createDelegationHandle } from './delegated-task-observability.js';
+import { bindReasoningRequestTimeout } from './reasoning/reasoning-fixed-binding.js';
 
 const NONCE = 'n0nce';
 const RECALL = /first message/u;
@@ -231,6 +232,23 @@ describe('backend live scenarios (MSN-HARNESS-ADOPT R1)', () => {
     expect(followUp.outcome).toBe('fail');
     expect(followUp.detail).toMatch(/repeats the first turn/u);
     expect(followUp.answer_excerpt).toContain(`M2-${NONCE}`);
+    // The recall turn was never asked, so this says nothing about continuity.
+    expect(followUp.continuity).toBe('unreported');
+  });
+
+  it('records continuity only from the recall turn', async () => {
+    const held = await harness(HEALTHY).run();
+    expect(outcome(held, 'follow_up').continuity).toBe('held');
+    const forgot = await harness({ ...HEALTHY, remembers: false }).run();
+    expect(outcome(forgot, 'follow_up').continuity).toBe('absent');
+    const ignoredM2 = await harness(
+      { ...HEALTHY, followUpFailuresBeforePass: 5 },
+      { retries: 0 }
+    ).run();
+    expect(outcome(ignoredM2, 'follow_up')).toMatchObject({
+      outcome: 'fail',
+      continuity: 'unreported',
+    });
   });
 
   it('judges from the answer, not the prompt: a refusal fails first and cascades not_run', async () => {
@@ -334,6 +352,32 @@ describe('backend live scenarios (MSN-HARNESS-ADOPT R1)', () => {
     expect(abort.detail).toMatch(/ignored the signal/u);
   });
 
+  it('never passes abort through the request-timeout wrapper, which answers for the provider', async () => {
+    // bindReasoningRequestTimeout rejects with the caller's reason the moment
+    // the signal fires, whatever the provider does. Through it, a provider that
+    // ignores the signal would look like one that stopped.
+    const files = new Map<string, string>();
+    const { backend } = stubSessionBackend({ ...HEALTHY, abort: 'ignores-signal' }, files);
+    const wrapped = bindReasoningRequestTimeout(backend, 60_000);
+    const record = await runBackendLiveScenarios(wrapped, {
+      mode: 'claude-cli',
+      nonce: NONCE,
+      turnTimeoutMs: 1_000,
+      abortTimeoutMs: 50,
+      abortStartDelayMs: 1,
+      createWorkspace: () => ({ path: '/scratch/ws-3', release: () => {} }),
+      readFile: (file) => files.get(file),
+    });
+    const abort = outcome(record, 'abort');
+    expect(abort.outcome).toBe('unreported');
+    expect(abort.detail).toMatch(/forwarded by a wrapper/u);
+  });
+
+  it('still passes abort when the provider itself rejects with its own cancellation error', async () => {
+    const record = await harness(HEALTHY).run();
+    expect(outcome(record, 'abort')).toMatchObject({ outcome: 'pass', attempts: 1 });
+  });
+
   it('scores abort unreported when the delegation settles before it can be aborted', async () => {
     const record = await harness({ ...HEALTHY, abort: 'settles-early' }).run();
     const abort = outcome(record, 'abort');
@@ -419,6 +463,9 @@ describe('backend capability honesty — live scenario evidence', () => {
         attempts: 1,
         detail: '',
         duration_ms: 0,
+        // What the runner writes when the recall turn decided the follow_up.
+        ...(scenario === 'follow_up' && value === 'pass' ? { continuity: 'held' as const } : {}),
+        ...(scenario === 'follow_up' && value === 'fail' ? { continuity: 'absent' as const } : {}),
       })),
       ...extra,
     };
@@ -468,6 +515,17 @@ describe('backend capability honesty — live scenario evidence', () => {
     expect(built.violations).toContainEqual(
       expect.objectContaining({ kind: 'contradicted_capability', mode })
     );
+  });
+
+  it('does not contradict continuity on a follow_up that failed before its recall turn', () => {
+    const m2Failure = record({ first: 'pass', follow_up: 'fail' });
+    m2Failure.scenarios[1]!.continuity = 'unreported';
+    expect(claim(report([m2Failure]), 'session_continuity').verdict).toBe('unproven');
+    // A record written before `continuity` existed cannot say which turn failed.
+    const legacy = record({ first: 'pass', follow_up: 'fail' });
+    delete legacy.scenarios[1]!.continuity;
+    expect(claim(report([legacy]), 'session_continuity').verdict).toBe('unproven');
+    expect(capabilityViolations(report([m2Failure, legacy]))).toEqual([]);
   });
 
   it('never counts not_run or unreported as evidence', () => {

@@ -28,7 +28,14 @@
  *   outcome is kept in `first_try`, so a flaky pass stays visible. An abort
  *   that ignored the signal is never retried: that delegation is still running.
  * - abort is judged on the provider's own promise after the AbortSignal, not
- *   on the delegation handle's state (see scenarioAbort).
+ *   on the delegation handle's state (see scenarioAbort). A rejection carrying
+ *   the scenario's own abort reason was answered by a wrapper that forwarded
+ *   the signal, not by the provider, and is `unreported`.
+ * - Measure the provider, not the request wrapper: build the backend with
+ *   `requestTimeout: 'caller'` (see check_backend_live_scenarios.ts). The
+ *   route wrapper races every call against the caller signal and the route
+ *   timeout, so through it abort reflects the wrapper and long turns hit the
+ *   route's 60s ceiling instead of `turnTimeoutMs`.
  * - `served_model` is what the caller can prove the provider served; absent
  *   that evidence it is `'unreported'`, never the requested model.
  *
@@ -79,6 +86,12 @@ export interface LiveScenarioResult {
   served_modes?: string[];
   /** reset_continue only: what the backend remembered after resetSession(). */
   continuity_after_reset?: 'lost' | 'retained' | 'unreported';
+  /**
+   * follow_up only: what the recall turn showed. Only the recall turn decides
+   * continuity; a follow_up that failed on the M2 instruction turn (echo,
+   * replay, non-compliance) never reached it and records `'unreported'`.
+   */
+  continuity?: 'held' | 'absent' | 'unreported';
 }
 
 export interface BackendLiveScenarioRecord {
@@ -132,7 +145,13 @@ export interface RunBackendLiveScenariosOptions {
   readFile?: (file: string) => string | undefined;
 }
 
-const DEFAULT_TURN_TIMEOUT_MS = 180_000;
+/**
+ * Default per-turn ceiling. The operator entrypoint builds its backend with
+ * `requestTimeout: 'caller'` and this as `timeoutMs`, so neither the route's
+ * request wrapper nor a shorter provider limit undercuts it.
+ */
+export const BACKEND_LIVE_TURN_TIMEOUT_MS = 180_000;
+const DEFAULT_TURN_TIMEOUT_MS = BACKEND_LIVE_TURN_TIMEOUT_MS;
 const DEFAULT_ABORT_TIMEOUT_MS = 30_000;
 const DEFAULT_ABORT_START_DELAY_MS = 1_000;
 const EXCERPT_CHARS = 200;
@@ -170,6 +189,7 @@ interface ScenarioContext {
   backend: ReasoningBackend;
   options: RunBackendLiveScenariosOptions;
   words: { m1: string; m2: string; m3: string };
+  nonce: string;
   turn: (prompt: string) => Promise<string>;
   /** Serving modes sampled during the current attempt (see servedMode). */
   servedModes: Set<string>;
@@ -259,24 +279,28 @@ async function scenarioFollowUp(ctx: ScenarioContext): Promise<Attempt> {
   const { m1, m2 } = ctx.words;
   const reply = await askForWord(ctx, `Reply with exactly: ${m2}`);
   if (!('answer' in reply)) return reply;
+  // Failures on this instruction turn are misbehaviour, not evidence about
+  // continuity: the recall turn that decides it was never asked.
   if (reply.answer.includes(m1)) {
     return {
       outcome: 'fail',
       detail: `the follow-up repeats the first turn's answer (${m1}): stale or replayed transcript`,
       answer_excerpt: excerpt(reply.answer),
+      continuity: 'unreported',
     };
   }
   const judged = judgeWordAnswer(reply.answer, m2);
-  if (judged === 'echo') return echoAttempt(reply.answer);
+  if (judged === 'echo') return { ...echoAttempt(reply.answer), continuity: 'unreported' };
   if (judged !== 'word') {
     return {
       outcome: 'fail',
       detail: `the follow-up answered without ${m2}`,
       answer_excerpt: excerpt(reply.answer),
+      continuity: 'unreported',
     };
   }
   const recall = await askForWord(ctx, RECALL_PROMPT);
-  if (!('answer' in recall)) return recall;
+  if (!('answer' in recall)) return { ...recall, continuity: 'unreported' };
   // The recall prompt does not contain M1, so an echo of it cannot produce the
   // word: a verbose but correct recall ("you asked for M1-…") is a pass. The
   // strict judgeWordAnswer stays on the "Reply with exactly" turns, whose
@@ -290,6 +314,7 @@ async function scenarioFollowUp(ctx: ScenarioContext): Promise<Attempt> {
       ? `answered ${m2} fresh, then recalled ${m1}: session continuity held`
       : `answered ${m2} but did not recall ${m1}: no session continuity`,
     answer_excerpt: excerpt(recall.answer),
+    continuity: ok ? 'held' : 'absent',
   };
 }
 
@@ -343,6 +368,22 @@ async function scenarioResetContinue(ctx: ScenarioContext): Promise<Attempt> {
     answer_excerpt: excerpt(recall.answer),
     continuity_after_reset: retained ? 'retained' : 'lost',
   };
+}
+
+/**
+ * A distinctive abort reason for this run. It is a plain string with no
+ * abort/cancel wording: governed providers turn a non-Error reason into their
+ * own `[DELEGATION_CANCELLED] …` error, so a rejection that IS this value (or
+ * quotes it) came from a layer that forwarded the caller's signal — e.g.
+ * `bindReasoningRequestTimeout`, which rejects the moment the signal fires
+ * without waiting for the provider — not from the provider stopping.
+ */
+function abortReasonFor(nonce: string): string {
+  return `backend-live-scenario-stop-${nonce}`;
+}
+
+function isForwardedSignalReason(error: unknown, reason: string): boolean {
+  return error === reason || errorText(error).includes(reason);
 }
 
 function isAbortError(error: unknown): boolean {
@@ -409,7 +450,8 @@ async function scenarioAbort(ctx: ScenarioContext): Promise<Attempt> {
       detail: `the delegation ${before.kind} before it could be aborted, so abort was not exercised`,
     };
   }
-  controller.abort('backend live scenario: abort');
+  const reason = abortReasonFor(ctx.nonce);
+  controller.abort(reason);
   try {
     await withTimeout(observed, graceMs, 'aborted delegation');
   } catch {
@@ -420,6 +462,13 @@ async function scenarioAbort(ctx: ScenarioContext): Promise<Attempt> {
     return {
       outcome: 'fail',
       detail: `the provider was still running ${graceMs}ms after the abort signal: it ignored the signal`,
+    };
+  }
+  if (after.kind === 'rejected' && isForwardedSignalReason(after.error, reason)) {
+    return {
+      outcome: 'unreported',
+      detail:
+        'the rejection is the caller signal reason forwarded by a wrapper, not the provider stopping; drive the backend without the request-timeout wrapper',
     };
   }
   if (after.kind === 'rejected' && isAbortError(after.error)) {
@@ -553,6 +602,7 @@ async function runAttempt(name: LiveScenarioName, ctx: ScenarioContext): Promise
       outcome: 'unreported',
       detail: `served by ${foreign.join(', ')} instead of ${ctx.options.mode}; ${attempt.detail}`,
       served_modes: sampled,
+      ...(attempt.continuity ? { continuity: 'unreported' as const } : {}),
     };
   }
   return sampled.length > 0 ? { ...attempt, served_modes: sampled } : attempt;
@@ -605,6 +655,7 @@ export async function runBackendLiveScenarios(
     backend,
     options,
     words: { m1: `M1-${nonce}`, m2: `M2-${nonce}`, m3: `M3-${nonce}` },
+    nonce,
     servedModes,
     sampleServedMode: () => {
       let sampled: string | undefined;

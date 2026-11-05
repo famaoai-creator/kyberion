@@ -19,6 +19,7 @@ vi.mock('@agent/core/backend-live-scenarios', async (importOriginal) => ({
   recordBackendLiveScenarioRun: mocks.recordBackendLiveScenarioRun,
 }));
 
+import { BACKEND_LIVE_TURN_TIMEOUT_MS } from '@agent/core/backend-live-scenarios';
 import { runCheckBackendLiveScenarios } from './check_backend_live_scenarios.js';
 
 describe('check:backend-live-scenarios entrypoint', () => {
@@ -64,6 +65,36 @@ describe('check:backend-live-scenarios entrypoint', () => {
     expect(output.join('\n')).toMatch(/--live requires an explicit --mode list/u);
     expect(mocks.buildTaskReasoningBackend).not.toHaveBeenCalled();
     expect(mocks.runBackendLiveScenarios).not.toHaveBeenCalled();
+  });
+
+  it('drives the provider without the route request wrapper on a live run', async () => {
+    const backend = { name: 'stub-live' };
+    mocks.buildTaskReasoningBackend.mockReturnValue(backend);
+    mocks.runBackendLiveScenarios.mockResolvedValue({
+      version: '1.0.0',
+      run_id: 'r',
+      mode: 'claude-cli',
+      backend_name: 'stub-live',
+      served_model: 'unreported',
+      started_at: 'a',
+      finished_at: 'b',
+      scenarios: [],
+    });
+    mocks.recordBackendLiveScenarioRun.mockReturnValue('/tmp/r.json');
+    await runCheckBackendLiveScenarios(['--live', '--mode', 'claude-cli']);
+    // The wrapper would answer an abort for the provider and cap turns at the
+    // route's 60s limit; the scenarios bound every call themselves.
+    expect(mocks.buildTaskReasoningBackend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'claude-cli',
+        requestTimeout: 'caller',
+        timeoutMs: BACKEND_LIVE_TURN_TIMEOUT_MS,
+      })
+    );
+    expect(mocks.runBackendLiveScenarios).toHaveBeenCalledWith(
+      backend,
+      expect.objectContaining({ turnTimeoutMs: BACKEND_LIVE_TURN_TIMEOUT_MS })
+    );
   });
 
   it('rejects an unknown flag before doing anything', async () => {

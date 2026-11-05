@@ -1,4 +1,5 @@
 import {
+  BACKEND_LIVE_TURN_TIMEOUT_MS,
   formatBackendLiveScenarioTable,
   recordBackendLiveScenarioRun,
   runBackendLiveScenarios,
@@ -81,9 +82,15 @@ export const runCheckBackendLiveScenarios = defineScript({
     for (const mode of requestedModes) {
       let backend;
       try {
+        // The scenarios bound every call themselves. The route's request
+        // wrapper would answer an abort for the provider (rejecting the moment
+        // the signal fires) and cap each turn at the route's 60s limit, so the
+        // run would measure the wrapper instead of the provider.
         backend = buildTaskReasoningBackend({
           mode: mode as ReasoningBackendMode,
           ...(model ? { model } : {}),
+          requestTimeout: 'caller',
+          timeoutMs: BACKEND_LIVE_TURN_TIMEOUT_MS,
         });
       } catch (error) {
         logger.warn(
@@ -94,6 +101,7 @@ export const runCheckBackendLiveScenarios = defineScript({
       resetReasoningFailoverTracking();
       const record = await runBackendLiveScenarios(backend, {
         mode,
+        turnTimeoutMs: BACKEND_LIVE_TURN_TIMEOUT_MS,
         ...(model ? { model } : {}),
         servedMode: () => getLastServedReasoningMode()?.mode,
       });
