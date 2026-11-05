@@ -379,6 +379,7 @@ Repository build, test, generator and gate scripts for contributors.
 | `pnpm kyberion check`                               | `pnpm check`                               | Run repository checks (pnpm check -- --changed before a PR)                |
 | `pnpm kyberion check apple-fm`                      | `pnpm check:apple-fm`                      | Check on-device Apple Intelligence availability                            |
 | `pnpm kyberion check backend-conformance`           |                                            | Check reasoning backend conformance                                        |
+| `pnpm kyberion check backend-live-scenarios`        |                                            | Run live reasoning backend scenarios (spends model turns; requires --live) |
 | `pnpm kyberion check chronos-perf`                  |                                            | Check Chronos performance baseline (browser)                               |
 | `pnpm kyberion check commit-subject`                | `pnpm check:commit-subject`                | Check the HEAD commit subject                                              |
 | `pnpm kyberion check contract-semver`               | `pnpm check:contract-semver`               | Check contract semver changes                                              |
