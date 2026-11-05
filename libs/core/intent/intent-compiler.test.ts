@@ -145,6 +145,23 @@ describe('intent-compiler', () => {
       expect(result!.warnings).toBeDefined();
     });
 
+    it('matches knowledge hints from a spaceless Japanese intent', () => {
+      const knowledgeHints = [
+        { topic: '請求書', hint: 'Use the invoice template', tags: ['経理'] },
+      ];
+      // Whitespace split kept '請求書を作成して' as one word that no topic contains.
+      const result = compileIntent('請求書を作成して', { standardIntents: [], knowledgeHints });
+      expect(result?.source).toBe('hint');
+      expect(result?.confidence).toBe(0.6);
+      // Particles shared with an unrelated topic do not count.
+      expect(
+        compileIntent('メールを送って', {
+          standardIntents: [],
+          knowledgeHints: [{ topic: '予定を確認', tags: [] }],
+        })
+      ).toBeNull();
+    });
+
     it('synthesizes a deterministic meeting orchestration step', () => {
       const result = compileIntent(
         'Teamsで開催されるオンラインミーティングに私の代わりに参加して無事成功させる',
