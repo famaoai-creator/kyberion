@@ -13,7 +13,6 @@ import {
   gitDiff,
   gitLog,
   gitStatus,
-  ghPrView,
   ghVersion,
   runPreparedVcsDevelopment,
   gitCheckout,
@@ -36,6 +35,7 @@ import {
   vcsHostPrChecks,
   vcsHostPrChecksWait,
   vcsHostPrList,
+  vcsHostPrViewFields,
 } from '@agent/core/vcs/vcs-host-verbs';
 
 export type VcsOp =
@@ -206,7 +206,9 @@ function asActionableError(error: unknown, bin: string, installStep: string): Er
 
 export async function handleAction(
   action: VcsAction,
-  publicationHost: (mutation: VcsHostMutation) => VcsCommandResult = (mutation) =>
+  publicationHost: (mutation: VcsHostMutation) => VcsCommandResult | Promise<VcsCommandResult> = (
+    mutation
+  ) =>
     runVcsMutationWithApproval(
       mutation,
       vcsHostInvocationId(mutation),
@@ -282,7 +284,7 @@ export async function handleAction(
         draft: params.draft,
         cwd,
       };
-      const result = publicationHost({ operation: 'pr_create', params: publication });
+      const result = await publicationHost({ operation: 'pr_create', params: publication });
       if (result.error || result.status !== 0) {
         throw asActionableError(
           new Error(result.stderr || `exit ${result.status}`),
@@ -299,7 +301,7 @@ export async function handleAction(
         ref: params.ref,
         setUpstream: params.set_upstream,
       };
-      const result = publicationHost({ operation: 'push', params: publication });
+      const result = await publicationHost({ operation: 'push', params: publication });
       assertOk(result, 'git push');
       return { op: valid.op, cwd, output: result.stdout };
     }
@@ -328,10 +330,11 @@ export async function handleAction(
       return {
         op: valid.op,
         cwd,
-        result: ghPrView(
-          { ref: params.ref, fields: params.fields || 'number,title,state,url', cwd },
-          runGhResult
-        ),
+        result: await vcsHostPrViewFields({
+          ref: params.ref,
+          fields: params.fields || 'number,title,state,url',
+          cwd,
+        }),
       };
     }
     case 'pr_list': {
@@ -360,7 +363,7 @@ export async function handleAction(
         deleteBranch: params.delete_branch,
         cwd,
       };
-      const result = publicationHost({ operation: 'pr_merge', params: publication });
+      const result = await publicationHost({ operation: 'pr_merge', params: publication });
       assertOk(result, 'gh pr merge');
       return { op: valid.op, cwd, output: result.stdout };
     }

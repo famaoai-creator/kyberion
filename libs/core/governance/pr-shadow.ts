@@ -43,14 +43,15 @@ export interface PrFinalState {
 }
 
 /** Read-only view of GitHub; the real one shells out to `gh`, tests pass a fake. */
+/** Read port over the forge; methods may resolve asynchronously (vcs-host seam). */
 export interface PrReadPort {
-  listOpen(): PrSummary[];
-  files(prNumber: number): PrFile[];
+  listOpen(): PrSummary[] | Promise<PrSummary[]>;
+  files(prNumber: number): PrFile[] | Promise<PrFile[]>;
   ciState(
     prNumber: number,
     ignoredChecks: readonly string[]
-  ): { state: PrCiState; failing: string[] };
-  finalState(prNumber: number): PrFinalState;
+  ): { state: PrCiState; failing: string[] } | Promise<{ state: PrCiState; failing: string[] }>;
+  finalState(prNumber: number): PrFinalState | Promise<PrFinalState>;
 }
 
 /** Tests, docs, changelog fragments and retired code: low risk when nothing else changes. */
@@ -229,10 +230,10 @@ function sameObservation(a: PrObservation, b: PrObservation): boolean {
  * tier or CI state), then settle every earlier-observed PR that has since been
  * merged or closed. Read-only toward GitHub; never throws for one bad PR.
  */
-export function observePullRequests(
+export async function observePullRequests(
   port: PrReadPort,
   options: { ignoredChecks?: readonly string[]; now?: Date } = {}
-): ObserveResult {
+): Promise<ObserveResult> {
   const now = options.now ?? new Date();
   const ignored = options.ignoredChecks ?? DEFAULT_IGNORED_CHECKS;
   const result: ObserveResult = {
@@ -251,7 +252,7 @@ export function observePullRequests(
   }
 
   const openNow = new Set<number>();
-  for (const pr of port.listOpen()) {
+  for (const pr of await port.listOpen()) {
     openNow.add(pr.number);
     if (pr.isDraft) {
       result.skippedDrafts += 1;
@@ -260,8 +261,8 @@ export function observePullRequests(
     try {
       const observation = buildObservation(
         pr,
-        classifyPullRequest(port.files(pr.number)),
-        port.ciState(pr.number, ignored),
+        classifyPullRequest(await port.files(pr.number)),
+        await port.ciState(pr.number, ignored),
         now
       );
       const previous = lastObservation.get(pr.number);
@@ -280,7 +281,7 @@ export function observePullRequests(
   for (const prNumber of lastObservation.keys()) {
     if (settled.has(prNumber) || openNow.has(prNumber)) continue;
     try {
-      const final = port.finalState(prNumber);
+      const final = await port.finalState(prNumber);
       if (final.state === 'open') continue;
       const outcome: PrOutcome = {
         kind: 'outcome',
