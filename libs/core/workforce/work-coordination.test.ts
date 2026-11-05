@@ -340,6 +340,33 @@ describe('work coordination', () => {
     expect(() => claimFor(kept.item_id, stillLeased.version)).toThrowError(/lease/i);
   });
 
+  it('R5: replays an idempotent claim only when the payload hash matches', () => {
+    const item = createWorkItem({
+      title: 'Payload-bound claim',
+      description: 'Replay must carry the same payload hash',
+    });
+    const claim = (payloadHash?: string) =>
+      claimWorkItem({
+        itemId: item.item_id,
+        actorPeerId: 'peer-a',
+        purpose: 'implementation',
+        idempotencyKey: 'claim-hash-1',
+        ...(payloadHash ? { payloadHash } : {}),
+      });
+    const first = claim('hash-a');
+    expect(first.lease.payload_hash).toBe('hash-a');
+    expect(claim('hash-a').lease.lease_id).toBe(first.lease.lease_id);
+    // Backward compatible: a replay without a hash still matches.
+    expect(claim().lease.lease_id).toBe(first.lease.lease_id);
+    // Same key, different payload: a typed idempotency conflict, not a busy lease.
+    expect(() => claim('hash-b')).toThrowError(/different payload/);
+    try {
+      claim('hash-b');
+    } catch (error) {
+      expect((error as { code?: string }).code).toBe('idempotency_conflict');
+    }
+  });
+
   it('claims, releases, and hands off leases with version checks', () => {
     const item = createWorkItem({
       title: 'Implement claim logic',

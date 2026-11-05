@@ -18,6 +18,7 @@ import {
   newDelegationSessionId,
   spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
+import { runWithDelegationExecutionTracker } from '../delegation-execution-tracker.js';
 
 const fakeBaseEnv = (): NodeJS.ProcessEnv =>
   ({
@@ -175,5 +176,24 @@ describe('spawnWithDelegationEnv', () => {
     expect(sessionIndexMocks.dispose).not.toHaveBeenCalled();
     child.emit('close', 0);
     expect(sessionIndexMocks.dispose).toHaveBeenCalledWith({ childPid: 4242 });
+  });
+
+  it('reports the delegation start only once a child process exists (R5)', async () => {
+    const spawned = await runWithDelegationExecutionTracker(async (tracker) => {
+      spawnWithDelegationEnv(implementerEnv(), () =>
+        Object.assign(new EventEmitter(), { pid: 4243 })
+      );
+      return tracker.started;
+    });
+    expect(spawned).toBe(true);
+    // ENOENT/EACCES: Node returns a child without a pid — no process, no start.
+    const neverSpawned = await runWithDelegationExecutionTracker(async (tracker) => {
+      spawnWithDelegationEnv(
+        implementerEnv(),
+        () => new EventEmitter() as EventEmitter & { pid?: number }
+      );
+      return tracker.started;
+    });
+    expect(neverSpawned).toBe(false);
   });
 });

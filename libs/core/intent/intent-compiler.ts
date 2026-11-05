@@ -5,6 +5,25 @@
  */
 import { logger } from '../core.js';
 import { loadStandardIntentCatalog, resolveIntentResolutionPacket } from './intent-resolution.js';
+import { segmentKeywordTerms } from '../locale-normalize.js';
+
+/**
+ * Whether a knowledge hint's topic or tags contain any intent keyword.
+ * Locale-aware: a spaceless Japanese intent is segmented into content words
+ * (particles dropped) instead of being one sentence-long "word" that no
+ * topic or tag can ever contain.
+ */
+function hintMatchesIntent(
+  hint: { topic?: string; tags?: string[] },
+  intentLower: string
+): boolean {
+  const words = segmentKeywordTerms(intentLower);
+  return words.some(
+    (w) =>
+      (hint.topic || '').toLowerCase().includes(w) ||
+      (hint.tags || []).some((t: string) => t.toLowerCase().includes(w))
+  );
+}
 
 export interface CompiledIntent {
   intentId: string;
@@ -70,14 +89,7 @@ export function compileIntent(
   // come from the canonical IntentResolutionPacket above.
   if (resolutionPacket !== undefined) {
     const hints = options?.knowledgeHints || [];
-    const matchedHints = hints.filter((h) => {
-      const words = intentLower.split(/\s+/);
-      return words.some(
-        (w) =>
-          (h.topic || '').toLowerCase().includes(w) ||
-          (h.tags || []).some((t: string) => t.toLowerCase().includes(w))
-      );
-    });
+    const matchedHints = hints.filter((h) => hintMatchesIntent(h, intentLower));
     if (matchedHints.length > 0) {
       logger.info(`[INTENT_COMPILER] Found ${matchedHints.length} knowledge hints`);
       return {
@@ -114,14 +126,7 @@ export function compileIntent(
 
   // 3. Knowledge hint match for explicit compatibility catalogs.
   const hints = options?.knowledgeHints || [];
-  const matchedHints = hints.filter((h: any) => {
-    const words = intentLower.split(/\s+/);
-    return words.some(
-      (w) =>
-        (h.topic || '').toLowerCase().includes(w) ||
-        (h.tags || []).some((t: string) => t.toLowerCase().includes(w))
-    );
-  });
+  const matchedHints = hints.filter((h: any) => hintMatchesIntent(h, intentLower));
 
   if (matchedHints.length > 0) {
     logger.info(`[INTENT_COMPILER] Found ${matchedHints.length} knowledge hints`);

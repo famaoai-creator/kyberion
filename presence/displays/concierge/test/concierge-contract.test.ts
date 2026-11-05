@@ -8,42 +8,52 @@ import { safeReadFile } from '@agent/core/secure-io';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+/**
+ * MSN-SHELL-IA: the decision queue moved from `/` to `/inbox` (page + card).
+ * The source contracts below read both files as one implementation.
+ */
+function readInbox(): string {
+  return ['src/app/inbox/page.tsx', 'src/app/inbox/needs-you-card.tsx']
+    .map((file) => fs.readFileSync(path.join(appDir, file), 'utf8'))
+    .join('\n');
+}
+
 describe('concierge surface contract', () => {
   it('keeps approval errors safe without changing decision dispatch or retrying', () => {
-    const page = safeReadFile(path.join(appDir, 'src/app/page.tsx')).toString();
+    const page = safeReadFile(path.join(appDir, 'src/app/inbox/page.tsx')).toString();
     const decision = page.slice(
-      page.indexOf('const decideApproval ='),
-      page.indexOf('const [changeFormId')
+      page.indexOf('const decide = async'),
+      page.indexOf('const visible =')
     );
-    expect(decision).toContain(
-      'if (!response.ok) throw await readApprovalResponseFailure(response)'
-    );
+    expect(decision).toContain('await postApprovalDecision(item.approval!, decision.decision)');
     expect(decision).toContain('formatApprovalFailure(error, locale)');
-    expect(decision).not.toContain('error.message');
+    // No raw error text reaches the operator, for any kind.
+    expect(decision).not.toContain('error.message,');
     expect(decision).not.toContain('String(error)');
-    expect(decision.match(/await fetch\(/g)).toHaveLength(1);
-    expect(decision.match(/await decideWithPasskey\(/g)).toHaveLength(1);
-    expect(decision.match(/presentedDigest: item.presented_digest/g)).toHaveLength(2);
-    expect(decision).toContain("if (item.min_assurance === 'A3')");
-    expect(decision).toContain('finally {\n        setBusyId(null);');
+    expect(decision).toContain('finally {\n      setBusyId(null);');
     expect(decision).not.toMatch(/setTimeout|setInterval/);
   });
 
-  it('dispatches personal-view decisions exactly like the company queue', () => {
-    // The personal (all-company) inbox decides through the same tenant-scoped
-    // route with the same presented digest and passkey branch — no retry.
-    const client = safeReadFile(
-      path.join(appDir, 'src/lib/approval-decision-client.ts')
-    ).toString();
-    expect(client).toContain('if (!response.ok) throw await readApprovalResponseFailure(response)');
-    expect(client.match(/await fetch\(/g)).toHaveLength(1);
-    expect(client.match(/await decideWithPasskey\(/g)).toHaveLength(1);
-    expect(client.match(/presentedDigest: item.presented_digest/g)).toHaveLength(2);
-    expect(client).toContain("if (item.min_assurance === 'A3')");
+  it('dispatches every approval decision through one helper without retrying', () => {
+    // Company and personal (all-company) views share /inbox: the same
+    // tenant-scoped route, presented digest and passkey branch — no retry.
+    const client = safeReadFile(path.join(appDir, 'src/lib/needs-you-client.ts')).toString();
+    const approval = client.slice(
+      client.indexOf('export async function postApprovalDecision'),
+      client.indexOf('export async function postReviewVerdict')
+    );
+    expect(approval).toContain(
+      'if (!response.ok) throw await readApprovalResponseFailure(response)'
+    );
+    expect(approval.match(/await fetch\(/g)).toHaveLength(1);
+    expect(approval.match(/await decideWithPasskey\(/g)).toHaveLength(1);
+    expect(approval.match(/presentedDigest: item.presented_digest/g)).toHaveLength(2);
+    expect(approval).toContain("if (item.min_assurance === 'A3')");
     expect(client).not.toMatch(/setTimeout|setInterval/);
-    const overview = safeReadFile(path.join(appDir, 'src/app/personal-overview.tsx')).toString();
-    expect(overview).toContain('await postApprovalDecision(item, decision)');
-    expect(overview).toContain('formatApprovalFailure(error, locale)');
+    // The parallel clients are gone: nothing else posts approval decisions.
+    expect(fs.existsSync(path.join(appDir, 'src/lib/approval-decision-client.ts'))).toBe(false);
+    expect(fs.existsSync(path.join(appDir, 'src/app/front-desk-inbox.tsx'))).toBe(false);
+    expect(fs.existsSync(path.join(appDir, 'src/app/personal-overview.tsx'))).toBe(false);
   });
 
   it('declares its role tagline in the layout header', () => {
@@ -375,8 +385,8 @@ describe('concierge surface contract', () => {
     expect(route).toContain("addEventListener('abort'");
   });
 
-  it('replaces window.prompt and 30 s summary polling on the home page', () => {
-    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+  it('replaces window.prompt and 30 s summary polling on the inbox', () => {
+    const page = readInbox();
     expect(page).not.toContain('window.prompt');
     expect(page).toContain("t('home.change_send')");
     expect(page).toContain('startSummaryWatch');
@@ -499,8 +509,15 @@ describe('concierge surface contract', () => {
     // The page renders the checklist and attention items jump to their section.
     expect(setupPage).toContain('<SettingsReadiness');
     expect(readiness).toContain("t('setup.readiness_title')");
-    expect(setupPage).toContain('const sectionOrder = SETTINGS_CARD_SECTION_ORDER');
+    // MSN-SHELL-IA: categories render in the fixed IA order; the first-run
+    // ordering only drives the checklist's "next to open" pointer.
+    expect(setupPage).toContain('SETTINGS_SECTION_ORDER.map((category)');
     expect(setupPage).not.toContain('orderSectionsForFirstRun(setup.diagnostics)');
+    const checklistCard = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/SetupChecklistCard.tsx'),
+      'utf8'
+    );
+    expect(checklistCard).toContain('orderSectionsForFirstRun(readiness)');
     expect(setupPage).toContain('createSettingsNavigation');
     const navigation = safeReadFile(path.join(appDir, 'src/app/settings/settings-navigation.ts'), {
       encoding: 'utf8',
@@ -571,7 +588,7 @@ describe('concierge surface contract', () => {
       'utf8'
     );
     const server = fs.readFileSync(path.join(appDir, 'src/lib/hygiene-server.ts'), 'utf8');
-    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+    const page = readInbox();
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -605,8 +622,10 @@ describe('concierge surface contract', () => {
 
     // The pane uses an inline confirm step, never the blocking browser dialog.
     // CS-04: the cards moved into the unified inquiry queue; the confirm
-    // mechanics (human-only decision) must survive the move.
-    expect(page).toContain('renderHygieneCard');
+    // mechanics (human-only decision) must survive the move. MSN-SHELL-IA:
+    // stalled requests render as the `clarification` needs-you card.
+    expect(page).toContain('item.clarification');
+    expect(page).toContain('postClarificationDecision(');
     expect(page).toContain("'hygiene.confirm_start'");
     expect(page).toContain("'hygiene.confirm_cancel'");
     expect(page).not.toContain('window.confirm');
@@ -620,7 +639,7 @@ describe('concierge surface contract', () => {
       path.join(appDir, 'src/app/api/outcomes/[id]/preview/route.ts'),
       'utf8'
     );
-    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+    const page = readInbox();
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -645,7 +664,7 @@ describe('concierge surface contract', () => {
     // it cannot show inline. FD-04: the trigger button now reads
     // `front_desk:action_open` (the shared "決める" action-row vocabulary);
     // the toggled-open "hide" state keeps the pre-FD-04 `home.preview_hide`.
-    expect(page).toContain("frontDeskText('action_open', locale)");
+    expect(page).toContain("f('action_open')");
     expect(page).toContain("t('home.preview_hide')");
     expect(page).toContain('useOutcomePreview');
     const preview = fs.readFileSync(path.join(appDir, 'src/lib/use-outcome-preview.ts'), 'utf8');
@@ -658,7 +677,7 @@ describe('concierge surface contract', () => {
 
   it('runs document intake as an explicit one-shot ingest ceremony (CS-03)', () => {
     const route = fs.readFileSync(path.join(appDir, 'src/app/api/ingest/route.ts'), 'utf8');
-    const page = fs.readFileSync(path.join(appDir, 'src/app/ingest/page.tsx'), 'utf8');
+    const page = fs.readFileSync(path.join(appDir, 'src/app/library/ingest-panel.tsx'), 'utf8');
     // FD-00c: the header's own nav links (Home / 資料の取込 / Setup) moved to
     // the shared front-desk rail — see test/front-desk-contract.test.ts for
     // the rail's own ingest-reachability assertion.
@@ -720,17 +739,21 @@ describe('concierge surface contract', () => {
       path.join(appDir, 'src/app/api/memory-queue/[id]/route.ts'),
       'utf8'
     );
-    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+    const page = readInbox();
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
     );
 
     // The list is a pure read over the shared promotion queue, filtered to
-    // undecided candidates; it never touches the mission controller.
-    expect(listRoute).toContain('listMemoryPromotionCandidates');
-    expect(listRoute).toContain("status === 'queued'");
+    // undecided candidates; it never touches the mission controller. The
+    // route and the needs-you queue share one reader (MSN-SHELL-IA).
+    const listReader = fs.readFileSync(path.join(appDir, 'src/lib/needs-you-server.ts'), 'utf8');
+    expect(listRoute).toContain('listConciergeMemoryQueue(');
+    expect(listReader).toContain('listMemoryPromotionCandidates');
+    expect(listReader).toContain("candidate.status === 'queued'");
     expect(listRoute).not.toContain('mission_controller');
+    expect(listReader).not.toContain('mission_controller');
 
     // Decisions share the controller's exact review and atomic queue facade.
     expect(decisionRoute).toContain('requireConciergeMutationAccess');
@@ -752,7 +775,9 @@ describe('concierge surface contract', () => {
     // internal kind/tier codes never render verbatim.
     // CS-04: the cards moved into the unified inquiry queue; the confirm
     // mechanics (human-only decision) must survive the move.
-    expect(page).toContain('renderMemoryCard');
+    // MSN-SHELL-IA: candidates render as the `knowledge` needs-you card.
+    expect(page).toContain('item.knowledge');
+    expect(page).toContain('postKnowledgeDecision(');
     expect(page).toContain('memory.kind.');
     expect(page).toContain('memory.tier.');
     expect(page).toContain("'memory.confirm_approve'");
@@ -809,7 +834,11 @@ describe('concierge surface contract', () => {
     // The setup section shows status chips, decides via inline confirm only,
     // and carries the trust caveat (third-party code runs only after approval).
     expect(pluginsSection).toContain('id="setup-plugins"');
-    expect(pluginsSection).toContain("t('setup.plugins_caveat')");
+    // The lead no longer claims "no terminal needed": installing is a
+    // terminal step (shown behind a command disclosure), approval is here.
+    expect(pluginsSection).toContain("'ia_settings_plugins_lead'");
+    expect(pluginsSection).toContain('pnpm plugin:install');
+    expect(pluginsSection).not.toContain("t('setup.plugins_description')");
     expect(pluginsSection).toContain("'setup.plugin_confirm_approve'");
     expect(pluginsSection).toContain("'setup.plugin_confirm_deny'");
     expect(setupPage).not.toContain('window.confirm');
@@ -888,7 +917,9 @@ describe('concierge surface contract', () => {
   });
 
   it('surfaces bounded response waiting with a recovery-oriented status panel', () => {
-    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
+    // MSN-SHELL-IA: the panel stays with the queue on /inbox.
+    const page = fs.readFileSync(path.join(appDir, 'src/app/inbox/inbox-advisories.tsx'), 'utf8');
+    expect(readInbox()).toContain('<ResponseStatusPanel />');
     const route = fs.readFileSync(
       path.join(appDir, 'src/app/api/response-status/route.ts'),
       'utf8'
@@ -899,26 +930,24 @@ describe('concierge surface contract', () => {
     expect(route).toContain('peekPersistedDelegationChildrenRegistry');
     expect(route).toContain('staleChildCount');
   });
-  it('CS-04/FD-04: presents one prioritized decision queue (決める) whose cards call the guarded decision endpoints', () => {
-    const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
-    // One queue section, ordered by decision urgency, rendered from the same
-    // card helpers the (now removed) detail panes used to duplicate.
-    expect(page).toContain('decide-queue');
+  it('CS-04/FD-04: presents one prioritized decision queue (あなた待ち) whose cards call the guarded decision endpoints', () => {
+    // MSN-SHELL-IA: the one queue is /inbox, read from the unified
+    // needs-you API (one count definition), with one card shape.
+    const page = readInbox();
+    expect(page).toContain('fetchNeedsYouPage(');
+    expect(page).toContain('fetchNeedsYouSummary(');
+    expect(page).toContain('<NeedsYouCard');
     // UI-06: the most urgent item leads as `ui:next-action`, filters are
     // `ui:tabs`, loading is a skeleton and errors are callouts.
     expect(page).toContain('<NextAction');
     expect(page).toContain('<Tabs');
     expect(page).toContain('<Skeleton');
     expect(page).toContain('<Callout');
-    // FD-04: `/` is the 決める page — the heading is the shared
-    // `front_desk:nav_decide` rail label, not the old `queue.title`.
-    expect(page).toContain("frontDeskText('nav_decide', locale)");
-    expect(page).toContain("frontDeskText('decide_lead', locale)");
-    expect(page).toContain('renderApprovalCard');
-    expect(page).toContain('renderHygieneCard');
-    expect(page).toContain('renderMemoryCard');
-    expect(page).toContain('renderOutcomeCard');
-    expect(page).toContain('renderExceptionCard');
+    expect(page).toContain("c('ia_inbox_title')");
+    expect(page).toContain("c('ia_inbox_lead')");
+    // Every kind renders through the same card and calls its one helper.
+    for (const kind of ['approval', 'outcome', 'knowledge', 'clarification', 'failure'])
+      expect(page).toContain(`item.${kind}`);
     // FD-04: the four duplicate panes (and their "see all in the queue"
     // links) and the briefing card are gone — the queue is the only place
     // these cards render.

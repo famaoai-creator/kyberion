@@ -1,0 +1,35 @@
+{
+  "description": "R5 delegation execution-start reporting: ReasoningBackend implementations whose delegateTask body is NOT wrapped in runStartReportingDelegation. Every entry needs a reason. Decorators that only forward to a wrapped backend (which reports itself) and in-process doubles with no side effects belong here; a backend that dispatches to a provider never does. Gate: tests/delegation-start-reporting.test.ts.",
+  "exceptions": [
+    {
+      "file": "libs/core/reasoning/reasoning-backend.ts",
+      "backend": "FailoverReasoningBackend",
+      "reason": "Consumer, not a dispatcher: delegateTask runs the R5 failover guard (delegation-failover-guard.ts runGuarded), which opens its own execution tracker per attempt and forwards to the candidate backend's delegateTask."
+    },
+    {
+      "file": "libs/core/reasoning/reasoning-backend.ts",
+      "backend": "RoleAwareReasoningBackend",
+      "reason": "Decorator: resolves the role's backend and forwards delegateTask to it unchanged; the resolved backend reports its own start."
+    },
+    {
+      "file": "libs/core/reasoning/reasoning-backend.ts",
+      "backend": "stubReasoningBackend",
+      "reason": "Deterministic in-process stub: returns a canned string and has no side effects, so there is no start to report and an unmarked failure cannot double-execute anything."
+    },
+    {
+      "file": "libs/core/agent/agent-dispatch.ts",
+      "backend": "DispatchingReasoningBackend",
+      "reason": "Decorator: routes delegateTask through the configured AgentDispatcher, whose default strategy calls the wrapped base backend's own delegateTask (which reports its start); an alternate dispatcher's spawn is reported by spawnWithDelegationEnv."
+    },
+    {
+      "file": "libs/core/scenario/scenario-model-fixtures.ts",
+      "backend": "scoped",
+      "reason": "Scenario-test decorator: forwards delegateTask to the in-scope fixture (side-effect-free canned answers) or to the real fallback backend, which reports its own start."
+    },
+    {
+      "file": "libs/core/testing/reasoning-backend-conformance.ts",
+      "backend": "primary",
+      "reason": "Conformance-probe double: spreads stubReasoningBackend (side-effect-free) and only overrides prompt() to fail; it never dispatches to a provider."
+    }
+  ]
+}
