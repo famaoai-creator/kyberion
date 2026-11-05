@@ -5,7 +5,9 @@ const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
   safeReadFile: vi.fn(),
   checkPrKnowledgeReadiness: vi.fn(),
-  ghPrCreate: vi.fn(),
+  vcsHostPrCreate: vi.fn(),
+  vcsHostAuthStatus: vi.fn(),
+  vcsHostDefaultBranch: vi.fn(),
   prPublicationBodySourceForPath: vi.fn(() => 'protected_or_unknown' as const),
   explicitRequest: vi.fn(),
   writeScopedArtifact: vi.fn(),
@@ -28,8 +30,15 @@ vi.mock('@agent/core/workforce/artifact-store', async (original) => ({
 
 vi.mock('@agent/core/vcs/github', async (original) => ({
   ...(await original<typeof import('@agent/core/vcs/github')>()),
-  ghPrCreate: mocks.ghPrCreate,
   prPublicationBodySourceForPath: mocks.prPublicationBodySourceForPath,
+}));
+
+// PR creation runs through the vcs-host seam (publication-host → vcsHostPrCreate).
+vi.mock('@agent/core/vcs/vcs-host-verbs', async (original) => ({
+  ...(await original<typeof import('@agent/core/vcs/vcs-host-verbs')>()),
+  vcsHostPrCreate: mocks.vcsHostPrCreate,
+  vcsHostAuthStatus: mocks.vcsHostAuthStatus,
+  vcsHostDefaultBranch: mocks.vcsHostDefaultBranch,
 }));
 
 vi.mock('@agent/core/secure-io', async (importOriginal) => ({
@@ -57,18 +66,16 @@ import {
 } from './publish_pull_request.js';
 import { ExternalOperationApprovalRequired } from '@agent/core/governance/external-operation';
 
-/** Default `safeExec` stub covering every gh/git call `main()` makes before `gh pr create`. */
+/** Default stubs for the seam reads and git calls `main()` makes before PR creation. */
 function stubGhAndGit(): void {
   mocks.explicitRequest.mockImplementation((_request, body) => body());
-  mocks.ghPrCreate.mockReturnValue({
-    status: 0,
-    stdout: 'https://github.com/acme/repo/pull/1\n',
-    stderr: '',
+  mocks.vcsHostAuthStatus.mockResolvedValue({ provider: 'gh-cli', ok: true });
+  mocks.vcsHostDefaultBranch.mockResolvedValue('main');
+  mocks.vcsHostPrCreate.mockResolvedValue({
+    number: 1,
+    url: 'https://github.com/acme/repo/pull/1',
   });
   mocks.safeExec.mockImplementation((command: string, args: string[] = []) => {
-    if (command === 'gh' && args[0] === '--version') return 'gh version 2.0.0\n';
-    if (command === 'gh' && args[0] === 'auth') return 'Logged in to github.com\n';
-    if (command === 'gh' && args[0] === 'repo') return '{"defaultBranchRef":{"name":"main"}}';
     if (command === 'git' && args[0] === 'branch') return 'agent/kl-03\n';
     if (command === 'git' && args[0] === 'rev-parse') return 'a'.repeat(40) + '\n';
     if (command === 'gh' && args[0] === 'pr') return 'https://github.com/acme/repo/pull/1\n';
@@ -282,24 +289,21 @@ describe('main() wiring (KL-03)', () => {
       'body.md',
       '--skip-readiness',
     ]);
-    const ghCalls = mocks.safeExec.mock.calls.filter(([command]) => command === 'gh');
-    expect(ghCalls.map(([, args]) => args[0])).toEqual(['--version', 'auth', 'repo']);
-    expect(mocks.ghPrCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        env: {
-          GH_TOKEN: undefined,
-          GITHUB_TOKEN: undefined,
-          [name]: 'fake-github-credential',
-        },
-      })
+    const credentials = {
+      GH_TOKEN: undefined,
+      GITHUB_TOKEN: undefined,
+      [name]: 'fake-github-credential',
+    };
+    expect(mocks.vcsHostAuthStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ env: credentials })
     );
-    for (const [, , options] of ghCalls) {
-      expect(options.env).toEqual({
-        GH_TOKEN: undefined,
-        GITHUB_TOKEN: undefined,
-        [name]: 'fake-github-credential',
-      });
-    }
+    expect(mocks.vcsHostDefaultBranch).toHaveBeenCalledWith(
+      expect.objectContaining({ env: credentials })
+    );
+    expect(mocks.vcsHostPrCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ env: credentials })
+    );
+    expect(mocks.safeExec.mock.calls.some(([command]) => command === 'gh')).toBe(false);
     for (const [command, , options] of mocks.safeExec.mock.calls) {
       if (command !== 'gh') expect(options.env).toBeUndefined();
     }
@@ -324,7 +328,7 @@ describe('main() wiring (KL-03)', () => {
       expect.arrayContaining(['check']),
       expect.anything()
     );
-    expect(mocks.ghPrCreate).toHaveBeenCalledWith(
+    expect(mocks.vcsHostPrCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'fix(pr): guard knowledge readiness',
         base: 'main',
@@ -360,7 +364,7 @@ describe('main() wiring (KL-03)', () => {
       ([command, args]) => command === 'gh' && Array.isArray(args) && args[0] === 'pr'
     );
     expect(prCreateCalls).toEqual([]);
-    expect(mocks.ghPrCreate).not.toHaveBeenCalled();
+    expect(mocks.vcsHostPrCreate).not.toHaveBeenCalled();
   });
 
   it('preserves typed approval suspension without a generic mutation fallback', async () => {
@@ -371,7 +375,7 @@ describe('main() wiring (KL-03)', () => {
     const pending = Object.assign(new Error('EXTERNAL_APPROVAL_REQUIRED'), {
       adfControlFlow: 'preflight',
     });
-    mocks.ghPrCreate.mockImplementation(() => {
+    mocks.vcsHostPrCreate.mockImplementation(() => {
       throw pending;
     });
     await expect(
@@ -385,7 +389,7 @@ describe('main() wiring (KL-03)', () => {
       ])
     ).rejects.toBe(pending);
     expect(mocks.checkPrKnowledgeReadiness).toHaveBeenCalledWith(expect.objectContaining({ body }));
-    expect(mocks.ghPrCreate).toHaveBeenCalledWith(
+    expect(mocks.vcsHostPrCreate).toHaveBeenCalledWith(
       expect.objectContaining({ bodyFile: 'review body.md', draft: false })
     );
     expect(
@@ -407,7 +411,7 @@ describe('main() wiring (KL-03)', () => {
       body: 'full reviewed text',
       headSha: 'a'.repeat(40),
     };
-    mocks.ghPrCreate.mockImplementation(() => {
+    mocks.vcsHostPrCreate.mockImplementation(() => {
       const request = mocks.explicitRequest.mock.calls.at(-1)![0];
       expect(request.operationId).toBe('vcs:pr_create');
       expect(request.reviewArtifacts(effect)).toEqual(['active/review.json']);
@@ -434,11 +438,25 @@ describe('main() wiring (KL-03)', () => {
     expect(print).toHaveBeenCalledWith(expect.stringContaining('rerun the same pr create command'));
   });
 
+  it('stops before any publication when the forge credential preflight fails', async () => {
+    stubGhAndGit();
+    mocks.vcsHostAuthStatus.mockResolvedValue({
+      provider: 'github-rest',
+      ok: false,
+      detail: 'auth',
+    });
+    await expect(
+      main(['--title', 'fix(pr): typed publication', '--body-file', 'body.md', '--skip-readiness'])
+    ).rejects.toThrow(/github-rest authentication/);
+    expect(mocks.vcsHostPrCreate).not.toHaveBeenCalled();
+    expect(mocks.checkPrKnowledgeReadiness).not.toHaveBeenCalled();
+  });
+
   it('reports typed transport failure instead of printing a successful publication', async () => {
     stubGhAndGit();
     mocks.safeReadFile.mockReturnValue('## Knowledge\nnone\n');
     mocks.checkPrKnowledgeReadiness.mockReturnValue({ ok: true, violations: [] });
-    mocks.ghPrCreate.mockReturnValue({ status: 1, stdout: '', stderr: 'publication failed' });
+    mocks.vcsHostPrCreate.mockRejectedValue(new Error('publication failed'));
     await expect(
       main(['--title', 'fix(pr): typed publication', '--body-file', 'body.md', '--skip-readiness'])
     ).rejects.toThrow('publication failed');
@@ -546,10 +564,9 @@ describe('publication check concurrency', () => {
   it('forwards the option through main and prevents publication when readiness fails', async () => {
     mocks.safeExec.mockImplementation((command: string, args: string[]) => {
       if (command === 'pnpm') throw new Error('readiness fixture failed');
-      if (command === 'gh' && args[0] === '--version') return 'gh version 2.0.0';
-      if (command === 'gh' && args[0] === 'auth') return 'Logged in';
-      throw new Error('unexpected operation');
+      throw new Error(`unexpected operation ${command} ${args.join(' ')}`);
     });
+    mocks.vcsHostAuthStatus.mockResolvedValue({ provider: 'gh-cli', ok: true });
     await expect(main(['--check-jobs=1', '--title', 'fix(check): concurrency'])).rejects.toThrow(
       'readiness fixture failed'
     );
