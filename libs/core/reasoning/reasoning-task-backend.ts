@@ -69,6 +69,9 @@ export function constructTaskReasoningBackend(
   if (!primary)
     throw new ReasoningSelectionError('unavailable', 'No task reasoning route is available');
   const fixed = primary.selection?.requested.mode === 'fixed';
+  // A caller that bounds requests itself must reach the provider unraced, and
+  // its own ceiling must not be undercut by the route's (default 60s) limit.
+  const callerBounded = options.requestTimeout === 'caller';
   const candidates: ReasoningProviderRuntimeBundle[] = [];
   for (const route of routes) {
     if (route.mode === 'stub') continue;
@@ -80,7 +83,9 @@ export function constructTaskReasoningBackend(
       allowedTools: route.allowedTools,
       contextWindowTokens: route.limits.contextWindowTokens ?? options.contextWindowTokens,
       maxCompletionTokens: route.limits.maxCompletionTokens ?? options.maxCompletionTokens,
-      timeoutMs: route.limits.timeoutMs ?? options.timeoutMs,
+      timeoutMs: callerBounded
+        ? (options.timeoutMs ?? route.limits.timeoutMs)
+        : (route.limits.timeoutMs ?? options.timeoutMs),
     });
     if (bundle) candidates.push(bundle);
     else if (fixed)
@@ -96,13 +101,13 @@ export function constructTaskReasoningBackend(
       'No usable task reasoning backend; implicit stub execution is disabled'
     );
   }
-  const backend = bindReasoningRequestTimeout(
-    buildFailoverReasoningBackend(
-      chain.map((candidate) => candidate.backend),
-      primary.failover
-    ),
-    primary.limits.timeoutMs
+  const failover = buildFailoverReasoningBackend(
+    chain.map((candidate) => candidate.backend),
+    primary.failover
   );
+  const backend = callerBounded
+    ? failover
+    : bindReasoningRequestTimeout(failover, primary.limits.timeoutMs);
   // Retained task-local handles must not become a cross-task credential cache.
   const owned = new Proxy(backend, {
     get(target, key, receiver) {

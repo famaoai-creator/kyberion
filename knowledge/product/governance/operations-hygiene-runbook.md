@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-04
+last_updated: 2026-11-05
 ---
 
 # Operations Hygiene Runbook
@@ -1226,6 +1226,29 @@ call fails.
   (`runAdaptiveStructuredLlmProfile('distill', ...)`, run by `mission_controller`). No interactive
   or surface path calls a wisdom profile synchronously. Such a caller must set its own shorter
   timeout rather than rely on the profile value.
+
+**Measure the provider, not the request wrapper.** `bindReasoningRequestTimeout` (applied to every
+task backend and every installed role backend) races each `prompt` / `delegateTask` against the
+caller's signal and the route's `limits.timeoutMs` (default 60s), and rejects with the caller's
+own abort reason the moment the signal fires, without waiting for the provider. The failover layer
+does the same for an already-aborted signal (`throwIfReasoningAborted`). A probe that judges abort
+or latency through either layer measures the wrapper: an abort "passes" for a provider that never
+stopped, and a long turn hits the route ceiling instead of the probe's own limit.
+
+- A measurement caller builds its backend with `requestTimeout: 'caller'` (task construction
+  only) and passes its own `timeoutMs`, so the wrapper is off and the provider adapters get the
+  probe's ceiling. `check:backend-live-scenarios` does this.
+- Abort with a distinctive non-Error reason (no abort/cancel wording). Governed adapters turn a
+  non-Error reason into their own `[DELEGATION_CANCELLED]` error, so a rejection that is (or
+  quotes) the reason came from a forwarding layer and is `unreported`, never a pass.
+- Judge a capability only from the step that measures it: a follow_up that failed on its M2
+  instruction turn says nothing about session continuity (`continuity: 'unreported'`).
+- Known remaining site: `libs/core/testing/reasoning-backend-conformance.ts` checks abort with a
+  pre-aborted `Error('conformance abort')`, which the wrapper and the failover layer answer before
+  any provider runs. Apply the same reason rule before it is used against a wrapped backend.
+- Gates: `backend-live-scenarios.test.ts` (abort through the wrapper is `unreported`),
+  `reasoning-task-backend.test.ts` (caller-bounded construction is unraced),
+  `check_backend_live_scenarios.test.ts` (the entrypoint opts out of the wrapper).
 
 ---
 
