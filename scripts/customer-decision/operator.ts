@@ -245,12 +245,14 @@ export async function runGenerate(opts: Record<string, string>, now: string): Pr
     generated: result.generated,
     content_hash: agendaContentHash(written),
     reasoning_backend: result.reasoning_backend,
+    ...(result.egress_denied ? { egress_denied: true } : {}),
   });
   return {
     ...agendaSummary(written),
     generated: result.generated,
     notes: result.notes,
     reasoning_backend: result.reasoning_backend,
+    ...(result.egress_denied ? { egress_denied: result.egress_denied } : {}),
   };
 }
 

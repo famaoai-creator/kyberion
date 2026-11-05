@@ -19,6 +19,7 @@ import {
   stubReasoningBackend,
   type ReasoningBackend,
 } from '../reasoning/reasoning-backend.js';
+import { getReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
 
 afterEach(() => resetReasoningBackend());
 
@@ -92,8 +93,56 @@ describe('roster proposer (TC-12)', () => {
       const outcome = await withExecutionContextAsync('mission_controller', () =>
         proposeMissionTeamRoster({ missionId, force: true, missionContext: 'confidential context' })
       );
-      expect(outcome.status).toBe('backend_unavailable');
+      // A policy refusal is reported as such, with the step that would unblock it.
+      expect(outcome.status).toBe('egress_denied');
+      expect(outcome.egress?.reason).toMatch(/CONTEXT_EGRESS_DENIED/);
+      expect(outcome.egress?.next).toMatch(/^next: /);
       expect(prompt).not.toHaveBeenCalled();
+    } finally {
+      dispose();
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(missionPath, { recursive: true, force: true });
+      });
+    }
+  });
+
+  it('declares no_training for tenant context and reports a send-time egress denial distinctly', async () => {
+    const missionId = 'MSN-PROPOSAL-EGRESS-DENIED';
+    const missionPath = pathResolver.missionDir(missionId, 'confidential');
+    let observed: ReturnType<typeof getReasoningPayloadScope>;
+    const prompt = vi.fn(async () => {
+      observed = getReasoningPayloadScope();
+      // The failover chain folds the gate's error into a plain Error.
+      throw new Error(
+        "[reasoning-backend:failover] prompt failed across 1 candidate(s): [policy] [REASONING_EGRESS_DENIED] training_use 'local_only' forbids — why | next: attest tenant-a | evidence: e"
+      );
+    });
+    // A local-only backend passes the participant's external_egress: deny scope.
+    const dispose = registerReasoningBackend({ ...stubReasoningBackend, name: 'ollama', prompt });
+    try {
+      withExecutionContext('mission_controller', () => {
+        safeMkdir(missionPath, { recursive: true });
+        writeMissionTeamPlan(
+          missionPath,
+          composeMissionTeamPlan({
+            missionId,
+            missionType: 'development',
+            tier: 'confidential',
+            tenantSlug: 'tenant-a',
+          })
+        );
+      });
+      const outcome = await withExecutionContextAsync('mission_controller', () =>
+        proposeMissionTeamRoster({ missionId, force: true, missionContext: 'tenant context' })
+      );
+      expect(prompt).toHaveBeenCalledTimes(1);
+      expect(observed).toMatchObject({
+        tier: 'confidential',
+        tenant_slug: 'tenant-a',
+        training_use: 'no_training',
+      });
+      expect(outcome.status).toBe('egress_denied');
+      expect(outcome.egress?.next).toBe('next: attest tenant-a');
     } finally {
       dispose();
       withExecutionContext('mission_controller', () => {
