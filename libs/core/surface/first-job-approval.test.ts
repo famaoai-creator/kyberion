@@ -63,8 +63,10 @@ vi.mock('../dot/dot-dispatch.js', async (original) => ({
   currentDotActions: () => (state.action ? [structuredClone(state.action)] : []),
 }));
 vi.mock('../foundation/lock-utils.js', () => ({
-  withLockSync: (_key: string, fn: () => unknown) => {
-    state.locks++;
+  withLockSync: (key: string, fn: () => unknown) => {
+    // The audit chain serialises its append-only log with this lock; only
+    // locks around diagnostic/decision state count as a mutation here.
+    if (!key.startsWith('audit-chain')) state.locks++;
     return fn();
   },
 }));
