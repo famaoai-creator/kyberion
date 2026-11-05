@@ -98,6 +98,7 @@ const RATCHET_GATE_IDS = new Set([
   'module-boundaries',
   'max-file-lines',
   'package-export-surface',
+  'foundation-weight',
   'i18n',
   'cli-manifest',
   'install-script-allowlist',
