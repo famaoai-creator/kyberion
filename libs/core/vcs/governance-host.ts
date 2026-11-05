@@ -67,7 +67,7 @@ try {
   if (pathResolver.rootDir() !== input.governanceRoot) throw new Error('[PR_GOVERNANCE_ROOT] Child root mismatch');
   const target = resolvePromotionTargetRoot(input.mutation.params.cwd);
   if (target.root !== input.mutation.params.cwd) throw new Error('[PR_GOVERNANCE_ROOT] Worktree root mismatch');
-  const result = withScopeEnvOnly(() => {
+  const result = await withScopeEnvOnly(() => {
     if (JSON.stringify(resolveScopeContext()) !== JSON.stringify(input.sourceScope)) throw new Error('[PR_GOVERNANCE_SCOPE_MISMATCH] Child must preserve the worktree scope');
     return withPrPublicationBodySource(input.bodySourceTier, () => runVcsMutationWithApproval({
       ...input.mutation,
@@ -162,18 +162,18 @@ function stageUnprovablePrBodyFile(
   }
 }
 
-export function runVcsMutationWithWorktreeGovernance(
+export async function runVcsMutationWithWorktreeGovernance(
   mutation: VcsHostMutation,
   invocationId: string,
   print: (value: unknown) => void,
   options: VcsGovernanceHostOptions = {}
-): VcsCommandResult {
+): Promise<VcsCommandResult> {
   mutation = stageUnprovablePrBodyFile(mutation, invocationId);
   const source =
     mutation.operation === 'pr_create' && mutation.params.bodyFile
       ? publicationBodySourceTier(mutation.params.bodyFile)
       : options.bodySourceTier;
-  const local = () =>
+  const local = (): Promise<VcsCommandResult> =>
     source
       ? withPrPublicationBodySource(source, () =>
           runVcsMutationWithApproval(mutation, invocationId, print)
@@ -283,7 +283,7 @@ export function publishWithWorktreeGovernance(
   invocationId: string,
   print: (value: unknown) => void,
   options: VcsGovernanceHostOptions = {}
-): VcsCommandResult {
+): Promise<VcsCommandResult> {
   return runVcsMutationWithWorktreeGovernance(
     { operation: 'pr_create', params: publication },
     invocationId,
