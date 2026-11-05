@@ -412,7 +412,7 @@ describe('no_training honours tenant provider attestations', () => {
   it('denies without an attestation', () => {
     noTraining('unattested-tenant', () => {
       expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(
-        /no no-training declaration .*no attestation for provider 'claude' \| next: .* \| tenant=unattested-tenant/
+        /no no-training declaration .*no attestation for provider 'claude'.* \| next: .*--tenant unattested-tenant.* \| custody=tenant:unattested-tenant tenant=unattested-tenant/
       );
     });
   });
@@ -460,9 +460,11 @@ describe('no_training honours tenant provider attestations', () => {
     );
   });
 
-  it('denies when the scope names no tenant', () => {
+  it('denies tenantless material without a system attestation and names the system attest command', () => {
     withReasoningPayloadScope({ tier: 'public', training_use: 'no_training' }, () => {
-      expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(/no tenant_slug/);
+      expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(
+        /the installation \(system custody\) has no attestation for provider 'claude' \| next: record one with 'pnpm onboarding llm attest --custody system --provider claude .*--request-approval'.* \| custody=system provider=claude attestation=absent/
+      );
     });
   });
 
