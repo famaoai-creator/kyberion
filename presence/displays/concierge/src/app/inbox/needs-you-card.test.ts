@@ -59,6 +59,8 @@ describe('inboxLandingHash (?request= deep links)', () => {
       '#decide-approval-APR%201'
     );
     expect(inboxLandingHash('', '?reason=approval')).toBe('');
+    // A window without a location search (embedded / test hosts) lands nowhere.
+    expect(inboxLandingHash(undefined, undefined)).toBe('');
   });
 
   it('lands a learning-review link straight on its approval card (no /ops hop)', () => {

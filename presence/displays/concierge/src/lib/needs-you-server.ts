@@ -15,7 +15,7 @@ import { readConciergeHome } from './headless-projections';
 import { companyFanoutViews } from './company-fanout-views';
 import {
   COMPANY_FANOUT_RATE_LIMITS,
-  guardCompanyFanoutRateLimit,
+  throttleCompanyFanout,
   readCompanyFanoutHome,
 } from './company-fanout-reader';
 import { libraryHrefForKnowledgeCandidate } from './inbox-links';
@@ -147,12 +147,7 @@ export function handleNeedsYouRequest(
   const resolved = resolveConciergeSelectedViewer(req);
   if (resolved.response) return resolved.response;
   if (resolved.selection.mode === 'personal') {
-    const limited = guardCompanyFanoutRateLimit(
-      req,
-      resolved.viewer,
-      'needs-you-personal',
-      NO_STORE
-    );
+    const limited = throttleCompanyFanout(req, resolved.viewer, 'needs-you-personal', NO_STORE);
     if (limited) return limited;
   }
   const params = req.nextUrl.searchParams;
