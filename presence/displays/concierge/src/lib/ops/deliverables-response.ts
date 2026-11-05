@@ -16,6 +16,8 @@ export type ClientDeliverable = {
   missing?: boolean;
   reviewVerdict?: string;
   reviewComment?: string;
+  /** An open governed inbox entry exists: decide it in あなた待ち. */
+  awaitingInboxDecision?: boolean;
 };
 
 export type DeliverablesResponse = {
@@ -65,6 +67,8 @@ function parseDeliverable(value: unknown): ClientDeliverable | undefined {
   )
     return undefined;
   if (value.missing !== undefined && typeof value.missing !== 'boolean') return undefined;
+  if (value.awaitingInboxDecision !== undefined && typeof value.awaitingInboxDecision !== 'boolean')
+    return undefined;
   return {
     artifactId: strings.artifactId!,
     kind: strings.kind!,
@@ -73,6 +77,7 @@ function parseDeliverable(value: unknown): ClientDeliverable | undefined {
     ...optionalStrings,
     ...(sizeBytes !== undefined ? { sizeBytes: sizeBytes as number } : {}),
     ...(value.missing !== undefined ? { missing: value.missing as boolean } : {}),
+    ...(value.awaitingInboxDecision === true ? { awaitingInboxDecision: true } : {}),
   };
 }
 

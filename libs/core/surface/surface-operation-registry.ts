@@ -29,11 +29,34 @@ import {
   type WorkspaceGraph,
   type WorkspaceGraphSources,
 } from './workspace-graph.js';
+import {
+  NEEDS_YOU_REASONS,
+  buildNeedsYouQueue,
+  pageNeedsYou,
+  summarizeNeedsYou,
+  type NeedsYouItem,
+  type NeedsYouReason,
+  type NeedsYouSourceData,
+} from './needs-you.js';
+import { readNeedsYouSources } from './needs-you-sources.js';
+import {
+  buildSetupChecklist,
+  collectSetupChecklistSignals,
+  type SetupChecklistReaders,
+} from './setup-checklist.js';
 
 export interface SurfaceOperationContext {
   viewer: SurfaceAuthorizationContext;
   /** Test seam; production reads the governed stores. */
   sources?: WorkspaceGraphSources;
+  /**
+   * Needs-you reader for this viewer. The unified shell passes its own (it
+   * adds owner-authenticated personal approvals); absent → the default store
+   * reader. Either way the one builder in `needs-you.ts` counts.
+   */
+  needsYou?: () => NeedsYouSourceData;
+  /** Test seam for `setup.checklist`; production reads the governed stores. */
+  setupReaders?: SetupChecklistReaders;
 }
 
 export interface SurfaceOperationDescriptor {
@@ -191,15 +214,93 @@ const operations = [
       items: listGraphNodes(viewerGraph(ctx), { q: input.q, limit: input.limit ?? 30 }),
     }),
   },
+  {
+    id: 'setup.checklist',
+    title: 'Setup checklist',
+    description:
+      'The first-run setup sequence (identity & tenant, reasoning backend, autonomy & approval policy, notification channel, first project, budget, trial mission) with progress and the settings card that completes each step.',
+    policy: readPolicy('setup.checklist'),
+    input: z.object({}).strict(),
+    run: (ctx: SurfaceOperationContext) =>
+      buildSetupChecklist(collectSetupChecklistSignals(viewerGraph(ctx), ctx.setupReaders)),
+  } satisfies SurfaceOperation<Record<string, never>>,
 ] as const;
 
 class OperationNotFound extends Error {}
+
+const needsYouNarrowing = {
+  tenant: ID.optional(),
+  organization_id: ID.optional(),
+  project_id: ID.optional(),
+};
+
+/** The viewer's open queue (needs-you.ts count definition), narrowed by the input. */
+function viewerNeedsYou(
+  ctx: SurfaceOperationContext,
+  input: { tenant?: string; organization_id?: string; project_id?: string }
+): NeedsYouItem[] {
+  const data = ctx.needsYou ? ctx.needsYou() : readNeedsYouSources(ctx.viewer);
+  return buildNeedsYouQueue(data, { viewer: ctx.viewer, narrowing: input });
+}
+
+const needsYouOperations = [
+  {
+    id: 'needs-you.list',
+    title: 'List what needs you',
+    description:
+      'Open items waiting for a person (approvals, customer decisions, deliverable reviews, knowledge candidates, stalled requests, failures) in urgency order. Identical approvals are folded with their true count. Filter by reason or overdue; page with the cursor.',
+    policy: readPolicy('needs-you.list'),
+    input: z
+      .object({
+        ...needsYouNarrowing,
+        reason: z.enum(NEEDS_YOU_REASONS).optional(),
+        overdue: z.union([z.boolean(), z.enum(['true', 'false', '1', '0'])]).optional(),
+        cursor: z
+          .string()
+          .trim()
+          .regex(/^\d{1,6}$/u)
+          .optional(),
+        limit: z.coerce.number().int().min(1).max(200).optional(),
+      })
+      .strict(),
+    run: (
+      ctx: SurfaceOperationContext,
+      input: {
+        tenant?: string;
+        organization_id?: string;
+        project_id?: string;
+        reason?: NeedsYouReason;
+        overdue?: boolean | 'true' | 'false' | '1' | '0';
+        cursor?: string;
+        limit?: number;
+      }
+    ) =>
+      pageNeedsYou(viewerNeedsYou(ctx, input), {
+        reason: input.reason,
+        overdue: input.overdue === true || input.overdue === 'true' || input.overdue === '1',
+        cursor: input.cursor,
+        limit: input.limit,
+      }),
+  },
+  {
+    id: 'needs-you.summary',
+    title: 'Needs-you summary',
+    description:
+      'The one needs-you count: open items by reason, how many are overdue, and the oldest wait. Every surface that shows a count of things to decide reads this.',
+    policy: readPolicy('needs-you.summary'),
+    input: z.object(needsYouNarrowing).strict(),
+    run: (
+      ctx: SurfaceOperationContext,
+      input: { tenant?: string; organization_id?: string; project_id?: string }
+    ) => summarizeNeedsYou(viewerNeedsYou(ctx, input)),
+  },
+];
 
 const logger = createLogger('surface-operations');
 
 type AnyOperation = SurfaceOperation<unknown>;
 const REGISTRY = new Map<string, AnyOperation>(
-  operations.map((op) => [op.id, op as unknown as AnyOperation])
+  [...operations, ...needsYouOperations].map((op) => [op.id, op as unknown as AnyOperation])
 );
 
 export function listSurfaceOperations(): SurfaceOperationDescriptor[] {

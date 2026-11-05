@@ -23,6 +23,13 @@ import {
   spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
 import {
+  redactProviderOutputError,
+  redactProviderOutputStream,
+  redactProviderOutputText,
+  redactProviderOutputValue,
+  withRedactedProviderOutput,
+} from './provider-output-redaction.js';
+import {
   buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
@@ -318,7 +325,7 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
    * Cursor emits that message as a complete duplicate of the partial stream.
    */
   streamPrompt(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream {
-    return this.streamPromptFromCli(prompt, options);
+    return redactProviderOutputStream(this.streamPromptFromCli(prompt, options));
   }
 
   private async *streamPromptFromCli(
@@ -493,12 +500,16 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
       if (!nativeInfo || typeof nativeInfo !== 'object') {
         throw new Error('[SUBAGENT_UNAVAILABLE] Cursor CLI returned no native subagent metadata.');
       }
-      this.lastHarnessSubagentInfo = { ...(nativeInfo as Record<string, unknown>) };
-      return response.text;
+      this.lastHarnessSubagentInfo = redactProviderOutputValue({
+        ...(nativeInfo as Record<string, unknown>),
+      });
+      return redactProviderOutputText(response.text);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw error;
-      throw new Error(`[SUBAGENT_UNAVAILABLE] Cursor CLI harness failed: ${message}`);
+      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw redactProviderOutputError(error);
+      throw redactProviderOutputError(
+        new Error(`[SUBAGENT_UNAVAILABLE] Cursor CLI harness failed: ${message}`)
+      );
     } finally {
       release();
     }
@@ -544,6 +555,23 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
   }
 
   private async complete(
+    systemPrompt: string,
+    userPrompt: string,
+    options?: {
+      profile?: ProviderPermissionProfileName;
+      signal?: AbortSignal;
+      model?: string;
+      effort?: ReasoningCallOptions['effort'];
+      shapeHint?: string;
+    }
+  ): Promise<string> {
+    // Output exit: the answer and any stderr-bearing error are redacted.
+    return withRedactedProviderOutput(() =>
+      this.completeUnredacted(systemPrompt, userPrompt, options)
+    );
+  }
+
+  private async completeUnredacted(
     systemPrompt: string,
     userPrompt: string,
     options?: {
