@@ -1816,6 +1816,10 @@
       "types": "./dist/governance/approval-presentation.d.ts",
       "default": "./dist/governance/approval-presentation.js"
     },
+    "./governance/approval-separation-of-duties": {
+      "types": "./dist/governance/approval-separation-of-duties.d.ts",
+      "default": "./dist/governance/approval-separation-of-duties.js"
+    },
     "./governance/approval-requester": {
       "types": "./dist/governance/approval-requester.d.ts",
       "default": "./dist/governance/approval-requester.js"
