@@ -62,6 +62,9 @@ export function entryExists(p: string): boolean {
       stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
     else if (insidePrimaryAuthority(candidate) !== undefined)
       stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
+    // Existence only: the walk toward an authority store passes its fixed ancestors.
+    else if (isPrimaryAuthorityAncestor(candidate))
+      stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
     else throw Object.assign(new Error('path is outside the repository'), { code: 'EOUTSIDE' });
   } catch (error) {
     if (errnoCode(error) === 'ENOTDIR') return false;
@@ -243,6 +246,30 @@ function insidePrimaryAuthority(candidate: string): string | undefined {
 }
 
 /**
+ * Primary-relative form of `candidate` when it is one of the fixed directories
+ * above a primary checkout authority store (e.g. `active/shared/coordination`).
+ * Used ONLY by the existence probe of the missing-ancestor walk and to spell
+ * such a directory back under the logical primary root (so mkdirGuarded's
+ * parent comparison holds when the primary's real path differs from its
+ * spelled one). It never admits a read, write or listing of the directory:
+ * permission checks still judge it as outside the repository.
+ */
+function primaryAuthorityAncestor(candidate: string): string | undefined {
+  const primary = pathResolver.primaryCheckoutRootDir();
+  if (primary === pathResolver.rootDir()) return undefined;
+  const abs = path.resolve(candidate);
+  const rel = isInside(path.resolve(primary), abs) ?? isInside(realPrimaryRoot().real, abs);
+  return rel !== undefined &&
+    pathResolver.isAuthorityStoreAncestorRelativePath(rel.split(path.sep).join('/'))
+    ? rel
+    : undefined;
+}
+
+function isPrimaryAuthorityAncestor(candidate: string): boolean {
+  return primaryAuthorityAncestor(candidate) !== undefined;
+}
+
+/**
  * On a case-insensitive volume, the on-disk spelling of an existing entry
  * `leaf` in the real directory `realDir` (`knowledge/PERSONAL` -> `personal`);
  * tier detection is case-sensitive, so the typed spelling must not be judged.
@@ -367,13 +394,24 @@ export function canonicalGuardPath(resolved: string, mode: CanonicalMode): strin
   return toLogicalRoot(physical);
 }
 
+/**
+ * The primary-checkout paths the root translators re-spell: authority stores
+ * and their fixed ancestors. ONE predicate for both directions keeps
+ * toLogicalRoot/toPhysicalRoot inverse of each other (a path one maps must
+ * map back). Translation is spelling only and grants nothing — every
+ * permission check still classifies the result on its own.
+ */
+function primaryRootTranslatable(candidate: string): string | undefined {
+  return insidePrimaryAuthority(candidate) ?? primaryAuthorityAncestor(candidate);
+}
+
 /** Inverse of toLogicalRoot: the same location under the realpath of the root (no linked prefix). */
 function toPhysicalRoot(logical: string): string {
   const relative = isInside(path.resolve(pathResolver.rootDir()), logical);
   if (relative !== undefined) {
     return relative === '' ? realRoot().real : path.join(realRoot().real, relative);
   }
-  const relPrimary = insidePrimaryAuthority(logical);
+  const relPrimary = primaryRootTranslatable(logical);
   if (relPrimary !== undefined) {
     return relPrimary === ''
       ? realPrimaryRoot().real
@@ -389,13 +427,19 @@ function toLogicalRoot(physical: string): string {
     const logicalRoot = path.resolve(pathResolver.rootDir());
     return relative === '' ? logicalRoot : path.join(logicalRoot, relative);
   }
-  const relPrimary = insidePrimaryAuthority(physical);
+  const relPrimary = primaryRootTranslatable(physical);
   if (relPrimary !== undefined) {
     const logicalPrimary = path.resolve(pathResolver.primaryCheckoutRootDir());
     return relPrimary === '' ? logicalPrimary : path.join(logicalPrimary, relPrimary);
   }
   return physical;
 }
+
+/** Test-only view of the root translators (round-trip assertions). */
+export const rootTranslationForTesting = {
+  toLogicalRoot: (physical: string): string => toLogicalRoot(physical),
+  toPhysicalRoot: (logical: string): string => toPhysicalRoot(logical),
+};
 
 /**
  * Write-side companion of `validateWritePermission`: the literal path is
