@@ -127,7 +127,7 @@
       "allow": []
     },
     "audit_mirror_writer": {
-      "allow": ["customer/${KYBERION_TENANT}/logs/audit/"]
+      "allow": ["active/shared/runtime/audit-mirror/confidential/${KYBERION_TENANT}/"]
     },
     "tenant_ledger_store": {
       "allow": [
@@ -215,7 +215,7 @@
       "allow": []
     },
     "customer_channel_binding_store": {
-      "allow": ["customer/${KYBERION_TENANT}/connections/"]
+      "allow": ["knowledge/confidential/${KYBERION_TENANT}/connections/"]
     }
   }
 }

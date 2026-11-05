@@ -16,6 +16,7 @@ export interface StoreRootSource {
   custody: { kind: 'system' | 'tenant' | 'person' | 'derived' | 'unscoped-legacy' };
   status: 'active' | 'planned' | 'legacy-move';
   registration?: StoreRootRegistration;
+  tiers?: readonly string[];
 }
 
 export interface StoreRootProjection {
@@ -94,8 +95,17 @@ export function projectStoreRoots(
     const partitioned = store.path.endsWith(PARTITION_SUFFIX);
     const legacyBareRoot =
       LEGACY_BARE_LEDGER_REGISTRATIONS.has(name) && store.custody.kind === 'unscoped-legacy';
-    const root = partitioned ? store.path.slice(0, -PARTITION_SUFFIX.length) : store.path;
-    if ((!partitioned && !legacyBareRoot) || !isCanonicalStoreRoot(root)) {
+    const fixedSuffix = '/confidential/<tenant>';
+    const fixedPartitioned =
+      store.path.endsWith(fixedSuffix) &&
+      store.tiers?.length === 1 &&
+      store.tiers[0] === 'confidential';
+    const root = partitioned
+      ? store.path.slice(0, -PARTITION_SUFFIX.length)
+      : fixedPartitioned
+        ? store.path.slice(0, -fixedSuffix.length)
+        : store.path;
+    if ((!partitioned && !fixedPartitioned && !legacyBareRoot) || !isCanonicalStoreRoot(root)) {
       violations.push(
         `${store.id}: registration ${name} requires a canonical root with tier/tenant binding`
       );

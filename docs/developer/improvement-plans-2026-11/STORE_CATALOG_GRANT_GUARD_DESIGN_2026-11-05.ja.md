@@ -269,6 +269,24 @@ Scope 設定の保存・変更は行わない。policy の拒否は診断結果�
 ファイルの存在は判定せず、内容を出力しない。既存 policy inspector による物理 alias や
 security metadata の検査は残し、sensitive-path mediation を含む実 I/O の許可保証とは区別する。
 
+### S2 更新の統合（2026-11-06）
+
+定期 fetch で `8f8d64abc`（tenant company 資産の S2）と `351ea97b8`（migration の
+`source_kind` 修正）を確認した。独立 Scope の CLI 実装をコミット後、この2件を統合する。
+company は tenant knowledge、channel binding と audit mirror は upstream の active 宣言を
+保持する。S3 の customer 所有モデルはこの作業で実施しない。実データの migration も実行しない。
+
+audit mirror を ledger の順序5で追加し、root 登録は state14・ledger5・floor4 の23件となる。
+固定の `confidential/<tenant>` を、対応する singleton `tiers` 宣言付きで検証する。
+`<tier>` へ書き換えて配置を広げず、tier 欠落・不一致・複数値は拒否する。既存22件の
+root 値・順序を維持し、新しい audit alias も生成 map から導出する。S2 の新しい専用
+ledger 保護は `TENANT_STORE_LEDGER_ROOTS` に残す。登録は配置の宣言であり認可を生成しない。
+
+統合レビューで、channel binding の strict な競合検査でも末端 reader が parse/schema failure を
+空配列へ変換する漏れを見つけた。実 bind の2ケースで修正前の進行を再現し、strict mode を
+末端まで伝えて不明な binding を「競合なし」にしない。nonstrict discovery は既存の動作を
+維持する。既存 target の bytes 不変を回帰で確認し、CI と運用手順へ追加する。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |

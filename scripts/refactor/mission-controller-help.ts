@@ -173,7 +173,7 @@ Maintenance Commands:
     sync                           Sync mission registry
   organization-catalogs [--json] [--organization-id <ORG>] [--selected-only] [--summary]
                                  List available organization team template catalogs
-  organization-profiles [--json] [--organization-id <ORG>] [--active-only] [--ready-only] [--missing-only] [--source <customer|public>] [--summary]
+  organization-profiles [--json] [--organization-id <ORG>] [--active-only] [--ready-only] [--missing-only] [--source <tenant|public>] [--summary]
                                  List available organization profiles
   organization-profile [--json] [--organization-id <ORG>] [--summary]
                                  Show the resolved organization profile and defaults
@@ -213,7 +213,7 @@ Organization Selection:
   --active-only                  Filter organization-profiles to the selected organization only
   --ready-only                   Filter organization-profiles to ready profiles only
   --missing-only                 Filter organization-profiles to missing profiles only
-  --source <customer|public>     Filter organization-profiles by source
+  --source <tenant|public>       Filter organization-profiles by source
   Guide: knowledge/product/orchestration/organization-selection-guide.md
 
 Organization Discovery:

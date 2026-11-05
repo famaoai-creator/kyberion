@@ -322,7 +322,6 @@
       },
       "status": "legacy-move",
       "moves_to": "tenant-audit-mirror",
-      "legacy_roles": ["audit_mirror_writer"],
       "sources": ["stance-overlay", "role-policy"],
       "note": "audit_mirror_writer, chronos_tenant_runner, run_pipeline"
     },
@@ -335,7 +334,6 @@
       },
       "status": "legacy-move",
       "moves_to": "tenant-channel-bindings",
-      "legacy_roles": ["customer_channel_binding_store"],
       "sources": ["stance-overlay", "role-policy"],
       "note": "customer-channel-binding.ts"
     },
@@ -347,9 +345,9 @@
         "ref": "<tenant>"
       },
       "status": "legacy-move",
-      "moves_to": "tenant-company",
+      "moves_to": "tenant-knowledge",
       "sources": ["stance-overlay"],
-      "note": "Company profile and design keyed by tenant slug (company.ts, creative-design-resolver.ts)."
+      "note": "Company assets keyed by tenant slug (company.json, vision, organization profile, org chart, OKRs, decision rights, finance, brand, design). Migration 0002-tenant-home moves them into the tenant home."
     },
     {
       "id": "legacy.customer-deals",
@@ -899,9 +897,16 @@
         "ref": "<tenant>"
       },
       "tiers": ["confidential"],
-      "status": "planned",
-      "sources": ["scope-model"],
-      "note": "S2: per-tenant audit mirror."
+      "status": "active",
+      "sources": ["scope-model", "role-policy"],
+      "note": "S2 done: per-tenant copy of the master audit chain, written only by audit_mirror_writer (storage-layout TENANT_STORE_LEDGER_ROOTS).",
+      "legacy_roles": ["audit_mirror_writer"],
+      "registration": {
+        "family": "ledger",
+        "key": "tenant_audit_mirror",
+        "order": 5,
+        "retention_path": "active/shared/runtime/audit-mirror"
+      }
     },
     {
       "id": "tenant-channel-bindings",
@@ -911,21 +916,10 @@
         "ref": "<tenant>"
       },
       "tiers": ["confidential"],
-      "status": "planned",
-      "sources": ["scope-model"],
-      "note": "S2: channel bindings of the tenant."
-    },
-    {
-      "id": "tenant-company",
-      "path": "knowledge/confidential/<tenant>/company",
-      "custody": {
-        "kind": "tenant",
-        "ref": "<tenant>"
-      },
-      "tiers": ["confidential"],
-      "status": "planned",
-      "sources": ["scope-model"],
-      "note": "S2: company profile, vision and design of the tenant."
+      "status": "active",
+      "sources": ["scope-model", "role-policy"],
+      "note": "S2 done: the tenant's customer channel bindings (customer-channel-binding.ts, scripts/customer-channel/bindings.ts).",
+      "legacy_roles": ["customer_channel_binding_store"]
     },
     {
       "id": "tenant-customer-records",
@@ -953,7 +947,8 @@
         "peer_responder_reader",
         "pipeline_journal_store"
       ],
-      "sources": ["role-policy"]
+      "sources": ["role-policy"],
+      "note": "The tenant home. Company assets live directly in it (organization/tenant-home.ts TENANT_ASSET_ENTRIES: company.json, vision.md, organization-profile.json, org-chart.json, okr.json, decision-rights.json, finance/, brand/, design/); S2 moved them from customer/<tenant>/."
     },
     {
       "id": "tenant-knowledge.autonomy-action-overrides",
@@ -1000,7 +995,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["peer_catalog_reader"],
+      "legacy_roles": ["customer_channel_binding_store", "peer_catalog_reader"],
       "sources": ["role-policy"]
     },
     {

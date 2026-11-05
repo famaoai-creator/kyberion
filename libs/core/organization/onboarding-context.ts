@@ -7,6 +7,7 @@ import {
   type TenantProfile,
 } from './tenant-registry.js';
 import { stanceDirForSlug } from '../stance-resolver.js';
+import { tenantHomePath } from './tenant-home.js';
 import { isTenantActivationActive } from './tenant-activation.js';
 import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
 import {
@@ -283,6 +284,22 @@ function archiveOnboardingWorkItem(item: WorkItem | undefined, rootDir: string):
   } catch {
     // The original failure is more actionable than a best-effort cleanup failure.
   }
+}
+
+/**
+ * The tenant home that holds the company's organization profile: the bound
+ * tenant's, else the company slug's (company onboarding run before a tenant
+ * was chosen keys the company files by its slug).
+ */
+export function companyProfileHome(
+  tenantSlug: string,
+  customerSlug: string,
+  rootDir: string
+): string {
+  for (const slug of [tenantSlug, customerSlug]) {
+    if (safeExistsSync(tenantHomePath(slug, 'organization-profile.json', rootDir))) return slug;
+  }
+  return tenantSlug;
 }
 
 function withCustomer<T>(customerSlug: string, fn: () => T): T {
@@ -616,7 +633,10 @@ export function resolveOnboardingContext(
   if (!customerExists) throw new Error(`Customer overlay '${customerSlug}' does not exist.`);
   const tenantSlug = input.tenantSlug.trim();
   const tenant = resolveTenantForCustomer(customerSlug, tenantSlug, rootDir);
-  const profile = withCustomer(customerSlug, () => loadOrganizationProfile(rootDir));
+  const profile = loadOrganizationProfile(
+    rootDir,
+    companyProfileHome(tenantSlug, customerSlug, rootDir)
+  );
   const binding = bindingFor({ ...input, customerSlug, tenantSlug }, profile);
   const organizationState = loadOrganizationOperationalState(binding.organization_id, {
     tier: binding.tier,

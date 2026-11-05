@@ -140,7 +140,7 @@ describe('bounded source generation', () => {
       clearProcessExitCode();
     }
   });
-  it.each(['tenant_ledger', 'tenant_approvals'])(
+  it.each(['tenant_ledger', 'tenant_approvals', 'tenant_audit_mirror'])(
     'refuses omitted mandatory alias %s before fixture writes',
     async (missing) => {
       const fixtureRoot = pathResolver.rootResolve(
@@ -149,14 +149,14 @@ describe('bounded source generation', () => {
       const output = `${fixtureRoot}/runtime-state-roots.ts`;
       const productionPath = pathResolver.rootResolve(STORE_ROOTS_OUTPUT);
       const productionBefore = readTextFile(productionPath);
-      const stores: StoreRootSource[] = ['tenant_ledger', 'tenant_approvals']
+      const stores: StoreRootSource[] = ['tenant_ledger', 'tenant_approvals', 'tenant_audit_mirror']
         .filter((key) => key !== missing)
-        .map((key) => ({
-          ...store(key, 1),
+        .map((key, index) => ({
+          ...store(key, index + 1),
           registration: {
             family: 'ledger',
             key,
-            order: 1,
+            order: index + 1,
             retention_path: `active/shared/runtime/${key}`,
           },
         }));

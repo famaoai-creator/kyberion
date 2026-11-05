@@ -1,14 +1,17 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { readTenantProfile, listTenantProfileSlugs } from './organization/tenant-registry.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
+import { readTenantProfile, tenantProfileDir } from './organization/tenant-registry.js';
+import { TENANT_CHANNEL_BINDINGS_FILE, tenantHomePath } from './organization/tenant-home.js';
+import { CUSTOMER_CHANNEL_BINDING_STORE_ROLE } from './foundation/customer-channel-binding-store-capability.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
 import { logger } from './core.js';
 import { isValidTenantSlug } from './foundation/scope.js';
 import { withExecutionContext } from './authority.js';
 
 /** Reads exactly `knowledge/personal/tenants/<tenant>.json` (shared core role). */
 const TENANT_REGISTRY_READER_ROLE = 'workspace_tenant_registry_reader';
+const TENANT_REGISTRY_INDEX_READER_ROLE = 'workspace_tenant_registry_index_reader';
 
 /**
  * E2E-06 Task 1: channel → customer binding.
@@ -44,12 +47,29 @@ export const CUSTOMER_CHANNEL_BINDINGS_SCHEMA_PATH = pathResolver.knowledge(
 export interface CustomerChannelBindingListOptions {
   /** Repository root seam for hermetic callers; defaults to the live root. */
   rootDir?: string;
+  /**
+   * Throw on registry/binding read, path or validation failures instead of
+   * treating them as no bindings. Genuine absence still yields no bindings.
+   * For checks that must fail closed, such as a bind's cross-tenant check.
+   */
+  strict?: boolean;
 }
 
-function readBindingsFile(filePath: string, rootDir: string): CustomerChannelBinding[] {
+function readBindingsFile(
+  filePath: string,
+  rootDir: string,
+  strict = false
+): CustomerChannelBinding[] {
   try {
-    const safeFilePath = assertSafeRepositoryPath(filePath, { rootDir });
-    if (!safeExistsSync(safeFilePath)) return [];
+    const safeFilePath = assertSafeRepositoryPath(filePath, { rootDir, allowMissingLeaf: true });
+    if (strict) {
+      try {
+        safeLstat(safeFilePath);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+        throw err;
+      }
+    } else if (!safeExistsSync(safeFilePath)) return [];
     const parsed = defineCatalog<{ bindings: CustomerChannelBinding[] }>({
       id: 'customer-channel-binding',
       path: safeFilePath,
@@ -57,6 +77,7 @@ function readBindingsFile(filePath: string, rootDir: string): CustomerChannelBin
     }).load();
     return parsed.bindings;
   } catch (err) {
+    if (strict) throw err;
     const message = err instanceof Error ? err.message : String(err);
     logger.warn(`[customer-channel-binding] failed to read ${filePath}: ${message}`);
     return [];
@@ -68,7 +89,7 @@ function readBindingsFile(filePath: string, rootDir: string): CustomerChannelBin
  * narrow reader (`knowledge/personal/tenants/<tenant>.json` only), so a
  * process without a personal-tier persona can check it; any failure is "no".
  */
-function isActiveTenant(tenantSlug: string, rootDir: string): boolean {
+function isActiveTenant(tenantSlug: string, rootDir: string, strict = false): boolean {
   try {
     return withExecutionContext(
       TENANT_REGISTRY_READER_ROLE,
@@ -76,7 +97,8 @@ function isActiveTenant(tenantSlug: string, rootDir: string): boolean {
       'worker',
       tenantSlug
     );
-  } catch {
+  } catch (err) {
+    if (strict) throw err;
     return false;
   }
 }
@@ -90,21 +112,62 @@ export function isActiveCustomerTenant(
   return isActiveTenant(tenantSlug, path.resolve(options.rootDir ?? pathResolver.rootDir()));
 }
 
-function activeRegisteredTenantSlugs(rootDir: string): Set<string> {
+/**
+ * One tenant's bindings, read as the binding store role bound to that tenant —
+ * the role whose grant is exactly that file. Throws when the caller is bound to
+ * another tenant ([ROLE_TENANT_SCOPE_MISMATCH]).
+ */
+function readTenantBindingsFile(
+  tenantSlug: string,
+  rootDir: string,
+  strict = false
+): CustomerChannelBinding[] {
+  const filePath = tenantHomePath(tenantSlug, TENANT_CHANNEL_BINDINGS_FILE, rootDir);
+  return withExecutionContext(
+    CUSTOMER_CHANNEL_BINDING_STORE_ROLE,
+    () => readBindingsFile(filePath, rootDir, strict),
+    'worker',
+    tenantSlug
+  );
+}
+
+/** Registered, active tenants — the only ones that may have bindings. */
+export function listActiveCustomerTenantSlugs(
+  options: CustomerChannelBindingListOptions = {}
+): string[] {
+  const rootDir = path.resolve(options.rootDir ?? pathResolver.rootDir());
+  return [...activeRegisteredTenantSlugs(rootDir, options.strict === true)].sort();
+}
+
+/**
+ * Registered, active tenants. The registry is listed as its index reader and
+ * each profile read as its tenant-bound reader, so no personal-tier persona is
+ * needed. A malformed, unreadable or unauthorized profile is not a binding
+ * authority: discovery skips it, or (strict) throws so a check fails closed.
+ */
+function activeRegisteredTenantSlugs(rootDir: string, strict = false): Set<string> {
   const registered = new Set<string>();
   let slugs: string[];
   try {
-    slugs = listTenantProfileSlugs({ rootDir });
-  } catch {
+    // The index reader lists names only; each profile is then checked by isActiveTenant.
+    slugs = withExecutionContext(
+      TENANT_REGISTRY_INDEX_READER_ROLE,
+      () => {
+        const dir = tenantProfileDir({ rootDir });
+        if (!safeExistsSync(dir)) return [];
+        return safeReaddir(dir)
+          .filter((entry) => entry.endsWith('.json'))
+          .map((entry) => entry.slice(0, -'.json'.length))
+          .filter(isValidTenantSlug);
+      },
+      'worker'
+    );
+  } catch (err) {
+    if (strict) throw err;
     return registered;
   }
   for (const slug of slugs) {
-    try {
-      if (readTenantProfile(slug, { rootDir })?.status === 'active') registered.add(slug);
-    } catch {
-      // A malformed, unreadable, or unauthorized profile is not a binding
-      // authority. Discovery fails closed for that tenant.
-    }
+    if (isActiveTenant(slug, rootDir, strict)) registered.add(slug);
   }
   return registered;
 }
@@ -113,36 +176,19 @@ export function listCustomerChannelBindings(
   options: CustomerChannelBindingListOptions = {}
 ): Array<ResolvedCustomerBinding & { file: string }> {
   const rootDir = path.resolve(options.rootDir ?? pathResolver.rootDir());
-  const customerRootDir = path.join(rootDir, 'customer');
   const results: Array<ResolvedCustomerBinding & { file: string }> = [];
-  let safeCustomerRoot: string;
-  try {
-    safeCustomerRoot = assertSafeRepositoryPath(customerRootDir, { rootDir });
-  } catch {
-    return results;
-  }
-  if (!safeExistsSync(safeCustomerRoot)) return results;
-  const activeTenants = activeRegisteredTenantSlugs(rootDir);
-  let slugs: string[] = [];
-  try {
-    slugs = safeReaddir(safeCustomerRoot);
-  } catch {
-    return results;
-  }
-  for (const slug of slugs) {
-    if (!activeTenants.has(slug)) continue;
-    const dirPath = path.join(safeCustomerRoot, slug);
-    let safeDirPath: string;
+  // Only a registered, active tenant has bindings; each lives in that tenant's home.
+  for (const slug of [...activeRegisteredTenantSlugs(rootDir, options.strict === true)].sort()) {
+    let bindings: CustomerChannelBinding[];
     try {
-      safeDirPath = assertSafeRepositoryPath(dirPath, { rootDir });
-      if (!safeStat(safeDirPath).isDirectory()) continue;
-    } catch {
+      bindings = readTenantBindingsFile(slug, rootDir, options.strict === true);
+    } catch (err) {
+      if (options.strict) throw err;
+      // A tenant this process may not read routes nothing here (fails closed).
       continue;
     }
-    const filePath = path.join(safeDirPath, 'connections', 'channel-bindings.json');
-    for (const binding of readBindingsFile(filePath, rootDir)) {
-      results.push({ tenantSlug: slug, binding, file: filePath });
-    }
+    const file = tenantHomePath(slug, TENANT_CHANNEL_BINDINGS_FILE, rootDir);
+    for (const binding of bindings) results.push({ tenantSlug: slug, binding, file });
   }
   return results;
 }
@@ -170,10 +216,10 @@ export function resolveCustomerBinding(
 }
 
 /**
- * CD-11: one tenant's bindings only (`customer/<tenant>/connections/channel-bindings.json`),
+ * CD-11: one tenant's bindings only (`knowledge/confidential/<tenant>/connections/channel-bindings.json`),
  * never a walk over other tenants, and none for a tenant that is not
  * registered and active (fails closed). A file that cannot be read or does
- * not validate is logged and yields no bindings.
+ * not validate is logged and yields no bindings, unless strict is requested.
  */
 export function readTenantCustomerChannelBindings(
   tenantSlug: string,
@@ -183,15 +229,17 @@ export function readTenantCustomerChannelBindings(
   const rootDir = path.resolve(options.rootDir ?? pathResolver.rootDir());
   // Same rule as the cross-tenant listing: only a registered, active tenant
   // has bindings (a suspended tenant never messages its customers).
-  if (!isActiveTenant(tenantSlug, rootDir)) return [];
-  const filePath = path.join(
-    rootDir,
-    'customer',
-    tenantSlug,
-    'connections',
-    'channel-bindings.json'
-  );
-  return readBindingsFile(filePath, rootDir);
+  if (!isActiveTenant(tenantSlug, rootDir, options.strict === true)) return [];
+  try {
+    return readTenantBindingsFile(tenantSlug, rootDir, options.strict === true);
+  } catch (err) {
+    if (options.strict) throw err;
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn(
+      `[customer-channel-binding] tenant '${tenantSlug}' bindings not readable here: ${message}`
+    );
+    return [];
+  }
 }
 
 /** CD-11: the tenant's active binding for exactly this surface + channel, or null. */

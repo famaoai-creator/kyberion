@@ -53,6 +53,45 @@ describe('runtime store registration coverage', () => {
     expect(stores[1].custody.kind).toBe('unscoped-legacy');
   });
 
+  it('projects an explicitly confidential-only tenant ledger without widening its path', () => {
+    const audit = store('audit', 'active/shared/runtime/audit-mirror/confidential/<tenant>', {
+      tiers: ['confidential'],
+      registration: {
+        family: 'ledger',
+        key: 'tenant_audit_mirror',
+        order: 1,
+        retention_path: 'active/shared/runtime/audit-mirror',
+      },
+    });
+    const registries = {
+      state: {},
+      ledger: { tenant_audit_mirror: 'active/shared/runtime/audit-mirror' },
+      floor: {},
+    };
+    const policies = [{ path: 'active/shared/runtime/audit-mirror' }];
+    expect(checkStoreRegistrations([audit], registries, policies)).toEqual([]);
+    for (const tiers of [
+      undefined,
+      [],
+      ['personal'],
+      ['confidential', 'personal'],
+      ['confidential', 'confidential'],
+    ]) {
+      expect(
+        checkStoreRegistrations([{ ...audit, tiers }], registries, policies).join('\n')
+      ).toContain('tier/tenant binding');
+    }
+    for (const path of [
+      'active/shared/runtime/audit-mirror/personal/<tenant>',
+      'active/shared/runtime/audit-mirror/../audit-mirror/confidential/<tenant>',
+    ]) {
+      expect(
+        checkStoreRegistrations([{ ...audit, path }], registries, policies).join('\n')
+      ).toContain('tier/tenant binding');
+    }
+    expect(audit.path).toBe('active/shared/runtime/audit-mirror/confidential/<tenant>');
+  });
+
   it('detects a missing ledger registration instead of accepting a broad parent store', () => {
     expect(
       checkStoreRegistrations(

@@ -2,7 +2,10 @@ import * as path from 'node:path';
 import { readConfiguredActorIdentity } from '../identity-context-bridge.js';
 import { auditChain, withAuditChainLock } from '../governance/audit-chain.js';
 import { readJson, writeJson } from '../foundation/json.js';
-import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
+import {
+  runtimeStatePath,
+  TENANT_AUDIT_MIRROR_ROOT_PATH,
+} from '../foundation/runtime-state-roots.js';
 import {
   defaultTenantKnowledgeRoot,
   readTenantProfile,
@@ -12,13 +15,16 @@ import {
   type TenantRegistryPathOptions,
 } from './tenant-registry.js';
 import { pathResolver } from '../path-resolver.js';
+import { withExecutionContext } from '../authority.js';
 import {
   safeExistsSync,
   safeMkdir,
   safeMoveSync,
   safeReadFile,
   safeReaddir,
+  safeRmSync,
   safeStat,
+  safeWriteFile,
 } from '../secure-io.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 
@@ -40,7 +46,7 @@ export type TenantLifecycleVerb = 'create' | 'update' | 'suspend' | 'resume' | '
 
 /** One directory or file relocation the rename performs. */
 export interface TenantRenameMove {
-  kind: 'profile' | 'knowledge_root' | 'organization_state' | 'customer_overlay';
+  kind: 'profile' | 'knowledge_root' | 'organization_state' | 'audit_mirror' | 'customer_overlay';
   from: string;
   to: string;
 }
@@ -328,7 +334,46 @@ export function renameTenantWithPlan(input: TenantRenameInput): TenantRenameResu
     }
   }
 
-  // 4. Customer stance overlay, if the tenant has one.
+  // 4a. The tenant's audit mirror partition. Moving it under the audit chain
+  //     lock keeps every append on one side of the move, and the marker records
+  //     where: mirror reconcile counts the old slug's earlier entries as the new
+  //     slug's (see audit_mirror_reconcile.ts).
+  const fromMirror = path.join(rootDir, TENANT_AUDIT_MIRROR_ROOT_PATH, 'confidential', fromSlug);
+  if (safeExistsSync(fromMirror)) {
+    const toMirror = path.join(rootDir, TENANT_AUDIT_MIRROR_ROOT_PATH, 'confidential', toSlug);
+    moves.push({
+      kind: 'audit_mirror',
+      from: relative(rootDir, fromMirror),
+      to: relative(rootDir, toMirror),
+    });
+    if (apply) {
+      // Only audit_mirror_writer, bound to one tenant, may write a mirror
+      // partition: copy into the new slug's partition, then clear the old one.
+      withAuditChainLock(() => {
+        const files = safeReaddir(fromMirror).sort();
+        withExecutionContext(
+          'audit_mirror_writer',
+          () => {
+            safeMkdir(toMirror, { recursive: true });
+            for (const file of files)
+              safeWriteFile(path.join(toMirror, file), safeReadFile(path.join(fromMirror, file)));
+          },
+          undefined,
+          toSlug
+        );
+        withExecutionContext(
+          'audit_mirror_writer',
+          () => safeRmSync(fromMirror, { recursive: true, force: true }),
+          undefined,
+          fromSlug
+        );
+        mirrorMovedId = auditChain.recordHeld(mirrorMovedEntry).id;
+      });
+    }
+  }
+
+  // 4b. The legacy customer/{tenant}/ directory, which still holds the tenant's
+  //     customer records until S3 moves them into the tenant home.
   const fromOverlay = path.join(rootDir, 'customer', fromSlug);
   if (safeExistsSync(fromOverlay)) {
     const toOverlay = path.join(rootDir, 'customer', toSlug);
@@ -337,16 +382,7 @@ export function renameTenantWithPlan(input: TenantRenameInput): TenantRenameResu
       from: relative(rootDir, fromOverlay),
       to: relative(rootDir, toOverlay),
     });
-    if (apply) {
-      // The overlay holds the tenant's audit mirror. Moving it under the audit
-      // chain lock keeps every append on one side of the move, and the marker
-      // records where: mirror reconcile counts the old slug's earlier entries
-      // as the new slug's (see audit_mirror_reconcile.ts).
-      withAuditChainLock(() => {
-        safeMoveSync(fromOverlay, toOverlay);
-        mirrorMovedId = auditChain.recordHeld(mirrorMovedEntry).id;
-      });
-    }
+    if (apply) safeMoveSync(fromOverlay, toOverlay);
   }
 
   // 5. Profile last: it is the registry entry, so it flips only once the

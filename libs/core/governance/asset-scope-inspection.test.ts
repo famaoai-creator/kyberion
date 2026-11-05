@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { inspectReadPermission } from '../tier-guard.js';
@@ -27,6 +28,49 @@ describe('asset scope read comparison', () => {
     expect(result.shadow).toMatchObject({
       status: 'address_only',
       resolution: { status: 'resolved', address: { custody: { kind: 'tenant', ref: 'acme' } } },
+    });
+    expect(result.shadow).not.toHaveProperty('observation');
+    expect(result.shadow).not.toHaveProperty('agrees');
+  });
+
+  it.each([
+    [
+      'active/shared/runtime/audit-mirror/confidential/acme/audit-2026-11-06.jsonl',
+      'tenant-audit-mirror',
+    ],
+    ['knowledge/confidential/acme/connections/channel-bindings.json', 'tenant-channel-bindings'],
+    ['knowledge/confidential/acme/company.json', 'tenant-knowledge'],
+  ])('reports the active S2 catalog address for %s without changing policy', (relative, store) => {
+    // Inspect the catalog's canonical placement, not Vitest's remapped runtime floor.
+    const target = path.resolve(pathResolver.rootDir(), relative);
+    const expected = inspectReadPermission(target);
+    const result = inspectAssetScopeRead(target);
+    expect(result.decision).toEqual(expected);
+    expect(result.shadow).toMatchObject({
+      status: 'address_only',
+      resolution: {
+        status: 'resolved',
+        address: {
+          path: relative,
+          store,
+          location: 'active',
+          custody: { kind: 'tenant', ref: 'acme' },
+          tier: 'confidential',
+        },
+      },
+    });
+    expect(result.shadow).not.toHaveProperty('observation');
+    expect(result.shadow).not.toHaveProperty('agrees');
+  });
+
+  it('keeps the legacy customer channel address unresolved without changing policy', () => {
+    const target = pathResolver.rootResolve('customer/acme/connections/channel-bindings.json');
+    const expected = inspectReadPermission(target);
+    const result = inspectAssetScopeRead(target);
+    expect(result.decision).toEqual(expected);
+    expect(result.shadow).toMatchObject({
+      status: 'unresolved',
+      resolution: { reason: 'tier_unresolved' },
     });
     expect(result.shadow).not.toHaveProperty('observation');
     expect(result.shadow).not.toHaveProperty('agrees');

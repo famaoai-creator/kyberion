@@ -534,6 +534,10 @@ floor roots. Each registration declares its family, exported key, positive
 family-local `order`, and effective retention-policy reference. Preserve order
 when editing an existing registration: prefix classification and exported arrays
 depend on it. Registrations describe placement; they do not grant access.
+Fixed-tier stores such as the audit mirror retain `confidential/<tenant>` and
+declare the matching singleton `tiers` value. Generation never widens that
+binding into a generic `<tier>` location; missing or inconsistent fixed-tier
+declarations fail validation.
 
 Run `node --import ./scripts/ts-loader.mjs scripts/generate_store_roots.ts`
 after changing registrations. The generator validates the catalog and retention

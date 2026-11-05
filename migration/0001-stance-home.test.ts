@@ -47,15 +47,12 @@ describe('0001-stance-home migration plan', () => {
       },
       { from: 'customer/acme/identity.json', to: 'knowledge/personal/stances/acme/identity.json' },
       { from: 'customer/acme/logs/traces', to: 'active/shared/logs/stances/acme/traces' },
-      {
-        from: 'customer/acme/organization-profile.json',
-        to: 'knowledge/personal/stances/acme/organization-profile.json',
-      },
       { from: 'customer/acme/policy', to: 'knowledge/personal/stances/acme/policy' },
       { from: 'customer/acme/voice', to: 'knowledge/personal/stances/acme/voice' },
     ]);
     const moved = moves.map((move) => move.from).join('\n');
     for (const tenantFile of [
+      'organization-profile.json',
       'customer.json',
       'vision.md',
       'org-chart.json',

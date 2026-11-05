@@ -52,7 +52,7 @@ describe('company vertical templates contract', () => {
       for (const file of [
         'organization-profile.json',
         'org-chart.json',
-        'customer.json',
+        'company.json',
         'identity.json',
         'vision.md',
         'README.md',

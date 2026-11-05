@@ -287,6 +287,7 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/feedback-loop/',
   'shared/runtime/tenants/',
   'shared/runtime/tenant-ledger/',
+  'shared/runtime/audit-mirror/',
   // Per-tenant approval store partitions (governance/approval-store-location.ts); a
   // safety net — approvalStoreRoots() already isolates them per Vitest run and pool.
   'shared/runtime/tenant-approvals/',

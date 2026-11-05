@@ -148,12 +148,17 @@ function collectTenantOverridePaths(rootDir: string, customerId?: string): strin
   const candidates = new Set<string>();
 
   if (customerId && isSafeTenantSegment(customerId)) {
-    // A tenant's design is a company asset, not stance configuration: it is read
-    // from the legacy customer/<tenant>/design/ until S2 moves company assets to
-    // knowledge/confidential/<tenant>/ (store-catalog guard design).
-    const legacyPath = path.join(rootDir, 'customer', customerId, 'design', 'tenant-override.json');
-    if (safeExistsSync(legacyPath)) {
-      return [path.resolve(legacyPath)];
+    // The tenant's own design (a company asset in its home) wins over the index.
+    const own = path.join(
+      rootDir,
+      'knowledge',
+      'confidential',
+      customerId,
+      'design',
+      'tenant-override.json'
+    );
+    if (safeExistsSync(own) && isConfidentialTenantDesignPath(own, rootDir, customerId)) {
+      return [path.resolve(own)];
     }
   }
 

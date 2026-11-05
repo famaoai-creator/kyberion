@@ -8,18 +8,26 @@ import { auditChain, registerAuditChainIo, type AuditChainIo } from './audit-cha
 
 // G17: under a company stance, `pnpm work create-item` recorded its audit
 // entry inside work coordination's infrastructure_sentinel store fence, so the
-// tenant mirror (customer/{slug}/logs/audit/) was written as an unbound
-// sentinel and denied. The mirror is the chain's own store: it is written as
-// the dedicated audit_mirror_writer role bound to the entry's tenant, whatever
-// the caller is. infrastructure_sentinel (also bound by resident dots) holds no
-// customer/ grant at all.
+// tenant mirror was written as an unbound sentinel and denied. The mirror is
+// the chain's own store (active/shared/runtime/audit-mirror/confidential/{slug}/,
+// a tenant store partition): it is written as the dedicated audit_mirror_writer
+// role bound to the entry's tenant, whatever the caller is.
+// infrastructure_sentinel (also bound by resident dots) holds no mirror grant.
+const MIRROR_SEGMENT = path.join('runtime', 'audit-mirror', 'confidential');
 const MIRROR_WRITER = 'audit_mirror_writer';
 const TENANT = 'mirror-authority-co';
 const OTHER_TENANT = 'mirror-other-co';
 const ENV_KEYS = ['KYBERION_PERSONA', 'MISSION_ROLE', 'KYBERION_SUDO', 'KYBERION_TENANT'] as const;
 
 function mirrorPath(slug: string): string {
-  return path.join(pathResolver.rootDir(), 'customer', slug, 'logs', 'audit', 'audit-x.jsonl');
+  return path.join(
+    pathResolver.rootDir(),
+    'active',
+    'shared',
+    MIRROR_SEGMENT,
+    slug,
+    'audit-x.jsonl'
+  );
 }
 
 describe('audit chain tenant mirror authority', () => {
@@ -55,7 +63,10 @@ describe('audit chain tenant mirror authority', () => {
     expect(allowed(OTHER_TENANT, mirrorPath(TENANT))).toBe(false);
     expect(allowed(undefined, mirrorPath(TENANT))).toBe(false);
     expect(
-      allowed(TENANT, path.join(pathResolver.rootDir(), 'customer', TENANT, 'customer.json'))
+      allowed(
+        TENANT,
+        path.join(pathResolver.rootDir(), 'knowledge', 'confidential', TENANT, 'company.json')
+      )
     ).toBe(false);
     // No infrastructure_sentinel scope rides along with the mirror grant.
     expect(
@@ -112,7 +123,7 @@ describe('audit chain tenant mirror authority', () => {
     const io: AuditChainIo = {
       read: () => '',
       loadJson: <T>() => ({}) as T,
-      exists: (file) => file.includes(`${path.sep}customer${path.sep}`),
+      exists: (file) => file.includes(MIRROR_SEGMENT),
       mkdir: () => undefined,
       readdir: () => [],
       append: (file) => {
@@ -138,9 +149,9 @@ describe('audit chain tenant mirror authority', () => {
       })
     );
 
-    const mirror = appends.find((entry) => entry.file.includes(`customer${path.sep}${TENANT}`));
+    const mirror = appends.find((entry) => entry.file.includes(path.join(MIRROR_SEGMENT, TENANT)));
     expect(mirror).toEqual({
-      file: expect.stringContaining(path.join('customer', TENANT, 'logs', 'audit')),
+      file: expect.stringContaining(path.join(MIRROR_SEGMENT, TENANT)),
       role: MIRROR_WRITER,
       tenant: TENANT,
       allowed: true,

@@ -27,7 +27,7 @@
     },
     "source_kind": {
       "type": "string",
-      "enum": ["customer", "confidential", "public", "derived"]
+      "enum": ["confidential", "public", "derived"]
     },
     "source_path": {
       "type": "string",
