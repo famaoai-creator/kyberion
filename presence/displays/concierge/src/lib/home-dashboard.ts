@@ -420,6 +420,8 @@ export function collectHomeDashboard(viewer: ViewerContext, now = Date.now()): H
     const board = buildAgentActivityBoard({
       tenant: tenantSlugs === 'all' || tenantSlugs.length !== 1 ? undefined : tenantSlugs[0],
       tenantSlugs,
+      // Server-resolved system selection: company-less work, as for missions.
+      ...(viewer.includeUntenanted ? { includeUntenanted: true } : {}),
     });
     return board.entries.map((entry) => ({ agent_id: entry.agent_id, status: entry.status }));
   });
@@ -492,7 +494,14 @@ export function collectHomeDashboard(viewer: ViewerContext, now = Date.now()): H
       collectCostSummary({
         missionIds: tenantSlugs === 'all' ? undefined : (missions ?? []).map((m) => m.missionId),
         budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : undefined,
-        ...(tenantSlugs !== 'all' ? { scopeFilter: { tenant_slugs: tenantSlugs } } : {}),
+        ...(tenantSlugs !== 'all'
+          ? {
+              scopeFilter: {
+                tenant_slugs: tenantSlugs,
+                ...(viewer.includeUntenanted ? { include_untenanted: true } : {}),
+              },
+            }
+          : {}),
       })
   );
   const deliverables = read('deliverables', () =>
@@ -500,6 +509,7 @@ export function collectHomeDashboard(viewer: ViewerContext, now = Date.now()): H
       tierAccess: viewer.tierAccess ?? ['public', 'confidential'],
       limit: 50,
       tenantSlugs,
+      ...(viewer.includeUntenanted ? { includeUntenanted: true } : {}),
       organizationIds,
       projectIds,
     })

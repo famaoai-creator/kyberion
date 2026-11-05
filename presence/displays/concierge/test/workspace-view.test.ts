@@ -38,7 +38,7 @@ describe('workspace hrefs', () => {
   });
 
   it('links pending approvals to their Inbox card', () => {
-    expect(inboxHrefForApproval('ap 1')).toBe('/inbox?reason=approval#decide-approval-ap%201');
+    expect(inboxHrefForApproval('ap 1')).toBe('/inbox?reason=approval&request=ap+1');
     expect(approvalNeedsDecision('pending')).toBe(true);
     expect(approvalNeedsDecision('approved')).toBe(false);
   });

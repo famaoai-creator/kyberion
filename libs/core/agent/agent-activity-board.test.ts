@@ -104,6 +104,19 @@ describe('agent-activity-board', () => {
     expect(board.entries.map((entry) => entry.item_id)).toEqual(['w1']);
   });
 
+  it('admits rows by their resolved tenant (context, else mission) for the system selection', () => {
+    const board = composeAgentActivityBoard({
+      items: [
+        item({ item_id: 'w1', labels: ['mission:MSN-A'] }),
+        item({ item_id: 'w2', labels: ['mission:MSN-B'] }),
+        item({ item_id: 'w3', labels: ['mission:MSN-SYS'] }),
+      ],
+      tenantByMission: { 'MSN-A': 'aurora', 'MSN-B': 'other', 'MSN-SYS': undefined },
+      admitTenant: (tenant) => !tenant,
+    });
+    expect(board.entries.map((entry) => entry.item_id)).toEqual(['w3']);
+  });
+
   it('names an unclaimed work item with the unassigned sentinel and no localized text (AC-09)', () => {
     const board = composeAgentActivityBoard({
       items: [item({ item_id: 'w1', status: 'ready', metadata: { task_id: 'a' } })],
