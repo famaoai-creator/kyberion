@@ -23,7 +23,6 @@
  * the tenant's own attestation, and a tenant-bound caller must not author the
  * installation's or a person's statement.
  */
-import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { approvalRequesterActorId } from '../governance/approval-requester.js';
@@ -321,12 +320,7 @@ export function requestCustodyProviderAttestationApproval(
     throw new Error(input.invoker.approvalRequesterError);
   }
   const resolved = input.invoker?.approvalRequester;
-  const requestedBy =
-    input.actor ||
-    resolved?.requestedBy ||
-    input.invoker?.actor ||
-    getRegisteredEnvText('KYBERION_PERSONA') ||
-    'operator';
+  const requestedBy = input.actor || resolved?.requestedBy || input.invoker?.actor || 'operator';
   const requesterActor = resolved ? approvalRequesterActorId(resolved) : requestedBy;
   const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
   const tierEffect =
@@ -484,8 +478,7 @@ export function attestCustodyProvider(
   input: AttestCustodyProviderInput
 ): CustodyProviderAttestationResult {
   const { custody, provider } = validateCustodyAttestationInput(input);
-  const actor =
-    input.actor || input.invoker?.actor || getRegisteredEnvText('KYBERION_PERSONA') || 'operator';
+  const actor = input.actor || input.invoker?.actor || 'operator';
   let approved:
     { approval: ApprovalRequestRecord; humanDecider: string; claimId: string } | undefined;
   if (input.training_use === 'none') {
