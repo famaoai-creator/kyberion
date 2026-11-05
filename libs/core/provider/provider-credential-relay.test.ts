@@ -9,6 +9,7 @@ import {
   applyProviderCredentialRelay,
   prepareProviderCredentialRelay,
   startCredentialRelay,
+  withLoopbackNoProxy,
   type CredentialRelayHandle,
 } from './provider-credential-relay.js';
 import { buildDelegationSpawnEnv, buildDelegationSpawnEnvWithRelay } from './provider-spawn-env.js';
@@ -212,6 +213,74 @@ describe('startCredentialRelay', () => {
     ).rejects.toThrow('[CREDENTIAL_RELAY_UPSTREAM_INVALID]');
   });
 
+  it('routes a non-loopback upstream hop through HTTPS_PROXY (CONNECT)', async () => {
+    const connects: string[] = [];
+    const proxy = http.createServer((_req, res) => res.writeHead(405).end());
+    proxy.on('connect', (req, socket) => {
+      connects.push(req.url ?? '');
+      socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
+    });
+    await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
+    // The guard checks the request's logical host; the socket only reaches the local proxy.
+    vi.stubEnv('KYBERION_VITEST_NETWORK_ALLOWLIST', 'api.relay-proxy.invalid:443');
+    try {
+      const relay = track(
+        await startCredentialRelay({
+          protocol: 'anthropic',
+          credential: REAL_ANTHROPIC,
+          upstream: 'https://api.relay-proxy.invalid',
+          proxyEnv: {
+            HTTPS_PROXY: `http://127.0.0.1:${(proxy.address() as AddressInfo).port}`,
+          },
+        })
+      );
+      const result = await call(`${relay.baseUrl}/v1/messages`, {
+        'x-api-key': relay.placeholder,
+      });
+      expect(result.status).toBe(502);
+      expect(connects).toEqual(['api.relay-proxy.invalid:443']);
+    } finally {
+      vi.unstubAllEnvs();
+      await new Promise<void>((resolve) => proxy.close(() => resolve()));
+    }
+  });
+
+  it('aborts the upstream forward when the client disconnects mid-stream', async () => {
+    let upstreamClosed = false;
+    const hanging = http.createServer((req, res) => {
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.write('data: first\n\n');
+      // Never ends: only a client-side abort can release it.
+      res.once('close', () => {
+        upstreamClosed = true;
+      });
+    });
+    await new Promise<void>((resolve) => hanging.listen(0, '127.0.0.1', resolve));
+    try {
+      const relay = track(
+        await startCredentialRelay({
+          protocol: 'anthropic',
+          credential: REAL_ANTHROPIC,
+          upstream: `http://127.0.0.1:${(hanging.address() as AddressInfo).port}`,
+        })
+      );
+      const controller = new AbortController();
+      const response = await fetch(`${relay.baseUrl}/v1/messages`, {
+        method: 'POST',
+        headers: { 'x-api-key': relay.placeholder },
+        body: '{}',
+        signal: controller.signal,
+      });
+      const reader = response.body!.getReader();
+      await reader.read();
+      controller.abort();
+      await vi.waitFor(() => expect(upstreamClosed).toBe(true), { timeout: 2000 });
+    } finally {
+      hanging.closeAllConnections();
+      await new Promise<void>((resolve) => hanging.close(() => resolve()));
+    }
+  });
+
   it('stops serving after teardown', async () => {
     const relay = await startCredentialRelay({
       protocol: 'anthropic',
@@ -257,6 +326,8 @@ describe('relay integration in the delegation spawn env', () => {
       baseEnv: baseEnv({
         KYBERION_PROVIDER_CREDENTIAL_RELAY: '1',
         ANTHROPIC_BASE_URL: upstreamUrl,
+        HTTPS_PROXY: 'http://proxy.corp.example:3128',
+        NO_PROXY: 'corp.example',
       }),
     });
     const childEnv = spawnEnv.env;
@@ -264,6 +335,10 @@ describe('relay integration in the delegation spawn env', () => {
     expect(JSON.stringify(childEnv)).not.toContain(REAL_OPENAI);
     expect(childEnv.ANTHROPIC_API_KEY?.startsWith(CREDENTIAL_RELAY_PLACEHOLDER_PREFIX)).toBe(true);
     expect(childEnv.ANTHROPIC_BASE_URL).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/u);
+    // A proxy-honoring CLI must reach the loopback relay directly.
+    expect(childEnv.NO_PROXY).toBe('corp.example,127.0.0.1,localhost,::1');
+    expect(childEnv.no_proxy).toBe('127.0.0.1,localhost,::1');
+    expect(childEnv.HTTPS_PROXY).toBe('http://proxy.corp.example:3128');
 
     const ok = await call(`${childEnv.ANTHROPIC_BASE_URL}/v1/messages`, {
       'x-api-key': childEnv.ANTHROPIC_API_KEY!,
@@ -306,6 +381,13 @@ describe('relay integration in the delegation spawn env', () => {
     expect(spawnEnv.env.OPENAI_API_KEY).toBeUndefined();
     expect(JSON.stringify(spawnEnv.env)).not.toContain(REAL_OPENAI);
     spawnEnv.dispose();
+  });
+
+  it('withLoopbackNoProxy appends loopback once and keeps existing entries', () => {
+    const env = withLoopbackNoProxy({ NO_PROXY: 'a.example, localhost', no_proxy: '' });
+    expect(env.NO_PROXY).toBe('a.example,localhost,127.0.0.1,::1');
+    expect(env.no_proxy).toBe('127.0.0.1,localhost,::1');
+    expect(withLoopbackNoProxy(env).NO_PROXY).toBe(env.NO_PROXY);
   });
 
   it('applyProviderCredentialRelay leaves the env untouched when the flag is off', () => {
