@@ -106,7 +106,7 @@ if (
   ) ||
     isDirectScript(
       import.meta.url,
-      'libs/core/media/native-docx-engine/examples/roundtrip_docx.js'
+      'libs/shared-media/dist/native-docx-engine/examples/roundtrip_docx.js'
     )) &&
   !getRegisteredEnvText('VITEST')
 ) {
