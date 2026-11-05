@@ -154,6 +154,24 @@ describe('lookup edge cases (round-2 regressions)', () => {
       lookupLessons({ libraryRoot: path.join(ROOT, 'seeded'), domain: 'stopx', cue: 'the and' })
     ).toHaveLength(0);
   });
+  it('matches a Japanese cue against Japanese lessons word by word', () => {
+    seedFile('jax', [
+      row({ cue: '請求書の作成', lesson: 'テンプレートを先に確認する' }),
+      row({ cue: '天気予報の取得', lesson: '外部APIは使わない' }),
+    ]);
+    // Whitespace / ASCII-only tokenization reduced both sides to nothing, so
+    // a Japanese cue never matched. Segmented, 請求 / 作成 overlap.
+    const hits = lookupLessons({
+      libraryRoot: path.join(ROOT, 'seeded'),
+      domain: 'jax',
+      cue: '請求書を作成したい',
+    });
+    expect(hits.map((h) => h.cue)).toEqual(['請求書の作成']);
+    // Particles alone (の / を) never count as overlap.
+    expect(
+      lookupLessons({ libraryRoot: path.join(ROOT, 'seeded'), domain: 'jax', cue: 'のを' })
+    ).toHaveLength(0);
+  });
   it('token overlap is word-boundary, not substring', () => {
     seedFile('tokx', [
       row({ cue: 'restart the probe harness', lesson: 'apply the winning overlay' }),

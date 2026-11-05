@@ -187,6 +187,12 @@ describe('protected library execution approval continuation', () => {
             session_id: `source:${id}`,
           });
           expect(journal.started?.execution_authority?.scope_policy).toEqual(sourcePolicy);
+          // A confidential pipeline run declares its posture at the mission boundary.
+          expect(journal.started?.library_execution?.payload_scope).toMatchObject({
+            tier: 'confidential',
+            tenant_slug: tenant,
+            training_use: 'no_training',
+          });
           releaseWorkItem({
             itemId: id,
             leaseId: claimed.lease.lease_id,
