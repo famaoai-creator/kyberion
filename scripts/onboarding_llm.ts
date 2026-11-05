@@ -489,6 +489,23 @@ function select(argv: readonly string[], print: Print, options: OnboardingLlmOpt
   );
 }
 
+/** The mode flags of `attest`, read once and shared by the tenant and custody paths. */
+interface AttestModeFlags {
+  json: boolean;
+  requestApproval: boolean;
+  apply: boolean;
+  accept: boolean;
+}
+
+function attestModeFlags(argv: readonly string[]): AttestModeFlags {
+  return {
+    json: argv.includes('--json'),
+    requestApproval: argv.includes('--request-approval'),
+    apply: argv.includes('--apply'),
+    accept: argv.includes('--accept'),
+  };
+}
+
 interface ParsedAttestClaim {
   provider: string;
   trainingUse: 'none' | 'used' | 'unknown';
@@ -610,7 +627,7 @@ export function applyCustodyAttestation(
 }
 
 function attestCustody(
-  argv: readonly string[],
+  flags: AttestModeFlags,
   print: Print,
   options: OnboardingLlmOptions,
   custody: NonTenantCustodyOwner,
@@ -635,10 +652,10 @@ function attestCustody(
     ...(approvalRequestId ? { approvalRequestId } : {}),
     invoker: captureCliAttestationInvoker(),
   };
-  const json = argv.includes('--json');
+  const { json } = flags;
   const label = custodyLabel(custody);
 
-  if (argv.includes('--request-approval')) {
+  if (flags.requestApproval) {
     const request = requestCustodyAttestationApproval(input);
     const applyCommand = [
       'pnpm',
@@ -676,8 +693,8 @@ function attestCustody(
     return;
   }
 
-  const apply = argv.includes('--apply');
-  if (apply && !argv.includes('--accept')) {
+  const { apply } = flags;
+  if (apply && !flags.accept) {
     throw new Error(
       'attest --apply requires --accept: the attestation is your statement about the plan’s training-use terms'
     );
@@ -730,7 +747,8 @@ function attestCustody(
 function attest(argv: readonly string[], print: Print, options: OnboardingLlmOptions): void {
   const custody = requestedCustody(argv);
   const claim = parseAttestClaim(argv);
-  if (custody) return attestCustody(argv, print, options, custody, claim);
+  const flags = attestModeFlags(argv);
+  if (custody) return attestCustody(flags, print, options, custody, claim);
   if (!optionValue(argv, '--tenant')?.trim()) {
     throw new Error(
       '--tenant <tenant-slug> is required (or --custody system|person for material without a tenant)'
@@ -756,9 +774,9 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
       ? { tenantRegistryRootDir: options.tenantRegistryRootDir }
       : {}),
   };
-  const json = argv.includes('--json');
+  const { json } = flags;
 
-  if (argv.includes('--request-approval')) {
+  if (flags.requestApproval) {
     const request = requestProviderAttestationApproval(input);
     // Print every bound value verbatim and shell-quoted: the approval is
     // hash-bound to plan/basis/attested_by/valid_for_days, so the command
@@ -809,8 +827,8 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
     return;
   }
 
-  const apply = argv.includes('--apply');
-  if (apply && !argv.includes('--accept')) {
+  const { apply } = flags;
+  if (apply && !flags.accept) {
     throw new Error(
       'attest --apply requires --accept: the attestation is your statement about the plan’s training-use terms'
     );
