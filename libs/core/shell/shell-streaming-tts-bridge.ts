@@ -24,7 +24,9 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { logger } from '../core.js';
 import { buildSafeExecEnv } from '../secure-io.js';
 import { BoundedAudioQueue, DEFAULT_AUDIO_BUFFER_POLICY } from '../bounded-audio-queue.js';
+import { runtimeSetupHint } from '../provider-runtime-requirements.js';
 import {
+  listStreamingTtsBridgeIds,
   registerStreamingTtsBridge,
   type StreamingTextToSpeechBridge,
   type StreamingTtsCapabilities,
@@ -567,13 +569,64 @@ export function installShellStreamingTtsBridge(opts: ShellStreamingTtsOptions): 
   );
 }
 
+/**
+ * Placeholder bridge for providers whose declared runtime requirements are
+ * unmet — registered so selection reports the reason instead of the bridge
+ * being invisible. Throws the setup hint on use.
+ */
+class UnavailableStreamingTtsBridge implements StreamingTextToSpeechBridge {
+  readonly format = DEFAULT_FORMAT;
+  readonly capabilities: StreamingTtsCapabilities = {
+    languages: ['*'],
+    local_only: false,
+    runtime_requirements: { env_command: 'KYBERION_TTS_COMMAND' },
+  };
+  constructor(
+    readonly bridge_id: string,
+    private readonly reason: string
+  ) {}
+  async *synthesizeStream(): AsyncIterable<AudioChunk> {
+    throw new Error(`[streaming-tts] bridge '${this.bridge_id}' unavailable: ${this.reason}`);
+  }
+  dispose(): void {}
+}
+
+/**
+ * Disposer for the env-gated 'shell' placeholder — released before the real
+ * shell bridge registers so a later env-configured call cannot hit the
+ * named-seam duplicate-provider error.
+ */
+let shellEnvPlaceholderDispose: (() => void) | undefined;
+
 export function installShellStreamingTtsBridgeFromEnv(sourceEnv: NodeJS.ProcessEnv = process.env): {
   installed: boolean;
   reason?: string;
   dispose?: () => void;
 } {
   const command = getRegisteredEnvText('KYBERION_TTS_COMMAND', { env: sourceEnv });
-  if (!command) return { installed: false, reason: 'KYBERION_TTS_COMMAND not set' };
+  // Register unconditionally: the declared env_command requirement keeps the
+  // bridge visible to selection as excluded-with-reason (env:KYBERION_TTS_COMMAND)
+  // instead of invisible — callers see a setup hint, not "bridge not found".
+  if (!command) {
+    if (!listStreamingTtsBridgeIds().includes('shell')) {
+      shellEnvPlaceholderDispose = registerStreamingTtsBridge(
+        'shell',
+        () =>
+          new UnavailableStreamingTtsBridge(
+            'shell',
+            'KYBERION_TTS_COMMAND not set — ' +
+              (runtimeSetupHint(['env:KYBERION_TTS_COMMAND']) ?? 'set KYBERION_TTS_COMMAND')
+          )
+      );
+    }
+    return {
+      installed: false,
+      reason: 'KYBERION_TTS_COMMAND not set',
+      dispose: shellEnvPlaceholderDispose,
+    };
+  }
+  shellEnvPlaceholderDispose?.();
+  shellEnvPlaceholderDispose = undefined;
   const args = (getRegisteredEnvText('KYBERION_TTS_ARGS', { env: sourceEnv }) ?? '')
     .split(',')
     .map((a) => a.trim())

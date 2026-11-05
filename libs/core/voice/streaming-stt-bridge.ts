@@ -25,6 +25,11 @@ import {
   type SeamProviderDecision,
 } from '../seam-provider-selection.js';
 import {
+  unmetRuntimeRequirements,
+  type ProviderRuntimeRequirement,
+  type RuntimeRequirementContext,
+} from '../provider-runtime-requirements.js';
+import {
   primaryLanguageSubtag,
   supportsSpeechLanguage,
   WHISPER_LANGUAGES,
@@ -91,6 +96,8 @@ export interface StreamingSttCapabilities {
   languages?: string[];
   /** Emits synthetic text (the stub), not a transcription of the audio. */
   synthetic?: boolean;
+  /** Host requirements the bridge needs to run (managed runtime, platform, env). */
+  runtime_requirements?: ProviderRuntimeRequirement;
 }
 
 /**
@@ -100,9 +107,25 @@ export interface StreamingSttCapabilities {
  */
 const KNOWN_STREAMING_STT_CAPABILITIES: Record<string, StreamingSttCapabilities> = {
   stub: { synthetic: true, local_only: true },
+  managed_mlx_whisper: {
+    local_only: true,
+    languages: [...WHISPER_LANGUAGES],
+    runtime_requirements: {
+      platforms: ['darwin'],
+      accelerator: 'mlx',
+      managed_tool_id: 'mlx_whisper',
+    },
+  },
   mlx_whisper: { local_only: true, languages: [...WHISPER_LANGUAGES] },
-  faster_whisper: { local_only: true, languages: [...WHISPER_LANGUAGES] },
-  speech_cpp: { local_only: true },
+  faster_whisper: {
+    local_only: true,
+    languages: [...WHISPER_LANGUAGES],
+    runtime_requirements: { managed_tool_id: 'faster_whisper' },
+  },
+  speech_cpp: {
+    local_only: true,
+    runtime_requirements: { managed_tool_id: 'speech_cpp' },
+  },
 };
 
 type StreamingSttFactory = (() => StreamingSpeechToTextBridge) & {
@@ -202,7 +225,11 @@ export interface StreamingSttSelection {
   decision?: SeamProviderDecision;
 }
 
-function unmetStreamingSttRequirements(id: string, requires: StreamingSttRequirements): string[] {
+function unmetStreamingSttRequirements(
+  id: string,
+  requires: StreamingSttRequirements,
+  runtimeCtx?: RuntimeRequirementContext
+): string[] {
   const capabilities = getStreamingSttBridgeCapabilities(id);
   const unmet: string[] = [];
   if (capabilities.synthetic && !requires.allowSynthetic)
@@ -211,15 +238,17 @@ function unmetStreamingSttRequirements(id: string, requires: StreamingSttRequire
   if (!supportsSpeechLanguage(capabilities.languages, requires.language)) {
     unmet.push(`language (${primaryLanguageSubtag(requires.language)})`);
   }
+  unmet.push(...unmetRuntimeRequirements(capabilities.runtime_requirements, runtimeCtx));
   return unmet;
 }
 
 /** Selection candidates (id, eligible, unmet) over the stub and registered bridges. */
 export function listStreamingSttCandidates(
-  requires: StreamingSttRequirements = {}
+  requires: StreamingSttRequirements = {},
+  runtimeCtx?: RuntimeRequirementContext
 ): Array<{ id: string; eligible: boolean; unmet: string[] }> {
   return listStreamingSttBridges().map((id) => {
-    const unmet = unmetStreamingSttRequirements(id, requires);
+    const unmet = unmetStreamingSttRequirements(id, requires, runtimeCtx);
     return { id, eligible: unmet.length === 0, unmet };
   });
 }
