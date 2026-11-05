@@ -209,6 +209,14 @@ describe('judgeWordAnswer', () => {
     expect(judgeWordAnswer(`${'blah '.repeat(30)}M1-x`, 'M1-x')).toBe('absent');
     expect(judgeWordAnswer('M2-x', 'M1-x')).toBe('absent');
   });
+
+  it('strips decoration linearly on hostile whitespace runs', () => {
+    expect(judgeWordAnswer('**M1-x**!', 'M1-x')).toBe('word');
+    expect(judgeWordAnswer('\u3000"M1-x"\u3000', 'M1-x')).toBe('word');
+    // CodeQL js/polynomial-redos input shape: a long tab run that is not at the end.
+    const hostile = `M1-x${'\t'.repeat(200_000)}y`;
+    expect(judgeWordAnswer(hostile, 'M1-x')).toBe('absent');
+  });
 });
 
 describe('backend live scenarios (MSN-HARNESS-ADOPT R1)', () => {
