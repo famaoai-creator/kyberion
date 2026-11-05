@@ -450,15 +450,26 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
   `security-policy.json` `tenant_scope.protected_prefixes`, add the prefixes to the
   `storage-layout.test.ts` expectation, and decide its offboarding disposition in
   `TENANT_RUNTIME_PARTITION_TARGET_KINDS` (the `satisfies` clause fails to compile until you do).
-- Do not use `physicalScopedPath` (`<base>/tenants/<slug>/…`) for new tenant state under
-  `active/shared/runtime/`: that layout is invisible to tier-guard's tenant check and to
-  `TENANT_RUNTIME_PARTITION_ROOTS`, so it is only offboarded when its base is hand-listed in
-  `scope-offboarding.ts`. Known legacy users are listed in the delegation-idempotency PR
-  (#1414) report; migrate them root by root.
-- Gates: `storage-layout.test.ts` (protected prefixes), `scope-offboarding.test.ts` (one
-  disposition per registered root; the tenant-state purge test), and the store's own
-  partition test (e.g. `delegation-idempotency.test.ts`). No gate yet flags an unregistered
-  `tenants/<slug>` store — add new ones to the registry instead.
+- Build those paths with `partitionedScopedPath(root, scope, …)` (`libs/core/physical-namespace.ts`),
+  which keeps the scope's entity segments (`organizations/<id>/…`) below the partition. Do not use
+  `physicalScopedPath` (`<base>/tenants/<slug>/…`) for new tenant state under
+  `active/shared/runtime/`: that layout is invisible to tier-guard's tenant check, backup/restore
+  and `TENANT_RUNTIME_PARTITION_ROOTS` (`tenantRuntimePartitionOf` cannot classify it), so it is
+  only offboarded when its base is hand-listed in `scope-offboarding.ts`
+  (`PHYSICAL_SCHEDULE_ROOT`, `PHYSICAL_PRESENCE_ROOT`, `PHYSICAL_TENANT_LEARNING_ROOTS`).
+- Migrating a legacy `tenants/<slug>` store: register the root, write only the partitioned path,
+  keep a read fallback to the legacy copy while it may still hold live data (remove the legacy copy
+  on the next write — `generation-cost-settlement.ts`), or skip the fallback when the data is
+  short-lived (`scripts/reasoning_credentials.ts` proofs expire in 15 minutes). Add the old base to
+  `PHYSICAL_LEGACY_TENANT_STATE_ROOTS` so offboarding still removes leftovers. A store whose current
+  layout is already registered and only detects legacy copies for operator-reviewed migration
+  (`dot-state-paths.ts`) is a documented `bases` exception instead.
+- Gates: `tests/tenant-runtime-store-registration.test.ts` (every `physicalScopedPath` base under
+  `active/shared/runtime/` must be an offboarding `PHYSICAL_*` base; dynamic bases and deliberate
+  exceptions go in `tests/fixtures/tenant-runtime-store-allowlist.json` with a reason),
+  `storage-layout.test.ts` (protected prefixes), `scope-offboarding.test.ts` (one disposition per
+  registered root; the tenant-state purge test), and the store's own partition test (e.g.
+  `delegation-idempotency.test.ts`, `generation-cost-settlement.test.ts`).
 
 ### Immutable scoped evidence attempts
 

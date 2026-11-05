@@ -9,7 +9,8 @@ import {
 } from './event-scope.js';
 import { aggregateMetricsForEnforcement, metrics, MetricsCollector } from './metrics.js';
 import { pathResolver } from './path-resolver.js';
-import { physicalScopedPath } from './physical-namespace.js';
+import { partitionedScopedPath, physicalScopedPath } from './physical-namespace.js';
+import { PARTITIONED_RUNTIME_STATE_ROOTS } from './foundation/runtime-state-roots.js';
 import { withLockSync } from './foundation/lock-utils.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import {
@@ -18,11 +19,21 @@ import {
   safeMkdir,
   safeReaddir,
   safeLstat,
+  safeRmSync,
   safeWriteFile,
 } from './secure-io.js';
 
+/**
+ * A registered tier/tenant-partitioned runtime-state root
+ * (`PARTITIONED_RUNTIME_STATE_ROOTS.generation_cost_settlements`): tenant
+ * settlements live under `<tier>/<tenant>/` (tier-guarded, backed up and
+ * offboarded with the tenant), untenanted ones under `system/`. Settlements
+ * written before the migration sit in the legacy physical namespace
+ * (`tenants/<slug>/…` or the bare root) and stay readable; the next write for
+ * the same job moves it to the partitioned path.
+ */
 export const GENERATION_COST_SETTLEMENT_ROOT =
-  'active/shared/runtime/media-generation/cost-settlements';
+  PARTITIONED_RUNTIME_STATE_ROOTS.generation_cost_settlements;
 
 const GENERATION_COST_SETTLEMENT_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/generation-cost-settlement.schema.json'
@@ -88,10 +99,32 @@ function settlementBase(rootDir?: string): string {
   return assertSafeRepositoryPath(rootDir, { allowMissingLeaf: true });
 }
 
-function settlementFile(jobId: string, scope: EventScope, rootDir?: string): string {
+function assertJobId(jobId: string): void {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(jobId)) {
     throw new Error(`[GENERATION_COST_JOB_ID_INVALID] invalid job_id '${jobId}'`);
   }
+}
+
+/**
+ * Repo-relative partitioned path: `<root>/<tier>/<tenant>/[organizations/…]/<job>.json`
+ * for a tenant scope, `<root>/system/<job>.json` otherwise. The entity
+ * namespace below the tenant (organization/project/mission/…) is preserved.
+ */
+export function generationCostSettlementRelativePath(jobId: string, scope: EventScope): string {
+  assertJobId(jobId);
+  return partitionedScopedPath(GENERATION_COST_SETTLEMENT_ROOT, scope, `${jobId}.json`);
+}
+
+function settlementFile(jobId: string, scope: EventScope, rootDir?: string): string {
+  return assertSafeRepositoryPath(
+    path.join(settlementBase(rootDir), generationCostSettlementRelativePath(jobId, scope)),
+    { allowMissingLeaf: true }
+  );
+}
+
+/** Pre-migration location (`physicalScopedPath`): read-only fallback, removed on rewrite. */
+function legacySettlementFile(jobId: string, scope: EventScope, rootDir?: string): string {
+  assertJobId(jobId);
   return assertSafeRepositoryPath(
     path.join(
       settlementBase(rootDir),
@@ -181,12 +214,12 @@ function parseSettlement(
   if (options.scope && !scopesEqual(scope, options.scope)) {
     throw new Error('generation cost settlement scope mismatch');
   }
-  const expectedPath = settlementFile(
-    parsed.job_id,
-    scope,
-    options.rootDir ?? pathResolver.rootDir()
-  );
-  if (path.resolve(expectedPath) !== path.resolve(filePath)) {
+  const rootDir = options.rootDir ?? pathResolver.rootDir();
+  const expectedPaths = [
+    settlementFile(parsed.job_id, scope, rootDir),
+    legacySettlementFile(parsed.job_id, scope, rootDir),
+  ].map((candidate) => path.resolve(candidate));
+  if (!expectedPaths.includes(path.resolve(filePath))) {
     throw new Error('generation cost settlement physical scope mismatch');
   }
   return { ...parsed, scope };
@@ -230,6 +263,30 @@ function writeSettlement(
   safeWriteFile(filePath, JSON.stringify(validated, null, 2));
 }
 
+/** The settlement at the partitioned path, else its pre-migration copy. */
+function readCurrentOrLegacySettlement(
+  jobId: string,
+  scope: EventScope,
+  rootDir?: string
+): GenerationCostSettlement | undefined {
+  const options = { jobId, scope, rootDir };
+  return (
+    readSettlement(settlementFile(jobId, scope, rootDir), options) ??
+    readSettlement(legacySettlementFile(jobId, scope, rootDir), options)
+  );
+}
+
+/** One-time migration: drop the legacy copy once the partitioned one is written. */
+function removeLegacySettlement(jobId: string, scope: EventScope, rootDir?: string): void {
+  const legacy = legacySettlementFile(jobId, scope, rootDir);
+  if (path.resolve(legacy) === path.resolve(settlementFile(jobId, scope, rootDir))) return;
+  try {
+    if (safeExistsSync(legacy)) safeRmSync(legacy, { force: true });
+  } catch {
+    // The partitioned copy is authoritative; a stale legacy copy only dedups.
+  }
+}
+
 export function settleGenerationProviderCost(
   job: GenerationCostSettlementJob,
   options: SettleGenerationProviderCostOptions = {}
@@ -238,15 +295,11 @@ export function settleGenerationProviderCost(
   const filePath = settlementFile(job.job_id, scope, options.rootDir);
   const now = (options.now || new Date()).toISOString();
   const actualCost = extractProviderReportedCost(job);
-  const existing = readSettlement(filePath, { jobId: job.job_id, scope, rootDir: options.rootDir });
+  const existing = readCurrentOrLegacySettlement(job.job_id, scope, options.rootDir);
   if (existing && actualCost === undefined) return existing;
 
   return withLockSync(lockId(job.job_id, scope), () => {
-    const lockedExisting = readSettlement(filePath, {
-      jobId: job.job_id,
-      scope,
-      rootDir: options.rootDir,
-    });
+    const lockedExisting = readCurrentOrLegacySettlement(job.job_id, scope, options.rootDir);
     if (lockedExisting && actualCost === undefined) return lockedExisting;
 
     const settlement: GenerationCostSettlement = {
@@ -311,16 +364,30 @@ export function settleGenerationProviderCost(
     }
 
     writeSettlement(filePath, settlement, options.rootDir);
+    removeLegacySettlement(job.job_id, scope, options.rootDir);
     return settlement;
   });
 }
 
 function settlementFiles(root: string): string[] {
-  if (!safeExistsSync(root)) return [];
-  return safeReaddir(root).flatMap((entry) => {
+  let entries: string[];
+  try {
+    if (!safeExistsSync(root)) return [];
+    entries = safeReaddir(root);
+  } catch {
+    // A tenant partition the caller may not read (tier-guard) is withheld,
+    // never a reason to fail the whole listing.
+    return [];
+  }
+  return entries.flatMap((entry) => {
     const entryPath = path.join(root, entry);
     if (entry === '.quarantine') return [];
-    const stat = safeLstat(entryPath);
+    let stat;
+    try {
+      stat = safeLstat(entryPath);
+    } catch {
+      return [];
+    }
     if (stat.isFile() && entry.endsWith('.json')) return [entryPath];
     if (stat.isDirectory()) return settlementFiles(entryPath);
     return [];

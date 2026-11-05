@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
+import { storagePartitionSegments } from './storage-layout.js';
 
 /** Physical tenant namespace root. The unqualified base path is the system namespace. */
 export const PHYSICAL_TENANT_NAMESPACE = 'tenants';
@@ -48,6 +49,30 @@ export function physicalScopedPath(
 ): string {
   const namespace = physicalScopeNamespace(scope);
   return path.posix.join(base, ...(namespace ? [namespace] : []), ...parts);
+}
+
+/**
+ * Build a repo-relative path under a REGISTERED tier/tenant-partitioned
+ * runtime root (`PARTITIONED_RUNTIME_STATE_ROOTS`): `<root>/<tier>/<tenant>/`
+ * for a tenant scope, `<root>/system/` otherwise, followed by the scope's
+ * entity namespace below the tenant (`organizations/<id>/projects/<id>/…`)
+ * and `parts`. Unlike {@link physicalScopedPath} (`<base>/tenants/<slug>/…`),
+ * this layout is what tier-guard's tenant check, backup/restore and tenant
+ * offboarding (`TENANT_RUNTIME_PARTITION_ROOTS`) recognise.
+ */
+export function partitionedScopedPath(
+  root: string,
+  scopeInput: EventScopeInput,
+  ...parts: string[]
+): string {
+  const scope = normalizeEventScope(scopeInput);
+  const partition = scope.tenant_slug
+    ? storagePartitionSegments({ kind: 'tier', tier: scope.tier, tenant: scope.tenant_slug })
+    : storagePartitionSegments({ kind: 'system' });
+  // physicalScopeNamespace is `tenants/<slug>/<entity segments…>`; the
+  // partition already names the tenant, so keep only the entity segments.
+  const entity = physicalScopeNamespace(scope).split('/').filter(Boolean).slice(2);
+  return path.posix.join(root, ...partition, ...entity, ...parts);
 }
 
 export function isTenantPhysicalNamespacePath(logicalPath: string): boolean {

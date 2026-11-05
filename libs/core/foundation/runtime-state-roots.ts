@@ -26,6 +26,10 @@ export const PARTITIONED_RUNTIME_STATE_ROOTS = {
   seam_selection_defaults: 'active/shared/runtime/seam-selection-defaults',
   /** R5 delegation idempotency reservations + replayable results (delegation-idempotency.ts). */
   delegation_idempotency: 'active/shared/runtime/delegation-idempotency',
+  /** Provider-reported media generation costs (generation-cost-settlement.ts). */
+  generation_cost_settlements: 'active/shared/runtime/media-generation/cost-settlements',
+  /** Reasoning API credential verification proofs (scripts/reasoning_credentials.ts). */
+  api_verification: 'active/shared/runtime/health/api-verification',
 } as const;
 
 /**
