@@ -14,7 +14,7 @@ import { logger } from '../core.js';
 import { appendJsonLine } from '../foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeReadFile } from '../secure-io.js';
 import { nowIso } from '../foundation/time.js';
-import { segmentKeywordTerms } from '../locale-normalize.js';
+import { segmentKeywordTerms } from '../foundation/locale-normalize.js';
 
 const SPACELESS_SCRIPT_CHAR = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
 

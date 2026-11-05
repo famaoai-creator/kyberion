@@ -1,5 +1,5 @@
 import { createLogger } from './logger.js';
-import { pickByLocale } from './locale-normalize.js';
+import { pickByLocale } from './foundation/locale-normalize.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { tryRepairJson } from './json-repair.js';
 

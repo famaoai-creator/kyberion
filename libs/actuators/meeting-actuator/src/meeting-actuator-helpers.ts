@@ -18,7 +18,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
+} from '@agent/core/contracts/execution-bounds';
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator/actuator-trace';
 import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import { resolveVars } from '@agent/core/logic-utils';

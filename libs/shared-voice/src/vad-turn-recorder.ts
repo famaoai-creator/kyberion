@@ -18,7 +18,7 @@
  */
 
 import { startMicCapture, type MicCaptureOptions } from '@agent/core/mic-capture';
-import { pcmToWav } from '@agent/core/pcm-wav';
+import { pcmToWav } from '@agent/core/foundation/pcm-wav';
 import { clamp } from '@agent/core/foundation/text';
 import { safeWriteFile } from '@agent/core/secure-io';
 import {

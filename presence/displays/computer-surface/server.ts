@@ -27,7 +27,7 @@ import {
   safeReadFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
-import { toWireError } from '@agent/core/wire-error';
+import { toWireError } from '@agent/core/contracts/wire-error';
 import {
   assertComputerSurfacePayloadInScope,
   computerSurfaceServerTenantResource,

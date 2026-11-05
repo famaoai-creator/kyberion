@@ -7,7 +7,7 @@
 // §3 WI-11.
 import type express from 'express';
 import { t as catalogT } from '@agent/core/t';
-import { normalizeLocale } from '@agent/core/locale-normalize';
+import { normalizeLocale } from '@agent/core/foundation/locale-normalize';
 import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
 import { withExecutionContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';

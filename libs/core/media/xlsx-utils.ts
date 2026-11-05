@@ -1,8 +1,8 @@
 import * as path from 'path';
 import JSZip from 'jszip';
 import { safeReadFile } from '../secure-io.js';
-import { stripTags } from '../html-sanitize.js';
-import { decodeEntities } from '../text-escaping.js';
+import { stripTags } from '../foundation/html-sanitize.js';
+import { decodeEntities } from '../foundation/text-escaping.js';
 import { nowIso } from '../foundation/time.js';
 import { decodeXstring, parseIsoDatetimeToSerial } from './xlsx-xstring.js';
 import {

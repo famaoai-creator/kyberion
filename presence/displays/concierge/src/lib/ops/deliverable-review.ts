@@ -12,7 +12,7 @@ import {
   type ArtifactRecord,
 } from '@agent/core/workforce/artifact-record';
 import type { GovernedArtifactRole } from '@agent/core/artifacts';
-import type { RejectionReasonCategory } from '@agent/core/rejection-reason';
+import type { RejectionReasonCategory } from '@agent/core/contracts/rejection-reason';
 import { nowIso } from '@agent/core/foundation';
 
 const REVIEW_DIR = 'active/shared/coordination/deliverable-reviews';

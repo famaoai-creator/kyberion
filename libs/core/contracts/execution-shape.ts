@@ -24,9 +24,11 @@ const EXECUTION_SHAPE_SET = new Set<string>(EXECUTION_SHAPE_VALUES);
 
 export function normalizeExecutionShape(
   value?: string | null,
-  fallback: ExecutionShape = 'task_session',
+  fallback: ExecutionShape = 'task_session'
 ): ExecutionShape {
-  const normalized = String(value || '').trim().toLowerCase();
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
   if (normalized && EXECUTION_SHAPE_SET.has(normalized)) {
     return normalized as ExecutionShape;
   }
@@ -34,7 +36,7 @@ export function normalizeExecutionShape(
 }
 
 export function projectExecutionShapeToWorkflowShape(
-  shape: ExecutionShape,
+  shape: ExecutionShape
 ): WorkflowExecutionShape {
   if (shape === 'actuator_action' || shape === 'browser_session') {
     return 'task_session';

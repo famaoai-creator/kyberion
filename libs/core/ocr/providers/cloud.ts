@@ -3,7 +3,7 @@ import { safeReadFile } from '../../secure-io.js';
 import { resolveRuntimeModelId } from '../../tool/runtime-model-defaults.js';
 import { getRegisteredEnvText } from '../../foundation/env.js';
 import { resolveGeminiApiKey } from '../../provider/gemini-api-backend.js';
-import { OcrRequest, OcrResult, OcrProvider } from '../../ocr-types.js';
+import { OcrRequest, OcrResult, OcrProvider } from '../../contracts/ocr-types.js';
 import {
   getMimeType,
   resolveOcrImagePath,

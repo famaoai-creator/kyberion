@@ -7,7 +7,7 @@ import AdmZip from 'adm-zip';
 import * as path from 'path';
 import { nowIso } from '@agent/core/foundation/time';
 import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
-import { sanitizeXmlText } from '@agent/core/text-escaping';
+import { sanitizeXmlText } from '@agent/core/foundation/text-escaping';
 import {
   DOCX_IMAGE_CONTENT_TYPES,
   diagramPartContentType,

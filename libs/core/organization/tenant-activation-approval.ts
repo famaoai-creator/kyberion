@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { ResolvedPrincipal } from '../authn-principal-resolver.js';
 import { humanActor } from '../actor.js';
 import { getAgentIdentity } from '../agent/agent-identity.js';
-import { parseNhiId } from '../nhi-id.js';
+import { parseNhiId } from '../contracts/nhi-id.js';
 import { acquireLock, releaseLock } from '../foundation/lock-utils.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord, readTextFile } from '../foundation/text.js';

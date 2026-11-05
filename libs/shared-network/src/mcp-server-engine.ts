@@ -67,7 +67,7 @@ import {
   listApprovalRequests,
   loadApprovalRequest,
 } from '@agent/core/governance/approval-store';
-import { formatWireError } from '@agent/core/wire-error';
+import { formatWireError } from '@agent/core/contracts/wire-error';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { buildKnowledgeIndex, queryKnowledge } from '@agent/core/knowledge-index';

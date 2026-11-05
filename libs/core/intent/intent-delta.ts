@@ -12,7 +12,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { nowIso } from '../foundation/time.js';
-import { segmentWords } from '../locale-normalize.js';
+import { segmentWords } from '../foundation/locale-normalize.js';
 
 export interface IntentBody {
   goal: string;

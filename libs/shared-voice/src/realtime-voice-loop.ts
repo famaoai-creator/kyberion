@@ -38,7 +38,7 @@ import { logger } from '@agent/core/core';
 import { nowIso } from '@agent/core/foundation/time';
 import { checkMeetingParticipationConsent } from '@agent/core/meeting/meeting-participation-coordinator';
 import { startMicCapture, type MicCaptureOptions } from '@agent/core/mic-capture';
-import { pcmToWav } from '@agent/core/pcm-wav';
+import { pcmToWav } from '@agent/core/foundation/pcm-wav';
 import { playAudioFile, type PlaybackHandle } from '@agent/core/voice/audio-playback';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import {

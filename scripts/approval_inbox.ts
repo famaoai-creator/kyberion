@@ -1,4 +1,4 @@
-import { coerceLocale } from '@agent/core/locale-normalize';
+import { coerceLocale } from '@agent/core/foundation/locale-normalize';
 import { resolveLocale } from '@agent/core/locale';
 import {
   buildDecisionDigest,

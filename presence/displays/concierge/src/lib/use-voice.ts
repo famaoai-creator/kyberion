@@ -4,7 +4,7 @@ import { frontDeskFetch as fetch } from './front-desk-fetch';
 
 import * as React from 'react';
 import type { ConciergeLocale } from './i18n';
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import {
   parseVoiceListenOnceResponse,
   parseVoiceStatusResponse,

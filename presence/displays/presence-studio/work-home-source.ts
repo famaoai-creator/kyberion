@@ -15,7 +15,7 @@ import {
   type EventScopeInput,
 } from '@agent/core/event-scope';
 import type { SurfaceViewerScope } from '@agent/core/surface/surface-mutation-guard';
-import { normalizeLocale } from '@agent/core/locale-normalize';
+import { normalizeLocale } from '@agent/core/foundation/locale-normalize';
 import {
   PresenceStudioViewerError,
   resolvePresenceStudioViewerContext,

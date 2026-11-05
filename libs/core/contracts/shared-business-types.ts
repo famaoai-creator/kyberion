@@ -63,10 +63,10 @@ export interface Issue {
   severity?: Severity;
   title?: string;
   description?: string;
-  risk?: string; 
+  risk?: string;
   impact?: string;
   mitigation?: string;
-  location?: string; 
+  location?: string;
   phase?: string; // Used by PMO
   missing?: string[]; // Used by Audit
 }
@@ -108,7 +108,7 @@ export interface StrategicAction {
  * Represents a pointer to a large data artifact stored on disk.
  */
 export interface ArtifactPointer {
-  path: string; 
+  path: string;
   hash: string;
   format: string;
   size_bytes: number;
@@ -124,7 +124,7 @@ export interface FinancialMetrics {
   annualRevenue?: number;
   monthlyBurn?: number;
   cashOnHand?: number;
-  growthRate?: number; 
+  growthRate?: number;
   churnRate?: number;
   grossMargin?: number;
   cac?: number;
@@ -136,7 +136,7 @@ export interface FinancialMetrics {
  */
 export interface DocumentArtifact {
   title: string;
-  body: string; 
+  body: string;
   pointer?: ArtifactPointer;
   metadata?: Record<string, any>;
   format: 'markdown' | 'html' | 'text';

@@ -3,7 +3,7 @@ import { WindowsNativeOcrProvider, AppleVisionOcrProvider } from './providers/na
 import { TesseractOcrProvider } from './providers/tesseract.js';
 import { LlmApiOcrProvider } from './providers/cloud.js';
 import { LocalVlmOcrProvider } from './providers/local-vlm.js';
-import type { OcrProvider } from '../ocr-types.js';
+import type { OcrProvider } from '../contracts/ocr-types.js';
 
 const builtinFactories: Readonly<Record<string, () => OcrProvider>> = {
   windows_native: () => new WindowsNativeOcrProvider(),

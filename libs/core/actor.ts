@@ -42,7 +42,7 @@
 // "rich" modules here would close that cycle back on itself at module-load
 // time (surfaced as `TypeError: __name is not a function` deep inside
 // `governed-catalog.ts`, a re-entrant-circular-import symptom).
-import { parseNhiId } from './nhi-id.js';
+import { parseNhiId } from './contracts/nhi-id.js';
 import { isValidMemberId } from './organization/member-id-grammar.js';
 
 // ---------------------------------------------------------------------------

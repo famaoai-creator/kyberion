@@ -8,7 +8,7 @@
 // `renderHearingCanvas` template (HT-01) — the model never gets to bypass
 // the fixed, escaped, external-resource-free canvas.
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import {
   resolveCreativeDesign,

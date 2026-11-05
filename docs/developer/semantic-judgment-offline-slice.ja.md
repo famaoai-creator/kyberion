@@ -75,7 +75,7 @@ KYBERION_TEST_LEAK_STRICT=1 pnpm exec vitest run \
   libs/core/workforce/artifact-store.test.ts \
   libs/core/decision-ledger/ledger.test.ts \
   libs/core/decision-ledger/conformance.test.ts \
-  libs/core/judge-route.test.ts
+  libs/core/contracts/judge-route.test.ts
 pnpm build
 pnpm typecheck
 ```

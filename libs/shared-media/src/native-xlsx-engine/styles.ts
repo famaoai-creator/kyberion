@@ -12,7 +12,7 @@ import type {
   XlsxColor,
 } from '@agent/core/contracts/xlsx-protocol';
 import { resolveLatinFontFamily } from '@agent/core/design-fonts';
-import { escapeXml as escXml } from '@agent/core/text-escaping';
+import { escapeXml as escXml } from '@agent/core/foundation/text-escaping';
 
 function colorXml(color: XlsxColor | undefined, tagName: string): string {
   if (!color) return '';

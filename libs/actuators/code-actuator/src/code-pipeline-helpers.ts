@@ -23,7 +23,7 @@ import {
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
+} from '@agent/core/contracts/execution-bounds';
 import { evaluateCondition, resolveWriteArtifactSpec } from '@agent/core/logic-utils';
 import * as pathResolver from '@agent/core/path-resolver';
 import {
@@ -38,7 +38,7 @@ import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defa
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import type { TraceContext } from '@agent/core/trace';
 import { getAllFiles } from '@agent/core/fs-utils';
-import type { EvidenceMeta } from '@agent/core/evidence';
+import type { EvidenceMeta } from '@agent/core/contracts/evidence';
 import { retainOversizedResult } from './retained-result.js';
 import * as path from 'node:path';
 import * as vm from 'node:vm';

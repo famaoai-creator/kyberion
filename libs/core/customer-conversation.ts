@@ -9,7 +9,7 @@ import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { logger } from './core.js';
 import { resolveLocale } from './locale.js';
-import { normalizeLocale } from './locale-normalize.js';
+import { normalizeLocale } from './foundation/locale-normalize.js';
 import { matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
 import { getReasoningBackend } from './reasoning/reasoning-backend.js';

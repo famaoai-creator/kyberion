@@ -37,7 +37,7 @@ import {
 } from './review-layer.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { handlePadUiAsset, resolvePadLocale } from '../lib/pad-ui.js';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 
 export interface ReportReviewServerResult {
   ok: boolean;

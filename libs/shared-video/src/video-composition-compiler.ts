@@ -3,7 +3,7 @@ import { getVideoCompositionTemplateRecord } from './video-composition-template-
 import { getVideoRenderRuntimePolicy } from './video-render-runtime-policy.js';
 import * as pathResolver from '@agent/core/path-resolver';
 import { slugify } from '@agent/core/foundation/text';
-import { escapeHtml } from '@agent/core/text-escaping';
+import { escapeHtml } from '@agent/core/foundation/text-escaping';
 import { renderSceneTimelineRuntime, VIDEO_TIMELINE_CUE_CSS } from './video-timeline-runtime.js';
 import { resolveDefaultVideoBackgroundColor } from '@agent/core/video/video-design-system';
 import {

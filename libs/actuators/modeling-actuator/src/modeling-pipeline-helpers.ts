@@ -15,7 +15,7 @@ import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
+} from '@agent/core/contracts/execution-bounds';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveMissionDir } from '@agent/core/owner-scope';
 import { evaluateCondition, getPathValue, resolveWriteArtifactSpec } from '@agent/core/logic-utils';

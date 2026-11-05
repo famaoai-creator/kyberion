@@ -40,7 +40,7 @@ import {
 import { physicalScopedPath } from '../physical-namespace.js';
 import type { ScopeContext } from '../scope-context.js';
 import { currentScope } from '../scope-context.js';
-import { segmentWords } from '../locale-normalize.js';
+import { segmentWords } from '../foundation/locale-normalize.js';
 import {
   createMemoryEligibilityResolver,
   resolveMemoryEligibility,

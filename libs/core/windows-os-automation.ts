@@ -2,7 +2,7 @@ import { safeExec, safeExecResult } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import type { FocusedInputState } from './apple-event-bridge.js';
-import { escapeXml } from './text-escaping.js';
+import { escapeXml } from './foundation/text-escaping.js';
 import { powerShellStdinArgs, windowsPowerShellEnv } from './windows-powershell.js';
 
 const PS = 'powershell.exe';

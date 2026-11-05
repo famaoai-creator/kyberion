@@ -15,8 +15,8 @@ import {
 } from '@agent/core/video/video-scene-composition';
 import { buildVideoDesignCssVars } from '@agent/core/video/video-design-system';
 import { slugify } from '@agent/core/foundation/text';
-import { escapeHtml } from '@agent/core/text-escaping';
-import { replaceElementBlocks } from '@agent/core/html-sanitize';
+import { escapeHtml } from '@agent/core/foundation/text-escaping';
+import { replaceElementBlocks } from '@agent/core/foundation/html-sanitize';
 import type {
   CompiledVideoCompositionScene,
   VideoCompositionADF,

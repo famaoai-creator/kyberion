@@ -3,7 +3,7 @@ import type { IntentResolutionPacket, StandardIntentDefinition } from './intent-
 import type { ReasoningLevelDecision } from '../reasoning/reasoning-level-policy.js';
 import type { ReasoningModelRoute } from '../reasoning/reasoning-model-routing.js';
 import type { IntentUseCaseScenario } from './intent-use-case-scenario.js';
-import type { WorkflowExecutionShape } from '../execution-shape.js';
+import type { WorkflowExecutionShape } from '../contracts/execution-shape.js';
 import type { ActuatorExecutionBrief } from '../contracts/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from '../contracts/operator-interaction-packet.js';
 

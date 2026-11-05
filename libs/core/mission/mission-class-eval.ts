@@ -1,6 +1,6 @@
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { resolveIntentResolutionPacket } from '../intent/intent-resolution.js';
-import { normalizeExecutionShape } from '../execution-shape.js';
+import { normalizeExecutionShape } from '../contracts/execution-shape.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   mapMissionClassToMissionTypeTemplate,

@@ -7,7 +7,7 @@ import AdmZip from 'adm-zip';
 import * as path from 'path';
 import { nowIso } from '@agent/core/foundation/time';
 import { safeExistsSync, safeMkdir, safeReadFile } from '@agent/core/secure-io';
-import { sanitizeXmlText } from '@agent/core/text-escaping';
+import { sanitizeXmlText } from '@agent/core/foundation/text-escaping';
 import type { XlsxDesignProtocol } from '@agent/core/contracts/xlsx-protocol';
 import { parseOoxmlCorePropertiesXml } from '@agent/core/media/ooxml-core-props';
 import { generateContentTypes } from './content-types.js';

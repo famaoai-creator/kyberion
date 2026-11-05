@@ -2,7 +2,7 @@
 
 export * from './governance/approval-store.js';
 
-export * from './judge-route.js';
+export * from './contracts/judge-route.js';
 
 export * from './reasoning/judgment-backend.js';
 

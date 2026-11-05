@@ -37,7 +37,7 @@ import type { AdfEngineContext, AdfRunResult, AdfStep } from '@agent/core/pipeli
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
+} from '@agent/core/contracts/execution-bounds';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
 import { executeTaskPlanFromOrchestrator, taskPlanCoordinator } from './task-plan-coordinator.js';

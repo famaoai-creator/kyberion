@@ -2,7 +2,7 @@
  * workbook.xml generator for XLSX packages
  */
 import type { XlsxDesignProtocol } from '@agent/core/contracts/xlsx-protocol';
-import { escapeXml as escXml } from '@agent/core/text-escaping';
+import { escapeXml as escXml } from '@agent/core/foundation/text-escaping';
 
 export function generateWorkbook(protocol: XlsxDesignProtocol): string {
   let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>

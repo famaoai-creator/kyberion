@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { resolveLocale } from './locale.js';
-import { localeToBcp47 } from './locale-normalize.js';
+import { localeToBcp47 } from './foundation/locale-normalize.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';

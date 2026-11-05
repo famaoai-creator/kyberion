@@ -26,7 +26,7 @@
 import * as path from 'node:path';
 import express from 'express';
 import { getUiMessageBundle, pathResolver, safeReadFile } from '@agent/core';
-import { SUPPORTED_LOCALES, type SupportedLocale } from '@agent/core/locale-normalize';
+import { SUPPORTED_LOCALES, type SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { resolveVocabularyEntry } from '@agent/core/knowledge/vocabulary-catalog';
 

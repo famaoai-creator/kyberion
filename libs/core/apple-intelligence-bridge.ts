@@ -7,7 +7,7 @@ export {
   type AppleVisionLine,
 } from './apple-vision-result.js';
 import { resolveLocale } from './locale.js';
-import { localeToBcp47 } from './locale-normalize.js';
+import { localeToBcp47 } from './foundation/locale-normalize.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';

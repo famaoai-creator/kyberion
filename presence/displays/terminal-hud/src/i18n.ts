@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
 import { t as coreT, type VocabularyKey } from '@agent/core/t';
 import { resolveLocale, type SupportedLocale } from '@agent/core/locale';
-import { nextSupportedLocale } from '@agent/core/locale-normalize';
+import { nextSupportedLocale } from '@agent/core/foundation/locale-normalize';
 
 export type TranslateParams = Record<string, string | number>;
 

@@ -8,10 +8,7 @@ export type NextActionType =
 
 export type NextActionRisk = 'low' | 'medium' | 'high';
 export type NextActionSurfaceRoute =
-  | 'approvals'
-  | 'mission-seeds'
-  | 'memory-promotion-queue'
-  | 'next-actions';
+  'approvals' | 'mission-seeds' | 'memory-promotion-queue' | 'next-actions';
 
 export interface NextActionContract {
   action_id: string;
@@ -62,7 +59,7 @@ export function validateNextActionContract(value: unknown): { valid: boolean; er
     ].includes(String(candidate.next_action_type || ''))
   ) {
     errors.push(
-      'next_action_type must be request_clarification|approve|inspect_evidence|retry_delivery|promote_mission_seed|resume_mission',
+      'next_action_type must be request_clarification|approve|inspect_evidence|retry_delivery|promote_mission_seed|resume_mission'
     );
   }
   if (!isNonEmpty(candidate.suggested_command) && !isNonEmpty(candidate.suggested_surface_action)) {
@@ -70,11 +67,18 @@ export function validateNextActionContract(value: unknown): { valid: boolean; er
   }
   if (
     isNonEmpty(candidate.suggested_surface_action) &&
-    !['approvals', 'mission-seeds', 'memory-promotion-queue', 'next-actions'].includes(String(candidate.suggested_surface_action))
+    !['approvals', 'mission-seeds', 'memory-promotion-queue', 'next-actions'].includes(
+      String(candidate.suggested_surface_action)
+    )
   ) {
-    errors.push('suggested_surface_action must be approvals|mission-seeds|memory-promotion-queue|next-actions');
+    errors.push(
+      'suggested_surface_action must be approvals|mission-seeds|memory-promotion-queue|next-actions'
+    );
   }
-  if (isPotentiallyDestructiveCommand(candidate.suggested_command) && candidate.approval_required !== true) {
+  if (
+    isPotentiallyDestructiveCommand(candidate.suggested_command) &&
+    candidate.approval_required !== true
+  ) {
     errors.push('destructive suggested_command requires approval_required=true');
   }
   return { valid: errors.length === 0, errors };

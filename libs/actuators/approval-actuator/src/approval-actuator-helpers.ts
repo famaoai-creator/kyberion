@@ -1,4 +1,4 @@
-import { normalizeRejectionReasonCategory } from '@agent/core/rejection-reason';
+import { normalizeRejectionReasonCategory } from '@agent/core/contracts/rejection-reason';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import {
   runAdfActuatorPipeline,
@@ -7,7 +7,7 @@ import {
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
+} from '@agent/core/contracts/execution-bounds';
 import { resolveVars } from '@agent/core/logic-utils';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';

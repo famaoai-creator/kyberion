@@ -63,7 +63,10 @@ import {
   runTestCameraInjectionOp,
   replayCollectedFrames,
 } from './system-pipeline-capture-media-helpers.js';
-import { withinLoopBounds, DEFAULT_MAX_LOOP_ITERATIONS } from '@agent/core/execution-bounds';
+import {
+  withinLoopBounds,
+  DEFAULT_MAX_LOOP_ITERATIONS,
+} from '@agent/core/contracts/execution-bounds';
 import {
   reconcileConfigFallbacks,
   reconcileUnclassifiedErrors,

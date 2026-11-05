@@ -4,7 +4,7 @@ import {
   fillCopy,
   loadDiscussionCopy,
 } from './discussion-copy.js';
-import { pickByLocale } from '../locale-normalize.js';
+import { pickByLocale } from '../foundation/locale-normalize.js';
 import type {
   DiscussionMessageView,
   DiscussionParticipant,

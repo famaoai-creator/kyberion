@@ -8,7 +8,7 @@ import { getAllFiles } from '@agent/core/fs-utils';
  *
  * A module that scores text similarity / overlap (Jaccard, cosine over hashed
  * tokens, keyword overlap, …) must tokenize natural language with the shared
- * ICU segmenter in `@agent/core/locale-normalize` — `segmentWords` for set
+ * ICU segmenter in `@agent/core/foundation/locale-normalize` — `segmentWords` for set
  * similarity, `segmentKeywordTerms` for substring / keyword matching.
  * Whitespace-only tokenization (`split(/\s+/)`, `split(' ')`) turns a Japanese
  * or Chinese sentence into ONE token, so every overlap score on those locales
@@ -97,7 +97,7 @@ describe('Text-similarity tokenization boundary', () => {
       actual,
       'whitespace-only tokenization in a text-similarity module — split(/\\s+/) / split(" ") ' +
         'makes a Japanese/Chinese sentence one token, so overlap scores collapse | next: tokenize ' +
-        "with segmentWords (set similarity) or segmentKeywordTerms (keyword/substring matching) from '@agent/core/locale-normalize'; " +
+        "with segmentWords (set similarity) or segmentKeywordTerms (keyword/substring matching) from '@agent/core/foundation/locale-normalize'; " +
         'if the split parses identifiers/CLI args or a separate locale-aware path covers spaceless ' +
         'scripts, register the file with its exact count and a reason in ALLOWED_WHITESPACE_SPLITS ' +
         '(and drop an entry whose splits are gone)'

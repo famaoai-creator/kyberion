@@ -1,4 +1,4 @@
-import { coerceLocale } from '@agent/core/locale-normalize';
+import { coerceLocale } from '@agent/core/foundation/locale-normalize';
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureDiscussionRunning } from '@agent/core/discussion/discussion-engine';
 import { listDiscussionRooms, DiscussionUserError } from '@agent/core/discussion/discussion-store';

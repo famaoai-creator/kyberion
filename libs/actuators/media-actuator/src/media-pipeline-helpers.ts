@@ -6,7 +6,7 @@ import type {
   AdfStepHooks,
   AdfStepOutcome,
 } from '@agent/core/pipeline/adf-engine';
-import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/execution-bounds';
+import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/contracts/execution-bounds';
 import { isRecord, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import type { PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';

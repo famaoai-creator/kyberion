@@ -1243,8 +1243,8 @@ vi.mock('@agent/core/recovery-policy', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/recovery-policy')),
   createGovernedRetryOptionsBuilder: vi.fn(() => vi.fn(() => ({}))),
 }));
-vi.mock('@agent/core/execution-bounds', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/execution-bounds')),
+vi.mock('@agent/core/contracts/execution-bounds', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/contracts/execution-bounds')),
   withinLoopBounds,
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,

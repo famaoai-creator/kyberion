@@ -4,7 +4,11 @@ import type { AutonomousOpsGateResult } from './autonomous-ops-gate.js';
 import type { DecisionCard, DecisionCardEvidence, InterventionLevel } from './decision-card.js';
 import type { NotificationChannelTarget } from '../surface/operator-notifications.js';
 import { resolveLocale } from '../locale.js';
-import { localeToBcp47, localeUsesWordSpaces, type SupportedLocale } from '../locale-normalize.js';
+import {
+  localeToBcp47,
+  localeUsesWordSpaces,
+  type SupportedLocale,
+} from '../foundation/locale-normalize.js';
 import { t, type VocabularyKey } from '../t.js';
 import { neutralizeChannelMarkup } from '../surface/channel-adapter-registry.js';
 

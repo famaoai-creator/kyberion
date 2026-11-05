@@ -11,7 +11,7 @@ export {
   AdaptivePolicyRouter as OcrAdaptivePolicyRouter,
 } from './ocr-bridge.js';
 
-export * from './ocr-types.js';
+export * from './contracts/ocr-types.js';
 
 export * from './knowledge/knowledge-context.js';
 

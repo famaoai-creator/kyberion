@@ -15,7 +15,7 @@ import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { enforceApprovalGate } from '../governance/approval-gate.js';
 import { recordGovernanceAction } from '../governance/kill-switch.js';
-import { matchesAllowedOrigin } from '../origin-policy.js';
+import { matchesAllowedOrigin } from '../foundation/origin-policy.js';
 import {
   type BrowserExtensionLease,
   type BrowserExtensionRecording,

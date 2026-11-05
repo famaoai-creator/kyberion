@@ -1,6 +1,6 @@
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineCatalog } from '@agent/core/foundation/governed-catalog';
-import { normalizeLocale } from '@agent/core/locale-normalize';
+import { normalizeLocale } from '@agent/core/foundation/locale-normalize';
 
 export interface DocumentContentsPolicyCatalog {
   version: string;

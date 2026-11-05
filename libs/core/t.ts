@@ -1,6 +1,6 @@
 import { logger } from './core.js';
 import { resolveLocale as resolveUnifiedLocale, type SupportedLocale } from './locale.js';
-import { renderMessage, type MessageParams } from './message-format.js';
+import { renderMessage, type MessageParams } from './foundation/message-format.js';
 import { loadVocabularyCatalog, resolveVocabularyEntry } from './knowledge/vocabulary-catalog.js';
 import type { VocabularyKey } from './knowledge/vocabulary-keys.generated.js';
 

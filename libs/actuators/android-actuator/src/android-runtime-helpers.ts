@@ -4,7 +4,7 @@ import {
   ensureParentDir,
   resolveAppProfile,
 } from '@agent/core/mobile-runtime-helpers';
-import { decodeEntities } from '@agent/core/text-escaping';
+import { decodeEntities } from '@agent/core/foundation/text-escaping';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -29,7 +29,7 @@ import {
   mirrorStateFilePath,
 } from '@agent/shared-mobile';
 import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
-import { DEFAULT_PIPELINE_TIMEOUT_MS } from '@agent/core/execution-bounds';
+import { DEFAULT_PIPELINE_TIMEOUT_MS } from '@agent/core/contracts/execution-bounds';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';

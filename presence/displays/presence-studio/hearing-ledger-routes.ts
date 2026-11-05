@@ -25,7 +25,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { nowIso } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
-import { normalizeLocale } from '@agent/core/locale-normalize';
+import { normalizeLocale } from '@agent/core/foundation/locale-normalize';
 import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
 import { withExecutionContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
@@ -67,7 +67,7 @@ import { hearingNamespace, saveHearingRecord } from './hearing-runtime.js';
 import { resolveHearingRequestViewer } from './hearing-request-scope.js';
 import { hearingStorageForViewer } from './hearing-storage-access.js';
 import { renderLedgerProjectionCanvas } from './hearing-ledger-canvas.js';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import {
   HEARING_SAFE_ID_PATTERN,
   type HearingDecidedBy,

@@ -11,7 +11,7 @@
  * never re-rendered while in use.
  */
 import type { LocalPadContext } from '../lib/local-artifact-pad.js';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import { escapePadHtml, renderPadHeader, renderPadPage } from '../lib/pad-ui.js';
 import { PERSONAL_PADS_SURFACE, storageLabelForTier, type PersonalPadsSurface } from './surface.js';
 import {

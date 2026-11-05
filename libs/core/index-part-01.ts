@@ -18,7 +18,7 @@ export * from './metrics.js';
 
 export * from './generation-cost-settlement.js';
 
-export * from './wire-error.js';
+export * from './contracts/wire-error.js';
 
 export * from './trust-requiring-resources.js';
 
@@ -270,7 +270,7 @@ export * from './camera-output-bridge.js';
 
 export * from './ledger.js';
 
-export * from './text-escaping.js';
+export * from './foundation/text-escaping.js';
 
 export * from './pipeline/logic-utils.js';
 

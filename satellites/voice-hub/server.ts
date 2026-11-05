@@ -9,7 +9,11 @@ import {
   parseSafeJsonInput,
   setRegisteredEnv,
 } from '@agent/core/foundation';
-import { localeToBcp47, pickByLocale, type SupportedLocale } from '@agent/core/locale-normalize';
+import {
+  localeToBcp47,
+  pickByLocale,
+  type SupportedLocale,
+} from '@agent/core/foundation/locale-normalize';
 import { createServer } from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
 import type { ChildProcess } from 'node:child_process';

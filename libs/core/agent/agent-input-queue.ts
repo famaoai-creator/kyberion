@@ -20,7 +20,7 @@ import { defineCatalog, type GovernedCatalog } from '../foundation/governed-cata
 import { pathResolver } from '../path-resolver.js';
 import { resolveMissionDir } from '../owner-scope.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
-import { escapeXml } from '../text-escaping.js';
+import { escapeXml } from '../foundation/text-escaping.js';
 import { withLock } from '../foundation/lock-utils.js';
 
 /** `inject` is a non-wake, process-local inbox delivery (DH-10). */

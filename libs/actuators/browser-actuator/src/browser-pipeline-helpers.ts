@@ -11,7 +11,7 @@ import {
   defineActuatorPipelineBase,
 } from '@agent/core/actuator/actuator-sdk';
 import type { AdfStepHooks, AdfStepOutcome } from '@agent/core/pipeline/adf-engine';
-import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/execution-bounds';
+import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/contracts/execution-bounds';
 import { TraceContext, persistTrace } from '@agent/core/trace';
 import { pathResolver } from '@agent/core/path-resolver';
 

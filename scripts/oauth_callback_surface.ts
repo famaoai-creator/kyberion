@@ -5,7 +5,7 @@ import {
   type OAuthCallbackResult,
 } from './oauth-callback-result.js';
 import { completeOAuthCallback } from '@agent/core/oauth-broker';
-import { escapeHtml } from '@agent/core/text-escaping';
+import { escapeHtml } from '@agent/core/foundation/text-escaping';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';

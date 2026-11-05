@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SUPPORTED_LOCALES } from '@agent/core/locale-normalize';
+import { SUPPORTED_LOCALES } from '@agent/core/foundation/locale-normalize';
 import { toggleLocale } from './i18n.js';
 
 describe('terminal-hud locale cycling', () => {

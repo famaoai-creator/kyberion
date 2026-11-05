@@ -1,4 +1,4 @@
-import { pickByLocale } from '@agent/core/locale-normalize';
+import { pickByLocale } from '@agent/core/foundation/locale-normalize';
 import { activationNextStep, prepareActivationSetup } from './onboarding_apply.js';
 import * as path from 'node:path';
 import * as readline from 'node:readline';

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { safeReadFile, safeReaddir, safeStat } from '@agent/core';
 import vocabulary from '../knowledge/product/orchestration/user-facing-vocabulary.json';
-import { createBrowserVocabularyResolver } from '@agent/core/locale-normalize';
+import { createBrowserVocabularyResolver } from '@agent/core/foundation/locale-normalize';
 
 // UX-03 Task 5.3: uxText/uxLabel no longer take per-call fallbacks — the
 // vocabulary catalog is the single source of truth. This contract walks the

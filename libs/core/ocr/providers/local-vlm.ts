@@ -3,7 +3,7 @@ import { safeReadFile } from '../../secure-io.js';
 import { resolveRuntimeModelId } from '../../tool/runtime-model-defaults.js';
 import { resolveRuntimeEndpoint } from '../../provider/provider-config.js';
 import { getRegisteredEnvText } from '../../foundation/env.js';
-import { OcrRequest, OcrResult, OcrProvider, OcrDataEgress } from '../../ocr-types.js';
+import { OcrRequest, OcrResult, OcrProvider, OcrDataEgress } from '../../contracts/ocr-types.js';
 import { resolveOcrImagePath, parseLocalVlmOcrResponse } from '../provider-support.js';
 
 /** Loopback hosts, i.e. a service running on this same machine. */

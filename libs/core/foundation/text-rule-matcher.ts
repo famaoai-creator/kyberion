@@ -28,7 +28,10 @@ export function matchesTextRule(text: string, rule: TextMatchRule | string): boo
   return text.toLowerCase().includes(normalized.value.toLowerCase());
 }
 
-export function matchesAnyTextRule(text: string, rules: Array<TextMatchRule | string> | undefined): boolean {
+export function matchesAnyTextRule(
+  text: string,
+  rules: Array<TextMatchRule | string> | undefined
+): boolean {
   if (!rules?.length) return false;
   return rules.some((rule) => matchesTextRule(text, rule));
 }

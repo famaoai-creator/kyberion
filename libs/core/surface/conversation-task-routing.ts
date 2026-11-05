@@ -10,7 +10,7 @@ import {
   matchesIntentPhrase,
   getIntentPhraseMatcher,
 } from '../intent/intent-phrase-lexicon.js';
-import { detectTextLocale, type SupportedLocale } from '../locale-normalize.js';
+import { detectTextLocale, type SupportedLocale } from '../foundation/locale-normalize.js';
 import { t } from '../t.js';
 import type { IntentResolutionContract } from '../intent/intent-resolution-contract-parser.js';
 

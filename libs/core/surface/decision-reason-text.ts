@@ -9,7 +9,7 @@
  * Server-side (reads the vocabulary through `t`); `decision-brief.ts` stays
  * browser-safe and receives this through `DecisionBriefOptions.reasonText`.
  */
-import { SUPPORTED_LOCALES } from '../locale-normalize.js';
+import { SUPPORTED_LOCALES } from '../foundation/locale-normalize.js';
 import { t } from '../t.js';
 import type { VocabularyKey } from '../knowledge/vocabulary-keys.generated.js';
 import type { DisplayText } from './display-humanize.js';

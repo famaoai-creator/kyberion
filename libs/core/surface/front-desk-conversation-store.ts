@@ -75,7 +75,7 @@ export type { FrontDeskExecutionRecoveryReceipt } from './front-desk-recovery-re
 import { withLockSync } from '../lock-utils.js';
 import { redactSensitiveString } from '../network.js';
 import { narrowSurfaceViewerScope } from './surface-mutation-guard.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import { t } from '../t.js';
 import {
   applyConversationTurnOutcome,

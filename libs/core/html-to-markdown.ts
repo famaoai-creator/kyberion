@@ -11,13 +11,13 @@
  * deterministic: no locale-, platform- or time-dependent behavior.
  */
 
-import { decodeEntities } from './text-escaping.js';
+import { decodeEntities } from './foundation/text-escaping.js';
 import {
   elementBlocks,
   replaceElementBlocks,
   stripElementBlocks,
   stripTags,
-} from './html-sanitize.js';
+} from './foundation/html-sanitize.js';
 
 /** Remove comments with a linear scan — no regex backtracking on `<!--` runs. */
 function stripComments(html: string): string {

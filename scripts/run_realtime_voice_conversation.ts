@@ -11,7 +11,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { pcmToWav } from '@agent/core/pcm-wav';
+import { pcmToWav } from '@agent/core/foundation/pcm-wav';
 import { loadVoiceTurnTakingLexicon } from '@agent/core/voice/voice-turn-taking-lexicon';
 import { checkMeetingParticipationConsent } from '@agent/core/meeting/meeting-participation-coordinator';
 import { createStandardYargs } from '@agent/core/cli-utils';

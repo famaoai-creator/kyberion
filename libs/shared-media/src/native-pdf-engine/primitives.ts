@@ -4,7 +4,7 @@ import * as zlib from 'zlib';
 import { nowIso } from '@agent/core/foundation/time';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { escapeXml } from '@agent/core/text-escaping';
+import { escapeXml } from '@agent/core/foundation/text-escaping';
 import type {
   PdfDesignProtocol,
   PdfPageLabel,

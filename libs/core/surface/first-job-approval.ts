@@ -1,4 +1,4 @@
-import { normalizeLocale } from '../locale-normalize.js';
+import { normalizeLocale } from '../foundation/locale-normalize.js';
 /** The only first-job decision writer: raw verified browser session, exact current effect. */
 import { createHmac } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';

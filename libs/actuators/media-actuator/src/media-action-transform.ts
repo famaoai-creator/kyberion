@@ -4,7 +4,7 @@ import { DECK_CANVAS_4_3, DECK_CANVAS_16_9, htmlToDeckProtocol } from './html-de
 import { buildDeckMeasurementScript, geometryToDeckProtocol } from './deck-geometry-helpers.js';
 import { logger } from '@agent/core/core';
 import { resolveLocale } from '@agent/core/locale';
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import { clamp, nowIso } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,

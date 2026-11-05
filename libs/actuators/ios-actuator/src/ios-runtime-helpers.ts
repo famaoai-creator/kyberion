@@ -31,7 +31,7 @@ import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
+} from '@agent/core/contracts/execution-bounds';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';

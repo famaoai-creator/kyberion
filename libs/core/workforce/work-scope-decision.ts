@@ -4,7 +4,7 @@ import {
   normalizeExecutionShape,
   projectExecutionShapeToWorkflowShape,
   type ExecutionShape,
-} from '../execution-shape.js';
+} from '../contracts/execution-shape.js';
 
 const POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/work-scope-policy.schema.json');
 const POLICY_PATH = pathResolver.knowledge('product/governance/work-scope-policy.json');

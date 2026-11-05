@@ -37,7 +37,7 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { toWireError } from '@agent/core/wire-error';
+import { toWireError } from '@agent/core/contracts/wire-error';
 import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
 import { saveBrowserOnboardingVoiceSample } from '@agent/shared-vision/browser-onboarding';
 import { startInRoomMinutesSession } from '@agent/core/in-room-minutes-recorder';

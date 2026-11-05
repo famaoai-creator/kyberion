@@ -7,7 +7,7 @@ import { inferImagePayloadTier } from '@agent/core/media/image-description-bridg
 import { classifyStorageFloorPath } from '@agent/core/storage-layout';
 import { tenantOfPath } from '@agent/core/path-tenant-attribution';
 import { KNOWLEDGE_TIER_RANK } from '@agent/core/foundation/knowledge-tier';
-import type { OcrResult } from '@agent/core/ocr-types';
+import type { OcrResult } from '@agent/core/contracts/ocr-types';
 import type { TranscriptSegment } from '@agent/core/voice/speech-to-text-bridge';
 
 export interface PerceptionScope {

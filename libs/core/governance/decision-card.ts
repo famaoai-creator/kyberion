@@ -4,7 +4,7 @@ import {
   type AutonomousOpsGateResult,
 } from './autonomous-ops-gate.js';
 import { resolveLocale } from '../locale.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import type { NotificationChannelTarget } from '../surface/operator-notifications.js';
 import { t } from '../t.js';
 
