@@ -17,14 +17,19 @@ import type {
   ReasoningCallOptions,
 } from './reasoning/reasoning-backend-contracts.js';
 import { createDelegationHandle } from './delegated-task-observability.js';
+import { DelegationAbortedError } from './mission/delegation-concurrency.js';
 import { bindReasoningRequestTimeout } from './reasoning/reasoning-fixed-binding.js';
 
 const NONCE = 'n0nce';
 const RECALL = /first message/u;
 
 type AbortBehaviour =
-  /** delegateTask rejects with an AbortError when the signal fires. */
+  /** delegateTask rejects, after its child exited, when the signal fires (a CLI adapter). */
   | 'honours-signal'
+  /** delegateTask rejects with a bare AbortError; no child exit is reported. */
+  | 'rejects-without-exit'
+  /** The adapter signalled its child, which survived SIGKILL. */
+  | 'child-survives'
   /** delegateTask never looks at the signal and keeps running. */
   | 'ignores-signal'
   /** delegateTask settles before the abort can be sent. */
@@ -134,9 +139,16 @@ function stubSessionBackend(behaviour: StubBehaviour, files: Map<string, string>
       // The long abort delegation.
       if (behaviour.abort === 'settles-early') return 'counted';
       if (behaviour.abort === 'ignores-signal') return new Promise<string>(() => {});
+      const stopError = () =>
+        behaviour.abort === 'rejects-without-exit'
+          ? abortError()
+          : new DelegationAbortedError(
+              behaviour.abort === 'child-survives' ? 'not_exited' : 'exited',
+              { signal: 'SIGTERM', graceMs: 5 }
+            );
       return new Promise<string>((_, reject) => {
-        if (signal?.aborted) reject(abortError());
-        signal?.addEventListener('abort', () => reject(abortError()));
+        if (signal?.aborted) reject(stopError());
+        signal?.addEventListener('abort', () => reject(stopError()));
       });
     },
   };
@@ -383,6 +395,30 @@ describe('backend live scenarios (MSN-HARNESS-ADOPT R1)', () => {
 
   it('still passes abort when the provider itself rejects with its own cancellation error', async () => {
     const record = await harness(HEALTHY).run();
+    expect(outcome(record, 'abort')).toMatchObject({ outcome: 'pass', attempts: 1 });
+    expect(outcome(record, 'abort').detail).toMatch(/observed to exit/u);
+  });
+
+  it('does not pass abort on a rejection alone: the child exit must be observed', async () => {
+    // A CLI adapter that rejected the moment it sent SIGTERM proved only that
+    // it started stopping.
+    const record = await harness({ ...HEALTHY, abort: 'rejects-without-exit' }).run();
+    const abort = outcome(record, 'abort');
+    expect(abort.outcome).toBe('unreported');
+    expect(abort.detail).toMatch(/no observed child process exit/u);
+  });
+
+  it('fails abort when the child survived SIGKILL', async () => {
+    const record = await harness({ ...HEALTHY, abort: 'child-survives' }).run();
+    expect(outcome(record, 'abort')).toMatchObject({ outcome: 'fail', attempts: 1 });
+    expect(outcome(record, 'abort').detail).toMatch(/still running after SIGKILL/u);
+  });
+
+  it('passes an abort error alone only for a backend with no child process', async () => {
+    const record = await harness(
+      { ...HEALTHY, abort: 'rejects-without-exit' },
+      { mode: 'anthropic', requireChildExit: false }
+    ).run();
     expect(outcome(record, 'abort')).toMatchObject({ outcome: 'pass', attempts: 1 });
   });
 
