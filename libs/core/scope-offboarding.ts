@@ -31,6 +31,7 @@ import { readJson, readJsonLines } from './foundation/json.js';
 import * as pathResolver from './path-resolver.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { readTextFile } from './foundation/text.js';
+import { streamTextLines } from './jsonl-read.js';
 import { nowIso } from './foundation/time.js';
 import { logger } from './core.js';
 import {
@@ -913,8 +914,17 @@ function computeLegacyDelegationTracePrunes(
     const abs = safeOptionalRepositoryPath(pathResolver.rootResolve(repoPath));
     if (!abs || !safeExistsSync(abs) || !safeLstat(abs).isFile()) continue;
     const prune: DedupRegistryPrune = { removedLines: [], keptLines: [] };
-    for (const line of readTextFile(abs).split('\n')) {
-      const trimmed = line.trim();
+    // Streamed (constant memory). A line over the scan limit is never yielded,
+    // so a rewrite would drop it: refuse the prune instead (fail closed).
+    const lines = streamTextLines(abs, {
+      onOversized: (oversized) => {
+        throw new Error(
+          `[OFFBOARD_DELEGATION_TRACE_OVERSIZED_LINE] ${repoPath} line ${oversized.lineNumber} exceeds the scan limit — refusing to rewrite it | next: inspect the line and prune it by hand | evidence: ${repoPath}`
+        );
+      },
+    });
+    for (const { text } of lines) {
+      const trimmed = text.trim();
       if (!trimmed) continue;
       let matches = false;
       try {

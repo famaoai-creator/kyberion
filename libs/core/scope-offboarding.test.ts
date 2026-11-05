@@ -145,6 +145,15 @@ vi.mock('./foundation/io.js', () => ({
     },
     exists: (p: string) => fs.existsSync(p),
     readFile: (p: string) => fs.readFileSync(p, 'utf8'),
+    readRange: (p: string, position: number, length: number) => {
+      const fd = fs.openSync(p, 'r');
+      try {
+        const buffer = Buffer.alloc(length);
+        return buffer.subarray(0, fs.readSync(fd, buffer, 0, length, position));
+      } finally {
+        fs.closeSync(fd);
+      }
+    },
     stat: (p: string) => fs.statSync(p),
     writeFile: (p: string, data: string) => {
       fs.mkdirSync(path.dirname(p), { recursive: true });
