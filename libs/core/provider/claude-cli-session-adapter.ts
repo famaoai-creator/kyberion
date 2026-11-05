@@ -35,9 +35,10 @@ import { assertOperatorNativeCredentialOwner } from '../agent/native-credential-
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import {
-  buildDelegationSpawnEnv,
+  buildDelegationSpawnEnvWithRelay,
   newDelegationSessionId,
   spawnWithDelegationEnv,
+  type DelegationSpawnEnv,
 } from './provider-spawn-env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord } from '../foundation/text.js';
@@ -297,14 +298,33 @@ export class ClaudeCliSessionAdapter {
     assertOperatorNativeCredentialOwner(this.credentialOwner);
     if (this.child) return;
     if (this.bootPromise) return this.bootPromise;
-    this.bootPromise = new Promise<void>((resolve, reject) => {
+    // Session-lifetime credential relay (flag-gated): disposed with the env
+    // when the session child closes, which shutdown() also triggers.
+    const pendingSpawnEnv = buildDelegationSpawnEnvWithRelay({
+      provider: 'claude',
+      cwd: this.cwd,
+      sessionId: newDelegationSessionId('claude'),
+      profile: this.profile,
+    });
+    const started =
+      pendingSpawnEnv instanceof Promise
+        ? pendingSpawnEnv.then(
+            (spawnEnv) => this.startSession(spawnEnv),
+            (error: unknown) => {
+              throw this.unavailable(`claude CLI session failed to start: ${describe(error)}`);
+            }
+          )
+        : this.startSession(pendingSpawnEnv);
+    this.bootPromise = started.catch((error) => {
+      this.bootPromise = undefined;
+      throw error;
+    });
+    return this.bootPromise;
+  }
+
+  private startSession(spawnEnv: DelegationSpawnEnv): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
       let child: ChildProcessWithoutNullStreams;
-      const spawnEnv = buildDelegationSpawnEnv({
-        provider: 'claude',
-        cwd: this.cwd,
-        sessionId: newDelegationSessionId('claude'),
-        profile: this.profile,
-      });
       try {
         // Turn timeouts shut the session down, so close covers them too.
         child = spawnWithDelegationEnv(
@@ -345,11 +365,7 @@ export class ClaudeCliSessionAdapter {
       // Nothing is emitted until the first user message, so a successful
       // spawn is the only boot signal this protocol offers.
       child.once('spawn', () => resolve());
-    }).catch((error) => {
-      this.bootPromise = undefined;
-      throw error;
     });
-    return this.bootPromise;
   }
 
   /** Plain turn in the shared session (no native delegation required). */

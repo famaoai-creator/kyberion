@@ -362,6 +362,12 @@
       "note": "Per-tenant daily abstract generation-unit counters (generation-quota.ts); historical cost remains in the usage ledger, while only the current quota window is load-bearing."
     },
     {
+      "path": "active/shared/runtime/media-generation/cost-settlements",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Provider-reported media generation cost settlements (generation-cost-settlement.ts), one JSON per job, read by the Chronos cost summary and used to dedupe resource-usage rows. A registered tier/tenant-partitioned runtime-state root (PARTITIONED_RUNTIME_STATE_ROOTS.generation_cost_settlements): tenant settlements live under <tier>/<tenant>/ (tier-guarded, backed up, exported and removed by tenant offboarding), untenanted ones under system/. Pre-migration copies under tenants/<slug>/ (or the bare root) stay readable until the next write for the job moves them; tenant offboarding also removes leftover tenants/<slug>/ copies (PHYSICAL_LEGACY_TENANT_STATE_ROOTS)."
+    },
+    {
       "path": "active/shared/runtime/memory",
       "artifact_class": "state",
       "action": "review_required",
@@ -426,6 +432,12 @@
       "artifact_class": "state",
       "action": "review_required",
       "note": "Surface runtime state (surface-runtime.ts) — load-bearing for running surfaces."
+    },
+    {
+      "path": "active/shared/runtime/delegation-idempotency",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "R5 delegation idempotency reservations (libs/core/delegation-idempotency.ts): one JSON per idempotency key holding the payload hash and the terminal DelegationResult used for replay; a registered tier/tenant-partitioned runtime-state root (PARTITIONED_RUNTIME_STATE_ROOTS.delegation_idempotency): tenant reservations live under confidential/<tenant>/ (tier-guarded, removed by tenant offboarding), untenanted ones under system/. Deleting a terminal reservation re-enables execution for that key, so removal is a reviewed decision."
     },
     {
       "path": "active/shared/runtime/task-sessions",
@@ -732,6 +744,13 @@
       "artifact_class": "report",
       "action": "delete",
       "note": "Backend conformance report (scripts/check_backend_conformance.ts), overwritten in place each run — bounded by construction, regenerable."
+    },
+    {
+      "path": "active/shared/runtime/backend-live-scenarios",
+      "artifact_class": "log",
+      "ttl_days": 90,
+      "action": "delete",
+      "note": "MSN-HARNESS-ADOPT R1: one JSON record per opt-in live backend scenario run (libs/core/backend-live-scenarios.ts recordBackendLiveScenarioRun, written by scripts/check_backend_live_scenarios.ts --live). Read by backend-capability-honesty.ts as session_continuity/abort evidence; stores answer excerpts of nonce prompts only, no task content. Stale measurements age out so honesty never rests on an old run."
     },
     {
       "path": "active/shared/runtime/tenant-rate-limit-state.json",

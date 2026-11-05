@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, ux, surface, mission, chronos, presence, intent]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-10-05
+last_updated: 2026-11-05
 kind: evergreen
 ---
 
@@ -335,3 +335,29 @@ Advanced inspection:
 - show actuator and ADF detail
 
 That separation is what keeps the system understandable as capabilities grow.
+
+## 9. Operator Shell Information Architecture (MSN-SHELL-IA-20261105)
+
+The operator shell (Concierge) has **seven top-level destinations and no others**:
+
+| Nav                    | Route       | Holds                                                                                                                     |
+| ---------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------- |
+| ホーム / Home          | `/`         | Glanceable dashboard. One aggregation (`GET /api/v1/home`), so tiles never contradict each other. Every tile drills down. |
+| あなた待ち / Needs you | `/inbox`    | The only place a pending approval, decision, review, knowledge candidate, stalled request or failure is decided           |
+| 仕事 / Work            | `/work`     | Mission state board, work-item kanban, mission planning                                                                   |
+| 組織 / Organization    | `/org`      | Objectives and KRs, interventions, projects, people & agents                                                              |
+| 資料 / Library         | `/library`  | Deliverables, knowledge (learning panel, register), intake                                                                |
+| 運用 / Operations      | `/ops`      | Agents live, surfaces, diagnostics, discussion (owner)                                                                    |
+| 設定 / Settings        | `/settings` | Two-pane settings with an ordered setup checklist (`GET /api/v1/setup/checklist`), pinned at the rail bottom              |
+
+Old routes (`/w`, `/w/<kind>`, `/ops?section=…`, `/ingest`, `/setup`) answer 308 to the new ones (`src/lib/ia-routes.ts`). `/w/<kind>/<id>` detail pages stay.
+
+**Rules that keep it from scattering again:**
+
+- **One place per list or decision.** Anywhere else shows a count and a link (`NeedsYouLink`), never a second copy of the list or its buttons. The operator audit that motivated this found the same approvals shown in 8+ places with five different counts (6 / 7 / 43 / 2 / 0) at the same moment.
+- **One count definition.** `libs/core/surface/needs-you.ts` is the only definition, and its header and the inbox's 件数の数え方 state it. An item counts when it is pending, not expired, folded by decision group, and inside the viewer's server-side scope. The HTTP routes (`/api/v1/needs-you{,/summary}`), the rail badge, Home and MCP (`kyberion.needs-you.*`) all read it. Explicit narrowing keeps only items tagged with that scope on every adapter.
+- **One write path per kind.** Approvals go through `/api/approvals/[id]` (passkey for A3), reviews and hand-offs through `/api/outcomes/[id]`, knowledge through `/api/memory-queue/[id]`, and stalled requests through `/api/hygiene/[id]`.
+- **No dead ends.** Every "open" goes somewhere the item can be acted on. Opening the inbox from a page that only browses must not lead back to that page.
+- **Page frame.** `PageHeader` plus `.kb-page[data-width=default|wide|form]` (1280 / 1440 / 720). Spacing uses only `--kb-ui-space-1..8`, gated by `test/css-spacing-literal-gate.test.ts`. There is one page-title scale and never a nested `.kb-app-shell__main`.
+- **States.** Loading, empty and couldn't-load look different. "Couldn't load" is never shown as zero. Charts encode by position or length, carry text alternatives, and use red only for the needs-you overdue.
+- **Reads don't drain reasoning budgets.** Ops GETs skip the tenant reasoning bucket (`lib/ops/ops-request-guard.ts`) and stay under the read ceiling.

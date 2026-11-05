@@ -11,6 +11,7 @@ import {
   buildLlamaCppBackendFromEnv,
   buildMlxBackendFromEnv,
   buildLocalAiBackendFromEnv,
+  sumChatCompletionUsage,
 } from './openai-compatible-backend.js';
 import { delegateStructured } from '../reasoning/reasoning-backend.js';
 import { z } from 'zod';
@@ -192,6 +193,70 @@ describe('openai-compatible-backend', () => {
     const firstBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(firstBody.messages[1].content).not.toContain('top-secret-token');
     expect(firstBody.messages[1].content).not.toContain('sk-test-1234567890abcdef');
+  });
+
+  it('reports summed tool-loop usage and the served model as delegation metadata (R5)', async () => {
+    const replies = [
+      {
+        model: 'served-local-model',
+        usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 },
+        choices: [
+          {
+            message: {
+              role: 'assistant',
+              content: '',
+              tool_calls: [
+                {
+                  id: 'call-1',
+                  type: 'function',
+                  function: { name: 'unknown_tool', arguments: '{}' },
+                },
+              ],
+            },
+          },
+        ],
+      },
+      {
+        model: 'served-local-model',
+        usage: { prompt_tokens: 20, completion_tokens: 5, total_tokens: 25 },
+        choices: [{ message: { role: 'assistant', content: 'done' } }],
+      },
+    ];
+    const fetchMock = vi.fn().mockImplementation(
+      async () =>
+        new Response(JSON.stringify(replies.shift()), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'requested-model',
+      toolsEnabled: true,
+    });
+    const { runWithDelegationExecutionTracker } =
+      await import('../delegation-execution-tracker.js');
+    const metadata = await runWithDelegationExecutionTracker(async (tracker) => {
+      await expect(backend.delegateTask('do it')).resolves.toBe('done');
+      return tracker.metadata;
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(metadata).toEqual({
+      usage: { input_tokens: 30, output_tokens: 7, total_tokens: 37 },
+      served_model: 'served-local-model',
+    });
+  });
+
+  it('keeps usage unmeasured when the server reports none or only for some turns', () => {
+    expect(sumChatCompletionUsage([{}, {}])).toBeUndefined();
+    expect(
+      sumChatCompletionUsage([
+        { usage: { prompt_tokens: 1, completion_tokens: 1 } },
+        { usage: { prompt_tokens: 2 } },
+      ])
+    ).toEqual({ prompt_tokens: 3 });
   });
 
   it('serializes native JSON-schema constrained sampling into response_format', async () => {

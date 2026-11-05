@@ -3431,6 +3431,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_PROVIDER_CREDENTIAL_RELAY",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Opt-in loopback credential relay for API-key mode provider CLI delegations (claude: ANTHROPIC_API_KEY, codex: OPENAI_API_KEY). The child gets a 127.0.0.1 *_BASE_URL and a per-turn placeholder key; the real key stays in the parent relay. Default off; OAuth-login CLIs are unaffected.",
+      "documented": true,
+      "subsystem": "secrets"
+    },
+    {
       "name": "KYBERION_PROVIDER_DEMOTION_TTL_MS",
       "category": "tuning",
       "type": "number",

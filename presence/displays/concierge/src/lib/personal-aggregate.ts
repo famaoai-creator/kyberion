@@ -1,4 +1,5 @@
 import type { CeoSurfaceSummary } from '@agent/core/ceo-surface-summary';
+import { companyFanoutViews } from './company-fanout-views';
 import type { ConciergeViewerContext } from './viewer-context';
 
 /**
@@ -61,18 +62,14 @@ export function buildPersonalAggregate(
   allowedTenants: readonly string[],
   deps: PersonalAggregateDeps
 ): PersonalAggregate {
-  const base: ConciergeViewerContext = { ...viewer };
-  delete base.includeUntenanted;
-  const companies = allowedTenants
-    .filter((slug) => viewer.tenantSlugs === 'all' || viewer.tenantSlugs.includes(slug))
-    .map((slug): PersonalCompanyCard => ({
-      tenant_slug: slug,
-      display_name: deps.displayName(slug) || slug,
-      ...scopeCard(deps.readCompanyHome({ ...base, tenantSlugs: [slug] })),
-    }));
-  if (viewer.tenantSlugs !== 'all') return { companies };
-  const system = scopeCard(
-    deps.readCompanyHome({ ...base, tenantSlugs: [], includeUntenanted: true })
+  const views = companyFanoutViews(viewer, allowedTenants);
+  const companies = views.companies.map(
+    ({ tenantSlug, viewer: companyViewer }): PersonalCompanyCard => ({
+      tenant_slug: tenantSlug,
+      display_name: deps.displayName(tenantSlug) || tenantSlug,
+      ...scopeCard(deps.readCompanyHome(companyViewer)),
+    })
   );
-  return { companies, system };
+  if (!views.system) return { companies };
+  return { companies, system: scopeCard(deps.readCompanyHome(views.system)) };
 }

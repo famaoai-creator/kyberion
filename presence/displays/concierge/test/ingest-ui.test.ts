@@ -5,7 +5,7 @@ import {
   installFakeDom,
   fireEvent,
 } from '../../../../libs/shared-ui/vanilla/fake-dom.test-support.js';
-import IngestPage from '../src/app/ingest/page';
+import { IngestPanel as IngestPage } from '../src/app/library/ingest-panel';
 
 const setup = {
   ok: true,

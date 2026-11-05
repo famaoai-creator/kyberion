@@ -347,6 +347,27 @@ describe('procedure-registry', () => {
     });
   });
 
+  describe('resolveProcedure — Japanese word overlap', () => {
+    it('surfaces a reworded Japanese intent for confirmation, never auto-execution', async () => {
+      // Neither phrase appears verbatim; whitespace tokenization left one
+      // sentence-long token, so the reworded request was "unmatched".
+      stubCatalog();
+      const result = await resolveProcedure('勤怠を承認してください');
+      expect(result.outcome).toBe('ambiguous');
+      expect(result.recommendedPattern).toBe('A');
+      const top = result.candidates[0];
+      expect(top?.procedure_id).toBe('attendance.approve.kingoftime');
+      expect(top?.confidence).toBeGreaterThanOrEqual(PROCEDURE_RESOLUTION_THRESHOLDS.learn);
+      expect(top?.confidence).toBeLessThan(PROCEDURE_RESOLUTION_THRESHOLDS.autoExecute);
+    });
+
+    it('does not count shared particles as overlap', async () => {
+      stubCatalog();
+      const result = await resolveProcedure('メールを送信して');
+      expect(result.outcome).toBe('unmatched');
+    });
+  });
+
   // -------------------------------------------------------------------------
   // resolveProcedure — stub backend skips Stage 2
   // -------------------------------------------------------------------------

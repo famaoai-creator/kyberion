@@ -21,6 +21,7 @@ import { isRecord } from '../foundation/text.js';
 import {
   withReasoningPayloadScope,
   type ReasoningPayloadScope,
+  type ReasoningTrainingUse,
 } from '../reasoning/reasoning-egress-scope.js';
 import type {
   ReasoningBackend,
@@ -80,6 +81,8 @@ export class AppleNativeImageDescriptionProvider implements ImageDescriptionProv
           ...(this.options.tenant_slug ? { tenant_slug: this.options.tenant_slug } : {}),
           purpose: 'image description',
           attachment_count: 1,
+          // On-device Apple captioning: the image never leaves this host.
+          training_use: 'local_only',
         },
         () => appleFmPromptWithImage(prompt, inputPath)
       );
@@ -177,6 +180,8 @@ export class OllamaVisionImageDescriptionProvider implements ImageDescriptionPro
         ...(this.visionOptions.tenant_slug ? { tenant_slug: this.visionOptions.tenant_slug } : {}),
         purpose: 'image description',
         attachment_count: 1,
+        // Loopback-only Ollama (checked above): the image never leaves this host.
+        training_use: 'local_only',
       },
       () =>
         secureFetch<unknown>({
@@ -242,6 +247,15 @@ export interface ReasoningVisionOptions {
    * failure means nothing is sent.
    */
   prepare_egress_image?: (absolutePath: string) => Promise<EgressImage>;
+  /**
+   * Provider data-use posture for the reasoning-vision channel. Defaults to
+   * `local_only` (declared explicitly, never implied): an image's tier is only
+   * inferred from its path, so a screenshot outside `confidential/` or
+   * `personal/` would otherwise look public. A caller that knows the material
+   * and its tenant's attestation passes `no_training` (or `training_eligible`
+   * for genuinely public images) to let it reach an external vision backend.
+   */
+  training_use?: ReasoningTrainingUse;
   /** Defaults to the active reasoning backend. Injected in tests. */
   resolveBackend?: ReasoningBackendResolver;
 }
@@ -349,6 +363,7 @@ export class ReasoningVisionImageDescriptionProvider implements ImageDescription
           ...(this.options.tenant_slug ? { tenant_slug: this.options.tenant_slug } : {}),
           purpose: 'image description',
           attachment_count: 1,
+          training_use: this.options.training_use ?? 'local_only',
         },
         () =>
           backend.promptWithImages!(prompt, [

@@ -125,6 +125,10 @@ describe('reasoning:credentials', () => {
       expect(resolveRole()).toBe('reasoning_credentials');
     });
     expect(mocks.write).toHaveBeenCalledOnce();
+    // Operator-scope proofs land in the registered root's system partition.
+    expect(String(mocks.write.mock.calls[0][0]).replaceAll('\\', '/')).toMatch(
+      /\/runtime\/health\/api-verification\/system\/anthropic\.json$/u
+    );
   });
   it('uses the secret introduction role across awaits and restores the caller role', async () => {
     mocks.introduce.mockImplementation(async () => {

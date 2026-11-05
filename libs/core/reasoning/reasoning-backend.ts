@@ -59,6 +59,7 @@ import { resolveReasoningProviderDescriptor } from './reasoning-provider-registr
 // Existing reasoning/delegation cycle is tracked by check:module-boundaries baseline.
 // eslint-disable-next-line import/no-cycle -- baseline until the delegation seam is split
 import { createDelegationHandle, type DelegationHandle } from '../delegated-task-observability.js';
+import * as dg from './delegation-failover-guard.js';
 import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js';
 import { AdvisoryPolicyViolation } from '../ce-adoption.js';
 import { assertDistillationTextEgress } from '../frame-redaction.js';
@@ -572,10 +573,12 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         }
         return { ok: true, result };
       } catch (error) {
-        if (!automaticReasoningRedispatchAllowed() || signal?.aborted) throw error;
-        const message = reasoningFailureMessage(error);
-        const classification = classifyReasoningFailure(error);
-        if (classification.retryable && retryAttempt < maxInPlaceRetries) {
+        if (!automaticReasoningRedispatchAllowed() || signal?.aborted) throw dg.unwrap(error);
+        // R5: a delegation that started is never retried in place nor failed over.
+        const { startedError, underlying } = dg.splitStarted(error);
+        const message = reasoningFailureMessage(underlying);
+        const classification = classifyReasoningFailure(underlying);
+        if (!startedError && classification.retryable && retryAttempt < maxInPlaceRetries) {
           const nextAttempt = retryAttempt + 1;
           const delayMs = resolveInPlaceRetryDelayMs(error, nextAttempt);
           logger.warn(
@@ -605,11 +608,12 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         const cooldownMs =
           resolveDemotionRetryAfterMs(error) ??
           (classification.class === 'entitlement' ? AUTH_FAILURE_DEMOTION_MS : undefined);
-        const nextAction = !classification.allowFailover
+        let nextAction = !classification.allowFailover
           ? 'stopping without fallback'
           : shouldDemote
             ? `cooling down ${demotedModel ? 'selected model' : 'provider instance'} for ${cooldownMs ?? getProviderHealthDemotionTtlMs()}ms`
             : 'trying next candidate without health demotion';
+        if (startedError) nextAction = dg.STARTED_NEXT_ACTION;
         logger.warn(
           `[reasoning-backend:failover] ${operation} failed on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; class=${classification.class}; ${nextAction}: ${message}`
         );
@@ -631,6 +635,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
             retryAfterMs: cooldownMs,
           });
         }
+        if (startedError) return dg.startedAttemptFailure(classification.class, message);
         return {
           ok: false,
           message: `[${classification.class}] ${message}`,
@@ -754,10 +759,15 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     );
   }
 
-  async delegateTask(
+  delegateTask(instruction: string, context?: string, options?: ReasoningCallOptions) {
+    return dg.runGuarded(this.delegateTaskGuarded.bind(this), instruction, context, options);
+  }
+
+  private async delegateTaskGuarded(
     instruction: string,
-    context?: string,
-    options?: ReasoningCallOptions
+    context: string | undefined,
+    options: ReasoningCallOptions | undefined,
+    { guard, onFirstPassServed }: dg.GuardedDelegationHooks
   ): Promise<string> {
     assertDistillationTextEgress([instruction, context].filter(Boolean).join('\n\n'));
     recordReasoningPromptVisibility(
@@ -768,17 +778,18 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     let servedBackendName = '';
     const first = await this.runWithFailover(
       'delegateTask',
-      (backend, candidate) => {
+      guard((backend, candidate) => {
         servedBackendName = backend.name;
         return backend.delegateTask(
           instruction,
           context,
           optionsForCandidate(this.candidates, candidate, options)
         );
-      },
+      }),
       options?.signal,
       options
     );
+    onFirstPassServed();
     if (
       !automaticReasoningRedispatchAllowed() ||
       !shouldRetryShortDelegationSummary({ instruction, result: first, servedBackendName })
@@ -797,7 +808,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     );
     return this.runWithFailover(
       'delegateTask',
-      (backend, candidate) => {
+      guard((backend, candidate) => {
         servedBackendName = backend.name;
         assertDistillationTextEgress([instruction, first, context].filter(Boolean).join('\n\n'));
         return backend.delegateTask(
@@ -805,7 +816,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
           context,
           optionsForCandidate(this.candidates, candidate, options)
         );
-      },
+      }),
       options?.signal,
       options
     );
@@ -1181,7 +1192,9 @@ export class RoleAwareReasoningBackend implements ReasoningBackend {
   delegateTask(instruction: string, context?: string, options?: ReasoningCallOptions) {
     const backend = this.pick(options);
     assertAdvisoryBackendPermission(backend.name, options);
-    return backend.delegateTask(instruction, context, options);
+    return dg.withDelegationIdempotency(instruction, context, options, () =>
+      backend.delegateTask(instruction, context, options)
+    );
   }
   delegateTaskHandle(instruction: string, context?: string, options?: ReasoningCallOptions) {
     const backend = this.pick(options);
@@ -1194,7 +1207,7 @@ export class RoleAwareReasoningBackend implements ReasoningBackend {
           backendName: backend.name,
           ...(options?.continuable ? { continuable: true } : {}),
           execute: (signal) =>
-            backend.delegateTask(instruction, context, {
+            this.delegateTask(instruction, context, {
               ...options,
               ...(signal ? { signal } : {}),
             }),

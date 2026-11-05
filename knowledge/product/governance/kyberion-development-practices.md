@@ -1,6 +1,6 @@
 ---
 title: 'Kyberion Development Practices — Hard-Won Rules for Changing This Repo'
-last_updated: 2026-11-04
+last_updated: 2026-11-05
 ---
 
 # Kyberion Development Practices — Hard-Won Rules for Changing This Repo
@@ -164,6 +164,40 @@ dist/scripts/check_golden_output.js --rebaseline`); `vital-check` is
 - **Platform-specific behavior is declared, not discovered**:
   `it.skipIf(process.platform !== 'darwin')` for say/mlx/BlackHole-class
   tests, with a comment saying why.
+
+### 2.1 Cross-language determinism — tokenize natural language with the ICU segmenter
+
+Japanese and Chinese have no spaces between words. A tokenizer that splits on
+whitespace (`split(/\s+/)`, `split(' ')`) turns a whole Japanese sentence into
+ONE token, so any similarity, overlap, dedup or keyword match over it silently
+scores 0 (or 1 on an exact repeat) and the feature works only in English
+(found reviewing PR #1411: the best-of-providers judge picked the outlier by
+input order for every Japanese answer).
+
+- **Set similarity (Jaccard, cosine over hashed tokens)** tokenizes with
+  `segmentWords` from `@agent/core/locale-normalize` (ICU `Intl.Segmenter`,
+  locale detected from the text). Count every word, single-character CJK words
+  included, and split ICU-joined `config.json`-style runs afterwards if needed.
+- **Keyword / substring matching (query terms, trigger phrases, cue
+  overlap)** uses `segmentKeywordTerms`: Latin chunks stay verbatim (so
+  `deploy` still matches `deployment`), spaceless-script chunks become content
+  words — hiragana-only particles/auxiliaries and one-character non-kanji
+  segments are dropped because they match almost anything; a single kanji is
+  kept.
+- **Persisted vectors**: changing the tokenizer of an embedding changes its
+  vector space. Bump the backend's `cacheKey` (for example
+  `LOCAL_HASH_EMBEDDING_CACHE_KEY`) so the knowledge-index disk cache never
+  compares old document vectors with new query vectors.
+- **Leave whitespace splits that parse structure** — CLI args, cron fields,
+  identifiers, code, paths, command lines — and word counts that already have
+  a language-pack path for spaceless scripts.
+- **Gate**: `tests/text-similarity-tokenization-boundary.test.ts`
+  (`registration-tests`) flags whitespace-only `split` in any source file that
+  defines a jaccard / similarity / overlap function. Fix the tokenizer; register
+  a justified exception in its `ALLOWED_WHITESPACE_SPLITS` with the exact count
+  and a reason.
+- **Test with Japanese input.** Every converted site carries a regression test
+  with a Japanese sentence that fails under the whitespace tokenizer.
 
 ## 3. Hermetic tests — the machine is not a fixture
 

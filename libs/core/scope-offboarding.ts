@@ -64,7 +64,7 @@ import { isValidTenantSlug } from './foundation/scope.js';
 import { withLockSync } from './foundation/lock-utils.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 import { revokeGrantsForTenantBestEffort } from './task/task-scoped-grants.js';
-import { assertPhysicalScopeSegment } from './physical-namespace.js';
+import { assertPhysicalScopeSegment, PHYSICAL_TENANT_NAMESPACE } from './physical-namespace.js';
 import { loadMissionStateAtPath } from './mission/mission-state-reader.js';
 import type { MissionState } from './mission/mission-types.js';
 
@@ -469,6 +469,12 @@ export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   // System / person custody provider attestations: never tenant-partitioned
   // (tenant attestations live in the tenant profile), so nothing to offboard.
   provider_attestations: 'not_offboarded',
+  // R5 idempotency reservations hold replayable tenant delegation output: purge with the tenant.
+  delegation_idempotency: 'tenant_runtime_state',
+  // Provider-reported tenant generation costs: exported, then removed with the tenant.
+  generation_cost_settlements: 'tenant_runtime_state',
+  // Reasoning API credential proofs (valid for 15 minutes): purge with the tenant.
+  api_verification: 'tenant_runtime_state',
 } as const satisfies Record<TenantRuntimePartitionKey, OffboardTargetKind | 'not_offboarded'>;
 
 /**
@@ -642,14 +648,41 @@ function collectDataVaultEntryTargets(
   return targets;
 }
 
-const PHYSICAL_SCHEDULE_ROOT = 'active/shared/runtime/media-generation/schedules';
-const PHYSICAL_CHANNEL_ROOT = 'active/shared/coordination/channels';
-const PHYSICAL_PRESENCE_ROOT = 'active/shared/runtime/presence';
-const PHYSICAL_TENANT_LEARNING_ROOTS = [
+export const PHYSICAL_SCHEDULE_ROOT = 'active/shared/runtime/media-generation/schedules';
+export const PHYSICAL_CHANNEL_ROOT = 'active/shared/coordination/channels';
+export const PHYSICAL_PRESENCE_ROOT = 'active/shared/runtime/presence';
+/**
+ * Bases of the `physicalScopedPath` layout (`<base>/tenants/<slug>/…`) whose
+ * tenant subtree tenant offboarding removes as a learning tree. Each entry is
+ * the BASE: the removed directory is `<base>/tenants/<slug>`. (Registered
+ * roots use `<root>/<tier>/<tenant>/` and are covered by
+ * TENANT_RUNTIME_PARTITION_ROOTS instead.)
+ *
+ * - `active/shared/runtime` is the base of `RUNTIME_STATE_PATHS['memory.tenantRoot']`
+ *   (`active/shared/runtime/tenants/<slug>/memory/…`) and of the scoped
+ *   cowork-sync / distill-candidate / execution-feedback state.
+ */
+export const PHYSICAL_TENANT_LEARNING_ROOTS = [
   'active/shared/runtime/feedback-loop',
-  'active/shared/runtime/tenants',
-  'active/shared/observability/tenants',
-  'active/shared/coordination/tenants',
+  'active/shared/runtime',
+  'active/shared/observability',
+  'active/shared/coordination',
+  // Public-tier diagnostic receipts of front-desk execution (surface/front-desk-execution.ts).
+  'active/shared/runtime/front-desk-execution',
+  // Concierge front-desk conversations (surface/front-desk-conversation-persistence.ts):
+  // nested one level below the channel surface, so the channel scan never sees them.
+  'active/shared/coordination/channels/concierge/conversations',
+] as const;
+/**
+ * Pre-migration `<base>/tenants/<slug>/` copies of stores that now live in a
+ * registered `<root>/<tier>/<tenant>/` partition. New writes never land here;
+ * tenant offboarding still removes what an older version left behind.
+ */
+export const PHYSICAL_LEGACY_TENANT_STATE_ROOTS = [
+  // generation-cost-settlement.ts: read fallback until the next write moves it.
+  PARTITIONED_RUNTIME_STATE_ROOTS.generation_cost_settlements,
+  // scripts/reasoning_credentials.ts: proofs expire after 15 minutes; no read fallback.
+  PARTITIONED_RUNTIME_STATE_ROOTS.api_verification,
 ] as const;
 
 export interface PhysicalNamespaceFilter {
@@ -753,9 +786,9 @@ function collectPhysicalNamespaceTargets(
         });
       }
     }
-    for (const root of PHYSICAL_TENANT_LEARNING_ROOTS) {
+    for (const root of [...PHYSICAL_TENANT_LEARNING_ROOTS, ...PHYSICAL_LEGACY_TENANT_STATE_ROOTS]) {
       const tenantRoot = safeOptionalRepositoryPath(
-        path.join(pathResolver.rootResolve(root), 'tenants', scopeId)
+        path.join(pathResolver.rootResolve(root), PHYSICAL_TENANT_NAMESPACE, scopeId)
       );
       if (tenantRoot && safeExistsSync(tenantRoot)) {
         targets.push({ path: repoRelativePosix(tenantRoot), kind: 'tenant_learning_tree' });

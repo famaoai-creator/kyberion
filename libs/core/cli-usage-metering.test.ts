@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { metrics } from './metrics.js';
 import {
   cliOutputFormat,
+  delegationMetadataFromCliReport,
   parseClaudeCliUsage,
   parseCodexCliUsage,
   parseGeminiCliUsage,
@@ -9,6 +10,7 @@ import {
   recordEstimatedCliUsage,
 } from './cli-usage-metering.js';
 import { withUsageAttribution } from './usage-accounting.js';
+import { runWithDelegationExecutionTracker } from './delegation-execution-tracker.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -367,5 +369,84 @@ describe('native CLI usage envelopes', () => {
       expect(call[3]).toMatchObject({ cost_status: 'unknown', usage_source: 'unknown' });
       expect(call[3]).not.toHaveProperty('usage');
     }
+  });
+});
+
+describe('R5 delegation result metadata from CLI usage envelopes', () => {
+  it('reports measured CLI usage and a single served model to the active delegation', async () => {
+    const report = parseGeminiCliUsage(
+      JSON.stringify({
+        response: 'ok',
+        stats: {
+          models: {
+            'gemini-served': { tokens: { prompt: 30, cached: 10, candidates: 7, thoughts: 3 } },
+          },
+        },
+      })
+    );
+    const metadata = await runWithDelegationExecutionTracker(async (tracker) => {
+      recordCliUsage('gemini-cli', 'gemini-requested', Date.now(), 'success', {
+        report,
+        promptChars: 1,
+        completionChars: 1,
+      });
+      return tracker.metadata;
+    });
+    expect(metadata).toEqual({
+      usage: { input_tokens: 30, output_tokens: 10, total_tokens: 40 },
+      served_model: 'gemini-served',
+    });
+  });
+
+  it('never reports estimated, unsent or ambiguous usage', async () => {
+    const metadata = await runWithDelegationExecutionTracker(async (tracker) => {
+      // Character estimates are not provider usage.
+      recordCliUsage('codex-cli', 'm', Date.now(), 'success', {
+        promptChars: 400,
+        completionChars: 400,
+      });
+      // A request that was never sent consumed nothing.
+      recordCliUsage('codex-cli', 'm', Date.now(), 'error', {
+        report: parseCodexCliUsage(
+          JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 9, output_tokens: 1 } })
+        ),
+        requestNotSent: true,
+        promptChars: 1,
+        completionChars: 1,
+      });
+      return tracker.metadata;
+    });
+    expect(metadata).toEqual({});
+    // Two different models: usage is summed but no single model served it.
+    expect(
+      delegationMetadataFromCliReport({
+        entries: [
+          { model: 'a', usage: { prompt_tokens: 1, completion_tokens: 2 } },
+          { model: 'b', usage: { prompt_tokens: 3, completion_tokens: 4, cache_read_tokens: 5 } },
+        ],
+        referenceCostUsd: 1.5,
+      })
+    ).toEqual({ usage: { input_tokens: 9, output_tokens: 6, total_tokens: 15 } });
+    expect(delegationMetadataFromCliReport({ entries: [], referenceCostUsd: 1 })).toBeUndefined();
+  });
+
+  it('reports the codex turn usage of a delegation', async () => {
+    const metadata = await runWithDelegationExecutionTracker(async (tracker) => {
+      recordCliUsage('codex-cli', 'gpt-requested', Date.now(), 'success', {
+        report: parseCodexCliUsage(
+          JSON.stringify({
+            type: 'turn.completed',
+            usage: { input_tokens: 120, cached_input_tokens: 80, output_tokens: 10 },
+          })
+        ),
+        promptChars: 1,
+        completionChars: 1,
+      });
+      return tracker.metadata;
+    });
+    // The requested model is not evidence of the served one.
+    expect(metadata).toEqual({
+      usage: { input_tokens: 120, output_tokens: 10, total_tokens: 130 },
+    });
   });
 });

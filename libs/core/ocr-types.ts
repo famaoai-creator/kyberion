@@ -39,7 +39,11 @@ export interface OcrRequest {
   tier?: OcrDataTier;
   /** Tenant owning the material; required by egress policy for non-public data. */
   tenant_slug?: string;
-  /** Maximum provider data policy allowed for this request. Defaults to local_only. */
+  /**
+   * Maximum provider data policy allowed for this request. Defaults to
+   * training_eligible when `tier` is explicitly 'public', else local_only
+   * (an omitted tier is not treated as an explicit public declaration).
+   */
   training_use?: OcrDataPolicy;
 }
 

@@ -322,12 +322,14 @@ export async function authorSceneCompositions(
         return String(await getReasoningBackend().prompt(text));
       });
     const reply = await withReasoningPayloadScope(
-      {
-        ...input.scope,
-        tier: input.scope?.tier ?? 'public',
-        purpose: input.scope?.purpose ?? 'video scene composition',
-        attachment_count: 0,
-      },
+      // The caller's scope (and its declared training_use) passes through as is.
+      input.scope
+        ? {
+            ...input.scope,
+            purpose: input.scope.purpose ?? 'video scene composition',
+            attachment_count: 0,
+          }
+        : { tier: 'public', purpose: 'video scene composition', attachment_count: 0 },
       () => generate(prompt)
     );
     const jsonText = reply.slice(reply.indexOf('{'), reply.lastIndexOf('}') + 1);

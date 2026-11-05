@@ -28,6 +28,7 @@
     "renewed_at": { "type": "string" },
     "released_at": { "type": "string" },
     "idempotency_key": { "type": "string" },
+    "payload_hash": { "type": "string" },
     "expected_version": { "type": "integer" },
     "previous_lease_id": { "type": "string" }
   },

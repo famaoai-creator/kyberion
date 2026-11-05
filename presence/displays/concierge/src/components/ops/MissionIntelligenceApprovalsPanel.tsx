@@ -1,8 +1,8 @@
+import { NeedsYouLink } from '../needs-you-link';
 import { Button, KeyValue, Table } from '@agent/shared-ui';
 import {
   ActionDetailList,
   ActionStatusBadge,
-  buildApprovalWorkLoopPreview,
   buildArtifactWorkLoopPreview,
   buildDistillCandidateWorkLoopPreview,
 } from './MissionIntelligenceViewHelpers';
@@ -22,12 +22,10 @@ export function MissionIntelligenceApprovalsPanel({ context }: { context: Record
   const {
     data,
     mt,
+    locale,
     filteredRecentArtifactsByTrack,
     filteredDistillCandidatesByTrack,
-    filteredPendingApprovalsByTrack,
     filteredMemoryCandidatesByTrack,
-    decideApproval,
-    approvalTarget,
     decideDistillCandidate,
     distillCandidateTarget,
     runMemoryPromotion,
@@ -50,71 +48,8 @@ export function MissionIntelligenceApprovalsPanel({ context }: { context: Record
             'Approvals keep authority explicit. Review pending risky actions here before they cross a governed boundary.'
           )}
         >
-          {filteredPendingApprovalsByTrack.length === 0 ? (
-            <p className="kb-text kb-text--muted">
-              {mt('chronos_mip_no_pending_approvals', 'No pending approvals.')}
-            </p>
-          ) : (
-            <FeedList>
-              {filteredPendingApprovalsByTrack.map((approval: any) => (
-                <FeedItem
-                  key={approval.id}
-                  title={approval.title}
-                  titleId={approval.missionId}
-                  status="pending"
-                  statusLabel={approval.riskLevel}
-                  meta={approval.summary}
-                >
-                  <KeyValue
-                    items={[
-                      {
-                        label: mt('chronos_channel', 'channel'),
-                        value: approval.channel,
-                        mono: true,
-                      },
-                      { label: mt('chronos_mip_kind', 'kind'), value: approval.kind, mono: true },
-                      {
-                        label: mt('chronos_mip_service', 'service'),
-                        value: approval.serviceId || '-',
-                        mono: true,
-                      },
-                      ...(approval.pendingRoles.length > 0
-                        ? [
-                            {
-                              label: mt('chronos_mip_pending_roles', 'pending roles'),
-                              value: approval.pendingRoles.join(', '),
-                            },
-                          ]
-                        : []),
-                    ]}
-                  />
-                  <WorkLoopDisclosure workLoop={buildApprovalWorkLoopPreview(approval)} mt={mt} />
-                  <FeedActions>
-                    <Button
-                      label={
-                        approvalTarget === approval.id
-                          ? mt('chronos_mip_processing', 'processing')
-                          : mt('chronos_approve', 'approve')
-                      }
-                      variant="primary"
-                      onClick={() => decideApproval(approval, 'approved')}
-                      disabled={approvalTarget === approval.id}
-                    />
-                    <Button
-                      label={
-                        approvalTarget === approval.id
-                          ? mt('chronos_mip_processing', 'processing')
-                          : mt('chronos_reject', 'reject')
-                      }
-                      variant="danger"
-                      onClick={() => decideApproval(approval, 'rejected')}
-                      disabled={approvalTarget === approval.id}
-                    />
-                  </FeedActions>
-                </FeedItem>
-              ))}
-            </FeedList>
-          )}
+          {/* Pending approvals are decided in あなた待ち only (IA contract §2). */}
+          <NeedsYouLink reason="approval" locale={locale} />
         </Panel>
 
         <Panel

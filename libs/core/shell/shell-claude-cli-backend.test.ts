@@ -710,3 +710,66 @@ describe('shell-claude-cli-backend', () => {
     });
   });
 });
+
+describe('output-exit secret redaction', () => {
+  const KEY = 'sk-ant-exit-redaction-secret-0123456789';
+
+  beforeEach(() => {
+    vi.stubEnv('ANTHROPIC_API_KEY', KEY);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    spawnMock.mockReset();
+  });
+
+  it('masks the provider key in the final answer', async () => {
+    spawnMock.mockReturnValueOnce(
+      createChild(JSON.stringify({ type: 'result', result: `the key is ${KEY}.` }))
+    );
+    const backend = new ShellClaudeCliBackend({ bin: 'claude', model: 'opus' });
+    const answer = await backend.delegateTask('leak it');
+    expect(answer).toBe('the key is [REDACTED_SECRET].');
+  });
+
+  it('masks a key split across streamed chunks', async () => {
+    const half = Math.floor(KEY.length / 2);
+    const output = [`prefix ${KEY.slice(0, half)}`, `${KEY.slice(half)} suffix`]
+      .map((text) =>
+        JSON.stringify({
+          type: 'stream_event',
+          event: { type: 'content_block_delta', delta: { type: 'text_delta', text } },
+        })
+      )
+      .join('\n');
+    spawnMock.mockReturnValueOnce(createChild(output));
+    const deltas: string[] = [];
+    for await (const delta of new ShellClaudeCliBackend({
+      bin: 'claude',
+      model: 'opus',
+    }).streamPrompt('q'))
+      deltas.push(delta);
+    expect(deltas.join('')).toBe('prefix [REDACTED_SECRET] suffix');
+    expect(deltas.some((delta) => delta.includes(KEY.slice(0, half)))).toBe(false);
+  });
+
+  it('masks the key in a stderr-bearing error', async () => {
+    const child = Object.assign(new EventEmitter(), {
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      stdin: new PassThrough(),
+      kill: vi.fn(),
+    });
+    queueMicrotask(() => {
+      child.stderr.write(`auth failed for ${KEY}`);
+      child.stdout.end();
+      child.stderr.end();
+      setTimeout(() => child.emit('close', 1), 0);
+    });
+    spawnMock.mockReturnValueOnce(child);
+    const backend = new ShellClaudeCliBackend({ bin: 'claude', model: 'opus' });
+    const error = await backend.delegateTask('x').catch((err: Error) => err);
+    expect((error as Error).message).toContain('[REDACTED_SECRET]');
+    expect((error as Error).message).not.toContain(KEY);
+  });
+});

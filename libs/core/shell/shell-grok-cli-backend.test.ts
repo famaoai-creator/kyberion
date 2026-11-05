@@ -115,6 +115,26 @@ describe('shell-grok-cli-backend', () => {
     );
   });
 
+  it('parses the raw envelope before redacting, so an unquoted numeric secret cannot break parsing', async () => {
+    const numericKey = '9876543210123';
+    vi.stubEnv('XAI_API_KEY', numericKey);
+    try {
+      spawnMock.mockReturnValueOnce(
+        createChild(
+          `{"structuredOutput":{"count":${numericKey},"note":"key ${numericKey} leaked"},"stopReason":"EndTurn"}`
+        )
+      );
+      const result = await new ShellGrokCliBackend({ bin: 'grok' }).runStructured({
+        systemPrompt: 'sys',
+        userPrompt: 'user',
+        schema: z.object({ count: z.number(), note: z.string() }),
+      });
+      expect(result).toEqual({ count: Number(numericKey), note: 'key [REDACTED_SECRET] leaked' });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('falls back to parsing text when structuredOutput is absent', async () => {
     const envelope = JSON.stringify({
       text: '{"answer":"pong"}',

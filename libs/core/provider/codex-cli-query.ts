@@ -12,7 +12,7 @@ import * as pathResolver from '../path-resolver.js';
 import { safeExecResult, safeLstat, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { locateCommandInvocation, platformFacts } from '../platform-facts.js';
 import {
-  buildDelegationSpawnEnv,
+  buildDelegationSpawnEnvWithRelay,
   newDelegationSessionId,
   spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
@@ -22,6 +22,10 @@ import {
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
+import {
+  redactProviderOutputError,
+  redactProviderStructuredResult,
+} from './provider-output-redaction.js';
 import { resolveCodexHome, resolveCodexProfileName } from './codex-profile.js';
 import {
   delegationChildHandleFromChildProcess,
@@ -58,6 +62,32 @@ export interface RunCodexCliQueryParams<T> {
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });
+}
+
+/**
+ * Re-label a codex failure without losing its structure: the original error
+ * stays as `cause`, and the spawn facts (`code`, `errno`, `syscall`, `path`)
+ * plus an explicit R5 `executionStarted` marker are copied over, so a spawn
+ * that never produced a process (`code: 'ENOENT'`) is still recognised as
+ * pre-start by `delegationExecutionStartedFromError` after the rewrap.
+ */
+export function rewrapCodexError(message: string, error: unknown): Error {
+  const wrapped = new Error(message, { cause: error });
+  if (!error || typeof error !== 'object') return wrapped;
+  const source = error as Record<string, unknown>;
+  const target = wrapped as unknown as Record<string, unknown>;
+  // System-call facts travel together: a bare `code: 'ENOENT'` without its
+  // `syscall` (e.g. a missing output file after codex ran) must never be
+  // re-read as a spawn that never happened.
+  if (typeof source.syscall === 'string') {
+    for (const key of ['code', 'errno', 'syscall', 'path'] as const) {
+      if (source[key] !== undefined) target[key] = source[key];
+    }
+  }
+  if (typeof source.executionStarted === 'boolean') {
+    target.executionStarted = source.executionStarted;
+  }
+  return wrapped;
 }
 
 export async function runCodexCliQuery<T>({
@@ -171,7 +201,8 @@ class CodexCliQuery {
           throw new Error(`[codex-cli] schema validation failed: ${parsed.error.message}`);
         }
         status = 'success';
-        return parsed.data;
+        // Output exit: the parsed answer is redacted value-wise.
+        return redactProviderStructuredResult(parsed.data);
       } finally {
         recordCliUsage('codex-cli', this.model, started, status, {
           report: parseCodexCliUsage(capture.stdout),
@@ -181,7 +212,12 @@ class CodexCliQuery {
         });
       }
     } catch (err: any) {
-      throw new Error(`[codex-cli] structured query failed: ${err?.message ?? String(err)}`);
+      throw redactProviderOutputError(
+        rewrapCodexError(
+          `[codex-cli] structured query failed: ${err?.message ?? String(err)}`,
+          redactProviderOutputError(err)
+        )
+      );
     } finally {
       safeRmSync(schemaPath, { force: true });
       safeRmSync(outputPath, { force: true });
@@ -193,7 +229,7 @@ class CodexCliQuery {
    * enforced against a real, killable handle via {@link withWallClockBudget}
    * — expiry actually SIGTERM's then SIGKILL's this CLI process.
    */
-  private spawnCli(
+  private async spawnCli(
     args: string[],
     stdin: string,
     profile?: ProviderPermissionProfileName,
@@ -201,7 +237,7 @@ class CodexCliQuery {
   ): Promise<void> {
     // XP-02: minimal allowlisted env, scoped to codex's own required vars;
     // WS-02: private git index for write-capable runs.
-    const spawnEnv = buildDelegationSpawnEnv({
+    const pendingSpawnEnv = buildDelegationSpawnEnvWithRelay({
       provider: 'codex',
       cwd: this.cwd,
       sessionId: newDelegationSessionId('codex'),
@@ -211,6 +247,8 @@ class CodexCliQuery {
       },
       ...(profile ? { profile } : {}),
     });
+    // Await only when a credential relay had to start (no extra tick otherwise).
+    const spawnEnv = pendingSpawnEnv instanceof Promise ? await pendingSpawnEnv : pendingSpawnEnv;
     const child = spawnWithDelegationEnv(spawnEnv, () =>
       spawn(this.bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -255,7 +293,7 @@ class CodexCliQuery {
           });
           child.on('error', (err) => {
             if (!spawned && !stdout) capture.requestNotSent = true;
-            reject(new Error(`[codex-cli] spawn failed: ${err.message}`));
+            reject(rewrapCodexError(`[codex-cli] spawn failed: ${err.message}`, err));
           });
           child.stdin.write(stdin);
           child.stdin.end();

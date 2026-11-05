@@ -1,22 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { decideWithPasskey } from '../../../lib/passkey-client';
 import { frontDeskFetch as fetch } from '../../../lib/front-desk-fetch';
+import { useConciergeI18n } from '../../../lib/use-concierge-i18n';
+import { NeedsYouLink } from '../../../components/needs-you-link';
 import { Button, SettingsGroup, Badge } from '@agent/shared-ui';
 import type { SettingsTranslate } from './form-scope';
 
 const record = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 
-type PendingApproval = {
-  request_id: string;
-  status: string;
-  channel: string;
-  kind: string;
-  expires_at?: string;
-  presented_digest?: string;
-};
 type ApprovalRule = {
   id: string;
   intent_ids: string[];
@@ -29,7 +22,6 @@ type Member = {
   external_identities: { issuer: string; subject: string; email?: string }[];
 };
 type Overview = {
-  pending_approvals: PendingApproval[];
   approval_rules: ApprovalRule[];
   members: Member[];
   current_identity: { issuer: string; subject: string; email?: string } | null;
@@ -39,9 +31,6 @@ type Overview = {
 function readOverview(value: unknown): Overview | null {
   if (!record(value) || value.ok !== true) return null;
   return {
-    pending_approvals: Array.isArray(value.pending_approvals)
-      ? (value.pending_approvals as PendingApproval[])
-      : [],
     approval_rules: Array.isArray(value.approval_rules)
       ? (value.approval_rules as ApprovalRule[])
       : [],
@@ -54,6 +43,7 @@ function readOverview(value: unknown): Overview | null {
 }
 
 export function GovernanceSection({ t }: { t: SettingsTranslate }) {
+  const { locale } = useConciergeI18n();
   const [data, setData] = React.useState<Overview | null>(null);
   const [linkMember, setLinkMember] = React.useState('');
   const [busy, setBusy] = React.useState(false);
@@ -111,41 +101,9 @@ export function GovernanceSection({ t }: { t: SettingsTranslate }) {
     <SettingsGroup id="settings-governance" title={t('governance.title')}>
       <div className="settings-row-block">
         <h4>{t('governance.pending_title')}</h4>
-        {data.pending_approvals.length === 0 && (
-          <p className="kb-text kb-text--muted">{t('governance.pending_empty')}</p>
-        )}
-        {data.pending_approvals.map((request) => (
-          <div key={request.request_id} className="settings-integration">
-            <div className="kb-setting-row__text">
-              <p className="kb-text">
-                {request.kind || request.channel} <Badge label={request.status} tone="info" />
-              </p>
-              <p className="kb-text kb-text--muted">
-                {request.request_id} · {request.channel}
-                {request.expires_at
-                  ? ` · ${t('governance.expires', { at: request.expires_at })}`
-                  : ''}
-              </p>
-            </div>
-            <Button
-              label={busy ? '…' : t('governance.approve_passkey')}
-              disabled={busy || request.status !== 'pending'}
-              onClick={() =>
-                void run(async () => {
-                  await decideWithPasskey({
-                    requestId: request.request_id,
-                    decision: 'approved',
-                    channel: request.channel,
-                    storageChannel: request.channel,
-                    presentedDigest: request.presented_digest,
-                  });
-                  setMessage(t('governance.approved_msg', { id: request.request_id }));
-                  await load();
-                })
-              }
-            />
-          </div>
-        ))}
+        {/* MSN-SHELL-IA: approvals (A3 passkey ones included) are decided in
+            one place, /inbox; settings shows the count and the link only. */}
+        <NeedsYouLink reason="approval" locale={locale} />
       </div>
 
       <div className="settings-row-block">
