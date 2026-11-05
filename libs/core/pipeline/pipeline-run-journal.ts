@@ -6,7 +6,7 @@
  * effects. Output snapshots are limited to declared channels.
  */
 import { createHash, randomUUID } from 'node:crypto';
-import type { ScopeContext } from '../scope-context-validation.js';
+import type { ScopeContext } from '../foundation/scope-context-validation.js';
 import { resolveScopeContext } from '../scope-context.js';
 import { currentScopeEnvelope, type ScopePolicy } from '../scope-envelope.js';
 import { capturePipelineResumePolicyEnvironment } from './pipeline-resume-policy-env.js';

@@ -17,7 +17,7 @@
 import * as path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import * as pathResolver from '../path-resolver.js';
-import { withLockSync } from '../lock-utils.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord, readTextFile } from '../foundation/text.js';
 import {

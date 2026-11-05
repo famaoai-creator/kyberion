@@ -16,7 +16,7 @@ import {
 import { logger } from '@agent/core/core';
 import { resolveAdbBin } from '@agent/core/tool/tool-binary-resolvers';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolvePipelineContextValues } from '@agent/core/logic-utils';
+import { resolvePipelineContextValues } from '@agent/core/pipeline/logic-utils';
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
 import { retry, sleep, getRetryDefaults } from '@agent/core/async-utils';
 import { defineCatalog, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';

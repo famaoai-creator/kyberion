@@ -1,6 +1,6 @@
 /** Opens exact scoped human reviews in the canonical shared approval store. */
 import { withExecutionContext } from '../authority.js';
-import { withLockSync } from '../lock-utils.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import {
   createApprovalRequest,
   loadApprovalRequest,

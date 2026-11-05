@@ -62,7 +62,7 @@ vi.mock('../dot/dot-dispatch.js', async (original) => ({
   ...(await original<typeof import('../dot/dot-dispatch.js')>()),
   currentDotActions: () => (state.action ? [structuredClone(state.action)] : []),
 }));
-vi.mock('../lock-utils.js', () => ({
+vi.mock('../foundation/lock-utils.js', () => ({
   withLockSync: (_key: string, fn: () => unknown) => {
     state.locks++;
     return fn();

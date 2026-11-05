@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { assertSafeRepositoryPath, safeReadFileSnapshot, safeUnlinkSync } from '../secure-io.js';
-import type { ScopeContext } from '../scope-context-validation.js';
+import type { ScopeContext } from '../foundation/scope-context-validation.js';
 import type { WorkerStateJournal } from './worker-state-journal.js';
 import {
   MAX_COMPACTION_RETENTION_MS,

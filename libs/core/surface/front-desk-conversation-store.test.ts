@@ -5,7 +5,7 @@ const files = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('../authority.js', () => ({
   withExecutionContext: (_role: string, fn: () => unknown) => fn(),
 }));
-vi.mock('../lock-utils.js', () => ({
+vi.mock('../foundation/lock-utils.js', () => ({
   withLockSync: (_key: string, fn: () => unknown) => fn(),
 }));
 vi.mock('../workforce/artifact-store.js', () => ({

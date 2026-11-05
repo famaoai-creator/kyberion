@@ -39,7 +39,7 @@ vi.mock('@agent/core/organization/member-registry', async (original) => ({
   readMemberProfile: (id: string) =>
     structuredClone(state.members.find((member) => member.member_id === id) ?? null),
 }));
-vi.mock('@agent/core/lock-utils', () => ({
+vi.mock('@agent/core/foundation/lock-utils', () => ({
   withLockSync: (_key: string, fn: () => unknown) => {
     state.locks++;
     return fn();

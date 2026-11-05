@@ -43,7 +43,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
-import { withLock } from '@agent/core/lock-utils';
+import { withLock } from '@agent/core/foundation/lock-utils';
 import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import {

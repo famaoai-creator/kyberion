@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import type { DecisionRecord } from '../decision-ledger/model.js';
 import type { DotCharter } from '../dot/dot-charter.js';
-import type { ScopeContext } from '../scope-context-validation.js';
+import type { ScopeContext } from '../foundation/scope-context-validation.js';
 import { storageFloorRelativePath } from '../storage-layout.js';
 import {
   judgmentScopeSchema,

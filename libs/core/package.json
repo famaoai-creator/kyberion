@@ -112,17 +112,9 @@
       "types": "./dist/actuator/index.d.ts",
       "default": "./dist/actuator/index.js"
     },
-    "./actuator-capability": {
-      "types": "./dist/actuator-capability.d.ts",
-      "default": "./dist/actuator-capability.js"
-    },
     "./actuator-dependency-bundles": {
       "types": "./dist/actuator/actuator-dependency-bundles.d.ts",
       "default": "./dist/actuator/actuator-dependency-bundles.js"
-    },
-    "./actuator-example-catalog": {
-      "types": "./dist/actuator-example-catalog.d.ts",
-      "default": "./dist/actuator-example-catalog.js"
     },
     "./actuator-forwarding-port": {
       "types": "./dist/actuator/actuator-forwarding-port.d.ts",
@@ -587,10 +579,6 @@
     "./artifact-verification": {
       "types": "./dist/workforce/artifact-verification.d.ts",
       "default": "./dist/workforce/artifact-verification.js"
-    },
-    "./artifacts": {
-      "types": "./dist/artifacts.d.ts",
-      "default": "./dist/artifacts.js"
     },
     "./assistant-compiler-request": {
       "types": "./dist/assistant-compiler-request.d.ts",
@@ -1128,10 +1116,6 @@
       "types": "./dist/creative-design-resolver.d.ts",
       "default": "./dist/creative-design-resolver.js"
     },
-    "./cron-utils": {
-      "types": "./dist/cron-utils.d.ts",
-      "default": "./dist/cron-utils.js"
-    },
     "./customer-channel-binding": {
       "types": "./dist/customer-channel-binding.d.ts",
       "default": "./dist/customer-channel-binding.js"
@@ -1143,10 +1127,6 @@
     "./customer-conversation-modes": {
       "types": "./dist/customer-conversation-modes.d.ts",
       "default": "./dist/customer-conversation-modes.js"
-    },
-    "./customer-decision": {
-      "types": "./dist/customer-decision.d.ts",
-      "default": "./dist/customer-decision.js"
     },
     "./customer-decision/operator-handoff": {
       "types": "./dist/customer-decision/operator-handoff.d.ts",
@@ -1384,10 +1364,6 @@
       "types": "./dist/documentation-source-map.d.ts",
       "default": "./dist/documentation-source-map.js"
     },
-    "./docx-utils": {
-      "types": "./dist/docx-utils.d.ts",
-      "default": "./dist/docx-utils.js"
-    },
     "./dot/dot-action-ledger": {
       "types": "./dist/dot/dot-action-ledger.d.ts",
       "default": "./dist/dot/dot-action-ledger.js"
@@ -1591,10 +1567,6 @@
     "./facet-registry": {
       "types": "./dist/facet-registry.d.ts",
       "default": "./dist/facet-registry.js"
-    },
-    "./feedback-loop": {
-      "types": "./dist/feedback-loop.d.ts",
-      "default": "./dist/feedback-loop.js"
     },
     "./finance-controller": {
       "types": "./dist/finance-controller.d.ts",
@@ -2180,10 +2152,6 @@
       "types": "./dist/intent/intent-clarification-format.d.ts",
       "default": "./dist/intent/intent-clarification-format.js"
     },
-    "./intent-compiler": {
-      "types": "./dist/intent-compiler.d.ts",
-      "default": "./dist/intent-compiler.js"
-    },
     "./intent-contract": {
       "types": "./dist/intent/intent-contract.d.ts",
       "default": "./dist/intent/intent-contract.js"
@@ -2383,14 +2351,6 @@
     "./knowledge": {
       "types": "./dist/knowledge/index.d.ts",
       "default": "./dist/knowledge/index.js"
-    },
-    "./knowledge-curation-report": {
-      "types": "./dist/knowledge-curation-report.d.ts",
-      "default": "./dist/knowledge-curation-report.js"
-    },
-    "./knowledge-feedback-loop": {
-      "types": "./dist/knowledge-feedback-loop.d.ts",
-      "default": "./dist/knowledge-feedback-loop.js"
     },
     "./knowledge-index": {
       "types": "./dist/knowledge-index.d.ts",
@@ -2644,17 +2604,9 @@
       "types": "./dist/foundation/locale-normalize.d.ts",
       "default": "./dist/foundation/locale-normalize.js"
     },
-    "./lock-utils": {
-      "types": "./dist/lock-utils.d.ts",
-      "default": "./dist/lock-utils.js"
-    },
     "./logger": {
       "types": "./dist/logger.d.ts",
       "default": "./dist/logger.js"
-    },
-    "./logic-utils": {
-      "types": "./dist/logic-utils.d.ts",
-      "default": "./dist/logic-utils.js"
     },
     "./macos-automation-bridge": {
       "types": "./dist/macos-automation-bridge.d.ts",
@@ -4284,25 +4236,13 @@
       "types": "./dist/pipeline/pipeline-dry-run.d.ts",
       "default": "./dist/pipeline/pipeline-dry-run.js"
     },
-    "./pipeline-engine": {
-      "types": "./dist/pipeline-engine.d.ts",
-      "default": "./dist/pipeline-engine.js"
-    },
     "./pipeline-input-contract": {
       "types": "./dist/pipeline/pipeline-input-contract.d.ts",
       "default": "./dist/pipeline/pipeline-input-contract.js"
     },
-    "./pipeline-preview": {
-      "types": "./dist/pipeline-preview.d.ts",
-      "default": "./dist/pipeline-preview.js"
-    },
     "./pipeline-run-journal": {
       "types": "./dist/pipeline/pipeline-run-journal.d.ts",
       "default": "./dist/pipeline/pipeline-run-journal.js"
-    },
-    "./pipeline-scheduler": {
-      "types": "./dist/pipeline-scheduler.d.ts",
-      "default": "./dist/pipeline-scheduler.js"
     },
     "./pipeline/adf-engine": {
       "types": "./dist/pipeline/adf-engine.d.ts",
@@ -4523,10 +4463,6 @@
     "./plugin/skill-wrapper": {
       "types": "./dist/plugin/skill-wrapper.d.ts",
       "default": "./dist/plugin/skill-wrapper.js"
-    },
-    "./pptx-utils": {
-      "types": "./dist/pptx-utils.d.ts",
-      "default": "./dist/pptx-utils.js"
     },
     "./presence-avatar": {
       "types": "./dist/presence-avatar.d.ts",
@@ -6000,10 +5936,6 @@
       "types": "./dist/source-analysis.d.ts",
       "default": "./dist/source-analysis.js"
     },
-    "./sovereign-sentinel": {
-      "types": "./dist/sovereign-sentinel.d.ts",
-      "default": "./dist/sovereign-sentinel.js"
-    },
     "./speech-to-text-bridge": {
       "types": "./dist/voice/speech-to-text-bridge.d.ts",
       "default": "./dist/voice/speech-to-text-bridge.js"
@@ -6696,10 +6628,6 @@
       "types": "./dist/accepted-pipeline-bindings.d.ts",
       "default": "./dist/accepted-pipeline-bindings.js"
     },
-    "./decision-ledger": {
-      "types": "./dist/decision-ledger.d.ts",
-      "default": "./dist/decision-ledger.js"
-    },
     "./ui-component-registry": {
       "types": "./dist/ui-component-registry.d.ts",
       "default": "./dist/ui-component-registry.js"
@@ -6779,10 +6707,6 @@
     "./tool/tool-runtime-registry": {
       "types": "./dist/tool/tool-runtime-registry.d.ts",
       "default": "./dist/tool/tool-runtime-registry.js"
-    },
-    "./trace": {
-      "types": "./dist/trace.d.ts",
-      "default": "./dist/trace.js"
     },
     "./trace-schema": {
       "types": "./dist/analysis/trace-schema.d.ts",
@@ -7576,10 +7500,6 @@
       "types": "./dist/workforce/workspace-sweep.d.ts",
       "default": "./dist/workforce/workspace-sweep.js"
     },
-    "./xlsx-utils": {
-      "types": "./dist/xlsx-utils.d.ts",
-      "default": "./dist/xlsx-utils.js"
-    },
     "./organization/continuous-operations": {
       "types": "./dist/organization/continuous-operations.d.ts",
       "default": "./dist/organization/continuous-operations.js"
@@ -7716,10 +7636,6 @@
       "types": "./dist/foundation/json-state.d.ts",
       "default": "./dist/foundation/json-state.js"
     },
-    "./rate-limit": {
-      "types": "./dist/rate-limit.d.ts",
-      "default": "./dist/rate-limit.js"
-    },
     "./failure-tracker": {
       "types": "./dist/failure-tracker.d.ts",
       "default": "./dist/failure-tracker.js"
@@ -7847,6 +7763,22 @@
     "./router-contract": {
       "types": "./dist/router-contract.d.ts",
       "default": "./dist/router-contract.js"
+    },
+    "./customer-decision": {
+      "types": "./dist/customer-decision/index.d.ts",
+      "default": "./dist/customer-decision/index.js"
+    },
+    "./decision-ledger": {
+      "types": "./dist/decision-ledger/index.d.ts",
+      "default": "./dist/decision-ledger/index.js"
+    },
+    "./foundation/rate-limit": {
+      "types": "./dist/foundation/rate-limit.d.ts",
+      "default": "./dist/foundation/rate-limit.js"
+    },
+    "./foundation/scope-context-validation": {
+      "types": "./dist/foundation/scope-context-validation.d.ts",
+      "default": "./dist/foundation/scope-context-validation.js"
     }
   },
   "dependencies": {

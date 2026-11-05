@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { resolveIdentityContext, withExecutionContext } from '../authority.js';
-import { withLockSync } from '../lock-utils.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { isApprovalRequestExpired } from './approval-store-reader.js';
 import { normalizeApprovalChannel, normalizeApprovalRequestId } from './approval-store-paths.js';
 import {

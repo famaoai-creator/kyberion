@@ -1,6 +1,6 @@
 /** Pure applicability checks. Semantic evidence does not authorize or execute an effect. */
 import { canonicalJson } from '../decision-ledger/model.js';
-import type { ScopeContext } from '../scope-context-validation.js';
+import type { ScopeContext } from '../foundation/scope-context-validation.js';
 import {
   judgmentBindingSchema,
   judgmentScopeSchema,

@@ -24,7 +24,7 @@ import { withLockSync } from '../foundation/lock-utils.js';
 import { writeJson } from '../foundation/json.js';
 import { readJsonLinesCached } from '../jsonl-tail.js';
 import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
-import { assertScopeContext } from '../scope-context-validation.js';
+import { assertScopeContext } from '../foundation/scope-context-validation.js';
 import { storagePartitionSegments } from '../storage-layout.js';
 import {
   PARTITIONED_RUNTIME_STATE_ROOTS,

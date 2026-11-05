@@ -27,7 +27,7 @@ import {
   type RunChannelTurnOptions,
 } from '@agent/core/surface/channel-adapter';
 import type { SurfaceConversationResult } from '@agent/core/surface/channel-surface-types';
-import { recordSlackKnowledgeReaction } from '@agent/core/knowledge-feedback-loop';
+import { recordSlackKnowledgeReaction } from '@agent/core/knowledge/knowledge-feedback-loop';
 import {
   createSurfaceOutboxDrainGuard,
   drainSurfaceOutbox,

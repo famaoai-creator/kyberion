@@ -1,4 +1,4 @@
-import { withLockSync } from '../lock-utils.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import type { ValidateFunction } from 'ajv';
 import { getRegisteredEnvBool, getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';

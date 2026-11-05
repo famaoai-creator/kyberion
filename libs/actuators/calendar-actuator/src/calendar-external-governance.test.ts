@@ -35,8 +35,8 @@ vi.mock('@agent/core/async-utils', async (original) => ({
   ...(await original<typeof import('@agent/core/async-utils')>()),
   retry: mocks.retry,
 }));
-vi.mock('@agent/core/trace', async (original) => ({
-  ...(await original<typeof import('@agent/core/trace')>()),
+vi.mock('@agent/core/analysis/trace', async (original) => ({
+  ...(await original<typeof import('@agent/core/analysis/trace')>()),
   persistTrace: vi.fn(),
 }));
 import { resetOpPreflight, registerOpPreflightListener } from '@agent/core/pipeline/op-preflight';

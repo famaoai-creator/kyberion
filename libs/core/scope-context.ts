@@ -13,7 +13,7 @@ import {
   normalizeScopeContext,
   type ScopeContext,
   type ScopeContextInput,
-} from './scope-context-validation.js';
+} from './foundation/scope-context-validation.js';
 export {
   assertScopeContext,
   normalizeScopeContext,
@@ -21,7 +21,7 @@ export {
   type ScopeContext,
   type ScopeContextInput,
   type ScopeContextValidationOptions,
-} from './scope-context-validation.js';
+} from './foundation/scope-context-validation.js';
 import {
   safeExistsSync,
   safeLstat,

@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import ExcelJS from 'exceljs';
 import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
 import { generateNativeDocx } from '@agent/shared-media/media-contracts';
-import { distillXlsxDesign } from '@agent/core/xlsx-utils';
+import { distillXlsxDesign } from '@agent/core/media/xlsx-utils';
 import type { DocxDesignProtocol } from '@agent/core/contracts/docx-protocol';
 import { diffDesigns, runDiffCommand, DIFF_USAGE } from './cli-diff.js';
 

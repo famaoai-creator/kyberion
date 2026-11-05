@@ -3,7 +3,7 @@ import {
   listScheduledPipelines,
   registerScheduledPipeline,
   unregisterScheduledPipeline,
-} from '@agent/core/pipeline-scheduler';
+} from '@agent/core/pipeline/pipeline-scheduler';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';

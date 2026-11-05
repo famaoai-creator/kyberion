@@ -11,7 +11,7 @@ import {
 import { resolveIdentityContext, withExecutionContextAsync } from '@agent/core/authority';
 import { nowIso } from '@agent/core/foundation/time';
 import { parseSafeJsonObjectInput } from '@agent/core/foundation/safe-json';
-import { TraceContext, finalizeAndPersist } from '@agent/core/trace';
+import { TraceContext, finalizeAndPersist } from '@agent/core/analysis/trace';
 import { logger } from '@agent/core/core';
 import { findMissionPath, missionEvidenceDir, pathResolver } from '@agent/core/path-resolver';
 import { pipelineBootstrapNeeds } from '@agent/core/reasoning/pipeline-bootstrap-needs';
@@ -209,7 +209,7 @@ async function recordPipelineFeedback(
   status: 'succeeded' | 'failed',
   trace: unknown
 ): Promise<void> {
-  const { runFeedbackLoop } = await import('@agent/core/feedback-loop');
+  const { runFeedbackLoop } = await import('@agent/core/knowledge/feedback-loop');
   runFeedbackLoop(pipelineId, status, trace as Parameters<typeof runFeedbackLoop>[2]);
 }
 

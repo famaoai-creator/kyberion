@@ -11,7 +11,7 @@ import {
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveMissionDir } from '@agent/core/owner-scope';
-import { resolveVars, evaluateCondition, getPathValue } from '@agent/core/logic-utils';
+import { resolveVars, evaluateCondition, getPathValue } from '@agent/core/pipeline/logic-utils';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 
 import { classifyError } from '@agent/core/error-classifier';

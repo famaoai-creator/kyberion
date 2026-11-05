@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { resolveRole, withExecutionContext } from '../authority.js';
-import { withLockSync } from '../lock-utils.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   MEMORY_PROVENANCE_READER_ROLE,

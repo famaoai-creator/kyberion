@@ -7,7 +7,7 @@ import {
   RESOURCE_USAGE_LEDGER_ROOT,
 } from '@agent/core/metrics';
 import { pathResolver } from '@agent/core/path-resolver';
-import { traceLogDir } from '@agent/core/trace';
+import { traceLogDir } from '@agent/core/analysis/trace';
 import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
 import { readTailJsonl, type TailRead } from './tail.js';
 import { theme, statusColor } from '../theme.js';

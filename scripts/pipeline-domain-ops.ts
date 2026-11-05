@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { grantVoiceConsent } from '@agent/core/voice/voice-consent';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveVars } from '@agent/core/logic-utils';
+import { resolveVars } from '@agent/core/pipeline/logic-utils';
 import { safeExecResult, safeMkdir, safeRmSync } from '@agent/core/secure-io';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';

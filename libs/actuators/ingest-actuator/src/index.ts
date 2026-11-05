@@ -20,7 +20,7 @@
  */
 
 import { logger } from '@agent/core/core';
-import { resolvePipelineContextValues } from '@agent/core/logic-utils';
+import { resolvePipelineContextValues } from '@agent/core/pipeline/logic-utils';
 import { stalenessReport, type IngestSourceObservation } from '@agent/core/ingest-asset-ledger';
 import {
   defineCatalogBackedActuator,

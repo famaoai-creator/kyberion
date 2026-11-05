@@ -23,7 +23,7 @@ import {
 import { resolveSecretIdentity } from './secret-identity.js';
 import { decryptConnectionDocument, isEncryptedConnectionEnvelope } from './secret-encryption.js';
 import { assertTaskCredentialClaim } from './shell-task-credential-binding.js';
-import type { ScopeContext } from '../scope-context-validation.js';
+import type { ScopeContext } from '../foundation/scope-context-validation.js';
 import { assertPluginGrantAllows } from '../shell/sandbox-policy.js';
 import { withCredentialMaterialCapability } from '../foundation/credential-material-capability.js';
 import { getSecretResolver, registerSecretResolver } from './secret-resolver.js';

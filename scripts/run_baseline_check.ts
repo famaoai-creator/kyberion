@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { SovereignSentinel } from '@agent/core/sovereign-sentinel';
+import { SovereignSentinel } from '@agent/core/pfc/SovereignSentinel';
 import { validateService } from '@agent/core/service/service-validator';
 import { pathResolver } from '@agent/core/path-resolver';
 import { inspectInstalledIdentity } from './lib/installed-identity.js';
@@ -47,8 +47,11 @@ import {
   type ProviderCapability,
 } from '@agent/core/provider/provider-capability-registry';
 import { readDaemonHeartbeat, type DaemonHeartbeatStatus } from '@agent/core/daemon-heartbeat';
-import { loadScheduleRegistry, type ScheduledPipeline } from '@agent/core/pipeline-scheduler';
-import { matchesCron } from '@agent/core/cron-utils';
+import {
+  loadScheduleRegistry,
+  type ScheduledPipeline,
+} from '@agent/core/pipeline/pipeline-scheduler';
+import { matchesCron } from '@agent/core/pipeline/cron-utils';
 import {
   sendOpsAlert,
   resolveOpsAlertChannelStatus,
@@ -58,7 +61,7 @@ import {
   collectFailedSchedules,
   sweepFailedSchedules,
   type FailedScheduleFinding,
-} from '@agent/core/feedback-loop';
+} from '@agent/core/knowledge/feedback-loop';
 import { enqueueOperationalLearningSignal } from '@agent/core/operational-learning';
 import {
   loadNotificationPreferences,

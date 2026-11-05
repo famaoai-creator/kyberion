@@ -13,7 +13,7 @@ import {
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
 import { evaluateDecisionRights, resolveDecisionRightsMatrix } from '@agent/core/decision-rights';
-import type { GovernedArtifactRole } from '@agent/core/artifacts';
+import type { GovernedArtifactRole } from '@agent/core/workforce/artifact-store';
 
 const isUsableApproval = (request: ApprovalRequestRecord): boolean =>
   !approvalUsabilityRefusal(request, 'approval_actuator_request_review');

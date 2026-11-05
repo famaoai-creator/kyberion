@@ -20,7 +20,7 @@ vi.mock('../../../lib/viewer-context', () => ({
 vi.mock('@agent/core/authority', () => ({
   withExecutionContext: (_role: string, fn: () => unknown) => fn(),
 }));
-vi.mock('@agent/core/lock-utils', () => ({
+vi.mock('@agent/core/foundation/lock-utils', () => ({
   withLockSync: (_key: string, fn: () => unknown) => fn(),
 }));
 vi.mock('@agent/core/workforce/artifact-store', () => ({

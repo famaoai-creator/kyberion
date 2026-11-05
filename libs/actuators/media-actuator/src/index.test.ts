@@ -15,7 +15,7 @@ import {
 } from '@agent/core/secure-io';
 import { saveProjectRecord, projectRecordPath } from '@agent/core/project/project-registry';
 import { saveServiceBindingRecord } from '@agent/core/service/service-binding-registry';
-import * as pptxUtils from '@agent/core/pptx-utils';
+import * as pptxUtils from '@agent/core/media/pptx-utils';
 import { withExecutionContext } from '@agent/core/authority';
 import { resetCurrentScope } from '@agent/core/scope-context';
 

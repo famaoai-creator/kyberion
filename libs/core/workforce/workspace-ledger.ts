@@ -23,7 +23,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { tryResolveOwnerScope, type OwnerScope } from '../owner-scope.js';
-import type { ScopeContext } from '../scope-context-validation.js';
+import type { ScopeContext } from '../foundation/scope-context-validation.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 
 export type WorkspaceKind = 'git-worktree' | 'scratch-dir' | 'git-index';

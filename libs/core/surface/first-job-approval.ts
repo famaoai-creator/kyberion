@@ -2,7 +2,7 @@ import { normalizeLocale } from '../foundation/locale-normalize.js';
 /** The only first-job decision writer: raw verified browser session, exact current effect. */
 import { createHmac } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
-import { withLockSync } from '../lock-utils.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { assertBuiltinOnlyWorkerEventStream } from '../workforce/worker-event-stream.js';
 import { browserSessionKey, verifyBrowserSessionToken } from '../authn-providers.js';
 import { resolveAuthnSurfaceViewerScope } from './surface-authn.js';

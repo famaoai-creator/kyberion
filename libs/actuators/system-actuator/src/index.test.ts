@@ -1229,8 +1229,8 @@ vi.mock('@agent/core/virtual/desktop-launch-adapter', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/virtual/desktop-launch-adapter')),
   resolveDesktopLaunchAdapter,
 }));
-vi.mock('@agent/core/logic-utils', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/logic-utils')),
+vi.mock('@agent/core/pipeline/logic-utils', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/pipeline/logic-utils')),
   resolveVars,
   evaluateCondition,
   getPathValue,

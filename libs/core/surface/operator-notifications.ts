@@ -6,7 +6,7 @@ import { parseSafeJsonObjectValue, readJsonIfPresent } from '../foundation/json.
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { isVitestProcess } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
-import { fixedWindowLimiter } from '../rate-limit.js';
+import { fixedWindowLimiter } from '../foundation/rate-limit.js';
 import { loadRuntimeControlPolicy } from '../runtime-control-policy.js';
 import {
   assertSafeRepositoryPath,

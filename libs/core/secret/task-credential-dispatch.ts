@@ -6,7 +6,7 @@ import {
   withTaskCredentialBinding,
   type TaskCredentialBinding,
 } from '../foundation/credential-binding.js';
-import { assertScopeContext, type ScopeContext } from '../scope-context-validation.js';
+import { assertScopeContext, type ScopeContext } from '../foundation/scope-context-validation.js';
 
 /**
  * Attests claimed-task lineage while granting zero credentials. Fresh tenants

@@ -18,7 +18,7 @@ import {
   safeRealpath,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { withLock } from '@agent/core/lock-utils';
+import { withLock } from '@agent/core/foundation/lock-utils';
 import { createLogger } from '@agent/core/logger';
 import type { DotSupervisorStep } from './dot_supervisor_extensions.js';
 
