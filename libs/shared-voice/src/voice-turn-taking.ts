@@ -1,7 +1,7 @@
 /**
  * Voice adapter for the Conversation Engine. `VoiceTurnTakingMachine` keeps
  * its historical name and options contract but is now a thin wiring layer
- * over `libs/core/interaction/conversation-engine.ts`: it injects the voice
+ * over `libs/shared-interaction/src/conversation-engine.ts`: it injects the voice
  * deciders (two-stage barge-in, EOT hold, respond gate, speculative policy)
  * and the governed turn-taking language packs. The pure machine / voice
  * workbench replays the same decisions on a fake clock.
@@ -29,12 +29,12 @@ import {
   type InterruptionAction,
   type InterruptionArbiter,
   type RespondGateFn,
-} from '@agent/core/interaction/conversation-engine';
+} from '@agent/shared-interaction/conversation-engine';
 import { BargeInController, type BargeInControllerOptions } from '@agent/core/barge-in-controller';
 import type { AudioChunk } from '@agent/core/meeting/meeting-session-types';
-import { languagePacksFromLexicon } from '@agent/core/interaction/language-pack';
-import type { BackchannelPolicyOptions } from '@agent/core/interaction/backchannel-policy';
-import type { UserRhythmOptions, RhythmAdjustments } from '@agent/core/interaction/user-rhythm';
+import { languagePacksFromLexicon } from '@agent/shared-interaction/language-pack';
+import type { BackchannelPolicyOptions } from '@agent/shared-interaction/backchannel-policy';
+import type { UserRhythmOptions, RhythmAdjustments } from '@agent/shared-interaction/user-rhythm';
 import { loadVoiceTurnTakingLexicon } from '@agent/core/voice/voice-turn-taking-lexicon';
 
 /** Event names the adapter accepts: legacy voice names + canonical engine names. */

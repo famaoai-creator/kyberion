@@ -30,6 +30,9 @@
       "path": "./libs/shared-video"
     },
     {
+      "path": "./libs/shared-interaction"
+    },
+    {
       "path": "./libs/shared-voice"
     },
     {
