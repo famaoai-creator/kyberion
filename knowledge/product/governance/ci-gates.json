@@ -945,6 +945,7 @@
         "--maxWorkers=2",
         "tests/shared-tmp-ratchet.test.ts",
         "tests/mission-lookup-boundary.test.ts",
+        "tests/text-similarity-tokenization-boundary.test.ts",
         "tests/core-fs-exception-boundary.test.ts",
         "tests/foundation-io-boundary.test.ts",
         "tests/process-boundary-governance.test.ts",
