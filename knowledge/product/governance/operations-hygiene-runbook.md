@@ -537,6 +537,17 @@ supervisor and PTC IPC tests when changing a listener.
   including a consumer already waiting for its next chunk. Regression gates:
   `shell-streaming-stt-bridge.boundary.test.ts` and `shell-streaming-tts-bridge.test.ts` use real
   subprocesses and delay consumption until the worker exits.
+- **A child given a loopback URL gets loopback in NO_PROXY via the shared helper.** A child that
+  honors `HTTP(S)_PROXY` sends a request for `127.0.0.1` / `localhost` to the proxy, which cannot
+  reach the parent's loopback (the credential relay, a local surface). Pass proxy vars only
+  through `buildProxyPassthroughEnv` (it appends `127.0.0.1,localhost,::1` to `NO_PROXY` and
+  `no_proxy` whenever a proxy is passed) and build an env that carries a loopback `*_URL` /
+  `*_HOST` / `*_BASE_URL` with `withLoopbackNoProxy`, both from `libs/core/foundation/env.ts`
+  (`PROXY_ENV_KEYS` is the single proxy allowlist; do not re-list the keys in a new child-env
+  allowlist). Gates: `tests/loopback-child-env-no-proxy-boundary.test.ts` (registration-tests;
+  allowlist with a reason for exceptions) and `libs/core/foundation/proxy-passthrough-env.test.ts`.
+  A parent-side upstream hop that relies on Node's `http(s).Agent` `proxyEnv` warns once when the
+  runtime ignores it (Node before 24.5) rather than silently connecting direct.
 - **Selection requirements reach execution.** Streaming STT forwards the requested language per
   transcription through normal, replay, barge-in and calibration paths; shell adapters translate
   it into the worker environment without mutating process-wide defaults. Gate this with the
@@ -1041,6 +1052,12 @@ isolation and parent-capability denial with an ordinary organization operator.
 
 **Rules:**
 
+- **Typed provider results are redacted fail-closed.** A `runStructured<T>` exit returns through
+  `redactProviderStructuredResult` (directly or via `withRedactedProviderOutput`), which throws on
+  an oversized value instead of substituting marker strings that break `T`.
+  `redactProviderOutputValue` is for diagnostic sinks (`lastHarnessSubagentInfo`) only, and a raw
+  `*Unredacted` inner is called only inside `withRedactedProviderOutput`. Gate:
+  `tests/provider-structured-result-redaction-boundary.test.ts` (registration-tests).
 - **Check provider egress for the data tier before every send.** Any path that hands mission or
   tenant content to an LLM provider (CLI or API) first calls `checkProviderEgress` (provider, data
   tier, tenant) from `libs/core/provider/provider-egress-gate.ts` for each candidate provider.
