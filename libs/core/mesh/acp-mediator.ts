@@ -1,5 +1,5 @@
 import { logger } from '../core.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
+import { getRegisteredEnvText, withoutRelayManagedCredentials } from '../foundation/env.js';
 import { ptyEngine } from '../shell/pty-engine.js';
 import { dispatchA2UI } from '../a2ui.js';
 import {
@@ -70,7 +70,7 @@ const ENV_WHITELIST = [
   'no_proxy',
 ];
 
-function sanitizeEnvForChild(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+export function sanitizeEnvForChild(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   // Build locally as a relaxed map; cast at the boundary because Next 15's
   // type augmentation makes NODE_ENV required-readonly, which is not
   // compatible with constructing a fresh sanitized env.
@@ -78,7 +78,8 @@ function sanitizeEnvForChild(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   for (const key of ENV_WHITELIST) {
     if (env[key]) safe[key] = env[key] as string;
   }
-  return safe as unknown as NodeJS.ProcessEnv;
+  // Credential relay flag on: an ACP child starts no relay, so the raw key is dropped.
+  return withoutRelayManagedCredentials(safe, env) as unknown as NodeJS.ProcessEnv;
 }
 
 // Dynamic import for ESM-only @agentclientprotocol/sdk

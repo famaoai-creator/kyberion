@@ -603,6 +603,128 @@ export const redactActiveSecretsForHostLog = (
   return masked;
 };
 
+export interface SecretValueRedactionOptions {
+  /** Values to mask besides the active-secret registry (e.g. a provider's own env key). */
+  readonly extraSecrets?: readonly string[];
+  readonly replacement?: string;
+  readonly minLength?: number;
+}
+
+/**
+ * Needles for output-exit redaction: every active secret (host-log
+ * semantics — other tasks' and ungranted secrets are masked too, because a
+ * leaked value is worse than a masking oracle) plus `extraSecrets`, each also
+ * in its JSON-escaped form so a multi-line value (PEM) that a model re-emits
+ * inside a JSON string is still caught. Longest first, so a secret that
+ * contains another is masked whole.
+ */
+const secretRedactionNeedles = (
+  extraSecrets: readonly string[] = [],
+  minLength = DEFAULT_MASK_MIN_LENGTH
+): string[] => {
+  const threshold =
+    getPluginExecutionContext() !== undefined
+      ? Math.max(minLength, DEFAULT_MASK_MIN_LENGTH)
+      : minLength;
+  const needles = new Set<string>();
+  for (const secret of [..._activeSecrets, ...extraSecrets]) {
+    if (!secret || secret.length <= threshold) continue;
+    needles.add(secret);
+    const escaped = JSON.stringify(secret).slice(1, -1);
+    if (escaped !== secret) needles.add(escaped);
+  }
+  return [...needles].sort((a, b) => b.length - a.length);
+};
+
+/**
+ * Masks active secrets (and `extraSecrets`) in one string value, including
+ * their JSON-escaped forms. Use on values, not on a JSON-stringified
+ * aggregate — see `redactSecretsDeep` (secret-redaction.ts).
+ *
+ * Limits: only exact and JSON-escaped forms match — base64, URL-encoded, hex
+ * or otherwise transformed values are not detected; values at or below
+ * `minLength` (default 5) are skipped, and the registry itself only holds
+ * values longer than 8 characters.
+ */
+export const redactSecretValuesInText = (
+  text: string,
+  options: SecretValueRedactionOptions = {}
+): string => {
+  const replacement = options.replacement ?? '[REDACTED_SECRET]';
+  let masked = text;
+  for (const needle of secretRedactionNeedles(options.extraSecrets, options.minLength)) {
+    if (masked.includes(needle)) masked = masked.split(needle).join(replacement);
+  }
+  return masked;
+};
+
+export interface SecretStreamRedactor {
+  /** Redacted text that is safe to emit now (may be shorter than the input). */
+  push(chunk: string): string;
+  /** Redacted remainder held back at the end of the stream. */
+  flush(): string;
+}
+
+/**
+ * Streaming redaction: a secret split across chunk boundaries is still
+ * masked because the longest buffer suffix that could begin a secret is held
+ * back until the next chunk (or `flush`). Needles are re-read on every push,
+ * so a secret registered mid-stream is honored from then on.
+ */
+export const createSecretStreamRedactor = (
+  options: SecretValueRedactionOptions = {}
+): SecretStreamRedactor => {
+  const replacement = options.replacement ?? '[REDACTED_SECRET]';
+  let pending = '';
+  const heldSuffixLength = (text: string, needles: readonly string[]): number => {
+    let held = 0;
+    for (const needle of needles) {
+      const max = Math.min(needle.length - 1, text.length);
+      for (let k = max; k > held; k -= 1) {
+        if (text.endsWith(needle.slice(0, k))) {
+          held = k;
+          break;
+        }
+      }
+    }
+    return held;
+  };
+  return {
+    push(chunk: string): string {
+      const needles = secretRedactionNeedles(options.extraSecrets, options.minLength);
+      // Work on the UNMASKED buffer: masking first would let a short secret A
+      // inside a longer secret B consume B's prefix, so B's split remainder
+      // would later be emitted in clear.
+      const raw = pending + chunk;
+      let cut = raw.length - heldSuffixLength(raw, needles);
+      // Never cut through a complete occurrence: move the cut to its start.
+      let moved = true;
+      while (moved) {
+        moved = false;
+        for (const needle of needles) {
+          for (let at = raw.indexOf(needle); at !== -1; at = raw.indexOf(needle, at + 1)) {
+            if (at < cut && at + needle.length > cut) {
+              cut = at;
+              moved = true;
+            }
+          }
+        }
+      }
+      pending = raw.slice(cut);
+      let emit = raw.slice(0, cut);
+      for (const needle of needles) {
+        if (emit.includes(needle)) emit = emit.split(needle).join(replacement);
+      }
+      return emit;
+    },
+    flush(): string {
+      const rest = redactSecretValuesInText(pending, options);
+      pending = '';
+      return rest;
+    },
+  };
+};
+
 export const isSecretPath = (filePath: string): boolean => {
   const resolved = path.resolve(filePath);
   return [
