@@ -4,8 +4,8 @@ import { judgmentCanonicalHash } from '../organization/judgment-precedents.js';
 import {
   loadApprovalRequest,
   isApprovalRequestExpired,
-  type ApprovalRequestRecord,
-} from '../governance/approval-store.js';
+} from '../governance/approval-store-reader.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import { approvalUsabilityRefusal } from '../governance/approval-linked-usability.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
 import type { RouteAutonomousDecisionInput } from '../governance/approval-decision-routing.js';

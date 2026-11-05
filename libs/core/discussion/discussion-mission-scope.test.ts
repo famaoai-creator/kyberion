@@ -27,6 +27,21 @@ vi.mock('../governance/approval-store.js', () => ({
   evaluateApprovalUsability: () => undefined,
   loadApprovalRequest: () => ({ status: mocks.status, scope: mocks.approvalScope }),
 }));
+// approval-request-create defines these; its importers bypass the facade.
+vi.mock('../governance/approval-request-create.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../governance/approval-request-create.js')>()),
+  createApprovalRequest: vi.fn(),
+}));
+// approval-separation-of-duties defines these; its importers bypass the facade.
+vi.mock('../governance/approval-separation-of-duties.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../governance/approval-separation-of-duties.js')>()),
+  evaluateApprovalUsability: () => undefined,
+}));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('../governance/approval-store-reader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../governance/approval-store-reader.js')>()),
+  loadApprovalRequest: () => ({ status: mocks.status, scope: mocks.approvalScope }),
+}));
 vi.mock('../surface/surface-mission-proposals.js', () => ({
   issueChronosMissionFromProposal: mocks.issue,
 }));

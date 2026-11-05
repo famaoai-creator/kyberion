@@ -21,7 +21,7 @@ import {
   type PrBodySourceTier,
 } from './github.js';
 import { runVcsMutationWithApproval, type VcsHostMutation } from './publication-host.js';
-import { computeApprovalPayloadHash } from '../governance/approval-store.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
 import { withExecutionContext } from '../authority.js';
 import {
   PR_PUBLICATION_STORE_ROLE,

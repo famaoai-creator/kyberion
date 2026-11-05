@@ -49,11 +49,9 @@ import {
   type RoutedDecision,
 } from '../governance/approval-decision-routing.js';
 import { approvalUsabilityRefusal } from '../governance/approval-linked-usability.js';
-import {
-  isSeparationOfDutiesEnabled,
-  loadApprovalRequest,
-  type ApprovalRequestRecord,
-} from '../governance/approval-store.js';
+import { isSeparationOfDutiesEnabled } from '../governance/approval-separation-of-duties.js';
+import { loadApprovalRequest } from '../governance/approval-store-reader.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import { VETO_WINDOW_DECIDER } from '../governance/approval-veto-window.js';
 import { auditChain } from '../governance/audit-chain.js';
 import {

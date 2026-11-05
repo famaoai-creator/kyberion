@@ -1,4 +1,4 @@
-import { createApprovalRequest } from './approval-store.js';
+import { createApprovalRequest } from './approval-request-create.js';
 import type { HeldActionApprovalLink, HeldActionSteeringSpec } from './held-effect-bridge.js';
 import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 

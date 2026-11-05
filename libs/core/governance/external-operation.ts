@@ -6,7 +6,7 @@ import { currentScopeEnvelope } from '../scope-envelope.js';
 import { normalizeEventScope, type EventScopeInput } from '../event-scope.js';
 import { enforceApprovalGate, type ApprovalGateResult } from './approval-gate.js';
 import type { ApprovalGateCharterInput } from './approval-gate-charter.js';
-import { computeApprovalPayloadHash } from './approval-store.js';
+import { computeApprovalPayloadHash } from './approval-presentation.js';
 import { auditChain } from './audit-chain.js';
 import { createLogger } from '../logger.js';
 import { operationAuthorization } from '../foundation/authorization-registry.js';

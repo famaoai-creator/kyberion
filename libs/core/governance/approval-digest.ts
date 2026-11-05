@@ -7,7 +7,8 @@ import {
   formatDecisionInstant,
   type InterventionLevel,
 } from './approval-decision-card.js';
-import { approvalStoreRoots, type ApprovalRequestRecord } from './approval-store.js';
+import { approvalStoreRoots } from './approval-store-paths.js';
+import type { ApprovalRequestRecord } from './approval-store.js';
 import { readJsonLines } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
 import { resolveLocale } from '../locale.js';

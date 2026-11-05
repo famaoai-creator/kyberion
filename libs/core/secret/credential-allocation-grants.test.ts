@@ -4,6 +4,11 @@ vi.mock('../governance/approval-store.js', async (original) => ({
   ...(await original<typeof import('../governance/approval-store.js')>()),
   loadApprovalRequest: approval.load,
 }));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('../governance/approval-store-reader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../governance/approval-store-reader.js')>()),
+  loadApprovalRequest: approval.load,
+}));
 import {
   normalizeGrantDraft,
   grantApprovalPayload,
