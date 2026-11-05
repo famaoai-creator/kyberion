@@ -28,6 +28,7 @@ import {
 import { resolveSurfaceApprovalReply } from '../surface/surface-approval-ui.js';
 import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
 import { knowledgeDeliveryLogDir } from '../knowledge/knowledge-feedback-loop.js';
+import { getReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
 import {
   runBackgroundReviewFork,
   triggerBackgroundReviewFork,
@@ -164,6 +165,11 @@ describe('background-review-runner', () => {
     );
     const delegateTask = vi.fn(async (prompt: string) => {
       expect(prompt).toContain('memory:enqueue');
+      // A task-session snapshot is personal material: declared local_only.
+      expect(getReasoningPayloadScope()).toMatchObject({
+        tier: 'personal',
+        training_use: 'local_only',
+      });
       return JSON.stringify({
         action: 'memory_candidate',
         title: 'Reusable closure checklist',
@@ -226,14 +232,16 @@ describe('background-review-runner', () => {
   it('stores skill/pipeline work as provenance-bearing proposals, never as direct patches', async () => {
     const sessionId = `runner-proposal-${process.pid}-${Date.now()}`;
     sessionIds.add(sessionId);
+    let observedScope: ReturnType<typeof getReasoningPayloadScope>;
     const result = await runBackgroundReviewFork({
       sessionId,
       surface: 'discord',
       missionId: 'MSN-BACKGROUND-REVIEW-1',
       snapshot: 'The same existing pipeline step is repeatedly useful.',
       backend: {
-        delegateTask: async () =>
-          JSON.stringify({
+        delegateTask: async () => {
+          observedScope = getReasoningPayloadScope();
+          return JSON.stringify({
             action: 'pipeline_proposal',
             title: 'Reuse bounded retry pipeline',
             summary:
@@ -243,11 +251,14 @@ describe('background-review-runner', () => {
               operation: 'append_step',
               step: { op: 'system:log', params: { message: 'reviewed' } },
             },
-          }),
+          });
+        },
       },
     });
 
     expect(result).toMatchObject({ status: 'queued', action: 'pipeline_proposal' });
+    // A mission snapshot is tenant working material: declared no_training.
+    expect(observedScope).toMatchObject({ tier: 'confidential', training_use: 'no_training' });
     expect(result.approval_request_id).toBeUndefined();
     // f896bc5cc made the pipeline target check explicit and symmetric with the
     // skill target check below, replacing the generic secure-io read error.
