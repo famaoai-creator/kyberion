@@ -123,6 +123,6 @@ describe('MissionIntelligence hydration', () => {
     );
     const body = source.slice(source.indexOf('export function MissionIntelligence({'));
     expect(body).toContain('const locale = useChronosLocale();');
-    expect(body).not.toContain('const locale = resolveChronosLocale();');
+    expect(source).not.toContain('resolveChronosLocale(');
   });
 });
