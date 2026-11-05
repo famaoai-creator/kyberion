@@ -16,6 +16,7 @@ import {
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
 import { prepareSessionGitIndex } from '../session-git-index.js';
+import { markDelegationExecutionStarted } from '../delegation-execution-tracker.js';
 
 export const SESSION_GIT_INDEX_ENV_VAR = 'KYBERION_SESSION_GIT_INDEX';
 
@@ -83,8 +84,9 @@ export function buildDelegationSpawnEnv(input: BuildDelegationSpawnEnvInput): De
 
 /**
  * Spawn a provider child with `spawnEnv`: disposes it when `spawnFn` throws
- * synchronously (then rethrows), otherwise records the child's pid and
- * disposes once it has closed or failed to start.
+ * synchronously (then rethrows), otherwise records the child's pid, reports
+ * the delegation's execution start (R5) once a process exists, and disposes
+ * once it has closed or failed to start.
  */
 export function spawnWithDelegationEnv<
   C extends { pid?: number; once(event: 'close' | 'error', listener: () => void): unknown },
@@ -97,6 +99,9 @@ export function spawnWithDelegationEnv<
     throw error;
   }
   spawnEnv.attachChild?.(child.pid);
+  // R5: a child process exists, so side effects are now possible. A spawn
+  // that never produced a process (ENOENT/EACCES) has no pid and stays pre-start.
+  if (child.pid !== undefined) markDelegationExecutionStarted();
   disposeOnChildExit(child, spawnEnv);
   return child;
 }

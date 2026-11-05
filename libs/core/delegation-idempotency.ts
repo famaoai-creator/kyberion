@@ -15,20 +15,22 @@
  *   explicit marker or a structural spawn failure). A dead or silent owner's
  *   record settles as `incomplete/interrupted` — never adopted, never re-run.
  *
- * Reservations are durable state under
- * `active/shared/runtime/delegation-idempotency/` (tenant scopes nest under
- * `tenants/<slug>/` via `physicalScopedPath`), written through secure-io.
+ * Reservations are durable state under the registered partitioned root
+ * `active/shared/runtime/delegation-idempotency/` (`confidential/<tenant>/`
+ * for tenant scopes, `system/` otherwise), written through secure-io.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomUUID } from 'node:crypto';
 import * as os from 'node:os';
+import * as path from 'node:path';
 import { logger } from './core.js';
 import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
 import { withLockSync } from './foundation/lock-utils.js';
 import { nowIso } from './foundation/time.js';
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { pathResolver } from './path-resolver.js';
-import { physicalScopedPath } from './physical-namespace.js';
+import { PARTITIONED_RUNTIME_STATE_ROOTS } from './foundation/runtime-state-roots.js';
+import { storagePartitionSegments } from './storage-layout.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { readJson } from './foundation/json.js';
 import {
@@ -46,8 +48,17 @@ import {
   type DelegationResult,
 } from './delegation-result.js';
 
-/** Reservation store root, relative to `active/shared/` (runtime state floor). */
-export const DELEGATION_IDEMPOTENCY_STORE_SUBPATH = 'runtime/delegation-idempotency';
+/**
+ * Reservation store root (repo-relative): a registered tier/tenant-partitioned
+ * runtime-state root, so tier-guard applies the tenant boundary and tenant
+ * offboarding / backup walk it. Tenant reservations live under
+ * `confidential/<tenant>/` (they carry tenant delegation output), untenanted
+ * ones under `system/`.
+ */
+export const DELEGATION_IDEMPOTENCY_STORE_ROOT =
+  PARTITIONED_RUNTIME_STATE_ROOTS.delegation_idempotency;
+/** Tier of tenant reservations: replayable results hold tenant delegation output. */
+const RESERVATION_TIER = 'confidential';
 
 /** Identifies this module instance so a recycled pid never adopts a reservation. */
 const OWNER_INSTANCE = randomUUID();
@@ -215,12 +226,14 @@ function reservationPath(
   tenantSlug: string | undefined,
   principal: string | undefined
 ): string {
-  const relative = physicalScopedPath(
-    DELEGATION_IDEMPOTENCY_STORE_SUBPATH,
-    tenantSlug ? { tenant_slug: tenantSlug } : {},
+  const relative = path.posix.join(
+    DELEGATION_IDEMPOTENCY_STORE_ROOT,
+    ...storagePartitionSegments(
+      tenantSlug ? { kind: 'tier', tier: RESERVATION_TIER, tenant: tenantSlug } : { kind: 'system' }
+    ),
     `${keyDigest(`${principal ?? ''}\u0000${idempotencyKey}`)}.json`
   );
-  return assertSafeRepositoryPath(pathResolver.shared(relative), { allowMissingLeaf: true });
+  return assertSafeRepositoryPath(pathResolver.rootResolve(relative), { allowMissingLeaf: true });
 }
 
 function isReservation(value: unknown): value is DelegationReservation {
@@ -282,6 +295,12 @@ interface InFlightEntry {
 }
 
 const inFlight = new Map<string, InFlightEntry>();
+/**
+ * Owner failures that released the key (proven pre-start). A joiner that sees
+ * one did not get an execution to join: it competes for the key afresh
+ * instead of inheriting the owner's own failure (e.g. the owner's abort).
+ */
+const releasedFailures = new WeakSet<object>();
 /** Keys already governed by an enclosing idempotent layer in this async context. */
 const activeKeys = new AsyncLocalStorage<ReadonlySet<string>>();
 
@@ -327,9 +346,7 @@ function recordedProcessAliveCached(pid: number, startMarker: string | undefined
  * Follow-up (not handled): heartbeat expiry compares another host's
  * `heartbeat_at` with the local clock, so clock skew larger than the lease
  * can misjudge a live remote owner as gone (safe direction: interrupted, no
- * re-run). Tenant offboarding does not yet walk
- * `delegation-idempotency/tenants/<slug>/` — registering it as a partitioned
- * runtime root is a tier-guard / security-policy change left for follow-up.
+ * re-run).
  */
 function ownerGoneReason(record: DelegationReservation): string | undefined {
   if (record.owner_instance === OWNER_INSTANCE) {
@@ -495,6 +512,14 @@ function abortReason(signal: AbortSignal): unknown {
   return signal.reason ?? new Error('aborted');
 }
 
+/** The abort reason as an object that can carry a start marker. */
+function abortReasonError(signal: AbortSignal): Error {
+  const reason = abortReason(signal);
+  return reason instanceof Error
+    ? reason
+    : new Error(`[DELEGATION_CANCELLED] ${String(reason ?? 'aborted')}`);
+}
+
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(abortReason(signal));
@@ -582,7 +607,14 @@ export async function runIdempotentDelegation(input: IdempotentDelegationInput):
           payloadHash
         );
       }
-      return raceSignal(joined.promise, signal);
+      try {
+        return await raceSignal(joined.promise, signal);
+      } catch (error) {
+        if (!(error && typeof error === 'object' && releasedFailures.has(error))) throw error;
+        // Nothing ran: drop the settled entry and compete for the key ourselves.
+        if (inFlight.get(mapKey) === joined) inFlight.delete(mapKey);
+        continue;
+      }
     }
     const outcome = reserve(filePath, idempotencyKey, payloadHash, principal);
     if (outcome.kind === 'replay') return replay(outcome.record);
@@ -612,7 +644,18 @@ async function executeReserved(
     update(filePath, 'heartbeat', (record) => ({ ...record, heartbeat_at: nowIso() }));
   }, timing.heartbeatMs);
   heartbeat.unref?.();
+  const release = (error: unknown): never => {
+    update(filePath, 'settle', (record) => ({ ...record, status: 'released' }));
+    if (error && typeof error === 'object') releasedFailures.add(error);
+    throw error;
+  };
   try {
+    // The owner's signal fired before dispatch: nothing ran, so release the
+    // key instead of persisting a terminal cancellation every replay inherits.
+    const signal = input.options?.signal;
+    if (signal?.aborted) {
+      release(markErrorExecutionStarted(abortReasonError(signal), false));
+    }
     return await activeKeys.run(keys, () =>
       runWithDelegationExecutionTracker(async (tracker) => {
         try {
@@ -629,19 +672,13 @@ async function executeReserved(
           // Release only on a proof that nothing ran; everything else replays.
           const provenNotStarted =
             !tracker.started && delegationExecutionStartedFromError(error) === false;
-          if (provenNotStarted) {
-            update(filePath, 'settle', (record) => ({ ...record, status: 'released' }));
-          } else {
-            update(filePath, 'settle', (record) => ({
-              ...record,
-              status: 'terminal',
-              completed_at: nowIso(),
-              result: buildFailedDelegationResult(
-                markErrorExecutionStarted(error),
-                tracker.metadata
-              ),
-            }));
-          }
+          if (provenNotStarted) release(error);
+          update(filePath, 'settle', (record) => ({
+            ...record,
+            status: 'terminal',
+            completed_at: nowIso(),
+            result: buildFailedDelegationResult(markErrorExecutionStarted(error), tracker.metadata),
+          }));
           throw error;
         }
       })

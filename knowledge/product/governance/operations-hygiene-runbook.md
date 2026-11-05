@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-04
+last_updated: 2026-11-05
 ---
 
 # Operations Hygiene Runbook
@@ -440,6 +440,25 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
 5. **Check the janitor report.** `uncoveredRuntimeDirs` / `uncoveredRuntimeFiles` must not list the
    new name. A name there means a store was created through a dynamic path the gate cannot see; add
    its catalog entry by hand.
+
+### Tenant-partitioned runtime state
+
+- A new runtime store that keeps per-tenant records under `active/shared/runtime/` registers its
+  root in `PARTITIONED_RUNTIME_STATE_ROOTS` (`libs/core/foundation/runtime-state-roots.ts`) and
+  lays files out as `<root>/<tier>/<tenant>/…` through `storagePartitionSegments` (untenanted
+  records under `system/`). Mirror `<root>/personal/` and `<root>/confidential/` in
+  `security-policy.json` `tenant_scope.protected_prefixes`, add the prefixes to the
+  `storage-layout.test.ts` expectation, and decide its offboarding disposition in
+  `TENANT_RUNTIME_PARTITION_TARGET_KINDS` (the `satisfies` clause fails to compile until you do).
+- Do not use `physicalScopedPath` (`<base>/tenants/<slug>/…`) for new tenant state under
+  `active/shared/runtime/`: that layout is invisible to tier-guard's tenant check and to
+  `TENANT_RUNTIME_PARTITION_ROOTS`, so it is only offboarded when its base is hand-listed in
+  `scope-offboarding.ts`. Known legacy users are listed in the delegation-idempotency PR
+  (#1414) report; migrate them root by root.
+- Gates: `storage-layout.test.ts` (protected prefixes), `scope-offboarding.test.ts` (one
+  disposition per registered root; the tenant-state purge test), and the store's own
+  partition test (e.g. `delegation-idempotency.test.ts`). No gate yet flags an unregistered
+  `tenants/<slug>` store — add new ones to the registry instead.
 
 ### Immutable scoped evidence attempts
 
@@ -1018,6 +1037,18 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
 ## §7 LLM and provider calls
 
 **Explicit attachment facts.** Under an explicitly processor-scoped charter, the trusted send boundary supplies a non-negative integer `attachment_count`. Text-only leaf calls declare zero; image calls declare the number of outgoing images. Missing facts fail closed rather than implying zero. Generic task/pipeline envelopes must not invent a count before the concrete payload is known. When adding a processor scope, cover missing, negative and fractional counts and preserve task backend/egress restrictions. Gates: `reasoning-egress-scope.test.ts`, `media/image-description-bridge.test.ts` and `visual-review.test.ts`.
+
+**Delegation execution-start reporting (R5).** A keyed `delegateTask` failure whose start
+state is unknown counts as started: no retry, no failover, a terminal replay. A backend opts in to
+precise reporting by wrapping its `delegateTask` body in `runStartReportingDelegation`
+(`libs/core/delegation-execution-tracker.ts`) — only when EVERY dispatch path reports its start:
+a pure completion call, a tool loop that calls `markDelegationExecutionStarted()` before its first
+tool, or a CLI spawned through `spawnWithDelegationEnv` (which marks once a child pid exists).
+An SDK or adapter that spawns or runs tools elsewhere (claude-agent, copilot-acp, agy native
+subagents) stays unwrapped, so its failures keep the conservative at-most-once verdict. Report
+measured usage / served model with `reportDelegationResultMetadata`; never zero-fill. Gates:
+`reasoning-backend.delegation-guard.test.ts`, `provider-spawn-env.test.ts`,
+`anthropic-reasoning-backend.test.ts`, `delegation-idempotency.test.ts`.
 
 **Host bookkeeping inside advisory execution.** A dot wake may stop before the provider call with
 `SANDBOX_WRITE_DENIED` on `observability/delegations.jsonl`: the planner's read-only sandbox also

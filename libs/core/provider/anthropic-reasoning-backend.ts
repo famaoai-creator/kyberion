@@ -64,6 +64,10 @@ import {
   applyCacheBreakpointToSystemBlocks,
   applyCacheBreakpointToTools,
 } from '../reasoning/prompt-cache-discipline.js';
+import {
+  reportDelegationResultMetadata,
+  runStartReportingDelegation,
+} from '../delegation-execution-tracker.js';
 
 const DEFAULT_MODEL = resolveRuntimeModelId('anthropic-default');
 const DEFAULT_MAX_TOKENS = 16000;
@@ -917,22 +921,33 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     context?: string,
     options?: ReasoningCallOptions
   ): Promise<string> {
-    const response = await this.callCreate(
-      {
-        model: this.model,
-        max_tokens: this.maxTokens,
-        thinking: this.thinkingConfig(),
-        messages: [
-          {
-            role: 'user',
-            content: [context ? `Context: ${context}\n\n` : '', `Task: ${instruction}`].join(''),
-          },
-        ],
-      },
-      options
-    );
-    const parts = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text');
-    return parts.map((b) => b.text).join('\n');
+    // R5: a pure completion — nothing executes locally, so any failure
+    // (429/5xx, a refused preflight, an abort) is provably pre-start.
+    return runStartReportingDelegation(async () => {
+      const response = await this.callCreate(
+        {
+          model: this.model,
+          max_tokens: this.maxTokens,
+          thinking: this.thinkingConfig(),
+          messages: [
+            {
+              role: 'user',
+              content: [context ? `Context: ${context}\n\n` : '', `Task: ${instruction}`].join(''),
+            },
+          ],
+        },
+        options
+      );
+      reportDelegationResultMetadata({
+        usage: {
+          input_tokens: response.usage?.input_tokens,
+          output_tokens: response.usage?.output_tokens,
+        },
+        ...(response.model ? { served_model: response.model } : {}),
+      });
+      const parts = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text');
+      return parts.map((b) => b.text).join('\n');
+    });
   }
 
   async prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
