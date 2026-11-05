@@ -36,9 +36,11 @@ import type { FirstJobDecisionProof } from '../surface/first-job-approval-proof.
 import { auditChain } from './audit-chain.js';
 import { resolveSeparationOfDutiesPolicy } from './approval-policy.js';
 import {
+  approvalConsentDecisionRefusal,
   auditSeparationOfDutiesRefusal,
   evaluateSeparationOfDuties,
   SEPARATION_OF_DUTIES_MESSAGES,
+  type ApprovalConsent,
   type ApprovalDeciderIdentitySource,
 } from './approval-separation-of-duties.js';
 import type { HeldEffectSteeringAction } from './held-effect-bridge.js';
@@ -164,6 +166,8 @@ export interface ApprovalAccountability {
   policy_rule_id?: string;
   payloadHash?: string;
   effectBinding?: string;
+  /** The request records a data subject's own consent (approval-separation-of-duties.ts). */
+  consent?: ApprovalConsent;
 }
 
 export interface ApprovalWorkflowState {
@@ -535,6 +539,8 @@ const TERMINAL_DECIDED_STATUSES: ReadonlySet<ApprovalRequestRecord['status']> = 
 
 export {
   APPROVAL_PLACEHOLDER_DECIDERS,
+  SELF_CONSENT_STORAGE_CHANNELS,
+  approvalConsentDecisionRefusal,
   approvalRequesterIdentities,
   approvalRevokeCommand,
   approvalUsabilityRefusal,
@@ -543,6 +549,7 @@ export {
   evaluateSeparationOfDuties,
   isSeparationOfDutiesEnabled,
   normalizeApprovalPrincipalId,
+  type ApprovalConsent,
   type ApprovalDeciderIdentitySource,
   type ApprovalUnusableReason,
   type SeparationOfDutiesViolation,
@@ -1005,6 +1012,8 @@ function decideApprovalRequestUnlocked(
   settleUnpresentedHumanDecision(record, bound, params.decidedBy);
 
   if (params.decision === 'approved') {
+    const consentRefusal = approvalConsentDecisionRefusal(record, params.decidedBy);
+    if (consentRefusal) throw new Error(consentRefusal);
     enforceSeparationOfDutiesOnDecision(role, {
       record,
       located,
