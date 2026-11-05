@@ -34,6 +34,10 @@ import { logger } from '../core.js';
 import { parseClaudeCliUsage, recordCliUsage } from '../cli-usage-metering.js';
 import { childDelegationEnv } from '../operation-policy-gate.js';
 import {
+  isProviderCredentialRelayEnabled,
+  withoutRelayManagedCredentials,
+} from '../foundation/env.js';
+import {
   createScratchWorkspace,
   deleteRegisteredWorkspace,
 } from '../workforce/workspace-ledger.js';
@@ -196,7 +200,18 @@ export function buildClaudeAgentIsolatedEnv(
     if (STRICT_ISOLATION_DROPPED_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
     env[key] = value;
   }
-  return { ...env, ...childDelegationEnv() };
+  // Credential relay flag on: this SDK child starts no relay, so the raw key is dropped.
+  return withoutRelayManagedCredentials({ ...env, ...childDelegationEnv() }, baseEnv);
+}
+
+/**
+ * Non-strict SDK children inherit process.env. With the credential relay flag
+ * on, that inheritance must not carry the raw API key — the SDK path starts
+ * no relay, so the key is dropped (fail closed). Flag off ⇒ no `env` option.
+ */
+export function relayFailClosedEnvOption(): Pick<Options, 'env'> {
+  if (!isProviderCredentialRelayEnabled()) return {};
+  return { env: withoutRelayManagedCredentials({ ...process.env }) };
 }
 
 interface IsolationScope {
@@ -306,6 +321,7 @@ async function runStructuredQuery<T>(
     // Isolation fields are applied after sanitization, so extraOptions can
     // never re-introduce settings, MCP servers, cwd or env.
     ...(isolationOptions ?? {}),
+    ...(isolationOptions ? {} : relayFailClosedEnvOption()),
     systemPrompt: params.systemPrompt,
     model: params.model ?? resolveRuntimeModelId('anthropic-default'),
     tools: [],
@@ -471,6 +487,7 @@ export async function runClaudeAgentTask(
     ...(params.allowedTools ? { allowedTools: params.allowedTools } : {}),
     ...(params.canUseTool ? { canUseTool: params.canUseTool } : {}),
     ...(params.agents ? { agents: params.agents } : {}),
+    ...relayFailClosedEnvOption(),
     abortController: params.abortController,
   };
 
