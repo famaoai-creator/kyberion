@@ -54,11 +54,14 @@ interface ReasoningPayloadScopeBase {
   allowed_reasoning_backends?: readonly string[];
 }
 
-/** Public material. An omitted `training_use` still means local_only. */
+/**
+ * Public material. An omitted `training_use` means `training_eligible`:
+ * public material may be used for provider training (decided 2026-11-05).
+ */
 export interface PublicReasoningPayloadScope extends ReasoningPayloadScopeBase {
   /** Most sensitive tier represented in what will be sent. */
   tier: 'public';
-  /** Maximum provider data-use posture. Defaults to local_only. */
+  /** Maximum provider data-use posture. Defaults to training_eligible. */
   training_use?: ReasoningTrainingUse;
 }
 
@@ -71,6 +74,23 @@ export interface PublicReasoningPayloadScope extends ReasoningPayloadScopeBase {
  * `tests/reasoning-payload-scope-training-use.test.ts` backstops untyped and
  * dynamic call sites.
  */
+/**
+ * The posture a scope gets when it declares none. Public material may be used
+ * for training; anything above public keeps the fail-closed `local_only`
+ * (typed callers must declare it; this default only covers untyped callers).
+ */
+export function defaultReasoningTrainingUse(tier: string | undefined): ReasoningTrainingUse {
+  return tier === 'public' ? 'training_eligible' : 'local_only';
+}
+
+/** The posture the gate applies: the declared one, else the tier default. */
+export function effectiveReasoningTrainingUse(scope: {
+  tier?: string;
+  training_use?: ReasoningTrainingUse;
+}): ReasoningTrainingUse {
+  return scope.training_use ?? defaultReasoningTrainingUse(scope.tier);
+}
+
 export interface NonPublicReasoningPayloadScope extends ReasoningPayloadScopeBase {
   /** Most sensitive tier represented in what will be sent. */
   tier: 'confidential' | 'personal';
@@ -337,7 +357,7 @@ export function assertReasoningEgressAllowedAtEndpoint(
   // A local endpoint is safe even when the adapter uses a provider-neutral
   // runtime name such as `openai-compatible`.
   if (localEndpoint) return;
-  if ((scope.training_use ?? 'local_only') === 'local_only') {
+  if (effectiveReasoningTrainingUse(scope) === 'local_only') {
     // Untyped or dynamic callers can still omit training_use. The gate keeps
     // the fail-closed default but says so, so the denial is diagnosable.
     const declared = scope.training_use !== undefined;
