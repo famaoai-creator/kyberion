@@ -72,6 +72,14 @@ function resolveDelegationProvider(backend: ReasoningBackend): string {
  * work each `dispatch()` implementation already did. See
  * `delegation-concurrency.ts` for the "why env config, why no real child
  * handle yet" design notes.
+ *
+ * Abort / expiry: this budget has no child handle, so by default it waits
+ * (`awaitOperationOnStop`, bounded by 2 × KYBERION_DELEGATION_KILL_GRACE_MS +
+ * margin) for `fn` to settle before rejecting — the slot is released only
+ * after the adapter's own SIGTERM → SIGKILL stop has finished, and the
+ * rejection carries the adapter's child-exit observation (or
+ * `child_exit=unconfirmed` after the bound). `delegation_abort_wait:
+ * 'immediate'` restores the immediate rejection.
  */
 function dispatchWithConcurrencyGovernance(
   backend: ReasoningBackend,
@@ -99,6 +107,10 @@ function dispatchWithConcurrencyGovernance(
         signal: options?.signal,
         inactivity: options?.delegation_inactivity,
         executionMode: options?.delegation_execution,
+        // This budget has no child handle; the adapter below it does. On abort
+        // or expiry, hold the slot until the adapter has stopped its child
+        // (bounded), unless the caller opted out of waiting.
+        awaitOperationOnStop: options?.delegation_abort_wait !== 'immediate',
       },
       async (signal, canAcceptResult) => {
         const result = await fn({ ...options, signal });

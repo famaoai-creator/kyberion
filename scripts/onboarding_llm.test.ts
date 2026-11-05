@@ -553,10 +553,14 @@ describe('pnpm onboarding llm', () => {
       ).toThrow(/already used/);
     });
 
-    it('person custody: the operator (single-user) attestation opens tenantless personal egress only', () => {
+    it("person custody: the operator's (single-user) consent opens tenantless personal egress only with the system attestation", () => {
       const personArgs = ['attest', '--custody', 'person', ...claimArgs];
       const request = JSON.parse(run([...personArgs, '--request-approval', '--json'])[0]!);
       requestIds.push(request.request_id);
+      expect(
+        loadApprovalRequest(CUSTODY_PROVIDER_ATTESTATION_APPROVAL_CHANNEL, request.request_id)!
+          .accountability?.consent
+      ).toEqual({ subject: 'user:owner', subject_only: false });
       humanApproves(request.request_id);
       const applied = JSON.parse(
         run([
@@ -571,8 +575,13 @@ describe('pnpm onboarding llm', () => {
       expect(applied.store_path).toBe(
         `${CUSTODY_PROVIDER_ATTESTATION_ROOT}/personal/shared/operator.json`
       );
+      // The consent is not evidence that the provider does not train.
+      expect(tenantlessEgress('personal')).toBe(false);
+      const system = JSON.parse(run([...systemArgs, '--request-approval', '--json'])[0]!);
+      requestIds.push(system.request_id);
+      humanApproves(system.request_id);
+      run([...systemArgs, '--apply', '--accept', '--approval-request-id', system.request_id]);
       expect(tenantlessEgress('personal')).toBe(true);
-      expect(tenantlessEgress('confidential')).toBe(false);
     });
 
     it('a system approval does not apply to person custody, and vice versa', () => {

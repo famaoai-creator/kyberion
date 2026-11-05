@@ -398,6 +398,41 @@ describe('delegation-concurrency', () => {
       expect(delegationAbortChildExit(await bare.catch((e: unknown) => e))).toBe('no_child');
     });
 
+    it('awaitOperationOnStop holds a wall-clock expiry until the wrapped call settles (bounded)', async () => {
+      vi.useFakeTimers();
+      let settle!: () => void;
+      let rejected: unknown;
+      const expiry = withWallClockBudget(
+        { budgetMs: 100, killGraceMs: 50, awaitOperationOnStop: true },
+        () =>
+          new Promise<string>((_resolve, reject) => {
+            settle = () => reject(new Error('inner stopped'));
+          })
+      ).catch((error: unknown) => {
+        rejected = error;
+      });
+      await vi.advanceTimersByTimeAsync(100);
+      expect(rejected).toBeUndefined();
+      settle();
+      await expiry;
+      expect(rejected).toBeInstanceOf(DelegationWallClockExceededError);
+
+      // Never settles: the expiry is reported after 2 × grace + 1s.
+      let bounded: unknown;
+      const never = withWallClockBudget(
+        { budgetMs: 100, killGraceMs: 50, awaitOperationOnStop: true },
+        () => new Promise<string>(() => {})
+      ).catch((error: unknown) => {
+        bounded = error;
+      });
+      await vi.advanceTimersByTimeAsync(100 + 2 * 50 + 1000 - 1);
+      expect(bounded).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(1);
+      await never;
+      expect(bounded).toBeInstanceOf(DelegationWallClockExceededError);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
     it('builds an exit promise from a real child process shape', async () => {
       const listeners: Array<() => void> = [];
       const running = delegationChildHandleFromChildProcess({

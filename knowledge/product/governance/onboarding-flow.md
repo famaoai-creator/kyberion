@@ -404,13 +404,22 @@ pnpm onboarding llm attest --custody system --provider claude --training-use non
 pnpm onboarding llm attest --custody person --provider claude --training-use none ... --request-approval
 ```
 
-- 承認するのはインストールの所有者（`sovereign` / `owner`）。依頼は system の承認領域に置かれ、
-  tenant に束縛されたプロセスからは依頼も記録もできない。`--custody system|person` と `--tenant` は併用できない。
+- system の証明（「この provider は学習に使わない」という事実）を承認するのはインストールの所有者
+  （`sovereign` / `owner`）。person の証明は、その人が自分の personal material を送ることへの**同意**で、
+  学習しないことの証拠にはならない。承認できるのは本人だけで（`--principal <id>` の人を所有者が代わりに
+  承認すると拒否される）、本人が自分で開いた依頼を本人が承認するのは自己承認ではなく同意として扱う。
+  単一利用者のインストールでは所有者が本人なので、system の証明と自分の同意をそのまま記録できる。
+  person の material を送るには、本人の同意に加えて system の証明（または policy の
+  `training_use: none` 宣言）が要る。`approved_providers` の例外は学習しないことの証拠にならない。
+- 依頼は system の承認領域に置かれ、tenant に束縛されたプロセスからは依頼も記録もできない。
+  `--custody system|person` と `--tenant` は併用できない。
 - 記録先は `active/shared/runtime/provider-attestations/` の `system/attestations.json`（system）と
   `personal/shared/<owner>.json`（person）。承認の根拠（request id と承認者）も一緒に保存され、根拠の無い
   `none` は読み込み時に無効として扱われる。shipped の `provider-egress-policy.json` には書かない。
-- system の証明は tenant の material にも personal の material にも使われない。person の証明は
-  confidential のシステム material には使われない。
+- system の証明は tenant の material には使われず、personal の material には本人の同意があるときだけ使われる。
+  person の証明は confidential のシステム material には使われない。
+- 本人以外（たとえば変更前に所有者）が承認した person の証明は削除されないが、同意としては読まれない。
+  本人の承認で記録し直す。
 
 ### Step 6: customer stance と organization を結合する（C）
 
