@@ -321,7 +321,7 @@
       "path": "active/shared/runtime/dot",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Resident-dot state (dot-state-paths.ts DOT_STATE_ROOT) partitions by tier/tenant and personal owner: scoped inboxes, private action/wake evidence, inbound events, work results, KR measurements, outcomes, autonomy, arbitration and memory. Flat or tenant-only legacy state requires explicit reviewed operator migration; never infer historical tier from the current charter. Load-bearing append-only state: deleting it can replay triggers or effects. Event-continuations retain immutable adoption offsets, bounded pending entries and unresolved dispatch attempts; never TTL-delete or capacity-evict them. Feed cursors and seen-key rings are durable state, not cache. No automatic deletion; tenant offboarding and owner retention require audited review."
+      "note": "Resident-dot state (dot-state-paths.ts DOT_STATE_ROOT) partitions by tier/tenant and personal owner: scoped inboxes, private action/wake evidence, inbound events, work results, KR measurements, outcomes, autonomy, arbitration and memory. Flat or tenant-only legacy state requires explicit reviewed operator migration for a live tenant (pnpm kyberion dot migrate-state); never infer historical tier from the current charter. When a tenant is offboarded, its legacy dot/tenants/<slug>/ copy is exported and soft-deleted automatically with the other tenant runtime state (audited SCOPE_OFFBOARD_SOFT_DELETE; owner decision 2026-11-05). Load-bearing append-only state: deleting it can replay triggers or effects. Event-continuations retain immutable adoption offsets, bounded pending entries and unresolved dispatch attempts; never TTL-delete or capacity-evict them. Feed cursors and seen-key rings are durable state, not cache. No automatic deletion; tenant offboarding and owner retention require audited review."
     },
     {
       "path": "active/shared/runtime/ingest",
@@ -438,6 +438,12 @@
       "artifact_class": "state",
       "action": "review_required",
       "note": "R5 delegation idempotency reservations (libs/core/delegation-idempotency.ts): one JSON per idempotency key holding the payload hash and the terminal DelegationResult used for replay; a registered tier/tenant-partitioned runtime-state root (PARTITIONED_RUNTIME_STATE_ROOTS.delegation_idempotency): tenant reservations live under confidential/<tenant>/ (tier-guarded, removed by tenant offboarding), untenanted ones under system/. Deleting a terminal reservation re-enables execution for that key, so removal is a reviewed decision."
+    },
+    {
+      "path": "active/shared/runtime/delegation-records",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Delegated-task trace and resumable records (libs/core/delegated-task-observability.ts): a registered tier/tenant-partitioned runtime ledger root (PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations, store role delegation_record_store). system/ holds untenanted delegations; confidential/<tenant>/ holds tenant delegations (instruction, context and result text) — delegations.jsonl (append-only audit trace), records/<id>.json and records/child-inbox/<child>.jsonl. Tenant partitions are tenant_scope protected prefixes, read and written only as the tenant-bound delegation_record_store role; tenant offboarding exports and soft-deletes a tenant's partitions (target kind tenant_delegations). Records are the resume authority for continuable child sessions, so removal is a reviewed decision."
     },
     {
       "path": "active/shared/runtime/task-sessions",
@@ -1226,7 +1232,7 @@
       "artifact_class": "log",
       "action": "rotate",
       "audit": true,
-      "note": "Append-only delegation index log (delegated-task-observability.ts). Canonical delegation state lives in per-delegation .json records under observability/delegations/, so rotating the index is safe; segments expire under the observability 90d sweep."
+      "note": "LEGACY (read-only since 2026-11-05): the pre-partition, tenant-mixed delegation index log. delegated-task-observability.ts no longer appends here (the trace moved to active/shared/runtime/delegation-records/<partition>/delegations.jsonl); readers fall back to it per row attribution, tenant offboarding exports and prunes a tenant's rows from it and from its rotated segments (SCOPE_OFFBOARD_DELEGATION_TRACE_PRUNE), and the remaining segments expire under the observability 90d sweep. The sibling legacy record directory observability/delegations/ is migrated record by record on the next write and offboarded per tenant (target kind delegation_legacy_record)."
     },
     {
       "path": "active/shared/observability/ops-alerts.jsonl",

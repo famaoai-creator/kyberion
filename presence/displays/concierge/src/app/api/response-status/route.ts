@@ -42,9 +42,15 @@ export function GET(req: NextRequest) {
     const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
     const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
       conciergeText(key, locale, params);
+    // Read only the selected company's delegation partition (or the system
+    // one); the mission attribution below still filters legacy shared records.
+    const readScope =
+      resolved.selection.mode === 'tenant'
+        ? { tenants: [resolved.selection.tenant_slug] }
+        : { includeSystem: resolved.selection.mode !== 'personal' };
     const activeTasks = withExecutionContext('sovereign_concierge', () =>
       delegatedTasksForSelection(
-        listActiveDelegatedTaskRecords(8),
+        listActiveDelegatedTaskRecords(8, readScope),
         resolved.selection,
         resolved.viewer,
         missionScope
