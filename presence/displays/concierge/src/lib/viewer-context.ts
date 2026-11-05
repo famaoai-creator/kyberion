@@ -329,6 +329,7 @@ export function toSurfaceAuthorizationContext(
     source: viewer.source,
     ...(viewer.principal ? { principal: viewer.principal } : {}),
     ...(viewer.memberId ? { memberId: viewer.memberId } : {}),
+    ...(viewer.includeUntenanted ? { includeUntenanted: true } : {}),
   };
 }
 

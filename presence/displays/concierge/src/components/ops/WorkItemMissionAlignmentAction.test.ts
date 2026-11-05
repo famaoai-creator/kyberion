@@ -57,7 +57,7 @@ describe('mission alignment action presentation', () => {
     });
     expect(html).toContain('work has not started');
     expect(html).toContain(requestId);
-    expect(html).toContain('section=approvals');
+    expect(html).toContain('/inbox?reason=approval&amp;request=');
     expect(html).not.toContain('task completed');
   });
   it('distinguishes approved waiting from activation', () => {

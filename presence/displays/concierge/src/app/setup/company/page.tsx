@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useConciergeI18n } from '../../../lib/use-concierge-i18n';
+import { frontDeskText } from '../../../lib/i18n';
 import {
   TENANT_CHANGED_EVENT,
   readSelectedTenant,
@@ -13,7 +14,7 @@ import { CompanySetupView } from './CompanySetupView';
 import '../../settings/settings.css';
 
 export default function CompanySetupPage() {
-  const { t } = useConciergeI18n();
+  const { locale, t } = useConciergeI18n();
   const controller = React.useMemo(() => createCompanySetupController(), []);
   const state = React.useSyncExternalStore(
     controller.subscribe,
@@ -57,17 +58,23 @@ export default function CompanySetupPage() {
     };
   }, [controller]);
   return (
-    <CompanySetupView
-      state={state}
-      t={t}
-      changeTenant={(tenant) => {
-        window.history.replaceState(window.history.state, '', companySetupHref(tenant));
-        void controller.load(tenant);
-      }}
-      updateDraft={controller.updateDraft}
-      act={(action) => void controller.act(action)}
-      refresh={() => void controller.refresh()}
-      dismissReview={controller.dismissReview}
-    />
+    <>
+      {/* Company setup is reached from 設定 › ワークスペースと組織 and returns there. */}
+      <a className="settings-back-link kb-text kb-text--caption" href="/settings#settings-company">
+        {frontDeskText('ia_settings_back_to_settings', locale)}
+      </a>
+      <CompanySetupView
+        state={state}
+        t={t}
+        changeTenant={(tenant) => {
+          window.history.replaceState(window.history.state, '', companySetupHref(tenant));
+          void controller.load(tenant);
+        }}
+        updateDraft={controller.updateDraft}
+        act={(action) => void controller.act(action)}
+        refresh={() => void controller.refresh()}
+        dismissReview={controller.dismissReview}
+      />
+    </>
   );
 }
