@@ -35,10 +35,14 @@ Forward Deployed Engineer engagements where the stance happens to be a
 customer's, and selected by `KYBERION_CUSTOMER` (now the deprecated name of
 `KYBERION_STANCE`). Because an engagement's stance slug and tenant slug are the
 same value, that directory also collected the tenant's company assets and its
-customers' records. Those are tenant data and move out separately
-(S2: `knowledge/confidential/{tenant}/`, S3:
-`knowledge/confidential/{tenant}/customers/{customer}/`); until then the legacy
-`customer/{tenant}/` holds only them. See
+customers' records. Those are tenant data and moved out separately: the company
+assets (company descriptor `company.json`, organization profile, vision, org
+chart, OKRs, decision rights, finance, brand, design, channel bindings) live in
+the tenant home `knowledge/confidential/{tenant}/` (S2,
+`libs/core/organization/tenant-home.ts`), the tenant's audit mirror in
+`active/shared/runtime/audit-mirror/confidential/{tenant}/`, and the customer
+records move to `knowledge/confidential/{tenant}/customers/{customer}/` in S3;
+until then the legacy `customer/{tenant}/` holds only them. See
 [the store-catalog guard design](../../../docs/developer/improvement-plans-2026-11/STORE_CATALOG_GRANT_GUARD_DESIGN_2026-11-05.ja.md).
 
 Two stances that matter in practice:

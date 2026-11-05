@@ -11,9 +11,9 @@
       "tier_access": ["personal", "confidential"]
     },
     "audit_mirror_writer": {
-      "description": "G17 follow-up: dedicated store-writer of the audit chain's per-tenant mirror (customer/<tenant>/logs/audit/). libs/core/authority.ts registers it as the audit chain's tenant mirror writer context, always bound to the entry's tenant, so the grant resolves through ${KYBERION_TENANT} to that one tenant's mirror directory. Its only role grant is that write (no role read grant). Like every narrow store-writer role it runs with persona worker, so it also keeps the paths every worker identity has (security-policy default_allow and worker persona grants, e.g. active/shared/tmp/ and the current mission's evidence); it adds nothing else. Nothing else assumes it (resident dots and coordination store writers run as infrastructure_sentinel, which has no customer/ grant).",
+      "description": "G17 follow-up: dedicated store-writer of the audit chain's per-tenant mirror (active/shared/runtime/audit-mirror/confidential/<tenant>/). libs/core/authority.ts registers it as the audit chain's tenant mirror writer context, always bound to the entry's tenant, so the grant resolves through ${KYBERION_TENANT} to that one tenant's mirror directory. Its only role grant is that write (no role read grant). Like every narrow store-writer role it runs with persona worker, so it also keeps the paths every worker identity has (security-policy default_allow and worker persona grants, e.g. active/shared/tmp/ and the current mission's evidence); it adds nothing else. Nothing else assumes it (resident dots and coordination store writers run as infrastructure_sentinel, which has no audit mirror grant).",
       "default_persona": "worker",
-      "write_scopes": ["customer/${KYBERION_TENANT}/logs/audit/"],
+      "write_scopes": ["active/shared/runtime/audit-mirror/confidential/${KYBERION_TENANT}/"],
       "scope_classes": ["audit"],
       "allowed_actuators": [],
       "tier_access": ["public"]
@@ -85,10 +85,7 @@
     "chronos_tenant_runner": {
       "description": "Chronos tenant-scoped pipeline runner. Entered ONLY in the child process chronos spawns for a schedule discovered under knowledge/confidential/{tenant}/pipelines/ (and, in the daemon, synchronously while listing/reading that tenant's pipeline files), always bound to that tenant (KYBERION_TENANT / execution-scope tenant, KYBERION_TENANT_SCOPE_REQUIRED=1 in the child). Grants resolve through ${KYBERION_TENANT}, so reads are limited to the bound tenant's confidential root plus the tenant registry; knowledge landings go through ingest:commit (ingest_commit role); writes are limited to that tenant's audit/trace mirrors.",
       "default_persona": "worker",
-      "write_scopes": [
-        "customer/${KYBERION_TENANT}/logs/audit/",
-        "customer/${KYBERION_TENANT}/logs/traces/"
-      ],
+      "write_scopes": ["customer/${KYBERION_TENANT}/logs/traces/"],
       "scope_classes": ["operations_runtime", "audit"],
       "allowed_actuators": ["ingest-actuator"],
       "tier_access": ["public", "confidential"]
@@ -133,9 +130,9 @@
       "tier_access": ["confidential"]
     },
     "customer_channel_binding_store": {
-      "description": "Customer channel binding storage (libs/core/foundation/customer-channel-binding-store-capability.ts): scripts/customer-channel/bindings.ts writeBindingChange (pnpm kyberion customer-channel bind|unbind) assumes it to read and write one tenant's customer/<tenant>/connections/channel-bindings.json; tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). Its grant is the bound tenant's customer/<tenant>/connections/ directory; the tier guard narrows every write and mkdir to the bindings file and the directories leading to it. No connection secrets, no other customer/ file, no knowledge or runtime state (it replaces customer_create on that write).",
+      "description": "Customer channel binding storage (libs/core/foundation/customer-channel-binding-store-capability.ts): scripts/customer-channel/bindings.ts writeBindingChange (pnpm kyberion customer-channel bind|unbind) assumes it to read and write one tenant's knowledge/confidential/<tenant>/connections/channel-bindings.json; tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). Its grant is the bound tenant's knowledge/confidential/<tenant>/connections/ directory; the tier guard narrows every write and mkdir to the bindings file and the directories leading to it. No connection secrets, no other customer/ file, no knowledge or runtime state (it replaces customer_create on that write).",
       "default_persona": "unknown",
-      "write_scopes": ["customer/${KYBERION_TENANT}/connections/"],
+      "write_scopes": ["knowledge/confidential/${KYBERION_TENANT}/connections/"],
       "scope_classes": ["customer_overlay"],
       "allowed_actuators": [],
       "tier_access": ["confidential"]

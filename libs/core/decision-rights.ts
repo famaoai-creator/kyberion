@@ -30,7 +30,7 @@ export interface DecisionRightsMatrix {
   version: string;
   company_id: string;
   tenant_slug: string | null;
-  source_kind: 'customer' | 'confidential' | 'public';
+  source_kind: 'confidential' | 'public';
   source_path: string;
   decisions: DecisionRight[];
 }
@@ -58,8 +58,6 @@ export interface DecisionRightsEvaluation {
 }
 
 const DEFAULT_DECISION_RIGHTS_PATHS = [
-  (baseDir: string, tenantSlug: string) =>
-    path.join(baseDir, 'customer', tenantSlug, 'decision-rights.json'),
   (baseDir: string, tenantSlug: string) =>
     path.join(
       baseDir,
@@ -144,11 +142,9 @@ export function resolveDecisionRightsMatrix(
   for (const candidate of candidates) {
     if (!safeExistsSync(candidate)) continue;
     const parsed = decisionRightsCatalog(candidate, baseDir).load();
-    const sourceKind: DecisionRightsMatrix['source_kind'] = candidate.includes('/customer/')
-      ? 'customer'
-      : candidate.includes('/confidential/')
-        ? 'confidential'
-        : 'public';
+    const sourceKind: DecisionRightsMatrix['source_kind'] = candidate.includes('/confidential/')
+      ? 'confidential'
+      : 'public';
     return normalizeLoadedMatrix(parsed, candidate, sourceKind, companyId, resolvedTenantSlug);
   }
 

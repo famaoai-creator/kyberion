@@ -100,7 +100,7 @@ export function narrowStoreRoleDenial(input: {
     role === CUSTOMER_CHANNEL_BINDING_STORE_ROLE &&
     !customerChannelBindingStorePathAllowed(relativePath, operation)
   )
-    return '[CUSTOMER_CHANNEL_BINDING_STORE_SCOPE] The binding store writes only customer/<tenant>/connections/channel-bindings.json';
+    return '[CUSTOMER_CHANNEL_BINDING_STORE_SCOPE] The binding store writes only knowledge/confidential/<tenant>/connections/channel-bindings.json';
   if (
     role === ARCHIVED_MISSION_STATE_READER_ROLE &&
     (operation === 'write' ||

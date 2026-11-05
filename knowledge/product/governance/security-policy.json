@@ -70,6 +70,8 @@
       "active/shared/runtime/tenant-ledger/confidential/",
       "active/shared/runtime/tenant-approvals/personal/",
       "active/shared/runtime/tenant-approvals/confidential/",
+      "active/shared/runtime/audit-mirror/personal/",
+      "active/shared/runtime/audit-mirror/confidential/",
       "active/shared/runtime/hearing/personal/",
       "active/shared/runtime/hearing/confidential/",
       "active/shared/runtime/discussion-create-requests/personal/",
@@ -375,7 +377,6 @@
         "active/missions/personal/${MISSION_ID}/evidence/",
         "active/missions/public/${MISSION_ID}/evidence/",
         "active/shared/logs/stances/${KYBERION_STANCE}/traces/",
-        "customer/${KYBERION_STANCE}/logs/audit/",
         "knowledge/personal/voice/profile-registry.json",
         "knowledge/product/governance/voice-engine-registry.json",
         "knowledge/product/governance/voice-engines/",
@@ -399,7 +400,6 @@
         "active/missions/personal/${MISSION_ID}/evidence/",
         "active/missions/public/${MISSION_ID}/evidence/",
         "active/shared/logs/stances/${KYBERION_STANCE}/traces/",
-        "customer/${KYBERION_STANCE}/logs/audit/",
         "knowledge/product/governance/voice-profile-registry.json",
         "knowledge/product/governance/voice-engine-registry.json",
         "knowledge/product/governance/voice-engines/"
@@ -546,10 +546,7 @@
     },
     "chronos_tenant_runner": {
       "allow_read": ["knowledge/personal/tenants/", "knowledge/confidential/${KYBERION_TENANT}/"],
-      "allow_write": [
-        "customer/${KYBERION_TENANT}/logs/audit/",
-        "customer/${KYBERION_TENANT}/logs/traces/"
-      ]
+      "allow_write": ["customer/${KYBERION_TENANT}/logs/traces/"]
     },
     "chronos_gateway": {
       "allow_read": [
@@ -719,7 +716,7 @@
     },
     "audit_mirror_writer": {
       "allow_read": [],
-      "allow_write": ["customer/${KYBERION_TENANT}/logs/audit/"]
+      "allow_write": ["active/shared/runtime/audit-mirror/confidential/${KYBERION_TENANT}/"]
     },
     "tenant_ledger_store": {
       "allow_read": [
@@ -825,8 +822,12 @@
       ]
     },
     "build_repository": { "allow_write": ["dist/.build-generation.json"] },
-    "customer_create": { "allow_write": ["customer/", "knowledge/personal/stances/"] },
-    "onboarding": { "allow_write": ["customer/", "knowledge/personal/stances/"] },
+    "customer_create": {
+      "allow_write": ["customer/", "knowledge/personal/stances/", "knowledge/confidential/"]
+    },
+    "onboarding": {
+      "allow_write": ["customer/", "knowledge/personal/stances/", "knowledge/confidential/"]
+    },
     "assemble_changelog": { "allow_write": ["CHANGELOG.md", "changelog.d/"] },
     "generate_changelog": { "allow_write": ["CHANGELOG.md"] },
     "generate_design_tokens": {
@@ -1173,8 +1174,8 @@
       "allow_write": []
     },
     "customer_channel_binding_store": {
-      "allow_read": ["customer/${KYBERION_TENANT}/connections/channel-bindings.json"],
-      "allow_write": ["customer/${KYBERION_TENANT}/connections/"]
+      "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/channel-bindings.json"],
+      "allow_write": ["knowledge/confidential/${KYBERION_TENANT}/connections/"]
     },
     "engine_runtime_preferences_operator": {
       "allow_read": [

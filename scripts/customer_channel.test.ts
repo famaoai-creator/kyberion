@@ -39,7 +39,7 @@ let cli: typeof import('./customer_channel.js');
 let io: typeof import('@agent/core/secure-io');
 
 const bindingsFile = (tenant: string) =>
-  path.join(ROOT, 'customer', tenant, 'connections', 'channel-bindings.json');
+  path.join(ROOT, 'knowledge', 'confidential', tenant, 'connections', 'channel-bindings.json');
 const readBindings = (tenant: string) =>
   JSON.parse(
     initialContext('ecosystem_architect', () =>
@@ -163,7 +163,7 @@ describe('customer-channel bind / unbind / list (D8, real paths)', () => {
     expect(created).toMatchObject({
       tenant_slug: TENANT,
       change: 'created',
-      file: `customer/${TENANT}/connections/channel-bindings.json`,
+      file: `knowledge/confidential/${TENANT}/connections/channel-bindings.json`,
     });
     expect(readBindings(TENANT).bindings).toEqual([
       {
@@ -270,7 +270,7 @@ describe('customer-channel bind / unbind / list (D8, real paths)', () => {
   }, 30_000);
 
   it('refuses to overwrite a bindings file that does not validate', () => {
-    initialContext('mission_controller', () =>
+    initialContext('onboarding', () =>
       io.safeWriteFile(bindingsFile(OTHER), JSON.stringify({ bindings: [{ surface: 'fax' }] }))
     );
     expect(exitOf(['bind', '--tenant', OTHER, '--surface', 'slack', '--channel', 'C-2'])).toMatch(
@@ -281,7 +281,7 @@ describe('customer-channel bind / unbind / list (D8, real paths)', () => {
 });
 
 describe('customer_channel_binding_store on the real guard', () => {
-  it("writes only its bound tenant's channel-bindings.json, nothing else under customer/", async () => {
+  it("writes only its bound tenant's channel-bindings.json, nothing else in the tenant home", async () => {
     const authority = await import('@agent/core/authority');
     const role = 'customer_channel_binding_store';
     const asStore = (fn: () => unknown, tenant = TENANT) =>
@@ -293,11 +293,16 @@ describe('customer_channel_binding_store on the real guard', () => {
     const denied = /CUSTOMER_CHANNEL_BINDING_STORE_SCOPE/u;
     expect(() =>
       asStore(() =>
-        io.safeWriteFile(path.join(ROOT, 'customer', TENANT, 'connections', 'slack.json'), '{}')
+        io.safeWriteFile(
+          path.join(ROOT, 'knowledge', 'confidential', TENANT, 'connections', 'slack.json'),
+          '{}'
+        )
       )
     ).toThrow(denied);
     expect(() =>
-      asStore(() => io.safeWriteFile(path.join(ROOT, 'customer', TENANT, 'profile.json'), '{}'))
+      asStore(() =>
+        io.safeWriteFile(path.join(ROOT, 'knowledge', 'confidential', TENANT, 'profile.json'), '{}')
+      )
     ).toThrow(denied);
     expect(() =>
       asStore(() => io.safeWriteFile(path.join(ROOT, 'active/shared/runtime/x.json'), '{}'))
