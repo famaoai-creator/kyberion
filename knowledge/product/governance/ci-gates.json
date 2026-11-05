@@ -998,6 +998,7 @@
         "tests/foundation-io-boundary.test.ts",
         "libs/core/foundation/asset-address.test.ts",
         "libs/core/foundation/resource-access-grant.test.ts",
+        "libs/core/foundation/credential-material-capability.test.ts",
         "libs/core/foundation/resource-access-decision.test.ts",
         "libs/core/foundation/governed-catalog.test.ts",
         "libs/core/dot/dot-execution-policy.test.ts",

@@ -1,3 +1,4 @@
+import { isCredentialMaterialCapability } from './foundation/credential-material-capability.js';
 import { engineRuntimeResourceAccessDenial as resourceAccessDenial } from './voice/engine-runtime-preferences-access.js';
 import {
   PERSONAL_APPROVAL_STORE_ROLE,
@@ -950,6 +951,15 @@ function requestResourceDenial(
     getRegisteredEnvText('SYSTEM_ROLE') ||
     getRegisteredEnvText('MISSION_ROLE');
   const normalizedRole = role?.trim().toLowerCase().replace(/\s+/gu, '_');
+  if (
+    normalizedRole === 'credential_material_reader' &&
+    !isCredentialMaterialCapability(currentResourceAccessScope())
+  )
+    return {
+      allowed: false,
+      reason:
+        '[CREDENTIAL_CAPABILITY_REQUIRED] Active exact credential material capability required',
+    };
   if (
     normalizedRole === DOT_RESULT_STORE_ROLE &&
     !denyCandidatePaths(relativePath).every((target) => dotResultResourceAllowed(target, operation))

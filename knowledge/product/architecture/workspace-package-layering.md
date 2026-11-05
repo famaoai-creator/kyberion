@@ -39,8 +39,18 @@ libs/shared-*  (video, media, voice, vision, interaction, network, ui, ...)
 - Foundation stays light: the gate `foundation-weight` (baseline
   `scripts/check_foundation_weight.baseline.json`) counts, on `libs/core/dist`, how many core
   modules `secure-io`, `path-resolver`, `logger` and every `foundation/**` / `contracts/**`
-  module load at runtime. Most of `secure-io`'s 66 are the guard's own machinery (audit chain,
+  module load at runtime. Most of `secure-io`'s 67 are the guard's own machinery (audit chain,
   policy engine, identity, tenant partitions, vault, sandbox); a new domain rule must not add to it.
+- Reviewed security repair exception (2026-11-06, `MSN-CREDENTIAL-LIFETIME-20261106`):
+  the existing credential-material role now checks its private live issuer on every I/O,
+  closing a reproduced stale queued-callback permission gap. Its pure proof module adds
+  exactly one transitive module to secure-io and five dependent watched foundations;
+  only those six measured budgets increase by one. It performs no catalog, identity or
+  network I/O. Authority's identity bridge did not already load this module. Preserve
+  the direct proof rather than introducing replaceable admission callbacks or moving
+  credential policy into generic resource machinery to avoid the count. This exception
+  restores the existing synchronous lifetime contract; it does not permit future
+  domain rules to grow foundation without a separate measured review.
 - The package graph is generated, never hand-drawn
   (gate `package-dependency-graph` → `docs/developer/architecture/dependency-graph.mmd`).
 

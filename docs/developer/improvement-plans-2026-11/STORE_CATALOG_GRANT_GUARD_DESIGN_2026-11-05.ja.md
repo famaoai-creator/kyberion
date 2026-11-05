@@ -238,6 +238,23 @@ literal/正準の全候補の検査、role・内容検査は維持する。他�
 discussion/journal の正規 append・metadata と autonomy maintenance prefix の行列、既存の
 偽造 capability 拒否を実 guard で検証する。専用ロールの削除や新しいカタログ認可ではない。
 
+### credential material の同期寿命の共通化（2026-11-06）
+
+credential material の既存 facade も private な共通 issuer を使用する。同期 callback の終了後に
+別途予約した Promise 継続へ role と exact Scope が残る場合を再現し、role 取得時だけでなく
+`tier-guard` の I/O 判定ごとにも capability の有効性を確認するようにした。返された Promise の
+拒否だけでは、外側が `undefined` を返す予約済み callback を止められないためである。
+元の exact connection path・tenant binding、allocation/claim/plugin の検査と sensitive-path
+mediation は維持する。再現した問題は失効後の permission 判定であり、secret byte の漏洩を
+実証したものではない。通常の非同期 deny-only Scope には同期寿命を導入しない。
+
+この修正では、直接の private issuer 検証により secure-io の依存が66→67、そこに依存する
+5つの foundation も各+1になることを実測した。identity bridge から authority 全体が
+読み込まれるという当初の想定は成立しなかった。置換可能な認可 callback を追加したり、
+汎用 scope module に credential policy を移したりせず、既存の同期寿命を回復する限定的な
+security 修正として、この6箇所だけを独立レビュー付きで更新する。新しい catalog/identity/network
+I/O や公開 subpath は増やさない。例外を workspace-package-layering にも明記する。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |
