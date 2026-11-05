@@ -59,6 +59,11 @@ import {
 } from './secure-io.js';
 import { createScratchWorkspace, deleteRegisteredWorkspace } from './workforce/workspace-ledger.js';
 import type { ReasoningBackend } from './reasoning/reasoning-backend-contracts.js';
+import {
+  classifyMeasuredAbortRejection,
+  measurementAbortReason,
+} from './reasoning/reasoning-abort-measurement.js';
+import { delegationAbortChildExit } from './mission/delegation-concurrency.js';
 
 export const LIVE_SCENARIO_NAMES = [
   'first',
@@ -133,6 +138,12 @@ export interface RunBackendLiveScenariosOptions {
   abortTimeoutMs?: number;
   /** Delay between starting the long delegation and cancelling it. */
   abortStartDelayMs?: number;
+  /**
+   * Abort passes only when the adapter observed its child process exit
+   * (default true). Set false only for a backend with no child process
+   * (API providers), where the provider's abort error is the whole evidence.
+   */
+  requireChildExit?: boolean;
   /** Retries for a failing scenario (default 1). */
   retries?: number;
   /** Evidence of the served model, when the caller has any. */
@@ -388,29 +399,6 @@ async function scenarioResetContinue(ctx: ScenarioContext): Promise<Attempt> {
   };
 }
 
-/**
- * A distinctive abort reason for this run. It is a plain string with no
- * abort/cancel wording: governed providers turn a non-Error reason into their
- * own `[DELEGATION_CANCELLED] …` error, so a rejection that IS this value (or
- * quotes it) came from a layer that forwarded the caller's signal — e.g.
- * `bindReasoningRequestTimeout`, which rejects the moment the signal fires
- * without waiting for the provider — not from the provider stopping.
- */
-function abortReasonFor(nonce: string): string {
-  return `backend-live-scenario-stop-${nonce}`;
-}
-
-function isForwardedSignalReason(error: unknown, reason: string): boolean {
-  return error === reason || errorText(error).includes(reason);
-}
-
-function isAbortError(error: unknown): boolean {
-  return (
-    (error instanceof Error && error.name === 'AbortError') ||
-    /abort|cancel/iu.test(errorText(error))
-  );
-}
-
 type AbortSettlement = { kind: 'resolved' } | { kind: 'rejected'; error: unknown };
 
 /**
@@ -421,7 +409,16 @@ type AbortSettlement = { kind: 'resolved' } | { kind: 'rejected'; error: unknown
  * decides whether work stops is whether the provider honours the AbortSignal
  * the handle forwards to `delegateTask`, so this drives that same call with
  * its own signal and watches the provider's own promise:
- * - rejects with an abort error within the grace window → pass;
+ * - rejects with an abort error within the grace window AND the adapter
+ *   observed its child process exit (`DelegationAbortedError`'s
+ *   `child_exit=exited`) → pass. A CLI adapter's rejection alone proves only
+ *   that it started stopping; `withWallClockBudget` now waits (bounded:
+ *   SIGTERM, grace, SIGKILL, grace) for the exit before rejecting. Backends
+ *   with no child process (API providers) are driven with
+ *   `requireChildExit: false`, where the abort error alone passes;
+ * - the child survived SIGKILL (`child_exit=not_exited`) → fail;
+ * - an abort error with no observed exit while `requireChildExit` is on →
+ *   unreported;
  * - still running after the grace window → fail (the signal was ignored);
  * - settled before the abort, resolved after it, or rejected for another
  *   reason → unreported (abort was not shown either way).
@@ -468,7 +465,7 @@ async function scenarioAbort(ctx: ScenarioContext): Promise<Attempt> {
       detail: `the delegation ${before.kind} before it could be aborted, so abort was not exercised`,
     };
   }
-  const reason = abortReasonFor(ctx.nonce);
+  const reason = measurementAbortReason('backend-live-scenario', ctx.nonce);
   controller.abort(reason);
   try {
     await withTimeout(observed, graceMs, 'aborted delegation');
@@ -482,14 +479,38 @@ async function scenarioAbort(ctx: ScenarioContext): Promise<Attempt> {
       detail: `the provider was still running ${graceMs}ms after the abort signal: it ignored the signal`,
     };
   }
-  if (after.kind === 'rejected' && isForwardedSignalReason(after.error, reason)) {
+  const rejection =
+    after.kind === 'rejected' ? classifyMeasuredAbortRejection(after.error, reason) : undefined;
+  if (rejection === 'forwarded') {
     return {
       outcome: 'unreported',
       detail:
         'the rejection is the caller signal reason forwarded by a wrapper, not the provider stopping; drive the backend without the request-timeout wrapper',
     };
   }
-  if (after.kind === 'rejected' && isAbortError(after.error)) {
+  if (rejection === 'abort') {
+    const childExit = delegationAbortChildExit(after.kind === 'rejected' ? after.error : undefined);
+    if (childExit === 'exited') {
+      return {
+        outcome: 'pass',
+        detail:
+          'the provider rejected with an abort error after its child process was observed to exit, within the grace window',
+      };
+    }
+    if (childExit === 'not_exited') {
+      return {
+        outcome: 'fail',
+        detail:
+          'the adapter signalled its child process but it was still running after SIGKILL: the work did not stop',
+      };
+    }
+    if (ctx.options.requireChildExit !== false) {
+      return {
+        outcome: 'unreported',
+        detail:
+          'the provider rejected with an abort error but reported no observed child process exit, so stopping was not shown (an adapter that only started stopping is not a pass)',
+      };
+    }
     return {
       outcome: 'pass',
       detail: 'the provider stopped and rejected with an abort error within the grace window',
