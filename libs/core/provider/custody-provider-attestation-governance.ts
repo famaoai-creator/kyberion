@@ -481,12 +481,6 @@ function assertCustodyAttestationApproval(
       '[POLICY_VIOLATION] custody provider attestation approval was not opened for an installation-owner decision; request a new approval'
     );
   }
-  if (!matchesConsent(approval, input.custody)) {
-    throw new Error(
-      `[POLICY_VIOLATION] custody provider attestation approval ${approval.id} was not opened as ${input.custody.kind === 'person' ? "the person's own consent" : 'an installation-owner decision'} — ` +
-        `a person-custody attestation is the person's consent and records its subject on the request | next: request a new approval with '${custodyProviderAttestationRequestCommand(input)}' | evidence: custody=${custodyOwnerLabel(input.custody)} consent_subject=${approval.accountability?.consent?.subject ?? '(none)'}`
-    );
-  }
   if (
     approval.accountability?.effectBinding !==
     custodyProviderAttestationEffectBinding(input.custody, input.provider)
@@ -501,6 +495,12 @@ function assertCustodyAttestationApproval(
   ) {
     throw new Error(
       '[POLICY_VIOLATION] custody provider attestation approval is bound to a different training_use/plan/basis/attested_by/valid_for_days'
+    );
+  }
+  if (!matchesConsent(approval, input.custody)) {
+    throw new Error(
+      `[POLICY_VIOLATION] custody provider attestation approval ${approval.id} was not opened as ${input.custody.kind === 'person' ? "the person's own consent" : 'an installation-owner decision'} — ` +
+        `a person-custody attestation is the person's consent and records its subject on the request | next: request a new approval with '${custodyProviderAttestationRequestCommand(input)}' | evidence: custody=${custodyOwnerLabel(input.custody)} consent_subject=${approval.accountability?.consent?.subject ?? '(none)'}`
     );
   }
   if (!humanApproval) {
