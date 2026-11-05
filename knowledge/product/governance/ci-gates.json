@@ -955,6 +955,7 @@
         "tests/runtime-surface-boundary.test.ts",
         "tests/protocol-service-boundary-contract.test.ts",
         "tests/script-topology-contract.test.ts",
+        "tests/reasoning-payload-scope-training-use.test.ts",
         "libs/core/seam.test.ts",
         "libs/core/seam-lifecycle-contract.test.ts",
         "libs/core/provider-module-boundaries.test.ts",
@@ -964,7 +965,7 @@
       ],
       "timeout_ms": 300000,
       "owner": "quality",
-      "rationale": "S3: registration-ceremony ratchets (storage/IO/process/package boundaries) and seam lifecycle/provider-boundary contracts, including OCR removal cache invalidation. Budget: about 30s wall alone; scanning under six concurrent gates uses a 60s test timeout and 300s gate timeout. tests/core-runtime-import-contract.test.ts stays in the test job."
+      "rationale": "S3: registration-ceremony ratchets (storage/IO/process/package boundaries; non-public reasoning payload scopes declaring training_use) and seam lifecycle/provider-boundary contracts, including OCR removal cache invalidation. Budget: about 30s wall alone; scanning under six concurrent gates uses a 60s test timeout and 300s gate timeout. tests/core-runtime-import-contract.test.ts stays in the test job."
     },
     {
       "id": "test-sleep-ratchet",
