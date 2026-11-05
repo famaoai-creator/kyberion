@@ -3,6 +3,7 @@ import { resolveTaskProviderEnvironment } from '../foundation/credential-binding
 import { credentialExecutionIdentity } from '../foundation/credential-binding.js';
 import {
   PROVIDER_CREDENTIAL_RELAY_ENV_VAR,
+  buildProxyPassthroughEnv,
   isProviderCredentialRelayEnabled,
 } from '../foundation/env.js';
 import { assertIsolatedProviderHome } from './provider-auth-home.js';
@@ -337,7 +338,8 @@ export function providerCanProjectProfile(
 /**
  * Env vars every provider CLI child process may see regardless of provider.
  * Mirrors secure-io.ts's SAFE_EXEC_ENV_ALLOWLIST base (PATH/HOME/locale/
- * shell/tmp/proxy plumbing) — duplicated here rather than imported because
+ * shell/tmp plumbing; proxy vars come from the shared
+ * buildProxyPassthroughEnv in foundation/env) — duplicated here rather than imported because
  * that list is private to secure-io.ts and this module's allowlist is
  * provider-keyed, not a generic exec allowlist.
  */
@@ -362,12 +364,8 @@ const ALWAYS_ALLOWED_ENV_KEYS: readonly string[] = [
   'NODE_EXTRA_CA_CERTS',
   'SSL_CERT_FILE',
   'SSL_CERT_DIR',
-  'HTTP_PROXY',
-  'HTTPS_PROXY',
-  'NO_PROXY',
-  'http_proxy',
-  'https_proxy',
-  'no_proxy',
+  // Proxy vars (PROXY_ENV_KEYS) are added by buildProxyPassthroughEnv in
+  // buildProviderChildEnv, loopback-guarded.
 ];
 
 /**
@@ -566,6 +564,9 @@ export function buildProviderChildEnv({
       result[key] = value;
     }
   }
+  // Proxy plumbing: without it a CLI behind a corporate proxy cannot reach its
+  // provider API; loopback is appended to NO_PROXY whenever a proxy is passed.
+  Object.assign(result, buildProxyPassthroughEnv(baseEnv));
 
   if (bound) {
     const identity = credentialExecutionIdentity();
