@@ -203,12 +203,17 @@ function railComponents(nav, me, current) {
       icon: item.icon,
       group_label: item.group_label,
       active: Boolean(actualCurrent) && item.id === actualCurrent,
+      placement: item.placement === 'footer' ? 'footer' : 'main',
     }));
+  // 設定 (placement: footer) is pinned at the rail bottom, like Concierge.
+  const strip = ({ placement: _placement, ...item }) => item;
+  const footer = items.filter((item) => item.placement === 'footer').map(strip);
   const props = {
     label: nav.aria_label,
     brand: { name: 'Kyberion', subtitle: nav.brand_tagline || undefined },
-    items,
+    items: items.filter((item) => item.placement !== 'footer').map(strip),
   };
+  if (footer.length) props.footer_items = footer;
   const context = tenantContext(nav, me);
   if (context) props.context = context;
   return [{ id: 'front-desk-rail', type: 'ui:nav-rail', props }];

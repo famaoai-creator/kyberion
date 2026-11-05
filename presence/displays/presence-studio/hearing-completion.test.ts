@@ -68,7 +68,7 @@ describe('hearing completion read model', () => {
       kind: 'mission',
       status: 'ready',
       id: missionId,
-      next: { href: 'https://review.example.test/?tenant=alpha' },
+      next: { href: 'https://review.example.test/inbox?tenant=alpha' },
     });
     expect(mocks.approval).toHaveBeenCalledWith('brief', approvalId);
   });
@@ -284,7 +284,7 @@ describe('selected hierarchy completion proof', () => {
       status: 'ready',
       id: missionId,
       next: {
-        href: 'https://review.example.test/?tenant=alpha&organizationId=org-a&projectId=project-a',
+        href: 'https://review.example.test/inbox?tenant=alpha&organizationId=org-a&projectId=project-a',
       },
     });
   });

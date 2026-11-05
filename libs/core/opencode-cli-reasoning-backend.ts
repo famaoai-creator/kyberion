@@ -25,6 +25,7 @@ import {
   newDelegationSessionId,
   spawnWithDelegationEnv,
 } from './provider/provider-spawn-env.js';
+import { withRedactedProviderOutput } from './provider/provider-output-redaction.js';
 import { resolveProviderCliCommand } from './provider/provider-managed-env.js';
 import {
   buildProviderChildEnv,
@@ -344,6 +345,23 @@ export class OpencodeCliReasoningBackend implements ReasoningBackend {
   }
 
   private async complete(
+    systemPrompt: string,
+    userPrompt: string,
+    options?: {
+      profile?: ProviderPermissionProfileName;
+      signal?: AbortSignal;
+      model?: string;
+      shapeHint?: string;
+      files?: readonly string[];
+    }
+  ): Promise<string> {
+    // Output exit: the answer and any stderr-bearing error are redacted.
+    return withRedactedProviderOutput(() =>
+      this.completeUnredacted(systemPrompt, userPrompt, options)
+    );
+  }
+
+  private async completeUnredacted(
     systemPrompt: string,
     userPrompt: string,
     options?: {

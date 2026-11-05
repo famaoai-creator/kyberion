@@ -1,5 +1,4 @@
 'use client';
-import { opsPagePath } from '../../lib/ops/ops-api-path';
 import * as React from 'react';
 import { Button } from '@agent/shared-ui';
 import { uxText, type SupportedLocale } from '../../lib/ops/ux-vocabulary';
@@ -53,7 +52,7 @@ export function WorkItemMissionAlignmentAction({
           {' · '}
           <a
             href={
-              opsPagePath('?section=approvals&request=') +
+              '/inbox?reason=approval&request=' +
               encodeURIComponent(admission.requestId) +
               '&mission=' +
               encodeURIComponent(admission.missionId)

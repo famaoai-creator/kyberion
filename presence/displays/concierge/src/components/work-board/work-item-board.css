@@ -51,6 +51,9 @@
 }
 
 .wb-board {
+  /* Containing block for the visually hidden labels inside the columns, so
+     they stay in this scroll container instead of widening the page (390). */
+  position: relative;
   display: flex;
   gap: var(--kb-ui-space-2);
   overflow-x: auto;

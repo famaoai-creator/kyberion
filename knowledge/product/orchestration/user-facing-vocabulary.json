@@ -7058,16 +7058,6 @@
         "ja": "対象",
         "qps-ploc": "⟦Ŧȧřɠėŧ ŀőř⟧"
       },
-      "chronos_fov_terminal_approval": {
-        "en": "Approve in the terminal",
-        "ja": "ターミナルで承認",
-        "qps-ploc": "⟦Ȧṗṗřőṽė ïñ ŧħė ŧėřɱïñȧŀ ŀőřėɱ ï⟧"
-      },
-      "chronos_fov_terminal_approval_detail": {
-        "en": "Run the command below. After approval, enter the value in Concierge under Settings → Introduce secret. Chronos never collects secret values.",
-        "ja": "次のコマンドを実行してください。承認後、Concierge の「設定 → シークレットを登録」で値を入力します。Chronos はシークレットの値を受け取りません。",
-        "qps-ploc": "⟦Řůñ ŧħė ƈőɱɱȧñḓ ƀėŀőẇ. Ȧƒŧėř ȧṗṗřőṽȧŀ, ėñŧėř ŧħė ṽȧŀůė ïñ Ƈőñƈïėřɠė ůñḓėř Şėŧŧïñɠş → Ïñŧřőḓůƈė şėƈřėŧ. Ƈħřőñőş ñėṽėř ƈőŀŀėƈŧş şėƈřėŧ ṽȧŀůėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
-      },
       "chronos_fov_title_audit_trail": {
         "en": "Audit trail",
         "ja": "監査の記録",
@@ -14318,6 +14308,11 @@
         "ja": "Chronosで確認",
         "qps-ploc": "⟦Řėṽïėẇ ïñ Ƈħřőñőş ŀőřėɱ⟧"
       },
+      "memory.review_in_library": {
+        "en": "Review in the library",
+        "ja": "資料で確認する",
+        "qps-ploc": "⟦Řėṽïėẇ ïñ ŧħė ŀïƀřȧřẏ ŀőřėɱ ⟧"
+      },
       "concierge_escalation_hold_reply": {
         "en": "We will confirm and get back to you shortly.",
         "ja": "確認して回答します",
@@ -14979,9 +14974,9 @@
         "qps-ploc": "⟦Şȧṽė ṗřőƒïŀė ȧñḓ ƈőññėƈŧïőñ ṗřėṗȧřȧŧïőñ ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
       "setup.management_title": {
-        "en": "2. Tenant, vision, and Kyberion agent",
-        "ja": "2. テナント・ビジョン・Kyberionエージェント",
-        "qps-ploc": "⟦2. Ŧėñȧñŧ, ṽïşïőñ, ȧñḓ Ķẏƀėřïőñ ȧɠėñŧ ŀőřėɱ ïṗşůɱ ⟧"
+        "en": "Tenant, vision, and Kyberion agent",
+        "ja": "テナント・ビジョン・Kyberionエージェント",
+        "qps-ploc": "⟦Ŧėñȧñŧ, ṽïşïőñ, ȧñḓ Ķẏƀėřïőñ ȧɠėñŧ ŀőřėɱ ïṗşůɱ⟧"
       },
       "setup.management_description": {
         "en": "Manage the tenant context, secretary vision, and the Kyberion agent bound to this personal profile.",
@@ -15539,9 +15534,9 @@
         "qps-ploc": "⟦Ñőŧïƒïƈȧŧïőñ şėŧŧïñɠş şȧṽėḓ. ŀőřėɱ ïṗş⟧"
       },
       "setup.operations_title": {
-        "en": "6. Secretary operations",
-        "ja": "6. 秘書業務の入口",
-        "qps-ploc": "⟦6. Şėƈřėŧȧřẏ őṗėřȧŧïőñş ŀőřėɱ ï⟧"
+        "en": "Secretary operations",
+        "ja": "秘書業務の入口",
+        "qps-ploc": "⟦Şėƈřėŧȧřẏ őṗėřȧŧïőñş ŀőřėɱ ⟧"
       },
       "setup.operations_description": {
         "en": "Bring approvals, scheduling, and email into one personal entry point.",
@@ -17258,6 +17253,11 @@
         "ja": "全体像",
         "qps-ploc": "⟦Őṽėřṽïėẇ ŀőř⟧"
       },
+      "ws_back_home": {
+        "en": "Back to Home",
+        "ja": "ホームに戻る",
+        "qps-ploc": "⟦Ƀȧƈķ ŧő Ħőɱė ŀőř⟧"
+      },
       "ws_overview_lead": {
         "en": "How companies, organizations, projects, missions and people connect — and what needs attention now.",
         "ja": "会社・組織・プロジェクト・ミッション・人のつながりと、いま対応が必要なもの。",
@@ -17562,6 +17562,546 @@
         "en": "Workspace",
         "ja": "ワークスペース",
         "qps-ploc": "⟦Ẇőřķşṗȧƈė ŀőř⟧"
+      },
+      "ia_home_title": {
+        "en": "Home",
+        "ja": "ホーム",
+        "qps-ploc": "⟦Ħőɱė ŀőř⟧"
+      },
+      "ia_home_lead": {
+        "en": "What is waiting for you, what is moving, and how it is going.",
+        "ja": "あなた待ちのこと、動いている仕事、その調子をひと目で。",
+        "qps-ploc": "⟦Ẇħȧŧ ïş ẇȧïŧïñɠ ƒőř ẏőů, ẇħȧŧ ïş ɱőṽïñɠ, ȧñḓ ħőẇ ïŧ ïş ɠőïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "ia_home_updated": {
+        "en": "Updated {time}",
+        "ja": "{time} 時点",
+        "qps-ploc": "⟦Ůṗḓȧŧėḓ {time} ŀőřė⟧"
+      },
+      "ia_home_loading": {
+        "en": "Loading this part of the overview",
+        "ja": "概況のこの項目を読み込んでいます",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ŧħïş ṗȧřŧ őƒ ŧħė őṽėřṽïėẇ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_home_view_all": {
+        "en": "Open",
+        "ja": "開く",
+        "qps-ploc": "⟦Őṗėñ ŀőř⟧"
+      },
+      "ia_home_retry": {
+        "en": "Try again",
+        "ja": "もう一度読み込む",
+        "qps-ploc": "⟦Ŧřẏ ȧɠȧïñ ŀőř⟧"
+      },
+      "ia_home_error_busy_title": {
+        "en": "Couldn't load: too many requests right now",
+        "ja": "読み込めませんでした(アクセスが集中しています)",
+        "qps-ploc": "⟦Ƈőůŀḓñ'ŧ ŀőȧḓ: ŧőő ɱȧñẏ řėɋůėşŧş řïɠħŧ ñőẇ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ia_home_error_busy_body": {
+        "en": "This is not an empty result. Wait a few seconds and try again.",
+        "ja": "データが空なのではありません。数秒待ってからもう一度読み込んでください。",
+        "qps-ploc": "⟦Ŧħïş ïş ñőŧ ȧñ ėɱṗŧẏ řėşůŀŧ. Ẇȧïŧ ȧ ƒėẇ şėƈőñḓş ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ia_home_error_failed_title": {
+        "en": "Couldn't load",
+        "ja": "読み込めませんでした",
+        "qps-ploc": "⟦Ƈőůŀḓñ'ŧ ŀőȧḓ ŀőřė⟧"
+      },
+      "ia_home_error_failed_body": {
+        "en": "This is not an empty result: the server did not answer. Try again.",
+        "ja": "データが空なのではなく、サーバーから応答がありませんでした。もう一度読み込んでください。",
+        "qps-ploc": "⟦Ŧħïş ïş ñőŧ ȧñ ėɱṗŧẏ řėşůŀŧ: ŧħė şėřṽėř ḓïḓ ñőŧ ȧñşẇėř. Ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_home_error_signin": {
+        "en": "Sign in to see the overview",
+        "ja": "概況を見るにはサインインしてください",
+        "qps-ploc": "⟦Şïɠñ ïñ ŧő şėė ŧħė őṽėřṽïėẇ ŀőřėɱ ïṗ⟧"
+      },
+      "ia_home_error_forbidden": {
+        "en": "Your access does not include this overview",
+        "ja": "あなたの権限ではこの概況を表示できません",
+        "qps-ploc": "⟦Ẏőůř ȧƈƈėşş ḓőėş ñőŧ ïñƈŀůḓė ŧħïş őṽėřṽïėẇ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ia_home_signin": {
+        "en": "Sign in",
+        "ja": "サインイン",
+        "qps-ploc": "⟦Şïɠñ ïñ ŀőř⟧"
+      },
+      "ia_home_tile_unavailable_title": {
+        "en": "Couldn't load this part",
+        "ja": "この項目を読み込めませんでした",
+        "qps-ploc": "⟦Ƈőůŀḓñ'ŧ ŀőȧḓ ŧħïş ṗȧřŧ ŀőřėɱ ï⟧"
+      },
+      "ia_home_tile_unavailable_body": {
+        "en": "The rest of the page is current. This is not a zero.",
+        "ja": "ほかの項目は最新です。0 件という意味ではありません。",
+        "qps-ploc": "⟦Ŧħė řėşŧ őƒ ŧħė ṗȧɠė ïş ƈůřřėñŧ. Ŧħïş ïş ñőŧ ȧ ẑėřő. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_home_tile_withheld_title": {
+        "en": "Choose a company to see the details",
+        "ja": "会社を選ぶと詳しく表示されます",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ƈőɱṗȧñẏ ŧő şėė ŧħė ḓėŧȧïŀş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_home_tile_withheld_body": {
+        "en": "With no company selected, Home shows counts across all your companies, not one company's items.",
+        "ja": "会社を選んでいないあいだは、すべての会社の件数だけを表示し、個別の会社の内容は出しません。",
+        "qps-ploc": "⟦Ẇïŧħ ñő ƈőɱṗȧñẏ şėŀėƈŧėḓ, Ħőɱė şħőẇş ƈőůñŧş ȧƈřőşş ȧŀŀ ẏőůř ƈőɱṗȧñïėş, ñőŧ őñė ƈőɱṗȧñẏ'ş ïŧėɱş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "ia_home_setup_title": {
+        "en": "Finish setting up",
+        "ja": "セットアップを仕上げましょう",
+        "qps-ploc": "⟦Ƒïñïşħ şėŧŧïñɠ ůṗ ŀőřėɱ⟧"
+      },
+      "ia_home_setup_lead": {
+        "en": "{done} of {total} steps done. Each step opens the setting that does it.",
+        "ja": "{total} 手順のうち {done} 手順が完了。各手順から、その設定を開けます。",
+        "qps-ploc": "⟦{done} őƒ {total} şŧėṗş ḓőñė. Ėȧƈħ şŧėṗ őṗėñş ŧħė şėŧŧïñɠ ŧħȧŧ ḓőėş ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "ia_home_setup_progress_label": {
+        "en": "Setup progress",
+        "ja": "セットアップの進み具合",
+        "qps-ploc": "⟦Şėŧůṗ ṗřőɠřėşş ŀőřė⟧"
+      },
+      "ia_home_needs_title": {
+        "en": "Needs you",
+        "ja": "あなた待ち",
+        "qps-ploc": "⟦Ñėėḓş ẏőů ŀőř⟧"
+      },
+      "ia_home_needs_total_label": {
+        "en": "waiting for your decision",
+        "ja": "件があなたの判断を待っています",
+        "qps-ploc": "⟦ẇȧïŧïñɠ ƒőř ẏőůř ḓėƈïşïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "ia_home_needs_overdue": {
+        "en": "{count} overdue or waiting long",
+        "ja": "{count} 件が期限切れ・長く待っています",
+        "qps-ploc": "⟦{count} őṽėřḓůė őř ẇȧïŧïñɠ ŀőñɠ ŀőřėɱ ïṗşů⟧"
+      },
+      "ia_home_needs_none_overdue": {
+        "en": "Nothing overdue or waiting long",
+        "ja": "期限切れや長く待っているものはありません",
+        "qps-ploc": "⟦Ñőŧħïñɠ őṽėřḓůė őř ẇȧïŧïñɠ ŀőñɠ ŀőřėɱ ïṗşů⟧"
+      },
+      "ia_home_needs_oldest": {
+        "en": "Oldest has waited since {time}",
+        "ja": "いちばん古いものは {time} から待っています",
+        "qps-ploc": "⟦Őŀḓėşŧ ħȧş ẇȧïŧėḓ şïñƈė {time} ŀőřėɱ ïṗşů⟧"
+      },
+      "ia_home_needs_by_reason": {
+        "en": "Waiting items by reason",
+        "ja": "理由別のあなた待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ïŧėɱş ƀẏ řėȧşőñ ŀőřėɱ ï⟧"
+      },
+      "ia_home_needs_open": {
+        "en": "Open Needs you",
+        "ja": "あなた待ちを開く",
+        "qps-ploc": "⟦Őṗėñ Ñėėḓş ẏőů ŀőřė⟧"
+      },
+      "ia_home_needs_empty_title": {
+        "en": "Nothing is waiting for you",
+        "ja": "あなた待ちはありません",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş ẇȧïŧïñɠ ƒőř ẏőů ŀőřėɱ ïṗ⟧"
+      },
+      "ia_home_needs_empty_body": {
+        "en": "Approvals, decisions, reviews and questions from agents appear here as soon as one needs you.",
+        "ja": "エージェントからの承認・判断・レビュー・質問は、あなたが必要になった時点でここに出ます。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş, ḓėƈïşïőñş, řėṽïėẇş ȧñḓ ɋůėşŧïőñş ƒřőɱ ȧɠėñŧş ȧṗṗėȧř ħėřė ȧş şőőñ ȧş őñė ñėėḓş ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "ia_home_needs_unavailable_title": {
+        "en": "Couldn't load what is waiting for you",
+        "ja": "あなた待ちを読み込めませんでした",
+        "qps-ploc": "⟦Ƈőůŀḓñ'ŧ ŀőȧḓ ẇħȧŧ ïş ẇȧïŧïñɠ ƒőř ẏőů ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_home_needs_unavailable_body": {
+        "en": "This is not zero. Open the queue directly to check.",
+        "ja": "0 件という意味ではありません。一覧を直接開いて確認してください。",
+        "qps-ploc": "⟦Ŧħïş ïş ñőŧ ẑėřő. Őṗėñ ŧħė ɋůėůė ḓïřėƈŧŀẏ ŧő ƈħėƈķ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_home_reason_approval": {
+        "en": "Approvals",
+        "ja": "承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ŀőř⟧"
+      },
+      "ia_home_reason_decision": {
+        "en": "Decisions",
+        "ja": "判断",
+        "qps-ploc": "⟦Ḓėƈïşïőñş ŀőř⟧"
+      },
+      "ia_home_reason_review": {
+        "en": "Reviews",
+        "ja": "レビュー",
+        "qps-ploc": "⟦Řėṽïėẇş ŀőř⟧"
+      },
+      "ia_home_reason_knowledge": {
+        "en": "Knowledge",
+        "ja": "ナレッジ",
+        "qps-ploc": "⟦Ķñőẇŀėḓɠė ŀőř⟧"
+      },
+      "ia_home_reason_clarification": {
+        "en": "Questions",
+        "ja": "質問",
+        "qps-ploc": "⟦Ɋůėşŧïőñş ŀőř⟧"
+      },
+      "ia_home_reason_failure": {
+        "en": "Stopped work",
+        "ja": "止まった仕事",
+        "qps-ploc": "⟦Şŧőṗṗėḓ ẇőřķ ŀőř⟧"
+      },
+      "ia_home_agents_title": {
+        "en": "Agents",
+        "ja": "エージェント",
+        "qps-ploc": "⟦Ȧɠėñŧş ŀőř⟧"
+      },
+      "ia_home_agents_summary": {
+        "en": "{total} agents with work",
+        "ja": "仕事を持つエージェント {total}",
+        "qps-ploc": "⟦{total} ȧɠėñŧş ẇïŧħ ẇőřķ ŀőřėɱ ï⟧"
+      },
+      "ia_home_agents_bar_label": {
+        "en": "Agents by state: {summary}",
+        "ja": "状態別のエージェント: {summary}",
+        "qps-ploc": "⟦Ȧɠėñŧş ƀẏ şŧȧŧė: {summary} ŀőřėɱ ïṗ⟧"
+      },
+      "ia_home_agent_working": {
+        "en": "Working",
+        "ja": "作業中",
+        "qps-ploc": "⟦Ẇőřķïñɠ ŀőř⟧"
+      },
+      "ia_home_agent_waiting": {
+        "en": "Waiting for input",
+        "ja": "入力待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ïñṗůŧ ŀőřėɱ⟧"
+      },
+      "ia_home_agent_error": {
+        "en": "Error",
+        "ja": "エラー",
+        "qps-ploc": "⟦Ėřřőř ŀőř⟧"
+      },
+      "ia_home_agent_idle": {
+        "en": "Idle",
+        "ja": "待機中",
+        "qps-ploc": "⟦Ïḓŀė ŀőř⟧"
+      },
+      "ia_home_agents_unassigned": {
+        "en": "{count} work items have no agent yet",
+        "ja": "エージェント未割り当ての仕事 {count} 件",
+        "qps-ploc": "⟦{count} ẇőřķ ïŧėɱş ħȧṽė ñő ȧɠėñŧ ẏėŧ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_home_agents_open": {
+        "en": "Open Operations",
+        "ja": "運用を開く",
+        "qps-ploc": "⟦Őṗėñ Őṗėřȧŧïőñş ŀőřė⟧"
+      },
+      "ia_home_cost_open": {
+        "en": "Open diagnostics",
+        "ja": "診断を開く",
+        "qps-ploc": "⟦Őṗėñ ḓïȧɠñőşŧïƈş ŀőřėɱ⟧"
+      },
+      "ia_home_agents_empty_title": {
+        "en": "No agent has work right now",
+        "ja": "いま仕事を持つエージェントはいません",
+        "qps-ploc": "⟦Ñő ȧɠėñŧ ħȧş ẇőřķ řïɠħŧ ñőẇ ŀőřėɱ ïṗ⟧"
+      },
+      "ia_home_agents_empty_body": {
+        "en": "Agents appear here with their state once they pick up work.",
+        "ja": "エージェントが仕事を受け持つと、状態とあわせてここに出ます。",
+        "qps-ploc": "⟦Ȧɠėñŧş ȧṗṗėȧř ħėřė ẇïŧħ ŧħėïř şŧȧŧė őñƈė ŧħėẏ ṗïƈķ ůṗ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "ia_home_missions_title": {
+        "en": "Missions",
+        "ja": "ミッション",
+        "qps-ploc": "⟦Ɱïşşïőñş ŀőř⟧"
+      },
+      "ia_home_missions_open_label": {
+        "en": "Open missions by state",
+        "ja": "状態別の未完了ミッション",
+        "qps-ploc": "⟦Őṗėñ ɱïşşïőñş ƀẏ şŧȧŧė ŀőřėɱ ï⟧"
+      },
+      "ia_home_mission_active": {
+        "en": "In progress",
+        "ja": "進行中",
+        "qps-ploc": "⟦Ïñ ṗřőɠřėşş ŀőř⟧"
+      },
+      "ia_home_mission_planned": {
+        "en": "Planned",
+        "ja": "計画中",
+        "qps-ploc": "⟦Ṗŀȧññėḓ ŀőř⟧"
+      },
+      "ia_home_mission_paused": {
+        "en": "Paused",
+        "ja": "一時停止",
+        "qps-ploc": "⟦Ṗȧůşėḓ ŀőř⟧"
+      },
+      "ia_home_mission_failed": {
+        "en": "Failed",
+        "ja": "失敗",
+        "qps-ploc": "⟦Ƒȧïŀėḓ ŀőř⟧"
+      },
+      "ia_home_missions_throughput": {
+        "en": "Finished in the last 7 days",
+        "ja": "直近 7 日間に完了",
+        "qps-ploc": "⟦Ƒïñïşħėḓ ïñ ŧħė ŀȧşŧ 7 ḓȧẏş ŀőřėɱ ïṗ⟧"
+      },
+      "ia_home_missions_throughput_spark": {
+        "en": "Missions finished per day, last 7 days",
+        "ja": "1 日ごとの完了ミッション数(直近 7 日間)",
+        "qps-ploc": "⟦Ɱïşşïőñş ƒïñïşħėḓ ṗėř ḓȧẏ, ŀȧşŧ 7 ḓȧẏş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_home_missions_blocked": {
+        "en": "Stopped missions",
+        "ja": "止まっているミッション",
+        "qps-ploc": "⟦Şŧőṗṗėḓ ɱïşşïőñş ŀőřėɱ⟧"
+      },
+      "ia_home_missions_blocked_more": {
+        "en": "{count} more",
+        "ja": "ほか {count} 件",
+        "qps-ploc": "⟦{count} ɱőřė ŀőř⟧"
+      },
+      "ia_home_missions_untitled": {
+        "en": "Mission without a stated goal",
+        "ja": "目的が書かれていないミッション",
+        "qps-ploc": "⟦Ɱïşşïőñ ẇïŧħőůŧ ȧ şŧȧŧėḓ ɠőȧŀ ŀőřėɱ ïṗş⟧"
+      },
+      "ia_home_missions_open": {
+        "en": "Open Work",
+        "ja": "仕事を開く",
+        "qps-ploc": "⟦Őṗėñ Ẇőřķ ŀőř⟧"
+      },
+      "ia_home_missions_empty_title": {
+        "en": "No missions yet",
+        "ja": "まだミッションはありません",
+        "qps-ploc": "⟦Ñő ɱïşşïőñş ẏėŧ ŀőřė⟧"
+      },
+      "ia_home_missions_empty_body": {
+        "en": "Missions appear here with their state and progress once work starts. Ask the assistant in the header to start one.",
+        "ja": "仕事が始まると、ミッションが状態と進み具合つきでここに出ます。ヘッダーの「秘書に相談」から始められます。",
+        "qps-ploc": "⟦Ɱïşşïőñş ȧṗṗėȧř ħėřė ẇïŧħ ŧħėïř şŧȧŧė ȧñḓ ṗřőɠřėşş őñƈė ẇőřķ şŧȧřŧş. Ȧşķ ŧħė ȧşşïşŧȧñŧ ïñ ŧħė ħėȧḓėř ŧő şŧȧřŧ őñė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "ia_home_health_title": {
+        "en": "Health",
+        "ja": "調子",
+        "qps-ploc": "⟦Ħėȧŀŧħ ŀőř⟧"
+      },
+      "ia_home_health_failure": {
+        "en": "Failure rate",
+        "ja": "失敗率",
+        "qps-ploc": "⟦Ƒȧïŀůřė řȧŧė ŀőř⟧"
+      },
+      "ia_home_health_failure_spark": {
+        "en": "Share of finished missions that failed, per day",
+        "ja": "1 日ごとの失敗の割合(完了したミッションのうち)",
+        "qps-ploc": "⟦Şħȧřė őƒ ƒïñïşħėḓ ɱïşşïőñş ŧħȧŧ ƒȧïŀėḓ, ṗėř ḓȧẏ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ia_home_health_duration": {
+        "en": "Typical duration",
+        "ja": "かかった時間(中央値)",
+        "qps-ploc": "⟦Ŧẏṗïƈȧŀ ḓůřȧŧïőñ ŀőřėɱ⟧"
+      },
+      "ia_home_health_duration_spark": {
+        "en": "Median hours from start to finish, per day",
+        "ja": "1 日ごとの開始から完了までの時間の中央値",
+        "qps-ploc": "⟦Ɱėḓïȧñ ħőůřş ƒřőɱ şŧȧřŧ ŧő ƒïñïşħ, ṗėř ḓȧẏ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ia_home_health_hours": {
+        "en": "{value} h",
+        "ja": "{value} 時間",
+        "qps-ploc": "⟦{value} ħ ŀőř⟧"
+      },
+      "ia_home_health_vs_previous": {
+        "en": "{delta} vs the 7 days before",
+        "ja": "前の 7 日間より {delta}",
+        "qps-ploc": "⟦{delta} ṽş ŧħė 7 ḓȧẏş ƀėƒőřė ŀőřėɱ ïṗş⟧"
+      },
+      "ia_home_health_no_previous": {
+        "en": "Nothing to compare with the 7 days before",
+        "ja": "前の 7 日間とは比べられません",
+        "qps-ploc": "⟦Ñőŧħïñɠ ŧő ƈőɱṗȧřė ẇïŧħ ŧħė 7 ḓȧẏş ƀėƒőřė ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ia_home_health_open": {
+        "en": "Open Diagnostics",
+        "ja": "診断を開く",
+        "qps-ploc": "⟦Őṗėñ Ḓïȧɠñőşŧïƈş ŀőřėɱ⟧"
+      },
+      "ia_home_health_empty_title": {
+        "en": "Nothing finished in the last 7 days",
+        "ja": "直近 7 日間に完了したものはありません",
+        "qps-ploc": "⟦Ñőŧħïñɠ ƒïñïşħėḓ ïñ ŧħė ŀȧşŧ 7 ḓȧẏş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_home_health_empty_body": {
+        "en": "Failure rate and duration appear once missions finish.",
+        "ja": "ミッションが完了すると、失敗率とかかった時間がここに出ます。",
+        "qps-ploc": "⟦Ƒȧïŀůřė řȧŧė ȧñḓ ḓůřȧŧïőñ ȧṗṗėȧř őñƈė ɱïşşïőñş ƒïñïşħ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ia_home_krs_title": {
+        "en": "Organization key results",
+        "ja": "組織の成果指標",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ķėẏ řėşůŀŧş ŀőřėɱ ï⟧"
+      },
+      "ia_home_krs_of": {
+        "en": "{organization}: furthest from target first",
+        "ja": "{organization}: 目標から遠い順",
+        "qps-ploc": "⟦{organization}: ƒůřŧħėşŧ ƒřőɱ ŧȧřɠėŧ ƒïřşŧ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ia_home_kr_progress": {
+        "en": "{percent}% of target",
+        "ja": "目標の {percent}%",
+        "qps-ploc": "⟦{percent}% őƒ ŧȧřɠėŧ ŀőřėɱ ⟧"
+      },
+      "ia_home_kr_value": {
+        "en": "{value} / {target}",
+        "ja": "{value} / {target}",
+        "qps-ploc": "⟦{value} / {target} ŀőřėɱ⟧"
+      },
+      "ia_home_kr_unmeasured": {
+        "en": "Not measured yet",
+        "ja": "まだ計測されていません",
+        "qps-ploc": "⟦Ñőŧ ɱėȧşůřėḓ ẏėŧ ŀőřėɱ⟧"
+      },
+      "ia_home_kr_target": {
+        "en": "Not measured yet · target {target}",
+        "ja": "まだ計測されていません・目標 {target}",
+        "qps-ploc": "⟦Ñőŧ ɱėȧşůřėḓ ẏėŧ · ŧȧřɠėŧ {target} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_home_kr_bar_label": {
+        "en": "{title}: {progress}",
+        "ja": "{title}: {progress}",
+        "qps-ploc": "⟦{title}: {progress} ŀőřėɱ ⟧"
+      },
+      "ia_home_kr_status_met": {
+        "en": "Met",
+        "ja": "達成",
+        "qps-ploc": "⟦Ɱėŧ ŀőř⟧"
+      },
+      "ia_home_kr_status_on_track": {
+        "en": "On track",
+        "ja": "順調",
+        "qps-ploc": "⟦Őñ ŧřȧƈķ ŀőř⟧"
+      },
+      "ia_home_kr_status_at_risk": {
+        "en": "At risk",
+        "ja": "要注意",
+        "qps-ploc": "⟦Ȧŧ řïşķ ŀőř⟧"
+      },
+      "ia_home_kr_status_off_track": {
+        "en": "Behind",
+        "ja": "遅れ",
+        "qps-ploc": "⟦Ƀėħïñḓ ŀőř⟧"
+      },
+      "ia_home_kr_status_unmeasured": {
+        "en": "Not measured",
+        "ja": "未計測",
+        "qps-ploc": "⟦Ñőŧ ɱėȧşůřėḓ ŀőř⟧"
+      },
+      "ia_home_krs_open": {
+        "en": "Open Organization",
+        "ja": "組織を開く",
+        "qps-ploc": "⟦Őṗėñ Őřɠȧñïẑȧŧïőñ ŀőřėɱ⟧"
+      },
+      "ia_home_krs_none_title": {
+        "en": "Choose one company to see its key results",
+        "ja": "成果指標を見るには会社を 1 つ選んでください",
+        "qps-ploc": "⟦Ƈħőőşė őñė ƈőɱṗȧñẏ ŧő şėė ïŧş ķėẏ řėşůŀŧş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ia_home_krs_none_body": {
+        "en": "Key results belong to one organization. Select a company in the header, or set up its objectives.",
+        "ja": "成果指標は組織ごとにあります。ヘッダーで会社を選ぶか、組織の目標を設定してください。",
+        "qps-ploc": "⟦Ķėẏ řėşůŀŧş ƀėŀőñɠ ŧő őñė őřɠȧñïẑȧŧïőñ. Şėŀėƈŧ ȧ ƈőɱṗȧñẏ ïñ ŧħė ħėȧḓėř, őř şėŧ ůṗ ïŧş őƀĵėƈŧïṽėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "ia_home_krs_empty_title": {
+        "en": "No key results yet",
+        "ja": "まだ成果指標がありません",
+        "qps-ploc": "⟦Ñő ķėẏ řėşůŀŧş ẏėŧ ŀőřėɱ⟧"
+      },
+      "ia_home_krs_empty_body": {
+        "en": "Key results appear here once the organization has objectives with measurable results.",
+        "ja": "組織に計測できる目標ができると、成果指標がここに出ます。",
+        "qps-ploc": "⟦Ķėẏ řėşůŀŧş ȧṗṗėȧř ħėřė őñƈė ŧħė őřɠȧñïẑȧŧïőñ ħȧş őƀĵėƈŧïṽėş ẇïŧħ ɱėȧşůřȧƀŀė řėşůŀŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "ia_home_cost_title": {
+        "en": "Cost",
+        "ja": "コスト",
+        "qps-ploc": "⟦Ƈőşŧ ŀőř⟧"
+      },
+      "ia_home_cost_spent": {
+        "en": "Spent so far",
+        "ja": "これまでの利用額",
+        "qps-ploc": "⟦Şṗėñŧ şő ƒȧř ŀőř⟧"
+      },
+      "ia_home_cost_of_budget": {
+        "en": "{spent} of {budget}",
+        "ja": "{budget} のうち {spent}",
+        "qps-ploc": "⟦{spent} őƒ {budget} ŀőřėɱ ⟧"
+      },
+      "ia_home_cost_bar_label": {
+        "en": "Spending against budget: {summary}",
+        "ja": "予算に対する利用額: {summary}",
+        "qps-ploc": "⟦Şṗėñḓïñɠ ȧɠȧïñşŧ ƀůḓɠėŧ: {summary} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_home_cost_remaining": {
+        "en": "{amount} left",
+        "ja": "残り {amount}",
+        "qps-ploc": "⟦{amount} ŀėƒŧ ŀőřė⟧"
+      },
+      "ia_home_cost_over": {
+        "en": "Over budget by {amount}",
+        "ja": "予算を {amount} 超えています",
+        "qps-ploc": "⟦Őṽėř ƀůḓɠėŧ ƀẏ {amount} ŀőřėɱ ï⟧"
+      },
+      "ia_home_cost_partial": {
+        "en": "Some usage has no known price, so the real total may be higher.",
+        "ja": "料金が分からない利用があるため、実際の合計はこれより多い可能性があります。",
+        "qps-ploc": "⟦Şőɱė ůşȧɠė ħȧş ñő ķñőẇñ ṗřïƈė, şő ŧħė řėȧŀ ŧőŧȧŀ ɱȧẏ ƀė ħïɠħėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ia_home_cost_no_budget": {
+        "en": "No budget is set, so there is nothing to compare against.",
+        "ja": "予算が未設定のため、比べる基準がありません。",
+        "qps-ploc": "⟦Ñő ƀůḓɠėŧ ïş şėŧ, şő ŧħėřė ïş ñőŧħïñɠ ŧő ƈőɱṗȧřė ȧɠȧïñşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "ia_home_cost_set_budget": {
+        "en": "Set a budget",
+        "ja": "予算を設定する",
+        "qps-ploc": "⟦Şėŧ ȧ ƀůḓɠėŧ ŀőř⟧"
+      },
+      "ia_home_cost_empty_title": {
+        "en": "No spending recorded yet",
+        "ja": "まだ利用額の記録はありません",
+        "qps-ploc": "⟦Ñő şṗėñḓïñɠ řėƈőřḓėḓ ẏėŧ ŀőřėɱ ï⟧"
+      },
+      "ia_home_cost_empty_body": {
+        "en": "Spending appears here once agents use a paid reasoning model.",
+        "ja": "エージェントが有料の推論モデルを使うと、利用額がここに出ます。",
+        "qps-ploc": "⟦Şṗėñḓïñɠ ȧṗṗėȧřş ħėřė őñƈė ȧɠėñŧş ůşė ȧ ṗȧïḓ řėȧşőñïñɠ ɱőḓėŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "ia_home_deliverables_title": {
+        "en": "Recent deliverables",
+        "ja": "最近の成果物",
+        "qps-ploc": "⟦Řėƈėñŧ ḓėŀïṽėřȧƀŀėş ŀőřėɱ ⟧"
+      },
+      "ia_home_deliverables_from": {
+        "en": "From: {mission}",
+        "ja": "元のミッション: {mission}",
+        "qps-ploc": "⟦Ƒřőɱ: {mission} ŀőřė⟧"
+      },
+      "ia_home_deliverables_dated": {
+        "en": "Deliverable from {date}",
+        "ja": "{date} の成果物",
+        "qps-ploc": "⟦Ḓėŀïṽėřȧƀŀė ƒřőɱ {date} ŀőřėɱ ï⟧"
+      },
+      "ia_home_deliverables_open": {
+        "en": "Open Library",
+        "ja": "資料を開く",
+        "qps-ploc": "⟦Őṗėñ Ŀïƀřȧřẏ ŀőř⟧"
+      },
+      "ia_home_deliverables_empty_title": {
+        "en": "No deliverables yet",
+        "ja": "まだ成果物はありません",
+        "qps-ploc": "⟦Ñő ḓėŀïṽėřȧƀŀėş ẏėŧ ŀőřėɱ ⟧"
+      },
+      "ia_home_deliverables_empty_body": {
+        "en": "Files your agents deliver appear here, newest first.",
+        "ja": "エージェントが納品したファイルが、新しい順にここに出ます。",
+        "qps-ploc": "⟦Ƒïŀėş ẏőůř ȧɠėñŧş ḓėŀïṽėř ȧṗṗėȧř ħėřė, ñėẇėşŧ ƒïřşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
       "palette.ingest": {
         "en": "Add documents",
@@ -19188,11 +19728,6 @@
         "ja": "承認待ち",
         "qps-ploc": "⟦Ṗėñḓïñɠ ȧṗṗřőṽȧŀş ŀőřėɱ⟧"
       },
-      "governance.pending_empty": {
-        "en": "No requests are waiting for approval.",
-        "ja": "承認待ちはありません。",
-        "qps-ploc": "⟦Ñő řėɋůėşŧş ȧřė ẇȧïŧïñɠ ƒőř ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ⟧"
-      },
       "governance.approve_passkey": {
         "en": "Approve with passkey",
         "ja": "パスキーで承認",
@@ -19257,16 +19792,6 @@
         "en": "linked {subject} → {member}",
         "ja": "{subject} を {member} に紐付けました",
         "qps-ploc": "⟦ŀïñķėḓ {subject} → {member} ŀőřėɱ ïṗ⟧"
-      },
-      "governance.approved_msg": {
-        "en": "approved {id}",
-        "ja": "{id} を承認しました",
-        "qps-ploc": "⟦ȧṗṗřőṽėḓ {id} ŀőřė⟧"
-      },
-      "governance.expires": {
-        "en": "expires {at}",
-        "ja": "期限 {at}",
-        "qps-ploc": "⟦ėẋṗïřėş {at} ŀőř⟧"
       },
       "attestation.title": {
         "en": "Provider attestation",
@@ -19972,6 +20497,466 @@
         "en": "These totals cover the first {shown} of {total} tenants. Choose a tenant in the scope selector above to see the others.",
         "ja": "この合計は {total} テナントのうち最初の {shown} テナント分です。ほかのテナントは上の範囲の選択から開いてください。",
         "qps-ploc": "⟦Ŧħėşė ŧőŧȧŀş ƈőṽėř ŧħė ƒïřşŧ {shown} őƒ {total} ŧėñȧñŧş. Ƈħőőşė ȧ ŧėñȧñŧ ïñ ŧħė şƈőṗė şėŀėƈŧőř ȧƀőṽė ŧő şėė ŧħė őŧħėřş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "ia_inbox_title": {
+        "en": "Needs you",
+        "ja": "あなた待ち",
+        "qps-ploc": "⟦Ñėėḓş ẏőů ŀőř⟧"
+      },
+      "ia_inbox_lead": {
+        "en": "Everything waiting for your decision or check, most urgent first. Decide here and the work moves on.",
+        "ja": "あなたの判断や確認を待っているものです。急ぎの順に並んでいます。ここで決めれば、仕事はそのまま先へ進みます。",
+        "qps-ploc": "⟦Ėṽėřẏŧħïñɠ ẇȧïŧïñɠ ƒőř ẏőůř ḓėƈïşïőñ őř ƈħėƈķ, ɱőşŧ ůřɠėñŧ ƒïřşŧ. Ḓėƈïḓė ħėřė ȧñḓ ŧħė ẇőřķ ɱőṽėş őñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "ia_inbox_count_definition": {
+        "en": "Open items that have not expired, with identical requests counted once, within the scope you are viewing. Every screen shows this same number.",
+        "ja": "未決で期限が切れていないものを、同じ依頼は1件にまとめ、いま見ている範囲だけで数えています。どの画面でも同じ数を表示します。",
+        "qps-ploc": "⟦Őṗėñ ïŧėɱş ŧħȧŧ ħȧṽė ñőŧ ėẋṗïřėḓ, ẇïŧħ ïḓėñŧïƈȧŀ řėɋůėşŧş ƈőůñŧėḓ őñƈė, ẇïŧħïñ ŧħė şƈőṗė ẏőů ȧřė ṽïėẇïñɠ. Ėṽėřẏ şƈřėėñ şħőẇş ŧħïş şȧɱė ñůɱƀėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+      },
+      "ia_inbox_filter_label": {
+        "en": "Filter by reason",
+        "ja": "理由で絞り込む",
+        "qps-ploc": "⟦Ƒïŀŧėř ƀẏ řėȧşőñ ŀőřėɱ⟧"
+      },
+      "ia_inbox_filter_all": {
+        "en": "All",
+        "ja": "すべて",
+        "qps-ploc": "⟦Ȧŀŀ ŀőř⟧"
+      },
+      "ia_inbox_filter_overdue": {
+        "en": "Overdue",
+        "ja": "期限切れ・長く待っているもの",
+        "qps-ploc": "⟦Őṽėřḓůė ŀőř⟧"
+      },
+      "ia_inbox_filter_clear": {
+        "en": "Clear filters",
+        "ja": "絞り込みを解除",
+        "qps-ploc": "⟦Ƈŀėȧř ƒïŀŧėřş ŀőřė⟧"
+      },
+      "ia_inbox_reason_approval": {
+        "en": "Approvals",
+        "ja": "承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ŀőř⟧"
+      },
+      "ia_inbox_reason_decision": {
+        "en": "Customer decisions",
+        "ja": "お客さまの決定",
+        "qps-ploc": "⟦Ƈůşŧőɱėř ḓėƈïşïőñş ŀőřėɱ⟧"
+      },
+      "ia_inbox_reason_review": {
+        "en": "Deliverable reviews",
+        "ja": "成果物の確認",
+        "qps-ploc": "⟦Ḓėŀïṽėřȧƀŀė řėṽïėẇş ŀőřėɱ ⟧"
+      },
+      "ia_inbox_reason_knowledge": {
+        "en": "Knowledge candidates",
+        "ja": "ナレッジ候補",
+        "qps-ploc": "⟦Ķñőẇŀėḓɠė ƈȧñḓïḓȧŧėş ŀőřėɱ ⟧"
+      },
+      "ia_inbox_reason_clarification": {
+        "en": "Stalled requests",
+        "ja": "止まっている依頼",
+        "qps-ploc": "⟦Şŧȧŀŀėḓ řėɋůėşŧş ŀőřėɱ⟧"
+      },
+      "ia_inbox_reason_failure": {
+        "en": "Failures",
+        "ja": "失敗・停止",
+        "qps-ploc": "⟦Ƒȧïŀůřėş ŀőř⟧"
+      },
+      "ia_inbox_requester_agent": {
+        "en": "Agent (Kyberion)",
+        "ja": "エージェント(Kyberion)",
+        "qps-ploc": "⟦Ȧɠėñŧ (Ķẏƀėřïőñ) ŀőřėɱ⟧"
+      },
+      "ia_inbox_requester_customer": {
+        "en": "Customer",
+        "ja": "お客さま",
+        "qps-ploc": "⟦Ƈůşŧőɱėř ŀőř⟧"
+      },
+      "ia_inbox_agent_badge": {
+        "en": "Agent",
+        "ja": "エージェント",
+        "qps-ploc": "⟦Ȧɠėñŧ ŀőř⟧"
+      },
+      "ia_inbox_asked_by": {
+        "en": "Asked by {name}",
+        "ja": "依頼元: {name}",
+        "qps-ploc": "⟦Ȧşķėḓ ƀẏ {name} ŀőřė⟧"
+      },
+      "ia_inbox_overdue_badge": {
+        "en": "Overdue",
+        "ja": "期限切れ",
+        "qps-ploc": "⟦Őṽėřḓůė ŀőř⟧"
+      },
+      "ia_inbox_waiting_since": {
+        "en": "Waiting since {value}",
+        "ja": "{value}から待っています",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ şïñƈė {value} ŀőřėɱ ⟧"
+      },
+      "ia_inbox_oldest": {
+        "en": "Oldest wait: {value}",
+        "ja": "最も長く待っているもの: {value}",
+        "qps-ploc": "⟦Őŀḓėşŧ ẇȧïŧ: {value} ŀőřėɱ ⟧"
+      },
+      "ia_inbox_total": {
+        "en": "{count} waiting",
+        "ja": "{count} 件が待っています",
+        "qps-ploc": "⟦{count} ẇȧïŧïñɠ ŀőřė⟧"
+      },
+      "ia_inbox_overdue_count": {
+        "en": "{count} overdue or waiting long",
+        "ja": "{count} 件が期限切れ・長く待っています",
+        "qps-ploc": "⟦{count} őṽėřḓůė őř ẇȧïŧïñɠ ŀőñɠ ŀőřėɱ ïṗşů⟧"
+      },
+      "ia_inbox_open_mission": {
+        "en": "Open the related mission",
+        "ja": "関連するミッションを開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė řėŀȧŧėḓ ɱïşşïőñ ŀőřėɱ ï⟧"
+      },
+      "ia_inbox_decision_title": {
+        "en": "A customer reply needs you",
+        "ja": "お客さまの回答に対応が必要です",
+        "qps-ploc": "⟦Ȧ ƈůşŧőɱėř řėṗŀẏ ñėėḓş ẏőů ŀőřėɱ ïṗ⟧"
+      },
+      "ia_inbox_decision_ask": {
+        "en": "The customer answered outside the options or asked a question. Read the case and reply.",
+        "ja": "お客さまが選択肢以外の回答や質問をしています。案件を開いて内容を確認し、対応してください。",
+        "qps-ploc": "⟦Ŧħė ƈůşŧőɱėř ȧñşẇėřėḓ őůŧşïḓė ŧħė őṗŧïőñş őř ȧşķėḓ ȧ ɋůėşŧïőñ. Řėȧḓ ŧħė ƈȧşė ȧñḓ řėṗŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "ia_inbox_decision_open": {
+        "en": "Open the case",
+        "ja": "案件を開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė ƈȧşė ŀőřė⟧"
+      },
+      "ia_inbox_decision_mark_handled": {
+        "en": "Mark as handled",
+        "ja": "対応済みにする",
+        "qps-ploc": "⟦Ɱȧřķ ȧş ħȧñḓŀėḓ ŀőřė⟧"
+      },
+      "ia_inbox_review_title": {
+        "en": "A deliverable is ready for your check",
+        "ja": "成果物の確認をお願いします",
+        "qps-ploc": "⟦Ȧ ḓėŀïṽėřȧƀŀė ïş řėȧḓẏ ƒőř ẏőůř ƈħėƈķ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_inbox_knowledge_title": {
+        "en": "A learning to keep",
+        "ja": "残しておく学びの候補",
+        "qps-ploc": "⟦Ȧ ŀėȧřñïñɠ ŧő ķėėṗ ŀőřėɱ⟧"
+      },
+      "ia_inbox_clarification_title": {
+        "en": "A request has stopped",
+        "ja": "止まっている依頼があります",
+        "qps-ploc": "⟦Ȧ řėɋůėşŧ ħȧş şŧőṗṗėḓ ŀőřėɱ ⟧"
+      },
+      "ia_inbox_failure_title": {
+        "en": "Something stopped and needs a person",
+        "ja": "止まった作業があり、人の確認が必要です",
+        "qps-ploc": "⟦Şőɱėŧħïñɠ şŧőṗṗėḓ ȧñḓ ñėėḓş ȧ ṗėřşőñ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_inbox_group_expand": {
+        "en": "Show all {count} identical requests",
+        "ja": "同じ依頼 {count} 件をすべて表示",
+        "qps-ploc": "⟦Şħőẇ ȧŀŀ {count} ïḓėñŧïƈȧŀ řėɋůėşŧş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_inbox_empty_title": {
+        "en": "Nothing is waiting for you",
+        "ja": "いまあなたを待っているものはありません",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş ẇȧïŧïñɠ ƒőř ẏőů ŀőřėɱ ïṗ⟧"
+      },
+      "ia_inbox_empty_reason": {
+        "en": "New approvals, reviews and questions appear here, most urgent first, as soon as they arrive.",
+        "ja": "新しい承認・確認・質問が届くと、ここに急ぎの順で並びます。",
+        "qps-ploc": "⟦Ñėẇ ȧṗṗřőṽȧŀş, řėṽïėẇş ȧñḓ ɋůėşŧïőñş ȧṗṗėȧř ħėřė, ɱőşŧ ůřɠėñŧ ƒïřşŧ, ȧş şőőñ ȧş ŧħėẏ ȧřřïṽė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "ia_inbox_empty_filtered": {
+        "en": "Nothing matches this filter.",
+        "ja": "この絞り込みに当てはまるものはありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ɱȧŧƈħėş ŧħïş ƒïŀŧėř. ŀőřėɱ ïṗş⟧"
+      },
+      "ia_inbox_load_more": {
+        "en": "Show more",
+        "ja": "さらに表示",
+        "qps-ploc": "⟦Şħőẇ ɱőřė ŀőř⟧"
+      },
+      "ia_inbox_load_more_error": {
+        "en": "Couldn't load more. The items above are still current — try again.",
+        "ja": "続きを読み込めませんでした。上に出ている項目はそのまま使えます。もう一度お試しください。",
+        "qps-ploc": "⟦Ƈőůŀḓñ'ŧ ŀőȧḓ ɱőřė. Ŧħė ïŧėɱş ȧƀőṽė ȧřė şŧïŀŀ ƈůřřėñŧ — ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_inbox_load_error": {
+        "en": "The queue could not be loaded. Try again.",
+        "ja": "一覧を読み込めませんでした。もう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė ɋůėůė ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. Ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ia_inbox_loading": {
+        "en": "Loading what needs you…",
+        "ja": "あなた待ちを読み込んでいます…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ẇħȧŧ ñėėḓş ẏőů… ŀőřėɱ ï⟧"
+      },
+      "ia_inbox_elsewhere": {
+        "en": "{count} waiting for your decision",
+        "ja": "{count} 件があなたの判断を待っています",
+        "qps-ploc": "⟦{count} ẇȧïŧïñɠ ƒőř ẏőůř ḓėƈïşïőñ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_inbox_elsewhere_none": {
+        "en": "Nothing here is waiting for your decision.",
+        "ja": "ここであなたの判断を待っているものはありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ħėřė ïş ẇȧïŧïñɠ ƒőř ẏőůř ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ia_inbox_elsewhere_link": {
+        "en": "Decide in Needs you",
+        "ja": "あなた待ちで判断する",
+        "qps-ploc": "⟦Ḓėƈïḓė ïñ Ñėėḓş ẏőů ŀőřėɱ ⟧"
+      },
+      "ia_inbox_elsewhere_lead": {
+        "en": "Decisions are made in one place, Needs you. This view only browses.",
+        "ja": "判断は「あなた待ち」の1か所で行います。この画面は閲覧用です。",
+        "qps-ploc": "⟦Ḓėƈïşïőñş ȧřė ɱȧḓė ïñ őñė ṗŀȧƈė, Ñėėḓş ẏőů. Ŧħïş ṽïėẇ őñŀẏ ƀřőẇşėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_inbox_count_how": {
+        "en": "How this is counted",
+        "ja": "件数の数え方",
+        "qps-ploc": "⟦Ħőẇ ŧħïş ïş ƈőůñŧėḓ ŀőřėɱ ⟧"
+      },
+      "ia_inbox_waiting_long_badge": {
+        "en": "Waiting a long time",
+        "ja": "長く待っています",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ȧ ŀőñɠ ŧïɱė ŀőřėɱ ⟧"
+      },
+      "ia_inbox_error_review": {
+        "en": "The review could not be recorded. Nothing was changed; try again.",
+        "ja": "レビューを記録できませんでした。変更はされていません。もう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė řėṽïėẇ ƈőůŀḓ ñőŧ ƀė řėƈőřḓėḓ. Ñőŧħïñɠ ẇȧş ƈħȧñɠėḓ; ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_inbox_error_note_required": {
+        "en": "Write what should change before requesting changes.",
+        "ja": "修正を依頼するときは、直してほしい点を書いてください。",
+        "qps-ploc": "⟦Ẇřïŧė ẇħȧŧ şħőůŀḓ ƈħȧñɠė ƀėƒőřė řėɋůėşŧïñɠ ƈħȧñɠėş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_inbox_error_knowledge": {
+        "en": "The knowledge decision could not be recorded. Nothing was changed; try again.",
+        "ja": "ナレッジの判断を記録できませんでした。変更はされていません。もう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė ķñőẇŀėḓɠė ḓėƈïşïőñ ƈőůŀḓ ñőŧ ƀė řėƈőřḓėḓ. Ñőŧħïñɠ ẇȧş ƈħȧñɠėḓ; ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "ia_inbox_error_clarification": {
+        "en": "The request could not be updated. Nothing was changed; try again.",
+        "ja": "依頼を更新できませんでした。変更はされていません。もう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƈőůŀḓ ñőŧ ƀė ůṗḓȧŧėḓ. Ñőŧħïñɠ ẇȧş ƈħȧñɠėḓ; ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_shell_tabs_label": {
+        "en": "Sections of this page",
+        "ja": "このページの表示",
+        "qps-ploc": "⟦Şėƈŧïőñş őƒ ŧħïş ṗȧɠė ŀőřėɱ ⟧"
+      },
+      "ia_shell_work_title": {
+        "en": "Work",
+        "ja": "仕事",
+        "qps-ploc": "⟦Ẇőřķ ŀőř⟧"
+      },
+      "ia_shell_work_subtitle": {
+        "en": "Where each mission stands, and the work assigned to people and agents.",
+        "ja": "ミッションの状態と、人やエージェントに割り当てた作業です。",
+        "qps-ploc": "⟦Ẇħėřė ėȧƈħ ɱïşşïőñ şŧȧñḓş, ȧñḓ ŧħė ẇőřķ ȧşşïɠñėḓ ŧő ṗėőṗŀė ȧñḓ ȧɠėñŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "ia_shell_work_tab_missions": {
+        "en": "Missions",
+        "ja": "ミッション",
+        "qps-ploc": "⟦Ɱïşşïőñş ŀőř⟧"
+      },
+      "ia_shell_work_tab_items": {
+        "en": "Work items",
+        "ja": "作業",
+        "qps-ploc": "⟦Ẇőřķ ïŧėɱş ŀőř⟧"
+      },
+      "ia_shell_mission_board_label": {
+        "en": "Missions by state",
+        "ja": "状態別のミッション",
+        "qps-ploc": "⟦Ɱïşşïőñş ƀẏ şŧȧŧė ŀőřėɱ⟧"
+      },
+      "ia_shell_mission_col_in_progress": {
+        "en": "In progress",
+        "ja": "進行中",
+        "qps-ploc": "⟦Ïñ ṗřőɠřėşş ŀőř⟧"
+      },
+      "ia_shell_mission_col_waiting": {
+        "en": "Waiting or stalled",
+        "ja": "入力待ち・停滞",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ őř şŧȧŀŀėḓ ŀőřėɱ⟧"
+      },
+      "ia_shell_mission_col_review": {
+        "en": "Waiting for review",
+        "ja": "レビュー待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř řėṽïėẇ ŀőřėɱ⟧"
+      },
+      "ia_shell_mission_col_done": {
+        "en": "Done",
+        "ja": "完了",
+        "qps-ploc": "⟦Ḓőñė ŀőř⟧"
+      },
+      "ia_shell_mission_col_empty": {
+        "en": "Nothing here right now.",
+        "ja": "いまはありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ħėřė řïɠħŧ ñőẇ. ŀőřėɱ ï⟧"
+      },
+      "ia_shell_mission_col_more": {
+        "en": "{count} more in the list view",
+        "ja": "ほか {count} 件(一覧表示で確認できます)",
+        "qps-ploc": "⟦{count} ɱőřė ïñ ŧħė ŀïşŧ ṽïėẇ ŀőřėɱ ïṗş⟧"
+      },
+      "ia_shell_org_title": {
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "ia_shell_org_subtitle": {
+        "en": "Goals and key results, projects, and the people and agents doing the work.",
+        "ja": "目標と成果指標、プロジェクト、仕事をする人とエージェントです。",
+        "qps-ploc": "⟦Ɠőȧŀş ȧñḓ ķėẏ řėşůŀŧş, ṗřőĵėƈŧş, ȧñḓ ŧħė ṗėőṗŀė ȧñḓ ȧɠėñŧş ḓőïñɠ ŧħė ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "ia_shell_org_tab_overview": {
+        "en": "Overview",
+        "ja": "概要",
+        "qps-ploc": "⟦Őṽėřṽïėẇ ŀőř⟧"
+      },
+      "ia_shell_org_tab_projects": {
+        "en": "Projects",
+        "ja": "プロジェクト",
+        "qps-ploc": "⟦Ṗřőĵėƈŧş ŀőř⟧"
+      },
+      "ia_shell_org_tab_people": {
+        "en": "People and agents",
+        "ja": "人とエージェント",
+        "qps-ploc": "⟦Ṗėőṗŀė ȧñḓ ȧɠėñŧş ŀőřėɱ⟧"
+      },
+      "ia_shell_org_edit": {
+        "en": "Edit organization",
+        "ja": "組織を編集",
+        "qps-ploc": "⟦Ėḓïŧ őřɠȧñïẑȧŧïőñ ŀőřėɱ⟧"
+      },
+      "ia_shell_library_title": {
+        "en": "Library",
+        "ja": "資料",
+        "qps-ploc": "⟦Ŀïƀřȧřẏ ŀőř⟧"
+      },
+      "ia_shell_library_subtitle": {
+        "en": "Delivered work, the knowledge it produced, and documents to add.",
+        "ja": "納品された成果物、そこから得たナレッジ、取り込む資料です。",
+        "qps-ploc": "⟦Ḓėŀïṽėřėḓ ẇőřķ, ŧħė ķñőẇŀėḓɠė ïŧ ṗřőḓůƈėḓ, ȧñḓ ḓőƈůɱėñŧş ŧő ȧḓḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ia_shell_library_tab_deliverables": {
+        "en": "Deliverables",
+        "ja": "成果物",
+        "qps-ploc": "⟦Ḓėŀïṽėřȧƀŀėş ŀőř⟧"
+      },
+      "ia_shell_library_tab_knowledge": {
+        "en": "Knowledge",
+        "ja": "ナレッジ",
+        "qps-ploc": "⟦Ķñőẇŀėḓɠė ŀőř⟧"
+      },
+      "ia_shell_library_tab_ingest": {
+        "en": "Add a document",
+        "ja": "資料の取込",
+        "qps-ploc": "⟦Ȧḓḓ ȧ ḓőƈůɱėñŧ ŀőřė⟧"
+      },
+      "ia_shell_library_review_where": {
+        "en": "Accepting a deliverable or asking for changes happens in Needs you.",
+        "ja": "成果物の受け入れや修正の依頼は「あなた待ち」で行います。",
+        "qps-ploc": "⟦Ȧƈƈėṗŧïñɠ ȧ ḓėŀïṽėřȧƀŀė őř ȧşķïñɠ ƒőř ƈħȧñɠėş ħȧṗṗėñş ïñ Ñėėḓş ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_shell_library_knowledge_where": {
+        "en": "Approving or rejecting a knowledge candidate happens in Needs you.",
+        "ja": "ナレッジ候補の承認や却下は「あなた待ち」で行います。",
+        "qps-ploc": "⟦Ȧṗṗřőṽïñɠ őř řėĵėƈŧïñɠ ȧ ķñőẇŀėḓɠė ƈȧñḓïḓȧŧė ħȧṗṗėñş ïñ Ñėėḓş ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_shell_open_inbox": {
+        "en": "Open Needs you",
+        "ja": "あなた待ちを開く",
+        "qps-ploc": "⟦Őṗėñ Ñėėḓş ẏőů ŀőřė⟧"
+      },
+      "ia_shell_ops_title": {
+        "en": "Operations",
+        "ja": "運用",
+        "qps-ploc": "⟦Őṗėřȧŧïőñş ŀőř⟧"
+      },
+      "ia_shell_ops_subtitle": {
+        "en": "Agents at work, screens, diagnostics and discussions.",
+        "ja": "稼働中のエージェント、画面、診断、ディスカッションです。",
+        "qps-ploc": "⟦Ȧɠėñŧş ȧŧ ẇőřķ, şƈřėėñş, ḓïȧɠñőşŧïƈş ȧñḓ ḓïşƈůşşïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ia_shell_scope_destination": {
+        "en": "Files into {workspace}. Change it with the workspace switcher.",
+        "ja": "登録先は {workspace} です。切り替えはワークスペースの選択から行います。",
+        "qps-ploc": "⟦Ƒïŀėş ïñŧő {workspace}. Ƈħȧñɠė ïŧ ẇïŧħ ŧħė ẇőřķşṗȧƈė şẇïŧƈħėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ia_shell_scope_pick": {
+        "en": "No workspace is selected, so choose where this goes.",
+        "ja": "ワークスペースが選ばれていないため、登録先を選んでください。",
+        "qps-ploc": "⟦Ñő ẇőřķşṗȧƈė ïş şėŀėƈŧėḓ, şő ƈħőőşė ẇħėřė ŧħïş ɠőėş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_shell_scope_current": {
+        "en": "{workspace}. Change it with the workspace switcher.",
+        "ja": "{workspace}(切り替えはワークスペースの選択から)",
+        "qps-ploc": "⟦{workspace}. Ƈħȧñɠė ïŧ ẇïŧħ ŧħė ẇőřķşṗȧƈė şẇïŧƈħėř. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_shell_crumb_home": {
+        "en": "Home",
+        "ja": "ホーム",
+        "qps-ploc": "⟦Ħőɱė ŀőř⟧"
+      },
+      "ia_shell_library_deliverables_hint": {
+        "en": "Pick a deliverable to read what was delivered.",
+        "ja": "成果物を選ぶと、納品された中身を読めます。",
+        "qps-ploc": "⟦Ṗïƈķ ȧ ḓėŀïṽėřȧƀŀė ŧő řėȧḓ ẇħȧŧ ẇȧş ḓėŀïṽėřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ia_shell_library_knowledge_hint": {
+        "en": "Pick an entry to read what was learned and where it came from.",
+        "ja": "項目を選ぶと、学んだ内容とその出どころを読めます。",
+        "qps-ploc": "⟦Ṗïƈķ ȧñ ėñŧřẏ ŧő řėȧḓ ẇħȧŧ ẇȧş ŀėȧřñėḓ ȧñḓ ẇħėřė ïŧ ƈȧɱė ƒřőɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ia_shell_work_plan_open": {
+        "en": "Plan a mission",
+        "ja": "ミッションを計画",
+        "qps-ploc": "⟦Ṗŀȧñ ȧ ɱïşşïőñ ŀőřė⟧"
+      },
+      "ia_shell_work_plan_close": {
+        "en": "Close planning",
+        "ja": "計画を閉じる",
+        "qps-ploc": "⟦Ƈŀőşė ṗŀȧññïñɠ ŀőřė⟧"
+      },
+      "ia_shell_plan_request_required": {
+        "en": "Write the request first.",
+        "ja": "依頼文を入力してください。",
+        "qps-ploc": "⟦Ẇřïŧė ŧħė řėɋůėşŧ ƒïřşŧ. ŀőřėɱ ï⟧"
+      },
+      "ia_shell_plan_preview_required": {
+        "en": "Check the plan first.",
+        "ja": "先に「計画を確認」を押して、計画を確認してください。",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ṗŀȧñ ƒïřşŧ. ŀőřėɱ ⟧"
+      },
+      "ia_shell_plan_preview_stale": {
+        "en": "You changed the inputs. Check the plan again before starting.",
+        "ja": "入力を変えたので、もう一度計画を確認してください。",
+        "qps-ploc": "⟦Ẏőů ƈħȧñɠėḓ ŧħė ïñṗůŧş. Ƈħėƈķ ŧħė ṗŀȧñ ȧɠȧïñ ƀėƒőřė şŧȧřŧïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "ia_shell_plan_failed": {
+        "en": "The plan could not be checked. Try again in a moment.",
+        "ja": "計画を確認できませんでした。少し待ってからもう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė ṗŀȧñ ƈőůŀḓ ñőŧ ƀė ƈħėƈķėḓ. Ŧřẏ ȧɠȧïñ ïñ ȧ ɱőɱėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ia_shell_plan_start_failed": {
+        "en": "The mission could not be started. Check the plan again and retry.",
+        "ja": "ミッションを開始できませんでした。計画を確認し直してからもう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė ɱïşşïőñ ƈőůŀḓ ñőŧ ƀė şŧȧřŧėḓ. Ƈħėƈķ ŧħė ṗŀȧñ ȧɠȧïñ ȧñḓ řėŧřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_shell_plan_started": {
+        "en": "The mission has started.",
+        "ja": "ミッションを開始しました。",
+        "qps-ploc": "⟦Ŧħė ɱïşşïőñ ħȧş şŧȧřŧėḓ. ŀőřėɱ ï⟧"
+      },
+      "ia_shell_plan_open_mission": {
+        "en": "Open the mission",
+        "ja": "ミッションを開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė ɱïşşïőñ ŀőřėɱ⟧"
       }
     },
     "onboarding": {
@@ -30689,9 +31674,9 @@
         "qps-ploc": "⟦Řėɠïşŧėř ŧħėşė řėḓïřėƈŧ ŮŘÏş ẇïŧħ ẏőůř ïḓėñŧïŧẏ ṗřőṽïḓėř: ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
       "sso_egress_hint": {
-        "en": "Identity providers other than Google and Microsoft must be allowed in knowledge/product/governance/egress-policy.json.",
-        "ja": "Google と Microsoft 以外の IdP は、knowledge/product/governance/egress-policy.json で通信先を許可する必要があります。",
-        "qps-ploc": "⟦Ïḓėñŧïŧẏ ṗřőṽïḓėřş őŧħėř ŧħȧñ Ɠőőɠŀė ȧñḓ Ɱïƈřőşőƒŧ ɱůşŧ ƀė ȧŀŀőẇėḓ ïñ ķñőẇŀėḓɠė/ṗřőḓůƈŧ/ɠőṽėřñȧñƈė/ėɠřėşş-ṗőŀïƈẏ.ĵşőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+        "en": "Identity providers other than Google and Microsoft must first be allowed in the network egress policy by an administrator on the Kyberion computer.",
+        "ja": "Google と Microsoft 以外の IdP は、管理者が Kyberion を動かしている PC の通信先許可ポリシーに追加する必要があります。",
+        "qps-ploc": "⟦Ïḓėñŧïŧẏ ṗřőṽïḓėřş őŧħėř ŧħȧñ Ɠőőɠŀė ȧñḓ Ɱïƈřőşőƒŧ ɱůşŧ ƒïřşŧ ƀė ȧŀŀőẇėḓ ïñ ŧħė ñėŧẇőřķ ėɠřėşş ṗőŀïƈẏ ƀẏ ȧñ ȧḓɱïñïşŧřȧŧőř őñ ŧħė Ķẏƀėřïőñ ƈőɱṗůŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
       },
       "sso_link_title": {
         "en": "Link your identity provider account",
@@ -30724,9 +31709,9 @@
         "qps-ploc": "⟦Ŀïñķïñɠ ïş ñőŧ ȧṽȧïŀȧƀŀė ẏėŧ. Şȧṽė ŧħė ŞŞŐ şėŧŧïñɠş ƒïřşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
       "sso_link_hint": {
-        "en": "After signing in with your identity provider, bind the issuer and subject shown on screen to your member under Settings › Organization and members.",
-        "ja": "IdP でサインインしたら、画面に表示される issuer と subject を「設定 › 組織とメンバー」で自分に紐付けてください。",
-        "qps-ploc": "⟦Ȧƒŧėř şïɠñïñɠ ïñ ẇïŧħ ẏőůř ïḓėñŧïŧẏ ṗřőṽïḓėř, ƀïñḓ ŧħė ïşşůėř ȧñḓ şůƀĵėƈŧ şħőẇñ őñ şƈřėėñ ŧő ẏőůř ɱėɱƀėř ůñḓėř Şėŧŧïñɠş › Őřɠȧñïẑȧŧïőñ ȧñḓ ɱėɱƀėřş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
+        "en": "After signing in with your identity provider, bind the issuer and subject shown on screen to your member under Settings › Workspace & organization.",
+        "ja": "IdP でサインインしたら、画面に表示される issuer と subject を「設定 › ワークスペースと組織」で自分に紐付けてください。",
+        "qps-ploc": "⟦Ȧƒŧėř şïɠñïñɠ ïñ ẇïŧħ ẏőůř ïḓėñŧïŧẏ ṗřőṽïḓėř, ƀïñḓ ŧħė ïşşůėř ȧñḓ şůƀĵėƈŧ şħőẇñ őñ şƈřėėñ ŧő ẏőůř ɱėɱƀėř ůñḓėř Şėŧŧïñɠş › Ẇőřķşṗȧƈė & őřɠȧñïẑȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
       },
       "sso_error_field": {
         "en": "Invalid value: {field}",
@@ -32872,6 +33857,826 @@
         "en": "Walk through purpose, requirements, quality needs, how to split the work, and budget and timing before development starts.",
         "ja": "開発を始める前に、目的、要件、品質の希望、作業の分け方、予算と時期を順に確認します。",
         "qps-ploc": "⟦Ẇȧŀķ ŧħřőůɠħ ṗůřṗőşė, řėɋůïřėɱėñŧş, ɋůȧŀïŧẏ ñėėḓş, ħőẇ ŧő şṗŀïŧ ŧħė ẇőřķ, ȧñḓ ƀůḓɠėŧ ȧñḓ ŧïɱïñɠ ƀėƒőřė ḓėṽėŀőṗɱėñŧ şŧȧřŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "ia_settings_cat_start": {
+        "en": "Get started",
+        "ja": "はじめに",
+        "qps-ploc": "⟦Ɠėŧ şŧȧřŧėḓ ŀőř⟧"
+      },
+      "ia_settings_cat_start_desc": {
+        "en": "The setup steps, in the order that works best",
+        "ja": "おすすめの順番で初期設定を進めます",
+        "qps-ploc": "⟦Ŧħė şėŧůṗ şŧėṗş, ïñ ŧħė őřḓėř ŧħȧŧ ẇőřķş ƀėşŧ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ia_settings_cat_workspace": {
+        "en": "Workspace & organization",
+        "ja": "ワークスペースと組織",
+        "qps-ploc": "⟦Ẇőřķşṗȧƈė & őřɠȧñïẑȧŧïőñ ŀőřėɱ ï⟧"
+      },
+      "ia_settings_cat_workspace_desc": {
+        "en": "You, your company, members and projects",
+        "ja": "あなた・会社・メンバー・プロジェクト",
+        "qps-ploc": "⟦Ẏőů, ẏőůř ƈőɱṗȧñẏ, ɱėɱƀėřş ȧñḓ ṗřőĵėƈŧş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ia_settings_cat_agents": {
+        "en": "Agents & autonomy",
+        "ja": "エージェントと自律度",
+        "qps-ploc": "⟦Ȧɠėñŧş & ȧůŧőñőɱẏ ŀőřėɱ⟧"
+      },
+      "ia_settings_cat_agents_desc": {
+        "en": "Which AI works, what it may do alone, and its voice",
+        "ja": "使う AI、ひとりで進めてよい範囲、声",
+        "qps-ploc": "⟦Ẇħïƈħ ȦÏ ẇőřķş, ẇħȧŧ ïŧ ɱȧẏ ḓő ȧŀőñė, ȧñḓ ïŧş ṽőïƈė ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_settings_cat_notifications": {
+        "en": "Notifications",
+        "ja": "通知",
+        "qps-ploc": "⟦Ñőŧïƒïƈȧŧïőñş ŀőřė⟧"
+      },
+      "ia_settings_cat_notifications_desc": {
+        "en": "Where and when you are told about things",
+        "ja": "どこに、いつ知らせるか",
+        "qps-ploc": "⟦Ẇħėřė ȧñḓ ẇħėñ ẏőů ȧřė ŧőŀḓ ȧƀőůŧ ŧħïñɠş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ia_settings_cat_connections": {
+        "en": "Connections",
+        "ja": "連携",
+        "qps-ploc": "⟦Ƈőññėƈŧïőñş ŀőř⟧"
+      },
+      "ia_settings_cat_connections_desc": {
+        "en": "Services, single sign-on and plugins",
+        "ja": "外部サービス・シングルサインオン・拡張機能",
+        "qps-ploc": "⟦Şėřṽïƈėş, şïñɠŀė şïɠñ-őñ ȧñḓ ṗŀůɠïñş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_settings_cat_data": {
+        "en": "Data & permissions",
+        "ja": "データと権限",
+        "qps-ploc": "⟦Ḓȧŧȧ & ṗėřɱïşşïőñş ŀőřėɱ⟧"
+      },
+      "ia_settings_cat_data_desc": {
+        "en": "What is recorded and how secrets are kept",
+        "ja": "記録の同意と秘密情報の扱い",
+        "qps-ploc": "⟦Ẇħȧŧ ïş řėƈőřḓėḓ ȧñḓ ħőẇ şėƈřėŧş ȧřė ķėṗŧ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ia_settings_cat_budget": {
+        "en": "Budget & limits",
+        "ja": "予算と上限",
+        "qps-ploc": "⟦Ƀůḓɠėŧ & ŀïɱïŧş ŀőřė⟧"
+      },
+      "ia_settings_cat_budget_desc": {
+        "en": "How much AI usage may cost",
+        "ja": "AI の利用にかけてよい費用",
+        "qps-ploc": "⟦Ħőẇ ɱůƈħ ȦÏ ůşȧɠė ɱȧẏ ƈőşŧ ŀőřėɱ ïṗ⟧"
+      },
+      "ia_settings_cat_display": {
+        "en": "Display",
+        "ja": "表示",
+        "qps-ploc": "⟦Ḓïşṗŀȧẏ ŀőř⟧"
+      },
+      "ia_settings_cat_display_desc": {
+        "en": "Language, theme and density on this browser",
+        "ja": "この端末の言語・テーマ・密度",
+        "qps-ploc": "⟦Ŀȧñɠůȧɠė, ŧħėɱė ȧñḓ ḓėñşïŧẏ őñ ŧħïş ƀřőẇşėř ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ia_settings_cat_advanced": {
+        "en": "Advanced",
+        "ja": "詳細",
+        "qps-ploc": "⟦Ȧḓṽȧñƈėḓ ŀőř⟧"
+      },
+      "ia_settings_cat_advanced_desc": {
+        "en": "Rarely needed options and terminal-only operations",
+        "ja": "ふだんは触らない設定とターミナル専用の操作",
+        "qps-ploc": "⟦Řȧřėŀẏ ñėėḓėḓ őṗŧïőñş ȧñḓ ŧėřɱïñȧŀ-őñŀẏ őṗėřȧŧïőñş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_settings_lead": {
+        "en": "Follow Get started from the top. Each card says what changing it does and what the default is.",
+        "ja": "「はじめに」を上から進めると迷いません。各カードに、変えると何が起きるかと既定値を書いています。",
+        "qps-ploc": "⟦Ƒőŀŀőẇ Ɠėŧ şŧȧřŧėḓ ƒřőɱ ŧħė ŧőṗ. Ėȧƈħ ƈȧřḓ şȧẏş ẇħȧŧ ƈħȧñɠïñɠ ïŧ ḓőėş ȧñḓ ẇħȧŧ ŧħė ḓėƒȧůŀŧ ïş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "ia_settings_search_label": {
+        "en": "Search settings",
+        "ja": "設定を検索",
+        "qps-ploc": "⟦Şėȧřƈħ şėŧŧïñɠş ŀőřė⟧"
+      },
+      "ia_settings_search_placeholder": {
+        "en": "For example: notifications, model, SSO",
+        "ja": "例: 通知、モデル、SSO",
+        "qps-ploc": "⟦Ƒőř ėẋȧɱṗŀė: ñőŧïƒïƈȧŧïőñş, ɱőḓėŀ, ŞŞŐ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_settings_search_results": {
+        "en": "{count} matching settings",
+        "ja": "一致する設定: {count} 件",
+        "qps-ploc": "⟦{count} ɱȧŧƈħïñɠ şėŧŧïñɠş ŀőřėɱ ïṗ⟧"
+      },
+      "ia_settings_search_empty": {
+        "en": "No setting matches “{query}”. Try another word.",
+        "ja": "「{query}」に一致する設定はありません。別の言葉で探してください。",
+        "qps-ploc": "⟦Ñő şėŧŧïñɠ ɱȧŧƈħėş “{query}”. Ŧřẏ ȧñőŧħėř ẇőřḓ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ia_settings_palette_group": {
+        "en": "Settings",
+        "ja": "設定",
+        "qps-ploc": "⟦Şėŧŧïñɠş ŀőř⟧"
+      },
+      "ia_settings_checklist_title": {
+        "en": "Setup checklist",
+        "ja": "初期設定チェックリスト",
+        "qps-ploc": "⟦Şėŧůṗ ƈħėƈķŀïşŧ ŀőřė⟧"
+      },
+      "ia_settings_checklist_lead": {
+        "en": "Do these from the top. A step is checked automatically once it is in place.",
+        "ja": "上から順に進めてください。整うと自動でチェックが付きます。",
+        "qps-ploc": "⟦Ḓő ŧħėşė ƒřőɱ ŧħė ŧőṗ. Ȧ şŧėṗ ïş ƈħėƈķėḓ ȧůŧőɱȧŧïƈȧŀŀẏ őñƈė ïŧ ïş ïñ ṗŀȧƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "ia_settings_checklist_progress": {
+        "en": "{done} of {total} done",
+        "ja": "{total} 件中 {done} 件完了",
+        "qps-ploc": "⟦{done} őƒ {total} ḓőñė ŀőřėɱ ï⟧"
+      },
+      "ia_settings_checklist_complete": {
+        "en": "Setup is complete. You can change anything later.",
+        "ja": "初期設定は完了しています。どの項目もあとから変えられます。",
+        "qps-ploc": "⟦Şėŧůṗ ïş ƈőɱṗŀėŧė. Ẏőů ƈȧñ ƈħȧñɠė ȧñẏŧħïñɠ ŀȧŧėř. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "ia_settings_checklist_loading": {
+        "en": "Checking your setup…",
+        "ja": "設定の状況を確認しています…",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ẏőůř şėŧůṗ… ŀőřėɱ ⟧"
+      },
+      "ia_settings_checklist_unavailable": {
+        "en": "Could not check your setup right now. The settings still work.",
+        "ja": "いまは状況を確認できませんでした。各設定はそのまま使えます。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈħėƈķ ẏőůř şėŧůṗ řïɠħŧ ñőẇ. Ŧħė şėŧŧïñɠş şŧïŀŀ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ia_settings_checklist_minutes": {
+        "en": "About {minutes} min",
+        "ja": "約 {minutes} 分",
+        "qps-ploc": "⟦Ȧƀőůŧ {minutes} ɱïñ ŀőřėɱ ⟧"
+      },
+      "ia_settings_checklist_status_done": {
+        "en": "Done",
+        "ja": "完了",
+        "qps-ploc": "⟦Ḓőñė ŀőř⟧"
+      },
+      "ia_settings_checklist_status_todo": {
+        "en": "To do",
+        "ja": "未完了",
+        "qps-ploc": "⟦Ŧő ḓő ŀőř⟧"
+      },
+      "ia_settings_checklist_status_unknown": {
+        "en": "Can’t tell yet",
+        "ja": "確認できません",
+        "qps-ploc": "⟦Ƈȧñ’ŧ ŧėŀŀ ẏėŧ ŀőřė⟧"
+      },
+      "ia_settings_checklist_open": {
+        "en": "Set up",
+        "ja": "設定する",
+        "qps-ploc": "⟦Şėŧ ůṗ ŀőř⟧"
+      },
+      "ia_settings_checklist_review": {
+        "en": "Review",
+        "ja": "見直す",
+        "qps-ploc": "⟦Řėṽïėẇ ŀőř⟧"
+      },
+      "ia_settings_checklist_next": {
+        "en": "Next",
+        "ja": "次はこれ",
+        "qps-ploc": "⟦Ñėẋŧ ŀőř⟧"
+      },
+      "ia_settings_next_category": {
+        "en": "Next to open: {category}",
+        "ja": "次に開く: {category}",
+        "qps-ploc": "⟦Ñėẋŧ ŧő őṗėñ: {category} ŀőřėɱ ï⟧"
+      },
+      "ia_settings_other_readiness": {
+        "en": "Nice to have",
+        "ja": "あると便利な準備",
+        "qps-ploc": "⟦Ñïƈė ŧő ħȧṽė ŀőř⟧"
+      },
+      "ia_settings_step_identity": {
+        "en": "You and your company",
+        "ja": "あなたと会社",
+        "qps-ploc": "⟦Ẏőů ȧñḓ ẏőůř ƈőɱṗȧñẏ ŀőřėɱ ⟧"
+      },
+      "ia_settings_step_identity_why": {
+        "en": "Decides who Kyberion works for and within which company.",
+        "ja": "Kyberion が誰のために、どの会社の範囲で働くかを決めます。",
+        "qps-ploc": "⟦Ḓėƈïḓėş ẇħő Ķẏƀėřïőñ ẇőřķş ƒőř ȧñḓ ẇïŧħïñ ẇħïƈħ ƈőɱṗȧñẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "ia_settings_step_reasoning": {
+        "en": "Reasoning engine",
+        "ja": "推論エンジン",
+        "qps-ploc": "⟦Řėȧşőñïñɠ ėñɠïñė ŀőřėɱ⟧"
+      },
+      "ia_settings_step_reasoning_why": {
+        "en": "The AI that plans and writes. Nothing can run without it.",
+        "ja": "計画や文章を作る AI です。これがないと仕事を始められません。",
+        "qps-ploc": "⟦Ŧħė ȦÏ ŧħȧŧ ṗŀȧñş ȧñḓ ẇřïŧėş. Ñőŧħïñɠ ƈȧñ řůñ ẇïŧħőůŧ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "ia_settings_step_autonomy": {
+        "en": "Autonomy and approval rules",
+        "ja": "自律度と承認のルール",
+        "qps-ploc": "⟦Ȧůŧőñőɱẏ ȧñḓ ȧṗṗřőṽȧŀ řůŀėş ŀőřėɱ ïṗ⟧"
+      },
+      "ia_settings_step_autonomy_why": {
+        "en": "Decides what agents may do alone and what needs your approval.",
+        "ja": "エージェントがひとりで進めてよいことと、承認が要ることを決めます。",
+        "qps-ploc": "⟦Ḓėƈïḓėş ẇħȧŧ ȧɠėñŧş ɱȧẏ ḓő ȧŀőñė ȧñḓ ẇħȧŧ ñėėḓş ẏőůř ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ia_settings_step_notifications": {
+        "en": "Where to notify you",
+        "ja": "通知先",
+        "qps-ploc": "⟦Ẇħėřė ŧő ñőŧïƒẏ ẏőů ŀőřėɱ ⟧"
+      },
+      "ia_settings_step_notifications_why": {
+        "en": "Requests for your decision reach you outside this screen too.",
+        "ja": "判断の依頼を、この画面の外でも受け取れるようにします。",
+        "qps-ploc": "⟦Řėɋůėşŧş ƒőř ẏőůř ḓėƈïşïőñ řėȧƈħ ẏőů őůŧşïḓė ŧħïş şƈřėėñ ŧőő. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "ia_settings_step_first_project": {
+        "en": "First project and goal",
+        "ja": "最初のプロジェクトと目標",
+        "qps-ploc": "⟦Ƒïřşŧ ṗřőĵėƈŧ ȧñḓ ɠőȧŀ ŀőřėɱ ï⟧"
+      },
+      "ia_settings_step_first_project_why": {
+        "en": "Gives agents a purpose to work toward.",
+        "ja": "エージェントが目指す目的を与えます。",
+        "qps-ploc": "⟦Ɠïṽėş ȧɠėñŧş ȧ ṗůřṗőşė ŧő ẇőřķ ŧőẇȧřḓ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_settings_step_budget": {
+        "en": "Budget",
+        "ja": "予算",
+        "qps-ploc": "⟦Ƀůḓɠėŧ ŀőř⟧"
+      },
+      "ia_settings_step_budget_why": {
+        "en": "Caps what AI usage may cost per day and per mission.",
+        "ja": "1日・1ミッションあたりの AI 利用費の上限を決めます。",
+        "qps-ploc": "⟦Ƈȧṗş ẇħȧŧ ȦÏ ůşȧɠė ɱȧẏ ƈőşŧ ṗėř ḓȧẏ ȧñḓ ṗėř ɱïşşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_settings_step_trial_mission": {
+        "en": "A trial job",
+        "ja": "試しの仕事",
+        "qps-ploc": "⟦Ȧ ŧřïȧŀ ĵőƀ ŀőř⟧"
+      },
+      "ia_settings_step_trial_mission_why": {
+        "en": "Runs one small job end to end so you see how work flows.",
+        "ja": "小さな仕事を一度最後まで通して、流れをつかみます。",
+        "qps-ploc": "⟦Řůñş őñė şɱȧŀŀ ĵőƀ ėñḓ ŧő ėñḓ şő ẏőů şėė ħőẇ ẇőřķ ƒŀőẇş. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "ia_settings_meta_default": {
+        "en": "Default: {value}",
+        "ja": "既定: {value}",
+        "qps-ploc": "⟦Ḓėƒȧůŀŧ: {value} ŀőřėɱ⟧"
+      },
+      "ia_settings_meta_effect": {
+        "en": "Changing it: {value}",
+        "ja": "変えると: {value}",
+        "qps-ploc": "⟦Ƈħȧñɠïñɠ ïŧ: {value} ŀőřėɱ ⟧"
+      },
+      "ia_settings_meta_current": {
+        "en": "Now: {value}",
+        "ja": "現在: {value}",
+        "qps-ploc": "⟦Ñőẇ: {value} ŀőř⟧"
+      },
+      "ia_settings_cli_badge": {
+        "en": "Set in the terminal",
+        "ja": "ターミナルで設定",
+        "qps-ploc": "⟦Şėŧ ïñ ŧħė ŧėřɱïñȧŀ ŀőřėɱ ⟧"
+      },
+      "ia_settings_cli_lead": {
+        "en": "This can’t be changed on this screen yet. Ask the person who runs Kyberion on its computer to run the command.",
+        "ja": "この画面ではまだ変更できません。Kyberion を動かしている PC の担当者に、コマンドを実行してもらってください。",
+        "qps-ploc": "⟦Ŧħïş ƈȧñ’ŧ ƀė ƈħȧñɠėḓ őñ ŧħïş şƈřėėñ ẏėŧ. Ȧşķ ŧħė ṗėřşőñ ẇħő řůñş Ķẏƀėřïőñ őñ ïŧş ƈőɱṗůŧėř ŧő řůñ ŧħė ƈőɱɱȧñḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "ia_settings_command_show": {
+        "en": "Show the command",
+        "ja": "コマンドを表示",
+        "qps-ploc": "⟦Şħőẇ ŧħė ƈőɱɱȧñḓ ŀőřėɱ⟧"
+      },
+      "ia_settings_command_copy": {
+        "en": "Copy",
+        "ja": "コピー",
+        "qps-ploc": "⟦Ƈőṗẏ ŀőř⟧"
+      },
+      "ia_settings_command_copied": {
+        "en": "Copied",
+        "ja": "コピーしました",
+        "qps-ploc": "⟦Ƈőṗïėḓ ŀőř⟧"
+      },
+      "ia_settings_command_copy_failed": {
+        "en": "Could not copy. Select the text and copy it.",
+        "ja": "コピーできませんでした。文字を選んでコピーしてください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈőṗẏ. Şėŀėƈŧ ŧħė ŧėẋŧ ȧñḓ ƈőṗẏ ïŧ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ia_settings_card_trial": {
+        "en": "Try a first job",
+        "ja": "試しの仕事を頼む",
+        "qps-ploc": "⟦Ŧřẏ ȧ ƒïřşŧ ĵőƀ ŀőřė⟧"
+      },
+      "ia_settings_card_trial_desc": {
+        "en": "Ask the secretary for one small job. You will see planning, your approval and the result once.",
+        "ja": "秘書に小さな仕事を一つ頼みます。計画、あなたの承認、成果までの流れを一度体験できます。",
+        "qps-ploc": "⟦Ȧşķ ŧħė şėƈřėŧȧřẏ ƒőř őñė şɱȧŀŀ ĵőƀ. Ẏőů ẇïŀŀ şėė ṗŀȧññïñɠ, ẏőůř ȧṗṗřőṽȧŀ ȧñḓ ŧħė řėşůŀŧ őñƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "ia_settings_card_trial_action": {
+        "en": "Ask the secretary",
+        "ja": "秘書に頼む",
+        "qps-ploc": "⟦Ȧşķ ŧħė şėƈřėŧȧřẏ ŀőřėɱ⟧"
+      },
+      "ia_settings_card_trial_work": {
+        "en": "See work",
+        "ja": "仕事を見る",
+        "qps-ploc": "⟦Şėė ẇőřķ ŀőř⟧"
+      },
+      "ia_settings_profile_default": {
+        "en": "empty — agents use a neutral tone",
+        "ja": "空欄(エージェントは標準の話し方を使います)",
+        "qps-ploc": "⟦ėɱṗŧẏ — ȧɠėñŧş ůşė ȧ ñėůŧřȧŀ ŧőñė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_settings_profile_effect": {
+        "en": "agents address you by name and follow your stated focus and policy",
+        "ja": "エージェントがあなたの名前で呼び、書いた領域と方針に沿って動きます",
+        "qps-ploc": "⟦ȧɠėñŧş ȧḓḓřėşş ẏőů ƀẏ ñȧɱė ȧñḓ ƒőŀŀőẇ ẏőůř şŧȧŧėḓ ƒőƈůş ȧñḓ ṗőŀïƈẏ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_settings_members_effect": {
+        "en": "people gain or lose access to this company’s work",
+        "ja": "その人がこの会社の仕事を見たり判断したりできるかが変わります",
+        "qps-ploc": "⟦ṗėőṗŀė ɠȧïñ őř ŀőşė ȧƈƈėşş ŧő ŧħïş ƈőɱṗȧñẏ’ş ẇőřķ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "ia_settings_card_company": {
+        "en": "Company registration",
+        "ja": "会社の登録と有効化",
+        "qps-ploc": "⟦Ƈőɱṗȧñẏ řėɠïşŧřȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "ia_settings_card_company_desc": {
+        "en": "Register a company, check that it is ready, get a person’s approval and prepare its first work, in that order.",
+        "ja": "会社の登録、準備確認、人による承認、初回の仕事の準備を順に進めます。",
+        "qps-ploc": "⟦Řėɠïşŧėř ȧ ƈőɱṗȧñẏ, ƈħėƈķ ŧħȧŧ ïŧ ïş řėȧḓẏ, ɠėŧ ȧ ṗėřşőñ’ş ȧṗṗřőṽȧŀ ȧñḓ ṗřėṗȧřė ïŧş ƒïřşŧ ẇőřķ, ïñ ŧħȧŧ őřḓėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "ia_settings_card_company_effect": {
+        "en": "a company becomes active and agents may work for it",
+        "ja": "会社が有効になり、エージェントがその会社の仕事をできるようになります",
+        "qps-ploc": "⟦ȧ ƈőɱṗȧñẏ ƀėƈőɱėş ȧƈŧïṽė ȧñḓ ȧɠėñŧş ɱȧẏ ẇőřķ ƒőř ïŧ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_settings_card_company_action": {
+        "en": "Open company setup",
+        "ja": "会社のセットアップを開く",
+        "qps-ploc": "⟦Őṗėñ ƈőɱṗȧñẏ şėŧůṗ ŀőřėɱ⟧"
+      },
+      "ia_settings_card_projects": {
+        "en": "Projects and goals",
+        "ja": "プロジェクトと目標",
+        "qps-ploc": "⟦Ṗřőĵėƈŧş ȧñḓ ɠőȧŀş ŀőřėɱ⟧"
+      },
+      "ia_settings_card_projects_desc": {
+        "en": "Create the project agents work in and write down its goal.",
+        "ja": "エージェントが働くプロジェクトを作り、その目標を書きます。",
+        "qps-ploc": "⟦Ƈřėȧŧė ŧħė ṗřőĵėƈŧ ȧɠėñŧş ẇőřķ ïñ ȧñḓ ẇřïŧė ḓőẇñ ïŧş ɠőȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "ia_settings_card_projects_default": {
+        "en": "no project — agents wait for a request",
+        "ja": "プロジェクトなし(エージェントは依頼を待ちます)",
+        "qps-ploc": "⟦ñő ṗřőĵėƈŧ — ȧɠėñŧş ẇȧïŧ ƒőř ȧ řėɋůėşŧ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_settings_card_projects_action": {
+        "en": "Manage organizations and projects",
+        "ja": "組織とプロジェクトを管理する",
+        "qps-ploc": "⟦Ɱȧñȧɠė őřɠȧñïẑȧŧïőñş ȧñḓ ṗřőĵėƈŧş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_settings_card_tenant_cli": {
+        "en": "Add another company",
+        "ja": "別の会社を追加する",
+        "qps-ploc": "⟦Ȧḓḓ ȧñőŧħėř ƈőɱṗȧñẏ ŀőřėɱ ⟧"
+      },
+      "ia_settings_card_tenant_cli_desc": {
+        "en": "A new company (tenant) and its link to this computer are created in the terminal.",
+        "ja": "新しい会社(テナント)の作成と、この PC への紐付けはターミナルで行います。",
+        "qps-ploc": "⟦Ȧ ñėẇ ƈőɱṗȧñẏ (ŧėñȧñŧ) ȧñḓ ïŧş ŀïñķ ŧő ŧħïş ƈőɱṗůŧėř ȧřė ƈřėȧŧėḓ ïñ ŧħė ŧėřɱïñȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "ia_settings_card_reasoning": {
+        "en": "Reasoning engine and model",
+        "ja": "推論エンジンとモデル",
+        "qps-ploc": "⟦Řėȧşőñïñɠ ėñɠïñė ȧñḓ ɱőḓėŀ ŀőřėɱ ïṗ⟧"
+      },
+      "ia_settings_card_reasoning_desc": {
+        "en": "The one place to choose which AI plans and writes. Other screens link here.",
+        "ja": "計画や文章を作る AI を選ぶ唯一の場所です。ほかの画面からはここへ移動します。",
+        "qps-ploc": "⟦Ŧħė őñė ṗŀȧƈė ŧő ƈħőőşė ẇħïƈħ ȦÏ ṗŀȧñş ȧñḓ ẇřïŧėş. Őŧħėř şƈřėėñş ŀïñķ ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "ia_settings_card_reasoning_default": {
+        "en": "automatic — the first engine available on this computer",
+        "ja": "自動(この PC で使える最初のエンジン)",
+        "qps-ploc": "⟦ȧůŧőɱȧŧïƈ — ŧħė ƒïřşŧ ėñɠïñė ȧṽȧïŀȧƀŀė őñ ŧħïş ƈőɱṗůŧėř ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ia_settings_card_reasoning_effect": {
+        "en": "new work uses the chosen engine; work already running keeps its engine",
+        "ja": "これから始まる仕事が選んだエンジンを使います。実行中の仕事は変わりません",
+        "qps-ploc": "⟦ñėẇ ẇőřķ ůşėş ŧħė ƈħőşėñ ėñɠïñė; ẇőřķ ȧŀřėȧḓẏ řůññïñɠ ķėėṗş ïŧş ėñɠïñė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "ia_settings_reasoning_provider": {
+        "en": "Engine",
+        "ja": "エンジン",
+        "qps-ploc": "⟦Ėñɠïñė ŀőř⟧"
+      },
+      "ia_settings_reasoning_model": {
+        "en": "Model",
+        "ja": "モデル",
+        "qps-ploc": "⟦Ɱőḓėŀ ŀőř⟧"
+      },
+      "ia_settings_reasoning_model_default": {
+        "en": "Engine default",
+        "ja": "エンジンの既定",
+        "qps-ploc": "⟦Ėñɠïñė ḓėƒȧůŀŧ ŀőřė⟧"
+      },
+      "ia_settings_reasoning_none": {
+        "en": "not chosen",
+        "ja": "未選択",
+        "qps-ploc": "⟦ñőŧ ƈħőşėñ ŀőř⟧"
+      },
+      "ia_settings_reasoning_none_ready": {
+        "en": "No engine is ready on this computer yet. An engine is installed in the terminal.",
+        "ja": "この PC で使えるエンジンがまだありません。エンジンの導入はターミナルで行います。",
+        "qps-ploc": "⟦Ñő ėñɠïñė ïş řėȧḓẏ őñ ŧħïş ƈőɱṗůŧėř ẏėŧ. Ȧñ ėñɠïñė ïş ïñşŧȧŀŀėḓ ïñ ŧħė ŧėřɱïñȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "ia_settings_reasoning_unavailable": {
+        "en": "Engines that need setup first",
+        "ja": "先に準備が必要なエンジン",
+        "qps-ploc": "⟦Ėñɠïñėş ŧħȧŧ ñėėḓ şėŧůṗ ƒïřşŧ ŀőřėɱ ïṗş⟧"
+      },
+      "ia_settings_reasoning_save": {
+        "en": "Use this engine",
+        "ja": "このエンジンを使う",
+        "qps-ploc": "⟦Ůşė ŧħïş ėñɠïñė ŀőřė⟧"
+      },
+      "ia_settings_reasoning_saved": {
+        "en": "Saved. New work uses this engine.",
+        "ja": "保存しました。これから始まる仕事はこのエンジンを使います。",
+        "qps-ploc": "⟦Şȧṽėḓ. Ñėẇ ẇőřķ ůşėş ŧħïş ėñɠïñė. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_settings_reasoning_failed": {
+        "en": "Could not save. Nothing was changed.",
+        "ja": "保存できませんでした。設定は変わっていません。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ şȧṽė. Ñőŧħïñɠ ẇȧş ƈħȧñɠėḓ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_settings_reasoning_load_failed": {
+        "en": "Could not read the engines right now.",
+        "ja": "いまはエンジンの一覧を読めませんでした。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ řėȧḓ ŧħė ėñɠïñėş řïɠħŧ ñőẇ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_settings_reasoning_install": {
+        "en": "Install or connect an engine",
+        "ja": "エンジンを導入・接続する",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ őř ƈőññėƈŧ ȧñ ėñɠïñė ŀőřėɱ ïṗş⟧"
+      },
+      "ia_settings_authority_effect": {
+        "en": "agents ask you before more actions, or fewer",
+        "ja": "エージェントが承認を求める操作の範囲が変わります",
+        "qps-ploc": "⟦ȧɠėñŧş ȧşķ ẏőů ƀėƒőřė ɱőřė ȧƈŧïőñş, őř ƒėẇėř ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ia_settings_authority_default": {
+        "en": "agents ask before anything that changes outside data",
+        "ja": "外部のデータを変える操作の前には必ず承認を求めます",
+        "qps-ploc": "⟦ȧɠėñŧş ȧşķ ƀėƒőřė ȧñẏŧħïñɠ ŧħȧŧ ƈħȧñɠėş őůŧşïḓė ḓȧŧȧ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_settings_voice_effect": {
+        "en": "how the secretary looks and sounds when it speaks",
+        "ja": "秘書が話すときの見た目と声が変わります",
+        "qps-ploc": "⟦ħőẇ ŧħė şėƈřėŧȧřẏ ŀőőķş ȧñḓ şőůñḓş ẇħėñ ïŧ şṗėȧķş ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "ia_settings_card_engine": {
+        "en": "Media engines (Presence Studio)",
+        "ja": "メディアエンジン(Presence Studio)",
+        "qps-ploc": "⟦Ɱėḓïȧ ėñɠïñėş (Ṗřėşėñƈė Şŧůḓïő) ŀőřėɱ ïṗşů⟧"
+      },
+      "ia_settings_card_engine_desc": {
+        "en": "Speech, transcription and video tools, and how agents run, are set in Presence Studio on the Kyberion computer.",
+        "ja": "音声合成・文字起こし・動画の道具と、エージェントの実行方式は、Kyberion を動かしている PC の Presence Studio で設定します。",
+        "qps-ploc": "⟦Şṗėėƈħ, ŧřȧñşƈřïṗŧïőñ ȧñḓ ṽïḓėő ŧőőŀş, ȧñḓ ħőẇ ȧɠėñŧş řůñ, ȧřė şėŧ ïñ Ṗřėşėñƈė Şŧůḓïő őñ ŧħė Ķẏƀėřïőñ ƈőɱṗůŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "ia_settings_card_engine_effect": {
+        "en": "voice and media features use the chosen local tools",
+        "ja": "声やメディアの機能が、選んだ道具を使います",
+        "qps-ploc": "⟦ṽőïƈė ȧñḓ ɱėḓïȧ ƒėȧŧůřėş ůşė ŧħė ƈħőşėñ ŀőƈȧŀ ŧőőŀş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_settings_card_engine_action": {
+        "en": "Open engine settings",
+        "ja": "エンジン設定を開く",
+        "qps-ploc": "⟦Őṗėñ ėñɠïñė şėŧŧïñɠş ŀőřėɱ ⟧"
+      },
+      "ia_settings_card_engine_local": {
+        "en": "Opens only on the Kyberion computer.",
+        "ja": "Kyberion を動かしている PC でのみ開けます。",
+        "qps-ploc": "⟦Őṗėñş őñŀẏ őñ ŧħė Ķẏƀėřïőñ ƈőɱṗůŧėř. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_settings_agentpanel_default_link": {
+        "en": "The default engine and model for all work is set in Settings › Agents & autonomy. This choice applies to this one agent only.",
+        "ja": "すべての仕事の既定のエンジンとモデルは「設定 › エージェントと自律度」で決めます。ここでの選択は、このエージェント1体にだけ使います。",
+        "qps-ploc": "⟦Ŧħė ḓėƒȧůŀŧ ėñɠïñė ȧñḓ ɱőḓėŀ ƒőř ȧŀŀ ẇőřķ ïş şėŧ ïñ Şėŧŧïñɠş › Ȧɠėñŧş & ȧůŧőñőɱẏ. Ŧħïş ƈħőïƈė ȧṗṗŀïėş ŧő ŧħïş őñė ȧɠėñŧ őñŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "ia_settings_agentpanel_open_settings": {
+        "en": "Open the default engine setting",
+        "ja": "既定のエンジン設定を開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė ḓėƒȧůŀŧ ėñɠïñė şėŧŧïñɠ ŀőřėɱ ïṗşů⟧"
+      },
+      "ia_settings_advanced_agent_engine": {
+        "en": "Agent engine and model",
+        "ja": "エージェントのエンジンとモデル",
+        "qps-ploc": "⟦Ȧɠėñŧ ėñɠïñė ȧñḓ ɱőḓėŀ ŀőřėɱ ï⟧"
+      },
+      "ia_settings_advanced_agent_engine_desc": {
+        "en": "Chosen in Agents & autonomy, so there is one place for it.",
+        "ja": "設定場所を一つにするため、「エージェントと自律度」で選びます。",
+        "qps-ploc": "⟦Ƈħőşėñ ïñ Ȧɠėñŧş & ȧůŧőñőɱẏ, şő ŧħėřė ïş őñė ṗŀȧƈė ƒőř ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "ia_settings_advanced_agent_engine_action": {
+        "en": "Choose the engine",
+        "ja": "エンジンを選ぶ",
+        "qps-ploc": "⟦Ƈħőőşė ŧħė ėñɠïñė ŀőřėɱ⟧"
+      },
+      "ia_settings_notifications_default": {
+        "en": "none — you see things only on this screen",
+        "ja": "なし(この画面でだけ確認します)",
+        "qps-ploc": "⟦ñőñė — ẏőů şėė ŧħïñɠş őñŀẏ őñ ŧħïş şƈřėėñ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ia_settings_notifications_effect": {
+        "en": "decision requests and results are also sent to the chosen channel",
+        "ja": "判断の依頼や結果が、選んだ通知先にも届きます",
+        "qps-ploc": "⟦ḓėƈïşïőñ řėɋůėşŧş ȧñḓ řėşůŀŧş ȧřė ȧŀşő şėñŧ ŧő ŧħė ƈħőşėñ ƈħȧññėŀ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_settings_services_effect": {
+        "en": "agents may use the selected services on your behalf",
+        "ja": "エージェントが選んだサービスをあなたの代わりに使えるようになります",
+        "qps-ploc": "⟦ȧɠėñŧş ɱȧẏ ůşė ŧħė şėŀėƈŧėḓ şėřṽïƈėş őñ ẏőůř ƀėħȧŀƒ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_settings_card_sso": {
+        "en": "Single sign-on (SSO)",
+        "ja": "シングルサインオン(SSO)",
+        "qps-ploc": "⟦Şïñɠŀė şïɠñ-őñ (ŞŞŐ) ŀőřėɱ ⟧"
+      },
+      "ia_settings_card_sso_desc": {
+        "en": "Let members sign in with your company’s identity provider instead of an access token.",
+        "ja": "メンバーがアクセス用トークンの代わりに、会社のアカウントでサインインできるようにします。",
+        "qps-ploc": "⟦Ŀėŧ ɱėɱƀėřş şïɠñ ïñ ẇïŧħ ẏőůř ƈőɱṗȧñẏ’ş ïḓėñŧïŧẏ ṗřőṽïḓėř ïñşŧėȧḓ őƒ ȧñ ȧƈƈėşş ŧőķėñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "ia_settings_card_sso_default": {
+        "en": "off — members sign in with an access token",
+        "ja": "オフ(メンバーはアクセス用トークンでサインイン)",
+        "qps-ploc": "⟦őƒƒ — ɱėɱƀėřş şïɠñ ïñ ẇïŧħ ȧñ ȧƈƈėşş ŧőķėñ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ia_settings_card_sso_effect": {
+        "en": "the sign-in screen offers your company account",
+        "ja": "サインイン画面に会社のアカウントでのサインインが出ます",
+        "qps-ploc": "⟦ŧħė şïɠñ-ïñ şƈřėėñ őƒƒėřş ẏőůř ƈőɱṗȧñẏ ȧƈƈőůñŧ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ia_settings_plugins_lead": {
+        "en": "Approve or decline plugins that were installed on the Kyberion computer. A plugin’s code never runs until it is approved here.",
+        "ja": "Kyberion を動かしている PC に追加された拡張機能を、ここで承認または拒否します。承認するまで拡張機能のコードは一切実行されません。",
+        "qps-ploc": "⟦Ȧṗṗřőṽė őř ḓėƈŀïñė ṗŀůɠïñş ŧħȧŧ ẇėřė ïñşŧȧŀŀėḓ őñ ŧħė Ķẏƀėřïőñ ƈőɱṗůŧėř. Ȧ ṗŀůɠïñ’ş ƈőḓė ñėṽėř řůñş ůñŧïŀ ïŧ ïş ȧṗṗřőṽėḓ ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "ia_settings_plugins_install": {
+        "en": "Add a new plugin",
+        "ja": "新しい拡張機能を追加する",
+        "qps-ploc": "⟦Ȧḓḓ ȧ ñėẇ ṗŀůɠïñ ŀőřėɱ⟧"
+      },
+      "ia_settings_plugins_install_desc": {
+        "en": "Adding a plugin is done in the terminal. It then appears here for your approval.",
+        "ja": "拡張機能の追加はターミナルで行います。追加するとここに表示され、承認できるようになります。",
+        "qps-ploc": "⟦Ȧḓḓïñɠ ȧ ṗŀůɠïñ ïş ḓőñė ïñ ŧħė ŧėřɱïñȧŀ. Ïŧ ŧħėñ ȧṗṗėȧřş ħėřė ƒőř ẏőůř ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "ia_settings_plugins_empty": {
+        "en": "No plugins have been added yet. Added plugins appear here for approval.",
+        "ja": "追加された拡張機能はまだありません。追加するとここに表示されます。",
+        "qps-ploc": "⟦Ñő ṗŀůɠïñş ħȧṽė ƀėėñ ȧḓḓėḓ ẏėŧ. Ȧḓḓėḓ ṗŀůɠïñş ȧṗṗėȧř ħėřė ƒőř ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "ia_settings_recording_effect": {
+        "en": "whether your PC activity may be observed to suggest work",
+        "ja": "PC の操作を観察して仕事を提案してよいかが変わります",
+        "qps-ploc": "⟦ẇħėŧħėř ẏőůř ṖƇ ȧƈŧïṽïŧẏ ɱȧẏ ƀė őƀşėřṽėḓ ŧő şůɠɠėşŧ ẇőřķ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "ia_settings_card_secrets": {
+        "en": "Secrets and backup passphrase",
+        "ja": "秘密情報とバックアップ",
+        "qps-ploc": "⟦Şėƈřėŧş ȧñḓ ƀȧƈķůṗ ṗȧşşṗħřȧşė ŀőřėɱ ïṗş⟧"
+      },
+      "ia_settings_card_secrets_desc": {
+        "en": "Passwords, API keys and the backup passphrase are registered on the Kyberion computer so they never pass through the browser.",
+        "ja": "パスワード・API キー・バックアップのパスフレーズは、ブラウザを通さないよう Kyberion を動かしている PC で登録します。",
+        "qps-ploc": "⟦Ṗȧşşẇőřḓş, ȦṖÏ ķėẏş ȧñḓ ŧħė ƀȧƈķůṗ ṗȧşşṗħřȧşė ȧřė řėɠïşŧėřėḓ őñ ŧħė Ķẏƀėřïőñ ƈőɱṗůŧėř şő ŧħėẏ ñėṽėř ṗȧşş ŧħřőůɠħ ŧħė ƀřőẇşėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "ia_settings_card_budget": {
+        "en": "AI spending limits",
+        "ja": "AI 利用費の上限",
+        "qps-ploc": "⟦ȦÏ şṗėñḓïñɠ ŀïɱïŧş ŀőřėɱ⟧"
+      },
+      "ia_settings_card_budget_desc": {
+        "en": "Limits on what AI usage may cost. When a limit is reached, work is warned or stopped until someone approves.",
+        "ja": "AI の利用にかけてよい費用の上限です。上限に達すると、警告するか、承認があるまで止めます。",
+        "qps-ploc": "⟦Ŀïɱïŧş őñ ẇħȧŧ ȦÏ ůşȧɠė ɱȧẏ ƈőşŧ. Ẇħėñ ȧ ŀïɱïŧ ïş řėȧƈħėḓ, ẇőřķ ïş ẇȧřñėḓ őř şŧőṗṗėḓ ůñŧïŀ şőɱėőñė ȧṗṗřőṽėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
+      "ia_settings_budget_daily": {
+        "en": "Per day",
+        "ja": "1日あたり",
+        "qps-ploc": "⟦Ṗėř ḓȧẏ ŀőř⟧"
+      },
+      "ia_settings_budget_mission": {
+        "en": "Per mission",
+        "ja": "1ミッションあたり",
+        "qps-ploc": "⟦Ṗėř ɱïşşïőñ ŀőř⟧"
+      },
+      "ia_settings_budget_posture": {
+        "en": "When a limit is reached",
+        "ja": "上限に達したとき",
+        "qps-ploc": "⟦Ẇħėñ ȧ ŀïɱïŧ ïş řėȧƈħėḓ ŀőřėɱ ï⟧"
+      },
+      "ia_settings_budget_posture_warn": {
+        "en": "Warn and continue",
+        "ja": "警告して続ける",
+        "qps-ploc": "⟦Ẇȧřñ ȧñḓ ƈőñŧïñůė ŀőřėɱ⟧"
+      },
+      "ia_settings_budget_posture_block": {
+        "en": "Stop until approved",
+        "ja": "承認まで止める",
+        "qps-ploc": "⟦Şŧőṗ ůñŧïŀ ȧṗṗřőṽėḓ ŀőřėɱ ⟧"
+      },
+      "ia_settings_budget_uses_default": {
+        "en": "Using the shipped defaults",
+        "ja": "既定値のまま",
+        "qps-ploc": "⟦Ůşïñɠ ŧħė şħïṗṗėḓ ḓėƒȧůŀŧş ŀőřėɱ ïṗ⟧"
+      },
+      "ia_settings_budget_custom": {
+        "en": "Set for this company",
+        "ja": "この会社用に設定済み",
+        "qps-ploc": "⟦Şėŧ ƒőř ŧħïş ƈőɱṗȧñẏ ŀőřėɱ ⟧"
+      },
+      "ia_settings_budget_default_value": {
+        "en": "$50 a day, $20 a mission, warn only",
+        "ja": "1日 $50、1ミッション $20、警告のみ",
+        "qps-ploc": "⟦$50 ȧ ḓȧẏ, $20 ȧ ɱïşşïőñ, ẇȧřñ őñŀẏ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_settings_budget_unavailable": {
+        "en": "Could not read the limits right now.",
+        "ja": "いまは上限を読み込めませんでした。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ řėȧḓ ŧħė ŀïɱïŧş řïɠħŧ ñőẇ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_settings_budget_change": {
+        "en": "Limits are a governed policy. An administrator changes them in the policy file on the Kyberion computer.",
+        "ja": "上限は管理されたポリシーです。管理者が Kyberion を動かしている PC のポリシーファイルで変更します。",
+        "qps-ploc": "⟦Ŀïɱïŧş ȧřė ȧ ɠőṽėřñėḓ ṗőŀïƈẏ. Ȧñ ȧḓɱïñïşŧřȧŧőř ƈħȧñɠėş ŧħėɱ ïñ ŧħė ṗőŀïƈẏ ƒïŀė őñ ŧħė Ķẏƀėřïőñ ƈőɱṗůŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "ia_settings_budget_file": {
+        "en": "Show the file location",
+        "ja": "ファイルの場所を表示",
+        "qps-ploc": "⟦Şħőẇ ŧħė ƒïŀė ŀőƈȧŧïőñ ŀőřėɱ ï⟧"
+      },
+      "ia_settings_display_locale_default": {
+        "en": "Japanese",
+        "ja": "日本語",
+        "qps-ploc": "⟦Ĵȧṗȧñėşė ŀőř⟧"
+      },
+      "ia_settings_display_theme_default": {
+        "en": "follow the system",
+        "ja": "システムに合わせる",
+        "qps-ploc": "⟦ƒőŀŀőẇ ŧħė şẏşŧėɱ ŀőřėɱ⟧"
+      },
+      "ia_settings_display_density_default": {
+        "en": "comfortable",
+        "ja": "ゆったり",
+        "qps-ploc": "⟦ƈőɱƒőřŧȧƀŀė ŀőř⟧"
+      },
+      "ia_settings_display_effect": {
+        "en": "every page on this browser changes at once; other devices are unaffected",
+        "ja": "この端末のすべての画面がすぐに変わります。ほかの端末には影響しません",
+        "qps-ploc": "⟦ėṽėřẏ ṗȧɠė őñ ŧħïş ƀřőẇşėř ƈħȧñɠėş ȧŧ őñƈė; őŧħėř ḓėṽïƈėş ȧřė ůñȧƒƒėƈŧėḓ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "ia_settings_card_cli": {
+        "en": "Terminal-only operations",
+        "ja": "ターミナル専用の操作",
+        "qps-ploc": "⟦Ŧėřɱïñȧŀ-őñŀẏ őṗėřȧŧïőñş ŀőřėɱ ï⟧"
+      },
+      "ia_settings_card_cli_desc": {
+        "en": "These have no screen yet. Each is run by the person who operates the Kyberion computer.",
+        "ja": "まだ画面がない操作です。Kyberion を動かしている PC の担当者が実行します。",
+        "qps-ploc": "⟦Ŧħėşė ħȧṽė ñő şƈřėėñ ẏėŧ. Ėȧƈħ ïş řůñ ƀẏ ŧħė ṗėřşőñ ẇħő őṗėřȧŧėş ŧħė Ķẏƀėřïőñ ƈőɱṗůŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "ia_settings_cli_first_run": {
+        "en": "Show the first owner’s one-time code",
+        "ja": "最初のオーナー用ワンタイムコードを表示する",
+        "qps-ploc": "⟦Şħőẇ ŧħė ƒïřşŧ őẇñėř’ş őñė-ŧïɱė ƈőḓė ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_settings_cli_scheduler": {
+        "en": "Start or update scheduled and always-on services",
+        "ja": "定期実行と常駐サービスを起動・更新する",
+        "qps-ploc": "⟦Şŧȧřŧ őř ůṗḓȧŧė şƈħėḓůŀėḓ ȧñḓ ȧŀẇȧẏş-őñ şėřṽïƈėş ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "ia_settings_cli_doctor": {
+        "en": "Check this computer’s environment",
+        "ja": "この PC の環境を診断する",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħïş ƈőɱṗůŧėř’ş ėñṽïřőñɱėñŧ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_settings_cli_surfaces": {
+        "en": "Enable or repair screens and bridges",
+        "ja": "画面や連携ブリッジを有効化・修復する",
+        "qps-ploc": "⟦Ėñȧƀŀė őř řėṗȧïř şƈřėėñş ȧñḓ ƀřïḓɠėş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_settings_cli_stance": {
+        "en": "Switch the customer you work for",
+        "ja": "担当する顧客を切り替える",
+        "qps-ploc": "⟦Şẇïŧƈħ ŧħė ƈůşŧőɱėř ẏőů ẇőřķ ƒőř ŀőřėɱ ïṗşů⟧"
+      },
+      "ia_settings_cli_customer_decision": {
+        "en": "Start a customer decision",
+        "ja": "顧客との意思決定を始める",
+        "qps-ploc": "⟦Şŧȧřŧ ȧ ƈůşŧőɱėř ḓėƈïşïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "ia_settings_meta_label": {
+        "en": "About this setting",
+        "ja": "この設定について",
+        "qps-ploc": "⟦Ȧƀőůŧ ŧħïş şėŧŧïñɠ ŀőřėɱ⟧"
+      },
+      "ia_settings_back_to_settings": {
+        "en": "← Back to Settings › Workspace & organization",
+        "ja": "← 設定 › ワークスペースと組織 に戻る",
+        "qps-ploc": "⟦← Ƀȧƈķ ŧő Şėŧŧïñɠş › Ẇőřķşṗȧƈė & őřɠȧñïẑȧŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ia_settings_reasoning_loading": {
+        "en": "Reading the engines available on this computer…",
+        "ja": "この PC で使えるエンジンを確認しています…",
+        "qps-ploc": "⟦Řėȧḓïñɠ ŧħė ėñɠïñėş ȧṽȧïŀȧƀŀė őñ ŧħïş ƈőɱṗůŧėř… ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ia_nav_home": {
+        "en": "Home",
+        "ja": "ホーム",
+        "qps-ploc": "⟦Ħőɱė ŀőř⟧"
+      },
+      "ia_nav_home_sub": {
+        "en": "Everything at a glance",
+        "ja": "全体をひと目で",
+        "qps-ploc": "⟦Ėṽėřẏŧħïñɠ ȧŧ ȧ ɠŀȧñƈė ŀőřėɱ ï⟧"
+      },
+      "ia_nav_inbox": {
+        "en": "Needs you",
+        "ja": "あなた待ち",
+        "qps-ploc": "⟦Ñėėḓş ẏőů ŀőř⟧"
+      },
+      "ia_nav_inbox_sub": {
+        "en": "Approvals, decisions and reviews",
+        "ja": "承認・判断・確認",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş, ḓėƈïşïőñş ȧñḓ řėṽïėẇş ŀőřėɱ ïṗşů⟧"
+      },
+      "ia_nav_work": {
+        "en": "Work",
+        "ja": "仕事",
+        "qps-ploc": "⟦Ẇőřķ ŀőř⟧"
+      },
+      "ia_nav_work_sub": {
+        "en": "Missions and work items",
+        "ja": "ミッションと作業",
+        "qps-ploc": "⟦Ɱïşşïőñş ȧñḓ ẇőřķ ïŧėɱş ŀőřėɱ ï⟧"
+      },
+      "ia_nav_org": {
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "ia_nav_org_sub": {
+        "en": "Goals, projects and people",
+        "ja": "目標・プロジェクト・人",
+        "qps-ploc": "⟦Ɠőȧŀş, ṗřőĵėƈŧş ȧñḓ ṗėőṗŀė ŀőřėɱ ïṗ⟧"
+      },
+      "ia_nav_library": {
+        "en": "Library",
+        "ja": "資料",
+        "qps-ploc": "⟦Ŀïƀřȧřẏ ŀőř⟧"
+      },
+      "ia_nav_library_sub": {
+        "en": "Deliverables, knowledge and intake",
+        "ja": "成果物・ナレッジ・取込",
+        "qps-ploc": "⟦Ḓėŀïṽėřȧƀŀėş, ķñőẇŀėḓɠė ȧñḓ ïñŧȧķė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_nav_ops": {
+        "en": "Operations",
+        "ja": "運用",
+        "qps-ploc": "⟦Őṗėřȧŧïőñş ŀőř⟧"
+      },
+      "ia_nav_ops_sub": {
+        "en": "Agents, screens and diagnostics",
+        "ja": "エージェント・画面・診断",
+        "qps-ploc": "⟦Ȧɠėñŧş, şƈřėėñş ȧñḓ ḓïȧɠñőşŧïƈş ŀőřėɱ ïṗşů⟧"
+      },
+      "ia_nav_settings": {
+        "en": "Settings",
+        "ja": "設定",
+        "qps-ploc": "⟦Şėŧŧïñɠş ŀőř⟧"
+      },
+      "ia_nav_settings_sub": {
+        "en": "Setup and preferences",
+        "ja": "初期設定と各種設定",
+        "qps-ploc": "⟦Şėŧůṗ ȧñḓ ṗřėƒėřėñƈėş ŀőřėɱ ⟧"
+      },
+      "ia_nav_badge_aria": {
+        "en": "{count} items need you",
+        "ja": "あなた待ち {count} 件",
+        "qps-ploc": "⟦{count} ïŧėɱş ñėėḓ ẏőů ŀőřėɱ ï⟧"
       }
     },
     "operator": {

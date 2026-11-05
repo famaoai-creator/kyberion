@@ -502,3 +502,33 @@ describe('Claude persistent credential owner fence', () => {
     expect(spawnProcess).not.toHaveBeenCalled();
   });
 });
+
+describe('credential relay (flag on, API-key mode)', () => {
+  it('boots the session with a relay placeholder and closes the relay when the child exits', async () => {
+    vi.stubEnv('KYBERION_PROVIDER_CREDENTIAL_RELAY', '1');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-session-real-key-0123456789');
+    try {
+      let child: FakeChild | undefined;
+      let env: NodeJS.ProcessEnv | undefined;
+      const adapter = new ClaudeCliSessionAdapter({
+        profile: 'explorer',
+        spawnProcess: ((_bin: string, _args: string[], options: { env: NodeJS.ProcessEnv }) => {
+          env = options.env;
+          child = createFakeChild().child;
+          return child;
+        }) as never,
+      });
+      await adapter.boot();
+      expect(JSON.stringify(env)).not.toContain('sk-ant-session-real-key-0123456789');
+      expect(env?.ANTHROPIC_API_KEY?.startsWith('kyb-relay-')).toBe(true);
+      const baseUrl = env?.ANTHROPIC_BASE_URL ?? '';
+      expect(baseUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/u);
+      const live = await fetch(`${baseUrl}/v1/messages`, { method: 'POST' });
+      expect(live.status).toBe(401);
+      child?.emit('close', 0, null);
+      await expect(fetch(`${baseUrl}/v1/messages`, { method: 'POST' })).rejects.toThrow();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});

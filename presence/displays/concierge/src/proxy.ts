@@ -8,6 +8,7 @@ import {
 } from '@agent/core/surface/surface-session-cookie';
 import { anonymousLoopbackAllowed } from '@agent/core/surface/installation-owner-access';
 import { isLoopbackPeer } from './lib/loopback-peer';
+import { resolveIaRedirect } from './lib/ia-routes';
 
 /** UX-only hint set by /signin after a pasted token is accepted. Grants nothing. */
 export const CLIENT_TOKEN_HINT_COOKIE = 'kyberion_client_token';
@@ -30,6 +31,11 @@ export function isPwaAssetPath(pathname: string): boolean {
  */
 export function proxy(req: NextRequest): NextResponse {
   const { pathname, search } = req.nextUrl;
+  // MSN-SHELL-IA §1: retired routes move permanently (308, query kept). This
+  // is navigation only and runs before the auth bounce, so the new page
+  // still resolves its own viewer.
+  const moved = resolveIaRedirect(pathname, search);
+  if (moved) return NextResponse.redirect(new URL(moved, req.url), 308);
   if (isSurfaceAuthPath(pathname) || PRE_AUTH_PAGES.has(pathname)) return NextResponse.next();
   // Installability assets are public and carry no data. A browser fetches the
   // manifest and service worker without credentials, so bouncing them to
