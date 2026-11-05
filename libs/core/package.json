@@ -5156,18 +5156,6 @@
       "types": "./dist/realtime-media-session.d.ts",
       "default": "./dist/realtime-media-session.js"
     },
-    "./realtime-voice-conversation": {
-      "types": "./dist/voice/realtime-voice-conversation.d.ts",
-      "default": "./dist/voice/realtime-voice-conversation.js"
-    },
-    "./realtime-voice-loop": {
-      "types": "./dist/voice/realtime-voice-loop.d.ts",
-      "default": "./dist/voice/realtime-voice-loop.js"
-    },
-    "./realtime-voice-preferences": {
-      "types": "./dist/voice/realtime-voice-preferences.d.ts",
-      "default": "./dist/voice/realtime-voice-preferences.js"
-    },
     "./engine-runtime-preferences": {
       "types": "./dist/voice/engine-runtime-preferences.d.ts",
       "default": "./dist/voice/engine-runtime-preferences.js"
@@ -6884,10 +6872,6 @@
       "types": "./dist/trust-requiring-resources.d.ts",
       "default": "./dist/trust-requiring-resources.js"
     },
-    "./tts-loopback-verifier": {
-      "types": "./dist/voice/tts-loopback-verifier.d.ts",
-      "default": "./dist/voice/tts-loopback-verifier.js"
-    },
     "./types": {
       "types": "./dist/types.d.ts",
       "default": "./dist/types.js"
@@ -6947,10 +6931,6 @@
     "./vad-registry": {
       "types": "./dist/voice/vad-registry.d.ts",
       "default": "./dist/voice/vad-registry.js"
-    },
-    "./vad-turn-recorder": {
-      "types": "./dist/voice/vad-turn-recorder.d.ts",
-      "default": "./dist/voice/vad-turn-recorder.js"
     },
     "./validate": {
       "types": "./dist/validate.d.ts",
@@ -7248,10 +7228,6 @@
       "types": "./dist/voice/voice-bridge.d.ts",
       "default": "./dist/voice/voice-bridge.js"
     },
-    "./voice-capability-bridge": {
-      "types": "./dist/voice/voice-capability-bridge.d.ts",
-      "default": "./dist/voice/voice-capability-bridge.js"
-    },
     "./voice-consent": {
       "types": "./dist/voice/voice-consent.d.ts",
       "default": "./dist/voice/voice-consent.js"
@@ -7259,18 +7235,6 @@
     "./voice-engine-registry": {
       "types": "./dist/voice/voice-engine-registry.d.ts",
       "default": "./dist/voice/voice-engine-registry.js"
-    },
-    "./voice-generation-runtime": {
-      "types": "./dist/voice/voice-generation-runtime.d.ts",
-      "default": "./dist/voice/voice-generation-runtime.js"
-    },
-    "./voice-path-policy": {
-      "types": "./dist/voice/voice-path-policy.d.ts",
-      "default": "./dist/voice/voice-path-policy.js"
-    },
-    "./voice-profile-promotion": {
-      "types": "./dist/voice/voice-profile-promotion.d.ts",
-      "default": "./dist/voice/voice-profile-promotion.js"
     },
     "./voice-profile-registry": {
       "types": "./dist/voice/voice-profile-registry.d.ts",
@@ -7280,45 +7244,13 @@
       "types": "./dist/voice/voice-provider-adapters.d.ts",
       "default": "./dist/voice/voice-provider-adapters.js"
     },
-    "./voice-runtime-policy": {
-      "types": "./dist/voice/voice-runtime-policy.d.ts",
-      "default": "./dist/voice/voice-runtime-policy.js"
-    },
-    "./voice-sample-collection": {
-      "types": "./dist/voice/voice-sample-collection.d.ts",
-      "default": "./dist/voice/voice-sample-collection.js"
-    },
-    "./voice-sample-ingestion-policy": {
-      "types": "./dist/voice/voice-sample-ingestion-policy.d.ts",
-      "default": "./dist/voice/voice-sample-ingestion-policy.js"
-    },
-    "./voice-sample-recorder": {
-      "types": "./dist/voice/voice-sample-recorder.d.ts",
-      "default": "./dist/voice/voice-sample-recorder.js"
-    },
-    "./voice-selection-preferences": {
-      "types": "./dist/voice/voice-selection-preferences.d.ts",
-      "default": "./dist/voice/voice-selection-preferences.js"
-    },
     "./voice-stt": {
       "types": "./dist/voice/voice-stt.d.ts",
       "default": "./dist/voice/voice-stt.js"
     },
-    "./voice-synth": {
-      "types": "./dist/voice/voice-synth.d.ts",
-      "default": "./dist/voice/voice-synth.js"
-    },
     "./voice-text-chunking": {
       "types": "./dist/voice/voice-text-chunking.d.ts",
       "default": "./dist/voice/voice-text-chunking.js"
-    },
-    "./voice-transcript-alignment": {
-      "types": "./dist/voice/voice-transcript-alignment.d.ts",
-      "default": "./dist/voice/voice-transcript-alignment.js"
-    },
-    "./voice-tts-config": {
-      "types": "./dist/voice/voice-tts-config.d.ts",
-      "default": "./dist/voice/voice-tts-config.js"
     },
     "./voice/audio-bus": {
       "types": "./dist/voice/audio-bus.d.ts",
@@ -7352,22 +7284,6 @@
       "types": "./dist/voice/audio-tee.d.ts",
       "default": "./dist/voice/audio-tee.js"
     },
-    "./voice/audio-text-similarity": {
-      "types": "./dist/voice/audio-text-similarity.d.ts",
-      "default": "./dist/voice/audio-text-similarity.js"
-    },
-    "./voice/realtime-voice-conversation": {
-      "types": "./dist/voice/realtime-voice-conversation.d.ts",
-      "default": "./dist/voice/realtime-voice-conversation.js"
-    },
-    "./voice/realtime-voice-loop": {
-      "types": "./dist/voice/realtime-voice-loop.d.ts",
-      "default": "./dist/voice/realtime-voice-loop.js"
-    },
-    "./voice/realtime-voice-preferences": {
-      "types": "./dist/voice/realtime-voice-preferences.d.ts",
-      "default": "./dist/voice/realtime-voice-preferences.js"
-    },
     "./voice/engine-runtime-preferences": {
       "types": "./dist/voice/engine-runtime-preferences.d.ts",
       "default": "./dist/voice/engine-runtime-preferences.js"
@@ -7392,10 +7308,6 @@
       "types": "./dist/voice/streaming-tts-bridge.d.ts",
       "default": "./dist/voice/streaming-tts-bridge.js"
     },
-    "./voice/tts-loopback-verifier": {
-      "types": "./dist/voice/tts-loopback-verifier.d.ts",
-      "default": "./dist/voice/tts-loopback-verifier.js"
-    },
     "./voice/vad-bridge-protocol": {
       "types": "./dist/voice/vad-bridge-protocol.d.ts",
       "default": "./dist/voice/vad-bridge-protocol.js"
@@ -7403,10 +7315,6 @@
     "./voice/vad-registry": {
       "types": "./dist/voice/vad-registry.d.ts",
       "default": "./dist/voice/vad-registry.js"
-    },
-    "./voice/vad-turn-recorder": {
-      "types": "./dist/voice/vad-turn-recorder.d.ts",
-      "default": "./dist/voice/vad-turn-recorder.js"
     },
     "./voice/voice-activity-detector": {
       "types": "./dist/voice/voice-activity-detector.d.ts",
@@ -7416,10 +7324,6 @@
       "types": "./dist/voice/voice-bridge.d.ts",
       "default": "./dist/voice/voice-bridge.js"
     },
-    "./voice/voice-capability-bridge": {
-      "types": "./dist/voice/voice-capability-bridge.d.ts",
-      "default": "./dist/voice/voice-capability-bridge.js"
-    },
     "./voice/voice-consent": {
       "types": "./dist/voice/voice-consent.d.ts",
       "default": "./dist/voice/voice-consent.js"
@@ -7427,34 +7331,6 @@
     "./voice/voice-engine-registry": {
       "types": "./dist/voice/voice-engine-registry.d.ts",
       "default": "./dist/voice/voice-engine-registry.js"
-    },
-    "./voice/voice-eot-scorer": {
-      "types": "./dist/voice/voice-eot-scorer.d.ts",
-      "default": "./dist/voice/voice-eot-scorer.js"
-    },
-    "./voice/voice-first-phrase-cache": {
-      "types": "./dist/voice/voice-first-phrase-cache.d.ts",
-      "default": "./dist/voice/voice-first-phrase-cache.js"
-    },
-    "./voice/voice-generation-runtime": {
-      "types": "./dist/voice/voice-generation-runtime.d.ts",
-      "default": "./dist/voice/voice-generation-runtime.js"
-    },
-    "./voice/voice-hub-playback": {
-      "types": "./dist/voice/voice-hub-playback.d.ts",
-      "default": "./dist/voice/voice-hub-playback.js"
-    },
-    "./voice/voice-path-policy": {
-      "types": "./dist/voice/voice-path-policy.d.ts",
-      "default": "./dist/voice/voice-path-policy.js"
-    },
-    "./voice/voice-phrase-chunker": {
-      "types": "./dist/voice/voice-phrase-chunker.d.ts",
-      "default": "./dist/voice/voice-phrase-chunker.js"
-    },
-    "./voice/voice-profile-promotion": {
-      "types": "./dist/voice/voice-profile-promotion.d.ts",
-      "default": "./dist/voice/voice-profile-promotion.js"
     },
     "./voice/voice-profile-registry": {
       "types": "./dist/voice/voice-profile-registry.d.ts",
@@ -7468,65 +7344,17 @@
       "types": "./dist/voice/voice-respond-gate.d.ts",
       "default": "./dist/voice/voice-respond-gate.js"
     },
-    "./voice/voice-runtime-policy": {
-      "types": "./dist/voice/voice-runtime-policy.d.ts",
-      "default": "./dist/voice/voice-runtime-policy.js"
-    },
-    "./voice/voice-sample-collection": {
-      "types": "./dist/voice/voice-sample-collection.d.ts",
-      "default": "./dist/voice/voice-sample-collection.js"
-    },
-    "./voice/voice-sample-ingestion-policy": {
-      "types": "./dist/voice/voice-sample-ingestion-policy.d.ts",
-      "default": "./dist/voice/voice-sample-ingestion-policy.js"
-    },
-    "./voice/voice-sample-recorder": {
-      "types": "./dist/voice/voice-sample-recorder.d.ts",
-      "default": "./dist/voice/voice-sample-recorder.js"
-    },
-    "./voice/voice-selection-preferences": {
-      "types": "./dist/voice/voice-selection-preferences.d.ts",
-      "default": "./dist/voice/voice-selection-preferences.js"
-    },
-    "./voice/voice-speculative-policy": {
-      "types": "./dist/voice/voice-speculative-policy.d.ts",
-      "default": "./dist/voice/voice-speculative-policy.js"
-    },
     "./voice/voice-stt": {
       "types": "./dist/voice/voice-stt.d.ts",
       "default": "./dist/voice/voice-stt.js"
-    },
-    "./voice/voice-synth": {
-      "types": "./dist/voice/voice-synth.d.ts",
-      "default": "./dist/voice/voice-synth.js"
     },
     "./voice/voice-text-chunking": {
       "types": "./dist/voice/voice-text-chunking.d.ts",
       "default": "./dist/voice/voice-text-chunking.js"
     },
-    "./voice/voice-transcript-alignment": {
-      "types": "./dist/voice/voice-transcript-alignment.d.ts",
-      "default": "./dist/voice/voice-transcript-alignment.js"
-    },
-    "./voice/voice-tts-config": {
-      "types": "./dist/voice/voice-tts-config.d.ts",
-      "default": "./dist/voice/voice-tts-config.js"
-    },
-    "./voice/voice-turn-cancellation": {
-      "types": "./dist/voice/voice-turn-cancellation.d.ts",
-      "default": "./dist/voice/voice-turn-cancellation.js"
-    },
-    "./voice/voice-turn-taking": {
-      "types": "./dist/voice/voice-turn-taking.d.ts",
-      "default": "./dist/voice/voice-turn-taking.js"
-    },
     "./voice/voice-turn-taking-lexicon": {
       "types": "./dist/voice/voice-turn-taking-lexicon.d.ts",
       "default": "./dist/voice/voice-turn-taking-lexicon.js"
-    },
-    "./voice/voice-workbench": {
-      "types": "./dist/voice/voice-workbench.d.ts",
-      "default": "./dist/voice/voice-workbench.js"
     },
     "./volatile-knowledge": {
       "types": "./dist/volatile-knowledge.d.ts",
@@ -8004,10 +7832,6 @@
       "types": "./dist/perception/image-dimensions.d.ts",
       "default": "./dist/perception/image-dimensions.js"
     },
-    "./voice/engine-runtime-preferences-operator": {
-      "types": "./dist/voice/engine-runtime-preferences-operator.d.ts",
-      "default": "./dist/voice/engine-runtime-preferences-operator.js"
-    },
     "./information-assets/types": {
       "types": "./dist/information-assets/types.d.ts",
       "default": "./dist/information-assets/types.js"
@@ -8075,6 +7899,30 @@
     "./windows-native-image-generation-bridge": {
       "types": "./dist/windows-native-image-generation-bridge.d.ts",
       "default": "./dist/windows-native-image-generation-bridge.js"
+    },
+    "./barge-in-controller": {
+      "types": "./dist/barge-in-controller.d.ts",
+      "default": "./dist/barge-in-controller.js"
+    },
+    "./interaction/reply-structure": {
+      "types": "./dist/interaction/reply-structure.d.ts",
+      "default": "./dist/interaction/reply-structure.js"
+    },
+    "./segmented-voice-playback": {
+      "types": "./dist/segmented-voice-playback.d.ts",
+      "default": "./dist/segmented-voice-playback.js"
+    },
+    "./two-stage-barge-in": {
+      "types": "./dist/two-stage-barge-in.d.ts",
+      "default": "./dist/two-stage-barge-in.js"
+    },
+    "./voice/engine-runtime-preferences-access": {
+      "types": "./dist/voice/engine-runtime-preferences-access.d.ts",
+      "default": "./dist/voice/engine-runtime-preferences-access.js"
+    },
+    "./voice/engine-runtime-preferences-transaction": {
+      "types": "./dist/voice/engine-runtime-preferences-transaction.d.ts",
+      "default": "./dist/voice/engine-runtime-preferences-transaction.js"
     }
   },
   "dependencies": {

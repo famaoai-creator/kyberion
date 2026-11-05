@@ -30,8 +30,6 @@ export * from './state-probe.js';
 
 export * from './graph-run-artifact.js';
 
-export * from './voice/realtime-voice-conversation.js';
-
 export * from './realtime-media-session.js';
 
 export * from './surface/surface-coordination-store.js';
@@ -50,8 +48,6 @@ export * from './in-room-minutes-recorder.js';
 
 export * from './pcm-wav.js';
 
-export * from './voice/vad-turn-recorder.js';
-
 export * from './voice/audio-playback.js';
 
 export * from './segmented-voice-playback.js';
@@ -63,8 +59,6 @@ export * from './voice/audio-tee.js';
 export * from './voice/vad-registry.js';
 
 export * from './silero-vad-bridge.js';
-
-export * from './voice/realtime-voice-loop.js';
 
 export * from './actuator/actuator-serve-client.js';
 

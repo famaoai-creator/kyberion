@@ -37,13 +37,9 @@ export * from './voice/audio-route.js';
 
 export * from './bounded-audio-queue.js';
 
-export * from './voice/audio-text-similarity.js';
-
 export * from './coreaudio-device-inventory.js';
 
 export * from './coreaudio-output-bridge.js';
-
-export * from './voice/tts-loopback-verifier.js';
 
 export * from './voice/audio-device-lease.js';
 
