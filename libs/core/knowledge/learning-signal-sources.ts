@@ -3,7 +3,7 @@ import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir } from '../secure-io.js';
 import { readJsonLinesSince } from '../jsonl-read.js';
 import { listConversationSignals } from '../intent/conversation-signals.js';
-import { loadApprovalRequest } from '../governance/approval-store.js';
+import { loadApprovalRequest } from '../governance/approval-store-reader.js';
 import {
   readApprovalJsonlAt,
   listApprovalChannelsAt,

@@ -30,7 +30,7 @@ import {
   requestTenantActivationApproval,
   applyApprovedTenantActivation,
 } from './tenant-activation-approval.js';
-import { loadApprovalRequest } from '../governance/approval-store.js';
+import { loadApprovalRequest } from '../governance/approval-store-reader.js';
 import { computeApprovalPresentedDigest } from '../governance/approval-presentation.js';
 
 export type CompanySetupAction =

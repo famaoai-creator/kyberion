@@ -45,10 +45,10 @@ import { withExecutionContext } from '../authority.js';
 import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 // Existing approval/steering cycle is tracked by check:module-boundaries baseline.
 // eslint-disable-next-line import/no-cycle -- baseline until the governance seam is split
-import {
-  createApprovalRequest,
-  type ApprovalRequestRecord,
-  type ApprovalSteeringAction,
+import { createApprovalRequest } from '../governance/approval-request-create.js';
+import type {
+  ApprovalRequestRecord,
+  ApprovalSteeringAction,
 } from '../governance/approval-store.js';
 import { enqueueSurfaceOutboxMessage } from './surface-coordination-store.js';
 import {
