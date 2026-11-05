@@ -16,6 +16,7 @@
 import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
+import { readJsonIfPresent, writeJson } from '@agent/core/foundation';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import {
   TENANT_COMPANY_FILE,
@@ -124,6 +125,39 @@ function moveAuditMirror(slug: string, move: Move, dryRun: boolean): void {
   safeRmSync(from, { recursive: true, force: true });
 }
 
+/**
+ * Company JSON files record where they came from (`source_kind`, `source_path`).
+ * The schemas no longer accept `source_kind: "customer"`, so a moved file is
+ * relabelled as confidential and pointed at its new path; anything else is kept.
+ */
+export function relabelSource(record: Record<string, unknown>, slug: string): boolean {
+  let changed = false;
+  if (record.source_kind === 'customer') {
+    record.source_kind = 'confidential';
+    changed = true;
+  }
+  const legacyPrefix = `${LEGACY_DIR}/${slug}/`;
+  if (typeof record.source_path === 'string' && record.source_path.startsWith(legacyPrefix)) {
+    record.source_path = `${TENANT_HOME_ROOT}/${slug}/${record.source_path.slice(legacyPrefix.length)}`;
+    changed = true;
+  }
+  return changed;
+}
+
+function relabelMovedJson(slug: string, target: string): void {
+  const files = safeLstat(target).isDirectory()
+    ? safeReaddir(target).map((entry) => path.join(target, entry))
+    : [target];
+  for (const file of files) {
+    if (!file.endsWith('.json') || !safeLstat(file).isFile()) continue;
+    const record = readJsonIfPresent<Record<string, unknown>>(file);
+    if (record && typeof record === 'object' && relabelSource(record, slug)) {
+      writeJson(file, record);
+      logger.info(`[${id}] relabelled source_kind/source_path in ${rel(file)}`);
+    }
+  }
+}
+
 export async function migrate(opts: { dryRun: boolean }): Promise<void> {
   const root = pathResolver.rootDir();
   const legacyRoot = safe(path.join(root, LEGACY_DIR));
@@ -149,6 +183,7 @@ export async function migrate(opts: { dryRun: boolean }): Promise<void> {
         if (opts.dryRun) continue;
         safeMkdir(path.dirname(to), { recursive: true });
         safeMoveSync(from, to);
+        relabelMovedJson(slug, to);
       }
       const mirror = planAuditMirrorMove(slug, root);
       if (mirror) moveAuditMirror(slug, mirror, opts.dryRun);
