@@ -66,6 +66,9 @@ vi.mock('@agent/core/cloudflare-os-control-plane', async (importOriginal) => {
       projectTaint(...args: any[]) {
         return mocks.controlPlane.projectTaint(...args);
       }
+      // sharedControlPlane() refreshes a cached instance once its interval
+      // elapses; a slow run must not reach a method the double lacks.
+      refreshFromJournals() {}
     },
   };
 });
