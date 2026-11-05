@@ -13,10 +13,18 @@ import {
   resolveReasoningProviderDescriptor,
 } from './reasoning-provider-registry.js';
 import {
+  custodyAttestationRequestCommand,
   evaluateProviderEgress,
-  lookupTenantProviderAttestation,
+  lookupCustodyProviderAttestation,
   providerIdForReasoningIdentifier,
+  resolveProviderEgressCustody,
 } from '../provider/provider-egress-gate.js';
+import {
+  CustodyOwnerConflictError,
+  custodyOwnerLabel,
+  deriveCustodyOwner,
+  type CustodyOwner,
+} from '../custody-owner.js';
 
 /**
  * Tier context for reasoning-backend sends.
@@ -46,6 +54,14 @@ export interface ReasoningPayloadScope {
   tier: 'public' | 'confidential' | 'personal';
   /** Tenant the material belongs to, when above public. */
   tenant_slug?: string;
+  /**
+   * Who is accountable for the material (custody-owner.ts). Derived when
+   * omitted: `tenant_slug` → tenant, personal tier without a tenant → person,
+   * otherwise system. An explicit value may only restate the scope (e.g. name
+   * the person behind tenantless material); a contradiction with
+   * `tenant_slug` is denied before anything is sent.
+   */
+  custody?: CustodyOwner;
   /** What is being sent, recorded on denial. */
   purpose?: string;
   /** Deterministic categories supplied by the caller; absent facts become `unknown`. */
@@ -109,20 +125,26 @@ export function _setReasoningTenantRegistryRootForTests(rootDir: string | undefi
 }
 
 /**
- * `no_training` toward an external backend is allowed only when the
- * tenant that owns the material holds a valid (unexpired) provider attestation
- * of `training_use: 'none'` for the backend's egress provider id — the same
- * attestation `checkProviderEgress` honours, read through the same governed
- * lookup. For confidential/personal material the send must additionally pass
- * `evaluateProviderEgress` — the side-effect-free evaluator behind
- * `checkProviderEgress` — so the tenant's `allowed_reasoning_backends` and the
- * provider-declared / approved_providers rule apply exactly as they do on the
- * delegation face. Anything else keeps the fail-closed denial.
+ * `no_training` toward an external backend needs a no-training basis that
+ * applies to the material's custody owner (custody-owner.ts):
+ *
+ * - confidential / personal material is decided by `evaluateProviderEgress`
+ *   — the same side-effect-free evaluator behind `checkProviderEgress` on the
+ *   delegation face — called with the same custody, so identical inputs give
+ *   identical answers on both faces (SM-01). That covers the custody owner's
+ *   own attestation (tenant profile, or the system / person store), the
+ *   tenant's `allowed_reasoning_backends`, the provider-declared /
+ *   approved_providers rule, and every expiry / `used` denial;
+ * - public material has no tier rule to apply, so only a valid custody
+ *   attestation of `training_use: 'none'` establishes the no-training claim.
+ *
+ * Anything else keeps the fail-closed denial, and the next step names the
+ * attestation command for the custody owner that is missing one.
  */
 function assertNoTrainingAttested(backendName: string, scope: ReasoningPayloadScope): void {
-  const next =
-    "next: record one with 'pnpm onboarding llm attest --request-approval' (or 'pnpm tenant attest-provider'), or declare training_use 'training_eligible' explicitly";
-  const deny = (why: string, evidence: string): never => {
+  const fallbackNext =
+    "next: record one with 'pnpm onboarding llm attest --request-approval' (--tenant <slug> for tenant material, --custody system|person otherwise), or declare training_use 'training_eligible' explicitly";
+  const deny = (why: string, evidence: string, next = fallbackNext): never => {
     throw new ReasoningEgressDeniedError(
       `backend ${backendName} has no no-training declaration — ${why} | ${next} | ${evidence}`
     );
@@ -130,53 +152,101 @@ function assertNoTrainingAttested(backendName: string, scope: ReasoningPayloadSc
   const provider = providerIdForReasoningIdentifier(backendName);
   if (!provider) {
     deny(
-      'the backend maps to no egress provider id, so no tenant attestation can cover it',
+      'the backend maps to no egress provider id, so no provider attestation can cover it',
       `backend=${backendName}`
     );
   }
-  const tenantSlug = scope.tenant_slug?.trim();
-  if (!tenantSlug) {
+  const resolved = resolveProviderEgressCustody({
+    dataTier: scope.tier,
+    ...(scope.tenant_slug ? { tenant_slug: scope.tenant_slug } : {}),
+    ...(scope.custody ? { custody: scope.custody } : {}),
+  });
+  if (resolved.error || !resolved.custody) {
     deny(
-      'the payload scope names no tenant_slug whose provider attestation could apply',
-      `provider=${provider}`
+      `the custody owner could not be resolved: ${resolved.error ?? 'unknown'}`,
+      `provider=${provider} tier=${scope.tier}`
     );
   }
-  const attestation = lookupTenantProviderAttestation({
-    tenant_slug: tenantSlug,
+  const custody = resolved.custody!;
+  const next = `next: record one with '${custodyAttestationRequestCommand(custody, provider)}', or declare training_use 'training_eligible' explicitly`;
+  const subject =
+    custody.kind === 'tenant'
+      ? `tenant '${custody.tenant_slug}'`
+      : custody.kind === 'person'
+        ? `person custody (${custodyOwnerLabel(custody)})`
+        : 'the installation (system custody)';
+  const attestation = lookupCustodyProviderAttestation({
+    custody,
     provider,
     ...(tenantRegistryRootForTests ? { tenant_registry_root_dir: tenantRegistryRootForTests } : {}),
   });
-  const evidence = `tenant=${tenantSlug} provider=${provider} attestation=${attestation.status}`;
-  if (attestation.error) {
-    deny(`the tenant attestation lookup failed: ${attestation.error}`, evidence);
+  const evidence = [
+    `custody=${custodyOwnerLabel(custody)}`,
+    ...(custody.kind === 'tenant' ? [`tenant=${custody.tenant_slug}`] : []),
+    `provider=${provider}`,
+    `attestation=${attestation.status}`,
+  ].join(' ');
+  // Why the custody owner's own statement does not settle it (empty when it is a valid 'none').
+  const attestationGap = attestation.error
+    ? `the ${custody.kind} attestation lookup failed: ${attestation.error}`
+    : attestation.status === 'absent'
+      ? `${subject} has no attestation for provider '${provider}'`
+      : attestation.status === 'expired'
+        ? `${subject} attestation for provider '${provider}' expired${attestation.expires_at ? ` on ${attestation.expires_at}` : ''}`
+        : attestation.training_use !== 'none'
+          ? `${subject} attests training_use '${attestation.training_use}' for provider '${provider}'`
+          : '';
+
+  if (scope.tier === 'public') {
+    if (attestationGap) {
+      deny(
+        attestationGap,
+        attestation.status === 'valid'
+          ? `${evidence} training_use=${attestation.training_use}`
+          : evidence,
+        next
+      );
+    }
+    return;
   }
-  if (attestation.status === 'absent') {
-    deny(`tenant '${tenantSlug}' has no attestation for provider '${provider}'`, evidence);
-  }
-  if (attestation.status === 'expired') {
-    deny(
-      `tenant '${tenantSlug}' attestation for provider '${provider}' expired${attestation.expires_at ? ` on ${attestation.expires_at}` : ''}`,
-      evidence
-    );
-  }
-  if (attestation.training_use !== 'none') {
-    deny(
-      `tenant '${tenantSlug}' attests training_use '${attestation.training_use}' for provider '${provider}'`,
-      `${evidence} training_use=${attestation.training_use}`
-    );
-  }
-  if (scope.tier === 'public') return;
+
+  // One evaluator for both faces: the delegation gate's own rule, with the
+  // same custody, decides confidential / personal material.
   const decision = evaluateProviderEgress({
     provider,
     dataTier: scope.tier,
-    tenant_slug: tenantSlug,
+    custody,
+    ...(resolved.tenant_slug ? { tenant_slug: resolved.tenant_slug } : {}),
     ...(tenantRegistryRootForTests ? { tenant_registry_root_dir: tenantRegistryRootForTests } : {}),
   });
   if (!decision.allowed) {
+    const policyWhy = `the provider egress policy denies ${scope.tier} material: ${decision.reason ?? 'denied'}`;
     deny(
-      `the provider egress policy denies ${scope.tier} material: ${decision.reason ?? 'denied'}`,
-      `${evidence} tier=${scope.tier}`
+      attestationGap ? `${attestationGap}; ${policyWhy}` : policyWhy,
+      `${evidence} tier=${scope.tier}`,
+      next
     );
+  }
+}
+
+/**
+ * Fail closed on a custody declaration that contradicts the scope (e.g.
+ * `custody: system` on material that names a tenant). Checked before any
+ * send, whatever the training_use, so a contradiction never reaches a model.
+ */
+function assertScopeCustodyConsistent(scope: ReasoningPayloadScope | undefined): void {
+  if (!scope?.custody) return;
+  try {
+    deriveCustodyOwner({
+      tier: scope.tier,
+      ...(scope.tenant_slug ? { tenant_slug: scope.tenant_slug } : {}),
+      custody: scope.custody,
+    });
+  } catch (error) {
+    if (error instanceof CustodyOwnerConflictError) {
+      throw new ReasoningEgressDeniedError(error.message);
+    }
+    throw error;
   }
 }
 
@@ -237,6 +307,7 @@ function assertCharterProcessorScope(
  */
 function assertTaskBackendPolicy(backendName: string, local: boolean): void {
   const scope = getReasoningPayloadScope();
+  assertScopeCustodyConsistent(scope);
   if (scope?.allowed_reasoning_backends && !scope.allowed_reasoning_backends.includes(backendName))
     throw new ReasoningEgressDeniedError(
       `[REASONING_EGRESS_DENIED] Backend ${backendName} is outside the task allowlist`

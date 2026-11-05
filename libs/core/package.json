@@ -1184,6 +1184,10 @@
       "types": "./dist/cron-utils.d.ts",
       "default": "./dist/cron-utils.js"
     },
+    "./custody-owner": {
+      "types": "./dist/custody-owner.d.ts",
+      "default": "./dist/custody-owner.js"
+    },
     "./customer-channel-binding": {
       "types": "./dist/customer-channel-binding.d.ts",
       "default": "./dist/customer-channel-binding.js"
@@ -5267,6 +5271,14 @@
     "./provider/codex-isolated-query": {
       "types": "./dist/provider/codex-isolated-query.d.ts",
       "default": "./dist/provider/codex-isolated-query.js"
+    },
+    "./provider/custody-provider-attestation-governance": {
+      "types": "./dist/provider/custody-provider-attestation-governance.d.ts",
+      "default": "./dist/provider/custody-provider-attestation-governance.js"
+    },
+    "./provider/custody-provider-attestation-store": {
+      "types": "./dist/provider/custody-provider-attestation-store.d.ts",
+      "default": "./dist/provider/custody-provider-attestation-store.js"
     },
     "./provider/isolated-text-generator": {
       "types": "./dist/provider/isolated-text-generator.d.ts",

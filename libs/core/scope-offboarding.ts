@@ -466,6 +466,9 @@ export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   browser_bridge_mailbox: 'tenant_runtime_state',
   // Tenant/organization/project seam provider defaults: tenant configuration, purge with the tenant.
   seam_selection_defaults: 'tenant_runtime_state',
+  // System / person custody provider attestations: never tenant-partitioned
+  // (tenant attestations live in the tenant profile), so nothing to offboard.
+  provider_attestations: 'not_offboarded',
 } as const satisfies Record<TenantRuntimePartitionKey, OffboardTargetKind | 'not_offboarded'>;
 
 /**
