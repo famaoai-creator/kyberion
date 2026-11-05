@@ -1,17 +1,76 @@
 import { randomUUID } from 'node:crypto';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolveRole, withExecutionContext } from '../authority.js';
-import { safeExistsSync, safeRmSync, safeWriteFile } from '../secure-io.js';
-import { pathResolver } from '../path-resolver.js';
-import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
-import { pipelineJournalCapability } from '../foundation/pipeline-journal-capability.js';
-import {
-  assertPipelineRunJournalCreatable,
-  createPipelineRunJournal,
-  loadPipelineRunJournal,
-  openPipelineRunJournal,
-  pipelineRunJournalPath,
-} from './pipeline-run-journal.js';
+import * as path from 'node:path';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { seedFirstJobTestRoot } from '../../../scripts/fixtures/first-job-approval-fixture.js';
+import { safeRmSync as removeFixture } from '../secure-io.js';
+import { withExecutionContext as inSourceContext } from '../authority.js';
+
+const sourceRoot = process.cwd();
+const fixtureRoot = path.join(sourceRoot, 'active/shared/tmp', `tenant-journal-${randomUUID()}`);
+let resolveRole: typeof import('../authority.js').resolveRole;
+let withExecutionContext: typeof import('../authority.js').withExecutionContext;
+let safeExistsSync: typeof import('../secure-io.js').safeExistsSync;
+let safeWriteFile: typeof import('../secure-io.js').safeWriteFile;
+let safeMkdir: typeof import('../secure-io.js').safeMkdir;
+let pathResolver: typeof import('../path-resolver.js').pathResolver;
+let runInResourceAccessScope: typeof import('../foundation/resource-access-scope.js').runInResourceAccessScope;
+let pipelineJournalCapability: typeof import('../foundation/pipeline-journal-capability.js').pipelineJournalCapability;
+let assertPipelineRunJournalCreatable: typeof import('./pipeline-run-journal.js').assertPipelineRunJournalCreatable;
+let createPipelineRunJournal: typeof import('./pipeline-run-journal.js').createPipelineRunJournal;
+let loadPipelineRunJournal: typeof import('./pipeline-run-journal.js').loadPipelineRunJournal;
+let openPipelineRunJournal: typeof import('./pipeline-run-journal.js').openPipelineRunJournal;
+let pipelineRunJournalPath: typeof import('./pipeline-run-journal.js').pipelineRunJournalPath;
+
+beforeAll(async () => {
+  seedFirstJobTestRoot(sourceRoot, fixtureRoot);
+  process.chdir(fixtureRoot);
+  vi.stubEnv('KYBERION_ROOT', fixtureRoot);
+  vi.stubEnv('VITEST', '');
+  vi.stubEnv('MISSION_ROLE', 'mission_controller');
+  vi.stubEnv('KYBERION_PERSONA', 'ecosystem_architect');
+  for (const key of [
+    'SYSTEM_ROLE',
+    'MISSION_ID',
+    'KYBERION_TENANT',
+    'KYBERION_TASK_ID',
+    'KYBERION_ORGANIZATION_ID',
+    'KYBERION_PROJECT_ID',
+    'KYBERION_SUDO',
+    'KYBERION_STANCE',
+    'KYBERION_CUSTOMER',
+  ])
+    vi.stubEnv(key, '');
+  // Default journal paths capture rootDir/shared at import; isolate the real
+  // selected and primary roots rather than merely spying on one namespace.
+  vi.resetModules();
+  ({ resolveRole, withExecutionContext } = await import('../authority.js'));
+  ({ safeExistsSync, safeWriteFile, safeMkdir } = await import('../secure-io.js'));
+  ({ pathResolver } = await import('../path-resolver.js'));
+  ({ runInResourceAccessScope } = await import('../foundation/resource-access-scope.js'));
+  ({ pipelineJournalCapability } = await import('../foundation/pipeline-journal-capability.js'));
+  ({
+    assertPipelineRunJournalCreatable,
+    createPipelineRunJournal,
+    loadPipelineRunJournal,
+    openPipelineRunJournal,
+    pipelineRunJournalPath,
+  } = await import('./pipeline-run-journal.js'));
+  expect(pathResolver.rootDir()).toBe(fixtureRoot);
+  expect(pathResolver.primaryCheckoutRootDir()).toBe(fixtureRoot);
+  // runtime-readiness.ts requires this onboarding floor; the bounded API
+  // must create the absent store root, tier and tenant partition itself.
+  withExecutionContext('ecosystem_architect', () => safeMkdir(pathResolver.shared('runtime')));
+  expect(safeExistsSync(pathResolver.shared('runtime/pipeline-library-runs'))).toBe(false);
+}, 60000);
+
+afterAll(() => {
+  process.chdir(sourceRoot);
+  vi.unstubAllEnvs();
+  inSourceContext('ecosystem_architect', () =>
+    removeFixture(fixtureRoot, { recursive: true, force: true })
+  );
+  vi.resetModules();
+});
 
 /**
  * Real permission floors (not the writable Vitest sandbox): a dot executor
@@ -34,33 +93,25 @@ describe('tenant confidential library run journal', () => {
 
   beforeEach(() => {
     tenantSlug = `vitest-journal-${randomUUID().slice(0, 8)}`;
-    vi.stubEnv('VITEST', '');
+    expect(pathResolver.rootDir()).toBe(fixtureRoot);
+    expect(pathResolver.primaryCheckoutRootDir()).toBe(fixtureRoot);
+    expect(journalDir()).toBe(
+      path.join(fixtureRoot, 'active/shared/runtime/pipeline-library-runs/confidential', tenantSlug)
+    );
     withExecutionContext(
       'ecosystem_architect',
       () =>
         safeWriteFile(
           pathResolver.rootResolve(`knowledge/personal/tenants/${tenantSlug}.json`),
-          JSON.stringify({ tenant_slug: tenantSlug, status: 'active' })
+          JSON.stringify({
+            tenant_slug: tenantSlug,
+            status: 'active',
+            display_name: 'Synthetic journal tenant',
+            assigned_role: 'owner',
+          })
         ),
       'ecosystem_architect'
     );
-  });
-  afterEach(() => {
-    withExecutionContext(
-      'ecosystem_architect',
-      () => safeRmSync(journalDir(), { recursive: true, force: true }),
-      'ecosystem_architect',
-      tenantSlug
-    );
-    withExecutionContext(
-      'ecosystem_architect',
-      () =>
-        safeRmSync(pathResolver.rootResolve(`knowledge/personal/tenants/${tenantSlug}.json`), {
-          force: true,
-        }),
-      'ecosystem_architect'
-    );
-    vi.unstubAllEnvs();
   });
 
   it('lets the tenant-bound charter role create and append its own run journal', () => {
