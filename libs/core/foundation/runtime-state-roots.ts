@@ -59,9 +59,12 @@ export const TENANT_APPROVAL_ROOT_PATH = 'active/shared/runtime/tenant-approvals
 /**
  * Root of the delegated-task trace and record store
  * (`libs/core/delegated-task-observability.ts`):
- * `<root>/system/{delegations.jsonl,records/}` for untenanted delegations and
- * `<root>/confidential/<tenant>/{delegations.jsonl,records/}` for tenant ones,
- * read and written as the tenant-bound `delegation_record_store` role.
+ * `<root>/system/{delegations.jsonl,records/,notifications.jsonl}` for
+ * untenanted delegations and
+ * `<root>/confidential/<tenant>/{delegations.jsonl,records/,notifications.jsonl}`
+ * for tenant ones (the background-completion notification queue,
+ * `libs/core/mission/delegation-notifications.ts`, lives beside them), read and
+ * written as the tenant-bound `delegation_record_store` role.
  * Registered in storage-layout.ts PARTITIONED_RUNTIME_LEDGER_ROOTS (with the
  * store role in TENANT_STORE_LEDGER_ROOTS) — not a state root.
  */
@@ -76,6 +79,19 @@ export const DELEGATION_RECORD_ROOT_PATH = 'active/shared/runtime/delegation-rec
  */
 export const LEGACY_DELEGATION_TRACE_PATH = 'active/shared/observability/delegations.jsonl';
 export const LEGACY_DELEGATION_RECORD_DIR = 'active/shared/observability/delegations';
+
+/**
+ * Pre-partition background-delegation notification queue (shared,
+ * tenant-mixed). New notifications land in `<partition>/notifications.jsonl`
+ * of DELEGATION_RECORD_ROOT_PATH; this file is read-only: readers fall back to
+ * it per row attribution (a claimed legacy row is copied, claimed, into its
+ * partition — never rewritten here) and tenant offboarding prunes a tenant's
+ * rows from it under DELEGATION_NOTIFICATIONS_LOCK.
+ */
+export const LEGACY_DELEGATION_NOTIFICATIONS_PATH =
+  'active/shared/runtime/delegations/notifications.jsonl';
+/** Inter-process lock serializing every notification queue read-rewrite (and the legacy prune). */
+export const DELEGATION_NOTIFICATIONS_LOCK = 'delegation-notifications';
 
 /**
  * The shared inter-process lock directory (foundation/lock-utils.ts LOCK_ROOT);
