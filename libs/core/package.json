@@ -688,6 +688,10 @@
       "types": "./dist/backend-conformance.d.ts",
       "default": "./dist/backend-conformance.js"
     },
+    "./backend-live-scenarios": {
+      "types": "./dist/backend-live-scenarios.d.ts",
+      "default": "./dist/backend-live-scenarios.js"
+    },
     "./background-review": {
       "types": "./dist/workforce/background-review-patch.d.ts",
       "default": "./dist/workforce/background-review-patch.js"

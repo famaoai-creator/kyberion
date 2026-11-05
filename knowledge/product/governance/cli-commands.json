@@ -1657,6 +1657,17 @@
       "long_running": true
     },
     {
+      "id": "script.check.backend-live-scenarios",
+      "module": "scripts/check_backend_live_scenarios.ts",
+      "command": "check backend-live-scenarios",
+      "noun": "check",
+      "verb": "backend-live-scenarios",
+      "audience": "dev",
+      "description": "cli_cmd_script_check_backend_live_scenarios",
+      "group": "dev",
+      "long_running": true
+    },
+    {
       "id": "script.check.chronos-perf",
       "module": "scripts/check_chronos_perf_baseline.ts",
       "command": "check chronos-perf",

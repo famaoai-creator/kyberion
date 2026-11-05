@@ -5,7 +5,8 @@ import {
 } from './backend-capability-honesty.js';
 import { BACKEND_CAPABILITY_PROFILES } from './backend-capability-profile.js';
 
-const report = buildBackendCapabilityHonestyReport();
+// Hermetic: never read the operator's fitness journal or live-scenario store.
+const report = buildBackendCapabilityHonestyReport({ fitnessRecords: [], liveScenarioRecords: [] });
 
 describe('backend capability honesty (TC-17)', () => {
   it('gives routing a profile for every mode the governed policy allows', () => {

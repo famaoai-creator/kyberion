@@ -9565,6 +9565,11 @@
         "ja": "推論バックエンドの適合性を確認",
         "qps-ploc": "⟦Ƈħėƈķ řėȧşőñïñɠ ƀȧƈķėñḓ ƈőñƒőřɱȧñƈė ŀőřėɱ ïṗşůɱ⟧"
       },
+      "cli_cmd_script_check_backend_live_scenarios": {
+        "en": "Run live reasoning backend scenarios (spends model turns; requires --live)",
+        "ja": "推論バックエンドのライブシナリオを実行（モデル呼び出しを消費、--live が必要）",
+        "qps-ploc": "⟦Řůñ ŀïṽė řėȧşőñïñɠ ƀȧƈķėñḓ şƈėñȧřïőş (şṗėñḓş ɱőḓėŀ ŧůřñş; řėɋůïřėş --ŀïṽė) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
       "cli_cmd_script_inventory_resource_loaders": {
         "en": "Inventory resource loader helpers",
         "ja": "リソースローダー補助関数を棚卸し",
