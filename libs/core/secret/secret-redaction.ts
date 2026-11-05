@@ -8,7 +8,10 @@
  * (raw and JSON-escaped forms, see `redactSecretValuesInText`), object keys
  * included. The walk is depth- and size-bounded and cycle-safe; anything it
  * refuses to descend into is replaced with a marker (fail closed) rather
- * than returned unredacted.
+ * than returned unredacted — or, with `onLimit: 'throw'`, the whole call
+ * fails with {@link SecretRedactionLimitError}. Use `'throw'` for typed /
+ * schema-validated results: a marker string in place of an object would
+ * silently break the caller's type contract.
  */
 
 import { logger } from '../core.js';
@@ -21,11 +24,35 @@ export const REDACTION_CIRCULAR_MARKER = '[CIRCULAR]';
 export const DEFAULT_REDACTION_MAX_DEPTH = 16;
 export const DEFAULT_REDACTION_MAX_NODES = 20_000;
 
+export const SECRET_REDACTION_LIMIT_ERROR_CODE = 'SECRET_REDACTION_LIMIT_EXCEEDED';
+
+export type SecretRedactionLimit = 'depth' | 'size' | 'circular';
+
+/** Thrown by {@link redactSecretsDeep} with `onLimit: 'throw'` (fail closed). */
+export class SecretRedactionLimitError extends Error {
+  readonly code = SECRET_REDACTION_LIMIT_ERROR_CODE;
+  constructor(
+    readonly limit: SecretRedactionLimit,
+    readonly bound: number
+  ) {
+    super(
+      `[${SECRET_REDACTION_LIMIT_ERROR_CODE}] value exceeds the redaction ${limit} bound (${bound}); refusing to return a partially redacted structured value`
+    );
+    this.name = 'SecretRedactionLimitError';
+  }
+}
+
 export interface DeepSecretRedactionOptions extends SecretValueRedactionOptions {
   /** Containers nested deeper than this are replaced by a marker. */
   readonly maxDepth?: number;
   /** Total visited nodes before the rest is replaced by a marker. */
   readonly maxNodes?: number;
+  /**
+   * What a refused node becomes: `'marker'` (default) substitutes a marker
+   * string; `'throw'` raises {@link SecretRedactionLimitError} so a typed
+   * result never comes back with a different shape.
+   */
+  readonly onLimit?: 'marker' | 'throw';
 }
 
 /**
@@ -42,20 +69,30 @@ export function redactSecretsDeep<T>(value: T, options: DeepSecretRedactionOptio
     ...(options.replacement !== undefined ? { replacement: options.replacement } : {}),
     ...(options.minLength !== undefined ? { minLength: options.minLength } : {}),
   };
+  const throwOnLimit = options.onLimit === 'throw';
   const ancestors = new WeakSet<object>();
   let visited = 0;
   const text = (input: string): string => redactSecretValuesInText(input, textOptions);
 
   const walk = (node: unknown, depth: number): unknown => {
     visited += 1;
-    if (visited > maxNodes) return REDACTION_SIZE_LIMIT_MARKER;
+    if (visited > maxNodes) {
+      if (throwOnLimit) throw new SecretRedactionLimitError('size', maxNodes);
+      return REDACTION_SIZE_LIMIT_MARKER;
+    }
     if (typeof node === 'string') return text(node);
     if (node === null || typeof node !== 'object') return node;
     if (node instanceof Date || ArrayBuffer.isView(node) || node instanceof ArrayBuffer) {
       return node;
     }
-    if (ancestors.has(node)) return REDACTION_CIRCULAR_MARKER;
-    if (depth >= maxDepth) return REDACTION_DEPTH_LIMIT_MARKER;
+    if (ancestors.has(node)) {
+      if (throwOnLimit) throw new SecretRedactionLimitError('circular', depth);
+      return REDACTION_CIRCULAR_MARKER;
+    }
+    if (depth >= maxDepth) {
+      if (throwOnLimit) throw new SecretRedactionLimitError('depth', maxDepth);
+      return REDACTION_DEPTH_LIMIT_MARKER;
+    }
     ancestors.add(node);
     try {
       if (Array.isArray(node)) return node.map((entry) => walk(entry, depth + 1));

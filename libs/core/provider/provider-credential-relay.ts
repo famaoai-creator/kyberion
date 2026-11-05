@@ -21,9 +21,12 @@
  *   - OUT OF SCOPE: OAuth-login CLIs (claude / codex / grok / devin logins kept
  *     in their own home or keychain). When the own API-key var is absent the
  *     relay is not started and the CLI authenticates with its login as before.
+ *   - Proxies: the child env gets loopback appended to NO_PROXY/no_proxy so
+ *     a proxy-honoring CLI reaches the relay directly; the relay's own
+ *     upstream hop honors HTTP(S)_PROXY / NO_PROXY via Node's `proxyEnv`
+ *     agent (never for a loopback upstream).
  *   - OUT OF SCOPE / follow-up: Bedrock SigV4 request signing and Vertex
- *     access-token minting, WebSocket upgrades, and honoring HTTPS_PROXY for
- *     the relay's own upstream hop.
+ *     access-token minting, WebSocket upgrades.
  */
 
 import { randomUUID, timingSafeEqual } from 'node:crypto';
@@ -113,6 +116,57 @@ export interface StartCredentialRelayInput {
   readonly credential: string;
   /** Upstream base URL (https, or http to a loopback host only). */
   readonly upstream: string;
+  /** Env the upstream hop reads HTTP(S)_PROXY / NO_PROXY from (default: process.env). */
+  readonly proxyEnv?: NodeJS.ProcessEnv;
+}
+
+const PROXY_ENV_KEYS = [
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'NO_PROXY',
+  'http_proxy',
+  'https_proxy',
+  'no_proxy',
+] as const;
+type RelayProxyEnv = Partial<Record<(typeof PROXY_ENV_KEYS)[number], string>>;
+
+function pickProxyEnv(env: NodeJS.ProcessEnv): RelayProxyEnv | undefined {
+  const picked: RelayProxyEnv = {};
+  for (const key of PROXY_ENV_KEYS) {
+    const value = env[key]?.trim();
+    if (value) picked[key] = value;
+  }
+  const hasProxy = Boolean(
+    picked.HTTPS_PROXY || picked.https_proxy || picked.HTTP_PROXY || picked.http_proxy
+  );
+  return hasProxy ? picked : undefined;
+}
+
+/** Hosts a child must reach directly (never via a proxy) to talk to the relay. */
+export const CREDENTIAL_RELAY_NO_PROXY_HOSTS: readonly string[] = ['127.0.0.1', 'localhost', '::1'];
+
+function appendNoProxyHosts(current: string | undefined, hosts: readonly string[]): string {
+  const entries = (current ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const present = new Set(entries.map((entry) => entry.toLowerCase()));
+  for (const host of hosts) if (!present.has(host)) entries.push(host);
+  return entries.join(',');
+}
+
+/**
+ * Return `env` with the loopback hosts appended to both NO_PROXY and
+ * no_proxy (existing entries kept, no duplicates). A child that honors
+ * HTTP(S)_PROXY would otherwise send its request for the loopback relay to
+ * the proxy, which cannot reach the parent's 127.0.0.1.
+ */
+export function withLoopbackNoProxy(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return {
+    ...env,
+    NO_PROXY: appendNoProxyHosts(env.NO_PROXY, CREDENTIAL_RELAY_NO_PROXY_HOSTS),
+    no_proxy: appendNoProxyHosts(env.no_proxy, CREDENTIAL_RELAY_NO_PROXY_HOSTS),
+  };
 }
 
 function parseUpstream(upstream: string): URL {
@@ -168,6 +222,13 @@ export async function startCredentialRelay(
   const basePath = normalizeBasePath(upstream.pathname);
   const placeholder = `${CREDENTIAL_RELAY_PLACEHOLDER_PREFIX}${randomUUID()}`;
   const inflight = new Set<http.ClientRequest>();
+  const transport = upstream.protocol === 'https:' ? https : http;
+  // The upstream hop honors HTTP(S)_PROXY / NO_PROXY like the CLI it replaces
+  // would have; a loopback upstream is always reached directly.
+  const proxyEnv = LOOPBACK_HOSTS.has(upstream.hostname)
+    ? undefined
+    : pickProxyEnv(input.proxyEnv ?? process.env);
+  const upstreamAgent = proxyEnv ? new transport.Agent({ proxyEnv }) : undefined;
   let closed = false;
   let port = 0;
   let lastRejectWarnAt = 0;
@@ -227,9 +288,9 @@ export async function startCredentialRelay(
     if (input.protocol === 'anthropic') headers['x-api-key'] = input.credential;
     else headers.authorization = `Bearer ${input.credential}`;
 
-    const transport = upstream.protocol === 'https:' ? https : http;
     const forward = transport.request(
       {
+        ...(upstreamAgent ? { agent: upstreamAgent } : {}),
         protocol: upstream.protocol,
         hostname: upstream.hostname,
         port: upstream.port || undefined,
@@ -260,6 +321,12 @@ export async function startCredentialRelay(
       forward.destroy(new Error('upstream idle timeout'));
     });
     forward.once('close', () => inflight.delete(forward));
+    // Client went away (cancelled turn, killed CLI) before the response was
+    // fully written: abort the upstream forward so it stops streaming/billing
+    // and does not linger in `inflight` until relay close.
+    res.once('close', () => {
+      if (!res.writableFinished) forward.destroy();
+    });
     forward.on('error', (error) => {
       logger.warn(
         `[credential-relay] upstream request failed — ${error.message} | next: check upstream reachability | evidence: ${upstream.host}`
@@ -295,7 +362,7 @@ export async function startCredentialRelay(
   // A leaked relay must not keep the parent alive; live sockets still do.
   server.unref();
   logger.debug(
-    `[credential-relay] started on 127.0.0.1:${port} (protocol=${input.protocol}, upstream=${upstream.protocol}//${upstream.host}${basePath})`
+    `[credential-relay] started on 127.0.0.1:${port} (protocol=${input.protocol}, upstream=${upstream.protocol}//${upstream.host}${basePath}, proxy=${proxyEnv ? 'env' : 'direct'})`
   );
 
   return {
@@ -309,6 +376,7 @@ export async function startCredentialRelay(
       closed = true;
       for (const request of inflight) request.destroy();
       inflight.clear();
+      upstreamAgent?.destroy();
       server.close();
       server.closeAllConnections();
     },
@@ -396,6 +464,7 @@ export async function prepareProviderCredentialRelay(input: {
     protocol: route.protocol,
     credential,
     upstream: configuredUpstream || route.defaultUpstream,
+    proxyEnv: baseEnv,
   });
   return { provider: input.provider, relay };
 }
@@ -428,7 +497,7 @@ export function applyProviderCredentialRelay(input: {
     return env;
   }
   return {
-    ...input.env,
+    ...withLoopbackNoProxy(input.env),
     [route.credentialEnvKey]: prepared.placeholder,
     [route.baseUrlEnvKey]: prepared.baseUrl,
   };

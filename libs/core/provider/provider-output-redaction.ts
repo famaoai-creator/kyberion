@@ -23,9 +23,23 @@ export function redactProviderOutputText(text: string): string {
   return redactSecretValuesInText(text, { extraSecrets: extraSecrets() });
 }
 
-/** Redact a structured exit (parsed JSON result, transcript record) value-wise. */
+/**
+ * Redact a diagnostic structured exit (transcript record, subagent info)
+ * value-wise. Oversized parts become marker strings — fine for diagnostics,
+ * NOT for typed results: use {@link redactProviderStructuredResult} there.
+ */
 export function redactProviderOutputValue<T>(value: T): T {
   return redactSecretsDeep(value, { extraSecrets: extraSecrets() });
+}
+
+/**
+ * Redact a typed / schema-validated result (e.g. `runStructured<T>`). Fails
+ * closed with `SecretRedactionLimitError` when the value exceeds the walk
+ * bounds instead of silently substituting marker strings that would break
+ * the caller's `T` shape.
+ */
+export function redactProviderStructuredResult<T>(value: T): T {
+  return redactSecretsDeep(value, { extraSecrets: extraSecrets(), onLimit: 'throw' });
 }
 
 /**
@@ -79,7 +93,7 @@ export async function* redactProviderOutputStream(
  */
 export async function withRedactedProviderOutput<T>(run: () => Promise<T>): Promise<T> {
   try {
-    return redactProviderOutputValue(await run());
+    return redactProviderStructuredResult(await run());
   } catch (error) {
     throw redactProviderOutputError(error);
   }

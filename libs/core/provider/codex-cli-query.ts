@@ -24,7 +24,7 @@ import {
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import {
   redactProviderOutputError,
-  redactProviderOutputValue,
+  redactProviderStructuredResult,
 } from './provider-output-redaction.js';
 import { resolveCodexHome, resolveCodexProfileName } from './codex-profile.js';
 import {
@@ -176,7 +176,7 @@ class CodexCliQuery {
         }
         status = 'success';
         // Output exit: the parsed answer is redacted value-wise.
-        return redactProviderOutputValue(parsed.data);
+        return redactProviderStructuredResult(parsed.data);
       } finally {
         recordCliUsage('codex-cli', this.model, started, status, {
           report: parseCodexCliUsage(capture.stdout),

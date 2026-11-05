@@ -4,8 +4,14 @@ import {
   REDACTION_CIRCULAR_MARKER,
   REDACTION_DEPTH_LIMIT_MARKER,
   REDACTION_SIZE_LIMIT_MARKER,
+  SECRET_REDACTION_LIMIT_ERROR_CODE,
+  SecretRedactionLimitError,
   redactSecretsDeep,
 } from './secret-redaction.js';
+import {
+  redactProviderStructuredResult,
+  withRedactedProviderOutput,
+} from '../provider/provider-output-redaction.js';
 
 const TOKEN = 'redaction-walk-token-0123456789';
 const PEM = [
@@ -68,6 +74,33 @@ describe('redactSecretsDeep', () => {
       { maxNodes: 4 }
     );
     expect(out.slice(3)).toEqual(Array(7).fill(REDACTION_SIZE_LIMIT_MARKER));
+  });
+
+  it("fails closed with a classified error under onLimit: 'throw' (typed results keep their shape)", () => {
+    const wide = Array.from({ length: 10 }, () => ({ value: TOKEN }));
+    expect(() => redactSecretsDeep(wide, { maxNodes: 4, onLimit: 'throw' })).toThrow(
+      SecretRedactionLimitError
+    );
+    try {
+      redactSecretsDeep({ a: { b: { c: 1 } } }, { maxDepth: 2, onLimit: 'throw' });
+      throw new Error('expected a throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(SecretRedactionLimitError);
+      expect((error as SecretRedactionLimitError).code).toBe(SECRET_REDACTION_LIMIT_ERROR_CODE);
+      expect((error as SecretRedactionLimitError).limit).toBe('depth');
+      expect((error as Error).message).not.toContain(TOKEN);
+    }
+  });
+
+  it('structured provider results never come back with a marker in place of a value', async () => {
+    const huge = { items: Array.from({ length: 25_000 }, (_, i) => ({ id: i })) };
+    expect(() => redactProviderStructuredResult(huge)).toThrow(SECRET_REDACTION_LIMIT_ERROR_CODE);
+    await expect(withRedactedProviderOutput(async () => huge)).rejects.toThrow(
+      SECRET_REDACTION_LIMIT_ERROR_CODE
+    );
+    await expect(withRedactedProviderOutput(async () => ({ answer: TOKEN }))).resolves.toEqual({
+      answer: '[REDACTED_SECRET]',
+    });
   });
 
   it('masks a multi-line PEM both raw and JSON-escaped (the stringify bypass)', () => {
