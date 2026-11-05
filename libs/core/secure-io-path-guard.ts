@@ -394,13 +394,24 @@ export function canonicalGuardPath(resolved: string, mode: CanonicalMode): strin
   return toLogicalRoot(physical);
 }
 
+/**
+ * The primary-checkout paths the root translators re-spell: authority stores
+ * and their fixed ancestors. ONE predicate for both directions keeps
+ * toLogicalRoot/toPhysicalRoot inverse of each other (a path one maps must
+ * map back). Translation is spelling only and grants nothing — every
+ * permission check still classifies the result on its own.
+ */
+function primaryRootTranslatable(candidate: string): string | undefined {
+  return insidePrimaryAuthority(candidate) ?? primaryAuthorityAncestor(candidate);
+}
+
 /** Inverse of toLogicalRoot: the same location under the realpath of the root (no linked prefix). */
 function toPhysicalRoot(logical: string): string {
   const relative = isInside(path.resolve(pathResolver.rootDir()), logical);
   if (relative !== undefined) {
     return relative === '' ? realRoot().real : path.join(realRoot().real, relative);
   }
-  const relPrimary = insidePrimaryAuthority(logical);
+  const relPrimary = primaryRootTranslatable(logical);
   if (relPrimary !== undefined) {
     return relPrimary === ''
       ? realPrimaryRoot().real
@@ -416,13 +427,19 @@ function toLogicalRoot(physical: string): string {
     const logicalRoot = path.resolve(pathResolver.rootDir());
     return relative === '' ? logicalRoot : path.join(logicalRoot, relative);
   }
-  const relPrimary = insidePrimaryAuthority(physical) ?? primaryAuthorityAncestor(physical);
+  const relPrimary = primaryRootTranslatable(physical);
   if (relPrimary !== undefined) {
     const logicalPrimary = path.resolve(pathResolver.primaryCheckoutRootDir());
     return relPrimary === '' ? logicalPrimary : path.join(logicalPrimary, relPrimary);
   }
   return physical;
 }
+
+/** Test-only view of the root translators (round-trip assertions). */
+export const rootTranslationForTesting = {
+  toLogicalRoot: (physical: string): string => toLogicalRoot(physical),
+  toPhysicalRoot: (logical: string): string => toPhysicalRoot(logical),
+};
 
 /**
  * Write-side companion of `validateWritePermission`: the literal path is
