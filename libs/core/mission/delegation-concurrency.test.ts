@@ -81,8 +81,10 @@ import {
   withDelegationSlot,
   getDelegationConcurrencyStats,
   withWallClockBudget,
+  DelegationAbortedError,
   DelegationInactivityExceededError,
   DelegationWallClockExceededError,
+  delegationAbortChildExit,
   terminateAllActiveDelegationChildren,
   wireDelegationKillSwitchIntegration,
   registerKillSwitchTerminationRegistrar,
@@ -258,6 +260,167 @@ describe('delegation-concurrency', () => {
     late.resolve('cancelled result');
     await assertion;
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  describe('explicit abort waits for the child to exit', () => {
+    // A fake child: kill() records the signal; exitOn decides which signal
+    // makes it exit (none = it ignores every signal).
+    function fakeChild(exitOn: Array<NodeJS.Signals>) {
+      const exit = makeDeferred<void>();
+      const kills: NodeJS.Signals[] = [];
+      const handle: DelegationChildHandle = {
+        pid: 4242,
+        kill: (signal) => {
+          kills.push(signal);
+          if (exitOn.includes(signal)) exit.resolve();
+        },
+        exited: exit.promise,
+      };
+      return { handle, kills };
+    }
+
+    it('rejects only after the child exited on SIGTERM, and reports the exit', async () => {
+      const controller = new AbortController();
+      const exit = makeDeferred<void>();
+      const kills: NodeJS.Signals[] = [];
+      const pending = withWallClockBudget(
+        {
+          signal: controller.signal,
+          killGraceMs: 50,
+          child: { kill: (signal) => kills.push(signal), exited: exit.promise },
+        },
+        () => new Promise<string>(() => {})
+      );
+      let settled = false;
+      void pending.catch(() => {
+        settled = true;
+      });
+      controller.abort('stop');
+      await Promise.resolve();
+      await Promise.resolve();
+      // SIGTERM sent, child not yet exited: the abort has not resolved.
+      expect(kills).toEqual(['SIGTERM']);
+      expect(settled).toBe(false);
+      exit.resolve();
+      const error = await pending.catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(DelegationAbortedError);
+      expect(delegationAbortChildExit(error)).toBe('exited');
+      expect(String((error as Error).message)).toContain('[DELEGATION_CANCELLED]');
+      expect(kills).toEqual(['SIGTERM']);
+      expect(peekPersistedDelegationChildrenRegistry()).toHaveLength(0);
+    });
+
+    it('escalates to SIGKILL after the grace window and reports the exit', async () => {
+      vi.useFakeTimers();
+      const controller = new AbortController();
+      const { handle, kills } = fakeChild(['SIGKILL']);
+      const pending = withWallClockBudget(
+        { signal: controller.signal, killGraceMs: 50, budgetMs: 10_000, child: handle },
+        () => new Promise<string>(() => {})
+      );
+      const outcome = pending.catch((e: unknown) => e);
+      controller.abort('stop');
+      await vi.advanceTimersByTimeAsync(49);
+      expect(kills).toEqual(['SIGTERM']);
+      await vi.advanceTimersByTimeAsync(1);
+      const error = await outcome;
+      expect(kills).toEqual(['SIGTERM', 'SIGKILL']);
+      expect(delegationAbortChildExit(error)).toBe('exited');
+      expect(String((error as Error).message)).toContain('after SIGKILL');
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('reports a child that survived SIGKILL as not exited, and keeps it registered', async () => {
+      vi.useFakeTimers();
+      const controller = new AbortController();
+      const { handle, kills } = fakeChild([]);
+      const pending = withWallClockBudget(
+        { signal: controller.signal, killGraceMs: 50, budgetMs: 10_000, child: handle },
+        () => new Promise<string>(() => {})
+      );
+      const outcome = pending.catch((e: unknown) => e);
+      controller.abort('stop');
+      await vi.advanceTimersByTimeAsync(100);
+      const error = await outcome;
+      expect(kills).toEqual(['SIGTERM', 'SIGKILL']);
+      expect(delegationAbortChildExit(error)).toBe('not_exited');
+      expect(peekPersistedDelegationChildrenRegistry()).toHaveLength(1);
+    });
+
+    it('reports the abort, not the close error, when the child closes on SIGTERM', async () => {
+      const controller = new AbortController();
+      const exit = makeDeferred<void>();
+      let closeChild: (code: number | null) => void = () => {};
+      const pending = withWallClockBudget(
+        {
+          signal: controller.signal,
+          killGraceMs: 50,
+          child: {
+            kill: () => {
+              closeChild(null);
+              exit.resolve();
+            },
+            exited: exit.promise,
+          },
+        },
+        () =>
+          new Promise<string>((_resolve, reject) => {
+            closeChild = (code) => reject(new Error(`CLI exited with code ${code}`));
+          })
+      );
+      controller.abort('stop');
+      const error = await pending.catch((e: unknown) => e);
+      expect(delegationAbortChildExit(error)).toBe('exited');
+    });
+
+    it('reports an exit it cannot observe, and keeps the handle-less path immediate', async () => {
+      const withHandle = new AbortController();
+      const kill = vi.fn();
+      const unobservable = withWallClockBudget(
+        { signal: withHandle.signal, killGraceMs: 50, child: { kill } },
+        () => new Promise<string>(() => {})
+      );
+      withHandle.abort('stop');
+      expect(delegationAbortChildExit(await unobservable.catch((e: unknown) => e))).toBe(
+        'unobservable'
+      );
+      expect(kill).toHaveBeenCalledWith('SIGTERM');
+
+      const noChild = new AbortController();
+      const bare = withWallClockBudget({ signal: noChild.signal }, () => new Promise(() => {}));
+      noChild.abort('stop');
+      expect(delegationAbortChildExit(await bare.catch((e: unknown) => e))).toBe('no_child');
+    });
+
+    it('builds an exit promise from a real child process shape', async () => {
+      const listeners: Array<() => void> = [];
+      const running = delegationChildHandleFromChildProcess({
+        pid: 1,
+        kill: () => true,
+        exitCode: null,
+        signalCode: null,
+        once: (_event, listener) => listeners.push(listener as () => void),
+      });
+      let exited = false;
+      void running.exited?.then(() => {
+        exited = true;
+      });
+      await Promise.resolve();
+      expect(exited).toBe(false);
+      listeners.forEach((listener) => listener());
+      await running.exited;
+      expect(exited).toBe(true);
+
+      const alreadyExited = delegationChildHandleFromChildProcess({
+        pid: 2,
+        kill: () => true,
+        exitCode: 0,
+        signalCode: null,
+        once: () => undefined,
+      });
+      await expect(alreadyExited.exited).resolves.toBeUndefined();
+      expect(delegationAbortChildExit(new Error('reasoning aborted'))).toBeUndefined();
+    });
   });
 
   it('keeps an idle child tracked through escalation when cooperative cancellation rejects', async () => {
