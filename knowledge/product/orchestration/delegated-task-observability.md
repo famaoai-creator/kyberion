@@ -64,6 +64,16 @@ an unbound process — and moves into its partition on its next write; tenant
 offboarding prunes the tenant's rows and records from them. See
 [runtime-storage-layout](../architecture/runtime-storage-layout.md#delegation-trace-and-records).
 
+Background delegations also enqueue a completion notification
+(`libs/core/mission/delegation-notifications.ts`) into the same partition
+(`system/notifications.jsonl` or `confidential/<tenant>/notifications.jsonl`).
+A tenant-bound process claims only its own tenant's notifications; the
+unbound mission worker drains every partition plus the read-only legacy queue
+`active/shared/runtime/delegations/notifications.jsonl`, whose rows are
+attributed (stamp, record partition, mission) and, once claimed, copied into
+their partition so they are delivered at most once. Tenant offboarding
+removes the partition queue and prunes the tenant's legacy rows.
+
 The traces stay observability evidence, not durable mission state.
 
 ## 4. Usage Rule

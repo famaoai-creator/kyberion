@@ -442,10 +442,10 @@ The delegated-task trace and the resumable delegation records
 context and result text, so they live in the registered ledger root
 `active/shared/runtime/delegation-records/` (`PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations`):
 
-| Delegation | Trace                                     | Records / child inboxes                                             |
-| ---------- | ----------------------------------------- | ------------------------------------------------------------------- |
-| untenanted | `system/delegations.jsonl`                | `system/records/<id>.json`, `system/records/child-inbox/`           |
-| tenant     | `confidential/<tenant>/delegations.jsonl` | `confidential/<tenant>/records/<id>.json`, `…/records/child-inbox/` |
+| Delegation | Trace                                     | Records / child inboxes                                             | Notification queue                          |
+| ---------- | ----------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------- |
+| untenanted | `system/delegations.jsonl`                | `system/records/<id>.json`, `system/records/child-inbox/`           | `system/notifications.jsonl`                |
+| tenant     | `confidential/<tenant>/delegations.jsonl` | `confidential/<tenant>/records/<id>.json`, `…/records/child-inbox/` | `confidential/<tenant>/notifications.jsonl` |
 
 - A tenant delegation is always `confidential` (it holds tenant prose). The
   record's `tenant_slug` (stamped from the bound tenant at start) decides
@@ -484,10 +484,30 @@ includeSystem }` narrows for an unbound reader (the Concierge response
   the tenant's mission ids taken before its mission trees are removed, which
   the post-offboard verification reuses. Rows with neither a stamp nor a
   mission cannot be attributed and stay (readable by unbound processes only).
-- The background-delegation notification queue
-  (`active/shared/runtime/delegations/notifications.jsonl`,
-  `mission/delegation-notifications.ts`) is a separate, still unpartitioned
-  store.
+- **Notification queue.** The background-delegation completion queue
+  (`mission/delegation-notifications.ts`; tenant instruction / result
+  excerpts) lives in the same partitions: `system/notifications.jsonl` and
+  `confidential/<tenant>/notifications.jsonl`, written to the delegation's
+  partition (its record's `tenant_slug`, else the bound tenant) as
+  `delegation_record_store`. A tenant-bound process lists and claims only its
+  own partition (enqueueing for another tenant is refused,
+  `[DELEGATION_TENANT_SCOPE_MISMATCH]`); an unbound host — the delivering
+  mission worker — drains `system/`, every tenant partition and the legacy
+  queue. Claiming rewrites the partition file under the
+  `delegation-notifications` lock (delivered at most once, as before).
+- **Legacy notification queue** (`active/shared/runtime/delegations/notifications.jsonl`)
+  is never appended to or rewritten at runtime. A row is attributed by its
+  `tenant_slug`, else by the partition holding its delegation record, else by
+  its mission's location; a bound reader sees only rows attributed to it and
+  unattributed rows reach unbound processes only (fail closed). Claiming a
+  legacy row appends it, claimed, to its partition; that copy shadows the
+  legacy row (same `notification_id`), so it is never delivered again and
+  previously claimed rows stay claimed. Tenant offboarding exports then prunes
+  the tenant's rows (stamp, mission, or one of its delegation ids) under the
+  queue lock in one atomic, audited rewrite
+  (`SCOPE_OFFBOARD_DELEGATION_NOTIFICATION_PRUNE`, streamed; a file with an
+  oversized line is refused, not rewritten); the partition queue is exported
+  and soft-deleted with the partition.
 
 ### Tenant runtime partitions (backup, restore, offboarding)
 

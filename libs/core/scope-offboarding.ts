@@ -67,6 +67,8 @@ import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.j
 import { revokeGrantsForTenantBestEffort } from './task/task-scoped-grants.js';
 import { assertPhysicalScopeSegment, PHYSICAL_TENANT_NAMESPACE } from './physical-namespace.js';
 import {
+  DELEGATION_NOTIFICATIONS_LOCK,
+  LEGACY_DELEGATION_NOTIFICATIONS_PATH,
   LEGACY_DELEGATION_RECORD_DIR,
   LEGACY_DELEGATION_TRACE_PATH,
 } from './foundation/runtime-state-roots.js';
@@ -846,6 +848,8 @@ function collectPhysicalNamespaceTargets(
 export const DELEGATION_LEGACY_TRACE_REPO_PATH = LEGACY_DELEGATION_TRACE_PATH;
 /** Pre-partition shared delegation records (`<id>.json`, `child-inbox/<child>.jsonl`). */
 export const DELEGATION_LEGACY_RECORD_REPO_DIR = LEGACY_DELEGATION_RECORD_DIR;
+/** Pre-partition shared background-delegation notification queue (tenant-mixed). */
+export const DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH = LEGACY_DELEGATION_NOTIFICATIONS_PATH;
 const DELEGATION_LEGACY_EXPORT_DIR = 'delegations-legacy-removed';
 
 /**
@@ -874,15 +878,81 @@ function tenantMissionIds(tenantSlug: string, targets: readonly OffboardTarget[]
   return ids;
 }
 
-/** Does a legacy delegation row / record belong to the tenant (its stamp, else its mission)? */
+/**
+ * Does a legacy delegation row / record belong to the tenant (its stamp, else
+ * its mission, else its delegation being one of the tenant's — `delegation_id`
+ * of a record or notification, `trace_id` of a trace row)?
+ */
 function legacyDelegationBelongsTo(
   row: Record<string, unknown>,
   tenantSlug: string,
-  missionIds: ReadonlySet<string>
+  missionIds: ReadonlySet<string>,
+  delegationIds: ReadonlySet<string> = new Set()
 ): boolean {
   const stamped = typeof row.tenant_slug === 'string' ? row.tenant_slug.trim().toLowerCase() : '';
   if (stamped) return stamped === tenantSlug;
-  return typeof row.mission_id === 'string' && missionIds.has(row.mission_id.trim().toUpperCase());
+  if (typeof row.mission_id === 'string' && missionIds.has(row.mission_id.trim().toUpperCase())) {
+    return true;
+  }
+  const delegationId =
+    typeof row.delegation_id === 'string'
+      ? row.delegation_id
+      : typeof row.trace_id === 'string'
+        ? row.trace_id
+        : '';
+  return Boolean(delegationId) && delegationIds.has(delegationId.trim());
+}
+
+/**
+ * Ids of the tenant's delegations: the records in its delegation-store
+ * partitions plus the legacy shared records attributed to it. Legacy
+ * notification rows written after the record moved to its partition carry
+ * neither a tenant stamp nor (always) a mission; their delegation id is the
+ * remaining attribution.
+ */
+function tenantDelegationIds(tenantSlug: string, missionIds: ReadonlySet<string>): Set<string> {
+  const ids = new Set<string>();
+  for (const tier of SCOPE_TIERS) {
+    const dir = safeOptionalRepositoryPath(
+      path.join(
+        pathResolver.rootDir(),
+        PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations,
+        tier,
+        tenantSlug,
+        'records'
+      )
+    );
+    if (!dir) continue;
+    let names: string[] = [];
+    try {
+      names = listDirEntries(dir);
+    } catch (error) {
+      logger.warn(
+        `[OFFBOARD_DELEGATION_IDS_UNREADABLE] tenant delegation records could not be listed — legacy notification rows attributed only by delegation id stay in place | next: rerun the offboarding with the sovereign persona | evidence: ${repoRelativePosix(dir)}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    for (const name of names) {
+      if (name.endsWith('.json')) ids.add(name.slice(0, -'.json'.length));
+    }
+  }
+  for (const target of collectLegacyDelegationRecordTargets(tenantSlug, missionIds)) {
+    const name = path.posix.basename(target.path);
+    if (
+      path.posix.dirname(target.path) === DELEGATION_LEGACY_RECORD_REPO_DIR &&
+      name.endsWith('.json')
+    ) {
+      ids.add(name.slice(0, -'.json'.length));
+    }
+  }
+  return ids;
+}
+
+/**
+ * Repo-relative legacy delegation JSONL files: the trace (live file plus its
+ * rotated segments) and the shared notification queue.
+ */
+function legacyDelegationLineFiles(): string[] {
+  return [...legacyDelegationTraceFiles(), DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH];
 }
 
 /** Repo-relative legacy trace files: the live file plus its rotated segments. */
@@ -903,14 +973,15 @@ interface LegacyDelegationTracePrune {
   prune: DedupRegistryPrune;
 }
 
-/** The tenant's rows of each legacy trace file (corrupt lines are kept). */
+/** The tenant's rows of each legacy trace / notification file (corrupt lines are kept). */
 function computeLegacyDelegationTracePrunes(
   tenantSlug: string,
-  missionIds: ReadonlySet<string>
+  missionIds: ReadonlySet<string>,
+  delegationIds: ReadonlySet<string> = new Set()
 ): LegacyDelegationTracePrune[] {
   const tenant = tenantSlug.trim().toLowerCase();
   const prunes: LegacyDelegationTracePrune[] = [];
-  for (const repoPath of legacyDelegationTraceFiles()) {
+  for (const repoPath of legacyDelegationLineFiles()) {
     const abs = safeOptionalRepositoryPath(pathResolver.rootResolve(repoPath));
     if (!abs || !safeExistsSync(abs) || !safeLstat(abs).isFile()) continue;
     const prune: DedupRegistryPrune = { removedLines: [], keptLines: [] };
@@ -934,7 +1005,8 @@ function computeLegacyDelegationTracePrunes(
             'delegation trace JSONL entry'
           ),
           tenant,
-          missionIds
+          missionIds,
+          delegationIds
         );
       } catch {
         /* corrupt line: keep it — the trace readers skip it anyway */
@@ -982,6 +1054,11 @@ export interface ScopeTargetOptions {
    * delegation rows attributed only by mission are still recognised).
    */
   legacyMissionIds?: ReadonlySet<string>;
+  /**
+   * Delegation ids known to belong to the tenant before its partitions were
+   * removed (legacy notification rows attributed only by delegation).
+   */
+  legacyDelegationIds?: ReadonlySet<string>;
 }
 
 /**
@@ -1313,7 +1390,15 @@ export function verifyScopeOffboarded(
         ...(options.legacyMissionIds ?? []),
         ...tenantMissionIds(id, []),
       ]);
-      for (const { path: tracePath, prune } of computeLegacyDelegationTracePrunes(id, missionIds)) {
+      const delegationIds = new Set([
+        ...(options.legacyDelegationIds ?? []),
+        ...tenantDelegationIds(id, missionIds),
+      ]);
+      for (const { path: tracePath, prune } of computeLegacyDelegationTracePrunes(
+        id,
+        missionIds,
+        delegationIds
+      )) {
         leftovers.push(
           `${tracePath} (${prune.removedLines.length} legacy delegation row(s) of '${id}')`
         );
@@ -1427,9 +1512,15 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       scopeType === 'tenant' && isValidTenantSlug(scopeId)
         ? tenantMissionIds(scopeId, result.targets)
         : new Set<string>();
+    // …and its delegation ids (partition records + attributed legacy records),
+    // which attribute legacy notification rows carrying neither stamp nor mission.
+    const legacyDelegationIds =
+      scopeType === 'tenant' && isValidTenantSlug(scopeId)
+        ? tenantDelegationIds(scopeId, legacyMissionIds)
+        : new Set<string>();
     const delegationTracePrunes =
       scopeType === 'tenant' && isValidTenantSlug(scopeId)
-        ? computeLegacyDelegationTracePrunes(scopeId, legacyMissionIds)
+        ? computeLegacyDelegationTracePrunes(scopeId, legacyMissionIds, legacyDelegationIds)
         : [];
     if (delegationTracePrunes.length > 0) {
       result.delegations_legacy = {
@@ -1663,19 +1754,27 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
     }
 
     // The tenant's rows of the pre-partition shared delegation trace (and its
-    // rotated segments): no writer appends there any more, but the prune still
-    // runs under a per-file lock, recomputes the rows from the file as it is
-    // now, exports them verbatim, then applies one atomic rewrite. Audited.
+    // rotated segments) and of the shared notification queue: no writer
+    // appends there any more, but the prune still runs under the file's lock
+    // (the notification queue's own lock, which every claim holds), recomputes
+    // the rows from the file as it is now, exports them verbatim, then applies
+    // one atomic rewrite. Audited.
     if (delegationTracePrunes.length > 0) {
       let removed = 0;
       for (const { path: tracePath } of delegationTracePrunes) {
         const traceAbs = assertSafeRepositoryPath(pathResolver.rootResolve(tracePath), {
           allowMissingLeaf: true,
         });
-        const prune = withLockSync(metricsLedgerLockId(traceAbs), () => {
-          const current = computeLegacyDelegationTracePrunes(scopeId, legacyMissionIds).find(
-            (entry) => entry.path === tracePath
-          )?.prune;
+        const isNotificationQueue = tracePath === DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH;
+        const lockId = isNotificationQueue
+          ? DELEGATION_NOTIFICATIONS_LOCK
+          : metricsLedgerLockId(traceAbs);
+        const prune = withLockSync(lockId, () => {
+          const current = computeLegacyDelegationTracePrunes(
+            scopeId,
+            legacyMissionIds,
+            legacyDelegationIds
+          ).find((entry) => entry.path === tracePath)?.prune;
           if (!current || current.removedLines.length === 0) return current;
           const exportPath = assertSafeRepositoryPath(
             path.join(exportDirAbs, DELEGATION_LEGACY_EXPORT_DIR, path.posix.basename(tracePath)),
@@ -1692,7 +1791,9 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
         if (!prune || prune.removedLines.length === 0) continue;
         removed += prune.removedLines.length;
         appendRetentionAudit({
-          event: 'SCOPE_OFFBOARD_DELEGATION_TRACE_PRUNE',
+          event: isNotificationQueue
+            ? 'SCOPE_OFFBOARD_DELEGATION_NOTIFICATION_PRUNE'
+            : 'SCOPE_OFFBOARD_DELEGATION_TRACE_PRUNE',
           scope_type: scopeType,
           scope_id: scopeId,
           path: tracePath,
@@ -1703,8 +1804,9 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
           approved_at: approvedAt,
           purpose,
           policy_ref: RETENTION_CATALOG_REPO_PATH,
-          reason:
-            'offboarding removed the tenant’s rows from the pre-partition shared delegation trace after export',
+          reason: isNotificationQueue
+            ? 'offboarding removed the tenant’s rows from the pre-partition shared delegation notification queue after export'
+            : 'offboarding removed the tenant’s rows from the pre-partition shared delegation trace after export',
         });
       }
       if (result.delegations_legacy) {
@@ -1762,6 +1864,7 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
     try {
       result.verification = verifyScopeOffboarded(scopeType, scopeId, physicalFilter, {
         legacyMissionIds,
+        legacyDelegationIds,
       });
       appendRetentionAudit({
         event: 'SCOPE_OFFBOARD_VERIFIED',
