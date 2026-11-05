@@ -83,8 +83,8 @@ function fixture(
   };
 }
 describe('server-derived CI provenance', () => {
-  it('accepts unchanged base workflow and server-pinned App', () =>
-    expect(readVcsDevelopmentCiProof(pr, {}, fixture()).state).toBe('success'));
+  it('accepts unchanged base workflow and server-pinned App', async () =>
+    expect((await readVcsDevelopmentCiProof(pr, {}, fixture())).state).toBe('success'));
   it.each([
     { app: 7 },
     { workflowChanged: true },
@@ -92,22 +92,26 @@ describe('server-derived CI provenance', () => {
     { rootConfigChanged: true },
     { strict: false },
     { truncated: true },
-  ])('rejects forged or incomplete authority %j', (change) =>
-    expect(readVcsDevelopmentCiProof(pr, {}, fixture(change)).state).toBe('unverified')
+  ])('rejects forged or incomplete authority %j', async (change) =>
+    expect((await readVcsDevelopmentCiProof(pr, {}, fixture(change))).state).toBe('unverified')
   );
-  it('missing check is pending', () =>
-    expect(readVcsDevelopmentCiProof(pr, {}, fixture({ missing: true })).state).toBe('pending'));
-  it('queued check is pending', () =>
-    expect(readVcsDevelopmentCiProof(pr, {}, fixture({ status: 'queued' })).state).toBe('pending'));
-  it('failed check requires repair', () =>
-    expect(readVcsDevelopmentCiProof(pr, {}, fixture({ conclusion: 'failure' })).state).toBe(
-      'failure'
+  it('missing check is pending', async () =>
+    expect((await readVcsDevelopmentCiProof(pr, {}, fixture({ missing: true }))).state).toBe(
+      'pending'
     ));
+  it('queued check is pending', async () =>
+    expect((await readVcsDevelopmentCiProof(pr, {}, fixture({ status: 'queued' }))).state).toBe(
+      'pending'
+    ));
+  it('failed check requires repair', async () =>
+    expect(
+      (await readVcsDevelopmentCiProof(pr, {}, fixture({ conclusion: 'failure' }))).state
+    ).toBe('failure'));
 });
 
 import { ghPrQueued, ghRun } from './github.js';
 describe('typed merge queue transport', () => {
-  it('observes actual server queue membership', () => {
+  it('observes actual server queue membership', async () => {
     const run: VcsCommandRunner = () => ({
       status: 0,
       stdout: JSON.stringify({
@@ -119,7 +123,7 @@ describe('typed merge queue transport', () => {
       true
     );
   });
-  it('rejects arbitrary GraphQL through generic read transport', () => {
+  it('rejects arbitrary GraphQL through generic read transport', async () => {
     expect(() =>
       ghRun([
         'api',
@@ -154,28 +158,34 @@ describe('post-merge original verification baseline', () => {
             return { ...result, stdout: result.stdout.replaceAll(pr.headSha, mergeSha) };
           })();
   }
-  it('rejects moving base which now points to merge itself', () =>
+  it('rejects moving base which now points to merge itself', async () =>
     expect(
-      readVcsDevelopmentMergedCiProof(
-        { ...pr, state: 'merged', baseSha: mergeSha, mergeCommitSha: mergeSha },
-        {},
-        mergedFixture(true)
+      (
+        await readVcsDevelopmentMergedCiProof(
+          { ...pr, state: 'merged', baseSha: mergeSha, mergeCommitSha: mergeSha },
+          {},
+          mergedFixture(true)
+        )
       ).state
     ).toBe('unverified'));
-  it('rejects modified verification infrastructure against original parent', () =>
+  it('rejects modified verification infrastructure against original parent', async () =>
     expect(
-      readVcsDevelopmentMergedCiProof(
-        { ...pr, state: 'merged', mergeCommitSha: mergeSha },
-        {},
-        mergedFixture(true)
+      (
+        await readVcsDevelopmentMergedCiProof(
+          { ...pr, state: 'merged', mergeCommitSha: mergeSha },
+          {},
+          mergedFixture(true)
+        )
       ).state
     ).toBe('unverified'));
-  it('verifies unchanged infrastructure against actual original squash parent', () =>
+  it('verifies unchanged infrastructure against actual original squash parent', async () =>
     expect(
-      readVcsDevelopmentMergedCiProof(
-        { ...pr, state: 'merged', mergeCommitSha: mergeSha },
-        {},
-        mergedFixture()
+      (
+        await readVcsDevelopmentMergedCiProof(
+          { ...pr, state: 'merged', mergeCommitSha: mergeSha },
+          {},
+          mergedFixture()
+        )
       ).state
     ).toBe('success'));
 });

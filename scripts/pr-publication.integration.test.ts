@@ -40,9 +40,9 @@ const run = (_command, args) => {
 const lines = [];
 const publish = () => publishWithApproval({ cwd: input.root, title: 'fix(pr): isolated human decision', body: 'Protected full review body', head: 'feature', base: 'main', draft: true }, 'a'.repeat(64), (line) => lines.push(String(line)), run);
 let pending;
-try { publish(); } catch (error) { pending = error.message; }
+try { await publish(); } catch (error) { pending = error.message; }
 const first = listApprovalRequests({ storageChannels: ['external-operation'] });
-try { publish(); } catch {}
+try { await publish(); } catch {}
 const second = listApprovalRequests({ storageChannels: ['external-operation'] });
 const reviewPath = lines.find((line) => line.includes('Review full publication: '))?.split('Review full publication: ')[1];
 if (!reviewPath) throw new Error('No protected review was created: ' + pending);
@@ -51,22 +51,22 @@ if (effects !== 0) throw new Error('An effect ran before human approval');
 // Synthetic authenticated human at the store boundary, as in HA-06 tests.
 // Production terminal/session proof collection remains outside this fixture.
 decideApprovalRequest('mission_controller', { channel: first[0].channel, storageChannel: first[0].storageChannel, requestId: first[0].id, decision: 'approved', decidedBy: 'user:owner', decidedByType: 'human', authenticated: true, authMethod: 'terminal_attested', deciderIdentitySource: 'server_resolved', presentedDigest: computeApprovalPresentedDigest(first[0]), payloadHash: first[0].accountability.payloadHash, effectBinding: first[0].accountability.effectBinding });
-const approved = publish();
+const approved = await publish();
 let duplicate;
-try { publish(); } catch (error) { duplicate = error.message; }
+try { await publish(); } catch (error) { duplicate = error.message; }
 const generic = [];
 for (const mutation of [ { operation: 'push', params: { cwd: input.root, remote: 'origin', ref: 'feature' } }, { operation: 'pr_merge', params: { cwd: input.root, ref: '1', method: 'squash' } } ]) {
   const invoke = () => runVcsMutationWithApproval(mutation, vcsHostInvocationId(mutation), () => {}, run);
   const priorIds = new Set(listApprovalRequests({ storageChannels: ['external-operation'] }).map((request) => request.id));
   let pending, replay, changed;
-  try { invoke(); } catch (error) { pending = error.message; }
+  try { await invoke(); } catch (error) { pending = error.message; }
   const request = listApprovalRequests({ storageChannels: ['external-operation'] }).find((request) => !priorIds.has(request.id));
   if (!request) throw new Error('No explicit approval request for ' + mutation.operation + ': ' + pending);
   decideApprovalRequest('mission_controller', { channel: request.channel, storageChannel: request.storageChannel, requestId: request.id, decision: 'approved', decidedBy: 'user:owner', decidedByType: 'human', authenticated: true, authMethod: 'terminal_attested', deciderIdentitySource: 'server_resolved', presentedDigest: computeApprovalPresentedDigest(request), payloadHash: request.accountability.payloadHash, effectBinding: request.accountability.effectBinding });
-  const resumed = invoke();
-  try { invoke(); } catch (error) { replay = error.message; }
+  const resumed = await invoke();
+  try { await invoke(); } catch (error) { replay = error.message; }
   sourceSha = 'c'.repeat(40);
-  try { invoke(); } catch (error) { changed = error.message; }
+  try { await invoke(); } catch (error) { changed = error.message; }
   sourceSha = 'a'.repeat(40);
   generic.push({ operation: mutation.operation, pending, resumed, replay, changed, finalDecision: request.accountability.finalDecision });
 }
@@ -86,7 +86,7 @@ withExecutionContext('mission_controller', () => {
   recordTripwire(accepted, 'manual-stop', 'Fixture stop');
 }, 'ecosystem_architect');
 let stopped;
-try { publish(); } catch (error) { stopped = error.message; }
+try { await publish(); } catch (error) { stopped = error.message; }
 let organization;
 withExecutionContext('mission_controller', () => {
   safeWriteFile(input.root + '/knowledge/personal/tenants/acme.json', JSON.stringify({ tenant_slug: 'acme', display_name: 'Fixture', status: 'active', assigned_role: 'owner' }));

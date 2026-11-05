@@ -17,6 +17,11 @@ import type { AudioChunk, AudioFormat } from '../meeting/meeting-session-types.j
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { engineRuntimePreferencesReadiness } from './engine-runtime-preferences.js';
 import { executeServicePreset } from '../service/service-engine.js';
+import {
+  unmetRuntimeRequirements,
+  type ProviderRuntimeRequirement,
+  type RuntimeRequirementContext,
+} from '../provider-runtime-requirements.js';
 import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 import {
   listSeamSelectionPurposes,
@@ -33,6 +38,8 @@ export interface StreamingTtsCapabilities {
   local_only: boolean;
   /** Emits placeholder bytes rather than real speech (the stub). */
   synthetic?: boolean;
+  /** Host requirements the bridge needs to run (managed runtime, platform, env). */
+  runtime_requirements?: ProviderRuntimeRequirement;
 }
 
 export interface StreamingTextToSpeechBridge {
@@ -223,7 +230,8 @@ export interface StreamingTtsRequirements {
 
 export function unmetStreamingTtsRequirements(
   bridge: StreamingTextToSpeechBridge,
-  requires: StreamingTtsRequirements
+  requires: StreamingTtsRequirements,
+  runtimeCtx?: RuntimeRequirementContext
 ): string[] {
   const capabilities = getStreamingTtsCapabilities(bridge);
   const unmet: string[] = [];
@@ -242,7 +250,13 @@ export function unmetStreamingTtsRequirements(
     unmet.push(`language ${language}`);
   }
   if (requires.localOnly && !capabilities.local_only) unmet.push('local_only');
+  unmet.push(...unmetRuntimeRequirements(capabilities.runtime_requirements, runtimeCtx));
   return unmet;
+}
+
+/** Registered bridge ids without instantiating the bridges. */
+export function listStreamingTtsBridgeIds(): string[] {
+  return streamingTtsSeam.list().map((record) => record.id);
 }
 
 /** Every registered named bridge, including the built-ins. */
