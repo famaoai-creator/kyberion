@@ -116,6 +116,15 @@ export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
     run: async (argv) => (await import('./generate_capability_seams.js')).main(argv),
   },
   {
+    id: 'package-dependency-graph',
+    script: 'scripts/generate_package_dependency_graph.ts',
+    tracked: ['docs/developer/architecture/dependency-graph.mmd'],
+    run: async (argv) =>
+      (await import('./generate_package_dependency_graph.js')).runGeneratePackageDependencyGraph(
+        argv
+      ),
+  },
+  {
     id: 'subagent-definitions',
     script: 'scripts/generate_subagent_definitions.ts',
     tracked: [
