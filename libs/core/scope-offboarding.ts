@@ -457,7 +457,9 @@ const SCOPE_TIERS = ['personal', 'confidential', 'public'] as const;
  */
 export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   // Resident-dot state: load-bearing append-only state; the retention catalog
-  // requires audited review before tenant offboarding deletes it.
+  // requires audited review before tenant offboarding deletes it. (Its
+  // pre-partition dot/tenants/<slug>/ copies are offboarded automatically via
+  // PHYSICAL_LEGACY_TENANT_STATE_ROOTS.)
   dot: 'not_offboarded',
   // Registered source workspaces are removed through their owning ledger,
   // never by a tenant tree deletion that leaves live workspace records behind.
@@ -696,6 +698,11 @@ export const PHYSICAL_TENANT_LEARNING_ROOTS = [
  * tenant offboarding still removes what an older version left behind.
  */
 export const PHYSICAL_LEGACY_TENANT_STATE_ROOTS = [
+  // dot-state-paths.ts: pre-partition tenant dot state (dot/tenants/<slug>/). Live
+  // tenants keep the operator-reviewed `pnpm kyberion dot migrate-state` path;
+  // an offboarded tenant's leftover copy is exported and soft-deleted (owner
+  // decision 2026-11-05). The partitioned dot state itself stays 'not_offboarded'.
+  PARTITIONED_RUNTIME_STATE_ROOTS.dot,
   // generation-cost-settlement.ts: read fallback until the next write moves it.
   PARTITIONED_RUNTIME_STATE_ROOTS.generation_cost_settlements,
   // scripts/reasoning_credentials.ts: proofs expire after 15 minutes; no read fallback.

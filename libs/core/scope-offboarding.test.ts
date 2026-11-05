@@ -204,6 +204,7 @@ import {
   INGEST_DEDUP_REGISTRY_REPO_PATH,
   offboardScope,
   OFFBOARDING_EXPORT_SUBDIR,
+  PHYSICAL_LEGACY_TENANT_STATE_ROOTS,
   TENANT_RUNTIME_PARTITION_TARGET_KINDS,
   verifyScopeOffboarded,
 } from './scope-offboarding.js';
@@ -1544,5 +1545,64 @@ describe('tenant offboarding — delegation trace and records (partitioned + leg
         `${LEGACY_RECORDS}/l-1.json`,
       ])
     );
+  });
+});
+
+describe('tenant offboarding — legacy resident-dot copies (dot/tenants/<slug>)', () => {
+  const TENANT = 'tenant-alpha';
+  const OTHER = 'tenant-beta';
+  const DOT = 'active/shared/runtime/dot';
+
+  function seedDot(): void {
+    for (const tenant of [TENANT, OTHER]) {
+      writeJson(abs(`${DOT}/tenants/${tenant}/memory/dot-${tenant}.json`), {
+        dot_id: `dot-${tenant}`,
+      });
+      fs.writeFileSync(
+        abs(`${DOT}/tenants/${tenant}/work-results.jsonl`),
+        `${JSON.stringify({ dot_id: `dot-${tenant}`, summary: `${tenant} prose` })}\n`
+      );
+    }
+    // Current (partitioned) dot state stays review-required.
+    writeJson(abs(`${DOT}/confidential/${TENANT}/memory/dot-${TENANT}.json`), {
+      dot_id: `dot-${TENANT}`,
+    });
+  }
+
+  it('exports and soft-deletes the tenant legacy copy only (audited), keeping the partitioned dot state', () => {
+    seedDot();
+    expect(PHYSICAL_LEGACY_TENANT_STATE_ROOTS).toContain(DOT);
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining([{ path: `${DOT}/tenants/${TENANT}`, kind: 'tenant_learning_tree' }])
+    );
+    const planned = dryRun.targets.map((target) => target.path);
+    expect(planned).not.toContain(`${DOT}/tenants/${OTHER}`);
+    expect(planned).not.toContain(`${DOT}/confidential/${TENANT}`);
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-11-05T02:03:04.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(result.verification).toMatchObject({ clean: true });
+    expect(fs.existsSync(abs(`${DOT}/tenants/${TENANT}`))).toBe(false);
+    expect(fs.existsSync(trashPathOf(`${DOT}/tenants/${TENANT}/work-results.jsonl`))).toBe(true);
+    expect(
+      fs.existsSync(abs(`${result.export_path}/${DOT}/tenants/${TENANT}/memory/dot-${TENANT}.json`))
+    ).toBe(true);
+    expect(fs.existsSync(abs(`${DOT}/tenants/${OTHER}/work-results.jsonl`))).toBe(true);
+    expect(fs.existsSync(abs(`${DOT}/confidential/${TENANT}/memory/dot-${TENANT}.json`))).toBe(
+      true
+    );
+    expect(
+      auditEvents().find(
+        (event) =>
+          event.event === 'SCOPE_OFFBOARD_SOFT_DELETE' && event.path === `${DOT}/tenants/${TENANT}`
+      )
+    ).toMatchObject({ kind: 'tenant_learning_tree', approved_by: 'operator@example' });
   });
 });

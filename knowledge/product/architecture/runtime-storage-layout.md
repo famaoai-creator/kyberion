@@ -207,7 +207,12 @@ one domain, `active/shared/runtime/dot/`, and is addressed only through
 
 Tenant prose (memory, follow-up reasons, inbound event bodies, work results)
 never goes in a system-floor file; the tenant-scoped inbound events ledger
-lives under the tenant namespace. The older flat dot ledgers directly under
+lives under the tenant namespace. Pre-partition tenant copies under
+`dot/tenants/<slug>/` are moved for a live tenant only by the
+operator-reviewed `pnpm kyberion dot migrate-state`; when the tenant is
+offboarded they are exported and soft-deleted automatically (audited) like the
+tenant's other runtime state, while its partitioned dot state stays
+review-required (`not_offboarded`). The older flat dot ledgers directly under
 `active/shared/runtime/` (wake, action, inbox) stay shared and carry
 category-only text for tenant dots. One `storage-retention-catalog.json` entry
 covers `active/shared/runtime/dot`. See
