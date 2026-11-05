@@ -90,6 +90,16 @@ describe('memory-notebook (QM-03)', () => {
     expect(queryBullets(body, '', 10)).toEqual([]);
   });
 
+  it('queryBullets segments a spaceless Japanese query into content words', () => {
+    const body = '- (2026-07-01) 手順: デプロイ前に承認を取る\n- (2026-07-02) 経費精算は月末';
+    // The whole query never appears verbatim; its words (デプロイ / 手順) do.
+    expect(queryBullets(body, 'デプロイの手順', 10)).toEqual([
+      '(2026-07-01) 手順: デプロイ前に承認を取る',
+    ]);
+    expect(queryBullets(body, '経費精算', 10)).toHaveLength(1);
+    expect(queryBullets(body, 'デプロイの予算', 10)).toEqual([]);
+  });
+
   describe('consolidation', () => {
     it('parses UPDATE/DELETE/ADD/NONE action lines', () => {
       const out = 'UPDATE 2: merged fact\nDELETE 3\nADD: a new fact\nNONE\nnoise line';
