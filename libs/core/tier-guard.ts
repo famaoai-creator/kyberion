@@ -133,6 +133,14 @@ function isOutsideProjectRoot(relativePath: string): boolean {
   return firstSegment === '..';
 }
 
+function dotResultResourceAllowed(target: string, operation: ResourceAccessOperation): boolean {
+  return isDotResultStoreCapability(currentResourceAccessScope(), {
+    rootDir: projectRoot(),
+    target,
+    operation,
+  });
+}
+
 const logger = createLogger('tier-guard');
 
 type PolicyLoad = { status: 'loaded'; policy: any } | { status: 'missing' } | { status: 'corrupt' };
@@ -570,11 +578,7 @@ function isScopedStructuralMkdir(
       tenantSlug &&
       isRegisteredActiveTenant(tenantSlug) &&
       currentResourceAccessScope()?.tenantSlug === tenantSlug &&
-      isDotResultStoreCapability(currentResourceAccessScope(), {
-        rootDir: projectRoot(),
-        target: relativePath,
-        operation: 'mkdir',
-      })
+      dotResultResourceAllowed(relativePath, 'mkdir')
     );
   if (access.role === PR_PUBLICATION_STORE_ROLE) {
     const publication = currentPrPublicationScope();
@@ -953,13 +957,7 @@ function requestResourceDenial(
   const normalizedRole = role?.trim().toLowerCase().replace(/\s+/gu, '_');
   if (
     normalizedRole === DOT_RESULT_STORE_ROLE &&
-    !denyCandidatePaths(relativePath).every((target) =>
-      isDotResultStoreCapability(currentResourceAccessScope(), {
-        rootDir: projectRoot(),
-        target,
-        operation,
-      })
-    )
+    !denyCandidatePaths(relativePath).every((target) => dotResultResourceAllowed(target, operation))
   )
     return {
       allowed: false,
@@ -1201,11 +1199,7 @@ export function validateWritePermission(
     // The exact request ceiling was checked before all ambient/default policy grants.
     if (
       (currentRole === DOT_RESULT_STORE_ROLE &&
-        isDotResultStoreCapability(currentResourceAccessScope(), {
-          rootDir: projectRoot(),
-          target: relativePath,
-          operation,
-        })) ||
+        dotResultResourceAllowed(relativePath, operation)) ||
       (currentRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
         isDiscussionRequestCapability(currentResourceAccessScope())) ||
       (currentRole === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
@@ -1399,11 +1393,7 @@ export function inspectReadPermission(
         // ledger root itself; it never widens knowledge/ access.
         if (
           ((identity.role === DOT_RESULT_STORE_ROLE &&
-            isDotResultStoreCapability(currentResourceAccessScope(), {
-              rootDir: projectRoot(),
-              target: relativePath,
-              operation,
-            })) ||
+            dotResultResourceAllowed(relativePath, operation)) ||
             (identity.role === DISCUSSION_REQUEST_STORAGE_ROLE &&
               isDiscussionRequestCapability(currentResourceAccessScope())) ||
             (identity.role === CUSTOMER_DECISION_INVITE_STORE_ROLE &&

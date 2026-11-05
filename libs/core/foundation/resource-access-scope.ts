@@ -113,7 +113,10 @@ function freezeScope(scope: ResourceAccessScope): ResourceAccessScope {
 
 /** Independent of role scopes: nested role assumptions cannot discard this ceiling. */
 export function runInResourceAccessScope<T>(scope: ResourceAccessScope, fn: () => T): T {
-  const frozen = freezeScope(scope);
+  return runInFrozenResourceAccessScope(freezeScope(scope), fn);
+}
+
+function runInFrozenResourceAccessScope<T>(frozen: ResourceAccessScope, fn: () => T): T {
   const outer = registry.storage.getStore() ?? [];
   if (
     outer.some(
@@ -130,6 +133,85 @@ export function runInResourceAccessScope<T>(scope: ResourceAccessScope, fn: () =
 
 export function currentResourceAccessScope(): ResourceAccessScope | undefined {
   return registry.storage.getStore()?.at(-1);
+}
+
+export interface SynchronousResourceGrantIssuer<Binding> {
+  /** The domain facade validates and freezes its binding before calling this. No role is assumed. */
+  run<T>(binding: Readonly<Binding>, scope: ResourceAccessScope, action: () => T): T;
+  /** Only this issuer's live, exact frozen ceiling resolves. A matching label is not proof. */
+  resolve(
+    scope: ResourceAccessScope | undefined
+  ): Readonly<{ binding: Readonly<Binding>; scope: ResourceAccessScope }> | undefined;
+}
+
+/**
+ * Shared opaque-grant lifetime, not an authorization facade. Keep the issuer
+ * instance private to the domain's existing governed issuer. The diagnostic
+ * prefix never identifies or authenticates an issuer; each factory call owns
+ * its own token registry. This adds no catalog/identity I/O to foundation.
+ */
+export function createSynchronousResourceGrantIssuer<Binding>(
+  errorPrefix = 'RESOURCE_GRANT'
+): SynchronousResourceGrantIssuer<Binding> {
+  const active = new WeakMap<
+    object,
+    Readonly<{ binding: Readonly<Binding>; scope: ResourceAccessScope }>
+  >();
+  return Object.freeze({
+    run<T>(binding: Readonly<Binding>, scope: ResourceAccessScope, action: () => T): T {
+      if (Object.hasOwn(scope, 'opaqueStoreToken'))
+        throw new Error(`[${errorPrefix}_INVALID] Only the issuer may attach a token`);
+      const token = Object.freeze({});
+      const frozen = freezeScope({ ...scope, opaqueStoreToken: token });
+      active.set(token, Object.freeze({ binding, scope: frozen }));
+      try {
+        return runInFrozenResourceAccessScope(frozen, () => {
+          const result = action();
+          if (
+            result &&
+            (typeof result === 'object' || typeof result === 'function') &&
+            'then' in result
+          ) {
+            // Assimilation handles rejected Promises/thenables without leaking an
+            // unhandled rejection. finally revokes before queued work can run.
+            void Promise.resolve(result).catch(() => undefined);
+            throw new Error(`[${errorPrefix}_ASYNC] Storage grant is synchronous only`);
+          }
+          const seen = new WeakSet<object>();
+          const escapes = (value: unknown): boolean => {
+            if (!value || (typeof value !== 'object' && typeof value !== 'function')) return false;
+            if (active.has(value) || Object.hasOwn(value, 'opaqueStoreToken')) return true;
+            if (seen.has(value)) return false;
+            seen.add(value);
+            if (
+              value instanceof Map &&
+              [...Map.prototype.entries.call(value)].some(
+                ([key, entry]) => escapes(key) || escapes(entry)
+              )
+            )
+              return true;
+            if (value instanceof Set && [...Set.prototype.values.call(value)].some(escapes))
+              return true;
+            // Never execute accessors while inspecting a result. Any closure or
+            // accessor that retained a token still loses it in finally.
+            return Reflect.ownKeys(value).some((key) => {
+              const descriptor = Object.getOwnPropertyDescriptor(value, key);
+              return descriptor !== undefined && 'value' in descriptor && escapes(descriptor.value);
+            });
+          };
+          if (escapes(result))
+            throw new Error(`[${errorPrefix}_ESCAPE] Internal grant material cannot be returned`);
+          return result;
+        });
+      } finally {
+        active.delete(token);
+      }
+    },
+    resolve(scope: ResourceAccessScope | undefined) {
+      const record = scope?.opaqueStoreToken ? active.get(scope.opaqueStoreToken) : undefined;
+      return record?.scope === scope && scope === currentResourceAccessScope() ? record : undefined;
+    },
+  });
 }
 
 function permits(

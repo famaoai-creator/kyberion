@@ -5,6 +5,7 @@ import * as paths from './path-resolver.js';
 import { resetRoleAssumptionPolicyCache, withExecutionContext } from './authority.js';
 import { validateReadPermission, validateWritePermission } from './tier-guard.js';
 import {
+  createSynchronousResourceGrantIssuer,
   currentResourceAccessScope,
   runInResourceAccessScope,
   type ResourceAccessScope,
@@ -174,6 +175,15 @@ describe('internal DOT result capability under actual registered policy', () => 
     runInResourceAccessScope(forged, () =>
       expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/)
     );
+    const counterfeitIssuer = createSynchronousResourceGrantIssuer('DOT_RESULT_CAPABILITY');
+    const { opaqueStoreToken: _token, ...sameCeiling } = forged;
+    counterfeitIssuer.run(
+      Object.freeze({ binding: binding(), operation: 'append_result' }),
+      sameCeiling,
+      () => {
+        expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/);
+      }
+    );
   });
   it('invalidates escaped scope, spread copies, exceptions and queued asynchronous callbacks', async () => {
     let escaped: ResourceAccessScope | undefined;
@@ -186,6 +196,12 @@ describe('internal DOT result capability under actual registered policy', () => 
       expect(
         isDotResultStoreCapability(
           { ...escaped! },
+          { rootDir: root, target: file, operation: 'append' }
+        )
+      ).toBe(false);
+      expect(
+        isDotResultStoreCapability(
+          { ...escaped!, opaqueStoreToken: escaped!.opaqueStoreToken },
           { rootDir: root, target: file, operation: 'append' }
         )
       ).toBe(false);

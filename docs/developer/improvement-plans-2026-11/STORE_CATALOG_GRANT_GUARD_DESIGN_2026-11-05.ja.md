@@ -2,7 +2,7 @@
 title: 保存先カタログと許可証による権限判定（tier-guard の再設計）
 kind: design
 status: planned
-last_updated: 2026-11-05
+last_updated: 2026-11-06
 tags: [design, tier-guard, secure-io, scope, custody, grant, storage, governance]
 importance: 8
 ---
@@ -173,6 +173,23 @@ G0 の後は、保存配置の移行 S1 → S2 → S3 と、Scope の解決・�
 
 この段階は G1 の判定関数・Grant 発行・保存先専用ロール廃止を完了したものではない。
 将来の S2/S3 は保存場所の対応を更新し、移動前後の管理者と tier の同一性を検証する。
+
+### 同期 Grant の共通寿命管理と DOT 採用（2026-11-06）
+
+次の単位として、既存 `foundation/resource-access-scope.ts` に
+`createSynchronousResourceGrantIssuer` を実装し、DOT result の既存発行 facade が採用した。
+issuer ごとに独立した WeakMap を持ち、生成した token と現在の凍結済み scope の identity で
+検証する。caller の文字列や構造の一致は発行証拠にしない。同期 callback の終了・例外で
+必ず失効し、Promise/thenable を拒否する。外側の scope の制限も継続して適用する。
+
+DOT 固有の binding/root/操作/対象検証と、`dot_result_writer`、origin permit、書込内容・
+hardlink・symlink の検査は既存のまま残す。issuer インスタンスも既存の private module 内に
+保持し、公開 factory を呼ぶだけでは DOT grant を偽造できない。token が同じでも複製した
+scope は拒否する。scope の一般的な deny-only 動作や非同期利用は変更しない。
+
+これは Grant の共通機構を実 consumer に採用する段階であり、カタログに基づく発行者認可、
+G1 の完全な `decide`、G2 の専用ロール削除、system/person scope への拡張ではない。
+既存モジュール内に置くことで公開 subpath と foundation の依存モジュール数を増やさない。
 
 ## 既定で拒否であること
 
