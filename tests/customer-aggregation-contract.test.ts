@@ -53,13 +53,10 @@ describe('Customer aggregation contract', () => {
     );
     expect(customerReadme).toContain('pnpm stance:create acme-corp');
     expect(customerReadme).toContain('pnpm stance:list');
-    expect(customerReadme).toContain(
-      'required customer.json / identity.json / vision.md files are present'
-    );
-    expect(customerReadme).toContain('pnpm stance:migrate-from-personal acme-corp');
     expect(customerReadme).toContain('pnpm stance:switch acme-corp');
+    expect(customerReadme).toContain('knowledge/personal/stances/{slug}/');
     expect(customerReadme).toContain(
-      'stance:switch requires customer.json / identity.json / vision.md to be present'
+      '`KYBERION_CUSTOMER` is the deprecated name of `KYBERION_STANCE`'
     );
   });
 });
