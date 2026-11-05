@@ -508,7 +508,11 @@ export function delegationAbortChildExit(error: unknown): DelegationAbortChildEx
   return match ? (match[1] as DelegationAbortChildExit) : undefined;
 }
 
-type OperationSettlement = { ok: true } | { ok: false; error: unknown };
+/**
+ * One shape, not a `{ok:true}|{ok:false,error}` union: libs/core compiles with
+ * `strictNullChecks: false`, where boolean-literal narrowing does not apply.
+ */
+type OperationSettlement = { ok: boolean; error?: unknown };
 
 /** The settlement of `settled` if it arrives within `ms`, else undefined; leaves no timer behind. */
 async function settlementWithin(
