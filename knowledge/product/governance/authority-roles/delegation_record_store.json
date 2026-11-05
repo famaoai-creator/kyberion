@@ -1,0 +1,9 @@
+{
+  "role": "delegation_record_store",
+  "description": "Tenant-bound store role of the delegated-task trace and record partitions (libs/core/delegated-task-observability.ts). The delegation store assumes it (withExecutionContext / withExecutionContextAsync) for every tenant partition read and write — trace append, record write/read/listing, child-inbox queue I/O — always bound to the delegation's tenant, so the grants resolve through ${KYBERION_TENANT} to that one tenant's active/shared/runtime/delegation-records/confidential/<tenant>/ partition. Tenant-bound (TENANT_BOUND_READER_ROLES): a caller with another active tenant cannot bind it, so a process bound to one tenant never reads another tenant's delegation instructions or results. The inter-process locks stay under the caller's role. No knowledge, mission, system partition, legacy observability or customer/ grant.",
+  "default_persona": "worker",
+  "write_scopes": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"],
+  "scope_classes": ["audit"],
+  "allowed_actuators": [],
+  "tier_access": ["confidential"]
+}
