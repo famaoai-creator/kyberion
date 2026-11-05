@@ -20783,6 +20783,11 @@
         "ja": "状態別のミッション",
         "qps-ploc": "⟦Ɱïşşïőñş ƀẏ şŧȧŧė ŀőřėɱ⟧"
       },
+      "ia_shell_mission_col_planned": {
+        "en": "Planned",
+        "ja": "計画中",
+        "qps-ploc": "⟦Ṗŀȧññėḓ ŀőř⟧"
+      },
       "ia_shell_mission_col_in_progress": {
         "en": "In progress",
         "ja": "進行中",
@@ -36059,7 +36064,7 @@
       },
       "status_planned": {
         "en": "Planned",
-        "ja": "予定",
+        "ja": "計画中",
         "qps-ploc": "⟦Ṗŀȧññėḓ ŀőř⟧"
       },
       "status_ready": {
