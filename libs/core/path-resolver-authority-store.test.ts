@@ -1,4 +1,11 @@
-import { existsSync, mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  realpathSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -277,6 +284,44 @@ describe('primary-checkout authority store resolution', () => {
     const inbox = path.join(linkedPrimary, 'active/shared/coordination/inbox/x');
     expect(() => guard.mkdirGuarded(inbox, inbox, inbox)).toThrow();
     expect(existsSync(path.join(primary, 'active/shared/coordination/inbox'))).toBe(false);
+  });
+
+  it('round-trips authority stores and their ancestors through the root translators', async () => {
+    // toLogicalRoot and toPhysicalRoot must be inverses for every primary path
+    // either one re-spells; a path only one direction knows breaks the
+    // physical-prefix open (macOS O_NOFOLLOW_ANY) or the parent comparison.
+    const linkedPrimary = path.join(tmp, 'primary-link');
+    symlinkSync(primary, linkedPrimary);
+    const linkedWorktree = path.join(tmp, 'worktrees', 'wt-linked');
+    makeCheckout(linkedWorktree);
+    const gitDir = path.join(linkedPrimary, '.git', 'worktrees', 'wt-linked');
+    mkdirSync(gitDir, { recursive: true });
+    writeFileSync(path.join(gitDir, 'commondir'), '../..\n');
+    writeFileSync(path.join(linkedWorktree, '.git'), `gitdir: ${gitDir}\n`);
+
+    await loadResolver(linkedWorktree);
+    const guard = await import('./secure-io-path-guard.js');
+    const { toLogicalRoot, toPhysicalRoot } = guard.rootTranslationForTesting;
+    const realPrimary = realpathSync.native(primary);
+    for (const rel of [
+      'active/shared/coordination',
+      'active/shared/runtime',
+      'knowledge/confidential/acme',
+      'active/shared/coordination/channels',
+      'active/shared/coordination/channels/external-operation/approvals/requests',
+      'knowledge/personal/charters/x.json',
+    ]) {
+      const logical = path.join(linkedPrimary, rel);
+      const physical = path.join(realPrimary, rel);
+      expect(toPhysicalRoot(logical)).toBe(physical);
+      expect(toLogicalRoot(physical)).toBe(logical);
+      expect(toLogicalRoot(toPhysicalRoot(logical))).toBe(logical);
+    }
+    // Non-authority primary paths are translated by neither direction.
+    const inbox = path.join(linkedPrimary, 'active/shared/coordination/inbox');
+    expect(toPhysicalRoot(inbox)).toBe(inbox);
+    const realInbox = path.join(realPrimary, 'active/shared/coordination/inbox');
+    expect(toLogicalRoot(realInbox)).toBe(realInbox);
   });
 
   it('does not create a missing ancestor of the authority store', async () => {
