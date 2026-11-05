@@ -67,6 +67,9 @@
       "path": "./libs/shared-interaction"
     },
     {
+      "path": "./libs/shared-perception"
+    },
+    {
       "path": "./libs/shared-voice"
     },
     {

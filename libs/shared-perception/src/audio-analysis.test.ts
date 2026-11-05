@@ -9,7 +9,7 @@ const mock = vi.hoisted(() => ({
   readRange: vi.fn(),
   exec: vi.fn(),
 }));
-vi.mock('../secure-io.js', () => ({
+vi.mock('@agent/core/secure-io', () => ({
   assertSafeRepositoryPath: (value: string) => value,
   safeLstat: mock.stat,
   safeReaddir: () => [],
@@ -19,7 +19,7 @@ vi.mock('../secure-io.js', () => ({
   assertGovernedExec: mock.exec,
 }));
 vi.mock('./observation.js', () => ({ resolvePerceptionScope: () => ({ tier: 'public' }) }));
-vi.mock('../managed-process.js', () => ({
+vi.mock('@agent/core/managed-process', () => ({
   spawnManagedProcess: mock.spawn,
   stopManagedProcess: mock.stop,
 }));

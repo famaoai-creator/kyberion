@@ -2,7 +2,7 @@ import { resolvePerceptionScope } from './observation.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import * as yaml from 'js-yaml';
-import { pathResolver } from '../path-resolver.js';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
   safeLstat,
@@ -11,9 +11,9 @@ import {
   safeReadFileRange,
   buildSafeExecEnv,
   assertGovernedExec,
-} from '../secure-io.js';
-import { spawnManagedProcess, stopManagedProcess } from '../managed-process.js';
-import { isRecord } from '../foundation/text.js';
+} from '@agent/core/secure-io';
+import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
+import { isRecord } from '@agent/core/foundation/text';
 
 /** Actual local inference only. Inputs are 16 kHz mono PCM16 WAV, bounded to ten minutes. */
 export interface AudioAnalysisRequest {
@@ -265,7 +265,7 @@ export async function analyzeAudio(request: AudioAnalysisRequest): Promise<Audio
   const audioModel = request.events ? localAsset(request.audioModel!, false) : undefined;
   if (audioModel && !/\.(tflite|task)$/iu.test(audioModel))
     return invalid('audio model must be a .tflite or .task asset');
-  const script = localAsset('libs/core/perception/audio-analysis.py', false);
+  const script = localAsset('libs/shared-perception/src/audio-analysis.py', false);
   const command = request.python ?? 'python3';
   if (!command.trim() || command.startsWith('-') || /[\r\n\0]/u.test(command))
     return invalid('invalid Python executable');
