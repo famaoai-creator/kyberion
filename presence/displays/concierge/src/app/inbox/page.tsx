@@ -32,6 +32,7 @@ import {
   type NeedsYouItem,
   type NeedsYouSummary,
 } from '../../lib/needs-you-client';
+import { inboxReturnToCandidateHref } from '../../lib/inbox-links';
 import {
   NeedsYouCard,
   cardAnchor,
@@ -298,11 +299,21 @@ function InboxView() {
   ];
   const next = visible[0];
   const filtered = Boolean(filters.reason || filters.overdue);
+  // An approval opened from a knowledge candidate (learning review) offers the
+  // way back to that candidate's row in the library.
+  const returnToCandidate = inboxReturnToCandidateHref(
+    new URLSearchParams(searchParams.toString())
+  );
 
   return (
     <div className="kb-page inbox-page" data-width="default">
       {header}
       {notice ? <Callout tone={notice.error ? 'danger' : 'success'} title={notice.text} /> : null}
+      {returnToCandidate ? (
+        <p className="inbox-return">
+          <a href={returnToCandidate}>{c('ia_inbox_return_to_candidate')}</a>
+        </p>
+      ) : null}
 
       {summary ? (
         <div className="inbox-summary" aria-live="polite">
