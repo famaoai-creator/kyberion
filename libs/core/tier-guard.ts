@@ -94,7 +94,7 @@ import { currentExecutionScope } from './foundation/execution-scope.js';
 import { informationAssetCoverageReadAllowed } from './foundation/information-asset-coverage-capability.js';
 import {
   currentResourceAccessScope,
-  matchesNamePrefix,
+  decideResourceAccess,
   type ResourceAccessOperation,
 } from './foundation/resource-access-scope.js';
 import type {
@@ -967,30 +967,10 @@ function requestResourceDenial(
     const scope = currentResourceAccessScope();
     if (!scope) return false;
     if (!withNamePrefixes && (scope.namePrefixExact?.length ?? 0) > 0) return false;
-    const candidates = denyCandidatePaths(relativePath);
-    const prefixed = (target: string): boolean =>
-      withNamePrefixes && operation !== 'mkdir' && matchesNamePrefix(scope, target);
-    if (operation === 'append')
-      return candidates.every((target) => scope.writeExact.includes(target) || prefixed(target));
-    if (operation === 'metadata') {
-      const original = [
-        ...(scope.metadataExact ?? []),
-        ...scope.readExact,
-        ...scope.writeExact,
-        ...scope.mkdirExact,
-      ];
-      return candidates.every(
-        (target) =>
-          prefixed(target) ||
-          original.some(
-            (allowed) => target === allowed || target === '' || allowed.startsWith(target + '/')
-          ) ||
-          (scope.allowProductKnowledgeRead === true &&
-            (target === 'knowledge' ||
-              target === 'knowledge/product' ||
-              target.startsWith('knowledge/product/')))
+    if (operation === 'append' || operation === 'metadata')
+      return denyCandidatePaths(relativePath).every(
+        (target) => decideResourceAccess({ ...scope, appendExact: [] }, target, operation).allowed
       );
-    }
     return true;
   };
   if (
