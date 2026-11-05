@@ -8,7 +8,7 @@ import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
+} from '@agent/core/contracts/execution-bounds';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertProjectTrustApproval } from '@agent/core/project/project-trust';

@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
-import { pcmToWav } from '@agent/core/pcm-wav';
+import { pcmToWav } from '@agent/core/foundation/pcm-wav';
 import type { TraceContext } from '@agent/core/analysis/trace';
 import type { AudioBus } from '@agent/core/voice/audio-bus';
 import type { StreamingSpeechToTextBridge } from '@agent/core/voice/streaming-stt-bridge';

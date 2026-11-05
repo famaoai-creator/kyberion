@@ -61,7 +61,7 @@ import {
 import { runOrganizationRetro } from '@agent/core/organization/organization-retro';
 import type { OrganizationTier } from '@agent/core/organization/organization-operating-model';
 import { runAccountabilityDigest } from '@agent/core/governance/accountability-digest';
-import { normalizeLocale } from '@agent/core/locale-normalize';
+import { normalizeLocale } from '@agent/core/foundation/locale-normalize';
 import {
   parseOrganizationRecordRunParams,
   recordOrganizationOperationRunWithDefaults,

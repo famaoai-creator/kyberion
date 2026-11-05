@@ -2,7 +2,7 @@
  * Table XML generator for XLSX packages
  */
 import type { XlsxTable } from '@agent/core/contracts/xlsx-protocol';
-import { escapeXml as escXml } from '@agent/core/text-escaping';
+import { escapeXml as escXml } from '@agent/core/foundation/text-escaping';
 
 export function generateTable(table: XlsxTable): string {
   if (table.rawXml) return table.rawXml;

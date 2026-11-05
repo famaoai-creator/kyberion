@@ -20,7 +20,7 @@ import {
   recordApprovalApplyResult,
 } from '@agent/core/governance/approval-store';
 import { nowIso } from '@agent/core/foundation';
-import { formatWireError } from '@agent/core/wire-error';
+import { formatWireError } from '@agent/core/contracts/wire-error';
 import type { RegisterGovernedTool, ToolCatalog } from './mcp-server-engine.js';
 
 export const MCP_MISSION_LIFECYCLE_OPERATIONS = [

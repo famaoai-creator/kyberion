@@ -15,7 +15,7 @@ import {
 import type { GuidedCoordinationBrief } from './contracts/guided-coordination-brief.js';
 import type { ActuatorExecutionBrief } from './contracts/actuator-execution-brief.js';
 import { resolveInputBindings, type InputBinding } from './input-binding.js';
-import { type WorkflowExecutionShape } from './execution-shape.js';
+import { type WorkflowExecutionShape } from './contracts/execution-shape.js';
 import { clamp } from './foundation/text.js';
 import { findIntentPhrase, matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
 import {

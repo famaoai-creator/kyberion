@@ -1,5 +1,5 @@
 import type { TranscriptSegment } from './video-ingest-types.js';
-import { decodeEntities } from '@agent/core/text-escaping';
+import { decodeEntities } from '@agent/core/foundation/text-escaping';
 
 const TIMESTAMP = /^(?:(\d{1,3}):)?(\d{2}):(\d{2})[.,](\d{3})$/;
 

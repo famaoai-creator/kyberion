@@ -8,6 +8,6 @@ export const SPECIALIST_IDS = {
   surfaceConcierge: 'surface-concierge',
 } as const;
 
-export type SpecialistId = typeof SPECIALIST_IDS[keyof typeof SPECIALIST_IDS];
+export type SpecialistId = (typeof SPECIALIST_IDS)[keyof typeof SPECIALIST_IDS];
 
 export const DEFAULT_SPECIALIST_ID: SpecialistId = SPECIALIST_IDS.surfaceConcierge;

@@ -82,7 +82,7 @@ import type {
   SurfaceAsyncChannel,
 } from './channel-surface-types.js';
 import type { SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import { t } from '../t.js';
 import { trimEndChars } from '../foundation/text.js';
 

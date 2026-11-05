@@ -1,5 +1,5 @@
 /** Stable OCR facade; registry, routing and concrete providers have separate boundaries. */
-import type { OcrRequest, OcrResult } from './ocr-types.js';
+import type { OcrRequest, OcrResult } from './contracts/ocr-types.js';
 import { AdaptivePolicyRouter, ocrImageWithRouter } from './ocr/router.js';
 import { listOcrProviders, ocrProviderRevision } from './ocr/provider-registry.js';
 import { ensureBuiltinOcrProviders } from './ocr/builtin-providers.js';

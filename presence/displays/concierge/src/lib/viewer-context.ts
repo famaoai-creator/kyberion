@@ -27,7 +27,7 @@ import { withExecutionContext } from '@agent/core/authority';
 import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
 import type { HeadlessViewerScope } from '@agent/core/headless-surface-contract';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
-import { toWireError } from '@agent/core/wire-error';
+import { toWireError } from '@agent/core/contracts/wire-error';
 import { conciergePeerAddress, isLoopbackPeer } from './loopback-peer';
 
 let conciergeRateLimiter: ReturnType<typeof fixedWindowLimiter> | undefined;

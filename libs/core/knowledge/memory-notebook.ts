@@ -24,7 +24,7 @@
  * blindly.
  */
 
-import { segmentKeywordTerms } from '../locale-normalize.js';
+import { segmentKeywordTerms } from '../foundation/locale-normalize.js';
 
 export const RECALL_MAX_CHARS = 6_000;
 export const MAX_FACTS = 300;

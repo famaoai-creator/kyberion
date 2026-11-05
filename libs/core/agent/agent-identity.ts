@@ -72,7 +72,7 @@ import {
   AgentIdentityFormatError,
   buildNhiId,
   parseNhiId,
-} from '../nhi-id.js';
+} from '../contracts/nhi-id.js';
 
 // ---------------------------------------------------------------------------
 // NHI id: kyberion://agent/<org>/<slug> (SPIFFE-shaped URI; NI-05 maps it out)

@@ -46,7 +46,7 @@ export * from './mic-capture.js';
 
 export * from './in-room-minutes-recorder.js';
 
-export * from './pcm-wav.js';
+export * from './foundation/pcm-wav.js';
 
 export * from './voice/audio-playback.js';
 
@@ -179,7 +179,7 @@ export * from './surface/surface-query.js';
 
 export * from './surface/surface-ux-contract.js';
 
-export * from './next-action-contract.js';
+export * from './contracts/next-action-contract.js';
 
 export * from './task/task-session.js';
 
@@ -376,7 +376,7 @@ export type { UnhandledIntentEntry, IntentMissType } from './unhandled-intent-re
 
 // Shared Business Types
 
-export * from './shared-business-types.js';
+export * from './contracts/shared-business-types.js';
 
 export * from './types.js';
 // export * as visionJudge from './vision-judge.js';

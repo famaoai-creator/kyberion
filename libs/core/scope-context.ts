@@ -3,7 +3,7 @@ import path from 'node:path';
 import { isScopeEnvOnly, transportedScopeLineage } from './foundation/scope-resolution-mode.js';
 export { withScopeEnvOnly } from './foundation/scope-resolution-mode.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { resolveClaimedNhiId } from './nhi-id.js';
+import { resolveClaimedNhiId } from './contracts/nhi-id.js';
 import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';

@@ -11,7 +11,7 @@ import {
 } from '@agent/core/surface/ui-element-detector';
 import { inspectSomImage, renderSomOverlay, type SomRedactFn } from '@agent/core/som-overlay';
 import { saveMarks, type MarksDisplay } from '@agent/core/mark-target-resolver';
-import type { OcrRoutingMode } from '@agent/core/ocr-types';
+import type { OcrRoutingMode } from '@agent/core/contracts/ocr-types';
 import type { PayloadTier } from '@agent/core/media/image-description-bridge';
 import {
   isInsideDir,

@@ -15,7 +15,11 @@ import { isRecord } from '@agent/core/foundation/primitives';
 import { compileReportSchema } from '@agent/core/report-contract';
 import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
 import { pathResolver } from '@agent/core/path-resolver';
-import { detectRouteCycle, resolveMaxRouteHops, selectJudgeRoute } from '@agent/core/judge-route';
+import {
+  detectRouteCycle,
+  resolveMaxRouteHops,
+  selectJudgeRoute,
+} from '@agent/core/contracts/judge-route';
 import { compactStepOutputContext } from '@agent/core/output-artifacts';
 import {
   executeAdfSteps,

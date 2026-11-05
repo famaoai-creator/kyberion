@@ -7,7 +7,7 @@ import type {
   XlsxRow,
   XlsxColumn,
 } from '@agent/core/contracts/xlsx-protocol';
-import { escapeXml as escXml } from '@agent/core/text-escaping';
+import { escapeXml as escXml } from '@agent/core/foundation/text-escaping';
 import {
   computeSheetDimension,
   escapeXlsxAttr,

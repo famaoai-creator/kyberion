@@ -8,7 +8,7 @@ import {
   updateTaskSession,
   type TaskSession,
 } from '../task/task-session.js';
-import { truncateTextWithCount } from '../text-truncation.js';
+import { truncateTextWithCount } from '../foundation/text-truncation.js';
 import {
   runApprovedClaudeBrowserTask,
   runApprovedClaudeDocumentTask,

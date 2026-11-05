@@ -18,7 +18,7 @@ import {
   resolveMediaDrawioTypeRank,
 } from '@agent/shared-media/media-drawio-sort-policy';
 import { resolveMediaDrawioSecurityGroupRelationPrefix } from '@agent/shared-media/media-drawio-security-group-order';
-import { escapeXml } from '@agent/core/text-escaping';
+import { escapeXml } from '@agent/core/foundation/text-escaping';
 import { nowIso } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';

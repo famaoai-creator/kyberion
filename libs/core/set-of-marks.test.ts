@@ -8,7 +8,7 @@ import {
   sortReadingOrder,
   type SomCandidate,
 } from './set-of-marks.js';
-import type { OcrResult } from './ocr-types.js';
+import type { OcrResult } from './contracts/ocr-types.js';
 
 function text(x: number, y: number, width: number, height: number, label: string, score = 0.9) {
   return {

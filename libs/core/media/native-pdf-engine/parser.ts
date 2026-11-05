@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { nowIso } from '../../foundation/time.js';
 import { pathResolver } from '../../path-resolver.js';
 import { safeMkdir, safeReadFile, safeWriteFile } from '../../secure-io.js';
-import { decodeEntities } from '../../text-escaping.js';
+import { decodeEntities } from '../../foundation/text-escaping.js';
 import type {
   PdfDesignProtocol,
   PdfLayoutElement,

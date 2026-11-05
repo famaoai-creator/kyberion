@@ -8,7 +8,7 @@ import {
 } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import { resolveLocale } from '@agent/core/locale';
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import {
   assertSafeRepositoryPath,
   safeReadFile,

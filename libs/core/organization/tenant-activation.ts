@@ -14,7 +14,7 @@ import {
 } from '../secure-io.js';
 import { revokeGrantsForTenantBestEffort } from '../task/task-scoped-grants.js';
 import { isRecord, readTextFile } from '../foundation/text.js';
-import { parseNhiId } from '../nhi-id.js';
+import { parseNhiId } from '../contracts/nhi-id.js';
 
 export const TENANT_ACTIVATION_CHECKS = [
   'registry',

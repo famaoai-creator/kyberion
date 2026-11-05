@@ -11,7 +11,7 @@
  * Pure + injectable clock/timer — no globals, no real timers in tests.
  */
 
-import { localeUsesWordSpaces, pickByLocale } from '@agent/core/locale-normalize';
+import { localeUsesWordSpaces, pickByLocale } from '@agent/core/foundation/locale-normalize';
 import { loadVoiceTurnTakingLexicon } from '@agent/core/voice/voice-turn-taking-lexicon';
 
 export type VoiceEotLang = 'ja' | 'en' | 'auto';

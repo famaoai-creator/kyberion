@@ -1,4 +1,4 @@
-import { createNextActionContract } from '@agent/core/next-action-contract';
+import { createNextActionContract } from '@agent/core/contracts/next-action-contract';
 import { createOutcomeContract } from '@agent/core/outcome-contract';
 import { resolveIntentResolutionContract } from '@agent/core/intent/intent-resolution-contract';
 import { readGovernanceJson, type ContractCheck } from './check_contract_schemas_shared.js';

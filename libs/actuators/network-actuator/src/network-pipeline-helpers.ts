@@ -28,7 +28,7 @@ import {
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
+} from '@agent/core/contracts/execution-bounds';
 import * as path from 'node:path';
 import { sendA2AMessage, pollA2AInbox } from './a2a-transport.js';
 import {

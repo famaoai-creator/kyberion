@@ -1,6 +1,6 @@
 import { appendJsonLine } from '../foundation/json.js';
 import { resolveLocale } from '../locale.js';
-import { localeToBcp47 } from '../locale-normalize.js';
+import { localeToBcp47 } from '../foundation/locale-normalize.js';
 /* eslint-disable no-restricted-imports */
 /**
  * ChromeExtensionMeetingJoinDriver — browser meeting attendance driven through

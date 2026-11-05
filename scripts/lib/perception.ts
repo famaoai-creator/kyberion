@@ -29,7 +29,7 @@ import {
   assertSafeRepositoryPath,
   safeReadFileRange,
 } from '@agent/core/secure-io';
-import type { OcrRequest, OcrResult } from '@agent/core/ocr-types';
+import type { OcrRequest, OcrResult } from '@agent/core/contracts/ocr-types';
 import type { describeImage } from '@agent/core/media/image-description-bridge';
 import type {
   SpeechToTextBridge,

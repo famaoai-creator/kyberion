@@ -86,7 +86,7 @@ export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
     id: 'vocabulary-types',
     script: 'scripts/generate_vocabulary_types.ts',
     tracked: [
-      'libs/core/locale-normalize.ts',
+      'libs/core/foundation/locale-normalize.ts',
       'libs/core/knowledge/vocabulary-keys.generated.ts',
       'libs/shared-ui/vanilla/kyberion-ui-vocabulary.js',
     ],

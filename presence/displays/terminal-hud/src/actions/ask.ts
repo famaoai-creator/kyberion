@@ -1,6 +1,6 @@
 import { runSurfaceMessageConversation } from '@agent/core/surface/channel-surface';
 import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import { auditAction } from './dispatch.js';
 
 export interface AskReply {
