@@ -740,69 +740,17 @@
       "types": "./dist/browser/index.d.ts",
       "default": "./dist/browser/index.js"
     },
-    "./browser-automation-runtime-bridge": {
-      "types": "./dist/browser/browser-automation-runtime-bridge.d.ts",
-      "default": "./dist/browser/browser-automation-runtime-bridge.js"
-    },
-    "./browser-conversation-session": {
-      "types": "./dist/browser/browser-conversation-session.d.ts",
-      "default": "./dist/browser/browser-conversation-session.js"
-    },
     "./browser-extension-bridge": {
       "types": "./dist/browser/browser-extension-bridge.d.ts",
       "default": "./dist/browser/browser-extension-bridge.js"
-    },
-    "./browser-judgment": {
-      "types": "./dist/browser/browser-judgment.d.ts",
-      "default": "./dist/browser/browser-judgment.js"
-    },
-    "./browser-onboarding": {
-      "types": "./dist/browser/browser-onboarding.d.ts",
-      "default": "./dist/browser/browser-onboarding.js"
-    },
-    "./browser-procedure-promotion": {
-      "types": "./dist/browser/browser-procedure-promotion.d.ts",
-      "default": "./dist/browser/browser-procedure-promotion.js"
     },
     "./browser-recording-compiler": {
       "types": "./dist/browser/browser-recording-compiler.d.ts",
       "default": "./dist/browser/browser-recording-compiler.js"
     },
-    "./browser/browser-bridge-mailbox": {
-      "types": "./dist/browser/browser-bridge-mailbox.d.ts",
-      "default": "./dist/browser/browser-bridge-mailbox.js"
-    },
-    "./browser/browser-automation-runtime-bridge": {
-      "types": "./dist/browser/browser-automation-runtime-bridge.d.ts",
-      "default": "./dist/browser/browser-automation-runtime-bridge.js"
-    },
-    "./browser/browser-conversation-session": {
-      "types": "./dist/browser/browser-conversation-session.d.ts",
-      "default": "./dist/browser/browser-conversation-session.js"
-    },
     "./browser/browser-extension-bridge": {
       "types": "./dist/browser/browser-extension-bridge.d.ts",
       "default": "./dist/browser/browser-extension-bridge.js"
-    },
-    "./browser/browser-golden-evidence": {
-      "types": "./dist/browser/browser-golden-evidence.d.ts",
-      "default": "./dist/browser/browser-golden-evidence.js"
-    },
-    "./browser/browser-judgment": {
-      "types": "./dist/browser/browser-judgment.d.ts",
-      "default": "./dist/browser/browser-judgment.js"
-    },
-    "./browser/browser-onboarding": {
-      "types": "./dist/browser/browser-onboarding.d.ts",
-      "default": "./dist/browser/browser-onboarding.js"
-    },
-    "./browser/browser-onboarding-state": {
-      "types": "./dist/browser/browser-onboarding-state.d.ts",
-      "default": "./dist/browser/browser-onboarding-state.js"
-    },
-    "./browser/browser-procedure-promotion": {
-      "types": "./dist/browser/browser-procedure-promotion.d.ts",
-      "default": "./dist/browser/browser-procedure-promotion.js"
     },
     "./browser/browser-recording-compiler": {
       "types": "./dist/browser/browser-recording-compiler.d.ts",
@@ -7923,6 +7871,22 @@
     "./voice/engine-runtime-preferences-transaction": {
       "types": "./dist/voice/engine-runtime-preferences-transaction.d.ts",
       "default": "./dist/voice/engine-runtime-preferences-transaction.js"
+    },
+    "./governance/approval-store-reader": {
+      "types": "./dist/governance/approval-store-reader.d.ts",
+      "default": "./dist/governance/approval-store-reader.js"
+    },
+    "./intent/intent-phrase-lexicon": {
+      "types": "./dist/intent/intent-phrase-lexicon.d.ts",
+      "default": "./dist/intent/intent-phrase-lexicon.js"
+    },
+    "./knowledge/golden-scenario-verdict": {
+      "types": "./dist/knowledge/golden-scenario-verdict.d.ts",
+      "default": "./dist/knowledge/golden-scenario-verdict.js"
+    },
+    "./router-contract": {
+      "types": "./dist/router-contract.d.ts",
+      "default": "./dist/router-contract.js"
     }
   },
   "dependencies": {

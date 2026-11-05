@@ -1,9 +1,9 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
-import { withLockSync } from '../foundation/lock-utils.js';
-import type { ApprovalRequestRecord } from '../governance/approval-store.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { withLockSync } from '@agent/core/foundation/lock-utils';
+import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
 import {
   BROWSER_BRIDGE_MAILBOX_ROOT,
   BROWSER_BRIDGE_MAX_RESPONSE_BYTES,
@@ -22,8 +22,8 @@ import {
 } from './browser-bridge-mailbox.js';
 
 // Pass-through spy: lets the poll test prove terminal records skip the lock.
-vi.mock('../foundation/lock-utils.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../foundation/lock-utils.js')>();
+vi.mock('@agent/core/foundation/lock-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/foundation/lock-utils')>();
   return { ...actual, withLockSync: vi.fn(actual.withLockSync) };
 });
 

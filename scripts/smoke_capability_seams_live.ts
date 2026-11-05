@@ -41,7 +41,7 @@ import {
 import {
   listBrowserAutomationRuntimeBridges,
   resolveBrowserAutomationRuntime,
-} from '@agent/core/browser/browser-automation-runtime-bridge';
+} from '@agent/shared-vision/browser-automation-runtime-bridge';
 
 type CheckResult = {
   seam: string;

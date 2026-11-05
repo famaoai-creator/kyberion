@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { getBrowserOnboardingState } from '@agent/core/browser/browser-onboarding';
+import { getBrowserOnboardingState } from '@agent/shared-vision/browser-onboarding';
 import { getInstalledReasoningMode } from '@agent/core/reasoning/reasoning-bootstrap';
 import { resolveRuntimeModelId } from '@agent/core/tool/runtime-model-defaults';
 import { listAgentIdentities } from '@agent/core/agent/agent-identity';

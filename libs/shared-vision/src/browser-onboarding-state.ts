@@ -1,11 +1,11 @@
-import { defineCatalog } from '../foundation/governed-catalog.js';
-import { pathResolver } from '../path-resolver.js';
+import { defineCatalog } from '@agent/core/foundation/governed-catalog';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeWriteFile,
-} from '../secure-io.js';
+} from '@agent/core/secure-io';
 
 export interface BrowserOnboardingState {
   version: string;

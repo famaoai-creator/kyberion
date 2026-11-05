@@ -38,30 +38,35 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { Buffer } from 'node:buffer';
-import { compileSchema } from '../foundation/ajv.js';
-import { readJsonIfPresent, writeJson } from '../foundation/json.js';
-import { withLockSync } from '../foundation/lock-utils.js';
-import { isValidTenantSlug } from '../foundation/scope.js';
-import { auditChain } from '../governance/audit-chain.js';
+import { compileSchema } from '@agent/core/foundation';
+import { readJsonIfPresent, writeJson } from '@agent/core/foundation/json';
+import { withLockSync } from '@agent/core/foundation/lock-utils';
+import { isValidTenantSlug } from '@agent/core/foundation/scope';
+import { auditChain } from '@agent/core/governance/audit-chain';
 import {
   isApprovalRequestExpired,
   listApprovalRequests,
-} from '../governance/approval-store-reader.js';
-import type { ApprovalRequestRecord } from '../governance/approval-store.js';
-import { resolveTenant } from '../organization/tenant-registry.js';
-import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeReaddir } from '../secure-io.js';
+} from '@agent/core/governance/approval-store-reader';
+import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
+import { resolveTenant } from '@agent/core/organization/tenant-registry';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReaddir,
+} from '@agent/core/secure-io';
 import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
   STORAGE_DATA_TIERS,
   UNTENANTED_PARTITION_SEGMENT,
   storagePartitionSegments,
   type StorageDataTier,
-} from '../storage-layout.js';
+} from '@agent/core/storage-layout';
 import {
   redactObservationText,
   validateBrowserExtensionObservation,
-} from './browser-extension-bridge.js';
+} from '@agent/core/browser/browser-extension-bridge';
 
 export const BROWSER_BRIDGE_REQUEST_KIND = 'browser-bridge-request.v1';
 export const BROWSER_BRIDGE_MAILBOX_ROOT = PARTITIONED_RUNTIME_STATE_ROOTS.browser_bridge_mailbox;

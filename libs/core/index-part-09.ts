@@ -153,8 +153,6 @@ export * from './media/native-subagent-adopter.js';
 export type * from './surface/channel-surface-types.js';
 export { isSurfaceAsyncChannel, SURFACE_ASYNC_CHANNELS } from './surface/channel-surface-types.js';
 
-export * from './browser/browser-conversation-session.js';
-
 export * from './mesh/peer-conversation.js';
 
 export * from './browser/browser-extension-bridge.js';

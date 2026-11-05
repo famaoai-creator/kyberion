@@ -2,7 +2,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { validateBrowserExtensionObservation } from '@agent/core/browser/browser-extension-bridge';
-import { BROWSER_BRIDGE_OBSERVE_PROCEDURE_ID } from '@agent/core/browser/browser-bridge-mailbox';
+import { BROWSER_BRIDGE_OBSERVE_PROCEDURE_ID } from '@agent/shared-vision/browser-bridge-mailbox';
 
 type MessageListener = (message: any, sender: any, respond: (value: any) => void) => boolean;
 const HASH = 'a'.repeat(64);

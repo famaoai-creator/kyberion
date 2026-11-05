@@ -7,7 +7,12 @@ const nextConfig = {
   // The operations console routes (/api/ops, the former Chronos API) reach
   // the agent runtime: node-pty is a native addon and the ACP SDK is a
   // runtime dependency of @agent/core, so neither is bundled.
-  serverExternalPackages: ['@agent/core', 'node-pty', '@agentclientprotocol/sdk'],
+  serverExternalPackages: [
+    '@agent/core',
+    '@agent/shared-vision',
+    'node-pty',
+    '@agentclientprotocol/sdk',
+  ],
   // PH-02 (carried over from Chronos): operations console pages may frame
   // only same-origin documents (plugin iframe views, deliverable previews).
   // Scoped to the /ops pages; API routes send their own policies (the plugin

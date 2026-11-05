@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "kyberion://schemas/browser-bridge-request.v1",
   "title": "Kyberion Browser Bridge Request v1",
-  "description": "One Kyberion -> Chrome extension request in the pull mailbox (libs/core/browser/browser-bridge-mailbox.ts). The extension pulls requests through the native host (poll_requests) and answers with respond_request. Requests never carry an executable instruction: observe_tab asks the user for consent to read the active tab, local_infer runs an on-device model whose result stays non-executable, notify is display-only and never carries page data. Stored one file per request under active/shared/runtime/browser-bridge-mailbox/<tier>/<tenant|shared>/.",
+  "description": "One Kyberion -> Chrome extension request in the pull mailbox (libs/shared-vision/src/browser-bridge-mailbox.ts). The extension pulls requests through the native host (poll_requests) and answers with respond_request. Requests never carry an executable instruction: observe_tab asks the user for consent to read the active tab, local_infer runs an on-device model whose result stays non-executable, notify is display-only and never carries page data. Stored one file per request under active/shared/runtime/browser-bridge-mailbox/<tier>/<tenant|shared>/.",
   "type": "object",
   "additionalProperties": false,
   "required": [

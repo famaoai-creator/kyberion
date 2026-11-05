@@ -30,10 +30,10 @@
  * this seam exists to avoid.
  */
 
-import { assistWithJudgment, choiceAnswer } from '../reasoning/judgment-assist.js';
-import type { JudgmentQuestion } from '../reasoning/judgment-backend.js';
-import { judgmentAssistReady } from '../reasoning/judgment-provider-bootstrap.js';
-import type { TierLevel } from '../types.js';
+import { assistWithJudgment, choiceAnswer } from '@agent/core/reasoning/judgment-assist';
+import type { JudgmentQuestion } from '@agent/core/reasoning/judgment-backend';
+import { judgmentAssistReady } from '@agent/core/reasoning/judgment-provider-bootstrap';
+import type { TierLevel } from '@agent/core/types';
 
 export const BROWSER_FAILURE_QUESTION = 'browser.failure_kind';
 export const BROWSER_READY_QUESTION = 'browser.page_ready';

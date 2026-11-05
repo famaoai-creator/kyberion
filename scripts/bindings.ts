@@ -14,7 +14,7 @@ import '@agent/core/agent/agent-exec-adapter-bridge';
 import '@agent/core/agent/agent-pane-runtime-bridge';
 import '@agent/core/voice/audio-bus-bridge';
 import '@agent/core/governance/audit-forwarder';
-import '@agent/core/browser/browser-automation-runtime-bridge';
+import '@agent/shared-vision/browser-automation-runtime-bridge';
 import '@agent/core/meeting/calendar-provider-bridge';
 import '@agent/core/camera-output-bridge';
 import '@agent/shared-video/video-filter';

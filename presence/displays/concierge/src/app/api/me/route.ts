@@ -3,7 +3,7 @@ import { withExecutionContext } from '@agent/core/authority';
 import { readFrontDeskMe } from '@agent/core/front-desk-identity';
 import { createLogger } from '@agent/core/logger';
 import { ensureOwnerMember } from '@agent/core/organization/member-registry';
-import { getBrowserOnboardingState } from '@agent/core/browser/browser-onboarding';
+import { getBrowserOnboardingState } from '@agent/shared-vision/browser-onboarding';
 import { conciergeAvailableOperations } from '../../../lib/headless-projections';
 import { resolveConciergeSelectedViewer } from '../../../lib/selected-tenant';
 import { conciergeErrorResponse } from '../../../lib/viewer-context';

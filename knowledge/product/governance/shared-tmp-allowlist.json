@@ -168,7 +168,7 @@
       "note": "provider sandbox probe scratch dir; disposable per-probe"
     },
     {
-      "file": "libs/core/browser/browser-conversation-session.ts",
+      "file": "libs/shared-vision/src/browser-conversation-session.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "temp screenshots/prompt files for browser sessions; call sites consolidated into a single browserConversationTempPath() helper"

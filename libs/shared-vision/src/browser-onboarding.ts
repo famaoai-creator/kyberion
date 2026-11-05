@@ -2,19 +2,19 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
-import { withExecutionContext } from '../authority.js';
-import { nowIso } from '../foundation/time.js';
-import { readTextFile } from '../foundation/text.js';
-import { ensureAgentIdentityBestEffort } from '../agent/agent-identity.js';
-import { ownerAccountableHumanId } from '../organization/member-registry.js';
-import { onboardingAgentIdentityParameters } from '../organization/onboarding-runtime-identity.js';
+import { withExecutionContext } from '@agent/core/authority';
+import { nowIso } from '@agent/core/foundation/time';
+import { readTextFile } from '@agent/core/foundation/text';
+import { ensureAgentIdentityBestEffort } from '@agent/core/agent/agent-identity';
+import { ownerAccountableHumanId } from '@agent/core/organization/member-registry';
+import { onboardingAgentIdentityParameters } from '@agent/core/organization/onboarding-runtime-identity';
 import {
   getAdapterDefaultSelectionSnapshot,
   saveAdapterDefaultPreferences,
   validateAdapterDefaultPreferences,
-} from '../actuator/adapter-default-selection.js';
-import { loadProviderConfig } from '../provider/provider-config.js';
-import { resolveActiveProfileRoot } from '../profile-root.js';
+} from '@agent/core/actuator/adapter-default-selection';
+import { loadProviderConfig } from '@agent/core/provider/provider-config';
+import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import {
   loadPersonalAgentIdentityAtPath,
   loadPersonalIdentityAtPath,
@@ -22,11 +22,11 @@ import {
   writePersonalIdentityAtPath,
   personalAgentIdentityRevision,
   readPersonalAgentIdentityStrictAtPath,
-} from '../personal-identity-state.js';
+} from '@agent/core/personal-identity-state';
 import {
   loadOperatorProviderPreferencesAtPath,
   writeOperatorProviderPreferencesAtPath,
-} from '../surface/operator-provider-preferences.js';
+} from '@agent/core/surface/operator-provider-preferences';
 import {
   loadBrowserOnboardingStateAtPath,
   writeBrowserOnboardingStateAtPath,
@@ -35,25 +35,28 @@ import {
   getLlmSelectionSnapshot,
   saveLlmSelectionPreferences,
   validateLlmSelectionPreferences,
-} from '../llm-selection-preferences.js';
-import { listServiceBindingRecords } from '../service/service-binding-registry.js';
+} from '@agent/core/llm-selection-preferences';
+import { listServiceBindingRecords } from '@agent/core/service/service-binding-registry';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
   safeWriteFile,
-} from '../secure-io.js';
-import { withLock } from '../foundation/lock-utils.js';
-import { getToolRuntimePolicy, writeToolRuntimePolicyAtPath } from '../tool/tool-runtime-policy.js';
-import { isValidTenantSlug } from '../entity-scope.js';
+} from '@agent/core/secure-io';
+import { withLock } from '@agent/core/foundation/lock-utils';
+import {
+  getToolRuntimePolicy,
+  writeToolRuntimePolicyAtPath,
+} from '@agent/core/tool/tool-runtime-policy';
+import { isValidTenantSlug } from '@agent/core/entity-scope';
 import {
   getVoiceProfileRegistry,
   loadVoiceProfileRegistryAtPath,
   resetVoiceProfileRegistryCache,
   writeVoiceProfileRegistry,
   type VoiceProfileRegistry,
-} from '../voice/voice-profile-registry.js';
+} from '@agent/core/voice/voice-profile-registry';
 
 const interactionStyles = ['Senior Partner', 'Concierge', 'Minimalist'] as const;
 const toolModes = ['trial_first', 'installed_first', 'installed_only'] as const;
@@ -718,4 +721,4 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
   );
 }
 
-export { loadOperatorProviderPreferences } from '../surface/operator-provider-preferences.js';
+export { loadOperatorProviderPreferences } from '@agent/core/surface/operator-provider-preferences';
