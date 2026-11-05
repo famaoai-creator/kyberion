@@ -14,7 +14,7 @@ import {
   distillPdfDesign,
   extractPptxSlides,
   protocolToMarkdown,
-} from '@agent/core/media/media-contracts';
+} from '@agent/shared-media/media-contracts';
 import { rasterizeVectorImage, VECTOR_IMAGE_EXTENSIONS } from '@agent/core/visual-raster';
 import { recognizeDocumentImage } from './media-ocr.js';
 import {

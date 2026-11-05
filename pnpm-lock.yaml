@@ -500,6 +500,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-media':
+        specifier: workspace:*
+        version: link:../../shared-media
 
   libs/actuators/meeting-actuator:
     dependencies:

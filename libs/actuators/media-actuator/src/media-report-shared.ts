@@ -1,4 +1,4 @@
-import { resolveThemeColorRole as resolveThemeColorRolePolicy } from '@agent/core/media/media-theme-role-policy';
+import { resolveThemeColorRole as resolveThemeColorRolePolicy } from '@agent/shared-media/media-theme-role-policy';
 import type { DocxDesignProtocol } from '@agent/core/contracts/docx-protocol';
 import type { PdfDesignProtocol } from '@agent/core/contracts/pdf-protocol';
 import type { DocumentCompositionPresetResolver, MediaTheme } from './media-document-helpers.js';

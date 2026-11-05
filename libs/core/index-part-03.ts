@@ -65,8 +65,6 @@ export { distillXlsxDesign } from './media/xlsx-utils.js';
 
 export { distillDocxDesign } from './media/docx-utils.js';
 
-export { generateNativePdf } from './media/native-pdf-engine/engine.js';
-
 export { generateNativePptx, patchPptxText } from './media/native-pptx-engine/engine.js';
 
 export {
@@ -78,37 +76,7 @@ export {
   type PptxDesignDefaultsInput,
 } from './media/native-pptx-engine/design-cascade.js';
 
-export {
-  fitTextToBox,
-  measureTextBlock,
-  measureTextWidthPt,
-  splitLinesBalanced,
-  wrapLine,
-  type LayoutFitRequest,
-  type LayoutFitResult,
-  type TextMeasurement,
-} from './media/native-pptx-engine/text-metrics.js';
-
-export {
-  PPTX_PALETTE,
-  resolvePptxPalette,
-  createPptxLayoutKit,
-  type PptxLayoutKit,
-  type PptxPalette,
-  textElement,
-  shapeElement,
-  lineElement,
-  sectionHeaderElements,
-  footerElements,
-  type SectionHeaderOptions,
-  type FooterOptions,
-} from './media/native-pptx-engine/layout-primitives.js';
-
 export type { PptxDesignProtocol, PptxElement, PptxSlide } from './contracts/pptx-protocol.js';
-
-export { generateNativeXlsx } from './media/native-xlsx-engine/engine.js';
-
-export { generateNativeDocx } from './media/native-docx-engine/engine.js';
 
 export {
   protocolToMarkdown,
@@ -250,8 +218,6 @@ export {
   loadServiceEndpointsCatalog,
   resolveServiceBinding,
 } from './service/service-binding.js';
-
-export { compileMusicGenerationADF } from './media/music-workflow-compiler.js';
 
 export {
   compileImageGenerationADF,
