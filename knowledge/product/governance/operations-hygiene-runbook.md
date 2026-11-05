@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-05
+last_updated: 2026-11-06
 ---
 
 # Operations Hygiene Runbook
@@ -718,6 +718,23 @@ this contract; a faster Linux run alone is not evidence that macOS CI passed.
 - Tests never write live `active/` state. CI runs the leak guard in strict mode
   (`KYBERION_TEST_LEAK_STRICT=1`, forwarded to the Vitest child by `pnpm test`). Any created or
   grown file outside the sandbox roots fails the job.
+- Apply the existing Vitest live-path redirect to both the master audit stream and
+  tenant mirrors. A mirror must retain its fixed `confidential/<tenant>` partition;
+  a custom owned root must still work unchanged. `audit-chain-tenant.test.ts`
+  checks redirected writes, absence at the canonical mirror, and verification.
+  Root-isolated tests that temporarily disable Vitest redirection must also isolate
+  the process-global audit singleton: save its property descriptor, remove it before
+  importing the fixture stack, and restore it after work settles. Module resets
+  alone do not reset `Symbol.for('@kyberion/audit-chain')`.
+- Copy regenerable policy/schema fixture files with guarded `safeCopyFileSync`,
+  rather than durable `safeWriteFile` for every copied file. Thousands of file and
+  parent-directory fsyncs can exhaust setup budgets under parallel load. Retain
+  secure path checks, real policy/schema contents and bounded hooks; do not change
+  production durability or raise timeouts to hide fixture preparation costs.
+- Tests of provider auto-selection must explicitly scope inherited backend/profile
+  environment variables and restore them afterward. Partial boundary mocks must
+  retain real grant issuers and compile real schemas; a new fallback validation
+  requirement is not a reason to replace validation with an always-valid stub.
 - Shared seam mechanisms must remain real in boundary tests. Use a partial mock
   with `createSeamCatalog()` to isolate registration state, rather than copying
   the seam API into a hand-written mock that omits new lifecycle helpers or

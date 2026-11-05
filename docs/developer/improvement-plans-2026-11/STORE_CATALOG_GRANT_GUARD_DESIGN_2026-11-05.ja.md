@@ -16,6 +16,35 @@ importance: 8
 
 ## 結論
 
+### 2026-11-06 早朝の実装状況
+
+作業ブランチは `feat/scope-independent-resolution-20261106`。参照ブランチは
+`4d34cf939` まで統合し、S2 の tenant home と固定 confidential audit mirror を維持した。
+保存先の root 登録は23件（state14・ledger5・floor4）で、生成 map と既存 alias を突合する。
+実際の利用者データの移行は実行していない。
+
+資産の住所の解決、操作上限の純粋判定、同期許可証の発行・失効、最終的な secure-io の
+認可を分けた。`scope inspect` は明示したパスを診断し、上限を指定しない場合は
+`address_only` とする。これは住所の構造の診断であり、tenant の登録・存在や完全な
+I/O 許可の証明ではない。新判定で旧認可を置き換える G1 全体、保存先専用ロールを
+除去する G2、system/person の許可証拡張 G4 は未完了である。
+
+公開 subpath は初期実装で3件追加した。credential 許可証の失効後にも残る権限を
+修正するため、secure-io の読み込み数は66から67へ増えた。これは pure proof module
+1件の明示した例外であり、core 全体の依存削減を達成したという意味ではない。
+
+全3267ファイルの最初の検証では3239成功・26失敗・2スキップ、34070テスト中
+33888成功・30失敗・152スキップだった。失敗を個別に分類し、継承された provider
+設定、古い partial mock、fixture の primary root と process-global audit singleton、
+再生成 fixture の大量 fsync、生成 gate 一覧の追従を修正している。
+この初回結果と後続の限定再実行は区別し、限定再実行だけで全体成功とは扱わない。
+
+修正後の28ファイルは516成功・1スキップ。続く全体再実行は3264ファイル成功・
+1失敗・2スキップ、テスト34151成功・1失敗・27スキップ（22分03秒）となり、
+実領域への書込みは検出されなかった。残った1件は test mock による非公開 AJV subpath
+参照で、公開 API を追加せず内部参照へ修正した後、actuator 3件と package boundary の
+4ファイル・101テストが通過した。この最後の test-only 修正後の全体再実行はしていない。
+
 門番（`libs/core/tier-guard.ts`）は、**資産の住所**と**許可証**だけを見て判定する。
 ドメインごとのロール名や capability モジュールを門番のコードに書かない。
 

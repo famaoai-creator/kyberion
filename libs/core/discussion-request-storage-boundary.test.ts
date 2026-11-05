@@ -73,8 +73,12 @@ beforeAll(async () => {
         const stat = initialIO.safeLstat(source);
         if (stat.isSymbolicLink()) throw new Error('Linked governance fixture');
         if (stat.isDirectory()) copy(file);
-        else if (/\.(?:json|yaml)$/u.test(name))
-          initialIO.safeWriteFile(path.join(ROOT, file), initialIO.safeReadFile(source));
+        else if (/\.(?:json|yaml)$/u.test(name)) {
+          const target = path.join(ROOT, file);
+          initialIO.safeMkdir(path.dirname(target), { recursive: true });
+          // Re-creatable policy fixtures retain guarded copy checks without per-file fsync.
+          initialIO.safeCopyFileSync(source, target);
+        }
       }
     };
     copy('knowledge/product/governance');
