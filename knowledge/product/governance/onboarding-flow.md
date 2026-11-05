@@ -1,7 +1,7 @@
 ---
 title: オンボーディング標準フロー — 環境 / Identity / Tenant / Activation / First Work
 tags: [governance, onboarding, identity, tenant, organization, activation, first-work]
-last_updated: 2026-11-01
+last_updated: 2026-11-05
 kind: governance
 scope: repository
 authority: standard
@@ -391,6 +391,26 @@ pnpm onboarding llm attest --tenant <tenant-slug> --provider claude --training-u
   Step 7 の `tenant:activation plan` の `llm_availability` で確認できる。
 - 対話型の `pnpm onboarding` でも、バックエンドを選んだ後にモデルを選び、tenant 登録の後に attest を
   選べる（既定は「しない」）。none を選ぶと承認依頼を作り、承認コマンドを表示する。
+
+テナントに属さない material（システム全体のロールの下書きなど）や、個人の material には tenant profile が
+無いため、管理者（custody）の種類で attest する。手順と承認の条件は tenant の場合と同じ。
+
+```bash
+# インストール単位（system custody）: テナントに属さない confidential material
+pnpm onboarding llm attest --custody system --provider claude --training-use none \
+  --plan "<契約プラン名>" --basis <規約の URL> --attested-by human:<owner> --request-approval
+# 個人単位（person custody）: テナントに属さない personal material。単一利用者のインストールでは
+# 現在の operator が本人になる。複数人のときは --principal <id> で区切る
+pnpm onboarding llm attest --custody person --provider claude --training-use none ... --request-approval
+```
+
+- 承認するのはインストールの所有者（`sovereign` / `owner`）。依頼は system の承認領域に置かれ、
+  tenant に束縛されたプロセスからは依頼も記録もできない。`--custody system|person` と `--tenant` は併用できない。
+- 記録先は `active/shared/runtime/provider-attestations/` の `system/attestations.json`（system）と
+  `personal/shared/<owner>.json`（person）。承認の根拠（request id と承認者）も一緒に保存され、根拠の無い
+  `none` は読み込み時に無効として扱われる。shipped の `provider-egress-policy.json` には書かない。
+- system の証明は tenant の material にも personal の material にも使われない。person の証明は
+  confidential のシステム material には使われない。
 
 ### Step 6: customer stance と organization を結合する（C）
 
