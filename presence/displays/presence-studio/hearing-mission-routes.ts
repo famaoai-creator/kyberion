@@ -144,7 +144,7 @@ function buildDecideNextAction(locale: SupportedLocale, viewer: PresenceStudioVi
     currentSurface: 'presence-studio',
     urls: readFrontDeskSurfaceUrls(),
     role: frontDeskRoleFromViewerScope(scope),
-  }).find((candidate) => candidate.id === 'decide');
+  }).find((candidate) => candidate.id === 'inbox');
   if (!item?.allowed) throw new HearingScopeError('hearing_scope_unavailable');
   const url = new URL(item.href);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)

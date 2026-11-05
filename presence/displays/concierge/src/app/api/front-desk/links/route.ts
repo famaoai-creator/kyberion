@@ -17,6 +17,15 @@ export const dynamic = 'force-dynamic';
 const CHRONOS_MIRROR_SURFACE_ID = 'chronos-mirror-v2';
 const CHRONOS_MIRROR_DEFAULT_PORT = 3000;
 
+/** 設定 › エージェントと自律度 › メディアエンジン: Studio's engine settings page. */
+function resolveStudioEngineConfigHref(): string | null {
+  try {
+    return resolveSurfaceBrowserUrl('presence-studio') + '/engine-config';
+  } catch {
+    return null;
+  }
+}
+
 function resolveChronosMirrorHref(): string {
   try {
     return resolveSurfaceBrowserUrl(CHRONOS_MIRROR_SURFACE_ID) + '/';
@@ -30,8 +39,13 @@ export function GET(req: NextRequest) {
   if (resolved.response) return resolved.response;
   try {
     const chronosHref = resolveChronosMirrorHref();
+    const studioEngineConfig = resolveStudioEngineConfigHref();
     return NextResponse.json(
-      { ok: true, chronos_url: chronosHref },
+      {
+        ok: true,
+        chronos_url: chronosHref,
+        ...(studioEngineConfig ? { studio_engine_config_url: studioEngineConfig } : {}),
+      },
       { headers: { 'Cache-Control': 'no-store' } }
     );
   } catch (error) {

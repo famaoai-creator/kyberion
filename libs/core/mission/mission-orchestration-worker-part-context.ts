@@ -21,6 +21,7 @@ import { resolveMissionDir } from '../owner-scope.js';
 import { pathResolver } from '../path-resolver.js';
 import { type MissionContextPackPruningSummary } from './mission-context-pack.js';
 import { appendPromptVisibilityRecord } from '../reasoning/prompt-visibility-ledger.js';
+import type { ReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
 import {
   recordKnowledgeDelivery,
   type DeliveredKnowledgeRef,
@@ -570,13 +571,24 @@ export async function maybeCompactDispatchSections(input: {
   const summaryProvider =
     getReasoningBackend().getRuntimeProviderName?.({ role: 'context_compaction' }) ||
     getReasoningBackend().name;
-  const summaryReasoningScope = input.securityScope
+  // The summarized head is the mission worker's own transcript. write_tier is
+  // its most sensitive tier (checked above). Tenant mission material may reach
+  // a provider the tenant attested as no-training; personal material and
+  // participants whose scope forbids external egress stay on this host.
+  const summaryReasoningScope: ReasoningPayloadScope | undefined = input.securityScope
     ? {
         tier: input.securityScope.write_tier,
         ...(input.securityScope.tenant_slug || input.securityScope.tenant_id
           ? { tenant_slug: input.securityScope.tenant_slug || input.securityScope.tenant_id }
           : {}),
         purpose: 'mission worker context compaction summary',
+        training_use:
+          input.securityScope.external_egress === 'deny' ||
+          input.securityScope.write_tier === 'personal'
+            ? 'local_only'
+            : input.securityScope.write_tier === 'public'
+              ? 'training_eligible'
+              : 'no_training',
       }
     : undefined;
   const summaryScope = input.securityScope

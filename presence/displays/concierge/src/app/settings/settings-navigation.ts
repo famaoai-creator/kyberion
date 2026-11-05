@@ -1,34 +1,19 @@
-import type { SettingsSectionId } from '../../lib/settings-view';
+import {
+  SETTINGS_SECTION_ELEMENT_ID,
+  settingsCategoryOf,
+  type SettingsSectionId,
+} from '../../lib/settings-view';
 
-export const SETTINGS_SECTION_ELEMENT_ID: Record<SettingsSectionId, string> = {
-  profile: 'setup-profile',
-  display: 'settings-display',
-  members: 'settings-members',
-  services: 'setup-services',
-  voice: 'setup-media',
-  notifications: 'setup-notifications',
-  recording: 'settings-recording',
-  authority: 'settings-authority',
-  plugins: 'setup-plugins',
-  advanced: 'settings-advanced',
-};
+export { SETTINGS_SECTION_ELEMENT_ID };
 
-const TARGET_SECTIONS = new Map<string, SettingsSectionId>([
-  ...Object.entries(SETTINGS_SECTION_ELEMENT_ID).map(
-    ([section, id]) => [id, section as SettingsSectionId] as const
-  ),
-  ['setup-management', 'advanced'],
-  ['setup-governance', 'authority'],
-  ['setup-operations', 'advanced'],
-]);
-
+/** A `#hash` → the element to reveal and the category that shows it. */
 export function resolveSettingsTarget(
   hash: string
 ): { id: string; section: SettingsSectionId } | null {
   if (!hash.startsWith('#')) return null;
   try {
     const id = decodeURIComponent(hash.slice(1));
-    const section = TARGET_SECTIONS.get(id);
+    const section = settingsCategoryOf(id);
     return section ? { id, section } : null;
   } catch {
     return null;

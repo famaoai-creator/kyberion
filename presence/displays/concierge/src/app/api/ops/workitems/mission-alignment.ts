@@ -1,4 +1,5 @@
 import { serverDelegatedChildEnv } from '../../../../lib/server-child-env';
+import { inboxHrefForApproval } from '../../../../lib/inbox-links';
 /** Existing scoped WorkItem action -> governed alignment CLI, never a shell or a new execution API. */
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -116,11 +117,7 @@ export function readWorkItemMissionAlignment(authorized: WorkItem, uncertain = f
           requestId: record.id,
           missionId,
           status,
-          href:
-            '/?section=approvals&request=' +
-            encodeURIComponent(record.id) +
-            '&mission=' +
-            encodeURIComponent(missionId),
+          href: inboxHrefForApproval(record.id, { missionId }),
         },
       };
     },

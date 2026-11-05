@@ -22,6 +22,7 @@ import {
   newDelegationSessionId,
   spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
+import { withRedactedProviderOutput } from './provider-output-redaction.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
 import type {
@@ -46,6 +47,7 @@ import type {
   DecomposedTaskPlan,
   ReasoningCallOptions,
 } from '../reasoning/reasoning-backend.js';
+import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
 
 export interface GeminiCliBackendOptions {
   /** CLI binary. Defaults to `gemini` (resolved via PATH). */
@@ -249,10 +251,24 @@ export class GeminiCliBackend implements ReasoningBackend {
     })) as DecomposedTaskPlan;
   }
 
-  async delegateTask(
+  delegateTask(
     instruction: string,
     context?: string,
     options?: ReasoningCallOptions
+  ): Promise<string> {
+    // R5: every dispatch path spawns through spawnWithDelegationEnv, which
+    // marks the start once a child exists — an earlier failure is pre-start.
+    // Output exit: the parsed answer and any stderr-bearing error are redacted
+    // (redaction mutates in place, so start markers survive it).
+    return runStartReportingDelegation(() =>
+      withRedactedProviderOutput(() => this.dispatchDelegatedTask(instruction, context, options))
+    );
+  }
+
+  private async dispatchDelegatedTask(
+    instruction: string,
+    context: string | undefined,
+    options: ReasoningCallOptions | undefined
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const profile = resolveEffectiveProviderPermissionProfile(
@@ -306,6 +322,15 @@ export class GeminiCliBackend implements ReasoningBackend {
   }
 
   private async runStructured<T>(params: {
+    systemPrompt: string;
+    userPrompt: string;
+    schema: ZodType<T>;
+  }): Promise<T> {
+    // Output exit: the parsed answer is redacted value-wise after parsing.
+    return withRedactedProviderOutput(() => this.runStructuredUnredacted(params));
+  }
+
+  private async runStructuredUnredacted<T>(params: {
     systemPrompt: string;
     userPrompt: string;
     schema: ZodType<T>;
@@ -367,6 +392,10 @@ export class GeminiCliBackend implements ReasoningBackend {
   }
 
   private async runPrompt(prompt: string): Promise<string> {
+    return withRedactedProviderOutput(() => this.runPromptUnredacted(prompt));
+  }
+
+  private async runPromptUnredacted(prompt: string): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const args = [
       '-p',
@@ -402,6 +431,10 @@ export class GeminiCliBackend implements ReasoningBackend {
     }
   }
 
+  /**
+   * Raw stdout for the callers to parse; redaction runs on their parsed
+   * results (an unquoted secret masked inside raw JSON would break parsing).
+   */
   private async spawnCli(args: string[], profile?: ProviderPermissionProfileName): Promise<string> {
     const started = Date.now();
     const promptChars = args[args.indexOf('-p') + 1]?.length ?? 0;
@@ -513,7 +546,14 @@ export function buildGeminiCliBackendFromEnv(
 export const GEMINI_STDIN_PROMPT_INSTRUCTION =
   'Answer the request given on stdin. Return exactly one JSON object.';
 
-export async function runGeminiCliQuery<T>(params: {
+export async function runGeminiCliQuery<T>(
+  params: Parameters<typeof runGeminiCliQueryRaw<T>>[0]
+): Promise<T> {
+  // Output exit: the parsed answer and any stderr-bearing error are redacted.
+  return withRedactedProviderOutput(() => runGeminiCliQueryRaw(params));
+}
+
+async function runGeminiCliQueryRaw<T>(params: {
   systemPrompt: string;
   userPrompt: string;
   schema: ZodType<T>;

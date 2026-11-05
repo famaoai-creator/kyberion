@@ -25,6 +25,13 @@ import {
   spawnWithDelegationEnv,
 } from '../provider/provider-spawn-env.js';
 import {
+  redactProviderOutputError,
+  redactProviderOutputStream,
+  redactProviderOutputText,
+  redactProviderOutputValue,
+  withRedactedProviderOutput,
+} from '../provider/provider-output-redaction.js';
+import {
   buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
@@ -72,6 +79,7 @@ import type {
   DecomposedTaskPlan,
   ReasoningTextStream,
 } from '../reasoning/reasoning-backend.js';
+import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });
@@ -207,10 +215,22 @@ export class ShellGrokCliBackend implements ReasoningBackend {
     return this.runStructuredOp(structuredReasoningSpecs.decomposeIntoTasks, input);
   }
 
-  async delegateTask(
+  delegateTask(
     instruction: string,
     context?: string,
     options?: ReasoningCallOptions
+  ): Promise<string> {
+    // R5: every dispatch path spawns through spawnWithDelegationEnv, which
+    // marks the start once a child exists — an earlier failure is pre-start.
+    return runStartReportingDelegation(() =>
+      this.dispatchDelegatedTask(instruction, context, options)
+    );
+  }
+
+  private async dispatchDelegatedTask(
+    instruction: string,
+    context: string | undefined,
+    options: ReasoningCallOptions | undefined
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const model = options?.model ?? resolveGrokModelForTier(options?.model_tier, this.model);
@@ -287,12 +307,16 @@ export class ShellGrokCliBackend implements ReasoningBackend {
       if (!nativeInfo || typeof nativeInfo !== 'object') {
         throw new Error('[SUBAGENT_UNAVAILABLE] Grok ACP returned no native subagent metadata.');
       }
-      this.lastHarnessSubagentInfo = { ...(nativeInfo as Record<string, unknown>) };
-      return response.text;
+      this.lastHarnessSubagentInfo = redactProviderOutputValue({
+        ...(nativeInfo as Record<string, unknown>),
+      });
+      return redactProviderOutputText(response.text);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw error;
-      throw new Error(`[SUBAGENT_UNAVAILABLE] Grok ACP harness failed: ${message}`);
+      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw redactProviderOutputError(error);
+      throw redactProviderOutputError(
+        new Error(`[SUBAGENT_UNAVAILABLE] Grok ACP harness failed: ${message}`)
+      );
     } finally {
       release();
     }
@@ -335,7 +359,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
 
   /** Stream Grok's Anthropic-compatible text deltas for live voice replies. */
   streamPrompt(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream {
-    return this.streamPromptFromCli(prompt, options);
+    return redactProviderOutputStream(this.streamPromptFromCli(prompt, options));
   }
 
   private async *streamPromptFromCli(
@@ -494,6 +518,16 @@ export class ShellGrokCliBackend implements ReasoningBackend {
     userPrompt: string;
     schema: ZodType<T>;
   }): Promise<T> {
+    // Output exit: parse the raw envelope first, then redact the parsed value
+    // and any error (masking raw JSON could break parsing on an unquoted secret).
+    return withRedactedProviderOutput(() => this.runStructuredUnredacted(params));
+  }
+
+  private async runStructuredUnredacted<T>(params: {
+    systemPrompt: string;
+    userPrompt: string;
+    schema: ZodType<T>;
+  }): Promise<T> {
     assertReasoningEgressAllowed(this.name);
     const jsonSchema = z.toJSONSchema(params.schema) as Record<string, unknown>;
     if ('$schema' in jsonSchema) delete jsonSchema['$schema'];
@@ -518,7 +552,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
       ...this.extraArgs,
     ];
 
-    const stdout = await this.spawnCli(args, '');
+    const stdout = await this.spawnCliRaw(args, '');
     let cliResult: any;
     try {
       cliResult = parseSafeJsonInput(stdout, 'Grok CLI response');
@@ -551,6 +585,16 @@ export class ShellGrokCliBackend implements ReasoningBackend {
   }
 
   private spawnCli(
+    args: string[],
+    stdin: string,
+    signal?: AbortSignal,
+    profile?: ProviderPermissionProfileName
+  ): Promise<string> {
+    // Output exit: the answer and any stderr-bearing error are redacted.
+    return withRedactedProviderOutput(() => this.spawnCliRaw(args, stdin, signal, profile));
+  }
+
+  private spawnCliRaw(
     args: string[],
     stdin: string,
     signal?: AbortSignal,

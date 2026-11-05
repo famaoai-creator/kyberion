@@ -23,6 +23,13 @@ import {
   spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
 import {
+  redactProviderOutputError,
+  redactProviderOutputStream,
+  redactProviderOutputText,
+  redactProviderOutputValue,
+  withRedactedProviderOutput,
+} from './provider-output-redaction.js';
+import {
   buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
@@ -69,6 +76,7 @@ import type {
   ReasoningCallOptions,
   ReasoningTextStream,
 } from '../reasoning/reasoning-backend.js';
+import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });
@@ -266,10 +274,22 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
     return this.runStructured(structuredReasoningSpecs.decomposeIntoTasks, input);
   }
 
-  async delegateTask(
+  delegateTask(
     instruction: string,
     context?: string,
     options?: ReasoningCallOptions
+  ): Promise<string> {
+    // R5: every dispatch path spawns through spawnWithDelegationEnv, which
+    // marks the start once a child exists — an earlier failure is pre-start.
+    return runStartReportingDelegation(() =>
+      this.dispatchDelegatedTask(instruction, context, options)
+    );
+  }
+
+  private async dispatchDelegatedTask(
+    instruction: string,
+    context: string | undefined,
+    options: ReasoningCallOptions | undefined
   ): Promise<string> {
     const profile = options?.advisory ? 'planner' : normalizePermissionProfile(options?.profile);
     return this.complete(
@@ -305,7 +325,7 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
    * Cursor emits that message as a complete duplicate of the partial stream.
    */
   streamPrompt(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream {
-    return this.streamPromptFromCli(prompt, options);
+    return redactProviderOutputStream(this.streamPromptFromCli(prompt, options));
   }
 
   private async *streamPromptFromCli(
@@ -480,12 +500,16 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
       if (!nativeInfo || typeof nativeInfo !== 'object') {
         throw new Error('[SUBAGENT_UNAVAILABLE] Cursor CLI returned no native subagent metadata.');
       }
-      this.lastHarnessSubagentInfo = { ...(nativeInfo as Record<string, unknown>) };
-      return response.text;
+      this.lastHarnessSubagentInfo = redactProviderOutputValue({
+        ...(nativeInfo as Record<string, unknown>),
+      });
+      return redactProviderOutputText(response.text);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw error;
-      throw new Error(`[SUBAGENT_UNAVAILABLE] Cursor CLI harness failed: ${message}`);
+      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw redactProviderOutputError(error);
+      throw redactProviderOutputError(
+        new Error(`[SUBAGENT_UNAVAILABLE] Cursor CLI harness failed: ${message}`)
+      );
     } finally {
       release();
     }
@@ -531,6 +555,23 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
   }
 
   private async complete(
+    systemPrompt: string,
+    userPrompt: string,
+    options?: {
+      profile?: ProviderPermissionProfileName;
+      signal?: AbortSignal;
+      model?: string;
+      effort?: ReasoningCallOptions['effort'];
+      shapeHint?: string;
+    }
+  ): Promise<string> {
+    // Output exit: the answer and any stderr-bearing error are redacted.
+    return withRedactedProviderOutput(() =>
+      this.completeUnredacted(systemPrompt, userPrompt, options)
+    );
+  }
+
+  private async completeUnredacted(
     systemPrompt: string,
     userPrompt: string,
     options?: {

@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { resolveSettingsTarget } from '../src/app/settings/settings-navigation';
 import { createSettingsMenu } from '../src/app/settings/settings-menu';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,22 +30,25 @@ describe('concierge recording-consent settings contract', () => {
     )
   ) as { domains: Record<string, Record<string, Record<string, string>>> };
 
-  it('registers the recording section after notifications, before the authority section', () => {
-    expect(settingsView).toMatch(/'notifications',\s*\n\s*'recording',\s*\n\s*'authority'/);
+  it('registers the recording card under データと権限 (data & permissions)', () => {
+    expect(settingsView).toMatch(
+      /card\(\s*'settings-recording',\s*'data',\s*'settings_nav_recording'/
+    );
   });
 
-  it('wires the section into the settings page render switch and nav label', () => {
+  it('wires the section into the settings page render switch and the settings catalog', () => {
     expect(page).toContain(
       "import { RecordingConsentSection } from './sections/RecordingConsentSection';"
     );
-    expect(page).toContain("case 'recording':");
+    expect(page).toContain("case 'settings-recording':");
     expect(page).toContain('<RecordingConsentSection');
     expect(page).toContain('createSettingsMenu(locale');
-    const recording = createSettingsMenu('en', {})
+    const data = createSettingsMenu('en', {})
       .flatMap((group) => group.items)
-      .find((item) => item.id === 'recording');
-    expect(recording?.label).toBe(vocabulary.domains.front_desk.settings_nav_recording.en);
-    expect(recording?.href).toBe('#settings-recording');
+      .find((item) => item.id === 'data');
+    expect(data?.href).toBe('#settings-cat-data');
+    expect(resolveSettingsTarget('#settings-recording')?.section).toBe('data');
+    expect(vocabulary.domains.front_desk.settings_nav_recording.en).toBeTruthy();
   });
 
   it('every front_desk:settings_recording_* key the section references exists with en+ja text', () => {

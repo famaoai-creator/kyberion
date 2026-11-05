@@ -34,11 +34,16 @@ import { logger } from '../core.js';
 import { parseClaudeCliUsage, recordCliUsage } from '../cli-usage-metering.js';
 import { childDelegationEnv } from '../operation-policy-gate.js';
 import {
+  isProviderCredentialRelayEnabled,
+  withoutRelayManagedCredentials,
+} from '../foundation/env.js';
+import {
   createScratchWorkspace,
   deleteRegisteredWorkspace,
 } from '../workforce/workspace-ledger.js';
 import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
+import { markDelegationExecutionStarted } from '../delegation-execution-tracker.js';
 
 /**
  * Record a claude-agent sub-agent call into the metrics collector so completed
@@ -196,7 +201,18 @@ export function buildClaudeAgentIsolatedEnv(
     if (STRICT_ISOLATION_DROPPED_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
     env[key] = value;
   }
-  return { ...env, ...childDelegationEnv() };
+  // Credential relay flag on: this SDK child starts no relay, so the raw key is dropped.
+  return withoutRelayManagedCredentials({ ...env, ...childDelegationEnv() }, baseEnv);
+}
+
+/**
+ * Non-strict SDK children inherit process.env. With the credential relay flag
+ * on, that inheritance must not carry the raw API key — the SDK path starts
+ * no relay, so the key is dropped (fail closed). Flag off ⇒ no `env` option.
+ */
+export function relayFailClosedEnvOption(): Pick<Options, 'env'> {
+  if (!isProviderCredentialRelayEnabled()) return {};
+  return { env: withoutRelayManagedCredentials({ ...process.env }) };
 }
 
 interface IsolationScope {
@@ -306,6 +322,7 @@ async function runStructuredQuery<T>(
     // Isolation fields are applied after sanitization, so extraOptions can
     // never re-introduce settings, MCP servers, cwd or env.
     ...(isolationOptions ?? {}),
+    ...(isolationOptions ? {} : relayFailClosedEnvOption()),
     systemPrompt: params.systemPrompt,
     model: params.model ?? resolveRuntimeModelId('anthropic-default'),
     tools: [],
@@ -319,6 +336,10 @@ async function runStructuredQuery<T>(
   };
 
   assertOperatorNativeCredentialOwner(credentialExecutionIdentity());
+  // R5: the SDK spawns the Claude Code process inside query(), so this call is
+  // the earliest dispatch point Kyberion can observe. Every check above is
+  // pre-start; from here on a failure may follow a real turn.
+  markDelegationExecutionStarted();
   const iterator = query({ prompt: params.userPrompt, options });
   const startedAt = Date.now();
 
@@ -471,10 +492,14 @@ export async function runClaudeAgentTask(
     ...(params.allowedTools ? { allowedTools: params.allowedTools } : {}),
     ...(params.canUseTool ? { canUseTool: params.canUseTool } : {}),
     ...(params.agents ? { agents: params.agents } : {}),
+    ...relayFailClosedEnvOption(),
     abortController: params.abortController,
   };
 
   assertOperatorNativeCredentialOwner(credentialExecutionIdentity());
+  // R5: query() spawns the agentic Claude Code process (tools may run), so
+  // report the start before it — conservatively, even if the spawn then fails.
+  markDelegationExecutionStarted();
   const iterator = query({ prompt: params.userPrompt, options });
   const startedAt = Date.now();
 

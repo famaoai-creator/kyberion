@@ -2,6 +2,7 @@ import type { ChildProcess } from 'node:child_process';
 import { authorSceneCompositions } from '@agent/core/video/video-scene-composition';
 import { generateVideoMotionDirection } from '@agent/core/video/video-motion-direction';
 import { generateVideoVisualDirection } from '@agent/core/video/video-visual-direction';
+import type { ReasoningPayloadScope } from '@agent/core/reasoning/reasoning-egress-scope';
 import { defineCatalog, nowIso, type GovernedCatalog } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
@@ -284,11 +285,21 @@ async function attachVisualDirection(adf: any, brief: Record<string, unknown>): 
           .map((beat: any) => `${beat?.title ?? ''} ${beat?.narration ?? beat?.summary ?? ''}`)
           .join('\n')
       : String((brief as any).narration?.script ?? (brief as any).summary ?? adf.title ?? '');
-    const scope = {
-      tier: brief.tier === 'personal' || brief.tier === 'confidential' ? brief.tier : 'public',
+    const tier: ReasoningPayloadScope['tier'] =
+      brief.tier === 'personal' || brief.tier === 'confidential' ? brief.tier : 'public';
+    // The storyboard is the tenant's own creative brief: it may reach a
+    // provider the tenant attested as no-training. Personal briefs stay local.
+    const scope: ReasoningPayloadScope = {
+      tier,
       tenant_slug: brief.tenant_slug ? String(brief.tenant_slug) : undefined,
       purpose: 'video composition direction',
-    } as const;
+      training_use:
+        tier === 'public'
+          ? 'training_eligible'
+          : tier === 'personal'
+            ? 'local_only'
+            : 'no_training',
+    };
     const sceneInputs = (adf.scenes || []).map((scene: any) => ({
       scene_id: String(scene.scene_id),
       role: scene.role,

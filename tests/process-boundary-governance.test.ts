@@ -13,6 +13,7 @@ const allowedManagedProcessConsumers = [
   'scripts/continuous_owner_process.ts',
   'scripts/continuous_owner_process.test.ts',
   'libs/actuators/process-actuator/src/process-actuator-helpers.ts',
+  'libs/actuators/process-actuator/src/process-actuator-relay-env.test.ts',
   'libs/actuators/video-composition-actuator/src/video-composition-action-helpers.ts',
   'libs/core/ocr/providers/native.ts',
   // Apple Intelligence bridge: short-lived afm CLI calls, supervised so a
