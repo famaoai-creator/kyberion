@@ -82,6 +82,8 @@
       "active/shared/runtime/browser-bridge-mailbox/confidential/",
       "active/shared/runtime/seam-selection-defaults/personal/",
       "active/shared/runtime/seam-selection-defaults/confidential/",
+      "active/shared/runtime/provider-attestations/personal/",
+      "active/shared/runtime/provider-attestations/confidential/",
       "active/shared/runtime/autonomy-learning/personal/",
       "active/shared/runtime/autonomy-learning/confidential/",
       "active/shared/runtime/pipeline-library-runs/personal/",

@@ -472,6 +472,7 @@ describe('Approval channel boundary', () => {
       'pipeline-await-state',
       'tenant-activation',
       'tenant-provider-attestation',
+      'custody-provider-attestation',
       'nhi-session-admission',
       'onboarding-authority',
       'project-trust',
