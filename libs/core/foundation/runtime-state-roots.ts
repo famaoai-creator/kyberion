@@ -24,6 +24,8 @@ export const PARTITIONED_RUNTIME_STATE_ROOTS = {
   browser_bridge_mailbox: 'active/shared/runtime/browser-bridge-mailbox',
   /** Saved per-seam provider defaults: tenant / organization / project layers (seam-selection-defaults.ts). */
   seam_selection_defaults: 'active/shared/runtime/seam-selection-defaults',
+  /** R5 delegation idempotency reservations + replayable results (delegation-idempotency.ts). */
+  delegation_idempotency: 'active/shared/runtime/delegation-idempotency',
 } as const;
 
 /**

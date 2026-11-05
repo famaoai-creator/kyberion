@@ -11,7 +11,13 @@ import {
   resetDelegationIdempotencyForTests,
   runIdempotentDelegation,
 } from './delegation-idempotency.js';
-import { DelegationTerminalError, markDelegationExecutionStarted } from './delegation-result.js';
+import {
+  DelegationTerminalError,
+  markDelegationExecutionStarted,
+  markErrorExecutionStarted,
+} from './delegation-result.js';
+import { tenantRuntimePartitionOf } from './storage-layout.js';
+import { runInResourceAccessScope } from './foundation/resource-access-scope.js';
 import { safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 
@@ -341,6 +347,74 @@ describe('R5 delegation idempotency', () => {
     await expect(joiner).rejects.toThrow('joiner stopped');
     release?.('first done');
     await expect(first).resolves.toBe('first done');
+  });
+
+  it("releases the key when the owner's own signal fired before dispatch", async () => {
+    const idempotencyKey = freshKey();
+    const controller = new AbortController();
+    controller.abort(new Error('owner cancelled'));
+    const execute = vi.fn(async () => 'must not run');
+    await expect(
+      runIdempotentDelegation({
+        instruction: 'x',
+        options: { idempotencyKey, signal: controller.signal },
+        execute,
+      })
+    ).rejects.toThrow('owner cancelled');
+    expect(execute).not.toHaveBeenCalled();
+    expect(loadDelegationReservation(idempotencyKey)?.status).toBe('released');
+    await expect(
+      runIdempotentDelegation({ instruction: 'x', options: { idempotencyKey }, execute })
+    ).resolves.toBe('must not run');
+  });
+
+  it("does not hand a joiner the owner's pre-start failure — the joiner runs it itself", async () => {
+    const idempotencyKey = freshKey();
+    let failOwner!: (error: unknown) => void;
+    const owner = runIdempotentDelegation({
+      instruction: 'x',
+      options: { idempotencyKey },
+      execute: () => new Promise<string>((_, reject) => (failOwner = reject)),
+    });
+    await vi.waitFor(() => expect(failOwner).toBeTypeOf('function'));
+    const joinerExecute = vi.fn(async () => 'joiner ran');
+    const joiner = runIdempotentDelegation({
+      instruction: 'x',
+      options: { idempotencyKey },
+      execute: joinerExecute,
+    });
+    // The owner is aborted before dispatch (a proven pre-start failure).
+    failOwner(markErrorExecutionStarted(new Error('owner aborted before dispatch'), false));
+    await expect(owner).rejects.toThrow('owner aborted before dispatch');
+    await expect(joiner).resolves.toBe('joiner ran');
+    expect(joinerExecute).toHaveBeenCalledTimes(1);
+    expect(loadDelegationReservation(idempotencyKey)).toMatchObject({
+      status: 'terminal',
+      result: { status: 'completed', output_text: 'joiner ran' },
+    });
+  });
+
+  it('stores tenant reservations in the registered tier/tenant partition', () => {
+    const idempotencyKey = freshKey();
+    const tenantPath = runInResourceAccessScope(
+      { tenantSlug: 'acme', readExact: [], writeExact: [], mkdirExact: [] },
+      () => delegationReservationPathForTests(idempotencyKey)
+    );
+    // Vitest redirects the live subtree; judge the production repo-relative path.
+    const repoRelative = (absolute: string) =>
+      'active/' +
+      absolute
+        .replace(/\\/gu, '/')
+        .slice(absolute.replace(/\\/gu, '/').lastIndexOf('shared/runtime/delegation-idempotency/'));
+    // Registered partition: tier-guard's tenant check and tenant offboarding apply.
+    expect(tenantRuntimePartitionOf(repoRelative(tenantPath))).toMatchObject({
+      key: 'delegation_idempotency',
+      tier: 'confidential',
+      tenant: 'acme',
+    });
+    const systemPath = repoRelative(delegationReservationPathForTests(idempotencyKey));
+    expect(systemPath).toMatch(/^active\/shared\/runtime\/delegation-idempotency\/system\//u);
+    expect(tenantRuntimePartitionOf(systemPath)).toBeUndefined();
   });
 
   it('fails closed on an unreadable reservation', async () => {
