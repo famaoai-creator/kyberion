@@ -173,8 +173,10 @@ export function readableMissionName(id: string | undefined | null): string {
   const parts = text.split('-').filter(Boolean);
   if (parts[0]?.toUpperCase() === 'MSN') parts.shift();
   const last = parts[parts.length - 1] ?? '';
+  const month = Number(last.slice(4, 6));
+  const day = Number(last.slice(6, 8));
   const date =
-    last.length === 8 && /^\d+$/u.test(last)
+    last.length === 8 && /^\d+$/u.test(last) && month >= 1 && month <= 12 && day >= 1 && day <= 31
       ? `${last.slice(0, 4)}-${last.slice(4, 6)}-${last.slice(6, 8)}`
       : '';
   if (date) parts.pop();
