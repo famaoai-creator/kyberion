@@ -1238,19 +1238,31 @@ or latency through either layer measures the wrapper: an abort "passes" for a pr
 stopped, and a long turn hits the route ceiling instead of the probe's own limit.
 
 - A measurement caller builds its backend with `requestTimeout: 'caller'` (task construction
-  only) and passes its own `timeoutMs`, so the wrapper is off and the provider adapters get the
-  probe's ceiling. `check:backend-live-scenarios` does this.
+  only), passes its own `timeoutMs` and bounds every call itself, so the wrapper is off and the
+  provider adapters get the probe's ceiling. Never measure on the installed chain
+  (`getReasoningBackend()`). `check:backend-live-scenarios` and the role-fitness runner
+  (`runModelRoleFitnessProbes`, `ROLE_FITNESS_PROBE_TIMEOUT_MS`) do this.
 - Abort with a distinctive non-Error reason (no abort/cancel wording). Governed adapters turn a
   non-Error reason into their own `[DELEGATION_CANCELLED]` error, so a rejection that is (or
-  quotes) the reason came from a forwarding layer and is `unreported`, never a pass.
+  quotes) the reason came from a forwarding layer and is `unreported`, never a pass. The rule
+  lives once in `libs/core/reasoning/reasoning-abort-measurement.ts`, shared by the live
+  scenarios and `runReasoningBackendConformance`.
+- A pre-aborted probe (conformance) is always answered by a failover chain's pre-flight guard,
+  so it takes the provider adapter itself; a failover chain reads `unavailable`.
+- A CLI adapter's abort rejection is not proof that work stopped. `withWallClockBudget` waits,
+  bounded (SIGTERM, grace, SIGKILL, grace), for the child to exit and reports it in
+  `DelegationAbortedError` (`child_exit=exited|not_exited|unobservable|no_child`); the abort
+  scenario passes only on `exited` (`requireChildExit`, off only for API backends with no child).
 - Judge a capability only from the step that measures it: a follow_up that failed on its M2
   instruction turn says nothing about session continuity (`continuity: 'unreported'`).
-- Known remaining site: `libs/core/testing/reasoning-backend-conformance.ts` checks abort with a
-  pre-aborted `Error('conformance abort')`, which the wrapper and the failover layer answer before
-  any provider runs. Apply the same reason rule before it is used against a wrapped backend.
-- Gates: `backend-live-scenarios.test.ts` (abort through the wrapper is `unreported`),
+- Gates: `tests/measurement-backend-construction.test.ts` (registration-tests: every measurement
+  entry point is registered and builds caller-bounded, never on the installed chain),
+  `backend-live-scenarios.test.ts` (abort through the wrapper is `unreported`; no observed child
+  exit is not a pass), `reasoning-backend-conformance.test.ts` (wrapper and failover chain cannot
+  verify abort), `delegation-concurrency.test.ts` (abort waits for child exit),
   `reasoning-task-backend.test.ts` (caller-bounded construction is unraced),
-  `check_backend_live_scenarios.test.ts` (the entrypoint opts out of the wrapper).
+  `check_backend_live_scenarios.test.ts` and `model-role-fitness-runner.test.ts` (the entry points
+  opt out of the wrapper).
 
 ---
 
