@@ -61,11 +61,12 @@
         "registration": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["family", "key", "retention_path"],
+          "required": ["family", "key", "order", "retention_path"],
           "description": "Build/CI binding to an existing runtime root and retention policy. Not an authority grant or executable custody migration.",
           "properties": {
             "family": { "enum": ["state", "ledger", "floor"] },
             "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+            "order": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
             "retention_path": { "type": "string", "minLength": 1 }
           }
         },

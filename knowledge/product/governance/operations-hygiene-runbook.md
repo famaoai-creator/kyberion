@@ -709,6 +709,13 @@ this contract; a faster Linux run alone is not evidence that macOS CI passed.
   `beforeAll` with an explicit hook timeout (e.g. `60_000`) so its one-time load is not charged
   to the first test's 10s budget ([WRITING_TESTS](../../../docs/developer/WRITING_TESTS.md#fixture-roots)
   lists the accepted exceptions).
+- Tests of default protected-store paths must bind both the selected root and
+  primary-checkout root to an owned scratch fixture before the first authority
+  import or write. Seed real policy/schema inputs, set root environment first,
+  then import once and assert both roots before calling the default API. Never
+  clean up a tenant parent in the real primary checkout. The enforcing regression
+  is `governance/delegated-execution.production-path.integration.test.ts` in
+  `registration-tests`; it retains actual store roles and default path selection.
 - A test must not depend on load or order. Run a suspect file with
   `--sequence.shuffle --sequence.seed=<n>` (at least 222, 7 and 20261008) and under parallel load
   before calling it fixed. Five defect classes caused the 2026-10 load and order failures:

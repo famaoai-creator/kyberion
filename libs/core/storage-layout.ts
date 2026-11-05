@@ -1,14 +1,14 @@
 import * as path from 'node:path';
 import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
-  TENANT_APPROVAL_ROOT_PATH,
-  TENANT_LEDGER_ROOT_PATH,
+  PARTITIONED_RUNTIME_LEDGER_ROOTS,
+  STORAGE_FLOOR_ROOTS,
 } from './foundation/runtime-state-roots.js';
 import { createHash } from 'node:crypto';
 import { rootDir } from './path-resolver.js';
 import { isReservedScopeName, isValidTenantSlug } from './foundation/scope.js';
 
-export { PARTITIONED_RUNTIME_STATE_ROOTS };
+export { PARTITIONED_RUNTIME_STATE_ROOTS, PARTITIONED_RUNTIME_LEDGER_ROOTS, STORAGE_FLOOR_ROOTS };
 
 /**
  * Runtime storage layout — one governed place per storage purpose.
@@ -38,18 +38,13 @@ export const STORAGE_DATA_TIERS: readonly StorageDataTier[] = [
   'public',
 ] as const;
 
-/** Floors resolved by this module, mapped to their repo-relative roots. */
-export const STORAGE_FLOOR_ROOTS = {
-  /** Consumable intermediates; 24h TTL. Re-creatable by contract. */
-  scratch: 'active/shared/tmp',
-  /** Inbound external files waiting for perception / ingest; short TTL. */
-  staging: 'active/shared/staging',
-  /** Derived, re-generable data (digest-keyed sidecars, build trees, models). */
-  cache: 'active/shared/cache',
-  /** Deliverables owned by the platform or a tenant (no narrower scope). */
-  artifact: 'active/shared/artifacts',
-} as const;
-
+/**
+ * Floors resolved by this module (roots are projected into the foundation map):
+ * - scratch: consumable intermediates; 24h TTL, re-creatable by contract.
+ * - staging: inbound files waiting for perception / ingest; short TTL.
+ * - cache: derived, re-generable sidecars, build trees and models.
+ * - artifact: deliverables owned by the platform or a tenant (no narrower scope).
+ */
 export type StorageFloor = keyof typeof STORAGE_FLOOR_ROOTS;
 
 export const STORAGE_FLOORS = Object.keys(STORAGE_FLOOR_ROOTS) as StorageFloor[];
@@ -204,24 +199,16 @@ export function protectedStorageFloorPrefixes(): string[] {
  * Their personal/confidential subtrees are tenant_scope protected prefixes in
  * security-policy.json; tier-guard gives reads of them the tenant check plus the
  * persona read rules of `knowledge/<tier>/`, and tenant offboarding purges them.
+ *
+ * Hash-chained tenant partitions of the hybrid ledger (`libs/core/ledger.ts`):
+ * `<personal|confidential>/<tenant>/ledger.jsonl`, written and verified as `tenant_ledger_store`.
+ * Tenant records and tenant mission metadata never reach the system ledger.
+ *
+ * Per-tenant approval store partitions (`libs/core/governance/approval-store-location.ts`):
+ * `<personal|confidential>/<tenant>/<channel>/` request records, passkey challenges and the
+ * channel's `approvals.jsonl` event log, read and written as `tenant_approval_store`.
+ * Untenanted records (and pre-activation tenant requests) stay in the system tree.
  */
-export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
-  resource_usage: 'active/shared/runtime/usage-ledger',
-  execution_metrics: 'active/shared/runtime/execution-metrics',
-  /**
-   * Hash-chained tenant partitions of the hybrid ledger (`libs/core/ledger.ts`):
-   * `<personal|confidential>/<tenant>/ledger.jsonl`, written and verified as `tenant_ledger_store`.
-   * Tenant records and tenant mission metadata never reach the system ledger.
-   */
-  tenant_ledger: TENANT_LEDGER_ROOT_PATH,
-  /**
-   * Per-tenant approval store partitions (`libs/core/governance/approval-store-location.ts`):
-   * `<personal|confidential>/<tenant>/<channel>/` request records, passkey challenges and the
-   * channel's `approvals.jsonl` event log, read and written as `tenant_approval_store`.
-   * Untenanted records (and pre-activation tenant requests) stay in the system tree.
-   */
-  tenant_approvals: TENANT_APPROVAL_ROOT_PATH,
-} as const;
 
 /**
  * Partitioned ledger roots whose tenant partitions belong to one dedicated,

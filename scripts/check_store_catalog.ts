@@ -22,6 +22,13 @@ import {
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 import { readSafeJsonFile } from './lib/json-input.js';
+import {
+  projectStoreRoots,
+  compareStoreRootRegistries,
+  type StoreRootRegistration,
+  type StoreRootRegistries,
+} from './lib/store-root-projection.js';
+export type { StoreRootRegistries } from './lib/store-root-projection.js';
 
 export interface StoreEntry {
   id: string;
@@ -30,11 +37,7 @@ export interface StoreEntry {
   status: 'active' | 'planned' | 'legacy-move';
   moves_to?: string;
   legacy_roles?: string[];
-  registration?: {
-    family: 'state' | 'ledger' | 'floor';
-    key: string;
-    retention_path: string;
-  };
+  registration?: StoreRootRegistration;
 }
 export interface StoreCatalog {
   stores: StoreEntry[];
@@ -48,82 +51,37 @@ const RETENTION = 'knowledge/product/governance/storage-retention-catalog.json';
 const RETENTION_SCHEMA = 'knowledge/product/schemas/storage-retention-catalog.schema.json';
 const STORE_ROLE = /_(store|writer|reader)$/u;
 
-export type StoreRootRegistries = Record<
-  'state' | 'ledger' | 'floor',
-  Readonly<Record<string, string>>
->;
 const ROOT_REGISTRIES: StoreRootRegistries = {
   state: PARTITIONED_RUNTIME_STATE_ROOTS,
   ledger: PARTITIONED_RUNTIME_LEDGER_ROOTS,
   floor: STORAGE_FLOOR_ROOTS,
 };
-// G0 inventories these two historical roots without resolving their custody.
-// Do not extend this compatibility set to new state, floor or ledger stores.
-const LEGACY_BARE_LEDGER_REGISTRATIONS = new Set([
-  'ledger:resource_usage',
-  'ledger:execution_metrics',
-]);
-
-const canonicalRoot = (value: string): boolean =>
-  /^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/u.test(value) &&
-  value.split('/').every((part) => part !== '.' && part !== '..');
-
 /** Static registration integrity only: does not grant access or change retention actions. */
 export function checkStoreRegistrations(
   stores: readonly StoreEntry[],
   registries: StoreRootRegistries,
   retention: readonly { path: string }[]
 ): string[] {
-  const violations: string[] = [];
-  const registered = new Set<string>();
-  const retentionPaths = new Set(retention.map(({ path }) => path));
+  const violations = compareStoreRootRegistries(projectStoreRoots(stores, retention), registries);
+  // Keep store-specific diagnostics useful when a declared key/path is invalid.
   for (const store of stores) {
-    const registration = store.registration;
-    if (!registration) continue;
-    const { family, key, retention_path: policyPath } = registration;
-    const name = `${family}:${key}`;
-    if (registered.has(name)) violations.push(`${store.id}: duplicate registration ${name}`);
-    registered.add(name);
-    const familyRoots = Object.hasOwn(registries, family) ? registries[family] : undefined;
-    const root = familyRoots && Object.hasOwn(familyRoots, key) ? familyRoots[key] : undefined;
-    if (!root) {
-      violations.push(`${store.id}: unknown registration ${name}`);
-      continue;
-    }
-    if (!canonicalRoot(root)) violations.push(`${name}: noncanonical runtime root ${root}`);
-    if (store.status !== 'active')
-      violations.push(`${store.id}: registered runtime root must be active`);
-    // G0's metrics/usage entries intentionally retain their bare-root,
-    // unscoped-legacy attribution; registration does not reinterpret custody.
-    const legacyBareRoot =
-      LEGACY_BARE_LEDGER_REGISTRATIONS.has(name) &&
-      store.custody.kind === 'unscoped-legacy' &&
-      store.path === root;
-    if (!legacyBareRoot && store.path !== `${root}/<tier>/<tenant>`)
-      violations.push(`${store.id}: registration ${name} does not match root ${root}`);
-    if (!canonicalRoot(policyPath) || !retentionPaths.has(policyPath))
-      violations.push(
-        `${store.id}: retention reference ${policyPath} does not name an existing canonical policy`
-      );
-    else if (root !== policyPath && !root.startsWith(policyPath + '/'))
-      violations.push(`${store.id}: retention reference ${policyPath} does not cover root ${root}`);
-    else {
-      const effective = retention
-        .filter(({ path }) => root === path || root.startsWith(path + '/'))
-        .sort((a, b) => b.path.length - a.path.length)[0]?.path;
-      if (policyPath !== effective)
-        violations.push(
-          `${store.id}: retention reference ${policyPath} differs from effective root policy ${effective}`
-        );
-      if (retention.filter(({ path }) => path === policyPath).length !== 1)
-        violations.push(`${store.id}: retention reference ${policyPath} is ambiguous`);
-    }
+    const r = store.registration;
+    if (!r) continue;
+    const roots = Object.hasOwn(registries, r.family) ? registries[r.family] : undefined;
+    const root = roots && Object.hasOwn(roots, r.key) ? roots[r.key] : undefined;
+    if (!root) violations.push(`${store.id}: unknown registration ${r.family}:${r.key}`);
+    else if (
+      store.path !== `${root}/<tier>/<tenant>` &&
+      !(
+        r.family === 'ledger' &&
+        ['resource_usage', 'execution_metrics'].includes(r.key) &&
+        store.custody.kind === 'unscoped-legacy' &&
+        store.path === root
+      )
+    )
+      violations.push(`${store.id}: registration ${r.family}:${r.key} does not match root ${root}`);
   }
-  for (const [family, roots] of Object.entries(registries))
-    for (const key of Object.keys(roots))
-      if (!registered.has(`${family}:${key}`))
-        violations.push(`missing store registration ${family}:${key}`);
-  return violations.sort();
+  return [...new Set(violations)].sort();
 }
 
 /** security-policy placeholders → catalog placeholders, trailing slash dropped. */

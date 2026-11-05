@@ -66,6 +66,12 @@ export interface GeneratedArtifactStep {
 // every generator's dependency graph.
 export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
   {
+    id: 'store-roots',
+    script: 'scripts/generate_store_roots.ts',
+    tracked: ['libs/core/foundation/runtime-state-roots.ts'],
+    run: async (argv) => (await import('./generate_store_roots.js')).main(argv),
+  },
+  {
     id: 'op-registry',
     script: 'scripts/generate_op_registry.ts',
     tracked: [
