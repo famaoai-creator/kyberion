@@ -63,7 +63,9 @@ export function entryExists(p: string): boolean {
     else if (insidePrimaryAuthority(candidate) !== undefined)
       stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
     // Existence only: the walk toward an authority store passes its fixed ancestors.
-    else if (isPrimaryAuthorityAncestor(candidate))
+    // The explicit primary-root prefix test is implied by the ancestor check; it is
+    // repeated here so the containment guard sits on the probed value itself.
+    else if (isPrimaryAuthorityAncestor(candidate) && insidePrimaryRoot(candidate))
       stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
     else throw Object.assign(new Error('path is outside the repository'), { code: 'EOUTSIDE' });
   } catch (error) {
@@ -263,6 +265,13 @@ function primaryAuthorityAncestor(candidate: string): string | undefined {
     pathResolver.isAuthorityStoreAncestorRelativePath(rel.split(path.sep).join('/'))
     ? rel
     : undefined;
+}
+
+/** `candidate` (already resolved) lies strictly under the primary checkout, by spelled or real root. */
+function insidePrimaryRoot(candidate: string): boolean {
+  const spelled = path.resolve(pathResolver.primaryCheckoutRootDir());
+  const real = realPrimaryRoot().real;
+  return candidate.startsWith(spelled + path.sep) || candidate.startsWith(real + path.sep);
 }
 
 function isPrimaryAuthorityAncestor(candidate: string): boolean {
