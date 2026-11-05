@@ -2,6 +2,10 @@ import { metrics } from './metrics.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { getUsageAttribution, type UsageBillingMode, type UsageCause } from './usage-accounting.js';
+import {
+  reportDelegationResultMetadata,
+  type DelegationResultExtras,
+} from './delegation-execution-tracker.js';
 
 export interface CliTokenUsage {
   /** Uncached input only. Cache counters below are disjoint. */
@@ -224,6 +228,38 @@ export function parseGeminiCliUsage(stdout: string): CliUsageReport | undefined 
       : undefined;
 }
 
+/**
+ * R5 result metadata from a provider-reported CLI usage envelope: summed
+ * token counts (input includes cache reads/writes) and the served model when
+ * every entry names the same one. `undefined` when the provider reported no
+ * tokens — usage is never zero-filled or estimated. The CLI's
+ * `referenceCostUsd` is an API-list equivalent, not a charge, so it is not
+ * reported as `cost_usd`.
+ */
+export function delegationMetadataFromCliReport(
+  report: CliUsageReport | undefined
+): DelegationResultExtras | undefined {
+  const entries = report?.entries ?? [];
+  if (!entries.length) return undefined;
+  let input = 0;
+  let output = 0;
+  for (const { usage } of entries) {
+    input +=
+      usage.prompt_tokens +
+      (usage.cache_read_tokens ?? 0) +
+      (usage.cache_write_tokens ?? 0) +
+      (usage.cache_write_1h_tokens ?? 0);
+    output += usage.completion_tokens;
+  }
+  if (!Number.isSafeInteger(input) || !Number.isSafeInteger(output)) return undefined;
+  const models = new Set(entries.map((entry) => entry.model?.trim() ?? ''));
+  const [model] = [...models];
+  return {
+    usage: { input_tokens: input, output_tokens: output, total_tokens: input + output },
+    ...(models.size === 1 && model ? { served_model: model } : {}),
+  };
+}
+
 export interface RecordCliUsageOptions {
   report?: CliUsageReport;
   promptChars: number;
@@ -249,6 +285,13 @@ export function recordCliUsage(
   // A diagnostic for an invocation that never started is not uncertain LLM
   // spend: no provider request occurred. Its caller already reports the error.
   if (options.requestNotSent) return;
+  try {
+    // R5: the delegation this call serves (if any) carries the measured usage.
+    const delegationMetadata = delegationMetadataFromCliReport(options.report);
+    if (delegationMetadata) reportDelegationResultMetadata(delegationMetadata);
+  } catch {
+    /* result metadata is bookkeeping and must never break reasoning */
+  }
   try {
     const attribution = getUsageAttribution();
     const effectiveStatus = options.report?.isError ? 'error' : status;
