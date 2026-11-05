@@ -24,7 +24,9 @@
  *   - Proxies: the child env gets loopback appended to NO_PROXY/no_proxy so
  *     a proxy-honoring CLI reaches the relay directly; the relay's own
  *     upstream hop honors HTTP(S)_PROXY / NO_PROXY via Node's `proxyEnv`
- *     agent (never for a loopback upstream).
+ *     agent (never for a loopback upstream). A Node runtime whose agent
+ *     ignores `proxyEnv` (before 24.5) logs a one-time diagnostic warning
+ *     instead of silently connecting direct.
  *   - OUT OF SCOPE / follow-up: Bedrock SigV4 request signing and Vertex
  *     access-token minting, WebSocket upgrades.
  */
@@ -35,13 +37,21 @@ import * as https from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { logger } from '../core.js';
 import {
+  LOOPBACK_NO_PROXY_HOSTS,
   PROVIDER_CREDENTIAL_RELAY_ENV_VAR,
+  PROXY_ENV_KEYS,
+  hasProxyEnv,
   isProviderCredentialRelayEnabled,
+  withLoopbackNoProxy,
+  type ProxyEnvKey,
 } from '../foundation/env.js';
 import { resolveTaskProviderEnvironment } from '../foundation/credential-binding.js';
 import type { ProviderId } from './provider-permission-profiles.js';
 
 export { PROVIDER_CREDENTIAL_RELAY_ENV_VAR, isProviderCredentialRelayEnabled };
+// Moved to foundation/env (shared with every child-env allowlist); re-exported
+// for existing importers.
+export { withLoopbackNoProxy };
 export const CREDENTIAL_RELAY_PLACEHOLDER_PREFIX = 'kyb-relay-';
 
 export type CredentialRelayProtocol = 'anthropic' | 'openai';
@@ -118,17 +128,14 @@ export interface StartCredentialRelayInput {
   readonly upstream: string;
   /** Env the upstream hop reads HTTP(S)_PROXY / NO_PROXY from (default: process.env). */
   readonly proxyEnv?: NodeJS.ProcessEnv;
+  /**
+   * Whether this runtime's http(s).Agent honors `proxyEnv` (default: probed
+   * with {@link agentSupportsProxyEnv}). Test seam only.
+   */
+  readonly proxyEnvSupported?: boolean;
 }
 
-const PROXY_ENV_KEYS = [
-  'HTTP_PROXY',
-  'HTTPS_PROXY',
-  'NO_PROXY',
-  'http_proxy',
-  'https_proxy',
-  'no_proxy',
-] as const;
-type RelayProxyEnv = Partial<Record<(typeof PROXY_ENV_KEYS)[number], string>>;
+type RelayProxyEnv = Partial<Record<ProxyEnvKey, string>>;
 
 function pickProxyEnv(env: NodeJS.ProcessEnv): RelayProxyEnv | undefined {
   const picked: RelayProxyEnv = {};
@@ -136,38 +143,59 @@ function pickProxyEnv(env: NodeJS.ProcessEnv): RelayProxyEnv | undefined {
     const value = env[key]?.trim();
     if (value) picked[key] = value;
   }
-  const hasProxy = Boolean(
-    picked.HTTPS_PROXY || picked.https_proxy || picked.HTTP_PROXY || picked.http_proxy
-  );
-  return hasProxy ? picked : undefined;
+  return hasProxyEnv(picked) ? picked : undefined;
 }
 
-/** Hosts a child must reach directly (never via a proxy) to talk to the relay. */
-export const CREDENTIAL_RELAY_NO_PROXY_HOSTS: readonly string[] = ['127.0.0.1', 'localhost', '::1'];
+type ProxyEnvAgentCtor = new (options: { proxyEnv?: RelayProxyEnv }) => object;
 
-function appendNoProxyHosts(current: string | undefined, hosts: readonly string[]): string {
-  const entries = (current ?? '')
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-  const present = new Set(entries.map((entry) => entry.toLowerCase()));
-  for (const host of hosts) if (!present.has(host)) entries.push(host);
-  return entries.join(',');
+/** First Node 24.x whose http(s).Agent honors the `proxyEnv` option. */
+const PROXY_ENV_AGENT_MIN_NODE: readonly [number, number] = [24, 5];
+
+function nodeVersionAtLeast(version: string, [major, minor]: readonly [number, number]): boolean {
+  const [maj = 0, min = 0] = version.split('.').map((part) => Number.parseInt(part, 10));
+  return maj > major || (maj === major && min >= minor);
 }
 
 /**
- * Return `env` with the loopback hosts appended to both NO_PROXY and
- * no_proxy (existing entries kept, no duplicates). A child that honors
- * HTTP(S)_PROXY would otherwise send its request for the loopback relay to
- * the proxy, which cannot reach the parent's 127.0.0.1.
+ * Whether `AgentCtor` (default: https.Agent) honors the `proxyEnv` option.
+ * Node before 24.5 accepts the option and silently ignores it, so the relay's
+ * upstream hop would connect directly past a configured proxy. Probed on the
+ * constructed agent (Node keeps the parsed proxy config on it), with the Node
+ * version as a fallback. A wrong "unsupported" answer only costs a warning:
+ * the agent is still built with `proxyEnv`.
  */
-export function withLoopbackNoProxy(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  return {
-    ...env,
-    NO_PROXY: appendNoProxyHosts(env.NO_PROXY, CREDENTIAL_RELAY_NO_PROXY_HOSTS),
-    no_proxy: appendNoProxyHosts(env.no_proxy, CREDENTIAL_RELAY_NO_PROXY_HOSTS),
-  };
+export function agentSupportsProxyEnv(
+  AgentCtor: ProxyEnvAgentCtor = https.Agent,
+  nodeVersion: string = process.versions.node
+): boolean {
+  try {
+    const agent = new AgentCtor({ proxyEnv: { HTTPS_PROXY: 'http://127.0.0.1:9' } });
+    if (Object.getOwnPropertySymbols(agent).some((sym) => sym.description === 'kProxyConfig')) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return nodeVersionAtLeast(nodeVersion, PROXY_ENV_AGENT_MIN_NODE);
 }
+
+let proxyEnvUnsupportedWarned = false;
+
+/** Reset the once-per-process proxy-support warning (tests only). */
+export function resetCredentialRelayProxyWarningForTests(): void {
+  proxyEnvUnsupportedWarned = false;
+}
+
+function warnProxyEnvUnsupportedOnce(upstreamHost: string): void {
+  if (proxyEnvUnsupportedWarned) return;
+  proxyEnvUnsupportedWarned = true;
+  logger.warn(
+    `[credential-relay] HTTP(S)_PROXY is set but this Node runtime's http(s).Agent ignores proxyEnv — the relay's upstream hop connects directly, bypassing the proxy (it fails or egresses unproxied) | next: run on Node >= ${PROXY_ENV_AGENT_MIN_NODE.join('.')}, or unset ${PROVIDER_CREDENTIAL_RELAY_ENV_VAR} | evidence: node=${process.versions.node} upstream=${upstreamHost}`
+  );
+}
+
+/** Hosts a child must reach directly (never via a proxy) to talk to the relay. */
+export const CREDENTIAL_RELAY_NO_PROXY_HOSTS: readonly string[] = LOOPBACK_NO_PROXY_HOSTS;
 
 function parseUpstream(upstream: string): URL {
   let url: URL;
@@ -228,6 +256,9 @@ export async function startCredentialRelay(
   const proxyEnv = LOOPBACK_HOSTS.has(upstream.hostname)
     ? undefined
     : pickProxyEnv(input.proxyEnv ?? process.env);
+  if (proxyEnv && !(input.proxyEnvSupported ?? agentSupportsProxyEnv(transport.Agent))) {
+    warnProxyEnvUnsupportedOnce(upstream.host);
+  }
   const upstreamAgent = proxyEnv ? new transport.Agent({ proxyEnv }) : undefined;
   let closed = false;
   let port = 0;

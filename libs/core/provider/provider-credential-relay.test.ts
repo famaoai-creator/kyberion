@@ -4,9 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../session-git-index.js', () => ({ prepareSessionGitIndex: vi.fn(() => null) }));
 
+import { logger } from '../core.js';
 import {
   CREDENTIAL_RELAY_PLACEHOLDER_PREFIX,
+  agentSupportsProxyEnv,
   applyProviderCredentialRelay,
+  resetCredentialRelayProxyWarningForTests,
   prepareProviderCredentialRelay,
   startCredentialRelay,
   withLoopbackNoProxy,
@@ -243,6 +246,63 @@ describe('startCredentialRelay', () => {
       vi.unstubAllEnvs();
       await new Promise<void>((resolve) => proxy.close(() => resolve()));
     }
+  });
+
+  it('warns once (what — why | next) when the runtime agent ignores proxyEnv and a proxy is set', async () => {
+    resetCredentialRelayProxyWarningForTests();
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    try {
+      const start = (proxyEnv: NodeJS.ProcessEnv) =>
+        startCredentialRelay({
+          protocol: 'anthropic',
+          credential: REAL_ANTHROPIC,
+          upstream: 'https://api.relay-proxy.invalid',
+          proxyEnv,
+          proxyEnvSupported: false,
+        }).then(track);
+      await start({});
+      expect(warn).not.toHaveBeenCalled();
+      await start({ HTTPS_PROXY: 'http://proxy.corp.example:3128' });
+      await start({ https_proxy: 'http://proxy.corp.example:3128' });
+      const relayWarnings = warn.mock.calls
+        .map(([message]) => String(message))
+        .filter((message) => message.includes('ignores proxyEnv'));
+      expect(relayWarnings).toHaveLength(1);
+      expect(relayWarnings[0]).toMatch(/ — .* \| next: .* \| evidence: node=/);
+    } finally {
+      warn.mockRestore();
+      resetCredentialRelayProxyWarningForTests();
+    }
+  });
+
+  it('does not warn when the agent honors proxyEnv', async () => {
+    resetCredentialRelayProxyWarningForTests();
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    try {
+      track(
+        await startCredentialRelay({
+          protocol: 'anthropic',
+          credential: REAL_ANTHROPIC,
+          upstream: 'https://api.relay-proxy.invalid',
+          proxyEnv: { HTTPS_PROXY: 'http://proxy.corp.example:3128' },
+          proxyEnvSupported: true,
+        })
+      );
+      expect(warn.mock.calls.some(([m]) => String(m).includes('ignores proxyEnv'))).toBe(false);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('agentSupportsProxyEnv detects an agent that silently ignores proxyEnv', () => {
+    class IgnoringAgent {
+      constructor(_options: unknown) {}
+    }
+    expect(agentSupportsProxyEnv(IgnoringAgent, '24.4.1')).toBe(false);
+    expect(agentSupportsProxyEnv(IgnoringAgent, '24.5.0')).toBe(true);
+    expect(agentSupportsProxyEnv(IgnoringAgent, '25.0.0')).toBe(true);
+    // This runtime (engines: node >= 24) — probe agrees with the real agent.
+    expect(typeof agentSupportsProxyEnv()).toBe('boolean');
   });
 
   it('aborts the upstream forward when the client disconnects mid-stream', async () => {
