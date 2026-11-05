@@ -25,6 +25,13 @@ import {
 } from './secure-io.js';
 import { withLockSync } from './foundation/lock-utils.js';
 import { spawnManagedProcess, type ManagedProcessHandle } from './managed-process.js';
+import {
+  buildCancelledDelegationResult,
+  buildCompletedDelegationResult,
+  buildFailedDelegationResult,
+  runWithDelegationExecutionTracker,
+  type DelegationResult,
+} from './delegation-result.js';
 
 export interface DelegatedTaskTrace {
   trace_id: string;
@@ -62,6 +69,21 @@ export interface DelegatedTaskTrace {
   settlement?: DelegatedTaskSettlement;
   /** QM-09: named-phase latency breakdown for this delegation. */
   gap_phases?: Array<{ phase: string; ms: number }>;
+  /**
+   * R2: structured terminal outcome. `status` above keeps the legacy enum
+   * (incomplete → failed); this carries the precise status, failure
+   * classification, usage and artifact references. The output text itself
+   * stays in `result_summary`.
+   */
+  outcome?: DelegatedTaskOutcome;
+}
+
+/** R2: persisted projection of a DelegationResult (output text excluded). */
+export type DelegatedTaskOutcome = Omit<DelegationResult, 'output_text'>;
+
+function outcomeOf(result: DelegationResult): DelegatedTaskOutcome {
+  const { output_text: _outputText, ...outcome } = result;
+  return outcome;
 }
 
 export interface DelegatedTaskReport {
@@ -99,7 +121,10 @@ export type DelegatedTaskRecord = Omit<DelegatedTaskTrace, 'trace_id'> & {
 export interface DelegationHandle {
   readonly delegation_id: string;
   status(): DelegatedTaskRecord;
+  /** Legacy text projection: resolves on completion, rejects otherwise. */
   join(): Promise<string>;
+  /** R2: structured terminal result; never rejects for a delegation failure. */
+  joinResult(): Promise<DelegationResult>;
   cancel(reason?: string): Promise<void>;
 }
 
@@ -141,6 +166,14 @@ function resolveStoreDir(): string {
     ? pathResolver.rootResolve(override)
     : pathResolver.shared('observability/delegations');
   return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+}
+
+/**
+ * Host-owned delegation bookkeeping (records, reservations) written through
+ * the same sandbox/tenant narrowing as the delegation trace. Not for general use.
+ */
+export function writeDelegationHostLeaf(filePath: string, serialized: string): void {
+  writeObservabilityLeaf(filePath, serialized, false);
 }
 
 /** Host-owned bookkeeping only: callers must serialize before entering this leaf. */
@@ -536,12 +569,19 @@ export function completeDelegatedTaskTrace(
     resultSummary?: string;
     error?: string;
     gapPhases?: Array<{ phase: string; ms: number }>;
+    /** R2: structured result; derived from resultSummary/error when absent. */
+    result?: DelegationResult;
   }
 ): DelegatedTaskTrace {
   const gapPhases = outcome.gapPhases
     ? sanitizeGapSamples(outcome.gapPhases, (message) => logger.warn(message))
     : undefined;
   const completedAt = nowIso();
+  const result =
+    outcome.result ??
+    (outcome.error
+      ? buildFailedDelegationResult(new Error(outcome.error))
+      : buildCompletedDelegationResult(outcome.resultSummary ?? ''));
   const completed: DelegatedTaskTrace = {
     ...trace,
     completed_at: completedAt,
@@ -549,6 +589,7 @@ export function completeDelegatedTaskTrace(
     ...(outcome.resultSummary ? { result_summary: outcome.resultSummary } : {}),
     ...(outcome.error ? { error: outcome.error } : {}),
     ...(gapPhases && gapPhases.length ? { gap_phases: gapPhases } : {}),
+    outcome: outcomeOf(result),
     child_report: {
       source: 'child',
       delegation_id: trace.trace_id,
@@ -602,6 +643,7 @@ export function cancelDelegatedTaskTrace(
     completed_at: cancelledAt,
     status: 'cancelled',
     error: reason,
+    outcome: outcomeOf(buildCancelledDelegationResult(reason)),
     settlement: {
       source: 'owner',
       report_delegation_id: trace.trace_id,
@@ -781,21 +823,30 @@ export function createDelegationHandle(input: {
   let record = trace;
   let cancelled = false;
   let cancelPromise: Promise<void> | undefined;
+  let structured: DelegationResult | undefined;
   const controller = new AbortController();
-  const result = Promise.resolve()
-    .then(() => input.execute(controller.signal))
-    .then((value) => {
-      if (!cancelled) record = completeDelegatedTaskTrace(record, { resultSummary: value });
+  const result = runWithDelegationExecutionTracker(async (tracker) => {
+    // Preserve the deferred start: execute never runs before the handle exists.
+    await Promise.resolve();
+    try {
+      const value = await input.execute(controller.signal);
+      structured = buildCompletedDelegationResult(value, tracker.metadata);
+      if (!cancelled) {
+        record = completeDelegatedTaskTrace(record, { resultSummary: value, result: structured });
+      }
       return value;
-    })
-    .catch((error: unknown) => {
+    } catch (error: unknown) {
+      structured = buildFailedDelegationResult(error, tracker.metadata);
       if (!cancelled) {
         record = completeDelegatedTaskTrace(record, {
           error: error instanceof Error ? error.message : String(error),
+          result: structured,
         });
       }
       throw error;
-    });
+    }
+  });
+  const cancelledResult = () => buildCancelledDelegationResult(record.error || 'cancelled');
   return {
     delegation_id: trace.trace_id,
     status: () => {
@@ -807,6 +858,14 @@ export function createDelegationHandle(input: {
       const value = await result;
       if (cancelled) throw new Error(`[DELEGATION_CANCELLED] ${record.error || 'cancelled'}`);
       return value;
+    },
+    joinResult: async () => {
+      if (cancelled) return cancelledResult();
+      await result.catch(() => undefined);
+      if (cancelled) return cancelledResult();
+      return (
+        structured ?? buildFailedDelegationResult(new Error('delegation settled without result'))
+      );
     },
     cancel: async (reason = 'cancelled by caller') => {
       if (cancelled || record.status !== 'started') return;

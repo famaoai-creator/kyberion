@@ -51,6 +51,7 @@ import {
 import type { ObservedNativeSubagent } from './claude-agent-query.js';
 import type { ProviderPermissionProfileName } from './provider-permission-profiles.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
+import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
 
 const SYSTEM_PROMPT = `You are a judgment-support reasoning engine for a CEO work-automation platform.
 
@@ -613,10 +614,23 @@ export class ClaudeAgentReasoningBackend implements ReasoningBackend {
     return result.parsed;
   }
 
-  async delegateTask(
+  delegateTask(
     instruction: string,
     context?: string,
     options?: import('../reasoning/reasoning-backend-contracts.js').ReasoningCallOptions
+  ): Promise<string> {
+    // R5: both paths dispatch through claude-agent-query, which marks the start
+    // immediately before the SDK's query() spawns Claude Code — so a refused
+    // preflight (egress scope, credential owner) is provably pre-start.
+    return runStartReportingDelegation(() =>
+      this.dispatchDelegatedTask(instruction, context, options)
+    );
+  }
+
+  private async dispatchDelegatedTask(
+    instruction: string,
+    context: string | undefined,
+    options: import('../reasoning/reasoning-backend-contracts.js').ReasoningCallOptions | undefined
   ): Promise<string> {
     // Direction B: governed agentic path (tools + Kyberion MCP + tier/approval gate),
     // opt-in via KYBERION_CLAUDE_AGENT_TOOLS=1. Default stays the pure single-turn

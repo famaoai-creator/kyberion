@@ -74,6 +74,7 @@ import type {
   DecomposedTaskPlan,
   ReasoningCallOptions,
 } from '../reasoning/reasoning-backend.js';
+import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });
@@ -203,10 +204,22 @@ export class DevinCliReasoningBackend implements ReasoningBackend {
     return this.runStructured(structuredReasoningSpecs.decomposeIntoTasks, input);
   }
 
-  async delegateTask(
+  delegateTask(
     instruction: string,
     context?: string,
     options?: ReasoningCallOptions
+  ): Promise<string> {
+    // R5: every dispatch path spawns through spawnWithDelegationEnv, which
+    // marks the start once a child exists — an earlier failure is pre-start.
+    return runStartReportingDelegation(() =>
+      this.dispatchDelegatedTask(instruction, context, options)
+    );
+  }
+
+  private async dispatchDelegatedTask(
+    instruction: string,
+    context: string | undefined,
+    options: ReasoningCallOptions | undefined
   ): Promise<string> {
     const profile = options?.advisory ? 'explorer' : normalizePermissionProfile(options?.profile);
     return this.complete(
