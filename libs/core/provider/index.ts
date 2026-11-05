@@ -55,6 +55,8 @@ export * from './provider-config.js';
 export * from './provider-credential-relay.js';
 export * from './provider-discovery.js';
 export * from './provider-egress-gate.js';
+export * from './custody-provider-attestation-store.js';
+export * from './custody-provider-attestation-governance.js';
 export * from './provider-endpoint-domains.js';
 export * from './provider-health-registry.js';
 export type { HealthyInstancesResolver } from './provider-health-view.js';
