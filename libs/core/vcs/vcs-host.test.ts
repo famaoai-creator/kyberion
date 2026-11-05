@@ -48,7 +48,7 @@ import {
   vcsHostPrMerge,
   vcsHostPrView,
 } from './vcs-host-verbs.js';
-import { createGhCliVcsHostProvider } from './gh-cli-host-provider.js';
+import { createGhCliVcsHostProvider, failureDetail } from './gh-cli-host-provider.js';
 import {
   checkRunBucket,
   createGithubRestVcsHostProvider,
@@ -644,5 +644,27 @@ describe('github-rest provider specifics', () => {
     expect(checkRunBucket('completed', 'skipped')).toBe('skipping');
     expect(checkRunBucket('completed', 'cancelled')).toBe('cancel');
     expect(checkRunBucket('completed', 'timed_out')).toBe('fail');
+  });
+});
+
+describe('gh CLI failure detail', () => {
+  it('keeps the first stderr line and redacts token-shaped values', () => {
+    expect(
+      failureDetail({
+        status: 1,
+        stdout: '',
+        stderr: 'HTTP 502: Bad Gateway (token ghp_ABCDEFGHIJKLMNOP)\nmore lines',
+      } as never)
+    ).toBe(' — HTTP 502: Bad Gateway (token [redacted])');
+    expect(failureDetail({ status: 1, stdout: '', stderr: '' } as never)).toBe('');
+  });
+
+  it('puts the detail on the thrown error', async () => {
+    const provider = createGhCliVcsHostProvider({
+      run: () => ({ status: 1, stdout: '', stderr: 'error connecting to api.github.com' }) as never,
+    });
+    await expect(provider.repository(ctx())).rejects.toThrow(
+      'gh repo view failed — error connecting to api.github.com'
+    );
   });
 });
