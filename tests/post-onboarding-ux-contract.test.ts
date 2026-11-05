@@ -13,11 +13,11 @@ describe('post-onboarding ux contract', () => {
     const roadmap = read('docs/developer/architecture/POST_ONBOARDING_UX_ROADMAP.md');
     const revolution = read('docs/developer/architecture/ONBOARDING_REVOLUTION.md');
 
-    expect(roadmap).toContain('customer/{slug}/connections/*.json');
+    expect(roadmap).toContain('knowledge/personal/stances/{slug}/connections/*.json');
     expect(roadmap).toContain(
       'KYBERION_STANCE` 未設定時は `knowledge/personal/connections/*.json`'
     );
-    expect(revolution).toContain('customer/{slug}/connections/*.json');
-    expect(revolution).toContain('customer/{slug}/tenants/{tenant_slug}.json');
+    expect(revolution).toContain('knowledge/personal/stances/{slug}/connections/*.json');
+    expect(revolution).toContain('knowledge/personal/stances/{slug}/tenants/{tenant_slug}.json');
   });
 });
