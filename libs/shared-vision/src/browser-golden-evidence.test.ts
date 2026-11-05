@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
-import { saveGoldenScenario } from '../knowledge/golden-scenario-verdict.js';
-import { resolveKnowledgeVerification } from '../knowledge/knowledge-verification.js';
-import type { ProcedureEntry } from '../knowledge/procedure-types.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { saveGoldenScenario } from '@agent/core/knowledge/golden-scenario-verdict';
+import { resolveKnowledgeVerification } from '@agent/core/knowledge/knowledge-verification';
+import type { ProcedureEntry } from '@agent/core/knowledge/procedure-types';
 import { judgeExtensionRun, normalizeExtensionGoldenElements } from './browser-golden-evidence.js';
 
 const root = pathResolver.sharedTmp(`extension-golden-${process.pid}`);

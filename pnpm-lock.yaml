@@ -936,6 +936,9 @@ importers:
       '@agent/shared-ui':
         specifier: workspace:*
         version: link:../../../libs/shared-ui
+      '@agent/shared-vision':
+        specifier: workspace:*
+        version: link:../../../libs/shared-vision
       '@simplewebauthn/browser':
         specifier: ^13.3.0
         version: 13.3.0

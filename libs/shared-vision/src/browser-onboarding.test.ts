@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { pathResolver } from '../path-resolver.js';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeExistsSync,
   safeMkdir,
@@ -9,7 +9,7 @@ import {
   safeRmSync,
   safeSymlinkSync,
   safeWriteFile,
-} from '../secure-io.js';
+} from '@agent/core/secure-io';
 
 const PROFILE_ROOT = pathResolver.sharedTmp('browser-onboarding-tests/profile');
 const PORTABLE_EMAIL_BACKEND = process.platform === 'darwin' ? 'mac_mailapp' : 'smtp';
@@ -18,7 +18,7 @@ const { resolveActiveProfileRootMock } = vi.hoisted(() => ({
   resolveActiveProfileRootMock: vi.fn(),
 }));
 
-vi.mock('../profile-root.js', () => ({
+vi.mock('@agent/core/profile-root', () => ({
   resolveActiveProfileRoot: resolveActiveProfileRootMock,
 }));
 
@@ -234,7 +234,8 @@ describe('browser onboarding', () => {
       )
     ).toMatchObject({ provider: 'stub', version: '1.0.0' });
 
-    const { resolveReasoningRoute } = await import('../reasoning/reasoning-route-resolver.js');
+    const { resolveReasoningRoute } =
+      await import('@agent/core/reasoning/reasoning-route-resolver');
     expect(resolveReasoningRoute({ role: 'default', env: {} }).mode).toBe('stub');
   });
 

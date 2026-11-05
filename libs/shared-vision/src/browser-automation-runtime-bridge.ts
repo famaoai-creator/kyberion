@@ -11,8 +11,8 @@ import {
   createSeamLifecycle,
   resolveSeamAutoProvider,
   type SeamProviderMetadata,
-} from '../seam.js';
-import { resolveSeamDefaultProvider } from '../seam-provider-selection.js';
+} from '@agent/core/seam';
+import { resolveSeamDefaultProvider } from '@agent/core/seam-provider-selection';
 
 export interface BrowserAutomationLaunchPersistentContextOptions {
   channel?: string;
@@ -71,7 +71,7 @@ const browserAutomationRuntimeSeam = createSeam<BrowserAutomationRuntimeBridge>(
   key: 'browser-automation-runtime',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
-  owner: 'libs/core/browser/browser-automation-runtime-bridge.ts',
+  owner: 'libs/shared-vision/src/browser-automation-runtime-bridge.ts',
 });
 
 const registrations = createSeamLifecycle(browserAutomationRuntimeSeam);

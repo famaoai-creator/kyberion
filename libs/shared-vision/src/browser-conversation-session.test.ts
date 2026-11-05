@@ -18,9 +18,9 @@ import {
   validateBrowserConversationFeedback,
   validateBrowserConversationSession,
 } from './browser-conversation-session.js';
-import { pathResolver } from '../path-resolver.js';
-import { safeReadFile, safeRmSync, safeWriteFile, safeMkdir } from '../secure-io.js';
-import { resolveIntentResolutionPacket } from '../intent/intent-resolution.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile, safeRmSync, safeWriteFile, safeMkdir } from '@agent/core/secure-io';
+import { resolveIntentResolutionPacket } from '@agent/core/intent/intent-resolution';
 
 describe('browser conversation session helpers', () => {
   const sessionDir = pathResolver.shared('runtime/browser/conversation-sessions');

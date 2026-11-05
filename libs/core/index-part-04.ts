@@ -327,8 +327,6 @@ export * from './agent/agent-exec-adapter-bridge.js';
 
 export * from './voice/audio-bus-bridge.js';
 
-export * from './browser/browser-automation-runtime-bridge.js';
-
 export * from './meeting/calendar-provider-bridge.js';
 
 export * from './temporal-context.js';

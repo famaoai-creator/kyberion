@@ -46,8 +46,6 @@ export * from './surface/operator-home-summary.js';
 
 export { resolveActiveProfileRoot } from './profile-root.js';
 
-export * from './browser/browser-onboarding.js';
-
 export { resolveOperatorDisplayName, resolveOperatorLocale } from './surface/operator-identity.js';
 // I18N-01: single source of truth for locale resolution.
 

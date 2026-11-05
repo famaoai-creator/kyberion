@@ -44,7 +44,7 @@ vi.mock('@agent/core/foundation', () => ({
       : { ok: false, error: 'request body must be an object' };
   }),
 }));
-vi.mock('@agent/core/browser/browser-onboarding', () => ({
+vi.mock('@agent/shared-vision/browser-onboarding', () => ({
   applyBrowserOnboarding: writes.applyBrowserOnboarding,
   applyBrowserOnboardingSettingsPatch: writes.applyBrowserOnboardingSettingsPatch,
   getBrowserOnboardingState: vi.fn(() => ({})),

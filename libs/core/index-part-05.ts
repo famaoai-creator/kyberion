@@ -18,8 +18,6 @@ export * from './error-classifier-judgment.js';
 
 export * from './knowledge/knowledge-relevance-judgment.js';
 
-export * from './browser/browser-judgment.js';
-
 export * from './reasoning/judgment-calibration-fit.js';
 
 export * from './reasoning/judgment-callsite-eval.js';

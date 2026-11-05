@@ -5,7 +5,7 @@ import {
   applyBrowserOnboarding,
   applyBrowserOnboardingSettingsPatch,
   saveBrowserOnboardingVoiceSample,
-} from '@agent/core/browser/browser-onboarding';
+} from '@agent/shared-vision/browser-onboarding';
 import { readTenantProfile, writeTenantProfile } from '@agent/core/organization/tenant-registry';
 import {
   loadPersonalAgentIdentityAtPath,

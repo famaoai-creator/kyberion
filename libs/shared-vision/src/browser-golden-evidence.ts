@@ -15,24 +15,24 @@
  */
 
 import * as path from 'node:path';
-import { pathResolver } from '../path-resolver.js';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
   safeWriteFile,
-} from '../secure-io.js';
-import { readJsonIfPresent } from '../foundation/json.js';
-import type { ScopeContext } from '../scope-context.js';
+} from '@agent/core/secure-io';
+import { readJsonIfPresent } from '@agent/core/foundation/json';
+import type { ScopeContext } from '@agent/core/scope-context';
 import {
   loadGoldenScenario,
   verifyProcedureRun,
   type GoldenVerdict,
   type RunEvidenceElement,
-} from '../knowledge/golden-scenario-verdict.js';
-import type { ProcedureEntry } from '../knowledge/procedure-types.js';
-import { validateBrowserExtensionReceipt } from './browser-extension-bridge.js';
+} from '@agent/core/knowledge/golden-scenario-verdict';
+import type { ProcedureEntry } from '@agent/core/knowledge/procedure-types';
+import { validateBrowserExtensionReceipt } from '@agent/core/browser/browser-extension-bridge';
 
 const RECEIPT_STORE = pathResolver.shared('runtime/browser-receipts');
 const MAX_ELEMENTS = 200;

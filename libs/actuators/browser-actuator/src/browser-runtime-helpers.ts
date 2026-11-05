@@ -29,7 +29,7 @@ import {
   getBrowserAutomationRuntimeCapabilities,
   resolveBrowserAutomationRuntime,
   type BrowserAutomationRuntimeBridge,
-} from '@agent/core/browser/browser-automation-runtime-bridge';
+} from '@agent/shared-vision/browser-automation-runtime-bridge';
 import type { Browser, BrowserContext, Frame, Page } from '@playwright/test';
 import * as path from 'node:path';
 import { isIP } from 'node:net';

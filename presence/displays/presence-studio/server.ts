@@ -25,7 +25,7 @@ import {
   createBrowserConversationSession,
   listBrowserConversationSessions,
   saveBrowserConversationSession,
-} from '@agent/core/browser/browser-conversation-session';
+} from '@agent/shared-vision/browser-conversation-session';
 import { listArtifactRecords } from '@agent/core/workforce/artifact-record';
 import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import { installReasoningBackendsForService } from '@agent/core/reasoning/reasoning-bootstrap';

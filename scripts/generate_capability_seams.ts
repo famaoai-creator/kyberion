@@ -165,7 +165,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     consumers: ['libs/core/meeting/calendar-workflow.ts'],
   },
   'browser-automation-runtime': {
-    declaration: 'libs/core/browser/browser-automation-runtime-bridge.ts',
+    declaration: 'libs/shared-vision/src/browser-automation-runtime-bridge.ts',
     consumers: ['libs/actuators/browser-actuator/src/browser-runtime-helpers.ts'],
   },
   'web-search-runtime': {

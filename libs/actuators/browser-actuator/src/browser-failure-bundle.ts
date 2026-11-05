@@ -1,5 +1,5 @@
 import { nowIso } from '@agent/core/foundation';
-import { judgeBrowserFailureKind } from '@agent/core/browser/browser-judgment';
+import { judgeBrowserFailureKind } from '@agent/shared-vision/browser-judgment';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import type { BrowserRuntime } from './browser-runtime-types.js';
 
