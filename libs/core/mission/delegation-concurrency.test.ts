@@ -374,6 +374,9 @@ describe('delegation-concurrency', () => {
     });
 
     it('reports an exit it cannot observe, and keeps the handle-less path immediate', async () => {
+      // Fake timers: the fire-and-forget SIGKILL escalation must fire inside
+      // this test, not unregister a later test's reused child id.
+      vi.useFakeTimers();
       const withHandle = new AbortController();
       const kill = vi.fn();
       const unobservable = withWallClockBudget(
@@ -385,6 +388,9 @@ describe('delegation-concurrency', () => {
         'unobservable'
       );
       expect(kill).toHaveBeenCalledWith('SIGTERM');
+      await vi.advanceTimersByTimeAsync(50);
+      expect(kill).toHaveBeenCalledWith('SIGKILL');
+      expect(vi.getTimerCount()).toBe(0);
 
       const noChild = new AbortController();
       const bare = withWallClockBudget({ signal: noChild.signal }, () => new Promise(() => {}));
