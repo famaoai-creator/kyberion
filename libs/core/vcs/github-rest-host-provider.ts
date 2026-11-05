@@ -110,9 +110,70 @@ interface RestPull {
   state: 'open' | 'closed';
   draft?: boolean;
   merged_at?: string | null;
+  closed_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  body?: string | null;
+  merge_commit_sha?: string | null;
+  auto_merge?: unknown;
+  additions?: number;
+  deletions?: number;
+  changed_files?: number;
+  labels?: Array<{ name?: string }>;
   user?: { login?: string };
   head: { sha: string; ref: string; repo?: { full_name?: string } | null };
   base: { sha: string; ref: string };
+}
+
+/** Project a REST pull onto gh `--json` field names and shapes. */
+export function restPullField(pull: RestPull, field: string): unknown {
+  switch (field) {
+    case 'number':
+      return pull.number;
+    case 'url':
+      return pull.html_url;
+    case 'title':
+      return pull.title;
+    case 'body':
+      return pull.body ?? '';
+    case 'state':
+      return pullState(pull);
+    case 'isDraft':
+      return pull.draft === true;
+    case 'headRefOid':
+      return pull.head.sha;
+    case 'baseRefOid':
+      return pull.base.sha;
+    case 'headRefName':
+      return pull.head.ref;
+    case 'baseRefName':
+      return pull.base.ref;
+    case 'author':
+      return { login: pull.user?.login ?? '' };
+    case 'createdAt':
+      return pull.created_at ?? null;
+    case 'updatedAt':
+      return pull.updated_at ?? null;
+    case 'closedAt':
+      return pull.closed_at ?? null;
+    case 'mergedAt':
+      return pull.merged_at ?? null;
+    // REST reports a test-merge sha on open PRs; gh exposes a merge commit only once merged.
+    case 'mergeCommit':
+      return pull.merged_at && pull.merge_commit_sha ? { oid: pull.merge_commit_sha } : null;
+    case 'autoMergeRequest':
+      return pull.auto_merge ?? null;
+    case 'additions':
+      return pull.additions ?? 0;
+    case 'deletions':
+      return pull.deletions ?? 0;
+    case 'changedFiles':
+      return pull.changed_files ?? 0;
+    case 'labels':
+      return (pull.labels ?? []).map((label) => ({ name: label.name ?? '' }));
+    default:
+      throw new VcsHostError('invalid', `github-rest cannot serve PR field ${field}`);
+  }
 }
 
 function pullState(pull: RestPull): string {
@@ -360,6 +421,39 @@ export function createGithubRestVcsHostProvider(
       if (!Number.isInteger(row.number) || typeof row.html_url !== 'string')
         throw new VcsHostError('invalid', 'GitHub API returned no pull request');
       return { number: row.number as number, url: row.html_url };
+    },
+    async prFields(ctx, repo, ref, fields) {
+      const row = await pull(ctx, repo, ref);
+      const out: Record<string, unknown> = {};
+      for (const field of fields) {
+        if (field !== 'files') out[field] = restPullField(row, field);
+      }
+      if (fields.includes('files')) {
+        const files: Array<{ path: string; additions: number; deletions: number }> = [];
+        // GitHub caps the listing at 3000 files (30 pages of 100).
+        for (let page = 1; page <= 30; page += 1) {
+          const rows = await request<
+            Array<{ filename: string; additions?: number; deletions?: number }>
+          >(
+            ctx,
+            repo,
+            'GET',
+            `/repos/${repo.slug}/pulls/${row.number}/files?per_page=100&page=${page}`
+          );
+          for (const file of rows)
+            files.push({
+              path: file.filename,
+              additions: file.additions ?? 0,
+              deletions: file.deletions ?? 0,
+            });
+          if (rows.length < 100) break;
+        }
+        out.files = files;
+      }
+      return out;
+    },
+    async githubApiGet(ctx, repo, path) {
+      return request<unknown>(ctx, repo, 'GET', `/repos/${repo.slug}${path ? `/${path}` : ''}`);
     },
     async prMerge(ctx, repo, input) {
       const row = await request<{ merged?: boolean }>(
