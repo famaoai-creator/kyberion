@@ -38,6 +38,19 @@ JSON state の lock と再入検出は Unicode 正規化と case folding を共�
 
 `defineCommand` は既存の CLI guard と `defineScript` を合成する。help と unknown option の処理は副作用より前に行う。`defineCheck` は findings があれば常に exit 1、JSON は `{ok,id,findings}`、成功は `[check:<id>] OK` を返す。新しい check は `ci-gates.json` に実行条件も登録する。CLI の既存契約を変更する移行は checker ごとに検証する。
 
+## 資産 Scope と保存配置
+
+資産の管理者（system / tenant / person）と tier は実行主体の `ScopeEnvelope`、Stance、
+ファイルの保存場所から分けて扱う。`resolveAssetAddress` は注入された検証済みカタログから
+解決し、混在する legacy 配置や管理者・tier が不明な資産は `unresolved` にする。
+現在の tenant や移行先の属性で不足情報を補わない。保存先の移行はこの解決処理の前提にしない。
+
+`inspectAssetScopeRead` の `decision` だけが既存の認可結果であり、`shadow` は管理者と
+tier の閲覧上限の観測である。`shadow` の許可・拒否・例外で既存認可を置き換えない。
+比較対象の ceiling はサーバーで解決し、クライアントの tenant/tier をそのまま渡さない。
+計画中の保存先は観測対象にできるが許可には使わない。Grant と完全な認可への移行は
+保存先ごとの契約テストと独立レビューを経て別段階で進める。
+
 ## 再増加の検出
 
 `check_concept_consolidation.ts` は context env、JSON serialization at write、runtime literal、limiter/tracker 宣言、重複 export 型名、CLI parser の6指標を測る。comments・テスト・生成コード・build 出力を除外し、ファイル単位の上限と重複型名ごとのサイトを検査する。payload と永続状態の全てを静的に証明するものではなく、指標とレビューを併用する。新しい duplicate 名は古い duplicate を削って相殺できない。

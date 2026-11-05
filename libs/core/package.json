@@ -16,6 +16,18 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./contracts/asset-scope": {
+      "types": "./dist/contracts/asset-scope.d.ts",
+      "default": "./dist/contracts/asset-scope.js"
+    },
+    "./foundation/asset-address": {
+      "types": "./dist/foundation/asset-address.d.ts",
+      "default": "./dist/foundation/asset-address.js"
+    },
+    "./governance/asset-scope-inspection": {
+      "types": "./dist/governance/asset-scope-inspection.d.ts",
+      "default": "./dist/governance/asset-scope-inspection.js"
+    },
     "./pipeline/pipeline-reuse": {
       "types": "./dist/pipeline/pipeline-reuse.d.ts",
       "default": "./dist/pipeline/pipeline-reuse.js"
