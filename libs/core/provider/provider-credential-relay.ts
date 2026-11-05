@@ -24,7 +24,9 @@
  *   - Proxies: the child env gets loopback appended to NO_PROXY/no_proxy so
  *     a proxy-honoring CLI reaches the relay directly; the relay's own
  *     upstream hop honors HTTP(S)_PROXY / NO_PROXY via Node's `proxyEnv`
- *     agent (never for a loopback upstream).
+ *     agent (never for a loopback upstream). A Node runtime whose agent
+ *     ignores `proxyEnv` (before 24.5) logs a one-time diagnostic warning
+ *     instead of silently connecting direct.
  *   - OUT OF SCOPE / follow-up: Bedrock SigV4 request signing and Vertex
  *     access-token minting, WebSocket upgrades.
  */
@@ -126,6 +128,11 @@ export interface StartCredentialRelayInput {
   readonly upstream: string;
   /** Env the upstream hop reads HTTP(S)_PROXY / NO_PROXY from (default: process.env). */
   readonly proxyEnv?: NodeJS.ProcessEnv;
+  /**
+   * Whether this runtime's http(s).Agent honors `proxyEnv` (default: probed
+   * with {@link agentSupportsProxyEnv}). Test seam only.
+   */
+  readonly proxyEnvSupported?: boolean;
 }
 
 type RelayProxyEnv = Partial<Record<ProxyEnvKey, string>>;
@@ -137,6 +144,54 @@ function pickProxyEnv(env: NodeJS.ProcessEnv): RelayProxyEnv | undefined {
     if (value) picked[key] = value;
   }
   return hasProxyEnv(picked) ? picked : undefined;
+}
+
+type ProxyEnvAgentCtor = new (options: { proxyEnv?: RelayProxyEnv }) => object;
+
+/** First Node 24.x whose http(s).Agent honors the `proxyEnv` option. */
+const PROXY_ENV_AGENT_MIN_NODE: readonly [number, number] = [24, 5];
+
+function nodeVersionAtLeast(version: string, [major, minor]: readonly [number, number]): boolean {
+  const [maj = 0, min = 0] = version.split('.').map((part) => Number.parseInt(part, 10));
+  return maj > major || (maj === major && min >= minor);
+}
+
+/**
+ * Whether `AgentCtor` (default: https.Agent) honors the `proxyEnv` option.
+ * Node before 24.5 accepts the option and silently ignores it, so the relay's
+ * upstream hop would connect directly past a configured proxy. Probed on the
+ * constructed agent (Node keeps the parsed proxy config on it), with the Node
+ * version as a fallback. A wrong "unsupported" answer only costs a warning:
+ * the agent is still built with `proxyEnv`.
+ */
+export function agentSupportsProxyEnv(
+  AgentCtor: ProxyEnvAgentCtor = https.Agent,
+  nodeVersion: string = process.versions.node
+): boolean {
+  try {
+    const agent = new AgentCtor({ proxyEnv: { HTTPS_PROXY: 'http://127.0.0.1:9' } });
+    if (Object.getOwnPropertySymbols(agent).some((sym) => sym.description === 'kProxyConfig')) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return nodeVersionAtLeast(nodeVersion, PROXY_ENV_AGENT_MIN_NODE);
+}
+
+let proxyEnvUnsupportedWarned = false;
+
+/** Reset the once-per-process proxy-support warning (tests only). */
+export function resetCredentialRelayProxyWarningForTests(): void {
+  proxyEnvUnsupportedWarned = false;
+}
+
+function warnProxyEnvUnsupportedOnce(upstreamHost: string): void {
+  if (proxyEnvUnsupportedWarned) return;
+  proxyEnvUnsupportedWarned = true;
+  logger.warn(
+    `[credential-relay] HTTP(S)_PROXY is set but this Node runtime's http(s).Agent ignores proxyEnv — the relay's upstream hop connects directly, bypassing the proxy (it fails or egresses unproxied) | next: run on Node >= ${PROXY_ENV_AGENT_MIN_NODE.join('.')}, or unset ${PROVIDER_CREDENTIAL_RELAY_ENV_VAR} | evidence: node=${process.versions.node} upstream=${upstreamHost}`
+  );
 }
 
 /** Hosts a child must reach directly (never via a proxy) to talk to the relay. */
@@ -201,6 +256,9 @@ export async function startCredentialRelay(
   const proxyEnv = LOOPBACK_HOSTS.has(upstream.hostname)
     ? undefined
     : pickProxyEnv(input.proxyEnv ?? process.env);
+  if (proxyEnv && !(input.proxyEnvSupported ?? agentSupportsProxyEnv(transport.Agent))) {
+    warnProxyEnvUnsupportedOnce(upstream.host);
+  }
   const upstreamAgent = proxyEnv ? new transport.Agent({ proxyEnv }) : undefined;
   let closed = false;
   let port = 0;
