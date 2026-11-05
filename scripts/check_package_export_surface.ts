@@ -11,8 +11,9 @@
  */
 import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
+import { writeJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReaddir, safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 import { readSafeJsonFile } from './lib/json-input.js';
@@ -84,11 +85,9 @@ export const runCheckPackageExportSurface = defineScript({
   run(context) {
     const baselinePath = resolveCiGateBaselinePath('package-export-surface');
     const counts = collectExportCounts();
-    if (context.argv.includes('--write-baseline')) {
+    if (context.unknownFlags.includes('--write-baseline')) {
       const next: ExportSurfaceBaseline = { version: 1, packages: counts };
-      withExecutionContext('ecosystem_architect', () =>
-        safeWriteFile(baselinePath, `${JSON.stringify(next, null, 2)}\n`)
-      );
+      withExecutionContext('ecosystem_architect', () => writeJson(baselinePath, next));
       context.print(`[check:package-export-surface] baseline written (${JSON.stringify(counts)})`);
       return { counts, violations: [], shrunk: [] };
     }
