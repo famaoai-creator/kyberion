@@ -30,15 +30,20 @@ describe('runtime store registration coverage', () => {
   ];
   const registered = (): StoreEntry[] => [
     store('dot', 'active/shared/runtime/dot/<tier>/<tenant>', {
-      registration: { family: 'state', key: 'dot', retention_path: policies[0].path },
+      registration: { family: 'state', key: 'dot', order: 1, retention_path: policies[0].path },
     }),
     // Registering an existing bare-root metrics store must not reinterpret custody.
     store('usage', 'active/shared/runtime/usage-ledger', {
       custody: { kind: 'unscoped-legacy' },
-      registration: { family: 'ledger', key: 'resource_usage', retention_path: policies[1].path },
+      registration: {
+        family: 'ledger',
+        key: 'resource_usage',
+        order: 1,
+        retention_path: policies[1].path,
+      },
     }),
     store('scratch', 'active/shared/tmp/<tier>/<tenant>', {
-      registration: { family: 'floor', key: 'scratch', retention_path: policies[2].path },
+      registration: { family: 'floor', key: 'scratch', order: 1, retention_path: policies[2].path },
     }),
   ];
 
@@ -67,7 +72,7 @@ describe('runtime store registration coverage', () => {
           [
             ...registered(),
             store('unknown', 'active/unknown', {
-              registration: { family: 'state', key, retention_path: policies[0].path },
+              registration: { family: 'state', key, order: 2, retention_path: policies[0].path },
             }),
           ],
           roots,

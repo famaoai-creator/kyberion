@@ -17,6 +17,7 @@
       "registration": {
         "family": "state",
         "key": "api_verification",
+        "order": 14,
         "retention_path": "active/shared/runtime/health"
       }
     },
@@ -47,6 +48,7 @@
       "registration": {
         "family": "state",
         "key": "autonomy_learning",
+        "order": 4,
         "retention_path": "active/shared/runtime/autonomy-learning"
       }
     },
@@ -64,6 +66,7 @@
       "registration": {
         "family": "state",
         "key": "browser_bridge_mailbox",
+        "order": 10,
         "retention_path": "active/shared/runtime/browser-bridge-mailbox"
       }
     },
@@ -82,6 +85,7 @@
       "registration": {
         "family": "state",
         "key": "customer_decision_invites",
+        "order": 9,
         "retention_path": "active/shared/runtime/customer-decision-invites"
       }
     },
@@ -99,6 +103,7 @@
       "registration": {
         "family": "state",
         "key": "delegation_idempotency",
+        "order": 12,
         "retention_path": "active/shared/runtime/delegation-idempotency"
       }
     },
@@ -117,6 +122,7 @@
       "registration": {
         "family": "state",
         "key": "discussion_create_requests",
+        "order": 7,
         "retention_path": "active/shared/runtime/discussion-create-requests"
       }
     },
@@ -135,6 +141,7 @@
       "registration": {
         "family": "state",
         "key": "dot",
+        "order": 2,
         "retention_path": "active/shared/runtime/dot"
       }
     },
@@ -164,6 +171,7 @@
       "registration": {
         "family": "state",
         "key": "external_operations",
+        "order": 5,
         "retention_path": "active/shared/runtime/external-operations"
       }
     },
@@ -183,6 +191,7 @@
       "registration": {
         "family": "floor",
         "key": "artifact",
+        "order": 4,
         "retention_path": "active/shared/artifacts"
       }
     },
@@ -201,6 +210,7 @@
       "registration": {
         "family": "floor",
         "key": "cache",
+        "order": 3,
         "retention_path": "active/shared/cache"
       }
     },
@@ -225,6 +235,7 @@
       "registration": {
         "family": "floor",
         "key": "scratch",
+        "order": 1,
         "retention_path": "active/shared/tmp"
       }
     },
@@ -243,6 +254,7 @@
       "registration": {
         "family": "floor",
         "key": "staging",
+        "order": 2,
         "retention_path": "active/shared/staging"
       }
     },
@@ -260,6 +272,7 @@
       "registration": {
         "family": "state",
         "key": "generation_cost_settlements",
+        "order": 13,
         "retention_path": "active/shared/runtime/media-generation/cost-settlements"
       }
     },
@@ -278,6 +291,7 @@
       "registration": {
         "family": "state",
         "key": "grants",
+        "order": 8,
         "retention_path": "active/shared/runtime/grants"
       }
     },
@@ -295,6 +309,7 @@
       "registration": {
         "family": "state",
         "key": "hearing",
+        "order": 6,
         "retention_path": "active/shared/runtime/hearing"
       }
     },
@@ -554,6 +569,7 @@
       "registration": {
         "family": "state",
         "key": "pipeline_library_runs",
+        "order": 3,
         "retention_path": "active/shared/runtime/pipeline-library-runs"
       }
     },
@@ -608,6 +624,7 @@
       "registration": {
         "family": "ledger",
         "key": "execution_metrics",
+        "order": 2,
         "retention_path": "active/shared/runtime/execution-metrics"
       }
     },
@@ -693,6 +710,7 @@
       "registration": {
         "family": "ledger",
         "key": "tenant_approvals",
+        "order": 4,
         "retention_path": "active/shared/runtime/tenant-approvals"
       }
     },
@@ -711,6 +729,7 @@
       "registration": {
         "family": "ledger",
         "key": "tenant_ledger",
+        "order": 3,
         "retention_path": "active/shared/runtime/tenant-ledger"
       }
     },
@@ -736,6 +755,7 @@
       "registration": {
         "family": "ledger",
         "key": "resource_usage",
+        "order": 1,
         "retention_path": "active/shared/runtime/usage-ledger"
       }
     },
@@ -773,6 +793,7 @@
       "registration": {
         "family": "state",
         "key": "seam_selection_defaults",
+        "order": 11,
         "retention_path": "active/shared/runtime/seam-selection-defaults"
       }
     },
@@ -866,6 +887,7 @@
       "registration": {
         "family": "state",
         "key": "task_workspaces",
+        "order": 1,
         "retention_path": "active/shared/runtime/workspaces"
       }
     },

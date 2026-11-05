@@ -1,8 +1,21 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
-import { runtimeStatePath } from './runtime-state-roots.js';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import {
+  runtimeStatePath,
+  PARTITIONED_RUNTIME_LEDGER_ROOTS,
+  TENANT_LEDGER_ROOT_PATH,
+  TENANT_APPROVAL_ROOT_PATH,
+} from './runtime-state-roots.js';
 
 describe('runtime state registry', () => {
+  it('retains literal alias types and values', () => {
+    expectTypeOf(TENANT_LEDGER_ROOT_PATH).toEqualTypeOf<'active/shared/runtime/tenant-ledger'>();
+    expectTypeOf(
+      TENANT_APPROVAL_ROOT_PATH
+    ).toEqualTypeOf<'active/shared/runtime/tenant-approvals'>();
+    expect(TENANT_LEDGER_ROOT_PATH).toBe(PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_ledger);
+    expect(TENANT_APPROVAL_ROOT_PATH).toBe(PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals);
+  });
   it('preserves the global Dot ledgers and refuses invented tenant placement', () => {
     expect(runtimeStatePath('dot.wakeLedger')).toEqual({
       logicalPath: 'active/shared/runtime/dot-wake-ledger.jsonl',
