@@ -1,7 +1,7 @@
 ---
 title: '共通概念の採用と安全な更新'
 tags: [governance, development, actor-context, state, rate-limit, cli]
-last_updated: 2026-10-21
+last_updated: 2026-11-06
 kind: runbook
 scope: repository
 authority: reference
@@ -50,6 +50,19 @@ tier の閲覧上限の観測である。`shadow` の許可・拒否・例外で
 比較対象の ceiling はサーバーで解決し、クライアントの tenant/tier をそのまま渡さない。
 計画中の保存先は観測対象にできるが許可には使わない。Grant と完全な認可への移行は
 保存先ごとの契約テストと独立レビューを経て別段階で進める。
+
+同期保存処理の token 寿命は `createSynchronousResourceGrantIssuer` に寄せる。issuer の
+インスタンスは既存の統制された発行 facade 内に保持し、文字列の store 名や診断用 prefix
+で発行者を認定しない。ドメインの binding を検証・凍結してから発行し、共通機構には
+path 上限と token の寿命だけを任せる。DOT 結果保存はこの機構を採用している。
+現在の凍結済み scope と一致しない複製、別 issuer の token、処理終了後の token は拒否する。
+外側の ResourceAccessScope の上限は交差したまま維持する。
+
+Promise/thenable を返す保存処理は拒否し、正常終了・例外とも `finally` で失効する。
+戻り値の Symbol を含む data property・Map・Set を検査して token や scope の持ち出しを拒否する。
+持ち出し検査では accessor を実行せず、Map/Set は組み込み iterator で調べる。
+closure/accessor が token を保持しても、戻り値が呼出元へ渡る前に
+失効する。これは権限の付与・保存先の正規化・内容検査の代替ではない。
 
 ## 再増加の検出
 
