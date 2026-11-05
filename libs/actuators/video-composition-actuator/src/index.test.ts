@@ -223,8 +223,8 @@ vi.mock('@agent/core/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/core')>()),
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
-vi.mock('@agent/core/video/video-composition-compiler', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/video/video-composition-compiler')>()),
+vi.mock('@agent/shared-video/video-composition-compiler', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/shared-video/video-composition-compiler')>()),
   compileVideoCompositionADF: mocks.compileVideoCompositionADF,
   writeVideoCompositionBundle: mocks.writeVideoCompositionBundle,
 }));
@@ -237,18 +237,18 @@ vi.mock('@agent/core/video/video-content-brief-contract', async (importOriginal)
   compileVideoContentBriefToStoryboard: mocks.compileVideoContentBriefToStoryboard,
   compileVideoStoryboardToNarratedVideoBrief: mocks.compileVideoStoryboardToNarratedVideoBrief,
 }));
-vi.mock('@agent/core/video/video-composition-template-registry', async (importOriginal) => ({
+vi.mock('@agent/shared-video/video-composition-template-registry', async (importOriginal) => ({
   ...(await importOriginal<
-    typeof import('@agent/core/video/video-composition-template-registry')
+    typeof import('@agent/shared-video/video-composition-template-registry')
   >()),
   getVideoCompositionTemplateRegistry: mocks.getVideoCompositionTemplateRegistry,
 }));
-vi.mock('@agent/core/video/video-render-runtime-policy', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/video/video-render-runtime-policy')>()),
+vi.mock('@agent/shared-video/video-render-runtime-policy', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/shared-video/video-render-runtime-policy')>()),
   getVideoRenderRuntimePolicy: mocks.getVideoRenderRuntimePolicy,
 }));
-vi.mock('@agent/core/video/video-render-backend', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/video/video-render-backend')>()),
+vi.mock('@agent/shared-video/video-render-backend', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/shared-video/video-render-backend')>()),
   renderNarratedFallbackVideo: mocks.renderNarratedFallbackVideo,
   renderVideoCompositionBundleAsync: mocks.renderVideoCompositionBundleAsync,
 }));

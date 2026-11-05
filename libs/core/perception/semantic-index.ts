@@ -7,7 +7,7 @@ import { currentScopeEnvelope } from '../scope-envelope.js';
 import { pathResolver } from '../path-resolver.js';
 import { resolveStorageFloor, classifyStorageFloorPath } from '../storage-layout.js';
 import { detectTier } from '../tier-guard.js';
-import { tenantOfPath } from '../video/ingest/video-brief.js';
+import { tenantOfPath } from '../path-tenant-attribution.js';
 import {
   assertSafeRepositoryPath,
   safeExecResultAsync,

@@ -21,11 +21,11 @@ import {
   mixNarrationTimeline,
   planNarrationTimeline,
   probeAudioDurationSec,
-} from '@agent/core/video/video-narration-timeline';
+} from '@agent/shared-video/video-narration-timeline';
 import {
   compileVideoCompositionADF,
   writeVideoCompositionBundle,
-} from '@agent/core/video/video-composition-compiler';
+} from '@agent/shared-video/video-composition-compiler';
 import {
   compileVideoContentBriefToStoryboard,
   compileVideoStoryboardToNarratedVideoBrief,
@@ -33,13 +33,13 @@ import {
 import {
   formatVideoLintReport,
   lintVideoComposition,
-} from '@agent/core/video/video-composition-lint';
-import { getVideoCompositionTemplateRegistry } from '@agent/core/video/video-composition-template-registry';
-import { getVideoRenderRuntimePolicy } from '@agent/core/video/video-render-runtime-policy';
+} from '@agent/shared-video/video-composition-lint';
+import { getVideoCompositionTemplateRegistry } from '@agent/shared-video/video-composition-template-registry';
+import { getVideoRenderRuntimePolicy } from '@agent/shared-video/video-render-runtime-policy';
 import {
   renderNarratedFallbackVideo,
   renderVideoCompositionBundleAsync,
-} from '@agent/core/video/video-render-backend';
+} from '@agent/shared-video/video-render-backend';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflightSync } from '@agent/core/pipeline/op-preflight';

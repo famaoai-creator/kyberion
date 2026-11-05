@@ -67,7 +67,7 @@
           }
         }
       },
-      "notes": "Video metadata / subtitle / media fetcher for libs/core/video-ingest (vision fetch_video, build_video_brief). Unlicense: invoked as an external binary, never vendored. Complying with the source site's terms of service is the caller's responsibility. Never self-update (-U mutates the managed binary and needs network): when extractors break, bump managed_binary.version + checksums here and run `pnpm tool:setup -- --tool yt_dlp --apply`. The sha256 values are the upstream SHA2-256SUMS digests of the pinned release (verified 2026-09-26); a managed install fails closed on checksum mismatch. Override the binary with KYBERION_YTDLP_BIN."
+      "notes": "Video metadata / subtitle / media fetcher for libs/shared-video/src/ingest (vision fetch_video, build_video_brief). Unlicense: invoked as an external binary, never vendored. Complying with the source site's terms of service is the caller's responsibility. Never self-update (-U mutates the managed binary and needs network): when extractors break, bump managed_binary.version + checksums here and run `pnpm tool:setup -- --tool yt_dlp --apply`. The sha256 values are the upstream SHA2-256SUMS digests of the pinned release (verified 2026-09-26); a managed install fails closed on checksum mismatch. Override the binary with KYBERION_YTDLP_BIN."
     }
   ]
 }

@@ -13,7 +13,7 @@ import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { defineCatalog, slugify } from '@agent/core/foundation';
-import { buildNarratedVideoUploadPackage } from '@agent/core/video/narrated-video-upload-package';
+import { buildNarratedVideoUploadPackage } from '@agent/shared-video/narrated-video-upload-package';
 import type { NarratedVideoPublishPlan } from '@agent/core/contracts/narrated-video-publish-plan';
 import type { NarratedVideoUploadPackage } from '@agent/core/contracts/narrated-video-upload-package';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';

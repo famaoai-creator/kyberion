@@ -5,7 +5,7 @@ import { assertSafeRepositoryPath, safeReadFileRange, safeLstat } from '../secur
 import { resolveScopeContext } from '../scope-context.js';
 import { inferImagePayloadTier } from '../media/image-description-bridge.js';
 import { classifyStorageFloorPath } from '../storage-layout.js';
-import { tenantOfPath } from '../video/ingest/video-brief.js';
+import { tenantOfPath } from '../path-tenant-attribution.js';
 import { KNOWLEDGE_TIER_RANK } from '../foundation/knowledge-tier.js';
 import type { OcrResult } from '../ocr-types.js';
 import type { TranscriptSegment } from '../voice/speech-to-text-bridge.js';

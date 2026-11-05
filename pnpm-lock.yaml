@@ -90,6 +90,9 @@ importers:
       '@agent/shared-network':
         specifier: workspace:*
         version: link:libs/shared-network
+      '@agent/shared-video':
+        specifier: workspace:*
+        version: link:libs/shared-video
       '@agent/shared-vision':
         specifier: workspace:*
         version: link:libs/shared-vision
@@ -679,6 +682,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-video':
+        specifier: workspace:*
+        version: link:../../shared-video
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
@@ -688,6 +694,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-video':
+        specifier: workspace:*
+        version: link:../../shared-video
 
   libs/actuators/voice-actuator:
     dependencies:
@@ -845,6 +854,12 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+
+  libs/shared-video:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../core
 
   libs/shared-vision:
     dependencies:
