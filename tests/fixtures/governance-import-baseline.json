@@ -217,7 +217,7 @@
     "libs/core/laya-mlx-judgment-backend.ts",
     "libs/core/managed-process.ts",
     "libs/shared-media/src/native-speech-listen-bridge.ts",
-    "libs/core/media/native-tts.ts",
+    "libs/shared-voice/src/native-tts.ts",
     "libs/core/mesh/acp-mediator.ts",
     "libs/core/mic-capture.ts",
     "libs/core/mlx-embedding-backend.ts",

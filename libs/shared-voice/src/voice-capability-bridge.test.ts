@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 const probeNativeTts = vi.fn();
 const speak = vi.fn();
-vi.mock('@agent/core/media/native-tts', () => ({ probeNativeTts, speak }));
+vi.mock('@agent/shared-voice/native-tts', () => ({ probeNativeTts, speak }));
 
 describe('voice-capability-bridge', () => {
   it('exposes native voice probe and speak through one contract', async () => {

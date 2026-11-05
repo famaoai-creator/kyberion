@@ -500,9 +500,9 @@
       "types": "./dist/analysis/trace-schema.d.ts",
       "default": "./dist/analysis/trace-schema.js"
     },
-    "./app-profiles": {
-      "types": "./dist/app-profiles.d.ts",
-      "default": "./dist/app-profiles.js"
+    "./app-profile-index-loader": {
+      "types": "./dist/app-profile-index-loader.d.ts",
+      "default": "./dist/app-profile-index-loader.js"
     },
     "./append-only-store": {
       "types": "./dist/append-only-store.d.ts",
@@ -616,9 +616,9 @@
       "types": "./dist/authn-principal-resolver.d.ts",
       "default": "./dist/authn-principal-resolver.js"
     },
-    "./authn-providers": {
-      "types": "./dist/authn-providers.d.ts",
-      "default": "./dist/authn-providers.js"
+    "./authn/authn-providers": {
+      "types": "./dist/authn/authn-providers.d.ts",
+      "default": "./dist/authn/authn-providers.js"
     },
     "./authn/installation-step-up": {
       "types": "./dist/authn/installation-step-up.d.ts",
@@ -2712,10 +2712,6 @@
       "types": "./dist/media/native-subagent-adopter.d.ts",
       "default": "./dist/media/native-subagent-adopter.js"
     },
-    "./media/native-tts": {
-      "types": "./dist/media/native-tts.d.ts",
-      "default": "./dist/media/native-tts.js"
-    },
     "./media/ooxml-core-props": {
       "types": "./dist/media/ooxml-core-props.d.ts",
       "default": "./dist/media/ooxml-core-props.js"
@@ -3720,10 +3716,6 @@
       "types": "./dist/media/native-pptx-engine/design-cascade.d.ts",
       "default": "./dist/media/native-pptx-engine/design-cascade.js"
     },
-    "./native-tts": {
-      "types": "./dist/media/native-tts.d.ts",
-      "default": "./dist/media/native-tts.js"
-    },
     "./nerve-bridge": {
       "types": "./dist/nerve-bridge.d.ts",
       "default": "./dist/nerve-bridge.js"
@@ -4676,9 +4668,9 @@
       "types": "./dist/provider/provider-pins-store.d.ts",
       "default": "./dist/provider/provider-pins-store.js"
     },
-    "./provider-transport": {
-      "types": "./dist/provider-transport.d.ts",
-      "default": "./dist/provider-transport.js"
+    "./provider/provider-transport": {
+      "types": "./dist/provider/provider-transport.d.ts",
+      "default": "./dist/provider/provider-transport.js"
     },
     "./provider/agy-cli-backend": {
       "types": "./dist/provider/agy-cli-backend.d.ts",

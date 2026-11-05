@@ -7,14 +7,14 @@
  * file under `provider-bundles/` rather than a new switch case.
  */
 
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
-import { getRegisteredEnvText } from './foundation/env.js';
-import type { ReasoningBackendMode } from './reasoning/reasoning-backend-policy.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import type { ReasoningBackendMode } from '../reasoning/reasoning-backend-policy.js';
 import {
   getReasoningProviderDescriptor,
   resolveReasoningProviderEnvironment,
   type ReasoningProviderRuntimeBundle,
-} from './reasoning/reasoning-provider-registry.js';
+} from '../reasoning/reasoning-provider-registry.js';
 
 export interface CliProviderBuildOptions {
   mode: ReasoningBackendMode;
@@ -41,7 +41,7 @@ const cliProviderBundleSeam = createSeam<CliProviderBundleFactory>({
   key: 'cli-provider-bundle',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
-  owner: 'libs/core/cli-provider-bundle.ts',
+  owner: 'libs/core/provider/cli-provider-bundle.ts',
 });
 
 export function registerCliProviderBundle(

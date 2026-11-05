@@ -64,7 +64,7 @@ vi.mock('./first-job.js', () => ({
 vi.mock('./front-desk-conversation-store.js', () => ({
   conversationRef: () => ({ sessionId: 'concierge-' + 'a'.repeat(64) }),
 }));
-import { mintBrowserSessionToken } from '../authn-providers.js';
+import { mintBrowserSessionToken } from '../authn/authn-providers.js';
 import { readFirstJobSetup } from './first-job-setup.js';
 
 const viewer: SurfaceViewerScope = {

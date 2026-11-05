@@ -36,3 +36,4 @@ export {
   normalizeSpeculativeTranscript,
   transcriptsMatchForSpeculation,
 } from './voice-speculative-policy.js';
+// native-tts shares names with voice-synth (speak, SpeakOptions); import it from @agent/shared-voice/native-tts.

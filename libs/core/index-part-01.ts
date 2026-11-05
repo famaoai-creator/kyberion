@@ -125,19 +125,6 @@ export type {
 // Native OS TTS (Phase A-5, voice tier 0)
 
 export {
-  speak as nativeTtsSpeak,
-  probeNativeTts,
-  currentPlatform as nativeTtsCurrentPlatform,
-  hasBuiltInTts as nativeTtsHasBuiltIn,
-} from './media/native-tts.js';
-
-export type {
-  SpeakOptions as NativeTtsSpeakOptions,
-  SpeakResult as NativeTtsSpeakResult,
-  Platform as NativeTtsPlatform,
-} from './media/native-tts.js';
-
-export {
   rootDir,
   knowledge,
   scripts,

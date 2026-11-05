@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeReadFile } from '../secure-io.js';
 import {
   DEFAULT_SAFETY_MARGIN_TOKENS,
   computeCompletionTokenBudget,
@@ -99,7 +99,7 @@ describe('estimateRequestInputTokens', () => {
 describe('resolveConfiguredContextWindowTokens', () => {
   it('routes context window environment reads through the governed accessor', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('libs/core/completion-token-budget.ts'), {
+      safeReadFile(pathResolver.rootResolve('libs/core/provider/completion-token-budget.ts'), {
         encoding: 'utf8',
       })
     );

@@ -7,7 +7,7 @@
 import * as path from 'node:path';
 import { safeExistsSync, safeMkdir } from './secure-io.js';
 import { assertValidMobileAppProfile } from './mobile-profile-validators.js';
-import type { MobileAppProfile } from './app-profiles.js';
+import type { MobileAppProfile } from './types.js';
 
 export type MobilePlatform = 'android' | 'ios';
 

@@ -242,7 +242,7 @@ export * from './output-artifacts.js';
 
 export * from './workforce/worker-context-compaction.js';
 
-export * from './completion-token-budget.js';
+export * from './provider/completion-token-budget.js';
 
 export * from './workforce/worker-event-stream.js';
 

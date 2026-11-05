@@ -25,7 +25,7 @@ import {
   type VoiceSttAvailability,
   type VoiceSttBackend,
 } from '@agent/core/voice/voice-stt';
-import { hasBuiltInTts } from '@agent/core/media/native-tts';
+import { hasBuiltInTts } from '@agent/shared-voice/native-tts';
 import {
   findInstalledManagedBinary,
   probeToolRuntime,

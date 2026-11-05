@@ -36,8 +36,8 @@ const state = vi.hoisted(() => ({
   rotateKey: false,
   failReadback: false,
 }));
-vi.mock('../authn-providers.js', async (original) => {
-  const actual = await original<typeof import('../authn-providers.js')>();
+vi.mock('../authn/authn-providers.js', async (original) => {
+  const actual = await original<typeof import('../authn/authn-providers.js')>();
   return {
     ...actual,
     browserSessionKey: () => {
@@ -222,7 +222,7 @@ vi.mock('./first-job-approval-proof.js', async (original) => ({
   ...(await original<typeof import('./first-job-approval-proof.js')>()),
   hasVerifiedFirstJobDecision: () => state.verifiedProof,
 }));
-import { mintBrowserSessionToken } from '../authn-providers.js';
+import { mintBrowserSessionToken } from '../authn/authn-providers.js';
 import { firstJobApprovalEffect } from './first-job-approval-proof.js';
 import { readFirstJobRecoveries, terminateFirstJobRequest } from './first-job-recovery.js';
 import { frontDeskExecutionProposal } from './front-desk-execution.js';

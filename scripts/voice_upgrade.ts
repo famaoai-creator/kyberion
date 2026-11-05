@@ -27,7 +27,7 @@ import * as customerResolver from '@agent/core/customer-resolver';
 import { classifyError, formatClassification } from '@agent/core/error-classifier';
 import { getRegisteredEnv } from '@agent/core/env-validator';
 import { pathResolver } from '@agent/core/path-resolver';
-import { probeNativeTts } from '@agent/core/media/native-tts';
+import { probeNativeTts } from '@agent/shared-voice/native-tts';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,

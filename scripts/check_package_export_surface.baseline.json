@@ -1,7 +1,7 @@
 {
   "version": 1,
   "packages": {
-    "libs/core": 1941,
+    "libs/core": 1939,
     "libs/kernel": 4,
     "libs/shared-interaction": 9,
     "libs/shared-media": 75,
@@ -9,6 +9,6 @@
     "libs/shared-ui": 3,
     "libs/shared-video": 21,
     "libs/shared-vision": 9,
-    "libs/shared-voice": 30
+    "libs/shared-voice": 31
   }
 }

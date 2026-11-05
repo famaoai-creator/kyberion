@@ -4,7 +4,7 @@ import { createHmac } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { assertBuiltinOnlyWorkerEventStream } from '../workforce/worker-event-stream.js';
-import { browserSessionKey, verifyBrowserSessionToken } from '../authn-providers.js';
+import { browserSessionKey, verifyBrowserSessionToken } from '../authn/authn-providers.js';
 import { resolveAuthnSurfaceViewerScope } from './surface-authn.js';
 import { resolveOidcLoginConfig } from './oidc-browser-login.js';
 import { resolveMemberByPrincipal } from '../organization/member-registry.js';

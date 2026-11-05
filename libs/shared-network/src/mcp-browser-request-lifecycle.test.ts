@@ -63,7 +63,7 @@ vi.mock('@agent/core/surface/front-desk-execution-contract', async (original) =>
 import {
   mintBrowserSessionToken,
   verifiedBrowserSessionIdentity,
-} from '@agent/core/authn-providers';
+} from '@agent/core/authn/authn-providers';
 import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface/surface-authn';
 import {
   resolveBrowserHumanRequestIdentity,

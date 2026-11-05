@@ -13,7 +13,7 @@ import {
   ProviderTransportError,
   resolveProviderTransport,
   type ProviderTransport,
-} from '../provider-transport.js';
+} from './provider-transport.js';
 
 export interface RemoteProviderFacadeOptions {
   /** Named capability seam the remote side resolves, e.g. 'ocr-provider'. */

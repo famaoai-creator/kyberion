@@ -44,7 +44,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     consumers: ['scripts/video_filter.ts'],
   },
   'cli-provider-bundle': {
-    declaration: 'libs/core/cli-provider-bundle.ts',
+    declaration: 'libs/core/provider/cli-provider-bundle.ts',
     consumers: [
       'libs/core/reasoning/reasoning-cli-provider.ts',
       'libs/core/reasoning/reasoning-bootstrap.ts',
@@ -59,7 +59,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     consumers: ['libs/core/provider/provider-backend-resolver.ts'],
   },
   'provider-transport': {
-    declaration: 'libs/core/provider-transport.ts',
+    declaration: 'libs/core/provider/provider-transport.ts',
     consumers: [
       'libs/core/provider/loopback-transport.ts',
       'libs/core/provider/remote-provider-facade.ts',

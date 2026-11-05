@@ -72,7 +72,7 @@ import {
 } from '@agent/core/secure-io';
 import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
 import { listenNativeSpeech } from '@agent/shared-media/native-speech-listen-bridge';
-import { buildNativeTtsCommand } from '@agent/core/media/native-tts';
+import { buildNativeTtsCommand } from '@agent/shared-voice/native-tts';
 import { normalizeEventScope } from '@agent/core/event-scope';
 import { recordVoiceSample } from '@agent/shared-voice/voice-sample-recorder';
 import { logger } from '@agent/core/core';

@@ -214,6 +214,6 @@ curl -si https://<公開 origin>/api/me | head -3
 
 - [`libs/core/surface/surface-auth-routes.ts`](../../libs/core/surface/surface-auth-routes.ts) — 共通ルート(`/login` `/auth/start` `/auth/callback` `/logout`)
 - [`libs/core/surface/oidc-browser-login.ts`](../../libs/core/surface/oidc-browser-login.ts) — code + PKCE、id_token 検証、member 束縛確認
-- [`libs/core/authn-providers.ts`](../../libs/core/authn-providers.ts) — `browser-session` provider(`kys1.`)
+- [`libs/core/authn/authn-providers.ts`](../../libs/core/authn/authn-providers.ts) — `browser-session` provider(`kys1.`)
 - [CHRONOS_VIEWER_SCOPE_OPERATIONS](./CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md) — viewer scope と token registry
 - [SURFACES](../SURFACES.md) — サーフェスの地図

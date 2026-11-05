@@ -21,8 +21,8 @@ const state = vi.hoisted(() => ({
   rotateKey: false,
   failReadback: false,
 }));
-vi.mock('../authn-providers.js', async (original) => {
-  const actual = await original<typeof import('../authn-providers.js')>();
+vi.mock('../authn/authn-providers.js', async (original) => {
+  const actual = await original<typeof import('../authn/authn-providers.js')>();
   return {
     ...actual,
     browserSessionKey: () => {
@@ -118,8 +118,8 @@ vi.mock('../governance/approval-store.js', async (original) => ({
     return structuredClone(state.record);
   },
 }));
-import { mintBrowserSessionToken } from '../authn-providers.js';
-import * as authnProviders from '../authn-providers.js';
+import { mintBrowserSessionToken } from '../authn/authn-providers.js';
+import * as authnProviders from '../authn/authn-providers.js';
 import type express from 'express';
 import { registerFirstJobRoutes } from '../../../presence/displays/presence-studio/first-job-routes.js';
 import {

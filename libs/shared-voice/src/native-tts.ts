@@ -21,7 +21,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { runExternalOperation } from '../governance/external-operation.js';
+import { runExternalOperation } from '@agent/core/governance/external-operation';
 
 export type Platform = 'darwin' | 'linux' | 'win32';
 

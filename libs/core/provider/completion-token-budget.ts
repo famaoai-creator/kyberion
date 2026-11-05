@@ -11,8 +11,8 @@
  * is unknown the configured max passes through unchanged.
  */
 
-import { estimateTokens } from './foundation/text.js';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { estimateTokens } from '../foundation/text.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 
 export const DEFAULT_SAFETY_MARGIN_TOKENS = 1_024;
 export const DEFAULT_COMPLETION_FLOOR_TOKENS = 1_024;
