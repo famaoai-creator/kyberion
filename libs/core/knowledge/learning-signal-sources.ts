@@ -32,7 +32,7 @@ import {
 import { listQuarantineRecords } from '../security-screen.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { listTaskSessions } from '../task/task-session.js';
-import { delegatedTaskTracePath } from '../delegated-task-observability.js';
+import { systemDelegationTracePaths } from '../delegated-task-observability.js';
 import {
   closedToken,
   daysInWindow,
@@ -319,10 +319,14 @@ export function adfErrorCategory(context: string): string {
   return 'other';
 }
 
+/**
+ * Delegation rows of the system partition and the legacy shared trace only:
+ * tenant partitions are never read here (clusters keep closed tokens).
+ */
 function readDelegationRows(window: LearningSignalWindow): Row[] {
-  return readJsonlRecords(delegatedTaskTracePath()).filter((row) =>
-    inWindow(stringField(row, 'completed_at', 'created_at'), window)
-  );
+  return systemDelegationTracePaths()
+    .flatMap((tracePath) => readJsonlRecords(tracePath))
+    .filter((row) => inWindow(stringField(row, 'completed_at', 'created_at'), window));
 }
 
 export const adfRepairSource: LearningSignalSource = {

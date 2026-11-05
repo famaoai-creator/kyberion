@@ -57,6 +57,27 @@ export const TENANT_LEDGER_ROOT_PATH = 'active/shared/runtime/tenant-ledger';
 export const TENANT_APPROVAL_ROOT_PATH = 'active/shared/runtime/tenant-approvals';
 
 /**
+ * Root of the delegated-task trace and record store
+ * (`libs/core/delegated-task-observability.ts`):
+ * `<root>/system/{delegations.jsonl,records/}` for untenanted delegations and
+ * `<root>/confidential/<tenant>/{delegations.jsonl,records/}` for tenant ones,
+ * read and written as the tenant-bound `delegation_record_store` role.
+ * Registered in storage-layout.ts PARTITIONED_RUNTIME_LEDGER_ROOTS (with the
+ * store role in TENANT_STORE_LEDGER_ROOTS) — not a state root.
+ */
+export const DELEGATION_RECORD_ROOT_PATH = 'active/shared/runtime/delegation-records';
+
+/**
+ * Pre-partition delegation store (shared, tenant-mixed): the append-only trace
+ * (plus its rotated `delegations-YYYYMMDD-HHmmss.jsonl` segments) and the
+ * per-delegation records (`<id>.json`, `child-inbox/<child>.jsonl`). New writes
+ * never land here; readers fall back to it per row attribution and tenant
+ * offboarding scrubs a tenant's rows and records from it.
+ */
+export const LEGACY_DELEGATION_TRACE_PATH = 'active/shared/observability/delegations.jsonl';
+export const LEGACY_DELEGATION_RECORD_DIR = 'active/shared/observability/delegations';
+
+/**
  * The shared inter-process lock directory (foundation/lock-utils.ts LOCK_ROOT);
  * narrow store roles that take a store lock name it from here.
  */
