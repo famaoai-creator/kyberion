@@ -9675,6 +9675,11 @@
         "ja": "現在のスコープを確認",
         "qps-ploc": "⟦Ïñşṗėƈŧ ŧħė ȧƈŧïṽė şƈőṗė ŀőřėɱ ï⟧"
       },
+      "cli_cmd_scope_inspect": {
+        "en": "Inspect asset scope and the current read policy",
+        "ja": "資産スコープと現在の読取ポリシーを確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ȧşşėŧ şƈőṗė ȧñḓ ŧħė ƈůřřėñŧ řėȧḓ ṗőŀïƈẏ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
       "cli_cmd_script_bindings": {
         "en": "Inspect the runtime seam catalog",
         "ja": "ランタイムのシームカタログを確認",

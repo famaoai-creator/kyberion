@@ -166,8 +166,9 @@ G0 の後は、保存配置の移行 S1 → S2 → S3 と、Scope の解決・�
 - `shadow` は管理者と tier の上限だけの観測であり、ロール・broker・Grant・内容検査を含む
   完全な新認可ではない。`agrees` もこの限定した比較結果であり、G1 の切り替え条件を満たした
   証拠とはしない。既存のロール・Grant がより狭ければ不一致は正常に起こる。
-  `planned` の配置は解決しても閲覧上限の許可に使わない。現時点の明示的な呼出元は
-  統合テストであり、本番 guard への配線は行わない。この段階境界を orphan 例外に記録する。
+  `planned` の配置は解決しても閲覧上限の許可に使わない。明示的な呼出元は統合テストと
+  後述の `scope inspect` であり、本番 guard への配線は行わない。実 CLI consumer の追加に伴い、
+  診断 API の暫定 orphan 例外は削除する。
 - 新しい公開 subpath は上記3件のみ（core export baseline 1941 → 1944）。既存 foundation の
   読み込み上限は上げず、新しい型モジュール0・純粋 resolver 2を登録する。
 
@@ -254,6 +255,19 @@ mediation は維持する。再現した問題は失効後の permission 判定�
 汎用 scope module に credential policy を移したりせず、既存の同期寿命を回復する限定的な
 security 修正として、この6箇所だけを独立レビュー付きで更新する。新しい catalog/identity/network
 I/O や公開 subpath は増やさない。例外を workspace-package-layering にも明記する。
+
+### 資産 Scope の CLI 診断（2026-11-06）
+
+既存の `scope` コマンドに `inspect <path> [--json]` を追加する。カタログ上の資産の
+store・location・custody・tier と、既存 `inspectReadPermission` の読取 policy 判定を示す。
+選択中の tier/tenant や対象パスから信頼された ceiling を作らず、解決できた場合も
+`address_only` として比較未実施を明示する。既存の ceiling 付き caller の比較は維持する。
+未解決の legacy/derived 配置やカタログ取得不能も、許可や管理者の推測に置き換えない。
+
+対象は1パスだけとし、選択用 `--tier` / `--tenant` などの追加 flag は検査前に拒否する。
+Scope 設定の保存・変更は行わない。policy の拒否は診断結果なので exit 0、引数不正は exit 2。
+ファイルの存在は判定せず、内容を出力しない。既存 policy inspector による物理 alias や
+security metadata の検査は残し、sensitive-path mediation を含む実 I/O の許可保証とは区別する。
 
 ## 既定で拒否であること
 

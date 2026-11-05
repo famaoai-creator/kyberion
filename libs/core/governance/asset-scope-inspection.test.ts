@@ -20,6 +20,79 @@ const ceiling: AssetReadCeiling = {
 const file = pathResolver.rootResolve('knowledge/confidential/acme/file.json');
 
 describe('asset scope read comparison', () => {
+  it('reports actual catalog attribution without inferring a ceiling', () => {
+    const expected = inspectReadPermission(file);
+    const result = inspectAssetScopeRead(file);
+    expect(result.decision).toEqual(expected);
+    expect(result.shadow).toMatchObject({
+      status: 'address_only',
+      resolution: { status: 'resolved', address: { custody: { kind: 'tenant', ref: 'acme' } } },
+    });
+    expect(result.shadow).not.toHaveProperty('observation');
+    expect(result.shadow).not.toHaveProperty('agrees');
+  });
+
+  it('preserves denied decisions for address-only planned locations without a comparison', () => {
+    const decision = { allowed: false, reason: 'existing denial' };
+    const result = inspectAssetScopeRead(file, undefined, {
+      inspect: () => decision,
+      loadStores: () => [{ ...stores[0], status: 'planned' }],
+    });
+    expect(result.decision).toBe(decision);
+    expect(result.shadow).toMatchObject({
+      status: 'address_only',
+      resolution: { address: { location: 'planned' } },
+    });
+    expect(result.shadow).not.toHaveProperty('observation');
+    expect(result.shadow).not.toHaveProperty('agrees');
+    expect(
+      inspectAssetScopeRead(file, ceiling, {
+        inspect: () => decision,
+        loadStores: () => [{ ...stores[0], status: 'planned' }],
+      }).shadow
+    ).toMatchObject({
+      status: 'compared',
+      observation: { allowed: false, reason: 'planned_location' },
+    });
+  });
+
+  it.each([
+    ['customer/acme/connections/slack.json', 'tier_unresolved'],
+    ['active/missions/public/MSN-X/state.json', 'custody_unresolved'],
+    ['unknown-asset-scope-fixture/file.json', 'unknown_store'],
+  ])('keeps actual unresolved attribution explicit for %s', (relative, reason) => {
+    const result = inspectAssetScopeRead(pathResolver.rootResolve(relative));
+    expect(result.shadow).toMatchObject({ status: 'unresolved', resolution: { reason } });
+  });
+
+  it('does not compare outside-repository and invalid addresses', () => {
+    for (const target of [
+      pathResolver.rootResolve('../outside-asset-scope-fixture.json'),
+      pathResolver.rootResolve('knowledge/confidential/acme/file%2ejson'),
+    ]) {
+      const result = inspectAssetScopeRead(target, undefined, {
+        inspect: () => ({ allowed: false }),
+        loadStores: () => stores,
+      });
+      expect(result.shadow).toMatchObject({
+        status: 'unresolved',
+        resolution: { reason: 'invalid_path' },
+      });
+    }
+  });
+
+  it('preserves address-only decisions when the catalog is unavailable', () => {
+    const decision = { allowed: false, reason: 'existing denial' };
+    expect(
+      inspectAssetScopeRead(file, undefined, {
+        inspect: () => decision,
+        loadStores: () => {
+          throw new Error('unavailable catalog');
+        },
+      })
+    ).toEqual({ decision, shadow: { status: 'unavailable' } });
+  });
+
   it('preserves the real inspector result with the real catalog', () => {
     const expected = inspectReadPermission(file);
     const result = inspectAssetScopeRead(file, ceiling);
