@@ -1,10 +1,17 @@
 import { coreSeamCatalog, createSeam, createSeamLifecycle } from './seam.js';
+import { segmentKeywordTerms } from './locale-normalize.js';
 
 export interface EmbeddingBackend {
   name: string;
   dimensions?: number;
   quality?: 'semantic' | 'approximate' | 'unknown';
   qualityNote?: string;
+  /**
+   * Identity of the vector space for persisted caches (knowledge-index disk
+   * cache). Defaults to `name`; bump it whenever the embedding function
+   * changes so vectors from the old function are never compared with new ones.
+   */
+  cacheKey?: string;
   embed(text: string): Promise<Float32Array>;
   embedBatch(texts: string[]): Promise<Float32Array[]>;
 }
@@ -29,13 +36,23 @@ function hashToken(token: string): number {
   return hash >>> 0;
 }
 
+const HAN_CHAR = /\p{Script=Han}/u;
+
+/**
+ * Hash-embedding tokens. Locale-aware: a spaceless Japanese / Chinese run is
+ * segmented into content words with the shared ICU segmenter
+ * (`segmentKeywordTerms`) instead of hashing the whole sentence as one token,
+ * which made every Japanese text orthogonal to every other. Single kanji are
+ * meaningful and kept; other one-character tokens are dropped as before.
+ */
 function normalizeEmbeddingText(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-    .split(/\s+/)
-    .filter((token) => token.length > 1);
+  return segmentKeywordTerms(text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ')).filter(
+    (token) => token.length > 1 || HAN_CHAR.test(token)
+  );
 }
+
+/** Bumped when `normalizeEmbeddingText` / `embedText` change (cache identity). */
+export const LOCAL_HASH_EMBEDDING_CACHE_KEY = 'local-hash-embedding@2';
 
 function embedText(text: string): Float32Array {
   const vector = new Float32Array(VECTOR_SIZE);
@@ -70,6 +87,7 @@ export function getEmbeddingBackend(): EmbeddingBackend | null {
     name: 'local-hash-embedding',
     quality: 'approximate',
     qualityNote: 'hash-bucket approximation; not real semantic embeddings',
+    cacheKey: LOCAL_HASH_EMBEDDING_CACHE_KEY,
     async embed(text: string): Promise<Float32Array> {
       return embedText(text);
     },

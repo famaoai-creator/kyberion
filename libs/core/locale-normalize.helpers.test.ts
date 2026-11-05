@@ -4,6 +4,7 @@ import {
   localeToBcp47,
   localeUsesWordSpaces,
   pickByLocale,
+  segmentKeywordTerms,
   segmentWords,
 } from './locale-normalize.js';
 
@@ -68,5 +69,20 @@ describe('locale helpers (IT-03)', () => {
   it('degrades safely on malformed locale tags', () => {
     expect(() => segmentWords('hello world', 'not a locale!')).not.toThrow();
     expect(segmentWords('hello world', 'not a locale!')).toEqual(['hello', 'world']);
+  });
+
+  it('derives keyword terms: Latin chunks verbatim, Japanese segmented to content words', () => {
+    expect(segmentKeywordTerms('deploy v1.2 config.json')).toEqual([
+      'deploy',
+      'v1.2',
+      'config.json',
+    ]);
+    // Particles / auxiliaries (の, を, して) are dropped; a single kanji is kept.
+    expect(segmentKeywordTerms('デプロイの手順')).toEqual(['デプロイ', '手順']);
+    expect(segmentKeywordTerms('請求書を作成して')).toEqual(['請求', '書', '作成']);
+    expect(segmentKeywordTerms('Slackに投稿')).toEqual(['Slack', '投稿']);
+    // Nothing but kana left: keep the whole chunk rather than drop the query.
+    expect(segmentKeywordTerms('まとめ')).toEqual(['まとめ']);
+    expect(segmentKeywordTerms('   ')).toEqual([]);
   });
 });

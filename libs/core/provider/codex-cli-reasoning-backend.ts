@@ -52,6 +52,11 @@ import {
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
+import {
+  redactProviderOutputError,
+  redactProviderOutputText,
+  redactProviderOutputValue,
+} from './provider-output-redaction.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { resolveSandboxPolicy, toCodexSandboxPolicy } from '../shell/sandbox-policy.js';
 import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js';
@@ -271,11 +276,16 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
           : runtimeNativeInfo && typeof runtimeNativeInfo === 'object'
             ? { ...(runtimeNativeInfo as Record<string, unknown>) }
             : null;
-      return response.text;
+      if (this.lastHarnessSubagentInfo) {
+        this.lastHarnessSubagentInfo = redactProviderOutputValue(this.lastHarnessSubagentInfo);
+      }
+      return redactProviderOutputText(response.text);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw error;
-      throw new Error(`[SUBAGENT_UNAVAILABLE] Codex app-server harness failed: ${message}`);
+      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw redactProviderOutputError(error);
+      throw redactProviderOutputError(
+        new Error(`[SUBAGENT_UNAVAILABLE] Codex app-server harness failed: ${message}`)
+      );
     } finally {
       release();
     }

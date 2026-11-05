@@ -182,6 +182,9 @@ async function runEgressProbe(
     tier: 'confidential',
     tenant_slug: 'conformance-tenant',
     purpose: 'backend conformance egress probe',
+    // The probe checks that tenant material is held on this host: external
+    // denied, loopback allowed. That is the explicit local_only posture.
+    training_use: 'local_only',
   };
   let externalDenied = false;
   let localAllowed = false;

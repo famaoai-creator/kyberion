@@ -1,6 +1,3 @@
-.management-page {
-  max-width: 64rem;
-}
 .management-editor {
   padding: var(--kb-ui-space-5);
   border: 1px solid var(--kb-ui-border);

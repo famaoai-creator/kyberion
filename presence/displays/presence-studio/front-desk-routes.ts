@@ -285,7 +285,9 @@ export function registerFrontDeskRoutes(app: express.Express): void {
         role,
       }).map((item) => ({
         id: item.id,
-        group_label: catalogT(item.group_key as VocabularyKey, undefined, locale),
+        group_label: item.group_key
+          ? catalogT(item.group_key as VocabularyKey, undefined, locale)
+          : '',
         icon: item.icon,
         scope_query_style: item.scope_query_style,
         label: catalogT(item.label_key as VocabularyKey, undefined, locale),
@@ -294,6 +296,7 @@ export function registerFrontDeskRoutes(app: express.Express): void {
         external: item.external,
         allowed: item.allowed,
         min_role: item.min_role,
+        placement: item.placement ?? 'main',
       }));
       res.setHeader('Cache-Control', 'no-store');
       res.json({

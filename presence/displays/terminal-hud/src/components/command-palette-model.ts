@@ -1,3 +1,4 @@
+import { segmentKeywordTerms } from '@agent/core/locale-normalize';
 import { PANELS, PANEL_LABEL_KEYS, type PanelId } from '../keymap.js';
 import type { I18n } from '../i18n.js';
 
@@ -47,7 +48,9 @@ export function navigationPalette(i18n: I18n): PaletteEntry[] {
 }
 
 export function filterPalette(entries: readonly PaletteEntry[], query: string): PaletteEntry[] {
-  const terms = query.normalize('NFKC').toLocaleLowerCase().trim().split(/\s+/u).filter(Boolean);
+  // Locale-aware terms: a spaceless Japanese query ("接続を管理") matches on its
+  // content words instead of requiring the whole phrase verbatim.
+  const terms = segmentKeywordTerms(query.normalize('NFKC').toLocaleLowerCase().trim());
   return entries.filter((entry) => {
     const searchable = `${entry.category} ${entry.label} ${entry.keywords}`
       .normalize('NFKC')
