@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import {
+  DELEGATION_RECORD_ROOT_PATH,
   PARTITIONED_RUNTIME_STATE_ROOTS,
   TENANT_APPROVAL_ROOT_PATH,
   TENANT_LEDGER_ROOT_PATH,
@@ -221,6 +222,13 @@ export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
    * Untenanted records (and pre-activation tenant requests) stay in the system tree.
    */
   tenant_approvals: TENANT_APPROVAL_ROOT_PATH,
+  /**
+   * Delegated-task audit trace + resumable records
+   * (`libs/core/delegated-task-observability.ts`): `system/` for untenanted
+   * delegations, `confidential/<tenant>/` for tenant ones (instruction, context
+   * and result text), read and written as `delegation_record_store`.
+   */
+  delegations: DELEGATION_RECORD_ROOT_PATH,
 } as const;
 
 /**
@@ -228,7 +236,8 @@ export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
  * tenant-bound store role (`<root>/<tier>/<tenant>/…`, every tier including
  * `public`, which the stores never use but must not leave open). These
  * partitions are authority evidence (hash-chained audit entries, approval
- * decisions), so tier-guard does not let broad runtime defaults or other roles'
+ * decisions) or tenant prose (delegation instructions and results), so
+ * tier-guard does not let broad runtime defaults or other roles'
  * grants write them: only SUDO, a persona grant, or the store role's own grant
  * (bound to that tenant) may. The metrics ledgers are deliberately absent.
  */
@@ -240,6 +249,10 @@ export const TENANT_STORE_LEDGER_ROOTS = {
   tenant_approvals: {
     root: PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals,
     storeRole: 'tenant_approval_store',
+  },
+  delegations: {
+    root: PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations,
+    storeRole: 'delegation_record_store',
   },
 } as const;
 

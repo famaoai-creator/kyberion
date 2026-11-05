@@ -464,9 +464,19 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
   `PHYSICAL_LEGACY_TENANT_STATE_ROOTS` so offboarding still removes leftovers. A store whose current
   layout is already registered and only detects legacy copies for operator-reviewed migration
   (`dot-state-paths.ts`) is a documented `bases` exception instead.
+- Tenant content in a shared observability store (`active/shared/observability/<store>`) has the
+  same defect: tier-guard, backup and offboarding cannot see it. The delegation trace and records
+  moved to the registered ledger root `active/shared/runtime/delegation-records/` (tenant partitions
+  only as the tenant-bound `delegation_record_store` role); their shared legacy copies are
+  read-only, attributed per row (stamp, else mission location), migrated on the next write and
+  scrubbed by tenant offboarding (export, then audited prune / soft-delete). A store that only
+  keeps tenant-free data says so in `tests/fixtures/tenant-observability-store-inventory.json`.
 - Gates: `tests/tenant-runtime-store-registration.test.ts` (every `physicalScopedPath` base under
   `active/shared/runtime/` must be an offboarding `PHYSICAL_*` base; dynamic bases and deliberate
   exceptions go in `tests/fixtures/tenant-runtime-store-allowlist.json` with a reason),
+  `tests/tenant-observability-store-registration.test.ts` (every `active/shared/observability/<store>`
+  a source file names is classified; the unclassified baseline only shrinks; the delegation store
+  stays partitioned and offboarded),
   `storage-layout.test.ts` (protected prefixes), `scope-offboarding.test.ts` (one disposition per
   registered root; the tenant-state purge test), and the store's own partition test (e.g.
   `delegation-idempotency.test.ts`, `generation-cost-settlement.test.ts`).

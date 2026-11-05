@@ -1393,3 +1393,156 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     expect(registryLines()).toHaveLength(4);
   });
 });
+
+describe('tenant offboarding — delegation trace and records (partitioned + legacy shared copies)', () => {
+  const TENANT = 'tenant-alpha';
+  const OTHER = 'tenant-beta';
+  const ROOT = 'active/shared/runtime/delegation-records';
+  const LEGACY_TRACE = 'active/shared/observability/delegations.jsonl';
+  const LEGACY_SEGMENT = 'active/shared/observability/delegations-20261001-010203.jsonl';
+  const LEGACY_RECORDS = 'active/shared/observability/delegations';
+  const TENANT_MISSION = 'MSN-ALPHA-DELEGATION';
+
+  function writeLines(repoRelative: string, rows: unknown[]): void {
+    fs.mkdirSync(path.dirname(abs(repoRelative)), { recursive: true });
+    fs.writeFileSync(abs(repoRelative), `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
+  }
+
+  function lines(repoRelative: string): Array<Record<string, unknown>> {
+    return fs
+      .readFileSync(abs(repoRelative), 'utf8')
+      .split('\n')
+      .filter((line) => line.trim())
+      .map((line) => JSON.parse(line));
+  }
+
+  function seed(): void {
+    for (const tenant of [TENANT, OTHER]) {
+      writeJson(abs(`${ROOT}/confidential/${tenant}/records/d-${tenant}.json`), {
+        delegation_id: `d-${tenant}`,
+        tenant_slug: tenant,
+        instruction: `secret instruction of ${tenant}`,
+      });
+      writeLines(`${ROOT}/confidential/${tenant}/delegations.jsonl`, [
+        { trace_id: `d-${tenant}`, tenant_slug: tenant, instruction: 'x' },
+      ]);
+    }
+    writeJson(abs(`${ROOT}/system/records/d-system.json`), { delegation_id: 'd-system' });
+    // The tenant's (partition-layout) mission locates its legacy rows.
+    writeJson(abs(`active/missions/confidential/${TENANT}/${TENANT_MISSION}/mission-state.json`), {
+      mission_id: TENANT_MISSION,
+    });
+    writeLines(LEGACY_TRACE, [
+      { trace_id: 'l-1', mission_id: TENANT_MISSION, instruction: 'alpha prose' },
+      { trace_id: 'l-2', mission_id: 'MSN-BETA-ONLY', instruction: 'beta prose' },
+      { trace_id: 'l-3', instruction: 'unattributed prose' },
+      { trace_id: 'l-4', tenant_slug: TENANT, instruction: 'stamped alpha prose' },
+    ]);
+    writeLines(LEGACY_SEGMENT, [
+      { trace_id: 'l-5', mission_id: TENANT_MISSION.toLowerCase(), instruction: 'older alpha' },
+      { trace_id: 'l-6', instruction: 'older unattributed' },
+    ]);
+    writeJson(abs(`${LEGACY_RECORDS}/l-1.json`), {
+      delegation_id: 'l-1',
+      mission_id: TENANT_MISSION,
+      child_session_id: 'child-alpha',
+    });
+    writeLines(`${LEGACY_RECORDS}/child-inbox/child-alpha.jsonl`, [{ text: 'alpha follow-up' }]);
+    writeJson(abs(`${LEGACY_RECORDS}/l-2.json`), {
+      delegation_id: 'l-2',
+      mission_id: 'MSN-BETA-ONLY',
+    });
+    writeJson(abs(`${LEGACY_RECORDS}/l-3.json`), { delegation_id: 'l-3' });
+  }
+
+  it('plans the tenant partition and its legacy records/rows, never another tenant or the system partition', () => {
+    seed();
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.status).toBe('dry_run');
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining([
+        { path: `${ROOT}/confidential/${TENANT}`, kind: 'tenant_delegations' },
+        { path: `${LEGACY_RECORDS}/l-1.json`, kind: 'delegation_legacy_record' },
+        {
+          path: `${LEGACY_RECORDS}/child-inbox/child-alpha.jsonl`,
+          kind: 'delegation_legacy_record',
+        },
+      ])
+    );
+    const paths = dryRun.targets.map((target) => target.path);
+    expect(paths).not.toContain(`${ROOT}/confidential/${OTHER}`);
+    expect(paths).not.toContain(`${ROOT}/system`);
+    expect(paths).not.toContain(`${LEGACY_RECORDS}/l-2.json`);
+    expect(paths).not.toContain(`${LEGACY_RECORDS}/l-3.json`);
+    expect(dryRun.delegations_legacy).toEqual({ matched: 3, removed: 0 });
+    // Dry run writes nothing.
+    expect(lines(LEGACY_TRACE)).toHaveLength(4);
+    expect(TENANT_RUNTIME_PARTITION_TARGET_KINDS.delegations).toBe('tenant_delegations');
+  });
+
+  it('exports, then removes the partition, the legacy records and the legacy trace rows (audited)', () => {
+    seed();
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-11-05T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(result.verification).toMatchObject({ clean: true });
+    expect(fs.existsSync(abs(`${ROOT}/confidential/${TENANT}`))).toBe(false);
+    expect(fs.existsSync(abs(`${ROOT}/confidential/${OTHER}/records/d-${OTHER}.json`))).toBe(true);
+    expect(fs.existsSync(abs(`${ROOT}/system/records/d-system.json`))).toBe(true);
+    expect(fs.existsSync(abs(`${LEGACY_RECORDS}/l-1.json`))).toBe(false);
+    expect(fs.existsSync(abs(`${LEGACY_RECORDS}/child-inbox/child-alpha.jsonl`))).toBe(false);
+    expect(fs.existsSync(abs(`${LEGACY_RECORDS}/l-2.json`))).toBe(true);
+    expect(fs.existsSync(abs(`${LEGACY_RECORDS}/l-3.json`))).toBe(true);
+    // Soft-deleted (restorable), not destroyed.
+    expect(fs.existsSync(trashPathOf(`${LEGACY_RECORDS}/l-1.json`))).toBe(true);
+
+    expect(lines(LEGACY_TRACE).map((row) => row.trace_id)).toEqual(['l-2', 'l-3']);
+    expect(lines(LEGACY_SEGMENT).map((row) => row.trace_id)).toEqual(['l-6']);
+    const exportDir = `${result.export_path}/delegations-legacy-removed`;
+    expect(lines(`${exportDir}/delegations.jsonl`).map((row) => row.trace_id)).toEqual([
+      'l-1',
+      'l-4',
+    ]);
+    expect(
+      lines(`${exportDir}/delegations-20261001-010203.jsonl`).map((row) => row.trace_id)
+    ).toEqual(['l-5']);
+    expect(fs.existsSync(abs(`${result.export_path}/${ROOT}/confidential/${TENANT}`))).toBe(true);
+    expect(result.delegations_legacy).toMatchObject({ matched: 3, removed: 3 });
+
+    const prunes = auditEvents().filter(
+      (event) => event.event === 'SCOPE_OFFBOARD_DELEGATION_TRACE_PRUNE'
+    );
+    expect(prunes.map((event) => [event.path, event.removed_lines, event.kept_lines])).toEqual([
+      [LEGACY_SEGMENT, 1, 1],
+      [LEGACY_TRACE, 2, 2],
+    ]);
+    expect(prunes[0]).toMatchObject({ approved_by: 'operator@example', scope_id: TENANT });
+    expect(
+      auditEvents()
+        .filter((event) => event.event === 'SCOPE_OFFBOARD_SOFT_DELETE')
+        .map((event) => event.kind)
+    ).toEqual(expect.arrayContaining(['tenant_delegations', 'delegation_legacy_record']));
+  });
+
+  it('reports legacy delegation rows and records still attributed to the tenant as leftovers', () => {
+    seed();
+    const verification = verifyScopeOffboarded(
+      'tenant',
+      TENANT,
+      {},
+      { legacyMissionIds: new Set([TENANT_MISSION]) }
+    );
+    expect(verification.clean).toBe(false);
+    expect(verification.leftovers).toEqual(
+      expect.arrayContaining([
+        `${LEGACY_TRACE} (2 legacy delegation row(s) of '${TENANT}')`,
+        `${LEGACY_RECORDS}/l-1.json`,
+      ])
+    );
+  });
+});

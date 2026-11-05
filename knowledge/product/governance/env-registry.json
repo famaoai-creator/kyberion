@@ -1336,7 +1336,7 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "Directory for durable delegation task records; keep it within governed shared runtime storage.",
+      "description": "Test/runtime override of the partitioned delegation store root (default active/shared/runtime/delegation-records): system/ and confidential/<tenant>/ partitions, plus a hermetic legacy/ fallback directory, live under it; keep it within governed shared runtime storage.",
       "documented": true
     },
     {
@@ -1352,7 +1352,7 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "Override path for delegated-task trace records used for observability and replay; keep it in governed runtime storage.",
+      "description": "Test override: one delegated-task trace file used for every scope (disables trace partitioning; records still follow the store root); keep it in governed runtime storage.",
       "documented": true
     },
     {

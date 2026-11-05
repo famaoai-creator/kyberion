@@ -70,6 +70,8 @@
       "active/shared/runtime/tenant-ledger/confidential/",
       "active/shared/runtime/tenant-approvals/personal/",
       "active/shared/runtime/tenant-approvals/confidential/",
+      "active/shared/runtime/delegation-records/personal/",
+      "active/shared/runtime/delegation-records/confidential/",
       "active/shared/runtime/hearing/personal/",
       "active/shared/runtime/hearing/confidential/",
       "active/shared/runtime/discussion-create-requests/personal/",
@@ -559,7 +561,7 @@
         "active/shared/runtime/terminal/",
         "active/audit/",
         "active/shared/observability/ops-alerts.jsonl",
-        "active/shared/observability/delegations.jsonl"
+        "active/shared/runtime/delegation-records/system/"
       ],
       "allow_write": [
         "active/shared/coordination/chronos/",
@@ -570,7 +572,7 @@
         "active/shared/runtime/terminal/",
         "active/audit/",
         "active/shared/observability/ops-alerts.jsonl",
-        "active/shared/observability/delegations.jsonl"
+        "active/shared/runtime/delegation-records/system/"
       ]
     },
     "chronos_operator": {
@@ -728,6 +730,10 @@
         "active/shared/runtime/tenant-ledger/personal/${KYBERION_TENANT}/",
         "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/"
       ]
+    },
+    "delegation_record_store": {
+      "allow_read": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"],
+      "allow_write": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"]
     },
     "tenant_approval_store": {
       "allow_read": [
