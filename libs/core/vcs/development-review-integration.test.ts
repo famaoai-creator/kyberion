@@ -88,6 +88,8 @@ const remote: VcsCommandRunner = (_command, args) => {
   return { status: 0, stdout: JSON.stringify(value), stderr: '' };
 };
 const run = <T>(body: () => T) => authority.withExecutionContext('mission_controller', body);
+const runAsync = <T>(body: () => Promise<T>) =>
+  authority.withExecutionContextAsync('mission_controller', body);
 beforeAll(async () => {
   seedFirstJobTestRoot(originalRoot, root);
   const manifest = 'libs/actuators/vcs-actuator/manifest.json';
@@ -120,7 +122,7 @@ beforeAll(async () => {
   coordination.setWorkCoordinationNamespace('development-review-' + randomUUID());
 }, 60000);
 beforeEach(() =>
-  run(() => {
+  runAsync(async () => {
     coordination.clearWorkCoordinationStore();
     missionPath = resolver.pathResolver.missionDir(missionId, 'public');
     io.safeMkdir(path.join(missionPath, 'deliverables'), { recursive: true });
@@ -156,7 +158,7 @@ beforeEach(() =>
         work_shape: 'improvement_experiment',
       },
     });
-    const actualCi = proof.readVcsDevelopmentCiProof(revision, { cwd: root }, remote);
+    const actualCi = await proof.readVcsDevelopmentCiProof(revision, { cwd: root }, remote);
     expect(actualCi.state).toBe('success');
     Object.assign(ci, actualCi);
     const manifestPath = path.join(missionPath, 'deliverables/revision.json');
@@ -226,10 +228,11 @@ afterAll(() => {
 });
 describe('canonical prepared WorkItem review admission', () => {
   it('submits a verified promotion without the flag rejected by merge queues', () =>
-    run(() => {
+    runAsync(async () => {
       const publication = vi.fn(() => ({ status: 0, stdout: '', stderr: '' }));
       expect(
-        reader.runPreparedVcsDevelopment({ ...input, dryRun: false }, publication, remote).status
+        (await reader.runPreparedVcsDevelopment({ ...input, dryRun: false }, publication, remote))
+          .status
       ).toBe('queued');
       expect(publication).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -243,10 +246,11 @@ describe('canonical prepared WorkItem review admission', () => {
       );
     }));
   it('admits the real default prepared host using canonical typed transport and stored independent review', () =>
-    run(() => {
+    runAsync(async () => {
       const publication = vi.fn(() => ({ status: 0, stdout: '', stderr: '' }));
       expect(
-        reader.runPreparedVcsDevelopment({ ...input, dryRun: true }, publication, remote).status
+        (await reader.runPreparedVcsDevelopment({ ...input, dryRun: true }, publication, remote))
+          .status
       ).toBe('ready');
       expect(publication).not.toHaveBeenCalled();
     }));
@@ -277,13 +281,15 @@ describe('canonical prepared WorkItem review admission', () => {
       })
   );
   it('never reaches publication from strict mode even with an otherwise valid stored review', () =>
-    run(() => {
+    runAsync(async () => {
       const publication = vi.fn(() => ({ status: 0, stdout: '', stderr: '' }));
       expect(
-        reader.runPreparedVcsDevelopment(
-          { ...input, dryRun: false, independencePolicy: 'authenticated_execution' },
-          publication,
-          remote
+        (
+          await reader.runPreparedVcsDevelopment(
+            { ...input, dryRun: false, independencePolicy: 'authenticated_execution' },
+            publication,
+            remote
+          )
         ).status
       ).toBe('review_required');
       expect(publication).not.toHaveBeenCalled();

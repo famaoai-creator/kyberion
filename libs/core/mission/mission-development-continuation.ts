@@ -106,12 +106,30 @@ export interface MissionDevelopmentDeps {
     head: string;
     limit: number;
   }) => PrListEntry[] | Promise<PrListEntry[]>;
-  pr?: typeof readVcsDevelopmentPr;
-  ci?: typeof readVcsDevelopmentCiProof;
-  repository?: typeof readVcsDevelopmentRepository;
+  pr?: (
+    ...args: Parameters<typeof readVcsDevelopmentPr>
+  ) => Awaited<ReturnType<typeof readVcsDevelopmentPr>> | ReturnType<typeof readVcsDevelopmentPr>;
+  ci?: (
+    ...args: Parameters<typeof readVcsDevelopmentCiProof>
+  ) =>
+    | Awaited<ReturnType<typeof readVcsDevelopmentCiProof>>
+    | ReturnType<typeof readVcsDevelopmentCiProof>;
+  repository?: (
+    ...args: Parameters<typeof readVcsDevelopmentRepository>
+  ) =>
+    | Awaited<ReturnType<typeof readVcsDevelopmentRepository>>
+    | ReturnType<typeof readVcsDevelopmentRepository>;
   review?: typeof verifyPreparedWorkItemReview;
-  reconcile?: typeof runPreparedVcsDevelopment;
-  publish?: (mutation: VcsHostMutation) => ReturnType<typeof runVcsMutationWithWorktreeGovernance>;
+  reconcile?: (
+    ...args: Parameters<typeof runPreparedVcsDevelopment>
+  ) =>
+    | Awaited<ReturnType<typeof runPreparedVcsDevelopment>>
+    | ReturnType<typeof runPreparedVcsDevelopment>;
+  publish?: (
+    mutation: VcsHostMutation
+  ) =>
+    | Awaited<ReturnType<typeof runVcsMutationWithWorktreeGovernance>>
+    | ReturnType<typeof runVcsMutationWithWorktreeGovernance>;
   git?: typeof gitRun;
   missionPath?: typeof findMissionPath;
   workspace?: typeof prepareMissionDevelopmentWorkspace;
@@ -170,7 +188,10 @@ export async function advanceMissionDevelopment(
         const dir = missionPathOrNull(deps.missionPath ?? findMissionPath, input.missionId);
         if (!dir) throw new Error('Development mission directory missing');
         let cwd = path.dirname(assertSafeRepositoryPath(pathResolver.rootResolve('package.json')));
-        if ((deps.repository ?? readVcsDevelopmentRepository)({ cwd }).url !== spec.repository_url)
+        if (
+          (await (deps.repository ?? readVcsDevelopmentRepository)({ cwd })).url !==
+          spec.repository_url
+        )
           throw new Error('Development repository differs from the reviewed plan');
         if (
           !/^evidence\/[A-Za-z0-9][A-Za-z0-9._/-]*\.md$/u.test(spec.body_file) ||
@@ -429,7 +450,7 @@ export async function advanceMissionDevelopment(
           );
         const head = read(['rev-parse', 'HEAD']);
         if (!/^[a-f0-9]{40,64}$/iu.test(head)) throw new Error('Invalid development commit');
-        const repository = (deps.repository ?? readVcsDevelopmentRepository)({ cwd });
+        const repository = await (deps.repository ?? readVcsDevelopmentRepository)({ cwd });
         if (repository.url !== spec.repository_url)
           throw new Error('Development repository differs from the reviewed plan');
         const refs = progress.pr_number
@@ -451,11 +472,11 @@ export async function advanceMissionDevelopment(
               vcsHostInvocationId(mutation),
               () => {}
             ));
-        const effect = (mutation: VcsHostMutation) => {
+        const effect = async (mutation: VcsHostMutation) => {
           assertChild();
           let published;
           try {
-            published = publish(mutation);
+            published = await publish(mutation);
           } catch (error) {
             if (error instanceof ExternalOperationApprovalRequired) {
               progress.pending_effect = undefined;
@@ -477,7 +498,7 @@ export async function advanceMissionDevelopment(
           if (progress.pushed_head !== head) {
             progress.pending_effect = 'push';
             save();
-            effect({
+            await effect({
               operation: 'push',
               params: { cwd, remote: 'origin', ref: branch, setUpstream: true },
             });
@@ -512,7 +533,7 @@ export async function advanceMissionDevelopment(
           }
           progress.pending_effect = 'pr_create';
           save();
-          effect({
+          await effect({
             operation: 'pr_create',
             params: { cwd, title: spec.title, bodyFile, head: branch, base: 'main' },
           });
@@ -524,7 +545,7 @@ export async function advanceMissionDevelopment(
           );
         }
         const ref = String(progress.pr_number);
-        const pr = (deps.pr ?? readVcsDevelopmentPr)(ref, { cwd });
+        const pr = await (deps.pr ?? readVcsDevelopmentPr)(ref, { cwd });
         if (
           pr.repository !== spec.repository_url ||
           pr.headBranch !== branch ||
@@ -536,7 +557,7 @@ export async function advanceMissionDevelopment(
             return result('blocked', 'Remote revision differs or prior push is uncertain');
           progress.pending_effect = 'push';
           save();
-          effect({
+          await effect({
             operation: 'push',
             params: { cwd, remote: 'origin', ref: branch, setUpstream: true },
           });
@@ -548,7 +569,7 @@ export async function advanceMissionDevelopment(
             'Repaired revision pushed; current CI and independent review must run again'
           );
         }
-        const ci = (deps.ci ?? readVcsDevelopmentCiProof)(pr, { cwd });
+        const ci = await (deps.ci ?? readVcsDevelopmentCiProof)(pr, { cwd });
         if (ci.state === 'pending')
           return result('running', 'Waiting for required CI; no repair attempt consumed');
         if (ci.state === 'failure') {
@@ -767,10 +788,13 @@ export async function advanceMissionDevelopment(
           );
         }
         assertChild();
-        const verified = (deps.reconcile ?? runPreparedVcsDevelopment)(prepared, (mutation) => {
-          assertChild();
-          return publish(mutation);
-        });
+        const verified = await (deps.reconcile ?? runPreparedVcsDevelopment)(
+          prepared,
+          (mutation) => {
+            assertChild();
+            return publish(mutation);
+          }
+        );
         check();
         if (
           verified.status === 'merged' &&

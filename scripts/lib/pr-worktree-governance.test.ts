@@ -41,12 +41,12 @@ const run: GitRunner = (args, cwd) => {
 };
 
 describe('PR governance root continuity', () => {
-  it('uses the primary checkout for a secondary worktree of the same repository', () => {
+  it('uses the primary checkout for a secondary worktree of the same repository', async () => {
     expect(resolvePrGovernanceRoot(current, run)).toBe(installation);
     expect(resolvePrGovernanceRoot(installation, run)).toBe(installation);
   });
 
-  it('refuses an installation whose Git common directory differs', () => {
+  it('refuses an installation whose Git common directory differs', async () => {
     const mismatch: GitRunner = (args, cwd) =>
       args.includes('--git-common-dir') && cwd === installation
         ? { status: 0, stdout: '/foreign/.git', stderr: '' }
@@ -54,7 +54,7 @@ describe('PR governance root continuity', () => {
     expect(() => resolvePrGovernanceRoot(current, mismatch)).toThrow(/different repository/);
   });
 
-  it('retains local behavior for bare/separate-git-dir layouts and fails closed on missing Git', () => {
+  it('retains local behavior for bare/separate-git-dir layouts and fails closed on missing Git', async () => {
     expect(
       resolvePrGovernanceRoot(current, () => ({
         status: 0,
@@ -67,7 +67,7 @@ describe('PR governance root continuity', () => {
     ).toThrow(/Cannot identify repository/);
   });
 
-  it('preserves protected body provenance when freezing a worktree file', () => {
+  it('preserves protected body provenance when freezing a worktree file', async () => {
     expect(publicationBodySourceTier(bodyFile)).toBe('protected_or_unknown');
     expect(
       publicationBodySourceTier('knowledge/public/procedures/system/github-pr-management.md')
@@ -76,11 +76,13 @@ describe('PR governance root continuity', () => {
     expect(() => publicationBodySourceTier('../outside.md')).toThrow();
   });
 
-  it('never discovers a live installation implicitly in a Vitest process', () => {
+  it('never discovers a live installation implicitly in a Vitest process', async () => {
     const publication = { title: 'fix(ci): fixture', head: 'work', base: 'main' };
     const receipt = { status: 0, stdout: 'fixture', stderr: '' };
     mocks.local.mockReturnValue(receipt);
-    expect(publishWithWorktreeGovernance(publication, 'invocation', () => undefined)).toBe(receipt);
+    await expect(
+      publishWithWorktreeGovernance(publication, 'invocation', () => undefined)
+    ).resolves.toBe(receipt);
     expect(mocks.local).toHaveBeenCalledWith(
       { operation: 'pr_create', params: publication },
       'invocation',
@@ -90,25 +92,25 @@ describe('PR governance root continuity', () => {
 
   it.each(['KYBERION_SUDO', 'KYBERION_SUDO_SCOPE'])(
     'keeps temporary %s authority in its original checkout',
-    (key) => {
+    async (key) => {
       vi.stubEnv(key, key === 'KYBERION_SUDO' ? 'true' : 'all');
       const receipt = { status: 0, stdout: 'fixture', stderr: '' };
       mocks.local.mockReturnValue(receipt);
       const transport = vi.fn();
-      expect(
+      await expect(
         publishWithWorktreeGovernance(
           { title: 'fix(vcs): elevated scope' },
           'stable',
           () => undefined,
           { governanceRoot: installation, gitRunner: run, transport }
         )
-      ).toBe(receipt);
+      ).resolves.toBe(receipt);
       expect(transport).not.toHaveBeenCalled();
     }
   );
 
-  it('rejects prototype-bearing data from the canonical child', () => {
-    expect(() =>
+  it('rejects prototype-bearing data from the canonical child', async () => {
+    await expect(
       publishWithWorktreeGovernance({ title: 'fix(vcs): fixture' }, 'stable', () => undefined, {
         governanceRoot: installation,
         gitRunner: run,
@@ -119,10 +121,10 @@ describe('PR governance root continuity', () => {
             'KYBERION_PR_GOVERNANCE_RESULT:{"ok":true,"result":{"status":0,"__proto__":{"polluted":true}}}\n',
         }),
       })
-    ).toThrow(/dangerous JSON key/);
+    ).rejects.toThrow(/dangerous JSON key/);
   });
 
-  it('transports frozen content as data, keeps credentials out of stdin, and surfaces the canonical human command', () => {
+  it('transports frozen content as data, keeps credentials out of stdin, and surfaces the canonical human command', async () => {
     const print = vi.fn();
     const transport = vi.fn(({ payload, env, root }) => {
       const input = JSON.parse(payload);
@@ -154,7 +156,7 @@ describe('PR governance root continuity', () => {
           '\n',
       };
     });
-    expect(() =>
+    await expect(
       publishWithWorktreeGovernance(
         {
           title: 'fix(pr): title',
@@ -167,12 +169,12 @@ describe('PR governance root continuity', () => {
         print,
         { governanceRoot: installation, gitRunner: run, transport }
       )
-    ).toThrow(/EXTERNAL_APPROVAL_REQUIRED/);
+    ).rejects.toThrow(/EXTERNAL_APPROVAL_REQUIRED/);
     expect(print).toHaveBeenCalledWith(`Approve at ${installation}: apr-1`);
     expect(transport).toHaveBeenCalledTimes(1);
   });
 
-  it('returns the child receipt and refuses a missing/failed child response without a retry', () => {
+  it('returns the child receipt and refuses a missing/failed child response without a retry', async () => {
     const receipt = { status: 0, stdout: 'https://github.com/fixture/repo/pull/1', stderr: '' };
     const transport = vi.fn(() => ({
       status: 0,
@@ -180,21 +182,21 @@ describe('PR governance root continuity', () => {
       stdout:
         'KYBERION_PR_GOVERNANCE_RESULT:' + JSON.stringify({ ok: true, result: receipt }) + '\n',
     }));
-    expect(
+    await expect(
       publishWithWorktreeGovernance({ title: 'fix(pr): fixture' }, 'stable', () => undefined, {
         governanceRoot: installation,
         gitRunner: run,
         transport,
       })
-    ).toEqual(receipt);
+    ).resolves.toEqual(receipt);
     const unavailable = vi.fn(() => ({ status: 1, stdout: '', stderr: 'unavailable' }));
-    expect(() =>
+    await expect(
       publishWithWorktreeGovernance({ title: 'fix(pr): fixture' }, 'stable', () => undefined, {
         governanceRoot: installation,
         gitRunner: run,
         transport: unavailable,
       })
-    ).toThrow(/Verify prior publication/);
+    ).rejects.toThrow(/Verify prior publication/);
     expect(unavailable).toHaveBeenCalledTimes(1);
   });
 });
