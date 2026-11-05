@@ -167,7 +167,7 @@ function harness(
   const files = new Map<string, string>();
   const { backend, seen } = stubSessionBackend(behaviour, files);
   const workspace = (): LiveScenarioWorkspace => ({
-    path: '/scratch/ws-1',
+    path: '/fake-workspace/ws-1',
     release: () => seen.events.push('released'),
   });
   const run = () =>
@@ -373,7 +373,7 @@ describe('backend live scenarios (MSN-HARNESS-ADOPT R1)', () => {
       turnTimeoutMs: 1_000,
       abortTimeoutMs: 50,
       abortStartDelayMs: 1,
-      createWorkspace: () => ({ path: '/scratch/ws-3', release: () => {} }),
+      createWorkspace: () => ({ path: '/fake-workspace/ws-3', release: () => {} }),
       readFile: (file) => files.get(file),
     });
     const abort = outcome(record, 'abort');
@@ -413,7 +413,7 @@ describe('backend live scenarios (MSN-HARNESS-ADOPT R1)', () => {
       abortTimeoutMs: 50,
       abortStartDelayMs: 1,
       retries: 0,
-      createWorkspace: () => ({ path: '/scratch/ws-2', release: () => {} }),
+      createWorkspace: () => ({ path: '/fake-workspace/ws-2', release: () => {} }),
       readFile: (file) => files.get(file),
       // The chain fails over to codex-cli for the follow-up turn only.
       servedMode: () => (seen.lastPrompt.includes('M2-') ? 'codex-cli' : 'claude-cli'),
