@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { NeedsYouItem } from '@agent/core/surface/needs-you';
-import { customerDecisionCardHref, resolveInboxAnchor } from './needs-you-card';
+import { resolveIaRedirect } from '../../lib/ia-routes';
+import { learningReviewHref } from '../../lib/ops/knowledge-learning-client';
+import { customerDecisionCardHref, inboxLandingHash, resolveInboxAnchor } from './needs-you-card';
 
 function approvalItem(id: string, group: NeedsYouItem[] = []): NeedsYouItem {
   return {
@@ -47,5 +49,26 @@ describe('customerDecisionCardHref (review H2 / UX-M1)', () => {
   it("opens the tenant's customer-decision card on 組織", () => {
     expect(customerDecisionCardHref('famao-ai')).toBe('/org?tenant=famao-ai#customer-decisions');
     expect(customerDecisionCardHref()).toBe('/org#customer-decisions');
+  });
+});
+
+describe('inboxLandingHash (?request= deep links)', () => {
+  it('prefers the hash, else targets the approval named by ?request=', () => {
+    expect(inboxLandingHash('#inbox-x', '?request=APR-1')).toBe('#inbox-x');
+    expect(inboxLandingHash('', '?reason=approval&request=APR%201&mission=M-1')).toBe(
+      '#decide-approval-APR%201'
+    );
+    expect(inboxLandingHash('', '?reason=approval')).toBe('');
+  });
+
+  it('lands a learning-review link on its approval card after the /ops redirect', () => {
+    const href = learningReviewHref('terminal:req-42', 'candidate-key', 'famao-ai')!;
+    const [path, query] = href.split('?');
+    const redirected = resolveIaRedirect(path, query)!;
+    expect(redirected.startsWith('/inbox?')).toBe(true);
+    const hash = inboxLandingHash('', redirected.slice('/inbox'.length));
+    expect(resolveInboxAnchor([approvalItem('req-42')], new Set(), hash)).toEqual({
+      scrollTo: 'decide-approval-req-42',
+    });
   });
 });
