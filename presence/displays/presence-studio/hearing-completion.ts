@@ -51,7 +51,7 @@ function completionHref(
   kind: HearingCompletion['kind'],
   viewer: PresenceStudioViewerContext
 ): string | undefined {
-  const item = resolveFrontDeskDestination(kind === 'mission' ? 'decide' : 'progress', {
+  const item = resolveFrontDeskDestination(kind === 'mission' ? 'inbox' : 'progress', {
     currentSurface: 'presence-studio',
     urls: readFrontDeskSurfaceUrls(),
     role: frontDeskRoleFromViewerScope(toFrontDeskViewerScope(viewer)),

@@ -166,6 +166,7 @@
   --kb-ui-space-5: 24px;
   --kb-ui-space-6: 32px;
   --kb-ui-space-7: 48px;
+  --kb-ui-space-8: 64px;
   --kb-ui-font-sans: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
   --kb-ui-font-mono: 'JetBrains Mono', monospace;
   --kb-ui-font-size-xs: 12px;
@@ -1770,7 +1771,6 @@ body {
   outline: 2px solid var(--kb-ui-focus-ring);
   outline-offset: 2px;
 }
-
 
 /* Tenant › organization › project scope, compacted under the title. */
 .chronos-scope {

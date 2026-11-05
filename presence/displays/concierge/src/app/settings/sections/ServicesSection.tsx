@@ -9,7 +9,6 @@ import type { ConciergeLocale } from '../../../lib/i18n';
 import type { Setup } from '../../../lib/settings-types';
 import { groupConnections, type ConnectionViewItem } from '../../../lib/connection-view';
 import { OperatorServiceRegistrationPanel } from './OperatorServiceRegistrationPanel';
-import { ReasoningSection } from './ReasoningSection';
 import { ServiceCatalogPane } from './ServiceCatalogPane';
 import { FormScope, type SettingsTranslate } from './form-scope';
 
@@ -142,7 +141,6 @@ export function ServicesSection({
           </div>
         </SettingsGroup>
       </FormScope>
-      <ReasoningSection t={t} />
       <ServiceCatalogPane
         t={t}
         busy={busy}

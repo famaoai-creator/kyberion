@@ -3,7 +3,12 @@ import { validateReasoningEgress } from '../context-security-scope.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
 import { loadMissionTeamPlan } from './mission-team-plan-composer.js';
 import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
-import { withReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
+import {
+  isReasoningEgressDenial,
+  reasoningEgressDenialNext,
+  withReasoningPayloadScope,
+  type ReasoningPayloadScope,
+} from '../reasoning/reasoning-egress-scope.js';
 import type { ReasoningParticipant } from '../reasoning/reasoning-participant.js';
 import type { MissionTeamAssignment } from '../organization/team-role-assignment-selection.js';
 
@@ -109,7 +114,15 @@ export interface AdvisoryOpinion {
 export interface MissionAdvisoryConsultation {
   mission_id: string;
   topic: string;
-  status: 'completed' | 'no_panel' | 'mission_plan_not_found' | 'backend_unavailable';
+  status:
+    | 'completed'
+    | 'no_panel'
+    | 'mission_plan_not_found'
+    | 'backend_unavailable'
+    /** Every advisor call was refused by egress policy, not by a backend fault. */
+    | 'egress_denied';
+  /** Present when `status` is `egress_denied`: the operator step that would unblock it. */
+  egress_next?: string;
   advisors: Array<Pick<MissionAdvisor, 'team_role' | 'agent_id' | 'staffing_state'>>;
   opinions: AdvisoryOpinion[];
   /** Opinions that survived the panel's own critique, in panel order. */
@@ -202,12 +215,20 @@ export async function consultMissionAdvisors(input: {
   }
 
   const opinions: AdvisoryOpinion[] = [];
-  const payloadScope = {
-    tier: plan.tier as 'personal' | 'confidential' | 'public',
+  const tier = plan.tier as ReasoningPayloadScope['tier'];
+  // Topic, question and context are the mission's own working material:
+  // tenant-scoped, so they may reach a provider the tenant attested as
+  // no-training. Personal-tier missions stay on this host.
+  const payloadScope: ReasoningPayloadScope = {
+    tier,
     ...(plan.tenant_slug ? { tenant_slug: plan.tenant_slug } : {}),
     purpose: `mission advisory:${input.topic}`,
     attachment_count: 0,
-  } as const;
+    training_use:
+      tier === 'public' ? 'training_eligible' : tier === 'personal' ? 'local_only' : 'no_training',
+  };
+  let egressDenials = 0;
+  let egressNext: string | undefined;
   for (const advisor of eligiblePanel) {
     try {
       const answer = await withReasoningPayloadScope(payloadScope, () =>
@@ -229,6 +250,10 @@ export async function consultMissionAdvisors(input: {
         survived: true,
       });
     } catch (error) {
+      if (isReasoningEgressDenial(error)) {
+        egressDenials += 1;
+        egressNext ??= reasoningEgressDenialNext(error);
+      }
       logger.warn(
         `[advisory] ${missionId}: ${advisor.team_role} did not answer: ${
           error instanceof Error ? error.message : String(error)
@@ -237,6 +262,16 @@ export async function consultMissionAdvisors(input: {
     }
   }
   if (opinions.length === 0) {
+    if (egressDenials > 0 && egressDenials === eligiblePanel.length) {
+      return {
+        ...base,
+        status: 'egress_denied',
+        egress_next:
+          egressNext ??
+          `next: attest the tenant via 'pnpm onboarding llm attest --tenant ${plan.tenant_slug ?? '<slug>'} --request-approval', or use a local backend`,
+        advisors,
+      };
+    }
     return { ...base, status: 'backend_unavailable', advisors };
   }
 

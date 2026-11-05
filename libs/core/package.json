@@ -4496,6 +4496,10 @@
       "types": "./dist/organization/role-assumption-trace.d.ts",
       "default": "./dist/organization/role-assumption-trace.js"
     },
+    "./organization/role-intent-draft": {
+      "types": "./dist/organization/role-intent-draft.d.ts",
+      "default": "./dist/organization/role-intent-draft.js"
+    },
     "./organization/scim-protocol": {
       "types": "./dist/organization/scim-protocol.d.ts",
       "default": "./dist/organization/scim-protocol.js"
@@ -6795,6 +6799,22 @@
     "./surface/surface-operation-registry": {
       "types": "./dist/surface/surface-operation-registry.d.ts",
       "default": "./dist/surface/surface-operation-registry.js"
+    },
+    "./surface/needs-you": {
+      "types": "./dist/surface/needs-you.d.ts",
+      "default": "./dist/surface/needs-you.js"
+    },
+    "./surface/needs-you-sources": {
+      "types": "./dist/surface/needs-you-sources.d.ts",
+      "default": "./dist/surface/needs-you-sources.js"
+    },
+    "./surface/setup-checklist": {
+      "types": "./dist/surface/setup-checklist.d.ts",
+      "default": "./dist/surface/setup-checklist.js"
+    },
+    "./surface/setup-checklist-model": {
+      "types": "./dist/surface/setup-checklist-model.d.ts",
+      "default": "./dist/surface/setup-checklist-model.js"
     },
     "./surface/workspace-graph": {
       "types": "./dist/surface/workspace-graph.d.ts",

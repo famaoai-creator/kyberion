@@ -478,6 +478,9 @@ describe('company setup wire and link contracts', () => {
           status: 'pending',
         },
       })
-    ).toBe('/?tenant=company-a#decide-approval-APR-1');
+    ).toBe('/inbox?tenant=company-a&reason=approval#decide-approval-APR-1');
+    expect(companyApprovalHref(setup('awaiting_approval'))).toBe(
+      '/inbox?tenant=company-a&reason=approval'
+    );
   });
 });

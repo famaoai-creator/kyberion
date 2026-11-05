@@ -6,7 +6,7 @@
  */
 
 import type { AgentAdapter, AgentAskOptions, AgentResponse } from './agent-adapter.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
+import { getRegisteredEnvText, withoutRelayManagedCredentials } from '../foundation/env.js';
 import { isRecord, trimEndChars } from '../foundation/text.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
@@ -215,7 +215,9 @@ export class HerdrRuntimeClient {
   run(args: string[], timeoutMs = 30_000): HerdrCliEnvelope {
     const result = this.exec(this.bin, args, {
       timeoutMs,
-      env: process.env as Record<string, string>,
+      // Pane agents (`agent start --kind claude|codex`) start no credential
+      // relay: with the relay flag on they must not inherit the raw key.
+      env: withoutRelayManagedCredentials({ ...process.env }) as Record<string, string>,
     });
     const envelope = parseEnvelope(result.stdout, result.stderr);
     if (envelope.error) return envelope;
@@ -428,7 +430,9 @@ export class HerdrRuntimeClient {
       ],
       {
         timeoutMs: 30_000,
-        env: process.env as Record<string, string>,
+        // Pane agents (`agent start --kind claude|codex`) start no credential
+        // relay: with the relay flag on they must not inherit the raw key.
+        env: withoutRelayManagedCredentials({ ...process.env }) as Record<string, string>,
       }
     );
     if (result.error) {

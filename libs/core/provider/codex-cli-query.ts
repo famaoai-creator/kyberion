@@ -12,7 +12,7 @@ import * as pathResolver from '../path-resolver.js';
 import { safeExecResult, safeLstat, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { locateCommandInvocation, platformFacts } from '../platform-facts.js';
 import {
-  buildDelegationSpawnEnv,
+  buildDelegationSpawnEnvWithRelay,
   newDelegationSessionId,
   spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
@@ -22,6 +22,10 @@ import {
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
+import {
+  redactProviderOutputError,
+  redactProviderStructuredResult,
+} from './provider-output-redaction.js';
 import { resolveCodexHome, resolveCodexProfileName } from './codex-profile.js';
 import {
   delegationChildHandleFromChildProcess,
@@ -171,7 +175,8 @@ class CodexCliQuery {
           throw new Error(`[codex-cli] schema validation failed: ${parsed.error.message}`);
         }
         status = 'success';
-        return parsed.data;
+        // Output exit: the parsed answer is redacted value-wise.
+        return redactProviderStructuredResult(parsed.data);
       } finally {
         recordCliUsage('codex-cli', this.model, started, status, {
           report: parseCodexCliUsage(capture.stdout),
@@ -181,7 +186,9 @@ class CodexCliQuery {
         });
       }
     } catch (err: any) {
-      throw new Error(`[codex-cli] structured query failed: ${err?.message ?? String(err)}`);
+      throw redactProviderOutputError(
+        new Error(`[codex-cli] structured query failed: ${err?.message ?? String(err)}`)
+      );
     } finally {
       safeRmSync(schemaPath, { force: true });
       safeRmSync(outputPath, { force: true });
@@ -193,7 +200,7 @@ class CodexCliQuery {
    * enforced against a real, killable handle via {@link withWallClockBudget}
    * — expiry actually SIGTERM's then SIGKILL's this CLI process.
    */
-  private spawnCli(
+  private async spawnCli(
     args: string[],
     stdin: string,
     profile?: ProviderPermissionProfileName,
@@ -201,7 +208,7 @@ class CodexCliQuery {
   ): Promise<void> {
     // XP-02: minimal allowlisted env, scoped to codex's own required vars;
     // WS-02: private git index for write-capable runs.
-    const spawnEnv = buildDelegationSpawnEnv({
+    const pendingSpawnEnv = buildDelegationSpawnEnvWithRelay({
       provider: 'codex',
       cwd: this.cwd,
       sessionId: newDelegationSessionId('codex'),
@@ -211,6 +218,8 @@ class CodexCliQuery {
       },
       ...(profile ? { profile } : {}),
     });
+    // Await only when a credential relay had to start (no extra tick otherwise).
+    const spawnEnv = pendingSpawnEnv instanceof Promise ? await pendingSpawnEnv : pendingSpawnEnv;
     const child = spawnWithDelegationEnv(spawnEnv, () =>
       spawn(this.bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],

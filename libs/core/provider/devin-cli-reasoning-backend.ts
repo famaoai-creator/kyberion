@@ -31,6 +31,7 @@ import {
   newDelegationSessionId,
   spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
+import { withRedactedProviderOutput } from './provider-output-redaction.js';
 import { resolveProviderCliCommand } from './provider-managed-env.js';
 import {
   buildProviderChildEnv,
@@ -246,6 +247,22 @@ export class DevinCliReasoningBackend implements ReasoningBackend {
   }
 
   private async complete(
+    systemPrompt: string,
+    userPrompt: string,
+    options?: {
+      profile?: ProviderPermissionProfileName;
+      signal?: AbortSignal;
+      model?: string;
+      shapeHint?: string;
+    }
+  ): Promise<string> {
+    // Output exit: the answer and any stderr-bearing error are redacted.
+    return withRedactedProviderOutput(() =>
+      this.completeUnredacted(systemPrompt, userPrompt, options)
+    );
+  }
+
+  private async completeUnredacted(
     systemPrompt: string,
     userPrompt: string,
     options?: {

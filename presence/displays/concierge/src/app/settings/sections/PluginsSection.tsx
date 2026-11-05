@@ -7,6 +7,7 @@ import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale, ConciergeMessageKey } from '../../../lib/i18n';
 import type { PluginEntry } from '../../../lib/settings-types';
 import type { SettingsTranslate } from './form-scope';
+import { CliSettingRow } from './settings-ia-parts';
 
 /** FD-06/CS-03 プラグイン pane (`#setup-plugins`) — extracted from
  * settings/page.tsx; the approve/deny decision handler stays owned by the
@@ -68,11 +69,11 @@ export function PluginsSection({
       <SettingsGroup
         id="settings-plugins"
         title={frontDeskText('settings_nav_plugins', locale)}
-        description={`${t('setup.plugins_description')} ${t('setup.plugins_caveat')}`}
+        description={frontDeskText('ia_settings_plugins_lead', locale)}
       >
         {plugins.length === 0 ? (
           <div className="settings-row-block">
-            <EmptyState title={t('setup.plugins_empty')} />
+            <EmptyState title={frontDeskText('ia_settings_plugins_empty', locale)} />
           </div>
         ) : (
           plugins.map((plugin) => {
@@ -140,6 +141,12 @@ export function PluginsSection({
             );
           })
         )}
+        <CliSettingRow
+          locale={locale}
+          label={frontDeskText('ia_settings_plugins_install', locale)}
+          description={frontDeskText('ia_settings_plugins_install_desc', locale)}
+          command="pnpm plugin:install --source <plugin-folder> --id <plugin-id>"
+        />
       </SettingsGroup>
     </div>
   );

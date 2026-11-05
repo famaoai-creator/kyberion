@@ -277,3 +277,5 @@ When a retrospective proposal or an operator correction reveals a _new_
 discipline (not a restatement), add it here first, then to the runtime brief
 if it earns a top-6 slot. Keep the runtime brief ≤ 6 core + 5 role lines —
 past that, small models start ignoring the middle of the list.
+
+Result/envelope shape rules: [contract-design-principles](./contract-design-principles.md).
