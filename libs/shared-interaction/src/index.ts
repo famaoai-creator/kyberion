@@ -1,4 +1,4 @@
-/** Domain barrel — public surface for libs/core/interaction */
+/** Public surface for @agent/shared-interaction — modality-independent conversation control. */
 export * from './backchannel-policy.js';
 export * from './conversation-engine.js';
 export * from './interaction-state.js';

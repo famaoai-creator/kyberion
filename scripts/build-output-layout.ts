@@ -9,6 +9,7 @@ export const PACKAGE_BUILD_OUTPUTS = [
   { id: 'libs/shared-network', sourceRoot: 'libs/shared-network/src', excludeTests: false },
   { id: 'libs/shared-vision', sourceRoot: 'libs/shared-vision/src', excludeTests: true },
   { id: 'libs/shared-video', sourceRoot: 'libs/shared-video/src', excludeTests: true },
+  { id: 'libs/shared-interaction', sourceRoot: 'libs/shared-interaction/src', excludeTests: true },
   { id: 'libs/shared-voice', sourceRoot: 'libs/shared-voice/src', excludeTests: true },
   {
     id: 'presence/displays/terminal-hud',

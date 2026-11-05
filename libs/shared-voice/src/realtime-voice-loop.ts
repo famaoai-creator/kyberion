@@ -62,7 +62,7 @@ import {
   ReplySegmentLabeler,
   segmentReplyStructure,
   type ReplySegmentKind,
-} from '@agent/core/interaction/reply-structure';
+} from '@agent/shared-interaction/reply-structure';
 import type { OwnTtsEchoContext } from '@agent/core/voice/voice-respond-gate';
 import {
   VoiceTurnCancellationCoordinator,

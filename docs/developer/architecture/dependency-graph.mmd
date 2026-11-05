@@ -12,6 +12,7 @@ graph TD
     agent_core["@agent/core"]
   end
   subgraph shared ["Shared libraries"]
+    agent_shared_interaction["@agent/shared-interaction"]
     agent_shared_media["@agent/shared-media"]
     agent_shared_mobile["@agent/shared-mobile"]
     agent_shared_nerve["@agent/shared-nerve"]
@@ -123,6 +124,7 @@ graph TD
   actuator_wisdom --> agent_core
   actuator_working_memory --> agent_core
   agent_core --> agent_kernel
+  agent_shared_interaction --> agent_core
   agent_shared_media --> agent_core
   agent_shared_mobile --> agent_core
   agent_shared_nerve --> agent_core
@@ -131,6 +133,7 @@ graph TD
   agent_shared_video --> agent_core
   agent_shared_vision --> agent_core
   agent_shared_voice --> agent_core
+  agent_shared_voice --> agent_shared_interaction
   kyberion_discord_bridge --> agent_core
   kyberion_imessage_bridge --> agent_core
   kyberion_slack_bridge --> agent_core
@@ -147,6 +150,7 @@ graph TD
   kyberion --> actuator_system
   kyberion --> agent_core
   kyberion --> agent_kernel
+  kyberion --> agent_shared_interaction
   kyberion --> agent_shared_media
   kyberion --> agent_shared_mobile
   kyberion --> agent_shared_nerve

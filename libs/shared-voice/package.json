@@ -132,6 +132,7 @@
     "build": "tsc -b tsconfig.json && node ../../scripts/write_core_dist_scope.mjs --run"
   },
   "dependencies": {
-    "@agent/core": "workspace:*"
+    "@agent/core": "workspace:*",
+    "@agent/shared-interaction": "workspace:*"
   }
 }

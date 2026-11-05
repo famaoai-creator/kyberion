@@ -217,6 +217,14 @@ export default defineConfig({
         replacement: path.resolve(rootDir, './libs/shared-video/src/index.ts'),
       },
       {
+        find: /^@agent\/shared-interaction\/(.*)$/,
+        replacement: path.resolve(rootDir, './libs/shared-interaction/src/$1'),
+      },
+      {
+        find: /^@agent\/shared-interaction$/,
+        replacement: path.resolve(rootDir, './libs/shared-interaction/src/index.ts'),
+      },
+      {
         find: /^@agent\/shared-voice\/(.*)$/,
         replacement: path.resolve(rootDir, './libs/shared-voice/src/$1'),
       },
