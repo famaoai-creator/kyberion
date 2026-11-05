@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withExecutionContext } from '@agent/core/authority';
 import { readTenantProfile } from '@agent/core/organization/tenant-registry';
-import {
-  guardCompanyFanoutRateLimit,
-  readCompanyFanoutHome,
-} from '../../../lib/company-fanout-reader';
+import { throttleCompanyFanout, readCompanyFanoutHome } from '../../../lib/company-fanout-reader';
 import { buildPersonalAggregate } from '../../../lib/personal-aggregate';
 import { resolveConciergeSelectedViewer } from '../../../lib/selected-tenant';
 import { conciergeErrorResponse } from '../../../lib/viewer-context';
@@ -26,7 +23,7 @@ export function GET(req: NextRequest) {
   const resolved = resolveConciergeSelectedViewer(req);
   if (resolved.response) return resolved.response;
   // Each request reads one home per company: the fan-out reader's own bucket.
-  const limited = guardCompanyFanoutRateLimit(req, resolved.viewer, 'personal-summary', NO_STORE);
+  const limited = throttleCompanyFanout(req, resolved.viewer, 'personal-summary', NO_STORE);
   if (limited) return limited;
   if (resolved.selection.mode !== 'personal') {
     return NextResponse.json(

@@ -6,7 +6,7 @@
  *
  * - **Dedicated rate limit.** A fan-out request costs one home read per
  *   company, so it draws from its own per-principal bucket
- *   (`guardCompanyFanoutRateLimit`), never the ordinary Concierge one.
+ *   (`throttleCompanyFanout`), never the ordinary Concierge one.
  * - **Short per-viewer cache, invalidated on needs-you mutations.** See
  *   `company-fanout-cache.ts`.
  */
@@ -39,7 +39,7 @@ export type CompanyFanoutBucket = keyof typeof COMPANY_FANOUT_RATE_LIMITS;
  * The dedicated fan-out rate limit, keyed by the server-resolved principal
  * (else the client address). Returns the 429 response, or null when allowed.
  */
-export function guardCompanyFanoutRateLimit(
+export function throttleCompanyFanout(
   req: NextRequest,
   viewer: Pick<ConciergeViewerContext, 'principalId'>,
   bucket: CompanyFanoutBucket,
