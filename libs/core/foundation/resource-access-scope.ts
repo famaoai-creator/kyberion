@@ -26,7 +26,15 @@ export interface ResourceAccessScope {
   readonly opaqueStoreToken?: object;
 }
 
-export type ResourceAccessOperation = 'read' | 'write' | 'append' | 'mkdir' | 'metadata';
+const RESOURCE_ACCESS_OPERATIONS = ['read', 'write', 'append', 'mkdir', 'metadata'] as const;
+export type ResourceAccessOperation = (typeof RESOURCE_ACCESS_OPERATIONS)[number];
+
+export type ResourceAccessDecision =
+  | { readonly allowed: true }
+  | {
+      readonly allowed: false;
+      readonly reason: 'invalid_operation' | 'invalid_path' | 'outside_scope';
+    };
 
 const KEY = Symbol.for('kyberion.core.resource-access-scope.v1');
 type Registry = { storage: AsyncLocalStorage<readonly ResourceAccessScope[]> };
@@ -214,6 +222,25 @@ export function createSynchronousResourceGrantIssuer<Binding>(
   });
 }
 
+/**
+ * Pure operation ceiling over a server-validated scope. This neither authenticates
+ * a grant nor checks roles, tenant ownership or other enclosing scopes.
+ */
+export function decideResourceAccess(
+  scope: ResourceAccessScope,
+  target: string,
+  operation: ResourceAccessOperation
+): ResourceAccessDecision {
+  // Runtime input must fail closed before name-prefix or metadata matching.
+  if (!RESOURCE_ACCESS_OPERATIONS.includes(operation))
+    return { allowed: false, reason: 'invalid_operation' };
+  if ((target !== '' || operation !== 'metadata') && !validPath(target))
+    return { allowed: false, reason: 'invalid_path' };
+  return permits(scope, target, operation)
+    ? { allowed: true }
+    : { allowed: false, reason: 'outside_scope' };
+}
+
 function permits(
   scope: ResourceAccessScope,
   target: string,
@@ -230,6 +257,7 @@ function permits(
   if (operation === 'append')
     return scope.writeExact.includes(target) || (scope.appendExact ?? []).includes(target);
   if (operation === 'mkdir') return scope.mkdirExact.includes(target);
+  if (operation !== 'metadata') return false;
   // Metadata inspection permits traversal, never directory enumeration or file content.
   return (
     [
@@ -253,10 +281,7 @@ export function resourceAccessDenial(
 ): { allowed: false; reason: string } | null {
   const scopes = registry.storage.getStore();
   if (!scopes) return null;
-  if (
-    (target !== '' && !validPath(target)) ||
-    scopes.some((scope) => !permits(scope, target, operation))
-  ) {
+  if (scopes.some((scope) => !decideResourceAccess(scope, target, operation).allowed)) {
     return {
       allowed: false,
       reason: '[RESOURCE_SCOPE_DENIED] Resource operation is outside the request capability',
