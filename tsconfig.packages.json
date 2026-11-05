@@ -27,6 +27,9 @@
       "path": "./libs/shared-vision"
     },
     {
+      "path": "./libs/shared-video"
+    },
+    {
       "path": "./presence/displays/terminal-hud"
     }
   ]

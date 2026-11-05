@@ -7,11 +7,11 @@ const mocks = vi.hoisted(() => ({
   resolve: vi.fn(),
   read: vi.fn(),
 }));
-vi.mock('@agent/core/video/video-filter-bootstrap', () => ({
+vi.mock('@agent/shared-video/video-filter-bootstrap', () => ({
   installBuiltinVideoFilterProviders: mocks.install,
 }));
-vi.mock('@agent/core/video/video-filter', async (original) => ({
-  ...(await original<typeof import('@agent/core/video/video-filter')>()),
+vi.mock('@agent/shared-video/video-filter', async (original) => ({
+  ...(await original<typeof import('@agent/shared-video/video-filter')>()),
   applyVideoFilter: mocks.apply,
   listVideoFilters: mocks.list,
   listVideoFilterProviders: mocks.providers,

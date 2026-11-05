@@ -117,8 +117,8 @@
     "engine_hex": {
       "libs/core/media/media-theme-role-policy.ts": 1,
       "libs/core/media/native-pptx-engine/design-cascade.ts": 2,
-      "libs/core/video/video-composition-compiler.ts": 11,
-      "libs/core/video/video-composition-rendering.ts": 5,
+      "libs/shared-video/src/video-composition-compiler.ts": 11,
+      "libs/shared-video/src/video-composition-rendering.ts": 5,
       "libs/core/video/video-content-brief-contract.ts": 1,
       "libs/core/video/video-visual-direction.ts": 6,
       "libs/actuators/media-actuator/src/deck-geometry-helpers.ts": 3,

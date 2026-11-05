@@ -15,8 +15,8 @@ dispatches.
 
 | Op                             | Kind      | Core module                           | Output                                                           |
 | ------------------------------ | --------- | ------------------------------------- | ---------------------------------------------------------------- |
-| `vision:fetch_video`           | capture   | `libs/core/video-ingest`              | `VideoBrief` for a remote URL (needs approval)                   |
-| `vision:build_video_brief`     | transform | `libs/core/video-ingest`              | `VideoBrief` for a URL or a local file                           |
+| `vision:fetch_video`           | capture   | `libs/shared-video/src/ingest`        | `VideoBrief` for a remote URL (needs approval)                   |
+| `vision:build_video_brief`     | transform | `libs/shared-video/src/ingest`        | `VideoBrief` for a URL or a local file                           |
 | `vision:mark_elements`         | capture   | `set-of-marks`, `ui-element-detector` | numbered marks, annotated PNG/SVG, `marks_id`, image dHash       |
 | `vision:describe_screen_delta` | capture   | `dirty-tile-describer`                | per-tile descriptions; only changed tiles reach the vision model |
 

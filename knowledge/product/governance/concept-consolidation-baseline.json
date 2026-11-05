@@ -1020,16 +1020,16 @@
       "env_direct_read_budget": 1,
       "json_state_write_budget": 1
     },
-    "libs/core/video/ingest/video-brief.ts": {
+    "libs/shared-video/src/ingest/video-brief.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/video/video-composition-compiler.ts": {
+    "libs/shared-video/src/video-composition-compiler.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/video/video-device-lease.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/video/video-recut.ts": {
+    "libs/shared-video/src/video-recut.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/virtual/computer-surface.ts": {

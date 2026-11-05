@@ -8,6 +8,7 @@ export const PACKAGE_BUILD_OUTPUTS = [
   { id: 'libs/shared-mobile', sourceRoot: 'libs/shared-mobile/src', excludeTests: false },
   { id: 'libs/shared-network', sourceRoot: 'libs/shared-network/src', excludeTests: false },
   { id: 'libs/shared-vision', sourceRoot: 'libs/shared-vision/src', excludeTests: false },
+  { id: 'libs/shared-video', sourceRoot: 'libs/shared-video/src', excludeTests: true },
   {
     id: 'presence/displays/terminal-hud',
     sourceRoot: 'presence/displays/terminal-hud/src',

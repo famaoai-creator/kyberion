@@ -42,6 +42,7 @@ const LEGACY_JS_GUARDED_PREFIXES = [
   // shared-ui guards only its TS sources; vanilla/ ships a hand-written ES module.
   'libs/shared-ui/src/',
   'libs/shared-vision/',
+  'libs/shared-video/',
   'libs/actuators/',
 ];
 const PACKAGE_SCAN_ROOTS = ['libs', 'presence', 'satellites', 'templates', 'package.json'];

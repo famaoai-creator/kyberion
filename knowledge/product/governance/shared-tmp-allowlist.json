@@ -12,7 +12,7 @@
       "note": "Consumable TTS audio for the optional Python bridge. Canonical checkout resolution preserves the existing voice-out default; explicit output overrides remain supported. Durable voice deliverables require separate scoped publication."
     },
     {
-      "file": "libs/core/video/video-recut.ts",
+      "file": "libs/shared-video/src/video-recut.ts",
       "count": 3,
       "classification": "legit-tmp",
       "note": "Read-only canonical boundary checks for user-supplied consumable local video/VTT inputs and explicitly requested scratch previews. Default output uses the governed runtime workspace; durable delivery is promoted separately."

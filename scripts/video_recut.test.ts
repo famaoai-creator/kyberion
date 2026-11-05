@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   render: vi.fn(),
   read: vi.fn(),
 }));
-vi.mock('@agent/core/video', () => ({
+vi.mock('@agent/shared-video/video-recut', () => ({
   parseVideoRecutRequest: (request: unknown) => request,
   prepareVideoRecut: mocks.prepare,
   renderVideoRecut: mocks.render,

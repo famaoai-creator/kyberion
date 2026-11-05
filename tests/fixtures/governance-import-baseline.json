@@ -248,7 +248,7 @@
     "libs/core/silero-vad-bridge.ts",
     "libs/core/streaming-voice-playback.ts",
     "libs/core/ten-vad-bridge.ts",
-    "libs/core/video/video-render-backend.ts",
+    "libs/shared-video/src/video-render-backend.ts",
     "libs/core/virtual/desktop-event-feed.ts",
     "libs/core/virtual/virtual-audio-input-recording-bridge.ts",
     "libs/core/voice/audio-playback.ts",

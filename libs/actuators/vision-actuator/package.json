@@ -10,6 +10,7 @@
     "test": "vitest run src/"
   },
   "dependencies": {
-    "@agent/core": "workspace:*"
+    "@agent/core": "workspace:*",
+    "@agent/shared-video": "workspace:*"
   }
 }

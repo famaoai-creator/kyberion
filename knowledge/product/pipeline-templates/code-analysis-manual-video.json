@@ -109,7 +109,7 @@
       "op": "code:read_file",
       "produces": { "channel": "video_composition_compiler", "type": "ReadResult" },
       "params": {
-        "path": "libs/core/video/video-composition-compiler.ts"
+        "path": "libs/shared-video/src/video-composition-compiler.ts"
       }
     },
     {
@@ -127,7 +127,7 @@
       "op": "code:read_file",
       "produces": { "channel": "video_render_backend", "type": "ReadResult" },
       "params": {
-        "path": "libs/core/video/video-render-backend.ts"
+        "path": "libs/shared-video/src/video-render-backend.ts"
       }
     },
     {
@@ -154,7 +154,7 @@
       "op": "code:write_artifact",
       "params": {
         "path": "{{analysis_notes_path}}",
-        "content": "# Kyberion Source Code Analysis Notes\n\n## Source Surfaces Inspected\n- `libs/actuators/code-actuator/src/index.ts`\n- `libs/actuators/media-actuator/src/index.ts`\n- `libs/actuators/video-composition-actuator/src/index.ts`\n- `libs/core/video/video-content-brief-contract.ts`\n- `libs/core/video/video-render-backend.ts`\n- `knowledge/public/procedures/media/generate-report-from-document-brief.md`\n- `knowledge/public/procedures/media/create-narrated-intro-movie.md`\n\n## What The Code Is Doing\n- `code-actuator` is a generic pipeline engine with capture, transform, apply, and control steps.\n- `media-actuator` owns the canonical document route: `document_outline_from_brief -> brief_to_design_protocol -> generate_document`.\n- `video-composition-actuator` compiles a video content brief into a storyboard and then into a narrated video brief.\n- `video-render-backend` performs the final backend render and audio muxing boundary.\n\n## Documentation Strategy\n- The manual document should explain how the code surfaces are analyzed and how the governed docs are produced.\n- The design spec should explain how the same analysis becomes a deterministic document and video pipeline.\n- The video manual should show the same flow as a narrated how-to, not as a product pitch.\n"
+        "content": "# Kyberion Source Code Analysis Notes\n\n## Source Surfaces Inspected\n- `libs/actuators/code-actuator/src/index.ts`\n- `libs/actuators/media-actuator/src/index.ts`\n- `libs/actuators/video-composition-actuator/src/index.ts`\n- `libs/core/video/video-content-brief-contract.ts`\n- `libs/shared-video/src/video-render-backend.ts`\n- `knowledge/public/procedures/media/generate-report-from-document-brief.md`\n- `knowledge/public/procedures/media/create-narrated-intro-movie.md`\n\n## What The Code Is Doing\n- `code-actuator` is a generic pipeline engine with capture, transform, apply, and control steps.\n- `media-actuator` owns the canonical document route: `document_outline_from_brief -> brief_to_design_protocol -> generate_document`.\n- `video-composition-actuator` compiles a video content brief into a storyboard and then into a narrated video brief.\n- `video-render-backend` performs the final backend render and audio muxing boundary.\n\n## Documentation Strategy\n- The manual document should explain how the code surfaces are analyzed and how the governed docs are produced.\n- The design spec should explain how the same analysis becomes a deterministic document and video pipeline.\n- The video manual should show the same flow as a narrated how-to, not as a product pitch.\n"
       }
     },
     {

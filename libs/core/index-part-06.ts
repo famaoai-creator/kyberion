@@ -57,8 +57,6 @@ export type {
 } from './video/video-frame-bus.js';
 
 export * from './video/video-route.js';
-export * from './video/video-filter.js';
-
 export * from './bounded-video-queue.js';
 
 export * from './video/video-device-lease.js';

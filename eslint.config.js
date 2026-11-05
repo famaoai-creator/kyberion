@@ -236,6 +236,13 @@ export default [
       'no-restricted-imports': [
         'error',
         {
+          patterns: [
+            {
+              group: ['@agent/shared-*', '@agent/shared-*/**'],
+              message:
+                'Dependency direction: @agent/shared-* packages depend on @agent/core, never the reverse. Move the shared primitive into core or invert the dependency.',
+            },
+          ],
           paths: [
             {
               name: 'fs',

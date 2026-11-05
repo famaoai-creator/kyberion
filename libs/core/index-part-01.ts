@@ -322,8 +322,6 @@ export * from './video/video-motion-direction.js';
 
 export * from './video/video-scene-composition.js';
 
-export * from './video/video-composition-lint.js';
-
 export * from './reasoning/reasoning-egress-scope.js';
 
 export * from './visual-raster.js';
