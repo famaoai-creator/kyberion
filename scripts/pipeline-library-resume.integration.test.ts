@@ -1,38 +1,112 @@
 import { randomUUID } from 'node:crypto';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { safeWriteFile, safeRmSync } from '@agent/core/secure-io';
-import { pathResolver } from '@agent/core/path-resolver';
-import { withExecutionContextAsync } from '@agent/core/authority';
-import { logger } from '@agent/core/core';
-import { getSecret } from '@agent/core/secret/secret-guard';
-import {
-  currentScopeEnvelope,
-  mintScopeEnvelope,
-  withScopeEnvelope,
-} from '@agent/core/scope-envelope';
-import { withScopeEnvOnly } from '@agent/core/scope-context';
-import {
-  cancelApprovalRequest,
-  decideApprovalRequest,
-  expireApprovalRequest,
-  loadApprovalRequest,
-} from '@agent/core/governance/approval-store';
-import { approvalStoreRoots } from '@agent/core/governance/approval-store-paths';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { seedFirstJobTestRoot } from './fixtures/first-job-approval-fixture.js';
+import { safeRmSync as removeFixture } from '@agent/core/secure-io';
+import { withExecutionContext as inSourceContext } from '@agent/core/authority';
 import path from 'node:path';
-import { loadPipelineRunJournal } from '@agent/core/pipeline/pipeline-run-journal';
-import {
-  claimWorkItem,
-  createWorkItem,
-  getWorkItem,
-  releaseWorkItem,
-  setWorkCoordinationNamespace,
-  clearWorkCoordinationNamespace,
-  clearWorkCoordinationStore,
-} from '@agent/core/workforce/work-coordination';
-import {
-  executePipelineFile,
-  resumeLibraryPipelineRun,
-} from './pipeline-execution-part-results.js';
+let safeWriteFile: typeof import('@agent/core/secure-io').safeWriteFile;
+let safeRmSync: typeof import('@agent/core/secure-io').safeRmSync;
+let pathResolver: typeof import('@agent/core/path-resolver').pathResolver;
+let withExecutionContextAsync: typeof import('@agent/core/authority').withExecutionContextAsync;
+let logger: typeof import('@agent/core/core').logger;
+let getSecret: typeof import('@agent/core/secret/secret-guard').getSecret;
+let currentScopeEnvelope: typeof import('@agent/core/scope-envelope').currentScopeEnvelope;
+let mintScopeEnvelope: typeof import('@agent/core/scope-envelope').mintScopeEnvelope;
+let withScopeEnvelope: typeof import('@agent/core/scope-envelope').withScopeEnvelope;
+let withScopeEnvOnly: typeof import('@agent/core/scope-context').withScopeEnvOnly;
+let cancelApprovalRequest: typeof import('@agent/core/governance/approval-store').cancelApprovalRequest;
+let decideApprovalRequest: typeof import('@agent/core/governance/approval-store').decideApprovalRequest;
+let expireApprovalRequest: typeof import('@agent/core/governance/approval-store').expireApprovalRequest;
+let loadApprovalRequest: typeof import('@agent/core/governance/approval-store').loadApprovalRequest;
+let approvalStoreRoots: typeof import('@agent/core/governance/approval-store-paths').approvalStoreRoots;
+let loadPipelineRunJournal: typeof import('@agent/core/pipeline/pipeline-run-journal').loadPipelineRunJournal;
+let claimWorkItem: typeof import('@agent/core/workforce/work-coordination').claimWorkItem;
+let createWorkItem: typeof import('@agent/core/workforce/work-coordination').createWorkItem;
+let getWorkItem: typeof import('@agent/core/workforce/work-coordination').getWorkItem;
+let releaseWorkItem: typeof import('@agent/core/workforce/work-coordination').releaseWorkItem;
+let setWorkCoordinationNamespace: typeof import('@agent/core/workforce/work-coordination').setWorkCoordinationNamespace;
+let clearWorkCoordinationNamespace: typeof import('@agent/core/workforce/work-coordination').clearWorkCoordinationNamespace;
+let clearWorkCoordinationStore: typeof import('@agent/core/workforce/work-coordination').clearWorkCoordinationStore;
+let executePipelineFile: typeof import('./pipeline-execution-part-results.js').executePipelineFile;
+let resumeLibraryPipelineRun: typeof import('./pipeline-execution-part-results.js').resumeLibraryPipelineRun;
+
+const sourceRoot = process.cwd();
+const fixtureRoot = path.join(
+  sourceRoot,
+  'active/shared/tmp',
+  `library-resume-root-${randomUUID()}`
+);
+const auditChainKey = Symbol.for('@kyberion/audit-chain');
+const sourceAuditChainDescriptor = Object.getOwnPropertyDescriptor(globalThis, auditChainKey);
+
+beforeAll(async () => {
+  seedFirstJobTestRoot(sourceRoot, fixtureRoot);
+  process.chdir(fixtureRoot);
+  vi.stubEnv('KYBERION_ROOT', fixtureRoot);
+  vi.stubEnv('VITEST', '');
+  // The bootstrap I/O imports construct a process-global chain whose methods
+  // capture the source checkout. resetModules alone cannot isolate that root.
+  expect(Reflect.deleteProperty(globalThis, auditChainKey)).toBe(true);
+  vi.resetModules();
+  ({ safeWriteFile, safeRmSync } = await import('@agent/core/secure-io'));
+  ({ pathResolver } = await import('@agent/core/path-resolver'));
+  ({ withExecutionContextAsync } = await import('@agent/core/authority'));
+  ({ logger } = await import('@agent/core/core'));
+  ({ getSecret } = await import('@agent/core/secret/secret-guard'));
+  ({ currentScopeEnvelope, mintScopeEnvelope, withScopeEnvelope } =
+    await import('@agent/core/scope-envelope'));
+  ({ withScopeEnvOnly } = await import('@agent/core/scope-context'));
+  ({ cancelApprovalRequest, decideApprovalRequest, expireApprovalRequest, loadApprovalRequest } =
+    await import('@agent/core/governance/approval-store'));
+  ({ approvalStoreRoots } = await import('@agent/core/governance/approval-store-paths'));
+  ({ loadPipelineRunJournal } = await import('@agent/core/pipeline/pipeline-run-journal'));
+  ({
+    claimWorkItem,
+    createWorkItem,
+    getWorkItem,
+    releaseWorkItem,
+    setWorkCoordinationNamespace,
+    clearWorkCoordinationNamespace,
+    clearWorkCoordinationStore,
+  } = await import('@agent/core/workforce/work-coordination'));
+  ({ executePipelineFile, resumeLibraryPipelineRun } =
+    await import('./pipeline-execution-part-results.js'));
+  expect(pathResolver.rootDir()).toBe(fixtureRoot);
+  expect(pathResolver.primaryCheckoutRootDir()).toBe(fixtureRoot);
+  const { auditChain } = await import('@agent/core/governance/audit-chain');
+  expect(auditChain).not.toBe(sourceAuditChainDescriptor?.value);
+  expect(Reflect.get(globalThis, auditChainKey)).toBe(auditChain);
+  // Seed the onboarding runtime floor; bounded store APIs create their own partitions.
+  const { safeMkdir } = await import('@agent/core/secure-io');
+  const { writeTenantProfile } = await import('@agent/core/organization/tenant-registry');
+  await withExecutionContextAsync(
+    'mission_controller',
+    async () => {
+      safeMkdir(pathResolver.shared('runtime'));
+      writeTenantProfile({
+        tenant_slug: 'pipeline-delegation',
+        display_name: 'Pipeline fixture',
+        assigned_role: 'owner',
+        status: 'active',
+      });
+    },
+    'ecosystem_architect'
+  );
+}, 60000);
+
+afterAll(() => {
+  // All fixture operations have settled. Restore the exact process-global
+  // bootstrap state before source-root I/O performs whole-fixture cleanup.
+  if (sourceAuditChainDescriptor)
+    Object.defineProperty(globalThis, auditChainKey, sourceAuditChainDescriptor);
+  else Reflect.deleteProperty(globalThis, auditChainKey);
+  process.chdir(sourceRoot);
+  vi.unstubAllEnvs();
+  inSourceContext('ecosystem_architect', () =>
+    removeFixture(fixtureRoot, { recursive: true, force: true })
+  );
+  vi.resetModules();
+});
 
 // The real approval decision remains durable; only detached process launch is replaced.
 vi.mock('@agent/core/pipeline/pipeline-approval-resume', () => ({
@@ -64,7 +138,9 @@ describe('protected library execution approval continuation', () => {
       'ecosystem_architect',
       'pipeline-delegation'
     );
-    vi.unstubAllEnvs();
+    // Preserve the suite's import-bound root until whole-fixture cleanup.
+    for (const key of ['MISSION_ID', 'KYBERION_TASK_ID', 'PIPELINE_RESUME_FIXTURE_SECRET'])
+      vi.stubEnv(key, '');
     vi.useRealTimers();
   });
   it.each(['approved', 'rejected', 'cancelled', 'expired'] as const)(
@@ -172,7 +248,7 @@ describe('protected library execution approval continuation', () => {
               quiet: true,
             })
           );
-          expect(pending.status).toBe('suspended');
+          expect(pending.status, JSON.stringify(pending.results)).toBe('suspended');
           if (pending.status !== 'suspended') throw new Error('expected approval suspension');
           const journal = loadPipelineRunJournal(pending.runId, undefined, {
             tier: 'confidential',

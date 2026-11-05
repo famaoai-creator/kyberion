@@ -62,6 +62,7 @@ beforeAll(async () => {
       '{"name":"hearing-access-policy-fixture"}'
     );
     const copy = (relative: string): void => {
+      initialIO.safeMkdir(path.join(ROOT, relative), { recursive: true });
       for (const name of initialIO.safeReaddir(path.join(SOURCE_ROOT, relative))) {
         const file = path.join(relative, name);
         const source = path.join(SOURCE_ROOT, file);
@@ -69,16 +70,14 @@ beforeAll(async () => {
         if (stat.isSymbolicLink()) throw new Error('Linked governance fixture');
         if (stat.isDirectory()) copy(file);
         else if (/\.(?:json|yaml)$/u.test(name))
-          initialIO.safeWriteFile(path.join(ROOT, file), initialIO.safeReadFile(source));
+          initialIO.safeCopyFileSync(source, path.join(ROOT, file));
       }
     };
     copy('knowledge/product/governance');
     copy('knowledge/product/schemas');
     const scenario = 'knowledge/product/orchestration/hearing-scenarios.json';
-    initialIO.safeWriteFile(
-      path.join(ROOT, scenario),
-      initialIO.safeReadFile(path.join(SOURCE_ROOT, scenario))
-    );
+    initialIO.safeMkdir(path.join(ROOT, path.dirname(scenario)), { recursive: true });
+    initialIO.safeCopyFileSync(path.join(SOURCE_ROOT, scenario), path.join(ROOT, scenario));
   });
   process.env.KYBERION_ROOT = ROOT;
   vi.resetModules();

@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 
 let testRoot: string;
+let remapMirrors = false;
 /** The tenant's partition of the audit mirror store. */
 const mirrorDir = (slug: string) =>
   path.join(testRoot, 'active', 'shared', 'runtime', 'audit-mirror', 'confidential', slug);
@@ -22,6 +23,10 @@ vi.mock('../path-resolver.js', () => ({
     rootDir: () => testRoot,
     rootResolve: (sub = '') => path.join(testRoot, sub),
     shared: (sub = '') => path.join(testRoot, 'active', 'shared', sub),
+    vitestLivePath: (absolute: string) =>
+      remapMirrors && absolute.startsWith(path.join(testRoot, 'active/shared/runtime/audit-mirror'))
+        ? path.join(testRoot, 'vitest-live', path.relative(path.join(testRoot, 'active'), absolute))
+        : absolute,
   },
   rootDir: () => testRoot,
 }));
@@ -73,6 +78,7 @@ vi.mock('../core.js', () => ({
 
 describe('audit-chain — tenant mirror', () => {
   beforeEach(() => {
+    remapMirrors = false;
     testRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-audit-tenant-'));
     // Clear singleton
     delete (globalThis as any)[GLOBAL_KEY];
@@ -109,6 +115,29 @@ describe('audit-chain — tenant mirror', () => {
       fs.existsSync(path.join(testRoot, 'active', 'shared', 'logs', 'audit', `audit-${date}.jsonl`))
     ).toBe(true);
     expect(fs.existsSync(path.join(mirrorDir('sbiss'), `audit-${date}.jsonl`))).toBe(true);
+  });
+
+  it('uses the existing Vitest mirror floor for both append and verification', async () => {
+    remapMirrors = true;
+    const { auditChain } = await loadFreshAuditChain(new Date('2026-07-01T10:00:00.000Z'));
+    const io = await import('../secure-io.js');
+    auditChain.record({
+      agentId: 'agent-test',
+      action: 'mirror-sandbox',
+      operation: 'audit',
+      result: 'completed',
+      tenantSlug: 'sbiss',
+    });
+    expect(io.safeExistsSync(path.join(mirrorDir('sbiss'), 'audit-2026-07-01.jsonl'))).toBe(false);
+    expect(
+      io.safeExistsSync(
+        path.join(
+          testRoot,
+          'vitest-live/shared/runtime/audit-mirror/confidential/sbiss/audit-2026-07-01.jsonl'
+        )
+      )
+    ).toBe(true);
+    expect(auditChain.verifyTenantMirrors().ok).toBe(true);
   });
 
   it('publishes through the optional forwarder seam without importing its implementation', async () => {

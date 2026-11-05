@@ -16,7 +16,8 @@ vi.mock('../authority.js', () => ({
   withExecutionContextAsync: async (_role: string, fn: () => unknown) => fn(),
   resolveRole: () => 'concierge',
 }));
-vi.mock('../foundation/resource-access-scope.js', () => ({
+vi.mock('../foundation/resource-access-scope.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../foundation/resource-access-scope.js')>()),
   runInResourceAccessScope: async (scope: unknown, fn: () => unknown) => {
     st.scope(scope);
     return fn();
