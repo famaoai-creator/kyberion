@@ -208,6 +208,23 @@ root の一致検査、通常の role/tenant/内容検査は保持する。3つ�
 完全な `decide` や G2 のロール削除を完了したものではない。保存先の移行を前提にせず、
 新しい公開 subpath や foundation の runtime import も増やさない。
 
+### G0 登録と保持規則参照の補完（2026-11-06）
+
+従来の gate は state と floor だけを列挙し、ledger root と保持規則の参照を検証していなかった。
+既存22件（state14・ledger4・floor4）の store に `registration` を追加し、family/key と
+現在の保持規則の path を宣言する。gate は全登録の網羅、未知・重複 key、active 状態、
+partition 形状、存在する最も具体的な root 保持規則への参照を検証する。
+`--write-baseline` の前にも同じ登録検査を行うため、登録不整合を baseline 更新で隠せない。
+
+state/floor/通常 ledger は `<tier>/<tenant>` の binding を保持する。既存の
+`ledger:resource_usage` と `ledger:execution_metrics` の bare root だけは、現在の
+`unscoped-legacy` 宣言と一緒に互換維持する。登録を理由に管理者を推測しない。
+保持規則の action/TTL、runtime root、backup/offboarding の列挙は変更しない。
+TypeScript の root 定義をカタログから生成する段階は後続とし、foundation への JSON 読込は追加しない。
+
+共通 catalog では fallback の schema 検証漏れも修正した。DOT の disabled default は無効のまま
+schema 範囲に合わせ、必須の fitness/security policy の欠落は明示的な失敗にする。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |

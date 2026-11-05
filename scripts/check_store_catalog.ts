@@ -4,7 +4,7 @@
  * knowledge/product/governance/store-catalog.json declares every governed
  * store once, with its custodian (system / tenant / person). This gate keeps
  * it aligned with the declarations it replaces later:
- *   - every PARTITIONED_RUNTIME_STATE_ROOTS root and storage floor has an entry;
+ *   - state, ledger and floor roots have typed registrations and retention references;
  *   - every store-scoped authority role (`*_store`, `*_writer`, `*_reader`) is
  *     listed on each entry its security-policy paths reach, and nowhere else;
  *   - a legacy-move entry names an existing replacement;
@@ -14,7 +14,11 @@
 import { withExecutionContext } from '@agent/core/authority';
 import { compileSchema, writeJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { PARTITIONED_RUNTIME_STATE_ROOTS, STORAGE_FLOOR_ROOTS } from '@agent/core/storage-layout';
+import {
+  PARTITIONED_RUNTIME_STATE_ROOTS,
+  PARTITIONED_RUNTIME_LEDGER_ROOTS,
+  STORAGE_FLOOR_ROOTS,
+} from '@agent/core/storage-layout';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 import { readSafeJsonFile } from './lib/json-input.js';
@@ -26,6 +30,11 @@ export interface StoreEntry {
   status: 'active' | 'planned' | 'legacy-move';
   moves_to?: string;
   legacy_roles?: string[];
+  registration?: {
+    family: 'state' | 'ledger' | 'floor';
+    key: string;
+    retention_path: string;
+  };
 }
 export interface StoreCatalog {
   stores: StoreEntry[];
@@ -35,7 +44,87 @@ type RolePermissions = Record<string, { allow_read?: string[]; allow_write?: str
 const CATALOG = 'knowledge/product/governance/store-catalog.json';
 const SCHEMA = 'knowledge/product/schemas/store-catalog.schema.json';
 const POLICY = 'knowledge/product/governance/security-policy.json';
+const RETENTION = 'knowledge/product/governance/storage-retention-catalog.json';
+const RETENTION_SCHEMA = 'knowledge/product/schemas/storage-retention-catalog.schema.json';
 const STORE_ROLE = /_(store|writer|reader)$/u;
+
+export type StoreRootRegistries = Record<
+  'state' | 'ledger' | 'floor',
+  Readonly<Record<string, string>>
+>;
+const ROOT_REGISTRIES: StoreRootRegistries = {
+  state: PARTITIONED_RUNTIME_STATE_ROOTS,
+  ledger: PARTITIONED_RUNTIME_LEDGER_ROOTS,
+  floor: STORAGE_FLOOR_ROOTS,
+};
+// G0 inventories these two historical roots without resolving their custody.
+// Do not extend this compatibility set to new state, floor or ledger stores.
+const LEGACY_BARE_LEDGER_REGISTRATIONS = new Set([
+  'ledger:resource_usage',
+  'ledger:execution_metrics',
+]);
+
+const canonicalRoot = (value: string): boolean =>
+  /^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/u.test(value) &&
+  value.split('/').every((part) => part !== '.' && part !== '..');
+
+/** Static registration integrity only: does not grant access or change retention actions. */
+export function checkStoreRegistrations(
+  stores: readonly StoreEntry[],
+  registries: StoreRootRegistries,
+  retention: readonly { path: string }[]
+): string[] {
+  const violations: string[] = [];
+  const registered = new Set<string>();
+  const retentionPaths = new Set(retention.map(({ path }) => path));
+  for (const store of stores) {
+    const registration = store.registration;
+    if (!registration) continue;
+    const { family, key, retention_path: policyPath } = registration;
+    const name = `${family}:${key}`;
+    if (registered.has(name)) violations.push(`${store.id}: duplicate registration ${name}`);
+    registered.add(name);
+    const familyRoots = Object.hasOwn(registries, family) ? registries[family] : undefined;
+    const root = familyRoots && Object.hasOwn(familyRoots, key) ? familyRoots[key] : undefined;
+    if (!root) {
+      violations.push(`${store.id}: unknown registration ${name}`);
+      continue;
+    }
+    if (!canonicalRoot(root)) violations.push(`${name}: noncanonical runtime root ${root}`);
+    if (store.status !== 'active')
+      violations.push(`${store.id}: registered runtime root must be active`);
+    // G0's metrics/usage entries intentionally retain their bare-root,
+    // unscoped-legacy attribution; registration does not reinterpret custody.
+    const legacyBareRoot =
+      LEGACY_BARE_LEDGER_REGISTRATIONS.has(name) &&
+      store.custody.kind === 'unscoped-legacy' &&
+      store.path === root;
+    if (!legacyBareRoot && store.path !== `${root}/<tier>/<tenant>`)
+      violations.push(`${store.id}: registration ${name} does not match root ${root}`);
+    if (!canonicalRoot(policyPath) || !retentionPaths.has(policyPath))
+      violations.push(
+        `${store.id}: retention reference ${policyPath} does not name an existing canonical policy`
+      );
+    else if (root !== policyPath && !root.startsWith(policyPath + '/'))
+      violations.push(`${store.id}: retention reference ${policyPath} does not cover root ${root}`);
+    else {
+      const effective = retention
+        .filter(({ path }) => root === path || root.startsWith(path + '/'))
+        .sort((a, b) => b.path.length - a.path.length)[0]?.path;
+      if (policyPath !== effective)
+        violations.push(
+          `${store.id}: retention reference ${policyPath} differs from effective root policy ${effective}`
+        );
+      if (retention.filter(({ path }) => path === policyPath).length !== 1)
+        violations.push(`${store.id}: retention reference ${policyPath} is ambiguous`);
+    }
+  }
+  for (const [family, roots] of Object.entries(registries))
+    for (const key of Object.keys(roots))
+      if (!registered.has(`${family}:${key}`))
+        violations.push(`missing store registration ${family}:${key}`);
+  return violations.sort();
+}
 
 /** security-policy placeholders → catalog placeholders, trailing slash dropped. */
 export function normalizePolicyPath(raw: string): string {
@@ -95,16 +184,6 @@ export function checkStoreCatalog(
     if (store.status === 'legacy-move' && (!store.moves_to || !ids.has(store.moves_to)))
       violations.push(`${store.id}: legacy-move needs moves_to naming an existing store`);
   }
-  const roots: Array<[string, string]> = [
-    ...Object.entries(PARTITIONED_RUNTIME_STATE_ROOTS),
-    ...Object.entries(STORAGE_FLOOR_ROOTS).map(([k, v]) => [`floor:${k}`, v] as [string, string]),
-  ];
-  for (const [name, root] of roots) {
-    if (!stores.some((store) => store.path === `${root}/<tier>/<tenant>`))
-      violations.push(
-        `${name}: partitioned root ${root} has no catalog entry ${root}/<tier>/<tenant>`
-      );
-  }
   const expected = new Map<string, Set<string>>();
   for (const [role, permissions] of Object.entries(roles)) {
     if (!STORE_ROLE.test(role)) continue;
@@ -149,6 +228,29 @@ export const runCheckStoreCatalog = defineScript({
         `${CATALOG} violates ${SCHEMA}: ${JSON.stringify(validate.errors)}`
       );
     }
+    const retention = readSafeJsonFile<{ entries: { path: string }[] }>(
+      pathResolver.rootResolve(RETENTION),
+      'storage retention catalog'
+    );
+    const validateRetention = compileSchema(pathResolver.rootResolve(RETENTION_SCHEMA));
+    if (!validateRetention(retention))
+      throw new ScriptExitError(
+        1,
+        `${RETENTION} violates ${RETENTION_SCHEMA}: ${JSON.stringify(validateRetention.errors)}`
+      );
+    const registrationViolations = checkStoreRegistrations(
+      catalog.stores,
+      ROOT_REGISTRIES,
+      retention.entries
+    );
+    if (registrationViolations.length > 0)
+      throw new ScriptExitError(
+        1,
+        [
+          'store registrations out of sync:',
+          ...registrationViolations.map((line) => `- ${line}`),
+        ].join('\n')
+      );
     const policy = readSafeJsonFile<{ authority_role_permissions?: RolePermissions }>(
       pathResolver.rootResolve(POLICY),
       'security policy'
