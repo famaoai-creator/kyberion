@@ -6,10 +6,13 @@
  * select by declared capability instead of tribal knowledge; this module
  * projects those declarations onto the profile shape (RS-01).
  *
- * Honest scope: these are declarations plus spot conformance checks. A full
- * live conformance matrix (exercising each CLI for abort/structured-output
- * support) is a follow-up recorded in the QM adoption plan — do not treat a
- * declared capability as proven until that lands.
+ * Honest scope: these are declarations plus spot conformance checks.
+ * `session_continuity` and `abort` can be measured by the opt-in live scenario
+ * runs (`backend-live-scenarios.ts`, `pnpm kyberion check backend-live-scenarios
+ * --live`), and `backend-capability-honesty.ts` reconciles the declaration
+ * against those records. Every other capability (structured output, streaming,
+ * tool calling, …) is still a declaration only — do not treat a declared
+ * capability as proven unless a recorded measurement backs it.
  */
 
 import type { ReasoningBackendMode } from './reasoning/reasoning-backend-policy.js';
