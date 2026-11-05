@@ -686,7 +686,14 @@ function attestCustody(
           )
         : [
             `${request.created ? 'Opened' : 'Reusing'} approval request ${request.request_id} (${request.status}${request.expires_at ? `, expires ${request.expires_at}` : ''})`,
-            `A human (the installation owner) decides with: ${request.approve_command}`,
+            custody.kind === 'person'
+              ? `${custody.principal_id ? `Only ${custody.principal_id}` : 'The person (on a single-user installation, the owner)'} decides — it is their own consent — with: ${request.approve_command}`
+              : `A human (the installation owner) decides with: ${request.approve_command}`,
+            ...(custody.kind === 'person'
+              ? [
+                  `Sending person material also needs the installation's no-training attestation: pnpm onboarding llm attest --custody system --provider ${provider} --training-use none ... --request-approval`,
+                ]
+              : []),
             `Then apply with the same values (POSIX shell: sh/bash/zsh): ${applyCommand}`,
           ].join('\n')
     );

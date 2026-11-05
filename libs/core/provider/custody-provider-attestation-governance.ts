@@ -13,11 +13,22 @@
  * approval store's own rule, as on the tenant path. `used` / `unknown` never
  * open egress and are recorded directly.
  *
- * Deciders: system custody is the installation's statement, so the
- * installation owner decides (`sovereign` / `owner`); person custody is the
- * person's statement — on a single-user installation the current operator —
- * decided by the same owner roles. There is no standing charter delegation
- * for custody claims in P1: every `none` needs its own human approval.
+ * Deciders (decided 2026-11-05, design option C):
+ * - system custody is the installation's statement that the provider does not
+ *   train, so the installation owner decides (`sovereign` / `owner`), and
+ *   separation of duties refuses self-approval as before;
+ * - person custody is that person's CONSENT to send their own personal
+ *   material under that condition — not evidence that the provider does not
+ *   train (the egress gate also needs the system attestation or a policy
+ *   declaration). Only the person decides it: the request carries
+ *   `accountability.consent` (`personCustodyConsentSubject`), the approval
+ *   store refuses an approval by anyone else for a principal-keyed person,
+ *   and the person deciding a request they opened is consent, not
+ *   self-approval. On the `operator` key (single-user installation) the
+ *   operator is both owner and subject, so the owner-role decision is the
+ *   consent and does not deadlock on separation of duties.
+ * There is no standing charter delegation for custody claims in P1: every
+ * `none` needs its own human decision.
  *
  * A process bound to a tenant scope is refused: tenant material is decided by
  * the tenant's own attestation, and a tenant-bound caller must not author the
@@ -48,8 +59,12 @@ import {
   type ProviderAttestationApprovalRequest,
 } from '../organization/tenant-governance.js';
 import { DEFAULT_ATTESTATION_TTL_DAYS, loadProviderEgressPolicy } from './provider-egress-gate.js';
+import { normalizeApprovalPrincipalId } from '../governance/approval-principal-id.js';
+import type { ApprovalConsent } from '../governance/approval-separation-of-duties.js';
 import {
   custodyProviderAttestationRelativePath,
+  personCustodyConsentGap,
+  personCustodyConsentSubject,
   personCustodyOwnerKey,
   writeCustodyProviderAttestationEntry,
   type CustodyProviderAttestationEntry,
@@ -59,7 +74,12 @@ import {
 /** Storage channel of the human approval a custody `training_use: none` attestation needs. */
 export const CUSTODY_PROVIDER_ATTESTATION_APPROVAL_CHANNEL = 'custody-provider-attestation';
 
-/** Roles that may decide a custody attestation: the installation owner. */
+/**
+ * Workflow roles a custody attestation request is decided through (the
+ * surfaces decide as `sovereign`). For system custody the decider is the
+ * installation owner; for person custody it must also be the person
+ * (`accountability.consent`, checked at decision, apply and read time).
+ */
 export const CUSTODY_PROVIDER_ATTESTATION_DECISION_ROLES = ['sovereign', 'owner'] as const;
 
 export interface AttestCustodyProviderInput {
@@ -268,6 +288,21 @@ function matchesDecisionWorkflow(record: ApprovalRequestRecord): boolean {
   );
 }
 
+/** The consent a request for this custody owner must carry (none for system custody). */
+function expectedConsent(custody: NonTenantCustodyOwner): ApprovalConsent | undefined {
+  return custody.kind === 'person' ? personCustodyConsentSubject(custody) : undefined;
+}
+
+function matchesConsent(record: ApprovalRequestRecord, custody: NonTenantCustodyOwner): boolean {
+  const expected = expectedConsent(custody);
+  const actual = record.accountability?.consent;
+  if (!expected || !actual) return !expected && !actual;
+  return (
+    actual.subject_only === expected.subject_only &&
+    normalizeApprovalPrincipalId(actual.subject) === normalizeApprovalPrincipalId(expected.subject)
+  );
+}
+
 function matchesApprovalScope(record: ApprovalRequestRecord): boolean {
   return (
     computeApprovalPayloadHash({ scope: record.scope }) ===
@@ -302,6 +337,7 @@ export function requestCustodyProviderAttestationApproval(
     (record) =>
       matchesApprovalScope(record) &&
       matchesDecisionWorkflow(record) &&
+      matchesConsent(record, custody) &&
       record.accountability?.payloadHash === payloadHash &&
       !record.applyClaim &&
       !isApprovalRequestExpired(record) &&
@@ -323,10 +359,19 @@ export function requestCustodyProviderAttestationApproval(
   const requestedBy = input.actor || resolved?.requestedBy || input.invoker?.actor || 'operator';
   const requesterActor = resolved ? approvalRequesterActorId(resolved) : requestedBy;
   const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
+  const consent = expectedConsent(custody);
   const tierEffect =
     custody.kind === 'system'
       ? 'confidential material that belongs to no tenant (system custody, e.g. system role drafts)'
       : 'personal material that belongs to no tenant (person custody)';
+  const decider = consent
+    ? consent.subject_only
+      ? `Decided by: ${consent.subject} only — this is the person's own consent; nobody else can give it`
+      : `Decided by: the installation owner, who is also the person (single-user consent)`
+    : 'Decided by: the installation owner (not the requester)';
+  const effect = consent
+    ? `Effect if approved: the person consents to sending their own ${tierEffect} to '${provider}' under training_use none, until the attestation expires. Egress also needs the installation's training_use none attestation for '${provider}' (or a policy declaration); this consent is not that evidence. Tenant material is unaffected.`
+    : `Effect if approved: ${tierEffect} may be sent to '${provider}' until the attestation expires. Tenant material is unaffected.`;
   const details = [
     `Custody: ${custodySubject(custody)}`,
     `Provider: ${provider}`,
@@ -336,7 +381,8 @@ export function requestCustodyProviderAttestationApproval(
     `Attested by: ${String(payload.attested_by)}`,
     `Valid for: ${payload.valid_for_days === null ? 'policy default' : `${String(payload.valid_for_days)} days`}`,
     `Requested by: ${requestedBy}`,
-    `Effect if approved: ${tierEffect} may be sent to '${provider}' until the attestation expires. Tenant material is unaffected.`,
+    decider,
+    effect,
   ].join('\n');
   const record = createApprovalRequest('mission_controller', {
     scope: approvalScope(),
@@ -349,8 +395,12 @@ export function requestCustodyProviderAttestationApproval(
     expiresAt,
     kind: 'mission_gate',
     draft: {
-      title: `Provider attestation: ${provider} for ${custodySubject(custody)}`,
-      summary: `Approve sending ${tierEffect} to '${provider}' on the basis that its plan does not train on it.`,
+      title: consent
+        ? `Provider consent: ${provider} for ${custodySubject(custody)}`
+        : `Provider attestation: ${provider} for ${custodySubject(custody)}`,
+      summary: consent
+        ? `Consent to sending your own ${tierEffect} to '${provider}' on the condition that its plan does not train on it.`
+        : `Approve sending ${tierEffect} to '${provider}' on the basis that its plan does not train on it.`,
       details,
       severity: 'high',
     },
@@ -384,6 +434,7 @@ export function requestCustodyProviderAttestationApproval(
       finalDecision: 'human_only',
       payloadHash,
       effectBinding,
+      ...(consent ? { consent } : {}),
     },
   });
   return {
@@ -446,6 +497,12 @@ function assertCustodyAttestationApproval(
       '[POLICY_VIOLATION] custody provider attestation approval is bound to a different training_use/plan/basis/attested_by/valid_for_days'
     );
   }
+  if (!matchesConsent(approval, input.custody)) {
+    throw new Error(
+      `[POLICY_VIOLATION] custody provider attestation approval ${approval.id} was not opened as ${input.custody.kind === 'person' ? "the person's own consent" : 'an installation-owner decision'} — ` +
+        `a person-custody attestation is the person's consent and records its subject on the request | next: request a new approval with '${custodyProviderAttestationRequestCommand(input)}' | evidence: custody=${custodyOwnerLabel(input.custody)} consent_subject=${approval.accountability?.consent?.subject ?? '(none)'}`
+    );
+  }
   if (!humanApproval) {
     throw new Error(
       '[POLICY_VIOLATION] custody provider attestation requires an authenticated human approval'
@@ -460,12 +517,16 @@ function assertCustodyAttestationApproval(
     effectBinding: humanApproval.effectBinding,
     phase: 'recheck',
   });
+  const humanDecider = humanApproval.approvedBy || approval.decidedBy || 'unknown-human';
+  const consentGap = personCustodyConsentGap(input.custody, humanDecider);
+  if (consentGap) {
+    throw new Error(
+      `[POLICY_VIOLATION] person custody provider attestation approval ${approval.id} is not the person's consent — ${consentGap} | next: request a new approval with '${custodyProviderAttestationRequestCommand(input)}' and have the person decide it from their own signed-in session | evidence: custody=${custodyOwnerLabel(input.custody)} approved_by=${humanDecider}`
+    );
+  }
   // Separation of duties (revoked / self-approved records) is enforced when
   // the approval is claimed: claimApprovalApply runs the `apply_claim` check.
-  return {
-    approval,
-    humanDecider: humanApproval.approvedBy || approval.decidedBy || 'unknown-human',
-  };
+  return { approval, humanDecider };
 }
 
 /**
