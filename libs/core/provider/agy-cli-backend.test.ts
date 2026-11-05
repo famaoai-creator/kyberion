@@ -8,6 +8,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 import { AgyCliBackend, buildAgyCliBackendFromEnv } from './agy-cli-backend.js';
 import { AgySdkAdapter } from './agy-sdk-adapter.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
+import { delegationExecutionStartedFromError } from '../delegation-execution-tracker.js';
 
 const { spawnMock, withWallClockBudgetMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -303,6 +304,27 @@ describe('agy-cli-backend', () => {
       provider: 'agy',
       threadId: 'agy-session-123',
     });
+  });
+
+  it('reports native delegateTask start at askNativeSubagent, not at boot (R5)', async () => {
+    const fakeHarness = {
+      boot: vi.fn(async () => {
+        throw new Error('agy harness boot failed');
+      }),
+      ask: vi.fn(async () => ({ text: 'fake' })),
+      askNativeSubagent: vi.fn(async () => {
+        throw new Error('native turn failed');
+      }),
+    };
+    const backend = new AgyCliBackend({ harnessSession: fakeHarness });
+    const bootFailure = await backend.delegateTask('task').catch((e: unknown) => e);
+    expect(String(bootFailure)).toContain('[SUBAGENT_UNAVAILABLE]');
+    expect(delegationExecutionStartedFromError(bootFailure)).toBe(false);
+    expect(fakeHarness.askNativeSubagent).not.toHaveBeenCalled();
+
+    fakeHarness.boot.mockImplementation(async () => {});
+    const turnFailure = await backend.delegateTask('task').catch((e: unknown) => e);
+    expect(delegationExecutionStartedFromError(turnFailure)).toBe(true);
   });
 
   it('rejects a harness response that does not prove native delegation', async () => {

@@ -55,7 +55,10 @@ import {
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { resolveSandboxPolicy, toCodexSandboxPolicy } from '../shell/sandbox-policy.js';
 import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js';
-import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
+import {
+  markDelegationExecutionStarted,
+  runStartReportingDelegation,
+} from '../delegation-execution-tracker.js';
 
 export interface CodexHarnessSession {
   boot(): Promise<void>;
@@ -236,6 +239,8 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
         await session.refreshContext?.();
       }
       assertOperatorNativeCredentialOwner(this.nativeCredentialOwner);
+      // R5: the prompt reaches the shared app-server session here.
+      markDelegationExecutionStarted();
       const ask = session.askNativeSubagent?.bind(session) || session.ask.bind(session);
       const response = await ask(
         [
