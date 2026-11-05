@@ -21,6 +21,12 @@ export interface EventScopeInput extends ScopeContextInput {
 export interface EventScopeFilter {
   tenant_slug?: string;
   tenant_slugs?: string[] | 'all';
+  /**
+   * Server-resolved only (the shell's system selection): a record that carries
+   * no tenant passes the tenant filter. Never set from a request parameter; it
+   * never widens the named tenants and the other entity filters still apply.
+   */
+  include_untenanted?: boolean;
   organization_id?: string;
   project_id?: string;
   mission_id?: string;
@@ -246,9 +252,11 @@ export function eventScopeMatches(
   filter: EventScopeFilter
 ): boolean {
   if (!scope) {
+    const hasTenantFilter = Boolean(
+      filter.tenant_slug || (filter.tenant_slugs && filter.tenant_slugs !== 'all')
+    );
     const hasEntityFilter = Boolean(
-      filter.tenant_slug ||
-      (filter.tenant_slugs && filter.tenant_slugs !== 'all') ||
+      (hasTenantFilter && filter.include_untenanted !== true) ||
       filter.organization_id ||
       filter.project_id ||
       filter.mission_id ||
@@ -263,7 +271,9 @@ export function eventScopeMatches(
       ? null
       : filter.tenant_slugs || (filter.tenant_slug ? [filter.tenant_slug] : undefined);
   if (requestedTenants) {
-    if (!scope?.tenant_slug || !requestedTenants.includes(scope.tenant_slug)) return false;
+    if (!scope?.tenant_slug) {
+      if (filter.include_untenanted !== true) return false;
+    } else if (!requestedTenants.includes(scope.tenant_slug)) return false;
   }
   if (filter.organization_id && scope?.organization_id !== filter.organization_id) return false;
   if (filter.project_id && scope?.project_id !== filter.project_id) return false;

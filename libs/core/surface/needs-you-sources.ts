@@ -7,7 +7,7 @@
  * count with the one builder.
  *
  * Admission is conservative: tier and tenant come from the server-resolved
- * viewer; a memory candidate with an audience or an owner restriction is left
+ * viewer (tenant admission is `admitsTenant`, shared with every surface); a memory candidate with an audience or an owner restriction is left
  * out because this reader cannot prove who the caller is.
  */
 
@@ -37,7 +37,7 @@ import type {
   NeedsYouOutcomeInput,
   NeedsYouSourceData,
 } from './needs-you.js';
-import type { SurfaceAuthorizationContext } from './surface-authorization.js';
+import { admitsTenant, type SurfaceAuthorizationContext } from './surface-authorization.js';
 
 const logger = createLogger('needs-you-sources');
 
@@ -50,11 +50,6 @@ const TIERS: readonly Tier[] = ['personal', 'confidential', 'public'];
 
 function tiersOf(viewer: SurfaceAuthorizationContext): Tier[] {
   return TIERS.filter((tier) => tier !== 'personal' && viewer.tierAccess.includes(tier));
-}
-
-function tenantAllowed(viewer: SurfaceAuthorizationContext, tenant: string | undefined): boolean {
-  if (viewer.tenantSlugs === 'all') return true;
-  return Boolean(tenant && viewer.tenantSlugs.includes(tenant));
 }
 
 /** A memory candidate as the queue card shows it (summary clamped, origin humanized). */
@@ -94,7 +89,7 @@ function knowledgeFor(viewer: SurfaceAuthorizationContext): NeedsYouKnowledgeInp
       if (!tiers.includes(candidate.sensitivity_tier as Tier) || !tiers.includes(sourceTier))
         return false;
       if (scope?.allowed_audience?.length || scope?.owner_nhi) return false;
-      return sourceTier === 'public' || tenantAllowed(viewer, scope?.tenant_slug);
+      return sourceTier === 'public' || admitsTenant(viewer, scope?.tenant_slug);
     })
     .map((candidate) => needsYouKnowledgeFromCandidate(candidate));
 }
@@ -104,7 +99,7 @@ function clarificationsFor(viewer: SurfaceAuthorizationContext): NeedsYouClarifi
   const report = withExecutionContext('sovereign_concierge', () => collectMissionHygieneReport());
   return [...report.abandoned, ...report.stale]
     .filter((finding) => tiers.includes(finding.tier as Tier))
-    .filter((finding) => finding.tier === 'public' || tenantAllowed(viewer, finding.tenant_slug))
+    .filter((finding) => finding.tier === 'public' || admitsTenant(viewer, finding.tenant_slug))
     .map((finding) => {
       let goal = '';
       let since: string | undefined;
@@ -151,7 +146,10 @@ function approvalsFor(viewer: SurfaceAuthorizationContext): CeoApprovalItem[] {
       const tenant = record.scope?.tenant_slug;
       // Personal approvals need an owner-authenticated reader (the shell's).
       if (!tier || !tiers.includes(tier)) return false;
-      return tenant ? tenantAllowed(viewer, tenant) : tier === 'public';
+      // A public untenanted approval is everyone's; any other untenanted one
+      // belongs to the views that admit company-less records.
+      if (!tenant && tier === 'public') return true;
+      return admitsTenant(viewer, tenant);
     })
     .map((record) =>
       toCeoApprovalItem(record, { publicationPreview: readApprovalPublicationPreview })
@@ -160,7 +158,7 @@ function approvalsFor(viewer: SurfaceAuthorizationContext): CeoApprovalItem[] {
 
 function outcomesFor(viewer: SurfaceAuthorizationContext): NeedsYouOutcomeInput[] {
   return listInboxEntries({ status: ['unread', 'read'], limit: NEEDS_YOU_READ_LIMIT })
-    .filter((entry) => Boolean(entry.tenant_slug) && tenantAllowed(viewer, entry.tenant_slug))
+    .filter((entry) => admitsTenant(viewer, entry.tenant_slug))
     .map((entry) => ({
       entry_id: entry.entry_id,
       title: entry.title,

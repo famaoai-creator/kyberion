@@ -12,13 +12,18 @@ import {
 } from '@agent/core/surface/needs-you-sources';
 import { invokeSurfaceOperation } from '@agent/core/surface/surface-operation-registry';
 import { readConciergeHome } from './headless-projections';
+import { companyFanoutViews } from './company-fanout-views';
+import {
+  COMPANY_FANOUT_RATE_LIMITS,
+  throttleCompanyFanout,
+  readCompanyFanoutHome,
+} from './company-fanout-reader';
+import { libraryHrefForKnowledgeCandidate } from './inbox-links';
 import { listHygieneInquiries } from './hygiene-server';
 import { memoryCandidateVisibleToViewer } from './memory-candidate-visibility';
 import { resolveConciergeSelectedViewer, type ConciergeSelectedViewer } from './selected-tenant';
 import { PERSONAL_SELECTION, SYSTEM_SELECTION } from './tenant-context';
 import {
-  checkConciergeRateLimit,
-  conciergeClientAddress,
   conciergeErrorResponse,
   narrowConciergeScope,
   toSurfaceAuthorizationContext,
@@ -39,10 +44,10 @@ import {
  */
 export function learningReviewUrl(candidate: MemoryCandidate): string | undefined {
   if (!(candidate.scope && candidate.proposed_memory_kind === 'sop')) return undefined;
-  const params = new URLSearchParams({ tab: 'knowledge' });
-  params.set('candidateKey', needsYouKnowledgeFromCandidate(candidate).candidateKey!);
-  if (candidate.scope.tenant_slug) params.set('tenant', candidate.scope.tenant_slug);
-  return `/library?${params.toString()}`;
+  return libraryHrefForKnowledgeCandidate(
+    needsYouKnowledgeFromCandidate(candidate).candidateKey!,
+    candidate.scope.tenant_slug || undefined
+  );
 }
 
 /** Undecided memory candidates the viewer may see, newest first. */
@@ -54,8 +59,15 @@ export function listConciergeMemoryQueue(viewer: ConciergeViewerContext): NeedsY
     .map((candidate) => needsYouKnowledgeFromCandidate(candidate, learningReviewUrl(candidate)));
 }
 
-export function readConciergeNeedsYou(viewer: ConciergeViewerContext): NeedsYouSourceData {
-  const home = readConciergeHome(viewer, { limit: NEEDS_YOU_READ_LIMIT });
+export function readConciergeNeedsYou(
+  viewer: ConciergeViewerContext,
+  options: { fanout?: boolean } = {}
+): NeedsYouSourceData {
+  // The personal view's per-company homes go through the shared fan-out
+  // reader (short per-viewer cache, cleared by every needs-you mutation).
+  const home = options.fanout
+    ? readCompanyFanoutHome(viewer, NEEDS_YOU_READ_LIMIT)
+    : readConciergeHome(viewer, { limit: NEEDS_YOU_READ_LIMIT });
   return {
     approvals: home.approval_queue,
     outcomes: home.outcome_feed,
@@ -75,9 +87,10 @@ export function readConciergeNeedsYou(viewer: ConciergeViewerContext): NeedsYouS
 
 /** Reads every view and concatenates; the builder dedupes records seen twice. */
 export function readConciergeNeedsYouViews(
-  views: readonly ConciergeViewerContext[]
+  views: readonly ConciergeViewerContext[],
+  options: { fanout?: boolean } = {}
 ): NeedsYouSourceData {
-  const parts = views.map(readConciergeNeedsYou);
+  const parts = views.map((view) => readConciergeNeedsYou(view, options));
   return {
     approvals: parts.flatMap((part) => part.approvals),
     outcomes: parts.flatMap((part) => part.outcomes),
@@ -99,24 +112,26 @@ export function conciergeNeedsYouViews(
   narrowed: ConciergeViewerContext
 ): ConciergeViewerContext[] {
   if (selected.selection.mode !== 'personal') return [narrowed];
-  const companies = selected.allowedTenants.filter(
-    (slug) => narrowed.tenantSlugs === 'all' || narrowed.tenantSlugs.includes(slug)
-  );
-  const views: ConciergeViewerContext[] = [{ ...narrowed, tenantSlugs: [] }];
-  for (const slug of companies) views.push({ ...narrowed, tenantSlugs: [slug] });
-  if (narrowed.tenantSlugs === 'all')
-    views.push({ ...narrowed, tenantSlugs: [], includeUntenanted: true });
-  return views;
+  // The same company fan-out `/api/personal-summary` reads.
+  const fanout = companyFanoutViews(narrowed, selected.allowedTenants);
+  const own: ConciergeViewerContext = { ...narrowed, tenantSlugs: [] };
+  delete own.includeUntenanted;
+  return [
+    own,
+    ...fanout.companies.map((company) => company.viewer),
+    ...(fanout.system ? [fanout.system] : []),
+  ];
 }
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' };
 /**
  * The personal view reads one full home per allowed company (plus the
  * viewer's own and the company-less view), so — like `/api/personal-summary`
- * — it draws from its own, smaller bucket, shared by `needs-you.list` and
- * `needs-you.summary` (the inbox polls both, the rail badge the summary).
+ * — it draws from the fan-out reader's own, smaller bucket, shared by
+ * `needs-you.list` and `needs-you.summary` (the inbox polls both, the rail
+ * badge the summary).
  */
-export const NEEDS_YOU_PERSONAL_RATE_LIMIT = 40;
+export const NEEDS_YOU_PERSONAL_RATE_LIMIT = COMPANY_FANOUT_RATE_LIMITS['needs-you-personal'];
 /** The non-narrowing inputs `needs-you.list` declares. */
 const LIST_PARAMS = ['reason', 'overdue', 'cursor', 'limit'] as const;
 
@@ -132,24 +147,8 @@ export function handleNeedsYouRequest(
   const resolved = resolveConciergeSelectedViewer(req);
   if (resolved.response) return resolved.response;
   if (resolved.selection.mode === 'personal') {
-    const limited = checkConciergeRateLimit(req, {
-      limit: NEEDS_YOU_PERSONAL_RATE_LIMIT,
-      key: `needs-you-personal:${resolved.viewer.principalId ?? conciergeClientAddress(req)}`,
-    });
-    if (!limited.ok) {
-      return NextResponse.json(
-        { ok: false, error_code: 'rate_limited' },
-        {
-          status: 429,
-          headers: {
-            ...NO_STORE,
-            ...(limited.retryAfterSeconds
-              ? { 'Retry-After': String(limited.retryAfterSeconds) }
-              : {}),
-          },
-        }
-      );
-    }
+    const limited = throttleCompanyFanout(req, resolved.viewer, 'needs-you-personal', NO_STORE);
+    if (limited) return limited;
   }
   const params = req.nextUrl.searchParams;
   let viewer: ConciergeViewerContext;
@@ -190,7 +189,10 @@ export function handleNeedsYouRequest(
   }
   const result = invokeSurfaceOperation(operation, input, {
     viewer: toSurfaceAuthorizationContext(viewer),
-    needsYou: () => readConciergeNeedsYouViews(conciergeNeedsYouViews(resolved, viewer)),
+    needsYou: () =>
+      readConciergeNeedsYouViews(conciergeNeedsYouViews(resolved, viewer), {
+        fanout: resolved.selection.mode === 'personal',
+      }),
   });
   if (!result.ok) {
     return NextResponse.json(
