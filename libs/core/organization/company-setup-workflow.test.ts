@@ -142,6 +142,10 @@ vi.mock('./tenant-activation-approval.js', () => ({
   }),
 }));
 vi.mock('../governance/approval-store.js', () => ({ loadApprovalRequest: () => st.approval }));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('../governance/approval-store-reader.js', () => ({
+  loadApprovalRequest: () => st.approval,
+}));
 vi.mock('../governance/approval-presentation.js', () => ({
   computeApprovalPresentedDigest: () => 'digest',
 }));

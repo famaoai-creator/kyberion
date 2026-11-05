@@ -13,6 +13,12 @@ vi.mock('../governance/approval-store.js', () => ({
   loadApprovalRequest: mocks.approval,
   isApprovalRequestExpired: mocks.expired,
 }));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('../governance/approval-store-reader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../governance/approval-store-reader.js')>()),
+  loadApprovalRequest: mocks.approval,
+  isApprovalRequestExpired: mocks.expired,
+}));
 vi.mock('../governance/approval-linked-usability.js', () => ({
   approvalUsabilityRefusal: mocks.usable,
 }));

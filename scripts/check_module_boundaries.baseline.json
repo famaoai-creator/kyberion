@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "cycles": 1,
+  "cycles": 0,
   "runtime_cycles": 3,
-  "max_runtime_scc_size": 33,
+  "max_runtime_scc_size": 24,
   "direction_violations": 0
 }

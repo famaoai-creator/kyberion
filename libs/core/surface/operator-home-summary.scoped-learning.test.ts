@@ -22,6 +22,14 @@ vi.mock('../governance/approval-store.js', () => ({
     return state.approvals;
   },
 }));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('../governance/approval-store-reader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../governance/approval-store-reader.js')>()),
+  listApprovalRequests: (...args: unknown[]) => {
+    state.approvalReads(...args);
+    return state.approvals;
+  },
+}));
 // Unrelated stores are intentionally absent. No fixtures or raw filesystem IO.
 vi.mock('../metrics.js', () => ({
   MetricsCollector: class {

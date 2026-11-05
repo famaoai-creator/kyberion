@@ -1,10 +1,8 @@
 /** Shared state-independent first-job bindings. These checks grant no authority. */
 import type { DotCharter } from '../dot/dot-charter.js';
 import { dotProposalHash, type DotActionRecord } from '../dot/dot-action-ledger.js';
-import {
-  computeApprovalPayloadHash,
-  type ApprovalRequestRecord,
-} from '../governance/approval-store.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import type { FrontDeskExecutionBinding } from './front-desk-execution-contract.js';
 import {
   frontDeskBindingsEqual,

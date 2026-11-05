@@ -1,11 +1,9 @@
 /** Opens exact scoped human reviews in the canonical shared approval store. */
 import { withExecutionContext } from '../authority.js';
 import { withLockSync } from '../foundation/lock-utils.js';
-import {
-  createApprovalRequest,
-  loadApprovalRequest,
-  type ApprovalRequestRecord,
-} from '../governance/approval-store.js';
+import { createApprovalRequest } from '../governance/approval-request-create.js';
+import { loadApprovalRequest } from '../governance/approval-store-reader.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import { markApprovalConsumed } from '../governance/approval-revocation.js';
 import {
   resolveApprovalRequesterInput,

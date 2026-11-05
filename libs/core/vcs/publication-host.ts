@@ -5,7 +5,7 @@ import { pathResolver } from '../path-resolver.js';
 import type { ghPrCreate, ghPrMerge } from './github.js';
 import { gitPush, type VcsCommandResult, type VcsCommandRunner } from './git.js';
 import { vcsHostOptionsForRunner, vcsHostPrCreate, vcsHostPrMerge } from './vcs-host-verbs.js';
-import { computeApprovalPayloadHash } from '../governance/approval-store.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
 import {
   ExternalOperationApprovalRequired,
   hasExternalOperationAuthority,

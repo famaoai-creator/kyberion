@@ -26,7 +26,7 @@ import { nowIso } from '../foundation/time.js';
 import { slugify } from '../foundation/text.js';
 import { pathResolver, findMissionPath } from '../path-resolver.js';
 import { loadState } from '../mission/mission-state.js';
-import { listApprovalRequests } from '../governance/approval-store.js';
+import { listApprovalRequests } from '../governance/approval-store-reader.js';
 import { buildExecutionEnv, withExecutionContext } from '../authority.js';
 import {
   assertSafeRepositoryPath,

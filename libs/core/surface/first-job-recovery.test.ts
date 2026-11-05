@@ -169,6 +169,14 @@ vi.mock('../governance/approval-store.js', async (original) => ({
     return structuredClone(state.record);
   },
 }));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('../governance/approval-store-reader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../governance/approval-store-reader.js')>()),
+  loadApprovalRequest: (_channel: string, id: string) =>
+    state.record?.id === id && !(state.failReadback && state.record.status !== 'pending')
+      ? structuredClone(state.record)
+      : null,
+}));
 
 vi.mock('../workforce/work-coordination.js', async (original) => ({
   ...(await original<typeof import('../workforce/work-coordination.js')>()),

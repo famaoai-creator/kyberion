@@ -11,14 +11,28 @@ vi.mock('./approval-gate-charter.js', () => ({
   runCharterGate: vi.fn(() => ({ kind: 'none' })),
   isCharterEligiblePolicy: vi.fn(() => true),
 }));
+// Values the facade only re-exports are mocked at their defining module below, so the
+// facade (spread from its original) and direct importers share one mock instance.
 vi.mock('./approval-store.js', async (original) => ({
   ...(await original<typeof import('./approval-store.js')>()),
-  listApprovalRequests: vi.fn(() => []),
-  createApprovalRequest: vi.fn(() => ({ id: 'apr-1' })),
   lookupSessionApprovalCache: vi.fn(() => null),
   recordSessionCacheAutoApproval: vi.fn(),
-  evaluateApprovalUsability: vi.fn(() => null),
+}));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('./approval-store-reader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./approval-store-reader.js')>()),
+  listApprovalRequests: vi.fn(() => []),
   loadApprovalRequest: vi.fn(),
+}));
+// approval-request-create defines these; its importers bypass the facade.
+vi.mock('./approval-request-create.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./approval-request-create.js')>()),
+  createApprovalRequest: vi.fn(() => ({ id: 'apr-1' })),
+}));
+// approval-separation-of-duties defines these; its importers bypass the facade.
+vi.mock('./approval-separation-of-duties.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./approval-separation-of-duties.js')>()),
+  evaluateApprovalUsability: vi.fn(() => null),
 }));
 vi.mock('./audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
 vi.mock('./accountability-charter-registry.js', () => ({

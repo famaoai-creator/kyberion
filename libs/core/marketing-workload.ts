@@ -3,11 +3,9 @@ import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
-import {
-  approvalUsabilityRefusal,
-  computeApprovalPayloadHash,
-  type ApprovalRequestRecord,
-} from './governance/approval-store.js';
+import { approvalUsabilityRefusal } from './governance/approval-separation-of-duties.js';
+import { computeApprovalPayloadHash } from './governance/approval-presentation.js';
+import type { ApprovalRequestRecord } from './governance/approval-store.js';
 import { evaluateArtifactReviews } from './workforce/artifact-review.js';
 
 export type MarketingRiskLevel = 0 | 1 | 2 | 3 | 4;

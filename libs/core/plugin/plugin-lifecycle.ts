@@ -35,7 +35,7 @@ import {
   type ManagedPluginRecord,
 } from './plugin-managed-install.js';
 import { permissionsDigest, type PluginPermissionGrant } from './plugin-permissions.js';
-import { loadApprovalRequest } from '../governance/approval-store.js';
+import { loadApprovalRequest } from '../governance/approval-store-reader.js';
 import {
   activatePluginContributions,
   disposeOwnedContribution,

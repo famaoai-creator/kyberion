@@ -20,6 +20,11 @@ vi.mock('../mission/mission-state.js', () => ({ loadState: mocks.loadState }));
 vi.mock('../governance/approval-store.js', () => ({
   listApprovalRequests: mocks.listApprovalRequests,
 }));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('../governance/approval-store-reader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../governance/approval-store-reader.js')>()),
+  listApprovalRequests: mocks.listApprovalRequests,
+}));
 
 import { pathResolver } from '../path-resolver.js';
 import {

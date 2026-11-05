@@ -13,7 +13,8 @@ import {
   withUndispatchedWorkItemEvidence,
 } from '../workforce/work-coordination.js';
 import { assertBuiltinOnlyWorkerEventStream } from '../workforce/worker-event-stream.js';
-import { loadApprovalRequest, computeApprovalPayloadHash } from '../governance/approval-store.js';
+import { loadApprovalRequest } from '../governance/approval-store-reader.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
 import {
   authenticateFirstJobBrowser,
   resolveFirstJobOwnerViewer,

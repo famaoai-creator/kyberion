@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import { resolveScopeContext } from '../scope-context.js';
-import { computeApprovalPayloadHash } from './approval-store.js';
+import { computeApprovalPayloadHash } from './approval-presentation.js';
 import { charterInputForDecision } from './charter-call-site.js';
 import { currentExternalOperationOccurrence } from './external-operation-occurrence.js';
 import { writeScopedArtifact } from '../workforce/artifact-store.js';

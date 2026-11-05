@@ -26,11 +26,11 @@ import { runAsDotCharter } from '../dot/dot-key-results.js';
 import type { DotCharter, LoadedDotCharter } from '../dot/dot-charter.js';
 import type { FrontDeskArtifactVerification } from '../dot/dot-state-paths.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
+import { assertApprovalUsable } from '../governance/approval-separation-of-duties.js';
 import {
-  assertApprovalUsable,
   loadApprovalRequest,
   isApprovalRequestExpired,
-} from '../governance/approval-store.js';
+} from '../governance/approval-store-reader.js';
 import {
   frontDeskRuntimeScope,
   inspectFrontDeskExecution,
