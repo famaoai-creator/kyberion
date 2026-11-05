@@ -461,9 +461,10 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
   keep a read fallback to the legacy copy while it may still hold live data (remove the legacy copy
   on the next write — `generation-cost-settlement.ts`), or skip the fallback when the data is
   short-lived (`scripts/reasoning_credentials.ts` proofs expire in 15 minutes). Add the old base to
-  `PHYSICAL_LEGACY_TENANT_STATE_ROOTS` so offboarding still removes leftovers. A store whose current
-  layout is already registered and only detects legacy copies for operator-reviewed migration
-  (`dot-state-paths.ts`) is a documented `bases` exception instead.
+  `PHYSICAL_LEGACY_TENANT_STATE_ROOTS` so offboarding still removes leftovers — also when the live
+  migration stays operator-reviewed: `dot-state-paths.ts` keeps `pnpm kyberion dot migrate-state`
+  for a live tenant, but an offboarded tenant's `dot/tenants/<slug>/` copy is exported and
+  soft-deleted automatically (owner decision 2026-11-05; no gate exception).
 - Tenant content in a shared observability store (`active/shared/observability/<store>`) has the
   same defect: tier-guard, backup and offboarding cannot see it. The delegation trace and records
   moved to the registered ledger root `active/shared/runtime/delegation-records/` (tenant partitions
