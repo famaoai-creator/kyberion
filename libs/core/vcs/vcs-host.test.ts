@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  admitError: undefined as Error | undefined,
   admitted: [] as Array<{
     operationId: string;
     effect: Record<string, unknown>;
@@ -14,6 +15,7 @@ vi.mock('../governance/external-operation.js', () => ({
     execute: () => Promise<unknown>
   ) => {
     mocks.admitted.push(input);
+    if (mocks.admitError && input.requiresApproval) throw mocks.admitError;
     return execute();
   },
   runExternalOperationSync: (input: (typeof mocks.admitted)[number], execute: () => unknown) => {
@@ -54,6 +56,9 @@ import {
   type GithubRestFetch,
 } from './github-rest-host-provider.js';
 import { createMemoryVcsHostProvider } from './memory-vcs-host-provider.js';
+import { parseVcsPrFields } from './vcs-host.js';
+import { vcsHostGithubApiGet, vcsHostPrViewFields } from './vcs-host-verbs.js';
+import { restPullField } from './github-rest-host-provider.js';
 
 const HEAD = 'a'.repeat(40);
 const BASE = 'b'.repeat(40);
@@ -106,6 +111,11 @@ function ghFixtureRunner(calls: string[][] = []): VcsCommandRunner {
         state: 'OPEN',
         title: 'Add widget',
         isDraft: false,
+        author: { login: 'octo' },
+        mergedAt: null,
+        closedAt: null,
+        mergeCommit: null,
+        files: [{ path: 'src/widget.ts', additions: 3, deletions: 1 }],
       };
       // Real gh returns only the requested --json fields.
       return ok(Object.fromEntries(fields.map((field) => [field, row[field]])));
@@ -158,6 +168,8 @@ function restFixtureFetch(calls: Array<Record<string, unknown>> = []): GithubRes
     if (url.startsWith('/repos/acme/widgets/commits/'))
       return { sha: url.endsWith('/main') ? BASE : HEAD };
     if (url === '/repos/acme/widgets/pulls/7') return PULL;
+    if (url === '/repos/acme/widgets/pulls/7/files?per_page=100&page=1')
+      return [{ filename: 'src/widget.ts', additions: 3, deletions: 1 }];
     if (url.startsWith('/repos/acme/widgets/pulls?')) return [PULL];
     if (url === '/repos/acme/widgets/pulls' && request.method === 'POST')
       return { number: 8, html_url: 'https://github.com/acme/widgets/pull/8' };
@@ -200,6 +212,15 @@ describe('vcs-host provider contract (gh-cli ≡ github-rest)', () => {
       view: await provider.prView(c, repo, '7'),
       list: await provider.prList(c, repo, { state: 'open', limit: 10 }),
       checks: summarizePrChecks(await provider.prChecks(c, repo, '7')),
+      fields: await provider.prFields(c, repo, '7', [
+        'number',
+        'state',
+        'author',
+        'mergedAt',
+        'closedAt',
+        'mergeCommit',
+        'files',
+      ]),
     };
     results.set(id, facts);
     expect(facts.repo).toEqual(REPO);
@@ -355,6 +376,18 @@ describe('governed vcs-host verbs', () => {
     expect(mocks.admitted).toHaveLength(0);
   });
 
+  it('keeps governance errors from admission intact (class and identity)', async () => {
+    memory();
+    class ApprovalRequired extends Error {}
+    const pending = new ApprovalRequired('approval pending');
+    mocks.admitError = pending;
+    try {
+      await expect(vcsHostPrMerge({ ...opts, ref: '7' })).rejects.toBe(pending);
+    } finally {
+      mocks.admitError = undefined;
+    }
+  });
+
   it('sanitizes provider error text', async () => {
     const forge = memory();
     forge.prView = async () => {
@@ -417,6 +450,95 @@ describe('governed vcs-host verbs', () => {
       provider: 'memory-test',
       ok: true,
     });
+  });
+});
+
+describe('pr fields and GitHub API reads', () => {
+  let unregister: (() => void) | undefined;
+  afterEach(() => unregister?.());
+  const opts = { provider: 'memory-fields', git: ghFixtureRunner() };
+  function forge() {
+    const provider = createMemoryVcsHostProvider({
+      id: 'memory-fields',
+      repository: REPO,
+      pulls: [
+        {
+          number: 7,
+          url: PULL.html_url,
+          headRefOid: HEAD,
+          baseRefOid: BASE,
+          headRefName: 'feat/widget',
+          baseRefName: 'main',
+          state: 'MERGED',
+          title: 'Add widget',
+          isDraft: false,
+          fields: { mergedAt: '2026-11-05T00:00:00Z', files: [{ path: 'a', additions: 1 }] },
+        },
+      ],
+      api: { 'branches/main/protection/required_status_checks': { strict: true } },
+    });
+    unregister = registerVcsHostProvider(provider);
+    return provider;
+  }
+
+  it('rejects unknown gh field names before any provider call', async () => {
+    forge();
+    expect(() => parseVcsPrFields('number,reviewDecision')).toThrow(/unsupported PR field/);
+    await expect(
+      vcsHostPrViewFields({ ...opts, ref: '7', fields: 'statusCheckRollup' })
+    ).rejects.toThrow(/unsupported PR field/);
+    expect(mocks.admitted).toHaveLength(0);
+  });
+
+  it('serves gh-shaped fields through the governed read', async () => {
+    forge();
+    await expect(
+      vcsHostPrViewFields({ ...opts, ref: '7', fields: 'state,mergedAt,files' })
+    ).resolves.toEqual({
+      state: 'MERGED',
+      mergedAt: '2026-11-05T00:00:00Z',
+      files: [{ path: 'a', additions: 1 }],
+    });
+  });
+
+  it('admits only allowlisted GitHub API read paths', async () => {
+    forge();
+    for (const path of [
+      'hooks',
+      'collaborators',
+      'git/refs/heads/main',
+      'commits/../../hooks?x',
+      'commits/../../hooks',
+      'commits/%2e%2e/%2e%2e/hooks',
+      'commits/./main',
+    ])
+      await expect(vcsHostGithubApiGet({ ...opts, path })).rejects.toThrow(
+        /VCS_TYPED_VERB_REQUIRED/
+      );
+    await expect(
+      vcsHostGithubApiGet({ ...opts, path: 'branches/main/protection/required_status_checks' })
+    ).resolves.toEqual({ strict: true });
+  });
+
+  it('treats a missing policy as absent only when allowed', async () => {
+    forge();
+    await expect(
+      vcsHostGithubApiGet({ ...opts, path: 'rules/branches/main', allowMissing: true })
+    ).resolves.toBeNull();
+    await expect(vcsHostGithubApiGet({ ...opts, path: 'rules/branches/main' })).rejects.toThrow(
+      VcsHostError
+    );
+  });
+
+  it('exposes a REST merge commit only once the PR is merged (gh semantics)', () => {
+    const open = { ...PULL, merge_commit_sha: 'f'.repeat(40) };
+    expect(restPullField(open, 'mergeCommit')).toBeNull();
+    expect(
+      restPullField({ ...open, merged_at: '2026-11-05T00:00:00Z', state: 'closed' }, 'mergeCommit')
+    ).toEqual({ oid: 'f'.repeat(40) });
+    expect(
+      restPullField({ ...open, merged_at: '2026-11-05T00:00:00Z', state: 'closed' }, 'state')
+    ).toBe('MERGED');
   });
 });
 

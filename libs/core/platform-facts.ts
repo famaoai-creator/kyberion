@@ -73,6 +73,11 @@ export function hostNodePlatform(): NodeJS.Platform {
   return process.platform;
 }
 
+/** Process CPU architecture, read at call time (e.g. 'arm64', 'x64'). */
+export function hostArch(): string {
+  return os.arch();
+}
+
 export interface PlatformFacts {
   /** Normalized platform identity (see normalizePlatform). */
   readonly platform: Platform;

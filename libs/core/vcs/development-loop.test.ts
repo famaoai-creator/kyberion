@@ -32,38 +32,38 @@ function fixture(): DevelopmentLoopPorts {
   };
 }
 describe('prepared development reconciliation', () => {
-  it('defaults to mutation-free preflight', () => {
+  it('defaults to mutation-free preflight', async () => {
     const p = fixture();
-    expect(reconcileVcsDevelopment(p).status).toBe('ready');
+    expect((await reconcileVcsDevelopment(p)).status).toBe('ready');
     expect(p.promote).not.toHaveBeenCalled();
   });
-  it('pending checks do not trigger repairs or review', () => {
+  it('pending checks do not trigger repairs or review', async () => {
     const p = fixture();
     p.ci = () => ({ state: 'pending', policyDigest: 'p', requiredChecks: ['CI'], reasons: [] });
-    expect(reconcileVcsDevelopment(p, false).status).toBe('waiting');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('waiting');
     expect(p.review).not.toHaveBeenCalled();
     expect(p.promote).not.toHaveBeenCalled();
   });
-  it('failed checks require the existing executor', () => {
+  it('failed checks require the existing executor', async () => {
     const p = fixture();
     p.ci = () => ({ state: 'failure', policyDigest: 'p', requiredChecks: ['CI'], reasons: [] });
-    expect(reconcileVcsDevelopment(p, false).status).toBe('repair_required');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('repair_required');
     expect(p.promote).not.toHaveBeenCalled();
   });
-  it('does not promote without independent review', () => {
+  it('does not promote without independent review', async () => {
     const p = fixture();
     p.review = () => ({ ok: false });
-    expect(reconcileVcsDevelopment(p, false).status).toBe('review_required');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('review_required');
     expect(p.promote).not.toHaveBeenCalled();
   });
-  it('invalidates proof after a concurrent head change', () => {
+  it('invalidates proof after a concurrent head change', async () => {
     const p = fixture();
     let n = 0;
     p.snapshot = () => ({ ...pr, headSha: ++n === 1 ? pr.headSha : 'c'.repeat(40) });
-    expect(reconcileVcsDevelopment(p, false).status).toBe('review_required');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('review_required');
     expect(p.promote).not.toHaveBeenCalled();
   });
-  it('invalidates proof after server policy changes', () => {
+  it('invalidates proof after server policy changes', async () => {
     const p = fixture();
     let n = 0;
     p.ci = () => ({
@@ -72,31 +72,31 @@ describe('prepared development reconciliation', () => {
       requiredChecks: ['CI'],
       reasons: [],
     });
-    expect(reconcileVcsDevelopment(p, false).status).toBe('blocked');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('blocked');
     expect(p.promote).not.toHaveBeenCalled();
   });
-  it('successful merge command only means queued until remote merged', () => {
+  it('successful merge command only means queued until remote merged', async () => {
     const p = fixture();
-    expect(reconcileVcsDevelopment(p, false).status).toBe('queued');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('queued');
     expect(p.promote).toHaveBeenCalledOnce();
   });
-  it('verifies immutable remote merge commit after promotion', () => {
+  it('verifies immutable remote merge commit after promotion', async () => {
     const p = fixture();
     let n = 0;
     p.snapshot = () =>
       ++n < 3 ? { ...pr } : { ...pr, state: 'merged', mergeCommitSha: 'd'.repeat(40) };
-    expect(reconcileVcsDevelopment(p, false).status).toBe('merged');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('merged');
   });
-  it('resumes a merged PR without a repeated mutation', () => {
+  it('resumes a merged PR without a repeated mutation', async () => {
     const p = fixture();
     p.snapshot = () => ({ ...pr, state: 'merged', mergeCommitSha: 'd'.repeat(40) });
-    expect(reconcileVcsDevelopment(p, false).status).toBe('merged');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('merged');
     expect(p.promote).not.toHaveBeenCalled();
   });
-  it('blocks ambiguous CI and wrong branch rather than weakening policy', () => {
+  it('blocks ambiguous CI and wrong branch rather than weakening policy', async () => {
     const p = fixture();
     p.snapshot = () => ({ ...pr, headBranch: 'attacker' });
-    expect(reconcileVcsDevelopment(p, false).status).toBe('blocked');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('blocked');
     expect(p.promote).not.toHaveBeenCalled();
   });
 });
@@ -104,7 +104,7 @@ describe('prepared development reconciliation', () => {
 describe('immutable post-merge verification', () => {
   it.each(['pending', 'failure', 'unverified'] as const)(
     'retains merge receipt when CI is %s',
-    (state) => {
+    async (state) => {
       const p = fixture();
       p.snapshot = () => ({ ...pr, state: 'merged', mergeCommitSha: 'e'.repeat(40) });
       p.verifyMerged = () => ({
@@ -113,7 +113,7 @@ describe('immutable post-merge verification', () => {
         requiredChecks: ['CI'],
         reasons: [],
       });
-      const r = reconcileVcsDevelopment(p, false);
+      const r = await reconcileVcsDevelopment(p, false);
       expect(r.status).toBe(
         state === 'pending'
           ? 'post_merge_waiting'
@@ -125,16 +125,16 @@ describe('immutable post-merge verification', () => {
       expect(p.promote).not.toHaveBeenCalled();
     }
   );
-  it('missing verification adapter never completes the WorkItem', () => {
+  it('missing verification adapter never completes the WorkItem', async () => {
     const p = fixture();
     p.snapshot = () => ({ ...pr, state: 'merged', mergeCommitSha: 'e'.repeat(40) });
     delete p.verifyMerged;
-    expect(reconcileVcsDevelopment(p, false).status).toBe('post_merge_unverified');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('post_merge_unverified');
   });
 });
 
 describe('live promotion lineage', () => {
-  it('rechecks review after fresh CI before mutation', () => {
+  it('rechecks review after fresh CI before mutation', async () => {
     const p = fixture();
     let reviewed = true,
       n = 0;
@@ -143,24 +143,24 @@ describe('live promotion lineage', () => {
       return { state: 'success', policyDigest: 'policy', requiredChecks: ['CI'], reasons: [] };
     };
     p.review = () => ({ ok: reviewed });
-    expect(reconcileVcsDevelopment(p, false).status).toBe('review_required');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('review_required');
     expect(p.promote).not.toHaveBeenCalled();
   });
-  it('does not reenqueue an already queued PR', () => {
+  it('does not reenqueue an already queued PR', async () => {
     const p = fixture();
     p.snapshot = () => ({ ...pr, queued: true });
-    expect(reconcileVcsDevelopment(p, false).status).toBe('queued');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('queued');
     expect(p.promote).not.toHaveBeenCalled();
   });
-  it('merged resume still requires original WorkItem review', () => {
+  it('merged resume still requires original WorkItem review', async () => {
     const p = fixture();
     p.snapshot = () => ({ ...pr, state: 'merged', mergeCommitSha: 'e'.repeat(40) });
     p.review = () => ({ ok: false });
-    const r = reconcileVcsDevelopment(p, false);
+    const r = await reconcileVcsDevelopment(p, false);
     expect(r.status).toBe('review_required');
     expect(r.knownMergeCommitSha).toBe('e'.repeat(40));
   });
-  it('merged wrong branch never completes', () => {
+  it('merged wrong branch never completes', async () => {
     const p = fixture();
     p.snapshot = () => ({
       ...pr,
@@ -168,14 +168,14 @@ describe('live promotion lineage', () => {
       state: 'merged',
       mergeCommitSha: 'e'.repeat(40),
     });
-    expect(reconcileVcsDevelopment(p, false).status).toBe('blocked');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('blocked');
   });
 });
 
 import { createHash } from 'node:crypto';
 import { readReviewedDevelopmentManifest } from './development-loop.js';
 describe('review manifest immutable snapshot', () => {
-  it('does not reread a mutable path between hash and parse', () => {
+  it('does not reread a mutable path between hash and parse', async () => {
     const reviewed = Buffer.from('{"head_sha":"reviewed"}'),
       replacement = Buffer.from('{"head_sha":"unreviewed"}');
     const read = vi.fn().mockReturnValueOnce(reviewed).mockReturnValue(replacement);
@@ -185,7 +185,7 @@ describe('review manifest immutable snapshot', () => {
     );
     expect(read).toHaveBeenCalledTimes(1);
   });
-  it('rejects mismatched snapshot even if subsequent path reads would match', () => {
+  it('rejects mismatched snapshot even if subsequent path reads would match', async () => {
     const reviewed = Buffer.from('{"head_sha":"reviewed"}'),
       replacement = Buffer.from('{"head_sha":"unreviewed"}');
     const read = vi.fn().mockReturnValueOnce(replacement).mockReturnValue(reviewed);
@@ -201,7 +201,7 @@ describe('review manifest immutable snapshot', () => {
 });
 
 describe('post-merge reviewed baseline transport', () => {
-  it('uses reviewed original base instead of current PR base', () => {
+  it('uses reviewed original base instead of current PR base', async () => {
     const p = fixture();
     p.snapshot = () => ({
       ...pr,
@@ -216,21 +216,21 @@ describe('post-merge reviewed baseline transport', () => {
       reasons: [],
     }));
     p.verifyMerged = verify;
-    expect(reconcileVcsDevelopment(p, false).status).toBe('merged');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('merged');
     expect(verify.mock.calls[0]?.[0]).toMatchObject({ baseSha: pr.baseSha });
   });
-  it('cannot complete without established reviewed baseline', () => {
+  it('cannot complete without established reviewed baseline', async () => {
     const p = fixture();
     p.snapshot = () => ({ ...pr, state: 'merged', mergeCommitSha: 'e'.repeat(40) });
     p.review = () => ({ ok: true });
-    expect(reconcileVcsDevelopment(p, false).status).toBe('post_merge_unverified');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('post_merge_unverified');
   });
 });
 
 describe('post-merge reviewed CI policy continuity', () => {
   it.each(['different-policy', ''])(
     'retains merge receipt without completing under %j policy',
-    (policyDigest) => {
+    async (policyDigest) => {
       const p = fixture();
       p.snapshot = () => ({ ...pr, state: 'merged', mergeCommitSha: 'e'.repeat(40) });
       p.verifyMerged = () => ({
@@ -239,17 +239,17 @@ describe('post-merge reviewed CI policy continuity', () => {
         requiredChecks: ['CI'],
         reasons: [],
       });
-      const r = reconcileVcsDevelopment(p, false);
+      const r = await reconcileVcsDevelopment(p, false);
       expect(r.status).toBe('post_merge_unverified');
       expect(r.knownMergeCommitSha).toBe('e'.repeat(40));
       expect(p.promote).not.toHaveBeenCalled();
     }
   );
-  it('requires nonempty reviewed policy even if postmerge policy is equally empty', () => {
+  it('requires nonempty reviewed policy even if postmerge policy is equally empty', async () => {
     const p = fixture();
     p.snapshot = () => ({ ...pr, state: 'merged', mergeCommitSha: 'e'.repeat(40) });
     p.ci = () => ({ state: 'success', policyDigest: '', requiredChecks: ['CI'], reasons: [] });
     p.verifyMerged = p.ci;
-    expect(reconcileVcsDevelopment(p, false).status).toBe('post_merge_unverified');
+    expect((await reconcileVcsDevelopment(p, false)).status).toBe('post_merge_unverified');
   });
 });
