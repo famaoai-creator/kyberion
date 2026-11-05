@@ -793,7 +793,11 @@
       ]
     },
     "check_tenant_registry_consistency": {
-      "allow_read": ["knowledge/personal/tenants/", "knowledge/confidential/tenants/index.json"]
+      "allow_read": [
+        "knowledge/personal/tenants/",
+        "knowledge/personal/stances/",
+        "knowledge/confidential/tenants/index.json"
+      ]
     },
     "secret_introduce": {
       "allow_read": ["vault/secrets/", "knowledge/personal/connections/", "active/shared/tmp/"],
