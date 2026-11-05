@@ -3,7 +3,7 @@ import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { withExecutionContextAsync } from '@agent/core/authority';
 import { resolveScopeContext } from '@agent/core/scope-context';
 import { resolveStorageFloor, classifyStorageFloorPath } from '@agent/core/storage-layout';
-import { resolvePerceptionScope, type PerceptionScope } from '@agent/core/perception/observation';
+import { resolvePerceptionScope, type PerceptionScope } from '@agent/shared-perception/observation';
 import { inferImagePayloadTier } from '@agent/core/media/image-description-bridge';
 import { KNOWLEDGE_TIER_RANK } from '@agent/core/foundation/knowledge-tier';
 import { parsePerceptionOption } from './perception-enhancements.js';
@@ -275,7 +275,7 @@ export async function withPerceptionMediaRole<T>(
   return withExecutionContextAsync('perception_media_worker', fn, 'worker', scope.tenant_slug);
 }
 
-export { sniffImageDimensions } from '@agent/core/perception/image-dimensions';
+export { sniffImageDimensions } from '@agent/shared-perception/image-dimensions';
 
 /** `mm:ss` (or `h:mm:ss` from one hour). */
 export function formatTimestamp(seconds: number): string {

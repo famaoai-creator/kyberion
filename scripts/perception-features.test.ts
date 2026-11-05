@@ -7,7 +7,7 @@ import { runSeeCommand } from './cli-see.js';
 import { runListenCommand } from './cli-listen.js';
 import { runWatchCommand } from './cli-watch.js';
 import { createFakeDeps, fakeBridge } from './lib/perception.test-support.js';
-import { compareFingerprints } from '@agent/core/perception/visual-change';
+import { compareFingerprints } from '@agent/shared-perception/visual-change';
 let dir: string, image: string, audio: string, video: string;
 beforeAll(() => {
   dir = pathResolver.sharedTmp('perception-feature-' + randomUUID());

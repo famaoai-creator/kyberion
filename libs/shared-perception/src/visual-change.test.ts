@@ -1,5 +1,5 @@
-import { pathResolver } from '../path-resolver.js';
-import { safeWriteFile, safeRmSync } from '../secure-io.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeWriteFile, safeRmSync } from '@agent/core/secure-io';
 import { randomUUID } from 'node:crypto';
 import { fingerprintImage } from './visual-change.js';
 import { describe, it, expect } from 'vitest';

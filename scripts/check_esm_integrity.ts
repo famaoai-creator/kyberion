@@ -44,6 +44,7 @@ const LEGACY_JS_GUARDED_PREFIXES = [
   'libs/shared-vision/',
   'libs/shared-video/',
   'libs/shared-interaction/',
+  'libs/shared-perception/',
   'libs/shared-voice/',
   'libs/actuators/',
 ];

@@ -194,6 +194,7 @@
     "@agent/shared-mobile": "workspace:*",
     "@agent/shared-nerve": "workspace:*",
     "@agent/shared-network": "workspace:*",
+    "@agent/shared-perception": "workspace:*",
     "@agent/shared-video": "workspace:*",
     "@agent/shared-voice": "workspace:*",
     "@agent/shared-vision": "workspace:*",

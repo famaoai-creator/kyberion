@@ -1,9 +1,9 @@
 import { sniffImageDimensions } from './image-dimensions.js';
 import { Jimp } from 'jimp';
-import { safeReadFile, assertSafeRepositoryPath, validateFileSize } from '../secure-io.js';
-import { pathResolver } from '../path-resolver.js';
+import { safeReadFile, assertSafeRepositoryPath, validateFileSize } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import { resolvePerceptionScope } from './observation.js';
-import { dhashRegion, hamming } from '../media/image-dhash.js';
+import { dhashRegion, hamming } from '@agent/core/media/image-dhash';
 
 export interface VisualFingerprint {
   hash: string;
