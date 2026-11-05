@@ -813,6 +813,8 @@ export function completeDelegatedTaskTrace(
       enqueueDelegationNotification({
         delegationId: completed.trace_id,
         owner: completed.owner,
+        // The notification lands in the delegation's own partition.
+        ...(completed.tenant_slug ? { tenantSlug: completed.tenant_slug } : {}),
         ...(completed.mission_id ? { missionId: completed.mission_id } : {}),
         ...(completed.task_id ? { taskId: completed.task_id } : {}),
         ...(completed.child_session_id ? { childSessionId: completed.child_session_id } : {}),
