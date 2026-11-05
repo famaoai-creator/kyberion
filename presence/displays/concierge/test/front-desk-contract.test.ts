@@ -51,10 +51,12 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     // eslint-disable-next-line no-misleading-character-class
     expect(rail).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}]/u);
     expect(rail).toContain('aria-current');
-    // 資料の取込 (ingest) stays reachable from the rail, labelled with the
-    // existing header.ingest key, now that the header dropped its own link.
+    // 資料の取込 (ingest) lives under 資料 (/library?tab=ingest); its old
+    // route still marks that destination. 設定 is pinned in the rail footer.
     expect(rail).toContain("pathname === '/ingest'");
     expect(rail).toContain('group_label: item.group_label');
+    expect(rail).toContain('footer_items');
+    expect(rail).toContain('/api/v1/needs-you/summary');
   });
 
   it('guards /api/me and /api/front-desk/nav with the shared viewer resolver and no-store', () => {
@@ -72,54 +74,45 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     expect(me).not.toContain('tenantSlugs: ');
   });
 
-  it('FD-04: `/` renders the 決める queue from front_desk decide_* vocabulary, defers client-side only, and never blocks on window dialogs', () => {
-    const page = read('src/app/page.tsx');
+  it('FD-04: `/inbox` renders the one queue from front_desk decide_* vocabulary, defers client-side only, and never blocks on window dialogs', () => {
+    // MSN-SHELL-IA: the queue moved from `/` to `/inbox` (page + card).
+    const page = [read('src/app/inbox/page.tsx'), read('src/app/inbox/needs-you-card.tsx')].join(
+      '\n'
+    );
     const decideView = read('src/lib/decide-view.ts');
 
-    // Header row: h1 = nav_decide, lead paragraph = decide_lead, filter chips
-    // built from decide_filter_all + presentKinds (plan §2.1/FD-04).
-    expect(page).toContain("frontDeskText('nav_decide', locale)");
-    expect(page).toContain("frontDeskText('decide_lead', locale)");
-    expect(page).toContain("frontDeskText('decide_filter_all', locale)");
-    expect(page).toContain('presentKinds(countsByKind)');
-    expect(page).toContain('groupDecideQueue(');
+    // Header: the needs-you title and lead; filter chips are the reasons
+    // the unified summary reports (one count definition).
+    expect(page).toContain("c('ia_inbox_title')");
+    expect(page).toContain("c('ia_inbox_lead')");
+    expect(page).toContain("c('ia_inbox_filter_all')");
     expect(page).toContain('deriveCardFields(');
 
-    // Per-kind action labels are the front_desk:decide_* keys via
-    // frontDeskText, not hardcoded strings or the old home.* pane labels.
-    expect(page).toContain("frontDeskText('decide_approve', locale)");
-    expect(page).toContain("frontDeskText('decide_reject', locale)");
-    expect(page).toContain("frontDeskText('decide_continue', locale)");
-    expect(page).toContain("frontDeskText('decide_stop', locale)");
-    expect(page).toContain("frontDeskText('decide_remember', locale)");
-    expect(page).toContain("frontDeskText('decide_forget', locale)");
-    expect(page).toContain("frontDeskText('decide_receive', locale)");
-    expect(page).toContain("frontDeskText('decide_return', locale)");
-    expect(page).toContain("frontDeskText('decide_later', locale)");
-    expect(page).toContain("frontDeskText('decide_empty', locale)");
+    // Per-kind action labels are the front_desk:decide_* keys, not hardcoded
+    // strings or the old home.* pane labels.
+    for (const key of [
+      'decide_approve',
+      'decide_reject',
+      'decide_continue',
+      'decide_stop',
+      'decide_remember',
+      'decide_forget',
+      'decide_receive',
+      'decide_return',
+      'decide_later',
+    ])
+      expect(page).toContain(`f('${key}')`);
     expect(page).toContain("frontDeskText('decide_deferred', locale");
     expect(page).toContain("frontDeskText('decide_undefer', locale)");
-    expect(page).toContain("frontDeskText('decide_by', locale");
 
-    // decide_by ("決める人") comes from the shared identity contract, not a
-    // hardcoded name — same shape as front-desk-rail.tsx's /api/me fetch.
-    expect(page).toContain('fetch(`/api/me');
-    expect(page).toContain('fetch(`/api/front-desk/nav');
-    expect(page).toContain('role_labels');
-
-    // decide_later is client-side only: the handlers that move an id into
-    // `deferredIds` never call fetch(), and the deferred section persists to
-    // localStorage rather than the server.
-    const deferItemBody = page.slice(
-      page.indexOf('const deferItem = React.useCallback'),
-      page.indexOf('const undeferItem = React.useCallback')
+    // あとで (set aside) is client-side only: the handler never calls fetch(),
+    // and the set-aside list persists to localStorage rather than the server.
+    const setAsideBody = page.slice(
+      page.indexOf('const setAside = (item: NeedsYouItem'),
+      page.indexOf('const decide = async')
     );
-    const undeferItemBody = page.slice(
-      page.indexOf('const undeferItem = React.useCallback'),
-      page.indexOf('const [kindFilter,')
-    );
-    expect(deferItemBody).not.toContain('fetch(');
-    expect(undeferItemBody).not.toContain('fetch(');
+    expect(setAsideBody).toContain('storeDeferred(next)');
+    expect(setAsideBody).not.toContain('fetch(');
     expect(page).toContain('front-desk.deferred');
     expect(page).not.toContain('window.prompt');
     expect(page).not.toContain('window.confirm');
@@ -359,7 +352,7 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
 });
 
 describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
-  it('returns grouped existing rail items with ja labels, relative concierge hrefs, and absolute presence-studio hrefs', async () => {
+  it('returns the seven top-level destinations with ja labels and relative concierge hrefs', async () => {
     vi.resetModules();
     vi.doMock('@agent/core/front-desk-nav', async () => {
       const actual = await vi.importActual<typeof import('@agent/core/front-desk-nav')>(
@@ -380,57 +373,36 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
 
     expect(payload.ok).toBe(true);
     expect(payload.current_surface).toBe('concierge');
-    expect(payload.items).toHaveLength(20);
     expect(payload.items.map((item) => item.id)).toEqual([
-      'decide',
-      'ask',
-      'missions',
-      'work-items',
-      'approvals',
-      'overview',
-      'organizations',
-      'projects',
-      'actors',
-      'deliverables',
-      'ingest',
-      'knowledge',
-      'discussion',
-      'first-job',
-      'help',
-      'organization',
-      'operations',
-      'surface-control',
-      'diagnostics',
+      'home',
+      'inbox',
+      'work',
+      'org',
+      'library',
+      'ops',
       'settings',
     ]);
-    // The operations console (former Chronos) is a local /ops destination.
-    for (const id of ['deliverables', 'knowledge', 'discussion', 'operations', 'diagnostics']) {
-      expect(payload.items.find((item) => item.id === id)?.href).toBe(`/ops?section=${id}`);
-      expect(payload.items.find((item) => item.id === id)?.external).toBe(false);
-    }
-
     const byId = Object.fromEntries(payload.items.map((item) => [item.id, item]));
-    expect(byId.decide.label).toBe('受信箱');
-    expect(byId.overview.label).toBe('全体像');
-    expect(byId.overview.group_label).toBe('組織');
-
-    // Decide, organization management, and settings are local Concierge destinations.
-    expect(byId.decide.external).toBe(false);
-    expect(byId.decide.href).toBe('/');
-    expect(byId.settings.external).toBe(false);
-    expect(byId.settings.href).toBe('/settings');
-    expect(byId.organization.external).toBe(false);
-    expect(byId.organization.href).toBe('/management');
-    expect(byId.organization.scope_query_style).toBe('camel');
-
-    // The workspace pages are local Concierge destinations.
-    for (const id of ['missions', 'work-items', 'approvals', 'overview', 'organizations']) {
-      expect(byId[id].external).toBe(false);
-      expect(byId[id].href.startsWith('/w')).toBe(true);
+    expect(byId.home.label).toBe('ホーム');
+    expect(byId.inbox.label).toBe('あなた待ち');
+    expect(byId.work.label).toBe('仕事');
+    expect(byId.org.label).toBe('組織');
+    expect(byId.library.label).toBe('資料');
+    expect(byId.ops.label).toBe('運用');
+    expect(byId.settings.label).toBe('設定');
+    // Ungrouped; 設定 is pinned to the rail footer.
+    expect(payload.items.every((item) => item.group_label === '')).toBe(true);
+    expect(payload.items.filter((item) => item.placement === 'footer').map((i) => i.id)).toEqual([
+      'settings',
+    ]);
+    // Every destination is a local Concierge route.
+    for (const item of payload.items) {
+      expect(item.external, item.id).toBe(false);
+      expect(item.href.startsWith('/'), item.id).toBe(true);
     }
-    // ask is hosted on presence-studio: absolute, same-tab.
-    expect(byId.ask.external).toBe(true);
-    expect(byId.ask.href).toBe('http://127.0.0.1:4031/ask');
+    expect(byId.ops.href).toBe('/ops');
+    expect(byId.ops.scope_query_style).toBe('snake');
+    expect(byId.org.scope_query_style).toBe('camel');
 
     vi.doUnmock('@agent/core/front-desk-nav');
   });

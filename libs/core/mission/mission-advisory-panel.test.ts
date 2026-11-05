@@ -10,6 +10,7 @@ import {
   stubReasoningBackend,
   type ReasoningBackend,
 } from '../reasoning/reasoning-backend.js';
+import { getReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
 
 const missionId = 'MSN-ADVISORY-PANEL';
 const missionPath = pathResolver.missionDir(missionId, 'public');
@@ -123,6 +124,57 @@ describe('mission advisory panel (TC-18)', () => {
       );
       expect(consultation.status).toBe('no_panel');
       expect(prompt).not.toHaveBeenCalled();
+    } finally {
+      dispose();
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(confidentialMissionPath, { recursive: true, force: true });
+      });
+    }
+  });
+
+  it('declares no_training and reports egress_denied when every advisor send is refused', async () => {
+    const confidentialMissionId = 'MSN-ADVISORY-EGRESS-DENIED';
+    const confidentialMissionPath = pathResolver.missionDir(confidentialMissionId, 'confidential');
+    const observed: Array<ReturnType<typeof getReasoningPayloadScope>> = [];
+    const prompt = vi.fn(async () => {
+      observed.push(getReasoningPayloadScope());
+      throw new Error(
+        '[reasoning-backend:failover] prompt failed across 1 candidate(s): [policy] [REASONING_EGRESS_DENIED] denied — why | next: attest tenant-a | evidence: e'
+      );
+    });
+    // A local-only backend passes the participants' external_egress: deny scope.
+    const dispose = registerReasoningBackend({ ...stubReasoningBackend, name: 'ollama', prompt });
+    try {
+      withExecutionContext('mission_controller', () => {
+        safeMkdir(confidentialMissionPath, { recursive: true });
+        writeMissionTeamPlan(
+          confidentialMissionPath,
+          composeMissionTeamPlan({
+            missionId: confidentialMissionId,
+            missionType: 'development',
+            tier: 'confidential',
+            tenantSlug: 'tenant-a',
+          })
+        );
+      });
+      const consultation = await withExecutionContextAsync('mission_controller', () =>
+        consultMissionAdvisors({
+          missionId: confidentialMissionId,
+          topic: 'topic',
+          question: 'question',
+          skipCritique: true,
+        })
+      );
+      expect(prompt).toHaveBeenCalled();
+      for (const scope of observed) {
+        expect(scope).toMatchObject({
+          tier: 'confidential',
+          tenant_slug: 'tenant-a',
+          training_use: 'no_training',
+        });
+      }
+      expect(consultation.status).toBe('egress_denied');
+      expect(consultation.egress_next).toBe('next: attest tenant-a');
     } finally {
       dispose();
       withExecutionContext('mission_controller', () => {

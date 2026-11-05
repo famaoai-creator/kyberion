@@ -116,7 +116,8 @@ export function settingsViewModel(data: SettingsData, i18n: I18n): PanelViewMode
 /** Navigation only; the receiving surface resolves the current viewer again. */
 export function approvalReviewUrl(id: string): string | undefined {
   try {
-    const target = new URL(resolveSurfaceBrowserUrl('concierge'));
+    // Decisions live in あなた待ち (/inbox); its card anchor is decide-approval-<id>.
+    const target = new URL('/inbox', resolveSurfaceBrowserUrl('concierge'));
     target.search = '';
     target.hash = `decide-approval-${id}`;
     return target.href;

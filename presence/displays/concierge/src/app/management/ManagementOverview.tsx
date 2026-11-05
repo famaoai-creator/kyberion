@@ -30,22 +30,32 @@ export function ManagementOverview({
   return (
     <>
       {' '}
+      {/* MSN-SHELL-IA §1: the workspace comes from the shell switcher; a
+          picker appears only when the shell has none selected. */}
       <SettingRow label={t('management.tenant')}>
-        <select
-          aria-label={t('management.tenant')}
-          value={scope.tenant}
-          disabled={busy || expired}
-          onChange={(event) =>
-            changeScope({ tenant: event.target.value, organizationId: '', projectId: '' })
-          }
-        >
-          <option value="">{t('management.choose_tenant')}</option>
-          {tenants.map((row) => (
-            <option key={row.slug} value={row.slug}>
-              {row.name}
-            </option>
-          ))}
-        </select>
+        {scope.tenant ? (
+          <p className="kb-text" role="status">
+            {t('ia_shell_scope_current', {
+              workspace: tenants.find((row) => row.slug === scope.tenant)?.name || scope.tenant,
+            })}
+          </p>
+        ) : (
+          <select
+            aria-label={t('management.tenant')}
+            value={scope.tenant}
+            disabled={busy || expired}
+            onChange={(event) =>
+              changeScope({ tenant: event.target.value, organizationId: '', projectId: '' })
+            }
+          >
+            <option value="">{t('management.choose_tenant')}</option>
+            {tenants.map((row) => (
+              <option key={row.slug} value={row.slug}>
+                {row.name}
+              </option>
+            ))}
+          </select>
+        )}
       </SettingRow>
       {data ? (
         <>

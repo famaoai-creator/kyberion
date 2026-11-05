@@ -122,6 +122,8 @@ The `--persona` flag selects an **Org Role**, not a `Persona`; the flag name is 
 
 Tier (`personal` / `confidential` / `public`) and Stance (`customer/{slug}/`) are separate axes, not scopes; they never appear in the entity scope chain.
 
+When the question is "what may be done with this information asset", use the **information asset scope model** (proposed): _custody_ (whose asset: `system` / `tenant` / `person`), _disclosure_ (who may see it: internal viewers → other custodians → external processors → external recipients → public), and _processing_ (what may be derived from it, and what derivatives inherit). Create / edit / delete / execute are operations judged by the existing authority layer, and tier is the classification label that caps disclosure and processing. → [INFORMATION_ASSET_SCOPE_MODEL_DESIGN](./developer/improvement-plans-2026-11/INFORMATION_ASSET_SCOPE_MODEL_DESIGN_2026-11-05.ja.md)
+
 ### Grants and approvals
 
 | Term               | Lifetime                | What it permits                                                      | Source                                       |

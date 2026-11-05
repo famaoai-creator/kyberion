@@ -24,6 +24,8 @@
  * blindly.
  */
 
+import { segmentKeywordTerms } from '../locale-normalize.js';
+
 export const RECALL_MAX_CHARS = 6_000;
 export const MAX_FACTS = 300;
 export const MEMORY_HEADER = '# Memory';
@@ -173,7 +175,9 @@ export function foldCapture(
 }
 
 export function queryBullets(body: string, q: string, limit: number): string[] {
-  const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+  // Locale-aware terms: a spaceless Japanese query ("デプロイの手順") becomes its
+  // content words instead of one sentence-long term that only matches verbatim.
+  const terms = [...new Set(segmentKeywordTerms(q.toLowerCase()))];
   if (!terms.length) return [];
   return bullets(body)
     .filter((line) => terms.every((term) => line.toLowerCase().includes(term)))

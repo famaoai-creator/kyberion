@@ -5,6 +5,7 @@
  * downstream step. Schema references are either a registered structured
  * contract (for example `task_result`) or a relative JSON schema under
  * `knowledge/product/schemas/`.
+ * Shape rules: knowledge/product/governance/contract-design-principles.md.
  */
 
 import type { ValidateFunction } from 'ajv';

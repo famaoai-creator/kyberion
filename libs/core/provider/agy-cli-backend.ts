@@ -20,6 +20,13 @@ import {
   newDelegationSessionId,
   spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
+import {
+  redactProviderOutputError,
+  redactProviderOutputStream,
+  redactProviderOutputText,
+  redactProviderOutputValue,
+  withRedactedProviderOutput,
+} from './provider-output-redaction.js';
 import * as pathResolver from '../path-resolver.js';
 import {
   delegationChildHandleFromChildProcess,
@@ -276,12 +283,16 @@ export class AgyCliBackend implements ReasoningBackend {
       if (!nativeInfo || typeof nativeInfo !== 'object') {
         throw new Error('[SUBAGENT_UNAVAILABLE] AGY SDK returned no native subagent metadata.');
       }
-      this.lastHarnessSubagentInfo = { ...(nativeInfo as Record<string, unknown>) };
-      return response.text;
+      this.lastHarnessSubagentInfo = redactProviderOutputValue({
+        ...(nativeInfo as Record<string, unknown>),
+      });
+      return redactProviderOutputText(response.text);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw error;
-      throw new Error(`[SUBAGENT_UNAVAILABLE] AGY harness failed: ${message}`);
+      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw redactProviderOutputError(error);
+      throw redactProviderOutputError(
+        new Error(`[SUBAGENT_UNAVAILABLE] AGY harness failed: ${message}`)
+      );
     } finally {
       release();
     }
@@ -478,6 +489,17 @@ export class AgyCliBackend implements ReasoningBackend {
     context?: string,
     options?: ReasoningCallOptions
   ): Promise<string> {
+    // Output exit: the answer and any stderr-bearing error are redacted.
+    return withRedactedProviderOutput(() =>
+      this.delegateTaskUnredacted(instruction, context, options)
+    );
+  }
+
+  private async delegateTaskUnredacted(
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
     if (this.injectedHarnessSession || this.harnessSession) {
       return this.dispatchNativeSubagent(instruction, context, options);
     }
@@ -497,7 +519,7 @@ export class AgyCliBackend implements ReasoningBackend {
 
   /** Stream AGY step_update text deltas for latency-sensitive callers. */
   streamPrompt(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream {
-    return this.streamPromptFromCli(prompt, options);
+    return redactProviderOutputStream(this.streamPromptFromCli(prompt, options));
   }
 
   private async *streamPromptFromCli(
@@ -605,6 +627,16 @@ export class AgyCliBackend implements ReasoningBackend {
   }
 
   public async runStructured<T>(params: {
+    systemPrompt: string;
+    userPrompt: string;
+    schema: ZodType<T>;
+    profile?: ProviderPermissionProfileName;
+  }): Promise<T> {
+    // Output exit: the parsed answer is redacted value-wise.
+    return withRedactedProviderOutput(() => this.runStructuredUnredacted(params));
+  }
+
+  private async runStructuredUnredacted<T>(params: {
     systemPrompt: string;
     userPrompt: string;
     schema: ZodType<T>;

@@ -5,6 +5,7 @@
  * `libs/core/surface/workspace-graph.ts`; only its types are imported here,
  * so this module stays client-safe.
  */
+import { iaListHref } from './ia-routes';
 import type {
   GraphActorLink,
   GraphEntityKind,
@@ -47,10 +48,13 @@ export function entityHref(kind: GraphEntityKind, id: string): string {
 
 /** A list page, optionally narrowed by scope query parameters. */
 export function kindListHref(kind: GraphEntityKind, narrow: WorkspaceListNarrowing = {}): string {
-  const query = new URLSearchParams();
+  // MSN-SHELL-IA §1: list pages live under the top-level destinations now
+  // (`/w/<kind>` only redirects there), so in-app links point straight at them.
+  const [path, fixed = ''] = (iaListHref(kind) ?? `/w/${kind}`).split('?');
+  const query = new URLSearchParams(fixed);
   for (const [key, value] of Object.entries(narrow)) if (value) query.set(key, value);
   const search = query.toString();
-  return `/w/${kind}${search ? `?${search}` : ''}`;
+  return `${path}${search ? `?${search}` : ''}`;
 }
 
 /** Route segments may arrive encoded or decoded depending on the router; decode once, safely. */
@@ -212,9 +216,9 @@ export function approvalNeedsDecision(status: string | undefined): boolean {
   return status === 'pending' || status === 'needs_review';
 }
 
-/** The Inbox card of a pending approval on Concierge `/` (the Decide queue). */
+/** The card of a pending approval in あなた待ち (`/inbox`, the one needs-you queue). */
 export function inboxHrefForApproval(id: string): string {
-  return `/#decide-approval-${encodeURIComponent(id)}`;
+  return `/inbox?reason=approval#decide-approval-${encodeURIComponent(id)}`;
 }
 
 export type WorkspaceLoadError = 'signin' | 'forbidden' | 'not_found' | 'failed';

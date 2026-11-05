@@ -293,6 +293,10 @@ export interface KbNavItem {
   action?: KbAction | string;
   icon?: string;
   active?: boolean;
+  /** Short count shown after the label (e.g. "3"); omitted or empty hides it. */
+  badge?: string;
+  /** Accessible text for the badge (e.g. "3 items need you"); defaults to `badge`. */
+  badge_label?: string;
 }
 
 // ---------------------------------------------------------------------------

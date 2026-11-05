@@ -70,7 +70,9 @@ describe('company setup stage UI contract (synthetic rendering, not browser QA)'
   });
   it('makes human approval a queue handoff and keeps activation disabled until approved', () => {
     const html = markup(state('awaiting_approval'));
-    expect(html).toContain('href="/?tenant=company-a#decide-approval-APR-1"');
+    expect(html).toContain(
+      'href="/inbox?tenant=company-a&amp;reason=approval#decide-approval-APR-1"'
+    );
     expect(html).toContain('Return here and refresh');
     expect(html).toContain('Apply approved activation');
     expect(html).not.toContain('proof-1');

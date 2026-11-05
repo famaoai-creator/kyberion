@@ -6,7 +6,7 @@ import * as crypto from 'node:crypto';
 import * as os from 'node:os';
 import { runtimeSupervisor } from '../tool/runtime-supervisor.js';
 import { pathResolver } from '../path-resolver.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
+import { getRegisteredEnvText, withoutRelayManagedCredentials } from '../foundation/env.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 
 /**
@@ -239,7 +239,14 @@ class PtyRegistry {
       shell ||
       (os.platform() === 'win32' ? 'powershell.exe' : getRegisteredEnvText('SHELL') || '/bin/bash');
     const targetCwd = cwd || pathResolver.rootDir();
-    const targetEnv = { ...process.env, ...env, TERM: 'xterm-256color', PAGER: 'cat' };
+    // A generic shell starts no credential relay: with the relay flag on, the
+    // raw relay-managed keys are dropped (caller-supplied env included).
+    const targetEnv = withoutRelayManagedCredentials({
+      ...process.env,
+      ...env,
+      TERM: 'xterm-256color',
+      PAGER: 'cat',
+    });
 
     let adapter: TerminalAdapter;
 

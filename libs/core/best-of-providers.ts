@@ -90,6 +90,7 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { logger } from './core.js';
+import { segmentWords } from './locale-normalize.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { appendJsonLine, parseSafeJsonObjectValue, readJsonLines } from './foundation/json.js';
@@ -313,12 +314,15 @@ function digestOf(instruction: string, context?: string): string {
 
 const AGREEMENT_SIMILARITY_THRESHOLD = 0.3;
 
+// Locale-aware: the shared ICU segmenter splits spaceless scripts (ja, zh)
+// into real words instead of one sentence-long token, so two Japanese answers
+// that agree in substance still score as agreeing. Every word counts —
+// single-character CJK words included — and ICU-joined dotted/underscored
+// runs ("config.json") are split on non-letter/number characters afterwards.
 function tokenize(text: string): Set<string> {
   return new Set(
-    String(text || '')
-      .toLowerCase()
-      .replace(/[^a-z0-9぀-ヿ゠-ヿ一-鿿]+/gi, ' ')
-      .split(/\s+/)
+    segmentWords(String(text || '').toLowerCase())
+      .flatMap((token) => token.split(/[^\p{L}\p{N}]+/u))
       .filter(Boolean)
   );
 }

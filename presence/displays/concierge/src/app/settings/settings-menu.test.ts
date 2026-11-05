@@ -21,11 +21,11 @@ describe('settings menu integration', () => {
 
   it('marks the sections with pending drafts without replacing their destination or name', () => {
     const clean = createSettingsMenu('ja', {}).flatMap((group) => group.items);
-    const dirty = createSettingsMenu('ja', { profile: true, notifications: true }).flatMap(
+    const dirty = createSettingsMenu('ja', { workspace: true, notifications: true }).flatMap(
       (group) => group.items
     );
     expect(dirty.filter((item) => item.badge).map((item) => item.id)).toEqual([
-      'profile',
+      'workspace',
       'notifications',
     ]);
     expect(dirty.map(({ id, label, href }) => ({ id, label, href }))).toEqual(

@@ -9,7 +9,20 @@ import {
 import { safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from '@agent/core/secure-io';
 import { defineCatalog, nowIso, writeJson, type GovernedCatalog } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
-import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
+import {
+  draftRoleFromIntent,
+  loadRoleDraftInventory,
+  type ActuatorConnectionProbe,
+  type RoleDraftDomainDefaults,
+  type RoleIntentDraft,
+  type RoleIntentDraftResult,
+} from '@agent/core/organization/role-intent-draft';
+import {
+  currentProcessArgv,
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+} from './lib/harness.js';
 
 type Print = (value: unknown) => void;
 
@@ -103,6 +116,8 @@ type OrgRoleCreateOptions = {
   teamRoleId: string;
   dryRun: boolean;
   approvalId?: string;
+  /** CLI only: allow an explicit --team-role-id that names an existing role. */
+  update?: boolean;
 };
 
 type OrgRolePromoteOptions = {
@@ -118,6 +133,11 @@ type OrgRolePromoteOptions = {
   approvalId?: string;
 };
 
+type RoleDraftCliOptions = { intent: string; json: boolean; tenantSlug?: string };
+
+/** Injection points for hermetic tests; production uses the defaults. */
+export type OrgMainDeps = { probeActuator?: ActuatorConnectionProbe };
+
 type OrgCommand =
   | {
       kind: 'role-create';
@@ -127,6 +147,7 @@ type OrgCommand =
       kind: 'role-promote';
       options: Partial<OrgRolePromoteOptions> & { roleId: string; authorityRoleId: string };
     }
+  | { kind: 'role-draft'; options: RoleDraftCliOptions }
   | { kind: 'help' };
 
 const DEFAULT_PERSONA: Persona = 'analyst';
@@ -209,6 +230,7 @@ function helpText(): string {
     'Usage:',
     '  pnpm organization role create --name <display-name> --domain <domain> [--authority <authority-role-id>]',
     '  pnpm organization role promote --role <role-id> --authority <authority-role-id>',
+    '  pnpm organization role draft --from-intent "<one sentence>" [--tenant <slug>] [--json]',
     '',
     'Options:',
     '  --name <name>                 Display name for the new role.',
@@ -229,6 +251,12 @@ function helpText(): string {
     '  --delegate-role <role>        Repeatable allowed delegate team role.',
     '  --approval-id <uuid>          Approved human request required for security-policy writes.',
     '  --dry-run                     Print the planned change set without writing.',
+    '  --from-intent <sentence>      (draft) Describe the role in one sentence; prints a draft only.',
+    '  --tenant <slug>               (draft) Tenant owning the intent; scopes the reasoning egress check.',
+    '  --json                        (draft) Print the draft envelope as JSON.',
+    '  --team-role-id <id>           (create) ASCII snake_case team-role id; defaults to the normalized --name.',
+    '                                Refused when the id already names an existing role, unless --update.',
+    '  --update                      (create) Allow --team-role-id to update an existing role on purpose.',
   ].join('\n');
 }
 
@@ -236,6 +264,31 @@ function parseArgs(argv: string[]): OrgCommand {
   const args = [...argv];
   if (!args.length || args[0] === 'help' || args[0] === '--help' || args[0] === '-h') {
     return { kind: 'help' };
+  }
+
+  if (args[0] === 'role' && args[1] === 'draft') {
+    let intent: string | undefined;
+    let tenantSlug: string | undefined;
+    let json = false;
+    const valueOf = (flag: string, value: string | undefined): string => {
+      if (value === undefined || value.startsWith('--')) {
+        throw new Error(`${flag} requires a value, e.g. ${flag} "<sentence>"`);
+      }
+      return value;
+    };
+    for (let i = 2; i < args.length; i++) {
+      const arg = args[i];
+      if (arg === '--from-intent') intent = valueOf(arg, args[++i]);
+      else if (arg === '--tenant') tenantSlug = valueOf(arg, args[++i]);
+      else if (arg === '--json') json = true;
+      else if (arg === '--help' || arg === '-h') return { kind: 'help' };
+      else if (arg.startsWith('--')) throw new Error(`Unknown option: ${arg}`);
+    }
+    if (intent === undefined) throw new Error('--from-intent "<sentence>" is required');
+    return {
+      kind: 'role-draft',
+      options: { intent, json, ...(tenantSlug ? { tenantSlug } : {}) },
+    };
   }
 
   if (args[0] !== 'role' || args[1] !== 'create') {
@@ -290,6 +343,8 @@ function parseArgs(argv: string[]): OrgCommand {
     const arg = args[i];
     if (arg === '--name') options.name = args[++i];
     else if (arg === '--domain') options.domain = args[++i];
+    else if (arg === '--team-role-id') options.teamRoleId = args[++i];
+    else if (arg === '--update') options.update = true;
     else if (arg === '--authority' || arg === '--authority-role')
       options.authorityRoleId = args[++i];
     else if (arg === '--persona') options.persona = args[++i];
@@ -634,6 +689,38 @@ function loadAuthorityRoleDirectory(rootDir: string): Record<string, AuthorityRo
     safeExistsSync(directory) && safeReaddir(directory).some((entry) => entry.endsWith('.json'));
   if (!hasDirectoryEntries && !safeExistsSync(snapshot)) return {};
   return loadGovernedAuthorityRoleIndex(rootDir);
+}
+
+/**
+ * Every role id that any store `role create` writes already holds: team and
+ * authority roles, the role-authority map (role and authority_role values),
+ * role-write-access, security-policy authority permissions, and role docs.
+ * A new role must not take one of these ids — the create would merge into
+ * or overwrite that role's records.
+ */
+export function collectExistingRoleIds(rootDir: string): Set<string> {
+  const ids = new Set<string>([
+    ...Object.keys(loadTeamRoleDirectory(rootDir)),
+    ...Object.keys(loadAuthorityRoleDirectory(rootDir)),
+  ]);
+  const map = loadRoleAuthorityMap(rootDir);
+  for (const bucket of ['system_roles', 'mission_roles', 'context_roles'] as const) {
+    for (const entry of map[bucket] || []) {
+      if (entry.role) ids.add(entry.role);
+      if (entry.authority_role) ids.add(entry.authority_role);
+    }
+  }
+  for (const role of Object.keys(loadRoleWriteAccess(rootDir).roles || {})) ids.add(role);
+  for (const role of Object.keys(loadSecurityPolicy(rootDir).authority_role_permissions || {})) {
+    ids.add(role);
+  }
+  const docsDir = path.join(rootDir, 'knowledge', 'product', 'roles');
+  if (safeExistsSync(docsDir)) {
+    for (const entry of safeReaddir(docsDir)) {
+      if (!entry.startsWith('.')) ids.add(entry);
+    }
+  }
+  return ids;
 }
 
 function writeAuthorityRoleBundle(
@@ -1005,17 +1092,232 @@ function printResult(result: Record<string, unknown>, print: Print): void {
   print(JSON.stringify(result, null, 2));
 }
 
+function shellQuote(value: string): string {
+  return /^[A-Za-z0-9_./:@=-]+$/.test(value) ? value : `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+/** The governed `role create` argv that commits a draft; the draft itself writes nothing. */
+export function roleCreateArgsFromDraft(draft: RoleIntentDraft): string[] {
+  // Ids are explicit so a confirm never re-derives them from the display
+  // name: the draft reserved this id against every existing team AND
+  // authority role, and `role create` would merge into an existing one.
+  const args = ['--name', draft.name, '--team-role-id', draft.team_role_id];
+  args.push('--authority', draft.team_role_id, '--domain', draft.domain);
+  args.push('--persona', draft.persona);
+  args.push('--autonomy', draft.autonomy_level, '--description', draft.description);
+  if (draft.ownership_scope) args.push('--ownership-scope', draft.ownership_scope);
+  for (const value of draft.required_capabilities) args.push('--capability', value);
+  for (const value of draft.scope_classes) args.push('--scope-class', value);
+  for (const value of draft.allowed_actuators) args.push('--actuator', value);
+  for (const value of draft.tier_access) args.push('--tier', value);
+  if (draft.escalation_parent_team_role) {
+    args.push('--parent-team-role', draft.escalation_parent_team_role);
+  }
+  for (const value of draft.allowed_delegate_team_roles) args.push('--delegate-role', value);
+  return args;
+}
+
+function roleDraftNextCommands(draft: RoleIntentDraft): { preview: string; commit: string } {
+  const base = ['pnpm', 'organization', 'role', 'create', ...roleCreateArgsFromDraft(draft)]
+    .map(shellQuote)
+    .join(' ');
+  return {
+    preview: `${base} --dry-run`,
+    commit: `${base} --approval-id <approved-request-id>`,
+  };
+}
+
+function roleDraftDomainDefaults(): Record<string, RoleDraftDomainDefaults> {
+  return Object.fromEntries(
+    Object.entries(DOMAIN_TEMPLATES).map(([domain, template]) => [
+      domain,
+      {
+        persona: (['analyst', 'worker', 'mission_owner'].includes(template.persona)
+          ? template.persona
+          : 'analyst') as RoleDraftDomainDefaults['persona'],
+        autonomy_level: template.autonomyLevel,
+        escalation_parent_team_role: template.escalationParentTeamRole,
+      },
+    ])
+  );
+}
+
+function draftCreateOptions(draft: RoleIntentDraft): OrgRoleCreateOptions {
+  return {
+    name: draft.name,
+    domain: draft.domain,
+    authorityRoleId: draft.team_role_id,
+    persona: draft.persona,
+    description: draft.description,
+    ownershipScope: draft.ownership_scope,
+    requiredCapabilities: unique(draft.required_capabilities),
+    scopeClasses: unique(draft.scope_classes),
+    writeScopes: [],
+    allowedActuators: unique(draft.allowed_actuators),
+    tierAccess: unique(draft.tier_access),
+    autonomyLevel: draft.autonomy_level,
+    escalationParentTeamRole: draft.escalation_parent_team_role ?? null,
+    allowedDelegateTeamRoles: unique(draft.allowed_delegate_team_roles),
+    teamRoleId: draft.team_role_id,
+    dryRun: true,
+  };
+}
+
+/**
+ * What confirming would actually grant: `role create` unions the domain
+ * template into the drafted values, so show the merged records computed by
+ * the same resolvers `role create` uses (read-only).
+ */
+export function effectiveRoleGrantFromDraft(draft: RoleIntentDraft) {
+  const options = draftCreateOptions(draft);
+  const authority = resolveAuthorityRoleRecord(pathResolver.rootDir(), draft.team_role_id, options);
+  const team = resolveTeamRoleRecord(options, draft.team_role_id);
+  return {
+    team_role_id: draft.team_role_id,
+    authority_role_id: draft.team_role_id,
+    required_capabilities: team.required_capabilities,
+    team_scope_classes: team.required_scope_classes,
+    authority_scope_classes: authority.scope_classes,
+    allowed_actuators: authority.allowed_actuators,
+    tier_access: authority.tier_access,
+    write_scopes: authority.write_scopes,
+    escalation_parent_team_role: team.escalation_parent_team_role,
+    allowed_delegate_team_roles: team.allowed_delegate_team_roles,
+  };
+}
+
+function renderRoleDraft(result: RoleIntentDraftResult): string {
+  if (result.status === 'failed') {
+    return [
+      `Role draft failed (${result.failure.class}): ${result.failure.message}`,
+      ...result.warnings.map((warning) => `warning: ${warning}`),
+      `next: ${result.failure.next}`,
+    ].join('\n');
+  }
+  const { draft } = result;
+  const list = (values: string[]) => (values.length ? values.join(', ') : '(none)');
+  const next = roleDraftNextCommands(draft);
+  const grant = effectiveRoleGrantFromDraft(draft);
+  const lines = [
+    `Role draft ${result.draft_id} (not created — draft only)`,
+    `  name:          ${draft.name} (team role id: ${draft.team_role_id})`,
+    `  domain:        ${draft.domain}`,
+    `  persona:       ${draft.persona}`,
+    `  autonomy:      ${draft.autonomy_level}`,
+    `  description:   ${draft.description}`,
+    ...(draft.ownership_scope ? [`  ownership:     ${draft.ownership_scope}`] : []),
+    `  capabilities:  ${list(draft.required_capabilities)}`,
+    `  scope classes: ${list(draft.scope_classes)}`,
+    `  actuators:     ${list(draft.allowed_actuators)}`,
+    `  tiers:         ${list(draft.tier_access)}`,
+    ...(draft.escalation_parent_team_role
+      ? [`  escalates to:  ${draft.escalation_parent_team_role}`]
+      : []),
+    `  delegates to:  ${list(draft.allowed_delegate_team_roles)}`,
+    '',
+    `Effective grant on confirm (drafted values + ${draft.domain} domain template defaults):`,
+    `  capabilities:  ${list(grant.required_capabilities)}`,
+    `  scope classes: ${list(grant.authority_scope_classes)} (team requires: ${list(grant.team_scope_classes)})`,
+    `  actuators:     ${list(grant.allowed_actuators)}`,
+    `  tiers:         ${list(grant.tier_access)}`,
+    `  write scopes:  ${list(grant.write_scopes)}`,
+    `  escalates to:  ${grant.escalation_parent_team_role ?? '(none)'}`,
+    `  delegates to:  ${list(grant.allowed_delegate_team_roles)}`,
+    '',
+    `Dropped (not in the governed inventory): ${
+      result.dropped.length
+        ? result.dropped
+            .map((entry) => `${entry.field}=${entry.value} (${entry.reason})`)
+            .join('; ')
+        : '(none)'
+    }`,
+    ...(result.fallbacks.length
+      ? [
+          `Fallbacks: ${result.fallbacks
+            .map((entry) => `${entry.field}: ${entry.rejected} -> ${entry.used}`)
+            .join('; ')}`,
+        ]
+      : []),
+    `Missing connections: ${
+      result.missing_connections.length
+        ? result.missing_connections
+            .map(
+              (entry) =>
+                `${entry.actuator}${entry.prerequisites.length ? ` (needs ${entry.prerequisites.join(', ')})` : ''}`
+            )
+            .join('; ')
+        : '(none)'
+    }`,
+    ...result.warnings.map((warning) => `warning: ${warning}`),
+    '',
+    'Next — preview, then commit with an approved security-policy request:',
+    `  ${next.preview}`,
+    `  ${next.commit}`,
+  ];
+  return lines.join('\n');
+}
+
+async function runRoleDraft(
+  options: RoleDraftCliOptions,
+  print: Print,
+  deps: OrgMainDeps
+): Promise<void> {
+  const inventory = loadRoleDraftInventory({
+    domains: roleDraftDomainDefaults(),
+    defaultDomain: 'default',
+    reservedRoleIds: collectExistingRoleIds(pathResolver.rootDir()),
+  });
+  const result = await draftRoleFromIntent({
+    intent: options.intent,
+    inventory,
+    ...(options.tenantSlug ? { tenantSlug: options.tenantSlug } : {}),
+    ...(deps.probeActuator ? { probeActuator: deps.probeActuator } : {}),
+  });
+  if (options.json) {
+    print(
+      JSON.stringify(
+        result.status === 'drafted'
+          ? {
+              ...result,
+              effective_grant: effectiveRoleGrantFromDraft(result.draft),
+              next_commands: roleDraftNextCommands(result.draft),
+            }
+          : result,
+        null,
+        2
+      )
+    );
+  } else {
+    print(renderRoleDraft(result));
+  }
+  // Failure is still a printed result; the exit code carries it to shells.
+  if (result.status === 'failed') throw new ScriptExitError(1);
+}
+
 export async function main(
   argv = currentProcessArgv().slice(2),
-  print: Print = () => undefined
+  print: Print = () => undefined,
+  deps: OrgMainDeps = {}
 ): Promise<void> {
   const command = parseArgs(argv);
   if (command.kind === 'help') {
     print(helpText());
     return;
   }
+  if (command.kind === 'role-draft') {
+    await runRoleDraft(command.options, print, deps);
+    return;
+  }
 
   const rootDir = pathResolver.rootDir();
+  if (command.kind === 'role-create' && command.options.teamRoleId && !command.options.update) {
+    const explicitId = normalizeRoleId(String(command.options.teamRoleId));
+    if (collectExistingRoleIds(rootDir).has(explicitId)) {
+      throw new Error(
+        `--team-role-id '${explicitId}' already names an existing role; creating it would merge into or overwrite that role's records — choose a free id, or pass --update to change that role on purpose`
+      );
+    }
+  }
   const result =
     command.kind === 'role-create'
       ? withExecutionContext('ecosystem_architect', () =>
@@ -1036,7 +1338,7 @@ export async function main(
             autonomyLevel: (command.options.autonomyLevel as AutonomyLevel) || 'medium',
             escalationParentTeamRole: (command.options.escalationParentTeamRole as string) || null,
             allowedDelegateTeamRoles: (command.options.allowedDelegateTeamRoles as string[]) || [],
-            teamRoleId: normalizeRoleId(command.options.name),
+            teamRoleId: normalizeRoleId(String(command.options.teamRoleId || command.options.name)),
             dryRun: Boolean(command.options.dryRun),
             approvalId: command.options.approvalId as string | undefined,
           })
