@@ -61,10 +61,22 @@ describe('inboxLandingHash (?request= deep links)', () => {
     expect(inboxLandingHash('', '?reason=approval')).toBe('');
   });
 
-  it('lands a learning-review link on its approval card after the /ops redirect', () => {
+  it('lands a learning-review link straight on its approval card (no /ops hop)', () => {
     const href = learningReviewHref('terminal:req-42', 'candidate-key', 'famao-ai')!;
+    expect(href.startsWith('/inbox?')).toBe(true);
     const [path, query] = href.split('?');
-    const redirected = resolveIaRedirect(path, query)!;
+    expect(resolveIaRedirect(path, query)).toBeNull();
+    const hash = inboxLandingHash('', query);
+    expect(resolveInboxAnchor([approvalItem('req-42')], new Set(), hash)).toEqual({
+      scrollTo: 'decide-approval-req-42',
+    });
+  });
+
+  it('still lands a legacy /ops approvals link after the redirect', () => {
+    const redirected = resolveIaRedirect(
+      '/ops',
+      'section=approvals&request=req-42&storageChannel=terminal'
+    )!;
     expect(redirected.startsWith('/inbox?')).toBe(true);
     const hash = inboxLandingHash('', redirected.slice('/inbox'.length));
     expect(resolveInboxAnchor([approvalItem('req-42')], new Set(), hash)).toEqual({
