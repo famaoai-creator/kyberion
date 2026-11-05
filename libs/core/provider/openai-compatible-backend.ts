@@ -68,6 +68,7 @@ import type { ReasoningToolName, SamplingParams } from '../reasoning/reasoning-r
 import type { ConstrainedSampling } from '../backend-capability-profile.js';
 import {
   markDelegationExecutionStarted,
+  reportDelegationResultMetadata,
   runStartReportingDelegation,
 } from '../delegation-execution-tracker.js';
 
@@ -181,6 +182,58 @@ export interface ChatCompletionResponse {
   error?: {
     message?: string;
   };
+  /** Provider-reported token usage; absent when the server did not report it. */
+  usage?: ChatCompletionUsage;
+  /** The model the server says served the request. */
+  model?: string;
+}
+
+export interface ChatCompletionUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+}
+
+function usageCount(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+}
+
+/** Keep only measured, well-formed token counts; `undefined` when none remain. */
+function parseChatCompletionUsage(value: unknown): ChatCompletionUsage | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const usage: ChatCompletionUsage = {};
+  for (const key of ['prompt_tokens', 'completion_tokens', 'total_tokens'] as const) {
+    const count = usageCount(record[key]);
+    if (count !== undefined) usage[key] = count;
+  }
+  return Object.keys(usage).length ? usage : undefined;
+}
+
+/**
+ * Sum the usage of every completion one prompt turn made (a tool loop issues
+ * several). A field stays absent unless every response reported it, so a
+ * partially measured turn never under-reports as if it were complete.
+ */
+export function sumChatCompletionUsage(
+  responses: ReadonlyArray<Pick<ChatCompletionResponse, 'usage'>>
+): ChatCompletionUsage | undefined {
+  if (!responses.length) return undefined;
+  const total: ChatCompletionUsage = {};
+  for (const key of ['prompt_tokens', 'completion_tokens', 'total_tokens'] as const) {
+    let sum = 0;
+    let measured = true;
+    for (const response of responses) {
+      const value = response.usage?.[key];
+      if (value === undefined) {
+        measured = false;
+        break;
+      }
+      sum += value;
+    }
+    if (measured && Number.isSafeInteger(sum)) total[key] = sum;
+  }
+  return Object.keys(total).length ? total : undefined;
 }
 
 const CHAT_ROLES = new Set<ChatRole>(['system', 'user', 'assistant', 'tool']);
@@ -279,7 +332,10 @@ function parseChatCompletionPayload(value: unknown): ChatCompletionResponse | nu
       if (typeof parsedError.message !== 'string') return null;
       error = { message: parsedError.message };
     }
-    if (root.choices === undefined) return error ? { choices: [], error } : null;
+    const usage = parseChatCompletionUsage(root.usage);
+    const model = typeof root.model === 'string' && root.model.trim() ? root.model.trim() : '';
+    const metadata = { ...(usage ? { usage } : {}), ...(model ? { model } : {}) };
+    if (root.choices === undefined) return error ? { choices: [], error, ...metadata } : null;
     if (!Array.isArray(root.choices)) return null;
     const choices: ChatCompletionResponse['choices'] = [];
     for (const [index, choice] of root.choices.entries()) {
@@ -294,7 +350,7 @@ function parseChatCompletionPayload(value: unknown): ChatCompletionResponse | nu
       if (!message) return null;
       choices.push({ message });
     }
-    return { choices, ...(error ? { error } : {}) };
+    return { choices, ...(error ? { error } : {}), ...metadata };
   } catch {
     return null;
   }
@@ -922,6 +978,26 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       signal: options?.signal,
       constrainedSampling: options?.constrainedSampling,
     });
+    // R5: report the turn's measured usage after every completion, so a tool
+    // loop that fails midway still carries what it consumed.
+    const responses: ChatCompletionResponse[] = [];
+    const reportUsage = (latest: ChatCompletionResponse): void => {
+      responses.push(latest);
+      const usage = sumChatCompletionUsage(responses);
+      reportDelegationResultMetadata({
+        ...(usage
+          ? {
+              usage: {
+                input_tokens: usage.prompt_tokens,
+                output_tokens: usage.completion_tokens,
+                total_tokens: usage.total_tokens,
+              },
+            }
+          : {}),
+        ...(latest.model ? { served_model: latest.model } : {}),
+      });
+    };
+    reportUsage(response);
     let message = response.choices[0].message;
     let guardrailState = createToolLoopGuardrailState();
     // KD-08: record the stable-prefix baseline for this turn before any tool
@@ -962,6 +1038,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         signal: options?.signal,
         constrainedSampling: options?.constrainedSampling,
       });
+      reportUsage(response);
       message = response.choices[0].message;
     }
 

@@ -5,8 +5,10 @@ import { z } from 'zod';
 import {
   buildCodexCliQueryOptionsFromEnv,
   resolveCodexBinary,
+  rewrapCodexError,
   runCodexCliQuery,
 } from './codex-cli-query.js';
+import { delegationExecutionStartedFromError } from '../delegation-execution-tracker.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
 import { metrics } from '../metrics.js';
 
@@ -159,6 +161,45 @@ describe('codex-cli-query', () => {
       })
     ).rejects.toThrow('spawn failed');
     expect(metrics.record).not.toHaveBeenCalled();
+  });
+
+  it('keeps the spawn error code through both rewraps so ENOENT stays pre-start (R5)', async () => {
+    const child = new EventEmitter() as any;
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    child.stdin = new PassThrough();
+    child.kill = vi.fn();
+    mocks.spawnMock.mockReturnValueOnce(child);
+    const enoent = Object.assign(new Error('spawn codex ENOENT'), {
+      code: 'ENOENT',
+      errno: -2,
+      syscall: 'spawn codex',
+      path: 'codex',
+    });
+    queueMicrotask(() => child.emit('error', enoent));
+    const error = (await runCodexCliQuery({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      schema: z.object({ ok: z.boolean() }),
+      options: { bin: 'codex' },
+    }).catch((e: unknown) => e)) as Error & Record<string, unknown>;
+    expect(error.message).toContain('[codex-cli] structured query failed');
+    expect(error.message).toContain('spawn failed');
+    expect(error).toMatchObject({ code: 'ENOENT', syscall: 'spawn codex', path: 'codex' });
+    expect((error.cause as Error).cause).toBe(enoent);
+    expect(delegationExecutionStartedFromError(error)).toBe(false);
+  });
+
+  it('never turns a bare ENOENT code without a syscall into a pre-start proof', () => {
+    const missingOutput = Object.assign(new Error('missing output'), { code: 'ENOENT' });
+    const wrapped = rewrapCodexError('[codex-cli] structured query failed', missingOutput);
+    expect(wrapped).not.toHaveProperty('code');
+    expect(delegationExecutionStartedFromError(wrapped)).toBeUndefined();
+    const started = rewrapCodexError(
+      '[codex-cli] structured query failed',
+      Object.assign(new Error('x'), { executionStarted: true })
+    );
+    expect(delegationExecutionStartedFromError(started)).toBe(true);
   });
 
   afterEach(() => {

@@ -9,6 +9,10 @@ import {
 } from '../structured-reasoning.js';
 import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
 import { getActiveSandboxPolicy } from '../shell/sandbox-policy.js';
+import {
+  markDelegationExecutionStarted,
+  runStartReportingDelegation,
+} from '../delegation-execution-tracker.js';
 import type {
   BranchForkInput,
   CritiqueInput,
@@ -102,6 +106,9 @@ export class CopilotAcpReasoningBackend implements ReasoningBackend {
       );
     }
     await this.ensureBooted();
+    // R5: booting the ACP server only negotiates a session; sending the prompt
+    // is the dispatch point after which the agent may run tools.
+    markDelegationExecutionStarted();
     try {
       return await this.mediator.ask(`${systemPrompt}\n\n${userPrompt}`);
     } catch (error) {
@@ -157,9 +164,13 @@ export class CopilotAcpReasoningBackend implements ReasoningBackend {
   }
 
   delegateTask(instruction: string, context?: string): Promise<string> {
-    return this.complete(
-      STRUCTURED_REASONING_SYSTEM_PROMPT,
-      [context ? `Context: ${context}` : '', `Task: ${instruction}`].filter(Boolean).join('\n\n')
+    // R5: complete() marks the start right before the prompt reaches the ACP
+    // session, so an egress/sandbox refusal or a boot failure is pre-start.
+    return runStartReportingDelegation(() =>
+      this.complete(
+        STRUCTURED_REASONING_SYSTEM_PROMPT,
+        [context ? `Context: ${context}` : '', `Task: ${instruction}`].filter(Boolean).join('\n\n')
+      )
     );
   }
 
