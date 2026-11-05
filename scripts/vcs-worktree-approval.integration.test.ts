@@ -77,7 +77,7 @@ if (input.action === 'migrate') {
 } else {
   const lines = [];
   try {
-    const result = runVcsMutationWithWorktreeGovernance({ operation: 'pr_create', params: { cwd: input.worktree, title: 'fix(vcs): cross-worktree human decision', body: 'Exact protected review body', head: 'fixture-head', base: 'main', draft: true } }, 'b'.repeat(64), (line) => lines.push(String(line)), { governanceRoot: input.canonical, bodySourceTier: 'protected_or_unknown' });
+    const result = await runVcsMutationWithWorktreeGovernance({ operation: 'pr_create', params: { cwd: input.worktree, title: 'fix(vcs): cross-worktree human decision', body: 'Exact protected review body', head: 'fixture-head', base: 'main', draft: true } }, 'b'.repeat(64), (line) => lines.push(String(line)), { governanceRoot: input.canonical, bodySourceTier: 'protected_or_unknown' });
     output = { result, lines };
   } catch (error) { output = { error: error.message, lines }; }
 }

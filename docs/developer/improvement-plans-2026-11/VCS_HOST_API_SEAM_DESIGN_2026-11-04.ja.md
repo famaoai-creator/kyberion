@@ -161,17 +161,18 @@ provider ごとの認証確認は `vcsHostAuthStatus()` で取得できる。`pn
 
 ## 実装状況
 
-| 段階 | 内容                                                                                                                                                                                                                                                    | 状況   |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 1    | 契約・registry (`vcs-host.ts`)、`gh-cli` provider、登録手続き一式 (SEAM_ROLES、bindings、exports、policy + index、changelog.d、CAPABILITY_SEAMS.md)                                                                                                     | 完了   |
-| 2    | `memory` provider と VH-A7 契約テスト (`vcs-host.test.ts`: gh-cli と github-rest の正規化一致)                                                                                                                                                          | 完了   |
-| 3    | async verb (`vcs-host-verbs.ts`) と `github-rest` provider。VH-A1 (sync 経路と effect 完全一致)・A2・A3・A5 のテスト                                                                                                                                    | 完了   |
-| 4a   | 契約に収まる呼び出し側の移行: `system-pr-lifecycle` (checks + auto-merge)、vcs-actuator `pr_list` / `pr_checks` (watch 含む) / `repo_view`、mission development continuation の PR 照合。`vcsHostPrChecksWait` と provider 注入 (`hostProvider`) を追加 | 完了   |
-| 4b   | 残り: vcs-actuator `pr_view` (任意 `--json` fields)、`pr_shadow` (同期 `PrReadPort`)、`development-proof` (branch protection / rules / actions API)、`publish_pull_request` と `publication-host.ts` (同期 approval host)                               | 未着手 |
-| 5    | 同期 gh 関数の deprecate と `gh` 直接呼び出しを禁止する AST check                                                                                                                                                                                       | 未着手 |
+| 段階 | 内容                                                                                                                                                                                                                                                                                                                                                                    | 状況   |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 1    | 契約・registry (`vcs-host.ts`)、`gh-cli` provider、登録手続き一式 (SEAM_ROLES、bindings、exports、policy + index、changelog.d、CAPABILITY_SEAMS.md)                                                                                                                                                                                                                     | 完了   |
+| 2    | `memory` provider と VH-A7 契約テスト (`vcs-host.test.ts`: gh-cli と github-rest の正規化一致)                                                                                                                                                                                                                                                                          | 完了   |
+| 3    | async verb (`vcs-host-verbs.ts`) と `github-rest` provider。VH-A1 (sync 経路と effect 完全一致)・A2・A3・A5 のテスト                                                                                                                                                                                                                                                    | 完了   |
+| 4a   | 契約に収まる呼び出し側の移行: `system-pr-lifecycle` (checks + auto-merge)、vcs-actuator `pr_list` / `pr_checks` (watch 含む) / `repo_view`、mission development continuation の PR 照合。`vcsHostPrChecksWait` と provider 注入 (`hostProvider`) を追加                                                                                                                 | 完了   |
+| 4b   | 残りの呼び出し側を移行: vcs-actuator `pr_view` (`prFields`, `VCS_PR_FIELDS` に限定)、`pr_shadow` (`PrReadPort` を async 化)、`development-proof` / `development-loop` (allowlist 付き `githubApiGet` 能力を追加して async 化)、`publication-host.ts` / `governance-host.ts` / `publish_pull_request` (approval host を async 化、認証 preflight は `vcsHostAuthStatus`) | 完了   |
+| 5    | 同期 gh 関数の deprecate と `gh` 直接呼び出しを禁止する AST check                                                                                                                                                                                                                                                                                                       | 未着手 |
 
-段階 4b の各項目は契約の拡張 (PR files / mergedAt・closedAt / branch protection・rules・actions 読み取り) か、
-同期 approval host (`withExplicitExternalApprovalRequest` ほか) の async 化を前提とするため、個別 PR で扱う。
+段階 4b で契約に `prFields` (gh `--json` 名と形状、`VCS_PR_FIELDS` に限定) と任意能力 `githubApiGet`
+(`repos/{slug}/` 配下の reviewed allowlist、dot segment と percent-encoded dot は拒否) を追加した。
+同期 approval host は AsyncLocalStorage ベースの context だけで構成されているため、そのまま async に移した。
 `gh_status` は gh CLI 自体の診断なので移行対象外 (provider 診断は `vcsHostAuthStatus()`)。
 
 段階 1 では既存 `github.ts` の関数本体を移さず、同期 verb をそのまま残した。段階 4 で呼び出し側が

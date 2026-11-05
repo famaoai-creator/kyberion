@@ -22,8 +22,17 @@ export interface MemoryVcsHostState {
   visibility: VcsRepositoryVisibility;
   /** Remote branch → commit sha. */
   branches: Record<string, string>;
-  pulls: Array<VcsPullRequestSnapshot & { author?: string; checks?: PrCheckEntry[] }>;
+  pulls: Array<
+    VcsPullRequestSnapshot & {
+      author?: string;
+      checks?: PrCheckEntry[];
+      /** Additional gh `--json` fields served by `prFields` (files, mergedAt, …). */
+      fields?: Record<string, unknown>;
+    }
+  >;
   queued: number[];
+  /** `githubApiGet` responses keyed by path under `repos/{slug}/`; absent → not_found. */
+  api: Record<string, unknown>;
   authenticated: boolean;
 }
 
@@ -49,6 +58,7 @@ export function createMemoryVcsHostProvider(
     branches: { ...(initial.branches ?? {}) },
     pulls: [...(initial.pulls ?? [])],
     queued: [...(initial.queued ?? [])],
+    api: { ...(initial.api ?? {}) },
     authenticated: initial.authenticated ?? true,
   };
   const created: VcsPrCreateInput[] = [];
@@ -63,8 +73,12 @@ export function createMemoryVcsHostProvider(
     if (!pull) throw new VcsHostError('not_found', `no pull request ${ref}`);
     return pull;
   };
-  const snapshotOf = ({ author: _a, checks: _c, ...pull }: MemoryVcsHostState['pulls'][number]) =>
-    ({ ...pull }) as VcsPullRequestSnapshot;
+  const snapshotOf = ({
+    author: _a,
+    checks: _c,
+    fields: _f,
+    ...pull
+  }: MemoryVcsHostState['pulls'][number]) => ({ ...pull }) as VcsPullRequestSnapshot;
 
   return {
     id: initial.id ?? MEMORY_VCS_HOST_ID,
@@ -96,6 +110,20 @@ export function createMemoryVcsHostProvider(
     async prView(_ctx, _repo, ref) {
       fire();
       return snapshotOf(find(ref));
+    },
+    async prFields(_ctx, _repo, ref, fields) {
+      fire();
+      const pull = find(ref);
+      const all: Record<string, unknown> = {
+        ...snapshotOf(pull),
+        author: { login: pull.author ?? '' },
+        ...(pull.fields ?? {}),
+      };
+      return Object.fromEntries(fields.map((field) => [field, all[field] ?? null]));
+    },
+    async githubApiGet(_ctx, _repo, path) {
+      if (!(path in state.api)) throw new VcsHostError('not_found', `no fixture for ${path}`);
+      return structuredClone(state.api[path]);
     },
     async prList(_ctx, _repo, filter): Promise<PrListEntry[]> {
       return state.pulls

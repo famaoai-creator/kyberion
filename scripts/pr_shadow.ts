@@ -1,5 +1,3 @@
-import { parseSafeJsonInput } from '@agent/core/foundation';
-import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import {
   DEFAULT_IGNORED_CHECKS,
   listPrShadowRecords,
@@ -14,8 +12,14 @@ import {
   type PrSummary,
 } from '@agent/core/governance/pr-shadow';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExecResult } from '@agent/core/secure-io';
-import { ghPrChecks, ghPrList, type VcsCommandRunner } from '@agent/core/vcs';
+import type { VcsCommandRunner } from '@agent/core/vcs';
+import { VcsHostError } from '@agent/core/vcs/vcs-host';
+import {
+  vcsHostOptionsForRunner,
+  vcsHostPrChecks,
+  vcsHostPrList,
+  vcsHostPrViewFields,
+} from '@agent/core/vcs/vcs-host-verbs';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 /**
@@ -25,7 +29,7 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
  *   node dist/scripts/pr_shadow.js observe [--ignore-check <name>]... [--json]
  *   node dist/scripts/pr_shadow.js report [--json]
  *
- * `observe` only READS GitHub (`gh pr list|view|checks`) and appends to the
+ * `observe` only READS GitHub (PR list/view/checks via the vcs-host seam) and appends to the
  * shadow ledger; it never merges, comments or edits a PR. Run it on a schedule
  * (`pipelines/pr-shadow-observer.json`) for a few weeks, then read `report`.
  * See libs/core/governance/pr-shadow.ts.
@@ -33,43 +37,28 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
 
 type GhRunner = (args: string[]) => { stdout: string; status: number | null };
 
-/** Credentials are explicit overrides for gh only, never general child inheritance. */
-function runGh(args: string[]): { stdout: string; status: number | null } {
-  const result = safeExecResult('gh', args, {
-    cwd: pathResolver.rootDir(),
-    env: {
-      GH_TOKEN: getRegisteredEnvText('GH_TOKEN'),
-      GITHUB_TOKEN: getRegisteredEnvText('GITHUB_TOKEN'),
-    },
-  });
-  return { stdout: result.stdout, status: result.status };
-}
-
-function parseJson<T>(raw: string, label: string): T {
-  return parseSafeJsonInput(raw, label) as T;
-}
-
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
 }
 
-export function createGhPrPort(run: GhRunner = runGh): PrReadPort {
-  // Adapts the argv-level seam (kept for tests) to the typed helpers in
-  // libs/core/vcs — the single implementation of gh verbs.
-  const exec: VcsCommandRunner = (_command, args) => {
-    const out = run(args);
-    return { stdout: out.stdout, stderr: '', status: out.status };
-  };
-  const view = (prNumber: number, fields: string): Record<string, unknown> => {
-    const out = run(['pr', 'view', String(prNumber), '--json', fields]);
-    if (out.status !== 0) throw new Error(`gh pr view #${prNumber} exited ${out.status}`);
-    return asRecord(parseJson(out.stdout, `gh pr view #${prNumber}`));
-  };
+/**
+ * Read port over the governed vcs-host seam (gh-cli by default, github-rest
+ * where gh is absent). An injected `run` keeps driving a gh CLI built on it —
+ * the argv-level seam the tests use. Credentials come from registered env.
+ */
+export function createGhPrPort(run?: GhRunner): PrReadPort {
+  const exec: VcsCommandRunner | undefined = run
+    ? (_command, args) => {
+        const out = run(args);
+        return { stdout: out.stdout, stderr: '', status: out.status };
+      }
+    : undefined;
+  const host = vcsHostOptionsForRunner({ cwd: pathResolver.rootDir() }, exec);
   return {
-    listOpen(): PrSummary[] {
-      return ghPrList({ state: 'open', limit: 100 }, exec).map((entry) => ({
+    async listOpen(): Promise<PrSummary[]> {
+      return (await vcsHostPrList({ ...host, state: 'open', limit: 100 })).map((entry) => ({
         number: Number(entry.number),
         title: String(entry.title ?? ''),
         headSha: String(entry.headRefOid ?? ''),
@@ -77,8 +66,12 @@ export function createGhPrPort(run: GhRunner = runGh): PrReadPort {
         author: String(entry.author?.login ?? '') || undefined,
       }));
     },
-    files(prNumber: number): PrFile[] {
-      const files = view(prNumber, 'files').files;
+    async files(prNumber: number): Promise<PrFile[]> {
+      const { files } = await vcsHostPrViewFields({
+        ...host,
+        ref: String(prNumber),
+        fields: 'files',
+      });
       return (Array.isArray(files) ? files : []).map((entry) => {
         const record = asRecord(entry);
         return {
@@ -88,17 +81,20 @@ export function createGhPrPort(run: GhRunner = runGh): PrReadPort {
         };
       });
     },
-    ciState(prNumber: number, ignoredChecks: readonly string[]) {
-      // `gh pr checks` exits non-zero while checks fail or are pending; the JSON is still valid.
+    async ciState(prNumber: number, ignoredChecks: readonly string[]) {
       // Shadow mode keeps the original leniency for command failures (no
       // checks / unreadable output → 'none', never a blocker) — but a
-      // well-formed gh response whose payload doesn't parse is a different
+      // well-formed response whose payload doesn't parse is a different
       // failure class: fail closed so a gh upgrade can't silently mask CI.
       let result;
       try {
-        result = ghPrChecks({ ref: String(prNumber), ignore: [...ignoredChecks] }, exec);
+        result = await vcsHostPrChecks({
+          ...host,
+          ref: String(prNumber),
+          ignore: [...ignoredChecks],
+        });
       } catch (error) {
-        if (error instanceof Error && error.message.includes('VCS_GH_INVALID_JSON')) {
+        if (error instanceof VcsHostError && error.code === 'invalid') {
           return { state: 'failure' as PrCiState, failing: ['gh-pr-checks-parse'] };
         }
         return { state: 'none' as PrCiState, failing: [] };
@@ -106,8 +102,12 @@ export function createGhPrPort(run: GhRunner = runGh): PrReadPort {
       if (result.state === 'none') return { state: 'none' as PrCiState, failing: [] };
       return { state: result.state as PrCiState, failing: result.failing };
     },
-    finalState(prNumber: number): PrFinalState {
-      const record = view(prNumber, 'state,mergedAt,closedAt');
+    async finalState(prNumber: number): Promise<PrFinalState> {
+      const record = await vcsHostPrViewFields({
+        ...host,
+        ref: String(prNumber),
+        fields: 'state,mergedAt,closedAt',
+      });
       const state = String(record.state ?? '').toUpperCase();
       if (state === 'MERGED')
         return { state: 'merged', at: String(record.mergedAt ?? '') || undefined };
@@ -159,11 +159,11 @@ export function formatObserveResult(result: ObserveResult): string {
 export const runPrShadow = defineScript({
   name: 'pr-shadow',
   flags: ['json'],
-  run(context) {
+  async run(context) {
     const first = context.argv[0];
     const command = first && !first.startsWith('--') ? first : 'report';
     if (command === 'observe') {
-      const result = observePullRequests(createGhPrPort(), {
+      const result = await observePullRequests(createGhPrPort(), {
         ignoredChecks: readIgnoredChecks(context.argv),
       });
       context.print(context.json ? JSON.stringify(result, null, 2) : formatObserveResult(result));
