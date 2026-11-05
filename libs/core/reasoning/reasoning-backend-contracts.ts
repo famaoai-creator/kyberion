@@ -488,7 +488,24 @@ export interface ReasoningBackend {
     input: DecomposeIntoTasksInput,
     options?: ReasoningCallOptions
   ): Promise<DecomposedTaskPlan>;
-  /** Delegate a complex, multi-step task to an autonomous sub-agent. */
+  /**
+   * Delegate a complex, multi-step task to an autonomous sub-agent.
+   *
+   * R5 execution-start contract: an implementation reports the moment its
+   * delegation's side effects become possible — wrap the body in
+   * `runStartReportingDelegation` and make every dispatch path call
+   * `markDelegationExecutionStarted()` before it can act (a child spawned
+   * through `spawnWithDelegationEnv` marks itself; an SDK / ACP / harness
+   * path marks right before it hands over the prompt; a tool loop marks
+   * before its first tool). A failure before that mark is then provably
+   * pre-start, so a keyed delegation may retry or fail over. A backend that
+   * does not report is treated conservatively: an unknown start state on a
+   * keyed delegation counts as started (no retry, no failover, terminal
+   * replay). Report measured usage / served model with
+   * `reportDelegationResultMetadata` — never zero-fill. Gate:
+   * `tests/delegation-start-reporting.test.ts` (documented exceptions in
+   * `tests/fixtures/delegation-start-reporting-allowlist.json`).
+   */
   delegateTask(
     instruction: string,
     context?: string,
