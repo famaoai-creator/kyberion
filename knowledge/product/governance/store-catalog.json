@@ -283,9 +283,8 @@
       },
       "status": "legacy-move",
       "moves_to": "stance",
-      "legacy_roles": ["tool_runtime_policy_reader"],
-      "sources": ["stance-overlay", "role-policy"],
-      "note": "Stance overlay addressed by KYBERION_CUSTOMER (identity, connections, policy, voice, mission seeds, brand, vision, tool runtime policy, tenant profiles). Moves to knowledge/personal/stances/<slug> in S1."
+      "sources": ["stance-overlay"],
+      "note": "Stance entries move to knowledge/personal/stances/<slug> with migration 0001-stance-home; KYBERION_CUSTOMER is the deprecated name of KYBERION_STANCE."
     },
     {
       "id": "legacy.customer-stance-logs",
@@ -731,21 +730,22 @@
         "ref": "installation-owner"
       },
       "tiers": ["personal"],
-      "status": "planned",
-      "sources": ["scope-model"],
-      "note": "S1: the operator's stances (identity, connections, policy, voice, mission seeds, brand, vision)."
+      "status": "active",
+      "sources": ["scope-model", "role-policy"],
+      "note": "S1 done: the operator's stances (identity, connections, policy, voice, mission seeds, tenant profiles, onboarding, organization profile).",
+      "legacy_roles": ["tool_runtime_policy_reader"]
     },
     {
       "id": "stance-logs",
-      "path": "active/shared/runtime/stance-logs/personal/shared/<slug>",
+      "path": "active/shared/logs/stances/<slug>/traces",
       "custody": {
         "kind": "person",
         "ref": "installation-owner"
       },
       "tiers": ["personal"],
-      "status": "planned",
+      "status": "active",
       "sources": ["scope-model"],
-      "note": "S1: traces and audit logs written under a stance."
+      "note": "Traces written while acting under a stance (default_allow covers active/shared/logs/)."
     },
     {
       "id": "task-workspaces",

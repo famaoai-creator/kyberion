@@ -320,6 +320,7 @@
         "active/shared/coordination/",
         "active/shared/observability/mission-control/",
         "customer/",
+        "knowledge/personal/stances/",
         "knowledge/personal/missions/",
         "knowledge/personal/governance/",
         "knowledge/evolution/",
@@ -328,7 +329,10 @@
         "registry.json"
       ]
     },
-    "knowledge_steward": { "allow_read": ["customer/"], "allow_write": ["customer/"] },
+    "knowledge_steward": {
+      "allow_read": ["customer/", "knowledge/personal/stances/"],
+      "allow_write": ["customer/", "knowledge/personal/stances/"]
+    },
     "run_baseline_check": { "allow_write": ["active/shared/observability/ops-alerts.jsonl"] },
     "ops_alerts": { "allow_write": ["active/shared/observability/ops-alerts.jsonl"] },
     "ops_alert_store": {
@@ -370,8 +374,8 @@
         "active/missions/confidential/${MISSION_ID}/evidence/",
         "active/missions/personal/${MISSION_ID}/evidence/",
         "active/missions/public/${MISSION_ID}/evidence/",
-        "customer/${KYBERION_CUSTOMER}/logs/traces/",
-        "customer/${KYBERION_CUSTOMER}/logs/audit/",
+        "active/shared/logs/stances/${KYBERION_STANCE}/traces/",
+        "customer/${KYBERION_STANCE}/logs/audit/",
         "knowledge/personal/voice/profile-registry.json",
         "knowledge/product/governance/voice-engine-registry.json",
         "knowledge/product/governance/voice-engines/",
@@ -394,8 +398,8 @@
         "active/missions/confidential/${MISSION_ID}/evidence/",
         "active/missions/personal/${MISSION_ID}/evidence/",
         "active/missions/public/${MISSION_ID}/evidence/",
-        "customer/${KYBERION_CUSTOMER}/logs/traces/",
-        "customer/${KYBERION_CUSTOMER}/logs/audit/",
+        "active/shared/logs/stances/${KYBERION_STANCE}/traces/",
+        "customer/${KYBERION_STANCE}/logs/audit/",
         "knowledge/product/governance/voice-profile-registry.json",
         "knowledge/product/governance/voice-engine-registry.json",
         "knowledge/product/governance/voice-engines/"
@@ -494,7 +498,7 @@
       ]
     },
     "ruthless_auditor": {
-      "allow_read": ["active/audit/", "customer/"],
+      "allow_read": ["active/audit/", "customer/", "knowledge/personal/stances/"],
       "allow_write": ["active/audit/"]
     },
     "cyber_security": {
@@ -817,8 +821,8 @@
       ]
     },
     "build_repository": { "allow_write": ["dist/.build-generation.json"] },
-    "customer_create": { "allow_write": ["customer/"] },
-    "onboarding": { "allow_write": ["customer/"] },
+    "customer_create": { "allow_write": ["customer/", "knowledge/personal/stances/"] },
+    "onboarding": { "allow_write": ["customer/", "knowledge/personal/stances/"] },
     "assemble_changelog": { "allow_write": ["CHANGELOG.md", "changelog.d/"] },
     "generate_changelog": { "allow_write": ["CHANGELOG.md"] },
     "generate_design_tokens": {
@@ -962,7 +966,7 @@
         "active/shared/runtime/",
         "active/shared/observability/",
         "active/shared/logs/traces/",
-        "customer/${KYBERION_CUSTOMER}/logs/traces/"
+        "active/shared/logs/stances/${KYBERION_STANCE}/traces/"
       ],
       "allow_write": [
         "active/organizations/confidential/${KYBERION_TENANT}/",
@@ -972,7 +976,7 @@
         "active/shared/runtime/",
         "active/shared/observability/",
         "active/shared/logs/traces/",
-        "customer/${KYBERION_CUSTOMER}/logs/traces/"
+        "active/shared/logs/stances/${KYBERION_STANCE}/traces/"
       ]
     },
     "decision_ledger": {
@@ -1112,7 +1116,7 @@
       "allow_read": [
         "knowledge/product/governance/tool-runtime-policy.json",
         "knowledge/personal/onboarding/tool-runtime-policy.json",
-        "customer/${KYBERION_CUSTOMER}/onboarding/tool-runtime-policy.json"
+        "knowledge/personal/stances/${KYBERION_STANCE}/onboarding/tool-runtime-policy.json"
       ],
       "allow_write": []
     },

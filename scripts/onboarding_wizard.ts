@@ -3,7 +3,7 @@ import { activationNextStep, prepareActivationSetup } from './onboarding_apply.j
 import * as path from 'node:path';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
-import * as customerResolver from '@agent/core/customer-resolver';
+import * as customerResolver from '@agent/core/stance-resolver';
 import { ensureDefaultTenantProfile } from '@agent/core/organization/tenant-registry';
 import { listServiceOnboardingCatalogEntries } from '@agent/core/service/service-onboarding-catalog';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -51,8 +51,8 @@ import {
   type OnboardingTutorial as TutorialDraft,
 } from '@agent/core/organization/onboarding-state';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { createCustomer } from './customer_create.js';
-import { switchCustomer } from './customer_switch.js';
+import { createStance } from './stance_create.js';
+import { switchStance } from './stance_switch.js';
 import {
   isExpressOnboarding,
   ONBOARD_CLI,
@@ -1160,18 +1160,20 @@ export async function runOnboarding(
   setRegisteredEnv('MISSION_ROLE', 'sovereign_concierge');
   setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
   const rootDir = pathResolver.rootDir();
-  let customerSlug = customerResolver.activeCustomer();
+  let stanceSlug = customerResolver.activeStance();
 
-  if (!customerSlug && interactive && !expressMode) {
-    const wantsCustomer = isAffirmative(await ask('Set up a customer overlay now? (y/N): ', 'n'));
-    if (wantsCustomer) {
-      while (!customerSlug) {
-        const slugInput = await ask('Customer slug [e.g. acme-corp]: ', '');
+  if (!stanceSlug && interactive && !expressMode) {
+    const wantsStance = isAffirmative(
+      await ask('Set up a stance (act as another entity) now? (y/N): ', 'n')
+    );
+    if (wantsStance) {
+      while (!stanceSlug) {
+        const slugInput = await ask('Stance slug [e.g. acme-engagement]: ', '');
         try {
-          createCustomer(slugInput);
-          switchCustomer(slugInput);
-          customerSlug = slugInput.trim();
-          setRegisteredEnv('KYBERION_CUSTOMER', customerSlug);
+          createStance(slugInput);
+          switchStance(slugInput);
+          stanceSlug = slugInput.trim();
+          setRegisteredEnv('KYBERION_STANCE', stanceSlug);
         } catch (error) {
           print(chalk.red(String(error)));
         }

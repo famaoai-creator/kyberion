@@ -50,14 +50,14 @@ customer/
 ### 2.1 アクティブ化
 
 ```bash
-export KYBERION_CUSTOMER=acme-corp
+export KYBERION_STANCE=acme-corp
 ```
 
 未設定時は既存の `knowledge/personal/` をレガシーフォールバックとして使う（後方互換）。
 
 ### 2.2 解決順序
 
-1. `customer/{slug}/{path}`（顧客オーバーレイ）
+1. `knowledge/personal/stances/{slug}/{path}`（顧客オーバーレイ）
 2. `knowledge/personal/{path}`（個人フォールバック）
 3. `knowledge/public/{path}`（公開デフォルト、policy 等）
 
@@ -73,7 +73,7 @@ export KYBERION_CUSTOMER=acme-corp
 
 ### 2.4 秘密情報
 
-`customer/{slug}/` は gitignored だが、それでも秘密情報を直接置かない。`secret-actuator`（OS keychain）か環境変数が原則。
+`knowledge/personal/stances/{slug}/` は gitignored だが、それでも秘密情報を直接置かない。`secret-actuator`（OS keychain）か環境変数が原則。
 
 ## 3. 配置先一覧
 
@@ -88,13 +88,13 @@ export KYBERION_CUSTOMER=acme-corp
 
 ## 4. 既存 1 ユーザ設定からの移行
 
-`knowledge/personal/` をそのまま使い続けて構わない（`KYBERION_CUSTOMER` 未設定で動作）。
+`knowledge/personal/` をそのまま使い続けて構わない（`KYBERION_STANCE` 未設定で動作）。
 
 顧客オーバーレイ構造に変換する場合:
 
 ```bash
 pnpm stance:create my-org
-export KYBERION_CUSTOMER=my-org
+export KYBERION_STANCE=my-org
 ```
 
 ## 5. Resolver API

@@ -24,7 +24,7 @@ You do **not** need a new actuator when:
 
 - You can wrap an existing op with a sub-pipeline (use `pipelines/fragments/`).
 - The work is one-shot and won't be reused (use a one-off script).
-- It's a customization for a single customer (use `customer/{slug}/mission-seeds/`).
+- It's a customization for a single customer (use `knowledge/personal/stances/{slug}/mission-seeds/`).
 
 ## The 30-minute walkthrough
 

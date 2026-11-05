@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import * as customerResolver from '@agent/core/customer-resolver';
+import * as customerResolver from '@agent/core/stance-resolver';
 import {
   listOrganizationMissionTeamTemplateCatalogSummariesForOrganization,
   resolveOrganizationMissionTeamTemplateCatalogId,
@@ -115,14 +115,14 @@ export function listOrganizationProfiles(
   const readyOnly = argv.includes('--ready-only');
   const missingOnly = argv.includes('--missing-only');
   const sourceFilter = getOptionValue('--source', [...argv])?.trim();
-  const customerRoot = path.join(rootDir, 'customer');
-  const activeCustomer = customerResolver.activeCustomer();
-  const requestedLabel = organizationId?.trim() || activeCustomer || 'default';
+  const stanceRoot = path.join(rootDir, customerResolver.STANCES_DIR);
+  const activeStance = customerResolver.activeStance();
+  const requestedLabel = organizationId?.trim() || activeStance || 'default';
   const resolvedOrganizationProfile = organizationId
     ? withOrganizationContext(organizationId, () => loadOrganizationProfile())
     : null;
   const selectedOrganizationId =
-    resolvedOrganizationProfile?.organization_id || organizationId || activeCustomer || 'default';
+    resolvedOrganizationProfile?.organization_id || organizationId || activeStance || 'default';
   const rows: Array<{
     slug: string;
     active: boolean;
@@ -143,10 +143,10 @@ export function listOrganizationProfiles(
     source: 'public',
   });
 
-  if (safeExistsSync(customerRoot) && safeLstat(customerRoot).isDirectory()) {
-    for (const entry of safeReaddir(customerRoot).sort()) {
+  if (safeExistsSync(stanceRoot) && safeLstat(stanceRoot).isDirectory()) {
+    for (const entry of safeReaddir(stanceRoot).sort()) {
       if (entry === 'README.md' || entry === '_template') continue;
-      const full = path.join(customerRoot, entry);
+      const full = path.join(stanceRoot, entry);
       if (!safeLstat(full).isDirectory()) continue;
       const profilePath = path.join(full, 'organization-profile.json');
       const profile = safeExistsSync(profilePath)

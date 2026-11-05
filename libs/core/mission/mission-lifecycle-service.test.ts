@@ -390,15 +390,15 @@ describe('mission-lifecycle-service — argv independence (SO-01 landmine regres
 
   beforeEach(() => {
     originalArgv = process.argv;
-    previousCustomer = process.env.KYBERION_CUSTOMER;
-    process.env.KYBERION_CUSTOMER = CUSTOMER_SLUG;
+    previousCustomer = process.env.KYBERION_STANCE;
+    process.env.KYBERION_STANCE = CUSTOMER_SLUG;
     seedSovereignProfile();
   });
 
   afterEach(() => {
     process.argv = originalArgv;
-    if (previousCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
-    else process.env.KYBERION_CUSTOMER = previousCustomer;
+    if (previousCustomer === undefined) delete process.env.KYBERION_STANCE;
+    else process.env.KYBERION_STANCE = previousCustomer;
     for (const id of [missionIdArgvPolluted, missionIdArgvClean]) {
       const missionPath = pathResolver.missionDir(id, 'public');
       fs.rmSync(missionPath, { recursive: true, force: true });
@@ -491,8 +491,8 @@ describe('mission-lifecycle-service — prerequisite gate on start', () => {
   let previousCustomer: string | undefined;
 
   beforeEach(() => {
-    previousCustomer = process.env.KYBERION_CUSTOMER;
-    process.env.KYBERION_CUSTOMER = CUSTOMER_SLUG;
+    previousCustomer = process.env.KYBERION_STANCE;
+    process.env.KYBERION_STANCE = CUSTOMER_SLUG;
     fs.mkdirSync(PROFILE_ROOT, { recursive: true });
     fs.writeFileSync(path.join(PROFILE_ROOT, 'my-identity.json'), '{"sovereign":"test"}');
     fs.writeFileSync(path.join(PROFILE_ROOT, 'my-vision.md'), '# Vision\n');
@@ -521,8 +521,8 @@ describe('mission-lifecycle-service — prerequisite gate on start', () => {
   });
 
   afterEach(() => {
-    if (previousCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
-    else process.env.KYBERION_CUSTOMER = previousCustomer;
+    if (previousCustomer === undefined) delete process.env.KYBERION_STANCE;
+    else process.env.KYBERION_STANCE = previousCustomer;
     fs.rmSync(PROFILE_ROOT, { recursive: true, force: true });
     fs.rmSync(pathResolver.archivedMissionDir(archivedPre), { recursive: true, force: true });
     for (const id of [childOk, childBlocked]) {

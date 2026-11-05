@@ -216,7 +216,7 @@ function loadIntentCatalogFromPath(filePath: string): StandardIntentDefinition[]
 function defaultTenantId(): string | undefined {
   const tenant =
     getRegisteredEnvText('KYBERION_TENANT')?.trim() ||
-    getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() ||
+    getRegisteredEnvText('KYBERION_STANCE')?.trim() ||
     '';
   return tenant || undefined;
 }

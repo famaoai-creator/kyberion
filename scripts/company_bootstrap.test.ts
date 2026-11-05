@@ -49,9 +49,12 @@ describe('company bootstrap', () => {
     expect(result.catalogId).toBe('saas-product-company');
     expect(result.writtenFiles.length).toBeGreaterThanOrEqual(6);
 
-    const profileRaw = safeReadFile(`${tmpRoot}/customer/acme-saas/organization-profile.json`, {
-      encoding: 'utf8',
-    }) as string;
+    const profileRaw = safeReadFile(
+      `${tmpRoot}/knowledge/personal/stances/acme-saas/organization-profile.json`,
+      {
+        encoding: 'utf8',
+      }
+    ) as string;
     expect(profileRaw).not.toContain('{COMPANY_');
     const profile = JSON.parse(profileRaw);
     expect(profile.organization_id).toBe('acme-saas');
@@ -78,7 +81,7 @@ describe('company bootstrap', () => {
         expect(() => JSON.parse(readTextFile(filePath)), filePath).not.toThrow();
       }
       const customer = JSON.parse(readTextFile(result.customerDir + '/customer.json'));
-      const profile = JSON.parse(readTextFile(result.customerDir + '/organization-profile.json'));
+      const profile = JSON.parse(readTextFile(result.stanceDir + '/organization-profile.json'));
       expect(customer.display_name).toBe(companyName);
       expect(profile.name).toContain(companyName);
       expect(readTextFile(result.customerDir + '/vision.md')).toContain(

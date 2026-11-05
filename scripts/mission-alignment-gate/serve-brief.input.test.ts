@@ -7,14 +7,14 @@ vi.mock('@agent/core/organization/member-registry', async (importOriginal) => ({
   resolveMemberByPrincipal: () =>
     fixture.owner ? { member_id: 'owner', display_name: 'Alice', status: 'active' } : null,
 }));
-vi.mock('@agent/core/customer-resolver', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/customer-resolver')>();
+vi.mock('@agent/core/stance-resolver', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/stance-resolver')>();
   return {
     ...actual,
-    customerRoot: (subPath = '', ...rest: unknown[]) =>
+    stanceRoot: (subPath = '', ...rest: unknown[]) =>
       subPath === 'policy/approval-policy.json' && fixture.overlayPath
         ? fixture.overlayPath
-        : (actual.customerRoot as (...args: unknown[]) => string | null)(subPath, ...rest),
+        : (actual.stanceRoot as (...args: unknown[]) => string | null)(subPath, ...rest),
   };
 });
 

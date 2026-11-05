@@ -20,7 +20,7 @@ import {
 } from './check_tenant_registry_consistency.js';
 
 const FIXTURE_PARENT = path.join(pathResolver.rootDir(), 'active', 'shared', 'tmp');
-const EMPTY_ENV = {} as NodeJS.ProcessEnv; // no KYBERION_CUSTOMER → personal tenants dir
+const EMPTY_ENV = {} as NodeJS.ProcessEnv; // no KYBERION_STANCE → personal tenants dir
 
 describe('check_tenant_registry_consistency (DA-01)', () => {
   let fixtureRoot = '';

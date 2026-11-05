@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import * as customerResolver from './customer-resolver.js';
+import * as customerResolver from './stance-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
@@ -709,7 +709,7 @@ export function validateMarketingCompletionEvidence(input: {
 }
 
 export function loadMarketingRiskPolicy(env: NodeJS.ProcessEnv = process.env): MarketingRiskPolicy {
-  const overlay = customerResolver.customerRoot('policy/marketing-risk-policy.json', env);
+  const overlay = customerResolver.stanceRoot('policy/marketing-risk-policy.json', env);
   const source = overlay && safeExistsSync(overlay) ? overlay : DEFAULT_POLICY_PATH;
   return defineCatalog<MarketingRiskPolicy>({
     id: 'marketing-risk-policy',

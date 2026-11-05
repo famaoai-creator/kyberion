@@ -168,7 +168,7 @@ See [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md).
 **Stable**:
 
 - The `customer/` directory layout and `_template/` schema.
-- The `KYBERION_CUSTOMER` env var as the activation mechanism.
+- The `KYBERION_STANCE` env var as the activation mechanism.
 - The slug pattern `^[a-z0-9][a-z0-9_-]*$`.
 - The resolver API (`activeCustomer`, `customerRoot`, `resolveOverlay`, `overlayCandidates`).
 - Resolution order: customer overlay → legacy personal fallback.
@@ -337,14 +337,14 @@ The stable extension point for meeting participation is the actuator / CLI contr
 
 For FDE / customer engagements:
 
-| Need                                      | Use this                                                    | Avoid                                                                       |
-| ----------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Customer-specific identity / vision       | `customer/{slug}/identity.json`, `vision.md`                | Editing `knowledge/personal/` when `KYBERION_CUSTOMER` is unset             |
-| Customer-specific connections             | `customer/{slug}/connections/`                              | Editing `knowledge/personal/connections/` when `KYBERION_CUSTOMER` is unset |
-| Customer-specific policy override         | `customer/{slug}/policy/`                                   | Editing `knowledge/product/governance/`                                     |
-| Customer-specific mission templates       | `customer/{slug}/mission-seeds/`                            | Modifying core `pipelines/`                                                 |
-| Customer-specific actuator                | A new actuator under `libs/actuators/` with its own version | Patching an existing actuator's behavior                                    |
-| Customer-specific actuator behavior tweak | A wrapper actuator that calls the core one                  | Forking the core actuator                                                   |
+| Need                                      | Use this                                                       | Avoid                                                                     |
+| ----------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Customer-specific identity / vision       | `knowledge/personal/stances/{slug}/identity.json`, `vision.md` | Editing `knowledge/personal/` when `KYBERION_STANCE` is unset             |
+| Customer-specific connections             | `knowledge/personal/stances/{slug}/connections/`               | Editing `knowledge/personal/connections/` when `KYBERION_STANCE` is unset |
+| Customer-specific policy override         | `knowledge/personal/stances/{slug}/policy/`                    | Editing `knowledge/product/governance/`                                   |
+| Customer-specific mission templates       | `knowledge/personal/stances/{slug}/mission-seeds/`             | Modifying core `pipelines/`                                               |
+| Customer-specific actuator                | A new actuator under `libs/actuators/` with its own version    | Patching an existing actuator's behavior                                  |
+| Customer-specific actuator behavior tweak | A wrapper actuator that calls the core one                     | Forking the core actuator                                                 |
 
 If you find yourself wanting to modify something that isn't listed in §2 as Stable, that's a signal to either:
 

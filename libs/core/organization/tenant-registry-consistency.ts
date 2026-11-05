@@ -29,6 +29,7 @@
  * All output is codepoint-sorted (never localeCompare) for cross-platform
  * reproducibility.
  */
+import { STANCES_DIR } from '../stance-resolver.js';
 import * as path from 'node:path';
 import { listTenantProfileSlugs, readTenantProfile, resolveTenant } from './tenant-registry.js';
 import { loadTenantDesignOverrideIndex } from './tenant-design-resolver.js';
@@ -114,7 +115,8 @@ export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsS
   }
 
   let customerTenantProfiles: string[] = [];
-  const customerBase = assertSafeRepositoryPath(path.join(rootDir, 'customer'), {
+  // Tenant profiles a stance may act for live under each stance's tenants/ folder.
+  const customerBase = assertSafeRepositoryPath(path.join(rootDir, STANCES_DIR), {
     allowMissingLeaf: true,
     rootDir,
   });

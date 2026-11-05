@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import * as customerResolver from './customer-resolver.js';
+import * as customerResolver from './stance-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { readTextFile } from './foundation/text.js';
@@ -220,7 +220,7 @@ export function resolveGoldenRulePriorityOrder(
 }
 
 export function resolveVision(tenantSlug?: string | null, rootDir?: string): ResolvedVision {
-  const resolvedTenantSlug = tenantSlug?.trim() || customerResolver.activeCustomer() || null;
+  const resolvedTenantSlug = tenantSlug?.trim() || customerResolver.activeStance() || null;
   const candidates = buildCandidatePaths(resolvedTenantSlug, rootDir);
 
   for (const candidate of candidates) {

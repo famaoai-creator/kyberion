@@ -24,6 +24,7 @@ import {
 } from '../secure-io.js';
 import { readTextFile } from '../foundation/index.js';
 import { loadOrganizationProfileAtPath } from './organization-profile.js';
+import { isStanceEntry, stanceDirForSlug } from '../stance-resolver.js';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;
 const VERTICAL_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
@@ -37,7 +38,10 @@ export interface BootstrapCompanyInput {
 }
 
 export interface BootstrapCompanyResult {
+  /** Legacy `customer/{slug}/` directory that still receives the company's tenant files (S2 moves them). */
   customerDir: string;
+  /** Stance directory that receives the stance files of the template. */
+  stanceDir: string;
   writtenFiles: string[];
   catalogId: string;
 }
@@ -85,8 +89,12 @@ export function bootstrapCompany(input: BootstrapCompanyInput): BootstrapCompany
     allowMissingLeaf: true,
     rootDir,
   });
+  // Template files read through the stance overlay go to the stance; the rest
+  // are the company's tenant files and stay in the legacy directory until S2.
+  const stanceDir = stanceDirForSlug(slug, rootDir);
+  const targetDirFor = (entry: string): string => (isStanceEntry(entry) ? stanceDir : customerDir);
   const profileTarget = assertSafeRepositoryPath(
-    path.join(customerDir, 'organization-profile.json'),
+    path.join(targetDirFor('organization-profile.json'), 'organization-profile.json'),
     {
       allowMissingLeaf: true,
       rootDir,
@@ -100,6 +108,7 @@ export function bootstrapCompany(input: BootstrapCompanyInput): BootstrapCompany
 
   const companyName = input.companyName?.trim() || slug;
   safeMkdir(customerDir, { recursive: true });
+  safeMkdir(stanceDir, { recursive: true });
   const writtenFiles: string[] = [];
   for (const entry of safeReaddir(safeTemplateDir) as string[]) {
     const sourcePath = assertSafeRepositoryPath(path.join(safeTemplateDir, entry), {
@@ -116,7 +125,7 @@ export function bootstrapCompany(input: BootstrapCompanyInput): BootstrapCompany
     const materialized = raw
       .replaceAll('{COMPANY_SLUG}', slug)
       .replaceAll('{COMPANY_NAME}', () => templateCompanyName);
-    const targetPath = assertSafeRepositoryPath(path.join(customerDir, entry), {
+    const targetPath = assertSafeRepositoryPath(path.join(targetDirFor(entry), entry), {
       allowMissingLeaf: true,
       rootDir,
     });
@@ -162,5 +171,5 @@ export function bootstrapCompany(input: BootstrapCompanyInput): BootstrapCompany
     );
   }
 
-  return { customerDir, writtenFiles, catalogId };
+  return { customerDir, stanceDir, writtenFiles, catalogId };
 }

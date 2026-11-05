@@ -236,7 +236,7 @@ export async function runVcsMutationWithWorktreeGovernance(
       MISSION_ID: scope.mission_id ?? '',
       KYBERION_NHI_ID: scope.nhi_id ?? '',
       KYBERION_NHI_SESSION: getRegisteredEnvText('KYBERION_NHI_SESSION') ?? '',
-      KYBERION_CUSTOMER: scope.customer_stance ?? '',
+      KYBERION_STANCE: scope.customer_stance ?? '',
       KYBERION_VIEWER_PRINCIPAL: scope.viewer_principal ?? '',
       SYSTEM_ROLE: getRegisteredEnvText('SYSTEM_ROLE'),
       GH_TOKEN: credentials?.GH_TOKEN ?? getRegisteredEnvText('GH_TOKEN'),

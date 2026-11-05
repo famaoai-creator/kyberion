@@ -104,7 +104,7 @@ We credit reporters here unless they request anonymity.
 
 Kyberion executes browser automation, talks to LLMs, and reads from your filesystem. A vulnerability could:
 
-- Leak `customer/{slug}/` or `knowledge/personal/` content to an LLM provider.
+- Leak `knowledge/personal/stances/{slug}/` or `knowledge/personal/` content to an LLM provider.
 - Bypass tier-guard and read confidential knowledge across customers.
 - Execute arbitrary commands via a malformed ADF pipeline.
 - Persist malicious state into a mission's git repo.

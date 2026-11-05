@@ -125,7 +125,7 @@ describe('installation identity metadata', () => {
     expect(s.calls[0].env).toMatchObject({
       KYBERION_TIER: 'confidential',
       KYBERION_TENANT: 'tenant-a',
-      KYBERION_CUSTOMER: 'customer-a',
+      KYBERION_STANCE: 'customer-a',
     });
     expect(JSON.parse(s.calls[0].input).scope).toEqual(s.scope);
   });
@@ -187,6 +187,6 @@ describe('installation identity metadata', () => {
     expect(command).toContain('/worktree/input.json');
     expect(command).toContain('--out=/worktree/reviewed.json');
     expect(command).toContain("KYBERION_TENANT='tenant-a'");
-    expect(command).toContain("KYBERION_CUSTOMER='customer-a'");
+    expect(command).toContain("KYBERION_STANCE='customer-a'");
   });
 });

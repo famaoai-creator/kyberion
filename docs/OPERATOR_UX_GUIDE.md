@@ -287,10 +287,10 @@ pnpm pipeline --input pipelines/meeting-followup.json --context '{"mission_id":"
 6. customer 提供まで finish する。
 
 ```bash
-KYBERION_CUSTOMER=<slug> pnpm mission finish MSN-...
+KYBERION_STANCE=<slug> pnpm mission finish MSN-...
 ```
 
-失敗したら `KYBERION_CUSTOMER` と `--tenant-slug` を一致させ、`customer/<slug>/` が存在することを確認してから finish を再実行する。
+失敗したら `KYBERION_STANCE` と `--tenant-slug` を一致させ、`knowledge/personal/stances/<slug>/` が存在することを確認してから finish を再実行する。
 
 For Google Workspace email and Meet work:
 
@@ -502,7 +502,7 @@ The most useful directory model for operators is by purpose.
 
 Practical rules:
 
-- connection material goes in the active private overlay: `customer/{slug}/connections/` when `KYBERION_CUSTOMER` is set, otherwise `knowledge/personal/connections/`
+- connection material goes in the active private overlay: `knowledge/personal/stances/{slug}/connections/` when `KYBERION_STANCE` is set, otherwise `knowledge/personal/connections/`
 - durable mission evidence goes in `active/missions/`
 - shared logs and tmp artifacts go in `active/shared/`
 - reusable policies, schemas, and procedures belong in `knowledge/public/`

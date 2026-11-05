@@ -738,7 +738,7 @@ describe('continuous work production owner ports', () => {
     };
     h.setState({ tier: tenantScope.tier, tenant_slug: tenantScope.tenant_slug });
     vi.stubEnv('MISSION_ID', 'MSN-PARENT');
-    vi.stubEnv('KYBERION_CUSTOMER', 'parent-customer');
+    vi.stubEnv('KYBERION_STANCE', 'parent-customer');
     vi.stubEnv('KYBERION_PROJECT_ID', 'parent-project');
     await h.ports.ensureMission({ ...missionInput, scope: tenantScope });
     const [, args, child] = h.exec.mock.calls[0];
@@ -759,7 +759,7 @@ describe('continuous work production owner ports', () => {
       KYBERION_ORGANIZATION_ID: scope.organization_id,
     });
     expect(child.env.MISSION_ID).toBeUndefined();
-    expect(child.env.KYBERION_CUSTOMER).toBeUndefined();
+    expect(child.env.KYBERION_STANCE).toBeUndefined();
     expect(child.env.KYBERION_PROJECT_ID).toBeUndefined();
   });
   it.each(['pending', 'rejected'] as const)(

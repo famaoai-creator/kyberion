@@ -23,7 +23,7 @@
  */
 
 import * as path from 'node:path';
-import * as customerResolver from '@agent/core/customer-resolver';
+import * as customerResolver from '@agent/core/stance-resolver';
 import { classifyError, formatClassification } from '@agent/core/error-classifier';
 import { getRegisteredEnv } from '@agent/core/env-validator';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -165,7 +165,7 @@ function checkTier2(): { name: string; ok: boolean; detail?: string }[] {
 
 function profilePath(): string {
   // Prefer customer overlay when active, else fall back to personal.
-  const customerOverlay = customerResolver.customerRoot('voice/profile.json');
+  const customerOverlay = customerResolver.stanceRoot('voice/profile.json');
   if (customerOverlay) return customerOverlay;
   return pathResolver.knowledge('personal/voice/profile.json');
 }
