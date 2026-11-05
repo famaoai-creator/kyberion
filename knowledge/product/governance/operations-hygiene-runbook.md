@@ -31,6 +31,25 @@ admission unchanged and must not be promoted into authenticated assurance. Run
 `libs/core/organization/nhi-session-admission.test.ts` for history changes, including
 no-op rebinds, release/reassignment, malformed journals and credential exclusion.
 
+## Revocable synchronous storage capabilities
+
+An assumed role and its AsyncLocalStorage scope can survive in separately queued
+callbacks after a synchronous issuer returns. Check live capability membership
+at each I/O policy boundary, as well as at role entry; a `finally` revocation or
+rejection of returned Promises alone does not stop a queued callback whose outer
+callback returns `undefined`. Use the existing private synchronous grant issuer
+for credential material and DOT, retaining exact path, tenant, claim and content
+checks. Do not apply synchronous lifetime semantics to ordinary asynchronous,
+deny-only resource scopes.
+
+Gate credential lifetime with
+`libs/core/foundation/credential-material-capability.test.ts` in
+`registration-tests`: active exact-file admission, separately queued stale-role
+denial, counterfeit/clone refusal and exception/async revocation. Run the real
+credential-allocation unit, grant and dispatch integration suites for broker
+changes. A stale permission result is distinct from proof of secret-byte access;
+secure-io's sensitive-path mediation remains an independent boundary.
+
 ## Checkout and canonical implementation drift
 
 Before changing a shared capability, record the checkout root, HEAD SHA/date,
