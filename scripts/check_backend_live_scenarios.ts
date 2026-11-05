@@ -104,7 +104,7 @@ export const runCheckBackendLiveScenarios = defineScript({
         turnTimeoutMs: BACKEND_LIVE_TURN_TIMEOUT_MS,
         // A CLI backend's abort passes only once its child process is seen
         // to exit; an API backend has no child, so its abort error suffices.
-        requireChildExit: cliModes.includes(mode),
+        requireChildExit: (cliModes as readonly string[]).includes(mode),
         ...(model ? { model } : {}),
         servedMode: () => getLastServedReasoningMode()?.mode,
       });
