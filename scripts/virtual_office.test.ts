@@ -177,8 +177,11 @@ describe('virtual office surface', () => {
     );
     const customerRoot = path.join(tmpRoot, 'customer', 'acme');
     fs.mkdirSync(customerRoot, { recursive: true });
+    // The organization profile belongs to the stance; the org chart is a company file.
+    const stanceRoot = path.join(tmpRoot, 'knowledge', 'personal', 'stances', 'acme');
+    fs.mkdirSync(stanceRoot, { recursive: true });
     fs.writeFileSync(
-      path.join(customerRoot, 'organization-profile.json'),
+      path.join(stanceRoot, 'organization-profile.json'),
       JSON.stringify(
         {
           $schema: 'https://kyberion.local/schemas/organization-profile.schema.json',

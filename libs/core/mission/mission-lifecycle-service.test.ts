@@ -366,7 +366,13 @@ describe('mission-lifecycle-service — argv independence (SO-01 landmine regres
   // explicit options; this test proves `start` no longer depends on argv.
   const RUN_ID = Date.now();
   const CUSTOMER_SLUG = `so01-argv-${RUN_ID}`;
-  const PROFILE_ROOT = path.join(pathResolver.rootDir(), 'customer', CUSTOMER_SLUG);
+  const PROFILE_ROOT = path.join(
+    pathResolver.rootDir(),
+    'knowledge',
+    'personal',
+    'stances',
+    CUSTOMER_SLUG
+  );
   const missionIdArgvPolluted = `MSN-SO01-ARGV-A-${RUN_ID}`;
   const missionIdArgvClean = `MSN-SO01-ARGV-B-${RUN_ID}`;
   let originalArgv: string[];
@@ -483,7 +489,13 @@ describe('mission-lifecycle-service — argv independence (SO-01 landmine regres
 describe('mission-lifecycle-service — prerequisite gate on start', () => {
   const RUN_ID = Date.now();
   const CUSTOMER_SLUG = `prereq-gate-${RUN_ID}`;
-  const PROFILE_ROOT = path.join(pathResolver.rootDir(), 'customer', CUSTOMER_SLUG);
+  const PROFILE_ROOT = path.join(
+    pathResolver.rootDir(),
+    'knowledge',
+    'personal',
+    'stances',
+    CUSTOMER_SLUG
+  );
   const archivedPre = `MSN-PREGATE-ARCH-${RUN_ID}`;
   const childOk = `MSN-PREGATE-OK-${RUN_ID}`;
   const childBlocked = `MSN-PREGATE-BLOCKED-${RUN_ID}`;
