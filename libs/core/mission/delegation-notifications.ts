@@ -305,12 +305,16 @@ export function enqueueDelegationNotification(input: {
   completedAt?: string;
 }): DelegationNotification {
   const requestedTenant = String(input.tenantSlug ?? '').trim();
-  const tenant = requestedTenant
-    ? normalizeDelegationTenant(requestedTenant)
-    : boundDelegationTenant();
+  const bound = boundDelegationTenant();
+  const tenant = requestedTenant ? normalizeDelegationTenant(requestedTenant) : bound;
   if (requestedTenant && !tenant) {
     throw new Error(
       `[DELEGATION_NOTIFICATION_TENANT_INVALID] notification tenant is not a valid tenant slug — refusing to place it in the system partition | next: pass the delegation record's tenant_slug | evidence: ${requestedTenant}`
+    );
+  }
+  if (bound && tenant !== bound) {
+    throw new Error(
+      `[DELEGATION_TENANT_SCOPE_MISMATCH] this process is bound to tenant '${bound}' — a notification for another tenant is refused | next: enqueue it from a process bound to that tenant (or unbound) | evidence: ${tenant}`
     );
   }
   const now = nowIso();
