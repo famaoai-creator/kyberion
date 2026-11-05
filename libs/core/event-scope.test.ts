@@ -81,6 +81,19 @@ describe('event scope', () => {
     expect(eventScopeMatches(undefined, { tenant_slug: 'client-a' })).toBe(false);
   });
 
+  it('admits company-less events only for a server-resolved include_untenanted filter', () => {
+    const system = normalizeEventScope({ tier: 'public' });
+    const other = normalizeEventScope({ tier: 'confidential', tenant_slug: 'client-b' });
+    const filter = { tenant_slugs: [] as string[], include_untenanted: true };
+    expect(eventScopeMatches(system, filter)).toBe(true);
+    expect(eventScopeMatches(undefined, filter)).toBe(true);
+    // Never widens the tenant set, and other entity filters still apply.
+    expect(eventScopeMatches(other, filter)).toBe(false);
+    expect(eventScopeMatches(undefined, { ...filter, mission_id: 'MSN-1' })).toBe(false);
+    expect(eventScopeMatches(system, { tenant_slugs: [] })).toBe(false);
+    expect(eventScopeMatches(undefined, { tenant_slugs: [] })).toBe(false);
+  });
+
   it('reads the nested canonical scope and preserves the legacy flat fallback', () => {
     expect(
       eventScopeFromRecord({

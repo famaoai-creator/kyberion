@@ -28,6 +28,7 @@ import {
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
+import { delegationExecutionStartedFromError } from '../delegation-execution-tracker.js';
 
 describe('CopilotAcpReasoningBackend', () => {
   beforeEach(() => {
@@ -85,6 +86,20 @@ describe('CopilotAcpReasoningBackend', () => {
       withSandboxPolicy(policy, () => backend.prompt('inspect the task'))
     ).rejects.toThrow('[SANDBOX_POLICY_UNSUPPORTED]');
     expect(mediatorInstances[0]?.instance.boot).not.toHaveBeenCalled();
+  });
+
+  it('reports delegateTask start only once the prompt reaches the ACP session (R5)', async () => {
+    const backend = new CopilotAcpReasoningBackend({ command: 'gh' });
+    const mediator = mediatorInstances[0]!.instance;
+    mediator.boot.mockRejectedValueOnce(new Error('copilot ACP boot failed'));
+    const bootFailure = await backend.delegateTask('task').catch((e: unknown) => e);
+    // Booting negotiates a session only: nothing ran, so a keyed call may retry.
+    expect(delegationExecutionStartedFromError(bootFailure)).toBe(false);
+    expect(mediator.ask).not.toHaveBeenCalled();
+
+    mediator.ask.mockRejectedValueOnce(new Error('ACP turn failed'));
+    const turnFailure = await backend.delegateTask('task').catch((e: unknown) => e);
+    expect(delegationExecutionStartedFromError(turnFailure)).toBe(true);
   });
 
   it('reuses a booted ACP session for repeated prompts', async () => {

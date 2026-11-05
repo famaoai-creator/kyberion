@@ -19,6 +19,10 @@ vi.mock('./claude-agent-governance.js', () => ({
 }));
 
 import { ClaudeAgentReasoningBackend } from './claude-agent-reasoning-backend.js';
+import {
+  delegationExecutionStartedFromError,
+  markDelegationExecutionStarted,
+} from '../delegation-execution-tracker.js';
 
 describe('ClaudeAgentReasoningBackend', () => {
   it('keeps advisory delegation text-only even when native agent tools are enabled', async () => {
@@ -35,6 +39,20 @@ describe('ClaudeAgentReasoningBackend', () => {
     vi.clearAllMocks();
     delete process.env.KYBERION_CLAUDE_AGENT_TOOLS;
     delete process.env.KYBERION_CLAUDE_NATIVE_SUBAGENT;
+  });
+
+  it('reports a delegateTask failure before the SDK dispatch point as never started (R5)', async () => {
+    const backend = new ClaudeAgentReasoningBackend({ model: 'sonnet' });
+    mocks.runClaudeAgentQuery.mockRejectedValueOnce(new Error('[EGRESS_DENIED] refused'));
+    const refused = await backend.delegateTask('task').catch((e: unknown) => e);
+    expect(delegationExecutionStartedFromError(refused)).toBe(false);
+
+    mocks.runClaudeAgentQuery.mockImplementationOnce(async () => {
+      markDelegationExecutionStarted();
+      throw new Error('turn failed after spawn');
+    });
+    const failed = await backend.delegateTask('task').catch((e: unknown) => e);
+    expect(delegationExecutionStartedFromError(failed)).toBe(true);
   });
 
   it('shapes divergePersonas requests and normalizes hypothesis status', async () => {

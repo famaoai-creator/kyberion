@@ -107,6 +107,22 @@ function denied(
   };
 }
 
+/**
+ * Row-level tenant admission shared by every reader that takes a viewer scope.
+ * `'all'` admits every record; a record with no tenant is admitted only when
+ * the server-resolved scope sets `includeUntenanted` (the shell's system
+ * selection); any other record only when its tenant is in `tenantSlugs`.
+ * It never widens the scope: callers still apply tier / organization / project.
+ */
+export function admitsTenant(
+  context: Pick<SurfaceAuthorizationContext, 'tenantSlugs' | 'includeUntenanted'>,
+  tenantSlug: string | null | undefined
+): boolean {
+  if (context.tenantSlugs === 'all') return true;
+  if (!tenantSlug) return context.includeUntenanted === true;
+  return context.tenantSlugs.includes(tenantSlug);
+}
+
 export function permissionsForSurfaceRole(
   role: SurfaceAuthorizationRole
 ): readonly SurfacePermission[] {
