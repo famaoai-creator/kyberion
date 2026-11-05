@@ -11,7 +11,10 @@ import path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { withExecutionContext } from '../authority.js';
-import { _resetProviderEgressPolicyCacheForTests } from '../provider/provider-egress-gate.js';
+import {
+  _resetProviderEgressPolicyCacheForTests,
+  evaluateProviderEgress,
+} from '../provider/provider-egress-gate.js';
 import { _resetEgressPolicyCacheForTests } from '../egress-policy.js';
 import {
   ReasoningEgressDeniedError,
@@ -508,6 +511,79 @@ describe('no_training honours tenant provider attestations', () => {
       expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(
         /the installation \(system custody\) has no attestation for provider 'claude' \| next: record one with 'pnpm onboarding llm attest --custody system --provider claude .*--request-approval'.* \| custody=system provider=claude attestation=absent/
       );
+    });
+  });
+
+  describe('an approved_providers exception is not evidence of no-training', () => {
+    const providerPolicyPath = path.join(REGISTRY_ROOT, 'provider-egress-exception.json');
+    function useProviderPolicy(claudeTrainingUse: 'none' | 'unknown'): void {
+      safeWriteFile(
+        providerPolicyPath,
+        JSON.stringify({
+          version: '1.3.0',
+          providers: { claude: { egress: 'external-api', training_use: claudeTrainingUse } },
+          tier_policy: {
+            confidential: { mode: 'approved-only', approved_providers: ['claude'] },
+            personal: { mode: 'local-only-or-approved', approved_providers: ['claude'] },
+          },
+        })
+      );
+      process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH = providerPolicyPath;
+      _resetProviderEgressPolicyCacheForTests();
+    }
+    beforeEach(() => writeTenant('approved-tenant'));
+    afterEach(() => {
+      delete process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH;
+      _resetProviderEgressPolicyCacheForTests();
+    });
+
+    it('denies tenant no_training material whose only basis is the exception', () => {
+      useProviderPolicy('unknown');
+      noTraining('approved-tenant', () => {
+        expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(
+          /no no-training declaration — tenant 'approved-tenant' has no attestation for provider 'claude'; .*approved_providers exception, which is an operator exception, not evidence that the provider does not train \| next: declare providers\.claude\.training_use 'none' in provider-egress-policy\.json, or record a custody attestation with 'pnpm onboarding llm attest --tenant approved-tenant --provider claude .*' \| custody=tenant:approved-tenant .*basis=approved-providers-exception/
+        );
+      });
+    });
+
+    it('denies person-custody no_training material whose only basis is the exception', () => {
+      useProviderPolicy('unknown');
+      withReasoningPayloadScope({ tier: 'personal', training_use: 'no_training' }, () => {
+        expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(
+          /approved_providers exception.* \| next: .*--custody person --provider claude.* \| custody=person .*basis=approved-providers-exception/
+        );
+      });
+    });
+
+    it('keeps the exception working on the delegation face', () => {
+      useProviderPolicy('unknown');
+      expect(
+        evaluateProviderEgress({
+          provider: 'claude',
+          dataTier: 'confidential',
+          tenant_slug: 'approved-tenant',
+          tenant_registry_root_dir: REGISTRY_ROOT,
+        })
+      ).toEqual({ allowed: true, basis: 'approved-providers-exception' });
+      expect(evaluateProviderEgress({ provider: 'claude', dataTier: 'personal' })).toEqual({
+        allowed: true,
+        basis: 'approved-providers-exception',
+      });
+    });
+
+    it('allows no_training material once the policy declares training_use none', () => {
+      useProviderPolicy('none');
+      noTraining('approved-tenant', () => {
+        expect(() => assertReasoningEgressAllowed('claude-cli')).not.toThrow();
+      });
+      // Personal material clears the no-training check; the endpoint-domain
+      // layer (no personal grant in this fixture) still decides afterwards.
+      withReasoningPayloadScope({ tier: 'personal', training_use: 'no_training' }, () => {
+        expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(/TIER_EGRESS_DENIED/);
+        expect(() => assertReasoningEgressAllowed('claude-cli')).not.toThrow(
+          /no no-training declaration/
+        );
+      });
     });
   });
 
