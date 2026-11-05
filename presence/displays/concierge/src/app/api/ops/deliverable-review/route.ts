@@ -1,3 +1,4 @@
+import { withCompanyFanoutInvalidation } from '../../../../lib/company-fanout-cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { loadArtifactRecord } from '@agent/core/workforce/artifact-record';
 import {
@@ -67,7 +68,7 @@ function syncInboxWithVerdict(input: {
   return updated;
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   try {
     const denied = guardOpsRequest(req);
     if (denied) return denied;
@@ -156,3 +157,6 @@ export async function POST(req: NextRequest) {
     return viewerErrorResponse(err, err instanceof ViewerContextError ? err.status : 500);
   }
 }
+
+/** A needs-you mutation: the personal fan-out cache never serves the decided item again. */
+export const POST = withCompanyFanoutInvalidation(handlePost);

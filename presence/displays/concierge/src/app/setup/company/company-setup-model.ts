@@ -1,3 +1,5 @@
+import { inboxHrefForApproval } from '../../../lib/inbox-links';
+
 export type CompanyStage =
   'unregistered' | 'registered' | 'awaiting_approval' | 'active' | 'first_work_prepared';
 export type CompanySetup = {
@@ -130,9 +132,7 @@ export function companySetupHref(tenantSlug: string): string {
  * narrowed to the company and to approvals, landing on the card when known.
  */
 export function companyApprovalHref(setup: CompanySetup): string {
-  const query = new URLSearchParams({ tenant: setup.tenantSlug, reason: 'approval' }).toString();
-  const anchor = setup.activationApproval
-    ? '#decide-approval-' + encodeURIComponent(setup.activationApproval.id)
-    : '';
-  return '/inbox?' + query + anchor;
+  if (setup.activationApproval)
+    return inboxHrefForApproval(setup.activationApproval.id, { tenant: setup.tenantSlug });
+  return '/inbox?' + new URLSearchParams({ tenant: setup.tenantSlug, reason: 'approval' });
 }
