@@ -828,7 +828,7 @@ describe('XP-06 delegation concurrency governance (agent-dispatch wiring)', () =
     async function arrange(options: { stopMs?: number; abortWait?: 'immediate' } = {}) {
       const { DelegationAbortedError } = await import('../mission/delegation-concurrency.js');
       const backend = makeFakeBackend();
-      (backend as any).name = 'claude-cli';
+      Object.assign(backend, { name: 'claude-cli' });
       const started: string[] = [];
       backend.delegateTask = vi
         .fn()
