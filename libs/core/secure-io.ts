@@ -14,8 +14,10 @@ import { createHash, randomUUID } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import { assertSafeRepositoryPath } from './path-resolver.js';
 import {
+  buildProxyPassthroughEnv,
   getRegisteredEnvBool,
   getRegisteredEnvText,
+  PROXY_ENV_KEYS,
   registerEnvironmentRegistryReader,
 } from './foundation/env.js';
 import {
@@ -131,12 +133,8 @@ const SAFE_EXEC_ENV_ALLOWLIST = [
   'NODE_EXTRA_CA_CERTS',
   'SSL_CERT_FILE',
   'SSL_CERT_DIR',
-  'HTTP_PROXY',
-  'HTTPS_PROXY',
-  'NO_PROXY',
-  'http_proxy',
-  'https_proxy',
-  'no_proxy',
+  // Proxy vars (PROXY_ENV_KEYS) are added by buildProxyPassthroughEnv, which
+  // appends loopback to NO_PROXY whenever a proxy is passed.
   'HF_HUB_OFFLINE',
   'HF_TOKEN',
   'HUGGING_FACE_HUB_TOKEN',
@@ -261,6 +259,15 @@ export function buildSafeExecEnv(
       safeEnv[key] = value;
     }
   }
+
+  // Proxy vars last, over the inherited value and any explicit override, so a
+  // child handed a proxy always reaches loopback services directly.
+  const proxySource: Record<string, string | undefined> = {};
+  for (const key of PROXY_ENV_KEYS) {
+    proxySource[key] = extraEnv[key] !== undefined ? extraEnv[key] : process.env[key];
+    delete safeEnv[key];
+  }
+  Object.assign(safeEnv, buildProxyPassthroughEnv(proxySource));
 
   return safeEnv as NodeJS.ProcessEnv;
 }
