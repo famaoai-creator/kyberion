@@ -443,7 +443,7 @@
       "path": "active/shared/runtime/delegation-records",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Delegated-task trace and resumable records (libs/core/delegated-task-observability.ts): a registered tier/tenant-partitioned runtime ledger root (PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations, store role delegation_record_store). system/ holds untenanted delegations; confidential/<tenant>/ holds tenant delegations (instruction, context and result text) — delegations.jsonl (append-only audit trace), records/<id>.json and records/child-inbox/<child>.jsonl. Tenant partitions are tenant_scope protected prefixes, read and written only as the tenant-bound delegation_record_store role; tenant offboarding exports and soft-deletes a tenant's partitions (target kind tenant_delegations). Records are the resume authority for continuable child sessions, so removal is a reviewed decision."
+      "note": "Delegated-task trace and resumable records (libs/core/delegated-task-observability.ts): a registered tier/tenant-partitioned runtime ledger root (PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations, store role delegation_record_store). system/ holds untenanted delegations; confidential/<tenant>/ holds tenant delegations (instruction, context and result text) — delegations.jsonl (append-only audit trace), records/<id>.json, records/child-inbox/<child>.jsonl and notifications.jsonl (the background-completion notification queue of libs/core/mission/delegation-notifications.ts: tenant instruction/result excerpts; claimed rows are kept as the delivered-once ledger). Tenant partitions are tenant_scope protected prefixes, read and written only as the tenant-bound delegation_record_store role; tenant offboarding exports and soft-deletes a tenant's partitions (target kind tenant_delegations). Records are the resume authority for continuable child sessions, so removal is a reviewed decision."
     },
     {
       "path": "active/shared/runtime/task-sessions",
@@ -977,7 +977,7 @@
       "path": "active/shared/runtime/delegations",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Delegation notification queue (libs/core/mission/delegation-notifications.ts notifications.jsonl)."
+      "note": "LEGACY (read-only since 2026-11-05): the pre-partition, tenant-mixed delegation notification queue (notifications.jsonl). libs/core/mission/delegation-notifications.ts no longer appends here (the queue moved to active/shared/runtime/delegation-records/<partition>/notifications.jsonl); readers fall back to it per row attribution (tenant stamp, the partition of the delegation record, else the mission location; unattributed rows reach unbound processes only), a claimed legacy row is copied, claimed, into its partition and shadowed there (the file is never rewritten at runtime), and tenant offboarding exports and prunes a tenant's rows under the queue lock (SCOPE_OFFBOARD_DELEGATION_NOTIFICATION_PRUNE). Remaining rows are a reviewed removal."
     },
     {
       "path": "active/shared/runtime/design-patterns",

@@ -66,9 +66,10 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   // scope-derivation
   // Production approvals derive their authorization scope from canonical mission state.
   'scripts/lib/video-production-evidence.ts': 'scope-derivation',
-  // Attributes a legacy shared delegation record to its mission's tenant; a
-  // hidden/ambiguous mission must leave it unattributed (hidden from tenants).
-  'libs/core/delegated-task-observability.ts': 'scope-derivation',
+  // Attributes a legacy shared delegation record / notification row to its
+  // mission's tenant; a hidden/ambiguous mission must leave it unattributed
+  // (hidden from tenants).
+  'libs/core/delegation-store-partition.ts': 'scope-derivation',
   'libs/core/history-search-index.ts': 'scope-derivation',
   'libs/core/injection-signal.ts': 'scope-derivation',
   'libs/core/mark-target-resolver.ts': 'scope-derivation',

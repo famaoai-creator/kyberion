@@ -472,12 +472,19 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
   read-only, attributed per row (stamp, else mission location), migrated on the next write and
   scrubbed by tenant offboarding (export, then audited prune / soft-delete). A store that only
   keeps tenant-free data says so in `tests/fixtures/tenant-observability-store-inventory.json`.
+  The same holds for a shared runtime queue: the background-delegation notification queue moved
+  from `active/shared/runtime/delegations/notifications.jsonl` into each delegation partition
+  (`<partition>/notifications.jsonl`). A queue with ack/claim state keeps it across the move:
+  claiming a legacy row appends the claimed copy to its partition, which shadows the legacy row
+  (never a runtime rewrite of the shared file), and offboarding prunes the tenant's legacy rows
+  under the queue's own lock (`SCOPE_OFFBOARD_DELEGATION_NOTIFICATION_PRUNE`).
 - Gates: `tests/tenant-runtime-store-registration.test.ts` (every `physicalScopedPath` base under
   `active/shared/runtime/` must be an offboarding `PHYSICAL_*` base; dynamic bases and deliberate
   exceptions go in `tests/fixtures/tenant-runtime-store-allowlist.json` with a reason),
   `tests/tenant-observability-store-registration.test.ts` (every `active/shared/observability/<store>`
   a source file names is classified; the unclassified baseline only shrinks; the delegation store
-  stays partitioned and offboarded),
+  and its notification queue stay partitioned and offboarded; only `runtime-state-roots.ts` names
+  the legacy `active/shared/runtime/delegations/` queue),
   `storage-layout.test.ts` (protected prefixes), `scope-offboarding.test.ts` (one disposition per
   registered root; the tenant-state purge test), and the store's own partition test (e.g.
   `delegation-idempotency.test.ts`, `generation-cost-settlement.test.ts`).
