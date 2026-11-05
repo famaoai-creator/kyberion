@@ -213,19 +213,19 @@
     "libs/core/bridge-error-reply.ts": {
       "rate_limiter_impl_budget": 1
     },
-    "libs/core/browser/browser-conversation-session.ts": {
+    "libs/shared-vision/src/browser-conversation-session.ts": {
       "json_state_write_budget": 4
     },
     "libs/core/browser/browser-extension-bridge.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/browser/browser-golden-evidence.ts": {
+    "libs/shared-vision/src/browser-golden-evidence.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/browser/browser-onboarding-state.ts": {
+    "libs/shared-vision/src/browser-onboarding-state.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/browser/browser-procedure-promotion.ts": {
+    "libs/shared-vision/src/browser-procedure-promotion.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/browser/chrome-extension-meeting-driver.ts": {

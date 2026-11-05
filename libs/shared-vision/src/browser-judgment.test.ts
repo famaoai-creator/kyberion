@@ -3,8 +3,8 @@ import {
   registerJudgmentBackend,
   resetJudgmentBackends,
   type JudgmentBackend,
-} from '../reasoning/judgment-backend.js';
-import { registerOrganizationWorkJudgment } from '../organization/organization-operating-model-persistence.js';
+} from '@agent/core/reasoning/judgment-backend';
+import { registerOrganizationWorkJudgment } from '@agent/core/organization/organization-operating-model-persistence';
 import {
   BROWSER_FAILURE_QUESTION,
   BROWSER_READY_QUESTION,

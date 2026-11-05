@@ -225,7 +225,11 @@ export default defineConfig({
         replacement: path.resolve(rootDir, './libs/shared-voice/src/index.ts'),
       },
       {
-        find: '@agent/shared-vision',
+        find: /^@agent\/shared-vision\/(.*)$/,
+        replacement: path.resolve(rootDir, './libs/shared-vision/src/$1'),
+      },
+      {
+        find: /^@agent\/shared-vision$/,
         replacement: path.resolve(rootDir, './libs/shared-vision/src/index.ts'),
       },
       // Exact match only: `@agent/shared-ui/vanilla` must keep resolving via the package exports.

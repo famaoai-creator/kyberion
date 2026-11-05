@@ -2,11 +2,11 @@ import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { promoteBrowserProcedure } from './browser-procedure-promotion.js';
-import * as secureIo from '../secure-io.js';
-import * as foundationJson from '../foundation/json.js';
-import { pathResolver } from '../path-resolver.js';
+import * as secureIo from '@agent/core/secure-io';
+import * as foundationJson from '@agent/core/foundation/json';
+import { pathResolver } from '@agent/core/path-resolver';
 
-import { getFoundationIo, registerFoundationIo } from '../foundation/io.js';
+import { getFoundationIo, registerFoundationIo } from '@agent/core/foundation/io';
 
 // defineCatalog reads presence through FoundationIo rather than secure-io's
 // exports directly, so spying on secureIo.safeExistsSync alone does not

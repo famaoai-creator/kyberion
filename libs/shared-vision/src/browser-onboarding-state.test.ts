@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { pathResolver } from '../path-resolver.js';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   loadBrowserOnboardingStateAtPath,
   writeBrowserOnboardingStateAtPath,
@@ -11,7 +11,7 @@ import {
   safeSymlinkSync,
   safeWriteFile,
   withExecutionContext,
-} from '../index.js';
+} from '@agent/core/index';
 
 const fixtureRoot = pathResolver.sharedTmp(`browser-onboarding-state-${process.pid}`);
 

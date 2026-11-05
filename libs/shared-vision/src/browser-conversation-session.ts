@@ -1,11 +1,11 @@
 import type { ValidateFunction } from 'ajv';
-import { compileSchema } from '../foundation/ajv.js';
-import { defineCatalog } from '../foundation/governed-catalog.js';
-import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
-import { nowIso } from '../foundation/time.js';
+import { compileSchema } from '@agent/core/foundation';
+import { defineCatalog } from '@agent/core/foundation/governed-catalog';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation/safe-json';
+import { nowIso } from '@agent/core/foundation/time';
 import { randomUUID } from 'node:crypto';
-import { logger } from '../core.js';
-import { pathResolver } from '../path-resolver.js';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -14,16 +14,16 @@ import {
   safeMkdir,
   safeReaddir,
   safeWriteFile,
-} from '../secure-io.js';
-import { resolveSurfaceIntent } from '../router-contract.js';
-import type { IntentResolutionPacket } from '../intent/intent-resolution.js';
+} from '@agent/core/secure-io';
+import { resolveSurfaceIntent } from '@agent/core/router-contract';
+import type { IntentResolutionPacket } from '@agent/core/intent/intent-resolution';
 import {
   captureIntentPhrase,
   intentPhraseSource,
   matchesIntentPhrase,
-} from '../intent/intent-phrase-lexicon.js';
-import { t } from '../t.js';
-import { deriveReplyLocale, getReplyLocale, runWithReplyLocale } from '../locale.js';
+} from '@agent/core/intent/intent-phrase-lexicon';
+import { t } from '@agent/core/t';
+import { deriveReplyLocale, getReplyLocale, runWithReplyLocale } from '@agent/core/locale';
 
 export type BrowserConversationSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
 export type BrowserConversationStatus =

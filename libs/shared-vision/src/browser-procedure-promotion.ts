@@ -1,24 +1,24 @@
 import path from 'node:path';
-import { compileBrowserRecording } from './browser-recording-compiler.js';
+import { compileBrowserRecording } from '@agent/core/browser/browser-recording-compiler';
 import {
   invalidateProcedureCache,
   readProcedureCatalog,
   resolveAllowlistedRecordingRef,
   validateProcedureCatalog,
-} from '../knowledge/procedure-registry.js';
-import { pathResolver } from '../path-resolver.js';
+} from '@agent/core/knowledge/procedure-registry';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   goldenScenarioPathForCatalog,
   saveGoldenScenario,
-} from '../knowledge/golden-scenario-verdict.js';
+} from '@agent/core/knowledge/golden-scenario-verdict';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeWriteFile,
-} from '../secure-io.js';
-import { loadBrowserExtensionRecordingAtPath } from './browser-extension-bridge.js';
-import type { ProcedureCatalog, ProcedureEntry } from '../knowledge/procedure-types.js';
+} from '@agent/core/secure-io';
+import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser/browser-extension-bridge';
+import type { ProcedureCatalog, ProcedureEntry } from '@agent/core/knowledge/procedure-types';
 
 const PROCEDURE_ID_RE = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/i;
 const PERSONAL_CATALOG_PATH = pathResolver.knowledge('personal/browser-procedures.json');

@@ -6,7 +6,7 @@ import { chromium } from '@playwright/test';
 import {
   registerBrowserAutomationRuntimeBridge,
   type BrowserAutomationLaunchPersistentContextOptions,
-} from '@agent/core/browser/browser-automation-runtime-bridge';
+} from '@agent/shared-vision/browser-automation-runtime-bridge';
 
 let registered = false;
 
