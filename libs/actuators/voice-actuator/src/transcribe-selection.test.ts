@@ -20,7 +20,7 @@ vi.mock('@agent/core/trace', async () => {
   const actual = await vi.importActual<typeof import('@agent/core/trace')>('@agent/core/trace');
   return { ...actual, persistTrace: vi.fn(() => 'trace-not-persisted-in-tests') };
 });
-vi.mock('@agent/core/voice/voice-path-policy', () => ({
+vi.mock('@agent/shared-voice/voice-path-policy', () => ({
   resolveVoicePath: vi.fn((value: string) => value),
 }));
 vi.mock('@agent/core/secure-io', async () => {

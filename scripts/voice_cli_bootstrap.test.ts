@@ -35,8 +35,8 @@ vi.mock('@agent/core/apple-speech-file-stt-bridge', async (original) => ({
   ...(await original<typeof import('@agent/core/apple-speech-file-stt-bridge')>()),
   installAppleSpeechFileToTextBridgeIfAvailable: setup.appleFile,
 }));
-vi.mock('@agent/core/voice/realtime-voice-conversation', async (original) => ({
-  ...(await original<typeof import('@agent/core/voice/realtime-voice-conversation')>()),
+vi.mock('@agent/shared-voice/realtime-voice-conversation', async (original) => ({
+  ...(await original<typeof import('@agent/shared-voice/realtime-voice-conversation')>()),
   runRealtimeVoiceConversationTurn: setup.turn,
   ensureRealtimeVoiceConversationSession: setup.session,
   recordRealtimeVoiceConversationExchange: setup.exchange,

@@ -49,7 +49,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import {
   getVoiceSelectionSnapshot,
   saveVoiceSelectionPreferences,
-} from '@agent/core/voice/voice-selection-preferences';
+} from '@agent/shared-voice/voice-selection-preferences';
 import { safeMkdir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { randomUUID } from 'node:crypto';
 import {

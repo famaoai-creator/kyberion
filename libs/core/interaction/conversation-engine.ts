@@ -14,7 +14,7 @@
  * the caller performs them (pause output, dispatch the turn, emit a
  * backchannel).
  *
- * Voice is the reference adapter (`libs/core/voice/voice-turn-taking.ts`),
+ * Voice is the reference adapter (`libs/shared-voice/src/voice-turn-taking.ts`),
  * but nothing here mentions audio, VAD, or TTS: the same machine can drive
  * text chat or meeting facilitation, which is what makes it the seed of an
  * "AI runs the company" interaction OS.

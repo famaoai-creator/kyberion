@@ -1002,7 +1002,7 @@
       "artifact_class": "log",
       "ttl_days": 30,
       "action": "delete",
-      "note": "Realtime voice conversation sessions (libs/core/voice/realtime-voice-conversation.ts) — conversation log, same 30d as peer-conversations / a2a-conversations."
+      "note": "Realtime voice conversation sessions (libs/shared-voice/src/realtime-voice-conversation.ts) — conversation log, same 30d as peer-conversations / a2a-conversations."
     },
     {
       "path": "active/shared/runtime/security",
@@ -1022,7 +1022,7 @@
       "artifact_class": "cache",
       "action": "delete",
       "backup": "exclude",
-      "note": "Synthesized first-phrase audio cache (libs/core/voice/voice-first-phrase-cache.ts); self-evicting LRU (maxEntries, default 64), regenerable."
+      "note": "Synthesized first-phrase audio cache (libs/shared-voice/src/voice-first-phrase-cache.ts); self-evicting LRU (maxEntries, default 64), regenerable."
     },
     {
       "path": "active/shared/runtime/web-push",
