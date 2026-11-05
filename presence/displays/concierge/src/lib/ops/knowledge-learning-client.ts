@@ -1,4 +1,5 @@
 import { opsPagePath } from './ops-api-path';
+import { inboxHrefForApproval } from '../inbox-links';
 import {
   parseKnowledgeCandidate,
   type ClientKnowledgeCandidate,
@@ -124,13 +125,14 @@ export function learningReviewHref(
 ): string | null {
   const match = /^terminal:([A-Za-z0-9][A-Za-z0-9._-]{0,255})$/.exec(approvalRef);
   if (!match) return null;
-  const params = workspaceQuery(selection);
-  params.set('section', 'approvals');
-  params.set('request', match[1]);
-  params.set('storageChannel', 'terminal');
-  params.set('candidateKey', candidateKey);
-  if (tenant) params.set('tenant', tenant);
-  return opsPagePath('?') + params.toString();
+  // Straight to the approval card in the needs-you inbox (no /ops redirect
+  // hop); the candidate key lets the inbox offer the way back.
+  return inboxHrefForApproval(match[1], {
+    storageChannel: 'terminal',
+    candidateKey,
+    ...(tenant ? { tenant } : {}),
+    selection,
+  });
 }
 /** Defensive UI only. Unsupported restrictions are preserved, never stripped to gain support. */
 export function learningScopeSupported(candidate: ClientKnowledgeCandidate): boolean {

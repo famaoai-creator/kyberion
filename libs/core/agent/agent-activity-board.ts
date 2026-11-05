@@ -15,6 +15,7 @@ import {
 } from '../workforce/work-visibility.js';
 import { loadState } from '../mission/mission-state.js';
 import { nowIso } from '../foundation/time.js';
+import { admitsTenant } from '../surface/surface-authorization.js';
 
 /**
  * AC-09: the agent id used for a work item nobody has claimed. A stable
@@ -114,6 +115,8 @@ export function composeAgentActivityBoard(input: {
   viewer?: WorkVisibilityViewer;
   tenantByMission?: Record<string, string | undefined>;
   tenantFilter?: string;
+  /** Row-level tenant admission on the resolved tenant (context, else mission). */
+  admitTenant?: (tenantSlug: string | undefined) => boolean;
   now?: string;
 }): AgentActivityBoard {
   const missionItems = buildWorkVisibilityProjection({
@@ -134,6 +137,7 @@ export function composeAgentActivityBoard(input: {
     const tenant =
       context.tenant_slug || (missionId ? input.tenantByMission?.[missionId] : undefined);
     if (input.tenantFilter && tenant !== input.tenantFilter) continue;
+    if (input.admitTenant && !input.admitTenant(tenant)) continue;
     if (['done', 'archived'].includes(item.status)) continue;
     const metadata = (item.metadata || {}) as Record<string, unknown>;
     entries.push({
@@ -187,10 +191,20 @@ export function readMissionTenantSlug(missionId: string): string | undefined {
 }
 
 export function buildAgentActivityBoard(
-  options: { tenant?: string; tenantSlugs?: string[] | 'all' } = {}
+  options: {
+    tenant?: string;
+    tenantSlugs?: string[] | 'all';
+    /** Server-resolved only (the system selection): also admit company-less work. */
+    includeUntenanted?: boolean;
+  } = {}
 ): AgentActivityBoard {
+  const tenantSlugs = options.tenantSlugs || (options.tenant ? [options.tenant] : 'all');
+  // Company-less work items carry no tenant, so the store's tenant filter would
+  // drop them: read unfiltered, then admit each row by its resolved tenant
+  // (`admitsTenant`, the rule every viewer-scoped reader shares).
+  const untenanted = options.includeUntenanted === true && tenantSlugs !== 'all';
   const items = listWorkItems({
-    tenantSlugs: options.tenantSlugs === 'all' ? undefined : options.tenantSlugs,
+    tenantSlugs: options.tenantSlugs === 'all' || untenanted ? undefined : options.tenantSlugs,
   });
   const tenantByMission: Record<string, string | undefined> = {};
   for (const item of items) {
@@ -203,6 +217,12 @@ export function buildAgentActivityBoard(
     items,
     tenantByMission,
     tenantFilter: options.tenant,
-    viewer: { tenantSlugs: options.tenantSlugs || (options.tenant ? [options.tenant] : 'all') },
+    viewer: { tenantSlugs: untenanted ? 'all' : tenantSlugs },
+    ...(untenanted
+      ? {
+          admitTenant: (tenant: string | undefined) =>
+            admitsTenant({ tenantSlugs, includeUntenanted: true }, tenant),
+        }
+      : {}),
   });
 }

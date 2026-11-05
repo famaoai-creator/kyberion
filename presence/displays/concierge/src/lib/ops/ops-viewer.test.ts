@@ -59,6 +59,15 @@ describe('operations viewer helpers (one viewer model)', () => {
     ).not.toContain('personal');
   });
 
+  it('carries the server-resolved system selection into the authorization context', () => {
+    const system = { ...scoped, tenantSlugs: [] as string[], includeUntenanted: true };
+    expect(toSurfaceAuthorizationContext(system)).toMatchObject({
+      tenantSlugs: [],
+      includeUntenanted: true,
+    });
+    expect(toSurfaceAuthorizationContext(scoped)).not.toHaveProperty('includeUntenanted');
+  });
+
   it('runs reads under the console execution roles with the single tenant bound', () => {
     withViewerExecutionContext(scoped, () => 1);
     expect(mocks.withExecutionContext).toHaveBeenLastCalledWith(
