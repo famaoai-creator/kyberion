@@ -291,6 +291,8 @@ const VITEST_LIVE_SUBTREES = [
   // safety net — approvalStoreRoots() already isolates them per Vitest run and pool.
   'shared/runtime/tenant-approvals/',
   'shared/runtime/service-receipts/',
+  // R5 delegation idempotency reservations (delegation-idempotency.ts).
+  'shared/runtime/delegation-idempotency/',
   'shared/logs/traces/',
   'shared/coordination/orchestration/',
   'shared/coordination/agent-runtime/',

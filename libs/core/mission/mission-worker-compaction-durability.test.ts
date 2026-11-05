@@ -113,6 +113,31 @@ describe('mission compaction durability production composition', () => {
     expect(mocks.compact).not.toHaveBeenCalled();
     expect(mocks.constructJournal).not.toHaveBeenCalled();
   });
+  it('declares the summary training_use from the canonical scope', async () => {
+    const summaryScopeFor = async (overrides: Record<string, unknown>) => {
+      dispatchCompactors.clear();
+      mocks.compact.mockClear();
+      const request = input();
+      await maybeCompactDispatchSections({
+        ...request,
+        securityScope: { ...request.securityScope, ...overrides },
+      });
+      return mocks.compact.mock.calls[0]?.[1]?.summaryReasoningScope;
+    };
+    // Tenant mission material may reach a no-training-attested provider.
+    expect(await summaryScopeFor({})).toMatchObject({
+      tier: 'confidential',
+      tenant_slug: 'tenant-x',
+      training_use: 'no_training',
+    });
+    // A participant whose scope forbids external egress stays on this host.
+    expect(await summaryScopeFor({ external_egress: 'deny' })).toMatchObject({
+      training_use: 'local_only',
+    });
+    expect(
+      await summaryScopeFor({ write_tier: 'personal', read_tiers: ['public', 'personal'] })
+    ).toMatchObject({ tier: 'personal', training_use: 'local_only' });
+  });
   it('connects owner-authored task policy to the existing per-task journal and canonical scope', async () => {
     await maybeCompactDispatchSections(input());
     expect(mocks.constructJournal).toHaveBeenCalledWith({

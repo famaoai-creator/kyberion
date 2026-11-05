@@ -1,3 +1,4 @@
+import { withCompanyFanoutInvalidation } from '../../../../lib/company-fanout-cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { nowIso } from '@agent/core/foundation';
 import {
@@ -386,7 +387,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   try {
     const denied = guardOpsRequest(req);
     if (denied) return denied;
@@ -467,3 +468,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+/** A needs-you mutation: the personal fan-out cache never serves the decided item again. */
+export const POST = withCompanyFanoutInvalidation(handlePost);

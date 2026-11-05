@@ -20,8 +20,12 @@ import {
   getReasoningPayloadScope,
   _setReasoningTenantRegistryRootForTests,
   isLocalReasoningBackend,
+  isReasoningEgressDenial,
+  effectiveReasoningTrainingUse,
   reasoningBackendEndpoint,
+  reasoningEgressDenialNext,
   withReasoningPayloadScope,
+  type ReasoningPayloadScope,
 } from './reasoning-egress-scope.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
 
@@ -121,18 +125,24 @@ describe('scope propagation', () => {
   });
 
   it('is visible inside the scope', () => {
-    withReasoningPayloadScope({ tier: 'confidential', tenant_slug: 't' }, () => {
-      expect(getReasoningPayloadScope()?.tier).toBe('confidential');
-    });
+    withReasoningPayloadScope(
+      { tier: 'confidential', tenant_slug: 't', training_use: 'local_only' },
+      () => {
+        expect(getReasoningPayloadScope()?.tier).toBe('confidential');
+      }
+    );
   });
 
   it('does not leak out of the scope', () => {
-    withReasoningPayloadScope({ tier: 'confidential' }, () => undefined);
+    withReasoningPayloadScope(
+      { tier: 'confidential', training_use: 'local_only' },
+      () => undefined
+    );
     expect(getReasoningPayloadScope()).toBeUndefined();
   });
 
   it('survives an await inside the scope', async () => {
-    await withReasoningPayloadScope({ tier: 'personal' }, async () => {
+    await withReasoningPayloadScope({ tier: 'personal', training_use: 'local_only' }, async () => {
       await new Promise((resolve) => setTimeout(resolve, 1));
       // Async-local rather than env-based precisely so this holds while other
       // reasoning calls run concurrently.
@@ -170,10 +180,31 @@ describe('assertReasoningEgressAllowed', () => {
     });
   });
 
-  it('blocks confidential material to an unapproved provider', () => {
-    withReasoningPayloadScope({ tier: 'confidential', tenant_slug: 'other-tenant' }, () => {
-      expect(() => assertReasoningEgressAllowed('anthropic')).toThrow(ReasoningEgressDeniedError);
+  it('treats public material without a declared posture as training-eligible', () => {
+    // Decision 2026-11-05: public material may be used for provider training.
+    withReasoningPayloadScope({ tier: 'public' }, () => {
+      expect(() => assertReasoningEgressAllowed('anthropic')).not.toThrow();
+      expect(() => assertReasoningEgressAllowed('claude-cli')).not.toThrow();
     });
+    // An explicit local_only on public material is still honoured.
+    withReasoningPayloadScope({ tier: 'public', training_use: 'local_only' }, () => {
+      expect(() => assertReasoningEgressAllowed('anthropic')).toThrow(/local_only/);
+    });
+    expect(effectiveReasoningTrainingUse({ tier: 'public' })).toBe('training_eligible');
+    expect(effectiveReasoningTrainingUse({ tier: 'confidential' })).toBe('local_only');
+    expect(effectiveReasoningTrainingUse({ tier: 'personal' })).toBe('local_only');
+    expect(effectiveReasoningTrainingUse({ tier: 'public', training_use: 'no_training' })).toBe(
+      'no_training'
+    );
+  });
+
+  it('blocks confidential material to an unapproved provider', () => {
+    withReasoningPayloadScope(
+      { tier: 'confidential', tenant_slug: 'other-tenant', training_use: 'local_only' },
+      () => {
+        expect(() => assertReasoningEgressAllowed('anthropic')).toThrow(ReasoningEgressDeniedError);
+      }
+    );
   });
 
   it('permits confidential material to a provider approved for that tenant', () => {
@@ -186,9 +217,12 @@ describe('assertReasoningEgressAllowed', () => {
   });
 
   it('permits confidential material to a local backend', () => {
-    withReasoningPayloadScope({ tier: 'confidential', tenant_slug: 'other-tenant' }, () => {
-      expect(() => assertReasoningEgressAllowed('ollama')).not.toThrow();
-    });
+    withReasoningPayloadScope(
+      { tier: 'confidential', tenant_slug: 'other-tenant', training_use: 'local_only' },
+      () => {
+        expect(() => assertReasoningEgressAllowed('ollama')).not.toThrow();
+      }
+    );
   });
 
   it('does not treat an undeclared remote backend as no-training', () => {
@@ -222,33 +256,42 @@ describe('assertReasoningEgressAllowed', () => {
   });
 
   it('allows a provider-neutral local adapter name when its endpoint is local', () => {
-    withReasoningPayloadScope({ tier: 'confidential', tenant_slug: 'other-tenant' }, () => {
-      expect(() =>
-        assertReasoningEgressAllowedAtEndpoint('openai-compatible', 'http://127.0.0.1:11434/v1')
-      ).not.toThrow();
-    });
+    withReasoningPayloadScope(
+      { tier: 'confidential', tenant_slug: 'other-tenant', training_use: 'local_only' },
+      () => {
+        expect(() =>
+          assertReasoningEgressAllowedAtEndpoint('openai-compatible', 'http://127.0.0.1:11434/v1')
+        ).not.toThrow();
+      }
+    );
   });
 
   it('rejects a local-only backend when its configured endpoint is external', () => {
-    withReasoningPayloadScope({ tier: 'confidential', tenant_slug: 'other-tenant' }, () => {
-      expect(() =>
-        assertReasoningEgressAllowedAtEndpoint('ollama', 'https://attacker.example/v1')
-      ).toThrow(ReasoningEgressDeniedError);
-    });
+    withReasoningPayloadScope(
+      { tier: 'confidential', tenant_slug: 'other-tenant', training_use: 'local_only' },
+      () => {
+        expect(() =>
+          assertReasoningEgressAllowedAtEndpoint('ollama', 'https://attacker.example/v1')
+        ).toThrow(ReasoningEgressDeniedError);
+      }
+    );
   });
 
   it('blocks an unrecognized provider holding tenant material', () => {
     // An unknown backend resolves to an invalid host, which the tenant rule
     // denies — the safe direction when the destination is unknown.
-    withReasoningPayloadScope({ tier: 'confidential', tenant_slug: 'approved-tenant' }, () => {
-      expect(() => assertReasoningEgressAllowed('some-new-vendor')).toThrow(
-        ReasoningEgressDeniedError
-      );
-    });
+    withReasoningPayloadScope(
+      { tier: 'confidential', tenant_slug: 'approved-tenant', training_use: 'local_only' },
+      () => {
+        expect(() => assertReasoningEgressAllowed('some-new-vendor')).toThrow(
+          ReasoningEgressDeniedError
+        );
+      }
+    );
   });
 
   it('names the tier in the error so the operator sees what was at stake', () => {
-    withReasoningPayloadScope({ tier: 'personal' }, () => {
+    withReasoningPayloadScope({ tier: 'personal', training_use: 'local_only' }, () => {
       try {
         assertReasoningEgressAllowed('anthropic');
         throw new Error('expected a denial');
@@ -621,5 +664,92 @@ describe('no_training honours tenant provider attestations', () => {
           assertReasoningEgressAllowedAtEndpoint('claude-cli', 'https://api.anthropic.com')
         ).toThrow(/active charter stop tripwire/)
     );
+  });
+});
+
+describe('training_use is a declared posture for non-public material', () => {
+  it('rejects a non-public scope without training_use at the type level', () => {
+    // @ts-expect-error — confidential/personal scopes must declare training_use.
+    const forgotten: ReasoningPayloadScope = { tier: 'confidential', tenant_slug: 't' };
+    const declared: ReasoningPayloadScope = { tier: 'personal', training_use: 'local_only' };
+    expect([forgotten.tier, declared.training_use]).toEqual(['confidential', 'local_only']);
+  });
+
+  it('gives a declared local_only denial a diagnostic next step and evidence', () => {
+    withReasoningPayloadScope(
+      {
+        tier: 'confidential',
+        tenant_slug: 'other-tenant',
+        purpose: 'unit probe',
+        training_use: 'local_only',
+      },
+      () => {
+        let message = '';
+        try {
+          assertReasoningEgressAllowed('claude-cli');
+        } catch (error) {
+          expect(error).toBeInstanceOf(ReasoningEgressDeniedError);
+          message = (error as Error).message;
+        }
+        expect(message).toMatch(/^\[REASONING_EGRESS_DENIED\] training_use 'local_only' forbids/);
+        expect(message).toContain('the payload scope declares local_only');
+        expect(message).toContain('| next: declare training_use explicitly');
+        expect(message).toContain(
+          'pnpm onboarding llm attest --tenant other-tenant --provider claude --training-use none --request-approval'
+        );
+        expect(message).toContain(
+          '| evidence: tier=confidential tenant=other-tenant backend=claude-cli training_use=local_only purpose=unit probe'
+        );
+      }
+    );
+  });
+
+  it('keeps the fail-closed default for an untyped scope but names it as a default', () => {
+    // Untyped JS / dynamic objects can still omit the field; the gate's
+    // semantics are unchanged, only the message says what happened.
+    const untyped = { tier: 'personal' } as unknown as ReasoningPayloadScope;
+    withReasoningPayloadScope(untyped, () => {
+      expect(() => assertReasoningEgressAllowed('anthropic')).toThrow(
+        /declares no training_use, which defaults to local_only.*tenant=\(none\).*training_use=local_only\(default\)/
+      );
+    });
+  });
+
+  it('recognises an egress denial folded into a failover error and extracts its next step', () => {
+    let denial: unknown;
+    withReasoningPayloadScope(
+      { tier: 'confidential', tenant_slug: 'acme', training_use: 'local_only' },
+      () => {
+        try {
+          assertReasoningEgressAllowed('claude-cli');
+        } catch (error) {
+          denial = error;
+        }
+      }
+    );
+    const wrapped = new Error(
+      `[reasoning-backend:failover] prompt failed across 1 candidate(s): [policy] ${(denial as Error).message}`
+    );
+    expect(isReasoningEgressDenial(denial)).toBe(true);
+    expect(isReasoningEgressDenial(wrapped)).toBe(true);
+    expect(isReasoningEgressDenial(new Error('ECONNRESET'))).toBe(false);
+    expect(reasoningEgressDenialNext(wrapped)).toMatch(
+      /^next: declare training_use explicitly .*--tenant acme .*--request-approval'$/
+    );
+    expect(reasoningEgressDenialNext(new Error('boom'))).toBeUndefined();
+  });
+
+  it('extracts the next step from untrusted text without regex backtracking', () => {
+    expect(reasoningEgressDenialNext(new Error('what | next: do it | evidence'))).toBe(
+      'next: do it'
+    );
+    expect(reasoningEgressDenialNext(new Error('what |  next: last step  '))).toBe(
+      'next: last step'
+    );
+    expect(reasoningEgressDenialNext(new Error('next: not after a pipe'))).toBeUndefined();
+    expect(reasoningEgressDenialNext(new Error('what | next: | evidence'))).toBeUndefined();
+    // CodeQL js/polynomial-redos input shape: '|next:{{' followed by a long tab run.
+    const hostile = `|next:{{${'\t'.repeat(200_000)}`;
+    expect(reasoningEgressDenialNext(new Error(hostile))).toBe('next:{{');
   });
 });

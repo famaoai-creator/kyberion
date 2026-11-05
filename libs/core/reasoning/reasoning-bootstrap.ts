@@ -140,6 +140,7 @@ import {
 } from './reasoning-fixed-binding.js';
 
 export type { ReasoningBackendMode } from './reasoning-backend-policy.js';
+import { registerInstalledReasoningModeReader } from './installed-reasoning-mode.js';
 
 let installed = false;
 let installedMode: ReasoningBackendMode | null = null;
@@ -170,6 +171,16 @@ export interface InstallReasoningOptions {
   maxCompletionTokens?: number;
   /** Per-request timeout for HTTP-based backends (e.g. OpenAI-compatible). */
   timeoutMs?: number;
+  /**
+   * Who bounds each request. `'route'` (default) races every prompt /
+   * delegateTask against the route's `limits.timeoutMs` and rejects as soon as
+   * the caller's signal fires, without waiting for the provider. `'caller'`
+   * (task-local construction only) leaves that wrapper off and lets
+   * `timeoutMs` override the route limit for the provider adapters: for
+   * measurement callers (live conformance) that bound every call themselves
+   * and must observe what the provider does after an abort, not the wrapper.
+   */
+  requestTimeout?: 'route' | 'caller';
   /** Pre-built Anthropic client (applies only to `anthropic` mode). */
   anthropicClient?: Anthropic;
   /** Force install even if stub would be chosen otherwise (for tests). */
@@ -958,6 +969,9 @@ export function resetReasoningBootstrap(): void {
 export function getInstalledReasoningMode(): ReasoningBackendMode | null {
   return installedMode;
 }
+// Light readers (the setup checklist) read the installed mode through this
+// seam instead of importing the bootstrap and every provider bundle.
+registerInstalledReasoningModeReader(getInstalledReasoningMode);
 
 /**
  * D10: a backend for exactly one explicitly requested mode (the operator's

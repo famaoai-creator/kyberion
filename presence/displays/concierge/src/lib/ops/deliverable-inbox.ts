@@ -6,6 +6,7 @@ import { clamp } from '@agent/core/foundation';
 import { loadState } from '@agent/core/mission/mission-state';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { admitsTenant } from '@agent/core/surface/surface-authorization';
 import { loadDeliverableReviewState } from './deliverable-review';
 
 export interface DeliverableInboxItem {
@@ -43,6 +44,11 @@ export interface DeliverableInboxItem {
   /** CE-07: role-separated claims carried from the governed inbox record. */
   roleSections?: DeliverableInboxEntry['role_sections'];
   integratedSummary?: string;
+  /**
+   * The governed deliverable inbox holds an open entry (unread / read) for this
+   * artifact: the operator decides it in あなた待ち, not on the artifact.
+   */
+  awaitingInboxDecision?: boolean;
 }
 
 export interface DeliverableInboxQuery {
@@ -53,6 +59,8 @@ export interface DeliverableInboxQuery {
   /** When supplied, unknown-tier records are excluded (fail closed). */
   tierAccess?: readonly OsKnowledgeTier[];
   tenantSlugs?: string[] | 'all';
+  /** Server-resolved only (the system selection): also admit company-less records. */
+  includeUntenanted?: boolean;
   organizationIds?: string[] | 'all';
   projectIds?: string[] | 'all';
   limit?: number;
@@ -254,17 +262,25 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
           ?.current_artifact_id,
         roleSections: linkedInbox?.role_sections,
         integratedSummary: linkedInbox?.integrated_summary,
+        ...(linkedInbox && (linkedInbox.status === 'unread' || linkedInbox.status === 'read')
+          ? { awaitingInboxDecision: true }
+          : {}),
       } satisfies DeliverableInboxItem;
     })
     .filter((item) => (missionId ? item.missionId?.toUpperCase() === missionId : true))
     // A record with no tenant is org-shared: admitted to a finite scope at
-    // public tier only; confidential/personal without an owner stays hidden.
-    .filter((item) =>
-      input.tenantSlugs && input.tenantSlugs !== 'all'
-        ? item.tenantSlug
-          ? input.tenantSlugs.includes(item.tenantSlug)
-          : item.tier === 'public'
-        : true
+    // public tier, or to the system selection (`includeUntenanted`); any other
+    // confidential/personal record without an owner stays hidden.
+    .filter(
+      (item) =>
+        (!item.tenantSlug && item.tier === 'public') ||
+        admitsTenant(
+          {
+            tenantSlugs: input.tenantSlugs ?? 'all',
+            includeUntenanted: input.includeUntenanted === true,
+          },
+          item.tenantSlug
+        )
     )
     .filter((item) =>
       input.organizationIds && input.organizationIds !== 'all'

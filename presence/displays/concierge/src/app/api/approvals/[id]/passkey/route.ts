@@ -1,3 +1,4 @@
+import { withCompanyFanoutInvalidation } from '../../../../../lib/company-fanout-cache';
 import { scopedLearningApprovalVisibleToViewer } from '../../../../../lib/scoped-learning-approval-visibility';
 import { onboardingApprovalMember } from '../../../../../lib/onboarding-authority-server';
 import {
@@ -35,7 +36,7 @@ const ROLE = 'sovereign_concierge' as const;
  * `action: 'verify'` checks the assertion and only then records the decision
  * as `passkey`. The member is the viewer's own, resolved server-side.
  */
-export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+async function handlePost(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
   const limited = passkeyRateLimited(req);
@@ -184,3 +185,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     return conciergeErrorResponse(error, passkeyErrorStatus(error));
   }
 }
+
+/** A needs-you mutation: the personal fan-out cache never serves the decided item again. */
+export const POST = withCompanyFanoutInvalidation(handlePost);
