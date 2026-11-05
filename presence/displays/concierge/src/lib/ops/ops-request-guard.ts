@@ -81,7 +81,19 @@ function crossOriginCookieMutation(req: NextRequest): NextResponse | null {
   );
 }
 
-/** Rate limit + admissible viewer + tenant budget, for every operations route. */
+/**
+ * Rate limit + admissible viewer + tenant budget, for every operations route.
+ *
+ * Two buckets, by method:
+ *   - Safe reads (GET / HEAD / OPTIONS) are bounded only by Concierge's
+ *     per-credential read ceiling (`runtime-control-policy.json`
+ *     `concierge.read_limit`, applied by `guardConciergeRequest`). They never
+ *     drain the tenant token bucket: that bucket is the reasoning-cost quota
+ *     (`tenant-rate-limit-policy.json`), and one `/ops` render issues ~19
+ *     reads, so charging reads to it 429'd normal browsing.
+ *   - Unsafe methods (mutations, which may start reasoning work) pass the
+ *     Concierge mutation ceiling AND consume the tenant budget.
+ */
 export function guardOpsRequest(req: NextRequest): NextResponse | null {
   const limited = guardConciergeRequest(req);
   if (limited) return limited;
@@ -89,6 +101,7 @@ export function guardOpsRequest(req: NextRequest): NextResponse | null {
   if (!viewer) return unauthorized();
   const blocked = crossOriginCookieMutation(req);
   if (blocked) return blocked;
+  if (!isUnsafeMethod(req)) return null;
   const tenants = viewer.tenantSlugs === 'all' ? [] : viewer.tenantSlugs;
   const budget = consumeTenantBudget({
     op: 'surface:ops_request',

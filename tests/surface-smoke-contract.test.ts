@@ -18,8 +18,12 @@ describe('surface smoke contract', () => {
     const pageConfig = read('presence/displays/concierge/src/app/ops/chronos-page-config.ts');
     const banner = read('presence/displays/concierge/src/components/ops/FirstRunBanner.tsx');
 
-    expect(page).toContain('FirstRunBanner');
-    expect(page).toContain('IdentityBadge');
+    // MSN-SHELL-IA: first-run guidance moved from /ops to the home setup
+    // checklist (one place per concern); /ops keeps the identity badge via its shell.
+    const home = read('presence/displays/concierge/src/app/page.tsx');
+    expect(page).not.toContain('FirstRunBanner');
+    expect(home).toMatch(/SetupChecklist|setup-checklist/);
+    expect(shell).toContain('IdentityBadge');
     // UX-03: the label moved into the vocabulary catalog; the shell renders it via its key.
     expect(shell).toContain("uxText('chronos_agent_runtimes'");
     expect(pageConfig).toContain("uxText('chronos_qa_action_prereq_check'");

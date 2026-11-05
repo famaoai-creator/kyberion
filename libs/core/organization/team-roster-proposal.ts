@@ -3,7 +3,12 @@ import { validateReasoningEgress } from '../context-security-scope.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
 import { loadTeamRoleIndex } from '../mission/mission-team-index.js';
 import { loadMissionTeamPlan } from '../mission/mission-team-plan-composer.js';
-import { withReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
+import {
+  isReasoningEgressDenial,
+  reasoningEgressDenialNext,
+  withReasoningPayloadScope,
+  type ReasoningPayloadScope,
+} from '../reasoning/reasoning-egress-scope.js';
 import {
   appendMissionExecutionLedgerEntry,
   readMissionExecutionLedger,
@@ -51,12 +56,22 @@ export type RosterProposalStatus =
   | 'mission_plan_not_found'
   | 'no_candidate_roles'
   | 'backend_unavailable'
+  /** Policy refused to send the mission context to this backend (not a backend fault). */
+  | 'egress_denied'
   | 'invalid_response'
   | 'completed';
+
+export interface RosterProposalEgressDenial {
+  reason: string;
+  /** The operator step that would let the send proceed. */
+  next: string;
+}
 
 export interface RosterProposalOutcome {
   mission_id: string;
   status: RosterProposalStatus;
+  /** Present when `status` is `egress_denied`. */
+  egress?: RosterProposalEgressDenial;
   /** Roles the proposer was allowed to choose from. */
   candidate_roles: string[];
   decisions: RosterProposalDecision[];
@@ -198,25 +213,43 @@ export async function proposeMissionTeamRoster(input: {
   const securityScope = plan.assignments.find(
     (assignment) => assignment.security_scope
   )?.security_scope;
+  const egressDenied = (reason: string, next: string): RosterProposalOutcome => {
+    logger.warn(`[roster-proposal] ${missionId}: egress denied — ${reason} | ${next}`);
+    return {
+      ...base,
+      status: 'egress_denied',
+      candidate_roles: candidateRoles,
+      egress: { reason, next },
+    };
+  };
   if (!securityScope && plan.tier !== 'public') {
-    logger.warn(
-      `[roster-proposal] ${missionId}: refusing non-public mission context without a security scope`
+    return egressDenied(
+      'refusing non-public mission context without a security scope',
+      'next: give the mission team plan an assignment security_scope, or run the proposer on a public mission'
     );
-    return { ...base, status: 'backend_unavailable', candidate_roles: candidateRoles };
   }
   if (securityScope) {
     const egress = validateReasoningEgress(securityScope, backend.name);
     if (!egress.allowed) {
-      logger.warn(`[roster-proposal] ${missionId}: ${egress.reason}`);
-      return { ...base, status: 'backend_unavailable', candidate_roles: candidateRoles };
+      return egressDenied(
+        egress.reason ?? 'the mission security scope forbids this backend',
+        `next: use a backend the mission security scope allows (current: ${backend.name}), or widen the scope through the governed mission facade`
+      );
     }
   }
-  const payloadScope = {
-    tier: plan.tier as 'personal' | 'confidential' | 'public',
+  const tier = plan.tier as ReasoningPayloadScope['tier'];
+  // The prompt carries the mission's classification/context and the governed
+  // role menu — tenant-scoped organization material, not personal data. Like
+  // peer auto-reply drafting it may reach a provider the tenant attested as
+  // no-training; personal-tier missions stay on this host.
+  const payloadScope: ReasoningPayloadScope = {
+    tier,
     ...(plan.tenant_slug ? { tenant_slug: plan.tenant_slug } : {}),
     purpose: 'mission roster proposal',
     attachment_count: 0,
-  } as const;
+    training_use:
+      tier === 'public' ? 'training_eligible' : tier === 'personal' ? 'local_only' : 'no_training',
+  };
 
   let raw: string;
   try {
@@ -232,11 +265,15 @@ export async function proposeMissionTeamRoster(input: {
       )
     );
   } catch (error) {
-    logger.warn(
-      `[roster-proposal] ${missionId}: backend failed: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
+    const message = error instanceof Error ? error.message : String(error);
+    if (isReasoningEgressDenial(error)) {
+      return egressDenied(
+        message,
+        reasoningEgressDenialNext(error) ??
+          `next: declare a training_use the tenant attested for ${backend.name}, use a local backend, or attest the tenant via 'pnpm onboarding llm attest --tenant ${plan.tenant_slug ?? '<slug>'} --request-approval'`
+      );
+    }
+    logger.warn(`[roster-proposal] ${missionId}: backend failed: ${message}`);
     return { ...base, status: 'backend_unavailable', candidate_roles: candidateRoles };
   }
 

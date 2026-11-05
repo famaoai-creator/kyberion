@@ -90,6 +90,8 @@ describe('egress control', () => {
       backendName: 'ollama',
       critique: async (prompt, images) => {
         expect(getReasoningPayloadScope()?.attachment_count).toBe(IMAGES.length);
+        // Rendered tenant deliverables declare their posture explicitly.
+        expect(getReasoningPayloadScope()?.training_use).toBe('no_training');
         return CLEAN_CRITIQUE(prompt, images);
       },
     });
