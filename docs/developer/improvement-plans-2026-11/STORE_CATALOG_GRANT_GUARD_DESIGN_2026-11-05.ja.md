@@ -45,6 +45,20 @@ I/O 許可の証明ではない。新判定で旧認可を置き換える G1 全
 参照で、公開 API を追加せず内部参照へ修正した後、actuator 3件と package boundary の
 4ファイル・101テストが通過した。この最後の test-only 修正後の全体再実行はしていない。
 
+続いて actor と person charter の2か所から、互換 wrapper ではなく既存の
+`foundation/scope` の同じ文法関数を直接参照した。wrapper と公開 API は残した。
+core build と関連7ファイル・99テストが通過し、生成した依存基準値では secure-io が
+67→66、JSON/AJV/catalog/state/service-endpoints の5基準点も各1減った。
+初期の66と比べると差引き0であり、G3 の40以下という目標達成ではない。
+次は権威ある viewer/authority から構築した上限で、一つの保存先の G1 比較を進める。
+
+最終の変更ゲートは `pnpm check -- --changed --base 5c37a7b48 --jobs 1` で
+80件すべて成功した（05:52 JST）。core build・関連99テスト・独立レビューも成功。
+初回検証で生成した合成 mirror の既知2ファイルは、既存の tenant-bound
+`audit_mirror_writer` と secure-io で削除し、親ディレクトリや他の記録には触れていない。
+参照ブランチは05:40時点で `4d34cf939`、main は `f1a6eec49` のままである。
+変更はローカルの専用ブランチに記録し、push・PR・remote CI は未実施である。
+
 門番（`libs/core/tier-guard.ts`）は、**資産の住所**と**許可証**だけを見て判定する。
 ドメインごとのロール名や capability モジュールを門番のコードに書かない。
 
