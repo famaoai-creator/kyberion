@@ -16,6 +16,7 @@ import {
   loadBackendLiveScenarioRecords,
   type BackendLiveScenarioRecord,
   type LiveScenarioName,
+  type LiveScenarioResult,
 } from './backend-live-scenarios.js';
 
 /**
@@ -144,6 +145,22 @@ function liveRecordModel(record: BackendLiveScenarioRecord): string {
  * either way (a turn another mode served is already scored `unreported` by the
  * runner).
  */
+/**
+ * What one scenario result evidences. A scenario's outcome can fail on a step
+ * that says nothing about the capability it evidences: follow_up fails when
+ * the M2 instruction turn is echoed or ignored, before the recall turn that
+ * decides session continuity is asked. Only a follow_up whose recall turn
+ * answered (`continuity: 'absent'`) is a continuity failure; a fail without
+ * that (including records written before the field existed) is no evidence.
+ */
+function evidenceOutcome(result: LiveScenarioResult): 'pass' | 'fail' | undefined {
+  if (result.outcome !== 'pass' && result.outcome !== 'fail') return undefined;
+  if (result.scenario === 'follow_up' && result.outcome === 'fail') {
+    return result.continuity === 'absent' ? 'fail' : undefined;
+  }
+  return result.outcome;
+}
+
 function liveScenarioEvidence(
   records: readonly BackendLiveScenarioRecord[]
 ): Map<string, { passed: string[]; failed: string[] }> {
@@ -160,10 +177,11 @@ function liveScenarioEvidence(
   for (const record of latest.values()) {
     const model = liveRecordModel(record);
     for (const result of record.scenarios) {
-      if (result.outcome !== 'pass' && result.outcome !== 'fail') continue;
+      const outcome = evidenceOutcome(result);
+      if (!outcome) continue;
       const key = `${record.mode}::${result.scenario}`;
       const bucket = evidence.get(key) || { passed: [], failed: [] };
-      const target = result.outcome === 'pass' ? bucket.passed : bucket.failed;
+      const target = outcome === 'pass' ? bucket.passed : bucket.failed;
       if (!target.includes(model)) target.push(model);
       evidence.set(key, bucket);
     }
