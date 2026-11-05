@@ -2,7 +2,8 @@
 /**
  * Validate and open a pull request with a Conventional Commit title.
  *
- * This is a narrow wrapper around `gh pr create` that fails fast when the
+ * This is a narrow wrapper around governed PR creation (the vcs-host seam:
+ * gh CLI by default, GitHub REST where gh is absent) that fails fast when the
  * requested PR title does not satisfy the repository's PR-title policy, and
  * (by default) runs the PR-scope readiness gate before create so agents and
  * operators follow knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md.
@@ -13,7 +14,7 @@ import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/founda
 import { safeExec, safeReadFile } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { createLogger, formatDiagnostic } from '@agent/core/logger';
-import { ghMust } from '@agent/core/vcs';
+import { vcsHostAuthStatus, vcsHostDefaultBranch } from '@agent/core/vcs/vcs-host-verbs';
 import { computeApprovalPayloadHash } from '@agent/core/governance/approval-store';
 import { withRuntimeExternalOperationAuthority } from '@agent/core/governance/external-operation-runtime';
 import { publishWithWorktreeGovernance } from './lib/pr-worktree-governance.js';
@@ -68,15 +69,6 @@ function ghCredentialsEnv(): Record<string, string | undefined> {
 
 function ghOpts() {
   return { cwd: pathResolver.rootDir(), env: ghCredentialsEnv() };
-}
-
-function runGithubCli(args: string[]): string {
-  return ghMust(args, ghOpts());
-}
-
-function readDefaultBranch(): string {
-  const raw = runGithubCli(['repo', 'view', '--json', 'defaultBranchRef']).trim();
-  return parseDefaultBranchResponse(raw);
 }
 
 export function parseDefaultBranchResponse(raw: string): string {
@@ -156,7 +148,9 @@ export function buildGhArgs(
   context?: { head?: string; defaultBranch?: string }
 ): string[] {
   const title = resolvePublishTitle(options.title, context?.head);
-  const base = options.base?.trim() || context?.defaultBranch?.trim() || readDefaultBranch();
+  // `main()` resolves the repository default branch through the vcs-host seam.
+  const base = options.base?.trim() || context?.defaultBranch?.trim();
+  if (!base) throw new Error('Could not determine the base branch; pass --base.');
   const head = context?.head?.trim() || readCurrentBranch();
   if (!head) {
     throw new Error('Could not determine the current branch.');
@@ -279,8 +273,13 @@ export async function main(argv: string[], print: Print = () => undefined): Prom
   if (guarded.handled) return;
   const options = parsePublishArgs(guarded.argv);
 
-  runGithubCli(['--version']);
-  runGithubCli(['auth', 'status']);
+  // Provider-agnostic credential preflight (gh auth status, or GET /user for
+  // github-rest); never prints credential material.
+  const auth = await vcsHostAuthStatus(ghOpts());
+  if (!auth.ok)
+    throw new Error(
+      `[VCS_GH_FAILED] ${auth.provider} authentication: ${auth.detail ?? 'unverified'} — authenticate the GitHub CLI (gh auth login) or register GH_TOKEN for github-rest`
+    );
 
   if (options.skipReadiness) {
     print(
@@ -293,7 +292,9 @@ export async function main(argv: string[], print: Print = () => undefined): Prom
   runKnowledgeReadinessGate(options);
   print('[pr:publish] Knowledge readiness check passed (KL-03).');
 
-  const args = buildGhArgs(options);
+  const args = buildGhArgs(options, {
+    ...(options.base?.trim() ? {} : { defaultBranch: await vcsHostDefaultBranch(ghOpts()) }),
+  });
   // Keep the established title/ref resolution and explicit body-file contract,
   // but route publication through the typed, snapshot-bound approval boundary.
   const publication = {
@@ -318,7 +319,7 @@ export async function main(argv: string[], print: Print = () => undefined): Prom
   // Run inside the installed runtime authority context so an accountability
   // charter with an exact vcs:pr_create grant can delegate this publication;
   // without a matching grant the normal human approval path applies.
-  const result = withRuntimeExternalOperationAuthority(
+  const result = await withRuntimeExternalOperationAuthority(
     { stepId: 'pr:publish', runId: invocationId },
     () => publishWithWorktreeGovernance(publication, invocationId, print)
   );
