@@ -232,6 +232,22 @@ describe('concierge viewer-context tier masking', () => {
     expect(toSurfaceAuthorizationContext(viewer).tierAccess).toEqual(['confidential', 'public']);
   });
 
+  it('carries the server-resolved includeUntenanted into the authorization context', async () => {
+    const { toSurfaceAuthorizationContext } = await import('./viewer-context.js');
+    const viewer = {
+      role: 'localadmin' as const,
+      tenantSlugs: [] as string[],
+      organizationIds: 'all' as const,
+      projectIds: 'all' as const,
+      tierAccess: ['confidential' as const, 'public' as const],
+      source: 'loopback' as const,
+    };
+    expect(toSurfaceAuthorizationContext(viewer).includeUntenanted).toBeUndefined();
+    expect(
+      toSurfaceAuthorizationContext({ ...viewer, includeUntenanted: true }).includeUntenanted
+    ).toBe(true);
+  });
+
   it('projects a single-tenant confidential viewer into a non-personal conversation scope', async () => {
     const { conciergeConversationScope } = await import('./viewer-context.js');
     expect(

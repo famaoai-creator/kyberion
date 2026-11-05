@@ -35,6 +35,7 @@ import {
 import {
   NeedsYouCard,
   cardAnchor,
+  inboxLandingHash,
   resolveInboxAnchor,
   REASON_TONES,
   formatWhen,
@@ -223,12 +224,13 @@ function InboxView() {
     }
   };
 
-  // A deep link (`/inbox#decide-approval-<id>`) lands on its card once the
-  // queue has loaded: reveal a set-aside card, use a folded group's lead card.
+  // A deep link (`/inbox#decide-approval-<id>` or `/inbox?request=<id>`) lands
+  // on its card once the queue has loaded: reveal a set-aside card, use a
+  // folded group's lead card.
   const landedHash = React.useRef<string | null>(null);
   React.useEffect(() => {
     if (!items || typeof window === 'undefined') return;
-    const hash = window.location.hash;
+    const hash = inboxLandingHash(window.location.hash, window.location.search);
     if (!hash || landedHash.current === hash) return;
     const landing = resolveInboxAnchor(items, deferred, hash);
     if (!landing) return;

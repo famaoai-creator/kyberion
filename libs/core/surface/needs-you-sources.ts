@@ -206,7 +206,15 @@ export function readNeedsYouFailures(
     : tiersOf(viewer);
   return listSurfaceNotificationsAcrossChannels()
     .filter((notification) => FAILURE_STATUSES.has(String(notification.status || '').toLowerCase()))
-    .filter((notification) => notificationMatchesScope(notification, { tiers, tenantSlugs }))
+    .filter((notification) =>
+      notificationMatchesScope(notification, {
+        tiers,
+        tenantSlugs,
+        // Server-resolved only: company-less failures belong to the view that
+        // admits untenanted records (the shell's system / all-company view).
+        ...(viewer.includeUntenanted === true ? { includeUntenanted: true } : {}),
+      })
+    )
     .map((notification) => {
       const tenant = String(
         (notification.scope as Record<string, unknown> | undefined)?.tenant_slug ||

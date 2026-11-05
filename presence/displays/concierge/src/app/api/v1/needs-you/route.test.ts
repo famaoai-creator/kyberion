@@ -163,6 +163,37 @@ describe('GET /api/v1/needs-you', () => {
     expect(mocks.readHome.mock.calls[3]![0].includeUntenanted).toBe(true);
   });
 
+  it('reads company-less failures only in the view that admits untenanted records', async () => {
+    mocks.resolveViewer.mockReturnValue({ context: viewer('all') });
+    await SUMMARY(request('/summary'));
+    // The failure reader gets the server-resolved includeUntenanted through
+    // the authorization context; the company views never carry it.
+    expect(mocks.failures.mock.calls.map(([context]) => context.includeUntenanted)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      true,
+    ]);
+  });
+
+  it('the personal view draws from its own, smaller rate-limit bucket', async () => {
+    mocks.resolveViewer.mockReturnValue({
+      context: { ...viewer('all'), principalId: 'human:needs-you-rate-limit' },
+    });
+    const { NEEDS_YOU_PERSONAL_RATE_LIMIT } = await import('../../../../lib/needs-you-server.js');
+    for (let index = 0; index < NEEDS_YOU_PERSONAL_RATE_LIMIT; index += 1) {
+      expect((await SUMMARY(request('/summary'))).status).toBe(200);
+    }
+    const reads = mocks.readHome.mock.calls.length;
+    const limited = await LIST(request());
+    expect(limited.status).toBe(429);
+    expect(await limited.json()).toEqual({ ok: false, error_code: 'rate_limited' });
+    expect(limited.headers.get('Retry-After')).toBeTruthy();
+    expect(mocks.readHome.mock.calls.length).toBe(reads);
+    // A company selection reads one view and is not held by that bucket.
+    expect((await SUMMARY(request('/summary?tenant=acme'))).status).toBe(200);
+  });
+
   it('rejects an unknown filter value', async () => {
     mocks.resolveViewer.mockReturnValue({ context: viewer('all') });
     const response = await LIST(request('?reason=everything'));

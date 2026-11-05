@@ -134,6 +134,18 @@ export function resolveInboxAnchor(
 }
 
 /**
+ * Where a deep link lands: the URL hash wins; otherwise `?request=<id>` (the
+ * links mission admission and learning review emit, and the `/ops?section=
+ * approvals&request=` redirect) targets that approval's card.
+ */
+export function inboxLandingHash(hash: string, search: string | URLSearchParams): string {
+  if (hash && hash !== '#') return hash;
+  const params = typeof search === 'string' ? new URLSearchParams(search) : search;
+  const request = params.get('request')?.trim();
+  return request ? `#decide-approval-${encodeURIComponent(request)}` : '';
+}
+
+/**
  * The card's anchor. Approvals keep the legacy `decide-approval-<id>` anchor
  * so existing deep links (`inboxHrefForApproval`) land on the card.
  */
