@@ -1,18 +1,22 @@
 /**
  * Pure model of the `/work` mission state board (MSN-SHELL-IA §1): every
- * mission falls in exactly one of four columns, derived from its lifecycle
- * status (`libs/core/mission/mission-status.ts`).
+ * mission falls in exactly one of five columns, derived from its lifecycle
+ * status (`libs/core/mission/mission-status.ts`). 計画中 and 進行中 match the
+ * home dashboard's mission tile; the tile shows paused and failed apart,
+ * while the board groups them (with unknown states) under 入力待ち・停滞.
  *
- *   進行中           active, planned (agreed and queued to run)
+ *   計画中           planned (agreed and queued to run)
+ *   進行中           active
  *   入力待ち・停滞   paused, failed, and any status this board does not know
  *                    (an unknown state needs a person to look, never "done")
  *   レビュー待ち     validating, distilling (result is being checked)
  *   完了             completed, archived
  */
 
-export type MissionBoardColumnId = 'in_progress' | 'waiting' | 'review' | 'done';
+export type MissionBoardColumnId = 'planned' | 'in_progress' | 'waiting' | 'review' | 'done';
 
 export const MISSION_BOARD_COLUMNS: readonly MissionBoardColumnId[] = [
+  'planned',
   'in_progress',
   'waiting',
   'review',
@@ -21,7 +25,7 @@ export const MISSION_BOARD_COLUMNS: readonly MissionBoardColumnId[] = [
 
 const STATUS_COLUMN: Readonly<Record<string, MissionBoardColumnId>> = {
   active: 'in_progress',
-  planned: 'in_progress',
+  planned: 'planned',
   paused: 'waiting',
   failed: 'waiting',
   validating: 'review',
@@ -53,7 +57,7 @@ function updatedMs(value: string | undefined): number {
   return Number.isFinite(ms) ? ms : 0;
 }
 
-/** Group missions into the four columns; columns keep their order even when empty. */
+/** Group missions into the five columns; columns keep their order even when empty. */
 export function groupMissionBoard<T extends MissionBoardInput>(
   missions: readonly T[],
   limit = 8

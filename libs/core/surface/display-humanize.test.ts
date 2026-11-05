@@ -3,6 +3,7 @@ import {
   clampText,
   describeActor,
   humanizeSummary,
+  readableMissionName,
   stripMachineText,
   stripIdPrefix,
 } from './display-humanize.js';
@@ -103,5 +104,19 @@ describe('describeActor', () => {
       params: { name: 'Kyberion Productization' },
     });
     expect(describeActor('user:owner')).toEqual({ text: 'owner' });
+  });
+});
+
+describe('readableMissionName', () => {
+  it.each([
+    ['MSN-CLI-GOV-FIX-20261030', 'CLI GOV FIX (2026-10-30)'],
+    ['MSN-SEMANTIC-JUDGMENT-20261031', 'SEMANTIC JUDGMENT (2026-10-31)'],
+    ['MSN-FOLLOWUP-UX', 'FOLLOWUP UX'],
+    ['MSN-LX3K2', 'MSN-LX3K2'],
+    ['MSN-20261030', 'MSN-20261030'],
+    ['MSN-X-99999999', 'X 99999999'],
+    ['', ''],
+  ])('%s → %s', (id, name) => {
+    expect(readableMissionName(id)).toBe(name);
   });
 });
