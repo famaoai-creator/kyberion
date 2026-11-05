@@ -1,21 +1,20 @@
-'use client';
-
-import { useConciergeI18n } from '../../../lib/use-concierge-i18n';
-import { frontDeskText } from '../../../lib/i18n';
-import { IdentityLinkSection } from '../identity-link-section';
-import { SsoSettingsForm } from '../sso-settings-form';
+import { permanentRedirect } from 'next/navigation';
 
 /**
- * SSO outside first-run setup: self-link needs owner on every tenant of the
- * signed-in member, and the settings form is instance owner only (both
- * enforced by the API).
+ * MSN-SHELL-IA-20261105 §4: SSO lives in 設定 › 連携 (`/settings#settings-sso`).
+ * The query is preserved, so the IdP link callback (`?linked=1`) still shows
+ * its confirmation on the settings card.
  */
-export default function SsoSettingsPage() {
-  const { locale } = useConciergeI18n();
-  return (
-    <section className="pane" aria-label={frontDeskText('sso_title', locale)}>
-      <IdentityLinkSection />
-      <SsoSettingsForm />
-    </section>
-  );
+export default async function SsoSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    for (const entry of Array.isArray(value) ? value : value === undefined ? [] : [value])
+      query.append(key, entry);
+  }
+  const search = query.toString();
+  permanentRedirect(`/settings${search ? `?${search}` : ''}#settings-sso`);
 }

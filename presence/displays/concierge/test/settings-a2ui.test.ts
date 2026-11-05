@@ -72,10 +72,12 @@ describe('Concierge settings A2UI projection', () => {
       items: Array<{ id: string; status?: string; href: string }>;
     }>;
     const items = groups.flatMap((group) => group.items);
-    expect(items.map((item) => item.id)).toContain('authority');
-    expect(items.find((item) => item.id === 'profile')?.status).toBe('needs_setup');
-    expect(items.find((item) => item.id === 'services')?.status).toBe('needs_setup');
-    expect(items.find((item) => item.id === 'voice')?.status).toBe('done');
+    // MSN-SHELL-IA: the nav lists the nine categories; a category takes the
+    // worst status of the diagnostics it fixes.
+    expect(items.map((item) => item.id)).toContain('start');
+    expect(items.find((item) => item.id === 'workspace')?.status).toBe('needs_setup');
+    expect(items.find((item) => item.id === 'connections')?.status).toBe('needs_setup');
+    expect(items.find((item) => item.id === 'agents')?.status).toBe('done');
     expect(items.every((item) => item.href.startsWith('/settings#'))).toBe(true);
 
     const readiness = byId.get('settings-readiness');

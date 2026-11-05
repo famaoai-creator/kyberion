@@ -116,49 +116,49 @@ export const CONSOLE_SECTIONS: Array<{
   },
 ];
 /**
- * UI-07: the eleven console sections are grouped into five top-level tabs
- * (one row at 1280px). A group's first section is its landing page; the
- * others are its sub-navigation. `?section=` keeps addressing a section, so
- * every existing deep link still resolves (`governance`, which only linked
- * to approvals and knowledge, now lands on the 判断 group).
+ * MSN-SHELL-IA §1: `/ops` is operations only — one row of four sections.
+ * Home, missions, work items, approvals, organization, deliverables and
+ * knowledge moved to their top-level destinations; `proxy.ts` 308-redirects
+ * those `?section=` values (`lib/ia-routes.ts`). The remaining group keeps
+ * the `operate` id so section → group lookups stay total.
  */
-export type ChronosNavGroupId = 'home' | 'work' | 'decide' | 'operate' | 'organization';
+export type ChronosNavGroupId = 'operate';
+
+export const OPS_DEFAULT_SECTION = 'operations' as const;
 
 export const CHRONOS_NAV_GROUPS: ReadonlyArray<{
   id: ChronosNavGroupId;
   labelKey: string;
   sections: readonly ConsoleContentSection[];
 }> = [
-  { id: 'home', labelKey: 'chronos_group_home', sections: ['home'] },
-  {
-    id: 'work',
-    labelKey: 'chronos_group_work',
-    sections: ['missions', 'work-items', 'deliverables'],
-  },
-  {
-    id: 'decide',
-    labelKey: 'chronos_group_decide',
-    sections: ['approvals', 'discussion', 'knowledge'],
-  },
   {
     id: 'operate',
     labelKey: 'chronos_group_operate',
-    sections: ['operations', 'surface-control', 'diagnostics'],
+    sections: ['operations', 'surface-control', 'diagnostics', 'discussion'],
   },
-  { id: 'organization', labelKey: 'chronos_group_organization', sections: ['organization'] },
 ];
 
+/** Sections that moved out of `/ops`; they never render here. */
+export const OPS_MOVED_SECTIONS: ReadonlySet<string> = new Set([
+  'home',
+  'organization',
+  'missions',
+  'work-items',
+  'deliverables',
+  'approvals',
+  'knowledge',
+  'governance',
+]);
+
 /** Retired section ids that still resolve for old bookmarks and callers. */
-export const CHRONOS_SECTION_ALIASES: Readonly<Record<string, ConsoleSectionId>> = {
-  governance: 'approvals',
-};
+export const CHRONOS_SECTION_ALIASES: Readonly<Record<string, ConsoleSectionId>> = {};
 
 const KNOWN_SECTIONS = new Set<string>([
-  ...CONSOLE_SECTIONS.map((section) => section.id),
+  ...CHRONOS_NAV_GROUPS.flatMap((group) => group.sections),
   'surface',
 ]);
 
-/** Map a `?section=` value (current or retired) to a section, or null. */
+/** Map a `?section=` value to a section `/ops` still renders, or null. */
 export function resolveConsoleSectionParam(
   value: string | null | undefined
 ): ConsoleSectionId | null {
@@ -168,17 +168,12 @@ export function resolveConsoleSectionParam(
   return KNOWN_SECTIONS.has(value) ? (value as ConsoleSectionId) : null;
 }
 
-/** The top-level group a section belongs to (`surface` shows under its origin). */
+/** The group a section belongs to; there is one group left. */
 export function chronosNavGroupFor(
-  section: ConsoleSectionId,
-  surfaceOrigin: ConsoleContentSection = 'home'
+  _section: ConsoleSectionId,
+  _surfaceOrigin: ConsoleContentSection = OPS_DEFAULT_SECTION
 ): ChronosNavGroupId {
-  const resolved =
-    section === 'surface' ? surfaceOrigin : (CHRONOS_SECTION_ALIASES[section] ?? section);
-  return (
-    CHRONOS_NAV_GROUPS.find((group) => group.sections.includes(resolved as ConsoleContentSection))
-      ?.id ?? 'home'
-  );
+  return 'operate';
 }
 
 export const OPERATOR_LAYOUT_PREFS_KEY = 'chronos.operator-layout.prefs';

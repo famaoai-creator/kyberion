@@ -30,23 +30,14 @@ import {
   KbInterventionPanel,
 } from '../../components/ops/A2UIComponentLibrary';
 import { FocusedOperatorView } from '../../components/ops/FocusedOperatorView';
-import { SovereignChat } from '../../components/ops/SovereignChat';
 import { AgentPanel } from '../../components/ops/AgentPanel';
-import { FirstRunBanner } from '../../components/ops/FirstRunBanner';
 import { IdentityBadge } from '../../components/ops/IdentityBadge';
 import { MissionIntelligence } from '../../components/ops/MissionIntelligence';
-import { MissionJourneySummary } from '../../components/ops/MissionJourneySummary';
 import { ChronosOffice } from '../../components/ops/ChronosOffice';
-import { WorkItemsWorkspace } from '../../components/ops/WorkItemsWorkspace';
 import { SurfaceControlWorkspace } from '../../components/ops/SurfaceControlWorkspace';
-import { OrganizationOperatingModel } from '../../components/ops/OrganizationOperatingModel';
-import { CloudflareOsPanel } from '../../components/ops/CloudflareOsPanel';
 import { HeadlessA2UIWorkspace } from '../../components/ops/HeadlessA2UIWorkspace';
-import { ApprovalsWorkspace } from '../../components/ops/ApprovalsWorkspace';
-import { DeliverablesWorkspace } from '../../components/ops/DeliverablesWorkspace';
-import { KnowledgeWorkspace } from '../../components/ops/KnowledgeWorkspace';
 import { DiagnosticsAttentionSummary } from '../../components/ops/DiagnosticsAttentionSummary';
-import { ChronosTenantScope, useChronosTenant } from '../../components/ops/ChronosTenantScope';
+import { useChronosTenant } from '../../components/ops/ChronosTenantScope';
 import {
   MISSION_CYCLE,
   OPERATOR_SCENARIO_PRESETS,
@@ -65,6 +56,7 @@ import {
   CONSOLE_SECTIONS,
   buildPlanPreviewSignature,
   resolveConsoleSectionParam,
+  OPS_DEFAULT_SECTION,
   buildQuickActionGroups,
   buildStatusCards,
   isPlanPreviewStale,
@@ -74,6 +66,9 @@ import {
   type ConsoleSectionId,
 } from './chronos-page-config';
 import { ChronosMirrorShell } from './ChronosMirrorShell';
+import { resolveIaRedirect } from '../../lib/ia-routes';
+import { withSelectedTenant } from '../../lib/tenant-context';
+import { entityHref } from '../../lib/workspace-view';
 import {
   nextChronosThemeMode,
   resolveChronosThemeMode,
@@ -102,12 +97,14 @@ import {
   parsePlanPreviewResponse,
   type ClientPlanPreview,
 } from '../../lib/ops/plan-preview-response';
-import { parseDeliverableReviewResponse } from '../../lib/ops/deliverable-review-response';
 import { parseConnectionReviewResponse } from '../../lib/ops/connection-review-response';
 import {
   parseMissionApprovalResponse,
   parseMissionProposalResponse,
 } from '../../lib/ops/agent-mutation-response';
+/** The flagged legacy grid (`NEXT_PUBLIC_CHRONOS_LEGACY_WORKSPACE=1`) is the only reader of the moved sections' data. */
+const OPS_LEGACY_WORKSPACE = process.env.NEXT_PUBLIC_CHRONOS_LEGACY_WORKSPACE === '1';
+
 export default function ChronosMirrorV2() {
   return (
     <Suspense fallback={null}>
@@ -152,16 +149,6 @@ function ChronosMirrorV2Content() {
   const [deliverablesError, setDeliverablesError] = useState<string | null>(null);
   const [deliverablesQuery, setDeliverablesQuery] = useState('');
   const [deliverablesRefreshTick, setDeliverablesRefreshTick] = useState(0);
-  const [selectedDeliverableId, setSelectedDeliverableId] = useState<string | null>(null);
-  const [deliverableReviewComment, setDeliverableReviewComment] = useState('');
-  const [deliverableReviewBusy, setDeliverableReviewBusy] = useState(false);
-  const [deliverableReviewError, setDeliverableReviewError] = useState<string | null>(null);
-  // LC-10 ask-why: when a reject / request-changes lands without any reason,
-  // ask exactly one skippable question so the redo/learning loops get a
-  // deterministic category instead of nothing.
-  const [deliverableAskWhyVerdict, setDeliverableAskWhyVerdict] = useState<
-    'reject' | 'request-changes' | null
-  >(null);
   const [operatorHomeSummary, setOperatorHomeSummary] = useState<ClientOperatorHomeSummary | null>(
     null
   );
@@ -258,6 +245,8 @@ function ChronosMirrorV2Content() {
   }, [locale]);
 
   useEffect(() => {
+    // MSN-SHELL-IA: only the legacy grid still shows this; /ops sections don't.
+    if (!OPS_LEGACY_WORKSPACE) return undefined;
     let cancelled = false;
     void fetch(
       opsApiPath(
@@ -291,6 +280,8 @@ function ChronosMirrorV2Content() {
   }, [deliverablesQuery, deliverablesRefreshTick, tenant, organizationId, projectId]);
 
   useEffect(() => {
+    // MSN-SHELL-IA: only the legacy grid still shows this; /ops sections don't.
+    if (!OPS_LEGACY_WORKSPACE) return undefined;
     let cancelled = false;
     const params = new URLSearchParams();
     params.set('limit', '24');
@@ -388,6 +379,8 @@ function ChronosMirrorV2Content() {
   }, [tenant]);
 
   useEffect(() => {
+    // MSN-SHELL-IA: only the legacy grid still shows this; /ops sections don't.
+    if (!OPS_LEGACY_WORKSPACE) return undefined;
     let cancelled = false;
     void fetch(
       opsApiPath(
@@ -485,11 +478,13 @@ function ChronosMirrorV2Content() {
 
   const [a2uiActionNotice, setA2uiActionNotice] = useState<string | null>(null);
   const sectionFromUrl = searchParams.get('section');
-  // UI-07: `?section=` addresses a section inside the five nav groups;
-  // retired ids (e.g. `governance`) resolve through CHRONOS_SECTION_ALIASES.
-  const initialSection: ConsoleSectionId = resolveConsoleSectionParam(sectionFromUrl) ?? 'home';
+  // MSN-SHELL-IA §1: `?section=` addresses one of the four operations
+  // sections; sections that moved to a top-level destination are redirected
+  // by proxy.ts and never render here.
+  const initialSection: ConsoleSectionId =
+    resolveConsoleSectionParam(sectionFromUrl) ?? OPS_DEFAULT_SECTION;
   const [consoleSection, setConsoleSection] = useState<ConsoleSectionId>(initialSection);
-  const [surfaceOrigin, setSurfaceOrigin] = useState<ConsoleContentSection>('home');
+  const [surfaceOrigin, setSurfaceOrigin] = useState<ConsoleContentSection>(OPS_DEFAULT_SECTION);
 
   useEffect(() => {
     const resolved = resolveConsoleSectionParam(sectionFromUrl);
@@ -498,9 +493,18 @@ function ChronosMirrorV2Content() {
 
   const openConsoleSection = useCallback(
     (requested: ConsoleSectionId) => {
-      const section = resolveConsoleSectionParam(requested) ?? 'home';
+      // A section that moved out of the console opens its new destination.
+      const moved = resolveIaRedirect(
+        pathname,
+        `?${new URLSearchParams({ ...Object.fromEntries(searchParams.entries()), section: requested })}`
+      );
+      if (moved) {
+        router.push(moved);
+        return;
+      }
+      const section = resolveConsoleSectionParam(requested) ?? OPS_DEFAULT_SECTION;
       if (section === 'surface') {
-        setSurfaceOrigin('home');
+        setSurfaceOrigin(OPS_DEFAULT_SECTION);
       }
       setConsoleSection(section);
       setSurface(null);
@@ -512,7 +516,7 @@ function ChronosMirrorV2Content() {
       // organization / project params are preserved).
       if (section !== 'surface') {
         const params = new URLSearchParams(searchParams.toString());
-        if (section === 'home') params.delete('section');
+        if (section === OPS_DEFAULT_SECTION) params.delete('section');
         else params.set('section', section);
         const query = params.toString();
         router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
@@ -739,60 +743,6 @@ function ChronosMirrorV2Content() {
     setDeliverablesRefreshTick((value) => value + 1);
   }, []);
 
-  const submitDeliverableReview = useCallback(
-    async (
-      verdict: 'accept' | 'reject' | 'request-changes',
-      options?: { reasonCategory?: string; skipAskWhy?: boolean }
-    ) => {
-      const item = deliverables.find((entry) => entry.artifactId === selectedDeliverableId);
-      if (!item) {
-        setDeliverableReviewError(uxText('chronos_deliverable_select_required', locale));
-        return;
-      }
-      // LC-10 ask-why: a rejection with no comment and no category teaches
-      // nothing — ask one skippable question before submitting.
-      if (
-        verdict !== 'accept' &&
-        !deliverableReviewComment.trim() &&
-        !options?.reasonCategory &&
-        !options?.skipAskWhy
-      ) {
-        setDeliverableAskWhyVerdict(verdict);
-        return;
-      }
-      setDeliverableAskWhyVerdict(null);
-      setDeliverableReviewBusy(true);
-      setDeliverableReviewError(null);
-      try {
-        const response = await fetch(opsApiPath('/deliverable-review'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            artifactId: item.artifactId,
-            verdict,
-            comment: deliverableReviewComment,
-            reasonCategory: options?.reasonCategory,
-          }),
-        });
-        const payload = await response.json().catch(() => null);
-        if (!response.ok) throw new Error('deliverable review failed');
-        const parsed = parseDeliverableReviewResponse(payload);
-        if (!parsed) throw new Error('Invalid deliverable review response');
-        setDeliverableReviewComment('');
-        refreshDeliverables();
-        setOperatorHomeRefreshTick((value) => value + 1);
-        if (parsed.state.current_artifact_id) {
-          setSelectedDeliverableId(parsed.state.current_artifact_id);
-        }
-      } catch (error) {
-        setDeliverableReviewError(error instanceof Error ? error.message : String(error));
-      } finally {
-        setDeliverableReviewBusy(false);
-      }
-    },
-    [deliverableReviewComment, deliverables, locale, refreshDeliverables, selectedDeliverableId]
-  );
-
   const submitConnectionReview = useCallback(
     async (bindingId: string, action: 'approve' | 'hold' | 'delete' | 'modify') => {
       setConnectionReviewBusyId(bindingId);
@@ -837,14 +787,11 @@ function ChronosMirrorV2Content() {
   const handleOperatorViewOpen = useCallback(
     (targetId: string, missionId: string | null = null) => {
       if (targetId === 'mission-control-plane' && missionId) {
-        setConsoleSection('missions');
-        setFocusedOperatorView(null);
-        setFocusedOperatorMissionId(null);
-        setMissionIntelligenceFocus('mission-control-plane');
-        setMissionIntelligenceFocusedMissionId(missionId);
+        // Missions live under 仕事 now: open the mission's own page.
+        router.push(withSelectedTenant(entityHref('mission', missionId), tenant || null));
         return;
       }
-      setSurfaceOrigin(consoleSection === 'surface' ? 'home' : consoleSection);
+      setSurfaceOrigin(consoleSection === 'surface' ? OPS_DEFAULT_SECTION : consoleSection);
       setConsoleSection('surface');
       setFocusedOperatorView(targetId);
       setMissionIntelligenceFocus(null);
@@ -852,12 +799,12 @@ function ChronosMirrorV2Content() {
       setFocusedOperatorMissionId(targetId === 'mission-control-plane' ? missionId : null);
       setSurface(null);
     },
-    [consoleSection]
+    [consoleSection, router, tenant]
   );
 
   const handleScenarioOpen = useCallback(
     (targetId: string, surfaceMode: 'mission-intelligence' | 'focused-operator') => {
-      setSurfaceOrigin(consoleSection === 'surface' ? 'home' : consoleSection);
+      setSurfaceOrigin(consoleSection === 'surface' ? OPS_DEFAULT_SECTION : consoleSection);
       setConsoleSection('surface');
       if (surfaceMode === 'mission-intelligence') {
         setMissionIntelligenceFocus(targetId);
@@ -1002,7 +949,7 @@ function ChronosMirrorV2Content() {
   const webLayout = webDesignSystem.layout;
   // Keep the former sidebar + embedded pane available for an explicit rollback
   // while the simplified screen model is the only default operator path.
-  const legacyWorkspaceEnabled = process.env.NEXT_PUBLIC_CHRONOS_LEGACY_WORKSPACE === '1';
+  const legacyWorkspaceEnabled = OPS_LEGACY_WORKSPACE;
   const isLightTheme = themeMode === 'light';
   const shellTextClass = isLightTheme ? 'text-[var(--kb-text-primary)]' : 'kb-text-primary';
   const shellMutedClass = isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'kb-text-muted';
@@ -1089,16 +1036,6 @@ function ChronosMirrorV2Content() {
     setDeliverablesQuery,
     deliverablesRefreshTick,
     setDeliverablesRefreshTick,
-    selectedDeliverableId,
-    setSelectedDeliverableId,
-    deliverableReviewComment,
-    setDeliverableReviewComment,
-    deliverableReviewBusy,
-    setDeliverableReviewBusy,
-    deliverableReviewError,
-    setDeliverableReviewError,
-    deliverableAskWhyVerdict,
-    setDeliverableAskWhyVerdict,
     operatorHomeSummary,
     setOperatorHomeSummary,
     operatorHomeError,
@@ -1168,7 +1105,6 @@ function ChronosMirrorV2Content() {
     runPlanPreview,
     approvePlanAndStart,
     refreshDeliverables,
-    submitDeliverableReview,
     submitConnectionReview,
     handleOperatorViewOpen,
     handleScenarioOpen,
@@ -1208,23 +1144,13 @@ function ChronosMirrorV2Content() {
     KbArtifactTile,
     KbInterventionPanel,
     FocusedOperatorView,
-    SovereignChat,
     AgentPanel,
-    FirstRunBanner,
     IdentityBadge,
     MissionIntelligence,
-    MissionJourneySummary,
     ChronosOffice,
-    WorkItemsWorkspace,
     SurfaceControlWorkspace,
-    OrganizationOperatingModel,
-    CloudflareOsPanel,
     HeadlessA2UIWorkspace,
-    ApprovalsWorkspace,
-    DeliverablesWorkspace,
-    KnowledgeWorkspace,
     DiagnosticsAttentionSummary,
-    ChronosTenantScope,
     MISSION_CYCLE,
     OPERATOR_SCENARIO_PRESETS,
     OPERATOR_VIEW_LINKS,

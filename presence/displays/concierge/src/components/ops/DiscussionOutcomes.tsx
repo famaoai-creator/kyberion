@@ -1,6 +1,6 @@
 'use client';
 
-import { opsApiPath, opsPagePath } from '../../lib/ops/ops-api-path';
+import { opsApiPath } from '../../lib/ops/ops-api-path';
 import * as React from 'react';
 import { savedDiscussionArtifactUrl } from '../../lib/ops/discussion-artifact-url';
 import { createPortal } from 'react-dom';
@@ -243,7 +243,7 @@ export function OutcomesCard({
           ) : (
             <>
               <span>{dt('missionAwaiting', locale)}</span>
-              <a className="dr-btn" href={opsPagePath('?section=approvals')}>
+              <a className="dr-btn" href="/inbox?reason=approval">
                 <ExternalLink size={13} aria-hidden /> {dt('openApprovals', locale)}
               </a>
             </>
@@ -256,7 +256,7 @@ export function OutcomesCard({
           <span>
             {dt('missionStarted', locale)}: {missionId}
           </span>
-          <a className="dr-btn" href={opsPagePath('?section=missions')}>
+          <a className="dr-btn" href="/work">
             <ExternalLink size={13} aria-hidden /> {dt('openMissions', locale)}
           </a>
         </div>
@@ -288,7 +288,7 @@ export function OutcomesCard({
           </a>
         ) : null}
         {review && review.verdict === 'accept' ? (
-          <a className="dr-btn" href={opsPagePath('?section=work-items')}>
+          <a className="dr-btn" href="/work?tab=items">
             <ExternalLink size={13} aria-hidden /> {dt('openWorkItems', locale)}
           </a>
         ) : null}
