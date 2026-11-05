@@ -635,7 +635,12 @@ describe('owned FluidAudio runtime defaults', () => {
     );
     preferencesReadiness.mockReturnValue({ status: 'missing' });
     expect(installFluidAudioSpeechToTextBridgeIfAvailable()).toBe(false);
-    expect(getSpeechToTextBridges().some((b) => b.name === 'fluid-audio-parakeet')).toBe(false);
+    // The owned bridge is disposed; only a runtime-gated placeholder may
+    // remain, carrying the unmet env requirement instead of a real backend.
+    const remaining = getSpeechToTextBridges().find((b) => b.name === 'fluid-audio-parakeet');
+    expect(remaining?.capabilities?.runtime_requirements?.env_command).toBe(
+      'KYBERION_FLUID_AUDIO_STT_COMMAND'
+    );
   });
   it('preserves a registration supplied by another owner when preferences are removed', () => {
     registerSpeechToTextBridge(

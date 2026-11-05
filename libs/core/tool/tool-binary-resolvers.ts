@@ -1,7 +1,8 @@
 import * as path from 'node:path';
+import { createBinaryAvailability } from '#binary-availability';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { safeExistsSync } from '../secure-io.js';
-import { executableName, isMacOS } from '../platform-facts.js';
+import { executableName, hostNodePlatform, isMacOS } from '../platform-facts.js';
 import {
   engineRuntimePreferencesReadiness,
   type EngineRuntimePreferences,
@@ -65,6 +66,32 @@ export function resolveExternalToolBin(
     registryCommand(toolId) ??
     literalFallback
   );
+}
+
+// `which` costs one spawned process per call; scanning PATH entries with stat
+// checks is milliseconds — same pattern as actuator-capability.ts.
+const hasPathBinary = createBinaryAvailability({
+  platform: hostNodePlatform(),
+  pathValue: process.env.PATH,
+  pathDelimiter: path.delimiter,
+  pathExt: process.env.PATHEXT,
+  exists: safeExistsSync,
+});
+
+/**
+ * Whether `resolveExternalToolBin` would resolve to something that exists —
+ * a configured env override, an installed managed binary, a governed registry
+ * command, or `literalName` visible on PATH. `runtime_requirements.tool_binary`
+ * delegates here; a false result maps to `tool_binary:<toolId>` unmet.
+ */
+export function isExternalToolBinResolvable(spec: {
+  toolId: string;
+  envNames: readonly string[];
+  binary: string;
+}): boolean {
+  if (firstConfiguredEnv(...spec.envNames)) return true;
+  if (managedBinary(spec.toolId) || registryCommand(spec.toolId)) return true;
+  return hasPathBinary(spec.binary);
 }
 
 export function resolveFfmpegBin(): string {
