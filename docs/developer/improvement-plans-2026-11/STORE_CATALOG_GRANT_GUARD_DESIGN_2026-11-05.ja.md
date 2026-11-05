@@ -220,10 +220,23 @@ state/floor/通常 ledger は `<tier>/<tenant>` の binding を保持する。�
 `ledger:resource_usage` と `ledger:execution_metrics` の bare root だけは、現在の
 `unscoped-legacy` 宣言と一緒に互換維持する。登録を理由に管理者を推測しない。
 保持規則の action/TTL、runtime root、backup/offboarding の列挙は変更しない。
-TypeScript の root 定義をカタログから生成する段階は後続とし、foundation への JSON 読込は追加しない。
+後続の `2b0d8c329` で、22件に family 内の安定した `order` を追加し、既存 foundation module の
+マーク範囲だけに3種類の root map を生成した。ledger alias は map から導出し、必須 alias の
+登録欠落は書込前に拒否する。runtime の root 値・列挙順序・partition descriptor はコンパイル後の
+snapshot 比較で同一性を確認した。`store-roots --check` を CI と `resolve-generated` に登録し、
+混在ソースの全体を置き換える merge driver は追加しない。foundation の JSON 読込も追加しない。
 
 共通 catalog では fallback の schema 検証漏れも修正した。DOT の disabled default は無効のまま
 schema 範囲に合わせ、必須の fitness/security policy の欠落は明示的な失敗にする。
+
+### 旧ストアの操作上限の共通化（2026-11-06）
+
+`tier-guard` に残る旧ストア用の append・metadata matcher も `decideResourceAccess` を使用する。
+旧 capability が知らない `appendExact` は空にした view を評価し、偽造した append path が
+metadata の祖先探索まで広げないようにする。既存 capability 検証、未対応 prefix の拒否、
+literal/正準の全候補の検査、role・内容検査は維持する。他の操作の分岐は変更しない。
+discussion/journal の正規 append・metadata と autonomy maintenance prefix の行列、既存の
+偽造 capability 拒否を実 guard で検証する。専用ロールの削除や新しいカタログ認可ではない。
 
 ## 既定で拒否であること
 
