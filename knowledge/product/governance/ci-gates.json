@@ -109,6 +109,15 @@
       "rationale": "Prevents new production modules from exceeding the 1,500-line simplicity boundary."
     },
     {
+      "id": "package-export-surface",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_package_export_surface.ts"],
+      "baseline": "scripts/check_package_export_surface.baseline.json",
+      "owner": "architecture",
+      "rationale": "Ratchets the published subpath count of each libs/* package (the @agent/core public surface) so it can only shrink unless a change raises the baseline in review."
+    },
+    {
       "id": "first-win-docs",
       "scope": "pr",
       "executable": "node",
