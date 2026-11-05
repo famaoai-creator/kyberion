@@ -12,7 +12,7 @@ import {
 } from '@agent/core/actuator/actuator-sdk';
 import type { AdfStepHooks, AdfStepOutcome } from '@agent/core/pipeline/adf-engine';
 import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/contracts/execution-bounds';
-import { TraceContext, persistTrace } from '@agent/core/trace';
+import { TraceContext, persistTrace } from '@agent/core/analysis/trace';
 import { pathResolver } from '@agent/core/path-resolver';
 
 import { decideFromObservation } from '@agent/core/semantic-decide';

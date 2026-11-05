@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, afterEach, describe, expect, it, vi } from 'vitest';
 import type { DecisionRecord } from '../decision-ledger/model.js';
-import type { ScopeContext } from '../scope-context-validation.js';
+import type { ScopeContext } from '../foundation/scope-context-validation.js';
 import type { JudgmentEvidenceRequest, JudgmentEvidenceDeps } from './judgment-evidence.js';
 import type { SemanticJudgmentResult } from './semantic-judgment.js';
 

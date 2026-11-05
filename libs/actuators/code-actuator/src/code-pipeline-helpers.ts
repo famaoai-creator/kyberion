@@ -24,7 +24,7 @@ import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
 } from '@agent/core/contracts/execution-bounds';
-import { evaluateCondition, resolveWriteArtifactSpec } from '@agent/core/logic-utils';
+import { evaluateCondition, resolveWriteArtifactSpec } from '@agent/core/pipeline/logic-utils';
 import * as pathResolver from '@agent/core/path-resolver';
 import {
   loadCapabilityRegistry,
@@ -36,7 +36,7 @@ import { runGovernedCommand, runGovernedShellScript } from '@agent/core/command-
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator/actuator-trace';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
-import type { TraceContext } from '@agent/core/trace';
+import type { TraceContext } from '@agent/core/analysis/trace';
 import { getAllFiles } from '@agent/core/fs-utils';
 import type { EvidenceMeta } from '@agent/core/contracts/evidence';
 import { retainOversizedResult } from './retained-result.js';

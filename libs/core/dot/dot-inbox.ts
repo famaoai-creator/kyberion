@@ -1,6 +1,6 @@
 import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import { type EventScopeInput } from '../event-scope.js';
-import { assertScopeContext } from '../scope-context-validation.js';
+import { assertScopeContext } from '../foundation/scope-context-validation.js';
 import { dotStatePath } from './dot-state-paths.js';
 /**
  * dot-inbox producer — the write side of the durable wake lane.

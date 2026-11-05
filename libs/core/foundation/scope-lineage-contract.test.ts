@@ -44,7 +44,7 @@ import {
   withScopeEnvelope,
   type ScopeEnvelope,
 } from '../scope-envelope.js';
-import { assertScopeContext, validateScopeContext } from '../scope-context-validation.js';
+import { assertScopeContext, validateScopeContext } from './scope-context-validation.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,

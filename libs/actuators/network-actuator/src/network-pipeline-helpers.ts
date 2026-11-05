@@ -18,7 +18,7 @@ import {
   evaluateCondition,
   getPathValue,
   resolveWriteArtifactSpec,
-} from '@agent/core/logic-utils';
+} from '@agent/core/pipeline/logic-utils';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { buildUnknownActuatorOpError } from '@agent/core/actuator/actuator-op-registry';
 import {

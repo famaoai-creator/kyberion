@@ -10,7 +10,7 @@ import {
   safeLstat,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { withLock } from '@agent/core/lock-utils';
+import { withLock } from '@agent/core/foundation/lock-utils';
 import { appendJsonLine, isRecord, nowIso } from '@agent/core/foundation';
 import { streamJsonLines } from '@agent/core/jsonl-read';
 import {

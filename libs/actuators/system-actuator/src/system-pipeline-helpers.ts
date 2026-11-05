@@ -14,7 +14,7 @@ import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveDesktopLaunchAdapter } from '@agent/core/virtual/desktop-launch-adapter';
-import { getPathValue } from '@agent/core/logic-utils';
+import { getPathValue } from '@agent/core/pipeline/logic-utils';
 import { createVoiceCapabilityBridge } from '@agent/shared-voice/voice-capability-bridge';
 import { retry } from '@agent/core/async-utils';
 import {

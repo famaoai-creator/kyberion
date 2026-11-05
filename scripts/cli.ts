@@ -13,8 +13,8 @@ import {
   safeStat,
   safeLstat,
 } from '@agent/core/secure-io';
-import { loadActuatorExampleCatalog } from '@agent/core/actuator-example-catalog';
-import type { ActuatorExampleRecord } from '@agent/core/actuator-example-catalog';
+import { loadActuatorExampleCatalog } from '@agent/core/actuator/actuator-example-catalog';
+import type { ActuatorExampleRecord } from '@agent/core/actuator/actuator-example-catalog';
 import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index';
 import { renderStatus } from '@agent/core/ux-vocabulary';
 import { t as coreT } from '@agent/core/t';

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { extractHintsFromTrace } from '@agent/core/feedback-loop';
-import { matchesCron } from '@agent/core/cron-utils';
-import type { Trace, TraceSpan } from '@agent/core/trace';
+import { extractHintsFromTrace } from '@agent/core/knowledge/feedback-loop';
+import { matchesCron } from '@agent/core/pipeline/cron-utils';
+import type { Trace, TraceSpan } from '@agent/core/analysis/trace';
 import { loadOrganizationOperationalState } from '@agent/core/organization/organization-operating-model';
 import { loadPipelineAdfAtPath } from '@agent/core/pipeline/pipeline-contract';
 import {

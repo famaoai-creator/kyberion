@@ -23,7 +23,7 @@ import type {
 } from '@agent/core/organization/organization-operating-model';
 import { pipelineFileRunner } from './lib/pipeline-file-runner.js';
 import * as path from 'node:path';
-import { withLock } from '@agent/core/lock-utils';
+import { withLock } from '@agent/core/foundation/lock-utils';
 import { resolveScopeResolution } from '@agent/core/scope-context';
 import { withExecutionContextAsync } from '@agent/core/authority';
 import { normalizeCadenceTenant } from '@agent/core/organization/organization-cadence';

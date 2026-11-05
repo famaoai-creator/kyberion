@@ -18,7 +18,7 @@ import {
   safeSymlinkSync,
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
-import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
+import { resolveVars, evaluateCondition } from '@agent/core/pipeline/logic-utils';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 
 import { pathResolver } from '@agent/core/path-resolver';

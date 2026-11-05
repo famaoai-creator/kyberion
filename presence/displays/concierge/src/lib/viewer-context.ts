@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { fixedWindowLimiter } from '@agent/core/rate-limit';
+import { fixedWindowLimiter } from '@agent/core/foundation/rate-limit';
 import { loadRuntimeControlPolicy } from '@agent/core/runtime-control-policy';
 import { currentScope } from '@agent/core/scope-context';
 import {

@@ -22,7 +22,7 @@ import {
   safeStat,
 } from '@agent/core/secure-io';
 import { assertVolatileId, pathResolver } from '@agent/core/path-resolver';
-import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
+import { resolveVars, evaluateCondition } from '@agent/core/pipeline/logic-utils';
 
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';

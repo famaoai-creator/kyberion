@@ -30,7 +30,7 @@ import {
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir, safeWriteFile } from '@agent/core/secure-io';
-import { TraceContext, finalizeAndPersist } from '@agent/core/trace';
+import { TraceContext, finalizeAndPersist } from '@agent/core/analysis/trace';
 import { getRegisteredEnvText, nowIso, readTextFile } from '@agent/core/foundation';
 
 type Print = (value: unknown) => void;

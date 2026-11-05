@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import { TraceContext, type Trace } from '../analysis/trace.js';
 import { sanitizeIdSegment } from '../foundation/text.js';
-import type { ScopeContext } from '../scope-context-validation.js';
+import type { ScopeContext } from '../foundation/scope-context-validation.js';
 import {
   readScopedArtifactAttempt,
   writeScopedArtifactAttempt,

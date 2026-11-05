@@ -14,7 +14,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { traceLogDir } from '@agent/core/trace';
+import { traceLogDir } from '@agent/core/analysis/trace';
 import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
 import type { IntentContractMemoryEntry } from '@agent/core/intent/intent-contract-learning';
 import { loadMissionOrchestrationJournal } from '@agent/core/mission/mission-orchestration-journal';

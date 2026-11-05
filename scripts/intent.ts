@@ -24,7 +24,7 @@ import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
 import type { AuditEntry } from '@agent/core/governance/audit-chain';
 import type { IntentContractMemoryEntry } from '@agent/core/intent/intent-contract-learning';
 import type { IntentDelta, IntentSnapshot } from '@agent/core/intent/intent-delta';
-import type { Trace } from '@agent/core/trace';
+import type { Trace } from '@agent/core/analysis/trace';
 import {
   getActiveMissionSearchDirs,
   listMissionsInSearchDirs,

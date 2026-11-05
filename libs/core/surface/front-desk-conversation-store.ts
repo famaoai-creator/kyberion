@@ -72,7 +72,7 @@ import {
   type FrontDeskExecutionRecoveryReceipt,
 } from './front-desk-recovery-receipt.js';
 export type { FrontDeskExecutionRecoveryReceipt } from './front-desk-recovery-receipt.js';
-import { withLockSync } from '../lock-utils.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { redactSensitiveString } from '../network.js';
 import { narrowSurfaceViewerScope } from './surface-mutation-guard.js';
 import type { SupportedLocale } from '../foundation/locale-normalize.js';

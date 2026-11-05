@@ -30,7 +30,7 @@ vi.mock('./organization-operating-model-operations.js', () => ({
   saveOrganizationIncident: mocks.saveIncident,
 }));
 vi.mock('../governance/audit-chain.js', () => ({ auditChain: { record: mocks.audit } }));
-vi.mock('../lock-utils.js', () => ({
+vi.mock('../foundation/lock-utils.js', () => ({
   withLock: (_id: string, fn: () => Promise<unknown>) => fn(),
 }));
 

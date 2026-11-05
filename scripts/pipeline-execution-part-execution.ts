@@ -13,7 +13,7 @@ import { safeExistsSync, safeLstat, type SafeShell } from '@agent/core/secure-io
 import { readTextFile } from '@agent/core/foundation/text';
 import { isRecord } from '@agent/core/foundation/primitives';
 import { compileReportSchema } from '@agent/core/report-contract';
-import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
+import { resolveVars, evaluateCondition } from '@agent/core/pipeline/logic-utils';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   detectRouteCycle,
