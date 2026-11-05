@@ -66,6 +66,9 @@ export const APPROVAL_DOMAINS: Readonly<Record<string, ApprovalDomainSpec>> = {
   'pipeline-await-state': { decision: 'pipeline await-state authorization' },
   'tenant-activation': { decision: 'tenant activation gate' },
   'tenant-provider-attestation': { decision: 'tenant provider attestation' },
+  'custody-provider-attestation': {
+    decision: 'system / person custody provider attestation',
+  },
   'nhi-session-admission': { decision: 'NHI session admission' },
   'onboarding-authority': { decision: 'organization onboarding authority' },
   'project-trust': { decision: 'managed project trust grant' },

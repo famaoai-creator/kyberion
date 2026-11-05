@@ -24,6 +24,13 @@ export const PARTITIONED_RUNTIME_STATE_ROOTS = {
   browser_bridge_mailbox: 'active/shared/runtime/browser-bridge-mailbox',
   /** Saved per-seam provider defaults: tenant / organization / project layers (seam-selection-defaults.ts). */
   seam_selection_defaults: 'active/shared/runtime/seam-selection-defaults',
+  /**
+   * System / person custody provider attestations
+   * (provider/custody-provider-attestation-store.ts): `system/attestations.json`
+   * and `personal/shared/<owner>.json`. Tenant attestations stay in the tenant
+   * profile, so no tenant partition is ever written here.
+   */
+  provider_attestations: 'active/shared/runtime/provider-attestations',
   /** R5 delegation idempotency reservations + replayable results (delegation-idempotency.ts). */
   delegation_idempotency: 'active/shared/runtime/delegation-idempotency',
   /** Provider-reported media generation costs (generation-cost-settlement.ts). */
