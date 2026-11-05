@@ -66,6 +66,10 @@ import {
 } from '../reasoning/prompt-cache-discipline.js';
 import type { ReasoningToolName, SamplingParams } from '../reasoning/reasoning-route-resolver.js';
 import type { ConstrainedSampling } from '../backend-capability-profile.js';
+import {
+  markDelegationExecutionStarted,
+  runStartReportingDelegation,
+} from '../delegation-execution-tracker.js';
 
 export type LocalLlmProviderPreset =
   'generic' | 'ollama' | 'vllm' | 'lmstudio' | 'llamacpp' | 'mlx' | 'localai';
@@ -878,6 +882,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     } catch {
       return `Error: Tool ${name} arguments must be a JSON object.`;
     }
+    markDelegationExecutionStarted();
     logger.info(`[LOCAL_LLM] Tool Call: ${name}(${JSON.stringify(redactSensitiveObject(args))})`);
 
     try {
@@ -1187,7 +1192,11 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     context?: string,
     options?: ReasoningCallOptions
   ): Promise<string> {
-    return this.prompt(`Task: ${instruction}\nContext: ${context ?? 'none'}`, undefined, options);
+    // R5: chat completions run no local side effects; the tool loop marks the
+    // start before its first tool executes (handleToolCall).
+    return runStartReportingDelegation(() =>
+      this.prompt(`Task: ${instruction}\nContext: ${context ?? 'none'}`, undefined, options)
+    );
   }
 }
 

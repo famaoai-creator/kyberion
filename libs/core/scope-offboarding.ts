@@ -466,6 +466,8 @@ export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   browser_bridge_mailbox: 'tenant_runtime_state',
   // Tenant/organization/project seam provider defaults: tenant configuration, purge with the tenant.
   seam_selection_defaults: 'tenant_runtime_state',
+  // R5 idempotency reservations hold replayable tenant delegation output: purge with the tenant.
+  delegation_idempotency: 'tenant_runtime_state',
 } as const satisfies Record<TenantRuntimePartitionKey, OffboardTargetKind | 'not_offboarded'>;
 
 /**

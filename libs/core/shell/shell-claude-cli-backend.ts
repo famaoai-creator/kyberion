@@ -99,6 +99,7 @@ import {
   parsePromptedToolResponse,
   renderPromptedToolProtocol,
 } from '../reasoning/prompted-tool-protocol.js';
+import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });
@@ -501,10 +502,22 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     })) as DecomposedTaskPlan;
   }
 
-  async delegateTask(
+  delegateTask(
     instruction: string,
     context?: string,
     options?: ReasoningCallOptions
+  ): Promise<string> {
+    // R5: every dispatch path spawns through spawnWithDelegationEnv, which
+    // marks the start once a child exists — an earlier failure is pre-start.
+    return runStartReportingDelegation(() =>
+      this.dispatchDelegatedTask(instruction, context, options)
+    );
+  }
+
+  private async dispatchDelegatedTask(
+    instruction: string,
+    context: string | undefined,
+    options: ReasoningCallOptions | undefined
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const model = options?.model ?? resolveClaudeModelForTier(options?.model_tier, this.model);

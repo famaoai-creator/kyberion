@@ -14,6 +14,10 @@ import { evaluateBudgetThrottle } from '../governance/org-budget-governor.js';
 import type { LoadedDotCharter } from '../dot/dot-charter.js';
 import { withExecutionContextAsync } from '../authority.js';
 import { withTaskCredentialBinding } from '../foundation/credential-binding.js';
+import {
+  delegationExecutionStartedFromError,
+  runWithDelegationExecutionTracker,
+} from '../delegation-execution-tracker.js';
 
 describe('AnthropicReasoningBackend', () => {
   afterEach(() => {
@@ -50,6 +54,36 @@ describe('AnthropicReasoningBackend', () => {
     const params = create.mock.calls[0][0];
     expect(params.thinking).toEqual({ type: 'adaptive' });
     expect(params.output_config).toEqual({ effort: 'low' });
+  });
+
+  it('marks a failed delegateTask as never started and reports usage/served model (R5)', async () => {
+    const rateLimited = Object.assign(new Error('429 rate_limit_error'), { status: 429 });
+    const failing = new AnthropicReasoningBackend({
+      client: {
+        messages: { create: vi.fn().mockRejectedValue(rateLimited), parse: vi.fn() },
+      } as unknown as Anthropic,
+    });
+    const error = await failing.delegateTask('do it').catch((e: unknown) => e);
+    expect(error).toBe(rateLimited);
+    // A pure completion runs nothing locally: a keyed delegation may fail over.
+    expect(delegationExecutionStartedFromError(error)).toBe(false);
+
+    const create = vi.fn().mockResolvedValue({
+      model: 'claude-served-model',
+      usage: { input_tokens: 12, output_tokens: 34 },
+      content: [{ type: 'text', text: 'done' }],
+    });
+    const ok = new AnthropicReasoningBackend({
+      client: { messages: { create, parse: vi.fn() } } as unknown as Anthropic,
+    });
+    const metadata = await runWithDelegationExecutionTracker(async (tracker) => {
+      await ok.delegateTask('do it');
+      return tracker.metadata;
+    });
+    expect(metadata).toEqual({
+      usage: { input_tokens: 12, output_tokens: 34 },
+      served_model: 'claude-served-model',
+    });
   });
 
   it('pins effort to high when unset, since Opus 5.5 defaults to medium', async () => {

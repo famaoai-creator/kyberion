@@ -54,6 +54,10 @@ import type {
 import { runStructuredReasoningOp, structuredReasoningSpecs } from '../structured-reasoning.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning/reasoning-egress-scope.js';
 import type { ReasoningToolName } from '../reasoning/reasoning-route-resolver.js';
+import {
+  markDelegationExecutionStarted,
+  runStartReportingDelegation,
+} from '../delegation-execution-tracker.js';
 
 export interface OpenRouterBackendOptions {
   apiKey: string;
@@ -447,6 +451,7 @@ export class OpenRouterBackend implements ReasoningBackend {
     } catch {
       return 'Error: OpenRouter tool arguments must be a JSON object.';
     }
+    markDelegationExecutionStarted();
     logger.info(`[OPENROUTER] Tool Call: ${name}(${JSON.stringify(redactSensitiveObject(args))})`);
 
     try {
@@ -668,7 +673,10 @@ export class OpenRouterBackend implements ReasoningBackend {
   }
 
   async delegateTask(instruction: string, context?: string): Promise<string> {
-    return this.prompt(`Task: ${instruction}\nContext: ${context ?? 'none'}`);
+    // R5: the tool loop marks the start before its first tool executes.
+    return runStartReportingDelegation(() =>
+      this.prompt(`Task: ${instruction}\nContext: ${context ?? 'none'}`)
+    );
   }
 }
 

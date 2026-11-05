@@ -1029,6 +1029,7 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
       'active/shared/runtime/autonomy-learning',
       'active/shared/runtime/external-operations',
       'active/shared/runtime/grants',
+      'active/shared/runtime/delegation-idempotency',
     ];
     // Durable receipts: review-required, never auto-offboarded.
     const kept = [

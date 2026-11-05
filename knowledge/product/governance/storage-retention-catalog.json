@@ -431,7 +431,7 @@
       "path": "active/shared/runtime/delegation-idempotency",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "R5 delegation idempotency reservations (libs/core/delegation-idempotency.ts): one JSON per idempotency key holding the payload hash and the terminal DelegationResult used for replay; tenant scopes nest under tenants/<slug>/. Deleting a terminal reservation re-enables execution for that key, so removal is a reviewed decision."
+      "note": "R5 delegation idempotency reservations (libs/core/delegation-idempotency.ts): one JSON per idempotency key holding the payload hash and the terminal DelegationResult used for replay; a registered tier/tenant-partitioned runtime-state root (PARTITIONED_RUNTIME_STATE_ROOTS.delegation_idempotency): tenant reservations live under confidential/<tenant>/ (tier-guarded, removed by tenant offboarding), untenanted ones under system/. Deleting a terminal reservation re-enables execution for that key, so removal is a reviewed decision."
     },
     {
       "path": "active/shared/runtime/task-sessions",

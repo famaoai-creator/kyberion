@@ -12,9 +12,11 @@ import { clearProviderHealth } from '../provider/provider-health-registry.js';
 import {
   buildFailedDelegationResult,
   markDelegationExecutionStarted,
+  runStartReportingDelegation,
 } from '../delegation-result.js';
 import {
   deriveDelegationIdempotencyKey,
+  loadDelegationReservation,
   resetDelegationIdempotencyForTests,
 } from '../delegation-idempotency.js';
 
@@ -167,5 +169,49 @@ describe('R5 delegation failover guard', () => {
     if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
     delete process.env.KYBERION_DELEGATION_STORE_DIR;
     delete process.env.KYBERION_DELEGATION_TRACE_PATH;
+  });
+
+  it('fails over a keyed delegation whose start-reporting backend failed before dispatch', async () => {
+    // A start-reporting backend (API completion, governed CLI spawn) that got
+    // a 429 before any child/tool ran proves "not started": no at-most-once lockout.
+    const primary = vi.fn(() =>
+      runStartReportingDelegation(async () => {
+        throw Object.assign(new Error('429 rate limit exceeded'), { status: 429 });
+      })
+    );
+    const fallback = vi.fn(async () => LONG);
+    const target = chain(primary, fallback);
+    const idempotencyKey = deriveDelegationIdempotencyKey({
+      workItemId: `w-${randomUUID()}`,
+      attempt: 1,
+    });
+    await expect(
+      run(() => target.delegateTask('task', undefined, { idempotencyKey }))
+    ).resolves.toBe(LONG);
+    expect(fallback).toHaveBeenCalledTimes(1);
+    expect(loadDelegationReservation(idempotencyKey)).toMatchObject({
+      status: 'terminal',
+      result: { status: 'completed' },
+    });
+
+    // The same backend once its child/tool ran: started, never re-run elsewhere.
+    clearProviderHealth();
+    const startedFallback = vi.fn(async () => LONG);
+    const started = chain(
+      () =>
+        runStartReportingDelegation(async () => {
+          markDelegationExecutionStarted();
+          throw new Error('503 service temporarily unavailable');
+        }),
+      startedFallback
+    );
+    const keyStarted = deriveDelegationIdempotencyKey({
+      workItemId: `w-${randomUUID()}`,
+      attempt: 1,
+    });
+    await expect(
+      run(() => started.delegateTask('task', undefined, { idempotencyKey: keyStarted }))
+    ).rejects.toThrow('[execution-started]');
+    expect(startedFallback).not.toHaveBeenCalled();
   });
 });
