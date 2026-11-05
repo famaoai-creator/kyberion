@@ -33,7 +33,7 @@ const designLogger = createLogger('creative-design-resolver');
  * Every artifact surface (web / pptx / doc / xlsx / video / generation prompt)
  * resolves its design exactly once through this module:
  *   brand tokens (knowledge/public/design-patterns/brand-tokens/kyberion.json)
- *   → tenant override (knowledge/confidential/<slug>/design/ or customer/<slug>/design/)
+ *   → tenant override (knowledge/confidential/<slug>/design/)
  *   → surface-specific projection.
  * Downstream code must not hardcode colors or fonts.
  */
@@ -504,10 +504,7 @@ function loadBrandTokens(mode: CreativeDesignMode): {
 }
 
 function tenantDesignDirCandidates(tenantSlug: string): string[] {
-  return [
-    pathResolver.rootResolve(path.join('customer', tenantSlug, 'design')),
-    pathResolver.knowledge(path.join('confidential', tenantSlug, 'design')),
-  ];
+  return [pathResolver.knowledge(path.join('confidential', tenantSlug, 'design'))];
 }
 
 interface TenantDesignData {

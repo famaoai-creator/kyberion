@@ -71,7 +71,7 @@ vi.mock('@agent/core/foundation/lock-utils', async (importOriginal) => {
 // Per file run: concurrent runs in one checkout never share the fixture.
 const ROOT = pathResolver.sharedTmp(`audit-mirror-reconcile-test-${randomUUID()}`);
 const MASTER = `${ROOT}/active/shared/logs/audit/audit-2026-07-01.jsonl`;
-const MIRROR = `${ROOT}/customer/acme/logs/audit/audit-2026-07-01.jsonl`;
+const MIRROR = `${ROOT}/active/shared/runtime/audit-mirror/confidential/acme/audit-2026-07-01.jsonl`;
 
 function entry(id: string, previousHash: string, tenantSlug = 'acme') {
   return {
@@ -95,7 +95,7 @@ describe('audit mirror reconcile findings', () => {
   afterEach(() => safeRmSync(ROOT, { recursive: true, force: true }));
 
   function fixture(master: string, mirror: string) {
-    safeMkdir(`${ROOT}/customer/acme/logs/audit`, { recursive: true });
+    safeMkdir(`${ROOT}/active/shared/runtime/audit-mirror/confidential/acme`, { recursive: true });
     safeWriteFile(MASTER, master);
     safeWriteFile(MIRROR, mirror);
   }
@@ -135,7 +135,7 @@ describe('audit mirror reconcile after a tenant rename', () => {
     metadata: { previous_slug: from },
   });
 
-  // oldco is renamed to acme: its mirror moved to customer/acme, and the move
+  // oldco is renamed to acme: its mirror moved to the acme partition, and the move
   // is marked in the chain. A later tenant reusing the slug oldco starts fresh.
   function renamed(profile: object) {
     const a = entry('AUD-A', '0'.repeat(64), 'oldco');
@@ -143,11 +143,14 @@ describe('audit mirror reconcile after a tenant rename', () => {
     const m = moved('AUD-M', b.currentHash, 'oldco', 'acme');
     const c = entry('AUD-C', m.currentHash, 'acme');
     const d = entry('AUD-D', c.currentHash, 'oldco');
-    safeMkdir(`${ROOT}/customer/acme/logs/audit`, { recursive: true });
-    safeMkdir(`${ROOT}/customer/oldco/logs/audit`, { recursive: true });
+    safeMkdir(`${ROOT}/active/shared/runtime/audit-mirror/confidential/acme`, { recursive: true });
+    safeMkdir(`${ROOT}/active/shared/runtime/audit-mirror/confidential/oldco`, { recursive: true });
     safeWriteFile(MASTER, lines(a, b, m, c, d));
     safeWriteFile(MIRROR, lines(a, b, m, c));
-    safeWriteFile(`${ROOT}/customer/oldco/logs/audit/audit-2026-07-01.jsonl`, lines(d));
+    safeWriteFile(
+      `${ROOT}/active/shared/runtime/audit-mirror/confidential/oldco/audit-2026-07-01.jsonl`,
+      lines(d)
+    );
     safeWriteFile(
       `${ROOT}/knowledge/personal/tenants/acme.json`,
       JSON.stringify({ display_name: 'Acme', status: 'active', assigned_role: 'pm', ...profile }),
@@ -252,7 +255,7 @@ describe('audit mirror reconcile after a tenant rename', () => {
 
 describe('audit mirror reconcile apply (SA-01)', () => {
   const MISSION = 'MSN-AUDIT-MIRROR-APPLY-TEST';
-  const STALE_MIRROR = `${ROOT}/customer/globex/logs/audit/audit-2026-07-01.jsonl`;
+  const STALE_MIRROR = `${ROOT}/active/shared/runtime/audit-mirror/confidential/globex/audit-2026-07-01.jsonl`;
   const opened: string[] = [];
   let previousRole: string | undefined;
 
@@ -282,8 +285,10 @@ describe('audit mirror reconcile apply (SA-01)', () => {
 
   /** acme's mirror misses AUD-B (rebuild); globex has a mirror but no master entry (quarantine). */
   function drift() {
-    safeMkdir(`${ROOT}/customer/acme/logs/audit`, { recursive: true });
-    safeMkdir(`${ROOT}/customer/globex/logs/audit`, { recursive: true });
+    safeMkdir(`${ROOT}/active/shared/runtime/audit-mirror/confidential/acme`, { recursive: true });
+    safeMkdir(`${ROOT}/active/shared/runtime/audit-mirror/confidential/globex`, {
+      recursive: true,
+    });
     safeWriteFile(MASTER, lines(a, b));
     safeWriteFile(MIRROR, lines(a));
     safeWriteFile(STALE_MIRROR, lines(old));
@@ -414,16 +419,20 @@ describe('audit mirror reconcile apply (SA-01)', () => {
     expect(receipt).toMatchObject({
       mode: 'apply',
       approval_request_id: id,
-      rebuilt: [{ slug: 'acme', path: 'customer/acme/logs/audit', entries: 2 }],
+      rebuilt: [
+        { slug: 'acme', path: 'active/shared/runtime/audit-mirror/confidential/acme', entries: 2 },
+      ],
     });
     expect(receipt.archived.map((item) => item.from)).toEqual([
-      'customer/acme/logs/audit',
-      'customer/globex/logs/audit',
+      'active/shared/runtime/audit-mirror/confidential/acme',
+      'active/shared/runtime/audit-mirror/confidential/globex',
     ]);
     // The master is never written; acme is rebuilt from it; globex is only quarantined.
     expect(safeReadFile(MASTER, { encoding: 'utf8' })).toBe(masterBefore);
     expect(safeReadFile(MIRROR, { encoding: 'utf8' })).toBe(lines(a, b));
-    expect(safeExistsSync(`${ROOT}/customer/globex/logs/audit`)).toBe(false);
+    expect(safeExistsSync(`${ROOT}/active/shared/runtime/audit-mirror/confidential/globex`)).toBe(
+      false
+    );
     // Archived copies keep the exact old content.
     const archivedContent = Object.fromEntries(
       receipt.archived.map((item) => {
@@ -435,8 +444,8 @@ describe('audit mirror reconcile apply (SA-01)', () => {
       })
     );
     expect(archivedContent).toEqual({
-      'customer/acme/logs/audit': lines(a),
-      'customer/globex/logs/audit': lines(old),
+      'active/shared/runtime/audit-mirror/confidential/acme': lines(a),
+      'active/shared/runtime/audit-mirror/confidential/globex': lines(old),
     });
     // The receipt is written where it says, and a second run finds nothing to do.
     expect(
@@ -565,7 +574,7 @@ describe('audit mirror reconcile apply (SA-01)', () => {
 
   it('names mirror entries the master can no longer read, in the finding and the approval', () => {
     // The master line of AUD-B is unreadable: only the mirror still holds it.
-    safeMkdir(`${ROOT}/customer/acme/logs/audit`, { recursive: true });
+    safeMkdir(`${ROOT}/active/shared/runtime/audit-mirror/confidential/acme`, { recursive: true });
     safeWriteFile(MASTER, lines(a, '{"truncated":'));
     safeWriteFile(MIRROR, lines(a, b));
 
@@ -607,7 +616,7 @@ describe('audit mirror reconcile apply (SA-01)', () => {
     const c = entry('AUD-C', b.currentHash);
     const tampered = { ...c, currentHash: 'AUD-C-other-hash' };
     const foreign = entry('AUD-G', '0'.repeat(64), 'globex');
-    safeMkdir(`${ROOT}/customer/acme/logs/audit`, { recursive: true });
+    safeMkdir(`${ROOT}/active/shared/runtime/audit-mirror/confidential/acme`, { recursive: true });
     safeWriteFile(MASTER, lines(a, b, c, foreign));
     // A duplicated line, a copy that differs from the master, and globex's
     // entry (readable in the master) in acme's mirror.

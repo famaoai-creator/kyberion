@@ -2,8 +2,8 @@
   "version": "1.0.0",
   "organization_id": "{COMPANY_SLUG}",
   "name": "{COMPANY_NAME} 組織図(コンサルティングファーム)",
-  "source_kind": "customer",
-  "source_path": "customer/{COMPANY_SLUG}/org-chart.json",
+  "source_kind": "confidential",
+  "source_path": "knowledge/confidential/{COMPANY_SLUG}/org-chart.json",
   "domains": [
     {
       "domain_id": "leadership",

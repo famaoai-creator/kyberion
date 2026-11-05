@@ -5,6 +5,7 @@
  */
 
 import { auditChain } from '@agent/core/governance/audit-chain';
+import { PARTITIONED_RUNTIME_LEDGER_ROOTS } from '@agent/core/storage-layout';
 import {
   fetchWithVaultCache,
   getVaultEntry,
@@ -98,8 +99,13 @@ export async function main(print: Print = () => undefined): Promise<void> {
 
     // Check tenant mirrors
     const rootDir = path.resolve(import.meta.dirname, '../..');
-    const sbissMirror = path.join(rootDir, 'customer/sbiss/logs/audit');
-    const sbijsmMirror = path.join(rootDir, 'customer/sbijsm/logs/audit');
+    const mirrorRoot = path.join(
+      rootDir,
+      PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_audit_mirror,
+      'confidential'
+    );
+    const sbissMirror = path.join(mirrorRoot, 'sbiss');
+    const sbijsmMirror = path.join(mirrorRoot, 'sbijsm');
 
     if (safeExistsSync(sbissMirror)) {
       const files = safeReaddir(sbissMirror);

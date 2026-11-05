@@ -23,6 +23,22 @@ const ROOT = pathResolver.rootDir();
 const FROM = 'zz-rename-src';
 const TO = 'zz-rename-dst';
 
+/** The tenant's audit mirror partition (only audit_mirror_writer may write it). */
+function mirrorDir(slug: string): string {
+  return path.join(ROOT, 'active', 'shared', 'runtime', 'audit-mirror', 'confidential', slug);
+}
+
+function seedMirror(slug: string): string {
+  const file = path.join(mirrorDir(slug), 'audit-2026-07-01.jsonl');
+  withExecutionContext(
+    'audit_mirror_writer',
+    () => safeWriteFile(file, '', { mkdir: true }),
+    undefined,
+    slug
+  );
+  return file;
+}
+
 /** Fixture paths, so cleanup does not depend on the rename having succeeded. */
 function allFixturePaths(): string[] {
   return [
@@ -33,6 +49,8 @@ function allFixturePaths(): string[] {
     path.join(ROOT, defaultTenantKnowledgeRoot(TO)),
     path.join(ROOT, 'customer', FROM),
     path.join(ROOT, 'customer', TO),
+    mirrorDir(FROM),
+    mirrorDir(TO),
   ];
 }
 
@@ -112,15 +130,14 @@ describe('renameTenant', () => {
     expect(renamed?.metadata?.previous_slug).toBe(FROM);
   });
 
-  it('moves the customer overlay under the audit lock and marks the move in the chain', () => {
-    const mirror = path.join(ROOT, 'customer', FROM, 'logs', 'audit', 'audit-2026-07-01.jsonl');
-    safeWriteFile(mirror, '', { mkdir: true });
+  it('moves the audit mirror under the audit lock and marks the move in the chain', () => {
+    seedMirror(FROM);
     const held: Array<{ locked: boolean; overlayMoved: boolean }> = [];
     const recordHeld = auditChain.recordHeld.bind(auditChain);
     const spy = vi.spyOn(auditChain, 'recordHeld').mockImplementation((entry) => {
       held.push({
         locked: holdsAuditChainLock(),
-        overlayMoved: safeExistsSync(path.join(ROOT, 'customer', TO, 'logs', 'audit')),
+        overlayMoved: safeExistsSync(path.join(mirrorDir(TO), 'audit-2026-07-01.jsonl')),
       });
       return recordHeld(entry);
     });
@@ -135,7 +152,7 @@ describe('renameTenant', () => {
         metadata: { previous_slug: FROM },
       })
     );
-    expect(safeExistsSync(path.join(ROOT, 'customer', FROM))).toBe(false);
+    expect(safeExistsSync(mirrorDir(FROM))).toBe(false);
     // The profile keeps the marker's id: reconcile trusts the marker by it.
     const markerId = spy.mock.results[0]?.value?.id;
     expect(markerId).toMatch(/^AUD-/);
@@ -143,10 +160,8 @@ describe('renameTenant', () => {
   });
 
   it('refuses before moving anything when its audit entries would be refused', () => {
-    const overlay = path.join(ROOT, 'customer', FROM);
-    safeWriteFile(path.join(overlay, 'logs', 'audit', 'audit-2026-07-01.jsonl'), '', {
-      mkdir: true,
-    });
+    const overlay = mirrorDir(FROM);
+    seedMirror(FROM);
     // Bound to the old slug, the entries naming the new slug conflict with the
     // active tenant. Refused after the moves, the tenant would be half renamed.
     expect(() =>

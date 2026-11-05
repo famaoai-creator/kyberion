@@ -19,16 +19,16 @@ describe('decision-rights', () => {
   });
 
   it('loads tenant overrides before the public default', () => {
-    safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential/acme`, { recursive: true });
     safeMkdir(`${tmpRoot}/knowledge/product/governance`, { recursive: true });
     safeWriteFile(
-      `${tmpRoot}/customer/acme/decision-rights.json`,
+      `${tmpRoot}/knowledge/confidential/acme/decision-rights.json`,
       JSON.stringify(
         {
           version: '1.0.0',
           company_id: 'acme',
           tenant_slug: 'acme',
-          source_kind: 'customer',
+          source_kind: 'confidential',
           source_path: 'placeholder',
           decisions: [
             {
@@ -60,7 +60,7 @@ describe('decision-rights', () => {
 
     const matrix = resolveDecisionRightsMatrix('acme', tmpRoot);
 
-    expect(matrix.source_kind).toBe('customer');
+    expect(matrix.source_kind).toBe('confidential');
     expect(matrix.company_id).toBe('acme');
     expect(matrix.decisions).toHaveLength(1);
     expect(matrix.decisions[0]?.decision_type).toBe('contract_signature');
@@ -227,7 +227,7 @@ describe('decision-rights', () => {
   });
 
   it('rejects a symlinked tenant override before reading it', () => {
-    safeMkdir(`${tmpRoot}/customer`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential`, { recursive: true });
     safeMkdir(`${tmpRoot}/outside`, { recursive: true });
     safeWriteFile(
       `${tmpRoot}/outside/decision-rights.json`,
@@ -235,7 +235,7 @@ describe('decision-rights', () => {
     );
     safeSymlinkSync(
       `${tmpRoot}/outside/decision-rights.json`,
-      `${tmpRoot}/customer/acme/decision-rights.json`
+      `${tmpRoot}/knowledge/confidential/acme/decision-rights.json`
     );
 
     expect(() => resolveDecisionRightsMatrix('acme', tmpRoot)).toThrow('[RESOURCE_PATH_SYMLINK]');

@@ -31,17 +31,17 @@ describe('vision-resolver', () => {
   });
 
   it('resolves tenant vision and exposes steering text for golden-rule evaluation', () => {
-    safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential/acme`, { recursive: true });
     safeMkdir(`${tmpRoot}/vision`, { recursive: true });
     safeWriteFile(
-      `${tmpRoot}/customer/acme/vision.md`,
+      `${tmpRoot}/knowledge/confidential/acme/vision.md`,
       `# ACME Vision\n\n## Steering\n- Logical integrity first\n- Vision alignment second\n- Speed when safe\n- Resilience when conditions change\n`
     );
     safeWriteFile(`${tmpRoot}/vision/_default.md`, '# Default Vision');
 
     const vision = resolveVision('acme', tmpRoot);
 
-    expect(vision.source_kind).toBe('customer');
+    expect(vision.source_kind).toBe('tenant');
     expect(vision.sections.steering[0]).toContain('Logical integrity first');
     expect(resolveGoldenRulePriorityOrder(vision)[0]).toBe('logical_integrity');
   });
@@ -66,14 +66,14 @@ describe('vision-resolver', () => {
   });
 
   it('rejects a symlinked tenant overlay before reading its vision', () => {
-    safeMkdir(`${tmpRoot}/customer`, { recursive: true });
-    safeSymlinkSync(tmpRoot, `${tmpRoot}/customer/acme`, 'dir');
+    safeMkdir(`${tmpRoot}/knowledge/confidential`, { recursive: true });
+    safeSymlinkSync(tmpRoot, `${tmpRoot}/knowledge/confidential/acme`, 'dir');
 
     expect(() => resolveVision('acme', tmpRoot)).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 
   it('rejects a tenant vision candidate replaced with a directory', () => {
-    safeMkdir(`${tmpRoot}/customer/acme/vision.md`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential/acme/vision.md`, { recursive: true });
     safeMkdir(`${tmpRoot}/vision`, { recursive: true });
     safeWriteFile(`${tmpRoot}/vision/_default.md`, '# Default Vision');
 
@@ -85,33 +85,33 @@ describe('vision-resolver', () => {
   // CO-01: getGoldenRule() (libs/core/core.ts) calls resolveVision() with no
   // tenantSlug at all — it relies entirely on this env-var fallback to be
   // tenant-aware. That fallback path itself had no test coverage until now.
-  describe('KYBERION_STANCE fallback (CO-01)', () => {
-    const ORIGINAL_CUSTOMER = process.env.KYBERION_STANCE;
+  describe('KYBERION_TENANT fallback (CO-01)', () => {
+    const ORIGINAL_CUSTOMER = process.env.KYBERION_TENANT;
 
     afterEach(() => {
-      if (ORIGINAL_CUSTOMER === undefined) delete process.env.KYBERION_STANCE;
-      else process.env.KYBERION_STANCE = ORIGINAL_CUSTOMER;
+      if (ORIGINAL_CUSTOMER === undefined) delete process.env.KYBERION_TENANT;
+      else process.env.KYBERION_TENANT = ORIGINAL_CUSTOMER;
     });
 
-    it('resolves the active KYBERION_STANCE tenant when no tenantSlug is passed explicitly', () => {
-      safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
+    it('resolves the active KYBERION_TENANT tenant when no tenantSlug is passed explicitly', () => {
+      safeMkdir(`${tmpRoot}/knowledge/confidential/acme`, { recursive: true });
       safeWriteFile(
-        `${tmpRoot}/customer/acme/vision.md`,
+        `${tmpRoot}/knowledge/confidential/acme/vision.md`,
         `# ACME Vision\n\n## Steering\n- Tenant priority first\n`
       );
-      process.env.KYBERION_STANCE = 'acme';
+      process.env.KYBERION_TENANT = 'acme';
 
       const vision = resolveVision(undefined, tmpRoot);
 
       expect(vision.tenant_slug).toBe('acme');
-      expect(vision.source_kind).toBe('customer');
+      expect(vision.source_kind).toBe('tenant');
       expect(vision.raw).toContain('Tenant priority first');
     });
 
-    it('falls back to global default when KYBERION_STANCE is unset', () => {
+    it('falls back to global default when KYBERION_TENANT is unset', () => {
       safeMkdir(`${tmpRoot}/vision`, { recursive: true });
       safeWriteFile(`${tmpRoot}/vision/_default.md`, '# Default Vision');
-      delete process.env.KYBERION_STANCE;
+      delete process.env.KYBERION_TENANT;
 
       const vision = resolveVision(undefined, tmpRoot);
 

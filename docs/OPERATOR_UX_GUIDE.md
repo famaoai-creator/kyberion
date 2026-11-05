@@ -590,7 +590,7 @@ pnpm kyberion deals --requirements DEAL-XXXX # 要件ヒアリングで収集済
 pnpm kyberion deals --ingest-audio DEAL-XXXX --audio 録音.aiff # 通話録音→要件ドラフト取り込み
 ```
 
-顧客チャネル(`customer/<tenant>/connections/channel-bindings.json`)に紐づく会話は
+顧客チャネル(`knowledge/confidential/<tenant>/connections/channel-bindings.json`)に紐づく会話は
 deal stage に応じて自動でモードが切り替わる: 営業(inquiry〜contract)/
 要件ヒアリング(discovery — 構造化ドラフトを増分収集)/ サポート(won 以降 —
 `knowledge/confidential/<tenant>/support/known-issues.md` を接地)。binding の

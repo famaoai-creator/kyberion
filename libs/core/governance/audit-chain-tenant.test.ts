@@ -4,6 +4,9 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 
 let testRoot: string;
+/** The tenant's partition of the audit mirror store. */
+const mirrorDir = (slug: string) =>
+  path.join(testRoot, 'active', 'shared', 'runtime', 'audit-mirror', 'confidential', slug);
 const GLOBAL_KEY = Symbol.for('@kyberion/audit-chain');
 
 async function loadFreshAuditChain(at: Date) {
@@ -71,13 +74,6 @@ vi.mock('../core.js', () => ({
 describe('audit-chain — tenant mirror', () => {
   beforeEach(() => {
     testRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-audit-tenant-'));
-    // EG-14: the mirror follows an existing stance overlay and never creates
-    // one, so a tenant that is expected to be mirrored must have its
-    // customer/{slug}/ directory provisioned first — the same thing
-    // `pnpm stance:create` does in a real checkout.
-    for (const slug of ['sbiss', 'sbijsm']) {
-      fs.mkdirSync(path.join(testRoot, 'customer', slug), { recursive: true });
-    }
     // Clear singleton
     delete (globalThis as any)[GLOBAL_KEY];
   });
@@ -112,11 +108,7 @@ describe('audit-chain — tenant mirror', () => {
     expect(
       fs.existsSync(path.join(testRoot, 'active', 'shared', 'logs', 'audit', `audit-${date}.jsonl`))
     ).toBe(true);
-    expect(
-      fs.existsSync(
-        path.join(testRoot, 'customer', 'sbiss', 'logs', 'audit', `audit-${date}.jsonl`)
-      )
-    ).toBe(true);
+    expect(fs.existsSync(path.join(mirrorDir('sbiss'), `audit-${date}.jsonl`))).toBe(true);
   });
 
   it('publishes through the optional forwarder seam without importing its implementation', async () => {
@@ -138,7 +130,7 @@ describe('audit-chain — tenant mirror', () => {
     expect(entries).toEqual([recorded.id]);
   });
 
-  it('does not create a stance overlay for a slug that has none (EG-14)', async () => {
+  it('creates only the mirror partition for a new slug, never a tenant directory (EG-14)', async () => {
     const { auditChain } = await import('./audit-chain.js');
     auditChain.record({
       agentId: 'agent-x',
@@ -148,14 +140,17 @@ describe('audit-chain — tenant mirror', () => {
       tenantSlug: 'not-provisioned',
     });
 
-    // The whole recurring-drift class: mirroring used to mkdir -p the path, so
-    // any audit entry carrying a novel slug materialised customer/{slug}/, which
-    // later read back as if a tenant existed.
+    // The mirror is the chain's own store: its partition appears on demand, but
+    // nothing that reads back as a tenant (customer/{slug}/, the tenant home) does.
+    expect(fs.existsSync(mirrorDir('not-provisioned'))).toBe(true);
     expect(fs.existsSync(path.join(testRoot, 'customer', 'not-provisioned'))).toBe(false);
+    expect(fs.existsSync(path.join(testRoot, 'knowledge', 'confidential', 'not-provisioned'))).toBe(
+      false
+    );
   });
 
   it('refuses to mirror under a tier name used as a slug (EG-14)', async () => {
-    fs.mkdirSync(path.join(testRoot, 'customer', 'public'), { recursive: true });
+    fs.mkdirSync(mirrorDir('public'), { recursive: true });
     const { auditChain } = await import('./audit-chain.js');
     const recorded = auditChain.record({
       agentId: 'agent-x',
@@ -169,7 +164,7 @@ describe('audit-chain — tenant mirror', () => {
     // accumulate tenant-scoped audit records in either the mirror or master.
     expect(recorded.tenantSlug).toBeUndefined();
     expect(auditChain.loadAll().at(-1)?.tenantSlug).toBeUndefined();
-    expect(fs.existsSync(path.join(testRoot, 'customer', 'public', 'logs', 'audit'))).toBe(false);
+    expect(fs.readdirSync(mirrorDir('public'))).toEqual([]);
   });
 
   it('mirrors to tenant directory when tenantSlug is present', async () => {
@@ -183,7 +178,7 @@ describe('audit-chain — tenant mirror', () => {
       tenantSlug: 'sbiss',
     });
 
-    const tenantAuditDir = path.join(testRoot, 'customer', 'sbiss', 'logs', 'audit');
+    const tenantAuditDir = mirrorDir('sbiss');
     expect(fs.existsSync(tenantAuditDir)).toBe(true);
     const files = fs.readdirSync(tenantAuditDir);
     expect(files.length).toBe(1);
@@ -198,10 +193,10 @@ describe('audit-chain — tenant mirror', () => {
     expect(entries[0].correlationId).toBe('corr-audit-001');
   });
 
-  it('does not mirror through a symlinked tenant overlay', async () => {
-    const outsideRoot = path.join(testRoot, 'outside-customer');
-    const linkedRoot = path.join(testRoot, 'customer', 'sbiss');
-    fs.rmSync(linkedRoot, { recursive: true, force: true });
+  it('does not mirror through a symlinked mirror partition', async () => {
+    const outsideRoot = path.join(testRoot, 'outside-mirror');
+    const linkedRoot = mirrorDir('sbiss');
+    fs.mkdirSync(path.dirname(linkedRoot), { recursive: true });
     fs.mkdirSync(outsideRoot, { recursive: true });
     fs.symlinkSync(outsideRoot, linkedRoot, 'dir');
     const { auditChain } = await import('./audit-chain.js');
@@ -214,18 +209,16 @@ describe('audit-chain — tenant mirror', () => {
       tenantSlug: 'sbiss',
     });
 
-    expect(fs.existsSync(path.join(outsideRoot, 'logs', 'audit'))).toBe(false);
+    expect(fs.readdirSync(outsideRoot)).toEqual([]);
   });
 
   it('does not mirror when no tenantSlug', async () => {
     const { auditChain } = await import('./audit-chain.js');
     auditChain.record({ agentId: 'agent-2', action: 'op', operation: 'x', result: 'completed' });
 
-    // The stance directories exist (provisioned in beforeEach), so the assertion
-    // is about the mirror not being written — not about customer/ being absent.
-    for (const slug of ['sbiss', 'sbijsm']) {
-      expect(fs.existsSync(path.join(testRoot, 'customer', slug, 'logs', 'audit'))).toBe(false);
-    }
+    expect(fs.existsSync(path.join(testRoot, 'active', 'shared', 'runtime', 'audit-mirror'))).toBe(
+      false
+    );
   });
 
   it('mirrors multiple entries for same tenant to same file', async () => {
@@ -245,7 +238,7 @@ describe('audit-chain — tenant mirror', () => {
       tenantSlug: 'sbiss',
     });
 
-    const tenantAuditDir = path.join(testRoot, 'customer', 'sbiss', 'logs', 'audit');
+    const tenantAuditDir = mirrorDir('sbiss');
     const files = fs.readdirSync(tenantAuditDir);
     expect(files).toHaveLength(1);
 
@@ -274,8 +267,8 @@ describe('audit-chain — tenant mirror', () => {
       tenantSlug: 'sbijsm',
     });
 
-    expect(fs.existsSync(path.join(testRoot, 'customer', 'sbiss', 'logs', 'audit'))).toBe(true);
-    expect(fs.existsSync(path.join(testRoot, 'customer', 'sbijsm', 'logs', 'audit'))).toBe(true);
+    expect(fs.existsSync(mirrorDir('sbiss'))).toBe(true);
+    expect(fs.existsSync(mirrorDir('sbijsm'))).toBe(true);
   });
 
   it('records canonical scope and exposes only the requested tenant view', async () => {
@@ -593,10 +586,7 @@ describe('audit-chain — tenant mirror', () => {
       result: 'completed',
       tenantSlug: 'sbiss',
     });
-    fs.appendFileSync(
-      path.join(testRoot, 'customer', 'sbiss', 'logs', 'audit', 'audit-2026-07-01.jsonl'),
-      'not json\n'
-    );
+    fs.appendFileSync(path.join(mirrorDir('sbiss'), 'audit-2026-07-01.jsonl'), 'not json\n');
 
     const mirrors = run.auditChain.verifyTenantMirrors();
     expect(mirrors.ok).toBe(false);
@@ -657,14 +647,7 @@ describe('audit-chain — tenant mirror', () => {
         tenantSlug: 'sbiss',
       });
     record();
-    const mirror = path.join(
-      testRoot,
-      'customer',
-      'sbiss',
-      'logs',
-      'audit',
-      'audit-2026-07-01.jsonl'
-    );
+    const mirror = path.join(mirrorDir('sbiss'), 'audit-2026-07-01.jsonl');
     fs.appendFileSync(mirror, '{"x":');
     const second = record();
 

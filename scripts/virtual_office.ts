@@ -387,13 +387,15 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
   const allowUnscopedRecords = !requestedTenantSlug && tenantRegistryReadable;
   const tenantSlug = requestedTenantSlug || customerSlug;
   const tenantScopeReadable = visibleTenantSlugs === null || visibleTenantSlugs.size > 0;
-  const organizationProfile = tenantScopeReadable ? loadOrganizationProfile() : null;
+  const organizationProfile = tenantScopeReadable
+    ? loadOrganizationProfile(undefined, tenantSlug ?? null)
+    : null;
   const contextBinding =
     tenantScopeReadable && customerSlug
       ? loadOnboardingContextBinding(customerSlug, rootDir)
       : null;
   const organizationChartData = tenantScopeReadable
-    ? resolveOrganizationOrgChart(customerSlug || tenantSlug, rootDir)
+    ? resolveOrganizationOrgChart(tenantSlug, rootDir)
     : null;
   const organizationChart = summarizeOrganizationOrgChart(organizationChartData);
   const rooms: OfficeRoom[] = [];

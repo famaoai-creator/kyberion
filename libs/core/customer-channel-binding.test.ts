@@ -49,7 +49,14 @@ describe('customer-channel-binding', () => {
   });
 
   it('loads a valid binding including the conversation mode', () => {
-    const file = path.join(rootDir, 'customer', 'acme', 'connections', 'channel-bindings.json');
+    const file = path.join(
+      rootDir,
+      'knowledge',
+      'confidential',
+      'acme',
+      'connections',
+      'channel-bindings.json'
+    );
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(
       file,
@@ -74,7 +81,14 @@ describe('customer-channel-binding', () => {
 
   it('reads one tenant only and finds an active binding by surface + channel (CD-11)', () => {
     const write = (tenant: string, bindings: unknown[]) => {
-      const file = path.join(rootDir, 'customer', tenant, 'connections', 'channel-bindings.json');
+      const file = path.join(
+        rootDir,
+        'knowledge',
+        'confidential',
+        tenant,
+        'connections',
+        'channel-bindings.json'
+      );
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, JSON.stringify({ bindings }));
     };
@@ -108,7 +122,14 @@ describe('customer-channel-binding', () => {
   });
 
   it('ignores schema-invalid binding files', () => {
-    const file = path.join(rootDir, 'customer', 'acme', 'connections', 'channel-bindings.json');
+    const file = path.join(
+      rootDir,
+      'knowledge',
+      'confidential',
+      'acme',
+      'connections',
+      'channel-bindings.json'
+    );
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, JSON.stringify({ bindings: [{ surface: 'slack' }] }));
 
@@ -116,7 +137,14 @@ describe('customer-channel-binding', () => {
   });
 
   it('ignores malformed binding files', () => {
-    const file = path.join(rootDir, 'customer', 'acme', 'connections', 'channel-bindings.json');
+    const file = path.join(
+      rootDir,
+      'knowledge',
+      'confidential',
+      'acme',
+      'connections',
+      'channel-bindings.json'
+    );
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, '{ malformed');
 
@@ -126,7 +154,8 @@ describe('customer-channel-binding', () => {
   it('ignores a customer overlay that has no active tenant profile', () => {
     const file = path.join(
       rootDir,
-      'customer',
+      'knowledge',
+      'confidential',
       'unregistered',
       'connections',
       'channel-bindings.json'
@@ -150,7 +179,14 @@ describe('customer-channel-binding', () => {
         assigned_role: 'owner',
       })
     );
-    const file = path.join(rootDir, 'customer', 'acme', 'connections', 'channel-bindings.json');
+    const file = path.join(
+      rootDir,
+      'knowledge',
+      'confidential',
+      'acme',
+      'connections',
+      'channel-bindings.json'
+    );
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(
       file,
@@ -162,7 +198,7 @@ describe('customer-channel-binding', () => {
 
   it('ignores a symlinked registered customer overlay', () => {
     const outside = path.join(rootDir, 'active', 'shared', 'escaped-customer');
-    const linked = path.join(rootDir, 'customer', 'acme');
+    const linked = path.join(rootDir, 'knowledge', 'confidential', 'acme');
     const file = path.join(outside, 'connections', 'channel-bindings.json');
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(

@@ -21,7 +21,7 @@ const nhiId = 'kyberion://agent/org-acme-ai/planner';
 function seed(strict = true, tenantSlug = scope.tenantSlug): void {
   safeMkdir(path.join(rootDir, 'knowledge', 'personal', 'stances', 'acme-ai'), { recursive: true });
   safeWriteFile(
-    path.join(rootDir, 'knowledge', 'personal', 'stances', 'acme-ai', 'organization-profile.json'),
+    path.join(rootDir, 'knowledge', 'confidential', 'acme-ai', 'organization-profile.json'),
     JSON.stringify({
       version: '1.0.0',
       organization_id: 'org-acme-ai',
@@ -107,8 +107,7 @@ describe('tenant activation probe', () => {
       const profilePath = path.join(
         rootDir,
         'knowledge',
-        'personal',
-        'stances',
+        'confidential',
         scope.customerSlug,
         'organization-profile.json'
       );
