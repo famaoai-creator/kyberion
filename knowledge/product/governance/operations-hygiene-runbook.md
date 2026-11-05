@@ -733,8 +733,17 @@ this contract; a faster Linux run alone is not evidence that macOS CI passed.
   import or write. Seed real policy/schema inputs, set root environment first,
   then import once and assert both roots before calling the default API. Never
   clean up a tenant parent in the real primary checkout. The enforcing regression
-  is `governance/delegated-execution.production-path.integration.test.ts` in
-  `registration-tests`; it retains actual store roles and default path selection.
+  includes `governance/delegated-execution.production-path.integration.test.ts`,
+  `pipeline/pipeline-run-journal.tenant-store.test.ts` and
+  `governance/autonomy-action-state.production-role.test.ts` in `registration-tests`;
+  they retain actual store roles and default path selection. Restore only the
+  per-test environment keys between cases; a blanket environment reset can drop
+  the suite's fixture root before a later lazy import. Shuffle the affected suites
+  with seeds 222, 7 and 20261008 when repairing root isolation.
+  Seed only installation prerequisites: `runtime-readiness.ts` requires
+  `active/shared/runtime`. Leave each store's domain/tier/tenant directories
+  absent so its bounded facade must create them; precreating those directories
+  would hide a first-use capability failure.
 - A test must not depend on load or order. Run a suspect file with
   `--sequence.shuffle --sequence.seed=<n>` (at least 222, 7 and 20261008) and under parallel load
   before calling it fixed. Five defect classes caused the 2026-10 load and order failures:
