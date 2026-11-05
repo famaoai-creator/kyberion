@@ -50,7 +50,7 @@
     "contracts/wisdom-action": 0,
     "contracts/xlsx-protocol": 0,
     "entity-scope": 1,
-    "foundation/ajv": 68,
+    "foundation/ajv": 69,
     "foundation/ansi-utils": 0,
     "foundation/approval-domains": 0,
     "foundation/archived-mission-state-capability": 1,
@@ -73,13 +73,13 @@
     "foundation/dot-result-store-capability": 3,
     "foundation/env": 0,
     "foundation/execution-scope": 4,
-    "foundation/governed-catalog": 69,
+    "foundation/governed-catalog": 70,
     "foundation/html-sanitize": 0,
     "foundation/inflight-limit": 0,
     "foundation/information-asset-coverage-capability": 8,
     "foundation/io": 0,
-    "foundation/json-state": 70,
-    "foundation/json": 67,
+    "foundation/json-state": 71,
+    "foundation/json": 68,
     "foundation/knowledge-tier": 0,
     "foundation/locale-normalize": 0,
     "foundation/lock-utils": 9,
@@ -102,7 +102,7 @@
     "foundation/scope-resolution-mode": 0,
     "foundation/scope": 0,
     "foundation/secret-resolution-session": 5,
-    "foundation/service-endpoints": 70,
+    "foundation/service-endpoints": 71,
     "foundation/task-source-workspace-capability": 0,
     "foundation/task-tool-grant-validation": 2,
     "foundation/text-escaping": 0,
@@ -114,6 +114,6 @@
     "logger": 3,
     "path-resolver": 4,
     "platform-facts": 0,
-    "secure-io": 66
+    "secure-io": 67
   }
 }
