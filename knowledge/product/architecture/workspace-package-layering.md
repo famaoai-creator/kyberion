@@ -36,6 +36,11 @@ libs/shared-*  (video, media, voice, vision, interaction, network, ui, ...)
   Compute that closure before moving; what core still uses stays in core.
 - The published surface may only shrink unless a change raises the baseline in review
   (gate `package-export-surface`, baseline `scripts/check_package_export_surface.baseline.json`).
+- Foundation stays light: the gate `foundation-weight` (baseline
+  `scripts/check_foundation_weight.baseline.json`) counts, on `libs/core/dist`, how many core
+  modules `secure-io`, `path-resolver`, `logger` and every `foundation/**` / `contracts/**`
+  module load at runtime. Most of `secure-io`'s 66 are the guard's own machinery (audit chain,
+  policy engine, identity, tenant partitions, vault, sandbox); a new domain rule must not add to it.
 - The package graph is generated, never hand-drawn
   (gate `package-dependency-graph` → `docs/developer/architecture/dependency-graph.mmd`).
 
