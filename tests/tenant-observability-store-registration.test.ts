@@ -8,6 +8,7 @@ import {
   tenantRuntimePartitionOf,
 } from '@agent/core/storage-layout';
 import {
+  DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH,
   DELEGATION_LEGACY_RECORD_REPO_DIR,
   DELEGATION_LEGACY_TRACE_REPO_PATH,
   TENANT_RUNTIME_PARTITION_TARGET_KINDS,
@@ -144,6 +145,31 @@ describe('tenant-bearing observability store registration', () => {
     // live code, via the shared constants — no new writer may target them.
     const delegationRefs = [...(stores.get('delegations') ?? [])].sort();
     expect(delegationRefs).toEqual(['libs/core/foundation/runtime-state-roots.ts']);
+  });
+
+  it('keeps the delegation notification queue partitioned and its legacy shared queue offboarded', () => {
+    expect(DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH).toBe(
+      'active/shared/runtime/delegations/notifications.jsonl'
+    );
+    // The queue lives in the delegation partitions, so tier-guard, backup and
+    // offboarding see it through the registered delegations ledger root.
+    const root = PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations;
+    expect(tenantRuntimePartitionOf(`${root}/confidential/acme/notifications.jsonl`)?.key).toBe(
+      'delegations'
+    );
+    // No live code names the shared queue directory except the legacy constant:
+    // a new writer must not target it again.
+    const refs = SCAN_ROOTS.flatMap((scanRoot) => getAllFiles(path.join(rootDir, scanRoot)))
+      .map((filePath) => path.relative(rootDir, filePath).split(path.sep).join('/'))
+      .filter((relPath) => /\.(ts|tsx|mts)$/u.test(relPath))
+      .filter((relPath) => !/\.(test|spec)\.tsx?$/u.test(relPath) && !relPath.endsWith('.d.ts'))
+      .filter((relPath) => !/(^|\/)(node_modules|dist|\.next|__tests__)\//u.test(relPath))
+      .filter((relPath) => /runtime\/delegations[/'"`]/u.test(read(path.join(rootDir, relPath))))
+      .sort();
+    expect(
+      refs,
+      'delegation notification queue — only foundation/runtime-state-roots.ts may name active/shared/runtime/delegations/ (the read-only legacy queue) | next: enqueue through libs/core/mission/delegation-notifications.ts, which writes the delegation partitions'
+    ).toEqual(['libs/core/foundation/runtime-state-roots.ts']);
   });
 
   it('requires every registered tenant partition root to have an offboarding disposition', () => {

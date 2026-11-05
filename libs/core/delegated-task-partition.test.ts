@@ -27,6 +27,12 @@ import {
   startDelegatedTaskTrace,
   systemDelegationTracePaths,
 } from './delegated-task-observability.js';
+import {
+  claimPendingDelegationNotifications,
+  delegationNotificationsPath,
+  enqueueDelegationNotification,
+  listDelegationNotifications,
+} from './mission/delegation-notifications.js';
 
 const STORE = `active/shared/tmp/delegation-partition-tests/store-${process.pid}`;
 const ENV_KEYS = [
@@ -277,5 +283,167 @@ describe('legacy shared delegation records', () => {
       activation_status: 'claimed',
     });
     expect(loadDelegatedTaskRecord('legacy-acme')?.activation_count).toBe(1);
+  });
+});
+
+describe('delegation notification partitions', () => {
+  function readRows(...parts: string[]): Array<Record<string, unknown>> {
+    const filePath = storePath(...parts);
+    if (!safeExistsSync(filePath)) return [];
+    return String(safeReadFile(filePath, { encoding: 'utf8' }))
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  }
+
+  function completeBackground(instruction: string) {
+    const trace = startDelegatedTaskTrace({ owner: 'op', instruction, background: true });
+    completeDelegatedTaskTrace(trace, { resultSummary: `${instruction} result` });
+    return trace;
+  }
+
+  function writeLegacyNotifications(rows: Array<Record<string, unknown>>): string {
+    const filePath = storePath('legacy', 'notifications.jsonl');
+    safeMkdir(path.dirname(filePath), { recursive: true });
+    safeWriteFile(
+      filePath,
+      `${rows
+        .map((row) =>
+          JSON.stringify({
+            owner: 'legacy-owner',
+            status: 'completed',
+            instruction_excerpt: `legacy ${String(row.notification_id)}`,
+            completed_at: '2026-10-01T00:00:00.000Z',
+            enqueued_at: '2026-10-01T00:00:00.000Z',
+            claimed: false,
+            ...row,
+          })
+        )
+        .join('\n')}\n`
+    );
+    return filePath;
+  }
+
+  beforeEach(() => {
+    delete process.env.KYBERION_DELEGATION_NOTIFICATIONS_PATH;
+  });
+
+  it("enqueues into the delegation's partition: tenant ones under confidential/<tenant>/", () => {
+    const system = completeBackground('system background');
+    bindTenant('acme');
+    const acme = completeBackground('acme secret background');
+
+    expect(readRows('confidential', 'acme', 'notifications.jsonl')).toEqual([
+      expect.objectContaining({ delegation_id: acme.trace_id, tenant_slug: 'acme' }),
+    ]);
+    const systemRows = readRows('system', 'notifications.jsonl');
+    expect(systemRows.map((row) => row.delegation_id)).toEqual([system.trace_id]);
+    expect(JSON.stringify(systemRows)).not.toContain('acme');
+    expect(delegationNotificationsPath()).toBe(
+      storePath('confidential', 'acme', 'notifications.jsonl')
+    );
+    // The registered layout puts the queue in the delegation_record_store partition.
+    delete process.env.KYBERION_DELEGATION_STORE_DIR;
+    expect(tenantStoreLedgerPartitionOf(repoRelative(delegationNotificationsPath()))).toMatchObject(
+      { storeRole: DELEGATION_RECORD_STORE_ROLE, tenant: 'acme' }
+    );
+    bindTenant(undefined);
+    expect(repoRelative(delegationNotificationsPath())).toBe(
+      'active/shared/runtime/delegation-records/system/notifications.jsonl'
+    );
+  });
+
+  it("never delivers another tenant's notification; an unbound host drains every partition once", () => {
+    bindTenant('acme');
+    const acme = completeBackground('acme only');
+    bindTenant('beta');
+    const beta = completeBackground('beta only');
+
+    expect(listDelegationNotifications().map((row) => row.delegation_id)).toEqual([beta.trace_id]);
+    expect(claimPendingDelegationNotifications().map((row) => row.delegation_id)).toEqual([
+      beta.trace_id,
+    ]);
+    // A tenant-bound process cannot place a notification in another tenant's queue.
+    expect(() =>
+      enqueueDelegationNotification({
+        delegationId: 'forged',
+        owner: 'op',
+        tenantSlug: 'acme',
+        status: 'completed',
+        instruction: 'forged',
+      })
+    ).toThrow('DELEGATION_TENANT_SCOPE_MISMATCH');
+
+    bindTenant(undefined);
+    const system = completeBackground('system work');
+    expect(claimPendingDelegationNotifications().map((row) => row.delegation_id)).toEqual([
+      acme.trace_id,
+      system.trace_id,
+    ]);
+    expect(claimPendingDelegationNotifications()).toEqual([]);
+    expect(readRows('confidential', 'acme', 'notifications.jsonl')[0]).toMatchObject({
+      claimed: true,
+    });
+  });
+
+  it('serves legacy rows per attribution, migrates claims into the partition, never rewrites the legacy file', () => {
+    const missionDir = pathResolver.rootResolve('active/missions/confidential/acme/MSN-NOTIFY-A');
+    vi.spyOn(pathResolver, 'findMissionPath').mockImplementation((id: string) =>
+      id === 'MSN-NOTIFY-A' ? missionDir : null
+    );
+    bindTenant('acme');
+    const recorded = startDelegatedTaskTrace({ owner: 'op', instruction: 'acme record' });
+    bindTenant(undefined);
+    const legacyFile = writeLegacyNotifications([
+      { notification_id: 'n-stamped', delegation_id: 'd-stamped', tenant_slug: 'acme' },
+      { notification_id: 'n-mission', delegation_id: 'd-mission', mission_id: 'MSN-NOTIFY-A' },
+      { notification_id: 'n-record', delegation_id: recorded.trace_id },
+      { notification_id: 'n-loose', delegation_id: 'd-loose' },
+      { notification_id: 'n-done', delegation_id: 'd-done', tenant_slug: 'acme', claimed: true },
+    ]);
+    const legacyBefore = String(safeReadFile(legacyFile, { encoding: 'utf8' }));
+
+    bindTenant('beta');
+    expect(listDelegationNotifications()).toEqual([]);
+    expect(claimPendingDelegationNotifications()).toEqual([]);
+
+    bindTenant('acme');
+    expect(listDelegationNotifications().map((row) => row.notification_id)).toEqual([
+      'n-stamped',
+      'n-mission',
+      'n-record',
+      'n-done',
+    ]);
+    const claimed = claimPendingDelegationNotifications();
+    expect(claimed.map((row) => row.notification_id)).toEqual([
+      'n-stamped',
+      'n-mission',
+      'n-record',
+    ]);
+    expect(claimed.every((row) => row.tenant_slug === 'acme')).toBe(true);
+    expect(claimPendingDelegationNotifications()).toEqual([]);
+    expect(
+      readRows('confidential', 'acme', 'notifications.jsonl').map((row) => [
+        row.notification_id,
+        row.claimed,
+      ])
+    ).toEqual([
+      ['n-stamped', true],
+      ['n-mission', true],
+      ['n-record', true],
+    ]);
+
+    // Unattributed rows reach unbound processes only; the migrated copies shadow
+    // the legacy rows, so nothing is delivered twice.
+    bindTenant(undefined);
+    expect(claimPendingDelegationNotifications().map((row) => row.notification_id)).toEqual([
+      'n-loose',
+    ]);
+    expect(claimPendingDelegationNotifications()).toEqual([]);
+    expect(readRows('system', 'notifications.jsonl').map((row) => row.notification_id)).toEqual([
+      'n-loose',
+    ]);
+    expect(String(safeReadFile(legacyFile, { encoding: 'utf8' }))).toBe(legacyBefore);
   });
 });
