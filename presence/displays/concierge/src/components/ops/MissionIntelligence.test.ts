@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 import {
   buildDangerousActionPrompt,
@@ -106,5 +108,21 @@ describe('MissionIntelligence helpers', () => {
     expect(prompt.detail).toContain('may not be fully reversible');
     expect(prompt.confirmLabel).toBe('restart runtime');
     expect(prompt.cancelLabel).toBe('cancel');
+  });
+});
+
+describe('MissionIntelligence hydration', () => {
+  it('reads the locale through the mount-safe hook so SSR and first render agree', () => {
+    const source = String(
+      safeReadFile(
+        pathResolver.rootResolve(
+          'presence/displays/concierge/src/components/ops/MissionIntelligence.tsx'
+        ),
+        { encoding: 'utf8' }
+      ) ?? ''
+    );
+    const body = source.slice(source.indexOf('export function MissionIntelligence({'));
+    expect(body).toContain('const locale = useChronosLocale();');
+    expect(body).not.toContain('const locale = resolveChronosLocale();');
   });
 });
