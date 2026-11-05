@@ -212,7 +212,9 @@ describe('reasoning-send and delegation faces agree (custody x attestation x tie
       useProviderPolicy(declaration === 'declared' ? DECLARED_POLICY : UNDECLARED_POLICY);
       arrange(subject, state);
       // Only the subject's own valid `none` for a declared provider opens
-      // egress; system custody can never hold personal material.
+      // egress; system custody can never hold personal material. (A person's
+      // `none` is consent and also needs the system attestation, which every
+      // person cell holds as a non-subject — see the block below.)
       const expected =
         state === 'valid' &&
         declaration === 'declared' &&
@@ -287,5 +289,29 @@ describe('a tenantless reasoning send (e.g. a system role draft) under the shipp
         () => assertReasoningEgressAllowed('claude-cli')
       )
     ).toThrow(/\[CUSTODY_OWNER_CONFLICT\] system custody cannot hold personal-tier material/);
+  });
+});
+
+describe("person custody: the person's attestation is consent, not no-training evidence", () => {
+  it('denies person consent without the installation attestation on both faces, and allows it with one', () => {
+    useProviderPolicy(DECLARED_POLICY);
+    clearCustodyStore();
+    writeCustody({ kind: 'person' }, 'valid');
+    expect({
+      delegation: delegationFace('person', 'personal'),
+      reasoning: reasoningFace('person', 'personal').allowed,
+    }).toEqual({ delegation: false, reasoning: false });
+    const reasoning = reasoningFace('person', 'personal');
+    expect(reasoning.error).toContain("consents to 'claude', but its consent is not evidence");
+    expect(reasoning.error).toContain(
+      'pnpm onboarding llm attest --custody system --provider claude'
+    );
+    writeCustody({ kind: 'system' }, 'expired');
+    expect(delegationFace('person', 'personal')).toBe(false);
+    writeCustody({ kind: 'system' }, 'valid');
+    expect({
+      delegation: delegationFace('person', 'personal'),
+      reasoning: reasoningFace('person', 'personal').allowed,
+    }).toEqual({ delegation: true, reasoning: true });
   });
 });

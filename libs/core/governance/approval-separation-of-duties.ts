@@ -9,23 +9,9 @@
 import { auditChain } from './audit-chain.js';
 import { resolveSeparationOfDutiesPolicy } from './approval-policy.js';
 import type { ApprovalRequestRecord } from './approval-store.js';
+import { normalizeApprovalPrincipalId } from './approval-principal-id.js';
 
-/**
- * Principal-type prefixes surfaces put in front of an identity
- * (`user:<member_id>` from chronos / presence-studio, `agent:…`, `service:…`).
- * They are stripped before comparison so `user:alice` and `alice` count as the
- * same principal. Because the requester controls `requestedBy`, a requester
- * can also make a later decider look like themselves (false positive); that
- * only refuses a decision, which is the safe direction.
- */
-const APPROVAL_PRINCIPAL_PREFIX =
-  /^(?:user|human|operator|member|principal|agent|service|persona|actor|policy):/;
-
-/** Canonical form of an approval principal id for identity comparison. */
-export function normalizeApprovalPrincipalId(value: unknown): string {
-  if (typeof value !== 'string') return '';
-  return value.normalize('NFKC').trim().toLowerCase().replace(APPROVAL_PRINCIPAL_PREFIX, '').trim();
-}
+export { normalizeApprovalPrincipalId };
 
 /**
  * Decider ids that surfaces fall back to when they could not resolve who
@@ -73,6 +59,64 @@ export function approvalRequesterIdentities(
   return Array.from(new Set(ids));
 }
 
+/**
+ * A request that records a data subject's own consent rather than asking for
+ * a review of someone else's action (decided 2026-11-05: a person-custody
+ * provider attestation is that person's consent). Carried in
+ * `accountability.consent`.
+ * - `subject` deciding it is consent, not a self-approval: separation of
+ *   duties lets `subject` approve a request they opened — only on the
+ *   {@link SELF_CONSENT_STORAGE_CHANNELS} and only for that principal.
+ * - `subject_only`: nobody but `subject` may approve it (refused at decision
+ *   time by {@link approvalConsentDecisionRefusal}, whatever the separation
+ *   setting).
+ */
+export interface ApprovalConsent {
+  subject: string;
+  subject_only: boolean;
+}
+
+/**
+ * Storage channels whose consent requests may be self-decided by their
+ * subject. A literal on purpose: widening it is a governance decision.
+ * `custody-provider-attestation` = CUSTODY_PROVIDER_ATTESTATION_APPROVAL_CHANNEL.
+ */
+export const SELF_CONSENT_STORAGE_CHANNELS: ReadonlySet<string> = new Set([
+  'custody-provider-attestation',
+]);
+
+type ConsentRecordFields = Partial<
+  Pick<ApprovalRequestRecord, 'accountability' | 'storageChannel' | 'channel'>
+>;
+
+/** The consent a record carries, when it is on a channel that honours one. */
+function recordConsent(record: ConsentRecordFields): ApprovalConsent | undefined {
+  const consent = record.accountability?.consent;
+  if (!consent || !normalizeApprovalPrincipalId(consent.subject)) return undefined;
+  const channel = record.storageChannel || record.channel || '';
+  return SELF_CONSENT_STORAGE_CHANNELS.has(channel) ? consent : undefined;
+}
+
+/**
+ * Why an approving decision of a `subject_only` consent request is refused
+ * (the decider is not its subject), else undefined. Rejections are never
+ * refused: declining only withdraws.
+ */
+export function approvalConsentDecisionRefusal(
+  record: ConsentRecordFields & Pick<ApprovalRequestRecord, 'id'>,
+  decidedBy: unknown
+): string | undefined {
+  const consent = recordConsent(record);
+  if (!consent?.subject_only) return undefined;
+  const decider = normalizeApprovalPrincipalId(decidedBy);
+  if (decider && decider === normalizeApprovalPrincipalId(consent.subject)) return undefined;
+  return (
+    `[POLICY_VIOLATION] approval refused — request ${record.id} records the consent of '${consent.subject}', which only that principal can give ` +
+    `| next: have '${consent.subject}' decide it from their own signed-in session (\`pnpm kyberion approvals --approve ${record.id}\`) ` +
+    `| evidence: decided_by=${typeof decidedBy === 'string' && decidedBy ? decidedBy : '(none)'} consent_subject=${consent.subject}`
+  );
+}
+
 export type SeparationOfDutiesViolation =
   'self_approval' | 'missing_requester' | 'missing_decider' | 'unverified_decider';
 
@@ -84,7 +128,8 @@ export type SeparationOfDutiesViolation =
  * so it is a violation — fail closed.
  */
 export function evaluateSeparationOfDuties(
-  record: Pick<ApprovalRequestRecord, 'requestedBy' | 'requestedByContext' | 'source'>,
+  record: Pick<ApprovalRequestRecord, 'requestedBy' | 'requestedByContext' | 'source'> &
+    ConsentRecordFields,
   decidedBy: unknown,
   identitySource?: ApprovalDeciderIdentitySource
 ): SeparationOfDutiesViolation | null {
@@ -93,7 +138,11 @@ export function evaluateSeparationOfDuties(
   if (!decider || APPROVAL_PLACEHOLDER_DECIDERS.has(decider)) return 'missing_decider';
   const requesters = approvalRequesterIdentities(record);
   if (requesters.length === 0) return 'missing_requester';
-  return requesters.includes(decider) ? 'self_approval' : null;
+  if (!requesters.includes(decider)) return null;
+  // A data subject giving their own consent is not reviewing their own work.
+  const consent = recordConsent(record);
+  if (consent && normalizeApprovalPrincipalId(consent.subject) === decider) return null;
+  return 'self_approval';
 }
 
 export const SEPARATION_OF_DUTIES_MESSAGES: Record<SeparationOfDutiesViolation, string> = {

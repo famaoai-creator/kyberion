@@ -541,7 +541,7 @@ describe('no_training honours tenant provider attestations', () => {
       useProviderPolicy('unknown');
       noTraining('approved-tenant', () => {
         expect(() => assertReasoningEgressAllowed('claude-cli')).toThrow(
-          /no no-training declaration — tenant 'approved-tenant' has no attestation for provider 'claude'; .*approved_providers exception, which is an operator exception, not evidence that the provider does not train \| next: declare providers\.claude\.training_use 'none' in provider-egress-policy\.json, or record a custody attestation with 'pnpm onboarding llm attest --tenant approved-tenant --provider claude .*' \| custody=tenant:approved-tenant .*basis=approved-providers-exception/
+          /no no-training declaration — tenant 'approved-tenant' has no attestation for provider 'claude'; .*approved_providers exception, which is an operator exception, not evidence that the provider does not train \| next: declare providers\.claude\.training_use 'none' in provider-egress-policy\.json, or record one with 'pnpm onboarding llm attest --tenant approved-tenant --provider claude .*' \| custody=tenant:approved-tenant .*basis=approved-providers-exception/
         );
       });
     });

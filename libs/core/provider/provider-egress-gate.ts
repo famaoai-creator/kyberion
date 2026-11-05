@@ -56,6 +56,7 @@ import {
   type CustodyOwner,
 } from '../custody-owner.js';
 import {
+  personCustodyConsentGap,
   readCustodyProviderAttestationEntry,
   type NonTenantCustodyOwner,
 } from './custody-provider-attestation-store.js';
@@ -421,6 +422,17 @@ function readNonTenantAttestationAsPolicyInput(
   if (read.error) return { error: read.error };
   if (!read.entry) return {};
   const { training_use, attested_at, expires_at } = read.entry;
+  // A person record is the person's consent only when that person decided it
+  // (decided 2026-11-05); one decided by anyone else is kept but not read.
+  const consentGap =
+    training_use === 'none'
+      ? personCustodyConsentGap(custody, read.entry.approval?.approved_by)
+      : undefined;
+  if (consentGap) {
+    return {
+      error: `${custodySubject(custody)} attestation for '${provider}' is not the person's consent: ${consentGap}; re-record it with '${custodyAttestationRequestCommand(custody, provider)}' decided by the person`,
+    };
+  }
   return {
     profile: {
       provider_attestations: {
@@ -660,12 +672,20 @@ export function evaluateProviderEgress(input: ProviderEgressCheckInput): Evaluat
     provider,
     ttlDays: policy.attestation_ttl_days,
   });
+  // Person custody (decided 2026-11-05, option C): the person's attestation
+  // is their consent, not evidence that the provider does not train. It opens
+  // egress only together with that evidence — the installation's own
+  // training_use none attestation, or a policy declaration of none.
+  let personEvidenceGap = '';
   if (
     attestation.status === 'valid' &&
     attestation.training_use === 'none' &&
     (declaration || exceptions.includes(provider))
   ) {
-    return { allowed: true, basis: `${custody.kind}-attestation` };
+    if (custody.kind !== 'person') return { allowed: true, basis: `${custody.kind}-attestation` };
+    const evidenceGap = noTrainingEvidenceGap(provider, declaration, policy.attestation_ttl_days);
+    if (!evidenceGap) return { allowed: true, basis: 'person-attestation' };
+    personEvidenceGap = `${custodySubject(custody)} consents to '${provider}', but its consent is not evidence that the provider does not train and ${evidenceGap} (record it with '${custodyAttestationRequestCommand({ kind: 'system' }, provider)}'); `;
   }
   if (attestation.status === 'expired') {
     return deny(
@@ -690,14 +710,51 @@ export function evaluateProviderEgress(input: ProviderEgressCheckInput): Evaluat
 
   if (!declaration) {
     return deny(
-      `'${provider}' is not declared in provider-egress-policy.json; a tenant attestation alone cannot establish its egress identity.`
+      `${personEvidenceGap}'${provider}' is not declared in provider-egress-policy.json; a tenant attestation alone cannot establish its egress identity.`
     );
   }
 
   const trainingUse = declaration.training_use ?? 'unknown';
   return deny(
-    `'${provider}' has training_use '${trainingUse}'; ${dataTier} material may only go to a provider attested 'none' (or an explicit approved_providers exception).`
+    `${personEvidenceGap}'${provider}' has training_use '${trainingUse}'; ${dataTier} material may only go to a provider attested 'none' (or an explicit approved_providers exception).`
   );
+}
+
+/**
+ * Why nothing shows that `provider` does not train, else '' — the evidence a
+ * person's consent needs: a policy declaration `training_use: none`, or the
+ * installation's valid (unexpired) system attestation of `none`. An
+ * approved_providers exception is never that evidence. Exported for the
+ * reasoning-send gate's public-material arm; a policy that cannot be loaded
+ * leaves only the system attestation.
+ */
+export function personConsentNoTrainingEvidenceGap(provider: string): string {
+  const loaded = loadProviderEgressPolicy();
+  return loaded.status === 'ok'
+    ? noTrainingEvidenceGap(
+        provider,
+        loaded.policy.providers[provider],
+        loaded.policy.attestation_ttl_days
+      )
+    : noTrainingEvidenceGap(provider, undefined, undefined);
+}
+
+function noTrainingEvidenceGap(
+  provider: string,
+  declaration: ProviderEgressPolicyFile['providers'][string] | undefined,
+  ttlDays: number | undefined
+): string {
+  if (declaration?.training_use === 'none') return '';
+  const read = readNonTenantAttestationAsPolicyInput({ kind: 'system' }, provider);
+  if (read.error)
+    return `the installation (system custody) attestation could not be read: ${read.error}`;
+  const system = resolveTenantProviderAttestation({ profile: read.profile, provider, ttlDays });
+  if (system.status === 'valid' && system.training_use === 'none') return '';
+  return system.status === 'expired'
+    ? `the installation (system custody) attestation for '${provider}' expired on ${system.expires_at}`
+    : system.status === 'valid'
+      ? `the installation (system custody) attests training_use '${system.training_use}' for '${provider}'`
+      : `the installation (system custody) has no training_use none attestation for '${provider}' and the policy does not declare one`;
 }
 
 export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEgressCheckResult {

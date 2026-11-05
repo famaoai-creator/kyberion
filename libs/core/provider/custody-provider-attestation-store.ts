@@ -27,12 +27,26 @@
  * basis — is reported as an error, which callers treat as "no attestation".
  * Writes happen only through the approval-mediated facade in
  * `custody-provider-attestation-governance.ts`.
+ *
+ * What a record means (decided 2026-11-05, design option C):
+ * - system custody — the installation owner's statement that the provider
+ *   does not train on material sent to it under the purchased plan;
+ * - person custody — that person's CONSENT to send their own personal
+ *   material to the provider under that condition. It is not evidence that
+ *   the provider does not train: the egress gate also needs the system
+ *   attestation (or a policy declaration `training_use: none`). A person
+ *   record counts as consent only when it was decided by its subject
+ *   ({@link personCustodyConsentGap}); a record decided by anyone else — e.g.
+ *   by the installation owner before this rule — stays on disk untouched but
+ *   is read as "no consent".
  */
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { resolveIdentityContext } from '../authority.js';
 import { custodyOwnerLabel, type CustodyOwner } from '../custody-owner.js';
 import { readJsonIfPresent, writeJson } from '../foundation/json.js';
+import { normalizeApprovalPrincipalId } from '../governance/approval-principal-id.js';
+import type { ApprovalConsent } from '../governance/approval-separation-of-duties.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeMkdir } from '../secure-io.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS, storagePartitionSegments } from '../storage-layout.js';
@@ -64,6 +78,51 @@ export function personCustodyOwnerKey(principalId: string | undefined): string {
   const principal = principalId?.trim();
   if (!principal) return 'operator';
   return `principal-${createHash('sha256').update(principal, 'utf8').digest('hex').slice(0, 32)}`;
+}
+
+/**
+ * The installation owner as an approval principal: the local owner member
+ * (`INSTALLATION_OWNER_MEMBER_ID` in surface/installation-owner-access.ts, as
+ * `user:<member_id>`). Kept literal so this store stays a leaf module.
+ */
+export const INSTALLATION_OWNER_APPROVAL_PRINCIPAL = 'user:owner';
+
+/**
+ * Whose consent a person-custody attestation records, as carried on its
+ * approval request (`accountability.consent`):
+ * - a principal-keyed person (`principal_id`) — that principal, and nobody
+ *   else may decide it (`subject_only`);
+ * - the `operator` key (single-user installation, or the installation owner's
+ *   own material) — the installation owner, who is also the decider of the
+ *   owner-role workflow, so an authenticated human decision through that
+ *   workflow is the subject's consent (unchanged), and the owner deciding a
+ *   request they opened is not a self-approval.
+ */
+export function personCustodyConsentSubject(
+  owner: Extract<NonTenantCustodyOwner, { kind: 'person' }>
+): ApprovalConsent {
+  const principal = owner.principal_id?.trim();
+  return principal
+    ? { subject: principal, subject_only: true }
+    : { subject: INSTALLATION_OWNER_APPROVAL_PRINCIPAL, subject_only: false };
+}
+
+/**
+ * Why a person-custody decision by `approvedBy` is not the person's own
+ * consent, else undefined. A principal-keyed person consents only through a
+ * decision recorded under their own principal id; the `operator` key accepts
+ * the owner-role decision. System custody is never consent (undefined).
+ */
+export function personCustodyConsentGap(
+  owner: NonTenantCustodyOwner,
+  approvedBy: string | undefined
+): string | undefined {
+  if (owner.kind !== 'person') return undefined;
+  const consent = personCustodyConsentSubject(owner);
+  if (!consent.subject_only) return undefined;
+  const decider = normalizeApprovalPrincipalId(approvedBy);
+  if (decider && decider === normalizeApprovalPrincipalId(consent.subject)) return undefined;
+  return `it was decided by '${approvedBy || '(none)'}', not by '${consent.subject}' — only the person can consent to sending their own material`;
 }
 
 /** Repo-relative store file of a system or person custody owner. */
