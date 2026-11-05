@@ -1,6 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import path from 'node:path';
+import { pathResolver } from '../path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { _resetEgressPolicyCacheForTests } from '../egress-policy.js';
+import { _resetProviderEgressPolicyCacheForTests } from '../provider/provider-egress-gate.js';
 import { stubReasoningBackend, type ReasoningBackend } from '../reasoning/reasoning-backend.js';
 import {
+  _setReasoningTenantRegistryRootForTests,
+  assertReasoningEgressAllowed,
   getReasoningPayloadScope,
   type ReasoningPayloadScope,
 } from '../reasoning/reasoning-egress-scope.js';
@@ -392,7 +399,11 @@ describe('role intent draft (R6)', () => {
       tenantSlug: 'acme',
       probeActuator: alwaysAvailable,
     });
-    expect(seen).toMatchObject({ tier: 'confidential', tenant_slug: 'acme' });
+    expect(seen).toMatchObject({
+      tier: 'confidential',
+      tenant_slug: 'acme',
+      training_use: 'no_training',
+    });
   });
 
   it('classifies an egress denial distinctly from an unavailable backend', async () => {
@@ -402,5 +413,128 @@ describe('role intent draft (R6)', () => {
     );
     const result = await draftRoleFromIntent({ intent: INTENT, inventory: INVENTORY, backend });
     expect(result.status === 'failed' && result.failure.class).toBe('egress_denied');
+  });
+});
+
+describe('role intent draft paste detection across scripts', () => {
+  const JA_INTENT = '月次の仕入先請求書を発注書と突き合わせるロール。';
+
+  it('detects a Japanese near-paraphrase (no spaces between words)', () => {
+    expect(
+      isPastedIntent('このロールは月次の仕入先請求書を発注書と突き合わせます。', JA_INTENT)
+    ).toBe(true);
+  });
+
+  it('does not flag a Japanese mandate that restates the request and adds substance', () => {
+    expect(
+      isPastedIntent(
+        '月次の仕入先請求書を発注書と突き合わせ、不一致の明細は財務レビュアーへエスカレーションし、仕入先ごとに監査証跡を残し、支払いは決して実行しない。',
+        JA_INTENT
+      )
+    ).toBe(false);
+  });
+});
+
+describe('role intent draft under the real reasoning egress gate', () => {
+  // The backend asserts egress exactly as the failover router does before each
+  // send, so the payload scope the draft declares is evaluated for real.
+  const ROOT = pathResolver.sharedTmp('role-intent-draft-egress-tests');
+  const TENANTS_DIR = path.join(ROOT, 'knowledge', 'personal', 'tenants');
+  const POLICY_PATH = path.join(ROOT, 'egress-policy.json');
+  const yesterday = () => new Date(Date.now() - 86_400_000).toISOString();
+
+  function gatedBackend(answer: unknown) {
+    const backend = fakeBackend(answer);
+    backend.prompt.mockImplementation(async () => {
+      assertReasoningEgressAllowed('claude-cli');
+      return JSON.stringify(answer);
+    });
+    return backend;
+  }
+
+  function writeTenant(slug: string, attestations?: Record<string, unknown>): void {
+    safeWriteFile(
+      path.join(TENANTS_DIR, `${slug}.json`),
+      JSON.stringify({
+        tenant_slug: slug,
+        display_name: slug,
+        status: 'active',
+        assigned_role: 'owner',
+        ...(attestations ? { provider_attestations: attestations } : {}),
+      })
+    );
+  }
+
+  beforeEach(() => {
+    safeMkdir(TENANTS_DIR, { recursive: true });
+    writeTenant('attested-tenant', { claude: { training_use: 'none', attested_at: yesterday() } });
+    writeTenant('unattested-tenant');
+    safeWriteFile(
+      POLICY_PATH,
+      JSON.stringify({
+        version: '1',
+        mode: 'warn',
+        manual_allowed_domains: ['api.anthropic.com'],
+        tenant_allowed_domains: {
+          'attested-tenant': ['api.anthropic.com'],
+          'unattested-tenant': ['api.anthropic.com'],
+        },
+      })
+    );
+    process.env.KYBERION_EGRESS_POLICY_PATH = POLICY_PATH;
+    _resetEgressPolicyCacheForTests();
+    _resetProviderEgressPolicyCacheForTests();
+    _setReasoningTenantRegistryRootForTests(ROOT);
+  });
+
+  afterEach(() => {
+    delete process.env.KYBERION_EGRESS_POLICY_PATH;
+    _resetEgressPolicyCacheForTests();
+    _setReasoningTenantRegistryRootForTests(undefined);
+    safeRmSync(ROOT, { recursive: true, force: true });
+  });
+
+  it('reaches an external backend for a tenant attesting training_use none', async () => {
+    const result = await draftRoleFromIntent({
+      intent: INTENT,
+      inventory: INVENTORY,
+      backend: gatedBackend(GOOD_ANSWER),
+      tenantSlug: 'attested-tenant',
+      probeActuator: alwaysAvailable,
+    });
+    expect(result.status).toBe('drafted');
+  });
+
+  it('is denied without an attestation, and the remedy names the attestation', async () => {
+    const result = await draftRoleFromIntent({
+      intent: INTENT,
+      inventory: INVENTORY,
+      backend: gatedBackend(GOOD_ANSWER),
+      tenantSlug: 'unattested-tenant',
+      probeActuator: alwaysAvailable,
+    });
+    expect(result.status).toBe('failed');
+    if (result.status !== 'failed') return;
+    expect(result.failure.class).toBe('egress_denied');
+    expect(result.failure.message).toMatch(/no attestation for provider 'claude'/);
+    expect(result.failure.next).toContain(
+      'pnpm onboarding llm attest --tenant unattested-tenant --request-approval'
+    );
+  });
+
+  it('without a tenant, says a tenant holding an attestation is needed', async () => {
+    const result = await draftRoleFromIntent({
+      intent: INTENT,
+      inventory: INVENTORY,
+      backend: gatedBackend(GOOD_ANSWER),
+      probeActuator: alwaysAvailable,
+    });
+    expect(result.status).toBe('failed');
+    if (result.status !== 'failed') return;
+    expect(result.failure.class).toBe('egress_denied');
+    expect(result.failure.message).not.toMatch(/local_only/);
+    expect(result.failure.next).toMatch(
+      /--tenant <slug> for a tenant holding a training_use 'none' attestation/
+    );
   });
 });
