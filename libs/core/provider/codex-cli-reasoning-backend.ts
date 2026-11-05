@@ -60,6 +60,10 @@ import {
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { resolveSandboxPolicy, toCodexSandboxPolicy } from '../shell/sandbox-policy.js';
 import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js';
+import {
+  markDelegationExecutionStarted,
+  runStartReportingDelegation,
+} from '../delegation-execution-tracker.js';
 
 export interface CodexHarnessSession {
   boot(): Promise<void>;
@@ -150,10 +154,22 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
     return this.runStructured(structuredReasoningSpecs.decomposeIntoTasks, input);
   }
 
-  async delegateTask(
+  delegateTask(
     instruction: string,
     context?: string,
     options?: ReasoningCallOptions
+  ): Promise<string> {
+    // R5: every dispatch path spawns through spawnWithDelegationEnv, which
+    // marks the start once a child exists — an earlier failure is pre-start.
+    return runStartReportingDelegation(() =>
+      this.dispatchDelegatedTask(instruction, context, options)
+    );
+  }
+
+  private async dispatchDelegatedTask(
+    instruction: string,
+    context: string | undefined,
+    options: ReasoningCallOptions | undefined
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const profile = resolveCliTaskPermissionProfile(options);
@@ -228,6 +244,8 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
         await session.refreshContext?.();
       }
       assertOperatorNativeCredentialOwner(this.nativeCredentialOwner);
+      // R5: the prompt reaches the shared app-server session here.
+      markDelegationExecutionStarted();
       const ask = session.askNativeSubagent?.bind(session) || session.ask.bind(session);
       const response = await ask(
         [

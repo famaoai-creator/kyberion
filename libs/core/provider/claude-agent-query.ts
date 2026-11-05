@@ -43,6 +43,7 @@ import {
 } from '../workforce/workspace-ledger.js';
 import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
+import { markDelegationExecutionStarted } from '../delegation-execution-tracker.js';
 
 /**
  * Record a claude-agent sub-agent call into the metrics collector so completed
@@ -335,6 +336,10 @@ async function runStructuredQuery<T>(
   };
 
   assertOperatorNativeCredentialOwner(credentialExecutionIdentity());
+  // R5: the SDK spawns the Claude Code process inside query(), so this call is
+  // the earliest dispatch point Kyberion can observe. Every check above is
+  // pre-start; from here on a failure may follow a real turn.
+  markDelegationExecutionStarted();
   const iterator = query({ prompt: params.userPrompt, options });
   const startedAt = Date.now();
 
@@ -492,6 +497,9 @@ export async function runClaudeAgentTask(
   };
 
   assertOperatorNativeCredentialOwner(credentialExecutionIdentity());
+  // R5: query() spawns the agentic Claude Code process (tools may run), so
+  // report the start before it — conservatively, even if the spawn then fails.
+  markDelegationExecutionStarted();
   const iterator = query({ prompt: params.userPrompt, options });
   const startedAt = Date.now();
 
