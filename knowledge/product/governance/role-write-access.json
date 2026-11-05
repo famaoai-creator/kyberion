@@ -76,7 +76,7 @@
         "active/shared/runtime/terminal/",
         "active/audit/",
         "active/shared/observability/ops-alerts.jsonl",
-        "active/shared/observability/delegations.jsonl"
+        "active/shared/runtime/delegation-records/system/"
       ]
     },
     "chronos_operator": {
@@ -134,6 +134,9 @@
         "active/shared/runtime/tenant-ledger/personal/${KYBERION_TENANT}/",
         "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/"
       ]
+    },
+    "delegation_record_store": {
+      "allow": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"]
     },
     "tenant_approval_store": {
       "allow": [

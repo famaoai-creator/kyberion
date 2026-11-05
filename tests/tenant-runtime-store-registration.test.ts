@@ -201,6 +201,15 @@ describe('tenant-partitioned runtime store registration', () => {
     ).toEqual([]);
   });
 
+  it('offboards the legacy dot/tenants/<slug> copies without a gate exception', () => {
+    // Owner decision 2026-11-05: an offboarded tenant's pre-partition dot state
+    // is removed automatically; live migration stays `pnpm kyberion dot migrate-state`.
+    expect(OFFBOARDED_BASES).toContain(PARTITIONED_RUNTIME_STATE_ROOTS.dot);
+    expect(allowlist.bases.map((entry) => entry.base)).not.toContain(
+      PARTITIONED_RUNTIME_STATE_ROOTS.dot
+    );
+  });
+
   it('covers the hand-joined tenant memory root and never lists a base twice', () => {
     // RUNTIME_STATE_PATHS['memory.tenantRoot'] is `<runtime>/tenants`: its base must be offboarded.
     // (Read statically: runtime-state-roots is not a public @agent/core subpath.)
