@@ -1,0 +1,911 @@
+{
+  "$schema": "../schemas/store-catalog.schema.json",
+  "version": 1,
+  "description": "Governed stores and their custodians (information asset scope model). G0: a copy of current behaviour; tier-guard does not read it yet. See docs/developer/improvement-plans-2026-11/STORE_CATALOG_GRANT_GUARD_DESIGN_2026-11-05.ja.md.",
+  "stores": [
+    {
+      "id": "api-verification",
+      "path": "active/shared/runtime/health/api-verification/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "sources": ["runtime-state-roots"]
+    },
+    {
+      "id": "archived-missions",
+      "path": "active/archive/missions",
+      "custody": {
+        "kind": "derived",
+        "note": "Each mission's custodian is the tenant recorded in its mission state (system when tenant-less)."
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": ["archived_mission_state_reader", "workspace_graph_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "autonomy-learning",
+      "path": "active/shared/runtime/autonomy-learning/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": ["autonomy_learning_store"],
+      "sources": ["runtime-state-roots", "role-policy"]
+    },
+    {
+      "id": "browser-bridge-mailbox",
+      "path": "active/shared/runtime/browser-bridge-mailbox/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "sources": ["runtime-state-roots"]
+    },
+    {
+      "id": "customer-decision-invites",
+      "path": "active/shared/runtime/customer-decision-invites/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": ["customer_decision_invite_store"],
+      "sources": ["runtime-state-roots", "role-policy"]
+    },
+    {
+      "id": "delegation-idempotency",
+      "path": "active/shared/runtime/delegation-idempotency/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "sources": ["runtime-state-roots"]
+    },
+    {
+      "id": "discussion-create-requests",
+      "path": "active/shared/runtime/discussion-create-requests/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": ["discussion_request_store"],
+      "sources": ["runtime-state-roots", "role-policy"]
+    },
+    {
+      "id": "dot",
+      "path": "active/shared/runtime/dot/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": ["concierge_management_reader", "dot_result_writer"],
+      "sources": ["runtime-state-roots", "role-policy"]
+    },
+    {
+      "id": "dot-charters",
+      "path": "dots",
+      "custody": {
+        "kind": "system"
+      },
+      "status": "active",
+      "legacy_roles": ["dot_lifecycle_writer"],
+      "sources": ["role-policy"],
+      "note": "Resident-agent charters shipped with the repository."
+    },
+    {
+      "id": "external-operations",
+      "path": "active/shared/runtime/external-operations/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": ["person_charter_store", "pr_publication_store"],
+      "sources": ["runtime-state-roots", "role-policy"]
+    },
+    {
+      "id": "floor.artifact",
+      "path": "active/shared/artifacts/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": ["peer_task_artifact_writer", "pr_publication_store"],
+      "sources": ["storage-floor", "role-policy"],
+      "note": "Floors also hold a system/ partition (custody system)."
+    },
+    {
+      "id": "floor.cache",
+      "path": "active/shared/cache/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "sources": ["storage-floor"],
+      "note": "Floors also hold a system/ partition (custody system)."
+    },
+    {
+      "id": "floor.scratch",
+      "path": "active/shared/tmp/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": [
+        "dot_lifecycle_writer",
+        "memory_provenance_reader",
+        "person_charter_store",
+        "pr_publication_store"
+      ],
+      "sources": ["storage-floor", "role-policy"],
+      "note": "Floors also hold a system/ partition (custody system)."
+    },
+    {
+      "id": "floor.staging",
+      "path": "active/shared/staging/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "sources": ["storage-floor"],
+      "note": "Floors also hold a system/ partition (custody system)."
+    },
+    {
+      "id": "generation-cost-settlements",
+      "path": "active/shared/runtime/media-generation/cost-settlements/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "sources": ["runtime-state-roots"]
+    },
+    {
+      "id": "grants",
+      "path": "active/shared/runtime/grants/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": ["credential_allocation_reader"],
+      "sources": ["runtime-state-roots", "role-policy"]
+    },
+    {
+      "id": "hearing",
+      "path": "active/shared/runtime/hearing/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "sources": ["runtime-state-roots"]
+    },
+    {
+      "id": "legacy.customer-audit-mirror",
+      "path": "customer/<tenant>/logs/audit",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "status": "legacy-move",
+      "moves_to": "tenant-audit-mirror",
+      "legacy_roles": ["audit_mirror_writer"],
+      "sources": ["stance-overlay", "role-policy"],
+      "note": "audit_mirror_writer, chronos_tenant_runner, run_pipeline"
+    },
+    {
+      "id": "legacy.customer-channel-bindings",
+      "path": "customer/<tenant>/connections",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "status": "legacy-move",
+      "moves_to": "tenant-channel-bindings",
+      "legacy_roles": ["customer_channel_binding_store"],
+      "sources": ["stance-overlay", "role-policy"],
+      "note": "customer-channel-binding.ts"
+    },
+    {
+      "id": "legacy.customer-company",
+      "path": "customer/<tenant>/design",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "status": "legacy-move",
+      "moves_to": "tenant-company",
+      "sources": ["stance-overlay"],
+      "note": "Company profile and design keyed by tenant slug (company.ts, creative-design-resolver.ts)."
+    },
+    {
+      "id": "legacy.customer-deals",
+      "path": "customer/<tenant>/deals",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "status": "legacy-move",
+      "moves_to": "tenant-customer-records",
+      "legacy_roles": ["customer_decision_deal_note_writer"],
+      "sources": ["stance-overlay", "role-policy"],
+      "note": "deal-store.ts, deal-documents.ts, customer-conversation.ts"
+    },
+    {
+      "id": "legacy.customer-stance",
+      "path": "customer/<slug>",
+      "custody": {
+        "kind": "person",
+        "ref": "installation-owner"
+      },
+      "status": "legacy-move",
+      "moves_to": "stance",
+      "legacy_roles": ["tool_runtime_policy_reader"],
+      "sources": ["stance-overlay", "role-policy"],
+      "note": "Stance overlay addressed by KYBERION_CUSTOMER (identity, connections, policy, voice, mission seeds, brand, vision, tool runtime policy, tenant profiles). Moves to knowledge/personal/stances/<slug> in S1."
+    },
+    {
+      "id": "legacy.customer-stance-logs",
+      "path": "customer/<slug>/logs/traces",
+      "custody": {
+        "kind": "person",
+        "ref": "installation-owner"
+      },
+      "status": "legacy-move",
+      "moves_to": "stance-logs",
+      "sources": ["stance-overlay"],
+      "note": "Traces written under the active stance."
+    },
+    {
+      "id": "legacy.customer-tenant-root",
+      "path": "customer/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "status": "legacy-move",
+      "moves_to": "tenant-knowledge",
+      "sources": ["stance-overlay", "role-policy"],
+      "note": "Whole legacy directory read by tenant slug (peer_responder_reader); its contents split across S1-S3.",
+      "legacy_roles": ["peer_responder_reader"]
+    },
+    {
+      "id": "missions",
+      "path": "active/missions",
+      "custody": {
+        "kind": "derived",
+        "note": "Each mission's custodian is the tenant recorded in its mission state (system when tenant-less)."
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": ["workspace_graph_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "organizations",
+      "path": "active/organizations/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": [
+        "concierge_management_reader",
+        "concierge_management_writer",
+        "dot_lifecycle_writer",
+        "operational_learning_writer",
+        "workspace_graph_reader"
+      ],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "personal-knowledge.charters",
+      "path": "knowledge/personal/charters",
+      "custody": {
+        "kind": "person",
+        "ref": "installation-owner"
+      },
+      "tiers": ["personal"],
+      "status": "active",
+      "legacy_roles": ["person_charter_store", "pr_publication_store"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "personal-knowledge.connections",
+      "path": "knowledge/personal/connections",
+      "custody": {
+        "kind": "person",
+        "ref": "installation-owner"
+      },
+      "tiers": ["personal"],
+      "status": "active",
+      "legacy_roles": ["chronos_token_registry_reader", "credential_material_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "personal-knowledge.dots",
+      "path": "knowledge/personal/dots",
+      "custody": {
+        "kind": "person",
+        "ref": "installation-owner"
+      },
+      "tiers": ["personal"],
+      "status": "active",
+      "legacy_roles": ["dot_lifecycle_writer"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "personal-knowledge.members",
+      "path": "knowledge/personal/members",
+      "custody": {
+        "kind": "system",
+        "note": "Installation-wide registry stored under the personal tier for historical reasons: tier is the classification label, not the custodian (scope model AS-04)."
+      },
+      "tiers": ["personal"],
+      "status": "active",
+      "legacy_roles": [
+        "concierge_management_reader",
+        "nhi_accountability_reader",
+        "workspace_graph_reader"
+      ],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "personal-knowledge.missions",
+      "path": "knowledge/personal/missions",
+      "custody": {
+        "kind": "person",
+        "ref": "installation-owner"
+      },
+      "tiers": ["personal"],
+      "status": "active",
+      "legacy_roles": ["workspace_graph_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "personal-knowledge.notification-preferences",
+      "path": "knowledge/personal/notification-preferences.json",
+      "custody": {
+        "kind": "person",
+        "ref": "installation-owner"
+      },
+      "tiers": ["personal"],
+      "status": "active",
+      "legacy_roles": ["notification_preferences_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "personal-knowledge.onboarding",
+      "path": "knowledge/personal/onboarding",
+      "custody": {
+        "kind": "person",
+        "ref": "installation-owner"
+      },
+      "tiers": ["personal"],
+      "status": "active",
+      "legacy_roles": ["tool_runtime_policy_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "personal-knowledge.tenants",
+      "path": "knowledge/personal/tenants",
+      "custody": {
+        "kind": "system",
+        "note": "Installation-wide registry stored under the personal tier for historical reasons: tier is the classification label, not the custodian (scope model AS-04)."
+      },
+      "tiers": ["personal"],
+      "status": "active",
+      "legacy_roles": [
+        "concierge_management_reader",
+        "concierge_management_writer",
+        "dot_lifecycle_writer",
+        "first_job_tenant_status_reader",
+        "peer_catalog_reader",
+        "peer_responder_reader",
+        "workspace_graph_reader",
+        "workspace_tenant_registry_index_reader",
+        "workspace_tenant_registry_reader"
+      ],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "personal.owners",
+      "path": "active/personal/owners",
+      "custody": {
+        "kind": "person",
+        "ref": "installation-owner",
+        "note": "Per-owner subdirectories keyed by a hash of owner_nhi."
+      },
+      "status": "active",
+      "legacy_roles": ["memory_provenance_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "pipeline-library-runs",
+      "path": "active/shared/runtime/pipeline-library-runs/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": ["pipeline_journal_store"],
+      "sources": ["runtime-state-roots", "role-policy"]
+    },
+    {
+      "id": "product-knowledge",
+      "path": "knowledge/product",
+      "custody": {
+        "kind": "system"
+      },
+      "tiers": ["public"],
+      "status": "active",
+      "legacy_roles": ["personal_approval_store"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "product-knowledge.governance",
+      "path": "knowledge/product/governance",
+      "custody": {
+        "kind": "system"
+      },
+      "tiers": ["public"],
+      "status": "active",
+      "legacy_roles": ["tool_runtime_policy_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "projects",
+      "path": "active/projects/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": [
+        "concierge_management_reader",
+        "concierge_management_writer",
+        "workspace_graph_reader"
+      ],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "runtime.execution-metrics",
+      "path": "active/shared/runtime/execution-metrics",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "legacy_roles": ["metrics_cap_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "runtime.locks",
+      "path": "active/shared/runtime/locks",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "legacy_roles": ["deliverable_inbox_writer"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "runtime.memory",
+      "path": "active/shared/runtime/memory",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "legacy_roles": ["memory_provenance_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "runtime.projects",
+      "path": "active/shared/runtime/projects",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "legacy_roles": ["concierge_management_reader", "concierge_management_writer"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "runtime.service-bindings",
+      "path": "active/shared/runtime/service-bindings",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "legacy_roles": ["concierge_management_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "runtime.state",
+      "path": "active/shared/runtime/state",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "legacy_roles": ["ops_alert_store"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "runtime.surface-management",
+      "path": "active/shared/runtime/surface-management/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": ["concierge_management_reader", "concierge_management_writer"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "runtime.tenant-approvals",
+      "path": "active/shared/runtime/tenant-approvals/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": [
+        "personal_approval_store",
+        "tenant_approval_partition_index_reader",
+        "tenant_approval_store"
+      ],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "runtime.tenant-ledger",
+      "path": "active/shared/runtime/tenant-ledger/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "legacy_roles": ["tenant_ledger_store"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "runtime.tenants",
+      "path": "active/shared/runtime/tenants",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "legacy_roles": ["memory_provenance_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "runtime.usage-ledger",
+      "path": "active/shared/runtime/usage-ledger",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "legacy_roles": ["metrics_cap_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "runtime.vitest-approvals",
+      "path": "active/shared/runtime/vitest-approvals",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "legacy_roles": ["personal_approval_store"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "runtime.work-coordination",
+      "path": "active/shared/runtime/work-coordination",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "legacy_roles": ["workspace_graph_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "seam-selection-defaults",
+      "path": "active/shared/runtime/seam-selection-defaults/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "sources": ["runtime-state-roots"]
+    },
+    {
+      "id": "shared.coordination",
+      "path": "active/shared/coordination",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "legacy_roles": ["workspace_graph_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "shared.inbox",
+      "path": "active/shared/inbox",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "legacy_roles": ["deliverable_inbox_writer"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "shared.observability",
+      "path": "active/shared/observability",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "legacy_roles": ["ops_alert_store"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "shared.runtime",
+      "path": "active/shared/runtime",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "legacy_roles": ["dot_lifecycle_writer"],
+      "sources": ["role-policy"],
+      "note": "Whole runtime root granted to dot_lifecycle_writer; narrow it to the stores the DOT lifecycle writes (G2)."
+    },
+    {
+      "id": "shared.state",
+      "path": "active/shared/state",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "legacy_roles": ["reasoning_settings_writer"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "stance",
+      "path": "knowledge/personal/stances/<slug>",
+      "custody": {
+        "kind": "person",
+        "ref": "installation-owner"
+      },
+      "tiers": ["personal"],
+      "status": "planned",
+      "sources": ["scope-model"],
+      "note": "S1: the operator's stances (identity, connections, policy, voice, mission seeds, brand, vision)."
+    },
+    {
+      "id": "stance-logs",
+      "path": "active/shared/runtime/stance-logs/personal/shared/<slug>",
+      "custody": {
+        "kind": "person",
+        "ref": "installation-owner"
+      },
+      "tiers": ["personal"],
+      "status": "planned",
+      "sources": ["scope-model"],
+      "note": "S1: traces and audit logs written under a stance."
+    },
+    {
+      "id": "task-workspaces",
+      "path": "active/shared/runtime/workspaces/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "sources": ["runtime-state-roots"]
+    },
+    {
+      "id": "tenant-audit-mirror",
+      "path": "active/shared/runtime/audit-mirror/confidential/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "planned",
+      "sources": ["scope-model"],
+      "note": "S2: per-tenant audit mirror."
+    },
+    {
+      "id": "tenant-channel-bindings",
+      "path": "knowledge/confidential/<tenant>/connections/channel-bindings.json",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "planned",
+      "sources": ["scope-model"],
+      "note": "S2: channel bindings of the tenant."
+    },
+    {
+      "id": "tenant-company",
+      "path": "knowledge/confidential/<tenant>/company",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "planned",
+      "sources": ["scope-model"],
+      "note": "S2: company profile, vision and design of the tenant."
+    },
+    {
+      "id": "tenant-customer-records",
+      "path": "knowledge/confidential/<tenant>/customers/<customer>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "planned",
+      "sources": ["scope-model"],
+      "note": "S3: deals, requirements, escalations and conversations about one customer of the tenant."
+    },
+    {
+      "id": "tenant-knowledge",
+      "path": "knowledge/confidential/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "active",
+      "legacy_roles": [
+        "autonomy_learning_store",
+        "peer_responder_reader",
+        "pipeline_journal_store"
+      ],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "tenant-knowledge.autonomy-action-overrides",
+      "path": "knowledge/confidential/<tenant>/autonomy-action-overrides.json",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "active",
+      "legacy_roles": ["autonomy_learning_store"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "tenant-knowledge.autonomy-outcomes",
+      "path": "knowledge/confidential/<tenant>/autonomy-outcomes.jsonl",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "active",
+      "legacy_roles": ["autonomy_learning_store"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "tenant-knowledge.charters",
+      "path": "knowledge/confidential/<tenant>/charters",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "active",
+      "legacy_roles": ["pr_publication_store"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "tenant-knowledge.connections",
+      "path": "knowledge/confidential/<tenant>/connections",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "active",
+      "legacy_roles": ["peer_catalog_reader"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "tenant-knowledge.decisions",
+      "path": "knowledge/confidential/<tenant>/decisions",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "active",
+      "legacy_roles": ["customer_decision_consumer_store", "customer_decision_milestone_store"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "tenant-knowledge.dots",
+      "path": "knowledge/confidential/<tenant>/dots",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "active",
+      "legacy_roles": ["dot_lifecycle_writer"],
+      "sources": ["role-policy"]
+    },
+    {
+      "id": "tenant-knowledge.locale",
+      "path": "knowledge/confidential/<tenant>/locale.json",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "active",
+      "legacy_roles": ["scope_locale_reader"],
+      "sources": ["role-policy"]
+    }
+  ]
+}

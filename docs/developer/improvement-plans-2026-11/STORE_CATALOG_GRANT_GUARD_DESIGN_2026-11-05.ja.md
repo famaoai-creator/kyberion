@@ -102,6 +102,50 @@ tier-guard の read / write / append / mkdir / metadata の各入口はこれを
 ドメイン固有の内容検査は、カタログで `content_check` を宣言した保存先について、発行者が
 登録した検査関数を呼ぶ。検査関数が未登録なら拒否する（拒否が既定）。
 
+## 棚卸しで決まったこと（2026-11-05）
+
+### 保存先専用ロールは 3 種類
+
+| 種類                           | 例                                                                            | 置き換え先                                               |
+| ------------------------------ | ----------------------------------------------------------------------------- | -------------------------------------------------------- |
+| 保存先一つの書き手・読み手     | `dot_result_writer`、`customer_decision_invite_store`、`tenant_ledger_store`  | 許可証                                                   |
+| 多くの保存先を横断して読む     | `workspace_graph_reader`、`concierge_management_reader`                       | 開示（D2 の閲覧範囲）。Viewer Scope と同じ問いとして扱う |
+| 業務の流れで複数の保存先に書く | `pr_publication_store`、`dot_lifecycle_writer`、`concierge_management_writer` | その流れの facade が保存先ごとに許可証を複数発行する     |
+
+### `customer/<slug>/` は 3 つの意味を持っていた
+
+`stance-tenant-customer-model.md` が概念として区別している 3 層が、物理的には一つの
+ディレクトリに同居している。代行（engagement）ではスタンスとテナントの slug が同じ値に
+なるため混ざった。
+
+| 意味                                  | 今の中身                                                           | 移動先                                                  | 管理者 |
+| ------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------- | ------ |
+| 自分の立場（Stance）                  | identity、connections、policy、voice、mission seeds、brand、vision | `knowledge/personal/stances/<slug>/`                    | person |
+| 自分の会社の資産（Tenant）            | 会社のプロフィール、デザイン、チャネルの紐づけ、監査ログの写し     | `knowledge/confidential/<tenant>/`                      | tenant |
+| 会社の顧客の情報（Tenant's customer） | 商談、要件、エスカレーション、顧客との会話                         | `knowledge/confidential/<tenant>/customers/<customer>/` | tenant |
+
+実行の痕跡（traces、スタンス単位の監査ログ）は設定ではないので `active/` 側の個人区画に置く。
+トップレベルの `customer/` は無くなり、`KYBERION_CUSTOMER` は `KYBERION_STANCE` に改名する
+（旧名は非推奨の別名として当面読む）。`customer-decision` と `customer-room` は「テナントの
+顧客」の意味で正しいので改名しない。
+
+### person の ref
+
+今の `knowledge/personal/` はインストールの持ち主ひとりの領域である。当面は person の ref を
+インストールの持ち主とし、スタンスのパスは `stance-resolver` の一つの関数だけで組み立てる。
+`knowledge/personal/` 全体を人ごと（`<member_id>`）に分けるかは G4 で別に判断する。
+
+### 移行の追加段階
+
+| ID  | 段階             | 内容                                                                                                   |
+| --- | ---------------- | ------------------------------------------------------------------------------------------------------ |
+| S1  | 立場の移動       | `customer/<slug>/` のスタンス設定を `knowledge/personal/stances/<slug>/` へ。`KYBERION_STANCE`         |
+| S2  | 会社の資産の移動 | 会社のプロフィール・デザイン・チャネルの紐づけ・監査ログの写しを `knowledge/confidential/<tenant>/` へ |
+| S3  | 顧客の情報の移動 | 商談・要件・エスカレーション・会話を `knowledge/confidential/<tenant>/customers/<customer>/` へ        |
+
+既存データは `migration/` の移行スクリプトで移す（一覧表示 → 確認 → 移動）。順番は
+G0 → S1 → S2 → S3 → G1。カタログに移動先を先に宣言し、ゲートで漏れを検出する。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |
