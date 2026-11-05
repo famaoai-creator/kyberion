@@ -205,7 +205,7 @@
         "active/shared/runtime/",
         "active/shared/observability/",
         "active/shared/logs/traces/",
-        "customer/${KYBERION_CUSTOMER}/logs/traces/"
+        "active/shared/logs/stances/${KYBERION_STANCE}/traces/"
       ]
     },
     "deliverable_inbox_writer": {

@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-import { customerRoot } from '../customer-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 import {
@@ -148,17 +147,13 @@ function isConfidentialTenantDesignPath(
 function collectTenantOverridePaths(rootDir: string, customerId?: string): string[] {
   const candidates = new Set<string>();
 
-  if (customerId) {
-    const customerPath = customerRoot(
-      path.join('design', 'tenant-override.json'),
-      {
-        ...process.env,
-        KYBERION_CUSTOMER: customerId,
-      },
-      rootDir
-    );
-    if (customerPath && safeExistsSync(customerPath)) {
-      return [path.resolve(customerPath)];
+  if (customerId && isSafeTenantSegment(customerId)) {
+    // A tenant's design is a company asset, not stance configuration: it is read
+    // from the legacy customer/<tenant>/design/ until S2 moves company assets to
+    // knowledge/confidential/<tenant>/ (store-catalog guard design).
+    const legacyPath = path.join(rootDir, 'customer', customerId, 'design', 'tenant-override.json');
+    if (safeExistsSync(legacyPath)) {
+      return [path.resolve(legacyPath)];
     }
   }
 

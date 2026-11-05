@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { defineCatalog } from '../foundation/governed-catalog.js';
-import * as customerResolver from '../customer-resolver.js';
+import * as customerResolver from '../stance-resolver.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -74,7 +74,7 @@ function missionSeedRecordCatalogAtPath(filePath: string) {
 
 function seedDirs(rootDir = pathResolver.rootDir()): string[] {
   const dirs: string[] = [];
-  const customerSeedDir = customerResolver.customerRoot('mission-seeds', process.env, rootDir);
+  const customerSeedDir = customerResolver.stanceRoot('mission-seeds', process.env, rootDir);
   if (customerSeedDir) {
     try {
       const safeCustomerSeedDir = assertSafeRepositoryPath(customerSeedDir, {

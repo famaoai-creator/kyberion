@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { customerRoot } from '@agent/core/customer-resolver';
+import { stanceLogDir } from '@agent/core/stance-resolver';
 import { parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
@@ -12,8 +12,8 @@ import {
 
 export function traceLogRoots(): string[] {
   const roots: string[] = [pathResolver.shared('logs/traces')];
-  const customerTraceRoot = customerRoot('logs/traces');
-  if (customerTraceRoot) roots.unshift(customerTraceRoot);
+  const stanceTraceRoot = stanceLogDir('traces');
+  if (stanceTraceRoot) roots.unshift(stanceTraceRoot);
   return Array.from(new Set(roots.map((root) => path.resolve(root))));
 }
 

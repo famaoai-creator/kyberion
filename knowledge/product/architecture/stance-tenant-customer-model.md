@@ -1,7 +1,7 @@
 ---
 title: Stance / Tenant / Customer — three layers that all get called "customer"
 tags: [architecture, governance, tenant, customer, stance, affiliation, multi-tenant]
-last_updated: 2026-08-12
+last_updated: 2026-11-05
 ---
 
 # Stance / Tenant / Customer
@@ -10,11 +10,11 @@ Three different things in Kyberion are routinely called "customer". They sit at
 different layers, and conflating them puts records on the wrong side of a
 confidentiality boundary. This document names them.
 
-| Layer                 | Question it answers                         | Where it lives                               | Lifetime                          |
-| --------------------- | ------------------------------------------- | -------------------------------------------- | --------------------------------- |
-| **Stance**            | Which stance am I operating from right now? | `customer/{slug}/` + `KYBERION_CUSTOMER`     | Runtime; switches per session     |
-| **Tenant**            | Which confidentiality boundary am I inside? | `knowledge/confidential/{tenant}/`           | Durable; a data boundary          |
-| **Tenant's customer** | Who does that tenant deliver to?            | `knowledge/confidential/{tenant}/customers/` | Durable; data owned by the tenant |
+| Layer                 | Question it answers                         | Where it lives                                           | Lifetime                          |
+| --------------------- | ------------------------------------------- | -------------------------------------------------------- | --------------------------------- |
+| **Stance**            | Which stance am I operating from right now? | `knowledge/personal/stances/{slug}/` + `KYBERION_STANCE` | Runtime; switches per session     |
+| **Tenant**            | Which confidentiality boundary am I inside? | `knowledge/confidential/{tenant}/`                       | Durable; a data boundary          |
+| **Tenant's customer** | Who does that tenant deliver to?            | `knowledge/confidential/{tenant}/customers/`             | Durable; data owned by the tenant |
 
 The canonical containment hierarchy is
 `tenant_slug → organization_id → project_id → mission_id → task_id → session`
@@ -23,17 +23,23 @@ because a stance is configuration, not a scope.
 
 ## Stance is an overlay, not an entity
 
-`customer/{slug}/` overlays `knowledge/personal/`: identity, connections, policy,
-voice, mission seeds, and the tenant profile directory
-(`libs/core/customer-resolver.ts`, `tenantProfileDir()`). Setting
-`KYBERION_CUSTOMER` changes _who Kyberion thinks it is acting as_.
+`knowledge/personal/stances/{slug}/` overlays `knowledge/personal/`: identity, connections, policy,
+voice, mission seeds, onboarding and the tenant profiles the stance may act for
+(`libs/core/stance-resolver.ts`). Setting `KYBERION_STANCE` changes _who Kyberion
+thinks it is acting as_. A stance is the operator's own configuration (custody
+`person`), so it lives in the personal space; its run traces go to
+`active/shared/logs/stances/{slug}/traces/`.
 
-The directory is named `customer/` for historical reasons — it was introduced
-for Forward Deployed Engineer engagements, where the stance happens to be a
-customer's. That is one use, not the definition. Renaming it would touch
-`KYBERION_CUSTOMER`, `customer-resolver`, `customer-channel-binding` and
-`tier-guard`'s `${KYBERION_CUSTOMER}` substitution for little gain, so the name
-stays and this document carries the meaning.
+Stances used to live in a top-level `customer/{slug}/` directory, named for
+Forward Deployed Engineer engagements where the stance happens to be a
+customer's, and selected by `KYBERION_CUSTOMER` (now the deprecated name of
+`KYBERION_STANCE`). Because an engagement's stance slug and tenant slug are the
+same value, that directory also collected the tenant's company assets and its
+customers' records. Those are tenant data and move out separately
+(S2: `knowledge/confidential/{tenant}/`, S3:
+`knowledge/confidential/{tenant}/customers/{customer}/`); until then the legacy
+`customer/{tenant}/` holds only them. See
+[the store-catalog guard design](../../../docs/developer/improvement-plans-2026-11/STORE_CATALOG_GRANT_GUARD_DESIGN_2026-11-05.ja.md).
 
 Two stances that matter in practice:
 

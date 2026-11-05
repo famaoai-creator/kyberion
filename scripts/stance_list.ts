@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import { classifyError, formatClassification } from '@agent/core/error-classifier';
-import * as customerResolver from '@agent/core/customer-resolver';
+import { STANCES_DIR, activeStance } from '@agent/core/stance-resolver';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -10,8 +10,9 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { STANCE_REQUIRED_FILES } from './stance_switch.js';
 
-interface CustomerEntry {
+interface StanceEntry {
   slug: string;
   path: string;
   active: boolean;
@@ -19,29 +20,26 @@ interface CustomerEntry {
   missing: string[];
 }
 
-const REQUIRED_FILES = ['customer.json', 'identity.json', 'vision.md'];
-
-export function listCustomers(): CustomerEntry[] {
+export function listStances(): StanceEntry[] {
   const rootDir = pathResolver.rootDir();
-  const customerRoot = assertSafeRepositoryPath(path.join(rootDir, 'customer'), {
+  const stancesRoot = assertSafeRepositoryPath(path.join(rootDir, STANCES_DIR), {
     allowMissingLeaf: true,
     rootDir,
   });
-  if (!safeExistsSync(customerRoot) || !safeLstat(customerRoot).isDirectory()) {
+  if (!safeExistsSync(stancesRoot) || !safeLstat(stancesRoot).isDirectory()) {
     return [];
   }
 
-  const current = customerResolver.activeCustomer() ?? null;
-  const entries: CustomerEntry[] = [];
+  const current = activeStance() ?? null;
+  const entries: StanceEntry[] = [];
 
-  for (const entry of safeReaddir(customerRoot).sort()) {
-    if (entry === 'README.md' || entry === '_template') continue;
-    const full = assertSafeRepositoryPath(path.join(customerRoot, entry), {
+  for (const entry of safeReaddir(stancesRoot).sort()) {
+    const full = assertSafeRepositoryPath(path.join(stancesRoot, entry), {
       allowMissingLeaf: true,
       rootDir,
     });
     if (!safeLstat(full).isDirectory()) continue;
-    const missing = REQUIRED_FILES.filter((required) => {
+    const missing = STANCE_REQUIRED_FILES.filter((required) => {
       const requiredPath = path.join(full, required);
       return !safeExistsSync(requiredPath) || !safeLstat(requiredPath).isFile();
     });
@@ -57,9 +55,9 @@ export function listCustomers(): CustomerEntry[] {
   return entries;
 }
 
-export function printText(entries: CustomerEntry[]): string[] {
+export function printText(entries: StanceEntry[]): string[] {
   if (entries.length === 0) {
-    return ['No customer overlays found.'];
+    return ['No stances found.'];
   }
 
   return entries.map((entry) => {
@@ -73,7 +71,7 @@ export const main = defineScript({
   flags: ['json'],
   run(context) {
     try {
-      const entries = listCustomers();
+      const entries = listStances();
       if (context.json) context.print(entries);
       else context.print(printText(entries).join('\n'));
     } catch (err) {
@@ -83,8 +81,8 @@ export const main = defineScript({
 });
 
 if (
-  isDirectScript(import.meta.url, 'customer_list.ts') ||
-  isDirectScript(import.meta.url, 'customer_list.js')
+  isDirectScript(import.meta.url, 'stance_list.ts') ||
+  isDirectScript(import.meta.url, 'stance_list.js')
 ) {
   void main();
 }

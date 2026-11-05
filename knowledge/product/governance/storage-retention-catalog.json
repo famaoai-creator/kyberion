@@ -672,10 +672,10 @@
       "note": "Single-file pointer to the operator's current mission focus (mission-system.ts / agent-dispatch.ts), rewritten in place."
     },
     {
-      "path": "active/shared/runtime/customer.env",
+      "path": "active/shared/runtime/stance.env",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Active customer overlay selector written by scripts/customer_switch.ts / company_onboarding.ts; rewritten in place."
+      "note": "Active customer overlay selector written by scripts/stance_switch.ts / company_onboarding.ts; rewritten in place."
     },
     {
       "path": "active/shared/runtime/scope.env",

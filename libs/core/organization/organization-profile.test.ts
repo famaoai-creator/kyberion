@@ -8,18 +8,18 @@ import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 
 describe('organization-profile', () => {
-  const originalCustomer = process.env.KYBERION_CUSTOMER;
+  const originalCustomer = process.env.KYBERION_STANCE;
   const overlayRoot = pathResolver.sharedTmp('organization-profile-test-org');
-  const overlayPath = `${overlayRoot}/customer/test-org/organization-profile.json`;
+  const overlayPath = `${overlayRoot}/knowledge/personal/stances/test-org/organization-profile.json`;
   const demoRoot = pathResolver.sharedTmp('organization-profile-demo-org');
-  const demoOverlayPath = `${demoRoot}/customer/demo-org/organization-profile.json`;
+  const demoOverlayPath = `${demoRoot}/knowledge/personal/stances/demo-org/organization-profile.json`;
   const alternateRoot = pathResolver.sharedTmp('organization-profile-alt-root');
-  const alternateOverlayRoot = `${alternateRoot}/customer/test-org`;
+  const alternateOverlayRoot = `${alternateRoot}/knowledge/personal/stances/test-org`;
   const alternateOverlayPath = `${alternateOverlayRoot}/organization-profile.json`;
 
   afterEach(() => {
-    if (originalCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
-    else process.env.KYBERION_CUSTOMER = originalCustomer;
+    if (originalCustomer === undefined) delete process.env.KYBERION_STANCE;
+    else process.env.KYBERION_STANCE = originalCustomer;
 
     if (safeExistsSync(overlayRoot)) {
       safeRmSync(overlayRoot, { recursive: true, force: true });
@@ -33,7 +33,7 @@ describe('organization-profile', () => {
   });
 
   it('loads the organization overlay from the provided root before the public default', () => {
-    process.env.KYBERION_CUSTOMER = 'test-org';
+    process.env.KYBERION_STANCE = 'test-org';
     safeMkdir(overlayRoot, { recursive: true });
     safeWriteFile(
       overlayPath,
@@ -77,7 +77,7 @@ describe('organization-profile', () => {
   });
 
   it('falls back to the public organization profile when no customer overlay exists', () => {
-    delete process.env.KYBERION_CUSTOMER;
+    delete process.env.KYBERION_STANCE;
 
     const profile = loadOrganizationProfile();
 
@@ -86,8 +86,8 @@ describe('organization-profile', () => {
   });
 
   it('loads the repository customer overlay when the active customer is set', () => {
-    process.env.KYBERION_CUSTOMER = 'demo-org';
-    safeMkdir(`${demoRoot}/customer/demo-org`, { recursive: true });
+    process.env.KYBERION_STANCE = 'demo-org';
+    safeMkdir(`${demoRoot}/knowledge/personal/stances/demo-org`, { recursive: true });
     safeWriteFile(
       demoOverlayPath,
       JSON.stringify(
@@ -138,7 +138,7 @@ describe('organization-profile', () => {
   });
 
   it('loads the customer overlay from a different root when provided', () => {
-    process.env.KYBERION_CUSTOMER = 'test-org';
+    process.env.KYBERION_STANCE = 'test-org';
     safeMkdir(alternateOverlayRoot, { recursive: true });
     safeWriteFile(
       alternateOverlayPath,
@@ -174,13 +174,13 @@ describe('organization-profile', () => {
   });
 
   it('does not fall back to the active repository when a root is explicitly provided', () => {
-    process.env.KYBERION_CUSTOMER = 'missing-from-fixture';
+    process.env.KYBERION_STANCE = 'missing-from-fixture';
 
     expect(loadOrganizationProfile(alternateRoot)).toBeNull();
   });
 
   it('does not accept a schema-invalid customer overlay', () => {
-    process.env.KYBERION_CUSTOMER = 'test-org';
+    process.env.KYBERION_STANCE = 'test-org';
     safeMkdir(alternateOverlayRoot, { recursive: true });
     safeWriteFile(
       alternateOverlayPath,

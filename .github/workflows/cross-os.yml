@@ -251,14 +251,14 @@ jobs:
 
       - name: Customer aggregation smoke
         env:
-          KYBERION_CUSTOMER: smoke-test
+          KYBERION_STANCE: smoke-test
           KYBERION_PERSONA: ecosystem_architect
           MISSION_ROLE: mission_controller
         run: |
           # Verify customer overlay path resolution doesn't panic on either OS.
           node -e "
           const r = require('./libs/core/dist/customer-resolver.js');
-          if (!r.activeCustomer({ KYBERION_CUSTOMER: 'smoke-test' })) {
+          if (!r.activeCustomer({ KYBERION_STANCE: 'smoke-test' })) {
             console.error('customer resolver failed to detect active slug');
             process.exit(1);
           }

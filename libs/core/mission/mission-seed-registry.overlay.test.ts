@@ -3,11 +3,11 @@ import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeRmSync, safeWriteFile } from '../secure-io.js';
 
 const mocks = vi.hoisted(() => ({
-  customerRoot: vi.fn(() => null as string | null),
+  stanceRoot: vi.fn(() => null as string | null),
 }));
 
-vi.mock('../customer-resolver.js', () => ({
-  customerRoot: mocks.customerRoot,
+vi.mock('../stance-resolver.js', () => ({
+  stanceRoot: mocks.stanceRoot,
 }));
 
 const runtimeDir = pathResolver.shared('runtime/mission-seeds');
@@ -17,13 +17,13 @@ describe('mission-seed-registry overlay', () => {
   beforeEach(() => {
     safeRmSync(runtimeDir, { recursive: true, force: true });
     safeRmSync(customerDir, { recursive: true, force: true });
-    mocks.customerRoot.mockReturnValue(customerDir);
+    mocks.stanceRoot.mockReturnValue(customerDir);
   });
 
   afterEach(() => {
     safeRmSync(runtimeDir, { recursive: true, force: true });
     safeRmSync(customerDir, { recursive: true, force: true });
-    mocks.customerRoot.mockReturnValue(null);
+    mocks.stanceRoot.mockReturnValue(null);
   });
 
   it('prefers customer mission seeds over runtime seeds when ids overlap', async () => {

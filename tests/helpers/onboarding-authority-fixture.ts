@@ -58,7 +58,7 @@ export function useOnboardingAuthorityFixture() {
       'KYBERION_ORGANIZATION',
       'KYBERION_PROJECT_ID',
       'KYBERION_SUDO',
-      'KYBERION_CUSTOMER',
+      'KYBERION_STANCE',
     ])
       vi.stubEnv(key, '');
     vi.stubEnv('KYBERION_SESSION_SECRET', FIRST_JOB_TEST_SESSION_KEY);

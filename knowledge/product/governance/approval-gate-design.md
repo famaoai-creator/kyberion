@@ -227,7 +227,7 @@ human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、�
     `pending_approval` に落とし、診断の警告をログに出す（plugin 一覧や読み込みが止まらないように）。
     DOT autonomy の昇格待ちは取り消さず、次の sweep で再試行する。
 - **スコープ**: 設定は `approval-policy.json` 全体と同じく、有効な customer overlay
-  （`customer/<slug>/policy/approval-policy.json`）がある場合はそれが product 既定を丸ごと置き換える。
+  （`knowledge/personal/stances/<slug>/policy/approval-policy.json`）がある場合はそれが product 既定を丸ごと置き換える。
   tenant・organization 単位の上書きはない（global 設定）。
 
 ### 限界

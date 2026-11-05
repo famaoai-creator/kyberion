@@ -85,7 +85,7 @@ vi.mock('../platform.js', async () => {
   return { ...actual, platform: { ...actual.platform, checkBinary: mocks.checkBinary } };
 });
 
-vi.mock('../customer-resolver.js', () => ({
+vi.mock('../stance-resolver.js', () => ({
   resolveOverlay: mocks.resolveOverlay,
 }));
 
@@ -263,7 +263,7 @@ describe('executeServicePreset', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.KYBERION_ALLOW_UNSAFE_CLI = 'true';
-    delete process.env.KYBERION_CUSTOMER;
+    delete process.env.KYBERION_STANCE;
     mocks.resolveServiceBinding.mockReturnValue({ accessToken: 'test-token' });
     mocks.loadServiceEndpointsCatalog.mockReturnValue({
       default_pattern: 'https://api.{service_id}.com/v1',
@@ -532,7 +532,7 @@ describe('executeServicePreset', () => {
   });
 
   it('prefers a customer overlay connection when active', async () => {
-    process.env.KYBERION_CUSTOMER = 'acme';
+    process.env.KYBERION_STANCE = 'acme';
     mocks.resolveOverlay.mockReturnValue(overlayConnectionPath);
 
     const { executeServicePreset } = await import('./service-engine.js');
@@ -567,7 +567,7 @@ describe('executeServicePreset', () => {
   });
 
   it('falls back to personal connection when no customer overlay exists', async () => {
-    process.env.KYBERION_CUSTOMER = 'acme';
+    process.env.KYBERION_STANCE = 'acme';
     mocks.resolveOverlay.mockReturnValue(missingOverlayConnectionPath);
 
     const { executeServicePreset } = await import('./service-engine.js');

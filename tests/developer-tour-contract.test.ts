@@ -43,9 +43,9 @@ describe('Developer tour contract', () => {
     expect(ext).toContain('voice-consent.json');
     expect(ext).toContain('PLUGIN_AUTHORING.md');
     expect(ext).toContain('Resolution order: customer overlay → legacy personal fallback.');
-    expect(ext).toContain('Editing `knowledge/personal/` when `KYBERION_CUSTOMER` is unset');
+    expect(ext).toContain('Editing `knowledge/personal/` when `KYBERION_STANCE` is unset');
     expect(ext).toContain(
-      'Editing `knowledge/personal/connections/` when `KYBERION_CUSTOMER` is unset'
+      'Editing `knowledge/personal/connections/` when `KYBERION_STANCE` is unset'
     );
     expect(ext).toContain('Stable (v1+)');
     expect(ext).toContain('Internal');

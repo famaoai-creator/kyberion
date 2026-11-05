@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
     rootDir: vi.fn(() => '/tmp/kyberion'),
   },
   customerResolver: {
-    activeCustomer: vi.fn(() => 'acme'),
+    activeStance: vi.fn(() => 'acme'),
   },
   safeExistsSync: vi.fn(),
   safeLstat: vi.fn(),
@@ -26,9 +26,10 @@ vi.mock('@agent/core/error-classifier', () => ({
   formatClassification: mocks.formatClassification,
 }));
 
-vi.mock('@agent/core/customer-resolver', () => ({
+vi.mock('@agent/core/stance-resolver', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/stance-resolver')>()),
   customerResolver: mocks.customerResolver,
-  activeCustomer: mocks.customerResolver.activeCustomer,
+  activeStance: mocks.customerResolver.activeStance,
 }));
 
 vi.mock('@agent/core/path-resolver', async () => {
@@ -48,7 +49,7 @@ vi.mock('@agent/core/secure-io', () => ({
   safeReaddir: mocks.safeReaddir,
 }));
 
-describe('customer_list', () => {
+describe('stance_list', () => {
   let tmpDir = '';
 
   afterEach(() => {
@@ -58,59 +59,69 @@ describe('customer_list', () => {
     }
   });
 
-  it('lists customer directories and marks the active slug', async () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'customer-list-'));
-    const customerRoot = path.join(tmpDir, 'customer');
-    fs.mkdirSync(path.join(customerRoot, '_template'), { recursive: true });
-    fs.mkdirSync(path.join(customerRoot, 'acme'), { recursive: true });
-    fs.mkdirSync(path.join(customerRoot, 'client_a'), { recursive: true });
-    fs.writeFileSync(path.join(customerRoot, 'acme', 'customer.json'), '{}');
-    fs.writeFileSync(path.join(customerRoot, 'acme', 'identity.json'), '{}');
-    fs.writeFileSync(path.join(customerRoot, 'acme', 'vision.md'), '# vision');
-    fs.writeFileSync(path.join(customerRoot, 'README.md'), 'readme');
+  it('lists stance directories and marks the active slug', async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stance-list-'));
+    const stanceRoot = path.join(tmpDir, 'knowledge', 'personal', 'stances');
+    fs.mkdirSync(path.join(stanceRoot, 'acme'), { recursive: true });
+    fs.mkdirSync(path.join(stanceRoot, 'client_a'), { recursive: true });
+    fs.writeFileSync(path.join(stanceRoot, 'acme', 'stance.json'), '{}');
+    fs.writeFileSync(path.join(stanceRoot, 'acme', 'identity.json'), '{}');
+    fs.writeFileSync(path.join(stanceRoot, 'README.md'), 'readme');
 
     mocks.pathResolver.rootDir.mockReturnValue(tmpDir);
     mocks.safeExistsSync.mockImplementation((target: string) => fs.existsSync(target));
     mocks.safeReaddir.mockImplementation((target: string) => fs.readdirSync(target));
     mocks.safeLstat.mockImplementation((target: string) => fs.lstatSync(target));
 
-    const mod = await import('./customer_list.js');
-    expect(mod.listCustomers()).toEqual([
-      { slug: 'acme', path: 'customer/acme', active: true, ready: true, missing: [] },
+    const mod = await import('./stance_list.js');
+    expect(mod.listStances()).toEqual([
+      {
+        slug: 'acme',
+        path: 'knowledge/personal/stances/acme',
+        active: true,
+        ready: true,
+        missing: [],
+      },
       {
         slug: 'client_a',
-        path: 'customer/client_a',
+        path: 'knowledge/personal/stances/client_a',
         active: false,
         ready: false,
-        missing: ['customer.json', 'identity.json', 'vision.md'],
+        missing: ['stance.json', 'identity.json'],
       },
     ]);
   });
 
-  it('returns empty list when no customer root exists', async () => {
+  it('returns empty list when no stances directory exists', async () => {
     mocks.pathResolver.rootDir.mockReturnValue('/tmp/kyberion-missing');
     mocks.safeExistsSync.mockReturnValue(false);
-    const mod = await import('./customer_list.js');
-    expect(mod.listCustomers()).toEqual([]);
+    const mod = await import('./stance_list.js');
+    expect(mod.listStances()).toEqual([]);
   });
 
   it('formats readiness in text mode', async () => {
     const entries = [
-      { slug: 'acme', path: 'customer/acme', active: true, ready: true, missing: [] },
+      {
+        slug: 'acme',
+        path: 'knowledge/personal/stances/acme',
+        active: true,
+        ready: true,
+        missing: [],
+      },
       {
         slug: 'client_a',
-        path: 'customer/client_a',
+        path: 'knowledge/personal/stances/client_a',
         active: false,
         ready: false,
-        missing: ['customer.json', 'vision.md'],
+        missing: ['stance.json'],
       },
     ];
-    const mod = await import('./customer_list.js');
+    const mod = await import('./stance_list.js');
     const output = mod.printText(entries);
 
     expect(output).toEqual([
-      '* acme\tready\tcustomer/acme',
-      '  client_a\tmissing customer.json, vision.md\tcustomer/client_a',
+      '* acme\tready\tknowledge/personal/stances/acme',
+      '  client_a\tmissing stance.json\tknowledge/personal/stances/client_a',
     ]);
   });
 });

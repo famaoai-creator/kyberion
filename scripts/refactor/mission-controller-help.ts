@@ -195,10 +195,10 @@ Mission Input Contract:
     --tier <personal|confidential|public>
     --tenant-id <TENANT>
     --tenant-slug <slug>           # multi-tenant isolation (^[a-z][a-z0-9-]{1,30}$)
-    --organization-id <ORG>        # selects KYBERION_CUSTOMER for org-specific defaults
+    --organization-id <ORG>        # selects KYBERION_STANCE for org-specific defaults
     --org <ORG>                    # alias for --organization-id
     --mission-type <TYPE>          # e.g. development | code_change | refactoring | operations_report
-    --vision-ref <REF>            Defaults to the active customer vision when KYBERION_CUSTOMER is set
+    --vision-ref <REF>            Defaults to the active customer vision when KYBERION_STANCE is set
     --persona <NAME>
     --dry-run
     --relationships <JSON>

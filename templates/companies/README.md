@@ -25,9 +25,9 @@ Kyberion に「会社」を運営させるための業態別テンプレート�
 
 ```bash
 pnpm onboarding company bootstrap --vertical saas-product-company --slug acme --name "ACME株式会社"
-export KYBERION_CUSTOMER=acme
+export KYBERION_STANCE=acme
 ```
 
-`customer/<slug>/` にプレースホルダ({COMPANY_SLUG} / {COMPANY_NAME})を置換した実体が生成される。組織図・プロファイルは `resolveOrganizationOrgChart` / `loadOrganizationProfile` が customer 優先で解決し、ミッションチーム編成(`composeMissionTeamPlan`)と operator surface に反映される。
+`knowledge/personal/stances/<slug>/` にプレースホルダ({COMPANY_SLUG} / {COMPANY_NAME})を置換した実体が生成される。組織図・プロファイルは `resolveOrganizationOrgChart` / `loadOrganizationProfile` が customer 優先で解決し、ミッションチーム編成(`composeMissionTeamPlan`)と operator surface に反映される。
 
 関連: 業務プロセス側のテンプレートは `knowledge/product/governance/mission-workflow-catalog.json`(MO-01)、ミッション種テンプレートは `templates/verticals/`(D-2)。

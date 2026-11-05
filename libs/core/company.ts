@@ -9,7 +9,7 @@ import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import * as customerResolver from './customer-resolver.js';
+import * as customerResolver from './stance-resolver.js';
 import { loadOrganizationProfileAtPath } from './organization/organization-profile.js';
 
 export interface CompanyComponentRef<T = unknown> {
@@ -167,7 +167,7 @@ function resolveSovereignName(
 
 export function resolveCompany(tenantSlug?: string | null, rootDir?: string): CompanyAggregate {
   const baseDir = resolveBaseDir(rootDir);
-  const resolvedTenantSlug = tenantSlug?.trim() || customerResolver.activeCustomer() || 'default';
+  const resolvedTenantSlug = tenantSlug?.trim() || customerResolver.activeStance() || 'default';
   if (!isValidTenantSlug(resolvedTenantSlug)) {
     throw new Error(`[COMPANY_TENANT_SCOPE] invalid tenant slug: ${resolvedTenantSlug}`);
   }

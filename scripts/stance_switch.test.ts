@@ -53,7 +53,7 @@ vi.mock('@agent/core/governance', () => ({
   withExecutionContext: async (_role: string, run: () => unknown) => await run(),
 }));
 
-describe('customer_switch', () => {
+describe('stance_switch', () => {
   let tmpDir = '';
 
   afterEach(() => {
@@ -63,14 +63,13 @@ describe('customer_switch', () => {
     }
   });
 
-  it('writes an activation env file for the selected customer', async () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'customer-switch-'));
-    const customerDir = path.join(tmpDir, 'customer', 'acme');
-    const envPath = path.join(tmpDir, 'active', 'shared', 'runtime', 'customer.env');
+  it('writes an activation env file for the selected stance', async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stance-switch-'));
+    const customerDir = path.join(tmpDir, 'knowledge', 'personal', 'stances', 'acme');
+    const envPath = path.join(tmpDir, 'active', 'shared', 'runtime', 'stance.env');
     fs.mkdirSync(customerDir, { recursive: true });
-    fs.writeFileSync(path.join(customerDir, 'customer.json'), '{}');
+    fs.writeFileSync(path.join(customerDir, 'stance.json'), '{}');
     fs.writeFileSync(path.join(customerDir, 'identity.json'), '{}');
-    fs.writeFileSync(path.join(customerDir, 'vision.md'), '# vision');
 
     mocks.pathResolver.rootDir.mockReturnValue(tmpDir);
     mocks.pathResolver.shared.mockImplementation((p = '') =>
@@ -86,55 +85,55 @@ describe('customer_switch', () => {
       fs.writeFileSync(target, content);
     });
 
-    const mod = await import('./customer_switch.js');
-    const result = mod.switchCustomer('acme');
+    const mod = await import('./stance_switch.js');
+    const result = mod.switchStance('acme');
 
     expect(result.envPath).toBe(envPath);
-    expect(fs.readFileSync(envPath, 'utf8')).toBe('export KYBERION_CUSTOMER=acme\n');
+    expect(fs.readFileSync(envPath, 'utf8')).toBe('export KYBERION_STANCE=acme\n');
   });
 
-  it('rejects unknown customers', async () => {
+  it('rejects unknown stances', async () => {
     mocks.safeExistsSync.mockReturnValue(false);
-    const mod = await import('./customer_switch.js');
-    expect(() => mod.switchCustomer('acme')).toThrow('Customer overlay not found');
+    const mod = await import('./stance_switch.js');
+    expect(() => mod.switchStance('acme')).toThrow('Stance not found');
   });
 
-  it('rejects incomplete customers with missing required files', async () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'customer-switch-missing-'));
-    const customerDir = path.join(tmpDir, 'customer', 'acme');
+  it('rejects incomplete stances with missing required files', async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stance-switch-missing-'));
+    const customerDir = path.join(tmpDir, 'knowledge', 'personal', 'stances', 'acme');
     fs.mkdirSync(customerDir, { recursive: true });
-    fs.writeFileSync(path.join(customerDir, 'customer.json'), '{}');
+    fs.writeFileSync(path.join(customerDir, 'stance.json'), '{}');
 
     mocks.pathResolver.rootDir.mockReturnValue(tmpDir);
     mocks.safeExistsSync.mockImplementation((target: string) => fs.existsSync(target));
     mocks.safeLstat.mockImplementation((target: string) => fs.lstatSync(target));
 
-    const mod = await import('./customer_switch.js');
-    expect(() => mod.switchCustomer('acme')).toThrow('Customer overlay is not ready');
+    const mod = await import('./stance_switch.js');
+    expect(() => mod.switchStance('acme')).toThrow('Stance is not ready');
   });
 
   it('formats activation output without writing to stdout', async () => {
     const rootDir = '/tmp/kyberion';
     mocks.pathResolver.rootDir.mockReturnValue(rootDir);
-    const mod = await import('./customer_switch.js');
+    const mod = await import('./stance_switch.js');
 
     expect(
-      mod.formatSwitchedCustomer({
+      mod.formatSwitchedStance({
         slug: 'acme',
-        envPath: `${rootDir}/active/shared/runtime/customer.env`,
+        envPath: `${rootDir}/active/shared/runtime/stance.env`,
       })
     ).toEqual([
-      'Switched customer to acme',
-      'Activation profile: active/shared/runtime/customer.env',
-      'Source it with: source active/shared/runtime/customer.env',
+      'Switched stance to acme',
+      'Activation profile: active/shared/runtime/stance.env',
+      'Source it with: source active/shared/runtime/stance.env',
     ]);
   });
 
   it('routes help output through the injected printer', async () => {
-    const mod = await import('./customer_switch.js');
+    const mod = await import('./stance_switch.js');
     const output: unknown[] = [];
 
     expect(() => mod.main(['--help'], (value) => output.push(value))).toThrow();
-    expect(output).toEqual(['Usage: customer_switch <slug>']);
+    expect(output).toEqual(['Usage: stance_switch <slug>']);
   });
 });

@@ -26,8 +26,8 @@ describe('Customer overlay use cases contract', () => {
     expect(doc).toContain('pnpm stance:switch <slug>');
     expect(doc).toContain('pnpm onboarding');
     expect(doc).toContain('pnpm kyberion doctor');
-    expect(doc).toContain('Unset `KYBERION_CUSTOMER`');
+    expect(doc).toContain('Unset `KYBERION_STANCE`');
     expect(readme).toContain('customer-overlay-use-cases.md');
-    expect(customerReadme).toContain('customer.json / identity.json / vision.md files are present');
+    expect(customerReadme).toContain('stance.json / identity.json files are present');
   });
 });

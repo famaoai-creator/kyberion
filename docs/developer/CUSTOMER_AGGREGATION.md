@@ -53,10 +53,10 @@ customer/
 
 ### 2.1 Activation
 
-The active customer is selected via the `KYBERION_CUSTOMER` environment variable:
+The active customer is selected via the `KYBERION_STANCE` environment variable:
 
 ```bash
-export KYBERION_CUSTOMER=acme-corp
+export KYBERION_STANCE=acme-corp
 ```
 
 When unset, Kyberion falls back to the legacy `knowledge/personal/` behavior.
@@ -65,7 +65,7 @@ When unset, Kyberion falls back to the legacy `knowledge/personal/` behavior.
 
 For a given config sub-path (e.g. `connections/slack.json`):
 
-1. **Customer overlay**: `customer/{slug}/connections/slack.json` if it exists.
+1. **Customer overlay**: `knowledge/personal/stances/{slug}/connections/slack.json` if it exists.
 2. **Legacy personal fallback**: `knowledge/personal/connections/slack.json` if it exists.
 3. **Public default**: for policy files, `knowledge/product/governance/slack.json` etc.
 
@@ -81,40 +81,40 @@ The resolver returns the first existing path. For writes, when a customer is act
 - Must start with letter or digit.
 - Path traversal patterns (`..`, `/`, `\`) are rejected.
 
-The validator is in `libs/core/customer-resolver.ts`. Any caller that uses `KYBERION_CUSTOMER` must go through this resolver — direct path joins are forbidden.
+The validator is in `libs/core/customer-resolver.ts`. Any caller that uses `KYBERION_STANCE` must go through this resolver — direct path joins are forbidden.
 
 ### 2.4 Secrets
 
-Secrets must **never** live in the customer overlay, even though `customer/{slug}/` is gitignored. Use one of:
+Secrets must **never** live in the customer overlay, even though `knowledge/personal/stances/{slug}/` is gitignored. Use one of:
 
 1. `secret-actuator` (OS keychain) — production / FDE deployments.
 2. Environment variables for short-lived credentials.
-3. `customer/{slug}/secrets.json` for local dev only — gitignored, not loaded by default. Loading requires explicit opt-in via secret-actuator.
+3. `knowledge/personal/stances/{slug}/secrets.json` for local dev only — gitignored, not loaded by default. Loading requires explicit opt-in via secret-actuator.
 
 ## 3. What Goes Where
 
-| File            | Customer overlay (`customer/{slug}/`)       | Legacy personal fallback (`knowledge/personal/`) | Public default (`knowledge/public/`) |
-| --------------- | ------------------------------------------- | ------------------------------------------------ | ------------------------------------ |
-| Identity        | `identity.json`                             | `my-identity.json`                               | —                                    |
-| Vision          | `vision.md`                                 | `my-vision.md`                                   | —                                    |
-| Connections     | `connections/*.json`                        | `connections/*.json`                             | —                                    |
-| Tenant facet    | `tenants/*.json` (optional reference facet) | `tenants/*.json` (canonical registry)            | —                                    |
-| Voice profile   | `voice/profile.json`                        | `voice/profile-registry.json`                    | `voice/*`                            |
-| Approval policy | `policy/approval-policy.json`               | —                                                | `governance/approval-policy.json`    |
-| Path scope      | `policy/path-scope-policy.json`             | —                                                | `governance/path-scope-policy.json`  |
-| Mission seeds   | `mission-seeds/*.json`                      | —                                                | (additive only)                      |
+| File            | Customer overlay (`knowledge/personal/stances/{slug}/`) | Legacy personal fallback (`knowledge/personal/`) | Public default (`knowledge/public/`) |
+| --------------- | ------------------------------------------------------- | ------------------------------------------------ | ------------------------------------ |
+| Identity        | `identity.json`                                         | `my-identity.json`                               | —                                    |
+| Vision          | `vision.md`                                             | `my-vision.md`                                   | —                                    |
+| Connections     | `connections/*.json`                                    | `connections/*.json`                             | —                                    |
+| Tenant facet    | `tenants/*.json` (optional reference facet)             | `tenants/*.json` (canonical registry)            | —                                    |
+| Voice profile   | `voice/profile.json`                                    | `voice/profile-registry.json`                    | `voice/*`                            |
+| Approval policy | `policy/approval-policy.json`                           | —                                                | `governance/approval-policy.json`    |
+| Path scope      | `policy/path-scope-policy.json`                         | —                                                | `governance/path-scope-policy.json`  |
+| Mission seeds   | `mission-seeds/*.json`                                  | —                                                | (additive only)                      |
 
 ## 4. Migration from Existing Single-User Setup
 
 For users who already have a `knowledge/personal/` filled in:
 
-1. **Do nothing** — the existing setup keeps working when `KYBERION_CUSTOMER` is unset.
+1. **Do nothing** — the existing setup keeps working when `KYBERION_STANCE` is unset.
 2. To convert to a customer-overlay structure:
 
    ```bash
    pnpm stance:create my-org
    # Copies knowledge/personal/* into customer/my-org/* with appropriate renames.
-   export KYBERION_CUSTOMER=my-org
+   export KYBERION_STANCE=my-org
    ```
 
    The conversion is a one-time copy; after it, edits to `customer/my-org/*` take precedence over `knowledge/personal/*`.
@@ -127,7 +127,7 @@ import { customerResolver } from '@agent/core';
 // Returns slug or null.
 const slug = customerResolver.activeCustomer();
 
-// Returns absolute path under customer/{slug}, or null if no customer active.
+// Returns absolute path under knowledge/personal/stances/{slug}, or null if no customer active.
 const path = customerResolver.customerRoot('connections/slack.json');
 
 // Returns the resolved path with overlay precedence.
@@ -142,7 +142,7 @@ const { overlay, base } = customerResolver.overlayCandidates('policy/approval-po
 
 - **Live customer switching within a session** — currently requires restarting the process. A `pnpm stance:switch` command is a Phase D'-1 follow-up.
 - **Concurrent multi-customer execution** — the current model assumes one active customer per process. Concurrent runs require separate processes with different env vars.
-- **Customer-scoped trace storage** — trace files currently land under `active/shared/logs/`. Phase B-1 will extend this to `customer/{slug}/logs/` when a customer is active.
+- **Customer-scoped trace storage** — trace files currently land under `active/shared/logs/`. Phase B-1 will extend this to `knowledge/personal/stances/{slug}/logs/` when a customer is active.
 - **Stance-scoped `confidential/` tier** — this document covers the overlay only. Confidential data is separated by **tenant**, not by stance: that is the existing `knowledge/confidential/{tenant-slug}/` mechanism, and it is unchanged. A stance selects which tenants you can see; it never becomes a confidentiality boundary of its own.
 
 ## 7. Relationship to Existing Tier System
@@ -151,7 +151,7 @@ The customer overlay is an **additional resolution layer** on top of the existin
 
 ```
 Read order for config:
-  customer/{slug}/{path}        ← new, per-customer
+  knowledge/personal/stances/{slug}/{path}        ← new, per-customer
   knowledge/personal/{path}     ← existing, legacy fallback
   knowledge/confidential/...    ← existing, project-scoped
   knowledge/public/{path}       ← existing, reusable
@@ -161,13 +161,13 @@ The 3-tier system continues to govern **tier hygiene** (no leaks from confidenti
 
 ## 8. Implementation Status
 
-- [x] Directory structure (`customer/`, `customer/_template/`, `.gitignore` rules)
+- [x] Directory structure (`customer/`, `templates/stance/`, `.gitignore` rules)
 - [x] Resolver API (`libs/core/customer-resolver.ts`)
 - [x] Resolver tests (`libs/core/customer-resolver.test.ts`)
 - [x] CLI: `pnpm stance:create <slug>` (copies from `_template/`)
 - [x] CLI: `pnpm stance:list`
-- [x] CLI: `pnpm stance:switch <slug>` (validates + writes `active/shared/runtime/customer.env`)
-- [x] Onboarding wizard integration (offer to create customer at start when `KYBERION_CUSTOMER` is unset and the user is FDE-mode)
+- [x] CLI: `pnpm stance:switch <slug>` (validates + writes `active/shared/runtime/stance.env`)
+- [x] Onboarding wizard integration (offer to create customer at start when `KYBERION_STANCE` is unset and the user is FDE-mode)
 - [x] Migration helper: `pnpm stance:migrate-from-personal`
 - [ ] Integration in `path-resolver.ts` consumers
   - [x] Connections consumer (`libs/core/service/service-engine.ts`)
@@ -182,6 +182,6 @@ The 3-tier system continues to govern **tier hygiene** (no leaks from confidenti
 
 # Marketing Policy And Brand Overlay
 
-With `KYBERION_CUSTOMER=<slug>`, marketing risk policy resolves from `customer/<slug>/policy/marketing-risk-policy.json`; otherwise the product governance policy is used. Brand assets resolve under `customer/<slug>/brand/`, and customer Mission seeds under `customer/<slug>/mission-seeds/marketing/`. Never merge confidential artifacts between customer roots, and never copy customer content into `knowledge/public/`.
+With `KYBERION_STANCE=<slug>`, marketing risk policy resolves from `knowledge/personal/stances/<slug>/policy/marketing-risk-policy.json`; otherwise the product governance policy is used. Brand assets resolve under `knowledge/personal/stances/<slug>/brand/`, and customer Mission seeds under `knowledge/personal/stances/<slug>/mission-seeds/marketing/`. Never merge confidential artifacts between customer roots, and never copy customer content into `knowledge/public/`.
 
-The marketing overlay contract is covered by an A/B filesystem test: two governed customer roots receive different allowed channels and CTA domains, resolve independently through `KYBERION_CUSTOMER`, and do not affect the no-customer product fallback.
+The marketing overlay contract is covered by an A/B filesystem test: two governed customer roots receive different allowed channels and CTA domains, resolve independently through `KYBERION_STANCE`, and do not affect the no-customer product fallback.

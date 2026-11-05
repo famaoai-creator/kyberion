@@ -11,7 +11,7 @@ import {
   safeReaddir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { createCustomer } from './customer_create.js';
+import { createStance } from './stance_create.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 
@@ -45,29 +45,30 @@ function copyTree(srcDir: string, dstDir: string): void {
   }
 }
 
-export function migratePersonalCustomer(slug: string): string {
-  const created = createCustomer(slug);
+/** Create a stance from the operator's current personal setup (identity, vision, connections, tenants, voice). */
+export function migratePersonalStance(slug: string): string {
+  const created = createStance(slug);
   const rootDir = pathResolver.rootDir();
   const personalRoot = assertSafeRepositoryPath(pathResolver.knowledge('personal'), {
     rootDir,
   });
-  const customerRoot = created.root;
+  const stanceRoot = created.root;
 
-  const customerJsonPath = assertSafeRepositoryPath(path.join(customerRoot, 'customer.json'), {
+  const stanceJsonPath = assertSafeRepositoryPath(path.join(stanceRoot, 'stance.json'), {
     allowMissingLeaf: true,
     rootDir,
   });
-  const customerJson = readSafeJsonFile<Record<string, unknown>>(
-    customerJsonPath,
-    'customer migration overlay'
+  const stanceJson = readSafeJsonFile<Record<string, unknown>>(
+    stanceJsonPath,
+    'stance migration overlay'
   );
   safeWriteFile(
-    customerJsonPath,
+    stanceJsonPath,
     JSON.stringify(
       {
-        ...customerJson,
+        ...stanceJson,
         slug,
-        display_name: customerJson.display_name || slug,
+        display_name: slug,
       },
       null,
       2
@@ -76,7 +77,7 @@ export function migratePersonalCustomer(slug: string): string {
 
   const mappings: Array<[string, string]> = [
     ['my-identity.json', 'identity.json'],
-    ['my-vision.md', 'vision.md'],
+    ['my-vision.md', 'my-vision.md'],
   ];
 
   for (const [srcName, dstName] of mappings) {
@@ -88,7 +89,7 @@ export function migratePersonalCustomer(slug: string): string {
       }
       safeCopyFileSync(
         safeSource,
-        assertSafeRepositoryPath(path.join(customerRoot, dstName), {
+        assertSafeRepositoryPath(path.join(stanceRoot, dstName), {
           allowMissingLeaf: true,
           rootDir,
         })
@@ -99,21 +100,21 @@ export function migratePersonalCustomer(slug: string): string {
   for (const dirName of ['connections', 'tenants', 'voice']) {
     const srcDir = path.join(personalRoot, dirName);
     if (safeExistsSync(srcDir) && safeLstat(srcDir).isDirectory()) {
-      copyTree(srcDir, path.join(customerRoot, dirName));
+      copyTree(srcDir, path.join(stanceRoot, dirName));
     }
   }
 
-  return customerRoot;
+  return stanceRoot;
 }
 
-export function formatMigratedCustomer(root: string): string[] {
+export function formatMigratedStance(root: string): string[] {
   return [`Migrated personal setup to ${path.relative(pathResolver.rootDir(), root)}`];
 }
 
 export function main(argv: string[], print: Print = () => undefined): string[] {
   const slug = argv[0];
   if (!slug || slug === '--help' || slug === '-h') {
-    const usage = 'Usage: customer_migrate_from_personal <slug>';
+    const usage = 'Usage: stance_migrate_from_personal <slug>';
     if (slug) {
       print(usage);
       throw new ScriptExitError(0);
@@ -122,16 +123,16 @@ export function main(argv: string[], print: Print = () => undefined): string[] {
   }
 
   try {
-    const customerRoot = migratePersonalCustomer(slug);
-    return formatMigratedCustomer(customerRoot);
+    const stanceRoot = migratePersonalStance(slug);
+    return formatMigratedStance(stanceRoot);
   } catch (err) {
     throw new Error(formatClassification(classifyError(err)));
   }
 }
 
 if (
-  isDirectScript(import.meta.url, 'customer_migrate_from_personal.ts') ||
-  isDirectScript(import.meta.url, 'customer_migrate_from_personal.js')
+  isDirectScript(import.meta.url, 'stance_migrate_from_personal.ts') ||
+  isDirectScript(import.meta.url, 'stance_migrate_from_personal.js')
 )
   void defineScript({
     name: 'stance:migrate-from-personal',

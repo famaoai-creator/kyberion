@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-import { customerDirForSlug } from '../customer-resolver.js';
 import * as pathResolver from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
@@ -167,7 +166,7 @@ export function tenantProfileDir(options: TenantRegistryPathOptions = {}): strin
   const rootDir = options.rootDir ?? pathResolver.rootDir();
   // The registry is durable authority, not a stance overlay. A customer stance
   // may contain a tenant facet for presentation, but changing
-  // KYBERION_CUSTOMER must never change which tenant profile is authoritative.
+  // KYBERION_STANCE must never change which tenant profile is authoritative.
   return path.join(rootDir, 'knowledge', 'personal', 'tenants');
 }
 
@@ -484,7 +483,9 @@ export function resolveTenant(
   const knowledgeRootPath = resolveTenantKnowledgeRootPath(rootDir, slug, knowledgeRoot);
   let safeOverlayDir: string | null = null;
   try {
-    const overlayDir = customerDirForSlug(slug, rootDir);
+    // Tenant company assets still live in the legacy customer/{tenant}/ directory
+    // until S2 moves them to knowledge/confidential/{tenant}/; this is not the stance.
+    const overlayDir = path.join(rootDir, 'customer', slug);
     const candidate = assertSafeRepositoryPath(overlayDir, {
       allowMissingLeaf: true,
       rootDir,

@@ -23,7 +23,7 @@ present it is always inside the tenant boundary. A `WorkItemContext` carries
 the same references and the writer normalizes their serialized order to this
 hierarchy; JSON key order is not an authorization mechanism.
 
-The `customer/{slug}/` overlay selected by `KYBERION_CUSTOMER` is **not** a level
+The `knowledge/personal/stances/{slug}/` overlay selected by `KYBERION_STANCE` is **not** a level
 in this hierarchy. It is a stance — runtime configuration for which entity
 Kyberion is acting as — and is deliberately orthogonal to scope
 ([stance-tenant-customer-model](./stance-tenant-customer-model.md)).
@@ -60,7 +60,7 @@ belongs to the governed writer and must use `secure-io`.
 positive allowlist を解決し、未指定の reader は `knowledge/public` と
 `knowledge/product` だけを読める。confidential / personal は tenant と必要な
 entity prefix が一致した物理 namespace に限り、system-wide scan は明示的な
-system authority がある場合だけ許可する。`customer/{slug}/` は引き続き stance
+system authority がある場合だけ許可する。`knowledge/personal/stances/{slug}/` は引き続き stance
 overlay であり、public knowledge の代替ではない。
 
 feedback delivery/usage、intent memory/learning、promotion ledger、HINTS、

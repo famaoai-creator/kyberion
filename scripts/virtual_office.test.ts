@@ -74,7 +74,7 @@ describe('virtual office surface', () => {
       }
     }
     process.env.KYBERION_ROOT = tmpRoot;
-    process.env.KYBERION_CUSTOMER = 'acme';
+    process.env.KYBERION_STANCE = 'acme';
 
     // one active mission with mixed task states
     const missionDir = path.join(tmpRoot, 'active', 'missions', 'MSN-OFFICE-1');
@@ -562,7 +562,7 @@ describe('virtual office surface', () => {
     core?.clearWorkCoordinationStore();
     core?.setWorkCoordinationNamespace(null);
     delete process.env.KYBERION_ROOT;
-    delete process.env.KYBERION_CUSTOMER;
+    delete process.env.KYBERION_STANCE;
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 

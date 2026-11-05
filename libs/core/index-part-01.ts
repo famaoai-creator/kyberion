@@ -105,7 +105,7 @@ export * from './knowledge/knowledge-scope.js';
 
 export type { VolatileScope, VolatileCadence } from './path-resolver.js';
 
-export * as customerResolver from './customer-resolver.js';
+export * as customerResolver from './stance-resolver.js';
 
 // Error Classification (Phase A-7)
 

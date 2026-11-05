@@ -20,7 +20,7 @@
 import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import * as customerResolver from '@agent/core/customer-resolver';
+import * as customerResolver from '@agent/core/stance-resolver';
 import { listApprovalRequests } from '@agent/core/governance/approval-store';
 import { listCustomerChannelBindings } from '@agent/core/customer-channel-binding';
 import { listDeals } from '@agent/core/deal-store';
@@ -359,7 +359,7 @@ function missionMatchesTenant(
 }
 
 export function collectOfficeSnapshot(): OfficeSnapshot {
-  const customerSlug = customerResolver.activeCustomer();
+  const customerSlug = customerResolver.activeStance();
   const requestedTenantSlug = normalizeTenantSlug(getRegisteredEnvText('KYBERION_TENANT'));
   const rootDir = pathResolver.rootDir();
   let tenantRegistryReadable = true;

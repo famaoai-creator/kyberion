@@ -85,21 +85,21 @@ describe('vision-resolver', () => {
   // CO-01: getGoldenRule() (libs/core/core.ts) calls resolveVision() with no
   // tenantSlug at all — it relies entirely on this env-var fallback to be
   // tenant-aware. That fallback path itself had no test coverage until now.
-  describe('KYBERION_CUSTOMER fallback (CO-01)', () => {
-    const ORIGINAL_CUSTOMER = process.env.KYBERION_CUSTOMER;
+  describe('KYBERION_STANCE fallback (CO-01)', () => {
+    const ORIGINAL_CUSTOMER = process.env.KYBERION_STANCE;
 
     afterEach(() => {
-      if (ORIGINAL_CUSTOMER === undefined) delete process.env.KYBERION_CUSTOMER;
-      else process.env.KYBERION_CUSTOMER = ORIGINAL_CUSTOMER;
+      if (ORIGINAL_CUSTOMER === undefined) delete process.env.KYBERION_STANCE;
+      else process.env.KYBERION_STANCE = ORIGINAL_CUSTOMER;
     });
 
-    it('resolves the active KYBERION_CUSTOMER tenant when no tenantSlug is passed explicitly', () => {
+    it('resolves the active KYBERION_STANCE tenant when no tenantSlug is passed explicitly', () => {
       safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
       safeWriteFile(
         `${tmpRoot}/customer/acme/vision.md`,
         `# ACME Vision\n\n## Steering\n- Tenant priority first\n`
       );
-      process.env.KYBERION_CUSTOMER = 'acme';
+      process.env.KYBERION_STANCE = 'acme';
 
       const vision = resolveVision(undefined, tmpRoot);
 
@@ -108,10 +108,10 @@ describe('vision-resolver', () => {
       expect(vision.raw).toContain('Tenant priority first');
     });
 
-    it('falls back to global default when KYBERION_CUSTOMER is unset', () => {
+    it('falls back to global default when KYBERION_STANCE is unset', () => {
       safeMkdir(`${tmpRoot}/vision`, { recursive: true });
       safeWriteFile(`${tmpRoot}/vision/_default.md`, '# Default Vision');
-      delete process.env.KYBERION_CUSTOMER;
+      delete process.env.KYBERION_STANCE;
 
       const vision = resolveVision(undefined, tmpRoot);
 

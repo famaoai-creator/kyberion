@@ -54,7 +54,7 @@ pnpm tenant rename <旧slug> --to <新slug> --display-name '<新商号>' --apply
 | -------------------- | ----------------------------------------------------------------------------- |
 | `knowledge_root`     | `knowledge/confidential/{slug}/`                                              |
 | `organization_state` | `active/organizations/{tier}/{slug}/`、および組織IDがslugと同じならその配下も |
-| `customer_overlay`   | `customer/{slug}/`                                                            |
+| `customer_overlay`   | `knowledge/personal/stances/{slug}/`                                          |
 | `profile`            | `knowledge/personal/tenants/{slug}.json`                                      |
 
 **書き換えるもの** — 組織レコード・プロジェクトレコード・ミッション状態の

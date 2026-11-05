@@ -116,7 +116,7 @@ export function createContinuousOwnerPorts(
     const env = buildExecutionEnv(process.env, 'mission_controller');
     // No parent mission, customer stance, or worker project restriction crosses this owner handoff.
     delete env.MISSION_ID;
-    delete env.KYBERION_CUSTOMER;
+    delete env.KYBERION_STANCE;
     delete env.KYBERION_PROJECT_ID;
     env.KYBERION_ORGANIZATION_ID = scope.organization_id;
     env.KYBERION_TIER = scope.tier;

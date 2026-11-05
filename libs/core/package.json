@@ -1140,9 +1140,9 @@
       "types": "./dist/customer-outbound-templates.d.ts",
       "default": "./dist/customer-outbound-templates.js"
     },
-    "./customer-resolver": {
-      "types": "./dist/customer-resolver.d.ts",
-      "default": "./dist/customer-resolver.js"
+    "./stance-resolver": {
+      "types": "./dist/stance-resolver.d.ts",
+      "default": "./dist/stance-resolver.js"
     },
     "./daemon-heartbeat": {
       "types": "./dist/daemon-heartbeat.d.ts",

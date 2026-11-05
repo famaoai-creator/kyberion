@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import * as customerResolver from '../customer-resolver.js';
+import * as customerResolver from '../stance-resolver.js';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
@@ -70,18 +70,21 @@ export function loadOrganizationProfileAtPath(filePath: string): OrganizationPro
 }
 
 export function loadOrganizationProfile(rootDir?: string): OrganizationProfile | null {
-  const customerSlug = customerResolver.activeCustomer();
+  const customerSlug = customerResolver.activeStance();
   const rootScopedCustomerPath =
     rootDir && customerSlug
       ? assertSafeRepositoryPath(
-          path.join(rootDir, 'customer', customerSlug, 'organization-profile.json'),
+          path.join(
+            customerResolver.stanceDirForSlug(customerSlug, rootDir),
+            'organization-profile.json'
+          ),
           { allowMissingLeaf: true, rootDir }
         )
       : null;
   const activeCustomerPath = rootDir
     ? null
     : customerSlug
-      ? customerResolver.customerRoot('organization-profile.json')
+      ? customerResolver.stanceRoot('organization-profile.json')
       : null;
   const candidatePaths = [
     rootScopedCustomerPath,

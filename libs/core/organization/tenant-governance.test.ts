@@ -6,14 +6,14 @@ vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 // Separation of duties is read from approval-policy.json; tests switch it on
 // through a customer overlay of the product policy (the real config path).
 const sod = vi.hoisted(() => ({ overlayPath: null as string | null }));
-vi.mock('../customer-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../customer-resolver.js')>();
+vi.mock('../stance-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../stance-resolver.js')>();
   return {
     ...actual,
-    customerRoot: (subPath = '', ...rest: unknown[]) =>
+    stanceRoot: (subPath = '', ...rest: unknown[]) =>
       subPath === 'policy/approval-policy.json' && sod.overlayPath
         ? sod.overlayPath
-        : (actual.customerRoot as (...args: unknown[]) => string | null)(subPath, ...rest),
+        : (actual.stanceRoot as (...args: unknown[]) => string | null)(subPath, ...rest),
   };
 });
 

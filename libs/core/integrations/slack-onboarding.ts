@@ -18,7 +18,7 @@ import {
 } from '../secure-io.js';
 import { withExecutionContext } from '../authority.js';
 import { writeGovernedArtifactJson } from '../workforce/artifact-store.js';
-import * as customerResolver from '../customer-resolver.js';
+import * as customerResolver from '../stance-resolver.js';
 
 import type {
   OnboardingField,
@@ -34,7 +34,7 @@ const SLACK_ONBOARDING_STATE_SCHEMA_PATH = pathResolver.knowledge(
 );
 
 function profileRoot(): string {
-  return customerResolver.customerRoot('') ?? pathResolver.knowledge('personal');
+  return customerResolver.stanceRoot('') ?? pathResolver.knowledge('personal');
 }
 
 function writeJsonAs(logicalPath: string, record: unknown): string {

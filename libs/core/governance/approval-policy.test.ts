@@ -5,11 +5,11 @@ import { loadApprovalPolicy, resolveApprovalPolicy } from './approval-policy.js'
 import { pathResolver } from '../path-resolver.js';
 
 const mocks = vi.hoisted(() => ({
-  customerRoot: vi.fn(() => null as string | null),
+  stanceRoot: vi.fn(() => null as string | null),
 }));
 
-vi.mock('../customer-resolver.js', () => ({
-  customerRoot: mocks.customerRoot,
+vi.mock('../stance-resolver.js', () => ({
+  stanceRoot: mocks.stanceRoot,
 }));
 
 describe('approval-policy', () => {
@@ -54,7 +54,7 @@ describe('approval-policy', () => {
       )
     );
 
-    mocks.customerRoot.mockReturnValue(customerPolicyPath);
+    mocks.stanceRoot.mockReturnValue(customerPolicyPath);
     vi.resetModules();
     const mod = await import('./approval-policy.js');
     const result = mod.resolveApprovalPolicy({
@@ -69,12 +69,12 @@ describe('approval-policy', () => {
     const customerPolicyPath = pathResolver.sharedTmp(`invalid-customer-policy-${Date.now()}.json`);
     safeWriteFile(customerPolicyPath, JSON.stringify({ defaults: { requires_approval: false } }));
 
-    mocks.customerRoot.mockReturnValue(customerPolicyPath);
+    mocks.stanceRoot.mockReturnValue(customerPolicyPath);
     vi.resetModules();
     const mod = await import('./approval-policy.js');
 
     expect(() => mod.loadApprovalPolicy()).toThrow(/Invalid catalog approval-policy/);
-    mocks.customerRoot.mockReturnValue(null);
+    mocks.stanceRoot.mockReturnValue(null);
   });
 
   it('fails closed for dangerous shell-style operations even without a matching rule', () => {

@@ -54,7 +54,7 @@ describe('runtime task tool loop with native mission contracts', () => {
       const pipeline = mode === 'pipeline';
       vi.stubEnv('MISSION_ID', missionId);
       vi.stubEnv('KYBERION_TENANT', '');
-      vi.stubEnv('KYBERION_CUSTOMER', '');
+      vi.stubEnv('KYBERION_STANCE', '');
       vi.stubEnv('KYBERION_PROJECT_ID', '');
       vi.stubEnv('KYBERION_REASONING_BACKEND', 'stub');
       vi.stubEnv('MISSION_ROLE', 'mission_controller');

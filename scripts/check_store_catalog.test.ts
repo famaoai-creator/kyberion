@@ -20,7 +20,7 @@ describe('store catalog gate', () => {
     expect(normalizePolicyPath('customer/${KYBERION_TENANT}/deals/')).toBe(
       'customer/<tenant>/deals'
     );
-    expect(normalizePolicyPath('customer/${KYBERION_CUSTOMER}/logs/')).toBe('customer/<slug>/logs');
+    expect(normalizePolicyPath('customer/${KYBERION_STANCE}/logs/')).toBe('customer/<slug>/logs');
   });
 
   it('matches placeholders by kind: a stance slug never stands for a tenant', () => {

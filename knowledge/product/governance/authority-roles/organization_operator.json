@@ -8,7 +8,7 @@
     "active/shared/runtime/",
     "active/shared/observability/",
     "active/shared/logs/traces/",
-    "customer/${KYBERION_CUSTOMER}/logs/traces/"
+    "active/shared/logs/stances/${KYBERION_STANCE}/traces/"
   ],
   "scope_classes": ["organization_operating_model", "operations_runtime", "observability"],
   "allowed_actuators": ["process-actuator"],

@@ -23,7 +23,7 @@
 | 会社の要素                   | Kyberion での表現                                                                                                                                                               | 実装状態                                                                                            |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | **会社そのもの(法人格)**     | `customer/{slug}/customer.json`(社名・事業形態・子会社・前期財務)+ `organization-profile.json`(経営既定)+ `knowledge/confidential/{slug}/`(機密データ)                          | 部品は本番。会社を束ねる集約オブジェクトは未実装(§4-1)                                              |
-| **創業者(あなた)**           | sovereign persona + `customer/{slug}/identity.json`(主権者・言語・対話スタイル・専門)                                                                                           | 本番。sbiss で famao=取締役社長として既に設定済み                                                   |
+| **創業者(あなた)**           | sovereign persona + `knowledge/personal/stances/{slug}/identity.json`(主権者・言語・対話スタイル・専門)                                                                         | 本番。sbiss で famao=取締役社長として既に設定済み                                                   |
 | **理念・意思決定の規範**     | `vision/_default.md`(全社憲章: 存在意義・意思決定の黄金律・優先順位)+ `customer/{slug}/vision.md`(`_template.md` の Soul/Steering/Destination 形式)                             | 全社版は runtime で読まれる(`core.ts:398`)。**テナント別 vision は authoring 止まりで未配線**(§4-3) |
 | **部門・機能**               | 28 の knowledge role を 5 ドメインに整理(`personalities/roles.json`: Leadership/Engineering/Business&Growth/Governance&Quality ほか)。各 role に `PROCEDURE.md`(職務規程)       | 本番(知識・責務として)。ただし CEO/finance/sales 等は**権限を持たない advisory role**(§4-2)         |
 | **従業員(AIスタッフ)**       | 13 の agent manifest(`*.agent.md`: capability・trust・persona・model)+ `agent-profile-index.json`(role/team-role 紐付け)                                                        | 本番。sovereign-brain=戦略、planner=企画/PM、surface 群=フロント、meeting-proxy=秘書                |
@@ -41,7 +41,7 @@
 
 既存プリミティブで「AIスタートアップの組織」を立てる具体手順:
 
-1. **会社を興す** — `customer/{slug}/` を作り(`_template` を複製)、`customer.json`(社名・事業形態・財務)と `identity.json`(あなた=創業者 sovereign・言語・対話スタイル・専門領域)を書く。`organization-profile.json` で経営既定(既定 mission class・チームテンプレート・並列 mission 上限・LLM 方針)を定める。
+1. **会社を興す** — `knowledge/personal/stances/{slug}/` を作り(`_template` を複製)、`customer.json`(社名・事業形態・財務)と `identity.json`(あなた=創業者 sovereign・言語・対話スタイル・専門領域)を書く。`organization-profile.json` で経営既定(既定 mission class・チームテンプレート・並列 mission 上限・LLM 方針)を定める。
 2. **理念と意思決定規範を書く** — `customer/{slug}/vision.md` を `_template.md` の形式(Core Emotion=魂 / Decision Principles=舵 / Victory Conditions=目的地)で書く。これが全エージェントの判断の拠り所になる(※現状は authoring 止まりなので CO-01 で runtime 配線)。
 3. **部門を選ぶ** — 5 ドメイン(Leadership/Engineering/Business&Growth/Governance&Quality)から必要な role を有効化。1人スタートアップなら最小構成: CEO(あなた)+ product_manager + strategic_sales + finance_controller + software_developer + cyber_security。各 role の `PROCEDURE.md` が職務を定義する。
 4. **スタッフを配属する** — 必要な agent を有効化し、`agent-profile-index.json` で authority_role / team_role に紐付ける。1人+AI の最小編成: sovereign-brain(戦略・調整)+ planner-agent(企画・分解)+ surface agent 1つ(あなたとの窓口、Slack 等)+ 必要に応じ specialist を mission ごとに召集。

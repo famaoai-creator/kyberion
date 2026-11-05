@@ -4,6 +4,7 @@
  * prints the refs `activate` needs. It never activates anything and never
  * issues an NHI: it only observes, so a failed probe names what to fix.
  */
+import { stanceDirForSlug } from '../stance-resolver.js';
 import * as path from 'node:path';
 import { getAgentIdentity } from '../agent/agent-identity.js';
 import { getRegisteredEnvText, nowIso } from '../foundation/index.js';
@@ -79,7 +80,7 @@ function checkTenantScopedConsistency(
       return failure;
     const profile = loadOrganizationProfileAtPath(
       assertSafeRepositoryPath(
-        path.join(rootDir, 'customer', input.customerSlug, 'organization-profile.json'),
+        path.join(stanceDirForSlug(input.customerSlug, rootDir), 'organization-profile.json'),
         { rootDir }
       )
     );

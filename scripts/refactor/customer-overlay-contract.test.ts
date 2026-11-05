@@ -34,8 +34,8 @@ describe('mission refactor customer overlay contract', () => {
     expect(creation).toContain('resolveCompany');
     expect(creation).toContain('buildCompanyVisionRef');
     expect(creation).toContain('company://');
-    expect(creation).not.toContain("customerResolver.customerRoot('my-vision.md')");
-    expect(llm).toContain("customerResolver.customerRoot('my-identity.json')");
+    expect(creation).not.toContain("customerResolver.stanceRoot('my-vision.md')");
+    expect(llm).toContain("customerResolver.stanceRoot('my-identity.json')");
   });
 
   it('normalizes mission vision refs to company URIs while preserving explicit company and vision URIs', () => {

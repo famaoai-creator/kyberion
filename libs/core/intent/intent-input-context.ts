@@ -11,7 +11,7 @@ export function resolveTenantId(input: CompileUserIntentFlowInput): string | und
     typeof runtime.tenant_slug === 'string' ? runtime.tenant_slug : undefined,
     typeof runtime.tenantSlug === 'string' ? runtime.tenantSlug : undefined,
     getRegisteredEnvText('KYBERION_TENANT'),
-    getRegisteredEnvText('KYBERION_CUSTOMER'),
+    getRegisteredEnvText('KYBERION_STANCE'),
   ];
   return candidates
     .find((value): value is string => typeof value === 'string' && value.trim().length > 0)

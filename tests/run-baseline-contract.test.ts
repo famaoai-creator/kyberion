@@ -20,7 +20,7 @@ describe('run_baseline_check connection readiness contract', () => {
     expect(identity).toContain("inspectIdentity(['my-identity.json'])");
     expect(identity).toContain('requiredFiles.filter(');
     expect(identity).toContain('path.join(resolveActiveProfileRoot(), name)');
-    expect(identity).toContain('KYBERION_CUSTOMER: scope.customer_stance');
+    expect(identity).toContain('KYBERION_STANCE: scope.customer_stance');
     expect(script).toContain('secretGuard.loadConnectionDocument(serviceId)');
     expect(script).not.toContain("path.join(profileRoot(), 'connections'");
   });

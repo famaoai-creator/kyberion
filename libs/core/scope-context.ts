@@ -301,7 +301,7 @@ export function resolveScopeResolution(
   const { values, provenance } = mergeScopeSources(input, env, options);
   const scope = normalizeScopeContext({
     ...values,
-    customer_stance: input.customer_stance || envText(env, 'KYBERION_CUSTOMER'),
+    customer_stance: input.customer_stance || envText(env, 'KYBERION_STANCE'),
     viewer_principal: input.viewer_principal || envText(env, 'KYBERION_VIEWER_PRINCIPAL'),
     nhi_id:
       input.nhi_id ||

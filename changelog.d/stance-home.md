@@ -1,0 +1,5 @@
+---
+category: Changed
+---
+
+- **Stances moved to `knowledge/personal/stances/<slug>/` and `KYBERION_CUSTOMER` became `KYBERION_STANCE`** — a stance (which hat Kyberion wears: identity, connections, policy, voice, mission seeds, tenant profiles, onboarding) is the operator's own configuration, so it now lives in the personal space instead of the top-level `customer/<slug>/`. Select it with `pnpm stance:switch <slug>` and `source active/shared/runtime/stance.env` (was `customer.env`); `KYBERION_CUSTOMER` is still read as a deprecated alias with a warning. Stance traces go to `active/shared/logs/stances/<slug>/traces/`. The stance template is `templates/stance/` (descriptor `stance.json`); the company starter files moved to `templates/tenant-company/`. `@agent/core/customer-resolver` is now `@agent/core/stance-resolver` (`activeStance`, `stanceRoot`, `stanceDirForSlug`, `stanceIsConfigured`, `stanceLogDir`). Tenant company files and customer records stay in `customer/<tenant>/` until S2/S3. Migration required: run `pnpm migration --dry-run`, then `pnpm migration` (`0001-stance-home` moves only stance entries and writes `stance.json` from `customer.json`).

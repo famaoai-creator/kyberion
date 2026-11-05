@@ -14,7 +14,9 @@ describe('post-onboarding ux contract', () => {
     const revolution = read('docs/developer/architecture/ONBOARDING_REVOLUTION.md');
 
     expect(roadmap).toContain('customer/{slug}/connections/*.json');
-    expect(roadmap).toContain('KYBERION_CUSTOMER` 未設定時は `knowledge/personal/connections/*.json`');
+    expect(roadmap).toContain(
+      'KYBERION_STANCE` 未設定時は `knowledge/personal/connections/*.json`'
+    );
     expect(revolution).toContain('customer/{slug}/connections/*.json');
     expect(revolution).toContain('customer/{slug}/tenants/{tenant_slug}.json');
   });

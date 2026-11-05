@@ -81,7 +81,7 @@ pnpm onboarding company --vertical saas-product-company --slug acme-ai \
 
 Full routes (personal-only / AI company / existing tenant), the `probe` → `activate` evidence flow, and Path B (`onboarding apply --identity <json>`) live in the [onboarding standard flow](../knowledge/product/governance/onboarding-flow.md) and [INITIALIZATION](./INITIALIZATION.md). Start there, not here.
 
-Customer-specific identity and onboarding artifacts: `customer/{slug}/ preferred when KYBERION_CUSTOMER is set`.
+Customer-specific identity and onboarding artifacts: `knowledge/personal/stances/{slug}/ preferred when KYBERION_STANCE is set`.
 
 ### Onboarding entry points
 
@@ -102,7 +102,7 @@ Several commands and pipelines carry "onboarding" in their name. They are not al
 | `pipelines/platform-onboarding.json`                     | Organization-integration flow: discovery transcript, requirements draft, design spec, test plan, task plan. Task execution runs in downstream pipelines.                       | Taking on a customer integration engagement, not setting up your own machine.                                                                    |
 | `pipelines/voice-onboarding.json`                        | Records three reference voice samples, registers the voice profile, makes a short preview, grants per-mission voice consent. `dry_run=true` only validates.                    | You want Kyberion to speak in a registered voice. Check devices with `pnpm kyberion doctor --scope voice` first.                                 |
 
-Acting as a customer (or company) writes into `customer/{slug}/` — customer/{slug}/ preferred when KYBERION_CUSTOMER is set; personal state stays under `knowledge/personal/` otherwise. Create the overlay with `pnpm stance:create <customer-slug>` and switch with `pnpm stance:switch <customer-slug>`.
+Acting under a stance (as a customer engagement or one of your companies) writes into `knowledge/personal/stances/{slug}/` — knowledge/personal/stances/{slug}/ preferred when KYBERION_STANCE is set; personal state stays under `knowledge/personal/` otherwise. Create the stance with `pnpm stance:create <slug>` and switch with `pnpm stance:switch <slug>` (`KYBERION_CUSTOMER` is the deprecated name of `KYBERION_STANCE`).
 
 The order of the steps, and which route you need, is canonical in the [onboarding standard flow](../knowledge/product/governance/onboarding-flow.md); the command-by-command detail is in [INITIALIZATION](./INITIALIZATION.md).
 

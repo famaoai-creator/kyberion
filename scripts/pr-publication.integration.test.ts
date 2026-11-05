@@ -131,7 +131,7 @@ it('clean headless host queues one real human-only request, writes protected rev
         MISSION_ROLE: '',
         MISSION_ID: '',
         KYBERION_TENANT: '',
-        KYBERION_CUSTOMER: '',
+        KYBERION_STANCE: '',
         KYBERION_NHI_ACTOR: '',
         KYBERION_TIER: 'public',
       },

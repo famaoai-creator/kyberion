@@ -1,3 +1,4 @@
+import { STANCES_DIR } from '../stance-resolver.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -859,13 +860,13 @@ function _scanPersonalTier(
   systemAuthority = false
 ): void {
   if (!customerId && !systemAuthority) return;
-  // Customer overlay: customer/{slug}/ takes precedence over knowledge/personal/
+  // Stance overlay: knowledge/personal/stances/{slug}/ takes precedence over knowledge/personal/
   const customerSlug = customerId ?? '';
   const projectRoot = path.dirname(knowledgeBase);
 
   const roots: Array<{ dir: string; label: string }> = [];
   if (customerSlug) {
-    const customerDir = path.join(projectRoot, 'customer', customerSlug);
+    const customerDir = path.join(projectRoot, STANCES_DIR, customerSlug);
     if (safeExistsSync(customerDir)) {
       roots.push({ dir: customerDir, label: customerSlug });
     }

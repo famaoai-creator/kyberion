@@ -24,7 +24,7 @@ After:
 
 - Every actuator emits a `Trace` with hierarchical `Span`s.
 - Mission ID flows through metadata for cross-actuator correlation.
-- Trace JSONL is appended to `active/shared/logs/traces/traces-YYYY-MM-DD.jsonl` (or `customer/{slug}/logs/traces/...` when KYBERION_CUSTOMER is set).
+- Trace JSONL is appended to `active/shared/logs/traces/traces-YYYY-MM-DD.jsonl` (or `knowledge/personal/stances/{slug}/logs/traces/...` when KYBERION_STANCE is set).
 - Chronos viewer (Phase B-8) reads this single format.
 
 ## Migration Steps
@@ -118,7 +118,7 @@ See `libs/actuators/browser-actuator/src/index.ts`:
 
 ## Customer-aware Persistence
 
-When `KYBERION_CUSTOMER` is set, `persistTrace` automatically routes to `customer/{slug}/logs/traces/`. The actuator does not need to do anything different — `traceLogDir()` resolves the right path.
+When `KYBERION_STANCE` is set, `persistTrace` automatically routes to `knowledge/personal/stances/{slug}/logs/traces/`. The actuator does not need to do anything different — `traceLogDir()` resolves the right path.
 
 ## What NOT to Do
 

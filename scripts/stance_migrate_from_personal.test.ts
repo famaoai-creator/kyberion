@@ -8,9 +8,9 @@ const mocks = vi.hoisted(() => ({
     rootDir: vi.fn(() => '/tmp/kyberion'),
     knowledge: vi.fn((p = '') => `/tmp/kyberion/knowledge/${String(p).replace(/^\/+/, '')}`),
   },
-  createCustomer: vi.fn((slug: string) => ({
+  createStance: vi.fn((slug: string) => ({
     slug,
-    root: `/tmp/kyberion/customer/${slug}`,
+    root: `/tmp/kyberion/knowledge/personal/stances/${slug}`,
     template: '/tmp/template',
   })),
   safeCopyFileSync: vi.fn(),
@@ -73,11 +73,11 @@ vi.mock('@agent/core/foundation', () => ({
   },
 }));
 
-vi.mock('./customer_create.js', () => ({
-  createCustomer: mocks.createCustomer,
+vi.mock('./stance_create.js', () => ({
+  createStance: mocks.createStance,
 }));
 
-describe('customer_migrate_from_personal', () => {
+describe('stance_migrate_from_personal', () => {
   let tmpDir = '';
 
   afterEach(() => {
@@ -87,15 +87,15 @@ describe('customer_migrate_from_personal', () => {
     }
   });
 
-  it('migrates the personal identity, vision, and core overlay directories', async () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'customer-migrate-'));
+  it('migrates the personal identity, vision, and core stance directories', async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stance-migrate-'));
     const personalRoot = path.join(tmpDir, 'knowledge', 'personal');
-    const customerRoot = path.join(tmpDir, 'customer', 'acme');
+    const customerRoot = path.join(tmpDir, 'knowledge', 'personal', 'stances', 'acme');
     fs.mkdirSync(path.join(personalRoot, 'connections'), { recursive: true });
     fs.mkdirSync(path.join(personalRoot, 'tenants'), { recursive: true });
     fs.mkdirSync(path.join(personalRoot, 'voice'), { recursive: true });
     fs.mkdirSync(customerRoot, { recursive: true });
-    fs.writeFileSync(path.join(customerRoot, 'customer.json'), '{"slug":"acme","display_name":""}');
+    fs.writeFileSync(path.join(customerRoot, 'stance.json'), '{"slug":"acme","display_name":""}');
     fs.writeFileSync(path.join(personalRoot, 'my-identity.json'), '{"name":"Personal"}');
     fs.writeFileSync(path.join(personalRoot, 'my-vision.md'), '# Personal vision');
     fs.writeFileSync(path.join(personalRoot, 'connections', 'slack.json'), '{"id":"slack"}');
@@ -104,13 +104,13 @@ describe('customer_migrate_from_personal', () => {
       path.join(personalRoot, 'voice', 'profile-registry.json'),
       '{"voice":"registry"}'
     );
-    fs.writeFileSync(path.join(customerRoot, 'customer.json'), '{"slug":"acme","display_name":""}');
+    fs.writeFileSync(path.join(customerRoot, 'stance.json'), '{"slug":"acme","display_name":""}');
 
     mocks.pathResolver.rootDir.mockReturnValue(tmpDir);
     mocks.pathResolver.knowledge.mockImplementation((p = '') =>
       path.join(tmpDir, 'knowledge', String(p).replace(/^\/+/, ''))
     );
-    mocks.createCustomer.mockReturnValue({
+    mocks.createStance.mockReturnValue({
       slug: 'acme',
       root: customerRoot,
       template: '/tmp/template',
@@ -128,14 +128,16 @@ describe('customer_migrate_from_personal', () => {
       fs.writeFileSync(target, content);
     });
 
-    const mod = await import('./customer_migrate_from_personal.js');
-    const migrated = mod.migratePersonalCustomer('acme');
+    const mod = await import('./stance_migrate_from_personal.js');
+    const migrated = mod.migratePersonalStance('acme');
 
     expect(migrated).toBe(customerRoot);
     expect(fs.readFileSync(path.join(customerRoot, 'identity.json'), 'utf8')).toBe(
       '{"name":"Personal"}'
     );
-    expect(fs.readFileSync(path.join(customerRoot, 'vision.md'), 'utf8')).toBe('# Personal vision');
+    expect(fs.readFileSync(path.join(customerRoot, 'my-vision.md'), 'utf8')).toBe(
+      '# Personal vision'
+    );
     expect(fs.readFileSync(path.join(customerRoot, 'connections', 'slack.json'), 'utf8')).toBe(
       '{"id":"slack"}'
     );
@@ -145,32 +147,32 @@ describe('customer_migrate_from_personal', () => {
     expect(fs.readFileSync(path.join(customerRoot, 'voice', 'profile-registry.json'), 'utf8')).toBe(
       '{"voice":"registry"}'
     );
-    expect(JSON.parse(fs.readFileSync(path.join(customerRoot, 'customer.json'), 'utf8')).slug).toBe(
+    expect(JSON.parse(fs.readFileSync(path.join(customerRoot, 'stance.json'), 'utf8')).slug).toBe(
       'acme'
     );
 
     fs.writeFileSync(
-      path.join(customerRoot, 'customer.json'),
+      path.join(customerRoot, 'stance.json'),
       '{"__proto__":{"polluted":true},"display_name":"Acme"}'
     );
-    expect(() => mod.migratePersonalCustomer('acme')).toThrow('dangerous JSON key');
+    expect(() => mod.migratePersonalStance('acme')).toThrow('dangerous JSON key');
   });
 
   it('formats migration output without writing to stdout', async () => {
     const rootDir = '/tmp/kyberion';
     mocks.pathResolver.rootDir.mockReturnValue(rootDir);
-    const mod = await import('./customer_migrate_from_personal.js');
+    const mod = await import('./stance_migrate_from_personal.js');
 
-    expect(mod.formatMigratedCustomer(`${rootDir}/customer/acme`)).toEqual([
-      'Migrated personal setup to customer/acme',
+    expect(mod.formatMigratedStance(`${rootDir}/knowledge/personal/stances/acme`)).toEqual([
+      'Migrated personal setup to knowledge/personal/stances/acme',
     ]);
   });
 
   it('routes help output through the injected printer', async () => {
-    const mod = await import('./customer_migrate_from_personal.js');
+    const mod = await import('./stance_migrate_from_personal.js');
     const print = vi.fn();
 
     expect(() => mod.main(['--help'], print)).toThrow();
-    expect(print).toHaveBeenCalledWith('Usage: customer_migrate_from_personal <slug>');
+    expect(print).toHaveBeenCalledWith('Usage: stance_migrate_from_personal <slug>');
   });
 });

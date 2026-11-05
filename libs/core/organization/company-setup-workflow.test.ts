@@ -94,7 +94,7 @@ vi.mock('./company-onboarding.js', () => ({
       tier: 'confidential',
       owner_id: input.accountableHumanId,
     };
-    st.files.set('/fixture/customer/acme/onboarding/ai-company-readiness.json', {
+    st.files.set('/fixture/knowledge/personal/stances/acme/onboarding/ai-company-readiness.json', {
       accountable_human: { resource_id: input.accountableHumanId },
       first_work: { goal: input.firstWork },
     });
@@ -307,7 +307,9 @@ describe('company setup workflow mediation', () => {
     await expect(executeCompanySetup(auth, c, principal)).rejects.toThrow('fixture');
     await expect(executeCompanySetup(auth, c, principal)).rejects.toThrow('already exists');
     expect(st.registrations).toBe(1);
-    expect(st.files.get('/fixture/customer/acme/onboarding/web-company-setup.json')).toMatchObject({
+    expect(
+      st.files.get('/fixture/knowledge/personal/stances/acme/onboarding/web-company-setup.json')
+    ).toMatchObject({
       registration: { state: 'failed' },
     });
   });

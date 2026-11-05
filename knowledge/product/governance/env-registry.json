@@ -1232,7 +1232,7 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Active customer profile slug used to resolve the profile root.",
+      "description": "Deprecated name of KYBERION_STANCE; still read (with a warning) when KYBERION_STANCE is unset.",
       "documented": true,
       "subsystem": "tenancy"
     },
@@ -4196,6 +4196,15 @@
       "description": "Maximum local Stable Audio 3 generation time in milliseconds; defaults to 30 minutes.",
       "documented": true,
       "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_STANCE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Active stance slug: which hat Kyberion wears. Selects the overlay knowledge/personal/stances/<slug>/ over knowledge/personal/.",
+      "documented": true,
+      "subsystem": "tenancy"
     },
     {
       "name": "KYBERION_STREAMING_STT_BRIDGE",

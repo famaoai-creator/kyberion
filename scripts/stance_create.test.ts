@@ -58,7 +58,7 @@ vi.mock('@agent/core/governance', () => ({
   withExecutionContext: async (_role: string, run: () => unknown) => await run(),
 }));
 
-describe('customer_create', () => {
+describe('stance_create', () => {
   let tmpDir = '';
 
   afterEach(() => {
@@ -68,16 +68,15 @@ describe('customer_create', () => {
     }
   });
 
-  it('copies the template tree into a new customer root', async () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'customer-create-'));
-    const template = path.join(tmpDir, 'customer', '_template');
-    const dest = path.join(tmpDir, 'customer', 'acme');
+  it('copies templates/stance into knowledge/personal/stances/<slug>', async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stance-create-'));
+    const template = path.join(tmpDir, 'templates', 'stance');
+    const dest = path.join(tmpDir, 'knowledge', 'personal', 'stances', 'acme');
     fs.mkdirSync(path.join(template, 'connections'), { recursive: true });
     fs.mkdirSync(path.join(template, 'policy'), { recursive: true });
     fs.writeFileSync(path.join(template, 'README.md'), 'template readme');
-    fs.writeFileSync(path.join(template, 'customer.json'), '{"slug":"template"}');
+    fs.writeFileSync(path.join(template, 'stance.json'), '{"slug":"template"}');
     fs.writeFileSync(path.join(template, 'identity.json'), '{"name":"template"}');
-    fs.writeFileSync(path.join(template, 'vision.md'), '# Vision');
     fs.writeFileSync(path.join(template, 'connections', 'slack.json'), '{"id":"slack"}');
     fs.writeFileSync(path.join(template, 'policy', 'approval.json'), '{"mode":"template"}');
 
@@ -90,8 +89,8 @@ describe('customer_create', () => {
       fs.copyFileSync(src, dst);
     });
 
-    const mod = await import('./customer_create.js');
-    const created = mod.createCustomer('acme');
+    const mod = await import('./stance_create.js');
+    const created = mod.createStance('acme');
 
     expect(created.root).toBe(dest);
     expect(fs.existsSync(path.join(dest, 'README.md'))).toBe(true);
@@ -104,24 +103,24 @@ describe('customer_create', () => {
   });
 
   it('rejects invalid slugs', async () => {
-    const mod = await import('./customer_create.js');
-    expect(() => mod.createCustomer('../bad')).toThrow('Invalid customer slug');
+    const mod = await import('./stance_create.js');
+    expect(() => mod.createStance('../bad')).toThrow('Invalid KYBERION_STANCE');
   });
 
   it('routes help output through the injected printer', async () => {
-    const mod = await import('./customer_create.js');
+    const mod = await import('./stance_create.js');
     const output: unknown[] = [];
 
     expect(() => mod.main(['--help'], (value) => output.push(value))).toThrow();
-    expect(output).toEqual(['Usage: customer_create <slug>']);
+    expect(output).toEqual(['Usage: stance_create <slug>']);
   });
 
   it('formats creation output without writing to stdout', async () => {
     mocks.pathResolver.rootDir.mockReturnValue('/tmp/kyberion');
-    const mod = await import('./customer_create.js');
+    const mod = await import('./stance_create.js');
 
-    expect(mod.formatCreatedCustomer('/tmp/kyberion/customer/acme')).toEqual([
-      'Created customer template at customer/acme',
+    expect(mod.formatCreatedStance('/tmp/kyberion/knowledge/personal/stances/acme')).toEqual([
+      'Created stance at knowledge/personal/stances/acme',
     ]);
   });
 });
