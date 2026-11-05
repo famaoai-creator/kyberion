@@ -118,6 +118,19 @@
       "rationale": "Ratchets the published subpath count of each libs/* package (the @agent/core public surface) so it can only shrink unless a change raises the baseline in review."
     },
     {
+      "id": "package-dependency-graph",
+      "scope": "pr",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/generate_package_dependency_graph.ts",
+        "--check"
+      ],
+      "owner": "architecture",
+      "rationale": "Keeps docs/developer/architecture/dependency-graph.mmd generated from the workspace package manifests so the package layering diagram cannot go stale."
+    },
+    {
       "id": "first-win-docs",
       "scope": "pr",
       "executable": "node",
