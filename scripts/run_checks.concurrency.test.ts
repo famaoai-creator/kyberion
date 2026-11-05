@@ -86,7 +86,7 @@ describe.each([undefined, 'true'])('bounded check scheduling (GITHUB_ACTIONS=%s)
     'preserves all selected gates, report order and failure propagation (%s, failure=%s)',
     async (scope, fail, failureCode) => {
       const selected = gates(scope);
-      if (scope === 'pr') expect(selected).toHaveLength(52);
+      if (scope === 'pr') expect(selected).toHaveLength(53);
       const expectedCommands = selected.map(declaredCommand).sort();
       const failingCommand = declaredCommand(selected[0]);
       const reports: Report[] = [];
