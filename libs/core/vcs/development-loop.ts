@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { missionPathOrNull } from '../mission-lookup.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { readTextFile } from '../foundation/text.js';
-import { assertSafeRepositoryPath, safeExecResult } from '../secure-io.js';
+import { assertSafeRepositoryPath } from '../secure-io.js';
 import { findMissionPath, pathResolver } from '../path-resolver.js';
 import { getWorkItem } from '../workforce/work-coordination.js';
 import {
@@ -40,15 +40,17 @@ export interface PreparedDevelopmentInput {
   /** Explicit migration policy; omission retains legacy actor-claim admission. */
   independencePolicy?: ArtifactReviewIndependencePolicy;
 }
+type MaybePromise<T> = T | Promise<T>;
+/** Ports may resolve asynchronously (the vcs-host seam is async). */
 export interface DevelopmentLoopPorts {
-  snapshot(): VcsDevelopmentPr;
-  ci(pr: VcsDevelopmentPr): VcsDevelopmentCiProof;
+  snapshot(): MaybePromise<VcsDevelopmentPr>;
+  ci(pr: VcsDevelopmentPr): MaybePromise<VcsDevelopmentCiProof>;
   review(
     pr: VcsDevelopmentPr,
     ci: VcsDevelopmentCiProof
   ): { ok: boolean; reason?: string; reviewedBaseSha?: string };
-  promote(pr: VcsDevelopmentPr): VcsCommandResult;
-  verifyMerged?(pr: VcsDevelopmentPr): VcsDevelopmentCiProof;
+  promote(pr: VcsDevelopmentPr): MaybePromise<VcsCommandResult>;
+  verifyMerged?(pr: VcsDevelopmentPr): MaybePromise<VcsDevelopmentCiProof>;
 }
 export interface DevelopmentLoopResult {
   status:
@@ -74,11 +76,11 @@ const same = (a: VcsDevelopmentPr, b: VcsDevelopmentPr) =>
 
 /** One bounded reconciliation step; pending CI/merge queues consume no repairs.
  * Re-entry rereads remote and receipt facts rather than reusing prior success. */
-export function reconcileVcsDevelopment(
+export async function reconcileVcsDevelopment(
   ports: DevelopmentLoopPorts,
   dryRun = true
-): DevelopmentLoopResult {
-  const pr = ports.snapshot();
+): Promise<DevelopmentLoopResult> {
+  const pr = await ports.snapshot();
   const result = (
     status: DevelopmentLoopResult['status'],
     nextAction: string,
@@ -95,7 +97,7 @@ export function reconcileVcsDevelopment(
       ...(pr.mergeCommitSha ? { knownMergeCommitSha: pr.mergeCommitSha } : {}),
     };
   if (pr.state === 'merged') {
-    const ci = ports.ci(pr),
+    const ci = await ports.ci(pr),
       review = ports.review(pr, ci);
     if (!review.ok)
       return {
@@ -122,7 +124,7 @@ export function reconcileVcsDevelopment(
       'blocked',
       'Prepare an open non-draft PR from agent/kyberion-development to main'
     );
-  const ci = ports.ci(pr);
+  const ci = await ports.ci(pr);
   if (ci.state === 'pending')
     return result('waiting', 'Reconcile after required CI finishes', ci.policyDigest);
   if (ci.state === 'failure')
@@ -141,10 +143,10 @@ export function reconcileVcsDevelopment(
     );
   if (dryRun)
     return result('ready', 'Advance with the installed publication charter', ci.policyDigest);
-  const latest = ports.snapshot();
+  const latest = await ports.snapshot();
   if (!same(pr, latest) || latest.state !== 'open' || latest.draft)
     return result('review_required', 'Revision changed; rerun CI and independent review');
-  const fresh = ports.ci(latest);
+  const fresh = await ports.ci(latest);
   if (fresh.state !== 'success' || fresh.policyDigest !== ci.policyDigest)
     return result('blocked', 'CI policy or check evidence changed; reconcile again');
   const liveReview = ports.review(latest, fresh);
@@ -154,13 +156,13 @@ export function reconcileVcsDevelopment(
       liveReview.reason || 'Independent review changed before publication'
     );
   if (latest.queued) return result('queued', 'PR already queued; do not repeat promotion');
-  const effect = ports.promote(latest);
+  const effect = await ports.promote(latest);
   if (effect.error || effect.status !== 0)
     return result(
       'blocked',
       'Promotion did not succeed; inspect the governed external-operation receipt before retrying'
     );
-  const after = ports.snapshot();
+  const after = await ports.snapshot();
   if (
     pr.repository !== after.repository ||
     pr.number !== after.number ||
@@ -180,9 +182,9 @@ export function reconcileVcsDevelopment(
 
 export function runPreparedVcsDevelopment(
   input: PreparedDevelopmentInput,
-  publicationHost: (mutation: VcsHostMutation) => VcsCommandResult,
-  run: VcsCommandRunner = safeExecResult
-): DevelopmentLoopResult {
+  publicationHost: (mutation: VcsHostMutation) => MaybePromise<VcsCommandResult>,
+  run?: VcsCommandRunner
+): Promise<DevelopmentLoopResult> {
   const options = { cwd: input.cwd };
   return reconcileVcsDevelopment(
     {
@@ -368,12 +370,12 @@ export function readReviewedDevelopmentManifest(
   );
 }
 
-function verifyMerged(
+async function verifyMerged(
   ports: DevelopmentLoopPorts,
   pr: VcsDevelopmentPr,
   reviewedBaseSha?: string,
   reviewedPolicyDigest?: string
-): DevelopmentLoopResult {
+): Promise<DevelopmentLoopResult> {
   if (!pr.mergeCommitSha)
     return {
       status: 'post_merge_unverified',
@@ -383,7 +385,7 @@ function verifyMerged(
   let proof: VcsDevelopmentCiProof | undefined;
   try {
     if (reviewedBaseSha && /^[a-f0-9]{40,64}$/i.test(reviewedBaseSha))
-      proof = ports.verifyMerged?.({ ...pr, baseSha: reviewedBaseSha });
+      proof = await ports.verifyMerged?.({ ...pr, baseSha: reviewedBaseSha });
   } catch {
     /* Retain the known effect on transport failure. */
   }

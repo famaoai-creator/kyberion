@@ -222,6 +222,16 @@ export function createGhCliVcsHostProvider(
         throw new VcsHostError('invalid', 'gh pr create: no pull request URL in output');
       return { number, url };
     },
+    async prFields(ctx, repo, ref, fields) {
+      return json<Record<string, unknown>>(
+        ctx,
+        ['pr', 'view', ref, '--repo', repo.url, '--json', fields.join(',')],
+        'pr view'
+      );
+    },
+    async githubApiGet(ctx, repo, path) {
+      return api<unknown>(ctx, repo, path ? `/${path}` : '');
+    },
     async prMerge(ctx, repo, input) {
       const args = [
         'pr',

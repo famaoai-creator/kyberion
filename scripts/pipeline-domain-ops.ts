@@ -1212,17 +1212,17 @@ export async function runInlineCustomerDecisionLearning(
  * were merged or closed. Read-only toward GitHub (`gh pr list|view|checks`);
  * it never merges, comments or edits a PR.
  */
-export function runInlinePrShadowObserve(
+export async function runInlinePrShadowObserve(
   step: PipelineAdfStep,
   params: Record<string, unknown>,
   ctx: Record<string, unknown>
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   const extra = resolveVars(params.ignored_checks ?? [], ctx);
   const ignoredChecks = [
     ...DEFAULT_IGNORED_CHECKS,
     ...(Array.isArray(extra) ? extra.map((name) => String(name)) : []),
   ];
-  const result = observePullRequests(createGhPrPort(), { ignoredChecks });
+  const result = await observePullRequests(createGhPrPort(), { ignoredChecks });
   return exportValue(params, step, { ...result }, ctx);
 }
 
