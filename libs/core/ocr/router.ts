@@ -19,6 +19,11 @@ const OCR_BUILTIN_DEFAULT_CHAINS: Record<string, readonly string[]> = {
   balanced: ['windows_native', 'apple_vision', 'llm_api', 'tesseract'],
 };
 
+/** Explicitly public material may be used for training; otherwise local_only. */
+export function ocrTrainingUse(request: Pick<OcrRequest, 'tier' | 'training_use'>) {
+  return request.training_use || (request.tier === 'public' ? 'training_eligible' : 'local_only');
+}
+
 export class AdaptivePolicyRouter extends ProviderChainRouter<OcrProvider, OcrRequest> {
   constructor(providers: OcrProvider[]) {
     super(providers, {
@@ -50,7 +55,7 @@ export class AdaptivePolicyRouter extends ProviderChainRouter<OcrProvider, OcrRe
   private allowedDataPolicies(
     request: OcrRequest
   ): ReadonlySet<NonNullable<OcrProvider['dataPolicy']>> {
-    switch (request.training_use || 'local_only') {
+    switch (ocrTrainingUse(request)) {
       case 'training_eligible':
         return new Set(['local_only', 'zero_retention', 'training_eligible']);
       case 'zero_retention':
@@ -89,7 +94,7 @@ export class AdaptivePolicyRouter extends ProviderChainRouter<OcrProvider, OcrRe
           id: provider.id,
           eligible: false,
           unmet: [
-            `dataPolicy '${dataPolicy}' not permitted by training_use '${request.training_use || 'local_only'}'`,
+            `dataPolicy '${dataPolicy}' not permitted by training_use '${ocrTrainingUse(request)}'`,
           ],
         });
         continue;

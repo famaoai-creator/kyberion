@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeRmSync } from './secure-io.js';
 import { setSeamSelectionRule } from './seam-selection-rules.js';
+import { ocrTrainingUse } from './ocr/router.js';
 
 // Mirrors libs/actuators/browser-actuator/src/browser-runtime-selection.test.ts:
 // exercise the real seam-provider-selection engine and the real ocr-provider
@@ -325,5 +326,14 @@ describe('purpose-driven OCR provider selection', () => {
       training_use: 'training_eligible',
     });
     expect(local.map((p) => p.id)).toEqual(['apple_vision', 'tesseract']);
+  });
+});
+
+describe('ocrTrainingUse', () => {
+  it('lets explicitly public images default to training-eligible and keeps others local', () => {
+    expect(ocrTrainingUse({ tier: 'public' })).toBe('training_eligible');
+    expect(ocrTrainingUse({})).toBe('local_only');
+    expect(ocrTrainingUse({ tier: 'confidential' })).toBe('local_only');
+    expect(ocrTrainingUse({ tier: 'public', training_use: 'local_only' })).toBe('local_only');
   });
 });

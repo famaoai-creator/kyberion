@@ -21,6 +21,7 @@ import {
   _setReasoningTenantRegistryRootForTests,
   isLocalReasoningBackend,
   isReasoningEgressDenial,
+  effectiveReasoningTrainingUse,
   reasoningBackendEndpoint,
   reasoningEgressDenialNext,
   withReasoningPayloadScope,
@@ -177,6 +178,24 @@ describe('assertReasoningEgressAllowed', () => {
       expect(() => assertReasoningEgressAllowed('anthropic')).not.toThrow();
       expect(() => assertReasoningEgressAllowed('agy-cli')).not.toThrow();
     });
+  });
+
+  it('treats public material without a declared posture as training-eligible', () => {
+    // Decision 2026-11-05: public material may be used for provider training.
+    withReasoningPayloadScope({ tier: 'public' }, () => {
+      expect(() => assertReasoningEgressAllowed('anthropic')).not.toThrow();
+      expect(() => assertReasoningEgressAllowed('claude-cli')).not.toThrow();
+    });
+    // An explicit local_only on public material is still honoured.
+    withReasoningPayloadScope({ tier: 'public', training_use: 'local_only' }, () => {
+      expect(() => assertReasoningEgressAllowed('anthropic')).toThrow(/local_only/);
+    });
+    expect(effectiveReasoningTrainingUse({ tier: 'public' })).toBe('training_eligible');
+    expect(effectiveReasoningTrainingUse({ tier: 'confidential' })).toBe('local_only');
+    expect(effectiveReasoningTrainingUse({ tier: 'personal' })).toBe('local_only');
+    expect(effectiveReasoningTrainingUse({ tier: 'public', training_use: 'no_training' })).toBe(
+      'no_training'
+    );
   });
 
   it('blocks confidential material to an unapproved provider', () => {
