@@ -1,6 +1,8 @@
 {
   "version": 1,
   "modules": {
+    "contracts/asset-scope": 0,
+    "foundation/asset-address": 2,
     "contracts/actuator-execution-brief": 0,
     "contracts/actuator-pipeline-bundle": 0,
     "contracts/actuator-resolution-plan": 0,

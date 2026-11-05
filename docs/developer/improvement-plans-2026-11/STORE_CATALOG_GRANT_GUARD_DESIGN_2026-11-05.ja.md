@@ -143,8 +143,36 @@ tier-guard の read / write / append / mkdir / metadata の各入口はこれを
 | S2  | 会社の資産の移動 | 会社のプロフィール・デザイン・チャネルの紐づけ・監査ログの写しを `knowledge/confidential/<tenant>/` へ |
 | S3  | 顧客の情報の移動 | 商談・要件・エスカレーション・会話を `knowledge/confidential/<tenant>/customers/<customer>/` へ        |
 
-既存データは `migration/` の移行スクリプトで移す（一覧表示 → 確認 → 移動）。順番は
-G0 → S1 → S2 → S3 → G1。カタログに移動先を先に宣言し、ゲートで漏れを検出する。
+既存データは `migration/` の移行スクリプトで移す（一覧表示 → 確認 → 移動）。
+G0 の後は、保存配置の移行 S1 → S2 → S3 と、Scope の解決・比較を独立して進める。
+カタログに移動先を先に宣言し、ゲートで漏れを検出する。G1 の認可判定への切り替えは、
+対象保存先の管理者・tier が解決でき、既存判定との差異を検証した単位で行う。
+
+### Scope 解決・比較の独立実装（2026-11-06）
+
+- `contracts/asset-scope.ts` は資産の管理者・tier・物理的な保存先と、その解決結果を定義する。
+  実行主体と権限上限を持つ `ScopeEnvelope` は変更しない。Stance は権限を与えない。
+- `foundation/asset-address.ts` の `resolveAssetAddress(relativePath, stores)` は、検証済みカタログと
+  正準の repository-relative path だけを受け取る純粋関数である。I/O、環境変数、現在の tenant
+  から管理者を推測しない。`movesTo` は移行先の参照であり、現在の資産の管理者や tier を
+  移行先からコピーする権限ではない。
+- 同じ深さの候補が重なる配置、記録からの解決が必要な `derived`、`unscoped-legacy`、
+  tier が確定しない保存先は `unresolved`。特に旧 `customer/<slug>` と `customer/<tenant>`、
+  混在する connections は現行の粗い G0 宣言だけで認可に使わない。
+- `governance/asset-scope-inspection.ts` の `inspectAssetScopeRead(filePath, ceiling)` は明示的な
+  比較入口。`decision` は既存 `inspectReadPermission` の結果をそのまま返し、`shadow` に
+  資産 Scope の解決と閲覧上限の比較を付ける。カタログはこの入口で遅延して schema 検証付きで読む。
+  比較不能・例外があっても `decision` は変えない。既存 tier-guard / secure-io に hook を追加しない。
+- `shadow` は管理者と tier の上限だけの観測であり、ロール・broker・Grant・内容検査を含む
+  完全な新認可ではない。`agrees` もこの限定した比較結果であり、G1 の切り替え条件を満たした
+  証拠とはしない。既存のロール・Grant がより狭ければ不一致は正常に起こる。
+  `planned` の配置は解決しても閲覧上限の許可に使わない。現時点の明示的な呼出元は
+  統合テストであり、本番 guard への配線は行わない。この段階境界を orphan 例外に記録する。
+- 新しい公開 subpath は上記3件のみ（core export baseline 1941 → 1944）。既存 foundation の
+  読み込み上限は上げず、新しい型モジュール0・純粋 resolver 2を登録する。
+
+この段階は G1 の判定関数・Grant 発行・保存先専用ロール廃止を完了したものではない。
+将来の S2/S3 は保存場所の対応を更新し、移動前後の管理者と tier の同一性を検証する。
 
 ## 既定で拒否であること
 
