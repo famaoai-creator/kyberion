@@ -7,6 +7,7 @@
  *
  * Translation stays with the caller: the catalog only names vocabulary keys.
  */
+import { segmentWords } from '@agent/core/locale-normalize';
 import type { FrontDeskMessageKey } from './i18n';
 import {
   SETUP_CHECKLIST_ANCHORS,
@@ -184,7 +185,22 @@ export function settingsCategoryOf(id: string): SettingsSectionId | null {
   return SETTINGS_CARDS.find((entry) => entry.id === id)?.category ?? NESTED_ANCHORS[id] ?? null;
 }
 
-/** Case- and width-insensitive match on the translated label, description and category. */
+/**
+ * Search terms of a settings query. Japanese has no spaces between words, so
+ * the query is segmented (`segmentWords`, ICU word boundaries) rather than
+ * split on whitespace: 「費用上限」 finds 「費用の上限」. A lone hiragana token
+ * is a particle (の・を・は …) and is dropped, so 「通知の時間帯」 still finds
+ * 「通知する時間帯」. A query with no word-like token is matched as typed.
+ *
+ * TODO: switch to `segmentKeywordTerms` from `@agent/core/locale-normalize`
+ * once it lands on this branch (PR #1417 adds it on main).
+ */
+export function settingsSearchTerms(needle: string): string[] {
+  const terms = segmentWords(needle).filter((term) => !/^\p{Script=Hiragana}$/u.test(term));
+  return terms.length ? terms : [needle];
+}
+
+/** Case- and width-insensitive, word-segmented match on the translated label, description and category. */
 export function filterSettingsCards(
   query: string,
   translate: (key: FrontDeskMessageKey) => string,
@@ -192,7 +208,7 @@ export function filterSettingsCards(
 ): SettingsCard[] {
   const needle = query.normalize('NFKC').trim().toLowerCase();
   if (!needle) return [...cards];
-  const words = needle.split(/\s+/);
+  const words = settingsSearchTerms(needle);
   return cards.filter((entry) => {
     const text = [
       translate(entry.label),
