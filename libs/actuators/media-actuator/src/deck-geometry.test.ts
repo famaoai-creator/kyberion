@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { handleAction } from './index.js';
 import type { MediaAction } from './media-pipeline-helpers.js';
-import type { PptxDesignProtocol } from '@agent/core/media/media-contracts';
+import type { PptxDesignProtocol } from '@agent/shared-media/media-contracts';
 
 describe('media:deck_from_geometry', () => {
   /** ブラウザ計測の戻り値を模したもの（browser:evaluate が返す幾何スキーマ）。 */

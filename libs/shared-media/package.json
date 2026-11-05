@@ -18,5 +18,307 @@
     "@types/node": "^26.6.5",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./document-contents-policy": {
+      "types": "./dist/document-contents-policy.d.ts",
+      "default": "./dist/document-contents-policy.js"
+    },
+    "./document-inference-policy": {
+      "types": "./dist/document-inference-policy.d.ts",
+      "default": "./dist/document-inference-policy.js"
+    },
+    "./document-outline-label-policy": {
+      "types": "./dist/document-outline-label-policy.d.ts",
+      "default": "./dist/document-outline-label-policy.js"
+    },
+    "./font-stack": {
+      "types": "./dist/font-stack.d.ts",
+      "default": "./dist/font-stack.js"
+    },
+    "./image-generation-bridge": {
+      "types": "./dist/image-generation-bridge.d.ts",
+      "default": "./dist/image-generation-bridge.js"
+    },
+    "./image-generation-policy": {
+      "types": "./dist/image-generation-policy.d.ts",
+      "default": "./dist/image-generation-policy.js"
+    },
+    "./image-generation-types": {
+      "types": "./dist/image-generation-types.d.ts",
+      "default": "./dist/image-generation-types.js"
+    },
+    "./image-generation/admission": {
+      "types": "./dist/image-generation/admission.d.ts",
+      "default": "./dist/image-generation/admission.js"
+    },
+    "./image-generation/builtin-providers": {
+      "types": "./dist/image-generation/builtin-providers.d.ts",
+      "default": "./dist/image-generation/builtin-providers.js"
+    },
+    "./image-generation/provider-registry": {
+      "types": "./dist/image-generation/provider-registry.d.ts",
+      "default": "./dist/image-generation/provider-registry.js"
+    },
+    "./image-generation/provider-support": {
+      "types": "./dist/image-generation/provider-support.d.ts",
+      "default": "./dist/image-generation/provider-support.js"
+    },
+    "./image-generation/providers/comfyui": {
+      "types": "./dist/image-generation/providers/comfyui.d.ts",
+      "default": "./dist/image-generation/providers/comfyui.js"
+    },
+    "./image-generation/providers/gemini": {
+      "types": "./dist/image-generation/providers/gemini.d.ts",
+      "default": "./dist/image-generation/providers/gemini.js"
+    },
+    "./image-generation/providers/host-bridge": {
+      "types": "./dist/image-generation/providers/host-bridge.d.ts",
+      "default": "./dist/image-generation/providers/host-bridge.js"
+    },
+    "./image-generation/providers/llm-api": {
+      "types": "./dist/image-generation/providers/llm-api.d.ts",
+      "default": "./dist/image-generation/providers/llm-api.js"
+    },
+    "./image-generation/providers/local-flux": {
+      "types": "./dist/image-generation/providers/local-flux.d.ts",
+      "default": "./dist/image-generation/providers/local-flux.js"
+    },
+    "./image-generation/providers/native": {
+      "types": "./dist/image-generation/providers/native.d.ts",
+      "default": "./dist/image-generation/providers/native.js"
+    },
+    "./image-generation/router": {
+      "types": "./dist/image-generation/router.d.ts",
+      "default": "./dist/image-generation/router.js"
+    },
+    "./image-reference-consent": {
+      "types": "./dist/image-reference-consent.d.ts",
+      "default": "./dist/image-reference-consent.js"
+    },
+    "./media-aws-icon-rules": {
+      "types": "./dist/media-aws-icon-rules.d.ts",
+      "default": "./dist/media-aws-icon-rules.js"
+    },
+    "./media-brief-lock": {
+      "types": "./dist/media-brief-lock.d.ts",
+      "default": "./dist/media-brief-lock.js"
+    },
+    "./media-contracts": {
+      "types": "./dist/media-contracts.d.ts",
+      "default": "./dist/media-contracts.js"
+    },
+    "./media-drawio-boundary-policy": {
+      "types": "./dist/media-drawio-boundary-policy.d.ts",
+      "default": "./dist/media-drawio-boundary-policy.js"
+    },
+    "./media-drawio-edge-policy": {
+      "types": "./dist/media-drawio-edge-policy.d.ts",
+      "default": "./dist/media-drawio-edge-policy.js"
+    },
+    "./media-drawio-policy": {
+      "types": "./dist/media-drawio-policy.d.ts",
+      "default": "./dist/media-drawio-policy.js"
+    },
+    "./media-drawio-security-group-order": {
+      "types": "./dist/media-drawio-security-group-order.d.ts",
+      "default": "./dist/media-drawio-security-group-order.js"
+    },
+    "./media-drawio-sort-policy": {
+      "types": "./dist/media-drawio-sort-policy.d.ts",
+      "default": "./dist/media-drawio-sort-policy.js"
+    },
+    "./media-drawio-tier-order": {
+      "types": "./dist/media-drawio-tier-order.d.ts",
+      "default": "./dist/media-drawio-tier-order.js"
+    },
+    "./media-semantic-map": {
+      "types": "./dist/media-semantic-map.d.ts",
+      "default": "./dist/media-semantic-map.js"
+    },
+    "./media-signal-entry-policy": {
+      "types": "./dist/media-signal-entry-policy.d.ts",
+      "default": "./dist/media-signal-entry-policy.js"
+    },
+    "./media-style-policy": {
+      "types": "./dist/media-style-policy.d.ts",
+      "default": "./dist/media-style-policy.js"
+    },
+    "./media-theme-role-policy": {
+      "types": "./dist/media-theme-role-policy.d.ts",
+      "default": "./dist/media-theme-role-policy.js"
+    },
+    "./media-tone-style-map": {
+      "types": "./dist/media-tone-style-map.d.ts",
+      "default": "./dist/media-tone-style-map.js"
+    },
+    "./music-generation-bridge": {
+      "types": "./dist/music-generation-bridge.d.ts",
+      "default": "./dist/music-generation-bridge.js"
+    },
+    "./music-generation-policy": {
+      "types": "./dist/music-generation-policy.d.ts",
+      "default": "./dist/music-generation-policy.js"
+    },
+    "./music-generation-types": {
+      "types": "./dist/music-generation-types.d.ts",
+      "default": "./dist/music-generation-types.js"
+    },
+    "./music-generation/builtin-providers": {
+      "types": "./dist/music-generation/builtin-providers.d.ts",
+      "default": "./dist/music-generation/builtin-providers.js"
+    },
+    "./music-generation/provider-registry": {
+      "types": "./dist/music-generation/provider-registry.d.ts",
+      "default": "./dist/music-generation/provider-registry.js"
+    },
+    "./music-generation/provider-support": {
+      "types": "./dist/music-generation/provider-support.d.ts",
+      "default": "./dist/music-generation/provider-support.js"
+    },
+    "./music-generation/providers/chatmusician": {
+      "types": "./dist/music-generation/providers/chatmusician.d.ts",
+      "default": "./dist/music-generation/providers/chatmusician.js"
+    },
+    "./music-generation/providers/ml-audiogen": {
+      "types": "./dist/music-generation/providers/ml-audiogen.d.ts",
+      "default": "./dist/music-generation/providers/ml-audiogen.js"
+    },
+    "./music-generation/providers/musicgen-mlx": {
+      "types": "./dist/music-generation/providers/musicgen-mlx.d.ts",
+      "default": "./dist/music-generation/providers/musicgen-mlx.js"
+    },
+    "./music-generation/providers/stable-audio": {
+      "types": "./dist/music-generation/providers/stable-audio.d.ts",
+      "default": "./dist/music-generation/providers/stable-audio.js"
+    },
+    "./music-generation/router": {
+      "types": "./dist/music-generation/router.d.ts",
+      "default": "./dist/music-generation/router.js"
+    },
+    "./music-workflow-compiler": {
+      "types": "./dist/music-workflow-compiler.d.ts",
+      "default": "./dist/music-workflow-compiler.js"
+    },
+    "./native-docx-engine/engine": {
+      "types": "./dist/native-docx-engine/engine.d.ts",
+      "default": "./dist/native-docx-engine/engine.js"
+    },
+    "./native-docx-engine/examples/roundtrip_docx": {
+      "types": "./dist/native-docx-engine/examples/roundtrip_docx.d.ts",
+      "default": "./dist/native-docx-engine/examples/roundtrip_docx.js"
+    },
+    "./native-pdf-engine/engine": {
+      "types": "./dist/native-pdf-engine/engine.d.ts",
+      "default": "./dist/native-pdf-engine/engine.js"
+    },
+    "./native-pdf-engine/fontkit-require": {
+      "types": "./dist/native-pdf-engine/fontkit-require.d.ts",
+      "default": "./dist/native-pdf-engine/fontkit-require.js"
+    },
+    "./native-pdf-engine/primitives": {
+      "types": "./dist/native-pdf-engine/primitives.d.ts",
+      "default": "./dist/native-pdf-engine/primitives.js"
+    },
+    "./native-pptx-engine/ja-line-break": {
+      "types": "./dist/native-pptx-engine/ja-line-break.d.ts",
+      "default": "./dist/native-pptx-engine/ja-line-break.js"
+    },
+    "./native-pptx-engine/layout-primitives": {
+      "types": "./dist/native-pptx-engine/layout-primitives.d.ts",
+      "default": "./dist/native-pptx-engine/layout-primitives.js"
+    },
+    "./native-pptx-engine/text-metrics": {
+      "types": "./dist/native-pptx-engine/text-metrics.d.ts",
+      "default": "./dist/native-pptx-engine/text-metrics.js"
+    },
+    "./native-speech-listen-bridge": {
+      "types": "./dist/native-speech-listen-bridge.d.ts",
+      "default": "./dist/native-speech-listen-bridge.js"
+    },
+    "./native-xlsx-engine/comments": {
+      "types": "./dist/native-xlsx-engine/comments.d.ts",
+      "default": "./dist/native-xlsx-engine/comments.js"
+    },
+    "./native-xlsx-engine/content-types": {
+      "types": "./dist/native-xlsx-engine/content-types.d.ts",
+      "default": "./dist/native-xlsx-engine/content-types.js"
+    },
+    "./native-xlsx-engine/drawing": {
+      "types": "./dist/native-xlsx-engine/drawing.d.ts",
+      "default": "./dist/native-xlsx-engine/drawing.js"
+    },
+    "./native-xlsx-engine/engine": {
+      "types": "./dist/native-xlsx-engine/engine.d.ts",
+      "default": "./dist/native-xlsx-engine/engine.js"
+    },
+    "./native-xlsx-engine/rels": {
+      "types": "./dist/native-xlsx-engine/rels.d.ts",
+      "default": "./dist/native-xlsx-engine/rels.js"
+    },
+    "./native-xlsx-engine/shared-strings": {
+      "types": "./dist/native-xlsx-engine/shared-strings.d.ts",
+      "default": "./dist/native-xlsx-engine/shared-strings.js"
+    },
+    "./native-xlsx-engine/styles": {
+      "types": "./dist/native-xlsx-engine/styles.d.ts",
+      "default": "./dist/native-xlsx-engine/styles.js"
+    },
+    "./native-xlsx-engine/table": {
+      "types": "./dist/native-xlsx-engine/table.d.ts",
+      "default": "./dist/native-xlsx-engine/table.js"
+    },
+    "./native-xlsx-engine/workbook": {
+      "types": "./dist/native-xlsx-engine/workbook.d.ts",
+      "default": "./dist/native-xlsx-engine/workbook.js"
+    },
+    "./native-xlsx-engine/worksheet": {
+      "types": "./dist/native-xlsx-engine/worksheet.d.ts",
+      "default": "./dist/native-xlsx-engine/worksheet.js"
+    },
+    "./video-generation/admission": {
+      "types": "./dist/video-generation/admission.d.ts",
+      "default": "./dist/video-generation/admission.js"
+    },
+    "./video-generation/builtin-adapters": {
+      "types": "./dist/video-generation/builtin-adapters.d.ts",
+      "default": "./dist/video-generation/builtin-adapters.js"
+    },
+    "./video-generation/provider": {
+      "types": "./dist/video-generation/provider.d.ts",
+      "default": "./dist/video-generation/provider.js"
+    },
+    "./video-generation/provider-registry": {
+      "types": "./dist/video-generation/provider-registry.d.ts",
+      "default": "./dist/video-generation/provider-registry.js"
+    },
+    "./video-generation/provider-support": {
+      "types": "./dist/video-generation/provider-support.d.ts",
+      "default": "./dist/video-generation/provider-support.js"
+    },
+    "./video-generation/providers/google-veo": {
+      "types": "./dist/video-generation/providers/google-veo.d.ts",
+      "default": "./dist/video-generation/providers/google-veo.js"
+    },
+    "./video-generation/providers/minimax-hailuo": {
+      "types": "./dist/video-generation/providers/minimax-hailuo.d.ts",
+      "default": "./dist/video-generation/providers/minimax-hailuo.js"
+    },
+    "./video-generation/providers/openai-sora": {
+      "types": "./dist/video-generation/providers/openai-sora.d.ts",
+      "default": "./dist/video-generation/providers/openai-sora.js"
+    },
+    "./video-generation/providers/runway": {
+      "types": "./dist/video-generation/providers/runway.d.ts",
+      "default": "./dist/video-generation/providers/runway.js"
+    },
+    "./video-generation/types": {
+      "types": "./dist/video-generation/types.d.ts",
+      "default": "./dist/video-generation/types.js"
+    }
   }
 }

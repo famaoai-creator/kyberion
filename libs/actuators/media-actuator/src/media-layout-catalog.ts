@@ -15,7 +15,7 @@ import {
   fitTextToBox,
   measureTextBlock,
   type LayoutFitResult,
-} from '@agent/core/media/native-pptx-engine/text-metrics';
+} from '@agent/shared-media/native-pptx-engine/text-metrics';
 import { resolvePptxSurfaceDesign } from '@agent/core/media/native-pptx-engine/design-cascade';
 import { KDS_SYSTEM_PREFIX, buildKdsDesignSystem } from './media-kds.js';
 import { compositionToZoneRegions, loadDesignFoundation } from '@agent/core/design-foundation';

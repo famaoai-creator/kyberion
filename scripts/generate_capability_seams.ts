@@ -124,24 +124,24 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     ],
   },
   'image-generation-provider': {
-    declaration: 'libs/core/media/image-generation/provider-registry.ts',
+    declaration: 'libs/shared-media/src/image-generation/provider-registry.ts',
     consumers: [
-      'libs/core/media/image-generation/router.ts',
-      'libs/core/media/image-generation-bridge.ts',
+      'libs/shared-media/src/image-generation/router.ts',
+      'libs/shared-media/src/image-generation-bridge.ts',
     ],
   },
   'music-generation-provider': {
-    declaration: 'libs/core/media/music-generation/provider-registry.ts',
+    declaration: 'libs/shared-media/src/music-generation/provider-registry.ts',
     consumers: [
-      'libs/core/media/music-generation/router.ts',
-      'libs/core/media/music-generation-bridge.ts',
+      'libs/shared-media/src/music-generation/router.ts',
+      'libs/shared-media/src/music-generation-bridge.ts',
     ],
   },
   'video-generation-provider-adapter': {
-    declaration: 'libs/core/media/video-generation/provider-registry.ts',
+    declaration: 'libs/shared-media/src/video-generation/provider-registry.ts',
     consumers: [
-      'libs/core/media/video-generation/builtin-adapters.ts',
-      'libs/core/media/video-generation/provider.ts',
+      'libs/shared-media/src/video-generation/builtin-adapters.ts',
+      'libs/shared-media/src/video-generation/provider.ts',
       'libs/actuators/media-generation-actuator/src/video-generation-provider.ts',
     ],
   },

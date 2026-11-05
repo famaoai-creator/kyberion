@@ -332,25 +332,3 @@ export * from './reasoning/reasoning-route-doctor.js';
 export * from './reasoning/reasoning-provider-readiness.js';
 
 export * from './reasoning/reasoning-failure-taxonomy.js';
-
-export {
-  loadMediaToneStyleMapCatalog,
-  resolveMediaToneStyle,
-} from './media/media-tone-style-map.js';
-
-export {
-  loadMediaDrawioPolicyCatalog,
-  resolveMediaDrawioBoundaryPalette,
-  resolveMediaDrawioNodeSize,
-} from './media/media-drawio-policy.js';
-
-export {
-  loadMediaAwsIconRuleCatalog,
-  resolveMediaAwsIconCandidates,
-} from './media/media-aws-icon-rules.js';
-
-export {
-  loadMediaSemanticMapCatalog,
-  resolveMediaSemanticType,
-  resolveProposalEvidenceIndex,
-} from './media/media-semantic-map.js';

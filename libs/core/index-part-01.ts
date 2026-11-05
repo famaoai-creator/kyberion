@@ -334,8 +334,6 @@ export * from './workforce/artifact-verification.js';
 export * from './training-catalog.js';
 export * from './hearing-scenario-catalog.js';
 
-export * from './media/media-brief-lock.js';
-
 export * from './deck-theme-direction.js';
 
 export * from './semantic-decide.js';
@@ -397,8 +395,6 @@ export * from './meeting/meeting-participation-runtime-plan.js';
 export * from './deliverable-quality.js';
 
 export * from './deliverable-inbox.js';
-
-export * from './media/font-stack.js';
 
 export { resolveInputBindings, classifyInputId, isPathInput } from './input-binding.js';
 

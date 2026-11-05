@@ -106,7 +106,7 @@
       "libs/core/deal-documents.ts": 1,
       "libs/core/media/native-pptx-engine/builders.ts": 3,
       "libs/core/media/native-pptx-engine/engine.ts": 1,
-      "libs/core/media/native-xlsx-engine/drawing.ts": 3,
+      "libs/shared-media/src/native-xlsx-engine/drawing.ts": 3,
       "libs/core/provider/codex-cli-query.ts": 1,
       "scripts/check_contract_schemas_checks_1.ts": 1,
       "scripts/check_contract_schemas_checks_2.ts": 2,
@@ -115,7 +115,7 @@
       "libs/actuators/media-actuator/src/proposal-pptx-helpers.ts": 1
     },
     "engine_hex": {
-      "libs/core/media/media-theme-role-policy.ts": 1,
+      "libs/shared-media/src/media-theme-role-policy.ts": 1,
       "libs/core/media/native-pptx-engine/design-cascade.ts": 2,
       "libs/shared-video/src/video-composition-compiler.ts": 11,
       "libs/shared-video/src/video-composition-rendering.ts": 5,

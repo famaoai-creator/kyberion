@@ -1428,18 +1428,6 @@
       "types": "./dist/knowledge/distill-knowledge-injector.d.ts",
       "default": "./dist/knowledge/distill-knowledge-injector.js"
     },
-    "./document-contents-policy": {
-      "types": "./dist/media/document-contents-policy.d.ts",
-      "default": "./dist/media/document-contents-policy.js"
-    },
-    "./document-inference-policy": {
-      "types": "./dist/media/document-inference-policy.d.ts",
-      "default": "./dist/media/document-inference-policy.js"
-    },
-    "./document-outline-label-policy": {
-      "types": "./dist/media/document-outline-label-policy.d.ts",
-      "default": "./dist/media/document-outline-label-policy.js"
-    },
     "./document-reader": {
       "types": "./dist/media/document-reader.d.ts",
       "default": "./dist/media/document-reader.js"
@@ -2132,22 +2120,6 @@
       "types": "./dist/media/image-dhash.d.ts",
       "default": "./dist/media/image-dhash.js"
     },
-    "./image-generation-bridge": {
-      "types": "./dist/media/image-generation-bridge.d.ts",
-      "default": "./dist/media/image-generation-bridge.js"
-    },
-    "./image-generation-policy": {
-      "types": "./dist/media/image-generation-policy.d.ts",
-      "default": "./dist/media/image-generation-policy.js"
-    },
-    "./image-generation-types": {
-      "types": "./dist/media/image-generation-types.d.ts",
-      "default": "./dist/media/image-generation-types.js"
-    },
-    "./image-reference-consent": {
-      "types": "./dist/media/image-reference-consent.d.ts",
-      "default": "./dist/media/image-reference-consent.js"
-    },
     "./imessage-bridge": {
       "types": "./dist/imessage-bridge.d.ts",
       "default": "./dist/imessage-bridge.js"
@@ -2704,10 +2676,6 @@
       "types": "./dist/laya-mlx-judgment-backend.d.ts",
       "default": "./dist/laya-mlx-judgment-backend.js"
     },
-    "./layout-primitives": {
-      "types": "./dist/media/native-pptx-engine/layout-primitives.d.ts",
-      "default": "./dist/media/native-pptx-engine/layout-primitives.js"
-    },
     "./lease/lease-backend": {
       "types": "./dist/lease/lease-backend.d.ts",
       "default": "./dist/lease/lease-backend.js"
@@ -2808,77 +2776,9 @@
       "types": "./dist/media/index.d.ts",
       "default": "./dist/media/index.js"
     },
-    "./media-aws-icon-rules": {
-      "types": "./dist/media/media-aws-icon-rules.d.ts",
-      "default": "./dist/media/media-aws-icon-rules.js"
-    },
     "./media-backend-registry": {
       "types": "./dist/media/media-backend-registry.d.ts",
       "default": "./dist/media/media-backend-registry.js"
-    },
-    "./media-brief-lock": {
-      "types": "./dist/media/media-brief-lock.d.ts",
-      "default": "./dist/media/media-brief-lock.js"
-    },
-    "./media-contracts": {
-      "types": "./dist/media/media-contracts.d.ts",
-      "default": "./dist/media/media-contracts.js"
-    },
-    "./media-drawio-boundary-policy": {
-      "types": "./dist/media/media-drawio-boundary-policy.d.ts",
-      "default": "./dist/media/media-drawio-boundary-policy.js"
-    },
-    "./media-drawio-edge-policy": {
-      "types": "./dist/media/media-drawio-edge-policy.d.ts",
-      "default": "./dist/media/media-drawio-edge-policy.js"
-    },
-    "./media-drawio-policy": {
-      "types": "./dist/media/media-drawio-policy.d.ts",
-      "default": "./dist/media/media-drawio-policy.js"
-    },
-    "./media-drawio-security-group-order": {
-      "types": "./dist/media/media-drawio-security-group-order.d.ts",
-      "default": "./dist/media/media-drawio-security-group-order.js"
-    },
-    "./media-drawio-sort-policy": {
-      "types": "./dist/media/media-drawio-sort-policy.d.ts",
-      "default": "./dist/media/media-drawio-sort-policy.js"
-    },
-    "./media-drawio-tier-order": {
-      "types": "./dist/media/media-drawio-tier-order.d.ts",
-      "default": "./dist/media/media-drawio-tier-order.js"
-    },
-    "./media-semantic-map": {
-      "types": "./dist/media/media-semantic-map.d.ts",
-      "default": "./dist/media/media-semantic-map.js"
-    },
-    "./media-signal-entry-policy": {
-      "types": "./dist/media/media-signal-entry-policy.d.ts",
-      "default": "./dist/media/media-signal-entry-policy.js"
-    },
-    "./media-style-policy": {
-      "types": "./dist/media/media-style-policy.d.ts",
-      "default": "./dist/media/media-style-policy.js"
-    },
-    "./media-theme-role-policy": {
-      "types": "./dist/media/media-theme-role-policy.d.ts",
-      "default": "./dist/media/media-theme-role-policy.js"
-    },
-    "./media-tone-style-map": {
-      "types": "./dist/media/media-tone-style-map.d.ts",
-      "default": "./dist/media/media-tone-style-map.js"
-    },
-    "./media/document-contents-policy": {
-      "types": "./dist/media/document-contents-policy.d.ts",
-      "default": "./dist/media/document-contents-policy.js"
-    },
-    "./media/document-inference-policy": {
-      "types": "./dist/media/document-inference-policy.d.ts",
-      "default": "./dist/media/document-inference-policy.js"
-    },
-    "./media/document-outline-label-policy": {
-      "types": "./dist/media/document-outline-label-policy.d.ts",
-      "default": "./dist/media/document-outline-label-policy.js"
     },
     "./media/document-reader": {
       "types": "./dist/media/document-reader.d.ts",
@@ -2887,10 +2787,6 @@
     "./media/docx-utils": {
       "types": "./dist/media/docx-utils.d.ts",
       "default": "./dist/media/docx-utils.js"
-    },
-    "./media/font-stack": {
-      "types": "./dist/media/font-stack.d.ts",
-      "default": "./dist/media/font-stack.js"
     },
     "./media/image-description-bridge": {
       "types": "./dist/media/image-description-bridge.d.ts",
@@ -2904,129 +2800,17 @@
       "types": "./dist/media/image-dhash.d.ts",
       "default": "./dist/media/image-dhash.js"
     },
-    "./media/image-generation-bridge": {
-      "types": "./dist/media/image-generation-bridge.d.ts",
-      "default": "./dist/media/image-generation-bridge.js"
-    },
-    "./media/image-generation-policy": {
-      "types": "./dist/media/image-generation-policy.d.ts",
-      "default": "./dist/media/image-generation-policy.js"
-    },
-    "./media/image-generation-types": {
-      "types": "./dist/media/image-generation-types.d.ts",
-      "default": "./dist/media/image-generation-types.js"
-    },
-    "./media/image-reference-consent": {
-      "types": "./dist/media/image-reference-consent.d.ts",
-      "default": "./dist/media/image-reference-consent.js"
-    },
-    "./media/media-aws-icon-rules": {
-      "types": "./dist/media/media-aws-icon-rules.d.ts",
-      "default": "./dist/media/media-aws-icon-rules.js"
-    },
     "./media/media-backend-registry": {
       "types": "./dist/media/media-backend-registry.d.ts",
       "default": "./dist/media/media-backend-registry.js"
-    },
-    "./media/media-brief-lock": {
-      "types": "./dist/media/media-brief-lock.d.ts",
-      "default": "./dist/media/media-brief-lock.js"
-    },
-    "./media/media-contracts": {
-      "types": "./dist/media/media-contracts.d.ts",
-      "default": "./dist/media/media-contracts.js"
-    },
-    "./media/media-drawio-boundary-policy": {
-      "types": "./dist/media/media-drawio-boundary-policy.d.ts",
-      "default": "./dist/media/media-drawio-boundary-policy.js"
-    },
-    "./media/media-drawio-edge-policy": {
-      "types": "./dist/media/media-drawio-edge-policy.d.ts",
-      "default": "./dist/media/media-drawio-edge-policy.js"
-    },
-    "./media/media-drawio-policy": {
-      "types": "./dist/media/media-drawio-policy.d.ts",
-      "default": "./dist/media/media-drawio-policy.js"
-    },
-    "./media/media-drawio-security-group-order": {
-      "types": "./dist/media/media-drawio-security-group-order.d.ts",
-      "default": "./dist/media/media-drawio-security-group-order.js"
-    },
-    "./media/media-drawio-sort-policy": {
-      "types": "./dist/media/media-drawio-sort-policy.d.ts",
-      "default": "./dist/media/media-drawio-sort-policy.js"
-    },
-    "./media/media-drawio-tier-order": {
-      "types": "./dist/media/media-drawio-tier-order.d.ts",
-      "default": "./dist/media/media-drawio-tier-order.js"
-    },
-    "./media/media-semantic-map": {
-      "types": "./dist/media/media-semantic-map.d.ts",
-      "default": "./dist/media/media-semantic-map.js"
-    },
-    "./media/media-signal-entry-policy": {
-      "types": "./dist/media/media-signal-entry-policy.d.ts",
-      "default": "./dist/media/media-signal-entry-policy.js"
-    },
-    "./media/media-style-policy": {
-      "types": "./dist/media/media-style-policy.d.ts",
-      "default": "./dist/media/media-style-policy.js"
-    },
-    "./media/media-theme-role-policy": {
-      "types": "./dist/media/media-theme-role-policy.d.ts",
-      "default": "./dist/media/media-theme-role-policy.js"
-    },
-    "./media/media-tone-style-map": {
-      "types": "./dist/media/media-tone-style-map.d.ts",
-      "default": "./dist/media/media-tone-style-map.js"
-    },
-    "./media/music-generation-bridge": {
-      "types": "./dist/media/music-generation-bridge.d.ts",
-      "default": "./dist/media/music-generation-bridge.js"
-    },
-    "./media/music-generation-policy": {
-      "types": "./dist/media/music-generation-policy.d.ts",
-      "default": "./dist/media/music-generation-policy.js"
-    },
-    "./media/music-generation-types": {
-      "types": "./dist/media/music-generation-types.d.ts",
-      "default": "./dist/media/music-generation-types.js"
-    },
-    "./media/music-workflow-compiler": {
-      "types": "./dist/media/music-workflow-compiler.d.ts",
-      "default": "./dist/media/music-workflow-compiler.js"
-    },
-    "./media/video-generation/provider": {
-      "types": "./dist/media/video-generation/provider.d.ts",
-      "default": "./dist/media/video-generation/provider.js"
-    },
-    "./media/video-generation/provider-registry": {
-      "types": "./dist/media/video-generation/provider-registry.d.ts",
-      "default": "./dist/media/video-generation/provider-registry.js"
-    },
-    "./media/native-docx-engine/engine": {
-      "types": "./dist/media/native-docx-engine/engine.d.ts",
-      "default": "./dist/media/native-docx-engine/engine.js"
-    },
-    "./media/native-docx-engine/examples/roundtrip_docx": {
-      "types": "./dist/media/native-docx-engine/examples/roundtrip_docx.d.ts",
-      "default": "./dist/media/native-docx-engine/examples/roundtrip_docx.js"
     },
     "./media/native-op-mapping": {
       "types": "./dist/media/native-op-mapping.d.ts",
       "default": "./dist/media/native-op-mapping.js"
     },
-    "./media/native-pdf-engine/engine": {
-      "types": "./dist/media/native-pdf-engine/engine.d.ts",
-      "default": "./dist/media/native-pdf-engine/engine.js"
-    },
     "./media/native-pdf-engine/parser": {
       "types": "./dist/media/native-pdf-engine/parser.d.ts",
       "default": "./dist/media/native-pdf-engine/parser.js"
-    },
-    "./media/native-pdf-engine/primitives": {
-      "types": "./dist/media/native-pdf-engine/primitives.d.ts",
-      "default": "./dist/media/native-pdf-engine/primitives.js"
     },
     "./media/native-pptx-engine/builders": {
       "types": "./dist/media/native-pptx-engine/builders.d.ts",
@@ -3044,10 +2828,6 @@
       "types": "./dist/media/native-pptx-engine/engine.d.ts",
       "default": "./dist/media/native-pptx-engine/engine.js"
     },
-    "./media/native-pptx-engine/layout-primitives": {
-      "types": "./dist/media/native-pptx-engine/layout-primitives.d.ts",
-      "default": "./dist/media/native-pptx-engine/layout-primitives.js"
-    },
     "./media/native-pptx-engine/presentation": {
       "types": "./dist/media/native-pptx-engine/presentation.d.ts",
       "default": "./dist/media/native-pptx-engine/presentation.js"
@@ -3056,17 +2836,9 @@
       "types": "./dist/media/native-pptx-engine/rels.d.ts",
       "default": "./dist/media/native-pptx-engine/rels.js"
     },
-    "./media/native-pptx-engine/text-metrics": {
-      "types": "./dist/media/native-pptx-engine/text-metrics.d.ts",
-      "default": "./dist/media/native-pptx-engine/text-metrics.js"
-    },
     "./media/native-pptx-engine/theme": {
       "types": "./dist/media/native-pptx-engine/theme.d.ts",
       "default": "./dist/media/native-pptx-engine/theme.js"
-    },
-    "./media/native-speech-listen-bridge": {
-      "types": "./dist/media/native-speech-listen-bridge.d.ts",
-      "default": "./dist/media/native-speech-listen-bridge.js"
     },
     "./media/native-subagent-adopter": {
       "types": "./dist/media/native-subagent-adopter.d.ts",
@@ -3075,46 +2847,6 @@
     "./media/native-tts": {
       "types": "./dist/media/native-tts.d.ts",
       "default": "./dist/media/native-tts.js"
-    },
-    "./media/native-xlsx-engine/comments": {
-      "types": "./dist/media/native-xlsx-engine/comments.d.ts",
-      "default": "./dist/media/native-xlsx-engine/comments.js"
-    },
-    "./media/native-xlsx-engine/content-types": {
-      "types": "./dist/media/native-xlsx-engine/content-types.d.ts",
-      "default": "./dist/media/native-xlsx-engine/content-types.js"
-    },
-    "./media/native-xlsx-engine/drawing": {
-      "types": "./dist/media/native-xlsx-engine/drawing.d.ts",
-      "default": "./dist/media/native-xlsx-engine/drawing.js"
-    },
-    "./media/native-xlsx-engine/engine": {
-      "types": "./dist/media/native-xlsx-engine/engine.d.ts",
-      "default": "./dist/media/native-xlsx-engine/engine.js"
-    },
-    "./media/native-xlsx-engine/rels": {
-      "types": "./dist/media/native-xlsx-engine/rels.d.ts",
-      "default": "./dist/media/native-xlsx-engine/rels.js"
-    },
-    "./media/native-xlsx-engine/shared-strings": {
-      "types": "./dist/media/native-xlsx-engine/shared-strings.d.ts",
-      "default": "./dist/media/native-xlsx-engine/shared-strings.js"
-    },
-    "./media/native-xlsx-engine/styles": {
-      "types": "./dist/media/native-xlsx-engine/styles.d.ts",
-      "default": "./dist/media/native-xlsx-engine/styles.js"
-    },
-    "./media/native-xlsx-engine/table": {
-      "types": "./dist/media/native-xlsx-engine/table.d.ts",
-      "default": "./dist/media/native-xlsx-engine/table.js"
-    },
-    "./media/native-xlsx-engine/workbook": {
-      "types": "./dist/media/native-xlsx-engine/workbook.d.ts",
-      "default": "./dist/media/native-xlsx-engine/workbook.js"
-    },
-    "./media/native-xlsx-engine/worksheet": {
-      "types": "./dist/media/native-xlsx-engine/worksheet.d.ts",
-      "default": "./dist/media/native-xlsx-engine/worksheet.js"
     },
     "./media/ooxml-core-props": {
       "types": "./dist/media/ooxml-core-props.d.ts",
@@ -4108,22 +3840,6 @@
       "types": "./dist/reasoning/model-role-fitness-runner.d.ts",
       "default": "./dist/reasoning/model-role-fitness-runner.js"
     },
-    "./music-generation-bridge": {
-      "types": "./dist/media/music-generation-bridge.d.ts",
-      "default": "./dist/media/music-generation-bridge.js"
-    },
-    "./music-generation-policy": {
-      "types": "./dist/media/music-generation-policy.d.ts",
-      "default": "./dist/media/music-generation-policy.js"
-    },
-    "./music-generation-types": {
-      "types": "./dist/media/music-generation-types.d.ts",
-      "default": "./dist/media/music-generation-types.js"
-    },
-    "./music-workflow-compiler": {
-      "types": "./dist/media/music-workflow-compiler.d.ts",
-      "default": "./dist/media/music-workflow-compiler.js"
-    },
     "./narrated-video-brief-compiler": {
       "types": "./dist/video/narrated-video-brief-compiler.d.ts",
       "default": "./dist/video/narrated-video-brief-compiler.js"
@@ -4135,14 +3851,6 @@
     "./native-pptx-engine/design-cascade": {
       "types": "./dist/media/native-pptx-engine/design-cascade.d.ts",
       "default": "./dist/media/native-pptx-engine/design-cascade.js"
-    },
-    "./native-pptx-engine/text-metrics": {
-      "types": "./dist/media/native-pptx-engine/text-metrics.d.ts",
-      "default": "./dist/media/native-pptx-engine/text-metrics.js"
-    },
-    "./native-speech-listen-bridge": {
-      "types": "./dist/media/native-speech-listen-bridge.d.ts",
-      "default": "./dist/media/native-speech-listen-bridge.js"
     },
     "./native-tts": {
       "types": "./dist/media/native-tts.d.ts",
@@ -6448,10 +6156,6 @@
       "types": "./dist/media/native-pptx-engine/design-cascade.d.ts",
       "default": "./dist/media/native-pptx-engine/design-cascade.js"
     },
-    "./src/native-pptx-engine/text-metrics": {
-      "types": "./dist/media/native-pptx-engine/text-metrics.d.ts",
-      "default": "./dist/media/native-pptx-engine/text-metrics.js"
-    },
     "./src/pipeline-engine": {
       "types": "./dist/pipeline/pipeline-engine.d.ts",
       "default": "./dist/pipeline/pipeline-engine.js"
@@ -8347,6 +8051,30 @@
     "./provider-runtime-requirements": {
       "types": "./dist/provider-runtime-requirements.d.ts",
       "default": "./dist/provider-runtime-requirements.js"
+    },
+    "./host-image-handoff": {
+      "types": "./dist/host-image-handoff.d.ts",
+      "default": "./dist/host-image-handoff.js"
+    },
+    "./media/docx-xml": {
+      "types": "./dist/media/docx-xml.d.ts",
+      "default": "./dist/media/docx-xml.js"
+    },
+    "./media/xlsx-xstring": {
+      "types": "./dist/media/xlsx-xstring.d.ts",
+      "default": "./dist/media/xlsx-xstring.js"
+    },
+    "./provider-chain-router": {
+      "types": "./dist/provider-chain-router.d.ts",
+      "default": "./dist/provider-chain-router.js"
+    },
+    "./provider-registry": {
+      "types": "./dist/provider-registry.d.ts",
+      "default": "./dist/provider-registry.js"
+    },
+    "./windows-native-image-generation-bridge": {
+      "types": "./dist/windows-native-image-generation-bridge.d.ts",
+      "default": "./dist/windows-native-image-generation-bridge.js"
     }
   },
   "dependencies": {

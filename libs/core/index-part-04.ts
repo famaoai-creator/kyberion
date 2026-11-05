@@ -4,8 +4,6 @@ export * from './voice/voice-selection-preferences.js';
 
 export * from './voice/realtime-voice-preferences.js';
 
-export * from './media/native-speech-listen-bridge.js';
-
 export {
   AppleVisionOcrProvider,
   LlmApiOcrProvider,
@@ -30,18 +28,6 @@ export * from './secret/secret-types.js';
 export * from './integrations/email-bridge.js';
 
 export * from './integrations/email-types.js';
-
-export * from './media/image-generation-bridge.js';
-
-export * from './media/image-generation-types.js';
-
-export * from './media/image-generation-policy.js';
-
-export * from './media/music-generation-bridge.js';
-
-export * from './media/music-generation-types.js';
-
-export * from './media/music-generation-policy.js';
 
 export * from './tool/tool-runtime-policy.js';
 

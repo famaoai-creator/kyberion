@@ -28,9 +28,9 @@ import {
   lockMediaBrief,
   inferredDecisions,
   formatBriefForConfirmation,
-} from '@agent/core/media/media-brief-lock';
+} from '@agent/shared-media/media-brief-lock';
 import { validateThemeContrast } from '@agent/core/design-qa';
-import { type PdfDesignProtocol } from '@agent/core/media/media-contracts';
+import { type PdfDesignProtocol } from '@agent/shared-media/media-contracts';
 import {
   buildPptxProtocolFromPdfDesign as buildPptxProtocolFromPdfDesignHelper,
   buildXlsxProtocolFromPdfDesign as buildXlsxProtocolFromPdfDesignHelper,

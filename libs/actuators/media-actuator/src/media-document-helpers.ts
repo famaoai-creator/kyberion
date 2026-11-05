@@ -4,22 +4,22 @@ import { logger } from '@agent/core/core';
 import {
   resolveDocumentContentsLabel,
   resolveDocumentContentsSubtitle,
-} from '@agent/core/media/document-contents-policy';
+} from '@agent/shared-media/document-contents-policy';
 import {
   resolveReportSectionTitle,
   resolveReportSummaryTitle,
-} from '@agent/core/media/document-outline-label-policy';
+} from '@agent/shared-media/document-outline-label-policy';
 import {
   resolveProposalSectionKeywords,
   resolveProposalEvidenceIndex,
-} from '@agent/core/media/media-semantic-map';
-import { resolveSignalToneRank } from '@agent/core/media/media-style-policy';
+} from '@agent/shared-media/media-semantic-map';
+import { resolveSignalToneRank } from '@agent/shared-media/media-style-policy';
 import {
   resolveDocumentTypeFromClues as resolveDocumentTypeFromCluesPolicy,
   resolveDocumentProfileCandidates as resolveDocumentProfileCandidatesPolicy,
   resolveDocumentProfileKeywords as resolveDocumentProfileKeywordsPolicy,
-} from '@agent/core/media/document-inference-policy';
-import { loadMediaSignalEntryPolicyCatalog } from '@agent/core/media/media-signal-entry-policy';
+} from '@agent/shared-media/document-inference-policy';
+import { loadMediaSignalEntryPolicyCatalog } from '@agent/shared-media/media-signal-entry-policy';
 import { loadTrackerSheetPolicyCatalog } from '@agent/core/tracker-sheet-policy';
 import { isLegacyMediaOp } from '@agent/core/legacy-media-ops';
 import { loadJsonValue } from './media-catalog-loaders.js';
