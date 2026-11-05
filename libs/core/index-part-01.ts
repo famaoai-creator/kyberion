@@ -266,10 +266,6 @@ export * from './command-runner.js';
 
 export * from './job-lifecycle.js';
 
-export * from './voice/voice-capability-bridge.js';
-
-export * from './voice/voice-path-policy.js';
-
 export * from './camera-output-bridge.js';
 
 export * from './ledger.js';

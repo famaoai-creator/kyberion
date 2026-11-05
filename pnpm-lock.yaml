@@ -96,6 +96,9 @@ importers:
       '@agent/shared-vision':
         specifier: workspace:*
         version: link:libs/shared-vision
+      '@agent/shared-voice':
+        specifier: workspace:*
+        version: link:libs/shared-voice
       '@agentclientprotocol/sdk':
         specifier: ^1.9.0
         version: 1.9.0(zod@4.6.7)
@@ -652,6 +655,9 @@ importers:
       '@agent/shared-vision':
         specifier: workspace:*
         version: link:../../shared-vision
+      '@agent/shared-voice':
+        specifier: workspace:*
+        version: link:../../shared-voice
       chalk:
         specifier: ^6.0.1
         version: 6.0.1
@@ -706,6 +712,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-voice':
+        specifier: workspace:*
+        version: link:../../shared-voice
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
@@ -872,6 +881,12 @@ importers:
       puppeteer:
         specifier: ^25.14.0
         version: 25.14.0(yauzl@3.4.0)
+
+  libs/shared-voice:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../core
 
   presence/bridge/terminal:
     dependencies:

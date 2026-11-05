@@ -282,7 +282,7 @@
       "note": "IPC socket dir"
     },
     {
-      "file": "libs/core/voice/realtime-voice-conversation.ts",
+      "file": "libs/shared-voice/src/realtime-voice-conversation.ts",
       "count": 1,
       "classification": "migrate-candidate",
       "note": "conversation recording artifact; session-scoped"
@@ -366,25 +366,25 @@
       "note": "visual-review raster fallback; review artifact"
     },
     {
-      "file": "libs/core/voice/voice-path-policy.ts",
+      "file": "libs/shared-voice/src/voice-path-policy.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "policy check of the tmp root itself"
     },
     {
-      "file": "libs/core/voice/voice-profile-promotion.ts",
+      "file": "libs/shared-voice/src/voice-profile-promotion.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "promotion staging dir (promoted copies leave tmp)"
     },
     {
-      "file": "libs/core/voice/voice-sample-collection.ts",
+      "file": "libs/shared-voice/src/voice-sample-collection.ts",
       "count": 1,
       "classification": "migrate-candidate",
       "note": "collected voice samples feed profile promotion; scoped artifacts"
     },
     {
-      "file": "libs/core/voice/voice-sample-recorder.ts",
+      "file": "libs/shared-voice/src/voice-sample-recorder.ts",
       "count": 1,
       "classification": "migrate-candidate",
       "note": "recorded voice samples feed profile promotion; scoped artifacts"

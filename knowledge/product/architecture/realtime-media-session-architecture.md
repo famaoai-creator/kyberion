@@ -412,7 +412,7 @@ bound to one identity.
 ## 13. Turn-taking contract (2026-09-24)
 
 `startRealtimeVoiceLoop` composes the turn-taking parts in
-`libs/core/voice/voice-turn-cancellation.ts`, `two-stage-barge-in.ts`,
+`libs/shared-voice/src/voice-turn-cancellation.ts`, `two-stage-barge-in.ts`,
 `voice-eot-scorer.ts`, `voice-respond-gate.ts`, `voice-phrase-chunker.ts`,
 `voice-first-phrase-cache.ts`, and `voice-speculative-policy.ts`. The pure
 `VoiceTurnTakingMachine` / voice workbench replays the same decisions on a

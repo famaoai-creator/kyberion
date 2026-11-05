@@ -160,8 +160,6 @@ const allowedCoreFsImports = [
   'libs/core/virtual/virtual-audio-input-recording-bridge.test.ts',
   'libs/core/virtual/virtual-audio-output-playback-bridge.test.ts',
   'libs/core/voice/voice-profile-registry.test.ts',
-  'libs/core/voice/voice-sample-collection.test.ts',
-  'libs/core/voice/voice-sample-ingestion-policy.test.ts',
   'libs/core/workforce/work-graph-projection.test.ts',
   // Module-mock fixtures: these tests vi.mock (or vi.spyOn) `./secure-io.js` /
   // `node:fs` itself, or seed a real OS-tmpdir root outside the repo, so the

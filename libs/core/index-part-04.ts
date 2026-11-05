@@ -1,9 +1,5 @@
 /** Generated public API barrel part. Keep exports in source order. */
 
-export * from './voice/voice-selection-preferences.js';
-
-export * from './voice/realtime-voice-preferences.js';
-
 export {
   AppleVisionOcrProvider,
   LlmApiOcrProvider,
@@ -42,15 +38,7 @@ export * from './service/service-runtime-registry.js';
 
 export * from './service/service-pid-registry.js';
 
-export * from './voice/voice-tts-config.js';
-
-export * from './voice/voice-runtime-policy.js';
-
 export * from './voice/voice-profile-registry.js';
-
-export * from './voice/voice-transcript-alignment.js';
-
-export * from './voice/voice-profile-promotion.js';
 
 export * from './presentation-preference-registry.js';
 
@@ -72,15 +60,7 @@ export * from './actuator/adapter-default-selection.js';
 
 export * from './intent/intent-execution-profile-registry.js';
 
-export * from './voice/voice-sample-ingestion-policy.js';
-
-export * from './voice/voice-sample-collection.js';
-
-export * from './voice/voice-sample-recorder.js';
-
 export * from './voice/voice-text-chunking.js';
-
-export * from './voice/voice-generation-runtime.js';
 
 export * from './video/video-composition-contract.js';
 

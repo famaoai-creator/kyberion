@@ -43,6 +43,7 @@ const LEGACY_JS_GUARDED_PREFIXES = [
   'libs/shared-ui/src/',
   'libs/shared-vision/',
   'libs/shared-video/',
+  'libs/shared-voice/',
   'libs/actuators/',
 ];
 const PACKAGE_SCAN_ROOTS = ['libs', 'presence', 'satellites', 'templates', 'package.json'];

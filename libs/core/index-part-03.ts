@@ -330,8 +330,6 @@ export * as docxUtils from './media/docx-utils.js';
 
 // Voice & Presentation
 
-export { say, speak } from './voice/voice-synth.js';
-
 export * from './voice/voice-stt.js';
 
 export * from './voice/voice-provider-adapters.js';

@@ -1,10 +1,11 @@
 {
   "version": 1,
   "packages": {
-    "libs/core": 2015,
+    "libs/core": 1977,
     "libs/kernel": 4,
     "libs/shared-media": 75,
     "libs/shared-ui": 3,
-    "libs/shared-video": 21
+    "libs/shared-video": 21,
+    "libs/shared-voice": 30
   }
 }

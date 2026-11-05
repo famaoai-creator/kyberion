@@ -30,6 +30,9 @@
       "path": "./libs/shared-video"
     },
     {
+      "path": "./libs/shared-voice"
+    },
+    {
       "path": "./presence/displays/terminal-hud"
     }
   ]

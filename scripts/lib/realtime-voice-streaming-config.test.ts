@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { RealtimeVoiceConversationPreferences } from '@agent/core/voice/realtime-voice-preferences';
+import type { RealtimeVoiceConversationPreferences } from '@agent/shared-voice/realtime-voice-preferences';
 import {
   realtimeVoiceStreamingEnvironment,
   resolveRealtimeVoiceStreamingConfig,

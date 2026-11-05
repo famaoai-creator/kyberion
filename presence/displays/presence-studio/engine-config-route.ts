@@ -4,7 +4,7 @@ import {
   updateOperatorEngineRuntimePreferences,
   EngineRuntimeOperatorError,
   type EngineRuntimeOperatorUpdate,
-} from '@agent/core/voice/engine-runtime-preferences-operator';
+} from '@agent/shared-voice/engine-runtime-preferences-operator';
 import { PresenceStudioViewerError } from './security.js';
 import { requireLocalOperatorRequest } from './local-operator-request.js';
 

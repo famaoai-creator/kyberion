@@ -19,6 +19,7 @@ graph TD
     agent_shared_ui["@agent/shared-ui"]
     agent_shared_video["@agent/shared-video"]
     agent_shared_vision["@agent/shared-vision"]
+    agent_shared_voice["@agent/shared-voice"]
   end
   subgraph actuators ["Actuators"]
     actuator_agent["@actuator/agent"]
@@ -109,6 +110,7 @@ graph TD
   actuator_service --> agent_core
   actuator_system --> agent_core
   actuator_system --> agent_shared_vision
+  actuator_system --> agent_shared_voice
   actuator_terminal --> agent_core
   actuator_terminal --> agent_shared_vision
   actuator_vcs --> agent_core
@@ -117,6 +119,7 @@ graph TD
   actuator_vision --> agent_core
   actuator_vision --> agent_shared_video
   actuator_voice --> agent_core
+  actuator_voice --> agent_shared_voice
   actuator_wisdom --> agent_core
   actuator_working_memory --> agent_core
   agent_core --> agent_kernel
@@ -127,6 +130,7 @@ graph TD
   agent_shared_ui --> agent_core
   agent_shared_video --> agent_core
   agent_shared_vision --> agent_core
+  agent_shared_voice --> agent_core
   kyberion_discord_bridge --> agent_core
   kyberion_imessage_bridge --> agent_core
   kyberion_slack_bridge --> agent_core
@@ -148,4 +152,5 @@ graph TD
   kyberion --> agent_shared_network
   kyberion --> agent_shared_video
   kyberion --> agent_shared_vision
+  kyberion --> agent_shared_voice
   kyberion --> presence_terminal_hud

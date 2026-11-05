@@ -1,0 +1,137 @@
+{
+  "name": "@agent/shared-voice",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Voice runtime: realtime conversation loops, TTS/STT orchestration, voice samples and selection. Depends on @agent/core; core never imports it.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./audio-text-similarity": {
+      "types": "./dist/audio-text-similarity.d.ts",
+      "default": "./dist/audio-text-similarity.js"
+    },
+    "./engine-runtime-preferences-operator": {
+      "types": "./dist/engine-runtime-preferences-operator.d.ts",
+      "default": "./dist/engine-runtime-preferences-operator.js"
+    },
+    "./gemini-live-client": {
+      "types": "./dist/gemini-live-client.d.ts",
+      "default": "./dist/gemini-live-client.js"
+    },
+    "./realtime-voice-conversation": {
+      "types": "./dist/realtime-voice-conversation.d.ts",
+      "default": "./dist/realtime-voice-conversation.js"
+    },
+    "./realtime-voice-loop": {
+      "types": "./dist/realtime-voice-loop.d.ts",
+      "default": "./dist/realtime-voice-loop.js"
+    },
+    "./realtime-voice-preferences": {
+      "types": "./dist/realtime-voice-preferences.d.ts",
+      "default": "./dist/realtime-voice-preferences.js"
+    },
+    "./tts-loopback-verifier": {
+      "types": "./dist/tts-loopback-verifier.d.ts",
+      "default": "./dist/tts-loopback-verifier.js"
+    },
+    "./vad-turn-recorder": {
+      "types": "./dist/vad-turn-recorder.d.ts",
+      "default": "./dist/vad-turn-recorder.js"
+    },
+    "./voice-capability-bridge": {
+      "types": "./dist/voice-capability-bridge.d.ts",
+      "default": "./dist/voice-capability-bridge.js"
+    },
+    "./voice-eot-scorer": {
+      "types": "./dist/voice-eot-scorer.d.ts",
+      "default": "./dist/voice-eot-scorer.js"
+    },
+    "./voice-first-phrase-cache": {
+      "types": "./dist/voice-first-phrase-cache.d.ts",
+      "default": "./dist/voice-first-phrase-cache.js"
+    },
+    "./voice-generation-runtime": {
+      "types": "./dist/voice-generation-runtime.d.ts",
+      "default": "./dist/voice-generation-runtime.js"
+    },
+    "./voice-hub-playback": {
+      "types": "./dist/voice-hub-playback.d.ts",
+      "default": "./dist/voice-hub-playback.js"
+    },
+    "./voice-loop-engine": {
+      "types": "./dist/voice-loop-engine.d.ts",
+      "default": "./dist/voice-loop-engine.js"
+    },
+    "./voice-path-policy": {
+      "types": "./dist/voice-path-policy.d.ts",
+      "default": "./dist/voice-path-policy.js"
+    },
+    "./voice-phrase-chunker": {
+      "types": "./dist/voice-phrase-chunker.d.ts",
+      "default": "./dist/voice-phrase-chunker.js"
+    },
+    "./voice-profile-promotion": {
+      "types": "./dist/voice-profile-promotion.d.ts",
+      "default": "./dist/voice-profile-promotion.js"
+    },
+    "./voice-runtime-policy": {
+      "types": "./dist/voice-runtime-policy.d.ts",
+      "default": "./dist/voice-runtime-policy.js"
+    },
+    "./voice-sample-collection": {
+      "types": "./dist/voice-sample-collection.d.ts",
+      "default": "./dist/voice-sample-collection.js"
+    },
+    "./voice-sample-ingestion-policy": {
+      "types": "./dist/voice-sample-ingestion-policy.d.ts",
+      "default": "./dist/voice-sample-ingestion-policy.js"
+    },
+    "./voice-sample-recorder": {
+      "types": "./dist/voice-sample-recorder.d.ts",
+      "default": "./dist/voice-sample-recorder.js"
+    },
+    "./voice-selection-preferences": {
+      "types": "./dist/voice-selection-preferences.d.ts",
+      "default": "./dist/voice-selection-preferences.js"
+    },
+    "./voice-speculative-policy": {
+      "types": "./dist/voice-speculative-policy.d.ts",
+      "default": "./dist/voice-speculative-policy.js"
+    },
+    "./voice-synth": {
+      "types": "./dist/voice-synth.d.ts",
+      "default": "./dist/voice-synth.js"
+    },
+    "./voice-transcript-alignment": {
+      "types": "./dist/voice-transcript-alignment.d.ts",
+      "default": "./dist/voice-transcript-alignment.js"
+    },
+    "./voice-tts-config": {
+      "types": "./dist/voice-tts-config.d.ts",
+      "default": "./dist/voice-tts-config.js"
+    },
+    "./voice-turn-cancellation": {
+      "types": "./dist/voice-turn-cancellation.d.ts",
+      "default": "./dist/voice-turn-cancellation.js"
+    },
+    "./voice-turn-taking": {
+      "types": "./dist/voice-turn-taking.d.ts",
+      "default": "./dist/voice-turn-taking.js"
+    },
+    "./voice-workbench": {
+      "types": "./dist/voice-workbench.d.ts",
+      "default": "./dist/voice-workbench.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.json && node ../../scripts/write_core_dist_scope.mjs --run"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*"
+  }
+}

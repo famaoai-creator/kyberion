@@ -170,7 +170,7 @@ export default defineConfig({
         'libs/core/reflex-terminal.ts',
         'libs/core/sensor-engine.ts',
         'libs/core/shell/terminal-bridge.ts',
-        'libs/core/voice/voice-synth.ts',
+        'libs/shared-voice/src/voice-synth.ts',
         // Large script refactors are covered indirectly through command/build paths.
         'scripts/refactor/**/*.ts',
       ],
@@ -215,6 +215,14 @@ export default defineConfig({
       {
         find: /^@agent\/shared-video$/,
         replacement: path.resolve(rootDir, './libs/shared-video/src/index.ts'),
+      },
+      {
+        find: /^@agent\/shared-voice\/(.*)$/,
+        replacement: path.resolve(rootDir, './libs/shared-voice/src/$1'),
+      },
+      {
+        find: /^@agent\/shared-voice$/,
+        replacement: path.resolve(rootDir, './libs/shared-voice/src/index.ts'),
       },
       {
         find: '@agent/shared-vision',

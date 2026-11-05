@@ -1367,8 +1367,8 @@ vi.mock('@agent/core/platform', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/platform')),
   platform: { listRunningApps: vi.fn(async () => []) },
 }));
-vi.mock('@agent/core/voice/voice-synth', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/voice/voice-synth')),
+vi.mock('@agent/shared-voice/voice-synth', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/shared-voice/voice-synth')),
   say: vi.fn(async () => undefined),
 }));
 vi.mock('@agent/core/macos-automation-bridge', async () => ({

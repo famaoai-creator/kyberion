@@ -150,7 +150,7 @@ import {
   registerVoicePlaybackPlatformAdapter,
   resolveVoicePlaybackPlatformAdapter,
 } from './voice-runtime-helpers.js';
-import { recordVoiceSample } from '@agent/core/voice/voice-sample-recorder';
+import { recordVoiceSample } from '@agent/shared-voice/voice-sample-recorder';
 import { outputToVirtualCamera } from './voice-media-output-helpers.js';
 import { safeExecShellScript } from '@agent/core/secure-io';
 import { installObsVirtualCameraOutputBridge } from '@agent/core/obs-virtual-camera-output';

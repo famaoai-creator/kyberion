@@ -27,14 +27,14 @@ import {
   estimateSpeechDurationMs,
 } from '@agent/core/presence-surface';
 import { getSurfaceAgentCatalogEntry } from '@agent/core/surface/surface-agent-catalog';
-import { getVoiceTtsLanguageConfig } from '@agent/core/voice/voice-tts-config';
+import { getVoiceTtsLanguageConfig } from '@agent/shared-voice/voice-tts-config';
 import { getVoiceProfileRecord } from '@agent/core/voice/voice-profile-registry';
 import {
   getVoiceEngineRegistry,
   resolveVoiceEngineForPlatform,
   type VoiceEngineRecord,
 } from '@agent/core/voice/voice-engine-registry';
-import { getVoiceSelectionSnapshot } from '@agent/core/voice/voice-selection-preferences';
+import { getVoiceSelectionSnapshot } from '@agent/shared-voice/voice-selection-preferences';
 import {
   resolveVoiceSttAdapter,
   resolveVoiceTtsAdapter,
@@ -70,7 +70,7 @@ import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-regis
 import { listenNativeSpeech } from '@agent/shared-media/native-speech-listen-bridge';
 import { buildNativeTtsCommand } from '@agent/core/media/native-tts';
 import { normalizeEventScope } from '@agent/core/event-scope';
-import { recordVoiceSample } from '@agent/core/voice/voice-sample-recorder';
+import { recordVoiceSample } from '@agent/shared-voice/voice-sample-recorder';
 import { logger } from '@agent/core/core';
 import * as pathResolver from '@agent/core/path-resolver';
 import type { EventScopeInput } from '@agent/core/event-scope';
