@@ -24,14 +24,25 @@ import {
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
-import { withExecutionContext, withExecutionContextAsync } from './authority.js';
-import { isReservedScopeName, isValidTenantSlug } from './foundation/scope.js';
 import {
-  DELEGATION_RECORD_ROOT_PATH,
   LEGACY_DELEGATION_RECORD_DIR,
   LEGACY_DELEGATION_TRACE_PATH,
 } from './foundation/runtime-state-roots.js';
-import { storagePartitionSegments, tenantStoreLedgerPartitionOf } from './storage-layout.js';
+import { tenantStoreLedgerPartitionOf } from './storage-layout.js';
+import {
+  asDelegationStore,
+  asDelegationStoreAsync,
+  boundDelegationTenant as boundTenantSlug,
+  DELEGATION_RECORD_STORE_ROLE,
+  delegationPartitionDir as partitionDir,
+  delegationRecordPathIn as recordPathIn,
+  delegationRecordsDirFor as recordsDirFor,
+  delegationStoreRootOverride as storeRootOverride,
+  legacyDelegationTenant as legacyRecordTenant,
+  listDelegationTenantPartitions as listTenantPartitions,
+  normalizeDelegationTenant as normalizeTenant,
+  safeDelegationLeafId as safeLeafId,
+} from './delegation-store-partition.js';
 import { withLockSync } from './foundation/lock-utils.js';
 import { spawnManagedProcess, type ManagedProcessHandle } from './managed-process.js';
 import {
@@ -169,54 +180,8 @@ export type DelegatedTaskWorkerHandler = (wake: DelegatedTaskWorkerWake) => Prom
  * trace file for every scope via KYBERION_DELEGATION_TRACE_PATH, so parallel
  * suites never clobber the real files (resolved lazily per call).
  */
-export const DELEGATION_RECORD_STORE_ROLE = 'delegation_record_store';
-/** Tenant delegations hold tenant instruction/context/result text: always confidential. */
-const DELEGATION_TENANT_TIER = 'confidential';
+export { DELEGATION_RECORD_STORE_ROLE };
 const DELEGATION_TRACE_FILE = 'delegations.jsonl';
-const DELEGATION_RECORDS_DIR = 'records';
-
-function normalizeTenant(value: string | undefined): string | undefined {
-  const slug = String(value ?? '')
-    .trim()
-    .toLowerCase();
-  return slug && isValidTenantSlug(slug) && !isReservedScopeName(slug) && slug !== 'system'
-    ? slug
-    : undefined;
-}
-
-/** The tenant this process (or the current resource scope) is bound to. */
-function boundTenantSlug(): string | undefined {
-  return normalizeTenant(
-    currentResourceAccessScope()?.tenantSlug ?? resolvePolicyIdentityContext().tenantSlug
-  );
-}
-
-function storeRootOverride(): string | undefined {
-  return getRegisteredEnvText('KYBERION_DELEGATION_STORE_DIR')?.trim() || undefined;
-}
-
-function resolveStoreRoot(): string {
-  const override = storeRootOverride();
-  return assertSafeRepositoryPath(
-    pathResolver.rootResolve(override ?? DELEGATION_RECORD_ROOT_PATH),
-    {
-      allowMissingLeaf: true,
-    }
-  );
-}
-
-/** `<root>/system` or `<root>/confidential/<tenant>`. */
-function partitionDir(tenant: string | undefined): string {
-  return assertSafeRepositoryPath(
-    path.join(
-      resolveStoreRoot(),
-      ...storagePartitionSegments(
-        tenant ? { kind: 'tier', tier: DELEGATION_TENANT_TIER, tenant } : { kind: 'system' }
-      )
-    ),
-    { allowMissingLeaf: true }
-  );
-}
 
 function tracePathFor(tenant: string | undefined): string {
   const override = getRegisteredEnvText('KYBERION_DELEGATION_TRACE_PATH')?.trim();
@@ -226,27 +191,6 @@ function tracePathFor(tenant: string | undefined): string {
   return assertSafeRepositoryPath(path.join(partitionDir(tenant), DELEGATION_TRACE_FILE), {
     allowMissingLeaf: true,
   });
-}
-
-function recordsDirFor(tenant: string | undefined): string {
-  return assertSafeRepositoryPath(path.join(partitionDir(tenant), DELEGATION_RECORDS_DIR), {
-    allowMissingLeaf: true,
-  });
-}
-
-function safeLeafId(value: string, label: string): string {
-  const safeId = String(value || '')
-    .trim()
-    .replace(/[^a-zA-Z0-9._-]+/g, '-');
-  if (!safeId) throw new Error(`${label} is required.`);
-  return safeId;
-}
-
-function recordPathIn(tenant: string | undefined, delegationId: string): string {
-  return assertSafeRepositoryPath(
-    path.join(recordsDirFor(tenant), `${safeLeafId(delegationId, 'Delegation id')}.json`),
-    { allowMissingLeaf: true }
-  );
 }
 
 /**
@@ -277,24 +221,6 @@ function legacyRecordPath(delegationId: string): string {
     path.join(legacyLocation().recordDir, `${safeLeafId(delegationId, 'Delegation id')}.json`),
     { allowMissingLeaf: true }
   );
-}
-
-/**
- * Run `fn` as `delegation_record_store` bound to the tenant of the registered
- * partition `filePath` lies in; otherwise (system partition, test override,
- * legacy copy) as the caller. The role is tenant-bound: a caller with another
- * active tenant throws [ROLE_TENANT_SCOPE_MISMATCH] before `fn` runs.
- */
-function asDelegationStore<T>(filePath: string, fn: () => T): T {
-  const partition = tenantStoreLedgerPartitionOf(filePath);
-  if (partition?.storeRole !== DELEGATION_RECORD_STORE_ROLE || !partition.tenant) return fn();
-  return withExecutionContext(DELEGATION_RECORD_STORE_ROLE, fn, undefined, partition.tenant);
-}
-
-async function asDelegationStoreAsync<T>(filePath: string, fn: () => Promise<T>): Promise<T> {
-  const partition = tenantStoreLedgerPartitionOf(filePath);
-  if (partition?.storeRole !== DELEGATION_RECORD_STORE_ROLE || !partition.tenant) return fn();
-  return withExecutionContextAsync(DELEGATION_RECORD_STORE_ROLE, fn, undefined, partition.tenant);
 }
 
 /** The trace this process's scope appends to (honours the test override). */
@@ -390,55 +316,12 @@ function readRecordFile(filePath: string): DelegatedTaskRecord | null {
   });
 }
 
-/**
- * Tenant a legacy (pre-partition) record belongs to: its stamp, else the
- * location of its mission (`active/[archive/]missions/<tier>/<tenant>/<id>`).
- * `{}` = untenanted (no mission, or an untenanted one); null = unattributable
- * (the mission exists but is not visible to this process).
- */
-function legacyRecordTenant(record: {
-  tenant_slug?: string;
-  mission_id?: string;
-}): { tenant?: string } | null {
-  const stamped = normalizeTenant(record.tenant_slug);
-  if (stamped) return { tenant: stamped };
-  if (!record.mission_id) return {};
-  let missionPath: string | null = null;
-  try {
-    missionPath = pathResolver.findMissionPath(record.mission_id);
-  } catch {
-    return null;
-  }
-  if (!missionPath) return {};
-  const segments = path.relative(pathResolver.rootDir(), missionPath).split(path.sep);
-  const start = segments[1] === 'archive' ? 3 : 2;
-  const rest = segments.slice(start + 1);
-  return rest.length === 2 ? { tenant: normalizeTenant(rest[0]) } : {};
-}
-
 interface LocatedDelegatedTaskRecord {
   record: DelegatedTaskRecord;
   /** Partition tenant (undefined = system). */
   tenant?: string;
   /** Found in the shared pre-partition directory. */
   legacy: boolean;
-}
-
-/** Tenant partitions present under the store root (directory names only). */
-function listTenantPartitions(): string[] {
-  const tierDir = path.join(resolveStoreRoot(), DELEGATION_TENANT_TIER);
-  if (!safeExistsSync(tierDir)) return [];
-  try {
-    return safeReaddir(tierDir)
-      .map((entry) => normalizeTenant(entry))
-      .filter((entry): entry is string => Boolean(entry))
-      .sort();
-  } catch (error) {
-    logger.debug(
-      `delegation partition listing skipped — ${error instanceof Error ? error.message : String(error)} | next: none | evidence: ${tierDir}`
-    );
-    return [];
-  }
 }
 
 function loadFromPartition(
