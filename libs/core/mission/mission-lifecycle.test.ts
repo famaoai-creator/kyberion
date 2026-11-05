@@ -177,7 +177,10 @@ afterEach(() => {
     recursive: true,
     force: true,
   });
-  safeRmSync(pathResolver.rootResolve('customer/demo'), { recursive: true, force: true });
+  safeRmSync(pathResolver.rootResolve('knowledge/personal/stances/demo'), {
+    recursive: true,
+    force: true,
+  });
   safeRmSync(missionPath, { recursive: true, force: true });
   safeRmSync(demoTenantMissionPath, { recursive: true, force: true });
   safeRmSync(personalRepairMissionPath, { recursive: true, force: true });
@@ -1818,7 +1821,7 @@ describe('mission lifecycle finish gate', () => {
         }
       ) as string;
       expect(deliveryLog).toContain(missionId);
-      expect(deliveryLog).toContain('customer/demo/deliverables');
+      expect(deliveryLog).toContain('knowledge/personal/stances/demo/deliverables');
     } finally {
       if (previousCustomer === undefined) delete process.env.KYBERION_STANCE;
       else process.env.KYBERION_STANCE = previousCustomer;

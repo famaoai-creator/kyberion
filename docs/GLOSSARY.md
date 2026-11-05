@@ -661,7 +661,7 @@ HMAC-signed peer-to-peer messaging between tenant instances. Peers are registere
 
 ### Stance (Customer Overlay)
 
-The `knowledge/personal/stances/{slug}/` overlay selected by `KYBERION_STANCE`, layering one identity / connections / policy / voice set over `knowledge/personal/` without forking (`libs/core/customer-resolver.ts`). It answers "which hat am I wearing right now" — an FDE engagement is one such stance, and holding roles at several independent legal entities is another. A stance is runtime configuration, not a scope: it does not appear in the entity scope hierarchy, and the directory keeps its historical `customer/` name. → [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md)
+The `knowledge/personal/stances/{slug}/` overlay selected by `KYBERION_STANCE`, layering one identity / connections / policy / voice set over `knowledge/personal/` without forking (`libs/core/stance-resolver.ts`). It answers "which hat am I wearing right now" — an FDE engagement is one such stance, and holding roles at several independent legal entities is another. A stance is runtime configuration, not a scope: it does not appear in the entity scope hierarchy. Stances used to live in the top-level `customer/` directory (selected by the now-deprecated `KYBERION_CUSTOMER`). → [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md)
 
 ### Tenant's Customers
 

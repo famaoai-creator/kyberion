@@ -49,6 +49,54 @@ const CONFIDENTIAL_INDEX_RELATIVE_PATH = 'knowledge/confidential/tenants/index.j
 /** Holds the read grant on the index (security-policy.json authority_role_permissions). */
 const REGISTRY_READER_ROLE = 'check_tenant_registry_consistency';
 
+function listStanceTenantProfiles(rootDir: string, notes: string[]): string[] {
+  const customerBase = assertSafeRepositoryPath(path.join(rootDir, STANCES_DIR), {
+    allowMissingLeaf: true,
+    rootDir,
+  });
+  if (safeExistsSync(customerBase) && safeLstat(customerBase).isDirectory()) {
+    const customerDirs = safeReaddir(customerBase)
+      .filter((entry) => {
+        try {
+          return (
+            assertSafeRepositoryPath(path.join(customerBase, entry), {
+              allowMissingLeaf: true,
+              rootDir,
+            }) && safeLstat(path.join(customerBase, entry)).isDirectory()
+          );
+        } catch {
+          return false;
+        }
+      })
+      .sort();
+    return customerDirs
+      .flatMap((customerSlug) => {
+        const tenantDir = assertSafeRepositoryPath(
+          path.join(customerBase, customerSlug, 'tenants'),
+          { allowMissingLeaf: true, rootDir }
+        );
+        if (!safeExistsSync(tenantDir) || !safeLstat(tenantDir).isDirectory()) return [];
+        return safeReaddir(tenantDir)
+          .filter((entry) => {
+            if (!entry.endsWith('.json')) return false;
+            try {
+              return safeLstat(
+                assertSafeRepositoryPath(path.join(tenantDir, entry), {
+                  rootDir,
+                })
+              ).isFile();
+            } catch {
+              return false;
+            }
+          })
+          .map((entry) => entry.slice(0, -'.json'.length));
+      })
+      .sort();
+  }
+  notes.push('(c) knowledge/personal/stances/ not present — treated as empty tenant facet set');
+  return [];
+}
+
 export type { TenantRegistryException } from './tenant-registry-exceptions.js';
 
 export interface TenantSystemsSnapshot {
@@ -114,53 +162,11 @@ export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsS
     notes.push(`(b) ${CONFIDENTIAL_INDEX_RELATIVE_PATH} not present — treated as empty set`);
   }
 
-  let customerTenantProfiles: string[] = [];
-  // Tenant profiles a stance may act for live under each stance's tenants/ folder.
-  const customerBase = assertSafeRepositoryPath(path.join(rootDir, STANCES_DIR), {
-    allowMissingLeaf: true,
-    rootDir,
-  });
-  if (safeExistsSync(customerBase) && safeLstat(customerBase).isDirectory()) {
-    const customerDirs = safeReaddir(customerBase)
-      .filter((entry) => {
-        try {
-          return (
-            assertSafeRepositoryPath(path.join(customerBase, entry), {
-              allowMissingLeaf: true,
-              rootDir,
-            }) && safeLstat(path.join(customerBase, entry)).isDirectory()
-          );
-        } catch {
-          return false;
-        }
-      })
-      .sort();
-    customerTenantProfiles = customerDirs
-      .flatMap((customerSlug) => {
-        const tenantDir = assertSafeRepositoryPath(
-          path.join(customerBase, customerSlug, 'tenants'),
-          { allowMissingLeaf: true, rootDir }
-        );
-        if (!safeExistsSync(tenantDir) || !safeLstat(tenantDir).isDirectory()) return [];
-        return safeReaddir(tenantDir)
-          .filter((entry) => {
-            if (!entry.endsWith('.json')) return false;
-            try {
-              return safeLstat(
-                assertSafeRepositoryPath(path.join(tenantDir, entry), {
-                  rootDir,
-                })
-              ).isFile();
-            } catch {
-              return false;
-            }
-          })
-          .map((entry) => entry.slice(0, -'.json'.length));
-      })
-      .sort();
-  } else {
-    notes.push('(c) customer/ directory not present — treated as empty tenant facet set');
-  }
+  // Tenant profiles a stance may act for live under each stance's tenants/ folder
+  // (personal tier): list them as the read-only registry reader too.
+  const customerTenantProfiles = withExecutionContext(REGISTRY_READER_ROLE, () =>
+    listStanceTenantProfiles(rootDir, notes)
+  );
   notes.push(
     '(c) top-level customer stance directories are not tenant references; nested tenant profiles are cross-checked'
   );
