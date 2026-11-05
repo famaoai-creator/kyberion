@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { planAuditMirrorMove, planTenantHomeMoves } from './0002-tenant-home.js';
+import { planAuditMirrorMove, planTenantHomeMoves, relabelSource } from './0002-tenant-home.js';
 
 describe('0002-tenant-home migration plan', () => {
   let root = '';
@@ -57,5 +57,22 @@ describe('0002-tenant-home migration plan', () => {
     expect(mirror && path.relative(root, mirror.to)).toBe(
       'active/shared/runtime/audit-mirror/confidential/acme'
     );
+  });
+
+  it('relabels a moved record from the customer source kind to its tenant home path', () => {
+    const chart: Record<string, unknown> = {
+      source_kind: 'customer',
+      source_path: 'customer/acme/org-chart.json',
+      name: 'Acme',
+    };
+    expect(relabelSource(chart, 'acme')).toBe(true);
+    expect(chart).toEqual({
+      source_kind: 'confidential',
+      source_path: 'knowledge/confidential/acme/org-chart.json',
+      name: 'Acme',
+    });
+    const other: Record<string, unknown> = { source_kind: 'public', source_path: 'x.json' };
+    expect(relabelSource(other, 'acme')).toBe(false);
+    expect(other).toEqual({ source_kind: 'public', source_path: 'x.json' });
   });
 });
