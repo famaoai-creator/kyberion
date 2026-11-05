@@ -352,6 +352,17 @@ export interface ReasoningCallOptions {
   delegation_inactivity?: { timeoutMs: number; lateResultGraceMs?: number };
   /** Continuous execution requires a semantic-progress-capable dispatcher. */
   delegation_execution?: 'bounded' | 'continuous';
+  /**
+   * What a dispatcher call (`AgentDispatcher` / `dispatchWithConcurrencyGovernance`)
+   * does on abort or wall-clock expiry before it rejects and releases its
+   * concurrency slot. `child_exit` (default) waits until the provider call
+   * settles — bounded by 2 × `KYBERION_DELEGATION_KILL_GRACE_MS` + 1s — so the
+   * slot stays held while the adapter stops its child process, and rejects with
+   * the adapter's child-exit observation (`child_exit=unconfirmed` after the
+   * bound). `immediate` rejects at once and releases the slot while the child
+   * may still be terminating: only for callers that must return immediately.
+   */
+  delegation_abort_wait?: 'child_exit' | 'immediate';
   /** Governed role used to resolve a runtime/model profile. */
   role?: string;
   /** Optional resolved profile override; security constraints still apply. */

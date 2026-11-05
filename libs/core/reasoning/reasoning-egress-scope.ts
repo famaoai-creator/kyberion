@@ -16,6 +16,7 @@ import {
   custodyAttestationRequestCommand,
   evaluateProviderEgress,
   lookupCustodyProviderAttestation,
+  personConsentNoTrainingEvidenceGap,
   providerIdForReasoningIdentifier,
   resolveProviderEgressCustody,
 } from '../provider/provider-egress-gate.js';
@@ -202,10 +203,15 @@ export function _setReasoningTenantRegistryRootForTests(rootDir: string | undefi
  *   delegation face — called with the same custody, so identical inputs give
  *   identical answers on both faces (SM-01). That covers the custody owner's
  *   own attestation (tenant profile, or the system / person store), the
- *   tenant's `allowed_reasoning_backends`, the provider-declared /
- *   approved_providers rule, and every expiry / `used` denial;
+ *   tenant's `allowed_reasoning_backends`, the provider-declared rule, and
+ *   every expiry / `used` denial. One basis the evaluator accepts is refused
+ *   here: `approved-providers-exception` lets an operator delegate to a
+ *   provider whose terms are undeclared, which is not evidence that it does
+ *   not train (decided 2026-11-05);
  * - public material has no tier rule to apply, so only a valid custody
- *   attestation of `training_use: 'none'` establishes the no-training claim.
+ *   attestation of `training_use: 'none'` establishes the no-training claim
+ *   (for person custody that attestation is the person's consent, which also
+ *   needs the installation's attestation or a policy declaration).
  *
  * Anything else keeps the fail-closed denial, and the next step names the
  * attestation command for the custody owner that is missing one.
@@ -237,7 +243,13 @@ function assertNoTrainingAttested(backendName: string, scope: ReasoningPayloadSc
     );
   }
   const custody = resolved.custody!;
-  const next = `next: record one with '${custodyAttestationRequestCommand(custody, provider)}', or declare training_use 'training_eligible' explicitly`;
+  // Person custody needs two records (decided 2026-11-05): the installation's
+  // no-training attestation, and the person's own consent.
+  const attestationSteps =
+    custody.kind === 'person'
+      ? `the installation's no-training attestation with '${custodyAttestationRequestCommand({ kind: 'system' }, provider)}' and the person's own consent with '${custodyAttestationRequestCommand(custody, provider)}' (decided by that person)`
+      : `one with '${custodyAttestationRequestCommand(custody, provider)}'`;
+  const next = `next: record ${attestationSteps}, or declare training_use 'training_eligible' explicitly`;
   const subject =
     custody.kind === 'tenant'
       ? `tenant '${custody.tenant_slug}'`
@@ -276,6 +288,17 @@ function assertNoTrainingAttested(backendName: string, scope: ReasoningPayloadSc
         next
       );
     }
+    // A person's attestation is their consent; the no-training fact still
+    // needs the installation's attestation or a policy declaration.
+    const evidenceGap =
+      custody.kind === 'person' ? personConsentNoTrainingEvidenceGap(provider!) : '';
+    if (evidenceGap) {
+      deny(
+        `${subject} consents to '${provider}', but its consent is not evidence that the provider does not train and ${evidenceGap}`,
+        evidence,
+        next
+      );
+    }
     return;
   }
 
@@ -294,6 +317,16 @@ function assertNoTrainingAttested(backendName: string, scope: ReasoningPayloadSc
       attestationGap ? `${attestationGap}; ${policyWhy}` : policyWhy,
       `${evidence} tier=${scope.tier}`,
       next
+    );
+  }
+  // An approved_providers entry is an operator exception for a provider whose
+  // terms are undeclared — it keeps delegation working, but it is no evidence
+  // that the provider does not train, which is what `no_training` claims.
+  if (decision.basis === 'approved-providers-exception') {
+    deny(
+      `${attestationGap ? `${attestationGap}; ` : ''}the provider egress policy allows ${scope.tier} material to '${provider}' only through the tier_policy.${scope.tier}.approved_providers exception, which is an operator exception, not evidence that the provider does not train`,
+      `${evidence} tier=${scope.tier} basis=approved-providers-exception`,
+      `next: declare providers.${provider}.training_use 'none' in provider-egress-policy.json, or record ${attestationSteps}`
     );
   }
 }
