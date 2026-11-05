@@ -193,6 +193,56 @@ describe('task-local reasoning construction', () => {
     expect(nativeRequired.requiresNativeSubagent?.()).toBe(true);
   });
 
+  it('lets a caller-bounded construction reach the provider unraced and with its own timeout', async () => {
+    vi.mocked(resolveReasoningRouteCandidates).mockReturnValue([
+      { ...route, limits: { timeoutMs: 20 } } as ResolvedReasoningRoute,
+    ]);
+    // A provider that ignores its signal and answers only when released.
+    const releases: Array<(answer: string) => void> = [];
+    const slow = (_prompt: string) =>
+      new Promise<string>((resolve) => {
+        releases.push(resolve);
+      });
+    const portsWith = () => {
+      const ports = construction();
+      ports.buildBundle.mockReturnValue({
+        mode: 'codex-cli',
+        backend: {
+          backend: {
+            ...getReasoningBackend(),
+            // The stub id is local-only, so the egress gate lets the call through.
+            name: 'stub',
+            prompt: slow,
+            getNativeSubagentAdopter: () => null,
+          },
+        },
+      });
+      return ports;
+    };
+
+    const routeBounded = constructTaskReasoningBackend({}, portsWith());
+    await expect(routeBounded.prompt('x')).rejects.toThrow('[REASONING_REQUEST_TIMEOUT]');
+    releases.splice(0).forEach((release) => release('late'));
+
+    const callerPorts = portsWith();
+    const callerBounded = constructTaskReasoningBackend(
+      { requestTimeout: 'caller', timeoutMs: 5_000 },
+      callerPorts
+    );
+    expect(callerPorts.buildBundle).toHaveBeenCalledWith(
+      'codex-cli',
+      expect.objectContaining({ timeoutMs: 5_000 })
+    );
+    // An abort is not answered on the provider's behalf: the provider's own
+    // (here: ignoring) behaviour is what the caller observes.
+    const controller = new AbortController();
+    const pending = callerBounded.prompt('x', { signal: controller.signal });
+    await vi.waitFor(() => expect(releases).toHaveLength(1));
+    controller.abort('caller stop');
+    releases[0]!('late');
+    await expect(pending).resolves.toBe('late');
+  });
+
   it('refuses implicit stubs and fixed routes without an available backend', () => {
     const ports = construction();
     vi.mocked(resolveReasoningRouteCandidates).mockReturnValue([{ ...route, mode: 'stub' }]);
