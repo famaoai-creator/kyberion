@@ -293,15 +293,10 @@ function expandPolicyPath(pattern: string, missionId?: string, tenantSlug?: stri
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(projectId)) return null;
     pattern = pattern.split(PROJECT_ID_PLACEHOLDER).join(projectId);
   }
-  // KYBERION_CUSTOMER is the deprecated name of KYBERION_STANCE (stance-resolver.ts).
-  const stanceSlug =
-    getRegisteredEnvText('KYBERION_STANCE')?.trim() ||
-    getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() ||
-    'NONE';
+  const slug = getRegisteredEnvText('KYBERION_STANCE') || getRegisteredEnvText('KYBERION_CUSTOMER');
   return pattern
     .replace('${MISSION_ID}', missionId || 'NONE')
-    .replace('${KYBERION_STANCE}', stanceSlug)
-    .replace('${KYBERION_CUSTOMER}', stanceSlug);
+    .replace('${KYBERION_STANCE}', slug?.trim() || 'NONE');
 }
 
 function policyPathMatches(

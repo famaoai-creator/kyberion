@@ -25,7 +25,9 @@ describe('Developer tour contract', () => {
     expect(tour).toContain('pnpm test -- --suite meeting-dry-run');
     expect(tour).toContain('voice-consent.json');
     expect(tour).toContain('telegram-bridge');
-    expect(tour).toContain('customer/{slug}/` becomes the preferred overlay root');
+    expect(tour).toContain(
+      'knowledge/personal/stances/{slug}/` becomes the preferred overlay root'
+    );
     expect(tour).toContain('Legacy personal fallback');
     expect(tour).toContain('Legacy personal fallback when no customer overlay is active');
     expect(tour).toContain('EXTENSION_POINTS.md');
