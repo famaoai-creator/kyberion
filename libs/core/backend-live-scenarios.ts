@@ -216,6 +216,24 @@ const PROMPT_ECHO_PATTERN = /reply with (?:exactly|just)|first message of this c
 
 export type WordJudgement = 'word' | 'echo' | 'absent';
 
+const LEADING_DECORATION = new Set([...'"\'`*.:']);
+const TRAILING_DECORATION = new Set([...'"\'`*.:!']);
+
+/**
+ * Trim whitespace and quote/punctuation decoration from both ends. A linear
+ * scan, not an anchored regex: `[…]+$` retries from every position and runs
+ * quadratically on long whitespace runs in untrusted model output.
+ */
+function stripAnswerDecoration(answer: string): string {
+  const isSpace = (ch: string) => ch.trim() === '';
+  let start = 0;
+  let end = answer.length;
+  while (start < end && (isSpace(answer[start]) || LEADING_DECORATION.has(answer[start]))) start++;
+  while (end > start && (isSpace(answer[end - 1]) || TRAILING_DECORATION.has(answer[end - 1])))
+    end--;
+  return answer.slice(start, end);
+}
+
 /**
  * Judge an answer against the requested word, from the answer alone. The word
  * must BE the answer (after trimming quotes/punctuation) or sit in a short
@@ -223,7 +241,7 @@ export type WordJudgement = 'word' | 'echo' | 'absent';
  */
 export function judgeWordAnswer(answer: string, word: string): WordJudgement {
   if (PROMPT_ECHO_PATTERN.test(answer)) return 'echo';
-  const stripped = answer.trim().replace(/^[\s"'`*.:]+|[\s"'`*.:!]+$/gu, '');
+  const stripped = stripAnswerDecoration(answer);
   if (stripped === word) return 'word';
   if (answer.includes(word) && answer.trim().length <= word.length + WORD_ANSWER_SLACK_CHARS) {
     return 'word';
