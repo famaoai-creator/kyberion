@@ -959,6 +959,7 @@
         "tests/delegation-start-reporting.test.ts",
         "tests/tenant-runtime-store-registration.test.ts",
         "tests/reasoning-payload-scope-training-use.test.ts",
+        "tests/measurement-backend-construction.test.ts",
         "libs/core/seam.test.ts",
         "libs/core/seam-lifecycle-contract.test.ts",
         "libs/core/provider-module-boundaries.test.ts",
