@@ -336,7 +336,7 @@ jobs:
           pnpm exec vitest run
           libs/core/windows-local-assist-bridge.test.ts
           libs/shared-media/src/native-speech-listen-bridge.test.ts
-          libs/core/media/native-tts.test.ts
+          libs/shared-voice/src/native-tts.test.ts
           libs/core/environment-capability.test.ts
           libs/core/platform.test.ts
           libs/core/virtual/os-accessibility-detector.test.ts

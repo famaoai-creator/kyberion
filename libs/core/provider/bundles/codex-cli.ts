@@ -1,4 +1,4 @@
-import { cliProviderEnv, registerCliProviderBundle } from '../../cli-provider-bundle.js';
+import { cliProviderEnv, registerCliProviderBundle } from '../cli-provider-bundle.js';
 import { maybeWrapWithDispatcher } from '../../agent/agent-dispatch.js';
 import { CodexCliIntentExtractor } from '../codex-cli-intent-extractor.js';
 import { CodexCliReasoningBackend } from '../codex-cli-reasoning-backend.js';

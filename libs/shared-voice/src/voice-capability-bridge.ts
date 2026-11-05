@@ -3,7 +3,7 @@ import {
   speak,
   type SpeakOptions,
   type SpeakResult,
-} from '@agent/core/media/native-tts';
+} from '@agent/shared-voice/native-tts';
 
 export const VOICE_CAPABILITY_BRIDGE_ID = 'voice-capability-bridge' as const;
 

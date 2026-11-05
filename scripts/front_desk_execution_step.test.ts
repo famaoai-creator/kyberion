@@ -60,7 +60,7 @@ let safeRmSync: typeof import('@agent/core/secure-io').safeRmSync;
 let safeWriteFile: typeof import('@agent/core/secure-io').safeWriteFile;
 let withExecutionContext: typeof import('@agent/core/authority').withExecutionContext;
 let withExecutionContextAsync: typeof import('@agent/core/authority').withExecutionContextAsync;
-let mintBrowserSessionToken: typeof import('@agent/core/authn-providers').mintBrowserSessionToken;
+let mintBrowserSessionToken: typeof import('@agent/core/authn/authn-providers').mintBrowserSessionToken;
 let readFirstJobApprovals: typeof import('@agent/core/surface/first-job-approval').readFirstJobApprovals;
 let decideFirstJobApproval: typeof import('@agent/core/surface/first-job-approval').decideFirstJobApproval;
 let runDotExecutorStep: typeof import('./dot_executor_step.js').runDotExecutorStep;
@@ -152,7 +152,7 @@ beforeAll(async () => {
   ({ safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } =
     await import('@agent/core/secure-io'));
   ({ withExecutionContext, withExecutionContextAsync } = await import('@agent/core/authority'));
-  ({ mintBrowserSessionToken } = await import('@agent/core/authn-providers'));
+  ({ mintBrowserSessionToken } = await import('@agent/core/authn/authn-providers'));
   ({ readFirstJobApprovals, decideFirstJobApproval } =
     await import('@agent/core/surface/first-job-approval'));
   ({ runDotExecutorStep, buildDotExecutorPorts } = await import('./dot_executor_step.js'));

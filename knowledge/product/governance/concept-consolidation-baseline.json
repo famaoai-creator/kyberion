@@ -539,7 +539,7 @@
     "libs/shared-media/src/music-generation/providers/musicgen-mlx.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "libs/core/media/native-tts.ts": {
+    "libs/shared-voice/src/native-tts.ts": {
       "exported_type_name_duplication_budget": 1
     },
     "libs/core/mesh/a2a-envelope-signature.ts": {
@@ -1950,7 +1950,7 @@
     ],
     "SpeakResult": [
       "libs/core/discussion/discussion-speaker.ts",
-      "libs/core/media/native-tts.ts",
+      "libs/shared-voice/src/native-tts.ts",
       "scripts/cli-speak.ts"
     ]
   }

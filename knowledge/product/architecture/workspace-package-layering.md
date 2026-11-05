@@ -56,6 +56,15 @@ Core itself is layered `foundation → contracts → domain → orchestration`
   with its domain. The public subpath follows the file (`@agent/core/foundation/<name>`,
   `@agent/core/contracts/<name>`).
 
+- A flat module that implements one core subsystem moves into that subsystem's directory
+  (`authn-providers` → `authn/`; `cli-provider-bundle`, `provider-transport`,
+  `completion-token-budget` → `provider/`).
+- A flat file that only re-exports one module is deleted and its importers point at the module;
+  a deliberate multi-module facade with many consumers (`@agent/core/governance`) stays.
+- A registry shared by several `shared-*` packages and actuators (for example
+  `voice/voice-profile-registry`) stays in core: moving it into one shared package would make
+  its sibling packages depend on each other.
+
 ## Placement guide
 
 | Package              | Holds                                                                                               | Stays in core instead                                                |
