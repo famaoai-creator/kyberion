@@ -31,8 +31,10 @@ export const runEvaluateModelRoleFitness = defineScript({
         'Usage: evaluate_model_role_fitness --model <MODEL_ID> [--provider <ID>] [--role <TEAM_ROLE>] [--dry-run]'
       );
     }
-    // A standalone entrypoint has to install the failover chain itself; the
-    // mission CLI does this during its own bootstrap.
+    // A standalone entrypoint has to install the host's reasoning seams itself
+    // (the mission CLI does this during its own bootstrap). The probes do not
+    // run on that installed chain: runModelRoleFitnessProbes builds its own
+    // caller-bounded measurement backend (requestTimeout: 'caller').
     installReasoningBackends();
     const teamRole = value('--role');
     const provider = value('--provider');
