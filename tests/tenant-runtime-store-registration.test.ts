@@ -2,10 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { safeReadFile } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
-import {
-  PARTITIONED_RUNTIME_STATE_ROOTS,
-  RUNTIME_STATE_PATHS,
-} from '@agent/core/foundation/runtime-state-roots';
+import { PARTITIONED_RUNTIME_STATE_ROOTS } from '@agent/core/storage-layout';
 import {
   PHYSICAL_LEGACY_TENANT_STATE_ROOTS,
   PHYSICAL_PRESENCE_ROOT,
@@ -206,9 +203,12 @@ describe('tenant-partitioned runtime store registration', () => {
 
   it('covers the hand-joined tenant memory root and never lists a base twice', () => {
     // RUNTIME_STATE_PATHS['memory.tenantRoot'] is `<runtime>/tenants`: its base must be offboarded.
-    expect(OFFBOARDED_BASES).toContain(
-      path.posix.dirname(RUNTIME_STATE_PATHS['memory.tenantRoot'])
-    );
+    // (Read statically: runtime-state-roots is not a public @agent/core subpath.)
+    const memoryTenantRoot = read(
+      path.join(rootDir, 'libs', 'core', 'foundation', 'runtime-state-roots.ts')
+    ).match(/'memory\.tenantRoot':\s*'([^']+)'/u)?.[1];
+    expect(memoryTenantRoot, 'memory.tenantRoot declaration not found').toBeDefined();
+    expect(OFFBOARDED_BASES).toContain(path.posix.dirname(memoryTenantRoot!));
     const all = [
       PHYSICAL_SCHEDULE_ROOT,
       PHYSICAL_PRESENCE_ROOT,

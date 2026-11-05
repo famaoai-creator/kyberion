@@ -677,9 +677,9 @@ export const PHYSICAL_TENANT_LEARNING_ROOTS = [
  */
 export const PHYSICAL_LEGACY_TENANT_STATE_ROOTS = [
   // generation-cost-settlement.ts: read fallback until the next write moves it.
-  'active/shared/runtime/media-generation/cost-settlements',
+  PARTITIONED_RUNTIME_STATE_ROOTS.generation_cost_settlements,
   // scripts/reasoning_credentials.ts: proofs expire after 15 minutes; no read fallback.
-  'active/shared/runtime/health/api-verification',
+  PARTITIONED_RUNTIME_STATE_ROOTS.api_verification,
 ] as const;
 
 export interface PhysicalNamespaceFilter {

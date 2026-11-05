@@ -164,11 +164,12 @@ describe('codex-cli-query', () => {
   });
 
   it('keeps the spawn error code through both rewraps so ENOENT stays pre-start (R5)', async () => {
-    const child = new EventEmitter() as any;
-    child.stdout = new PassThrough();
-    child.stderr = new PassThrough();
-    child.stdin = new PassThrough();
-    child.kill = vi.fn();
+    const child = Object.assign(new EventEmitter(), {
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      stdin: new PassThrough(),
+      kill: vi.fn(),
+    });
     mocks.spawnMock.mockReturnValueOnce(child);
     const enoent = Object.assign(new Error('spawn codex ENOENT'), {
       code: 'ENOENT',
