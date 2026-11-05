@@ -163,6 +163,26 @@ export function stripIdPrefix(title: string | undefined | null): string {
   return rest || text;
 }
 
+/**
+ * A readable name for a mission that has no recorded goal, built from its id:
+ * `MSN-CLI-GOV-FIX-20261030` → `CLI GOV FIX (2026-10-30)`. Ids that carry no
+ * words (`MSN-LX3K2`) come back unchanged; the id itself stays in the detail view.
+ */
+export function readableMissionName(id: string | undefined | null): string {
+  const text = String(id ?? '').trim();
+  const parts = text.split('-').filter(Boolean);
+  if (parts[0]?.toUpperCase() === 'MSN') parts.shift();
+  const last = parts[parts.length - 1] ?? '';
+  const date =
+    last.length === 8 && /^\d+$/u.test(last)
+      ? `${last.slice(0, 4)}-${last.slice(4, 6)}-${last.slice(6, 8)}`
+      : '';
+  if (date) parts.pop();
+  const words = parts.filter((part) => /[A-Za-z]/u.test(part));
+  if (words.length === 0 || (words.length === 1 && !date && /\d/u.test(words[0]))) return text;
+  return date ? `${parts.join(' ')} (${date})` : parts.join(' ');
+}
+
 /** Display names the surface already knows (members, agents), by actor id. */
 export type ActorNameLookup = (actorId: string) => string | undefined;
 

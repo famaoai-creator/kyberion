@@ -4,6 +4,7 @@ import { opsApiPath } from '../../lib/ops/ops-api-path';
 import { useEffect, useRef, useState } from 'react';
 import { buildAttentionItems, type AttentionItem } from '../../lib/ops/operator-console';
 import { resolveChronosLocale, uxText, uxTextOr } from '../../lib/ops/ux-vocabulary';
+import { useChronosLocale } from '../../lib/ops/hooks';
 import { MissionIntelligenceMissionPanel } from './MissionIntelligenceMissionPanel';
 import { MissionIntelligenceApprovalsPanel } from './MissionIntelligenceApprovalsPanel';
 import { MissionIntelligenceRuntimePanel } from './MissionIntelligenceRuntimePanel';
@@ -72,7 +73,9 @@ export function MissionIntelligence({
   showMissionIntelligenceLabel?: boolean;
   tenant?: string;
 }) {
-  const locale = resolveChronosLocale();
+  // The hook starts at the SSR default and switches after mount, so the
+  // server HTML and the first client render agree (no hydration mismatch).
+  const locale = useChronosLocale();
   const mt = (key: string, fallbackEn: string) => uxTextOr(key, fallbackEn, locale);
   const missionActionText = (action: ControlActionDefinition) => missionActionLabel(action, locale);
   const missionIntelligenceEyebrow = showMissionIntelligenceLabel
