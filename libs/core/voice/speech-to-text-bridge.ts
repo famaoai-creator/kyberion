@@ -41,7 +41,13 @@ import {
   discoverLocalSttBackends,
   selectPreferredLocalSttBackend,
 } from '../local-stt-discovery.js';
-import { resolveSpeechCppBin } from '../tool/tool-binary-resolvers.js';
+import { isExternalToolBinResolvable, resolveSpeechCppBin } from '../tool/tool-binary-resolvers.js';
+import {
+  unmetRuntimeRequirements,
+  runtimeSetupHint,
+  type ProviderRuntimeRequirement,
+  type RuntimeRequirementContext,
+} from '../provider-runtime-requirements.js';
 import {
   coreSeamCatalog,
   createSeam,
@@ -84,6 +90,8 @@ export interface SpeechToTextCapabilities {
    * Unset means "not declared": the backend is not filtered by language.
    */
   languages?: string[];
+  /** Host requirements the bridge needs to run (managed runtime, platform, env). */
+  runtime_requirements?: ProviderRuntimeRequirement;
 }
 
 export { WHISPER_LANGUAGES, primaryLanguageSubtag, supportsSpeechLanguage };
@@ -152,6 +160,35 @@ const RUNTIME_STT_METADATA: SeamProviderMetadata = {
   source: 'speech-to-text-runtime-discovery',
 };
 
+/**
+ * Runtime-gated placeholder bridges keyed by provider name. Placeholders live
+ * outside the seam so `getSpeechToTextBridge()` keeps returning a usable
+ * bridge (or the stub) while `getSpeechToTextBridges()` /
+ * `listSpeechToTextCandidates()` surface them as excluded candidates with
+ * `unmet` runtime reasons — instead of the provider being invisible and
+ * surfacing as "not found" at runtime. When the runtime later becomes
+ * available the installer drops the placeholder and registers the real
+ * bridge (named seams reject duplicate registrations).
+ */
+const runtimeGatedPlaceholders = new Map<string, SpeechToTextBridge>();
+
+function releaseRuntimeGatedPlaceholder(name: string): void {
+  runtimeGatedPlaceholders.delete(name);
+}
+
+function registerRuntimeGatedSttPlaceholder(
+  name: string,
+  capabilities: SpeechToTextCapabilities,
+  reason: string
+): void {
+  if (getSpeechToTextBridges().some((bridge) => bridge.name === name)) return;
+  runtimeGatedPlaceholders.set(name, {
+    name,
+    capabilities: { ...capabilities },
+    transcribe: () => Promise.reject(new Error(`[stt-bridge:${name}] unavailable: ${reason}`)),
+  });
+}
+
 export function registerSpeechToTextBridge(
   bridge: SpeechToTextBridge,
   metadata: SeamProviderMetadata = {
@@ -161,6 +198,9 @@ export function registerSpeechToTextBridge(
 ): () => void {
   const name = String(bridge.name || '').trim();
   if (!name) throw new Error('SpeechToTextBridge.name is required');
+  // A real registration supersedes any runtime-gated placeholder for the name,
+  // so the candidates list never carries both.
+  runtimeGatedPlaceholders.delete(name);
   const transcribe = bridge.transcribe.bind(bridge);
   const localOnly = bridge.capabilities?.local_only === true;
   const guarded: SpeechToTextBridge = {
@@ -220,7 +260,10 @@ export function getSpeechToTextBridge(): SpeechToTextBridge {
 }
 
 export function getSpeechToTextBridges(): SpeechToTextBridge[] {
-  const bridges = speechToTextSeam.list().map((provider) => provider.implementation);
+  const bridges = [
+    ...speechToTextSeam.list().map((provider) => provider.implementation),
+    ...runtimeGatedPlaceholders.values(),
+  ];
   return bridges.length > 0 ? bridges : [stubSpeechToTextBridge];
 }
 
@@ -300,7 +343,8 @@ const GRANULARITY_RANK: Record<SpeechToTextCapabilities['granularity'], number> 
 
 function unmetSpeechToTextRequirements(
   bridge: SpeechToTextBridge,
-  requires: SpeechToTextRequirements
+  requires: SpeechToTextRequirements,
+  runtimeCtx?: RuntimeRequirementContext
 ): string[] {
   const capabilities = getSpeechToTextCapabilities(bridge);
   const unmet: string[] = [];
@@ -318,16 +362,25 @@ function unmetSpeechToTextRequirements(
   if (!supportsSpeechLanguage(capabilities.languages, requires.language)) {
     unmet.push(`language (${primaryLanguageSubtag(requires.language)})`);
   }
+  unmet.push(...unmetRuntimeRequirements(capabilities.runtime_requirements, runtimeCtx));
   return unmet;
 }
 
 /** Selection candidates (id, eligible, unmet) for a task's requirements. */
 export function listSpeechToTextCandidates(
   requires: SpeechToTextRequirements = {},
-  bridges: SpeechToTextBridge[] = getSpeechToTextBridges()
+  bridges?: SpeechToTextBridge[],
+  runtimeCtx?: RuntimeRequirementContext
 ): Array<{ id: string; eligible: boolean; unmet: string[] }> {
-  return bridges.map((bridge) => {
-    const unmet = unmetSpeechToTextRequirements(bridge, requires);
+  let candidates = bridges ?? getSpeechToTextBridges();
+  // On the live provider list the stub stays a candidate even while
+  // runtime-gated placeholders occupy the catalog — explicit lists are
+  // evaluated as given.
+  if (bridges === undefined && !candidates.some((b) => b.name === stubSpeechToTextBridge.name)) {
+    candidates = [...candidates, stubSpeechToTextBridge];
+  }
+  return candidates.map((bridge) => {
+    const unmet = unmetSpeechToTextRequirements(bridge, requires, runtimeCtx);
     return { id: bridge.name, eligible: unmet.length === 0, unmet };
   });
 }
@@ -434,6 +487,7 @@ export function selectSpeechToTextBridges(
 export function resetSpeechToTextBridge(): void {
   registrations.reset();
   ownedFluidAudio = undefined;
+  runtimeGatedPlaceholders.clear();
 }
 
 export function normalizeSpeechToTextResult(
@@ -738,10 +792,31 @@ export function installFluidAudioSpeechToTextBridgeIfAvailable(
     (current !== ownedFluidAudio.bridge || ownedFluidAudio.fingerprint !== fingerprint)
   )
     releaseOwnedFluidAudio();
-  if (!configured) return false;
+  if (!configured) {
+    // Register unconditionally: the env_command requirement keeps the bridge
+    // visible to selection as excluded-with-reason
+    // (env:KYBERION_FLUID_AUDIO_STT_COMMAND) instead of invisible.
+    registerRuntimeGatedSttPlaceholder(
+      'fluid-audio-parakeet',
+      {
+        timestamps: true,
+        granularity: 'segment',
+        local_only: true,
+        runtime_requirements: { env_command: 'KYBERION_FLUID_AUDIO_STT_COMMAND' },
+      },
+      'FluidAudio STT command not configured — ' +
+        (runtimeSetupHint(['env:KYBERION_FLUID_AUDIO_STT_COMMAND']) ??
+          'set KYBERION_FLUID_AUDIO_STT_COMMAND or save fluid_audio_stt_command in engine runtime preferences')
+    );
+    return false;
+  }
   // A host/plugin's same-name registration is not ours to replace or remove.
-  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'fluid-audio-parakeet'))
+  if (
+    getSpeechToTextBridges().some((bridge) => bridge.name === 'fluid-audio-parakeet') &&
+    !runtimeGatedPlaceholders.has('fluid-audio-parakeet')
+  )
     return true;
+  releaseRuntimeGatedPlaceholder('fluid-audio-parakeet');
   const dispose = registerSpeechToTextBridge(
     new ShellSpeechToTextBridge({
       name: 'fluid-audio-parakeet',
@@ -772,7 +847,22 @@ export function installShellSpeechToTextBridgeIfAvailable(
   env: NodeJS.ProcessEnv = process.env
 ): boolean {
   const command = envText(env, 'KYBERION_STT_COMMAND')?.trim();
-  if (!command) return false;
+  // Register unconditionally: the env_command requirement keeps the bridge
+  // visible to selection as excluded-with-reason (env:KYBERION_STT_COMMAND)
+  // instead of invisible — callers see a setup hint, not "bridge not found".
+  if (!command) {
+    registerRuntimeGatedSttPlaceholder(
+      'shell',
+      {
+        ...NO_TIMESTAMP_STT_CAPABILITIES,
+        runtime_requirements: { env_command: 'KYBERION_STT_COMMAND' },
+      },
+      'KYBERION_STT_COMMAND not set — ' +
+        (runtimeSetupHint(['env:KYBERION_STT_COMMAND']) ?? 'set KYBERION_STT_COMMAND')
+    );
+    return false;
+  }
+  releaseRuntimeGatedPlaceholder('shell');
   releaseOwnedFluidAudio();
   if (getSpeechToTextBridges().some((bridge) => bridge.name === 'shell')) return true;
   let capabilities: SpeechToTextCapabilities | undefined;
@@ -907,7 +997,11 @@ export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
   if (envText(env, 'KYBERION_STT_COMMAND')?.trim() || fluidAudioSttCommandConfigured(env)) {
     return false;
   }
-  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'mlx_whisper')) return true;
+  if (
+    getSpeechToTextBridges().some((bridge) => bridge.name === 'mlx_whisper') &&
+    !runtimeGatedPlaceholders.has('mlx_whisper')
+  )
+    return true;
   const detected = discoverLocalSttBackends().filter(
     (candidate) =>
       candidate.backend === 'mlx_whisper' &&
@@ -917,10 +1011,28 @@ export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
   const selected = selectPreferredLocalSttBackend(detected);
   const pythonBin = selected?.python_bin;
   const priority = selected?.priority ?? 0;
+  const gateMlxWhisper = () => {
+    registerRuntimeGatedSttPlaceholder(
+      'mlx_whisper',
+      {
+        ...MLX_WHISPER_CAPABILITIES,
+        runtime_requirements: {
+          platforms: ['darwin'],
+          accelerator: 'mlx',
+          managed_tool_id: 'mlx_whisper',
+        },
+      },
+      'managed mlx_whisper runtime is unavailable — ' +
+        (runtimeSetupHint(['managed_runtime:mlx_whisper']) ?? 'install the managed runtime')
+    );
+    return false;
+  };
+  if (!pythonBin) return gateMlxWhisper();
   const bridgeScript = assertSafeRepositoryPath(
     rootResolve('libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py')
   );
-  if (!pythonBin || !safeExistsSync(bridgeScript)) return false;
+  if (!safeExistsSync(bridgeScript)) return gateMlxWhisper();
+  releaseRuntimeGatedPlaceholder('mlx_whisper');
 
   registerSpeechToTextBridge(
     {
@@ -978,7 +1090,11 @@ export function installManagedFasterWhisperSpeechToTextBridgeIfAvailable(
   if (envText(env, 'KYBERION_STT_COMMAND')?.trim() || fluidAudioSttCommandConfigured(env)) {
     return false;
   }
-  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'faster_whisper')) return true;
+  if (
+    getSpeechToTextBridges().some((bridge) => bridge.name === 'faster_whisper') &&
+    !runtimeGatedPlaceholders.has('faster_whisper')
+  )
+    return true;
   const selected = discoverLocalSttBackends().find(
     (candidate) =>
       candidate.backend === 'faster_whisper' &&
@@ -987,11 +1103,24 @@ export function installManagedFasterWhisperSpeechToTextBridgeIfAvailable(
   );
   const pythonBin = selected?.python_bin;
   const priority = selected?.priority ?? 0;
-  if (!pythonBin) return false;
+  const gateFasterWhisper = () => {
+    registerRuntimeGatedSttPlaceholder(
+      'faster_whisper',
+      {
+        ...MLX_WHISPER_CAPABILITIES,
+        runtime_requirements: { managed_tool_id: 'faster_whisper' },
+      },
+      'managed faster_whisper runtime is unavailable — ' +
+        (runtimeSetupHint(['managed_runtime:faster_whisper']) ?? 'install the managed runtime')
+    );
+    return false;
+  };
+  if (!pythonBin) return gateFasterWhisper();
   const bridgeScript = assertSafeRepositoryPath(
     rootResolve('libs/actuators/voice-actuator/scripts/faster_whisper_stt_bridge.py')
   );
-  if (!pythonBin || !safeExistsSync(bridgeScript)) return false;
+  if (!safeExistsSync(bridgeScript)) return gateFasterWhisper();
+  releaseRuntimeGatedPlaceholder('faster_whisper');
 
   registerSpeechToTextBridge(
     {
@@ -1062,11 +1191,36 @@ export function installSpeechCppSpeechToTextBridgeIfAvailable(
   if (envText(env, 'KYBERION_STT_COMMAND')?.trim() || fluidAudioSttCommandConfigured(env)) {
     return false;
   }
-  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'speech_cpp')) return true;
+  if (
+    getSpeechToTextBridges().some((bridge) => bridge.name === 'speech_cpp') &&
+    !runtimeGatedPlaceholders.has('speech_cpp')
+  )
+    return true;
 
-  const bin = resolveSpeechCppBin();
-  const probe = safeExecResult(bin, ['--help'], { timeoutMs: 5_000, maxOutputMB: 1 });
-  if (probe.error || probe.status !== 0) return false;
+  const toolBinary = {
+    toolId: 'speech_cpp',
+    envNames: ['KYBERION_SPEECH_CPP_BIN'],
+    binary: 'speech',
+  } as const;
+  const resolvable = isExternalToolBinResolvable(toolBinary);
+  const bin = resolvable ? resolveSpeechCppBin() : '';
+  const probe = resolvable
+    ? safeExecResult(bin, ['--help'], { timeoutMs: 5_000, maxOutputMB: 1 })
+    : null;
+  if (!probe || probe.error || probe.status !== 0) {
+    registerRuntimeGatedSttPlaceholder(
+      'speech_cpp',
+      {
+        ...NO_TIMESTAMP_STT_CAPABILITIES,
+        local_only: true,
+        runtime_requirements: { tool_binary: toolBinary },
+      },
+      'speech.cpp binary is unavailable — ' +
+        (runtimeSetupHint(['tool_binary:speech_cpp']) ?? 'install speech.cpp')
+    );
+    return false;
+  }
+  releaseRuntimeGatedPlaceholder('speech_cpp');
 
   registerSpeechToTextBridge(
     {

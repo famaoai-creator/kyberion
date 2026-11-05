@@ -28,14 +28,16 @@ import { safeExistsSync } from '../secure-io.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { resolveManagedToolPythonBin } from '../tool/tool-runtime-registry.js';
+import { runtimeSetupHint } from '../provider-runtime-requirements.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import {
+  listStreamingSttBridges,
   registerStreamingSttBridge,
   type StreamingSpeechToTextBridge,
   type StreamingSttCapabilities,
   type StreamingSttRequestOptions,
 } from '../voice/streaming-stt-bridge.js';
-import { primaryLanguageSubtag, WHISPER_LANGUAGES } from '../voice/speech-languages.js';
+import { primaryLanguageSubtag } from '../voice/speech-languages.js';
 import type { AudioChunk, TranscriptChunk } from '../meeting/meeting-session-types.js';
 
 export interface ShellStreamingSttOptions {
@@ -74,6 +76,21 @@ function validateShellCommand(command: string): string {
     throw new Error('KYBERION_STT_COMMAND contains an invalid null byte');
   }
   return normalized;
+}
+
+/**
+ * Placeholder bridge for providers whose declared runtime requirements are
+ * unmet — registered so selection reports the reason instead of the bridge
+ * being invisible. Throws the setup hint on use.
+ */
+class UnavailableStreamingSttBridge implements StreamingSpeechToTextBridge {
+  constructor(
+    readonly bridge_id: string,
+    private readonly reason: string
+  ) {}
+  async *transcribeStream(): AsyncIterable<TranscriptChunk> {
+    throw new Error(`[streaming-stt] bridge '${this.bridge_id}' unavailable: ${this.reason}`);
+  }
 }
 
 export class ShellStreamingSpeechToTextBridge implements StreamingSpeechToTextBridge {
@@ -222,6 +239,13 @@ export function installShellStreamingSttBridge(opts: ShellStreamingSttOptions): 
 }
 
 /**
+ * Disposer for the env-gated 'shell' placeholder — released before the real
+ * shell bridge registers so a later env-configured call cannot hit the
+ * named-seam duplicate-provider error.
+ */
+let shellEnvPlaceholderDispose: (() => void) | undefined;
+
+/**
  * Convenience: installs from `KYBERION_STT_COMMAND` (and optional
  * `KYBERION_STT_ARGS`, comma-separated) under the bridge id `shell`.
  */
@@ -231,7 +255,30 @@ export function installShellStreamingSttBridgeFromEnv(env: NodeJS.ProcessEnv = p
   dispose?: () => void;
 } {
   const command = getRegisteredEnvText('KYBERION_STT_COMMAND', { env });
-  if (!command) return { installed: false, reason: 'KYBERION_STT_COMMAND not set' };
+  // Register unconditionally: the declared env_command requirement keeps the
+  // bridge visible to selection as excluded-with-reason (env:KYBERION_STT_COMMAND)
+  // instead of invisible — callers see a setup hint, not "bridge not found".
+  if (!command) {
+    if (!listStreamingSttBridges().includes('shell')) {
+      shellEnvPlaceholderDispose = registerStreamingSttBridge(
+        'shell',
+        () =>
+          new UnavailableStreamingSttBridge(
+            'shell',
+            'KYBERION_STT_COMMAND not set — ' +
+              (runtimeSetupHint(['env:KYBERION_STT_COMMAND']) ?? 'set KYBERION_STT_COMMAND')
+          ),
+        { runtime_requirements: { env_command: 'KYBERION_STT_COMMAND' } }
+      );
+    }
+    return {
+      installed: false,
+      reason: 'KYBERION_STT_COMMAND not set',
+      dispose: shellEnvPlaceholderDispose,
+    };
+  }
+  shellEnvPlaceholderDispose?.();
+  shellEnvPlaceholderDispose = undefined;
   const args = (getRegisteredEnvText('KYBERION_STT_ARGS', { env }) ?? '')
     .split(',')
     .map((a) => a.trim())
@@ -241,8 +288,11 @@ export function installShellStreamingSttBridgeFromEnv(env: NodeJS.ProcessEnv = p
 }
 
 /**
- * Install the resident MLX Whisper stream adapter when the managed runtime is
- * available and no explicit deployment-specific command was supplied.
+ * Register the resident MLX Whisper stream adapter when no explicit
+ * deployment-specific command was supplied. Registration is unconditional —
+ * declared runtime_requirements keep the bridge visible to selection as
+ * excluded-with-reason (managed_runtime:mlx_whisper) when the managed runtime
+ * is absent, instead of the bridge being invisible.
  */
 export function installManagedMlxWhisperStreamingSttBridgeIfAvailable(
   env: NodeJS.ProcessEnv = process.env
@@ -250,18 +300,43 @@ export function installManagedMlxWhisperStreamingSttBridgeIfAvailable(
   if (getRegisteredEnvText('KYBERION_STT_COMMAND', { env })?.trim()) {
     return { installed: false, reason: 'KYBERION_STT_COMMAND already configured' };
   }
-  const command = resolveManagedToolPythonBin('mlx_whisper');
-  const script = pathResolver.rootResolve('scripts/stt_mlx_whisper_stream.py');
-  if (!command || !safeExistsSync(script)) {
-    return { installed: false, reason: 'managed mlx_whisper stream runtime is unavailable' };
-  }
   const bridgeId = 'managed_mlx_whisper';
-  const dispose = installShellStreamingSttBridge({
-    bridge_id: bridgeId,
-    command,
-    args: [script],
-    capabilities: { local_only: true, languages: [...WHISPER_LANGUAGES] },
+  const script = pathResolver.rootResolve('scripts/stt_mlx_whisper_stream.py');
+  // Register unconditionally: declared runtime_requirements make the bridge
+  // visible to selection as excluded-with-reason (managed_runtime:mlx_whisper)
+  // instead of invisible — callers see a setup hint, not "bridge not found".
+  // The factory re-probes the managed runtime on every call, so a single
+  // registration covers unavailable→available transitions; a second install
+  // call must not re-register (named seams reject duplicates).
+  if (listStreamingSttBridges().includes(bridgeId)) {
+    const available = resolveManagedToolPythonBin('mlx_whisper') !== null && safeExistsSync(script);
+    return {
+      installed: available,
+      reason: available
+        ? undefined
+        : 'managed mlx_whisper stream runtime is unavailable (registered as runtime-gated candidate)',
+      bridge_id: bridgeId,
+    };
+  }
+  const dispose = registerStreamingSttBridge(bridgeId, () => {
+    const command = resolveManagedToolPythonBin('mlx_whisper');
+    if (!command || !safeExistsSync(script)) {
+      return new UnavailableStreamingSttBridge(
+        bridgeId,
+        'managed mlx_whisper stream runtime is unavailable — ' +
+          (runtimeSetupHint(['managed_runtime:mlx_whisper']) ?? 'install the managed runtime')
+      );
+    }
+    return new ShellStreamingSpeechToTextBridge({ bridge_id: bridgeId, command, args: [script] });
   });
-  logger.success('[stt-bridge] installed managed mlx_whisper streaming bridge');
-  return { installed: true, bridge_id: bridgeId, dispose };
+  const available = resolveManagedToolPythonBin('mlx_whisper') !== null && safeExistsSync(script);
+  if (available) logger.success('[stt-bridge] installed managed mlx_whisper streaming bridge');
+  return {
+    installed: available,
+    reason: available
+      ? undefined
+      : 'managed mlx_whisper stream runtime is unavailable (registered as runtime-gated candidate)',
+    bridge_id: bridgeId,
+    dispose,
+  };
 }
