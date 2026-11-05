@@ -141,4 +141,23 @@ describe('readNeedsYouFailures (review M2)', () => {
     expect(readNeedsYouFailures(owner)).toHaveLength(0);
     expect(readNeedsYouFailures(owner, { includePersonal: true })).toHaveLength(1);
   });
+
+  it('admits untenanted and legacy unscoped failures only for a viewer that admits untenanted records', () => {
+    mocks.notifications.mockReturnValue([
+      failure(1, { scope: { tier: 'confidential' } }),
+      {
+        status: 'failed',
+        surface: 'presence',
+        title: 'Legacy',
+        created_at: '2026-11-05T11:00:00Z',
+      },
+      failure(2, { scope: { tenant_slug: 'other-co', tier: 'confidential' } }),
+    ]);
+    const system = { ...viewer, tenantSlugs: [] as string[] };
+    expect(readNeedsYouFailures(system)).toHaveLength(0);
+    const admitted = readNeedsYouFailures({ ...system, includeUntenanted: true });
+    expect(admitted.map((item) => item.title).sort()).toEqual(['Broke 1', 'Legacy']);
+    // Never widens the tenant set: another company's failure stays out.
+    expect(admitted.some((item) => item.tenant_slug === 'other-co')).toBe(false);
+  });
 });

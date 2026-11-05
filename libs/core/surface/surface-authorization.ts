@@ -31,6 +31,13 @@ export interface SurfaceAuthorizationContext {
   principal?: ResolvedPrincipal;
   /** Member id declared by the matched token registration (FD-07). */
   memberId?: string;
+  /**
+   * Server-resolved only (e.g. the shell's system selection): readers also
+   * admit records that carry no tenant. It never widens `tenantSlugs`; a
+   * projection from a viewer scope must carry it, or untenanted records
+   * silently drop out of every read made through this context.
+   */
+  includeUntenanted?: boolean;
 }
 
 export interface SurfaceAuthorizationResource {

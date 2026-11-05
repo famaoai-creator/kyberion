@@ -17,6 +17,8 @@ import { memoryCandidateVisibleToViewer } from './memory-candidate-visibility';
 import { resolveConciergeSelectedViewer, type ConciergeSelectedViewer } from './selected-tenant';
 import { PERSONAL_SELECTION, SYSTEM_SELECTION } from './tenant-context';
 import {
+  checkConciergeRateLimit,
+  conciergeClientAddress,
   conciergeErrorResponse,
   narrowConciergeScope,
   toSurfaceAuthorizationContext,
@@ -108,6 +110,13 @@ export function conciergeNeedsYouViews(
 }
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' };
+/**
+ * The personal view reads one full home per allowed company (plus the
+ * viewer's own and the company-less view), so — like `/api/personal-summary`
+ * — it draws from its own, smaller bucket, shared by `needs-you.list` and
+ * `needs-you.summary` (the inbox polls both, the rail badge the summary).
+ */
+export const NEEDS_YOU_PERSONAL_RATE_LIMIT = 40;
 /** The non-narrowing inputs `needs-you.list` declares. */
 const LIST_PARAMS = ['reason', 'overdue', 'cursor', 'limit'] as const;
 
@@ -122,6 +131,26 @@ export function handleNeedsYouRequest(
 ): NextResponse {
   const resolved = resolveConciergeSelectedViewer(req);
   if (resolved.response) return resolved.response;
+  if (resolved.selection.mode === 'personal') {
+    const limited = checkConciergeRateLimit(req, {
+      limit: NEEDS_YOU_PERSONAL_RATE_LIMIT,
+      key: `needs-you-personal:${resolved.viewer.principalId ?? conciergeClientAddress(req)}`,
+    });
+    if (!limited.ok) {
+      return NextResponse.json(
+        { ok: false, error_code: 'rate_limited' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE,
+            ...(limited.retryAfterSeconds
+              ? { 'Retry-After': String(limited.retryAfterSeconds) }
+              : {}),
+          },
+        }
+      );
+    }
+  }
   const params = req.nextUrl.searchParams;
   let viewer: ConciergeViewerContext;
   try {
