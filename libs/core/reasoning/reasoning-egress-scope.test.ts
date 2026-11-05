@@ -717,4 +717,18 @@ describe('training_use is a declared posture for non-public material', () => {
     );
     expect(reasoningEgressDenialNext(new Error('boom'))).toBeUndefined();
   });
+
+  it('extracts the next step from untrusted text without regex backtracking', () => {
+    expect(reasoningEgressDenialNext(new Error('what | next: do it | evidence'))).toBe(
+      'next: do it'
+    );
+    expect(reasoningEgressDenialNext(new Error('what |  next: last step  '))).toBe(
+      'next: last step'
+    );
+    expect(reasoningEgressDenialNext(new Error('next: not after a pipe'))).toBeUndefined();
+    expect(reasoningEgressDenialNext(new Error('what | next: | evidence'))).toBeUndefined();
+    // CodeQL js/polynomial-redos input shape: '|next:{{' followed by a long tab run.
+    const hostile = `|next:{{${'\t'.repeat(200_000)}`;
+    expect(reasoningEgressDenialNext(new Error(hostile))).toBe('next:{{');
+  });
 });

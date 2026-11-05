@@ -139,8 +139,15 @@ export function isReasoningEgressDenial(error: unknown): boolean {
 /** The `next: …` step a denial message carries, when it carries one. */
 export function reasoningEgressDenialNext(error: unknown): string | undefined {
   const message = error instanceof Error ? error.message : String(error ?? '');
-  const match = /\|\s*(next:[^|]+?)\s*(?:\||$)/u.exec(message);
-  return match?.[1]?.trim();
+  // Split instead of a regex: an overlapping `\s*` / `[^|]+?` pattern backtracks
+  // polynomially on long whitespace runs in untrusted provider error text.
+  // The first segment precedes any `|`, so it can never be the `next:` field.
+  const segment = message
+    .split('|')
+    .slice(1)
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('next:') && part.length > 'next:'.length);
+  return segment;
 }
 
 let tenantRegistryRootForTests: string | undefined;
