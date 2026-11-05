@@ -1,6 +1,6 @@
 /**
  * customer_channel.ts — the governed command for a tenant's customer channel
- * bindings (`customer/<tenant>/connections/channel-bindings.json`, E2E-06 / D8)
+ * bindings (`knowledge/confidential/<tenant>/connections/channel-bindings.json`, E2E-06 / D8)
  * and for reading a customer message that waits for approval (CD-11 / B2).
  *
  *   bind     --tenant <slug> --surface <slack|telegram|email|imessage|discord> --channel <id>

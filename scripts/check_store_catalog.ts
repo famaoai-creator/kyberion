@@ -38,6 +38,7 @@ export interface StoreEntry {
   moves_to?: string;
   legacy_roles?: string[];
   registration?: StoreRootRegistration;
+  tiers?: readonly string[];
 }
 export interface StoreCatalog {
   stores: StoreEntry[];
@@ -62,7 +63,8 @@ export function checkStoreRegistrations(
   registries: StoreRootRegistries,
   retention: readonly { path: string }[]
 ): string[] {
-  const violations = compareStoreRootRegistries(projectStoreRoots(stores, retention), registries);
+  const projection = projectStoreRoots(stores, retention);
+  const violations = compareStoreRootRegistries(projection, registries);
   // Keep store-specific diagnostics useful when a declared key/path is invalid.
   for (const store of stores) {
     const r = store.registration;
@@ -71,13 +73,8 @@ export function checkStoreRegistrations(
     const root = roots && Object.hasOwn(roots, r.key) ? roots[r.key] : undefined;
     if (!root) violations.push(`${store.id}: unknown registration ${r.family}:${r.key}`);
     else if (
-      store.path !== `${root}/<tier>/<tenant>` &&
-      !(
-        r.family === 'ledger' &&
-        ['resource_usage', 'execution_metrics'].includes(r.key) &&
-        store.custody.kind === 'unscoped-legacy' &&
-        store.path === root
-      )
+      !Object.hasOwn(projection.roots[r.family], r.key) ||
+      projection.roots[r.family][r.key] !== root
     )
       violations.push(`${store.id}: registration ${r.family}:${r.key} does not match root ${root}`);
   }

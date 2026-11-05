@@ -5,6 +5,7 @@ import {
   PARTITIONED_RUNTIME_LEDGER_ROOTS,
   TENANT_LEDGER_ROOT_PATH,
   TENANT_APPROVAL_ROOT_PATH,
+  TENANT_AUDIT_MIRROR_ROOT_PATH,
 } from './runtime-state-roots.js';
 
 describe('runtime state registry', () => {
@@ -13,6 +14,12 @@ describe('runtime state registry', () => {
     expectTypeOf(
       TENANT_APPROVAL_ROOT_PATH
     ).toEqualTypeOf<'active/shared/runtime/tenant-approvals'>();
+    expectTypeOf(
+      TENANT_AUDIT_MIRROR_ROOT_PATH
+    ).toEqualTypeOf<'active/shared/runtime/audit-mirror'>();
+    expect(TENANT_AUDIT_MIRROR_ROOT_PATH).toBe(
+      PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_audit_mirror
+    );
     expect(TENANT_LEDGER_ROOT_PATH).toBe(PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_ledger);
     expect(TENANT_APPROVAL_ROOT_PATH).toBe(PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals);
   });

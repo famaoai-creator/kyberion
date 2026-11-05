@@ -2,8 +2,8 @@
  * Company Bootstrap — 業態別会社テンプレートの実体化
  *
  * `templates/companies/<vertical>/` に定義された業態テンプレート
- * (organization-profile / org-chart / customer / identity / vision)を
- * `customer/<slug>/` へプレースホルダ({COMPANY_SLUG} / {COMPANY_NAME})を
+ * (organization-profile / org-chart / company / identity / vision)を
+ * テナントのホーム `knowledge/confidential/<slug>/`（identity はスタンス）へプレースホルダ({COMPANY_SLUG} / {COMPANY_NAME})を
  * 置換してコピーする。チームテンプレートカタログはテンプレート ID のまま
  * `knowledge/product/governance/organization-team-template-catalogs/` を
  * 参照するためコピー不要。
@@ -25,6 +25,7 @@ import {
 import { readTextFile } from '../foundation/index.js';
 import { loadOrganizationProfileAtPath } from './organization-profile.js';
 import { isStanceEntry, stanceDirForSlug } from '../stance-resolver.js';
+import { tenantHomeDir } from './tenant-home.js';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;
 const VERTICAL_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
@@ -32,14 +33,16 @@ const VERTICAL_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
 export interface BootstrapCompanyInput {
   vertical: string;
   slug: string;
+  /** Tenant whose home receives the company files; defaults to `slug`. */
+  tenantSlug?: string;
   companyName?: string;
   rootDir?: string;
   force?: boolean;
 }
 
 export interface BootstrapCompanyResult {
-  /** Legacy `customer/{slug}/` directory that still receives the company's tenant files (S2 moves them). */
-  customerDir: string;
+  /** `knowledge/confidential/{tenant}/` — the tenant home that receives the company files. */
+  tenantDir: string;
   /** Stance directory that receives the stance files of the template. */
   stanceDir: string;
   writtenFiles: string[];
@@ -85,14 +88,11 @@ export function bootstrapCompany(input: BootstrapCompanyInput): BootstrapCompany
     );
   }
 
-  const customerDir = assertSafeRepositoryPath(path.join(rootDir, 'customer', slug), {
-    allowMissingLeaf: true,
-    rootDir,
-  });
-  // Template files read through the stance overlay go to the stance; the rest
-  // are the company's tenant files and stay in the legacy directory until S2.
+  // Company files belong to the tenant (its home); files read through the stance
+  // overlay (the company's operating identity) go to the stance of the same slug.
+  const tenantDir = tenantHomeDir(input.tenantSlug?.trim() || slug, rootDir);
   const stanceDir = stanceDirForSlug(slug, rootDir);
-  const targetDirFor = (entry: string): string => (isStanceEntry(entry) ? stanceDir : customerDir);
+  const targetDirFor = (entry: string): string => (isStanceEntry(entry) ? stanceDir : tenantDir);
   const profileTarget = assertSafeRepositoryPath(
     path.join(targetDirFor('organization-profile.json'), 'organization-profile.json'),
     {
@@ -102,12 +102,12 @@ export function bootstrapCompany(input: BootstrapCompanyInput): BootstrapCompany
   );
   if (safeExistsSync(profileTarget) && !input.force) {
     throw new Error(
-      `[company-bootstrap] customer '${slug}' already has an organization profile. Re-run with --force to overwrite.`
+      `[company-bootstrap] company '${slug}' already has an organization profile. Re-run with --force to overwrite.`
     );
   }
 
   const companyName = input.companyName?.trim() || slug;
-  safeMkdir(customerDir, { recursive: true });
+  safeMkdir(tenantDir, { recursive: true });
   safeMkdir(stanceDir, { recursive: true });
   const writtenFiles: string[] = [];
   for (const entry of safeReaddir(safeTemplateDir) as string[]) {
@@ -171,5 +171,5 @@ export function bootstrapCompany(input: BootstrapCompanyInput): BootstrapCompany
     );
   }
 
-  return { customerDir, stanceDir, writtenFiles, catalogId };
+  return { tenantDir, stanceDir, writtenFiles, catalogId };
 }

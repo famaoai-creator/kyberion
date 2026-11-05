@@ -1,5 +1,5 @@
 /**
- * The governed writer of `customer/<tenant>/connections/channel-bindings.json`
+ * The governed writer of `knowledge/confidential/<tenant>/connections/channel-bindings.json`
  * (D8, `pnpm kyberion customer-channel bind|unbind`). The reader is
  * libs/core/customer-channel-binding.ts; this module is the only writer.
  */
@@ -8,6 +8,7 @@ import { withExecutionContext } from '@agent/core/authority';
 import {
   CUSTOMER_CHANNEL_BINDINGS_SCHEMA_PATH,
   isActiveCustomerTenant,
+  listActiveCustomerTenantSlugs,
   readTenantCustomerChannelBindings,
   type CustomerBindingSurface,
   type CustomerChannelBinding,
@@ -18,14 +19,13 @@ import { withLockSync } from '@agent/core/foundation/lock-utils';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeMkdir,
-  safeReaddir,
-} from '@agent/core/secure-io';
+  TENANT_CHANNEL_BINDINGS_FILE,
+  tenantHomePath,
+} from '@agent/core/organization/tenant-registry';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 
 /**
- * Writes `customer/<tenant>/connections/channel-bindings.json` as the narrow,
+ * Writes `knowledge/confidential/<tenant>/connections/channel-bindings.json` as the narrow,
  * tenant-bound `customer_channel_binding_store` role: the guard lets it write
  * that one file (and its directories) of the bound tenant, nothing else.
  */
@@ -68,7 +68,7 @@ export interface CustomerChannelBindingWriteResult {
 }
 
 function bindingFilePath(tenantSlug: string, rootDir: string): string {
-  return path.join(rootDir, 'customer', tenantSlug, 'connections', 'channel-bindings.json');
+  return tenantHomePath(tenantSlug, TENANT_CHANNEL_BINDINGS_FILE, rootDir);
 }
 
 function bindingCatalog(filePath: string) {
@@ -209,22 +209,18 @@ function writeBindingChange(
   });
 }
 
+/** Test seam: how the cross-tenant check lists tenants (default: the active registered ones). */
+export const customerTenantLister = {
+  list: (rootDir: string) => listActiveCustomerTenantSlugs({ rootDir, strict: true }),
+};
+
 /**
  * Another registered, active tenant with this channel bound and active, or
  * null. Each tenant is checked through its own tenant-bound read
- * (`readTenantCustomerChannelBindings`), so the scan needs no personal-tier
- * persona. A customer/ tree that cannot be listed is refused (fails closed).
+ * (`readTenantCustomerChannelBindings`, strict), so the scan needs no
+ * personal-tier persona. Tenants that cannot be listed, or bindings this
+ * caller may not read, are refused (fails closed).
  */
-function listCustomerTenantDirs(rootDir: string): string[] {
-  const customerRoot = assertSafeRepositoryPath(path.join(rootDir, 'customer'), {
-    rootDir,
-    allowMissingLeaf: true,
-  });
-  return safeExistsSync(customerRoot) ? safeReaddir(customerRoot) : [];
-}
-
-/** Test seam: how the cross-tenant check lists customer/ (default: the live tree). */
-export const customerTenantLister = { list: listCustomerTenantDirs };
 
 function otherTenantBindingChannel(target: ReturnType<typeof validatedTarget>): string | null {
   let slugs: string[];
@@ -233,12 +229,22 @@ function otherTenantBindingChannel(target: ReturnType<typeof validatedTarget>): 
   } catch (err) {
     throw bindingError(
       'CUSTOMER_BINDING_CONFLICT_CHECK',
-      `cannot list customer/ to check the channel against other tenants (${err instanceof Error ? err.message : String(err)})`
+      `cannot list the tenants to check the channel against other tenants (${err instanceof Error ? err.message : String(err)})`
     );
   }
   for (const slug of slugs.sort()) {
     if (slug === target.tenantSlug || !isValidTenantSlug(slug)) continue;
-    const bound = readTenantCustomerChannelBindings(slug, { rootDir: target.rootDir }).some(
+    // strict: a tenant whose bindings this caller may not read cannot be ruled out.
+    let others: ReturnType<typeof readTenantCustomerChannelBindings>;
+    try {
+      others = readTenantCustomerChannelBindings(slug, { rootDir: target.rootDir, strict: true });
+    } catch (err) {
+      throw bindingError(
+        'CUSTOMER_BINDING_CONFLICT_CHECK',
+        `cannot read tenant '${slug}' bindings to check the channel (${err instanceof Error ? err.message : String(err)})`
+      );
+    }
+    const bound = others.some(
       (item) =>
         item.active !== false &&
         item.surface === target.surface &&

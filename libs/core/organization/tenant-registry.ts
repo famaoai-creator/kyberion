@@ -212,6 +212,18 @@ function assertTenantProfile(profile: unknown): asserts profile is TenantProfile
   }
 }
 
+// Company assets of a tenant live in its home (S2); see tenant-home.ts.
+export {
+  TENANT_ASSET_ENTRIES,
+  TENANT_CHANNEL_BINDINGS_FILE,
+  TENANT_COMPANY_FILE,
+  TENANT_HOME_ROOT,
+  activeTenantSlug,
+  isTenantAssetEntry,
+  tenantHomeDir,
+  tenantHomePath,
+} from './tenant-home.js';
+
 /** Default repo-relative knowledge root for a tenant (DA-01). */
 export function defaultTenantKnowledgeRoot(slug: string): string {
   assertTenantSlug(slug);

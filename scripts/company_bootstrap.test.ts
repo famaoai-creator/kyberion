@@ -38,7 +38,7 @@ describe('company bootstrap', () => {
     expect(verticals.length).toBeGreaterThanOrEqual(5);
   });
 
-  it('materializes a vertical into customer/<slug> with placeholders substituted', () => {
+  it('materializes a vertical into the tenant home with placeholders substituted', () => {
     const result = bootstrapCompany({
       vertical: 'saas-product-company',
       slug: 'acme-saas',
@@ -50,7 +50,7 @@ describe('company bootstrap', () => {
     expect(result.writtenFiles.length).toBeGreaterThanOrEqual(6);
 
     const profileRaw = safeReadFile(
-      `${tmpRoot}/knowledge/personal/stances/acme-saas/organization-profile.json`,
+      `${tmpRoot}/knowledge/confidential/acme-saas/organization-profile.json`,
       {
         encoding: 'utf8',
       }
@@ -61,9 +61,9 @@ describe('company bootstrap', () => {
     expect(profile.name).toContain('ACME株式会社');
 
     // The materialized chart must be picked up by the org-chart resolver as
-    // an explicit customer chart (not derived).
+    // an explicit tenant chart (not derived).
     const chart = resolveOrganizationOrgChart('acme-saas', tmpRoot);
-    expect(chart.source_kind).toBe('customer');
+    expect(chart.source_kind).toBe('confidential');
     expect(chart.organization_id).toBe('acme-saas');
     expect(chart.positions.some((position) => position.role_id === 'ceo')).toBe(true);
   });
@@ -80,11 +80,11 @@ describe('company bootstrap', () => {
       for (const filePath of result.writtenFiles.filter((file) => file.endsWith('.json'))) {
         expect(() => JSON.parse(readTextFile(filePath)), filePath).not.toThrow();
       }
-      const customer = JSON.parse(readTextFile(result.customerDir + '/customer.json'));
-      const profile = JSON.parse(readTextFile(result.stanceDir + '/organization-profile.json'));
-      expect(customer.display_name).toBe(companyName);
+      const company = JSON.parse(readTextFile(result.tenantDir + '/company.json'));
+      const profile = JSON.parse(readTextFile(result.tenantDir + '/organization-profile.json'));
+      expect(company.display_name).toBe(companyName);
       expect(profile.name).toContain(companyName);
-      expect(readTextFile(result.customerDir + '/vision.md')).toContain(
+      expect(readTextFile(result.tenantDir + '/vision.md')).toContain(
         '# ' + companyName + ' Vision'
       );
     }
@@ -109,6 +109,6 @@ describe('company bootstrap', () => {
       rootDir: tmpRoot,
       force: true,
     });
-    expect(safeExistsSync(forced.customerDir)).toBe(true);
+    expect(safeExistsSync(forced.tenantDir)).toBe(true);
   });
 });

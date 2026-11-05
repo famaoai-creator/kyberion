@@ -208,6 +208,9 @@ export function protectedStorageFloorPrefixes(): string[] {
  * `<personal|confidential>/<tenant>/<channel>/` request records, passkey challenges and the
  * channel's `approvals.jsonl` event log, read and written as `tenant_approval_store`.
  * Untenanted records (and pre-activation tenant requests) stay in the system tree.
+ *
+ * Audit chain mirrors (`governance/audit-chain.ts`) use
+ * `confidential/<tenant>/audit-<date>.jsonl`, appended as `audit_mirror_writer`.
  */
 
 /**
@@ -227,6 +230,10 @@ export const TENANT_STORE_LEDGER_ROOTS = {
   tenant_approvals: {
     root: PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals,
     storeRole: 'tenant_approval_store',
+  },
+  tenant_audit_mirror: {
+    root: PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_audit_mirror,
+    storeRole: 'audit_mirror_writer',
   },
 } as const;
 
