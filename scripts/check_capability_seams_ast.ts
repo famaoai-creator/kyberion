@@ -13,7 +13,17 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir, safeStat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-const SOURCE_ROOT = pathResolver.rootResolve('libs/core');
+const LIBS_ROOT = pathResolver.rootResolve('libs');
+
+/** libs/core plus every libs/shared-* package source tree (packages split out of core). */
+function sourceRoots(): string[] {
+  const shared = safeReaddir(LIBS_ROOT)
+    .filter((entry) => entry.startsWith('shared-'))
+    .sort()
+    .map((entry) => path.join(LIBS_ROOT, entry, 'src'))
+    .filter((root) => safeExistsSync(root) && safeStat(root).isDirectory());
+  return [path.join(LIBS_ROOT, 'core'), ...shared];
+}
 const GRAPH_PATH = pathResolver.rootResolve('docs/developer/CAPABILITY_SEAMS.md');
 
 interface SeamDeclaration {
@@ -86,7 +96,7 @@ function constStringLiterals(sourceFile: ts.SourceFile): Map<string, string> {
 
 function scanDeclarations(): SeamDeclaration[] {
   const declarations: SeamDeclaration[] = [];
-  for (const file of collectSourceFiles(SOURCE_ROOT)) {
+  for (const file of sourceRoots().flatMap((root) => collectSourceFiles(root))) {
     const source = readCapabilitySeamsTextFile(file);
     const sourceFile = ts.createSourceFile(
       file,
