@@ -97,7 +97,7 @@ export function WorkspaceCrumbs({
     <nav className="ws-crumbs" aria-label={t('ws_breadcrumb_label')}>
       <ol>
         <li>
-          <a href="/w">{t('ws_overview_title')}</a>
+          <a href="/">{t('ia_shell_crumb_home')}</a>
         </li>
         {lineage.map((ref) => (
           <li key={`${ref.kind}:${ref.id}`}>
@@ -328,7 +328,7 @@ export function kindNextStep(
     case 'work_item':
       return { label: t('ws_ask_for_work'), onClick: openDock };
     case 'approval':
-      return { label: t('ws_open_inbox'), href: '/' };
+      return { label: t('ws_open_inbox'), href: '/inbox?reason=approval' };
     default:
       return undefined;
   }

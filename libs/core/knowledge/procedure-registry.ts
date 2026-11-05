@@ -14,6 +14,7 @@ import {
 } from './procedure-types.js';
 import { isDesktopPromotionPending } from '../virtual/desktop-promotion-transaction.js';
 import { clamp } from '../foundation/text.js';
+import { segmentKeywordTerms } from '../locale-normalize.js';
 
 const PROCEDURES_PATH = 'knowledge/product/orchestration/procedures.json';
 /** User-local substrate-neutral overlay. This path is intentionally ignored by git. */
@@ -217,8 +218,10 @@ function phraseScore(phrase: string, intent: string): number {
   if (normIntent.includes(normPhrase)) return 0.9;
   if (normPhrase.includes(normIntent)) return 0.85;
 
-  // Space-separated token overlap (useful for EN / mixed intent strings)
-  const phraseWords = normPhrase.split(/\s+/).filter(Boolean);
+  // Word overlap. Locale-aware: a spaceless Japanese phrase is segmented into
+  // its content words (particles dropped) instead of staying one token that
+  // only the substring checks above can ever match.
+  const phraseWords = segmentKeywordTerms(normPhrase);
   if (phraseWords.length === 0) return 0;
   const matchCount = phraseWords.filter((w) => normIntent.includes(w)).length;
   return matchCount > 0 ? (matchCount / phraseWords.length) * 0.7 : 0;

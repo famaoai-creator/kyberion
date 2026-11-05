@@ -54,10 +54,7 @@ export default function WorkspaceEntityPage() {
     return (
       <div className="ws-page">
         <WorkspaceCrumbs t={t} lineage={[]} />
-        <EmptyState
-          title={t('ws_error_title')}
-          action={{ label: t('ws_overview_title'), href: '/w' }}
-        />
+        <EmptyState title={t('ws_error_title')} action={{ label: t('ws_back_home'), href: '/' }} />
       </div>
     );
   }

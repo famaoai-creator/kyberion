@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import { Segmented, SettingRow, SettingsGroup } from '@agent/shared-ui';
-import { resolveConciergeLocale, type ConciergeLocale } from '../../../lib/i18n';
+import { frontDeskText, resolveConciergeLocale, type ConciergeLocale } from '../../../lib/i18n';
+import { SettingMeta } from './settings-ia-parts';
 import {
   normalizeThemePreference,
   onDisplayPreferencesChange,
@@ -27,6 +28,10 @@ export type DisplaySectionProps = {
  * event as the header controls) — no server call, so no save button.
  */
 export function DisplaySection({ locale, t, onLocaleChange }: DisplaySectionProps) {
+  const byDefault = (key: 'locale' | 'theme' | 'density') =>
+    frontDeskText('ia_settings_meta_default', locale, {
+      value: frontDeskText(`ia_settings_display_${key}_default`, locale),
+    });
   const [theme, setTheme] = React.useState<ConciergeThemePreference>('system');
   const [density, setDensity] = React.useState<ConciergeDensityPreference>('comfortable');
 
@@ -63,7 +68,7 @@ export function DisplaySection({ locale, t, onLocaleChange }: DisplaySectionProp
           title={t('settings.display_title')}
           description={t('settings.display_description')}
         >
-          <SettingRow label={t('locale.label')}>
+          <SettingRow label={t('locale.label')} description={byDefault('locale')}>
             <Segmented
               id="display-locale"
               name="display.locale"
@@ -76,7 +81,7 @@ export function DisplaySection({ locale, t, onLocaleChange }: DisplaySectionProp
               ]}
             />
           </SettingRow>
-          <SettingRow label={t('theme.label')}>
+          <SettingRow label={t('theme.label')} description={byDefault('theme')}>
             <Segmented
               id="display-theme"
               name="display.theme"
@@ -92,7 +97,7 @@ export function DisplaySection({ locale, t, onLocaleChange }: DisplaySectionProp
           </SettingRow>
           <SettingRow
             label={t('settings.display_density')}
-            description={t('settings.display_density_description')}
+            description={`${t('settings.display_density_description')} ${byDefault('density')}`}
           >
             <Segmented
               id="display-density"
@@ -106,6 +111,12 @@ export function DisplaySection({ locale, t, onLocaleChange }: DisplaySectionProp
               ]}
             />
           </SettingRow>
+          <div className="settings-row-block">
+            <SettingMeta
+              locale={locale}
+              effect={frontDeskText('ia_settings_display_effect', locale)}
+            />
+          </div>
         </SettingsGroup>
       </div>
     </FormScope>

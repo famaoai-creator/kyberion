@@ -25,7 +25,7 @@ import {
   withSelectedTenant,
 } from '../lib/tenant-context';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
-import { frontDeskText } from '../lib/i18n';
+import { frontDeskText, type ConciergeLocale, type FrontDeskMessageKey } from '../lib/i18n';
 import { getStoredFrontDeskToken, isLoopbackHostname } from '../lib/front-desk-auth-token';
 
 /**
@@ -55,6 +55,7 @@ interface FrontDeskNavItemPayload {
   external: boolean;
   allowed: boolean;
   min_role: 'owner' | 'approver' | 'operator' | 'viewer';
+  placement?: 'main' | 'footer';
 }
 
 interface FrontDeskNavResponse {
@@ -94,49 +95,117 @@ interface FrontDeskMeResponse {
  * front-desk surfaces render the same `.kb-nav-rail` markup.
  */
 
-/** Settings subpages share its current marker; first-run bootstrap remains outside feature navigation. */
+/**
+ * The rail entry a route belongs to (MSN-SHELL-IA §1): each of the seven
+ * destinations owns its own path and the detail pages folded under it.
+ * Settings subpages share its marker; first-run bootstrap stays outside
+ * feature navigation.
+ */
 export function currentItemId(
   pathname: string | null,
-  section?: string | null
+  _section?: string | null
 ): FrontDeskNavItemPayload['id'] | null {
-  if (pathname === '/ops' || pathname?.startsWith('/ops/')) return opsItemId(pathname, section);
-  if (pathname === '/') return 'decide';
-  if (pathname === '/ingest') return 'ingest';
-  if (pathname === '/management') return 'organization';
+  if (!pathname) return null;
+  if (pathname === '/') return 'home';
   if (pathname === '/setup/first-run') return null;
-  if (pathname === '/setup' || pathname?.startsWith('/setup/') || pathname === '/settings')
+  if (pathname === '/setup' || pathname.startsWith('/setup/') || pathname === '/settings')
     return 'settings';
+  if (pathname === '/management' || pathname.startsWith('/management/')) return 'org';
+  if (pathname === '/ingest') return 'library';
+  for (const id of ['inbox', 'work', 'org', 'library', 'ops'] as const) {
+    if (pathname === `/${id}` || pathname.startsWith(`/${id}/`)) return id;
+  }
   return workspaceItemId(pathname);
 }
 
-/** Operations console sections (`/ops?section=…`, the former Chronos surface) on the rail. */
-const OPS_RAIL_SECTIONS = new Set([
-  'deliverables',
-  'knowledge',
-  'discussion',
-  'operations',
-  'surface-control',
-  'diagnostics',
-]);
-function opsItemId(pathname: string, section?: string | null): string | null {
-  if (pathname === '/ops/discussion') return 'discussion';
-  return section && OPS_RAIL_SECTIONS.has(section) ? section : null;
+/** `/w/<kind>/<id>` detail pages mark the destination their kind lives under. */
+const WORKSPACE_RAIL_IDS: Record<string, string> = {
+  tenant: 'org',
+  organization: 'org',
+  project: 'org',
+  actor: 'org',
+  mission: 'work',
+  task: 'work',
+  work_item: 'work',
+  approval: 'inbox',
+};
+function workspaceItemId(pathname: string): string | null {
+  if (pathname !== '/w' && !pathname.startsWith('/w/')) return null;
+  const kind = pathname.split('/')[2];
+  return kind ? (WORKSPACE_RAIL_IDS[kind] ?? 'home') : 'home';
 }
 
-/** `/w/<kind>[/<id>]` marks the rail entry for that kind; tasks belong to missions. */
-const WORKSPACE_RAIL_IDS: Record<string, string> = {
-  organization: 'organizations',
-  project: 'projects',
-  mission: 'missions',
-  task: 'missions',
-  work_item: 'work-items',
-  approval: 'approvals',
-  actor: 'actors',
-};
-function workspaceItemId(pathname: string | null): string | null {
-  if (pathname !== '/w' && !pathname?.startsWith('/w/')) return null;
-  const kind = pathname.split('/')[2];
-  return kind ? (WORKSPACE_RAIL_IDS[kind] ?? 'overview') : 'overview';
+/**
+ * A label the server could not resolve comes back as its own key
+ * (`front_desk:ia_nav_home`) — e.g. a runtime whose knowledge root predates
+ * a new destination. Render it from the client-bundled catalog instead of
+ * showing the raw key; anything else passes through unchanged.
+ */
+const RAIL_KEY = /^front_desk:([a-z0-9_]+)$/;
+export function railLabel(text: string | undefined, locale: ConciergeLocale): string {
+  if (typeof text !== 'string') return '';
+  const match = text.match(RAIL_KEY);
+  if (!match) return text;
+  const resolved = frontDeskText(match[1] as FrontDeskMessageKey, locale);
+  return resolved && resolved !== text && resolved !== match[1] ? resolved : '';
+}
+
+/** Rail id that carries the needs-you count badge. */
+export const NEEDS_YOU_RAIL_ID = 'inbox';
+
+/**
+ * `GET /api/v1/needs-you/summary` returns `total` (MSN-SHELL-IA §2). Anything but
+ * an ok payload with a finite, non-negative `total` hides the badge — the
+ * rail never shows a guessed or stale-looking count.
+ */
+export function needsYouBadgeTotal(payload: unknown): number | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const record = payload as { ok?: unknown; total?: unknown };
+  if (record.ok !== true) return null;
+  const total = record.total;
+  return typeof total === 'number' && Number.isFinite(total) && total >= 0
+    ? Math.floor(total)
+    : null;
+}
+
+/** Badge text: hidden at zero, capped so the rail width never changes. */
+export function needsYouBadgeText(total: number | null): string | undefined {
+  if (total === null || total <= 0) return undefined;
+  return total > 99 ? '99+' : String(total);
+}
+
+function useNeedsYouTotal(enabled: boolean, scopeKey: string | null): number | null {
+  const [total, setTotal] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    if (!enabled) {
+      setTotal(null);
+      return undefined;
+    }
+    const controller = new AbortController();
+    const load = () =>
+      fetch(withSelectedTenant('/api/v1/needs-you/summary', scopeKey), {
+        cache: 'no-store',
+        signal: controller.signal,
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: unknown) => {
+          if (!controller.signal.aborted) setTotal(needsYouBadgeTotal(data));
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setTotal(null);
+        });
+    void load();
+    // A decision elsewhere lowers the count; refresh when the tab returns.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      controller.abort();
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [enabled, scopeKey]);
+  return total;
 }
 
 export function FrontDeskRail() {
@@ -359,9 +428,31 @@ function FrontDeskRailContent() {
   // UI-05: `ui:nav-rail` — the grouped existing destinations (role-gated by
   // `allowed`, unchanged) with the current one marked `aria-current="page"`
   // by NavRail.
-  const items = (nav?.items || [])
+  const scopeValue = me?.selection
+    ? railSelectionValue(me.selection)
+    : (me?.viewing?.tenant_slug ?? null);
+  const badgeEnabled = Boolean(
+    nav?.items.some((item) => item.id === NEEDS_YOU_RAIL_ID && item.allowed)
+  );
+  const needsYouTotal = useNeedsYouTotal(badgeEnabled, scopeValue);
+  const badgeText = needsYouBadgeText(needsYouTotal);
+  const railItems = (nav?.items || [])
     .filter((item) => item.allowed)
     .map((item) => ({
+      ...item,
+      label: railLabel(item.label, locale),
+      sublabel: railLabel(item.sublabel, locale),
+    }))
+    .map((item) => ({
+      placement: item.placement ?? 'main',
+      ...(item.id === NEEDS_YOU_RAIL_ID && badgeText
+        ? {
+            badge: badgeText,
+            badge_label: frontDeskText('ia_nav_badge_aria', locale, {
+              count: needsYouTotal ?? 0,
+            }),
+          }
+        : {}),
       id: item.id,
       label: item.label,
       hint: needsWorkspaceSelection(
@@ -388,6 +479,12 @@ function FrontDeskRailContent() {
       group_label: item.group_label,
       active: item.id === current,
     }));
+  const items = railItems
+    .filter((item) => item.placement !== 'footer')
+    .map(({ placement: _placement, ...item }) => item);
+  const footerItems = railItems
+    .filter((item) => item.placement === 'footer')
+    .map(({ placement: _placement, ...item }) => item);
 
   // UI-05: the brand and tenant blocks are the shared `ui:nav-rail`
   // `brand` / `context` slots (same markup and CSS as the presence-studio
@@ -446,6 +543,7 @@ function FrontDeskRailContent() {
         brand={{ name: 'Kyberion', subtitle: brandTagline }}
         context={context}
         items={items}
+        {...(footerItems.length ? { footer_items: footerItems } : {})}
       />
       <Dialog
         id="workspace-destination"

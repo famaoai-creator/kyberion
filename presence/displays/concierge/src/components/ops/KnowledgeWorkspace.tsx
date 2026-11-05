@@ -4,6 +4,7 @@ import { opsApiPath } from '../../lib/ops/ops-api-path';
 import * as React from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { KnowledgeLearningPanel, learningStateLabel } from './KnowledgeLearningPanel';
+import { NeedsYouLink } from '../needs-you-link';
 import { knowledgeSelectionAfterRefresh } from '../../lib/ops/knowledge-selection';
 import { workspaceQuery, workspaceSelectionFromQuery } from '@agent/core/surface/workspace-query';
 import {
@@ -32,6 +33,7 @@ import {
   StatusPill,
 } from '@agent/shared-ui';
 import { WsPreformatted, WsSelectTable, WsTextareaField, WsTitleCell } from './ChronosWsParts';
+import type { WorkspaceDecisionPointer } from './DeliverablesWorkspace';
 import { useChronosLocale } from '../../lib/ops/hooks';
 import { uxText, uxTextOr, type SupportedLocale } from '../../lib/ops/ux-vocabulary';
 import {
@@ -59,10 +61,16 @@ export function KnowledgeWorkspace({
   tenant,
   organizationId,
   projectId,
+  browseOnly,
 }: {
   tenant?: string;
   organizationId?: string;
   projectId?: string;
+  /**
+   * 資料 › ナレッジ (MSN-SHELL-IA §1): browse only. Candidate decisions live in
+   * あなた待ち, so the decision controls are replaced by a pointer there.
+   */
+  browseOnly?: WorkspaceDecisionPointer;
 }) {
   const locale = useChronosLocale();
   const [items, setItems] = React.useState<Candidate[]>([]);
@@ -104,7 +112,8 @@ export function KnowledgeWorkspace({
   const select = (key: string) => {
     setSelectedKey(key);
     const params = new URLSearchParams(searchParams.toString());
-    params.set('section', 'knowledge');
+    // On /library the tab is the route; the console still keys on `section`.
+    if (!browseOnly) params.set('section', 'knowledge');
     params.set('candidateKey', key);
     params.delete('request');
     params.delete('storageChannel');
@@ -287,9 +296,7 @@ export function KnowledgeWorkspace({
     }
   };
 
-  const mutateLegacy = async (
-    action: 'memory_promote_candidate' | 'memory_approve_candidate' | 'memory_reject_candidate'
-  ) => {
+  const mutateLegacy = async (action: 'memory_promote_candidate' | 'memory_reject_candidate') => {
     const candidate = selected;
     if (
       !candidate ||
@@ -332,7 +339,6 @@ export function KnowledgeWorkspace({
     }
   };
   const promote = () => mutateLegacy('memory_promote_candidate');
-  const approve = () => mutateLegacy('memory_approve_candidate');
   const reject = () => mutateLegacy('memory_reject_candidate');
 
   const recordFeedback = async (verdict: 'useful' | 'not_useful') => {
@@ -371,8 +377,8 @@ export function KnowledgeWorkspace({
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(18rem,0.9fr)_minmax(0,1.5fr)]">
       <Section
-        title={uxText('chronos_knowledge_title', locale)}
-        description={uxText('chronos_knowledge_description', locale)}
+        title={browseOnly?.heading ?? uxText('chronos_knowledge_title', locale)}
+        description={browseOnly?.description ?? uxText('chronos_knowledge_description', locale)}
       >
         <div className="flex flex-wrap gap-2">
           <Badge label={scopeLabel} tone="accent" />
@@ -468,6 +474,10 @@ export function KnowledgeWorkspace({
               body={uxText('chronos_learning_check_only', locale)}
             />
           ) : null}
+          {/* Curating a scoped learning candidate and registering an approved
+              one are not queue decisions: they happen here, in the library
+              (the queue's "open" links to this card). Only approve/reject of a
+              queued candidate lives in あなた待ち. */}
           {selected.learning ? (
             <KnowledgeLearningPanel
               key={selected.candidateKey + ':' + (selected.learning.payloadDigest || '')}
@@ -545,49 +555,48 @@ export function KnowledgeWorkspace({
               </div>
             </div>
           ) : null}
-          {canDecide ? (
-            <WsTextareaField
-              id="chronos-knowledge-note"
-              label={uxTextOr('chronos_ws_decision_note_label', 'Decision note', locale)}
-              value={decisionNote}
-              onChange={setDecisionNote}
-              placeholder={uxText('chronos_decision_note', locale)}
-              rows={2}
-            />
-          ) : null}
-          {!selected.learning ? (
-            <div className="flex flex-wrap gap-2">
-              {selected.ratification_required && selected.status === 'queued' ? (
-                <Button
-                  label={uxText('chronos_approve_candidate', locale)}
-                  variant="primary"
-                  disabled={busy || !fresh || !localAdmin}
-                  onClick={() => void approve()}
-                />
-              ) : (
-                <Button
-                  label={uxText('chronos_register_knowledge', locale)}
-                  variant="primary"
-                  disabled={
-                    busy ||
-                    !fresh ||
-                    !localAdmin ||
-                    selected.status === 'rejected' ||
-                    selected.status === 'promoted'
-                  }
-                  onClick={() => void promote()}
-                />
-              )}
+          {!selected.learning && selected.status === 'queued' ? (
+            // Approving or rejecting a queued candidate happens in あなた待ち
+            // (IA contract §2); registering an approved one stays here.
+            <NeedsYouLink reason="knowledge" locale={locale} />
+          ) : (
+            <>
               {canDecide ? (
-                <Button
-                  label={uxText('chronos_reject_candidate', locale)}
-                  variant="danger"
-                  disabled={busy || !fresh || !localAdmin}
-                  onClick={() => void reject()}
+                <WsTextareaField
+                  id="chronos-knowledge-note"
+                  label={uxTextOr('chronos_ws_decision_note_label', 'Decision note', locale)}
+                  value={decisionNote}
+                  onChange={setDecisionNote}
+                  placeholder={uxText('chronos_decision_note', locale)}
+                  rows={2}
                 />
               ) : null}
-            </div>
-          ) : null}
+              {!selected.learning ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    label={uxText('chronos_register_knowledge', locale)}
+                    variant="primary"
+                    disabled={
+                      busy ||
+                      !fresh ||
+                      !localAdmin ||
+                      selected.status === 'rejected' ||
+                      selected.status === 'promoted'
+                    }
+                    onClick={() => void promote()}
+                  />
+                  {canDecide ? (
+                    <Button
+                      label={uxText('chronos_reject_candidate', locale)}
+                      variant="danger"
+                      disabled={busy || !fresh || !localAdmin}
+                      onClick={() => void reject()}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          )}
           {!localAdmin ? (
             <p className="kb-text kb-text--muted">
               {uxText('chronos_localadmin_required', locale)}

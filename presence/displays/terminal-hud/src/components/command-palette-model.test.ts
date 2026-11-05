@@ -33,4 +33,19 @@ describe('navigation palette discovery', () => {
     ).toBe(true);
     expect(filterPalette(catalog, 'not-a-real-command')).toEqual([]);
   });
+
+  it('matches a spaceless Japanese query on its content words', () => {
+    const entries = [
+      {
+        id: 'connections',
+        category: '操作',
+        label: '接続管理',
+        keywords: 'connections',
+        selection: { kind: 'connections' as const },
+      },
+    ];
+    // The phrase never appears verbatim; its words (接続 / 管理) do.
+    expect(filterPalette(entries, '接続を管理').map((entry) => entry.id)).toEqual(['connections']);
+    expect(filterPalette(entries, '予定を管理')).toEqual([]);
+  });
 });

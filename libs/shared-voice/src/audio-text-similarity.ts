@@ -1,4 +1,5 @@
 import { clamp } from '@agent/core/foundation/text';
+import { segmentWords } from '@agent/core/locale-normalize';
 
 export interface AudioTextComparison {
   expected_normalized: string;
@@ -40,11 +41,19 @@ function levenshtein(left: readonly string[], right: readonly string[]): number 
   return previous[right.length];
 }
 
+/**
+ * Word tokens for WER and missing/unexpected spans. Segmented with the shared
+ * ICU word segmenter on a whitespace-preserving normalization: the
+ * whitespace-stripped `normalizeAudioText` form would collapse an English
+ * sentence into one "word", and Japanese has no spaces to split on at all.
+ */
 function tokens(text: string): string[] {
-  if (/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(text)) {
-    return Array.from(text).filter((token) => token.trim().length > 0);
-  }
-  return text.split(/\s+/u).filter(Boolean);
+  const spaced = String(text || '')
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(FILLERS, '')
+    .replace(PUNCTUATION, ' ');
+  return segmentWords(spaced);
 }
 
 function spans(
@@ -74,8 +83,8 @@ export function compareAudioText(expected: string, actual: string): AudioTextCom
   const actualNormalized = normalizeAudioText(actual);
   const expectedChars = Array.from(expectedNormalized);
   const actualChars = Array.from(actualNormalized);
-  const expectedTokens = tokens(expectedNormalized);
-  const actualTokens = tokens(actualNormalized);
+  const expectedTokens = tokens(expected);
+  const actualTokens = tokens(actual);
   const characterErrorRate =
     expectedChars.length === 0
       ? actualChars.length > 0

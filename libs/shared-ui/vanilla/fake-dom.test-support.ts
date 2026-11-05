@@ -243,6 +243,20 @@ export class FakeElement extends FakeNode {
    * input. Subclassing keeps that lookup — and the wrapping it triggers —
    * scoped to `<select>` / `<option>`, where it mirrors the real DOM.
    */
+  /** The fake DOM does no layout: nothing is rendered, so there are no boxes. */
+  getClientRects(): { length: number } {
+    return { length: 0 };
+  }
+  getBoundingClientRect(): {
+    top: number;
+    left: number;
+    bottom: number;
+    right: number;
+    width: number;
+    height: number;
+  } {
+    return { top: 0, left: 0, bottom: 0, right: 0, width: 0, height: 0 };
+  }
   focus(): void {
     if (this.ownerDocument) this.ownerDocument.activeElement = this;
   }

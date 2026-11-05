@@ -31,6 +31,13 @@ export interface SurfaceAuthorizationContext {
   principal?: ResolvedPrincipal;
   /** Member id declared by the matched token registration (FD-07). */
   memberId?: string;
+  /**
+   * Server-resolved only (e.g. the shell's system selection): readers also
+   * admit records that carry no tenant. It never widens `tenantSlugs`; a
+   * projection from a viewer scope must carry it, or untenanted records
+   * silently drop out of every read made through this context.
+   */
+  includeUntenanted?: boolean;
 }
 
 export interface SurfaceAuthorizationResource {
@@ -98,6 +105,22 @@ function denied(
     reason,
     policyId: `surface:${operation.operationId}`,
   };
+}
+
+/**
+ * Row-level tenant admission shared by every reader that takes a viewer scope.
+ * `'all'` admits every record; a record with no tenant is admitted only when
+ * the server-resolved scope sets `includeUntenanted` (the shell's system
+ * selection); any other record only when its tenant is in `tenantSlugs`.
+ * It never widens the scope: callers still apply tier / organization / project.
+ */
+export function admitsTenant(
+  context: Pick<SurfaceAuthorizationContext, 'tenantSlugs' | 'includeUntenanted'>,
+  tenantSlug: string | null | undefined
+): boolean {
+  if (context.tenantSlugs === 'all') return true;
+  if (!tenantSlug) return context.includeUntenanted === true;
+  return context.tenantSlugs.includes(tenantSlug);
 }
 
 export function permissionsForSurfaceRole(

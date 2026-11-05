@@ -1,3 +1,4 @@
+import { withCompanyFanoutInvalidation } from '../../../../lib/company-fanout-cache';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   acceptInboxEntryWithHumanReceipt,
@@ -24,6 +25,16 @@ const ALLOWED_STATUSES: DeliverableInboxStatus[] = [
   'changes_requested',
 ];
 
+/**
+ * Customer-decision hand-offs (CD-10/11) land in the same inbox; あなた待ち
+ * closes one with "対応済みにする" — an accepted verdict with a human receipt
+ * that names what the operator took responsibility for.
+ */
+const HANDOFF_INBOX_KINDS = new Set([
+  'customer_decision_handoff',
+  'customer_decision_manual_reminder',
+]);
+
 function requestLocale(req: NextRequest) {
   return resolveConciergeLocale(req.headers.get('accept-language') ?? undefined);
 }
@@ -32,7 +43,7 @@ function isAllowedStatus(value: unknown): value is DeliverableInboxStatus {
   return typeof value === 'string' && ALLOWED_STATUSES.includes(value as DeliverableInboxStatus);
 }
 
-export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+async function handlePost(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
   // FD-07: a failed viewer resolution is a hard stop — the request never
@@ -79,7 +90,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
             actorId: decidedBy?.id ?? 'human:concierge',
             authenticated: true,
             authMethod: 'surface_session',
-            responsibilityStatement: 'I accept this deliverable on behalf of the operator.',
+            responsibilityStatement: HANDOFF_INBOX_KINDS.has(String(entry.kind ?? ''))
+              ? 'I handled this customer decision hand-off on behalf of the operator.'
+              : 'I accept this deliverable on behalf of the operator.',
           })
         : markInboxEntry(id, status, {
             verdictNote: typeof body?.note === 'string' ? body.note : undefined,
@@ -96,3 +109,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     return conciergeErrorResponse(error, 500);
   }
 }
+
+/** A needs-you mutation: the personal fan-out cache never serves the decided item again. */
+export const POST = withCompanyFanoutInvalidation(handlePost);

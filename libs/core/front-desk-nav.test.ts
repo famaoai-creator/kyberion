@@ -12,11 +12,13 @@ vi.mock('./surface/surface-runtime.js', () => ({
 import {
   DEFAULT_FRONT_DESK_PORTS,
   FRONT_DESK_HELP_LINK,
+  FRONT_DESK_LINKED_DESTINATIONS,
   FRONT_DESK_MENU,
   frontDeskRoleAllows,
   frontDeskRoleFromViewer,
   readFrontDeskSurfacePorts,
   readAvailableFrontDeskSurfaces,
+  resolveFrontDeskDestination,
   resolveFrontDeskMenu,
   type FrontDeskRole,
 } from './front-desk-nav.js';
@@ -32,27 +34,14 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('FRONT_DESK_MENU', () => {
-  it('lists existing destinations in stable groups without an item limit', () => {
+  it('lists exactly the seven top-level destinations (MSN-SHELL-IA §1)', () => {
     expect(FRONT_DESK_MENU.map((item) => item.id)).toEqual([
-      'decide',
-      'ask',
-      'missions',
-      'work-items',
-      'approvals',
-      'overview',
-      'organizations',
-      'projects',
-      'actors',
-      'deliverables',
-      'ingest',
-      'knowledge',
-      'discussion',
-      'first-job',
-      'help',
-      'organization',
-      'operations',
-      'surface-control',
-      'diagnostics',
+      'home',
+      'inbox',
+      'work',
+      'org',
+      'library',
+      'ops',
       'settings',
     ]);
     expect(new Set(FRONT_DESK_MENU.map((item) => item.id)).size).toBe(FRONT_DESK_MENU.length);
@@ -61,10 +50,10 @@ describe('FRONT_DESK_MENU', () => {
 
   it('resolves every label_key/sublabel_key to a non-empty ja and en string with no internal leftovers or port numbers', () => {
     const forbiddenPatterns = [/Approval Inbox/i, /Hold To Talk/i, /3031/, /3050/];
-    const keys = FRONT_DESK_MENU.flatMap((item) => [
+    const keys = [...FRONT_DESK_MENU, ...FRONT_DESK_LINKED_DESTINATIONS].flatMap((item) => [
       item.label_key,
       item.sublabel_key,
-      item.group_key,
+      ...(item.group_key ? [item.group_key] : []),
     ]);
     for (const key of keys) {
       for (const locale of ['en', 'ja'] as const) {
@@ -82,7 +71,9 @@ describe('FRONT_DESK_MENU', () => {
     expect(FRONT_DESK_HELP_LINK.id).toBe('help');
     const helpText = t(FRONT_DESK_HELP_LINK.label_key as VocabularyKey, undefined, 'ja');
     expect(helpText.length).toBeGreaterThan(0);
-    expect(FRONT_DESK_MENU.find((item) => item.id === 'help')).toMatchObject({
+    // Help left the rail (it is not one of the seven destinations) but stays linkable.
+    expect(FRONT_DESK_MENU.some((item) => item.id === 'help')).toBe(false);
+    expect(FRONT_DESK_LINKED_DESTINATIONS.find((item) => item.id === 'help')).toMatchObject({
       surface: FRONT_DESK_HELP_LINK.surface,
       path: FRONT_DESK_HELP_LINK.path,
     });
@@ -94,13 +85,11 @@ describe('resolveFrontDeskMenu', () => {
     const menu = resolveFrontDeskMenu({ currentSurface: 'presence-studio' });
     const byId = Object.fromEntries(menu.map((item) => [item.id, item]));
 
-    expect(byId.ask.href).toBe('/ask');
-    expect(byId.ask.external).toBe(false);
-    expect(byId.overview.href).toBe('http://127.0.0.1:3050/w');
-    expect(byId.missions.href).toBe('http://127.0.0.1:3050/w/mission');
+    expect(byId.home.href).toBe('http://127.0.0.1:3050/');
+    expect(byId.work.href).toBe('http://127.0.0.1:3050/work');
 
-    expect(byId.decide.href).toBe('http://127.0.0.1:3050/');
-    expect(byId.decide.external).toBe(true);
+    expect(byId.inbox.href).toBe('http://127.0.0.1:3050/inbox');
+    expect(byId.inbox.external).toBe(true);
     expect(byId.settings.href).toBe('http://127.0.0.1:3050/settings');
     expect(byId.settings.external).toBe(true);
   });
@@ -109,18 +98,18 @@ describe('resolveFrontDeskMenu', () => {
     const menu = resolveFrontDeskMenu({ currentSurface: 'concierge' });
     const byId = Object.fromEntries(menu.map((item) => [item.id, item]));
 
-    expect(byId.decide.href).toBe('/');
-    expect(byId.decide.external).toBe(false);
+    expect(byId.home.href).toBe('/');
+    expect(byId.inbox.href).toBe('/inbox');
     expect(byId.settings.href).toBe('/settings');
     expect(byId.settings.external).toBe(false);
-
-    expect(byId.ask.href).toBe('http://127.0.0.1:3031/ask');
-    expect(byId.ask.external).toBe(true);
-    for (const id of ['missions', 'work-items', 'approvals', 'overview', 'projects', 'actors']) {
-      expect(byId[id].external).toBe(false);
-      expect(byId[id].href.startsWith('/w')).toBe(true);
-    }
-    expect(byId.organizations.href).toBe('/w/organization');
+    expect(byId.org.href).toBe('/org');
+    expect(byId.library.href).toBe('/library');
+    expect(byId.ops.href).toBe('/ops');
+    expect(menu.every((item) => !item.external)).toBe(true);
+    // The old `/w/*` lists and `/ops?section=*` entries are no longer rail items.
+    expect(
+      menu.some((item) => /^\/w(\/|$)/.test(item.href) || item.href.includes('section='))
+    ).toBe(false);
   });
 
   it('honors custom ports overrides', () => {
@@ -128,17 +117,17 @@ describe('resolveFrontDeskMenu', () => {
       currentSurface: 'presence-studio',
       ports: { concierge: 4000 },
     });
-    const decide = menu.find((item) => item.id === 'decide')!;
-    expect(decide.href).toBe('http://127.0.0.1:4000/');
+    const inbox = menu.find((item) => item.id === 'inbox')!;
+    expect(inbox.href).toBe('http://127.0.0.1:4000/inbox');
   });
 
   it('gates allowed by role, defaulting to viewer when role is omitted', () => {
     const defaultMenu = resolveFrontDeskMenu({ currentSurface: 'presence-studio' });
     const byIdDefault = Object.fromEntries(defaultMenu.map((item) => [item.id, item]));
-    expect(byIdDefault.overview.allowed).toBe(true);
-    expect(byIdDefault.missions.allowed).toBe(true);
-    expect(byIdDefault.ask.allowed).toBe(false);
-    expect(byIdDefault.decide.allowed).toBe(false);
+    expect(byIdDefault.home.allowed).toBe(true);
+    expect(byIdDefault.work.allowed).toBe(true);
+    expect(byIdDefault.inbox.allowed).toBe(false);
+    expect(byIdDefault.ops.allowed).toBe(false);
     expect(byIdDefault.settings.allowed).toBe(false);
 
     const ownerMenu = resolveFrontDeskMenu({ currentSurface: 'presence-studio', role: 'owner' });
@@ -217,25 +206,12 @@ describe('optional destinations', () => {
   it('hosts the operations console items on Concierge and needs no optional surface', () => {
     const menu = resolveFrontDeskMenu({ currentSurface: 'concierge', role: 'owner' });
     expect(menu.map((item) => item.id)).toEqual([
-      'decide',
-      'ask',
-      'missions',
-      'work-items',
-      'approvals',
-      'overview',
-      'organizations',
-      'projects',
-      'actors',
-      'deliverables',
-      'ingest',
-      'knowledge',
-      'discussion',
-      'first-job',
-      'help',
-      'organization',
-      'operations',
-      'surface-control',
-      'diagnostics',
+      'home',
+      'inbox',
+      'work',
+      'org',
+      'library',
+      'ops',
       'settings',
     ]);
     expect(
@@ -256,10 +232,10 @@ describe('optional destinations', () => {
     expect(menu).toHaveLength(FRONT_DESK_MENU.length);
     // The former Chronos destinations are same-origin /ops sections now, even
     // while a Chronos process is still reachable during the migration.
-    expect(menu.find((item) => item.id === 'knowledge')?.href).toBe('/ops?section=knowledge');
-    expect(menu.find((item) => item.id === 'knowledge')?.external).toBe(false);
+    expect(menu.find((item) => item.id === 'ops')?.href).toBe('/ops');
+    expect(menu.find((item) => item.id === 'ops')?.external).toBe(false);
     expect(menu.some((item) => item.id === 'monitor')).toBe(false);
-    expect(menu.find((item) => item.id === 'knowledge')?.scope_query_style).toBe('snake');
+    expect(menu.find((item) => item.id === 'ops')?.scope_query_style).toBe('snake');
   });
   it.each(['viewer', 'operator', 'approver', 'owner'] as const)(
     'keeps role gates for %s with all surfaces available',
@@ -333,38 +309,37 @@ describe('readAvailableFrontDeskSurfaces', () => {
   });
 });
 
-it('keeps organization management available without optional Chronos', () => {
-  const item = resolveFrontDeskMenu({ currentSurface: 'concierge', role: 'owner' }).find(
-    (entry) => entry.id === 'organization'
-  );
-  expect(item).toMatchObject({
-    href: '/management',
-    surface: 'concierge',
-    allowed: true,
-    scope_query_style: 'camel',
+describe('rail placement and destinations', () => {
+  it('pins settings at the rail bottom and keeps the rest in the main list', () => {
+    expect(FRONT_DESK_MENU.filter((item) => item.placement === 'footer').map((i) => i.id)).toEqual([
+      'settings',
+    ]);
+    expect(FRONT_DESK_MENU.every((item) => !item.group_key)).toBe(true);
   });
-});
 
-describe('operations console destinations (former Chronos)', () => {
-  it('resolves to the Concierge origin from presence-studio', () => {
+  it('keeps the operations console same-origin with the snake_case scope query', () => {
     const menu = resolveFrontDeskMenu({
       currentSurface: 'presence-studio',
       role: 'owner',
       urls: { concierge: 'http://127.0.0.1:3050' },
     });
-    for (const id of [
-      'deliverables',
-      'knowledge',
-      'discussion',
-      'operations',
-      'surface-control',
-      'diagnostics',
-    ]) {
-      const item = menu.find((entry) => entry.id === id);
-      expect(item?.surface, id).toBe('concierge');
-      expect(item?.href, id).toBe(`http://127.0.0.1:3050/ops?section=${id}`);
-      expect(item?.scope_query_style, id).toBe('snake');
-    }
+    const ops = menu.find((entry) => entry.id === 'ops');
+    expect(ops).toMatchObject({
+      surface: 'concierge',
+      href: 'http://127.0.0.1:3050/ops',
+      scope_query_style: 'snake',
+      min_role: 'owner',
+    });
+    expect(menu.find((entry) => entry.id === 'org')?.scope_query_style).toBe('camel');
     expect(FRONT_DESK_MENU.some((item) => item.surface === 'chronos-mirror-v2')).toBe(false);
+  });
+
+  it('still resolves Studio destinations that left the rail', () => {
+    for (const id of ['ask', 'first-job', 'help', 'progress', 'home-studio']) {
+      expect(
+        resolveFrontDeskDestination(id, { currentSurface: 'concierge', role: 'owner' })?.surface,
+        id
+      ).toBe('presence-studio');
+    }
   });
 });

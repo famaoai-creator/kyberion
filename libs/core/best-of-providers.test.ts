@@ -383,4 +383,19 @@ describe('defaultBestOfProvidersJudge', () => {
     expect(verdict.votes.a).toBe(1);
     expect(verdict.votes.b).toBe(1);
   });
+
+  it('scores agreement between Japanese answers word by word, not as one sentence token', async () => {
+    // Whitespace tokenization made every Japanese answer a single token, so
+    // all pairwise similarities were 0 and the outlier won by input order.
+    const verdict = await defaultBestOfProvidersJudge({
+      instruction: 'x',
+      candidates: [
+        { provider: 'outlier', output: '明日の天気予報は雨です' },
+        { provider: 'a', output: '請求書を作成してメールで送信します' },
+        { provider: 'b', output: '請求書を作成してメールで送ります' },
+      ],
+    });
+    expect(verdict.winnerProvider).toBe('a');
+    expect(verdict.votes).toEqual({ outlier: 0, a: 1, b: 1 });
+  });
 });

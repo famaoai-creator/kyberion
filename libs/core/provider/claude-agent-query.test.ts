@@ -14,6 +14,11 @@ vi.mock('../metrics.js', () => ({
 
 import { runClaudeAgentTask, runClaudeAgentQuery } from './claude-agent-query.js';
 import { metrics } from '../metrics.js';
+import {
+  delegationExecutionStartedFromError,
+  runStartReportingDelegation,
+  runWithDelegationExecutionTracker,
+} from '../delegation-execution-tracker.js';
 
 function stream(messages: Record<string, unknown>[]): AsyncIterable<unknown> {
   return {
@@ -227,4 +232,59 @@ it('fails closed before the Agent SDK can inherit an operator environment under 
       ).rejects.toThrow('CREDENTIAL_NATIVE_UNSUPPORTED');
   });
   expect(mocks.query).not.toHaveBeenCalled();
+});
+
+describe('R5 execution-start reporting at the SDK dispatch point', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const failingStream = (): AsyncIterable<unknown> => ({
+    async *[Symbol.asyncIterator]() {
+      throw new Error('Claude Code process exited with code 1');
+    },
+  });
+
+  it('marks the delegation started before query() spawns Claude Code', async () => {
+    for (const run of [
+      () => runClaudeAgentTask({ systemPrompt: 's', userPrompt: 'u' }),
+      () =>
+        runClaudeAgentQuery({
+          systemPrompt: 's',
+          userPrompt: 'u',
+          schema: z.object({ ok: z.boolean() }),
+        }),
+    ]) {
+      mocks.query.mockReturnValueOnce(failingStream());
+      const error = await runStartReportingDelegation(run).catch((e: unknown) => e);
+      // A failure after the spawn point may follow a real turn: never retried.
+      expect(delegationExecutionStartedFromError(error)).toBe(true);
+    }
+  });
+
+  it('keeps a refusal raised before query() provably pre-start', async () => {
+    await runInExecutionScope({ tenantBound: true, tenantSlug: 'sdk-native-fixture' }, async () => {
+      const error = await runStartReportingDelegation(() =>
+        runClaudeAgentTask({ systemPrompt: 's', userPrompt: 'u' })
+      ).catch((e: unknown) => e);
+      expect(String(error)).toContain('CREDENTIAL_NATIVE_UNSUPPORTED');
+      expect(delegationExecutionStartedFromError(error)).toBe(false);
+    });
+    expect(mocks.query).not.toHaveBeenCalled();
+  });
+
+  it('reports the turn usage as delegation result metadata', async () => {
+    mocks.query.mockReturnValueOnce(
+      stream([
+        {
+          ...SUCCESS,
+          usage: { input_tokens: 10, output_tokens: 3, cache_read_input_tokens: 5 },
+          modelUsage: { 'claude-served': { inputTokens: 15, outputTokens: 3 } },
+        },
+      ])
+    );
+    const metadata = await runWithDelegationExecutionTracker(async (tracker) => {
+      await runClaudeAgentTask({ systemPrompt: 's', userPrompt: 'u' });
+      return tracker.metadata;
+    });
+    expect(metadata.usage).toEqual({ input_tokens: 15, output_tokens: 3, total_tokens: 18 });
+  });
 });

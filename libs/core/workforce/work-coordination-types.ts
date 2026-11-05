@@ -133,6 +133,8 @@ export interface WorkLease {
   renewed_at: string;
   released_at?: string;
   idempotency_key?: string;
+  /** R5: normalized hash of the claimed payload; a replay must carry the same hash. */
+  payload_hash?: string;
   expected_version?: number;
   previous_lease_id?: string;
 }
@@ -285,6 +287,8 @@ export interface ClaimWorkItemInput {
   ttlMs?: number;
   expectedVersion?: number;
   idempotencyKey?: string;
+  /** R5: normalized payload hash bound to idempotencyKey (compared on replay when both sides carry one). */
+  payloadHash?: string;
   traceId?: string;
   metadata?: Record<string, unknown>;
   /** W4 opt-in: consult an injected lease manager for contender suspension. */

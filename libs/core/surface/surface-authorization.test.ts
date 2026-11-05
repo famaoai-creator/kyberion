@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  admitsTenant,
   authorizeSurfaceOperation,
   assertSurfaceOperation,
   type SurfaceAuthorizationContext,
@@ -98,5 +99,25 @@ describe('surface authorization', () => {
         },
       })
     ).toMatchObject({ allowed: false, reasonCode: 'policy_missing' });
+  });
+});
+
+describe('admitsTenant (row-level tenant admission)', () => {
+  it('admits every record for an all-tenant scope', () => {
+    expect(admitsTenant({ tenantSlugs: 'all' }, 'acme')).toBe(true);
+    expect(admitsTenant({ tenantSlugs: 'all' }, undefined)).toBe(true);
+  });
+
+  it('admits a company-less record only for a server-resolved includeUntenanted scope', () => {
+    expect(admitsTenant({ tenantSlugs: [], includeUntenanted: true }, undefined)).toBe(true);
+    expect(admitsTenant({ tenantSlugs: [], includeUntenanted: true }, '')).toBe(true);
+    expect(admitsTenant({ tenantSlugs: [] }, undefined)).toBe(false);
+    expect(admitsTenant({ tenantSlugs: ['acme'] }, null)).toBe(false);
+  });
+
+  it('never widens the named tenants', () => {
+    expect(admitsTenant({ tenantSlugs: [], includeUntenanted: true }, 'acme')).toBe(false);
+    expect(admitsTenant({ tenantSlugs: ['acme'] }, 'acme')).toBe(true);
+    expect(admitsTenant({ tenantSlugs: ['acme'], includeUntenanted: true }, 'beta')).toBe(false);
   });
 });

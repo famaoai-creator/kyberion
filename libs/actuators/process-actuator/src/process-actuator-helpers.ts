@@ -4,7 +4,11 @@ import {
   currentProcessArgv,
   runActuatorCliEntryPoint,
 } from '@agent/core/cli-utils';
-import { parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
+import {
+  parseSafeJsonObjectValue,
+  readJson,
+  withoutRelayManagedCredentials,
+} from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
@@ -126,7 +130,12 @@ export async function handleAction(input: ProcessAction) {
               ? resolveProcessPath(String(params.cwd), false)
               : pathResolver.rootDir(),
             // Caller-supplied env may not set execution authority (DR-01).
-            env: { ...process.env, ...stripAuthorityEnvOverrides(params.env) },
+            // With the credential relay flag on, a generic process starts no
+            // relay, so the raw relay-managed keys are dropped (fail closed).
+            env: withoutRelayManagedCredentials({
+              ...process.env,
+              ...stripAuthorityEnvOverrides(params.env),
+            }),
             stdio: ['pipe', 'pipe', 'pipe'],
           },
         });
