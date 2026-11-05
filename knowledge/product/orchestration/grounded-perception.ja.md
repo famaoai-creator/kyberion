@@ -37,7 +37,7 @@ watchでも --diarize / --events / --no-transcript / --track / --avatar-id を�
 
 ```bash
 uv venv --python 3.12 active/shared/cache/system/perception-runtime
-uv pip install --python active/shared/cache/system/perception-runtime/bin/python -r libs/core/perception/requirements.txt
+uv pip install --python active/shared/cache/system/perception-runtime/bin/python -r libs/shared-perception/src/requirements.txt
 ```
 
 以降は --python active/shared/cache/system/perception-runtime/bin/python を付ける。ランタイムはモデルも依存関係も自動取得しない。公開モデル資産はsystem cacheに導入できるが、利用者データ・索引はtier / tenant partitionに置く。

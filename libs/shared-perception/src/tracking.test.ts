@@ -1,10 +1,10 @@
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import type { ChildProcess } from '../secure-io.js';
+import type { ChildProcess } from '@agent/core/secure-io';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver } from '../path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   openTrackingSession,
   trackingObservations,

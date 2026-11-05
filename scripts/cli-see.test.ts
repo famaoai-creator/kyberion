@@ -17,7 +17,7 @@ import {
   type SemanticEmbeddingProvider,
   type SemanticIndexOptions,
   type SemanticSearchOptions,
-} from '@agent/core/perception/semantic-index';
+} from '@agent/shared-perception/semantic-index';
 import { renderSeeResult, runSeeCommand, SEE_USAGE } from './cli-see.js';
 import { createFakeDeps } from './lib/perception.test-support.js';
 

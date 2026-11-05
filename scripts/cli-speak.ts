@@ -32,7 +32,7 @@ import { primaryLanguageSubtag, supportsSpeechLanguage } from '@agent/core/voice
 import type { AudioChunk } from '@agent/core/meeting/meeting-session-types';
 import type { PlaybackHandle, PlaybackResult } from '@agent/core/voice/audio-playback';
 import type { AudioDeviceDescriptor } from '@agent/core/voice/audio-route';
-import type { PerceptionScope } from '@agent/core/perception/observation';
+import type { PerceptionScope } from '@agent/shared-perception/observation';
 import {
   safeCopyFileSync,
   safeExistsSync,

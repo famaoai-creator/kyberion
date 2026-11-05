@@ -1,13 +1,13 @@
-import { readJson, writeJson } from '../foundation/json.js';
+import { readJson, writeJson } from '@agent/core/foundation/json';
 /** Local multimodal retrieval. Index scope is checked against runtime authority on every call. */
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { currentScope } from '../scope-context.js';
-import { currentScopeEnvelope } from '../scope-envelope.js';
-import { pathResolver } from '../path-resolver.js';
-import { resolveStorageFloor, classifyStorageFloorPath } from '../storage-layout.js';
-import { detectTier } from '../tier-guard.js';
-import { tenantOfPath } from '../path-tenant-attribution.js';
+import { currentScope } from '@agent/core/scope-context';
+import { currentScopeEnvelope } from '@agent/core/scope-envelope';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveStorageFloor, classifyStorageFloorPath } from '@agent/core/storage-layout';
+import { detectTier } from '@agent/core/tier-guard';
+import { tenantOfPath } from '@agent/core/path-tenant-attribution';
 import {
   assertSafeRepositoryPath,
   safeExecResultAsync,
@@ -16,7 +16,7 @@ import {
   safeReadFile,
   safeReadFileRange,
   safeReaddir,
-} from '../secure-io.js';
+} from '@agent/core/secure-io';
 
 export interface SemanticScope {
   tier: 'public' | 'confidential' | 'personal';
@@ -301,7 +301,7 @@ export function createLocalMultimodalEmbeddingProvider(
       });
       const result = await safeExecResultAsync(
         options.python ?? 'python3',
-        [pathResolver.rootResolve('libs/core/perception/semantic-embedding.py')],
+        [pathResolver.rootResolve('libs/shared-perception/src/semantic-embedding.py')],
         {
           timeoutMs: timeout,
           maxOutputMB: 4,

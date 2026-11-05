@@ -1,0 +1,45 @@
+{
+  "name": "@agent/shared-perception",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sensing into scoped observations: audio analysis, visual change, object tracking and the semantic index behind kyberion read/see/listen/watch. Uses the core sensing bridges; core never imports it.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./audio-analysis": {
+      "types": "./dist/audio-analysis.d.ts",
+      "default": "./dist/audio-analysis.js"
+    },
+    "./image-dimensions": {
+      "types": "./dist/image-dimensions.d.ts",
+      "default": "./dist/image-dimensions.js"
+    },
+    "./observation": {
+      "types": "./dist/observation.d.ts",
+      "default": "./dist/observation.js"
+    },
+    "./semantic-index": {
+      "types": "./dist/semantic-index.d.ts",
+      "default": "./dist/semantic-index.js"
+    },
+    "./tracking": {
+      "types": "./dist/tracking.d.ts",
+      "default": "./dist/tracking.js"
+    },
+    "./visual-change": {
+      "types": "./dist/visual-change.d.ts",
+      "default": "./dist/visual-change.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.json && node ../../scripts/write_core_dist_scope.mjs --run"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*"
+  }
+}

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { pathResolver } from '../path-resolver.js';
-import { safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
-import { resolveStorageFloor } from '../storage-layout.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { resolveStorageFloor } from '@agent/core/storage-layout';
 import {
   indexMedia,
   searchMedia,
@@ -14,8 +14,8 @@ import {
 const authority = vi.hoisted(() => ({
   scope: { tier: 'public' as string, tenant_slug: undefined as string | undefined },
 }));
-vi.mock('../scope-context.js', () => ({ currentScope: () => authority.scope }));
-vi.mock('../scope-envelope.js', () => ({ currentScopeEnvelope: () => undefined }));
+vi.mock('@agent/core/scope-context', () => ({ currentScope: () => authority.scope }));
+vi.mock('@agent/core/scope-envelope', () => ({ currentScopeEnvelope: () => undefined }));
 const files: string[] = [];
 function source(name = 'image.png'): string {
   const file = pathResolver.sharedTmp('semantic-tests/' + randomUUID() + '-' + name);

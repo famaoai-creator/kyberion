@@ -1,14 +1,14 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { createLogger } from '../logger.js';
-import { spawnManagedProcess, stopManagedProcess } from '../managed-process.js';
+import { createLogger } from '@agent/core/logger';
+import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import {
   observation,
   resolvePerceptionScope,
   type PerceptionSource,
   type Observation,
 } from './observation.js';
-import { pathResolver } from '../path-resolver.js';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
   safeLstat,
@@ -16,10 +16,10 @@ import {
   safeExecResultAsync,
   assertGovernedExec,
   buildSafeExecEnv,
-} from '../secure-io.js';
-import { isRecord } from '../foundation/text.js';
-import { parseSafeJsonInput } from '../foundation/safe-json.js';
-import type { AnimationCue } from '../realtime-media-session.js';
+} from '@agent/core/secure-io';
+import { isRecord } from '@agent/core/foundation/text';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import type { AnimationCue } from '@agent/core/realtime-media-session';
 
 const logger = createLogger('perception-tracking');
 
@@ -208,7 +208,7 @@ export async function trackMedia(
   const timeoutMs = integer(request.timeoutMs, 120000, 600000, 'timeoutMs');
   const args = [
     '-I',
-    pathResolver.rootResolve('libs/core/perception/tracking.py'),
+    pathResolver.rootResolve('libs/shared-perception/src/tracking.py'),
     '--input',
     input,
     '--max-frames',
@@ -354,7 +354,7 @@ export function openTrackingSession(
   const timeoutMs = integer(options.timeoutMs, 120000, 600000, 'timeoutMs');
   const args = [
     '-I',
-    pathResolver.rootResolve('libs/core/perception/tracking.py'),
+    pathResolver.rootResolve('libs/shared-perception/src/tracking.py'),
     '--stream',
     '--max-frames',
     String(limit),

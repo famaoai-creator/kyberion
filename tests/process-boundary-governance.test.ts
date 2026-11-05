@@ -6,9 +6,9 @@ import { getAllFiles } from '@agent/core/fs-utils';
 const rootDir = process.cwd();
 const allowedManagedProcessConsumers = [
   // Bounded local inference helpers: explicit models, deadline/cancellation, and session-owned teardown.
-  'libs/core/perception/audio-analysis.ts',
-  'libs/core/perception/audio-analysis.test.ts',
-  'libs/core/perception/tracking.ts',
+  'libs/shared-perception/src/audio-analysis.ts',
+  'libs/shared-perception/src/audio-analysis.test.ts',
+  'libs/shared-perception/src/tracking.ts',
   // Continuous owner controllers are cancellable, supervised children.
   'scripts/continuous_owner_process.ts',
   'scripts/continuous_owner_process.test.ts',

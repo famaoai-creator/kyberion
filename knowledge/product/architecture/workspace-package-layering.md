@@ -47,6 +47,7 @@ libs/shared-*  (video, media, voice, vision, interaction, network, ui, ...)
 | `shared-media`       | document generation engines, image/music/video generation, layout and drawio policies               | document reader, docx/xlsx/pptx utils, pdf parser, image description |
 | `shared-voice`       | realtime voice conversation loops, voice generation runtime, samples, selection, turn-taking        | audio bus/route, STT/TTS bridges, VAD, voice-engine registries       |
 | `shared-vision`      | browser automation bridge, extension mailbox, browser conversation, onboarding, procedure promotion | extension bridge, recording compiler, Chrome meeting driver          |
+| `shared-perception`  | observation scoping, audio analysis, visual change, tracking, semantic index (+ Python helpers)     | STT/VAD/OCR/image-description bridges it calls                       |
 | `shared-interaction` | modality-independent conversation control                                                           | —                                                                    |
 
 ## Listen, think, speak: layer by role, not by sense
@@ -67,6 +68,6 @@ Split by layer instead — device bridges (core) → modality runtime (`shared-v
 interaction control (`shared-interaction`). A text chat or meeting facilitator reuses
 `shared-interaction` without the voice runtime.
 
-`libs/core/perception` (observation, semantic index, audio analysis, visual change) is the
-next candidate for a sensing package; its boundary with the core sensing bridges needs to be
-drawn first.
+`shared-perception` turns the core sensing bridges into scoped observations for
+`kyberion read / see / listen / watch`; the bridges themselves stay in core because meeting,
+shell and the voice runtime share them.

@@ -1,14 +1,14 @@
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeReadFileRange, safeLstat } from '../secure-io.js';
-import { resolveScopeContext } from '../scope-context.js';
-import { inferImagePayloadTier } from '../media/image-description-bridge.js';
-import { classifyStorageFloorPath } from '../storage-layout.js';
-import { tenantOfPath } from '../path-tenant-attribution.js';
-import { KNOWLEDGE_TIER_RANK } from '../foundation/knowledge-tier.js';
-import type { OcrResult } from '../ocr-types.js';
-import type { TranscriptSegment } from '../voice/speech-to-text-bridge.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeReadFileRange, safeLstat } from '@agent/core/secure-io';
+import { resolveScopeContext } from '@agent/core/scope-context';
+import { inferImagePayloadTier } from '@agent/core/media/image-description-bridge';
+import { classifyStorageFloorPath } from '@agent/core/storage-layout';
+import { tenantOfPath } from '@agent/core/path-tenant-attribution';
+import { KNOWLEDGE_TIER_RANK } from '@agent/core/foundation/knowledge-tier';
+import type { OcrResult } from '@agent/core/ocr-types';
+import type { TranscriptSegment } from '@agent/core/voice/speech-to-text-bridge';
 
 export interface PerceptionScope {
   tier: 'public' | 'confidential' | 'personal';
