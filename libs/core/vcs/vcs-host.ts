@@ -178,6 +178,67 @@ export interface VcsHostProvider {
     repo: VcsRepositoryRef,
     input: VcsPrMergeInput
   ): Promise<VcsPrMergeResult>;
+  /**
+   * gh-`--json`-shaped projection of one PR, limited to {@link VCS_PR_FIELDS}.
+   * Field names and value shapes follow the gh CLI so existing consumers keep
+   * their parsing; a provider that cannot serve a field throws `invalid`.
+   */
+  prFields(
+    ctx: VcsHostCallContext,
+    repo: VcsRepositoryRef,
+    ref: string,
+    fields: readonly VcsPrField[]
+  ): Promise<Record<string, unknown>>;
+  /**
+   * Optional GitHub capability: a REST GET under `repos/{slug}/` for the
+   * allowlisted read-only paths the verb layer admits (branch protection,
+   * rulesets, trees, check runs, workflow runs, workflow contents). Throws
+   * `not_found` for a 404 so callers can treat a missing policy as absent.
+   */
+  githubApiGet?(ctx: VcsHostCallContext, repo: VcsRepositoryRef, path: string): Promise<unknown>;
+}
+
+/** gh `--json` PR field names served by the contract (both builtin providers). */
+export const VCS_PR_FIELDS = [
+  'number',
+  'url',
+  'title',
+  'body',
+  'state',
+  'isDraft',
+  'headRefOid',
+  'baseRefOid',
+  'headRefName',
+  'baseRefName',
+  'author',
+  'createdAt',
+  'updatedAt',
+  'closedAt',
+  'mergedAt',
+  'mergeCommit',
+  'autoMergeRequest',
+  'additions',
+  'deletions',
+  'changedFiles',
+  'files',
+  'labels',
+] as const;
+export type VcsPrField = (typeof VCS_PR_FIELDS)[number];
+
+export function parseVcsPrFields(fields: string): VcsPrField[] {
+  const names = fields
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
+  if (!names.length) throw new VcsHostError('invalid', 'at least one PR field is required');
+  const allowed = new Set<string>(VCS_PR_FIELDS);
+  const unknown = names.filter((name) => !allowed.has(name));
+  if (unknown.length)
+    throw new VcsHostError(
+      'invalid',
+      `unsupported PR field(s): ${unknown.join(', ')} — supported: ${VCS_PR_FIELDS.join(', ')}`
+    );
+  return [...new Set(names)] as VcsPrField[];
 }
 
 // ─── Registry & resolution ───────────────────────────────────────────────────

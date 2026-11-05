@@ -82,7 +82,7 @@ describe('trusted publication body provenance', () => {
   ] as const)('classifies only canonical proven sources: %s', (file, expected) => {
     expect(publicationBodySourceTier(file)).toEqual(expected);
   });
-  it('preserves concrete tenant provenance and frozen bytes across worktree transport despite caller hint', () => {
+  it('preserves concrete tenant provenance and frozen bytes across worktree transport despite caller hint', async () => {
     let payload:
       | {
           bodySourceTier: unknown;
@@ -90,7 +90,7 @@ describe('trusted publication body provenance', () => {
           sourceScope: unknown;
         }
       | undefined;
-    const result = runVcsMutationWithWorktreeGovernance(
+    const result = await runVcsMutationWithWorktreeGovernance(
       {
         operation: 'pr_create',
         params: {
@@ -127,7 +127,7 @@ describe('trusted publication body provenance', () => {
     expect(payload?.sourceScope).toEqual({ tier: 'confidential', tenant_slug: 'acme' });
     expect(PR_GOVERNANCE_CHILD).toContain('withPrPublicationBodySource(input.bodySourceTier');
   });
-  it('stages a scratch-floor body file into public evidence before classification', () => {
+  it('stages a scratch-floor body file into public evidence before classification', async () => {
     writeScopedArtifact.mockClear();
     let payload:
       | {
@@ -135,7 +135,7 @@ describe('trusted publication body provenance', () => {
           mutation: { params: { body: string; bodyFile?: string } };
         }
       | undefined;
-    const result = runVcsMutationWithWorktreeGovernance(
+    const result = await runVcsMutationWithWorktreeGovernance(
       {
         operation: 'pr_create',
         params: {
@@ -180,9 +180,9 @@ describe('trusted publication body provenance', () => {
     expect(payload?.mutation.params.body).toBe('exact confidential bytes');
     expect(payload?.mutation.params.bodyFile).toBeUndefined();
   });
-  it('does not restage a body file that already carries provenance', () => {
+  it('does not restage a body file that already carries provenance', async () => {
     writeScopedArtifact.mockClear();
-    runVcsMutationWithWorktreeGovernance(
+    await runVcsMutationWithWorktreeGovernance(
       {
         operation: 'pr_create',
         params: {
@@ -210,7 +210,7 @@ describe('trusted publication body provenance', () => {
     );
     expect(writeScopedArtifact).not.toHaveBeenCalled();
   });
-  it('rejects malformed transported tenant marker', () => {
+  it('rejects malformed transported tenant marker', async () => {
     expect(() =>
       withPrPublicationBodySource({ tier: 'confidential', tenantSlug: 'public' }, () => {})
     ).toThrow('PROVENANCE_INVALID');
