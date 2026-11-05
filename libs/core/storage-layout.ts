@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
   TENANT_APPROVAL_ROOT_PATH,
+  TENANT_AUDIT_MIRROR_ROOT_PATH,
   TENANT_LEDGER_ROOT_PATH,
 } from './foundation/runtime-state-roots.js';
 import { createHash } from 'node:crypto';
@@ -221,6 +222,11 @@ export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
    * Untenanted records (and pre-activation tenant requests) stay in the system tree.
    */
   tenant_approvals: TENANT_APPROVAL_ROOT_PATH,
+  /**
+   * Per-tenant audit chain mirrors (`libs/core/governance/audit-chain.ts`):
+   * `confidential/<tenant>/audit-<date>.jsonl`, appended as `audit_mirror_writer`.
+   */
+  tenant_audit_mirror: TENANT_AUDIT_MIRROR_ROOT_PATH,
 } as const;
 
 /**
@@ -240,6 +246,10 @@ export const TENANT_STORE_LEDGER_ROOTS = {
   tenant_approvals: {
     root: PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals,
     storeRole: 'tenant_approval_store',
+  },
+  tenant_audit_mirror: {
+    root: PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_audit_mirror,
+    storeRole: 'audit_mirror_writer',
   },
 } as const;
 

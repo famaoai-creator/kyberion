@@ -1412,11 +1412,11 @@ registerOperationalTenantMembership((tenant, rootDir) =>
 registerOperationalAlertStore((fn) => withExecutionContext('ops_alert_store', fn, 'worker'));
 
 /**
- * G17: the audit chain's tenant mirror (customer/{slug}/logs/audit/) is written
+ * G17: the audit chain's tenant mirror (active/shared/runtime/audit-mirror/confidential/{slug}/) is written
  * as audit_mirror_writer bound to the entry's tenant — a dedicated shared core
  * store-writer role whose only grant is that tenant-parameterised path — so the
  * mirror never depends on (or borrows) the caller's own grants, and no other
- * store writer or resident dot (infrastructure_sentinel) holds a customer/ grant.
+ * store writer or resident dot (infrastructure_sentinel) holds a mirror grant.
  */
 const TENANT_AUDIT_MIRROR_WRITER_ROLE = 'audit_mirror_writer';
 // Guarded lookup, as in secure-io's registerOptionalAuditIo: a test's reduced

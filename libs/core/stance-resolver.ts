@@ -93,16 +93,14 @@ export function stanceRoot(
  * Top-level entries of a stance directory: the files and folders read through
  * the stance overlay. Anything else that legacy `customer/{slug}/` held (company
  * profile, vision, org chart, OKRs, decision rights, brand, design, deals, the
- * audit mirror, channel bindings) belongs to a tenant, not to a stance.
- * `organization-profile.json` is still read through the overlay; it moves to the
- * tenant's company assets in S2 of the store-catalog guard design.
+ * audit mirror, channel bindings) belongs to a tenant, not to a stance
+ * (`organization/tenant-home.ts`).
  */
 export const STANCE_ENTRIES: readonly string[] = [
   'identity.json',
   'my-identity.json',
   'agent-identity.json',
   'my-vision.md',
-  'organization-profile.json',
   'policy',
   'connections',
   'voice',

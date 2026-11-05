@@ -7,6 +7,7 @@ import * as nodePath from 'node:path';
 import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { rootDir, sharedLogsAudit } from './path-resolver.js';
+import { TENANT_AUDIT_MIRROR_ROOT_PATH } from './foundation/runtime-state-roots.js';
 import {
   safeReaddir,
   safeUnlinkSync,
@@ -293,12 +294,12 @@ export function isAuditChainDayFile(filePath: string): boolean {
 
 /** Each tenant mirror's file for a master audit day, listed before any lock is taken. */
 export function auditChainDayMirrors(dayFile: string): string[] {
-  const customersDir = nodePath.join(rootDir(), 'customer');
-  if (!safeExistsSync(customersDir)) return [];
-  return safeReaddir(customersDir)
+  const mirrorsDir = nodePath.join(rootDir(), TENANT_AUDIT_MIRROR_ROOT_PATH, 'confidential');
+  if (!safeExistsSync(mirrorsDir)) return [];
+  return safeReaddir(mirrorsDir)
     .filter(isValidTenantSlug)
     .sort()
-    .map((slug) => nodePath.join(customersDir, slug, 'logs', 'audit', dayFile))
+    .map((slug) => nodePath.join(mirrorsDir, slug, dayFile))
     .filter((mirrorFile) => safeExistsSync(mirrorFile));
 }
 

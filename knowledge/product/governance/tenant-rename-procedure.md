@@ -74,7 +74,7 @@ pnpm tenant rename <旧slug> --to <新slug> --display-name '<新商号>' --apply
 4. 顧客スタンスのオーバーレイを移す
 5. **最後にテナントプロファイルを書く**（旧プロファイルは `.renamed` を付けて残す）
 
-オーバーレイ（手順4）には監査チェーンのテナント複製 `customer/{slug}/logs/audit/` が入っている。
+オーバーレイ（手順4）には監査チェーンのテナント複製 `active/shared/runtime/audit-mirror/confidential/{slug}/` が入っている。
 そのため移動は監査チェーンのロックを取って行い、同じロックの中で
 `tenant.audit_mirror_moved` エントリ（`metadata.previous_slug` に旧slug）をチェーンに記録する。
 監査の追記は移動の前か後のどちらかにしか入らない。`audit mirror-reconcile` はこの印より前の

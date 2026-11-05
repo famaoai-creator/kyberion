@@ -28,7 +28,7 @@
           },
           "confirm_target": { "type": "string" },
           "channel": {
-            "description": "CD-11: the bound customer channel reminders for this actor go to — a surface + channel_id that exists in customer/<tenant>/connections/channel-bindings.json (checked when it is set).",
+            "description": "CD-11: the bound customer channel reminders for this actor go to — a surface + channel_id that exists in knowledge/confidential/<tenant>/connections/channel-bindings.json (checked when it is set).",
             "type": "object",
             "additionalProperties": false,
             "required": ["surface", "channel_id"],

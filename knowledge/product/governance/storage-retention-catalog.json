@@ -827,6 +827,12 @@
       "note": "MSN-STORE-BOUNDS-2: raw-union archives written by write-time store maintenance (append-only-store.ts writeTimeArchiveDir: <store dir>/compaction-archive/) for top-level runtime stores such as dot-feedback.jsonl and dot-token-usage.jsonl. Store writers cannot write active/archive/, so the archive sits next to the store, keeping its tier/tenant partition. Kept 90 days, like other observability evidence."
     },
     {
+      "path": "active/shared/runtime/audit-mirror",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "S2: per-tenant copy of the master audit chain (libs/core/governance/audit-chain.ts, TENANT_AUDIT_MIRROR_ROOT_PATH): confidential/<tenant>/audit-<date>.jsonl, appended as the tenant-bound audit_mirror_writer only (storage-layout TENANT_STORE_LEDGER_ROOTS); formerly customer/<tenant>/logs/audit/. No TTL of its own: a day file expires together with the master day file (storage-retention-expiry auditChainDayMirrors), and audit_mirror_reconcile rebuilds a drifted copy from the master. personal/confidential subtrees are tenant_scope protected prefixes; tenant offboarding removes a tenant's partition."
+    },
+    {
       "path": "active/shared/runtime/tenant-approvals",
       "artifact_class": "state",
       "action": "review_required",

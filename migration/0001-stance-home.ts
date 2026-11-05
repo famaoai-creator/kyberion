@@ -3,10 +3,10 @@
  * `customer/{slug}/` directory into `knowledge/personal/stances/{slug}/`.
  *
  * Only stance entries move (identity, connections, policy, voice, mission
- * seeds, tenant profiles, onboarding, organization profile — `STANCE_ENTRIES`).
- * The tenant files that shared the directory (company descriptor, vision, org
- * chart, OKRs, decision rights, brand, design, deals, audit mirror, channel
- * bindings) stay where they are until S2/S3. Stance traces move to
+ * seeds, tenant profiles, onboarding — `STANCE_ENTRIES`).
+ * The tenant files that shared the directory (company descriptor, organization
+ * profile, vision, org chart, OKRs, decision rights, brand, design, deals, audit mirror, channel
+ * bindings) stay for 0002-tenant-home (S2) and S3. Stance traces move to
  * `active/shared/logs/stances/{slug}/traces/`. A `stance.json` is written from
  * the legacy `customer.json` when the stance has none.
  *

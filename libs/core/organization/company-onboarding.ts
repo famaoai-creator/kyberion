@@ -3,6 +3,7 @@
  * create the initial AI workforce, and leave one reviewed first-work plan.
  */
 import { isStanceEntry, stanceDirForSlug } from '../stance-resolver.js';
+import { tenantHomeDir } from './tenant-home.js';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { writeJson } from '../foundation/json.js';
@@ -54,8 +55,9 @@ export interface AiCompanyOnboardingInput {
 
 export interface AiCompanyOnboardingResult {
   status: 'planned' | 'ready';
-  customerDir: string;
-  /** knowledge/personal/stances/{slug}/ — organization profile and onboarding state. */
+  /** knowledge/confidential/{tenant}/ — the company files (organization profile, org chart, …). */
+  tenantDir: string;
+  /** knowledge/personal/stances/{slug}/ — the company stance and its onboarding state. */
   stanceDir: string;
   readinessPath: string;
   firstWorkPath: string;
@@ -194,16 +196,13 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
   };
   validateInput(normalized);
   const rootDir = normalized.rootDir || pathResolver.rootDir();
-  // The stance (organization profile, onboarding state) lives in the personal
-  // space; the company's own files stay in customer/{slug}/ until S2.
+  // The stance (identity, onboarding state) lives in the personal space.
   const stanceDir = assertSafeRepositoryPath(stanceDirForSlug(normalized.slug, rootDir), {
     allowMissingLeaf: true,
     rootDir,
   });
-  const customerDir = assertSafeRepositoryPath(path.join(rootDir, 'customer', normalized.slug), {
-    allowMissingLeaf: true,
-    rootDir,
-  });
+  // Company files live in the tenant home (the bound tenant when given, else the slug).
+  const tenantDir = tenantHomeDir(normalized.tenantSlug || normalized.slug, rootDir);
   const readinessPath = assertSafeRepositoryPath(
     path.join(stanceDir, 'onboarding', 'ai-company-readiness.json'),
     { allowMissingLeaf: true, rootDir }
@@ -248,7 +247,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
   if (normalized.dryRun) {
     return {
       status: 'planned',
-      customerDir,
+      tenantDir,
       stanceDir,
       readinessPath,
       firstWorkPath,
@@ -257,7 +256,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
     };
   }
 
-  const profilePath = assertSafeRepositoryPath(path.join(stanceDir, 'organization-profile.json'), {
+  const profilePath = assertSafeRepositoryPath(path.join(tenantDir, 'organization-profile.json'), {
     allowMissingLeaf: true,
     rootDir,
   });
@@ -267,7 +266,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
   );
   const templatePaths = safeExistsSync(templateDir)
     ? safeReaddir(templateDir).map((entry) =>
-        assertSafeRepositoryPath(path.join(isStanceEntry(entry) ? stanceDir : customerDir, entry), {
+        assertSafeRepositoryPath(path.join(isStanceEntry(entry) ? stanceDir : tenantDir, entry), {
           allowMissingLeaf: true,
           rootDir,
         })
@@ -281,6 +280,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
     const bootstrapped = bootstrapCompany({
       vertical: normalized.vertical,
       slug: normalized.slug,
+      tenantSlug: normalized.tenantSlug,
       companyName: normalized.companyName,
       rootDir,
       force: normalized.force,
@@ -414,7 +414,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
             entry.endsWith('organization-context.json')
           );
           seededDomains = seedOrgChartDomains({
-            orgChartPath: path.join(customerDir, 'org-chart.json'),
+            orgChartPath: path.join(tenantDir, 'org-chart.json'),
             organizationId: normalized.slug,
             tenantSlug: tenant.tenant_slug,
             rootDir,
@@ -448,7 +448,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
     );
     return {
       status: 'ready',
-      customerDir,
+      tenantDir,
       stanceDir,
       readinessPath,
       firstWorkPath,
