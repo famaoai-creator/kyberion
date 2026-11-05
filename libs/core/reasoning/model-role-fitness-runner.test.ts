@@ -64,11 +64,14 @@ describe('model role fitness runner (measurement entry point)', () => {
 
   it('keeps a probe answered after the route default 60s', async () => {
     vi.useFakeTimers();
+    // The answer is held on deferreds and released only after 61s of fake
+    // time, so the runner's own ceiling (not a 60s route limit) is in force.
+    const releases: Array<(answer: string) => void> = [];
     mocks.buildTaskReasoningBackend.mockReturnValue({
       name: 'test-provider',
       prompt: () =>
         new Promise<string>((resolve) => {
-          setTimeout(() => resolve('slow but complete answer'), 61_000);
+          releases.push(resolve);
         }),
     });
     const pending = runModelRoleFitnessProbes({
@@ -78,7 +81,11 @@ describe('model role fitness runner (measurement entry point)', () => {
       record: false,
     });
     const probes = listRoleFitnessProbes('reviewer');
-    for (let i = 0; i < probes.length; i++) await vi.advanceTimersByTimeAsync(61_000);
+    for (let i = 0; i < probes.length; i++) {
+      await vi.waitFor(() => expect(releases).toHaveLength(i + 1));
+      await vi.advanceTimersByTimeAsync(61_000);
+      releases[i]!('slow but complete answer');
+    }
     const result = await pending;
     expect(result.evaluations).toHaveLength(probes.length);
   });
