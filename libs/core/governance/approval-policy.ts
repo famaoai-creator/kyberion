@@ -1,4 +1,4 @@
-import * as customerResolver from '../customer-resolver.js';
+import * as customerResolver from '../stance-resolver.js';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
@@ -57,7 +57,7 @@ export interface ApprovalPolicyResolution {
 const approvalPolicyCatalog = defineCatalog<ApprovalPolicyFile>({
   id: 'approval-policy',
   path: () => {
-    const customerPolicyPath = customerResolver.customerRoot('policy/approval-policy.json');
+    const customerPolicyPath = customerResolver.stanceRoot('policy/approval-policy.json');
     const fallbackPath = assertSafeRepositoryPath(
       pathResolver.knowledge('product/governance/approval-policy.json')
     );
@@ -128,7 +128,7 @@ export function loadApprovalPolicy(): ApprovalPolicyFile {
  */
 /** Whether any approval-policy.json exists (customer overlay or product default). */
 function approvalPolicyFilePresent(): boolean {
-  const customerPolicyPath = customerResolver.customerRoot('policy/approval-policy.json');
+  const customerPolicyPath = customerResolver.stanceRoot('policy/approval-policy.json');
   const candidates = [
     ...(customerPolicyPath ? [customerPolicyPath] : []),
     pathResolver.knowledge('product/governance/approval-policy.json'),

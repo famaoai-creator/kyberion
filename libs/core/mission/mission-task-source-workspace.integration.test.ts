@@ -47,7 +47,7 @@ beforeAll(() => {
     'MISSION_ID',
     'SYSTEM_ROLE',
     'KYBERION_SUDO',
-    'KYBERION_CUSTOMER',
+    'KYBERION_STANCE',
     'KYBERION_TASK_ID',
   ])
     vi.stubEnv(name, '');

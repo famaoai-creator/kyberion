@@ -128,7 +128,7 @@ describe('scope-context', () => {
   it('keeps customer stance separate from tenant scope', () => {
     const context = resolveScopeContext(
       { tier: 'confidential', customer_stance: 'kyberion-development-team' },
-      { KYBERION_CUSTOMER: 'kyberion-development-team' }
+      { KYBERION_STANCE: 'kyberion-development-team' }
     );
     expect(context.customer_stance).toBe('kyberion-development-team');
     expect(context.tenant_slug).toBeUndefined();

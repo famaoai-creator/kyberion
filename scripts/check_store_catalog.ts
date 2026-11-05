@@ -41,7 +41,7 @@ const STORE_ROLE = /_(store|writer|reader)$/u;
 export function normalizePolicyPath(raw: string): string {
   return raw
     .replace(/\$\{KYBERION_TENANT\}/gu, '<tenant>')
-    .replace(/\$\{KYBERION_CUSTOMER\}/gu, '<slug>')
+    .replace(/\$\{KYBERION_STANCE\}/gu, '<slug>')
     .replace(/\$\{[A-Z_]+\}/gu, '<id>')
     .replace(/\/+$/u, '');
 }

@@ -2,15 +2,16 @@ import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  customerRoot: vi.fn(),
-  activeCustomer: vi.fn(),
+  stanceRoot: vi.fn(),
+  activeStance: vi.fn(),
   rootDir: vi.fn(),
   knowledge: vi.fn(),
 }));
 
-vi.mock('./customer-resolver.js', () => ({
-  customerRoot: mocks.customerRoot,
-  activeCustomer: mocks.activeCustomer,
+vi.mock('./stance-resolver.js', () => ({
+  STANCES_DIR: path.join('knowledge', 'personal', 'stances'),
+  stanceRoot: mocks.stanceRoot,
+  activeStance: mocks.activeStance,
 }));
 
 vi.mock('./path-resolver.js', () => ({
@@ -28,33 +29,33 @@ describe('profile-root', () => {
   });
 
   it('resolves a validated customer lexically without entering the filesystem-guarded helper', async () => {
-    mocks.activeCustomer.mockReturnValue('acme');
-    mocks.customerRoot.mockImplementation(() => {
+    mocks.activeStance.mockReturnValue('acme');
+    mocks.stanceRoot.mockImplementation(() => {
       throw new Error('unexpected customer filesystem probe');
     });
     const { resolveActiveProfileRoot } = await import('./profile-root.js');
     expect(resolveActiveProfileRoot({ lexicalOnly: true })).toBe(
-      path.join(mocks.rootDir(), 'customer', 'acme')
+      path.join(mocks.rootDir(), 'knowledge', 'personal', 'stances', 'acme')
     );
-    expect(mocks.customerRoot).not.toHaveBeenCalled();
-    expect(mocks.activeCustomer).toHaveBeenCalledTimes(1);
+    expect(mocks.stanceRoot).not.toHaveBeenCalled();
+    expect(mocks.activeStance).toHaveBeenCalledTimes(1);
   });
 
   it('keeps personal lexical resolution probe-free and propagates invalid customer selection', async () => {
-    mocks.activeCustomer.mockReturnValue(null);
+    mocks.activeStance.mockReturnValue(null);
     const { resolveActiveProfileRoot } = await import('./profile-root.js');
     expect(resolveActiveProfileRoot({ lexicalOnly: true })).toBe('/tmp/personal');
-    expect(mocks.customerRoot).not.toHaveBeenCalled();
-    mocks.activeCustomer.mockImplementation(() => {
-      throw new Error('Invalid KYBERION_CUSTOMER');
+    expect(mocks.stanceRoot).not.toHaveBeenCalled();
+    mocks.activeStance.mockImplementation(() => {
+      throw new Error('Invalid KYBERION_STANCE');
     });
     expect(() => resolveActiveProfileRoot({ lexicalOnly: true })).toThrow(
-      'Invalid KYBERION_CUSTOMER'
+      'Invalid KYBERION_STANCE'
     );
-    expect(mocks.customerRoot).not.toHaveBeenCalled();
+    expect(mocks.stanceRoot).not.toHaveBeenCalled();
   });
   it('prefers the customer overlay root when active', async () => {
-    mocks.customerRoot.mockReturnValue('/tmp/customer/acme');
+    mocks.stanceRoot.mockReturnValue('/tmp/customer/acme');
     mocks.knowledge.mockReturnValue('/tmp/personal');
     const { resolveActiveProfileRoot } = await import('./profile-root.js');
 
@@ -62,7 +63,7 @@ describe('profile-root', () => {
   });
 
   it('falls back to the personal knowledge root when no customer is active', async () => {
-    mocks.customerRoot.mockReturnValue(null);
+    mocks.stanceRoot.mockReturnValue(null);
     mocks.knowledge.mockReturnValue('/tmp/personal');
     const { resolveActiveProfileRoot } = await import('./profile-root.js');
 

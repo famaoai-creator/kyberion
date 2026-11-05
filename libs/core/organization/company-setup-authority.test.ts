@@ -64,7 +64,7 @@ beforeEach(() => {
     vi.stubEnv(key, launched[key] ?? '');
   vi.stubEnv('KYBERION_SUDO', 'false');
   vi.stubEnv('KYBERION_TENANT', '');
-  vi.stubEnv('KYBERION_CUSTOMER', '');
+  vi.stubEnv('KYBERION_STANCE', '');
   vi.stubEnv('KYBERION_VIEWER_SCOPE', 'enforce');
   vi.stubEnv('KYBERION_REASONING_BACKEND', 'stub');
   resetRoleAssumptionPolicyCache();
@@ -85,7 +85,7 @@ beforeEach(() => {
       tenantProfilePath(tenant),
       memberProfilePath(member),
       projectRecordPath(projectId),
-      pathResolver.rootResolve('customer/' + tenant),
+      pathResolver.rootResolve('knowledge/personal/stances/' + tenant),
       pathResolver.rootResolve('knowledge/confidential/' + tenant),
       pathResolver.rootResolve('active/organizations/confidential/' + tenant),
       pathResolver.rootResolve('active/projects/confidential/' + tenant),

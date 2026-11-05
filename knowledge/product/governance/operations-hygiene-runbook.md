@@ -1055,7 +1055,7 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
    `scope-offboarding.test.ts` case for the purge.
 3. Verify onboarding-flow commands with the real CLI in a throwaway worktree.
    - Create the throwaway company with `pnpm onboarding company … --slug probe-co --tenant-slug probe-co`.
-   - Then run `tenant:activation plan|probe` and `work create-item` with `KYBERION_CUSTOMER`,
+   - Then run `tenant:activation plan|probe` and `work create-item` with `KYBERION_STANCE`,
      `KYBERION_TENANT_SCOPE_REQUIRED=true` and `KYBERION_PERSONA=sovereign`.
    - Remove the throwaway state afterwards: `customer/`, `knowledge/personal/tenants/`,
      `knowledge/confidential/`, `active/organizations/`.

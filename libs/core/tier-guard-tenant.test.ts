@@ -429,8 +429,11 @@ describe('tier-guard tenant scope (IP-1)', () => {
   });
 
   it('allows run_pipeline to persist traces and temp artifacts', () => {
-    process.env.KYBERION_CUSTOMER = 'story-demo';
-    const traceTarget = path.join(ROOT, 'customer/story-demo/logs/traces/traces-2026-05-08.jsonl');
+    process.env.KYBERION_STANCE = 'story-demo';
+    const traceTarget = path.join(
+      ROOT,
+      'active/shared/logs/stances/story-demo/traces/traces-2026-05-08.jsonl'
+    );
     const tmpTarget = path.join(ROOT, 'active/shared/tmp/pipeline-step.json');
     const productVoiceProfileTarget = path.join(
       ROOT,
@@ -457,8 +460,11 @@ describe('tier-guard tenant scope (IP-1)', () => {
   });
 
   it('allows run_super_pipeline to write temporary dispatch artifacts', () => {
-    process.env.KYBERION_CUSTOMER = 'story-demo';
-    const traceTarget = path.join(ROOT, 'customer/story-demo/logs/traces/traces-2026-05-08.jsonl');
+    process.env.KYBERION_STANCE = 'story-demo';
+    const traceTarget = path.join(
+      ROOT,
+      'active/shared/logs/stances/story-demo/traces/traces-2026-05-08.jsonl'
+    );
     const tmpTarget = path.join(ROOT, 'active/shared/tmp/super-pipeline.json');
 
     withExecutionContext(

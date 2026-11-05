@@ -14,7 +14,7 @@ What Kyberion does and doesn't do with your data.
 | Path                                    | Contents                                                                                                                                                                                                                                                                                                               |
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `knowledge/personal/`                   | Your identity, vision, connections, voice profile. **Gitignored.**                                                                                                                                                                                                                                                     |
-| `customer/{slug}/`                      | Stance overlay — identity/connections/policy for the entity you are acting as (when `KYBERION_CUSTOMER` is set). **Gitignored** except `_template/`.                                                                                                                                                                   |
+| `knowledge/personal/stances/{slug}/`    | Stance overlay — identity/connections/policy for the entity you are acting as (when `KYBERION_STANCE` is set). **Gitignored** except `_template/`.                                                                                                                                                                     |
 | `active/missions/{id}/`                 | Per-mission git repo, state, evidence. **Gitignored.**                                                                                                                                                                                                                                                                 |
 | `active/shared/logs/traces/`            | Structured execution traces (JSONL). **Gitignored.**                                                                                                                                                                                                                                                                   |
 | `active/shared/runtime/`                | Runtime state, locks, surface metadata. **Gitignored.**                                                                                                                                                                                                                                                                |
@@ -56,7 +56,7 @@ When sending to external LLMs, Kyberion attempts to redact:
 
 - Strings matching common API key patterns (`sk-…`, `AIza…`, etc.).
 - Values that flow from `secret-actuator` reads.
-- File paths inside `knowledge/personal/` and `customer/{slug}/secrets.json`.
+- File paths inside `knowledge/personal/` and `knowledge/personal/stances/{slug}/secrets.json`.
 
 This is best-effort, not a security boundary. **Treat any data you ask Kyberion to process as potentially sent to the LLM provider.** For sensitive data, run with `KYBERION_REASONING_BACKEND=stub` (offline) or self-host an inference endpoint.
 

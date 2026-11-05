@@ -8,7 +8,7 @@ import {
   resolveOnboardingContext,
   resolveOnboardingFirstWork,
 } from '@agent/core/organization/onboarding-context';
-import * as customerResolver from '@agent/core/customer-resolver';
+import * as customerResolver from '@agent/core/stance-resolver';
 import type { OrganizationTier } from '@agent/core/organization/organization-operating-model';
 import { withExecutionContext } from '@agent/core/authority';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -65,7 +65,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   return {
     command: subcommand,
     rootDir: value(argv, '--root-dir') ? path.resolve(value(argv, '--root-dir')!) : undefined,
-    customerSlug: value(argv, '--customer-slug') || customerResolver.activeCustomer() || undefined,
+    customerSlug: value(argv, '--customer-slug') || customerResolver.activeStance() || undefined,
     tenantSlug: value(argv, '--tenant-slug'),
     organizationId: value(argv, '--organization-id'),
     tier: parseTier(value(argv, '--tier')),

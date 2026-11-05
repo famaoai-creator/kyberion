@@ -460,7 +460,7 @@ async function executePipelineFileOnce(
   const effectivePayloadScope: ReasoningPayloadScope = withPipelineTrainingUse(
     options.payloadScope || {
       tier: payloadTier,
-      tenant_slug: registeredEnv('KYBERION_CUSTOMER')?.trim() || undefined,
+      tenant_slug: registeredEnv('KYBERION_STANCE')?.trim() || undefined,
       purpose: `pipeline ${pipelineId}`,
     }
   );
@@ -1172,7 +1172,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
     const inferredScope: Record<string, unknown> = {
       tiers: ['public', autoContext.mission_tier],
     };
-    const customer = registeredEnv('KYBERION_CUSTOMER')?.trim();
+    const customer = registeredEnv('KYBERION_STANCE')?.trim();
     if (customer) inferredScope.customerId = customer;
     autoContext._knowledge_scope = inferredScope;
   }
@@ -1318,7 +1318,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
           ).withReasoningPayloadScope(
             {
               tier: payloadTier,
-              tenant_slug: registeredEnv('KYBERION_CUSTOMER')?.trim() || undefined,
+              tenant_slug: registeredEnv('KYBERION_STANCE')?.trim() || undefined,
               purpose: `pipeline ${pipelineId}`,
               training_use: pipelinePayloadTrainingUse(payloadTier),
             },

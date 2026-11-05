@@ -10,42 +10,21 @@ import {
   safeMkdir,
   safeReaddir,
 } from '@agent/core/secure-io';
+import { stanceDirForSlug } from '@agent/core/stance-resolver';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
 
-const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
-
-export class InvalidCustomerSlugError extends Error {
-  constructor(slug: string) {
-    super(`Invalid customer slug: "${slug}". Must match ${SLUG_PATTERN.source}.`);
-    this.name = 'InvalidCustomerSlugError';
-  }
-}
-
-function validateSlug(slug: string): string {
-  const normalized = slug.trim();
-  if (!SLUG_PATTERN.test(normalized)) {
-    throw new InvalidCustomerSlugError(slug);
-  }
-  return normalized;
-}
+/** Repository-relative template copied into a new stance. */
+export const STANCE_TEMPLATE_DIR = path.join('templates', 'stance');
 
 function rootDir(): string {
   return pathResolver.rootDir();
 }
 
-function customerRoot(slug: string): string {
-  const resolvedRoot = rootDir();
-  return assertSafeRepositoryPath(path.join(resolvedRoot, 'customer', slug), {
-    allowMissingLeaf: true,
-    rootDir: resolvedRoot,
-  });
-}
-
 function templateRoot(): string {
   const resolvedRoot = rootDir();
-  return assertSafeRepositoryPath(path.join(resolvedRoot, 'customer', '_template'), {
+  return assertSafeRepositoryPath(path.join(resolvedRoot, STANCE_TEMPLATE_DIR), {
     allowMissingLeaf: true,
     rootDir: resolvedRoot,
   });
@@ -83,36 +62,35 @@ function copyTree(srcDir: string, dstDir: string): void {
   }
 }
 
-export function createCustomer(slugInput: string): {
+/** Create `knowledge/personal/stances/{slug}/` from the stance template. */
+export function createStance(slugInput: string): {
   slug: string;
   root: string;
   template: string;
 } {
-  const slug = validateSlug(slugInput);
+  const slug = slugInput.trim();
+  const dest = stanceDirForSlug(slug, rootDir());
   const template = templateRoot();
   if (!safeExistsSync(template) || !safeLstat(template).isDirectory()) {
-    throw new Error(`Customer template not found: ${path.relative(rootDir(), template)}`);
+    throw new Error(`Stance template not found: ${path.relative(rootDir(), template)}`);
   }
-
-  const dest = customerRoot(slug);
   if (safeExistsSync(dest) && !isDirectoryEmpty(dest)) {
     throw new Error(
-      `Customer directory already exists and is not empty: ${path.relative(rootDir(), dest)}`
+      `Stance directory already exists and is not empty: ${path.relative(rootDir(), dest)}`
     );
   }
-
   copyTree(template, dest);
   return { slug, root: dest, template };
 }
 
-export function formatCreatedCustomer(root: string): string[] {
-  return [`Created customer template at ${path.relative(rootDir(), root)}`];
+export function formatCreatedStance(root: string): string[] {
+  return [`Created stance at ${path.relative(rootDir(), root)}`];
 }
 
 export function main(argv: string[], print: Print = () => undefined): string[] {
   const slug = argv[0];
   if (!slug || slug === '--help' || slug === '-h') {
-    const usage = 'Usage: customer_create <slug>';
+    const usage = 'Usage: stance_create <slug>';
     if (slug) {
       print(usage);
       throw new ScriptExitError(0, '', true);
@@ -121,16 +99,16 @@ export function main(argv: string[], print: Print = () => undefined): string[] {
   }
 
   try {
-    const created = createCustomer(slug);
-    return formatCreatedCustomer(created.root);
+    const created = createStance(slug);
+    return formatCreatedStance(created.root);
   } catch (err) {
     throw new Error(formatClassification(classifyError(err)));
   }
 }
 
 if (
-  isDirectScript(import.meta.url, 'customer_create.ts') ||
-  isDirectScript(import.meta.url, 'customer_create.js')
+  isDirectScript(import.meta.url, 'stance_create.ts') ||
+  isDirectScript(import.meta.url, 'stance_create.js')
 )
   void defineScript({
     name: 'stance:create',

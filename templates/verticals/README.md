@@ -25,7 +25,7 @@ Each template directory contains:
 
 ```bash
 # 1. Decide the customer / mission scope.
-export KYBERION_CUSTOMER=acme-corp
+export KYBERION_STANCE=acme-corp
 
 # 2. Copy the template into the customer's mission-seeds dir.
 cp -R templates/verticals/finance-ringi-approval customer/acme-corp/mission-seeds/ringi-2026-q2

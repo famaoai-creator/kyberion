@@ -20,9 +20,9 @@ const LEDGER_BEFORE = fs.existsSync(LEDGER_PATH) ? fs.readFileSync(LEDGER_PATH, 
 // KP-07 (knowledge-store hygiene): mission_controller's checkPrerequisites()
 // gates mission creation on a full "sovereign profile" (my-identity.json +
 // my-vision.md + agent-identity.json) resolved via resolveActiveProfileRoot()
-// (libs/core/mission/mission-state.ts). That resolver honors KYBERION_CUSTOMER
-// as a profile-root override (libs/core/customer-resolver.ts: customerRoot()),
-// so this suite points the gate at an isolated `customer/{slug}/` overlay
+// (libs/core/mission/mission-state.ts). That resolver honors KYBERION_STANCE
+// as a profile-root override (libs/core/stance-resolver.ts: stanceRoot()),
+// so this suite points the gate at an isolated `knowledge/personal/stances/{slug}/` overlay
 // instead of writing fixture identity content into the real
 // knowledge/personal/ tier — writing there was the root cause of
 // knowledge/personal/my-identity.json being clobbered with `{"sovereign":
@@ -34,8 +34,8 @@ const LEDGER_BEFORE = fs.existsSync(LEDGER_PATH) ? fs.readFileSync(LEDGER_PATH, 
 // aborted with [COMPANY_TENANT_SCOPE] invalid tenant slug. Base36 keeps the
 // per-run uniqueness inside the limit.
 const CUSTOMER_SLUG = `a2a-life-${RUN_ID.toString(36)}`;
-process.env.KYBERION_CUSTOMER = CUSTOMER_SLUG;
-const PROFILE_ROOT = path.join(process.cwd(), 'customer', CUSTOMER_SLUG);
+process.env.KYBERION_STANCE = CUSTOMER_SLUG;
+const PROFILE_ROOT = path.join(process.cwd(), 'knowledge', 'personal', 'stances', CUSTOMER_SLUG);
 const IDENTITY_PATH = path.join(PROFILE_ROOT, 'my-identity.json');
 
 function ensurePersonalFixtures() {
@@ -102,7 +102,7 @@ describe('A2A Mission Lifecycle & Trust Engine Integration', SUITE_OPTIONS, () =
     // profile gate (see CUSTOMER_SLUG above) and restore the env var so it
     // never leaks into other test files sharing this worker process.
     fs.rmSync(PROFILE_ROOT, { recursive: true, force: true });
-    delete process.env.KYBERION_CUSTOMER;
+    delete process.env.KYBERION_STANCE;
     // Missions created via the real mission_controller land in the REAL
     // personal missions tier — remove this run's fixtures so test debris does
     // not accumulate in the operator home view.

@@ -8,7 +8,7 @@ import * as lockUtils from '../foundation/lock-utils.js';
 import { getFoundationIo } from '../foundation/io.js';
 import { resolveStorageFloor } from '../storage-layout.js';
 import * as profileResolver from '../profile-root.js';
-import * as customerResolver from '../customer-resolver.js';
+import * as customerResolver from '../stance-resolver.js';
 
 const profileRoot = vi.hoisted(() => ({ value: '', fixtureRoot: '' }));
 vi.mock('../profile-root.js', () => ({
@@ -156,8 +156,8 @@ describe('engine-runtime preferences', () => {
     vi.spyOn(profileResolver, 'resolveActiveProfileRoot').mockImplementation(
       actual.resolveActiveProfileRoot
     );
-    vi.stubEnv('KYBERION_CUSTOMER', 'engine-runtime-guard-test');
-    const customerGuard = vi.spyOn(customerResolver, 'customerRoot').mockImplementation(() => {
+    vi.stubEnv('KYBERION_STANCE', 'engine-runtime-guard-test');
+    const customerGuard = vi.spyOn(customerResolver, 'stanceRoot').mockImplementation(() => {
       throw new Error('[RESOURCE_PATH_SYMLINK] Customer metadata was probed');
     });
     const inspect = vi
@@ -174,7 +174,9 @@ describe('engine-runtime preferences', () => {
     expect(customerGuard).not.toHaveBeenCalled();
     const target = path.join(
       pathResolver.rootDir(),
-      'customer',
+      'knowledge',
+      'personal',
+      'stances',
       'engine-runtime-guard-test',
       'onboarding',
       'engine-runtime.json'
@@ -198,9 +200,9 @@ describe('engine-runtime preferences', () => {
     vi.spyOn(profileResolver, 'resolveActiveProfileRoot').mockImplementation(
       actual.resolveActiveProfileRoot
     );
-    vi.stubEnv('KYBERION_CUSTOMER', '../invalid');
+    vi.stubEnv('KYBERION_STANCE', '../invalid');
     const inspect = vi.spyOn(tierGuard, 'inspectReadPermission');
-    expect(() => engineRuntimePreferencesReadiness()).toThrow('Invalid KYBERION_CUSTOMER');
+    expect(() => engineRuntimePreferencesReadiness()).toThrow('Invalid KYBERION_STANCE');
     expect(inspect).not.toHaveBeenCalled();
   });
 

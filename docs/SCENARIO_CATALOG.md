@@ -38,14 +38,14 @@ The catalogs above describe scenarios in prose. Executable, machine-checked scen
 
 # Marketing And Video Production
 
-| Scenario                              | Risk | Canonical pipeline template                   | Completion boundary                                                                     |
-| ------------------------------------- | ---: | --------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Local YouTube video package           |    0 | `video-production.json`                       | Local review package exists; no publication                                             |
-| Independent publication review        |  2-4 | `publication-review.json`                     | Required roles reviewed the same artifact hashes with no blocking finding               |
-| Approved unlisted publication preview |    2 | `publish-youtube-dry-run.json`                | Dry-run verification exists; it never counts as publication                             |
-| Post-publication CTA verification     |  2-4 | Publication connector extension               | G6 verifies URL, visibility, artifact hash, CTA, thumbnail, and captions                |
-| Campaign retrospective                |  1-4 | Mission retrospective                         | Measurement evidence exists after verified publication                                  |
-| Customer-branded video package        |  0-4 | `video-production.json` plus customer overlay | `KYBERION_CUSTOMER` resolves brand and marketing policy without cross-customer fallback |
+| Scenario                              | Risk | Canonical pipeline template                   | Completion boundary                                                                   |
+| ------------------------------------- | ---: | --------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Local YouTube video package           |    0 | `video-production.json`                       | Local review package exists; no publication                                           |
+| Independent publication review        |  2-4 | `publication-review.json`                     | Required roles reviewed the same artifact hashes with no blocking finding             |
+| Approved unlisted publication preview |    2 | `publish-youtube-dry-run.json`                | Dry-run verification exists; it never counts as publication                           |
+| Post-publication CTA verification     |  2-4 | Publication connector extension               | G6 verifies URL, visibility, artifact hash, CTA, thumbnail, and captions              |
+| Campaign retrospective                |  1-4 | Mission retrospective                         | Measurement evidence exists after verified publication                                |
+| Customer-branded video package        |  0-4 | `video-production.json` plus customer overlay | `KYBERION_STANCE` resolves brand and marketing policy without cross-customer fallback |
 
 All external publication is a Distribution responsibility and requires an authenticated human approval bound to the exact effect payload. Strategy, Creative, and Review roles have no publication authority.
 

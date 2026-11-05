@@ -6,7 +6,7 @@
 import { guardSupersedeState } from './mission-next-tasks-supersede-guard.js';
 import * as path from 'node:path';
 import { createActuatorTrace } from '../actuator/actuator-trace.js';
-import * as customerResolver from '../customer-resolver.js';
+import * as customerResolver from '../stance-resolver.js';
 import * as pathResolver from '../path-resolver.js';
 import { findMissionPath } from '../path-resolver.js';
 import { logger } from '../core.js';
@@ -180,7 +180,7 @@ export function publishMeetingDeliverablesIfNeeded(input: {
 
   let activeCustomerSlug: string | null = null;
   try {
-    activeCustomerSlug = customerResolver.activeCustomer(process.env);
+    activeCustomerSlug = customerResolver.activeStance(process.env);
   } catch (err: any) {
     logger.warn(
       `⚠️ [DELIVERY] Meeting deliverables skipped for ${input.missionId}: ${err?.message || err}`
@@ -199,8 +199,8 @@ export function publishMeetingDeliverablesIfNeeded(input: {
     return;
   }
 
-  const customerRoot = customerResolver.customerRoot('', process.env);
-  if (!customerRoot || !safeExistsSync(customerRoot)) {
+  const stanceRoot = customerResolver.stanceRoot('', process.env);
+  if (!stanceRoot || !safeExistsSync(stanceRoot)) {
     logger.warn(
       `⚠️ [DELIVERY] Meeting deliverables skipped for ${input.missionId}: customer root missing for ${tenantSlug}.`
     );
@@ -211,7 +211,7 @@ export function publishMeetingDeliverablesIfNeeded(input: {
   }
 
   const safeMissionPathRoot = safeMissionDir(input.missionDir);
-  const safeCustomerRoot = assertSafeRepositoryPath(customerRoot);
+  const safeCustomerRoot = assertSafeRepositoryPath(stanceRoot);
   const safeMissionId = requireSafeMissionId(input.missionId);
   const evidenceDir = safeMissionPath(safeMissionPathRoot, 'evidence');
   const deliverablesRoot = assertSafeRepositoryPath(path.join(safeCustomerRoot, 'deliverables'), {

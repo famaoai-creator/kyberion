@@ -13,7 +13,7 @@ const roots: string[] = [];
 const originalMissionRole = process.env.MISSION_ROLE;
 
 function createCustomerPolicy(slug: string, allowedChannel: string): string {
-  const root = pathResolver.rootResolve(`customer/${slug}`);
+  const root = pathResolver.rootResolve(`knowledge/personal/stances/${slug}`);
   const policyPath = path.join(root, 'policy', 'marketing-risk-policy.json');
   safeMkdir(path.dirname(policyPath), { recursive: true });
   roots.push(root);
@@ -49,8 +49,8 @@ describe('marketing customer overlay', () => {
     createCustomerPolicy(customerA, 'youtube-a');
     createCustomerPolicy(customerB, 'youtube-b');
 
-    const policyA = loadMarketingRiskPolicy({ KYBERION_CUSTOMER: customerA });
-    const policyB = loadMarketingRiskPolicy({ KYBERION_CUSTOMER: customerB });
+    const policyA = loadMarketingRiskPolicy({ KYBERION_STANCE: customerA });
+    const policyB = loadMarketingRiskPolicy({ KYBERION_STANCE: customerB });
     const fallback = loadMarketingRiskPolicy({});
 
     expect(policyA.allowed_channels).toEqual(['youtube-a']);

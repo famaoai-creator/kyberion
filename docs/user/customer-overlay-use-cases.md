@@ -1,4 +1,4 @@
-# Stance Overlay Use Cases (`customer/{slug}/`)
+# Stance Overlay Use Cases (`knowledge/personal/stances/{slug}/`)
 
 Anyone who operates Kyberion as more than one entity needs a repeatable way to
 keep each one isolated while using the same checkout. The overlay holds the
@@ -28,18 +28,18 @@ mixing state.
 
 ## Use cases
 
-| #   | Use case                        | What the user does                                                                                       | Expected outcome                                                |
-| --- | ------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| 1   | Start a new customer engagement | `pnpm stance:create <slug>`                                                                              | Creates `customer/<slug>/` from `customer/_template/`           |
-| 2   | Reuse an existing local setup   | `pnpm stance:migrate-from-personal <slug>`                                                               | Copies personal files into the customer overlay                 |
-| 3   | Inspect engagement readiness    | `pnpm stance:list`                                                                                       | Shows which overlays exist and which required files are missing |
-| 4   | Activate a customer             | `pnpm stance:switch <slug>`                                                                              | Writes `active/shared/runtime/customer.env` for a ready overlay |
-| 5   | Boot the engagement             | `pnpm onboarding`                                                                                        | Creates or updates customer-scoped onboarding state             |
-| 6   | Check the environment           | `pnpm kyberion doctor`                                                                                   | Summarizes must / should / nice readiness signals               |
-| 7   | Fill customer-specific setup    | Edit `customer/<slug>/identity.json`, `vision.md`, `connections/`, `policy/`, `voice/`, `mission-seeds/` | Customer-specific config overrides the personal fallback        |
-| 8   | Run customer work               | Use the normal Kyberion commands and workflows                                                           | Operations resolve against the active customer overlay          |
-| 9   | Move to another customer        | Switch to another slug and repeat the checks                                                             | Customer state stays isolated between engagements               |
-| 10  | Return to personal use          | Unset `KYBERION_CUSTOMER`                                                                                | Kyberion falls back to `knowledge/personal/`                    |
+| #   | Use case                        | What the user does                                                                                                         | Expected outcome                                                      |
+| --- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| 1   | Start a new customer engagement | `pnpm stance:create <slug>`                                                                                                | Creates `knowledge/personal/stances/<slug>/` from `templates/stance/` |
+| 2   | Reuse an existing local setup   | `pnpm stance:migrate-from-personal <slug>`                                                                                 | Copies personal files into the customer overlay                       |
+| 3   | Inspect engagement readiness    | `pnpm stance:list`                                                                                                         | Shows which overlays exist and which required files are missing       |
+| 4   | Activate a customer             | `pnpm stance:switch <slug>`                                                                                                | Writes `active/shared/runtime/stance.env` for a ready overlay         |
+| 5   | Boot the engagement             | `pnpm onboarding`                                                                                                          | Creates or updates customer-scoped onboarding state                   |
+| 6   | Check the environment           | `pnpm kyberion doctor`                                                                                                     | Summarizes must / should / nice readiness signals                     |
+| 7   | Fill customer-specific setup    | Edit `knowledge/personal/stances/<slug>/identity.json`, `vision.md`, `connections/`, `policy/`, `voice/`, `mission-seeds/` | Customer-specific config overrides the personal fallback              |
+| 8   | Run customer work               | Use the normal Kyberion commands and workflows                                                                             | Operations resolve against the active customer overlay                |
+| 9   | Move to another customer        | Switch to another slug and repeat the checks                                                                               | Customer state stays isolated between engagements                     |
+| 10  | Return to personal use          | Unset `KYBERION_STANCE`                                                                                                    | Kyberion falls back to `knowledge/personal/`                          |
 
 ## What this protects
 
@@ -59,7 +59,7 @@ like it belong elsewhere:
   cross-tenant access stays deny-unless-brokered and audited.
 - **A tenant's own end customers** belong inside that tenant, at
   `knowledge/confidential/{tenant-slug}/customers/` — not under
-  `customer/{slug}/`, which would put them outside the boundary meant to contain
+  `knowledge/personal/stances/{slug}/`, which would put them outside the boundary meant to contain
   them.
 
 Full distinction: [stance / tenant / a tenant's customers](../../knowledge/product/architecture/stance-tenant-customer-model.md).

@@ -6,7 +6,7 @@ import {
   readTenantProfile,
   type TenantProfile,
 } from './tenant-registry.js';
-import { customerDirForSlug } from '../customer-resolver.js';
+import { stanceDirForSlug } from '../stance-resolver.js';
 import { isTenantActivationActive } from './tenant-activation.js';
 import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
 import {
@@ -199,7 +199,7 @@ function assertCustomerSlug(slug: string): string {
 
 function contextPath(customerSlug: string, rootDir = pathResolver.rootDir()): string {
   return assertSafeRepositoryPath(
-    path.join(rootDir, 'customer', customerSlug, 'onboarding', 'organization-context.json'),
+    path.join(stanceDirForSlug(customerSlug, rootDir), 'onboarding', 'organization-context.json'),
     { allowMissingLeaf: true, rootDir }
   );
 }
@@ -219,7 +219,7 @@ export function readOptionalOnboardingFile(filePath: string, label: string): str
 
 function firstWorkPath(customerSlug: string, rootDir = pathResolver.rootDir()): string {
   return assertSafeRepositoryPath(
-    path.join(rootDir, 'customer', customerSlug, 'onboarding', 'first-work-resolution.json'),
+    path.join(stanceDirForSlug(customerSlug, rootDir), 'onboarding', 'first-work-resolution.json'),
     { allowMissingLeaf: true, rootDir }
   );
 }
@@ -286,12 +286,12 @@ function archiveOnboardingWorkItem(item: WorkItem | undefined, rootDir: string):
 }
 
 function withCustomer<T>(customerSlug: string, fn: () => T): T {
-  const previous = getRegisteredEnvText('KYBERION_CUSTOMER');
-  setRegisteredEnv('KYBERION_CUSTOMER', customerSlug);
+  const previous = getRegisteredEnvText('KYBERION_STANCE');
+  setRegisteredEnv('KYBERION_STANCE', customerSlug);
   try {
     return fn();
   } finally {
-    setRegisteredEnv('KYBERION_CUSTOMER', previous);
+    setRegisteredEnv('KYBERION_STANCE', previous);
   }
 }
 
@@ -520,7 +520,7 @@ function resolveTenantForCustomer(
 ): TenantProfile {
   const profile = readTenantProfile(tenantSlug, {
     rootDir,
-    env: { ...process.env, KYBERION_CUSTOMER: customerSlug },
+    env: { ...process.env, KYBERION_STANCE: customerSlug },
   });
   if (!profile) {
     throw new Error(`Tenant '${tenantSlug}' is not registered for customer '${customerSlug}'.`);
@@ -611,7 +611,7 @@ export function resolveOnboardingContext(
 ): OnboardingContextResolution {
   const customerSlug = assertCustomerSlug(input.customerSlug);
   const rootDir = input.rootDir || pathResolver.rootDir();
-  const customerPath = customerDirForSlug(customerSlug, rootDir);
+  const customerPath = stanceDirForSlug(customerSlug, rootDir);
   const customerExists = safeExistsSync(customerPath);
   if (!customerExists) throw new Error(`Customer overlay '${customerSlug}' does not exist.`);
   const tenantSlug = input.tenantSlug.trim();

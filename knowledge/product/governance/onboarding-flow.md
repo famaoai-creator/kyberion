@@ -73,7 +73,7 @@ export KYBERION_PERSONA=sovereign
 
 | 名前              | 意味                                                | 正本・用途                                                                                       |
 | ----------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `customer_slug`   | いまどの主体として振る舞うかという stance           | `customer/{slug}/` と `KYBERION_CUSTOMER`。認可境界ではない                                      |
+| `customer_slug`   | いまどの主体として振る舞うかという stance           | `knowledge/personal/stances/{slug}/` と `KYBERION_STANCE`。認可境界ではない                      |
 | `tenant_slug`     | 機密性、認可、監査の境界                            | `knowledge/personal/tenants/{slug}.json` の registry profile と `knowledge/confidential/{slug}/` |
 | `organization_id` | tenant をどう運営するかという目的・責任・運用モデル | governed organization facade が管理する状態                                                      |
 
@@ -83,7 +83,7 @@ export KYBERION_PERSONA=sovereign
 tenant_slug → organization_id → project_id → mission_id → task_id → session
 ```
 
-`customer/{slug}` はこの chain の一階層ではなく stance overlay である。customer 側にある
+`knowledge/personal/stances/{slug}` はこの chain の一階層ではなく stance overlay である。customer 側にある
 tenant JSON は表示・契約上の facet になり得るが、tenant registry の代替にはならない。
 
 ## 3. 標準手順
@@ -197,9 +197,9 @@ pnpm surfaces reconcile
 identity の保存先は stance で決まる。baseline の L3 も同じ場所を見るため、**identity を保存する前に**
 stance を決める。
 
-- 自分として使う（ルート 1）: `KYBERION_CUSTOMER` を設定しない。保存先は `knowledge/personal/`。
+- 自分として使う（ルート 1）: `KYBERION_STANCE` を設定しない。保存先は `knowledge/personal/`。
 - 顧客・会社として使う: 先に `pnpm stance:switch <customer-slug>` で stance を切り替える。保存先は
-  `customer/{customer-slug}/`。ルート 2 の `pnpm onboarding company` はこの overlay を作るので、
+  `knowledge/personal/stances/{customer-slug}/`。ルート 2 の `pnpm onboarding company` はこの overlay を作るので、
   ルート 2 では上の「ルート 2 の実行順」に従い、company stance でもう一度 identity を保存する。
 
 identity は次のどれかで保存する。
@@ -309,7 +309,7 @@ pnpm onboarding company --vertical saas-product-company --slug <company-slug> \
 作られる。続けて company stance に切り替え、その stance の identity を保存する。
 
 ```bash
-pnpm stance:switch <company-slug> && source active/shared/runtime/customer.env
+pnpm stance:switch <company-slug> && source active/shared/runtime/stance.env
 pnpm onboarding apply --identity <reviewed-identity-json>
 ```
 
@@ -369,7 +369,7 @@ pnpm onboarding llm attest --tenant <tenant-slug> --provider claude --training-u
   拒否され、同じ承認は 1 回しか使えない。承認は認証済みの人間だけが行え、エージェントの決定は承認ストアが拒否する。
 - 既定では、依頼者本人が承認しても通る（1 人の operator で運用する前提）。依頼者と承認者を必ず分けたい場合は
   `approval-policy.json` の `separation_of_duties.enabled` を `true` にする（customer overlay
-  `customer/<slug>/policy/approval-policy.json` でもよい）。ON にすると、依頼者と同じ identity による承認は
+  `knowledge/personal/stances/<slug>/policy/approval-policy.json` でもよい）。ON にすると、依頼者と同じ identity による承認は
   `[POLICY_VIOLATION] Separation of duties` で拒否・監査され、依頼は pending のまま残る。OFF のときに
   本人が承認した依頼は、ON にした後の手順 4 で拒否される。そのときはメッセージに出る `--request-approval`
   付きのコマンドで新しい依頼を作り（古い承認は再利用されない）、別の人に承認してもらう。
@@ -409,7 +409,7 @@ pnpm onboarding:context bind \
   --apply --json
 ```
 
-この apply は `customer/{customer-slug}/onboarding/organization-context.json` と、
+この apply は `knowledge/personal/stances/{customer-slug}/onboarding/organization-context.json` と、
 tenant に紐づく organization state を作成または再利用する。これは activation ではない。
 
 Web の初回利用では、既存 first-run の本人登録後に `/setup/company` から会社登録・probe・本人承認・最初の仕事の準備を進められる。対象はその credential が許可する既存 tenant に限る。詳細は [Web 会社設定](../../../docs/developer/COMPANY_WEB_ONBOARDING.ja.md) を参照。

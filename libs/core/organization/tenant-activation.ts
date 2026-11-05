@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { customerDirForSlug } from '../customer-resolver.js';
+import { stanceDirForSlug } from '../stance-resolver.js';
 import { resolveTenant } from './tenant-registry.js';
 import { loadOrganizationOperationalState } from './organization-operating-model.js';
 import { pathResolver } from '../path-resolver.js';
@@ -113,10 +113,10 @@ function pathSegment(value: string): string {
 }
 
 function activationPath(input: TenantActivationScope, rootDir: string): string {
-  const customerRoot = customerDirForSlug(input.customerSlug, rootDir);
+  const stanceRoot = stanceDirForSlug(input.customerSlug, rootDir);
   return assertSafeRepositoryPath(
     path.join(
-      customerRoot,
+      stanceRoot,
       'onboarding',
       'tenant-activation',
       pathSegment(input.tenantSlug),
@@ -150,14 +150,14 @@ function activationPathForRecord(record: TenantActivationRecord, rootDir: string
 
 function legacyActivationPath(customerSlug: string, rootDir: string): string {
   return assertSafeRepositoryPath(
-    path.join(customerDirForSlug(customerSlug, rootDir), 'onboarding', 'tenant-activation.json'),
+    path.join(stanceDirForSlug(customerSlug, rootDir), 'onboarding', 'tenant-activation.json'),
     { allowMissingLeaf: true, rootDir }
   );
 }
 
 function bindingPath(customerSlug: string, rootDir: string): string {
   return assertSafeRepositoryPath(
-    path.join(customerDirForSlug(customerSlug, rootDir), 'onboarding', 'organization-context.json'),
+    path.join(stanceDirForSlug(customerSlug, rootDir), 'onboarding', 'organization-context.json'),
     { allowMissingLeaf: true, rootDir }
   );
 }

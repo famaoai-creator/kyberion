@@ -104,6 +104,7 @@ export default defineConfig({
       // @agent/shared-ui React components (renderToStaticMarkup, no DOM).
       'libs/shared-*/**/*.test.tsx',
       'scripts/**/*.test.ts',
+      'migration/**/*.test.ts',
       'tests/**/*.test.ts',
     ],
     exclude: [

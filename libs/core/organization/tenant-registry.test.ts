@@ -98,7 +98,7 @@ describe('tenant-registry', () => {
 // TenantRegistryPathOptions seam; the real knowledge/ tree is never touched.
 describe('resolveTenant (DA-01 spine)', () => {
   const FIXTURE_PARENT = path.join(pathResolver.rootDir(), 'active', 'shared', 'tmp');
-  const EMPTY_ENV = {} as NodeJS.ProcessEnv; // no KYBERION_CUSTOMER → personal tenants dir
+  const EMPTY_ENV = {} as NodeJS.ProcessEnv; // no KYBERION_STANCE → personal tenants dir
   let fixtureRoot = '';
 
   beforeEach(() => {
@@ -312,7 +312,14 @@ describe('resolveTenant (DA-01 spine)', () => {
 
   it('keeps the tenant registry authoritative when customer stance changes', () => {
     seedProfile('acme-corp');
-    const customerDir = path.join(fixtureRoot, 'customer', 'engagement-a', 'tenants');
+    const customerDir = path.join(
+      fixtureRoot,
+      'knowledge',
+      'personal',
+      'stances',
+      'engagement-a',
+      'tenants'
+    );
     fs.mkdirSync(customerDir, { recursive: true });
     fs.writeFileSync(
       path.join(customerDir, 'acme-corp.json'),
@@ -325,13 +332,13 @@ describe('resolveTenant (DA-01 spine)', () => {
     );
     const resolved = resolveTenant('acme-corp', {
       rootDir: fixtureRoot,
-      env: { KYBERION_CUSTOMER: 'engagement-a' },
+      env: { KYBERION_STANCE: 'engagement-a' },
     });
     expect(resolved.profile.display_name).toBe('Tenant acme-corp');
     expect(
       listTenantProfileSlugs({
         rootDir: fixtureRoot,
-        env: { KYBERION_CUSTOMER: 'engagement-a' },
+        env: { KYBERION_STANCE: 'engagement-a' },
       })
     ).toEqual(['acme-corp']);
   });
