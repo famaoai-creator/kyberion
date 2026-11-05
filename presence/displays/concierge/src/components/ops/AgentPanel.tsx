@@ -928,6 +928,18 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                     )
                   ) : (
                     <>
+                      {/* The default engine/model has one home (設定 › エージェントと自律度);
+                          this picker only overrides it for the one agent being started. */}
+                      <ChronosMeta>
+                        {uxText('ia_settings_agentpanel_default_link', locale)}
+                      </ChronosMeta>
+                      <ChronosInline>
+                        <Button
+                          label={uxText('ia_settings_agentpanel_open_settings', locale)}
+                          variant="ghost"
+                          href="/settings#settings-reasoning"
+                        />
+                      </ChronosInline>
                       {installedProviders.length === 0 ? (
                         <p className="kb-text kb-text--muted">
                           {uxText('chronos_agentpanel_scanning_providers', locale)}

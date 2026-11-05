@@ -4,7 +4,15 @@ import type { OAuthOperationHandle } from './sections/OAuthOperationCard';
 import { frontDeskFetch as fetch } from '../../lib/front-desk-fetch';
 
 import * as React from 'react';
-import { Button, Callout, Disclosure, SaveBar, SettingsNav, Skeleton } from '@agent/shared-ui';
+import {
+  Button,
+  Callout,
+  Disclosure,
+  PageHeader,
+  SaveBar,
+  SettingsNav,
+  Skeleton,
+} from '@agent/shared-ui';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import { frontDeskText } from '../../lib/i18n';
 import { parseSetupResponse, type Setup as SetupPayload } from '../../lib/setup-response';
@@ -15,10 +23,32 @@ import {
   parsePluginListResponse,
 } from '../../lib/setup-auxiliary-response';
 import {
-  SETTINGS_CARD_SECTION_ORDER,
+  DIAGNOSTIC_SECTION,
+  SETTINGS_CARDS,
+  SETTINGS_CATEGORIES,
+  SETTINGS_SECTION_ELEMENT_ID,
+  SETTINGS_SECTION_ORDER,
+  filterSettingsCards,
   resolveSelectedServices,
   type SettingsSectionId,
 } from '../../lib/settings-view';
+import { useSetupChecklist } from '../../lib/setup-checklist-client';
+import { companySetupHref } from '../setup/company/company-setup-model';
+import { ReasoningSection } from './sections/ReasoningSection';
+import { SetupChecklistCard } from './sections/SetupChecklistCard';
+import { SettingMeta } from './sections/settings-ia-parts';
+import {
+  BudgetCard,
+  CliOperationsCard,
+  CompanySetupCard,
+  EngineConfigCard,
+  ProjectsCard,
+  SecretsCard,
+  SsoCard,
+  TenantCliCard,
+  TrialMissionCard,
+} from './sections/IaCards';
+import { CARD_META } from './settings-card-meta';
 import {
   parseAddMemberResponse,
   parseChronosLink,
@@ -218,7 +248,10 @@ export default function SettingsPage() {
   } = useTrainingAssignments(locale, setNotice);
   const recordingConsent = useRecordingConsent(locale, setNotice);
   const { refreshRecordingConsent, refreshRecordingObservations } = recordingConsent;
-  const [activeSection, setActiveSection] = React.useState<SettingsSectionId>('profile');
+  const [activeSection, setActiveSection] = React.useState<SettingsSectionId>('start');
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const checklist = useSetupChecklist();
+  const [studioUrl, setStudioUrl] = React.useState<string | null>(null);
   const voiceStreamRef = React.useRef<MediaStream | null>(null);
   const voiceRecorderRef = React.useRef<MediaRecorder | null>(null);
   const voiceChunksRef = React.useRef<Blob[]>([]);
@@ -528,9 +561,12 @@ export default function SettingsPage() {
   const refreshChronosLink = React.useCallback(async () => {
     try {
       const response = await fetch('/api/front-desk/links', { cache: 'no-store' });
-      const chronos = parseChronosLink(await response.json().catch(() => null));
+      const links = await response.json().catch(() => null);
+      const chronos = parseChronosLink(links);
       if (!response.ok || !chronos) throw new Error('Invalid links response');
       setChronosUrl(chronos);
+      const studio = (links as { studio_engine_config_url?: unknown }).studio_engine_config_url;
+      if (typeof studio === 'string' && /^https?:\/\//.test(studio)) setStudioUrl(studio);
     } catch {
       // 詳細設定 keeps the rest of its content usable without the link.
     }
@@ -634,6 +670,8 @@ export default function SettingsPage() {
     // Close the mobile chooser before measuring the destination's position.
     const disclosure = compactNavigation.current?.querySelector('details');
     if (disclosure) disclosure.open = false;
+    // Jumping to a card leaves search mode so its category is the visible one.
+    setSearchQuery('');
     settingsNavigation.current?.navigate(target);
   }, []);
   const settingsReady = setup !== null;
@@ -1163,17 +1201,13 @@ export default function SettingsPage() {
 
   const channelDisplayName = (surface: string) =>
     notifChannels.find((channel) => channel.surface === surface)?.display_name || surface;
-  const firstRun = !setup.diagnostics.every((item) => item.status === 'ok');
-  // Keep the body in menu order as diagnostics arrive or change after saving.
-  const sectionOrder = SETTINGS_CARD_SECTION_ORDER;
+  const selectedTenant = readSelectedTenant() || meViewing?.tenant_slug || management.tenant_slug;
   const settingsMenu = createSettingsMenu(locale, {
-    profile: profileDirty,
-    services: servicesDirty,
+    workspace: profileDirty,
+    connections: servicesDirty,
     notifications: notifDirty,
   });
-  const currentSettingsLabel = settingsMenu
-    .flatMap((group) => group.items)
-    .find((item) => item.id === activeSection)?.label;
+  const currentSettingsLabel = frontDeskText(SETTINGS_CATEGORIES[activeSection].label, locale);
   const settingsNav = (
     <SettingsNav
       label={frontDeskText('nav_settings', locale)}
@@ -1186,16 +1220,46 @@ export default function SettingsPage() {
   const setSectionRef = (id: SettingsSectionId) => (element: HTMLElement | null) => {
     sectionRefs.current[id] = element;
   };
+  // Section components keep their own anchors; the category container is the
+  // navigation target, so their former section refs are unused.
+  const noRef = () => {};
+  const searching = searchQuery.trim().length > 0;
+  const visibleCards = new Set(
+    filterSettingsCards(searchQuery, (key) => frontDeskText(key, locale)).map((card) => card.id)
+  );
+  // "Nice to have" readiness: the /api/setup items the checklist does not cover.
+  const extraDiagnostics = setup.diagnostics.filter(
+    (item) => item.id !== 'reasoning' && item.id !== 'notifications' && DIAGNOSTIC_SECTION[item.id]
+  );
 
   // Declared as a `const` (not a hoisted `function`) so TypeScript narrows
   // `setup` to non-null inside it — the early `if (!setup) return` above
   // already guarantees that for every call site below.
-  const renderSection = (id: SettingsSectionId): React.ReactNode => {
+  const renderCard = (id: string): React.ReactNode => {
     switch (id) {
-      case 'profile':
+      case 'settings-checklist':
+        return (
+          <SetupChecklistCard
+            locale={locale}
+            state={checklist}
+            diagnostics={extraDiagnostics}
+            onNavigate={jumpToSection}
+          >
+            {extraDiagnostics.length > 0 ? (
+              <SettingsReadiness
+                diagnostics={extraDiagnostics}
+                t={t}
+                title={frontDeskText('ia_settings_other_readiness', locale)}
+                onNavigate={jumpToSection}
+              />
+            ) : null}
+          </SetupChecklistCard>
+        );
+      case 'settings-trial-mission':
+        return <TrialMissionCard locale={locale} />;
+      case 'setup-profile':
         return (
           <ProfileSection
-            key="profile"
             locale={locale}
             t={t}
             profile={profile}
@@ -1204,17 +1268,14 @@ export default function SettingsPage() {
             saveFeedback={saveFeedback?.section === 'profile' ? saveFeedback : null}
             hasUnsavedChanges={profileDirty || servicesDirty}
             onSaveProfile={() => void saveSettings(false, 'profile')}
-            sectionRef={setSectionRef('profile')}
+            sectionRef={noRef}
           >
-            <DisplaySection locale={locale} t={t} onLocaleChange={setLocale} />
             <PasskeyPane locale={locale} t={t} />
           </ProfileSection>
         );
-
-      case 'members':
+      case 'settings-members':
         return (
           <MembersSection
-            key="members"
             locale={locale}
             t={t}
             setup={setup}
@@ -1238,37 +1299,41 @@ export default function SettingsPage() {
             onAssignTraining={(memberId) =>
               void assignTraining(memberId, meViewing?.tenant_slug ?? meTenants[0]?.tenant_slug)
             }
-            sectionRef={setSectionRef('members')}
+            sectionRef={noRef}
           />
         );
-
-      case 'services':
+      case 'settings-company':
         return (
-          <ServicesSection
-            key="services"
+          <CompanySetupCard
+            locale={locale}
+            href={selectedTenant ? companySetupHref(selectedTenant) : '/setup/company'}
+          />
+        );
+      case 'settings-projects':
+        return (
+          <ProjectsCard
+            locale={locale}
+            state={checklist}
+            href={withSelectedTenant('/management', selectedTenant, 'snake')}
+          />
+        );
+      case 'settings-tenant-cli':
+        return <TenantCliCard locale={locale} />;
+      case 'settings-reasoning':
+        return <ReasoningSection locale={locale} />;
+      case 'settings-authority':
+        return (
+          <AuthoritySection
             locale={locale}
             t={t}
-            setup={setup}
-            services={services}
-            setServices={setServices}
-            busy={busy}
-            oauthOperation={oauthOperation}
-            onDismissOAuthOperation={() => setOauthOperation(null)}
-            oauthBusyId={oauthBusyId}
-            oauthMessage={oauthMessage}
-            oauthError={oauthError}
-            onConnectOAuth={(serviceId, serviceLabel) => void connectOAuth(serviceId, serviceLabel)}
-            saveFeedback={saveFeedback?.section === 'services' ? saveFeedback : null}
-            hasUnsavedChanges={servicesDirty}
-            onSaveConnections={() => void saveSettings(false, 'services')}
-            sectionRef={setSectionRef('services')}
+            authorityTenants={meTenants.filter((tenant) => tenant.status === 'active')}
+            selectedTenant={meViewing?.tenant_slug || readSelectedTenant() || undefined}
+            sectionRef={noRef}
           />
         );
-
-      case 'voice':
+      case 'setup-media':
         return (
           <VoiceSection
-            key="voice"
             locale={locale}
             t={t}
             setup={setup}
@@ -1287,14 +1352,14 @@ export default function SettingsPage() {
             voiceDevices={voiceDevices}
             voiceSelectionBusy={voiceSelectionBusy}
             onSaveVoiceSelection={(field, value) => void saveVoiceSelection(field, value)}
-            sectionRef={setSectionRef('voice')}
+            sectionRef={noRef}
           />
         );
-
-      case 'notifications':
+      case 'settings-engine':
+        return <EngineConfigCard locale={locale} studioUrl={studioUrl} />;
+      case 'setup-notifications':
         return (
           <NotificationsSection
-            key="notifications"
             locale={locale}
             t={t}
             notifCurrent={notifCurrent}
@@ -1306,61 +1371,71 @@ export default function SettingsPage() {
             saveFeedback={saveFeedback?.section === 'notifications' ? saveFeedback : null}
             hasUnsavedChanges={notifDirty}
             onSaveNotification={() => void saveNotification()}
-            sectionRef={setSectionRef('notifications')}
+            sectionRef={noRef}
           />
         );
-
-      case 'authority':
+      case 'setup-services':
         return (
-          <AuthoritySection
-            key="authority"
+          <ServicesSection
             locale={locale}
             t={t}
-            authorityTenants={meTenants.filter((tenant) => tenant.status === 'active')}
-            selectedTenant={meViewing?.tenant_slug || readSelectedTenant() || undefined}
-            sectionRef={setSectionRef('authority')}
+            setup={setup}
+            services={services}
+            setServices={setServices}
+            busy={busy}
+            oauthOperation={oauthOperation}
+            onDismissOAuthOperation={() => setOauthOperation(null)}
+            oauthBusyId={oauthBusyId}
+            oauthMessage={oauthMessage}
+            oauthError={oauthError}
+            onConnectOAuth={(serviceId, serviceLabel) => void connectOAuth(serviceId, serviceLabel)}
+            saveFeedback={saveFeedback?.section === 'services' ? saveFeedback : null}
+            hasUnsavedChanges={servicesDirty}
+            onSaveConnections={() => void saveSettings(false, 'services')}
+            sectionRef={noRef}
           />
         );
-
-      case 'recording':
-        return (
-          <RecordingConsentSection
-            key="recording"
-            locale={locale}
-            sectionRef={setSectionRef('recording')}
-            // WI-18: attach still needs an owner/approver viewer; grant,
-            // revoke, confirm, and discard are self-service for everyone.
-            canAttachToWorkItem={meViewing?.role !== 'viewer'}
-            {...recordingConsent}
-          />
-        );
-
-      case 'plugins':
+      case 'settings-sso':
+        return <SsoCard locale={locale} />;
+      case 'setup-plugins':
         return (
           <PluginsSection
-            key="plugins"
             locale={locale}
             t={t}
             plugins={plugins}
             pluginConfirm={pluginConfirm}
             setPluginConfirm={setPluginConfirm}
             busy={busy}
-            onDecidePlugin={(id, decision) => void decidePlugin(id, decision)}
-            sectionRef={setSectionRef('plugins')}
+            onDecidePlugin={(pluginId, decision) => void decidePlugin(pluginId, decision)}
+            sectionRef={noRef}
           />
         );
-
-      case 'advanced':
-      default:
+      case 'settings-recording':
+        return (
+          <RecordingConsentSection
+            locale={locale}
+            sectionRef={noRef}
+            // WI-18: attach still needs an owner/approver viewer; grant,
+            // revoke, confirm, and discard are self-service for everyone.
+            canAttachToWorkItem={meViewing?.role !== 'viewer'}
+            {...recordingConsent}
+          />
+        );
+      case 'settings-secrets':
+        return <SecretsCard locale={locale} />;
+      case 'settings-budget':
+        return <BudgetCard locale={locale} state={checklist} />;
+      case 'settings-display':
+        return <DisplaySection locale={locale} t={t} onLocaleChange={setLocale} />;
+      case 'settings-advanced':
         return (
           <AdvancedSection
-            key="advanced"
             locale={locale}
             t={t}
             setup={setup}
             busy={busy}
             chronosUrl={chronosUrl}
-            sectionRef={setSectionRef('advanced')}
+            sectionRef={noRef}
             management={management}
             setManagement={setManagement}
             onSaveManagement={() => void saveManagement()}
@@ -1380,32 +1455,56 @@ export default function SettingsPage() {
             onJumpToSection={jumpToSection}
           />
         );
+      case 'settings-cli':
+        return <CliOperationsCard locale={locale} />;
+      default:
+        return null;
     }
   };
 
-  return (
-    <div className="settings-page">
-      <header className="settings-heading">
-        <div>
-          <h1>{frontDeskText('nav_settings', locale)}</h1>
-          <p>{frontDeskText('settings_intro', locale)}</p>
-        </div>
-        <Button
-          label={t('management.title')}
-          href={withSelectedTenant(
-            '/management',
-            readSelectedTenant() || meViewing?.tenant_slug || management.tenant_slug,
-            'snake'
-          )}
-        />
-      </header>
-      {firstRun ? (
-        <p className="settings-first-run-lead">
-          {frontDeskText('settings_first_run_lead', locale)}
-        </p>
-      ) : null}
+  const renderCardWithMeta = (id: string) => {
+    const meta = CARD_META[id];
+    return (
+      <div className="settings-card" key={id} data-card={id} hidden={!visibleCards.has(id)}>
+        {renderCard(id)}
+        {meta ? (
+          <SettingMeta
+            locale={locale}
+            defaultValue={meta.default ? frontDeskText(meta.default, locale) : undefined}
+            effect={frontDeskText(meta.effect, locale)}
+          />
+        ) : null}
+      </div>
+    );
+  };
 
-      <SettingsReadiness diagnostics={setup.diagnostics} t={t} onNavigate={jumpToSection} />
+  return (
+    <div className="settings-page kb-settings kb-page" data-width="default">
+      <PageHeader
+        title={frontDeskText('nav_settings', locale)}
+        subtitle={frontDeskText('ia_settings_lead', locale)}
+      />
+      <div className="settings-search" role="search">
+        <label className="kb-field__label" htmlFor="settings-search">
+          {frontDeskText('ia_settings_search_label', locale)}
+        </label>
+        <input
+          id="settings-search"
+          className="kb-input"
+          type="search"
+          autoComplete="off"
+          value={searchQuery}
+          placeholder={frontDeskText('ia_settings_search_placeholder', locale)}
+          onChange={(event) => setSearchQuery(event.target.value)}
+        />
+        {searching ? (
+          <p className="kb-text kb-text--caption" role="status">
+            {visibleCards.size > 0
+              ? frontDeskText('ia_settings_search_results', locale, { count: visibleCards.size })
+              : frontDeskText('ia_settings_search_empty', locale, { query: searchQuery.trim() })}
+          </p>
+        ) : null}
+      </div>
 
       {notice ? (
         <div role="status" aria-live="polite">
@@ -1421,22 +1520,40 @@ export default function SettingsPage() {
         <aside className="settings-navigation settings-navigation--desktop">{settingsNav}</aside>
         <div className="settings-navigation--compact" ref={compactNavigation}>
           <Disclosure
-            summary={`${frontDeskText('nav_settings', locale)} · ${currentSettingsLabel || ''}`}
+            summary={`${frontDeskText('nav_settings', locale)} · ${currentSettingsLabel}`}
           >
             {settingsNav}
           </Disclosure>
         </div>
         <div className="settings-content">
-          {/* Sections stay mounted so in-progress panel state survives a
-              switch; only the active section is visible. */}
-          {sectionOrder.map((id) => (
-            <div key={id} hidden={id !== activeSection}>
-              {renderSection(id)}
-            </div>
-          ))}
+          {/* Every card stays mounted so in-progress panel state survives a
+              switch; one category is visible, or every match while searching. */}
+          {SETTINGS_SECTION_ORDER.map((category) => {
+            const cards = SETTINGS_CARDS.filter((card) => card.category === category);
+            const shown = searching
+              ? cards.some((card) => visibleCards.has(card.id))
+              : category === activeSection;
+            return (
+              <section
+                key={category}
+                id={SETTINGS_SECTION_ELEMENT_ID[category]}
+                ref={setSectionRef(category)}
+                className="settings-category"
+                hidden={!shown}
+                aria-labelledby={`${SETTINGS_SECTION_ELEMENT_ID[category]}-title`}
+              >
+                <header className="settings-category__header">
+                  <h2 id={`${SETTINGS_SECTION_ELEMENT_ID[category]}-title`}>
+                    {frontDeskText(SETTINGS_CATEGORIES[category].label, locale)}
+                  </h2>
+                  <p>{frontDeskText(SETTINGS_CATEGORIES[category].description, locale)}</p>
+                </header>
+                {cards.map((card) => renderCardWithMeta(card.id))}
+              </section>
+            );
+          })}
         </div>
       </div>
-
       {saveBarState !== 'clean' ? (
         <FormScope
           actions={{

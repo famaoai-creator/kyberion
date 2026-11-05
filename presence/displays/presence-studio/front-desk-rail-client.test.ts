@@ -129,30 +129,43 @@ function harness(
   };
 }
 describe('shipped grouped front-desk rail client', () => {
-  it.each([
-    ['/first-job', 'first-job'],
-    ['/help/owner', 'help'],
-  ])('marks %s from the route rather than a stale home hint', async (path, id) => {
-    const h = harness(path);
+  it('renders the seven destinations with 設定 pinned in the footer and scoped hrefs', async () => {
+    const h = harness('/first-job');
+    await h.mount();
+    const props = h.rendered.at(-1)!.components[0].props;
+    const items = props.items;
+    const footer = props.footer_items;
+    expect(items.map((item) => item.id)).toEqual([
+      'home',
+      'inbox',
+      'work',
+      'org',
+      'library',
+      'ops',
+    ]);
+    expect(footer.map((item) => item.id)).toEqual(['settings']);
+    expect([...items, ...footer]).toHaveLength(FRONT_DESK_MENU.length);
+    expect(
+      [...items, ...footer].every((item) => item.icon && item.href.includes('tenant=alpha'))
+    ).toBe(true);
+    // Studio pages are not rail destinations, so nothing is marked current.
+    expect([...items, ...footer].filter((item) => item.active)).toHaveLength(0);
+    expect(items.find((item) => item.id === 'work').href).toContain('/work');
+  });
+  it('marks the destination named by the page hint', async () => {
+    const h = harness('/home');
     await h.mount();
     const items = h.rendered.at(-1)!.components[0].props.items;
-    expect(items).toHaveLength(FRONT_DESK_MENU.length);
-    expect(items.filter((item) => item.active).map((item) => item.id)).toEqual([id]);
-    expect(
-      items.every((item) => item.group_label && item.icon && item.href.includes('tenant=alpha'))
-    ).toBe(true);
-    expect(items.find((item) => item.id === 'deliverables').href).toContain('section=deliverables');
-    expect(items.find((item) => item.id === 'missions').href).toContain('/w/mission');
+    expect(items.filter((item) => item.active).map((item) => item.id)).toEqual(['home']);
   });
-  it('fails closed for denied and unknown allowed values, without duplicate help', async () => {
+  it('fails closed for denied and unknown allowed values', async () => {
     const h = harness('/work');
     h.menu[0].allowed = false;
     (h.menu[1] as { allowed?: boolean }).allowed = undefined;
     await h.mount();
     const items = h.rendered.at(-1)!.components[0].props.items;
-    expect(items.some((item) => item.id === 'decide' || item.id === 'ask')).toBe(false);
-    expect(items.filter((item) => item.id === 'help')).toHaveLength(1);
-    expect(h.rendered.at(-1)!.components[0].props.footer_items).toBeUndefined();
+    expect(items.some((item) => item.id === 'home' || item.id === 'inbox')).toBe(false);
+    expect(items.some((item) => item.id === 'help')).toBe(false);
   });
   it('ignores an interrupted older mount', async () => {
     const old = deferred<unknown>();

@@ -56,9 +56,7 @@ export function ChronosMirrorLegacySections({ model }: { model: ViewModel }) {
     A2UIRenderer,
     FocusedOperatorView,
     MissionIntelligence,
-    WorkItemsWorkspace,
     SurfaceControlWorkspace,
-    OrganizationOperatingModel,
     HeadlessA2UIWorkspace,
     DiagnosticsAttentionSummary,
     MISSION_CYCLE,
@@ -618,17 +616,6 @@ export function ChronosMirrorLegacySections({ model }: { model: ViewModel }) {
         </div>
       ) : null}
 
-      {consoleSection === 'organization' ? (
-        <OrganizationOperatingModel
-          key={`${tenant}:${organizationId}:${projectId}`}
-          organizationId={organizationId || undefined}
-          projectId={projectId || undefined}
-          tenant={tenant || undefined}
-          onOpenOperations={() => openConsoleSection('operations')}
-          onOpenGovernance={() => openConsoleSection('governance')}
-        />
-      ) : null}
-
       {consoleSection === 'operations' ? (
         <>
           <Section
@@ -661,17 +648,6 @@ export function ChronosMirrorLegacySections({ model }: { model: ViewModel }) {
         </>
       ) : null}
 
-      {consoleSection === 'work-items' ? (
-        <WorkItemsWorkspace
-          tenant={tenant || undefined}
-          organizationId={organizationId || undefined}
-          projectId={projectId || undefined}
-          onOpenMission={(missionId: string) =>
-            handleOperatorViewOpen('mission-control-plane', missionId)
-          }
-        />
-      ) : null}
-
       {consoleSection === 'surface-control' ? (
         <>
           <SurfaceControlWorkspace tenant={tenant || undefined} />
@@ -684,39 +660,6 @@ export function ChronosMirrorLegacySections({ model }: { model: ViewModel }) {
             />
           </Disclosure>
         </>
-      ) : null}
-
-      {consoleSection === 'governance' ? (
-        <Section
-          title={uxText('chronos_nav_governance_hint', locale)}
-          description={uxText('chronos_governance_description', locale)}
-        >
-          <div className="chronos-two-col">
-            <Section
-              headingLevel={3}
-              title={uxText('chronos_governance_approvals_title', locale)}
-              description={uxText('chronos_governance_approvals_description', locale)}
-              actions={[
-                {
-                  label: uxText('chronos_governance_approvals_action', locale),
-                  variant: 'primary',
-                  onClick: () => openConsoleSection('approvals'),
-                },
-              ]}
-            />
-            <Section
-              headingLevel={3}
-              title={uxText('chronos_governance_knowledge_title', locale)}
-              description={uxText('chronos_governance_knowledge_description', locale)}
-              actions={[
-                {
-                  label: uxText('chronos_governance_knowledge_action', locale),
-                  onClick: () => openConsoleSection('knowledge'),
-                },
-              ]}
-            />
-          </div>
-        </Section>
       ) : null}
 
       {consoleSection === 'diagnostics' && focusedOperatorView ? (

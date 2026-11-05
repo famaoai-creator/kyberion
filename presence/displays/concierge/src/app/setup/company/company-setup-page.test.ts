@@ -76,7 +76,14 @@ describe('company setup page navigation wiring (synthetic events)', () => {
     expect(harness.controller.act).not.toHaveBeenCalled();
   });
   it('changes tenant with a credential-free URL and uses guarded explicit refresh', () => {
-    const tree = CompanySetupPage();
+    // The page wraps the view with a back link to its settings card.
+    const page = CompanySetupPage();
+    const children = [page.props.children].flat() as Array<{
+      props?: { changeTenant?: unknown };
+    }>;
+    const tree = children.find((child) => typeof child?.props?.changeTenant === 'function') as {
+      props: { changeTenant: (tenant: string) => void; refresh: () => void };
+    };
     tree.props.changeTenant('company-b');
     expect(target.history.replaceState).toHaveBeenCalledExactlyOnceWith(
       null,

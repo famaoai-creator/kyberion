@@ -637,7 +637,9 @@ export async function buildKnowledgeIndex(rootDir?: string): Promise<KnowledgeHi
 
 async function _hydrateEmbedCache(index: KnowledgeHintIndex, scope: KnowledgeScope): Promise<void> {
   const backend = getEmbeddingBackend();
-  const modelName = backend?.name ?? 'none';
+  // cacheKey names the vector space; a changed embedding function mints a new
+  // scope hash so stale vectors are never mixed with fresh query vectors.
+  const modelName = backend ? (backend.cacheKey ?? backend.name) : 'none';
   const scopeHash = computeScopeHash(scope, modelName);
 
   const diskCache = loadDiskCache(scopeHash);

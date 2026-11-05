@@ -16,6 +16,12 @@ import {
   withSelectedTenant,
 } from '../lib/tenant-context';
 import { entityHref, type GraphNode } from '../lib/workspace-view';
+import {
+  SETTINGS_CARDS,
+  SETTINGS_CATEGORIES,
+  SETTINGS_SECTION_ELEMENT_ID,
+  SETTINGS_SECTION_ORDER,
+} from '../lib/settings-view';
 
 /** The rail and palette share the server's role-gated, manifest-resolved catalog. */
 type PaletteEntry = {
@@ -46,16 +52,18 @@ function workspaceHits(payload: unknown): GraphNode[] {
     : [];
 }
 
+/**
+ * Settings entries: every category and card of the settings IA, so ⌘K finds
+ * a setting by name and jumps to `/settings#<id>` (the same catalog the
+ * settings search filters).
+ */
 const SETTINGS_SHORTCUTS: Array<{ anchor: string; labelKey: FrontDeskMessageKey }> = [
-  { anchor: 'setup-profile', labelKey: 'settings_nav_profile' },
-  { anchor: 'settings-display', labelKey: 'settings_nav_display' },
-  { anchor: 'settings-members', labelKey: 'settings_nav_members' },
-  { anchor: 'setup-services', labelKey: 'settings_nav_services' },
-  { anchor: 'setup-media', labelKey: 'settings_nav_voice' },
-  { anchor: 'setup-notifications', labelKey: 'settings_nav_notifications' },
-  { anchor: 'settings-recording', labelKey: 'settings_nav_recording' },
-  { anchor: 'setup-plugins', labelKey: 'settings_nav_plugins' },
-  { anchor: 'settings-advanced', labelKey: 'settings_nav_advanced' },
+  // Cards first: a category named like its card (通知, 表示) resolves to the card.
+  ...SETTINGS_CARDS.map((card) => ({ anchor: card.id, labelKey: card.label })),
+  ...SETTINGS_SECTION_ORDER.map((id) => ({
+    anchor: SETTINGS_SECTION_ELEMENT_ID[id],
+    labelKey: SETTINGS_CATEGORIES[id].label,
+  })),
 ];
 
 function allowedItems(payload: unknown): NavItem[] {

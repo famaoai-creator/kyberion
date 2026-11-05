@@ -62,16 +62,41 @@ describe('operations request gates (Concierge viewer model)', () => {
     expect(mocks.resolveConciergeViewerContext).not.toHaveBeenCalled();
   });
 
-  it('charges the tenant budget of a single-tenant viewer only', () => {
+  it('charges a mutation to the tenant budget of a single-tenant viewer only', () => {
     mocks.resolveConciergeViewerContext.mockReturnValue(viewer('readonly', ['acme']));
-    expect(guardOpsRequest(request())).toBeNull();
+    expect(guardOpsRequest(request('POST'))).toBeNull();
     expect(mocks.consumeTenantBudget).toHaveBeenCalledWith({
       op: 'surface:ops_request',
       tenantSlug: 'acme',
     });
     mocks.resolveConciergeViewerContext.mockReturnValue(viewer('localadmin', 'all'));
-    expect(guardOpsRequest(request())).toBeNull();
+    expect(guardOpsRequest(request('POST'))).toBeNull();
     expect(mocks.consumeTenantBudget).toHaveBeenLastCalledWith({ op: 'surface:ops_request' });
+  });
+
+  it('429s a mutation once the tenant reasoning budget is spent', () => {
+    mocks.resolveConciergeViewerContext.mockReturnValue(viewer('localadmin', ['acme']));
+    mocks.consumeTenantBudget.mockReturnValue({ allowed: false, retry_after_ms: 1000 } as never);
+    expect(guardOpsRequest(request('POST'))?.status).toBe(429);
+  });
+
+  it('never drains the tenant budget for safe reads, even when it is spent', () => {
+    mocks.resolveConciergeViewerContext.mockReturnValue(viewer('readonly', ['acme']));
+    mocks.consumeTenantBudget.mockReturnValue({ allowed: false, retry_after_ms: 1000 } as never);
+    for (let i = 0; i < 100; i += 1) {
+      expect(guardOpsRequest(request('GET'))).toBeNull();
+    }
+    expect(guardOpsRequest(request('HEAD'))).toBeNull();
+    expect(mocks.consumeTenantBudget).not.toHaveBeenCalled();
+    // Reads still pass the per-viewer Concierge read ceiling first.
+    expect(mocks.guardConciergeRequest).toHaveBeenCalledTimes(101);
+  });
+
+  it('still 429s a read once the per-viewer read ceiling is exhausted', () => {
+    mocks.resolveConciergeViewerContext.mockReturnValue(viewer('readonly', ['acme']));
+    mocks.guardConciergeRequest.mockReturnValue(NextResponse.json({}, { status: 429 }));
+    expect(guardOpsRequest(request('GET'))?.status).toBe(429);
+    expect(mocks.consumeTenantBudget).not.toHaveBeenCalled();
   });
 
   it('lets a readonly viewer read but forbids localadmin-only actions', () => {
