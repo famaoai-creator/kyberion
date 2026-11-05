@@ -11,6 +11,7 @@ vi.mock('../reasoning/reasoning-backend.js', async (importOriginal) => ({
 }));
 
 import { generateAgendaDraft } from './draft.js';
+import { getReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
 import { buildReasoningBackendForMode } from '../reasoning/reasoning-bootstrap.js';
 import type { DecisionAgenda } from './model.js';
 
@@ -185,6 +186,47 @@ describe('generateAgendaDraft', () => {
       backend: fake('', 'stub'),
     });
     expect(out.agenda.entries[0].our_decision?.rationale).toBe('組織の既定値です。');
+  });
+});
+
+describe('generateAgendaDraft egress posture', () => {
+  it('declares no_training for the tenant agenda', async () => {
+    let observed: ReturnType<typeof getReasoningPayloadScope>;
+    const out = await generateAgendaDraft(agenda(), {
+      intentText: 'x',
+      now: NOW,
+      backend: {
+        name: 'fake',
+        prompt: async () => {
+          observed = getReasoningPayloadScope();
+          return '{"entries":[]}';
+        },
+      },
+    });
+    expect(observed).toMatchObject({
+      tier: 'confidential',
+      tenant_slug: 'acme-corp',
+      training_use: 'no_training',
+    });
+    expect(out.egress_denied).toBeUndefined();
+  });
+
+  it('surfaces an egress denial distinctly while keeping the organization-default fallback', async () => {
+    const denial = new Error(
+      '[reasoning-backend:failover] prompt failed across 1 candidate(s): [policy] [REASONING_EGRESS_DENIED] backend claude-cli has no no-training declaration — why | next: attest acme-corp | evidence: e'
+    );
+    const out = await generateAgendaDraft(agenda(), {
+      intentText: 'x',
+      now: NOW,
+      backend: fake(denial),
+    });
+    expect(out.generated).toBe(false);
+    expect(out.agenda.entries[0].our_decision?.value).toBe('standard');
+    expect(out.egress_denied).toEqual({ reason: denial.message, next: 'next: attest acme-corp' });
+    expect(out.notes).toContain(
+      'reasoning egress denied; used organization defaults — next: attest acme-corp'
+    );
+    expect(out.notes).not.toContain('reasoning backend failed; used organization defaults');
   });
 });
 
