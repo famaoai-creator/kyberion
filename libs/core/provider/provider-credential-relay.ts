@@ -35,13 +35,21 @@ import * as https from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { logger } from '../core.js';
 import {
+  LOOPBACK_NO_PROXY_HOSTS,
   PROVIDER_CREDENTIAL_RELAY_ENV_VAR,
+  PROXY_ENV_KEYS,
+  hasProxyEnv,
   isProviderCredentialRelayEnabled,
+  withLoopbackNoProxy,
+  type ProxyEnvKey,
 } from '../foundation/env.js';
 import { resolveTaskProviderEnvironment } from '../foundation/credential-binding.js';
 import type { ProviderId } from './provider-permission-profiles.js';
 
 export { PROVIDER_CREDENTIAL_RELAY_ENV_VAR, isProviderCredentialRelayEnabled };
+// Moved to foundation/env (shared with every child-env allowlist); re-exported
+// for existing importers.
+export { withLoopbackNoProxy };
 export const CREDENTIAL_RELAY_PLACEHOLDER_PREFIX = 'kyb-relay-';
 
 export type CredentialRelayProtocol = 'anthropic' | 'openai';
@@ -120,15 +128,7 @@ export interface StartCredentialRelayInput {
   readonly proxyEnv?: NodeJS.ProcessEnv;
 }
 
-const PROXY_ENV_KEYS = [
-  'HTTP_PROXY',
-  'HTTPS_PROXY',
-  'NO_PROXY',
-  'http_proxy',
-  'https_proxy',
-  'no_proxy',
-] as const;
-type RelayProxyEnv = Partial<Record<(typeof PROXY_ENV_KEYS)[number], string>>;
+type RelayProxyEnv = Partial<Record<ProxyEnvKey, string>>;
 
 function pickProxyEnv(env: NodeJS.ProcessEnv): RelayProxyEnv | undefined {
   const picked: RelayProxyEnv = {};
@@ -136,38 +136,11 @@ function pickProxyEnv(env: NodeJS.ProcessEnv): RelayProxyEnv | undefined {
     const value = env[key]?.trim();
     if (value) picked[key] = value;
   }
-  const hasProxy = Boolean(
-    picked.HTTPS_PROXY || picked.https_proxy || picked.HTTP_PROXY || picked.http_proxy
-  );
-  return hasProxy ? picked : undefined;
+  return hasProxyEnv(picked) ? picked : undefined;
 }
 
 /** Hosts a child must reach directly (never via a proxy) to talk to the relay. */
-export const CREDENTIAL_RELAY_NO_PROXY_HOSTS: readonly string[] = ['127.0.0.1', 'localhost', '::1'];
-
-function appendNoProxyHosts(current: string | undefined, hosts: readonly string[]): string {
-  const entries = (current ?? '')
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-  const present = new Set(entries.map((entry) => entry.toLowerCase()));
-  for (const host of hosts) if (!present.has(host)) entries.push(host);
-  return entries.join(',');
-}
-
-/**
- * Return `env` with the loopback hosts appended to both NO_PROXY and
- * no_proxy (existing entries kept, no duplicates). A child that honors
- * HTTP(S)_PROXY would otherwise send its request for the loopback relay to
- * the proxy, which cannot reach the parent's 127.0.0.1.
- */
-export function withLoopbackNoProxy(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  return {
-    ...env,
-    NO_PROXY: appendNoProxyHosts(env.NO_PROXY, CREDENTIAL_RELAY_NO_PROXY_HOSTS),
-    no_proxy: appendNoProxyHosts(env.no_proxy, CREDENTIAL_RELAY_NO_PROXY_HOSTS),
-  };
-}
+export const CREDENTIAL_RELAY_NO_PROXY_HOSTS: readonly string[] = LOOPBACK_NO_PROXY_HOSTS;
 
 function parseUpstream(upstream: string): URL {
   let url: URL;
