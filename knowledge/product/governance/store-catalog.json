@@ -13,7 +13,12 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "sources": ["runtime-state-roots"]
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "api_verification",
+        "retention_path": "active/shared/runtime/health"
+      }
     },
     {
       "id": "archived-missions",
@@ -38,7 +43,12 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["autonomy_learning_store"],
-      "sources": ["runtime-state-roots", "role-policy"]
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "state",
+        "key": "autonomy_learning",
+        "retention_path": "active/shared/runtime/autonomy-learning"
+      }
     },
     {
       "id": "browser-bridge-mailbox",
@@ -50,7 +60,12 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "sources": ["runtime-state-roots"]
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "browser_bridge_mailbox",
+        "retention_path": "active/shared/runtime/browser-bridge-mailbox"
+      }
     },
     {
       "id": "customer-decision-invites",
@@ -63,7 +78,12 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["customer_decision_invite_store"],
-      "sources": ["runtime-state-roots", "role-policy"]
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "state",
+        "key": "customer_decision_invites",
+        "retention_path": "active/shared/runtime/customer-decision-invites"
+      }
     },
     {
       "id": "delegation-idempotency",
@@ -75,7 +95,12 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "sources": ["runtime-state-roots"]
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "delegation_idempotency",
+        "retention_path": "active/shared/runtime/delegation-idempotency"
+      }
     },
     {
       "id": "discussion-create-requests",
@@ -88,7 +113,12 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["discussion_request_store"],
-      "sources": ["runtime-state-roots", "role-policy"]
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "state",
+        "key": "discussion_create_requests",
+        "retention_path": "active/shared/runtime/discussion-create-requests"
+      }
     },
     {
       "id": "dot",
@@ -101,7 +131,12 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["concierge_management_reader", "dot_result_writer"],
-      "sources": ["runtime-state-roots", "role-policy"]
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "state",
+        "key": "dot",
+        "retention_path": "active/shared/runtime/dot"
+      }
     },
     {
       "id": "dot-charters",
@@ -125,7 +160,12 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["person_charter_store", "pr_publication_store"],
-      "sources": ["runtime-state-roots", "role-policy"]
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "state",
+        "key": "external_operations",
+        "retention_path": "active/shared/runtime/external-operations"
+      }
     },
     {
       "id": "floor.artifact",
@@ -139,7 +179,12 @@
       "status": "active",
       "legacy_roles": ["peer_task_artifact_writer", "pr_publication_store"],
       "sources": ["storage-floor", "role-policy"],
-      "note": "Floors also hold a system/ partition (custody system)."
+      "note": "Floors also hold a system/ partition (custody system).",
+      "registration": {
+        "family": "floor",
+        "key": "artifact",
+        "retention_path": "active/shared/artifacts"
+      }
     },
     {
       "id": "floor.cache",
@@ -152,7 +197,12 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "sources": ["storage-floor"],
-      "note": "Floors also hold a system/ partition (custody system)."
+      "note": "Floors also hold a system/ partition (custody system).",
+      "registration": {
+        "family": "floor",
+        "key": "cache",
+        "retention_path": "active/shared/cache"
+      }
     },
     {
       "id": "floor.scratch",
@@ -171,7 +221,12 @@
         "pr_publication_store"
       ],
       "sources": ["storage-floor", "role-policy"],
-      "note": "Floors also hold a system/ partition (custody system)."
+      "note": "Floors also hold a system/ partition (custody system).",
+      "registration": {
+        "family": "floor",
+        "key": "scratch",
+        "retention_path": "active/shared/tmp"
+      }
     },
     {
       "id": "floor.staging",
@@ -184,7 +239,12 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "sources": ["storage-floor"],
-      "note": "Floors also hold a system/ partition (custody system)."
+      "note": "Floors also hold a system/ partition (custody system).",
+      "registration": {
+        "family": "floor",
+        "key": "staging",
+        "retention_path": "active/shared/staging"
+      }
     },
     {
       "id": "generation-cost-settlements",
@@ -196,7 +256,12 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "sources": ["runtime-state-roots"]
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "generation_cost_settlements",
+        "retention_path": "active/shared/runtime/media-generation/cost-settlements"
+      }
     },
     {
       "id": "grants",
@@ -209,7 +274,12 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["credential_allocation_reader"],
-      "sources": ["runtime-state-roots", "role-policy"]
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "state",
+        "key": "grants",
+        "retention_path": "active/shared/runtime/grants"
+      }
     },
     {
       "id": "hearing",
@@ -221,7 +291,12 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "sources": ["runtime-state-roots"]
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "hearing",
+        "retention_path": "active/shared/runtime/hearing"
+      }
     },
     {
       "id": "legacy.customer-audit-mirror",
@@ -475,7 +550,12 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["pipeline_journal_store"],
-      "sources": ["runtime-state-roots", "role-policy"]
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "state",
+        "key": "pipeline_library_runs",
+        "retention_path": "active/shared/runtime/pipeline-library-runs"
+      }
     },
     {
       "id": "product-knowledge",
@@ -524,7 +604,12 @@
       },
       "status": "active",
       "legacy_roles": ["metrics_cap_reader"],
-      "sources": ["role-policy"]
+      "sources": ["role-policy"],
+      "registration": {
+        "family": "ledger",
+        "key": "execution_metrics",
+        "retention_path": "active/shared/runtime/execution-metrics"
+      }
     },
     {
       "id": "runtime.locks",
@@ -604,7 +689,12 @@
         "tenant_approval_partition_index_reader",
         "tenant_approval_store"
       ],
-      "sources": ["role-policy"]
+      "sources": ["role-policy"],
+      "registration": {
+        "family": "ledger",
+        "key": "tenant_approvals",
+        "retention_path": "active/shared/runtime/tenant-approvals"
+      }
     },
     {
       "id": "runtime.tenant-ledger",
@@ -617,7 +707,12 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["tenant_ledger_store"],
-      "sources": ["role-policy"]
+      "sources": ["role-policy"],
+      "registration": {
+        "family": "ledger",
+        "key": "tenant_ledger",
+        "retention_path": "active/shared/runtime/tenant-ledger"
+      }
     },
     {
       "id": "runtime.tenants",
@@ -637,7 +732,12 @@
       },
       "status": "active",
       "legacy_roles": ["metrics_cap_reader"],
-      "sources": ["role-policy"]
+      "sources": ["role-policy"],
+      "registration": {
+        "family": "ledger",
+        "key": "resource_usage",
+        "retention_path": "active/shared/runtime/usage-ledger"
+      }
     },
     {
       "id": "runtime.vitest-approvals",
@@ -669,7 +769,12 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "sources": ["runtime-state-roots"]
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "seam_selection_defaults",
+        "retention_path": "active/shared/runtime/seam-selection-defaults"
+      }
     },
     {
       "id": "shared.coordination",
@@ -757,7 +862,12 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "sources": ["runtime-state-roots"]
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "task_workspaces",
+        "retention_path": "active/shared/runtime/workspaces"
+      }
     },
     {
       "id": "tenant-audit-mirror",

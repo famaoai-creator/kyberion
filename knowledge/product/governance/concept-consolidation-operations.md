@@ -18,6 +18,11 @@ phase: [execution, review]
 
 ## JSON 状態と更新
 
+`defineCatalog` の fallback もファイルと同じ schema で検証してから通知・cache・返却する。
+schema を満たさない fallback は cache せず失敗する。安全な disabled default は schema の
+範囲内で定義し、必須の probe/security policy が無い場合は空の偽ポリシーで代用しない。
+symlink・非 regular file・repository 境界の拒否は fallback の対象にしない。
+
 新しい JSON 状態は `openJsonState` に schema と default、repository 内の path または登録済み logicalPath を渡す。`update` の read・同期 mutator・検証・atomic write は同じ正準 lock の内側で行われる。Promise を返す mutator と同じファイルの再入更新は拒否される。既存ファイルの破損は空状態への読み替えで上書きしない。JSONL は append ledger のまま扱う。
 
 inbox と provider pins の更新では mutex identity が変わる。**旧 writer を停止 → 更新 → 新 writer を再起動**の順とし、新旧プロセスを同時に動かさない。ファイル形式の変換や利用額の初期化は不要。旧 mutex を残すだけでは正準 lock と相互排他にならない。
@@ -39,6 +44,13 @@ JSON state の lock と再入検出は Unicode 正規化と case folding を共�
 `defineCommand` は既存の CLI guard と `defineScript` を合成する。help と unknown option の処理は副作用より前に行う。`defineCheck` は findings があれば常に exit 1、JSON は `{ok,id,findings}`、成功は `[check:<id>] OK` を返す。新しい check は `ci-gates.json` に実行条件も登録する。CLI の既存契約を変更する移行は checker ごとに検証する。
 
 ## 資産 Scope と保存配置
+
+保存先の登録は既存 `store-catalog.json` の `registration` に family（state/ledger/floor）、
+既存の export key、`retention_path` を宣言する。CI は全 runtime root の登録、重複・未知の key、
+partition 形状、現在の最も具体的な保持規則への参照を突合する。保持 action/TTL と custody は
+変更しない。state/floor は `<tier>/<tenant>` を必須とし、bare root は既存の2つの metrics
+ledger と `unscoped-legacy` の組み合わせだけを互換例外とする。これは実行時の認可情報ではない。
+現段階では既存 TypeScript root 定義との整合検査であり、root の生成・移行を完了したものではない。
 
 資産の管理者（system / tenant / person）と tier は実行主体の `ScopeEnvelope`、Stance、
 ファイルの保存場所から分けて扱う。`resolveAssetAddress` は注入された検証済みカタログから

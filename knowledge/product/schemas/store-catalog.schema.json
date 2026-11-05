@@ -58,6 +58,17 @@
           "type": "string",
           "description": "Store id that replaces a legacy-move store."
         },
+        "registration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["family", "key", "retention_path"],
+          "description": "Build/CI binding to an existing runtime root and retention policy. Not an authority grant or executable custody migration.",
+          "properties": {
+            "family": { "enum": ["state", "ledger", "floor"] },
+            "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+            "retention_path": { "type": "string", "minLength": 1 }
+          }
+        },
         "legacy_roles": {
           "type": "array",
           "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
