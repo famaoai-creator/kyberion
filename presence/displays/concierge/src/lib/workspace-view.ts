@@ -217,9 +217,7 @@ export function approvalNeedsDecision(status: string | undefined): boolean {
 }
 
 /** The card of a pending approval in あなた待ち (`/inbox`, the one needs-you queue). */
-export function inboxHrefForApproval(id: string): string {
-  return `/inbox?reason=approval#decide-approval-${encodeURIComponent(id)}`;
-}
+export { inboxHrefForApproval } from './inbox-links';
 
 export type WorkspaceLoadError = 'signin' | 'forbidden' | 'not_found' | 'failed';
 
