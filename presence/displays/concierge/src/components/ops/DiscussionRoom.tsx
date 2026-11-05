@@ -94,9 +94,9 @@ export function DiscussionRoom({ embedded = false }: { embedded?: boolean }) {
     setSavedDraft((current) => ({ ...current, draft: { ...current.draft, ...patch } }));
   };
   const chronosLocale = useChronosLocale();
-  const [override, setOverride] = React.useState<DiscussionLocale | null>(null);
-  const locale: DiscussionLocale =
-    override ?? coerceLocale(chronosLocale, ['en', 'ja'] as const, 'en');
+  // MSN-SHELL-IA §1: one language control (settings › 表示 and the header).
+  // A new room uses the shell language; an open room keeps its own.
+  const locale: DiscussionLocale = coerceLocale(chronosLocale, ['en', 'ja'] as const, 'en');
   const [roomId, setRoomId] = React.useState<string | null>(null);
   const [canSteer, setCanSteer] = React.useState(false);
   const [readOnly, setReadOnly] = React.useState(false);
@@ -140,7 +140,6 @@ export function DiscussionRoom({ embedded = false }: { embedded?: boolean }) {
           draftDiscarded={savedDraft.discarded}
           embedded={embedded}
           locale={locale}
-          onLocale={setOverride}
           onOpen={open}
           onAccess={setCanSteer}
           onConfirmedOpen={(id) => open(id, true)}
@@ -159,7 +158,6 @@ function Launcher({
   draftDiscarded,
   embedded,
   locale,
-  onLocale,
   onOpen,
   onAccess,
   onConfirmedOpen,
@@ -170,7 +168,6 @@ function Launcher({
   draftDiscarded: boolean;
   embedded: boolean;
   locale: DiscussionLocale;
-  onLocale: (locale: DiscussionLocale) => void;
   onOpen: (id: string) => void;
   onAccess: (canSteer: boolean) => void;
   onConfirmedOpen: (id: string) => void;
@@ -247,25 +244,10 @@ function Launcher({
             <ArrowLeft size={14} aria-hidden /> Chronos
           </a>
         )}
-        <div className="dr-langs" role="radiogroup" aria-label="language">
-          {(['ja', 'en'] as const).map((code) => (
-            <button
-              type="button"
-              key={code}
-              role="radio"
-              aria-checked={locale === code}
-              data-active={locale === code ? 'true' : undefined}
-              disabled={busy}
-              onClick={() => onLocale(code)}
-            >
-              {code.toUpperCase()}
-            </button>
-          ))}
-        </div>
         <div className="dr-hero__mark" aria-hidden>
           <Users size={22} />
         </div>
-        <h1>{dt('title', locale)}</h1>
+        <h2>{dt('title', locale)}</h2>
         <p>{dt('subtitle', locale)}</p>
       </header>
 

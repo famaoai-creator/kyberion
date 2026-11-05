@@ -24,6 +24,16 @@ const ALLOWED_STATUSES: DeliverableInboxStatus[] = [
   'changes_requested',
 ];
 
+/**
+ * Customer-decision hand-offs (CD-10/11) land in the same inbox; あなた待ち
+ * closes one with "対応済みにする" — an accepted verdict with a human receipt
+ * that names what the operator took responsibility for.
+ */
+const HANDOFF_INBOX_KINDS = new Set([
+  'customer_decision_handoff',
+  'customer_decision_manual_reminder',
+]);
+
 function requestLocale(req: NextRequest) {
   return resolveConciergeLocale(req.headers.get('accept-language') ?? undefined);
 }
@@ -79,7 +89,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
             actorId: decidedBy?.id ?? 'human:concierge',
             authenticated: true,
             authMethod: 'surface_session',
-            responsibilityStatement: 'I accept this deliverable on behalf of the operator.',
+            responsibilityStatement: HANDOFF_INBOX_KINDS.has(String(entry.kind ?? ''))
+              ? 'I handled this customer decision hand-off on behalf of the operator.'
+              : 'I accept this deliverable on behalf of the operator.',
           })
         : markInboxEntry(id, status, {
             verdictNote: typeof body?.note === 'string' ? body.note : undefined,

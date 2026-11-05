@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
-  orderSectionsForFirstRun,
-  SETTINGS_CARD_SECTION_ORDER,
+  SETUP_CHECKLIST_ANCHORS,
+  SETUP_CHECKLIST_ORDER,
+} from '@agent/core/surface/setup-checklist-model';
+import { frontDeskText } from '../src/lib/i18n';
+import {
+  CHECKLIST_SECTION,
+  SETTINGS_CARDS,
+  SETTINGS_SECTION_ELEMENT_ID,
   SETTINGS_SECTION_ORDER,
+  filterSettingsCards,
+  orderSectionsForFirstRun,
+  settingsCategoryOf,
   type SettingsReadinessItem,
 } from '../src/lib/settings-view';
 
@@ -10,76 +19,102 @@ const ok = (id: string): SettingsReadinessItem => ({ id, status: 'ok' });
 const incomplete = (id: string): SettingsReadinessItem => ({ id, status: 'incomplete' });
 const error = (id: string): SettingsReadinessItem => ({ id, status: 'error' });
 
-describe('orderSectionsForFirstRun', () => {
-  it('lists 表示 (display) in the sub-nav right after profile but never as its own card', () => {
-    expect(SETTINGS_SECTION_ORDER.indexOf('display')).toBe(
-      SETTINGS_SECTION_ORDER.indexOf('profile') + 1
-    );
-    expect(SETTINGS_CARD_SECTION_ORDER).not.toContain('display');
-    expect(orderSectionsForFirstRun([incomplete('voice')])).not.toContain('display');
-  });
-
-  it('returns the canonical order when every diagnostic is ok', () => {
-    const readiness = [
-      ok('profile'),
-      ok('avatar'),
-      ok('voice'),
-      ok('services'),
-      ok('notifications'),
-      ok('reasoning'),
-    ];
-    expect(orderSectionsForFirstRun(readiness)).toEqual([...SETTINGS_CARD_SECTION_ORDER]);
-  });
-
-  it('returns the canonical order when there is no readiness data at all', () => {
-    expect(orderSectionsForFirstRun([])).toEqual([...SETTINGS_CARD_SECTION_ORDER]);
-  });
-
-  it('sorts incomplete/error sections first, in canonical order, ahead of complete ones', () => {
-    const readiness = [
-      ok('profile'),
-      ok('avatar'),
-      incomplete('voice'),
-      ok('services'),
-      incomplete('notifications'),
-      error('reasoning'),
-    ];
-    expect(orderSectionsForFirstRun(readiness)).toEqual([
-      'voice',
+describe('settings IA catalog', () => {
+  it('has the nine categories of the IA contract, in order, with はじめに first', () => {
+    expect(SETTINGS_SECTION_ORDER).toEqual([
+      'start',
+      'workspace',
+      'agents',
       'notifications',
+      'connections',
+      'data',
+      'budget',
+      'display',
       'advanced',
-      'profile',
-      'members',
-      'services',
-      'recording',
-      'authority',
-      'plugins',
+    ]);
+    expect(frontDeskText('ia_settings_cat_start', 'ja')).toBe('はじめに');
+  });
+
+  it('gives every card a unique, stable id and keeps the legacy anchors', () => {
+    const ids = SETTINGS_CARDS.map((card) => card.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const legacy of [
+      'setup-profile',
+      'settings-display',
+      'settings-members',
+      'setup-services',
+      'setup-media',
+      'setup-notifications',
+      'settings-recording',
+      'settings-authority',
+      'setup-plugins',
+      'settings-advanced',
+    ])
+      expect(ids).toContain(legacy);
+    expect(settingsCategoryOf('setup-governance')).toBe('advanced');
+    expect(settingsCategoryOf('settings-charter')).toBe('agents');
+    expect(settingsCategoryOf(SETTINGS_SECTION_ELEMENT_ID.budget)).toBe('budget');
+    expect(settingsCategoryOf('nope')).toBeNull();
+  });
+
+  it('puts the reasoning model in exactly one card, under エージェントと自律度', () => {
+    const reasoning = SETTINGS_CARDS.filter((card) => card.id === 'settings-reasoning');
+    expect(reasoning).toHaveLength(1);
+    expect(reasoning[0].category).toBe('agents');
+  });
+
+  it('points every checklist step at a card that exists', () => {
+    for (const step of SETUP_CHECKLIST_ORDER) {
+      expect(SETTINGS_CARDS.map((card) => card.id)).toContain(SETUP_CHECKLIST_ANCHORS[step]);
+    }
+    expect(CHECKLIST_SECTION.reasoning).toBe('agents');
+    expect(CHECKLIST_SECTION.identity).toBe('workspace');
+    expect(CHECKLIST_SECTION.trial_mission).toBe('start');
+  });
+
+  it('filters cards by translated label, description and category', () => {
+    const ja = (key: Parameters<typeof frontDeskText>[0]) => frontDeskText(key, 'ja');
+    expect(filterSettingsCards('', ja)).toHaveLength(SETTINGS_CARDS.length);
+    expect(filterSettingsCards('モデル', ja).map((card) => card.id)).toContain(
+      'settings-reasoning'
+    );
+    expect(filterSettingsCards('ＳＳＯ', ja).map((card) => card.id)).toContain('settings-sso');
+    expect(filterSettingsCards('通知', ja).map((card) => card.id)).toContain('setup-notifications');
+    expect(filterSettingsCards('zzzz-no-match', ja)).toEqual([]);
+    const en = (key: Parameters<typeof frontDeskText>[0]) => frontDeskText(key, 'en');
+    expect(filterSettingsCards('budget', en).map((card) => card.id)).toContain('settings-budget');
+  });
+});
+
+describe('orderSectionsForFirstRun', () => {
+  it('returns the canonical order when everything is done or nothing is known', () => {
+    expect(orderSectionsForFirstRun([])).toEqual([...SETTINGS_SECTION_ORDER]);
+    expect(orderSectionsForFirstRun([ok('identity'), ok('profile')])).toEqual([
+      ...SETTINGS_SECTION_ORDER,
     ]);
   });
 
-  it('deduplicates sections shared by multiple diagnostics (avatar + voice both map to voice)', () => {
-    const readiness = [incomplete('avatar'), incomplete('voice')];
-    const order = orderSectionsForFirstRun(readiness);
-    expect(order.filter((id) => id === 'voice')).toHaveLength(1);
-    expect(order[0]).toBe('voice');
+  it('visits the categories of unfinished steps first, in the checklist order', () => {
+    const order = orderSectionsForFirstRun([
+      ok('identity'),
+      incomplete('reasoning'),
+      ok('autonomy'),
+      incomplete('notifications'),
+      incomplete('budget'),
+      error('avatar'),
+    ]);
+    expect(order.slice(0, 3)).toEqual(['agents', 'notifications', 'budget']);
+    expect(order).toHaveLength(SETTINGS_SECTION_ORDER.length);
+    expect(new Set(order).size).toBe(order.length);
   });
 
-  it('ignores diagnostics that do not map to a settings section', () => {
-    const readiness = [incomplete('unknown-thing')];
-    expect(orderSectionsForFirstRun(readiness)).toEqual([...SETTINGS_CARD_SECTION_ORDER]);
-  });
-
-  it('never surfaces "members" ahead of others on its own — it has no diagnostic yet', () => {
-    const readiness = [incomplete('profile')];
-    const order = orderSectionsForFirstRun(readiness);
-    expect(order[0]).toBe('profile');
-    expect(order.indexOf('members')).toBeGreaterThan(order.indexOf('profile'));
-  });
-
-  it('never surfaces "recording" ahead of others on its own — it has no diagnostic yet', () => {
-    const readiness = [incomplete('profile')];
-    const order = orderSectionsForFirstRun(readiness);
-    expect(order[0]).toBe('profile');
-    expect(order.indexOf('recording')).toBeGreaterThan(order.indexOf('profile'));
+  it('deduplicates categories shared by several items and ignores unknown ids', () => {
+    const order = orderSectionsForFirstRun([
+      incomplete('avatar'),
+      incomplete('voice'),
+      incomplete('unknown-thing'),
+    ]);
+    expect(order[0]).toBe('agents');
+    expect(order.filter((id) => id === 'agents')).toHaveLength(1);
   });
 });

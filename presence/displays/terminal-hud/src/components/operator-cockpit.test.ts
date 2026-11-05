@@ -55,7 +55,8 @@ describe('TUI approval review handoff', () => {
     expect(frame).not.toContain(approval.summary);
     expect(frame).not.toContain(computeApprovalPresentedDigest(approval));
     expect(frame).toContain('2026-10-28');
-    expect(frame.replace(/\s+/g, '')).toContain('#decide-approval-approval-fixture');
+    // Decisions live in あなた待ち: the HUD links straight to the /inbox card.
+    expect(frame.replace(/\s+/g, '')).toContain('/inbox#decide-approval-approval-fixture');
     expect(frame).not.toContain('private-query');
     expect(frame.split('\n').length).toBeLessThanOrEqual(16);
   });

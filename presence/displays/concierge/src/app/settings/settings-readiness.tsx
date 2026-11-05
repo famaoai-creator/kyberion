@@ -18,16 +18,19 @@ const LABELS: Record<string, ConciergeMessageKey> = {
 export function SettingsReadiness({
   diagnostics,
   t,
+  title,
   onNavigate,
 }: {
   diagnostics: readonly SetupDiagnostic[];
   t: SettingsTranslate;
+  /** Replaces the default "readiness" heading in the summary line. */
+  title?: string;
   onNavigate: (target: string) => void;
 }) {
   const completed = diagnostics.filter((item) => item.status === 'ok').length;
   const errors = diagnostics.filter((item) => item.status === 'error').length;
   const summary = [
-    t('setup.readiness_title'),
+    title ?? t('setup.readiness_title'),
     `${t('setup.completed')}: ${completed}/${diagnostics.length}`,
     ...(errors ? [`${t('setup.diag_error')}: ${errors}`] : []),
   ].join(' · ');

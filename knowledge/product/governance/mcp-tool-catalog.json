@@ -189,6 +189,36 @@
       "band": "discover"
     },
     {
+      "name": "kyberion.setup.checklist",
+      "description": "First-run setup checklist progress in the caller scope: each step, whether it is done, and the settings card that completes it.",
+      "category": "workspace",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover"
+    },
+    {
+      "name": "kyberion.needs-you.list",
+      "description": "Open items waiting for a person (approvals, customer decisions, deliverable reviews, knowledge candidates, stalled requests, failures) in urgency order, identical approvals folded with their true count. Read-only.",
+      "category": "workspace",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover"
+    },
+    {
+      "name": "kyberion.needs-you.summary",
+      "description": "The one needs-you count in the caller scope: open items by reason, how many are overdue, and the oldest wait. Read-only.",
+      "category": "workspace",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover"
+    },
+    {
       "name": "kyberion.capability.list",
       "description": "List available Kyberion actuator capabilities.",
       "category": "capability",
