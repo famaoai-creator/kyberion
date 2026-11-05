@@ -41,7 +41,11 @@ import {
   resolveSpeechToTextBridge,
   type SpeechToTextBridge,
 } from '@agent/core/voice/speech-to-text-bridge';
-import { selectStreamingSttBridge } from '@agent/core/voice/streaming-stt-bridge';
+import { runtimeSetupHintsFromCandidates } from '@agent/core/provider-runtime-requirements';
+import {
+  selectStreamingSttBridge,
+  listStreamingSttCandidates,
+} from '@agent/core/voice/streaming-stt-bridge';
 import { getStreamingTtsBridge } from '@agent/core/voice/streaming-tts-bridge';
 import { installAppleSpeechToTextBridgeIfAvailable } from '@agent/core/apple-intelligence-bridge';
 import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/core/apple-speech-file-stt-bridge';
@@ -740,8 +744,15 @@ export async function runRealtimeVoiceConversationLoop(
       }
     }
 
-    if (!streamingStt && sttBridge.name === 'stub')
-      throw new Error('Realtime interactive voice requires a real streaming or batch STT backend');
+    if (!streamingStt && sttBridge.name === 'stub') {
+      const hints = runtimeSetupHintsFromCandidates(
+        listStreamingSttCandidates({ allowSynthetic: false, ...(language ? { language } : {}) })
+      );
+      throw new Error(
+        'Realtime interactive voice requires a real streaming or batch STT backend' +
+          (hints.length ? ` — setup: ${hints.join('; ')}` : '')
+      );
+    }
 
     // Warm actuator (Phase 1): one resident synthesis process per session.
     warmClient =
