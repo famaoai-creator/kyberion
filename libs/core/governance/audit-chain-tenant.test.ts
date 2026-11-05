@@ -80,8 +80,10 @@ describe('audit-chain — tenant mirror', () => {
   beforeEach(() => {
     remapMirrors = false;
     testRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-audit-tenant-'));
-    // Clear singleton
+    // Reset both the process-global singleton and its cached module export.
+    // The constructor captures this fixture's master audit directory.
     delete (globalThis as any)[GLOBAL_KEY];
+    vi.resetModules();
   });
 
   afterEach(() => {

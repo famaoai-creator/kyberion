@@ -726,6 +726,11 @@ this contract; a faster Linux run alone is not evidence that macOS CI passed.
   the process-global audit singleton: save its property descriptor, remove it before
   importing the fixture stack, and restore it after work settles. Module resets
   alone do not reset `Symbol.for('@kyberion/audit-chain')`.
+  Audit-only suites with mocked I/O must refresh both that singleton and the cached
+  audit module when selecting a new fixture root. For guards caching a lazy import,
+  restore the same hoisted mock sink after an import-failure case; replacing its
+  identity makes later assertions observe a different sink. Preserve failure and
+  reentrancy assertions, and run seeds 222, 7 and 20261008 under parallel load.
 - Copy regenerable policy/schema fixture files with guarded `safeCopyFileSync`,
   rather than durable `safeWriteFile` for every copied file. Thousands of file and
   parent-directory fsyncs can exhaust setup budgets under parallel load. Retain
