@@ -167,8 +167,6 @@ export * from './browser/browser-extension-bridge.js';
 
 export * from './video/narrated-video-preference-profile.js';
 
-export * from './video/narrated-video-upload-package.js';
-
 export * from './meeting/meeting-operations-profile.js';
 
 export * from './meeting/meeting-attendees.js';

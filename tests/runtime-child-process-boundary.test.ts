@@ -59,7 +59,7 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/pfc/PhysicalLayer.ts',
   'libs/core/streaming-voice-playback.ts',
   'libs/core/ten-vad-bridge.ts',
-  'libs/core/video/video-render-backend.ts',
+  'libs/shared-video/src/video-render-backend.ts',
   'libs/core/virtual/virtual-audio-input-recording-bridge.ts',
   'satellites/voice-hub/server.ts',
 ].sort((a, b) => a.localeCompare(b));

@@ -1,0 +1,101 @@
+{
+  "name": "@agent/shared-video",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Video production runtime: ingest, composition compile/render, filters and recut. Depends on @agent/core; core never imports it.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./ingest": {
+      "types": "./dist/ingest/index.d.ts",
+      "default": "./dist/ingest/index.js"
+    },
+    "./ingest/video-brief": {
+      "types": "./dist/ingest/video-brief.d.ts",
+      "default": "./dist/ingest/video-brief.js"
+    },
+    "./ingest/video-fetch": {
+      "types": "./dist/ingest/video-fetch.d.ts",
+      "default": "./dist/ingest/video-fetch.js"
+    },
+    "./ingest/video-ingest-types": {
+      "types": "./dist/ingest/video-ingest-types.d.ts",
+      "default": "./dist/ingest/video-ingest-types.js"
+    },
+    "./ingest/video-media": {
+      "types": "./dist/ingest/video-media.d.ts",
+      "default": "./dist/ingest/video-media.js"
+    },
+    "./ingest/vtt-parser": {
+      "types": "./dist/ingest/vtt-parser.d.ts",
+      "default": "./dist/ingest/vtt-parser.js"
+    },
+    "./narrated-video-upload-package": {
+      "types": "./dist/narrated-video-upload-package.d.ts",
+      "default": "./dist/narrated-video-upload-package.js"
+    },
+    "./obs-video-filter-provider": {
+      "types": "./dist/obs-video-filter-provider.d.ts",
+      "default": "./dist/obs-video-filter-provider.js"
+    },
+    "./video-composition-compiler": {
+      "types": "./dist/video-composition-compiler.d.ts",
+      "default": "./dist/video-composition-compiler.js"
+    },
+    "./video-composition-lint": {
+      "types": "./dist/video-composition-lint.d.ts",
+      "default": "./dist/video-composition-lint.js"
+    },
+    "./video-composition-rendering": {
+      "types": "./dist/video-composition-rendering.d.ts",
+      "default": "./dist/video-composition-rendering.js"
+    },
+    "./video-composition-template-registry": {
+      "types": "./dist/video-composition-template-registry.d.ts",
+      "default": "./dist/video-composition-template-registry.js"
+    },
+    "./video-filter": {
+      "types": "./dist/video-filter.d.ts",
+      "default": "./dist/video-filter.js"
+    },
+    "./video-filter-bootstrap": {
+      "types": "./dist/video-filter-bootstrap.d.ts",
+      "default": "./dist/video-filter-bootstrap.js"
+    },
+    "./video-narration-timeline": {
+      "types": "./dist/video-narration-timeline.d.ts",
+      "default": "./dist/video-narration-timeline.js"
+    },
+    "./video-recut": {
+      "types": "./dist/video-recut.d.ts",
+      "default": "./dist/video-recut.js"
+    },
+    "./video-render-backend": {
+      "types": "./dist/video-render-backend.d.ts",
+      "default": "./dist/video-render-backend.js"
+    },
+    "./video-render-runtime": {
+      "types": "./dist/video-render-runtime.d.ts",
+      "default": "./dist/video-render-runtime.js"
+    },
+    "./video-render-runtime-policy": {
+      "types": "./dist/video-render-runtime-policy.d.ts",
+      "default": "./dist/video-render-runtime-policy.js"
+    },
+    "./video-timeline-runtime": {
+      "types": "./dist/video-timeline-runtime.d.ts",
+      "default": "./dist/video-timeline-runtime.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.json && node ../../scripts/write_core_dist_scope.mjs --run"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*"
+  }
+}

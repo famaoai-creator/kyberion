@@ -205,6 +205,14 @@ export default defineConfig({
         replacement: path.resolve(rootDir, './libs/shared-media/src/index.ts'),
       },
       {
+        find: /^@agent\/shared-video\/(.*)$/,
+        replacement: path.resolve(rootDir, './libs/shared-video/src/$1'),
+      },
+      {
+        find: /^@agent\/shared-video$/,
+        replacement: path.resolve(rootDir, './libs/shared-video/src/index.ts'),
+      },
+      {
         find: '@agent/shared-vision',
         replacement: path.resolve(rootDir, './libs/shared-vision/src/index.ts'),
       },

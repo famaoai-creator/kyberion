@@ -100,17 +100,7 @@ export * from './video/video-composition-contract.js';
 
 export * from './video/video-content-brief-contract.js';
 
-export * from './video/video-composition-template-registry.js';
-
-export * from './video/video-render-runtime-policy.js';
-
-export * from './video/video-render-runtime.js';
-
-export * from './video/video-composition-compiler.js';
-
 export * from './video/narrated-video-brief-compiler.js';
-
-export * from './video/video-render-backend.js';
 
 export * from './platform.js';
 

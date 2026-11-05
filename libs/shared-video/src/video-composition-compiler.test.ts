@@ -1,0 +1,803 @@
+import { describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import {
+  compileVideoCompositionADF,
+  writeVideoCompositionBundle,
+} from './video-composition-compiler.js';
+import type { VideoCompositionADF } from '@agent/core/video/video-composition-contract';
+
+describe('video composition compiler', () => {
+  it('rejects an external bundle directory at compile time', () => {
+    expect(() =>
+      compileVideoCompositionADF({
+        kind: 'video-composition-adf',
+        version: '1.0.0',
+        composition: { duration_sec: 1, fps: 24, width: 640, height: 360 },
+        scenes: [],
+        output: { format: 'mp4', bundle_dir: '/tmp/external-video-bundle' },
+      })
+    ).toThrow('RESOURCE_PATH_SCOPE');
+  });
+
+  it('rejects external audio and scene asset references at compile time', () => {
+    const base = {
+      kind: 'video-composition-adf' as const,
+      version: '1.0.0',
+      composition: { duration_sec: 2, fps: 24, width: 640, height: 360 },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook' as const,
+          start_sec: 0,
+          duration_sec: 2,
+          template_ref: { template_id: 'basic-title-card' },
+          content: { headline: 'Safe path boundary' },
+        },
+      ],
+      output: {
+        format: 'mp4' as const,
+        bundle_dir: pathResolver.sharedTmp('video-composition-bundle-tests/path-boundary'),
+      },
+    };
+
+    expect(() =>
+      compileVideoCompositionADF({ ...base, audio: { narration_ref: '/tmp/external-audio.wav' } })
+    ).toThrow('RESOURCE_PATH_SCOPE');
+    expect(() =>
+      compileVideoCompositionADF({
+        ...base,
+        scenes: [
+          {
+            ...base.scenes[0],
+            asset_refs: [{ asset_id: 'external', path: '/tmp/external-image.png' }],
+          },
+        ],
+      })
+    ).toThrow('RESOURCE_PATH_SCOPE');
+  });
+
+  it('compiles render plans and writes bundle artifacts', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/product-explainer');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      intent: 'Product explainer',
+      title: 'Product explainer',
+      composition: {
+        duration_sec: 8,
+        fps: 30,
+        width: 1920,
+        height: 1080,
+        background_color: '#081225',
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          template_ref: { template_id: 'basic-title-card' },
+          content: {
+            headline: 'Explain the product clearly',
+            body: 'Deterministic scenes complement model-generated video clips.',
+          },
+        },
+        {
+          scene_id: 'proof',
+          role: 'proof',
+          start_sec: 3,
+          duration_sec: 5,
+          template_ref: { template_id: 'split-highlight' },
+          content: {
+            headline: 'Structured scenes',
+            body: 'Scene templates stay governed and reusable.',
+          },
+        },
+      ],
+      output: {
+        format: 'mp4',
+        bundle_dir: bundleDir,
+        emit_progress_packets: true,
+      },
+    };
+
+    const plan = compileVideoCompositionADF(adf);
+    expect(plan.scenes).toHaveLength(2);
+    expect(plan.output_format).toBe('mp4');
+    expect(plan.narration_ref).toBeUndefined();
+
+    const written = writeVideoCompositionBundle(adf);
+    expect(written.bundle_dir).toBe(bundleDir);
+    expect(safeExistsSync(`${bundleDir}/index.html`)).toBe(true);
+    expect(safeExistsSync(`${bundleDir}/render-plan.json`)).toBe(true);
+    expect(safeReadFile(`${bundleDir}/compositions/hook.html`, { encoding: 'utf8' })).toContain(
+      'Explain the product clearly'
+    );
+  });
+
+  // MP-02: motion arrives from the governed catalog, not from literals in the
+  // compiler, and no scene ships as a static slide with only an entrance.
+  it('injects catalog-driven motion into every scene', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/motion-direction');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      intent: 'Motion direction',
+      title: 'Motion direction',
+      composition: { duration_sec: 8, fps: 30, width: 1920, height: 1080 },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          template_ref: { template_id: 'basic-title-card' },
+          content: { headline: 'Hook', body: 'Body copy.' },
+        },
+        {
+          scene_id: 'proof',
+          role: 'proof',
+          start_sec: 3,
+          duration_sec: 5,
+          template_ref: { template_id: 'split-highlight' },
+          content: { headline: 'Proof', body: 'Evidence copy.' },
+        },
+      ],
+      output: { format: 'mp4', bundle_dir: bundleDir },
+    };
+
+    writeVideoCompositionBundle(adf);
+
+    for (const sceneId of ['hook', 'proof']) {
+      const html = safeReadFile(`${bundleDir}/compositions/${sceneId}.html`, { encoding: 'utf8' });
+      expect(html).toContain('data-kb-motion=');
+      expect(html).toContain('@keyframes kb-in-');
+      // Two mid-scene layers — an entrance alone is a slide that faded in.
+      const midsceneBlocks = [...html.matchAll(/@keyframes kb-mid-/g)];
+      expect(midsceneBlocks.length).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('honors a drafted motion direction and clamps it', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/motion-drafted');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      intent: 'Drafted motion',
+      composition: {
+        duration_sec: 3,
+        fps: 30,
+        width: 1920,
+        height: 1080,
+        motion_direction: {
+          scenes: [
+            {
+              scene_id: 'hook',
+              entrance: {
+                pattern_id: 'wipe-reveal',
+                ease: 'snap',
+                duration_sec: 0.9,
+                offset_sec: 0.2,
+              },
+              midscene: [],
+            },
+          ],
+          transitions: [],
+        } as any,
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          template_ref: { template_id: 'basic-title-card' },
+          content: { headline: 'Hook', body: 'Body copy.' },
+        },
+      ],
+      output: { format: 'mp4', bundle_dir: bundleDir },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const html = safeReadFile(`${bundleDir}/compositions/hook.html`, { encoding: 'utf8' });
+    expect(html).toContain('@keyframes kb-in-wipe-reveal');
+    // The draft supplied no mid-scene layers; the floor still applies.
+    expect([...html.matchAll(/@keyframes kb-mid-/g)].length).toBeGreaterThanOrEqual(2);
+  });
+
+  // MP-02: model-composed arrangements are opt-in and stay token-governed.
+  it('applies a scene composition when the ADF carries one', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/composition');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      intent: 'Composed scene',
+      composition: {
+        duration_sec: 3,
+        fps: 30,
+        width: 1920,
+        height: 1080,
+        scene_compositions: [
+          {
+            scene_id: 'hook',
+            layout: 'split-left',
+            blocks: [
+              { type: 'headline', content_key: 'headline', emphasis: 'lead', column: 'primary' },
+              { type: 'body', content_key: 'body', emphasis: 'support', column: 'secondary' },
+            ],
+          },
+        ],
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          template_ref: { template_id: 'basic-title-card' },
+          content: { headline: 'Composed', body: 'Body copy.' },
+        },
+      ],
+      output: { format: 'mp4', bundle_dir: bundleDir },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const html = safeReadFile(`${bundleDir}/compositions/hook.html`, {
+      encoding: 'utf8',
+    }) as string;
+
+    expect(html).toContain('data-kb-composition="split-left"');
+    expect(html).toContain('.kb-composed-hook');
+    // Styling still resolves through the design cascade.
+    expect(html).toContain('var(--kb-');
+  });
+
+  it('leaves scenes untouched when no composition is supplied', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/no-composition');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      intent: 'Uncomposed scene',
+      composition: { duration_sec: 3, fps: 30, width: 1920, height: 1080 },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          template_ref: { template_id: 'basic-title-card' },
+          content: { headline: 'Plain', body: 'Body copy.' },
+        },
+      ],
+      output: { format: 'mp4', bundle_dir: bundleDir },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const html = safeReadFile(`${bundleDir}/compositions/hook.html`, {
+      encoding: 'utf8',
+    }) as string;
+    expect(html).not.toContain('data-kb-composition');
+  });
+
+  it('re-normalizes a stored composition against the content the scene has', () => {
+    // A stored arrangement must not outlive the fields it was written for.
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/stale-composition');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      intent: 'Stale composition',
+      composition: {
+        duration_sec: 3,
+        fps: 30,
+        width: 1920,
+        height: 1080,
+        scene_compositions: [
+          {
+            scene_id: 'hook',
+            layout: 'split-left',
+            blocks: [
+              { type: 'headline', content_key: 'headline', emphasis: 'lead', column: 'primary' },
+              {
+                type: 'steps',
+                content_key: 'visual_steps',
+                emphasis: 'support',
+                column: 'secondary',
+              },
+            ],
+          },
+        ],
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          template_ref: { template_id: 'basic-title-card' },
+          // visual_steps is gone; the block referencing it must be dropped.
+          content: { headline: 'Composed' },
+        },
+      ],
+      output: { format: 'mp4', bundle_dir: bundleDir },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const html = safeReadFile(`${bundleDir}/compositions/hook.html`, {
+      encoding: 'utf8',
+    }) as string;
+    // With the secondary column empty the split collapses to a stack.
+    expect(html).toContain('data-kb-composition="stack"');
+  });
+
+  it('threads tenant design_system_vars into rendered scene css (DS-04 / E2E-02)', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/tenant-branding');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      intent: 'Tenant branded',
+      title: 'Tenant branded',
+      composition: {
+        duration_sec: 3,
+        fps: 24,
+        width: 1280,
+        height: 720,
+        background_color: '#081225',
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          template_ref: { template_id: 'basic-title-card' },
+          content: {
+            headline: 'Branded hook',
+            design_system_vars: {
+              '--kb-accent': '#ff00aa',
+              '--kb-accent-blue': '#ff00aa',
+              '--kb-bg-main': '#101010',
+              '--kb-size-headline': '104px',
+              '--evil': 'red; --kb-text-primary: white',
+            },
+          },
+        },
+      ],
+      output: { format: 'mp4', bundle_dir: bundleDir },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const html = safeReadFile(`${bundleDir}/compositions/hook.html`, {
+      encoding: 'utf8',
+    }) as string;
+
+    // Tenant overrides land on :root, and tokenized scene styles resolve to them.
+    expect(html).toContain('--kb-accent: #ff00aa');
+    expect(html).toContain('--kb-bg-main: #101010');
+    expect(html).toContain('var(--kb-accent-blue');
+    expect(html).toContain('--headline-size: var(--kb-size-headline, 104px);');
+    expect(html).not.toContain('--evil');
+  });
+
+  it('slugifies the composition id from the intent when present', () => {
+    const plan = compileVideoCompositionADF({
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      intent: 'Product Explainer',
+      title: 'Product Explainer',
+      composition: {
+        duration_sec: 4,
+        fps: 24,
+        width: 1280,
+        height: 720,
+        background_color: '#081225',
+      },
+      scenes: [],
+      output: {
+        format: 'mp4',
+        bundle_dir: pathResolver.sharedTmp('video-composition-bundle-tests/slugified-id'),
+      },
+    });
+
+    expect(plan.composition_id).toBe('product-explainer');
+  });
+
+  it('carries narration references into the render plan', () => {
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      title: 'Narrated explainer',
+      composition: {
+        duration_sec: 6,
+        fps: 30,
+        width: 1280,
+        height: 720,
+        background_color: '#081225',
+      },
+      audio: {
+        narration_ref: 'active/shared/tmp/narration.aiff',
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 6,
+          template_ref: { template_id: 'basic-title-card' },
+          content: { headline: 'Narrated' },
+        },
+      ],
+      output: {
+        format: 'mp4',
+        bundle_dir: pathResolver.sharedTmp('video-composition-bundle-tests/narrated-explainer'),
+      },
+    };
+
+    const plan = compileVideoCompositionADF(adf);
+    expect(plan.narration_ref).toBe(pathResolver.resolve('active/shared/tmp/narration.aiff'));
+    expect(plan.artifact_refs).toContain(pathResolver.resolve('active/shared/tmp/narration.aiff'));
+  });
+
+  it('carries music references into the render plan', () => {
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      title: 'Music video',
+      composition: {
+        duration_sec: 6,
+        fps: 30,
+        width: 1280,
+        height: 720,
+        background_color: '#081225',
+      },
+      audio: {
+        music_ref: 'active/shared/tmp/music-track.mp3',
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 6,
+          template_ref: { template_id: 'basic-title-card' },
+          content: { headline: 'Music driven cut' },
+        },
+      ],
+      output: {
+        format: 'mp4',
+        bundle_dir: pathResolver.sharedTmp('video-composition-bundle-tests/music-video'),
+      },
+    };
+
+    const plan = compileVideoCompositionADF(adf);
+    expect(plan.music_ref).toBe(pathResolver.resolve('active/shared/tmp/music-track.mp3'));
+    expect(plan.artifact_refs).toContain(pathResolver.resolve('active/shared/tmp/music-track.mp3'));
+  });
+
+  it('omits placeholder process steps when no visual_steps are provided', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/process-visual');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      title: 'Process visual',
+      composition: {
+        duration_sec: 6,
+        fps: 30,
+        width: 1280,
+        height: 720,
+        background_color: '#081225',
+      },
+      scenes: [
+        {
+          scene_id: 'feature',
+          role: 'feature',
+          start_sec: 0,
+          duration_sec: 6,
+          template_ref: { template_id: 'split-highlight' },
+          content: {
+            headline: 'From brief to scene plan',
+            body: 'Turn a fixed brief into a renderable content outline.',
+          },
+        },
+      ],
+      output: {
+        format: 'mp4',
+        bundle_dir: bundleDir,
+      },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const html = safeReadFile(`${bundleDir}/compositions/feature.html`, {
+      encoding: 'utf8',
+    }) as string;
+    // agy short-video quality: missing visual_steps must no longer inject
+    // English demo placeholders ("Brief intake" etc.) into real videos.
+    expect(html).not.toContain('Brief intake');
+    expect(html).not.toContain('Render package');
+    expect(html).toContain('process-visual');
+    expect(html).toContain('var(--kb-accent-blue-soft, #93c5fd)');
+    expect(html).toContain('var(--kb-bg-main, #081225)');
+  });
+
+  it('renders howto guide templates with step chips and fallback stage text', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/howto-guide');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      title: 'Howto guide',
+      composition: {
+        duration_sec: 6,
+        fps: 30,
+        width: 1280,
+        height: 720,
+        background_color: '#081225',
+      },
+      scenes: [
+        {
+          scene_id: 'process',
+          role: 'feature',
+          start_sec: 0,
+          duration_sec: 6,
+          template_ref: { template_id: 'howto-guide' },
+          content: {
+            headline: 'Turn the brief into a storyboard',
+            body: 'Convert the approved brief into a governed outline.',
+            visual_steps: [
+              { step: '01', detail: 'Brief intake' },
+              { step: '02', detail: 'Content plan' },
+              { step: '03', detail: 'Render package' },
+            ],
+          },
+        },
+      ],
+      output: {
+        format: 'mp4',
+        bundle_dir: bundleDir,
+      },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const html = safeReadFile(`${bundleDir}/compositions/process.html`, {
+      encoding: 'utf8',
+    }) as string;
+    expect(html).toContain('Operating cycle');
+    expect(html).toContain('Brief intake');
+    expect(html).toContain('Render package');
+    expect(html).not.toContain('Ordered steps');
+    expect(html).not.toContain('Audience, use case, constraints');
+  });
+
+  it('renders promo and vtuber templates with mode-specific layouts', () => {
+    const promoDir = pathResolver.sharedTmp('video-composition-bundle-tests/promo-spot');
+    const vtuberDir = pathResolver.sharedTmp('video-composition-bundle-tests/vtuber-stage');
+
+    writeVideoCompositionBundle({
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      title: 'Promo spot',
+      composition: {
+        duration_sec: 6,
+        fps: 30,
+        width: 1280,
+        height: 720,
+        background_color: '#08101e',
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 6,
+          template_ref: { template_id: 'promo-spot' },
+          content: {
+            headline: 'Launch value',
+            body: 'Show the promise with proof.',
+            presentation_mode: 'promo',
+            value_points: ['Value spike', 'Proof point'],
+            social_proof: ['Customer proof'],
+          },
+        },
+      ],
+      output: {
+        format: 'mp4',
+        bundle_dir: promoDir,
+      },
+    });
+
+    writeVideoCompositionBundle({
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      title: 'VTuber stage',
+      composition: {
+        duration_sec: 6,
+        fps: 30,
+        width: 1280,
+        height: 720,
+        background_color: '#090814',
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 6,
+          template_ref: { template_id: 'vtuber-stage' },
+          content: {
+            headline: 'Live on air',
+            body: 'Start with the avatar and the premise.',
+            presentation_mode: 'vtuber',
+            chat_messages: [
+              { speaker: 'chat', text: 'What are we building today?' },
+              { speaker: 'kyberion', text: 'A governed pipeline.' },
+            ],
+            stage_notes: ['On air', 'Guided step'],
+          },
+        },
+      ],
+      output: {
+        format: 'mp4',
+        bundle_dir: vtuberDir,
+      },
+    });
+
+    expect(safeReadFile(`${promoDir}/compositions/hook.html`, { encoding: 'utf8' })).toContain(
+      'Promo spot'
+    );
+    expect(safeReadFile(`${vtuberDir}/compositions/hook.html`, { encoding: 'utf8' })).toContain(
+      'LIVE'
+    );
+  });
+
+  it('sanitizes unsafe scene ids before writing bundle artifacts and runtime keys', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/scene-id-safety');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      title: 'Scene id safety',
+      composition: {
+        duration_sec: 4,
+        fps: 30,
+        width: 1280,
+        height: 720,
+        background_color: '#081225',
+      },
+      scenes: [
+        {
+          scene_id: 'foo/../bar<script>',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 4,
+          template_ref: { template_id: 'basic-title-card' },
+          content: {
+            headline: 'Safe scene keys',
+            body: 'Scene ids are normalized before they hit the filesystem.',
+          },
+        },
+      ],
+      output: {
+        format: 'mp4',
+        bundle_dir: bundleDir,
+      },
+    };
+
+    writeVideoCompositionBundle(adf);
+    expect(safeExistsSync(`${bundleDir}/compositions/foo-bar-script.html`)).toBe(true);
+    const html = safeReadFile(`${bundleDir}/compositions/foo-bar-script.html`, {
+      encoding: 'utf8',
+    }) as string;
+    expect(html).toContain('window.__timelines["foo-bar-script"]');
+    expect(html).not.toContain('foo/../bar<script>');
+  });
+
+  it('stages avatar_assets declared in scene content for vtuber rendering', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/avatar-assets');
+    const avatarPath = pathResolver.sharedTmp(
+      'video-composition-bundle-tests/assets/avatar-smile.png'
+    );
+    safeWriteFile(avatarPath, 'avatar-bytes');
+
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      title: 'Avatar assets',
+      composition: {
+        duration_sec: 4,
+        fps: 30,
+        width: 1280,
+        height: 720,
+        background_color: '#090814',
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 4,
+          template_ref: { template_id: 'vtuber-stage' },
+          content: {
+            headline: 'Live avatar',
+            body: 'Use the scene-specific avatar asset.',
+            presentation_mode: 'vtuber',
+            layout_variant: 'focus-center',
+            avatar_assets: {
+              default: avatarPath,
+            },
+          },
+        },
+      ],
+      output: {
+        format: 'mp4',
+        bundle_dir: bundleDir,
+      },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const html = safeReadFile(`${bundleDir}/compositions/hook.html`, {
+      encoding: 'utf8',
+    }) as string;
+    expect(html).toContain('../assets/avatar-smile.png');
+    expect(safeExistsSync(`${bundleDir}/assets/avatar-smile.png`)).toBe(true);
+  });
+
+  it('renders the quote-card template and honors visual-direction scene layouts', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/quote-card');
+    const adf: any = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      title: 'Quote Demo',
+      composition: {
+        duration_sec: 6,
+        fps: 30,
+        width: 1080,
+        height: 1920,
+        visual_direction: {
+          mood: 'mono-editorial',
+          palette: {
+            bg: '#fafafa',
+            panel: '#f0f0f0',
+            accent: '#dc2626',
+            accent_text: '#7f1d1d',
+            text: '#0a0a0a',
+            subtext: '#525252',
+          },
+          typography: { headline_px: 104, body_px: 36 },
+          per_scene: [
+            { scene_id: 'hook', layout_variant: 'quote-card' },
+            { scene_id: 'detail', layout_variant: 'split-highlight' },
+          ],
+        },
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          content: { headline: '意図こそがインターフェースだ', eyebrow: 'Kyberion' },
+        },
+        {
+          scene_id: 'detail',
+          role: 'generic',
+          start_sec: 3,
+          duration_sec: 3,
+          // body is missing -> split-highlight is NOT satisfiable, so the
+          // directed layout must be skipped and the default kept.
+          content: { headline: 'Detail scene' },
+        },
+      ],
+      output: { format: 'mp4', bundle_dir: bundleDir },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const hook = safeReadFile(`${bundleDir}/compositions/hook.html`, {
+      encoding: 'utf8',
+    }) as string;
+    expect(hook).toContain('quote-text');
+    expect(hook).toContain('意図こそがインターフェースだ');
+    expect(hook).toContain('--headline-size: 104px;');
+    const detail = safeReadFile(`${bundleDir}/compositions/detail.html`, {
+      encoding: 'utf8',
+    }) as string;
+    expect(detail).not.toContain('split-card');
+  });
+});

@@ -4588,6 +4588,10 @@
       "types": "./dist/path-resolver.d.ts",
       "default": "./dist/path-resolver.js"
     },
+    "./path-tenant-attribution": {
+      "types": "./dist/path-tenant-attribution.d.ts",
+      "default": "./dist/path-tenant-attribution.js"
+    },
     "./pcm-wav": {
       "types": "./dist/pcm-wav.d.ts",
       "default": "./dist/pcm-wav.js"
@@ -7284,21 +7288,9 @@
       "types": "./dist/video/index.d.ts",
       "default": "./dist/video/index.js"
     },
-    "./video-composition-compiler": {
-      "types": "./dist/video/video-composition-compiler.d.ts",
-      "default": "./dist/video/video-composition-compiler.js"
-    },
     "./video-composition-contract": {
       "types": "./dist/video/video-composition-contract.d.ts",
       "default": "./dist/video/video-composition-contract.js"
-    },
-    "./video-composition-lint": {
-      "types": "./dist/video/video-composition-lint.d.ts",
-      "default": "./dist/video/video-composition-lint.js"
-    },
-    "./video-composition-template-registry": {
-      "types": "./dist/video/video-composition-template-registry.d.ts",
-      "default": "./dist/video/video-composition-template-registry.js"
     },
     "./video-content-brief-contract": {
       "types": "./dist/video/video-content-brief-contract.d.ts",
@@ -7312,25 +7304,9 @@
       "types": "./dist/video/video-frame-bus.d.ts",
       "default": "./dist/video/video-frame-bus.js"
     },
-    "./video-ingest": {
-      "types": "./dist/video/ingest/index.d.ts",
-      "default": "./dist/video/ingest/index.js"
-    },
     "./video-motion-direction": {
       "types": "./dist/video/video-motion-direction.d.ts",
       "default": "./dist/video/video-motion-direction.js"
-    },
-    "./video-render-backend": {
-      "types": "./dist/video/video-render-backend.d.ts",
-      "default": "./dist/video/video-render-backend.js"
-    },
-    "./video-render-runtime": {
-      "types": "./dist/video/video-render-runtime.d.ts",
-      "default": "./dist/video/video-render-runtime.js"
-    },
-    "./video-render-runtime-policy": {
-      "types": "./dist/video/video-render-runtime-policy.d.ts",
-      "default": "./dist/video/video-render-runtime-policy.js"
     },
     "./video-scene-composition": {
       "types": "./dist/video/video-scene-composition.d.ts",
@@ -7340,34 +7316,6 @@
       "types": "./dist/video/video-visual-direction.d.ts",
       "default": "./dist/video/video-visual-direction.js"
     },
-    "./video/ingest": {
-      "types": "./dist/video/ingest/index.d.ts",
-      "default": "./dist/video/ingest/index.js"
-    },
-    "./video/ingest/index": {
-      "types": "./dist/video/ingest/index.d.ts",
-      "default": "./dist/video/ingest/index.js"
-    },
-    "./video/ingest/video-brief": {
-      "types": "./dist/video/ingest/video-brief.d.ts",
-      "default": "./dist/video/ingest/video-brief.js"
-    },
-    "./video/ingest/video-fetch": {
-      "types": "./dist/video/ingest/video-fetch.d.ts",
-      "default": "./dist/video/ingest/video-fetch.js"
-    },
-    "./video/ingest/video-ingest-types": {
-      "types": "./dist/video/ingest/video-ingest-types.d.ts",
-      "default": "./dist/video/ingest/video-ingest-types.js"
-    },
-    "./video/ingest/video-media": {
-      "types": "./dist/video/ingest/video-media.d.ts",
-      "default": "./dist/video/ingest/video-media.js"
-    },
-    "./video/ingest/vtt-parser": {
-      "types": "./dist/video/ingest/vtt-parser.d.ts",
-      "default": "./dist/video/ingest/vtt-parser.js"
-    },
     "./video/narrated-video-brief-compiler": {
       "types": "./dist/video/narrated-video-brief-compiler.d.ts",
       "default": "./dist/video/narrated-video-brief-compiler.js"
@@ -7376,29 +7324,9 @@
       "types": "./dist/video/narrated-video-preference-profile.d.ts",
       "default": "./dist/video/narrated-video-preference-profile.js"
     },
-    "./video/narrated-video-upload-package": {
-      "types": "./dist/video/narrated-video-upload-package.d.ts",
-      "default": "./dist/video/narrated-video-upload-package.js"
-    },
-    "./video/video-composition-compiler": {
-      "types": "./dist/video/video-composition-compiler.d.ts",
-      "default": "./dist/video/video-composition-compiler.js"
-    },
     "./video/video-composition-contract": {
       "types": "./dist/video/video-composition-contract.d.ts",
       "default": "./dist/video/video-composition-contract.js"
-    },
-    "./video/video-composition-lint": {
-      "types": "./dist/video/video-composition-lint.d.ts",
-      "default": "./dist/video/video-composition-lint.js"
-    },
-    "./video/video-composition-rendering": {
-      "types": "./dist/video/video-composition-rendering.d.ts",
-      "default": "./dist/video/video-composition-rendering.js"
-    },
-    "./video/video-composition-template-registry": {
-      "types": "./dist/video/video-composition-template-registry.d.ts",
-      "default": "./dist/video/video-composition-template-registry.js"
     },
     "./video/video-content-brief-contract": {
       "types": "./dist/video/video-content-brief-contract.d.ts",
@@ -7412,18 +7340,6 @@
       "types": "./dist/video/video-device-lease.d.ts",
       "default": "./dist/video/video-device-lease.js"
     },
-    "./video/video-filter": {
-      "types": "./dist/video/video-filter.d.ts",
-      "default": "./dist/video/video-filter.js"
-    },
-    "./video/video-filter-bootstrap": {
-      "types": "./dist/video/video-filter-bootstrap.d.ts",
-      "default": "./dist/video/video-filter-bootstrap.js"
-    },
-    "./video/obs-video-filter-provider": {
-      "types": "./dist/video/obs-video-filter-provider.d.ts",
-      "default": "./dist/video/obs-video-filter-provider.js"
-    },
     "./video/video-frame-archive": {
       "types": "./dist/video/video-frame-archive.d.ts",
       "default": "./dist/video/video-frame-archive.js"
@@ -7436,22 +7352,6 @@
       "types": "./dist/video/video-motion-direction.d.ts",
       "default": "./dist/video/video-motion-direction.js"
     },
-    "./video/video-narration-timeline": {
-      "types": "./dist/video/video-narration-timeline.d.ts",
-      "default": "./dist/video/video-narration-timeline.js"
-    },
-    "./video/video-render-backend": {
-      "types": "./dist/video/video-render-backend.d.ts",
-      "default": "./dist/video/video-render-backend.js"
-    },
-    "./video/video-render-runtime": {
-      "types": "./dist/video/video-render-runtime.d.ts",
-      "default": "./dist/video/video-render-runtime.js"
-    },
-    "./video/video-render-runtime-policy": {
-      "types": "./dist/video/video-render-runtime-policy.d.ts",
-      "default": "./dist/video/video-render-runtime-policy.js"
-    },
     "./video/video-route": {
       "types": "./dist/video/video-route.d.ts",
       "default": "./dist/video/video-route.js"
@@ -7459,10 +7359,6 @@
     "./video/video-scene-composition": {
       "types": "./dist/video/video-scene-composition.d.ts",
       "default": "./dist/video/video-scene-composition.js"
-    },
-    "./video/video-timeline-runtime": {
-      "types": "./dist/video/video-timeline-runtime.d.ts",
-      "default": "./dist/video/video-timeline-runtime.js"
     },
     "./video/video-visual-direction": {
       "types": "./dist/video/video-visual-direction.d.ts",

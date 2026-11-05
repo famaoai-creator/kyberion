@@ -97,7 +97,7 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'libs/core/organization/organization-operation-run-recording.ts': 'placement',
   'libs/core/path-resolver.ts': 'placement',
   'libs/core/pipeline/pipeline-run-journal.ts': 'placement',
-  'libs/core/video/ingest/video-brief.ts': 'placement',
+  'libs/shared-video/src/ingest/video-brief.ts': 'placement',
 };
 
 const rootDir = process.cwd();
