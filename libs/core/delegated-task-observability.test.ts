@@ -13,6 +13,7 @@ import {
 import {
   buildDelegatedTaskWorkerProcessSpec,
   completeDelegatedTaskTrace,
+  createDelegationHandle,
   claimDelegatedTaskActivation,
   consumeDelegatedTaskInbox,
   delegatedTaskStoreDir,
@@ -86,6 +87,45 @@ describe('KC-06 delegated-task-observability store', () => {
     });
     expect(completed?.settlement).toMatchObject({ source: 'owner', status: 'completed' });
     expect(delegatedTaskStoreDir()).toContain('kc06-tests');
+  });
+
+  it('R2: joinResult returns a structured failure and persists the outcome', async () => {
+    const handle = createDelegationHandle({
+      owner: 'test-owner',
+      instruction: 'Fail with a timeout.',
+      execute: async () => {
+        throw new Error('codex-cli timed out after wall-clock limit');
+      },
+    });
+    const result = await handle.joinResult();
+    expect(result).toMatchObject({
+      status: 'incomplete',
+      incomplete_reason: 'timeout',
+      output_text: '',
+      artifacts: [],
+      usage: null,
+    });
+    expect(result.error).toMatchObject({ class: 'transient', allowFailover: true });
+    await expect(handle.join()).rejects.toThrow('timed out');
+    const record = loadDelegatedTaskRecord(handle.delegation_id);
+    expect(record?.status).toBe('failed');
+    expect(record?.outcome).toMatchObject({ status: 'incomplete', incomplete_reason: 'timeout' });
+  });
+
+  it('R2: joinResult reports a caller cancellation', async () => {
+    let release!: (value: string) => void;
+    const handle = createDelegationHandle({
+      owner: 'test-owner',
+      instruction: 'Wait forever.',
+      execute: () => new Promise<string>((resolve) => (release = resolve)),
+    });
+    await handle.cancel('operator stop');
+    release?.('late');
+    await expect(handle.joinResult()).resolves.toMatchObject({
+      status: 'cancelled',
+      error: { class: 'cancelled', allowFailover: false },
+    });
+    expect(loadDelegatedTaskRecord(handle.delegation_id)?.outcome?.status).toBe('cancelled');
   });
 
   it('records an untenanted delegation started inside a read-only sandbox', () => {

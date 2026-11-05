@@ -1,3 +1,4 @@
+import { withCompanyFanoutInvalidation } from '../../../../lib/company-fanout-cache';
 import { serverDelegatedChildEnv } from '../../../../lib/server-child-env';
 import { NextRequest, NextResponse } from 'next/server';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -44,7 +45,7 @@ const CONTROLLER_RELATIVE = 'dist/scripts/mission_controller.js';
 // `start` replays governance gates and can touch git; give it room but stay bounded.
 const CONTROLLER_TIMEOUT_MS = 120_000;
 
-export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+async function handlePost(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
   const resolved = resolveConciergeViewer(req);
@@ -166,3 +167,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     return NextResponse.json({ ok: false, error: t('api.hygiene.failed') }, { status: 500 });
   }
 }
+
+/** A needs-you mutation: the personal fan-out cache never serves the decided item again. */
+export const POST = withCompanyFanoutInvalidation(handlePost);

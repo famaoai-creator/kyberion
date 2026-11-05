@@ -13,6 +13,17 @@ describe('knowledge context', () => {
     expect(context.training_use).toBe('local_only');
   });
 
+  it('lets public knowledge default to training-eligible', () => {
+    const context = resolveKnowledgeContext({ purpose: 'recall', tier: 'public' });
+    expect(context.training_use).toBe('training_eligible');
+    const explicit = resolveKnowledgeContext({
+      purpose: 'recall',
+      tier: 'public',
+      training_use: 'local_only',
+    });
+    expect(explicit.training_use).toBe('local_only');
+  });
+
   it('requires a redacted provenance-bearing context to publish restricted knowledge', () => {
     expect(() =>
       resolveKnowledgeContext({

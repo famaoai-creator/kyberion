@@ -64,6 +64,32 @@ function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });
 }
 
+/**
+ * Re-label a codex failure without losing its structure: the original error
+ * stays as `cause`, and the spawn facts (`code`, `errno`, `syscall`, `path`)
+ * plus an explicit R5 `executionStarted` marker are copied over, so a spawn
+ * that never produced a process (`code: 'ENOENT'`) is still recognised as
+ * pre-start by `delegationExecutionStartedFromError` after the rewrap.
+ */
+export function rewrapCodexError(message: string, error: unknown): Error {
+  const wrapped = new Error(message, { cause: error });
+  if (!error || typeof error !== 'object') return wrapped;
+  const source = error as Record<string, unknown>;
+  const target = wrapped as unknown as Record<string, unknown>;
+  // System-call facts travel together: a bare `code: 'ENOENT'` without its
+  // `syscall` (e.g. a missing output file after codex ran) must never be
+  // re-read as a spawn that never happened.
+  if (typeof source.syscall === 'string') {
+    for (const key of ['code', 'errno', 'syscall', 'path'] as const) {
+      if (source[key] !== undefined) target[key] = source[key];
+    }
+  }
+  if (typeof source.executionStarted === 'boolean') {
+    target.executionStarted = source.executionStarted;
+  }
+  return wrapped;
+}
+
 export async function runCodexCliQuery<T>({
   systemPrompt,
   userPrompt,
@@ -187,7 +213,10 @@ class CodexCliQuery {
       }
     } catch (err: any) {
       throw redactProviderOutputError(
-        new Error(`[codex-cli] structured query failed: ${err?.message ?? String(err)}`)
+        rewrapCodexError(
+          `[codex-cli] structured query failed: ${err?.message ?? String(err)}`,
+          redactProviderOutputError(err)
+        )
       );
     } finally {
       safeRmSync(schemaPath, { force: true });
@@ -264,7 +293,7 @@ class CodexCliQuery {
           });
           child.on('error', (err) => {
             if (!spawned && !stdout) capture.requestNotSent = true;
-            reject(new Error(`[codex-cli] spawn failed: ${err.message}`));
+            reject(rewrapCodexError(`[codex-cli] spawn failed: ${err.message}`, err));
           });
           child.stdin.write(stdin);
           child.stdin.end();

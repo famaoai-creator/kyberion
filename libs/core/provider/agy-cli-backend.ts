@@ -16,6 +16,10 @@ import {
 } from './provider-permission-profiles.js';
 import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js';
 import {
+  markDelegationExecutionStarted,
+  runStartReportingDelegation,
+} from '../delegation-execution-tracker.js';
+import {
   buildDelegationSpawnEnv,
   newDelegationSessionId,
   spawnWithDelegationEnv,
@@ -265,6 +269,9 @@ export class AgyCliBackend implements ReasoningBackend {
         });
       }
       await this.harnessBoot;
+      // R5: the prompt reaches the AGY harness here; an injected or already
+      // booted session spawns nothing, so this is the observable dispatch point.
+      markDelegationExecutionStarted();
       const response = await session.askNativeSubagent(
         [profile.systemPromptPrefix, context ? `Context:\n${context}` : '', `Task: ${instruction}`]
           .filter(Boolean)
@@ -291,7 +298,9 @@ export class AgyCliBackend implements ReasoningBackend {
       const message = error instanceof Error ? error.message : String(error);
       if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw redactProviderOutputError(error);
       throw redactProviderOutputError(
-        new Error(`[SUBAGENT_UNAVAILABLE] AGY harness failed: ${message}`)
+        new Error(`[SUBAGENT_UNAVAILABLE] AGY harness failed: ${message}`, {
+          cause: redactProviderOutputError(error),
+        })
       );
     } finally {
       release();
@@ -484,21 +493,25 @@ export class AgyCliBackend implements ReasoningBackend {
     })) as DecomposedTaskPlan;
   }
 
-  async delegateTask(
+  delegateTask(
     instruction: string,
     context?: string,
     options?: ReasoningCallOptions
   ): Promise<string> {
-    // Output exit: the answer and any stderr-bearing error are redacted.
-    return withRedactedProviderOutput(() =>
-      this.delegateTaskUnredacted(instruction, context, options)
+    // R5: the native path marks before askNativeSubagent (its SDK boot spawns
+    // through spawnWithDelegationEnv), the CLI path spawns through
+    // spawnWithDelegationEnv — an earlier failure is provably pre-start.
+    // Output exit: the answer and any stderr-bearing error are redacted
+    // (redaction mutates in place, so start markers survive it).
+    return runStartReportingDelegation(() =>
+      withRedactedProviderOutput(() => this.dispatchDelegatedTask(instruction, context, options))
     );
   }
 
-  private async delegateTaskUnredacted(
+  private async dispatchDelegatedTask(
     instruction: string,
-    context?: string,
-    options?: ReasoningCallOptions
+    context: string | undefined,
+    options: ReasoningCallOptions | undefined
   ): Promise<string> {
     if (this.injectedHarnessSession || this.harnessSession) {
       return this.dispatchNativeSubagent(instruction, context, options);

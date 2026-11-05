@@ -227,6 +227,12 @@ describe('durable partitioned runtime state', () => {
       'active/shared/runtime/browser-bridge-mailbox/confidential/',
       'active/shared/runtime/seam-selection-defaults/personal/',
       'active/shared/runtime/seam-selection-defaults/confidential/',
+      'active/shared/runtime/delegation-idempotency/personal/',
+      'active/shared/runtime/delegation-idempotency/confidential/',
+      'active/shared/runtime/media-generation/cost-settlements/personal/',
+      'active/shared/runtime/media-generation/cost-settlements/confidential/',
+      'active/shared/runtime/health/api-verification/personal/',
+      'active/shared/runtime/health/api-verification/confidential/',
     ]);
     expect(
       partitionedRuntimeStateTierInPath(

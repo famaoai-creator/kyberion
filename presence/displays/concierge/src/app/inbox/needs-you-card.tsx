@@ -138,8 +138,12 @@ export function resolveInboxAnchor(
  * links mission admission and learning review emit, and the `/ops?section=
  * approvals&request=` redirect) targets that approval's card.
  */
-export function inboxLandingHash(hash: string, search: string | URLSearchParams): string {
+export function inboxLandingHash(
+  hash: string | undefined,
+  search: string | URLSearchParams | undefined
+): string {
   if (hash && hash !== '#') return hash;
+  if (!search) return '';
   const params = typeof search === 'string' ? new URLSearchParams(search) : search;
   const request = params.get('request')?.trim();
   return request ? `#decide-approval-${encodeURIComponent(request)}` : '';

@@ -1,0 +1,47 @@
+{
+  "description": "Tenant-partitioned runtime stores: physicalScopedPath (<base>/tenants/<slug>/...) call sites under active/shared/runtime/ that the gate cannot attribute to an offboarding PHYSICAL_* base in libs/core/scope-offboarding.ts. 'unresolved' entries name a base expression the static scan cannot evaluate (say what it resolves to and why it is covered); 'bases' entries name a resolved runtime base that is deliberately not offboarded. Gate: tests/tenant-runtime-store-registration.test.ts.",
+  "unresolved": [
+    {
+      "file": "libs/core/knowledge/knowledge-index.ts",
+      "expression": "relativeBase",
+      "reason": "The feedback ledger base: active/shared/runtime/feedback-loop (covered, PHYSICAL_TENANT_LEARNING_ROOTS) unless the KYBERION_KNOWLEDGE_FEEDBACK_DIR test/runtime override points elsewhere."
+    },
+    {
+      "file": "libs/core/knowledge/knowledge-verification.ts",
+      "expression": "relativeBase",
+      "reason": "pathResolver.shared('runtime/feedback-loop') (covered, PHYSICAL_TENANT_LEARNING_ROOTS) unless the KYBERION_KNOWLEDGE_FEEDBACK_DIR override is set."
+    },
+    {
+      "file": "libs/core/knowledge/knowledge-feedback-loop.ts",
+      "expression": "relativeBase",
+      "reason": "Only reached when the KYBERION_KNOWLEDGE_FEEDBACK_DIR override lies outside active/shared/runtime/feedback-loop (the default base takes the feedbackRoot branch, which is covered)."
+    },
+    {
+      "file": "libs/core/intent/intent-contract-learning.ts",
+      "expression": "path.dirname(base)",
+      "reason": "dirname of active/shared/runtime/intent-contract-memory.json = active/shared/runtime (covered: <runtime>/tenants/<slug>) unless KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH overrides it."
+    },
+    {
+      "file": "libs/core/contextual-intent-memory.ts",
+      "expression": "path.dirname(base)",
+      "reason": "dirname of knowledge/personal/contextual-intent-memory.json: a knowledge-tier path, not active/shared/runtime (tier-guarded as knowledge/personal)."
+    },
+    {
+      "file": "libs/core/surface/surface-coordination-store.ts",
+      "expression": "base",
+      "reason": "Surface async-channel bases under active/shared/coordination/channels/<surface>/ (PHYSICAL_CHANNEL_ROOT, offboarded per surface), not active/shared/runtime."
+    },
+    {
+      "file": "scripts/migrate_physical_namespaces.ts",
+      "expression": "item.base",
+      "reason": "One-shot migration tool that MOVES legacy flat records into the existing physical bases it enumerates; it creates no new store."
+    }
+  ],
+  "bases": [
+    {
+      "file": "libs/core/dot/dot-state-paths.ts",
+      "base": "active/shared/runtime/dot",
+      "reason": "Read-only legacy detection/migration of pre-partition dot state (dot/tenants/<slug>/): current dot state is the registered <tier>/<tenant> root, whose offboarding disposition is 'not_offboarded' (audited review required), so the legacy copy is deliberately not auto-removed either; `pnpm kyberion dot migrate-state` relocates it after operator review."
+    }
+  ]
+}
