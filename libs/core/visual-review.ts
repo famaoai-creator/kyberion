@@ -346,12 +346,20 @@ export async function runVisualReview(input: RunVisualReviewInput): Promise<Visu
     // Declaring the scope means the backend's own send gate applies too. Custom
     // external critique channels were rejected above because AsyncLocalStorage
     // cannot police arbitrary callback networking.
+    // Rendered tenant deliverables may reach a provider the tenant attested as
+    // no-training; personal-tier renders stay on this host.
     const raw = await withReasoningPayloadScope(
       {
         tier: payloadTier,
         tenant_slug: input.scope.tenant_id,
         purpose: 'media visual review',
         attachment_count: input.images.length,
+        training_use:
+          payloadTier === 'public'
+            ? 'training_eligible'
+            : payloadTier === 'personal'
+              ? 'local_only'
+              : 'no_training',
       },
       () => critique!(prompt, input.images)
     );

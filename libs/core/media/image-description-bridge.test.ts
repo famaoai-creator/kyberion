@@ -133,6 +133,24 @@ describe('describeImage with the reasoning_vision provider', () => {
     expect(calls[1].scope?.tier).toBe('personal');
   });
 
+  it('declares local_only explicitly unless the caller states a training_use', async () => {
+    const calls: VisionCall[] = [];
+    await describeImage(
+      { path: fixture('confidential/MSN-X/evidence/shot.jpg') },
+      { tenant_slug: 'acme', resolveBackend: () => visionBackend(calls) }
+    );
+    expect(calls[0].scope).toMatchObject({ tier: 'confidential', training_use: 'local_only' });
+    await describeImage(
+      { path: fixture('confidential/MSN-X/evidence/shot.jpg') },
+      {
+        tenant_slug: 'acme',
+        training_use: 'no_training',
+        resolveBackend: () => visionBackend(calls),
+      }
+    );
+    expect(calls[1].scope).toMatchObject({ tier: 'confidential', training_use: 'no_training' });
+  });
+
   it('fails explicitly with a typed error when the backend is text-only', async () => {
     const error = await describeImage(
       { path: fixture('shot.png') },
@@ -379,7 +397,7 @@ describe('Apple native image description integration', () => {
     );
     expect(result.provider).toBe('apple_native');
     expect(applePrompt).toHaveBeenCalledWith(expect.any(String), preparedPath);
-    expect(scope).toMatchObject({ tier: 'personal' });
+    expect(scope).toMatchObject({ tier: 'personal', training_use: 'local_only' });
     expect(dispose).toHaveBeenCalledTimes(1);
   });
 

@@ -22,7 +22,41 @@ import {
   fireLifecycleHooks,
   getDefaultLifecycleHookEngine,
 } from '@agent/core/lifecycle-hook-engine';
-import { type ReasoningPayloadScope } from '@agent/core/reasoning/reasoning-egress-scope';
+import {
+  type ReasoningPayloadScope,
+  type ReasoningTrainingUse,
+} from '@agent/core/reasoning/reasoning-egress-scope';
+
+/**
+ * Training-use posture a pipeline run declares at the mission boundary.
+ *
+ * Everything a confidential mission's pipeline hands a model is that tenant's
+ * working material: like peer auto-reply drafting it may reach a provider the
+ * tenant attested as no-training (the gate still requires that attestation).
+ * Personal material stays on this host. Public runs are not scoped at all.
+ */
+export function pipelinePayloadTrainingUse(
+  tier: ReasoningPayloadScope['tier']
+): ReasoningTrainingUse {
+  return tier === 'public'
+    ? 'training_eligible'
+    : tier === 'personal'
+      ? 'local_only'
+      : 'no_training';
+}
+
+/** A trusted payload scope as supplied or replayed from a run journal (training_use may predate the field). */
+export type PipelinePayloadScopeInput = Omit<ReasoningPayloadScope, 'training_use' | 'tier'> & {
+  tier: ReasoningPayloadScope['tier'];
+  training_use?: ReasoningTrainingUse;
+};
+
+function withPipelineTrainingUse(scope: PipelinePayloadScopeInput): ReasoningPayloadScope {
+  return {
+    ...scope,
+    training_use: scope.training_use ?? pipelinePayloadTrainingUse(scope.tier),
+  };
+}
 import {
   createPipelineRunJournal,
   loadPipelineRunJournal,
@@ -202,7 +236,7 @@ export interface ExecutePipelineFileOptions {
   /** Durable human approval for the exact project-local resource being loaded. */
   projectTrustApprovalId?: string;
   /** Trusted caller's data tier for reasoning egress during this pipeline run. */
-  payloadScope?: ReasoningPayloadScope;
+  payloadScope?: PipelinePayloadScopeInput;
 }
 
 /**
@@ -423,11 +457,13 @@ async function executePipelineFileOnce(
       : missionTier === 'confidential'
         ? 'confidential'
         : 'public';
-  const effectivePayloadScope: ReasoningPayloadScope = options.payloadScope || {
-    tier: payloadTier,
-    tenant_slug: registeredEnv('KYBERION_CUSTOMER')?.trim() || undefined,
-    purpose: `pipeline ${pipelineId}`,
-  };
+  const effectivePayloadScope: ReasoningPayloadScope = withPipelineTrainingUse(
+    options.payloadScope || {
+      tier: payloadTier,
+      tenant_slug: registeredEnv('KYBERION_CUSTOMER')?.trim() || undefined,
+      purpose: `pipeline ${pipelineId}`,
+    }
+  );
   const tierRank = { public: 0, confidential: 1, personal: 2 };
   if (tierRank[effectivePayloadScope.tier] < tierRank[payloadTier]) {
     throw new Error('Pipeline payload scope cannot be lower than its mission tier.');
@@ -1284,6 +1320,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
               tier: payloadTier,
               tenant_slug: registeredEnv('KYBERION_CUSTOMER')?.trim() || undefined,
               purpose: `pipeline ${pipelineId}`,
+              training_use: pipelinePayloadTrainingUse(payloadTier),
             },
             runSteps
           );

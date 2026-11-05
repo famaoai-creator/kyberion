@@ -19,7 +19,11 @@ import type {
 } from '../reasoning/reasoning-backend-contracts.js';
 import { getLastServedReasoningMode, getReasoningBackend } from '../reasoning/reasoning-backend.js';
 import { buildReasoningBackendForMode } from '../reasoning/reasoning-bootstrap.js';
-import { withReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
+import {
+  isReasoningEgressDenial,
+  reasoningEgressDenialNext,
+  withReasoningPayloadScope,
+} from '../reasoning/reasoning-egress-scope.js';
 import { t } from '../t.js';
 import type { AgendaEntry, DecisionAgenda } from './model.js';
 
@@ -54,7 +58,18 @@ export interface GenerateAgendaDraftResult {
   notes: string[];
   /** D10: the backend asked (`requested` when chosen explicitly, `used` null when none was). */
   reasoning_backend: { requested?: string; used: string | null };
+  /**
+   * Present when egress policy — not a backend fault — kept the agenda from
+   * reaching the backend. The organization-default fallback still applies;
+   * this says why it happened and what would let the draft be generated.
+   */
+  egress_denied?: { reason: string; next: string };
 }
+
+type AskBackendResult =
+  | { status: 'answered'; raw: string }
+  | { status: 'skipped' }
+  | { status: 'egress_denied'; reason: string; next: string };
 
 /** The backend the draft goes to, and what to record about it. */
 function selectDraftBackend(
@@ -212,27 +227,40 @@ async function askBackend(
   agenda: DecisionAgenda,
   prompt: string,
   notes: string[]
-): Promise<string | undefined> {
+): Promise<AskBackendResult> {
   if (backend.name === 'stub') {
     notes.push('reasoning backend unavailable (stub); used organization defaults');
-    return undefined;
+    return { status: 'skipped' };
   }
   try {
-    // Agenda content is tenant material: every send is governed by the egress gate.
-    return await withReasoningPayloadScope(
+    // Agenda content is tenant material: every send is governed by the egress
+    // gate. It is the tenant's own drafting work (questions, options, intent),
+    // so — like peer auto-reply drafting — it may reach a provider the tenant
+    // attested as no-training, and nowhere else.
+    const raw = await withReasoningPayloadScope(
       {
         tier: 'confidential',
         tenant_slug: agenda.tenant_slug,
         purpose: 'customer decision agenda draft',
         attachment_count: 0,
+        training_use: 'no_training',
       },
       () => backend.prompt(prompt, undefined as ReasoningCallOptions | undefined)
     );
+    return { status: 'answered', raw };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (isReasoningEgressDenial(error)) {
+      const next =
+        reasoningEgressDenialNext(error) ??
+        `next: attest the tenant via 'pnpm onboarding llm attest --tenant ${agenda.tenant_slug} --request-approval', or use a local backend`;
+      logger.warn(`[customer-decision-draft] egress denied — ${message} | ${next}`);
+      notes.push(`reasoning egress denied; used organization defaults — ${next}`);
+      return { status: 'egress_denied', reason: message, next };
+    }
     logger.warn(`[customer-decision-draft] backend failed: ${message}`);
     notes.push('reasoning backend failed; used organization defaults');
-    return undefined;
+    return { status: 'skipped' };
   }
 }
 
@@ -247,17 +275,20 @@ export async function generateAgendaDraft(
   let proposals = new Map<string, Proposal>();
   const requested = opts.backend ? undefined : opts.requestedBackend?.trim() || undefined;
   let used: string | null = null;
+  let egressDenied: GenerateAgendaDraftResult['egress_denied'];
   if (eligible.length > 0) {
     const selected = selectDraftBackend(opts, notes);
     const backend = selected.backend;
-    const raw = backend
+    const asked: AskBackendResult = backend
       ? await askBackend(
           backend,
           agenda,
           buildPrompt(eligible, opts.intentText, opts.groundingText, agenda.locale),
           notes
         )
-      : undefined;
+      : { status: 'skipped' };
+    if (asked.status === 'egress_denied') egressDenied = { reason: asked.reason, next: asked.next };
+    const raw = asked.status === 'answered' ? asked.raw : undefined;
     if (raw !== undefined && backend) {
       // The explicit backend has one candidate; the default chain may have failed over.
       used = selected.explicitMode ?? getLastServedReasoningMode()?.mode ?? backend.name;
@@ -301,5 +332,6 @@ export async function generateAgendaDraft(
     generated,
     notes,
     reasoning_backend: { ...(requested ? { requested } : {}), used },
+    ...(egressDenied ? { egress_denied: egressDenied } : {}),
   };
 }
