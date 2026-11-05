@@ -265,6 +265,12 @@ export function getDelegationConcurrencyStats(): DelegationConcurrencyStats {
 export interface DelegationChildHandle {
   pid?: number;
   kill(signal: NodeJS.Signals): void;
+  /**
+   * Settles when the child process has exited. With it, an explicit abort
+   * waits (bounded) for the child to exit before rejecting, so the rejection
+   * proves the process stopped; without it the exit is not observable.
+   */
+  exited?: Promise<void>;
 }
 
 /**
@@ -278,12 +284,31 @@ export interface DelegationChildHandle {
 export function delegationChildHandleFromChildProcess(child: {
   pid?: number;
   kill(signal?: NodeJS.Signals | number): boolean;
+  exitCode?: number | null;
+  signalCode?: NodeJS.Signals | string | null;
+  once?(event: 'exit', listener: (...args: unknown[]) => void): unknown;
 }): DelegationChildHandle {
+  // Subscribe at construction (right after spawn) so an exit that happens
+  // before an abort is not missed; an already-exited child settles at once.
+  const exited =
+    typeof child.once === 'function'
+      ? new Promise<void>((resolve) => {
+          if (
+            (child.exitCode !== undefined && child.exitCode !== null) ||
+            (child.signalCode !== undefined && child.signalCode !== null)
+          ) {
+            resolve();
+            return;
+          }
+          child.once!('exit', () => resolve());
+        })
+      : undefined;
   return {
     pid: child.pid,
     kill: (signal: NodeJS.Signals) => {
       child.kill(signal);
     },
+    ...(exited ? { exited } : {}),
   };
 }
 
@@ -411,6 +436,110 @@ export class DelegationWallClockExceededError extends Error {
   }
 }
 
+/**
+ * What an explicit abort observed of the delegation's child process:
+ * - `exited`: the child exited within the bounded wait (after SIGTERM, or
+ *   after the SIGKILL escalation);
+ * - `not_exited`: the child was still running after SIGTERM, the grace
+ *   window, SIGKILL and a second grace window;
+ * - `unobservable`: a child was signalled but its handle exposes no exit;
+ * - `no_child`: the delegation had no child process handle.
+ */
+export type DelegationAbortChildExit = 'exited' | 'not_exited' | 'unobservable' | 'no_child';
+
+const CHILD_EXIT_MARKER = /\(child_exit=(exited|not_exited|unobservable|no_child)\b/u;
+
+/**
+ * Rejection of an explicitly aborted delegation. The message keeps the
+ * `[DELEGATION_CANCELLED] provider operation aborted` prefix every caller
+ * classifies on, plus a `(child_exit=…)` marker so the observation survives
+ * adapters that re-wrap errors by message.
+ */
+export class DelegationAbortedError extends Error {
+  readonly childExit: DelegationAbortChildExit;
+  readonly signal?: NodeJS.Signals;
+  constructor(
+    childExit: DelegationAbortChildExit,
+    detail: { signal?: NodeJS.Signals; graceMs?: number } = {}
+  ) {
+    const observed =
+      childExit === 'exited'
+        ? `child exited after ${detail.signal ?? 'SIGTERM'}`
+        : childExit === 'not_exited'
+          ? `child still running ${detail.graceMs ?? 0}ms after SIGKILL`
+          : childExit === 'unobservable'
+            ? 'child signalled; its exit is not observable'
+            : 'no child process';
+    super(
+      `[DELEGATION_CANCELLED] provider operation aborted (child_exit=${childExit}: ${observed})`
+    );
+    this.name = 'DelegationAbortedError';
+    this.childExit = childExit;
+    if (detail.signal) this.signal = detail.signal;
+  }
+}
+
+/** The child-exit observation an abort rejection carries, if any. */
+export function delegationAbortChildExit(error: unknown): DelegationAbortChildExit | undefined {
+  if (error instanceof DelegationAbortedError) return error.childExit;
+  const text = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  const match = CHILD_EXIT_MARKER.exec(text);
+  return match ? (match[1] as DelegationAbortChildExit) : undefined;
+}
+
+/** Resolve true when `exited` settles within `ms`, false otherwise; leaves no timer behind. */
+async function childExitedWithin(exited: Promise<void>, ms: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      exited.then(() => true),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * Stop an explicitly aborted delegation's child and report what was observed.
+ * SIGTERM, wait up to `graceMs` for exit, escalate to SIGKILL, wait up to
+ * `graceMs` again. A handle without `exited` keeps the previous
+ * fire-and-forget escalation and reports `unobservable`.
+ */
+async function stopChildAfterAbort(
+  child: DelegationChildHandle,
+  graceMs: number,
+  id: string
+): Promise<DelegationAbortedError> {
+  safeKillChild(child, 'SIGTERM');
+  const exited = child.exited;
+  if (!exited) {
+    const sigkillTimer = setTimeout(() => {
+      safeKillChild(child, 'SIGKILL');
+      unregisterActiveChild(id);
+    }, graceMs);
+    sigkillTimer.unref?.();
+    return new DelegationAbortedError('unobservable');
+  }
+  if (await childExitedWithin(exited, graceMs)) {
+    unregisterActiveChild(id);
+    return new DelegationAbortedError('exited', { signal: 'SIGTERM' });
+  }
+  safeKillChild(child, 'SIGKILL');
+  if (await childExitedWithin(exited, graceMs)) {
+    unregisterActiveChild(id);
+    return new DelegationAbortedError('exited', { signal: 'SIGKILL' });
+  }
+  logger.warn(
+    `[delegation-concurrency] aborted delegation child did not exit — still running ${graceMs}ms after SIGKILL | next: inspect pid ${child.pid ?? 'unknown'}; the active-child registry keeps it for the janitor sweep | evidence: id=${id}`
+  );
+  // Still running: it stays registered until it exits (or the janitor sweeps it).
+  void exited.then(() => unregisterActiveChild(id));
+  return new DelegationAbortedError('not_exited', { graceMs });
+}
+
 export class DelegationInactivityExceededError extends Error {
   constructor(
     readonly provider: string,
@@ -500,6 +629,7 @@ export async function withWallClockBudget<T>(
   let inactive = false;
   let terminal = false;
   let armInactivity = () => {};
+  let abortOutcome: Promise<DelegationAbortedError> | undefined;
 
   const timeoutPromise = new Promise<never>((_resolve, reject) => {
     killListener = () => {
@@ -533,15 +663,13 @@ export async function withWallClockBudget<T>(
         terminal = true;
         timedOut = true;
         controller.abort();
-        if (opts.child) {
-          safeKillChild(opts.child, 'SIGTERM');
-          const sigkillTimer = setTimeout(() => {
-            safeKillChild(opts.child!, 'SIGKILL');
-            unregisterActiveChild(id);
-          }, graceMs);
-          sigkillTimer.unref?.();
-        }
-        reject(new Error('[DELEGATION_CANCELLED] provider operation aborted'));
+        // Reject only once the child is shown stopped (bounded by the
+        // SIGTERM/SIGKILL grace windows), so an abort rejection means the
+        // process exited, not merely that stopping started.
+        abortOutcome = opts.child
+          ? stopChildAfterAbort(opts.child, graceMs, id)
+          : Promise.resolve(new DelegationAbortedError('no_child'));
+        void abortOutcome.then(reject);
       };
       if (opts.signal.aborted) abortListener();
       else opts.signal.addEventListener('abort', abortListener, { once: true });
@@ -596,12 +724,17 @@ export async function withWallClockBudget<T>(
       opts.executionMode
     );
     const result = await Promise.race([operation, timeoutPromise]);
+    // The child closing after SIGTERM can settle fn first: report the abort.
+    if (abortOutcome) throw await abortOutcome;
     // A synchronous abort listener can settle fn before the race rejection.
     if (terminal || opts.signal?.aborted) {
       throw new Error('[DELEGATION_CANCELLED] result arrived after terminal cancellation');
     }
     return result;
   } catch (error) {
+    // An aborted child exiting makes fn reject ("exited with code null") while
+    // the abort still waits on the exit; the abort observation is the answer.
+    if (abortOutcome && !(error instanceof DelegationAbortedError)) throw await abortOutcome;
     if (inactive && !terminal) {
       terminal = true;
       timedOut = true;
