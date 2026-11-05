@@ -362,6 +362,12 @@
       "note": "Per-tenant daily abstract generation-unit counters (generation-quota.ts); historical cost remains in the usage ledger, while only the current quota window is load-bearing."
     },
     {
+      "path": "active/shared/runtime/media-generation/cost-settlements",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Provider-reported media generation cost settlements (generation-cost-settlement.ts), one JSON per job, read by the Chronos cost summary and used to dedupe resource-usage rows. A registered tier/tenant-partitioned runtime-state root (PARTITIONED_RUNTIME_STATE_ROOTS.generation_cost_settlements): tenant settlements live under <tier>/<tenant>/ (tier-guarded, backed up, exported and removed by tenant offboarding), untenanted ones under system/. Pre-migration copies under tenants/<slug>/ (or the bare root) stay readable until the next write for the job moves them; tenant offboarding also removes leftover tenants/<slug>/ copies (PHYSICAL_LEGACY_TENANT_STATE_ROOTS)."
+    },
+    {
       "path": "active/shared/runtime/memory",
       "artifact_class": "state",
       "action": "review_required",
