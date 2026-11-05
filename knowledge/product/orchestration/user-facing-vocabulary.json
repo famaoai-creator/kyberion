@@ -20508,6 +20508,11 @@
         "ja": "あなたの判断や確認を待っているものです。急ぎの順に並んでいます。ここで決めれば、仕事はそのまま先へ進みます。",
         "qps-ploc": "⟦Ėṽėřẏŧħïñɠ ẇȧïŧïñɠ ƒőř ẏőůř ḓėƈïşïőñ őř ƈħėƈķ, ɱőşŧ ůřɠėñŧ ƒïřşŧ. Ḓėƈïḓė ħėřė ȧñḓ ŧħė ẇőřķ ɱőṽėş őñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
       },
+      "ia_inbox_return_to_candidate": {
+        "en": "Back to the knowledge candidate",
+        "ja": "ナレッジ候補に戻る",
+        "qps-ploc": "⟦Ƀȧƈķ ŧő ŧħė ķñőẇŀėḓɠė ƈȧñḓïḓȧŧė ŀőřėɱ ïṗşů⟧"
+      },
       "ia_inbox_count_definition": {
         "en": "Open items that have not expired, with identical requests counted once, within the scope you are viewing. Every screen shows this same number.",
         "ja": "未決で期限が切れていないものを、同じ依頼は1件にまとめ、いま見ている範囲だけで数えています。どの画面でも同じ数を表示します。",

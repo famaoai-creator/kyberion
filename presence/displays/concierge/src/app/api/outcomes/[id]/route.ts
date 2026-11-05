@@ -1,3 +1,4 @@
+import { withCompanyFanoutInvalidation } from '../../../../lib/company-fanout-cache';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   acceptInboxEntryWithHumanReceipt,
@@ -42,7 +43,7 @@ function isAllowedStatus(value: unknown): value is DeliverableInboxStatus {
   return typeof value === 'string' && ALLOWED_STATUSES.includes(value as DeliverableInboxStatus);
 }
 
-export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+async function handlePost(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
   // FD-07: a failed viewer resolution is a hard stop — the request never
@@ -108,3 +109,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     return conciergeErrorResponse(error, 500);
   }
 }
+
+/** A needs-you mutation: the personal fan-out cache never serves the decided item again. */
+export const POST = withCompanyFanoutInvalidation(handlePost);
