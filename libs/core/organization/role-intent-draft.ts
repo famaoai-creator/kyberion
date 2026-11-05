@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
+import { segmentWords } from '../locale-normalize.js';
 import { frameUntrustedInput } from '../untrusted-input-framing.js';
 import { scanForInjection } from '../untrusted-content.js';
 import { parseStructuredJson } from '../structured-reasoning.js';
@@ -364,8 +365,19 @@ function normalizeForComparison(value: string): string {
     .trim();
 }
 
+/** Scripts written without spaces, where a one-character word is meaningful. */
+const UNSPACED_SCRIPT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]/u;
+
+/**
+ * Comparison words. A whitespace split would turn a whole Japanese sentence
+ * into one "word" and defeat the overlap check, so words come from the shared
+ * ICU segmenter (`segmentWords`). One-letter words are dropped only in spaced
+ * scripts, where they are noise ("a", "i").
+ */
 function wordSet(normalized: string): Set<string> {
-  return new Set(normalized.split(' ').filter((word) => word.length >= 2));
+  return new Set(
+    segmentWords(normalized).filter((word) => word.length >= 2 || UNSPACED_SCRIPT.test(word))
+  );
 }
 
 /**
@@ -375,6 +387,8 @@ function wordSet(normalized: string): Set<string> {
  * words are mostly the intent's words (≥80% of the intent's words reused
  * AND ≥60% of its own words taken from the intent — a real mandate that
  * restates the request and then adds substance stays below the second bar).
+ * Words come from the shared ICU segmenter (see
+ * `wordSet`), so the check holds for Japanese as well as English.
  */
 export function isPastedIntent(text: string, intent: string): boolean {
   const a = normalizeForComparison(text);
@@ -670,6 +684,19 @@ async function findMissingConnections(
 // ── draft ────────────────────────────────────────────────────────────────────
 
 /**
+ * The remedy for an egress denial. The draft is sent as confidential with
+ * training_use no_training, so an external backend needs a tenant whose
+ * training_use 'none' attestation covers the backend's provider; naming a
+ * tenant alone does not help when that tenant holds no such attestation.
+ */
+function roleDraftEgressDeniedNext(tenantSlug: string | undefined): string {
+  if (tenantSlug) {
+    return `record a training_use 'none' attestation for this backend's provider on tenant '${tenantSlug}' (\`pnpm onboarding llm attest --tenant ${tenantSlug} --request-approval\`) and make sure its provider egress policy admits confidential material, or switch to a local reasoning backend`;
+  }
+  return "pass --tenant <slug> for a tenant holding a training_use 'none' attestation for this backend's provider (record one with `pnpm onboarding llm attest --tenant <slug> --request-approval`), or switch to a local reasoning backend";
+}
+
+/**
  * One bounded drafting pass: at most `ROLE_DRAFT_MAX_ATTEMPTS` reasoning
  * calls (the second only when the first answer was rejected). Never writes
  * role state; never throws for an expected failure — it returns one.
@@ -738,12 +765,19 @@ export async function draftRoleFromIntent(
     try {
       raw = await withReasoningPayloadScope(
         {
-          // Operator intent may describe internal work: treat it like other
-          // drafting inputs (customer-decision draft, peer auto-reply).
+          // Operator intent may describe internal work, so it is confidential.
+          // The data-use posture must be declared: an undeclared training_use
+          // falls back to local_only, which silently denies every external
+          // backend (claude-cli included). no_training is the posture
+          // confidential drafting warrants (peer auto-reply declares the
+          // same): an external backend is allowed only when the tenant holds
+          // a valid training_use 'none' attestation for its provider and the
+          // provider egress policy admits confidential material.
           tier: 'confidential',
           ...(input.tenantSlug ? { tenant_slug: input.tenantSlug } : {}),
           purpose: 'role intent draft',
           attachment_count: 0,
+          training_use: 'no_training',
         },
         () => backend.prompt(buildRoleDraftPrompt(intent, input.inventory, rejection))
       );
@@ -761,7 +795,7 @@ export async function draftRoleFromIntent(
           failure: {
             class: 'egress_denied',
             message: (error as Error).message,
-            next: 'use a local reasoning backend, or pass --tenant <slug> for a tenant whose provider egress policy allows this backend',
+            next: roleDraftEgressDeniedNext(input.tenantSlug),
           },
         };
       }
