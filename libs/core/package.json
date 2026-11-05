@@ -4492,6 +4492,10 @@
       "types": "./dist/organization/role-assumption-trace.d.ts",
       "default": "./dist/organization/role-assumption-trace.js"
     },
+    "./organization/role-intent-draft": {
+      "types": "./dist/organization/role-intent-draft.d.ts",
+      "default": "./dist/organization/role-intent-draft.js"
+    },
     "./organization/scim-protocol": {
       "types": "./dist/organization/scim-protocol.d.ts",
       "default": "./dist/organization/scim-protocol.js"

@@ -34,7 +34,7 @@ export async function main(
       runPublicationRoleMigration(args.slice(2), print);
       return;
     }
-    await organizationRolesMain(args);
+    await organizationRolesMain(args, print);
     return;
   }
   if (args[0] === 'member') {
