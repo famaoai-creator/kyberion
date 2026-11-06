@@ -546,6 +546,51 @@ public のログ置き場）で、スタンスの痕跡を個人 tier として�
   追加移行（`publication-role-migration.ts` の `PUBLICATION_MIGRATION_ROLES`）の対象でもあり、
   外すには移行手続きの変更が要る。
 
+### G2 の前提: 1 つのプロセスに `@agent/core` は 1 つだけ（2026-11-06）
+
+`task_source_workspace` の窓（`foundation/task-source-workspace-capability.ts`）は、登録簿を
+`globalThis` に `Symbol.for` で置いていた。同じプロセスに `@agent/core` のモジュールが 2 つ
+読み込まれたとき（ソースとビルド済みの dist）、もう一方が開いた窓も認めるためである。発行者ごとの
+不透明な許可証（`createSynchronousResourceGrantIssuer`）はモジュールの中だけに登録簿を持つので、
+2 つ目のモジュールが発行したものは認めない。許可証に置き換える前に、1 つのプロセスが
+`@agent/core` を 2 つ読み込む経路を洗い出し、本番の経路から無くした。
+
+棚卸し（`1f24914b5` 時点）:
+
+| 経路                                                                              | 実行時に起きるか              | 内容                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/build_repository.ts`（`pnpm build`）                                     | 起きていた                    | ビルドの起動処理なので libs/core をソースの相対パスで読む。ビルド後の確認（`readiness`）と入力の指紋（`snapshotInputs`）で `check_stale_dist.ts` / `check_dist_workspace_imports.ts` を動的に読み、それらが `@agent/core/*` を読む。dist があるとローダーは dist を返し、`secure-io`・`tier-guard`・`path-resolver` が 2 つになっていた。新しい checkout でも、ビルドの途中で dist ができた後の動的 import は dist になっていた |
+| `scripts/ts-loader.mjs` の subpath ごとの切り替え                                 | 起きていた（dist が古いとき） | `@agent/core/<subpath>` ごとに「その dist ファイルがあれば dist、無ければソース」を選んでいた。libs/core に足したばかりのモジュールや一部だけのビルドでは、そのモジュールだけソースから読まれ、その相対 import 先（`tier-guard` など）のソース版が dist 版の横に読み込まれていた                                                                                                                                                |
+| `scripts/clean.ts`・`scripts/clean_entrypoint.ts`                                 | 起きない                      | ソースの相対パスだけで読み、`@agent/core` を読まない                                                                                                                                                                                                                                                                                                                                                                            |
+| `scripts/ts-loader-cache.mjs` → `libs/core/private-host-cache.mjs`                | 起きない                      | 素の `.mjs` で、libs/core の `#private-host-cache`（package の `imports`）と同じ URL になる                                                                                                                                                                                                                                                                                                                                     |
+| `scripts/run_built.mjs` → `libs/core/dist/script-harness.js`                      | 起きない                      | パスで読むが、`@agent/core/script-harness` と同じ実ファイル（realpath）の URL になる。`--preserve-symlinks` のときだけ別 URL になりうる                                                                                                                                                                                                                                                                                         |
+| scripts / actuators / satellites / presence / plugins のその他の相対 import       | 無い                          | 本番のファイルに libs/core への相対 import は無い（見つかった 5 件は `libs/actuators/*/src/*.test.ts` と `libs/shared-ui/src/*.test.tsx` の `../../core/...` で、テストだけ）                                                                                                                                                                                                                                                   |
+| `@agent/core` の dist を import する package（`@agent/shared-*`）をソースから実行 | 起きない                      | ローダーは同じプロセスの `@agent/core` を同じ側に解決するので、package の dist が読む `@agent/core` も同じものになる                                                                                                                                                                                                                                                                                                            |
+| package の root と subpath の混在、別名の subpath                                 | 起きない                      | 1948 件の exports はすべて `./dist/*.js` を指す。別名（例 `./a2a-bridge` と `./mesh/a2a-bridge`）は同じファイルで、`require` 条件の別ファイルも無い                                                                                                                                                                                                                                                                             |
+| bundle（`dist/scripts/*.bundle.js`）                                              | 起きない                      | esbuild の `packages: 'external'` で `@agent/core` は bundle に入らない                                                                                                                                                                                                                                                                                                                                                         |
+| Next.js の surface（concierge、operator-surface、chronos-mirror-v2）              | 起きない                      | `serverExternalPackages: ['@agent/core']` で bundle に入らない                                                                                                                                                                                                                                                                                                                                                                  |
+| vitest                                                                            | テストだけ                    | `@agent/core` をソースに alias するので、テストのプロセスはソース 1 つになる。2 つ目ができるのは `vi.resetModules()` で読み直したときだけ（`task-source-workspace-io.test.ts` が意図して作っていた）                                                                                                                                                                                                                            |
+| worker_threads / vm                                                               | 対象外                        | `globalThis` も別なので、`Symbol.for` の登録簿でも共有されない                                                                                                                                                                                                                                                                                                                                                                  |
+
+本番で起きていた 2 つは、ローダーで直した（`scripts/ts-loader.mjs`）。`@agent/core` を dist から
+読むかソースから読むかを、プロセスごとに 1 回だけ決める。最初の `@agent/core` の import では
+`libs/core/dist/index.js` があれば dist、無ければソースにする。それより先に libs/core の
+TypeScript モジュールを相対パスで読んだとき（起動処理のスクリプトだけ）はソースにする。決めた後は、
+dist に無い subpath をソースで補わない（古いビルドは解決できない export として失敗する）。ビルド中に
+できた dist にも切り替えない。`pnpm build` の確認処理は、起動処理が読んだソースのモジュールを
+そのまま使う。
+
+あわせて門番を足した（pr gate `core-single-instance`、`scripts/check_core_single_instance.ts`）。
+libs/core の外の本番のファイルが、libs/core のモジュールを相対パスで読むと失敗する。import / export、
+副作用だけの import、動的 `import()`、`require`、`import x = require()` を TypeScript の構文木で
+拾い、パスを解決して判定するので、libs/ の中からの `../../core/...` も見つかる。型だけの import は
+実行時に消えるので数えない。テストは対象外（上の vitest の行）。例外はファイルごとに理由を書いた
+一覧で、ビルドの起動処理と clean（`build_repository.ts`、`clean.ts`、`clean_entrypoint.ts`）と
+ローダーのキャッシュ（`ts-loader-cache.mjs`）だけである。相対 import をやめた例外の行が残ると
+失敗する。正規表現で同じことを一部だけ見ていた `check_esm_integrity.ts` の libs/core の分と
+`tests/package-boundary-contract.test.ts` の 1 件はこの門番にまとめ、そこにあった古い例外
+（`bindings.ts` と依存方針の 3 つの check。今は `@agent/core` で読んでいる）は消した。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |

@@ -106,6 +106,7 @@ const RATCHET_GATE_IDS = new Set([
   'install-script-allowlist',
   'orphans',
   'esm',
+  'core-single-instance',
   'dist-workspace-imports',
   'knowledge-scope',
   'op-effect-coverage',
