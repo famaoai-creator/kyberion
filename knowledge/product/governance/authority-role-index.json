@@ -210,16 +210,6 @@
       "allowed_actuators": ["file-actuator", "artifact-actuator"],
       "tier_access": ["public", "confidential"]
     },
-    "discussion_request_store": {
-      "description": "Chronos-only immutable Discussion receipt storage. Requires an exact deny-only tenant/actor/scope/request capability before every operation. No knowledge, room, provider, membership or deployment authority.",
-      "default_persona": "unknown",
-      "write_scopes": [
-        "active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/"
-      ],
-      "scope_classes": ["operations_runtime"],
-      "allowed_actuators": [],
-      "tier_access": ["confidential"]
-    },
     "dot_lifecycle_writer": {
       "description": "Writes dot charters (dots/) and the lifecycle audit ledger during governed status transitions (kyberion dot activate/pause/retire). Deliberately separate from any role a dot may bind at runtime, so an active dot can never rewrite the contract it runs under.",
       "default_persona": "worker",

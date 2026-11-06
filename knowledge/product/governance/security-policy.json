@@ -1055,14 +1055,6 @@
         "active/shared/state/reasoning-route-user-config.json.history/"
       ]
     },
-    "discussion_request_store": {
-      "allow_read": [
-        "active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/"
-      ],
-      "allow_write": [
-        "active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/"
-      ]
-    },
     "customer_decision_consumer_store": {
       "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/decisions/"],
       "allow_write": ["knowledge/confidential/${KYBERION_TENANT}/decisions/"]

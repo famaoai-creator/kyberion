@@ -9,14 +9,11 @@ const implementation = 'libs/core/foundation/discussion-request-capability.ts';
 const facade = 'libs/core/discussion/discussion-request-storage-scope.ts';
 const issuerName = 'withDiscussionRequestCapability';
 // Named, value-only consumers of the capability module and the names each may import.
+// G2: the grant alone authorizes, so authority.ts and tier-guard.ts no longer import it;
+// the only predicate consumer is the tier-guard store-grant table.
 const consumers = new Map<string, readonly string[]>([
-  [facade, [issuerName, 'DISCUSSION_REQUEST_STORAGE_ROLE']],
-  ['libs/core/authority.ts', ['DISCUSSION_REQUEST_STORAGE_ROLE', 'isDiscussionRequestCapability']],
-  ['libs/core/tier-guard.ts', ['DISCUSSION_REQUEST_STORAGE_ROLE', 'isDiscussionRequestCapability']],
-  [
-    'libs/core/tier-guard-store-grants.ts',
-    ['DISCUSSION_REQUEST_STORAGE_ROLE', 'isDiscussionRequestCapability'],
-  ],
+  [facade, [issuerName, 'DISCUSSION_REQUEST_GRANT_ISSUANCE_RIGHT']],
+  ['libs/core/tier-guard-store-grants.ts', ['isDiscussionRequestCapability']],
 ]);
 
 function violations(relative: string, text: string): string[] {
@@ -154,6 +151,10 @@ describe('Discussion request grant trusted import boundary', () => {
           `import {isDiscussionRequestCapability} from '${target}';`
         )
       ).toEqual([]);
+      for (const former of ['libs/core/authority.ts', 'libs/core/tier-guard.ts'])
+        expect(
+          violations(former, `import {isDiscussionRequestCapability} from '${target}';`).length
+        ).toBeGreaterThan(0);
       expect(violations(facade, `import {${issuerName}} from '${target}';`)).toEqual([]);
     }
   });

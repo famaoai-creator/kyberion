@@ -10,10 +10,6 @@ import {
   PR_PUBLICATION_STORE_ROLE,
   currentPrPublicationScope,
 } from './governance/pr-publication-runtime.js';
-import {
-  isDiscussionRequestCapability,
-  DISCUSSION_REQUEST_STORAGE_ROLE,
-} from './foundation/discussion-request-capability.js';
 import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
 import {
   MEMORY_PROVENANCE_READER_ROLE,
@@ -578,13 +574,6 @@ function isScopedStructuralMkdir(
       PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites + '/confidential';
   if (inviteGrant) {
     // fall through to the shared checks
-  } else if (access.role === DISCUSSION_REQUEST_STORAGE_ROLE) {
-    if (
-      !isDiscussionRequestCapability(currentResourceAccessScope()) ||
-      normalizePath(protectedPrefix) !==
-        PARTITIONED_RUNTIME_STATE_ROOTS.discussion_create_requests + '/confidential'
-    )
-      return false;
   } else if (access.role === 'autonomy_learning_store') {
     if (
       !isAutonomyLearningCapability(currentResourceAccessScope()) ||
@@ -1005,15 +994,6 @@ function requestResourceDenial(
         '[RESOURCE_SCOPE_REQUIRED] Autonomy learning access requires its exact tenant store capability',
     };
   }
-  if (
-    normalizedRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
-    !legacyStoreCapability(isDiscussionRequestCapability(currentResourceAccessScope()))
-  )
-    return {
-      allowed: false,
-      reason:
-        '[RESOURCE_SCOPE_REQUIRED] Discussion receipt access requires its exact tenant request capability',
-    };
   if (
     normalizedRole === PIPELINE_JOURNAL_STORE_ROLE &&
     !legacyStoreCapability(isPipelineJournalCapability(currentResourceAccessScope()))

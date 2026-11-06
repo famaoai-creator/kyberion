@@ -504,14 +504,39 @@ public のログ置き場）で、スタンスの痕跡を個人 tier として�
   `authority.ts` の特例、保存先カタログの `legacy_roles`）を削除した。予約が必要な charter の
   宣言は無いので、名前は残していない。
 
+### G2: 議論のリクエストの許可証化（2026-11-06）
+
+議論のリクエストの受付記録（`discussion/discussion-request-storage-scope.ts`）から専用ロール
+`discussion_request_store` を外した（案 A）。当初は外せなかった専用ロールに入れていた。ロールが
+共有コアロールではなく Concierge の `may_assume` だけに置かれ、他の surface（`slack_bridge` など）が
+受付の記録を書けないことをロールの引き受けで守っていたのに、許可証（2 ファイルの形の一致）は
+それを表さなかったからである。2 段階で外した。
+
+- まず許可証を偽造できないものにした。発行者ごとの不透明な許可証
+  （`createSynchronousResourceGrantIssuer`、DOT と同じ）にし、発行の関数は受付の窓口だけが使う
+  （import の境界テスト）。判定は、その発行者が今発行している許可証だけを認める。偽造、複製、
+  外への持ち出し、期限切れ・非同期、別の発行者による同じ形の許可証は何も認めない。正確な範囲
+  （予約と受付の 2 ファイル、読み取りだけの復旧は書き込みもディレクトリ作成もなし）は変えていない。
+- 次に許可証を権限にし、ロールを外した。`tier-guard` はリクエストの上限と tenant 範囲の検査の後に、
+  有効な許可証かを問う（`storeGrantAuthorizes`）。tenant の器（`confidential/`）を作る構造上の
+  mkdir も許可証で判定する。窓口は、許可証が有効な間だけ呼び出し元のロールのまま選んだ tenant に
+  束縛して I/O を行い（組織は引き継がない）、別 tenant に束縛された呼び出し元は拒否する。
+- 誰が発行できるかは変えていない。窓口は許可証を発行する前に、旧ロールの引き受けと同じ規則
+  （RA-02）を名前 `discussion_request_store` に対して確かめる（`authority.ts` の
+  `assertStoreGrantIssuanceAllowed`）。SYSTEM_ROLE の無いプロセスと Concierge だけが発行でき、
+  他の surface は従来どおり `[ROLE_ASSUMPTION_DENIED]` になる。この名前は
+  `role-assumption-policy.json` の Concierge の `may_assume` に、ロールではなく発行の権利として
+  残した（説明文に明記）。到達性の検査（`role-assumption-reachability`）は到達するロールが許可されて
+  いるかだけを見るので、別の宣言を足すより既存の一覧に残すのがいちばん小さい。
+- ロールの宣言（security-policy、authority role index、ロール定義、`authority.ts` の特例と
+  tenant 束縛ロールの一覧、保存先カタログの `legacy_roles`）を削除した。`tier-guard` に残っていた
+  この保存先のロール名の分岐（構造上の mkdir、リクエストの拒否）も無くなった。
+
 ### G2: 案 A のまま外せなかった専用ロール（2026-11-06）
 
-次の 3 つは、許可証だけを権限にするとロールが守っていた性質が失われるので、ロールを残した。
+次の 2 つは、許可証だけを権限にするとロールが守っていた性質が失われるので、ロールを残した
+（`discussion_request_store` は上の節で外した）。
 
-- `discussion_request_store`: 共有コアロールではなく、Concierge の `may_assume` だけに置かれている
-  （`role-assumption-policy.json`）。他の surface（`slack_bridge` など）が受付の記録を書けないことは
-  ロールの引き受けで守られており、許可証（2 ファイルの形の一致、発行者の token なし）はそれを表さない。
-  発行者ごとの不透明な許可証にし、発行できる surface を許可証の側で絞ってから外す。
 - `task_source_workspace`: 許可証（I/O の窓）は deny-only の上限ではない。窓の中の I/O を窓の対象だけに
   絞るのは、ロール名で効く狭い拒否（`narrow-store-role-denial.ts`）である。これを「窓が有効なら」に
   置き換えると、窓の中で呼び出し元の範囲に戻って実行される生存確認（`assertCurrent`）の読み取りまで
