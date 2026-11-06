@@ -1,7 +1,7 @@
 ---
 title: Stance / Tenant / Customer — three layers that all get called "customer"
 tags: [architecture, governance, tenant, customer, stance, affiliation, multi-tenant]
-last_updated: 2026-11-05
+last_updated: 2026-11-06
 ---
 
 # Stance / Tenant / Customer
@@ -10,11 +10,11 @@ Three different things in Kyberion are routinely called "customer". They sit at
 different layers, and conflating them puts records on the wrong side of a
 confidentiality boundary. This document names them.
 
-| Layer                 | Question it answers                         | Where it lives                                           | Lifetime                          |
-| --------------------- | ------------------------------------------- | -------------------------------------------------------- | --------------------------------- |
-| **Stance**            | Which stance am I operating from right now? | `knowledge/personal/stances/{slug}/` + `KYBERION_STANCE` | Runtime; switches per session     |
-| **Tenant**            | Which confidentiality boundary am I inside? | `knowledge/confidential/{tenant}/`                       | Durable; a data boundary          |
-| **Tenant's customer** | Who does that tenant deliver to?            | `knowledge/confidential/{tenant}/customers/`             | Durable; data owned by the tenant |
+| Layer                 | Question it answers                         | Where it lives                                                              | Lifetime                          |
+| --------------------- | ------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------- |
+| **Stance**            | Which stance am I operating from right now? | `knowledge/personal/stances/{slug}/` + `KYBERION_STANCE`                    | Runtime; switches per session     |
+| **Tenant**            | Which confidentiality boundary am I inside? | `knowledge/confidential/{tenant}/`                                          | Durable; a data boundary          |
+| **Tenant's customer** | Who does that tenant deliver to?            | `knowledge/confidential/{tenant}/customers/` (actors), `.../deals/` (deals) | Durable; data owned by the tenant |
 
 The canonical containment hierarchy is
 `tenant_slug → organization_id → project_id → mission_id → task_id → session`
@@ -41,8 +41,12 @@ chart, OKRs, decision rights, finance, brand, design, channel bindings) live in
 the tenant home `knowledge/confidential/{tenant}/` (S2,
 `libs/core/organization/tenant-home.ts`), the tenant's audit mirror in
 `active/shared/runtime/audit-mirror/confidential/{tenant}/`, and the customer
-records move to `knowledge/confidential/{tenant}/customers/{customer}/` in S3;
-until then the legacy `customer/{tenant}/` holds only them. See
+records (deals and their documents) in `knowledge/confidential/{tenant}/deals/`
+(S3). The `customer/` directory is gone; `pnpm migration` (0001–0003) empties an
+existing one. Deals name no customer yet, so they are not grouped under
+`knowledge/confidential/{tenant}/customers/{customer}/` (which holds the decision
+ledger's customer actor registry); that grouping comes when a deal carries a
+customer key. See
 [the store-catalog guard design](../../../docs/developer/improvement-plans-2026-11/STORE_CATALOG_GRANT_GUARD_DESIGN_2026-11-05.ja.md).
 
 Two stances that matter in practice:

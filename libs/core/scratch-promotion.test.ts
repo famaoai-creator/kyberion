@@ -62,9 +62,8 @@ describe('scratch promotion classifiers', () => {
     expect(
       classifyPromotionSourceScope('active/missions/confidential/acme/MSN-1/evidence/a.json')
     ).toMatchObject({ tier: 'confidential', tenant: 'acme' });
-    expect(classifyPromotionSourceScope('customer/acme/x.json')).toMatchObject({
-      tenant: 'acme',
-    });
+    // The legacy customer/ tree is gone (S3): it carries no tier or tenant.
+    expect(classifyPromotionSourceScope('customer/acme/x.json')).toBeNull();
   });
 
   it('builds the exact promote command', () => {

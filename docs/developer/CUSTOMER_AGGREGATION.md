@@ -12,7 +12,7 @@ How Kyberion isolates **per-stance configuration** from the rest of the codebase
 
 > **Naming note.** This document and the `customer/` directory were written for the FDE case, where the stance you operate from happens to be a customer's. That is one use of the mechanism, not its definition — the general concept is a **stance** ("which entity am I acting as right now"), and holding concurrent roles at several independent legal entities is an equally valid use. A stance is also distinct from a **tenant** (a confidentiality boundary) and from a **tenant's own customers**; all three get called "customer" in conversation. → [stance-tenant-customer-model](../../knowledge/product/architecture/stance-tenant-customer-model.md). Read "customer" below as "stance"; the environment variable and directory keep their historical names.
 
-This document defines the contract. For day-to-day usage, see [`customer/README.md`](../../customer/README.md).
+This document defines the contract. For day-to-day usage, see [`templates/stance/README.md`](../../templates/stance/README.md).
 
 ## 1. Problem
 

@@ -38,6 +38,37 @@ const policies = [
 const frame = `// before\n${STORE_ROOTS_BEGIN}\nold\n${STORE_ROOTS_END}\n// after\n`;
 
 describe('catalog root projection', () => {
+  it('attributes S3 deals to the tenant while keeping customer grouping planned and legacy paths physical', () => {
+    const catalog = JSON.parse(
+      readTextFile(pathResolver.rootResolve('knowledge/product/governance/store-catalog.json'))
+    );
+    expect(
+      resolveAssetAddress('knowledge/confidential/acme/deals/DEAL-1.json', catalog.stores)
+    ).toMatchObject({
+      status: 'resolved',
+      address: {
+        store: 'tenant-deals',
+        location: 'active',
+        custody: { kind: 'tenant', ref: 'acme' },
+        tier: 'confidential',
+      },
+    });
+    expect(
+      resolveAssetAddress(
+        'knowledge/confidential/acme/customers/client-1/deals/DEAL-1.json',
+        catalog.stores
+      )
+    ).toMatchObject({
+      status: 'resolved',
+      address: { store: 'tenant-customer-records', location: 'planned' },
+    });
+    expect(
+      resolveAssetAddress('customer/acme/deals/DEAL-1.json', catalog.stores)
+    ).not.toMatchObject({
+      status: 'resolved',
+      address: { store: 'tenant-deals', location: 'active' },
+    });
+  });
   it('registers the existing mixed system/person attestation root without tenant inference', () => {
     const root = 'active/shared/runtime/provider-attestations';
     const provider: StoreRootSource = {

@@ -21,6 +21,13 @@ export const TENANT_COMPANY_FILE = 'company.json';
 export const TENANT_CHANNEL_BINDINGS_FILE = 'connections/channel-bindings.json';
 
 /**
+ * The tenant's customer records (deals with their documents, requirements,
+ * escalations and notes), keyed by deal id. Deals name no customer yet; once
+ * they do, they can move under `customers/{customer}/` (S3).
+ */
+export const TENANT_DEALS_DIR = 'deals';
+
+/**
  * Company asset entries, relative to the tenant home. Everything else in the
  * legacy directory is either a stance (moved by 0001) or a customer record
  * (deals, moved in S3).
