@@ -1120,22 +1120,6 @@
       "deny_read_descendants": ["knowledge/personal/tenants/"],
       "allow_write": []
     },
-    "pr_publication_store": {
-      "allow_read": [
-        "knowledge/personal/charters/",
-        "knowledge/confidential/${KYBERION_TENANT}/charters/",
-        "active/shared/artifacts/personal/shared/",
-        "active/shared/artifacts/confidential/${KYBERION_TENANT}/",
-        "active/shared/runtime/external-operations/",
-        "active/shared/tmp/"
-      ],
-      "allow_write": [
-        "knowledge/confidential/${KYBERION_TENANT}/charters/",
-        "active/shared/artifacts/",
-        "active/shared/runtime/external-operations/",
-        "active/shared/tmp/"
-      ]
-    },
     "person_charter_store": {
       "allow_read": [
         "knowledge/personal/charters/",

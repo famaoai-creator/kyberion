@@ -22,9 +22,7 @@ import {
 } from './github.js';
 import { runVcsMutationWithApproval, type VcsHostMutation } from './publication-host.js';
 import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
-import { withExecutionContext } from '../authority.js';
 import {
-  PR_PUBLICATION_STORE_ROLE,
   withPrPublicationRuntime,
   withPrPublicationStoreAccess,
 } from '../governance/pr-publication-runtime.js';
@@ -132,21 +130,15 @@ function stageUnprovablePrBodyFile(
       invocationId,
       () =>
         withPrPublicationStoreAccess('body-stage', [], [artifactPath, indexPath], () =>
-          withExecutionContext(
-            PR_PUBLICATION_STORE_ROLE,
-            () =>
-              writeScopedArtifact({
-                // Public shared floor — the body is published verbatim to the PR
-                // either way; staging under the acting tenant blurs provenance.
-                scope: { tenant: 'shared' },
-                tier: 'public',
-                artifact_class: 'evidence',
-                name,
-                content,
-              }),
-            'worker',
-            scope.tenant_slug
-          )
+          writeScopedArtifact({
+            // Public shared floor — the body is published verbatim to the PR
+            // either way; staging under the acting tenant blurs provenance.
+            scope: { tenant: 'shared' },
+            tier: 'public',
+            artifact_class: 'evidence',
+            name,
+            content,
+          })
         ),
       'vcs:pr_create'
     );

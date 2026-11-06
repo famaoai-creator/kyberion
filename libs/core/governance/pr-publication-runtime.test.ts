@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   currentPrPublicationScope,
-  prPublicationResourceAllowed,
   withPrPublicationRuntime,
   withPrPublicationStoreAccess,
 } from './pr-publication-runtime.js';
+import { prPublicationResourceAllowed } from '../foundation/pr-publication-store-capability.js';
 
 const invocation = 'a'.repeat(64);
 describe('PR publication store capability', () => {
@@ -182,7 +182,10 @@ describe('PR publication store capability', () => {
 
   it('is not honoured by a second module instance, in either direction (counterfeit)', async () => {
     vi.resetModules();
-    const second = await import('./pr-publication-runtime.js');
+    const second = {
+      ...(await import('./pr-publication-runtime.js')),
+      ...(await import('../foundation/pr-publication-store-capability.js')),
+    };
     expect(second.prPublicationResourceAllowed).not.toBe(prPublicationResourceAllowed);
     second.withPrPublicationRuntime(acme, invocation, () =>
       second.withPrPublicationStoreAccess('charter-ledger-write', [], [ledger], () => {
