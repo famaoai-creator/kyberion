@@ -85,6 +85,7 @@ export function EngineConfigPanel({ locale }: { locale: ConciergeLocale }) {
       setStatus('ready');
     } catch (error) {
       setSnapshot(null);
+      setDraft(null);
       setStatus(
         engineConfigFailure(error instanceof RequestFailure ? error.status : 0, 'load_failed')
       );
@@ -129,8 +130,11 @@ export function EngineConfigPanel({ locale }: { locale: ConciergeLocale }) {
     }
   };
 
-  const setField = (key: EngineConfigField) => (value: unknown) =>
+  const setField = (key: EngineConfigField) => (value: unknown) => {
     setDraft((current) => (current ? { ...current, [key]: asText(value) } : current));
+    // A finished save or "nothing to save" no longer describes the edited form.
+    setStatus((current) => (current === 'saved' || current === 'unchanged' ? 'ready' : current));
+  };
 
   const label = (key: EngineConfigField) =>
     text(`engine_config_${key}` as PresenceStudioMessageKey);

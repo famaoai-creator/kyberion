@@ -45,11 +45,16 @@ export function resolveEngineConfigOperator(
   req: NextRequest,
   mutation: boolean
 ):
-  | { principal: EngineRuntimeOperatorPrincipal; denial?: never; status?: never }
-  | { principal?: never; denial: EngineConfigDenial; status: 401 | 403 } {
+  | { principal: EngineRuntimeOperatorPrincipal; denial?: never; status?: never; response?: never }
+  | { principal?: never; denial: EngineConfigDenial; status: 401 | 403; response?: never }
+  | { principal?: never; denial?: never; status?: never; response: Response } {
   const local = { denial: 'engine_config_local_session_required', status: 403 } as const;
   if (!isLoopbackPeer(req) || !isLocalEngineConfigHost(req.headers.get('host'))) return local;
-  if (mutation && requireConciergeMutationAccess(req)) return local;
+  if (mutation) {
+    // Rate limiting, an unknown token or a cross-origin write keep their own answer.
+    const denied = requireConciergeMutationAccess(req);
+    if (denied) return { response: denied };
+  }
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) {
     return resolved.response.status === 401
@@ -58,6 +63,9 @@ export function resolveEngineConfigOperator(
   }
   const viewer = resolved.context;
   if (viewer.role !== 'localadmin') return local;
+  // The core operator accepts only a loopback localadmin. Here "loopback" is
+  // the verified peer + Host above, whatever credential the localadmin viewer
+  // presented (cookie, localadmin token, or the open-bootstrap local operator).
   return {
     principal: {
       role: 'localadmin',

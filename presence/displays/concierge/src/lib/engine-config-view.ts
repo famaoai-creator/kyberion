@@ -92,7 +92,7 @@ export function engineConfigChanges(
   const unset: EngineConfigField[] = [];
   for (const key of ENGINE_CONFIG_FIELDS) {
     const value = draft[key].trim();
-    if (value === baseline[key]) continue;
+    if (value === baseline[key].trim()) continue;
     if (value) patch[key] = value;
     else unset.push(key);
   }
