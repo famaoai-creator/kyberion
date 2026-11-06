@@ -3708,10 +3708,6 @@
       "types": "./dist/mobile-profile-validators.d.ts",
       "default": "./dist/mobile-profile-validators.js"
     },
-    "./mobile-runtime-helpers": {
-      "types": "./dist/mobile-runtime-helpers.d.ts",
-      "default": "./dist/mobile-runtime-helpers.js"
-    },
     "./model-performance-index": {
       "types": "./dist/reasoning/model-performance-index.d.ts",
       "default": "./dist/reasoning/model-performance-index.js"
