@@ -22,11 +22,10 @@ import { withExecutionContext } from '../authority.js';
 import { logger } from '../core.js';
 import {
   CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
-  customerDecisionMilestoneCapability,
+  withCustomerDecisionMilestoneCapability,
   type CustomerDecisionMilestoneAccess,
 } from '../foundation/customer-decision-milestone-capability.js';
 import { DELIVERABLE_INBOX_WRITER_ROLE } from '../foundation/deliverable-inbox-writer-capability.js';
-import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
 import { ledgerDir } from '../decision-ledger/ledger.js';
@@ -74,15 +73,13 @@ function asMilestoneStore<T>(
   fn: () => T
 ): T {
   const caseDir = pathResolver.toRepoRelative(ledgerDir(decisionCase.location));
-  return runInResourceAccessScope(
-    customerDecisionMilestoneCapability(decisionCase.tenantSlug, caseDir, access),
-    () =>
-      withExecutionContext(
-        CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
-        fn,
-        undefined,
-        decisionCase.tenantSlug
-      )
+  return withCustomerDecisionMilestoneCapability(decisionCase.tenantSlug, caseDir, access, () =>
+    withExecutionContext(
+      CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
+      fn,
+      undefined,
+      decisionCase.tenantSlug
+    )
   );
 }
 
