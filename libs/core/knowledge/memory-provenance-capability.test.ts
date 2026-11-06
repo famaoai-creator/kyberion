@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { withExecutionContext } from '../authority.js';
+import { pathResolver } from '../path-resolver.js';
+import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
 import {
   currentMemoryProvenanceReadCapability,
   memoryProvenanceReadAllowed,
@@ -47,5 +50,31 @@ describe('memory provenance read grant (G2: module-private, synchronous)', () =>
       );
     });
     await expect(later).resolves.toBeUndefined();
+  });
+});
+
+describe('memory provenance read grant authority (G2: no reader role)', () => {
+  it('authorizes its exact read for a role-less caller and narrows every other I/O', () => {
+    const owner = 'c'.repeat(64);
+    const personal = { tier: 'personal' as const, owner_nhi: owner };
+    vi.stubEnv('VITEST', '');
+    try {
+      const file = memoryProvenanceStatePath(personal);
+      expect(file).toMatch(/^active\/personal\/owners\/[a-f0-9]{64}\/memory\/provenance\.json$/);
+      const abs = pathResolver.rootResolve(file);
+      withExecutionContext('chronos_tenant_runner', () => {
+        const before = validateReadPermission(abs).allowed;
+        withMemoryProvenanceReadCapability(personal, () => {
+          expect(validateReadPermission(abs)).toMatchObject({ allowed: true });
+          expect(
+            validateReadPermission(pathResolver.rootResolve('knowledge/public/x.md')).reason
+          ).toContain('MEMORY_PROVENANCE_READ_SCOPE');
+          expect(validateWritePermission(abs).reason).toContain('MEMORY_PROVENANCE');
+        });
+        expect(validateReadPermission(abs).allowed).toBe(before);
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

@@ -19,6 +19,7 @@ import { prPublicationGrantAuthorizes } from './foundation/pr-publication-store-
 import { autonomyLearningGrantAllows } from './foundation/autonomy-learning-capability.js';
 import { pipelineJournalGrantAllows } from './foundation/pipeline-journal-capability.js';
 import { credentialMaterialGrantAllows } from './foundation/credential-material-capability.js';
+import { memoryProvenanceGrantAllows } from './knowledge/memory-provenance-capability.js';
 
 /**
  * Does the active invite capability cover this I/O? Its validator predates
@@ -76,6 +77,9 @@ function discussionRequestGrantAllows(
  * - Credential material: the opaque issuer grant of one allocated connection file read by the
  *   admitted allocation broker (and its ancestors' metadata). Its facade checks the issuance right
  *   (the former shared core role's RA-02 rule) before it issues.
+ * - Memory provenance: the module-private synchronous grant of one exact lineage state read, under
+ *   the roots the former reader role covered. Its facade checks the issuance right (the former
+ *   shared core role's RA-02 rule) and the tenant / owner binding before it issues.
  */
 export function storeGrantAuthorizes(
   target: string,
@@ -91,6 +95,7 @@ export function storeGrantAuthorizes(
     prPublicationGrantAuthorizes(target, operation) ||
     autonomyLearningGrantAllows(target, operation) ||
     pipelineJournalGrantAllows(target, operation) ||
-    credentialMaterialGrantAllows(target, operation)
+    credentialMaterialGrantAllows(target, operation) ||
+    memoryProvenanceGrantAllows(target, operation)
   );
 }

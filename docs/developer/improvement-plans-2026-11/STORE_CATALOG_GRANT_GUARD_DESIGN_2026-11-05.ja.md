@@ -867,6 +867,42 @@ tenant に束縛し、claim の mission と task を実行の主体として結�
 **比較。** 上限のファイル、その祖先、上限の外の 8 個のパスを 5 つの操作で、10 種類の呼び出し元から
 問い、旧と新を突き合わせた（385 件）。違いは無い（拒否の符号も同じ）。
 
+### G2: 記憶の由来（lineage）の読み取りの許可証化（2026-11-06）
+
+`memory_provenance_reader` は、記憶の由来の状態（`knowledge/memory-provenance.ts`）を、書き手の
+ロール（`mission_controller`、`knowledge_steward`、`chronos_gateway`）以外の呼び出し元が読むときに、
+その 1 ファイルを読む間だけ引き受けていた共有コアロールである。引き受けの検査が束縛を決めていた。
+範囲の tenant と許可証の tenant が同じこと、機密の読み取りは呼び出し元の有効な tenant のときだけ、
+個人の読み取りは所有者の NHI（`KYBERION_NHI_ID`）のときだけ、である。`tier-guard` はロール名で、
+その 1 ファイルの読み取りとその祖先のメタデータ以外をすべて拒否していた。
+
+**第 1 段階。** 窓（`AsyncLocalStorage`）は既にモジュールの中だけにあったが、同期ではなかった。読み取りの
+中で捕まえた継続は、戻った後も窓を見ていた。発行済みの集合を持ち、コールバックが戻ると失効し、
+Promise を返すと拒否し、捕まえた継続には窓が無いようにした。`currentMemoryProvenanceReadCapability` は
+有効な窓の凍結した写しだけを返す。境界テスト `tests/memory-provenance-capability-boundary.test.ts`。
+
+**第 2 段階: 許可証を権限にし、ロールを外した。**
+
+- 絞り込み: 窓が有効な間の I/O はすべて、その 1 ファイルの読み取りと祖先のメタデータに絞る
+  （`requestResourceDenial` → `memoryProvenanceReadDenial`、ロール名ではなく窓が有効なこと）。
+  ロールが引き受けられていたのは読み取りの間だけだったので、絞る対象は同じである。
+- 許可: `storeGrantAuthorizes` → `memoryProvenanceGrantAllows`。窓の範囲の中で、旧ロールの権限が覆って
+  いた根（共有と tenant の状態ファイル、所有者の状態、tier ごとの scratch の floor）の下だけを認める。
+- 誰が発行できるかと束縛は変えていない。窓口は窓を開ける前に、旧共有コアロールの引き受けと同じ規則を
+  名前 `memory_provenance_reader` に対して確かめ、旧ロールの引き受けの検査（機密は有効な tenant、個人は
+  所有者の NHI）を同じ符号 `[MEMORY_PROVENANCE_READ_SCOPE]` で行う。呼び出し元のロールと persona は
+  そのまま使い、範囲の tenant に束縛する（tenant の無い範囲では束縛しない。組織は引き継がない）。
+  範囲に tenant があり、呼び出し元が別の tenant に束縛されていれば `[ROLE_TENANT_SCOPE_MISMATCH]` で
+  拒否する（機密は既に拒否されていた。個人・公開の範囲に tenant が付く場合だけ狭くなる）。
+- ロールの宣言（security-policy、`authority.ts` の persona の対応と引き受けの検査、保存先カタログの
+  `legacy_roles` 4 件、`tier-guard` のロール名の分岐）を削除し、名前を退役したロールの一覧に加えた。
+  書き手の一覧（`MEMORY_PROVENANCE_AUTHORITY`）と窓口の書き手のロールの分岐は対象外で残した。
+
+**比較。** 公開・機密（`acme`）・個人（所有者の NHI）の 3 つの範囲について、状態ファイル、その祖先、
+上限の外の 9 個のパスを 5 つの操作で、13 種類の呼び出し元（既定の 10 種類と、`acme` に束縛、
+所有者の NHI を持つ worker 2 種類）から問い、旧と新を突き合わせた（1315 件）。判定の違いは無い。
+拒否は同じ符号で、方針に無い SYSTEM_ROLE は引き受けではなく発行で拒否される。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |
