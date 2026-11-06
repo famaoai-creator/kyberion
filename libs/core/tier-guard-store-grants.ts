@@ -14,13 +14,12 @@ import {
   isDiscussionRequestCapability,
 } from './foundation/discussion-request-capability.js';
 import { isDotResultStoreCapability } from './foundation/dot-result-store-capability.js';
-import {
-  CUSTOMER_DECISION_INVITE_STORE_ROLE,
-  isCustomerDecisionInviteCapability,
-} from './foundation/customer-decision-invite-capability.js';
+import { isCustomerDecisionInviteCapability } from './foundation/customer-decision-invite-capability.js';
 import {
   currentResourceAccessScope,
+  decideResourceAccess,
   type ResourceAccessOperation,
+  type ResourceAccessScope,
 } from './foundation/resource-access-scope.js';
 import {
   TASK_SOURCE_WORKSPACE_ROLE,
@@ -40,8 +39,6 @@ type StoreGrantCheck = (
 const STORE_GRANTS: Readonly<Record<string, StoreGrantCheck>> = Object.freeze({
   [DISCUSSION_REQUEST_STORAGE_ROLE]: () =>
     isDiscussionRequestCapability(currentResourceAccessScope()),
-  [CUSTOMER_DECISION_INVITE_STORE_ROLE]: () =>
-    isCustomerDecisionInviteCapability(currentResourceAccessScope()),
   [TASK_SOURCE_WORKSPACE_ROLE]: (target, operation) =>
     taskSourceWorkspaceIoAllowed(target, operation),
   [PR_PUBLICATION_STORE_ROLE]: (target, operation) =>
@@ -49,18 +46,41 @@ const STORE_GRANTS: Readonly<Record<string, StoreGrantCheck>> = Object.freeze({
 });
 
 /**
+ * Does the active invite capability cover this I/O? Its validator predates
+ * appendExact and name prefixes, so neither can enlarge its write ceiling.
+ */
+function customerDecisionInviteGrantAllows(
+  scope: ResourceAccessScope | undefined,
+  target: string,
+  operation: ResourceAccessOperation
+): boolean {
+  if (!scope || !isCustomerDecisionInviteCapability(scope)) return false;
+  if ((scope.namePrefixExact?.length ?? 0) > 0) return false;
+  return decideResourceAccess({ ...scope, appendExact: [] }, target, operation).allowed;
+}
+
+/**
  * Stores whose active, exact grant is itself the authority for the I/O it
  * covers — no dedicated role (G2). The grant is issued only by the store's
- * governed facade, which also binds the grant's tenant; possession alone
- * resolves nothing. tier-guard still runs the request ceiling and the tenant
- * scope check before it asks.
+ * governed facade, which also binds the grant's tenant. tier-guard still runs
+ * the request ceiling, the tenant scope check and the store's deny-only rules
+ * (e.g. the invite tenant/content check) before it asks.
+ *
+ * - DOT result: an opaque issuer token; possession of a lookalike resolves nothing.
+ * - Customer decision invite: the exact structural ceiling of one record (or a
+ *   read-only listing). Its former role was a shared core role any in-process
+ *   caller could assume with that ceiling, so removing it adds no reach.
  */
 export function storeGrantAuthorizes(
   target: string,
   operation: ResourceAccessOperation,
   rootDir: string
 ): boolean {
-  return isDotResultStoreCapability(currentResourceAccessScope(), { rootDir, target, operation });
+  const scope = currentResourceAccessScope();
+  return (
+    isDotResultStoreCapability(scope, { rootDir, target, operation }) ||
+    customerDecisionInviteGrantAllows(scope, target, operation)
+  );
 }
 
 /** Does the active grant of `role`'s dedicated store cover this I/O? False for any other role. */

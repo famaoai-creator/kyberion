@@ -80,7 +80,6 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["customer_decision_invite_store"],
       "sources": ["runtime-state-roots", "role-policy"],
       "registration": {
         "family": "state",
