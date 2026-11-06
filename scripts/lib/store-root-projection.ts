@@ -8,6 +8,8 @@ export interface StoreRootRegistration {
   key: string;
   order: number;
   retention_path: string;
+  /** Placement-only shape for a mixed system/person store; never a grant. */
+  partition_shape?: 'system_person';
 }
 
 export interface StoreRootSource {
@@ -95,6 +97,19 @@ export function projectStoreRoots(
     const partitioned = store.path.endsWith(PARTITION_SUFFIX);
     const legacyBareRoot =
       LEGACY_BARE_LEDGER_REGISTRATIONS.has(name) && store.custody.kind === 'unscoped-legacy';
+    const systemPersonShape = registration.partition_shape === 'system_person';
+    const nonTenantStateRoot =
+      systemPersonShape &&
+      family === 'state' &&
+      store.custody.kind === 'derived' &&
+      store.tiers === undefined &&
+      isCanonicalStoreRoot(store.path);
+    if (systemPersonShape && !nonTenantStateRoot) {
+      violations.push(
+        `${store.id}: system_person shape requires a derived state store with a bare canonical root and no declared tier`
+      );
+      valid = false;
+    }
     const fixedSuffix = '/confidential/<tenant>';
     const fixedPartitioned =
       store.path.endsWith(fixedSuffix) &&
@@ -105,7 +120,10 @@ export function projectStoreRoots(
       : fixedPartitioned
         ? store.path.slice(0, -fixedSuffix.length)
         : store.path;
-    if ((!partitioned && !fixedPartitioned && !legacyBareRoot) || !isCanonicalStoreRoot(root)) {
+    if (
+      (!partitioned && !fixedPartitioned && !legacyBareRoot && !nonTenantStateRoot) ||
+      !isCanonicalStoreRoot(root)
+    ) {
       violations.push(
         `${store.id}: registration ${name} requires a canonical root with tier/tenant binding`
       );

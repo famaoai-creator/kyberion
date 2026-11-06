@@ -51,7 +51,11 @@
  * bypass the dispatcher plane entirely, e.g. `runStructured`/document/browser
  * agent tasks) — nesting two independent wall-clock races over the same unit
  * of work is redundant but not incorrect; only the inner (backend-level) one
- * can ever actually kill anything.
+ * can ever actually kill anything. Because the outer one holds the
+ * concurrency slot, it passes `awaitOperationOnStop`: on abort or expiry it
+ * keeps the slot until the inner call settles (bounded by
+ * {@link stopSettleBoundMs}), so a slot is never handed to the next
+ * delegation while the previous child is still being stopped.
  *
  * Each backend also has one or two genuinely synchronous helper spawns
  * (`shell-claude-cli-backend.ts`'s `probeShellClaudeCliAvailability` via
@@ -98,6 +102,8 @@ const DEFAULT_GLOBAL_MAX_CONCURRENCY = 4;
 const DEFAULT_PROVIDER_MAX_CONCURRENCY = 2;
 const DEFAULT_WALL_CLOCK_MS = 10 * 60 * 1000;
 const DEFAULT_KILL_GRACE_MS = 5000;
+/** Slack over the inner SIGTERM + grace + SIGKILL + grace stop sequence. */
+const STOP_SETTLE_MARGIN_MS = 1000;
 
 /** Bucket shared by delegations whose provider could not be identified. */
 export const UNKNOWN_DELEGATION_PROVIDER = 'unknown';
@@ -162,6 +168,15 @@ function resolveKillGraceMs(): number {
     getRegisteredEnvText('KYBERION_DELEGATION_KILL_GRACE_MS'),
     DEFAULT_KILL_GRACE_MS
   );
+}
+
+/**
+ * How long a handle-less budget with `awaitOperationOnStop` waits for the
+ * wrapped call to settle after an abort or expiry: the inner adapter's whole
+ * stop sequence (SIGTERM, grace, SIGKILL, grace = 2 × grace) plus a margin.
+ */
+export function stopSettleBoundMs(graceMs: number = resolveKillGraceMs()): number {
+  return 2 * graceMs + STOP_SETTLE_MARGIN_MS;
 }
 
 // --- concurrency semaphore -------------------------------------------------
@@ -265,6 +280,12 @@ export function getDelegationConcurrencyStats(): DelegationConcurrencyStats {
 export interface DelegationChildHandle {
   pid?: number;
   kill(signal: NodeJS.Signals): void;
+  /**
+   * Settles when the child process has exited. With it, an explicit abort
+   * waits (bounded) for the child to exit before rejecting, so the rejection
+   * proves the process stopped; without it the exit is not observable.
+   */
+  exited?: Promise<void>;
 }
 
 /**
@@ -278,12 +299,31 @@ export interface DelegationChildHandle {
 export function delegationChildHandleFromChildProcess(child: {
   pid?: number;
   kill(signal?: NodeJS.Signals | number): boolean;
+  exitCode?: number | null;
+  signalCode?: NodeJS.Signals | string | null;
+  once?(event: 'exit', listener: (...args: unknown[]) => void): unknown;
 }): DelegationChildHandle {
+  // Subscribe at construction (right after spawn) so an exit that happens
+  // before an abort is not missed; an already-exited child settles at once.
+  const exited =
+    typeof child.once === 'function'
+      ? new Promise<void>((resolve) => {
+          if (
+            (child.exitCode !== undefined && child.exitCode !== null) ||
+            (child.signalCode !== undefined && child.signalCode !== null)
+          ) {
+            resolve();
+            return;
+          }
+          child.once!('exit', () => resolve());
+        })
+      : undefined;
   return {
     pid: child.pid,
     kill: (signal: NodeJS.Signals) => {
       child.kill(signal);
     },
+    ...(exited ? { exited } : {}),
   };
 }
 
@@ -411,6 +451,140 @@ export class DelegationWallClockExceededError extends Error {
   }
 }
 
+/**
+ * What an explicit abort observed of the delegation's child process:
+ * - `exited`: the child exited within the bounded wait (after SIGTERM, or
+ *   after the SIGKILL escalation);
+ * - `not_exited`: the child was still running after SIGTERM, the grace
+ *   window, SIGKILL and a second grace window;
+ * - `unobservable`: a child was signalled but its handle exposes no exit;
+ * - `no_child`: the delegation had no child process handle;
+ * - `unconfirmed`: a handle-less wrapper waited (`awaitOperationOnStop`) for
+ *   the wrapped call to settle and it had not within the bound, so whether
+ *   the child below it stopped is not known.
+ */
+export type DelegationAbortChildExit =
+  'exited' | 'not_exited' | 'unobservable' | 'no_child' | 'unconfirmed';
+
+const CHILD_EXIT_MARKER = /\(child_exit=(exited|not_exited|unobservable|no_child|unconfirmed)\b/u;
+
+/**
+ * Rejection of an explicitly aborted delegation. The message keeps the
+ * `[DELEGATION_CANCELLED] provider operation aborted` prefix every caller
+ * classifies on, plus a `(child_exit=…)` marker so the observation survives
+ * adapters that re-wrap errors by message.
+ */
+export class DelegationAbortedError extends Error {
+  readonly childExit: DelegationAbortChildExit;
+  readonly signal?: NodeJS.Signals;
+  constructor(
+    childExit: DelegationAbortChildExit,
+    detail: { signal?: NodeJS.Signals; graceMs?: number; waitedMs?: number } = {}
+  ) {
+    const observed =
+      childExit === 'exited'
+        ? `child exited after ${detail.signal ?? 'SIGTERM'}`
+        : childExit === 'not_exited'
+          ? `child still running ${detail.graceMs ?? 0}ms after SIGKILL`
+          : childExit === 'unobservable'
+            ? 'child signalled; its exit is not observable'
+            : childExit === 'unconfirmed'
+              ? `the wrapped call had not settled ${detail.waitedMs ?? 0}ms after the abort`
+              : 'no child process';
+    super(
+      `[DELEGATION_CANCELLED] provider operation aborted (child_exit=${childExit}: ${observed})`
+    );
+    this.name = 'DelegationAbortedError';
+    this.childExit = childExit;
+    if (detail.signal) this.signal = detail.signal;
+  }
+}
+
+/** The child-exit observation an abort rejection carries, if any. */
+export function delegationAbortChildExit(error: unknown): DelegationAbortChildExit | undefined {
+  if (error instanceof DelegationAbortedError) return error.childExit;
+  const text = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  const match = CHILD_EXIT_MARKER.exec(text);
+  return match ? (match[1] as DelegationAbortChildExit) : undefined;
+}
+
+/**
+ * One shape, not a `{ok:true}|{ok:false,error}` union: libs/core compiles with
+ * `strictNullChecks: false`, where boolean-literal narrowing does not apply.
+ */
+type OperationSettlement = { ok: boolean; error?: unknown };
+
+/** The settlement of `settled` if it arrives within `ms`, else undefined; leaves no timer behind. */
+async function settlementWithin(
+  settled: Promise<OperationSettlement>,
+  ms: number
+): Promise<OperationSettlement | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      settled,
+      new Promise<undefined>((resolve) => {
+        timer = setTimeout(() => resolve(undefined), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** Resolve true when `exited` settles within `ms`, false otherwise; leaves no timer behind. */
+async function childExitedWithin(exited: Promise<void>, ms: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      exited.then(() => true),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * Stop an explicitly aborted delegation's child and report what was observed.
+ * SIGTERM, wait up to `graceMs` for exit, escalate to SIGKILL, wait up to
+ * `graceMs` again. A handle without `exited` keeps the previous
+ * fire-and-forget escalation and reports `unobservable`.
+ */
+async function stopChildAfterAbort(
+  child: DelegationChildHandle,
+  graceMs: number,
+  id: string
+): Promise<DelegationAbortedError> {
+  safeKillChild(child, 'SIGTERM');
+  const exited = child.exited;
+  if (!exited) {
+    const sigkillTimer = setTimeout(() => {
+      safeKillChild(child, 'SIGKILL');
+      unregisterActiveChild(id);
+    }, graceMs);
+    sigkillTimer.unref?.();
+    return new DelegationAbortedError('unobservable');
+  }
+  if (await childExitedWithin(exited, graceMs)) {
+    unregisterActiveChild(id);
+    return new DelegationAbortedError('exited', { signal: 'SIGTERM' });
+  }
+  safeKillChild(child, 'SIGKILL');
+  if (await childExitedWithin(exited, graceMs)) {
+    unregisterActiveChild(id);
+    return new DelegationAbortedError('exited', { signal: 'SIGKILL' });
+  }
+  logger.warn(
+    `[delegation-concurrency] aborted delegation child did not exit — still running ${graceMs}ms after SIGKILL | next: inspect pid ${child.pid ?? 'unknown'}; the active-child registry keeps it for the janitor sweep | evidence: id=${id}`
+  );
+  // Still running: it stays registered until it exits (or the janitor sweeps it).
+  void exited.then(() => unregisterActiveChild(id));
+  return new DelegationAbortedError('not_exited', { graceMs });
+}
+
 export class DelegationInactivityExceededError extends Error {
   constructor(
     readonly provider: string,
@@ -436,6 +610,19 @@ export interface WithWallClockBudgetOptions {
   /** Opt-in semantic progress timeout. Transport output does not reset it. */
   inactivity?: { timeoutMs: number; lateResultGraceMs?: number };
   executionMode?: 'bounded' | 'continuous';
+  /**
+   * Only for a budget WITHOUT `child` that wraps a call which has one (the
+   * dispatcher-level budget in `agent-dispatch.ts`). On explicit abort or
+   * wall-clock expiry, keep this call pending until `fn` settles — bounded by
+   * {@link stopSettleBoundMs} (2 × `killGraceMs` + margin) — instead of
+   * rejecting at once, so a concurrency slot held around it stays held while
+   * the inner adapter stops its child. The abort rejection is then the
+   * provider's own (`child_exit=exited|not_exited|…`) when `fn` rejected with
+   * one, `no_child` when `fn` settled without one, and `unconfirmed` after the
+   * bound. Expiry still rejects with {@link DelegationWallClockExceededError}.
+   * Ignored when `child` is supplied (that path already waits for the exit).
+   */
+  awaitOperationOnStop?: boolean;
 }
 
 /**
@@ -500,6 +687,26 @@ export async function withWallClockBudget<T>(
   let inactive = false;
   let terminal = false;
   let armInactivity = () => {};
+  let abortOutcome: Promise<Error> | undefined;
+  let expiryOutcome: Promise<Error> | undefined;
+  // Handle-less wrapper of a call that owns a child: wait for that call on stop.
+  const awaitOperation = Boolean(opts.awaitOperationOnStop && !opts.child);
+  const settleBoundMs = stopSettleBoundMs(graceMs);
+  let notifySettled: (settlement: OperationSettlement) => void = () => {};
+  const operationSettled = new Promise<OperationSettlement>((resolve) => {
+    notifySettled = resolve;
+  });
+  const abortAfterOperationSettles = async (): Promise<Error> => {
+    const settlement = await settlementWithin(operationSettled, settleBoundMs);
+    if (!settlement) return new DelegationAbortedError('unconfirmed', { waitedMs: settleBoundMs });
+    // The provider's own observation of its child, never one made up here.
+    if (!settlement.ok && delegationAbortChildExit(settlement.error)) {
+      return settlement.error instanceof Error
+        ? settlement.error
+        : new Error(String(settlement.error));
+    }
+    return new DelegationAbortedError('no_child');
+  };
 
   const timeoutPromise = new Promise<never>((_resolve, reject) => {
     killListener = () => {
@@ -524,7 +731,11 @@ export async function withWallClockBudget<T>(
           }, graceMs);
           sigkillTimer.unref?.();
         }
-        reject(new DelegationWallClockExceededError(provider, budgetMs));
+        const exceeded = new DelegationWallClockExceededError(provider, budgetMs);
+        if (awaitOperation) {
+          expiryOutcome = settlementWithin(operationSettled, settleBoundMs).then(() => exceeded);
+          void expiryOutcome.then(reject);
+        } else reject(exceeded);
       }, budgetMs);
       sigtermTimer.unref?.();
     }
@@ -533,15 +744,15 @@ export async function withWallClockBudget<T>(
         terminal = true;
         timedOut = true;
         controller.abort();
-        if (opts.child) {
-          safeKillChild(opts.child, 'SIGTERM');
-          const sigkillTimer = setTimeout(() => {
-            safeKillChild(opts.child!, 'SIGKILL');
-            unregisterActiveChild(id);
-          }, graceMs);
-          sigkillTimer.unref?.();
-        }
-        reject(new Error('[DELEGATION_CANCELLED] provider operation aborted'));
+        // Reject only once the child is shown stopped (bounded by the
+        // SIGTERM/SIGKILL grace windows), so an abort rejection means the
+        // process exited, not merely that stopping started.
+        abortOutcome = opts.child
+          ? stopChildAfterAbort(opts.child, graceMs, id)
+          : awaitOperation
+            ? abortAfterOperationSettles()
+            : Promise.resolve(new DelegationAbortedError('no_child'));
+        void abortOutcome.then(reject);
       };
       if (opts.signal.aborted) abortListener();
       else opts.signal.addEventListener('abort', abortListener, { once: true });
@@ -595,13 +806,24 @@ export async function withWallClockBudget<T>(
       () => fn(controller.signal, () => !terminal && !opts.signal?.aborted),
       opts.executionMode
     );
+    operation.then(
+      () => notifySettled({ ok: true }),
+      (error: unknown) => notifySettled({ ok: false, error })
+    );
     const result = await Promise.race([operation, timeoutPromise]);
+    // The child closing after SIGTERM can settle fn first: report the abort.
+    if (abortOutcome) throw await abortOutcome;
+    if (expiryOutcome) throw await expiryOutcome;
     // A synchronous abort listener can settle fn before the race rejection.
     if (terminal || opts.signal?.aborted) {
       throw new Error('[DELEGATION_CANCELLED] result arrived after terminal cancellation');
     }
     return result;
   } catch (error) {
+    // An aborted child exiting makes fn reject ("exited with code null") while
+    // the abort still waits on the exit; the abort observation is the answer.
+    if (abortOutcome && !(error instanceof DelegationAbortedError)) throw await abortOutcome;
+    if (expiryOutcome) throw await expiryOutcome;
     if (inactive && !terminal) {
       terminal = true;
       timedOut = true;

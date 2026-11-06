@@ -233,8 +233,8 @@ const APPEND_ONLY_PARTITION_KEYS: ReadonlySet<string> = new Set(
 );
 
 /**
- * Run `fn` as the dedicated store role of the tenant ledger / approval
- * partition `absolutePath` lies in (live checkout only); otherwise as the
+ * Run `fn` as the dedicated store role of the tenant ledger / approval /
+ * delegation partition `absolutePath` lies in (live checkout only); otherwise as the
  * caller. Those partitions admit no broad runtime write.
  */
 function asPartitionStore<T>(absolutePath: string, fn: () => T): T {
@@ -245,6 +245,9 @@ function asPartitionStore<T>(absolutePath: string, fn: () => T): T {
   }
   if (store.storeRole === 'tenant_approval_store') {
     return withExecutionContext('tenant_approval_store', fn, undefined, store.tenant);
+  }
+  if (store.storeRole === 'delegation_record_store') {
+    return withExecutionContext('delegation_record_store', fn, undefined, store.tenant);
   }
   throw new Error(`[BACKUP_RESTORE_STORE_ROLE_UNKNOWN] ${store.storeRole}`);
 }

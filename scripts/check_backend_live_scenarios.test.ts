@@ -93,7 +93,34 @@ describe('check:backend-live-scenarios entrypoint', () => {
     );
     expect(mocks.runBackendLiveScenarios).toHaveBeenCalledWith(
       backend,
-      expect.objectContaining({ turnTimeoutMs: BACKEND_LIVE_TURN_TIMEOUT_MS })
+      // A CLI backend's abort must show its child process exited.
+      expect.objectContaining({
+        turnTimeoutMs: BACKEND_LIVE_TURN_TIMEOUT_MS,
+        requireChildExit: true,
+      })
+    );
+  });
+
+  it('does not require a child exit from a backend with no child process', async () => {
+    mocks.buildTaskReasoningBackend.mockReturnValue({ name: 'api-live' });
+    mocks.runBackendLiveScenarios.mockResolvedValue({
+      version: '1.0.0',
+      run_id: 'r',
+      mode: 'anthropic',
+      backend_name: 'api-live',
+      served_model: 'unreported',
+      started_at: 'a',
+      finished_at: 'b',
+      scenarios: [],
+    });
+    mocks.recordBackendLiveScenarioRun.mockReturnValue('/tmp/r.json');
+    await runCheckBackendLiveScenarios(['--live', '--mode', 'anthropic']);
+    expect(mocks.buildTaskReasoningBackend).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'anthropic', requestTimeout: 'caller' })
+    );
+    expect(mocks.runBackendLiveScenarios).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ requireChildExit: false })
     );
   });
 

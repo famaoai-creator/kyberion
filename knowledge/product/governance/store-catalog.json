@@ -611,6 +611,42 @@
       "sources": ["role-policy"]
     },
     {
+      "id": "runtime.provider-attestations",
+      "path": "active/shared/runtime/provider-attestations",
+      "custody": {
+        "kind": "derived",
+        "note": "System records live in system/attestations.json; person records live in personal/shared/<owner>.json. This mixed root has no tenant partition and does not establish one custodian or tier."
+      },
+      "status": "active",
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "provider_attestations",
+        "order": 15,
+        "partition_shape": "system_person",
+        "retention_path": "active/shared/runtime/provider-attestations"
+      }
+    },
+    {
+      "id": "runtime.delegations",
+      "path": "active/shared/runtime/delegation-records/confidential/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "active",
+      "legacy_roles": ["delegation_record_store"],
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "ledger",
+        "key": "delegations",
+        "order": 6,
+        "retention_path": "active/shared/runtime/delegation-records"
+      },
+      "note": "Tenant delegation traces, resumable records, child inboxes and completion notifications share this confidential partition. Untenanted delegations use the separate system/ partition; mixed legacy traces, records and notification queues are read-only fallbacks, not tenant custody inferred from this declaration."
+    },
+    {
       "id": "runtime.execution-metrics",
       "path": "active/shared/runtime/execution-metrics",
       "custody": {

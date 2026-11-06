@@ -41,6 +41,19 @@ function classify(result: VcsCommandResult): VcsHostErrorCode {
   return 'unavailable';
 }
 
+/**
+ * The first line of gh's error output, credential-shaped tokens redacted and
+ * capped, so a failed publication says why (`HTTP 502`, a timeout) instead of
+ * only that it failed.
+ */
+export function failureDetail(result: VcsCommandResult): string {
+  const source = String(result.stderr || result.error?.message || '').trim();
+  const line = source.split('\n', 1)[0]?.trim() ?? '';
+  if (!line) return '';
+  const redacted = line.replace(/\b(?:gh[opsu]_|github_pat_)[A-Za-z0-9_]{8,}/gu, '[redacted]');
+  return ` — ${redacted.length > 200 ? `${redacted.slice(0, 200)}…` : redacted}`;
+}
+
 export function createGhCliVcsHostProvider(
   options: { run?: VcsCommandRunner } = {}
 ): VcsHostProvider {
@@ -61,7 +74,7 @@ export function createGhCliVcsHostProvider(
   const gh = (ctx: VcsHostCallContext, args: string[], label: string): string => {
     const result = run('gh', args, execOptions(ctx));
     if (result.error || result.status !== 0)
-      throw new VcsHostError(classify(result), `gh ${label} failed`);
+      throw new VcsHostError(classify(result), `gh ${label} failed${failureDetail(result)}`);
     return result.stdout;
   };
   const json = <T>(ctx: VcsHostCallContext, args: string[], label: string): T => {

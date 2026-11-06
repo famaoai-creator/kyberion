@@ -3,7 +3,7 @@ title: Runtime Storage Layout
 category: Architecture
 tags: [storage, artifacts, workspace, tmp, cache, staging, tier, multi-tenant, retention]
 importance: 8
-last_updated: 2026-10-31
+last_updated: 2026-11-05
 runtime_stages: [alignment, execution, review]
 ---
 
@@ -207,7 +207,12 @@ one domain, `active/shared/runtime/dot/`, and is addressed only through
 
 Tenant prose (memory, follow-up reasons, inbound event bodies, work results)
 never goes in a system-floor file; the tenant-scoped inbound events ledger
-lives under the tenant namespace. The older flat dot ledgers directly under
+lives under the tenant namespace. Pre-partition tenant copies under
+`dot/tenants/<slug>/` are moved for a live tenant only by the
+operator-reviewed `pnpm kyberion dot migrate-state`; when the tenant is
+offboarded they are exported and soft-deleted automatically (audited) like the
+tenant's other runtime state, while its partitioned dot state stays
+review-required (`not_offboarded`). The older flat dot ledgers directly under
 `active/shared/runtime/` (wake, action, inbox) stay shared and carry
 category-only text for tenant dots. One `storage-retention-catalog.json` entry
 covers `active/shared/runtime/dot`. See
@@ -429,6 +434,80 @@ the record is stored follows its scope
   learning-signal rejection reader cover the partitions too. Retention is
   `review_required`; tenant offboarding exports and soft-deletes the tenant's
   partitions (target kind `tenant_approvals`).
+
+### Delegation trace and records
+
+The delegated-task trace and the resumable delegation records
+(`libs/core/delegated-task-observability.ts`) carry tenant instruction,
+context and result text, so they live in the registered ledger root
+`active/shared/runtime/delegation-records/` (`PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations`):
+
+| Delegation | Trace                                     | Records / child inboxes                                             | Notification queue                          |
+| ---------- | ----------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------- |
+| untenanted | `system/delegations.jsonl`                | `system/records/<id>.json`, `system/records/child-inbox/`           | `system/notifications.jsonl`                |
+| tenant     | `confidential/<tenant>/delegations.jsonl` | `confidential/<tenant>/records/<id>.json`, `…/records/child-inbox/` | `confidential/<tenant>/notifications.jsonl` |
+
+- A tenant delegation is always `confidential` (it holds tenant prose). The
+  record's `tenant_slug` (stamped from the bound tenant at start) decides
+  every later write, so settlement, activation claims and resumes stay in
+  that partition; a resume refuses a tenant other than the bound one
+  (`[DELEGATION_TENANT_SCOPE_MISMATCH]`), and a cold-resume worker process is
+  spawned with `KYBERION_TENANT` set to the record's tenant.
+- Tenant partitions are `tenant_scope.protected_prefixes` and a dedicated
+  store root (`TENANT_STORE_LEDGER_ROOTS.delegations`): only the tenant-bound
+  `delegation_record_store` role, bound to the partition's tenant, reads or
+  writes them (locks stay under the caller's role). The system partition keeps
+  the ordinary runtime grants (`chronos_gateway` names `system/`).
+- **Readers.** `loadDelegatedTaskRecord(id)`: a tenant-bound process looks only
+  in its own partition; an unbound process looks in `system/`, then every
+  tenant partition, then the legacy directory.
+  `listActiveDelegatedTaskRecords(limit, read?)`: omitted `read` is the
+  process's own scope (bound tenant, else `system/` only); `{ tenants,
+includeSystem }` narrows for an unbound reader (the Concierge response
+  status passes the selected company); a bound reader's request for another
+  tenant or `system/` is dropped. Learning signals read `system/` plus the
+  legacy trace only (closed tokens).
+- **Legacy shared copies** (`active/shared/observability/delegations.jsonl`
+  with its rotated `delegations-YYYYMMDD-HHmmss.jsonl` segments, and
+  `active/shared/observability/delegations/`) are never appended to again.
+  A legacy record is attributed by its `tenant_slug`, else by its mission's
+  location (`active/[archive/]missions/<tier>/<tenant>/<id>`): a bound reader
+  sees only records attributed to its tenant (an unresolvable mission hides
+  the record), an unbound reader sees them as before. The next write of a
+  legacy record lands in its partition and removes the shared copy
+  (migration on first write; a legacy child inbox is read until the
+  partitioned one exists). Tenant offboarding exports and soft-deletes the
+  tenant's legacy records and child inboxes (target kind
+  `delegation_legacy_record`) and, under a per-file lock, exports then prunes
+  the tenant's rows from the legacy trace and each segment in one atomic,
+  audited rewrite (`SCOPE_OFFBOARD_DELEGATION_TRACE_PRUNE`); attribution uses
+  the tenant's mission ids taken before its mission trees are removed, which
+  the post-offboard verification reuses. Rows with neither a stamp nor a
+  mission cannot be attributed and stay (readable by unbound processes only).
+- **Notification queue.** The background-delegation completion queue
+  (`mission/delegation-notifications.ts`; tenant instruction / result
+  excerpts) lives in the same partitions: `system/notifications.jsonl` and
+  `confidential/<tenant>/notifications.jsonl`, written to the delegation's
+  partition (its record's `tenant_slug`, else the bound tenant) as
+  `delegation_record_store`. A tenant-bound process lists and claims only its
+  own partition (enqueueing for another tenant is refused,
+  `[DELEGATION_TENANT_SCOPE_MISMATCH]`); an unbound host — the delivering
+  mission worker — drains `system/`, every tenant partition and the legacy
+  queue. Claiming rewrites the partition file under the
+  `delegation-notifications` lock (delivered at most once, as before).
+- **Legacy notification queue** (`active/shared/runtime/delegations/notifications.jsonl`)
+  is never appended to or rewritten at runtime. A row is attributed by its
+  `tenant_slug`, else by the partition holding its delegation record, else by
+  its mission's location; a bound reader sees only rows attributed to it and
+  unattributed rows reach unbound processes only (fail closed). Claiming a
+  legacy row appends it, claimed, to its partition; that copy shadows the
+  legacy row (same `notification_id`), so it is never delivered again and
+  previously claimed rows stay claimed. Tenant offboarding exports then prunes
+  the tenant's rows (stamp, mission, or one of its delegation ids) under the
+  queue lock in one atomic, audited rewrite
+  (`SCOPE_OFFBOARD_DELEGATION_NOTIFICATION_PRUNE`, streamed; a file with an
+  oversized line is refused, not rewritten); the partition queue is exported
+  and soft-deleted with the partition.
 
 ### Tenant runtime partitions (backup, restore, offboarding)
 

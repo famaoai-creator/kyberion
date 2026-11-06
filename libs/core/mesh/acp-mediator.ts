@@ -1,5 +1,9 @@
 import { logger } from '../core.js';
-import { getRegisteredEnvText, withoutRelayManagedCredentials } from '../foundation/env.js';
+import {
+  buildProxyPassthroughEnv,
+  getRegisteredEnvText,
+  withoutRelayManagedCredentials,
+} from '../foundation/env.js';
 import { ptyEngine } from '../shell/pty-engine.js';
 import { dispatchA2UI } from '../a2ui.js';
 import {
@@ -62,12 +66,7 @@ const ENV_WHITELIST = [
   'NODE_EXTRA_CA_CERTS',
   'SSL_CERT_FILE',
   'SSL_CERT_DIR',
-  'HTTP_PROXY',
-  'HTTPS_PROXY',
-  'NO_PROXY',
-  'http_proxy',
-  'https_proxy',
-  'no_proxy',
+  // Proxy vars: added by buildProxyPassthroughEnv (loopback-guarded).
 ];
 
 export function sanitizeEnvForChild(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -78,6 +77,7 @@ export function sanitizeEnvForChild(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   for (const key of ENV_WHITELIST) {
     if (env[key]) safe[key] = env[key] as string;
   }
+  Object.assign(safe, buildProxyPassthroughEnv(env));
   // Credential relay flag on: an ACP child starts no relay, so the raw key is dropped.
   return withoutRelayManagedCredentials(safe, env) as unknown as NodeJS.ProcessEnv;
 }
