@@ -65,7 +65,7 @@ describe('asset read ceiling (G1, decide step 1)', () => {
     expect(result.ceiling).toBe(bound === owner);
   });
 
-  it('never lets the guard allow a cross-tenant read the ceiling denies, except the known gaps', () => {
+  it('never lets the guard allow a cross-tenant read the ceiling denies', () => {
     const allowedOutsideCeiling: string[] = [];
     for (const store of stores) {
       if (store.status !== 'active' || store.custody.kind !== 'tenant') continue;
@@ -84,12 +84,8 @@ describe('asset read ceiling (G1, decide step 1)', () => {
           allowedOutsideCeiling.push(`${store.id}:${tier}`);
       }
     }
-    // Same gaps as tests/tenant-store-guard-gaps.test.ts: no protected prefix yet (G2).
-    expect(allowedOutsideCeiling.sort()).toEqual([
-      'projects:personal',
-      'runtime.surface-management:confidential',
-      'runtime.surface-management:personal',
-    ]);
+    // G2 closed the three unprotected partitions this sweep found.
+    expect(allowedOutsideCeiling).toEqual([]);
   });
 
   it('takes the tier ceiling from the role declaration, public always included', () => {
@@ -102,7 +98,8 @@ describe('asset read ceiling (G1, decide step 1)', () => {
   it('never lets the guard read a tier a role does not declare, except the known classes', () => {
     // Accepted for now, each for a recorded reason (G2):
     // - stance-logs: declared personal, but lives on the public logs floor;
-    // - runtime.surface-management: no protected prefix, readable by anyone;
+    // - runtime.surface-management: like the floors, the bound tenant's partition is
+    //   readable by any role bound to that tenant (runtime default read);
     // - tenant floors: the bound tenant's scratch, staging and cache partitions are
     //   readable by any role bound to that tenant, whatever the role's tiers.
     const known = new Set([
