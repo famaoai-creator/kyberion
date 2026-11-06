@@ -9,6 +9,7 @@ import {
   isArchivedMissionStateCapability,
 } from './archived-mission-state-capability.js';
 import { isCustomerDecisionInviteCapability } from './customer-decision-invite-capability.js';
+import { customerDecisionConsumerGrantActive } from './customer-decision-consumer-capability.js';
 import { customerDecisionInviteWriteDenial } from './customer-decision-invite-write-content.js';
 import {
   CONTENT_CHECKED_ROLES,
@@ -33,8 +34,9 @@ import {
  *     and may only append to the shared entries file;
  *   - `archived_mission_state_reader`: reads only under its exact capability;
  *   - `customer_channel_binding_store`: writes / mkdirs only the bindings file;
- *   - content-checked roles (consumer / milestone store): every write is
- *     checked against the record on disk;
+ *   - content-checked stores: every write inside a live consumer-lock grant
+ *     (G2: no role) and every write of the milestone store role is checked
+ *     against the record on disk;
  *   - an active customer decision invite capability (G2: it replaced the
  *     `customer_decision_invite_store` role, whatever role the caller holds):
  *     writes / mkdirs only for a registered active tenant, except a
@@ -81,6 +83,17 @@ export function narrowStoreRoleDenial(input: {
     });
     if (inviteDenial) return inviteDenial;
   }
+  // G2: every write inside a live consumer-lock grant (no role) is content-checked.
+  if (operation === 'write' && customerDecisionConsumerGrantActive()) {
+    const contentDenial = customerDecisionWriteContentDenial(
+      'consumer',
+      relativePath,
+      input.content,
+      input.scope?.metadataExact?.[0],
+      input.readRepoFile
+    );
+    if (contentDenial) return contentDenial;
+  }
   if (!role) return null;
   if (
     role === DELIVERABLE_INBOX_WRITER_ROLE &&
@@ -118,7 +131,7 @@ export function narrowStoreRoleDenial(input: {
     return '[RESOURCE_SCOPE_REQUIRED] Archived mission state reads require their exact read-only capability';
   if (operation === 'write' && CONTENT_CHECKED_ROLES.has(role))
     return customerDecisionWriteContentDenial(
-      role,
+      'milestone',
       relativePath,
       input.content,
       input.scope?.metadataExact?.[0],

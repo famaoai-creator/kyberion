@@ -137,14 +137,6 @@
       "allowed_actuators": [],
       "tier_access": ["confidential"]
     },
-    "customer_decision_consumer_store": {
-      "description": "Customer decision consumer lock storage (CD-09, libs/core/mission/mission-decision-lock.ts): reads the bound tenant's decision case (decisions.jsonl, switches.jsonl, agendas/, consumers/) and writes only consumers/<consumer>.json under knowledge/confidential/<tenant>/decisions/<case>/. Requires an exact deny-only case capability (libs/core/foundation/customer-decision-consumer-capability.ts) naming every path before each operation; tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). No ledger, agenda, receipt, switch, invite or customers/ write authority.",
-      "default_persona": "unknown",
-      "write_scopes": ["knowledge/confidential/${KYBERION_TENANT}/decisions/"],
-      "scope_classes": ["knowledge_core"],
-      "allowed_actuators": [],
-      "tier_access": ["confidential"]
-    },
     "customer_decision_deal_note_writer": {
       "description": "Tenant deal store (libs/core/deal-store.ts asDealStore, S3): every read and write of a tenant's customer records — deals, deal documents, requirements captures, escalations and the deal log under knowledge/confidential/<tenant>/deals/ — runs as this role, bound to that tenant (tenant-bound: libs/core/authority.ts TENANT_BOUND_READER_ROLES), and scripts/customer_decision.ts respond / confirm uses it for the best-effort deal note (CD-08), so neither the customer-triggered path nor a surface needs mission_controller or a confidential-tier grant. Only the deal file IO runs under it; callers keep their own role for notifications and the memory promotion queue. No other knowledge, decision ledger, agenda, receipt or invite authority.",
       "default_persona": "worker",
