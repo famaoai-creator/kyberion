@@ -3,6 +3,7 @@ import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
   PARTITIONED_RUNTIME_LEDGER_ROOTS,
   STORAGE_FLOOR_ROOTS,
+  SURFACE_MANAGEMENT_ROOT_PATH,
 } from './foundation/runtime-state-roots.js';
 import { createHash } from 'node:crypto';
 import { rootDir } from './path-resolver.js';
@@ -413,6 +414,31 @@ export function partitionedRuntimeStateKnowledgePath(filePath: string): string |
 export function partitionedRuntimeStateTierInPath(filePath: string): StorageDataTier | undefined {
   const normalized = filePath.replace(/\\/gu, '/');
   for (const root of Object.values(PARTITIONED_RUNTIME_STATE_ROOTS)) {
+    const escaped = root.replace(/[.*+?^$()|[\]\\]/gu, '\\$&');
+    const match = normalized.match(
+      new RegExp('(?:^|/)' + escaped + '/(personal|confidential|public)(?:/|$)', 'u')
+    );
+    if (match) return match[1] as StorageDataTier;
+  }
+  return undefined;
+}
+
+/**
+ * Tier-partitioned runtime roots that are neither state roots nor floors: the
+ * ledger roots and the surface management partitions
+ * (`<root>/<personal|confidential|public>/<tenant>/`). detectTier reads their
+ * tier from the path so a confidential ledger partition is never reported as
+ * public (egress and publication checks key on it).
+ */
+export const TIER_PARTITIONED_RUNTIME_ROOTS: readonly string[] = [
+  ...Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS),
+  SURFACE_MANAGEMENT_ROOT_PATH,
+];
+
+/** The tier segment of a path under a ledger or other tier-partitioned runtime root. */
+export function partitionedRuntimeTierInPath(filePath: string): StorageDataTier | undefined {
+  const normalized = filePath.replace(/\\/gu, '/');
+  for (const root of TIER_PARTITIONED_RUNTIME_ROOTS) {
     const escaped = root.replace(/[.*+?^$()|[\]\\]/gu, '\\$&');
     const match = normalized.match(
       new RegExp('(?:^|/)' + escaped + '/(personal|confidential|public)(?:/|$)', 'u')

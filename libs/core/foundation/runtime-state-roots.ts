@@ -118,6 +118,13 @@ export const LEGACY_DELEGATION_NOTIFICATIONS_PATH =
 export const DELEGATION_NOTIFICATIONS_LOCK = 'delegation-notifications';
 
 /**
+ * Root of the surface management partitions
+ * (`<personal|confidential|public>/<tenant>/`, libs/core/surface/surface-management-mutations.ts):
+ * tier-partitioned like a state root, tenant-scoped by protected prefixes.
+ */
+export const SURFACE_MANAGEMENT_ROOT_PATH = 'active/shared/runtime/surface-management';
+
+/**
  * The shared inter-process lock directory (foundation/lock-utils.ts LOCK_ROOT);
  * narrow store roles that take a store lock name it from here.
  */

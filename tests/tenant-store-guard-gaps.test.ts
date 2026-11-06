@@ -6,10 +6,11 @@ import { detectTier } from '@agent/core/tier-guard';
 import type { AssetStoreDeclaration } from '@agent/core/contracts/asset-scope';
 
 /**
- * Where the store catalog (the asset address) and tier-guard still disagree.
- * Found by the G1 comparison; each list is the current, accepted state and is
- * meant to shrink to empty in G2. A new entry is a regression: a tenant store
- * the guard does not scope, or one whose tier the guard misreads.
+ * The store catalog (the asset address) and tier-guard must agree on every
+ * tenant partition: each personal/confidential partition is tenant-scoped by a
+ * protected prefix, and detectTier reads its tier. The G1 comparison found
+ * three unscoped partitions and five stores whose tier it misread; G2 closed them. A new entry
+ * is a regression.
  */
 const rootDir = process.cwd();
 const readJson = <T>(rel: string): T =>
@@ -30,21 +31,15 @@ const partitioned = stores.filter(
 );
 const PROTECTED_TIERS = ['personal', 'confidential'] as const;
 
-describe('tenant store guard gaps (G1 → G2)', () => {
-  it('lists the tenant partitions tier-guard does not tenant-scope', () => {
+describe('tenant store guard coverage', () => {
+  it('tenant-scopes every personal and confidential tenant partition', () => {
     const missing = partitioned.flatMap((store) =>
       PROTECTED_TIERS.map((tier) => `${store.path.slice(0, store.path.indexOf('<tier>'))}${tier}/`)
     );
-    // Known gaps: tenant data on these personal/confidential partitions has no
-    // protected prefix, so a caller bound to another tenant is not refused.
-    expect(missing.filter((prefix) => !protectedPrefixes.includes(prefix)).sort()).toEqual([
-      'active/projects/personal/',
-      'active/shared/runtime/surface-management/confidential/',
-      'active/shared/runtime/surface-management/personal/',
-    ]);
+    expect(missing.filter((prefix) => !protectedPrefixes.includes(prefix)).sort()).toEqual([]);
   });
 
-  it('lists the tenant partitions whose tier detectTier misreads as public', () => {
+  it('reads the tier of every tenant partition from its path', () => {
     const misread = partitioned.flatMap((store) =>
       PROTECTED_TIERS.flatMap((tier) => {
         const sample = `${store.path.replace('<tier>', tier).replace('<tenant>', 'acme')}/x.json`;
@@ -55,20 +50,6 @@ describe('tenant store guard gaps (G1 → G2)', () => {
           : [];
       })
     );
-    // detectTier knows the state roots and floors, not the ledger roots: their
-    // protected prefixes and store roles still scope them, but tier rules that
-    // key on detectTier see public.
-    expect(misread.sort()).toEqual([
-      'runtime.execution-metrics.tenant:confidential',
-      'runtime.execution-metrics.tenant:personal',
-      'runtime.surface-management:confidential',
-      'runtime.surface-management:personal',
-      'runtime.tenant-approvals:confidential',
-      'runtime.tenant-approvals:personal',
-      'runtime.tenant-ledger:confidential',
-      'runtime.tenant-ledger:personal',
-      'runtime.usage-ledger.tenant:confidential',
-      'runtime.usage-ledger.tenant:personal',
-    ]);
+    expect(misread.sort()).toEqual([]);
   });
 });
