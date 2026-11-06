@@ -1,7 +1,7 @@
 import type { ResourceAccessOperation, ResourceAccessScope } from './resource-access-scope.js';
 import {
-  PERSONAL_APPROVAL_STORE_ROLE,
   personalApprovalIoAllowed,
+  personalApprovalIoNarrowing,
 } from './personal-approval-io-capability.js';
 import { taskSourceWorkspaceIoDenial } from './task-source-workspace-capability.js';
 import {
@@ -54,16 +54,14 @@ export function narrowStoreRoleDenial(input: {
   const { role, relativePath } = input;
   // `shared` is the personal storage marker, never a tenant credential. An
   // unbound tenant-store reader must not reinterpret this owner namespace.
+  // G2: only the live personal approval owner window (no role) reaches an owner partition,
+  // and every I/O made while a window is entered is narrowed to it.
   if (
     /(?:^|\/)tenant-approvals\/personal\/shared\/owners(?:\/|$)/u.test(relativePath) &&
-    (role !== PERSONAL_APPROVAL_STORE_ROLE ||
-      !personalApprovalIoAllowed(relativePath, input.operation))
-  )
-    return '[PERSONAL_APPROVAL_SCOPE_REQUIRED] Personal owner partition requires exact owner IO';
-  if (
-    role === PERSONAL_APPROVAL_STORE_ROLE &&
     !personalApprovalIoAllowed(relativePath, input.operation)
   )
+    return '[PERSONAL_APPROVAL_SCOPE_REQUIRED] Personal owner partition requires exact owner IO';
+  if (!personalApprovalIoNarrowing(relativePath, input.operation))
     return '[PERSONAL_APPROVAL_SCOPE_REQUIRED] Exact personal owner IO window required';
   // G2: an open task source workspace window (no role) narrows every I/O made inside it;
   // its liveness check runs with the window suspended, so it is never narrowed.

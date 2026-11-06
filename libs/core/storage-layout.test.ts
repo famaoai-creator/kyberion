@@ -379,23 +379,10 @@ describe('tenant approval partitions', () => {
       allow_write: [],
     });
     for (const [role, grant] of Object.entries(policy.authority_role_permissions))
-      if (
-        role !== 'tenant_approval_store' &&
-        role !== 'tenant_approval_partition_index_reader' &&
-        role !== 'personal_approval_store'
-      )
+      if (role !== 'tenant_approval_store' && role !== 'tenant_approval_partition_index_reader')
         expect(JSON.stringify(grant)).not.toContain('runtime/tenant-approvals');
-    expect(policy.authority_role_permissions.personal_approval_store).toEqual({
-      allow_read: [
-        'knowledge/product/',
-        'active/shared/runtime/tenant-approvals/personal/shared/',
-        'active/shared/runtime/vitest-approvals/',
-      ],
-      allow_write: [
-        'active/shared/runtime/tenant-approvals/personal/shared/',
-        'active/shared/runtime/vitest-approvals/',
-      ],
-    });
+    // G2: the personal owner partitions are reached through the owner window, not a role.
+    expect(policy.authority_role_permissions.personal_approval_store).toBeUndefined();
   });
 });
 

@@ -1,8 +1,4 @@
 import {
-  PERSONAL_APPROVAL_STORE_ROLE,
-  personalApprovalIoAllowed,
-} from './foundation/personal-approval-io-capability.js';
-import {
   isArchivedMissionStateCapability,
   ARCHIVED_MISSION_STATE_READER_ROLE,
 } from './foundation/archived-mission-state-capability.js';
@@ -794,8 +790,6 @@ function prepareExecutionContext(
 ): PreparedExecutionContext {
   const normalizedRole = normalizeRoleName(role.trim());
   const executionIdentity = { ...currentExecutionScope()?.executionIdentity, ...identity };
-  if (normalizedRole === PERSONAL_APPROVAL_STORE_ROLE && !personalApprovalIoAllowed())
-    throw new Error('[PERSONAL_APPROVAL_SCOPE_REQUIRED] Exact personal owner IO window required');
   for (const value of Object.values(executionIdentity)) {
     if (value !== null && value !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(value))
       throw new Error('[SCOPE_CONTEXT_INVALID] invalid execution identity');
