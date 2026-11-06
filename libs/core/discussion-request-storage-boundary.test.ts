@@ -491,3 +491,156 @@ it('does not bootstrap a protected container for an inactive tenant', async () =
     )
   );
 });
+
+describe('the Discussion request grant is opaque and live-only', () => {
+  const binding = (write = true) => ({
+    directory: path.relative(ROOT, directory()).split(path.sep).join('/'),
+    tenant: TENANT,
+    write,
+  });
+  const assume = () =>
+    withExecutionContext('discussion_request_store', () => undefined, undefined, TENANT);
+  const reservation = () => path.join(directory(), 'reservation.json');
+  async function grantModules() {
+    const capability = await import('./foundation/discussion-request-capability.js');
+    const scope = await import('./foundation/resource-access-scope.js');
+    return { ...capability, ...scope };
+  }
+
+  it('resolves only inside its issuer', async () => {
+    const {
+      withDiscussionRequestCapability,
+      isDiscussionRequestCapability,
+      currentResourceAccessScope,
+    } = await grantModules();
+    expect(isDiscussionRequestCapability(currentResourceAccessScope())).toBe(false);
+    withDiscussionRequestCapability(binding(), () => {
+      expect(isDiscussionRequestCapability(currentResourceAccessScope())).toBe(true);
+      expect(assume).not.toThrow();
+    });
+    expect(assume).toThrow(/RESOURCE_SCOPE_REQUIRED/);
+  });
+
+  it('denies a forged scope with the exact ceiling and a fake token', async () => {
+    const {
+      withDiscussionRequestCapability,
+      runInResourceAccessScope,
+      currentResourceAccessScope,
+    } = await grantModules();
+    let ceiling!: import('./foundation/resource-access-scope.js').ResourceAccessScope;
+    withDiscussionRequestCapability(binding(), () => {
+      ceiling = { ...currentResourceAccessScope()! };
+    });
+    expect(Object.hasOwn(ceiling, 'opaqueStoreToken')).toBe(false);
+    runInResourceAccessScope(ceiling, () => expect(assume).toThrow(/RESOURCE_SCOPE_REQUIRED/));
+    expect(() =>
+      runInResourceAccessScope({ ...ceiling, opaqueStoreToken: {} } as never, () => assume())
+    ).toThrow(/RESOURCE_SCOPE_REQUIRED/);
+  });
+
+  it('denies a copy of the live grant nested inside it', async () => {
+    const {
+      withDiscussionRequestCapability,
+      runInResourceAccessScope,
+      currentResourceAccessScope,
+    } = await grantModules();
+    withDiscussionRequestCapability(binding(), () => {
+      const live = currentResourceAccessScope()!;
+      runInResourceAccessScope({ ...live }, () =>
+        expect(assume).toThrow(/RESOURCE_SCOPE_REQUIRED/)
+      );
+    });
+  });
+
+  it('cannot return its grant, and an escaped or expired scope resolves nothing', async () => {
+    const {
+      withDiscussionRequestCapability,
+      isDiscussionRequestCapability,
+      runInResourceAccessScope,
+      currentResourceAccessScope,
+    } = await grantModules();
+    expect(() =>
+      withDiscussionRequestCapability(binding(), () => currentResourceAccessScope())
+    ).toThrow(/DISCUSSION_REQUEST_CAPABILITY_ESCAPE/);
+    let escaped: ReturnType<typeof currentResourceAccessScope>;
+    withDiscussionRequestCapability(binding(), () => {
+      escaped = currentResourceAccessScope();
+    });
+    expect(isDiscussionRequestCapability(escaped)).toBe(false);
+    expect(() => runInResourceAccessScope(escaped!, () => assume())).toThrow(
+      /RESOURCE_SCOPE_REQUIRED/
+    );
+  });
+
+  it('is synchronous only: an async body loses the grant before it can run', async () => {
+    const {
+      withDiscussionRequestCapability,
+      isDiscussionRequestCapability,
+      currentResourceAccessScope,
+    } = await grantModules();
+    let later: boolean | undefined;
+    expect(() =>
+      withDiscussionRequestCapability(binding(), () =>
+        Promise.resolve().then(() => {
+          later = isDiscussionRequestCapability(currentResourceAccessScope());
+        })
+      )
+    ).toThrow(/DISCUSSION_REQUEST_CAPABILITY_ASYNC/);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(later).toBe(false);
+  });
+
+  it('does not accept a counterfeit issuer with the same ceiling', async () => {
+    const {
+      withDiscussionRequestCapability,
+      createSynchronousResourceGrantIssuer,
+      currentResourceAccessScope,
+    } = await grantModules();
+    let ceiling!: import('./foundation/resource-access-scope.js').ResourceAccessScope;
+    withDiscussionRequestCapability(binding(), () => {
+      ceiling = { ...currentResourceAccessScope()! };
+    });
+    const counterfeit = createSynchronousResourceGrantIssuer('DISCUSSION_REQUEST_CAPABILITY');
+    counterfeit.run(Object.freeze(binding()), ceiling, () =>
+      expect(assume).toThrow(/RESOURCE_SCOPE_REQUIRED/)
+    );
+  });
+
+  it('rejects invalid bindings before issuing', async () => {
+    const { withDiscussionRequestCapability } = await grantModules();
+    for (const bad of [
+      { ...binding(), tenant: OTHER },
+      { ...binding(), directory: binding().directory + '/..' },
+      { ...binding(), directory: binding().directory.replace('a'.repeat(64), 'x') },
+      { ...binding(), write: 'yes' as never },
+    ])
+      expect(() => withDiscussionRequestCapability(bad, () => undefined)).toThrow(
+        /RESOURCE_SCOPE_INVALID/
+      );
+  });
+
+  it('a read-only grant never writes and a write grant covers only its two records', async () => {
+    const { withDiscussionRequestCapability } = await grantModules();
+    withDiscussionRequestCapability(binding(false), () =>
+      withExecutionContext(
+        'discussion_request_store',
+        () => expect(guard.validateWritePermission(reservation()).allowed).toBe(false),
+        undefined,
+        TENANT
+      )
+    );
+    withDiscussionRequestCapability(binding(true), () =>
+      withExecutionContext(
+        'discussion_request_store',
+        () => {
+          expect(guard.validateWritePermission(reservation()).allowed).toBe(true);
+          expect(guard.validateWritePermission(path.join(directory(), 'other.json')).allowed).toBe(
+            false
+          );
+        },
+        undefined,
+        TENANT
+      )
+    );
+  });
+});
