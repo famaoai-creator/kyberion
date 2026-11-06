@@ -68,6 +68,7 @@ import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
   partitionedRuntimeStateKnowledgePath,
   partitionedRuntimeStateTierInPath,
+  partitionedRuntimeTierInPath,
   STORAGE_FLOOR_ROOTS,
   storageFloorTier,
   storageFloorTierInPath,
@@ -1291,7 +1292,8 @@ export function detectTier(filePath: string): TierLevel {
     resolved.includes('/active/projects/personal/')
   )
     return 'personal';
-  const stateTier = partitionedRuntimeStateTierInPath(resolved);
+  const stateTier =
+    partitionedRuntimeStateTierInPath(resolved) ?? partitionedRuntimeTierInPath(resolved);
   if (stateTier) return stateTier;
   const floorTier = storageFloorTierInPath(resolved);
   if (floorTier) return floorTier;

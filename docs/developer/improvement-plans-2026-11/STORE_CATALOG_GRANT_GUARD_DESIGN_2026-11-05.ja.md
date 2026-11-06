@@ -445,6 +445,25 @@ tier の内側にある」を、宣言のある 60 ロール × 全保存先（p
 許可そのものが妥当かは G2 で見直す。残りは上の既知の 3 分類だけで、
 `governance/asset-read-ceiling.test.ts` が新しいずれを失敗にする。
 
+### G2 の最初の一歩: 比較で見つかった抜けを塞ぐ（2026-11-06）
+
+G1 の比較で見つかった門番の抜けを塞いだ。
+
+- tenant 範囲の保護プレフィックスに `active/projects/personal/`、
+  `active/shared/runtime/surface-management/{personal,confidential}/` を追加した。
+  他 tenant に束縛された主体は、これらの tenant 区画を読み書きできなくなる。束縛の無い主体と
+  同じ tenant の主体の挙動は変わらない。`surface-management` を使うのは tenant に束縛した
+  管理画面のロール（confidential のみ）だけである。
+- `detectTier` が台帳の区画（`PARTITIONED_RUNTIME_LEDGER_ROOTS`）と `surface-management`
+  の tier をパスから読むようにした（`storage-layout.ts` の `partitionedRuntimeTierInPath`）。
+  これまで public と読んでいたため、provider への送信判定や git 公開判定が confidential の
+  台帳区画を public 扱いしうる状態だった。判定はより厳しくなる方向だけに変わる。
+
+`tests/tenant-store-guard-gaps.test.ts` は抜けの一覧から「抜けが無いこと」の検査に変わり、
+新しい抜けを失敗にする。主体の上限との比較でも、他 tenant の読み取りを門番が上限の外で
+許す保存先は無くなった。残るのは、宣言と置き場が食い違う `stance-logs`（個人 tier の宣言、
+public のログ置き場）で、スタンスの痕跡を個人 tier として保護する置き場へ移すかを別に決める。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |
