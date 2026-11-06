@@ -56,7 +56,10 @@ export function projectHintFromQuery(query: URLSearchParams): {
  */
 export function projectSwitchHref(href: string, project: SelectableProject | null): string {
   const url = new URL(href);
-  let query = changeWorkspaceSelection(url.searchParams, 'organization_id', '');
+  // Clear both explicitly: a project can sit in the URL without its
+  // organization, and an unchanged organization would keep it.
+  let query = changeWorkspaceSelection(url.searchParams, 'project_id', '');
+  query = changeWorkspaceSelection(query, 'organization_id', '');
   if (project) {
     query = changeWorkspaceSelection(query, 'organization_id', project.organization_id);
     query = changeWorkspaceSelection(query, 'project_id', project.project_id);
