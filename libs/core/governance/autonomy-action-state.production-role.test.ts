@@ -28,6 +28,7 @@ let validateWritePermission: typeof import('../tier-guard.js').validateWritePerm
 let streamJsonLines: typeof import('../jsonl-read.js').streamJsonLines;
 let resetAppendOnlyStoreMaintenanceState: typeof import('../append-only-store.js').resetAppendOnlyStoreMaintenanceState;
 let autonomyLearningCapability: typeof import('../foundation/autonomy-learning-capability.js').autonomyLearningCapability;
+let withAutonomyLearningCapability: typeof import('../foundation/autonomy-learning-capability.js').withAutonomyLearningCapability;
 let runInResourceAccessScope: typeof import('../foundation/resource-access-scope.js').runInResourceAccessScope;
 let AUTONOMY_OUTCOMES_MIN_RETENTION_MS: typeof import('./autonomy-action-state.js').AUTONOMY_OUTCOMES_MIN_RETENTION_MS;
 let AUTONOMY_OUTCOMES_RETENTION_MARGIN_MS: typeof import('./autonomy-action-state.js').AUTONOMY_OUTCOMES_RETENTION_MARGIN_MS;
@@ -65,7 +66,8 @@ beforeAll(async () => {
   ({ validateWritePermission } = await import('../tier-guard.js'));
   ({ streamJsonLines } = await import('../jsonl-read.js'));
   ({ resetAppendOnlyStoreMaintenanceState } = await import('../append-only-store.js'));
-  ({ autonomyLearningCapability } = await import('../foundation/autonomy-learning-capability.js'));
+  ({ autonomyLearningCapability, withAutonomyLearningCapability } =
+    await import('../foundation/autonomy-learning-capability.js'));
   ({ runInResourceAccessScope } = await import('../foundation/resource-access-scope.js'));
   ({
     AUTONOMY_OUTCOMES_MIN_RETENTION_MS,
@@ -191,7 +193,14 @@ describe('production tenant autonomy store role mediation', () => {
     expect(() =>
       withExecutionContext('autonomy_learning_store', () => undefined, 'worker', tenantSlug)
     ).toThrow('RESOURCE_SCOPE_REQUIRED');
-    runInResourceAccessScope(autonomyLearningCapability(tenantSlug), () =>
+    // G2: a structural lookalike of the exact ceiling is not the issued grant.
+    expect(() =>
+      runInResourceAccessScope(autonomyLearningCapability(tenantSlug), () =>
+        withExecutionContext('autonomy_learning_store', () => undefined, 'worker', tenantSlug)
+      )
+    ).toThrow('RESOURCE_SCOPE_REQUIRED');
+    const directory = `active/shared/runtime/autonomy-learning/confidential/${tenantSlug}`;
+    withAutonomyLearningCapability(tenantSlug, directory, () =>
       withExecutionContext(
         'autonomy_learning_store',
         () => {
@@ -248,7 +257,7 @@ describe('production tenant autonomy store role mediation', () => {
   describe('write-time retention of the tenant partition', () => {
     const partition = () => `active/shared/runtime/autonomy-learning/confidential/${tenantSlug}`;
     const asStore = <T>(fn: () => T): T =>
-      runInResourceAccessScope(autonomyLearningCapability(tenantSlug), () =>
+      withAutonomyLearningCapability(tenantSlug, partition(), () =>
         withExecutionContext('autonomy_learning_store', fn, 'worker', tenantSlug)
       );
     const asOperator = <T>(fn: () => T): T =>

@@ -2,10 +2,12 @@ import * as path from 'node:path';
 import { PARTITIONED_RUNTIME_STATE_ROOTS as FOUNDATION_STATE_ROOTS } from './foundation/runtime-state-roots.js';
 import { describe, expect, it } from 'vitest';
 import { rootDir } from './path-resolver.js';
+import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
 import { safeReadFile } from './secure-io.js';
 import {
   autonomyLearningCapability,
   isAutonomyLearningCapability,
+  withAutonomyLearningCapability,
 } from './foundation/autonomy-learning-capability.js';
 import {
   SYSTEM_PARTITION,
@@ -342,15 +344,13 @@ describe('durable partitioned runtime state', () => {
         tenantRoot + '/compaction-archive/',
       ],
     });
-    expect(isAutonomyLearningCapability(capability)).toBe(true);
-    expect(isAutonomyLearningCapability({ ...capability, writeExact: [tenantRoot] })).toBe(false);
+    // G2: the ceiling is data; only the private issuer's live grant is the capability.
+    expect(isAutonomyLearningCapability(capability)).toBe(false);
     expect(
-      isAutonomyLearningCapability({
-        ...capability,
-        namePrefixExact: [...(capability.namePrefixExact ?? []), tenantRoot + '/'],
-      })
-    ).toBe(false);
-    expect(isAutonomyLearningCapability({ ...capability, tenantSlug: 'tenant-b' })).toBe(false);
+      withAutonomyLearningCapability('tenant-a', tenantRoot, () =>
+        isAutonomyLearningCapability(currentResourceAccessScope())
+      )
+    ).toBe(true);
   });
 });
 
