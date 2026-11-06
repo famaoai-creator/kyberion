@@ -21,6 +21,7 @@ import { pipelineJournalGrantAllows } from './foundation/pipeline-journal-capabi
 import { credentialMaterialGrantAllows } from './foundation/credential-material-capability.js';
 import { memoryProvenanceGrantAllows } from './knowledge/memory-provenance-capability.js';
 import { personCharterGrantAuthorizes } from './governance/person-charter-runtime.js';
+import { customerDecisionConsumerGrantAllows } from './foundation/customer-decision-consumer-capability.js';
 
 /**
  * Does the active invite capability cover this I/O? Its validator predates
@@ -84,6 +85,9 @@ function discussionRequestGrantAllows(
  * - Person charter: the module-private grant of one synchronous registry access or canonical personal
  *   reservation inside the installed owner binding, under the roots the former role covered. Its
  *   facade checks the issuance right (the former shared core role's RA-02 rule) before the I/O.
+ * - Customer decision consumer lock: the opaque issuer grant of one consumer-lock operation of one
+ *   case (CD-09), under the tenant decisions root; its writes are content-checked
+ *   (narrow-store-role-denial). Its facade checks the issuance right before it issues.
  */
 export function storeGrantAuthorizes(
   target: string,
@@ -101,6 +105,7 @@ export function storeGrantAuthorizes(
     pipelineJournalGrantAllows(target, operation) ||
     credentialMaterialGrantAllows(target, operation) ||
     memoryProvenanceGrantAllows(target, operation) ||
-    personCharterGrantAuthorizes(target, operation)
+    personCharterGrantAuthorizes(target, operation) ||
+    customerDecisionConsumerGrantAllows(target, operation)
   );
 }

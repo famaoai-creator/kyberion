@@ -3,6 +3,9 @@ import * as path from 'node:path';
 import { caseRecordCanonicalJson } from './customer-decision-milestone-capability.js';
 import {
   createSynchronousResourceGrantIssuer,
+  currentResourceAccessScope,
+  decideResourceAccess,
+  type ResourceAccessOperation,
   type ResourceAccessScope,
 } from './resource-access-scope.js';
 import { getProcessEnv } from './process-env.js';
@@ -13,13 +16,20 @@ import {
 } from './customer-decision-standing.js';
 
 /**
- * Narrow store role for CD-09 task decision locks
+ * CD-09 task decision locks
  * (`knowledge/confidential/<tenant>/decisions/<case>/consumers/<consumer>.json`,
- * libs/core/mission/mission-decision-lock.ts). Mission processes assume it at
- * task boundaries instead of the full `decision_ledger` role: it may read the
- * case's ledger, switches and agendas and write exactly one consumer lock.
+ * libs/core/mission/mission-decision-lock.ts). Mission processes open the exact
+ * consumer-lock grant at task boundaries instead of the full `decision_ledger`
+ * role: it may read the case's ledger, switches and agendas and write exactly one
+ * consumer lock, every write held to the content rules below.
+ *
+ * G2: the live grant is itself the authority for the I/O it covers
+ * (`customerDecisionConsumerGrantAllows`); there is no store role. The former role
+ * name is the grant's issuance right (role-assumption-policy `shared_core_roles`,
+ * checked by authority.ts assertStoreGrantIssuanceAllowed); it is not an assumable
+ * authority role.
  */
-export const CUSTOMER_DECISION_CONSUMER_STORE_ROLE = 'customer_decision_consumer_store';
+export const CUSTOMER_DECISION_CONSUMER_GRANT_ISSUANCE_RIGHT = 'customer_decision_consumer_store';
 
 const CASE_DIR =
   /^knowledge\/confidential\/([a-z][a-z0-9-]{1,30})\/decisions\/[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/u;
@@ -170,7 +180,7 @@ const grants = createSynchronousResourceGrantIssuer<ConsumerBinding>(
 
 /**
  * Internal synchronous issuer of one exact consumer-lock ceiling (G2), import-restricted to
- * mission/mission-decision-lock.ts and customer-decision/store.ts (boundary test
+ * customer-decision/consumer-grant-access.ts (boundary test
  * tests/customer-decision-consumer-capability-boundary.test.ts). The opaque grant exists only
  * while `internalFn` runs; a structural lookalike, copy or counterfeit resolves nothing.
  */
@@ -732,4 +742,28 @@ export function customerDecisionConsumerWriteProblem(
     }
   }
   return null;
+}
+
+/**
+ * Does the live grant authorize this I/O? Only inside its exact ceiling and only where the former
+ * `customer_decision_consumer_store` policy grant reached: under the tenant decisions root, and the
+ * metadata of that root's ancestors (the role-policy metadata rule for a scoped role). Product
+ * schema reads and the Vitest sandbox case stay with the caller's own policy, as under the role.
+ */
+export function customerDecisionConsumerGrantAllows(
+  target: string,
+  operation: ResourceAccessOperation
+): boolean {
+  const scope = currentResourceAccessScope();
+  if (!scope || !isCustomerDecisionConsumerCapability(scope)) return false;
+  const root = customerDecisionsRootDir(scope.tenantSlug);
+  const under = target === root || target.startsWith(root + '/');
+  const ancestor = operation === 'metadata' && root.startsWith(target + '/');
+  if (!under && !ancestor) return false;
+  return decideResourceAccess(scope, target, operation).allowed;
+}
+
+/** Is a live consumer-lock grant current (its writes are content-checked)? */
+export function customerDecisionConsumerGrantActive(): boolean {
+  return isCustomerDecisionConsumerCapability(currentResourceAccessScope());
 }

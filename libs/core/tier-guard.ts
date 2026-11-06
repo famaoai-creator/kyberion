@@ -18,10 +18,6 @@ import {
 } from './knowledge/memory-provenance-capability.js';
 import { isCustomerDecisionInviteCapability } from './foundation/customer-decision-invite-capability.js';
 import {
-  isCustomerDecisionConsumerCapability,
-  CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
-} from './foundation/customer-decision-consumer-capability.js';
-import {
   isCustomerDecisionMilestoneCapability,
   CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
 } from './foundation/customer-decision-milestone-capability.js';
@@ -959,15 +955,6 @@ function requestResourceDenial(
       allowed: false,
       reason:
         '[PERSON_CHARTER_RESOURCE_DENIED] Person charter IO requires its installed owner and exact resource capability',
-    };
-  if (
-    normalizedRole === CUSTOMER_DECISION_CONSUMER_STORE_ROLE &&
-    !legacyStoreCapability(isCustomerDecisionConsumerCapability(currentResourceAccessScope()))
-  )
-    return {
-      allowed: false,
-      reason:
-        '[RESOURCE_SCOPE_REQUIRED] Customer decision consumer lock access requires its exact case capability',
     };
   if (
     normalizedRole === CUSTOMER_DECISION_MILESTONE_STORE_ROLE &&
