@@ -53,10 +53,9 @@ import { resolveRole, withExecutionContext } from '../authority.js';
 import { CUSTOMER_DECISION_MILESTONE_STORE_ROLE } from '../foundation/customer-decision-milestone-capability.js';
 import {
   CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
-  customerDecisionConsumerCapability,
+  withCustomerDecisionConsumerCapability,
   type CustomerDecisionConsumerSuperseded,
 } from '../foundation/customer-decision-consumer-capability.js';
-import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 
 /** The guard's relink rule, for the facade to check a re-ask before it writes anything. */
 export { taskProposalRelinkProblem } from '../foundation/customer-decision-consumer-capability.js';
@@ -705,9 +704,8 @@ export function asCustomerDecisionConsumerOwner<T>(
   fn: () => T
 ): T {
   const caseDir = pathResolver.toRepoRelative(ledgerDir(location));
-  return runInResourceAccessScope(
-    customerDecisionConsumerCapability(tenantSlug, caseDir, access),
-    () => withExecutionContext(CUSTOMER_DECISION_CONSUMER_STORE_ROLE, fn, undefined, tenantSlug)
+  return withCustomerDecisionConsumerCapability(tenantSlug, caseDir, access, () =>
+    withExecutionContext(CUSTOMER_DECISION_CONSUMER_STORE_ROLE, fn, undefined, tenantSlug)
   );
 }
 

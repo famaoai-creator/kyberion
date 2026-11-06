@@ -1,7 +1,10 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import * as path from 'node:path';
 import { caseRecordCanonicalJson } from './customer-decision-milestone-capability.js';
-import type { ResourceAccessScope } from './resource-access-scope.js';
+import {
+  createSynchronousResourceGrantIssuer,
+  type ResourceAccessScope,
+} from './resource-access-scope.js';
 import { getProcessEnv } from './process-env.js';
 import { isValidTenantSlug } from './scope.js';
 import {
@@ -34,13 +37,12 @@ const READABLE = new Set(['decisions.jsonl', 'switches.jsonl', 'agendas', 'consu
  * is built and again whenever the guard validates it). A task boundary
  * builds an owner-bound capability and can never obtain the sweep kind by
  * construction. A single consumer file is structurally the same either way.
+ *
+ * G2: the sweep marker lives in this module instance only (no globalThis
+ * registry; scripts/check_core_single_instance.ts keeps a production process on
+ * one instance), so a second instance can neither open nor honour a sweep.
  */
-const SWEEP_KEY = Symbol.for('kyberion.core.customer-decision-consumer-sweep.v1');
-const sweepRegistry = globalThis as typeof globalThis & {
-  [SWEEP_KEY]?: AsyncLocalStorage<true>;
-};
-const sweepStorage =
-  sweepRegistry[SWEEP_KEY] ?? (sweepRegistry[SWEEP_KEY] = new AsyncLocalStorage());
+const sweepStorage = new AsyncLocalStorage<true>();
 
 /** Run the case-wide consumer sweep (`sweepDecisionConsumers` only). */
 export function runInCustomerDecisionConsumerSweep<T>(fn: () => T): T {
@@ -156,9 +158,56 @@ export function customerDecisionConsumerCapability(
   };
 }
 
+interface ConsumerBinding {
+  readonly tenantSlug: string;
+  readonly caseDir: string;
+  /** A listing or several consumer locks: valid only inside the sweep. */
+  readonly sweep: boolean;
+}
+const grants = createSynchronousResourceGrantIssuer<ConsumerBinding>(
+  'CUSTOMER_DECISION_CONSUMER_CAPABILITY'
+);
+
+/**
+ * Internal synchronous issuer of one exact consumer-lock ceiling (G2), import-restricted to
+ * mission/mission-decision-lock.ts and customer-decision/store.ts (boundary test
+ * tests/customer-decision-consumer-capability-boundary.test.ts). The opaque grant exists only
+ * while `internalFn` runs; a structural lookalike, copy or counterfeit resolves nothing.
+ */
+export function withCustomerDecisionConsumerCapability<T>(
+  tenantSlug: string,
+  caseDir: string,
+  access: CustomerDecisionConsumerAccess,
+  internalFn: () => T
+): T {
+  const scope = customerDecisionConsumerCapability(tenantSlug, caseDir, access);
+  const prefix = `${caseDir}/`;
+  const binding: ConsumerBinding = Object.freeze({
+    tenantSlug,
+    caseDir,
+    sweep: sweepShaped(
+      [...scope.readExact, ...scope.writeExact].map((target) =>
+        target.startsWith(prefix) ? target.slice(prefix.length) : ''
+      )
+    ),
+  });
+  return grants.run(binding, scope, internalFn);
+}
+
+/**
+ * Pure mandatory guard: only this issuer's live grant resolves, and a sweep-kind grant only while
+ * the sweep runs (re-checked at every use, as when the capability was built).
+ */
 export function isCustomerDecisionConsumerCapability(
   scope: ResourceAccessScope | undefined
 ): boolean {
+  const grant = grants.resolve(scope);
+  if (!grant || (grant.binding.sweep && !inSweep())) return false;
+  return isConsumerCeiling(scope);
+}
+
+/** The structural ceiling check of one consumer-lock capability (any issuer). */
+function isConsumerCeiling(scope: ResourceAccessScope | undefined): boolean {
   if (
     !scope ||
     scope.organizationId ||

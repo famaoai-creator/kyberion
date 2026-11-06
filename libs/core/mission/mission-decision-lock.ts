@@ -31,9 +31,9 @@ import { logger } from '../core.js';
 import { listDeals, type DealRecord } from '../deal-store.js';
 import {
   CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
-  customerDecisionConsumerCapability,
   customerDecisionsRootDir,
   runInCustomerDecisionConsumerSweep,
+  withCustomerDecisionConsumerCapability,
   type CustomerDecisionConsumerAccess,
 } from '../foundation/customer-decision-consumer-capability.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
@@ -234,9 +234,8 @@ function asConsumerStore<T>(
   fn: () => T
 ): T {
   const caseDir = pathResolver.toRepoRelative(ledgerDir(location));
-  return runInResourceAccessScope(
-    customerDecisionConsumerCapability(tenantSlug, caseDir, access),
-    () => withExecutionContext(CUSTOMER_DECISION_CONSUMER_STORE_ROLE, fn, undefined, tenantSlug)
+  return withCustomerDecisionConsumerCapability(tenantSlug, caseDir, access, () =>
+    withExecutionContext(CUSTOMER_DECISION_CONSUMER_STORE_ROLE, fn, undefined, tenantSlug)
   );
 }
 
@@ -375,15 +374,13 @@ function writeLock(
 /** The tenant's decisions root, checked as the narrow store role (existence only). */
 function defaultDecisionsRootExists(tenantSlug: string): boolean {
   const root = customerDecisionsRootDir(tenantSlug);
-  return runInResourceAccessScope(
-    customerDecisionConsumerCapability(tenantSlug, root, { read: [] }),
-    () =>
-      withExecutionContext(
-        CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
-        () => safeExistsSync(pathResolver.rootResolve(root)),
-        undefined,
-        tenantSlug
-      )
+  return withCustomerDecisionConsumerCapability(tenantSlug, root, { read: [] }, () =>
+    withExecutionContext(
+      CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
+      () => safeExistsSync(pathResolver.rootResolve(root)),
+      undefined,
+      tenantSlug
+    )
   );
 }
 
