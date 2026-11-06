@@ -25,6 +25,9 @@ function failure(error: unknown) {
       error.code === 'engine_config_conflict' ? 409 : 400
     );
   }
+  if (error instanceof Error && error.message.includes('[ENGINE_RUNTIME_OPERATOR_DENIED]')) {
+    return reply({ ok: false, error: 'engine_config_local_session_required' }, 403);
+  }
   logger.error(
     `engine settings unavailable — ${error instanceof Error ? error.name : 'error'} | next: check the profile engine-runtime.json and its schema`
   );
@@ -39,6 +42,7 @@ function failure(error: unknown) {
  */
 export function GET(req: NextRequest) {
   const access = resolveEngineConfigOperator(req, false);
+  if (access.response) return access.response;
   if (!access.principal) return reply({ ok: false, error: access.denial }, access.status);
   try {
     return reply({ ok: true, ...getOperatorEngineRuntimePreferences(access.principal) });
@@ -49,6 +53,7 @@ export function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const access = resolveEngineConfigOperator(req, true);
+  if (access.response) return access.response;
   if (!access.principal) return reply({ ok: false, error: access.denial }, access.status);
   const body: unknown = await req.json().catch(() => null);
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
