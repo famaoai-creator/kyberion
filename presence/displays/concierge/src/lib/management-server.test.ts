@@ -12,12 +12,6 @@ vi.mock('./viewer-context', () => ({
   conciergeCredential: () => ({ token: mocks.token, source: 'header' }),
   resolveConciergeViewer: () => ({ context: mocks.viewer }),
 }));
-vi.mock('@agent/core/authority', () => ({
-  withExecutionContextAsync: async (_role: string, fn: () => unknown) => fn(),
-}));
-vi.mock('@agent/core/foundation/resource-access-scope', () => ({
-  runInResourceAccessScope: (_scope: unknown, fn: () => unknown) => fn(),
-}));
 vi.mock('@agent/core/secure-io', () => ({
   safeExistsSync: () => true,
   safeReaddir: () => mocks.directories,
@@ -27,6 +21,7 @@ vi.mock('@agent/core/organization/tenant-registry', () => ({
   readTenantProfile: () => ({ display_name: 'Tenant A' }),
 }));
 vi.mock('@agent/core/surface/surface-management-mutations', () => ({
+  readSurfaceManagementExact: async (_auth: unknown, _files: string[], fn: () => unknown) => fn(),
   verifySurfaceManagementAuthorization: mocks.verify,
   readSurfaceManagementResource: mocks.read,
   SurfaceManagementError: class extends Error {

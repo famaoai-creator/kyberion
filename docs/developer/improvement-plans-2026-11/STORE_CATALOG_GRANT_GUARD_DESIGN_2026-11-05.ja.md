@@ -558,7 +558,9 @@ public のログ置き場）で、スタンスの痕跡を個人 tier として�
   （対象外として残すもの）はリーダーのロール名で許可を決める。ロールを外すとこれらの判断が変わる。
   (3) 上限は呼び出し元が `runInResourceAccessScope` で組み立てた形の一致（読み取りだけ、組織付きの書き
   込み）で、発行者が 1 つに決まっていない。ロール名の分岐（構造上の mkdir、リクエストの拒否 2 つ）は
-  そのまま残した。
+  そのまま残した。その後、(1)〜(3) は第 1 段階で解いた（下の「Concierge の Web 管理の許可証」。非同期の
+  寿命を持つ許可証、1 つの窓口、tier-guard の外の判断は許可証に尋ねる）。ロールを外す第 2 段階の状況は
+  同じ節に書く。
 
 `narrowStoreRoleDenial` の、パスだけで絞る拒否だけのロール（`deliverable_inbox_writer`、
 `customer_channel_binding_store`、`archived_mission_state_reader`）は対象外である。これらは許可証では
@@ -1099,6 +1101,39 @@ mkdir は拒否されていた。読み取りは窓の中ではすべて許さ�
 問い、旧と新を突き合わせた（6800 件）。広がる側は 0 件。違いは `deliverable_inbox_writer` の 28 件
 （呼び出し元の拒否だけのロールが窓の中でも効く。狭くなる側）と、方針に無い SYSTEM_ROLE の拒否の文言
 （同じ `[ROLE_ASSUMPTION_DENIED]`、「引き受け」が「発行」になった）だけだった。
+
+### G2: Concierge の Web 管理の許可証（2026-11-06）
+
+`concierge_management_reader` / `concierge_management_writer` は、Concierge だけが引き受ける（`may_assume`）
+Web 管理の仲介のロールである。呼び出し元（Concierge の管理サーバー、`surface/surface-management-mutations.ts`、
+`organization/organization-people-access.ts`、`information-assets/access.ts`）が、それぞれ正確な資源の上限
+（`runInResourceAccessScope`）を組み立て、その中でロールを tenant（書き込みは組織も）に束縛して引き受けて
+いた。管理サーバーと surface の仲介は `withExecutionContextAsync` で await を含む処理全体を包む。
+
+**第 1 段階: 非同期の寿命を持つ許可証と、1 つの窓口（ロールは残す）。**
+
+- 許可証 `foundation/concierge-management-capability.ts`: モジュールの中だけの発行済みの集合を持つ（`globalThis`
+  の登録簿は無い）。開いた実行の scope（窓口が引き受けたロールの scope そのもの）に束縛し、中で別のロールを
+  引き受けると見えない（ロール名の検査がそこで効かなくなったのと同じ）。寿命は窓口の呼び出しと同じで、
+  同期の形は callback が返るまで（Promise を返すと拒否）、非同期の形は await した本体が決着する（成功でも
+  失敗でも）まで。取り消しの後に動く継続（中で予約した処理）には許可証が無い。
+- 窓口 `surface/concierge-management-access.ts`（`withConciergeManagementAccess` /
+  `withConciergeManagementAccessAsync`）: 正確な上限、発行の権利の確かめ（旧ロールの引き受けと同じ RA-02 の
+  規則を名前 `concierge_management_reader` / `_writer` に対して。Concierge 以外の SYSTEM_ROLE は
+  `[ROLE_ASSUMPTION_DENIED]`）、ロールの引き受け（tenant・組織・実行の識別子に束縛）、許可証を 1 回で開く。
+  書き込みのある要求は writer、無いものは読み取りだけの reader。4 つの呼び出し元は上限を自分で組み立てず、
+  窓口に資源の一覧だけを渡す（管理サーバーは `readSurfaceManagementExact` を通す）。役割を明示した人の
+  管理（`sovereign_concierge` / `mission_controller`）はそのロールの権限のままで、窓口を通らない。
+- tier-guard の外でロール名で決めていた 2 つの判断を、許可証に尋ねるように書き換えた。
+  `project/project-management.ts` の surface からの project の変更の確かめ（`assumedRole` が writer か →
+  writer の許可証が有効か）と、`informationAssetCoverageReadAllowed` の読み取りのロールの一覧（reader の
+  ロール名 → reader の許可証が有効か。`chronos_operator` / `chronos_localadmin` はロール名のまま）。
+  窓口を通る所ではロールと許可証は必ず一緒なので判定は同じで、ロール名だけ（窓口を通らない直接の引き受けや
+  MISSION_ROLE）では認めなくなった（狭くなる側）。
+- 境界テスト `tests/concierge-management-capability-boundary.test.ts`（許可証を開くのは窓口だけ、窓口を
+  使うのは 3 つの仲介だけ）。
+- tier-guard と `authority.ts` のロール名の分岐（構造上の mkdir、reader / writer の上限の確かめ）と、ロールの
+  宣言はこの段階では残す。
 
 ## 既定で拒否であること
 

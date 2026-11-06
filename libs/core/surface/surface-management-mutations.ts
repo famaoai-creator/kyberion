@@ -23,7 +23,7 @@ import * as path from 'node:path';
 import { withExecutionContextAsync, resolveRole } from '../authority.js';
 import { humanActor } from '../actor.js';
 import { acquireLock, releaseLock } from '../foundation/lock-utils.js';
-import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+import { withConciergeManagementAccessAsync } from './concierge-management-access.js';
 import { readJsonIfPresent, writeJson } from '../foundation/json.js';
 import { readTextFile } from '../foundation/text.js';
 import { pathResolver } from '../path-resolver.js';
@@ -82,23 +82,34 @@ async function scoped<T>(
   writes: string[],
   callback: () => T
 ): Promise<T> {
-  return runInResourceAccessScope(
+  return withConciergeManagementAccessAsync(
     {
       tenantSlug: auth.tenantSlug,
       ...target,
-      readExact: [...new Set([...reads, ...writes].map(relative))],
-      writeExact: writes.map(relative),
-      mkdirExact: writes.length ? directories(writes) : [],
-      allowProductKnowledgeRead: true,
+      reads: [...new Set([...reads, ...writes].map(relative))],
+      writes: writes.map(relative),
+      mkdir: writes.length ? directories(writes) : [],
     },
-    () =>
-      withExecutionContextAsync(
-        writes.length ? 'concierge_management_writer' : 'concierge_management_reader',
-        callback,
-        undefined,
-        auth.tenantSlug,
-        target.organizationId
-      )
+    callback
+  );
+}
+/**
+ * One exact read-only management access for the Concierge management server (its snapshot
+ * listing and tenant profile read), through the governed management grant facade.
+ */
+export function readSurfaceManagementExact<T>(
+  auth: SurfaceManagementAuthorization,
+  files: string[],
+  callback: () => T
+): Promise<T> {
+  return withConciergeManagementAccessAsync(
+    {
+      tenantSlug: auth.tenantSlug,
+      reads: files.map((file) => pathResolver.toRepoRelative(file)),
+      writes: [],
+      mkdir: [],
+    },
+    callback
   );
 }
 /**
@@ -115,21 +126,14 @@ export async function resolveSurfaceManagementAuthorization(
       request.allowedOrganizationIds === 'all' ? 'all' : [...request.allowedOrganizationIds],
     allowedProjectIds: request.allowedProjectIds === 'all' ? 'all' : [...request.allowedProjectIds],
   };
-  const member = await runInResourceAccessScope(
+  const member = await withConciergeManagementAccessAsync(
     {
       tenantSlug: input.tenantSlug,
-      readExact: [relative(memberProfilePath(input.memberId))],
-      writeExact: [],
-      mkdirExact: [],
-      allowProductKnowledgeRead: true,
+      reads: [relative(memberProfilePath(input.memberId))],
+      writes: [],
+      mkdir: [],
     },
-    () =>
-      withExecutionContextAsync(
-        'concierge_management_reader',
-        () => readMemberProfile(input.memberId),
-        undefined,
-        input.tenantSlug
-      )
+    () => readMemberProfile(input.memberId)
   );
   if (!member || member.member_id !== input.memberId || member.status !== 'active')
     fail('forbidden', 403, 'An active owner membership is required.');
