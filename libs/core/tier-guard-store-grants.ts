@@ -16,6 +16,7 @@ import {
 } from './foundation/resource-access-scope.js';
 import { taskSourceWorkspaceGrantAllows } from './foundation/task-source-workspace-capability.js';
 import { prPublicationGrantAuthorizes } from './foundation/pr-publication-store-capability.js';
+import { autonomyLearningGrantAllows } from './foundation/autonomy-learning-capability.js';
 
 /**
  * Does the active invite capability cover this I/O? Its validator predates
@@ -64,6 +65,9 @@ function discussionRequestGrantAllows(
  *   a VCS host run (one of five kinds, one store each), inside its exact ceiling
  *   and the roots the former role's policy grant covered. Its facade checks the
  *   issuance right (the former shared core role's RA-02 rule) before it issues.
+ * - Autonomy learning: the opaque issuer grant over one tenant partition (outcomes ledger,
+ *   overrides, their rewrite siblings and archive), under the store root. Its facade checks the
+ *   issuance right (the former shared core role's RA-02 rule) before it issues.
  */
 export function storeGrantAuthorizes(
   target: string,
@@ -76,6 +80,7 @@ export function storeGrantAuthorizes(
     customerDecisionInviteGrantAllows(scope, target, operation) ||
     discussionRequestGrantAllows(scope, target, operation) ||
     taskSourceWorkspaceGrantAllows(target, operation) ||
-    prPublicationGrantAuthorizes(target, operation)
+    prPublicationGrantAuthorizes(target, operation) ||
+    autonomyLearningGrantAllows(target, operation)
   );
 }

@@ -10,7 +10,6 @@ import {
   prPublicationResourceAllowed,
   prPublicationStoreGrantActive,
 } from './foundation/pr-publication-store-capability.js';
-import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
 import {
   MEMORY_PROVENANCE_READER_ROLE,
   memoryProvenanceReadAllowed,
@@ -30,6 +29,7 @@ import {
   CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
 } from './foundation/customer-decision-milestone-capability.js';
 import { narrowStoreRoleDenial } from './foundation/narrow-store-role-denial.js';
+import { RETIRED_STORE_ROLE_NAMES } from './foundation/retired-store-roles.js';
 import { storeGrantAuthorizes } from './tier-guard-store-grants.js';
 import type { WriteContent } from './foundation/customer-decision-write-content.js';
 /**
@@ -574,13 +574,6 @@ function isScopedStructuralMkdir(
       PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites + '/confidential';
   if (inviteGrant) {
     // fall through to the shared checks
-  } else if (access.role === 'autonomy_learning_store') {
-    if (
-      !isAutonomyLearningCapability(currentResourceAccessScope()) ||
-      normalizePath(protectedPrefix) !==
-        PARTITIONED_RUNTIME_STATE_ROOTS.autonomy_learning + '/confidential'
-    )
-      return false;
   } else if (access.role === PIPELINE_JOURNAL_STORE_ROLE) {
     if (
       !isPipelineJournalCapability(currentResourceAccessScope()) ||
@@ -923,6 +916,13 @@ function requestResourceDenial(
     getRegisteredEnvText('SYSTEM_ROLE') ||
     getRegisteredEnvText('MISSION_ROLE');
   const normalizedRole = role?.trim().toLowerCase().replace(/\s+/gu, '_');
+  // G2: a former store role name is only its grant's issuance right; a process still running
+  // as one (SYSTEM_ROLE / MISSION_ROLE env) gets no I/O, as the role granted none outside it.
+  if (normalizedRole && RETIRED_STORE_ROLE_NAMES.has(normalizedRole))
+    return {
+      allowed: false,
+      reason: `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant issuance right, not a role`,
+    };
   if (
     normalizedRole === 'credential_material_reader' &&
     !isCredentialMaterialCapability(currentResourceAccessScope())
@@ -934,12 +934,12 @@ function requestResourceDenial(
     };
   // Old dedicated-store capability validators predate appendExact. An added append path
   // cannot enlarge their original write or metadata ceiling, even under ambient grants.
-  // Name prefixes count only for a validator that checks them (`withNamePrefixes`).
-  const legacyStoreCapability = (valid: boolean, withNamePrefixes = false): boolean => {
+  // Their validators do not check name prefixes, so a prefix-carrying lookalike is refused.
+  const legacyStoreCapability = (valid: boolean): boolean => {
     if (!valid) return false;
     const scope = currentResourceAccessScope();
     if (!scope) return false;
-    if (!withNamePrefixes && (scope.namePrefixExact?.length ?? 0) > 0) return false;
+    if ((scope.namePrefixExact?.length ?? 0) > 0) return false;
     if (operation === 'append' || operation === 'metadata')
       return denyCandidatePaths(relativePath).every(
         (target) => decideResourceAccess({ ...scope, appendExact: [] }, target, operation).allowed
@@ -985,16 +985,6 @@ function requestResourceDenial(
       reason:
         '[PERSON_CHARTER_RESOURCE_DENIED] Person charter IO requires its installed owner and exact resource capability',
     };
-  if (
-    normalizedRole === 'autonomy_learning_store' &&
-    !legacyStoreCapability(isAutonomyLearningCapability(currentResourceAccessScope()), true)
-  ) {
-    return {
-      allowed: false,
-      reason:
-        '[RESOURCE_SCOPE_REQUIRED] Autonomy learning access requires its exact tenant store capability',
-    };
-  }
   if (
     normalizedRole === PIPELINE_JOURNAL_STORE_ROLE &&
     !legacyStoreCapability(isPipelineJournalCapability(currentResourceAccessScope()))
