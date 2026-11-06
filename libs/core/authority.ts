@@ -3,7 +3,6 @@ import {
   PERSONAL_APPROVAL_STORE_ROLE,
   personalApprovalIoAllowed,
 } from './foundation/personal-approval-io-capability.js';
-import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
 import {
   MEMORY_PROVENANCE_READER_ROLE,
   currentMemoryProvenanceReadCapability,
@@ -56,7 +55,7 @@ import {
   type ExecutionIdentityBinding,
 } from './foundation/execution-scope.js';
 import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
-import { PR_PUBLICATION_GRANT_ISSUANCE_RIGHT } from './foundation/pr-publication-store-capability.js';
+import { RETIRED_STORE_ROLE_NAMES } from './foundation/retired-store-roles.js';
 import { traceRoleAssumption } from './organization/role-assumption-trace.js';
 import { resolveTenant } from './organization/tenant-registry.js';
 import {
@@ -102,7 +101,6 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   peer_responder_reader: 'worker',
   peer_task_artifact_writer: 'worker',
   metrics_cap_reader: 'worker',
-  autonomy_learning_store: 'worker',
   pipeline_journal_store: 'worker',
   audit_mirror_writer: 'worker',
   tenant_ledger_store: 'worker',
@@ -770,7 +768,6 @@ interface PreparedExecutionContext {
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'credential_allocation_reader',
   'credential_material_reader',
-  'autonomy_learning_store',
   CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
   CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
   ARCHIVED_MISSION_STATE_READER_ROLE,
@@ -828,9 +825,9 @@ function prepareExecutionContext(
       throw new Error('[SCOPE_CONTEXT_INVALID] invalid execution identity');
   }
   assertRoleAssumptionAllowed(normalizedRole);
-  // G2: the former PR publication store role is only a grant issuance right now. Refusing it
-  // keeps an installation whose catalogs still declare the old role from granting its policy.
-  if (normalizedRole === PR_PUBLICATION_GRANT_ISSUANCE_RIGHT)
+  // G2: former store roles are only grant issuance rights now. Refusing them keeps an
+  // installation whose catalogs still declare an old role from granting its policy.
+  if (RETIRED_STORE_ROLE_NAMES.has(normalizedRole))
     throw new Error(
       `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant issuance right, not an assumable role`
     );
@@ -854,15 +851,6 @@ function prepareExecutionContext(
       throw new Error(
         '[MEMORY_PROVENANCE_READ_SCOPE] Exact current tenant/owner read capability required'
       );
-  }
-  if (
-    normalizedRole === 'autonomy_learning_store' &&
-    (!isAutonomyLearningCapability(currentResourceAccessScope()) ||
-      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
-  ) {
-    throw new Error(
-      '[RESOURCE_SCOPE_REQUIRED] Autonomy learning access requires its exact tenant store capability'
-    );
   }
   if (
     normalizedRole === PIPELINE_JOURNAL_STORE_ROLE &&

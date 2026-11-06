@@ -735,6 +735,69 @@ governance root（main の checkout）を `KYBERION_ROOT` にした子プロセ�
 許可証が認める範囲（根の下）では、旧で許されたものはすべて新でも許され、旧で拒否されたものは新でも
 拒否される。旧と新が違うのは、狭くなる側か、呼び出し元が自分の権限で既にできる I/O だけである。
 
+### G2: 自律の学習記録の許可証化（2026-11-06）
+
+`autonomy_learning_store` は、自律の判断の記録（`governance/autonomy-action-state.ts`）が tenant の
+区画 `active/shared/runtime/autonomy-learning/confidential/<tenant>/` を読み書きする間だけ引き受けていた
+共有コアロールである。
+
+**届く範囲。** 上限（`autonomyLearningCapability`）は 1 つの tenant の区画の正確なファイルである。
+結果の台帳 `autonomy-outcomes.jsonl` と上書きの `autonomy-action-overrides.json`（読む・書く）、書き込み
+時の保持のための台帳の書き換えの兄弟（`.compacting-*`、`.compact-out-*`、`.compact-restore-*`）と
+`compaction-archive/` の 1 段下のファイル（名前の前方一致）、区画までの祖先と archive の mkdir。
+ストアのロックと保持の監査は上限の外で、呼び出し元のまま走る。ロールの security-policy の権限は
+保存先の根 `autonomy-learning` 以下と、その knowledge の写し（`knowledge/confidential/<tenant>`）を
+覆っていたが、上限が実際のファイルだけに絞っていた。
+
+**第 1 段階: 偽造できない許可証（ロールは残す）。** 上限を、発行者ごとの不透明な許可証
+（`createSynchronousResourceGrantIssuer`、議論のリクエストと同じ）としてだけ発行するようにした。
+発行の関数 `withAutonomyLearningCapability` は窓口だけが使う（import の境界テスト
+`tests/autonomy-learning-capability-boundary.test.ts`。保存先ごとの境界テストは共通の
+`tests/helpers/store-grant-boundary.ts` で書く）。`isAutonomyLearningCapability` は、その発行者が今発行して
+いて、上限が束縛と一致する許可証だけを認める。形だけ同じ上限、複製、入れ子の上限、別の発行者、
+捕まえた継続、持ち出し・Promise の結果は何も認めない。以前は形の一致だけだったので、同じ形の上限と
+一緒なら誰でもロールを引き受けられた（共有コアロールなので届く範囲は同じだった）。
+
+**第 2 段階: 許可証を権限にし、ロールを外した。**
+
+- `tier-guard` はリクエストの上限と tenant 範囲の検査の後に、有効な許可証かを問う
+  （`storeGrantAuthorizes` → `autonomyLearningGrantAllows`）。認めるのは上限の中で、保存先の根
+  `active/shared/runtime/autonomy-learning` の下だけである。発行者が append とメタデータの上限を付けない
+  ので、以前のロール名の分岐（append とメタデータで上限を広げさせない）は要らない。tenant の器
+  （`autonomy-learning/confidential`）を作る構造上の mkdir も、許可証と tenant の一致で判定する
+  （共通の分岐。以前の分岐の条件「対象が器そのもの、上限の mkdir に載る、書く対象がその tenant の下」は
+  上限がいつも満たす）。Vitest の砂場の区画（`vitest-live/...`）は根の外なので、以前と同じく呼び出し元の
+  権限で決まる。
+- 誰が発行できるかは変えていない。窓口は発行の前に、旧共有コアロールの引き受けと同じ規則を名前
+  `autonomy_learning_store` に対して確かめる（`assertStoreGrantIssuanceAllowed`）。名前は
+  `shared_core_roles` に発行の権利として残した（説明文に明記）。
+- 呼び出し元のロールと persona はそのまま使い、記録の tenant に束縛する（組織は引き継がない）。別
+  tenant に束縛された呼び出し元は `[ROLE_TENANT_SCOPE_MISMATCH]` で拒否する（以前もロールの引き受けが
+  同じ符号で拒否していた）。
+- 退役したロールの名前の一覧を `foundation/retired-store-roles.ts` に置いた（`pr_publication_store` と
+  `autonomy_learning_store`）。`authority.ts` はこの一覧で引き受けを拒否する（PR の公開のときの個別の
+  分岐を一般化）。`tier-guard` は、SYSTEM_ROLE / MISSION_ROLE の環境変数でまだこの名前で動くプロセスの
+  I/O をすべて拒否する。以前はロール名の分岐が上限の外を拒否していたので、ロールの権限が消えた後に
+  persona だけで決まると広がりうるからである（狭くなる側。PR の公開の名前にも効く）。
+- ロールの宣言（security-policy、`authority.ts` の persona の対応・tenant 束縛ロールの一覧・引き受けの
+  検査、保存先カタログの `legacy_roles` 4 件、`tier-guard` のロール名の分岐 2 つ）を削除した。ロールの
+  索引と定義には元から載っていなかった。
+
+**比較。** 窓口 1 つの上限の 7 個のパス、その祖先、上限の外の 8 個のパス（別 tenant の区画、knowledge の
+写し、区画の中の別のファイル、archive の 2 段下、product の policy、ロック、public）を 5 つの操作で、
+10 種類の呼び出し元（ロール無し、`mission_controller`、SYSTEM_ROLE `slack_bridge` と
+`sovereign_concierge`、別 tenant に束縛、同じ tenant と組織に束縛、`organization_operator`、方針に無い
+SYSTEM_ROLE、`deliverable_inbox_writer`、`ecosystem_architect`）から問い、旧と新を突き合わせた（735 件）。
+
+| 呼び出し元                                    | 違い                                                                                     |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| 別 tenant に束縛                              | 無し（どちらも `[ROLE_TENANT_SCOPE_MISMATCH]`）                                          |
+| 方針に無い SYSTEM_ROLE、`sovereign_concierge` | 無し（どちらも `[ROLE_ASSUMPTION_DENIED]`。旧は引き受け、新は発行で拒否）                |
+| `deliverable_inbox_writer`                    | 新は 16 件拒否（呼び出し元の拒否だけのロールが効く。狭くなる側。task source・PR と同じ） |
+| その他 6 種類                                 | 無し                                                                                     |
+
+広がる側の違いは無い。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |

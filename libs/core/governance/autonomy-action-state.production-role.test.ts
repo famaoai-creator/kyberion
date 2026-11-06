@@ -97,7 +97,7 @@ afterAll(() => {
   vi.resetModules();
 });
 
-describe('production tenant autonomy store role mediation', () => {
+describe('production tenant autonomy store grant mediation', () => {
   let tenantSlug: string;
   beforeEach(() => {
     tenantSlug = `vitest-learning-${randomUUID().slice(0, 8)}`;
@@ -189,76 +189,75 @@ describe('production tenant autonomy store role mediation', () => {
     );
   });
 
-  it('the bounded role cannot mutate arbitrary tenant knowledge or another tenant', () => {
+  it('the grant alone authorizes its exact tenant ceiling; the former role grants nothing', () => {
+    const directory = `active/shared/runtime/autonomy-learning/confidential/${tenantSlug}`;
+    const outcomes = pathResolver.rootResolve(`${directory}/autonomy-outcomes.jsonl`);
+    // G2: the former role name is an issuance right, not an assumable role.
     expect(() =>
       withExecutionContext('autonomy_learning_store', () => undefined, 'worker', tenantSlug)
-    ).toThrow('RESOURCE_SCOPE_REQUIRED');
-    // G2: a structural lookalike of the exact ceiling is not the issued grant.
-    expect(() =>
+    ).toThrow('ROLE_ASSUMPTION_DENIED');
+    // A role-less caller (persona worker, no store grant of its own) bound to the tenant.
+    const caller = <T>(fn: () => T): T =>
+      withExecutionContext('chronos_gateway', fn, 'worker', tenantSlug);
+    caller(() => {
+      expect(validateWritePermission(outcomes, 'append')).toMatchObject({ allowed: false });
+      // A structural lookalike of the exact ceiling is not the issued grant.
       runInResourceAccessScope(autonomyLearningCapability(tenantSlug), () =>
-        withExecutionContext('autonomy_learning_store', () => undefined, 'worker', tenantSlug)
-      )
-    ).toThrow('RESOURCE_SCOPE_REQUIRED');
-    const directory = `active/shared/runtime/autonomy-learning/confidential/${tenantSlug}`;
-    withAutonomyLearningCapability(tenantSlug, directory, () =>
-      withExecutionContext(
-        'autonomy_learning_store',
-        () => {
-          expect(() =>
-            safeWriteFile(
-              pathResolver.rootResolve(`knowledge/confidential/${tenantSlug}/unrelated.json`),
-              '{}'
-            )
-          ).toThrow();
-          expect(() =>
-            safeWriteFile(
-              pathResolver.shared(
-                'runtime/autonomy-learning/confidential/other-tenant/autonomy-outcomes.jsonl'
-              ),
-              '{}'
-            )
-          ).toThrow();
-          expect(() =>
-            safeWriteFile(
-              pathResolver.rootResolve(
-                `knowledge/confidential/${tenantSlug}/autonomy-outcomes.jsonl`
-              ),
-              '{}'
-            )
-          ).toThrow('RESOURCE_SCOPE_DENIED');
-        },
-        'worker',
-        tenantSlug
-      )
-    );
-    expect(() =>
-      runInResourceAccessScope(
-        {
-          tenantSlug,
-          readExact: [`knowledge/confidential/${tenantSlug}/unrelated.json`],
-          writeExact: [`knowledge/confidential/${tenantSlug}/unrelated.json`],
-          mkdirExact: [],
-        },
-        () => withExecutionContext('autonomy_learning_store', () => undefined, 'worker', tenantSlug)
-      )
-    ).toThrow('RESOURCE_SCOPE_REQUIRED');
+        expect(validateWritePermission(outcomes, 'append')).toMatchObject({ allowed: false })
+      );
+      withAutonomyLearningCapability(tenantSlug, directory, () => {
+        expect(resolveRole()).toBe('chronos_gateway');
+        expect(validateWritePermission(outcomes, 'append')).toMatchObject({ allowed: true });
+        expect(() =>
+          safeWriteFile(
+            pathResolver.rootResolve(`knowledge/confidential/${tenantSlug}/unrelated.json`),
+            '{}'
+          )
+        ).toThrow();
+        expect(() =>
+          safeWriteFile(
+            pathResolver.shared(
+              'runtime/autonomy-learning/confidential/other-tenant/autonomy-outcomes.jsonl'
+            ),
+            '{}'
+          )
+        ).toThrow();
+        expect(() =>
+          safeWriteFile(
+            pathResolver.rootResolve(
+              `knowledge/confidential/${tenantSlug}/autonomy-outcomes.jsonl`
+            ),
+            '{}'
+          )
+        ).toThrow('RESOURCE_SCOPE_DENIED');
+      });
+      expect(validateWritePermission(outcomes, 'append')).toMatchObject({ allowed: false });
+    });
+    // A process still launched as the former role gets no I/O at all.
     vi.stubEnv('SYSTEM_ROLE', 'autonomy_learning_store');
+    expect(validateWritePermission(outcomes, 'write').reason).toContain('ROLE_ASSUMPTION_DENIED');
+    vi.stubEnv('SYSTEM_ROLE', '');
+  });
+
+  it('issues the grant only where the former shared role could be assumed', () => {
+    vi.stubEnv('SYSTEM_ROLE', 'zz_unlisted_surface');
     expect(() =>
-      safeWriteFile(
-        pathResolver.shared(
-          `runtime/autonomy-learning/confidential/${tenantSlug}/autonomy-outcomes.jsonl`
-        ),
-        '{}'
+      recordAutonomyOutcome(
+        { action_id: 'never', receipt_id: randomUUID(), decision: 'approve', executed: false },
+        { tenantSlug }
       )
-    ).toThrow('RESOURCE_SCOPE_REQUIRED');
+    ).toThrow('ROLE_ASSUMPTION_DENIED');
     vi.stubEnv('SYSTEM_ROLE', '');
   });
 
   describe('write-time retention of the tenant partition', () => {
     const partition = () => `active/shared/runtime/autonomy-learning/confidential/${tenantSlug}`;
     const asStore = <T>(fn: () => T): T =>
-      withAutonomyLearningCapability(tenantSlug, partition(), () =>
-        withExecutionContext('autonomy_learning_store', fn, 'worker', tenantSlug)
+      withExecutionContext(
+        'chronos_gateway',
+        () => withAutonomyLearningCapability(tenantSlug, partition(), fn),
+        'worker',
+        tenantSlug
       );
     const asOperator = <T>(fn: () => T): T =>
       withExecutionContext('ecosystem_architect', fn, 'ecosystem_architect', tenantSlug);

@@ -289,7 +289,6 @@ describe('durable partitioned runtime state', () => {
         expect(JSON.stringify(policy[field])).not.toContain(`runtime/${store}`);
       }
       for (const [role, grant] of Object.entries(policy.authority_role_permissions)) {
-        if (store === 'autonomy-learning' && role === 'autonomy_learning_store') continue;
         if (
           store === 'grants' &&
           ['credential_allocation_manager', 'credential_allocation_reader'].includes(role)
@@ -298,25 +297,9 @@ describe('durable partitioned runtime state', () => {
         expect(JSON.stringify(grant)).not.toContain(`runtime/${store}`);
       }
     }
-    // The learning mediator has exact tenant file/directory policy grants;
-    // its mandatory capability further limits directory grants to mkdir and
-    // rejects the virtual knowledge aliases as actual data destinations.
+    // G2: no role holds a learning grant; the private issuer's exact ceiling is the authority.
     const runtime = 'active/shared/runtime/autonomy-learning';
-    const tenantDirectory = runtime + '/confidential/${KYBERION_TENANT}';
-    const exactGrant = [
-      tenantDirectory,
-      tenantDirectory + '/autonomy-outcomes.jsonl',
-      'knowledge/confidential/${KYBERION_TENANT}/autonomy-outcomes.jsonl',
-      tenantDirectory + '/autonomy-action-overrides.json',
-      'knowledge/confidential/${KYBERION_TENANT}/autonomy-action-overrides.json',
-      runtime,
-      runtime + '/confidential',
-      'knowledge/confidential/${KYBERION_TENANT}',
-    ];
-    expect(policy.authority_role_permissions.autonomy_learning_store).toEqual({
-      allow_read: exactGrant,
-      allow_write: exactGrant,
-    });
+    expect(policy.authority_role_permissions.autonomy_learning_store).toBeUndefined();
     const capability = autonomyLearningCapability('tenant-a');
     const tenantRoot = runtime + '/confidential/tenant-a';
     expect(capability).toEqual({

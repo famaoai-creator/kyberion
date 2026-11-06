@@ -160,7 +160,7 @@ describe('request resource ceiling', () => {
   it('retains supported autonomy maintenance prefixes for one component only', () => {
     const capability = autonomyLearningCapability('acme-corp');
     withProtectedFixture((root) => {
-      process.env.SYSTEM_ROLE = 'autonomy_learning_store';
+      // G2: the grant is the authority; the caller is a plain tenant-bound process.
       process.env.KYBERION_TENANT = 'acme-corp';
       const directory = 'active/shared/runtime/autonomy-learning/confidential/acme-corp';
       withAutonomyLearningCapability('acme-corp', directory, () => {
