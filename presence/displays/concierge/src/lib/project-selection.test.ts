@@ -53,6 +53,18 @@ describe('projectSwitchHref', () => {
   });
 });
 
+describe('projectSwitchHref without an organization', () => {
+  it.each(['project_id=PRJ-ONE', 'projectId=PRJ-ONE'])('clears %s for every project', (hint) => {
+    const url = new URL(
+      projectSwitchHref(`https://x.test/inbox?tenant=acme&${hint}`, null),
+      'https://x.test'
+    );
+    expect(url.searchParams.has('project_id')).toBe(false);
+    expect(url.searchParams.has('projectId')).toBe(false);
+    expect(url.searchParams.get('tenant')).toBe('acme');
+  });
+});
+
 describe('withProjectScope', () => {
   it('copies the page project onto an API path', () => {
     expect(
