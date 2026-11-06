@@ -11,7 +11,7 @@ function read(relPath: string): string {
 describe('Customer onboarding contract', () => {
   it('offers customer overlay setup in the onboarding wizard and docs', () => {
     const wizard = read('scripts/onboarding_wizard.ts');
-    const readme = read('customer/README.md');
+    const readme = read('templates/stance/README.md');
     const operator = read('docs/operator/DEPLOYMENT.md');
     const init = read('docs/INITIALIZATION.md');
     const quickstart = read('docs/QUICKSTART.md');
@@ -54,7 +54,9 @@ describe('Customer onboarding contract', () => {
     expect(cliCommandHandlers).toContain("from './cli-presentation.js'");
     expect(cliCommandHandlers).toContain('printHelp');
     expect(cliPresentation).toContain("t('cli_help_onboard', locale)");
-    expect(dashboard).toContain('customer/{slug}/ preferred when KYBERION_STANCE is set');
+    expect(dashboard).toContain(
+      'knowledge/personal/stances/{slug}/ preferred when KYBERION_STANCE is set'
+    );
     expect(localDev).toContain(
       'Customer-specific identity, connections, and onboarding artifacts resolve under knowledge/personal/stances/{slug}/ when set'
     );

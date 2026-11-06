@@ -12,7 +12,7 @@ describe('Customer overlay use cases contract', () => {
   it('documents the customer overlay story and operational commands', () => {
     const doc = read('docs/user/customer-overlay-use-cases.md');
     const readme = read('docs/user/README.md');
-    const customerReadme = read('customer/README.md');
+    const customerReadme = read('templates/stance/README.md');
 
     expect(doc).toContain('Stance Overlay Use Cases');
     expect(doc).toContain('create a customer overlay from the template');

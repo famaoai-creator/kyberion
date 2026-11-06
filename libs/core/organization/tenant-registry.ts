@@ -89,8 +89,6 @@ export interface ResolvedTenant {
   knowledge_root: string;
   /** Absolute path of knowledge_root. */
   knowledge_root_path: string;
-  /** Absolute path of the customer/{slug}/ overlay directory, or null when absent on disk. */
-  customer_overlay_root: string | null;
 }
 
 export interface TenantGroupProfile {
@@ -217,6 +215,7 @@ export {
   TENANT_ASSET_ENTRIES,
   TENANT_CHANNEL_BINDINGS_FILE,
   TENANT_COMPANY_FILE,
+  TENANT_DEALS_DIR,
   TENANT_HOME_ROOT,
   activeTenantSlug,
   isTenantAssetEntry,
@@ -493,32 +492,10 @@ export function resolveTenant(
   assertTenantOperational(profile, 'tenant-bound operation');
   const knowledgeRoot = profile.knowledge_root ?? defaultTenantKnowledgeRoot(slug);
   const knowledgeRootPath = resolveTenantKnowledgeRootPath(rootDir, slug, knowledgeRoot);
-  let safeOverlayDir: string | null = null;
-  try {
-    // Tenant company assets still live in the legacy customer/{tenant}/ directory
-    // until S2 moves them to knowledge/confidential/{tenant}/; this is not the stance.
-    const overlayDir = path.join(rootDir, 'customer', slug);
-    const candidate = assertSafeRepositoryPath(overlayDir, {
-      allowMissingLeaf: true,
-      rootDir,
-    });
-    if (safeExistsSync(candidate)) safeOverlayDir = candidate;
-  } catch (error) {
-    const reason = String((error as Error)?.message ?? error);
-    if (reason.includes('[RESOURCE_PATH_SYMLINK]')) {
-      throw new Error(
-        `[tenant-registry] tenant '${slug}' customer overlay traverses a symbolic link`
-      );
-    }
-    throw new Error(
-      `[tenant-registry] tenant '${slug}' customer overlay could not be inspected safely`
-    );
-  }
   return {
     profile,
     knowledge_root: knowledgeRoot,
     knowledge_root_path: knowledgeRootPath,
-    customer_overlay_root: safeOverlayDir,
   };
 }
 

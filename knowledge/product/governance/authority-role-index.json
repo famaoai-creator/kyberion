@@ -85,7 +85,7 @@
     "chronos_tenant_runner": {
       "description": "Chronos tenant-scoped pipeline runner. Entered ONLY in the child process chronos spawns for a schedule discovered under knowledge/confidential/{tenant}/pipelines/ (and, in the daemon, synchronously while listing/reading that tenant's pipeline files), always bound to that tenant (KYBERION_TENANT / execution-scope tenant, KYBERION_TENANT_SCOPE_REQUIRED=1 in the child). Grants resolve through ${KYBERION_TENANT}, so reads are limited to the bound tenant's confidential root plus the tenant registry; knowledge landings go through ingest:commit (ingest_commit role); writes are limited to that tenant's audit/trace mirrors.",
       "default_persona": "worker",
-      "write_scopes": ["customer/${KYBERION_TENANT}/logs/traces/"],
+      "write_scopes": [],
       "scope_classes": ["operations_runtime", "audit"],
       "allowed_actuators": ["ingest-actuator"],
       "tier_access": ["public", "confidential"]
@@ -146,12 +146,12 @@
       "tier_access": ["confidential"]
     },
     "customer_decision_deal_note_writer": {
-      "description": "Customer decision deal-note writer (scripts/customer_decision.ts respond / confirm, CD-08): reads and appends notes to the bound tenant's deal records under customer/<tenant>/deals/ only, bound to that tenant (tenant-bound: libs/core/authority.ts TENANT_BOUND_READER_ROLES). Assumed only for the best-effort deal note that a customer decision switch adds, so the customer-triggered respond path never needs mission_controller. No knowledge, decision ledger, agenda, receipt, invite or other customer/ authority.",
+      "description": "Tenant deal store (libs/core/deal-store.ts asDealStore, S3): every read and write of a tenant's customer records — deals, deal documents, requirements captures, escalations and the deal log under knowledge/confidential/<tenant>/deals/ — runs as this role, bound to that tenant (tenant-bound: libs/core/authority.ts TENANT_BOUND_READER_ROLES), and scripts/customer_decision.ts respond / confirm uses it for the best-effort deal note (CD-08), so neither the customer-triggered path nor a surface needs mission_controller or a confidential-tier grant. Only the deal file IO runs under it; callers keep their own role for notifications and the memory promotion queue. No other knowledge, decision ledger, agenda, receipt or invite authority.",
       "default_persona": "worker",
-      "write_scopes": ["customer/${KYBERION_TENANT}/deals/"],
+      "write_scopes": ["knowledge/confidential/${KYBERION_TENANT}/deals/"],
       "scope_classes": ["operations_runtime"],
       "allowed_actuators": [],
-      "tier_access": ["public"]
+      "tier_access": ["public", "confidential"]
     },
     "customer_decision_invite_store": {
       "description": "Customer decision invite record storage (libs/core/customer-decision/invite.ts): reads and writes only the bound tenant's active/shared/runtime/customer-decision-invites/confidential/<tenant>/ records. Requires an exact deny-only tenant capability for one invite record (or a read-only listing of the tenant directory) before every operation. No knowledge, decision ledger, agenda, receipt or deployment authority.",
@@ -426,7 +426,7 @@
       "tier_access": ["confidential", "personal"]
     },
     "peer_responder_reader": {
-      "description": "Least-privilege reader for peer conversation auto replies. libs/core/mesh/peer-auto-reply.ts assumes it, bound to the receiving tenant, to retrieve tenant knowledge (queryTenantKnowledge) that grounds an opt-in LLM reply; it reads that tenant's profile, knowledge/confidential/<tenant>/ and customer/<tenant>/ only, never knowledge/confidential/<tenant>/connections/ (peer secrets; security-policy.json deny_read), and writes nothing (persona worker). It is a tenant-bound reader (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
+      "description": "Least-privilege reader for peer conversation auto replies. libs/core/mesh/peer-auto-reply.ts assumes it, bound to the receiving tenant, to retrieve tenant knowledge (queryTenantKnowledge) that grounds an opt-in LLM reply; it reads that tenant's profile, knowledge/confidential/<tenant>/ only, never knowledge/confidential/<tenant>/connections/ (peer secrets; security-policy.json deny_read), and writes nothing (persona worker). It is a tenant-bound reader (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
       "default_persona": "worker",
       "write_scopes": [],
       "scope_classes": [],

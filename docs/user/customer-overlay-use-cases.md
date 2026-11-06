@@ -69,5 +69,5 @@ Full distinction: [stance / tenant / a tenant's customers](../../knowledge/produ
 - [Stance / Tenant / Customer — the three layers](../../knowledge/product/architecture/stance-tenant-customer-model.md)
 - [Customer Aggregation Point](../developer/CUSTOMER_AGGREGATION.md)
 - [Customer Aggregation Point (JA)](../developer/CUSTOMER_AGGREGATION.ja.md)
-- [customer/README.md](../../customer/README.md)
+- [templates/stance/README.md](../../templates/stance/README.md)
 - [Quickstart](../QUICKSTART.md)

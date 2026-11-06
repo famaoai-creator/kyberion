@@ -617,7 +617,15 @@ describe('customer dialogue (E2E-06)', () => {
     );
     const unquotable = JSON.parse(
       fs.readFileSync(
-        path.join(tmpRoot, 'customer', SLUG, 'deals', deal.deal_id, 'quote-unquotable.json'),
+        path.join(
+          tmpRoot,
+          'knowledge',
+          'confidential',
+          SLUG,
+          'deals',
+          deal.deal_id,
+          'quote-unquotable.json'
+        ),
         'utf8'
       )
     );
@@ -756,7 +764,8 @@ describe('customer dialogue (E2E-06)', () => {
     });
     const snapshot = path.join(
       tmpRoot,
-      'customer',
+      'knowledge',
+      'confidential',
       SLUG,
       'deals',
       deal.deal_id,

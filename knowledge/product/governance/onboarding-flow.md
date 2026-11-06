@@ -40,9 +40,9 @@ E. 組織の運営       purpose → service / operation → cadence / decision 
 
 ### ルート 2（AI 会社）の実行順
 
-ルート 2 の stance（`customer/<company-slug>/`）は Step 5 の `onboard company` が作る。そのため
+ルート 2 の stance（`knowledge/personal/stances/<company-slug>/`）は Step 5 の `onboard company` が作る。そのため
 Step 3 の identity は **2 回**保存する: まず個人 profile に（Step 3）、次に company stance に切り替えて
-もう一度（Step 5 の直後）。stance を有効にすると profile root が `customer/<company-slug>/` に
+もう一度（Step 5 の直後）。stance を有効にすると profile root が `knowledge/personal/stances/<company-slug>/` に
 切り替わり、mission start はそこにある `my-identity.json` / `my-vision.md` / `agent-identity.json`
 を要求するためである（無いと `Sovereign profile incomplete` で停止する）。
 
@@ -313,7 +313,7 @@ pnpm stance:switch <company-slug> && source active/shared/runtime/stance.env
 pnpm onboarding apply --identity <reviewed-identity-json>
 ```
 
-`customer/<company-slug>/onboarding/ai-company-readiness.json` と `first-work-plan.md` を
+`knowledge/personal/stances/<company-slug>/onboarding/ai-company-readiness.json` と `first-work-plan.md` を
 確認する。consistency check と Step 7 の activation は省略しない。
 
 ### Step 5.1: 使うモデルと provider への送信許可を決める（C）
@@ -446,7 +446,7 @@ pnpm tenant:activation activate \
 
 `--accept` は人間の受け入れを表す。現状このフラグは CLI 実行者の声明で、attest のような
 承認依頼との hash 照合はない。運用では人間が実行すること。成功すると
-`customer/<customer-slug>/onboarding/tenant-activation/<tenant>/<organization>/<tier>/activation.json`
+`knowledge/personal/stances/<customer-slug>/onboarding/tenant-activation/<tenant>/<organization>/<tier>/activation.json`
 に activation receipt が保存され、status が `active` になる。receipt には stance、tenant、
 organization、tier、owner、NHI、次の行動、operation contract（task lease、heartbeat watchdog、
 quota と budget、approval gate、pause と escalation、drift watcher）、各 probe の監査証跡 ref が記録される。
@@ -711,7 +711,7 @@ pnpm work project-next-tasks --mission-id MSN-<...> --project-id PRJ-<ID> --tena
   その目標は「unmeasured」のままになる。KR が 1 つでも未計測なら目標全体の進捗も出ない）。
   ファイルを用意できないうちは `objective kr record` で値を記録すれば進捗が出る。
 - `manual` 型の KR は `measure` では計測されない。`record` で記録した値が最新の計測値になる。
-- mission は company stance の identity を要求する（`--organization-id` が `customer/<org>/` の
+- mission は company stance の identity を要求する（`--organization-id` が `knowledge/personal/stances/<org>/` の
   stance を選ぶため）。Step 5 の後に stance で `onboarding apply` を済ませておく。
 - 朝会（`pipelines/organization-standup.json`）と振り返り（`organization-retro.json`）は、
   運用・決定・目標の変化を組織ごとにまとめて `active/organizations/.../artifacts/report/` に保存する。

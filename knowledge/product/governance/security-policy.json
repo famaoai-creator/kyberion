@@ -332,8 +332,8 @@
       ]
     },
     "knowledge_steward": {
-      "allow_read": ["customer/", "knowledge/personal/stances/"],
-      "allow_write": ["customer/", "knowledge/personal/stances/"]
+      "allow_read": ["knowledge/personal/stances/"],
+      "allow_write": ["knowledge/personal/stances/"]
     },
     "run_baseline_check": { "allow_write": ["active/shared/observability/ops-alerts.jsonl"] },
     "ops_alerts": { "allow_write": ["active/shared/observability/ops-alerts.jsonl"] },
@@ -498,7 +498,7 @@
       ]
     },
     "ruthless_auditor": {
-      "allow_read": ["active/audit/", "customer/", "knowledge/personal/stances/"],
+      "allow_read": ["active/audit/", "knowledge/personal/stances/"],
       "allow_write": ["active/audit/"]
     },
     "cyber_security": {
@@ -546,7 +546,7 @@
     },
     "chronos_tenant_runner": {
       "allow_read": ["knowledge/personal/tenants/", "knowledge/confidential/${KYBERION_TENANT}/"],
-      "allow_write": ["customer/${KYBERION_TENANT}/logs/traces/"]
+      "allow_write": []
     },
     "chronos_gateway": {
       "allow_read": [
@@ -669,8 +669,7 @@
     "peer_responder_reader": {
       "allow_read": [
         "knowledge/personal/tenants/${KYBERION_TENANT}.json",
-        "knowledge/confidential/${KYBERION_TENANT}/",
-        "customer/${KYBERION_TENANT}/"
+        "knowledge/confidential/${KYBERION_TENANT}/"
       ],
       "deny_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/"],
       "allow_write": []
@@ -823,7 +822,7 @@
     },
     "build_repository": { "allow_write": ["dist/.build-generation.json"] },
     "customer_create": {
-      "allow_write": ["customer/", "knowledge/personal/stances/", "knowledge/confidential/"]
+      "allow_write": ["knowledge/personal/stances/", "knowledge/confidential/"]
     },
     "onboarding": {
       "allow_write": ["customer/", "knowledge/personal/stances/", "knowledge/confidential/"]
@@ -1062,8 +1061,8 @@
       "allow_write": ["knowledge/confidential/${KYBERION_TENANT}/decisions/"]
     },
     "customer_decision_deal_note_writer": {
-      "allow_read": ["customer/${KYBERION_TENANT}/deals/"],
-      "allow_write": ["customer/${KYBERION_TENANT}/deals/"]
+      "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/deals/"],
+      "allow_write": ["knowledge/confidential/${KYBERION_TENANT}/deals/"]
     },
     "customer_decision_invite_store": {
       "allow_read": [
@@ -1185,7 +1184,7 @@
         "knowledge/product/governance/env-registry.json",
         "knowledge/product/governance/agent-policies.yaml"
       ],
-      "allow_write": ["knowledge/personal/", "customer/"]
+      "allow_write": ["knowledge/personal/"]
     }
   },
   "authority_permissions": {

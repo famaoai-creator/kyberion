@@ -83,9 +83,8 @@ _この `/vision/` ディレクトリの独立そのものが、「論理（Know
 AIは以下の順序で「今回の決断基準」を特定する。
 
 1. **Explicit Mission Override**: ミッションの `mission-state.json` に直接記述された `vision_ref`。
-2. **Customer stance overlay (optional)**: `customer/{customer_slug}/vision.md`。これは表示・運用スタンスであり、tenant registry や scope chain の代替ではない。
-3. **Tenant Vision**: `knowledge/confidential/{tenant_slug}/vision.md`。tenant registry が解決する canonical な tenant 境界に属する。
-4. **Global Vision (The Sovereign's Default)**: `/vision/_default.md`。
+2. **Tenant Vision**: `knowledge/confidential/{tenant_slug}/vision.md`。tenant registry が解決する canonical な tenant 境界に属する会社資産(以前の `customer/{slug}/vision.md` はここへ移った)。
+3. **Global Vision (The Sovereign's Default)**: `/vision/_default.md`。
 
 ---
 

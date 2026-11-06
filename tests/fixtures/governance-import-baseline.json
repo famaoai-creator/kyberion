@@ -138,6 +138,7 @@
     "libs/shared-voice/src/voice-sample-ingestion-policy.test.ts",
     "migration/0001-stance-home.test.ts",
     "migration/0002-tenant-home.test.ts",
+    "migration/0003-deal-home.test.ts",
     "plugins/fixtures/skill-plugin-loader-official-fixture.mjs",
     "presence/displays/concierge/test/concierge-contract.test.ts",
     "presence/displays/concierge/test/front-desk-contract.test.ts",

@@ -45,10 +45,9 @@ knowledge/personal/voice/*
 # Per-user experimental / confidential project scaffolds
 projects/
 
-# Customer aggregation: per-customer dirs are gitignored, but README and _template/ are committed.
-/customer/*
-!/customer/README.md
-!/customer/_template/
+# Legacy customer/ tree (stances, tenant assets and deals before S1–S3): local data only,
+# moved by `pnpm migration` (0001–0003).
+/customer/
 
 # Auto-generated audit reports (regenerate via pnpm license:audit / pnpm find:dead-code)
 /docs/legal/third-party-licenses.json

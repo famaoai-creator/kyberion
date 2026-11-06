@@ -5,10 +5,10 @@
  * systems and exits non-zero on drift:
  *
  *   (a) tenant profiles — the SPINE (libs/core/organization/tenant-registry.ts:
- *       knowledge/personal/tenants/*.json). The customer/{slug}/tenants/*.json
+ *       knowledge/personal/tenants/*.json). The knowledge/personal/stances/{slug}/tenants/*.json
  *       tree is a stance facet only and never changes registry authority,
  *   (b) knowledge/confidential/tenants/index.json (design override index),
- *   (c) customer/{customer}/tenants/{tenant}.json profile facets,
+ *   (c) knowledge/personal/stances/{stance}/tenants/{tenant}.json profile facets,
  *   (d) project registry — ProjectRecord.tenant_slug fields on non-archived
  *       records are cross-checked; archived projects keep historical tenant
  *       references and are excluded from the live consistency check.
@@ -104,7 +104,7 @@ export interface TenantSystemsSnapshot {
   profiles: string[];
   /** (b) ids in knowledge/confidential/tenants/index.json. */
   confidentialIndex: string[];
-  /** (c) tenant slugs declared by customer/{customer}/tenants/*.json facets. */
+  /** (c) tenant slugs declared by knowledge/personal/stances/{stance}/tenants/*.json facets. */
   customerTenantProfiles: string[];
   /** (d) tenant slugs declared by project registry records. */
   projectTenants: string[];
