@@ -27,7 +27,7 @@ import {
 } from '../customer-decision/store.js';
 import { boltMilestone } from '../customer-decision/bolt-review.js';
 import {
-  CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
+  CUSTOMER_DECISION_MILESTONE_GRANT_ISSUANCE_RIGHT,
   customerDecisionMilestoneCapability,
   withCustomerDecisionMilestoneCapability,
   isCustomerDecisionMilestoneCapability,
@@ -204,8 +204,18 @@ describe('mission bolt review (CD-10)', () => {
           TENANT,
           pathResolver.toRepoRelative(dir),
           { read: [], write: file },
-          () => withExecutionContext(CUSTOMER_DECISION_MILESTONE_STORE_ROLE, fn, undefined, TENANT)
+          // G2: the grant is the authority; the caller keeps its own role.
+          () => withExecutionContext('mission_controller', fn, undefined, TENANT)
         );
+      // The former role name is only the grant's issuance right.
+      expect(() =>
+        withExecutionContext(
+          CUSTOMER_DECISION_MILESTONE_GRANT_ISSUANCE_RIGHT,
+          () => 0,
+          undefined,
+          TENANT
+        )
+      ).toThrow('ROLE_ASSUMPTION_DENIED');
       const current = readAgenda({ dir }, 'agd-review0001') as DecisionAgenda;
       for (const changed of [
         { ...current, title: 'Changed' },

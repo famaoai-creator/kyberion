@@ -22,6 +22,7 @@ import { credentialMaterialGrantAllows } from './foundation/credential-material-
 import { memoryProvenanceGrantAllows } from './knowledge/memory-provenance-capability.js';
 import { personCharterGrantAuthorizes } from './governance/person-charter-runtime.js';
 import { customerDecisionConsumerGrantAllows } from './foundation/customer-decision-consumer-capability.js';
+import { customerDecisionMilestoneGrantAllows } from './foundation/customer-decision-milestone-capability.js';
 
 /**
  * Does the active invite capability cover this I/O? Its validator predates
@@ -88,6 +89,9 @@ function discussionRequestGrantAllows(
  * - Customer decision consumer lock: the opaque issuer grant of one consumer-lock operation of one
  *   case (CD-09), under the tenant decisions root; its writes are content-checked
  *   (narrow-store-role-denial). Its facade checks the issuance right before it issues.
+ * - Customer decision milestone: the opaque issuer grant of one bolt-review milestone operation of
+ *   one case (CD-10), under the tenant decisions root; its writes are content-checked. The bolt
+ *   review checks the issuance right before it issues.
  */
 export function storeGrantAuthorizes(
   target: string,
@@ -106,6 +110,7 @@ export function storeGrantAuthorizes(
     credentialMaterialGrantAllows(target, operation) ||
     memoryProvenanceGrantAllows(target, operation) ||
     personCharterGrantAuthorizes(target, operation) ||
-    customerDecisionConsumerGrantAllows(target, operation)
+    customerDecisionConsumerGrantAllows(target, operation) ||
+    customerDecisionMilestoneGrantAllows(target, operation)
   );
 }

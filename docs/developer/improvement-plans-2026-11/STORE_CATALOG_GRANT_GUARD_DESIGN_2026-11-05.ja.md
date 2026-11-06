@@ -994,6 +994,37 @@ decisions の根の存在確認だけである。書き込みはすべて `tier-
 突き合わせた（1610 件）。違いは `deliverable_inbox_writer` の 2 件（狭くなる側）だけで、拒否は同じ符号
 だった。
 
+### G2: 顧客判断の bolt review の milestone の許可証化（2026-11-06）
+
+`customer_decision_milestone_store`（CD-10）は、mission の開始時に `mission/mission-bolt-review.ts` が、
+判断の case の tenant に束縛して引き受けていた共有コアロールである。上限は agendas の一覧と名前を挙げた
+agenda の読み取り、agenda 1 つの書き込みで、書き込みは milestone の追記だけという内容の規則を
+`tier-guard`（ロール名）と agenda の保存の窓口（`customer-decision/store.ts` の `writeAgenda`、
+`resolveRole()` がこのロールのとき）の両方で確かめていた。
+
+**第 1 段階。** 消費ロックと同じく、上限を発行者ごとの不透明な許可証としてだけ発行するようにした
+（`withCustomerDecisionMilestoneCapability`、bolt review だけが使う。境界テスト
+`tests/customer-decision-milestone-capability-boundary.test.ts`）。
+
+**第 2 段階: 許可証を権限にし、ロールを外した。**
+
+- bolt review は発行の前に、旧共有コアロールの引き受けと同じ規則を名前
+  `customer_decision_milestone_store` に対して確かめ、呼び出し元のロールと persona のまま case の tenant に
+  束縛する（組織は引き継がない。別 tenant に束縛された呼び出し元は `[ROLE_TENANT_SCOPE_MISMATCH]`）。
+- 許可: `storeGrantAuthorizes` → `customerDecisionMilestoneGrantAllows`（tenant の decisions の根の下と、
+  根の祖先のメタデータ）。
+- 内容の規則は 2 か所ともそのまま残し、ロール名ではなく有効な許可証で効かせる
+  （`narrow-store-role-denial.ts`、`writeAgenda` → `customerDecisionMilestoneGrantActive`）。内容の規則を
+  ロール名で引く一覧（`CONTENT_CHECKED_ROLES`）は無くなった。`tier-guard` の古い許可証の検査
+  （`legacyStoreCapability`）は使う所が無くなったので消した。
+- ロールの宣言（security-policy、authority role index、ロール定義、`authority.ts` の tenant 束縛ロールの
+  一覧と引き受けの検査、保存先カタログの `legacy_roles` 1 件、`tier-guard` のロール名の分岐）を削除し、
+  名前を退役したロールの一覧に加えた。
+
+**比較。** 書く・読む窓口について、上限、その祖先、上限の外の 8 個のパスを 5 つの操作で（agenda は
+内容のある書き込みも）、10 種類の呼び出し元から問い、旧と新を突き合わせた（1085 件）。違いは
+`deliverable_inbox_writer` の 1 件（狭くなる側）だけだった。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |

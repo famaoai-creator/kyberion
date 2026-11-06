@@ -1059,13 +1059,7 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
           TENANT,
           caseDir(TENANT),
           { read: [agendaFile], write: agendaFile },
-          () =>
-            authority.withExecutionContext(
-              milestone.CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
-              fn,
-              undefined,
-              TENANT
-            )
+          fn
         );
       const current = asMilestone(() =>
         JSON.parse(String(io.safeReadFile(inCase(agendaFile), { encoding: 'utf8' })))
