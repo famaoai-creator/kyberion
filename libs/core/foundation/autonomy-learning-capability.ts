@@ -1,4 +1,18 @@
-import type { ResourceAccessScope } from './resource-access-scope.js';
+/**
+ * Tenant autonomy learning store grant (G2 of the store-catalog guard design).
+ *
+ * The exact ceiling of one tenant partition (`autonomyLearningCapability`) is
+ * issued only as an opaque, synchronous grant of this module's private issuer
+ * (`withAutonomyLearningCapability`, import-restricted to
+ * governance/autonomy-action-state.ts by
+ * tests/autonomy-learning-capability-boundary.test.ts). A structural lookalike,
+ * a copy, a grant of another issuer, a captured continuation or a grant of a
+ * second module instance resolves nothing (`isAutonomyLearningCapability`).
+ */
+import {
+  createSynchronousResourceGrantIssuer,
+  type ResourceAccessScope,
+} from './resource-access-scope.js';
 import * as path from 'node:path';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from './runtime-state-roots.js';
 import { getProcessEnv } from './process-env.js';
@@ -50,9 +64,35 @@ export function autonomyLearningCapability(
   };
 }
 
+interface AutonomyLearningBinding {
+  readonly tenantSlug: string;
+  readonly directory: string;
+}
+const grants = createSynchronousResourceGrantIssuer<AutonomyLearningBinding>(
+  'AUTONOMY_LEARNING_CAPABILITY'
+);
+
+/**
+ * Internal synchronous issuer of the exact tenant store ceiling, import-restricted to
+ * governance/autonomy-action-state.ts. The opaque grant exists only while `internalFn` runs.
+ */
+export function withAutonomyLearningCapability<T>(
+  tenantSlug: string,
+  directory: string,
+  internalFn: () => T
+): T {
+  const binding: AutonomyLearningBinding = Object.freeze({ tenantSlug, directory });
+  return grants.run(binding, autonomyLearningCapability(tenantSlug, directory), internalFn);
+}
+
+/** Pure mandatory guard: only this issuer's live grant with its exact ceiling resolves. */
 export function isAutonomyLearningCapability(scope: ResourceAccessScope | undefined): boolean {
+  const grant = grants.resolve(scope);
+  if (!grant || !scope) return false;
   if (
-    !scope ||
+    scope.tenantSlug !== grant.binding.tenantSlug ||
+    path.posix.dirname(scope.readExact[0] ?? '') !== grant.binding.directory ||
+    (scope.appendExact?.length ?? 0) !== 0 ||
     scope.organizationId ||
     scope.projectId ||
     scope.allowProductKnowledgeRead ||

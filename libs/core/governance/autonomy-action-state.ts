@@ -54,8 +54,7 @@ import { loadAutonomyLearningPolicy } from './autonomy-learning-policy.js';
 import { appendRetentionAudit } from '../storage-retention-expiry.js';
 import type { AutonomousOpsDecision } from './autonomous-ops-gate.js';
 import { withExecutionContext } from '../authority.js';
-import { autonomyLearningCapability } from '../foundation/autonomy-learning-capability.js';
-import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+import { withAutonomyLearningCapability } from '../foundation/autonomy-learning-capability.js';
 
 const logger = createLogger('autonomy-action-state');
 
@@ -199,7 +198,7 @@ function withTenantAutonomyStore<T>(deps: AutonomyStateDeps, operation: () => T)
   const directory = pathResolver.toRepoRelative(
     path.dirname(filePath(deps, AUTONOMY_OUTCOMES_PATH))
   );
-  return runInResourceAccessScope(autonomyLearningCapability(deps.tenantSlug, directory), () =>
+  return withAutonomyLearningCapability(deps.tenantSlug, directory, () =>
     withExecutionContext('autonomy_learning_store', operation, undefined, deps.tenantSlug)
   );
 }
