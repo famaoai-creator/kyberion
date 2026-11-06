@@ -59,8 +59,20 @@ export function storeGrantBoundaryViolations(
             problems.push(`aliased issuer import ${imported}`);
         }
     }
-    if (ts.isExportDeclaration(node) && module(node.moduleSpecifier))
-      problems.push('reexport of a store grant module is forbidden');
+    if (ts.isExportDeclaration(node) && module(node.moduleSpecifier)) {
+      // Only a named, non-issuer re-export of names the consumer may import (a trusted seam).
+      const clause = node.exportClause;
+      if (
+        !allowed ||
+        !clause ||
+        !ts.isNamedExports(clause) ||
+        clause.elements.some((entry) => {
+          const name = (entry.propertyName ?? entry.name).text;
+          return boundary.issuers.has(name) || !allowed.includes(name);
+        })
+      )
+        problems.push('reexport of a store grant module is forbidden');
+    }
     if (
       ts.isImportEqualsDeclaration(node) &&
       ts.isExternalModuleReference(node.moduleReference) &&
