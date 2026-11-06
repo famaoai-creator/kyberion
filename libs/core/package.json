@@ -7764,10 +7764,6 @@
       "types": "./dist/segmented-voice-playback.d.ts",
       "default": "./dist/segmented-voice-playback.js"
     },
-    "./two-stage-barge-in": {
-      "types": "./dist/two-stage-barge-in.d.ts",
-      "default": "./dist/two-stage-barge-in.js"
-    },
     "./voice/engine-runtime-preferences-access": {
       "types": "./dist/voice/engine-runtime-preferences-access.d.ts",
       "default": "./dist/voice/engine-runtime-preferences-access.js"
