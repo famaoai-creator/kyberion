@@ -3,10 +3,7 @@ import {
   PERSONAL_APPROVAL_STORE_ROLE,
   personalApprovalIoAllowed,
 } from './personal-approval-io-capability.js';
-import {
-  TASK_SOURCE_WORKSPACE_ROLE,
-  taskSourceWorkspaceIoAllowed,
-} from './task-source-workspace-capability.js';
+import { taskSourceWorkspaceIoDenial } from './task-source-workspace-capability.js';
 import {
   ARCHIVED_MISSION_STATE_READER_ROLE,
   isArchivedMissionStateCapability,
@@ -67,11 +64,10 @@ export function narrowStoreRoleDenial(input: {
     !personalApprovalIoAllowed(relativePath, input.operation)
   )
     return '[PERSONAL_APPROVAL_SCOPE_REQUIRED] Exact personal owner IO window required';
-  if (
-    role === TASK_SOURCE_WORKSPACE_ROLE &&
-    !taskSourceWorkspaceIoAllowed(relativePath, input.operation)
-  )
-    return '[TASK_SOURCE_SCOPE_DENIED] Exact live workspace IO capability required';
+  // G2: an open task source workspace window (no role) narrows every I/O made inside it;
+  // its liveness check runs with the window suspended, so it is never narrowed.
+  const workspaceDenial = taskSourceWorkspaceIoDenial(relativePath, input.operation);
+  if (workspaceDenial) return workspaceDenial;
   // Append must retain every pre-existing write/content restriction, never fall through
   // a metadata/read branch merely because the resource ceiling distinguishes the verb.
   const operation = input.operation === 'append' ? 'write' : input.operation;

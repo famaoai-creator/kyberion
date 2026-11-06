@@ -103,7 +103,7 @@
     "foundation/scope": 0,
     "foundation/secret-resolution-session": 5,
     "foundation/service-endpoints": 71,
-    "foundation/task-source-workspace-capability": 0,
+    "foundation/task-source-workspace-capability": 2,
     "foundation/task-tool-grant-validation": 2,
     "foundation/text-escaping": 0,
     "foundation/text-rule-matcher": 0,

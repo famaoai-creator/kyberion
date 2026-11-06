@@ -18,10 +18,7 @@ import {
   type ResourceAccessOperation,
   type ResourceAccessScope,
 } from './foundation/resource-access-scope.js';
-import {
-  TASK_SOURCE_WORKSPACE_ROLE,
-  taskSourceWorkspaceIoAllowed,
-} from './foundation/task-source-workspace-capability.js';
+import { taskSourceWorkspaceGrantAllows } from './foundation/task-source-workspace-capability.js';
 import {
   PR_PUBLICATION_STORE_ROLE,
   prPublicationResourceAllowed,
@@ -34,8 +31,6 @@ type StoreGrantCheck = (
 ) => boolean;
 
 const STORE_GRANTS: Readonly<Record<string, StoreGrantCheck>> = Object.freeze({
-  [TASK_SOURCE_WORKSPACE_ROLE]: (target, operation) =>
-    taskSourceWorkspaceIoAllowed(target, operation),
   [PR_PUBLICATION_STORE_ROLE]: (target, operation) =>
     prPublicationResourceAllowed(target, operation),
 });
@@ -92,7 +87,8 @@ export function storeGrantAuthorizes(
   return (
     isDotResultStoreCapability(scope, { rootDir, target, operation }) ||
     customerDecisionInviteGrantAllows(scope, target, operation) ||
-    discussionRequestGrantAllows(scope, target, operation)
+    discussionRequestGrantAllows(scope, target, operation) ||
+    taskSourceWorkspaceGrantAllows(target, operation)
   );
 }
 

@@ -35,7 +35,6 @@
       "slack_bridge",
       "surface_runtime",
       "task_runtime_worker",
-      "task_source_workspace",
       "tenant_approval_partition_index_reader",
       "tenant_approval_store",
       "tenant_ledger_store",
