@@ -136,7 +136,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["concierge_management_reader", "dot_result_writer"],
+      "legacy_roles": ["concierge_management_reader"],
       "sources": ["runtime-state-roots", "role-policy"],
       "registration": {
         "family": "state",

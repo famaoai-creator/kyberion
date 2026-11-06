@@ -50,10 +50,11 @@ const binding = (): DotResultStoreBinding => ({
   file,
 });
 const at = (value = file) => path.join(root, value);
-const writer = <T>(fn: () => T) =>
-  withExecutionContext('dot_result_writer', fn, undefined, tenant, 'org-a');
-const append = <T>(fn: () => T) =>
-  withDotResultStoreCapability(binding(), 'append_result', () => writer(fn));
+// G2: the grant alone authorizes DOT result I/O; there is no store role to assume.
+const writer = <T>(fn: () => T): T => fn();
+const append = <T>(fn: () => T) => withDotResultStoreCapability(binding(), 'append_result', fn);
+const assumeRemovedRole = () =>
+  withExecutionContext('dot_result_writer', () => undefined, undefined, tenant, 'org-a');
 beforeEach(() => {
   root = path.join(sourceRoot, 'active/shared/tmp/dot-result-cap-' + crypto.randomUUID());
   safeMkdir(path.join(root, 'knowledge/personal/tenants'), { recursive: true });
@@ -141,17 +142,16 @@ describe('internal DOT result capability under actual registered policy', () => 
     }
   );
 
-  it('checks every cold and warm role assumption, including registered system-role metadata', () => {
+  it('no longer has a store role: the former role name grants nothing, and system processes cannot assume it', () => {
+    const asRemovedRole = <T>(fn: () => T) =>
+      withExecutionContext('dot_result_writer', fn, undefined, tenant, 'org-a');
+    expect(asRemovedRole(() => validateWritePermission(at(), 'append').allowed)).toBe(false);
     vi.stubEnv('SYSTEM_ROLE', 'operator_surface');
-    expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/);
-    append(() => expect(validateWritePermission(at(), 'append').allowed).toBe(true));
-    expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/);
+    expect(assumeRemovedRole).toThrow();
     withDotResultStoreCapability(binding(), 'append_result', () => {
-      expect(() =>
-        withExecutionContext('dot_result_writer', () => undefined, undefined, tenant, 'other-org')
-      ).toThrow();
+      expect(assumeRemovedRole).toThrow();
+      expect(validateWritePermission(at(), 'append').allowed).toBe(true);
     });
-    expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/);
   });
   it('absorbs rejected promises and hostile thenables while invalidating their capability', async () => {
     expect(() =>
@@ -205,21 +205,22 @@ describe('internal DOT result capability under actual registered policy', () => 
       })
     );
   });
-  it('requires role and active opaque capability together, even with ambient grants', () => {
-    expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/);
+  it('authorizes with the active grant alone; forged, counterfeit and other-tenant use fail closed', () => {
     expect(validateWritePermission(at(), 'append').allowed).toBe(false);
     withDotResultStoreCapability(binding(), 'append_result', () => {
-      expect(validateWritePermission(at(), 'append').allowed).toBe(false);
-      expect(() =>
-        withExecutionContext(
-          'dot_result_writer',
-          () => undefined,
-          undefined,
-          'other-tenant',
-          'org-a'
-        )
-      ).toThrow();
+      expect(validateWritePermission(at(), 'append').allowed).toBe(true);
     });
+    expect(validateWritePermission(at(), 'append').allowed).toBe(false);
+    // A caller bound to another tenant gains nothing from the grant.
+    withExecutionContext(
+      'infrastructure_sentinel',
+      () =>
+        withDotResultStoreCapability(binding(), 'append_result', () => {
+          expect(validateWritePermission(at(), 'append').allowed).toBe(false);
+        }),
+      undefined,
+      'other-tenant'
+    );
     const forged: ResourceAccessScope = {
       tenantSlug: tenant,
       organizationId: 'org-a',
@@ -231,7 +232,7 @@ describe('internal DOT result capability under actual registered policy', () => 
       opaqueStoreToken: {},
     };
     runInResourceAccessScope(forged, () =>
-      expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/)
+      expect(validateWritePermission(at(), 'append').allowed).toBe(false)
     );
     const counterfeitIssuer = createSynchronousResourceGrantIssuer('DOT_RESULT_CAPABILITY');
     const { opaqueStoreToken: _token, ...sameCeiling } = forged;
@@ -239,7 +240,7 @@ describe('internal DOT result capability under actual registered policy', () => 
       Object.freeze({ binding: binding(), operation: 'append_result' }),
       sameCeiling,
       () => {
-        expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/);
+        expect(validateWritePermission(at(), 'append').allowed).toBe(false);
       }
     );
   });
@@ -287,7 +288,9 @@ describe('internal DOT result capability under actual registered policy', () => 
     expect(() =>
       withDotResultStoreCapability(binding(), 'append_result', () => Promise.resolve())
     ).toThrow(/ASYNC/);
-    expect(() => runInResourceAccessScope(escaped!, () => writer(() => undefined))).toThrow();
+    expect(
+      runInResourceAccessScope(escaped!, () => validateWritePermission(at(), 'append').allowed)
+    ).toBe(false);
   });
   it('cannot expand nested ceilings, root, scope, dot or operation arrays', () => {
     const outer: ResourceAccessScope = {
