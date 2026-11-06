@@ -5,11 +5,12 @@ import { PARTITIONED_RUNTIME_STATE_ROOTS } from './runtime-state-roots.js';
 import { isValidTenantSlug } from './scope.js';
 
 /**
- * Narrow store role for one tenant's customer decision invite records
+ * Exact capability for one tenant's customer decision invite records
  * (`active/shared/runtime/customer-decision-invites/confidential/<tenant>/`,
- * libs/core/customer-decision/invite.ts). It grants no knowledge access.
+ * libs/core/customer-decision/invite.ts). G2: the active capability itself is
+ * the authority for the I/O it covers — the former `customer_decision_invite_store`
+ * role is removed. It grants no knowledge access.
  */
-export const CUSTOMER_DECISION_INVITE_STORE_ROLE = 'customer_decision_invite_store';
 
 const ROOT = PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites;
 const FILE = /^inv-[a-f0-9]{16}\.json$/u;
