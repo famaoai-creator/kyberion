@@ -12,7 +12,7 @@ describe('Customer aggregation contract', () => {
   it('documents stance:create as an available command', () => {
     const doc = read('docs/developer/CUSTOMER_AGGREGATION.md');
     const jp = read('docs/developer/CUSTOMER_AGGREGATION.ja.md');
-    const customerReadme = read('customer/README.md');
+    const customerReadme = read('templates/stance/README.md');
     expect(doc).toContain('pnpm stance:create <slug>');
     expect(doc).toContain('[x] CLI: `pnpm stance:create <slug>`');
     expect(doc).toContain('[x] CLI: `pnpm stance:list`');

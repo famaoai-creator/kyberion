@@ -98,6 +98,29 @@ core build と関連7ファイル・99テストが通過し、生成した依存
 runtime import・workspace build・fragment 検査の3ファイル8テストも成功した。
 この最終修正後の全体再実行は行わず、失敗の再現範囲と変更ゲートで確認する。
 
+### S3 の追従と migration 保全（2026-11-06）
+
+検証中に参照ブランチへ届いた `bc8e04f39` を追加統合した。deals は
+`knowledge/confidential/<tenant>/deals` の tenant 管理資産として active にし、
+customer 別配置は planned のままにする。旧 `customer/` の住所を active な移行先へ
+読み替えない。実カタログによる住所解決の回帰でも、この区別を確認した。
+カタログは75保存先、runtime 登録は25件のままである。
+
+S3 migration の合成 fixture で、非 UTF-8 添付の byte 破損と symlink の読み飛ばしを
+修正前に再現した。非 JSON は Buffer のままコピーし、JSON/JSONL だけ参照を再リンクする。
+全 tenant の事前検査を終えるまでコピー・削除をせず、特殊 entry と不正な README を拒否し、
+宛先への上書きも拒否する。実ポリシー・実ロールの隔離 root で11テストが成功し、
+S3 と Scope・rename・offboarding 等の28ファイル301テストも成功した。
+
+copy/delete は transaction ではない。途中の I/O 障害では部分的な宛先が残るため、
+既存宛先として停止し、原本を消さずに手動照合する。今回は実データ移行を実行していない。
+
+最終ビルド、生成物13種の drift 検査、migration の3シード（各11テスト）が成功した。
+main 同期前の `66eaa0442` から S3 までを合わせた174ファイルに対し、
+`pnpm check -- --changed --base 66eaa0442 --jobs 1` の84ゲートがすべて成功した。
+独立 reviewer に実装・認可・UX の未解消指摘はない。全体 suite は最後の修正後に
+再実行しておらず、全体結果と失敗再現範囲の再検証を区別している。
+
 門番（`libs/core/tier-guard.ts`）は、**資産の住所**と**許可証**だけを見て判定する。
 ドメインごとのロール名や capability モジュールを門番のコードに書かない。
 
