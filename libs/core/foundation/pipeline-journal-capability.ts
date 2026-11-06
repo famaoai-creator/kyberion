@@ -8,9 +8,16 @@
  * tests/pipeline-journal-capability-boundary.test.ts). A structural lookalike,
  * a copy, a grant of another issuer, a captured continuation or a grant of a
  * second module instance resolves nothing (`isPipelineJournalCapability`).
+ *
+ * G2: the live grant is itself the authority for the I/O it covers
+ * (`pipelineJournalGrantAllows`, asked by tier-guard's store-grant table);
+ * there is no store role.
  */
 import {
   createSynchronousResourceGrantIssuer,
+  currentResourceAccessScope,
+  decideResourceAccess,
+  type ResourceAccessOperation,
   type ResourceAccessScope,
 } from './resource-access-scope.js';
 import * as path from 'node:path';
@@ -18,8 +25,13 @@ import { PARTITIONED_RUNTIME_STATE_ROOTS } from './runtime-state-roots.js';
 import { getProcessEnv } from './process-env.js';
 import { isValidTenantSlug } from './scope.js';
 
-/** Narrow store role that writes one tenant's confidential library pipeline run journal. */
-export const PIPELINE_JOURNAL_STORE_ROLE = 'pipeline_journal_store';
+/**
+ * Issuance right of the pipeline journal grant (G2). The former shared core role of this name is
+ * gone; the name stays only in role-assumption-policy `shared_core_roles`, which decides which
+ * processes may issue the grant (authority.ts assertStoreGrantIssuanceAllowed). It is not an
+ * assumable authority role.
+ */
+export const PIPELINE_JOURNAL_GRANT_ISSUANCE_RIGHT = 'pipeline_journal_store';
 
 const ROOT = PARTITIONED_RUNTIME_STATE_ROOTS.pipeline_library_runs;
 const FILE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.jsonl$/u;
@@ -124,4 +136,19 @@ export function isPipelineJournalCapability(scope: ResourceAccessScope | undefin
   } catch {
     return false;
   }
+}
+
+/**
+ * Does the live grant authorize this I/O? Only inside its exact ceiling and only under the store
+ * root the former `pipeline_journal_store` policy grant covered. Product schema reads and the
+ * Vitest sandbox partition stay with the caller's own policy, as they did under the role.
+ */
+export function pipelineJournalGrantAllows(
+  target: string,
+  operation: ResourceAccessOperation
+): boolean {
+  const scope = currentResourceAccessScope();
+  if (!isPipelineJournalCapability(scope)) return false;
+  if (target !== ROOT && !target.startsWith(ROOT + '/')) return false;
+  return decideResourceAccess(scope!, target, operation).allowed;
 }

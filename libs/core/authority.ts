@@ -8,10 +8,6 @@ import {
   currentMemoryProvenanceReadCapability,
 } from './knowledge/memory-provenance-capability.js';
 import {
-  isPipelineJournalCapability,
-  PIPELINE_JOURNAL_STORE_ROLE,
-} from './foundation/pipeline-journal-capability.js';
-import {
   isCustomerDecisionConsumerCapability,
   CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
 } from './foundation/customer-decision-consumer-capability.js';
@@ -101,7 +97,6 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   peer_responder_reader: 'worker',
   peer_task_artifact_writer: 'worker',
   metrics_cap_reader: 'worker',
-  pipeline_journal_store: 'worker',
   audit_mirror_writer: 'worker',
   tenant_ledger_store: 'worker',
   tenant_approval_store: 'worker',
@@ -774,7 +769,6 @@ export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'customer_channel_binding_store',
   'customer_decision_deal_note_writer',
   'delegation_record_store',
-  PIPELINE_JOURNAL_STORE_ROLE,
   'peer_catalog_reader',
   'peer_responder_reader',
   'peer_task_artifact_writer',
@@ -852,14 +846,6 @@ function prepareExecutionContext(
         '[MEMORY_PROVENANCE_READ_SCOPE] Exact current tenant/owner read capability required'
       );
   }
-  if (
-    normalizedRole === PIPELINE_JOURNAL_STORE_ROLE &&
-    (!isPipelineJournalCapability(currentResourceAccessScope()) ||
-      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
-  )
-    throw new Error(
-      '[RESOURCE_SCOPE_REQUIRED] Pipeline journal access requires its exact tenant journal capability'
-    );
   if (
     normalizedRole === CUSTOMER_DECISION_CONSUMER_STORE_ROLE &&
     (!isCustomerDecisionConsumerCapability(currentResourceAccessScope()) ||
