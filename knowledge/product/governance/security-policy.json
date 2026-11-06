@@ -300,10 +300,6 @@
         "active/shared/runtime/vitest-approvals/"
       ]
     },
-    "task_source_workspace": {
-      "allow_read": ["knowledge/product/", "active/shared/runtime/workspaces/"],
-      "allow_write": ["active/shared/runtime/workspaces/"]
-    },
     "mission_controller": {
       "allow_read": [
         "active/missions/",

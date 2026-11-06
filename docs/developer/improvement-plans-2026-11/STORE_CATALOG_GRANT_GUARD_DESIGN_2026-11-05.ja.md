@@ -534,13 +534,9 @@ public のログ置き場）で、スタンスの痕跡を個人 tier として�
 
 ### G2: 案 A のまま外せなかった専用ロール（2026-11-06）
 
-次の 2 つは、許可証だけを権限にするとロールが守っていた性質が失われるので、ロールを残した
-（`discussion_request_store` は上の節で外した）。
+次のものは、許可証だけを権限にするとロールが守っていた性質が失われるので、ロールを残した
+（`discussion_request_store` と `task_source_workspace` はそれぞれの節で外した）。
 
-- `task_source_workspace`: 許可証（I/O の窓）は deny-only の上限ではない。窓の中の I/O を窓の対象だけに
-  絞るのは、ロール名で効く狭い拒否（`narrow-store-role-denial.ts`）である。これを「窓が有効なら」に
-  置き換えると、窓の中で呼び出し元の範囲に戻って実行される生存確認（`assertCurrent`）の読み取りまで
-  絞られる。窓を上限として表す形を決めてから外す。
 - `pr_publication_store`: 業務の流れで複数の保存先（charter の台帳、成果物、外部操作の記録）に書く
   種類で、置き換え先は保存先ごとの複数の許可証である（上の棚卸しの表）。ロールはインストール単位の
   追加移行（`publication-role-migration.ts` の `PUBLICATION_MIGRATION_ROLES`）の対象でもあり、
@@ -590,6 +586,49 @@ libs/core の外の本番のファイルが、libs/core のモジュールを相
 失敗する。正規表現で同じことを一部だけ見ていた `check_esm_integrity.ts` の libs/core の分と
 `tests/package-boundary-contract.test.ts` の 1 件はこの門番にまとめ、そこにあった古い例外
 （`bindings.ts` と依存方針の 3 つの check。今は `@agent/core` で読んでいる）は消した。
+
+### G2: 作業場所の I/O の窓の許可証化（2026-11-06）
+
+非公開の作業のソース（`workforce/task-source-edit.ts`）から共有コアロール `task_source_workspace` を
+外した。上の節で 1 つのプロセスに `@agent/core` が 1 つだけになったので、窓をモジュールの中だけのものに
+できた。
+
+- 窓（`foundation/task-source-workspace-capability.ts`）は、`AsyncLocalStorage` と発行済みの集合を
+  モジュールの中だけに持つ（`globalThis` の登録簿をやめた）。`createSynchronousResourceGrantIssuer` は
+  使わない。それはリソースの上限（`ResourceAccessScope`）として中の I/O をすべて絞るので、窓の中で
+  走る生存確認の台帳の読み取りまで絞ってしまう。2 つ目のモジュールは窓を見ず、認めない。旧キーに
+  置いた偽の登録簿や形だけ同じ窓は何も認めない。窓は同期だけで、Promise を返すと拒否し、捕まえた
+  継続には窓が無い。窓を開けるのは `workforce/task-source-workspace-io.ts` だけである（import の
+  境界テスト `tests/task-source-workspace-capability-boundary.test.ts`）。
+- 許可: `tier-guard` はリクエストの上限と tenant 範囲の検査の後に、有効な窓かを問う
+  （`storeGrantAuthorizes` → `taskSourceWorkspaceGrantAllows`）。窓が認めるのは対象のファイル
+  （読む・メタデータ・書く）と、書くときの無い祖先ディレクトリの作成だけで、物理的な区画
+  `workspaces/<personal|confidential>/<tenant|shared>/` の中に限る。区画の検査は窓口にもあるが、
+  判定の側でもう一度行う。public の作業には窓を開けない。
+- 絞り込み: 窓が有効な間の I/O はすべて窓に絞る（`narrow-store-role-denial.ts` →
+  `taskSourceWorkspaceIoDenial`）。範囲はロールのときと同じで、対象、その祖先の読み取りと
+  メタデータ、書くときの祖先の作成、`knowledge/product/` の読み取り（policy engine が読む）である。
+  ロールのときは「ロールが `task_source_workspace` の I/O」を絞っていたが、ロールの中で走ったのは
+  窓口の I/O だけなので、「窓が有効な間の I/O」に変えても絞る対象は同じである。
+- 生存確認: `assertCurrent`（作業の claim、lease、作業場所の台帳）は、窓を外した状態
+  （`AsyncLocalStorage.exit`）で呼び出し元として走る。ロールのときも呼び出し元の execution scope で
+  走っていたので、台帳の読み取りは絞られず、窓の権限も使わない。生存確認が失敗すれば I/O は
+  拒否される（古い claim は従来どおり止まる）。2 つの方式（呼び出し元のロールが変わっていないかで
+  絞る、生存確認の間だけ窓を外す）のうち、後者を選んだ。窓の中の I/O をロールに依らず一律に絞れ、
+  判定に execution scope の比較を足さずに済むからである。
+- 呼び出し元のロールと persona はそのまま使い、作業の tenant と組織に束縛する（ロールの引き受けが
+  束縛していたのと同じ）。誰が窓を開けられるかは変えていない（共有コアロールだったので、プロセス内の
+  どの呼び出し元でもよい）。
+- 届く範囲: 窓の中の I/O は窓に絞られ、窓が認めるのは対象と区画の中の祖先の作成だけなので、
+  ロールより広がらない。違いは 2 つで、どちらも狭くなる側である。(1) 区画より上のディレクトリ
+  （`workspaces/<tier>/<tenant>` 自体など）の作成は呼び出し元の権限で判定する。生きた作業場所が
+  区画の中にあるので、それらは既にある。(2) 呼び出し元が deny-only の狭いロール（例
+  `deliverable_inbox_writer`）を持ったまま窓を開けると、そのロールの拒否も効く。以前はロールの
+  引き受けで置き換わっていた。作業のツールはそのようなロールの中では動かない。
+- ロールの宣言（security-policy、role-assumption-policy の共有ロール、`authority.ts` の引き受けの検査、
+  `tier-guard-store-grants.ts` の表の行、ロール名で効いた絞り込み）を削除した。保存先カタログの
+  `legacy_roles` とロールの索引・定義には元から載っていなかった。旧ロール名を引き受けても何も
+  許されない（`task-source-edit.private.integration.test.ts`）。
 
 ## 既定で拒否であること
 
