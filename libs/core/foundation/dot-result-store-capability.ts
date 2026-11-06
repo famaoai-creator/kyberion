@@ -9,6 +9,10 @@ import {
   type ResourceAccessOperation,
 } from './resource-access-scope.js';
 
+/**
+ * Reserved name of the former DOT result store role. The grant alone now
+ * authorizes result I/O (G2); charters still may not name this role.
+ */
 export const DOT_RESULT_STORE_ROLE = 'dot_result_writer';
 export interface DotResultStoreBinding {
   rootDir: string;
@@ -74,7 +78,10 @@ function normalized(input: DotResultStoreBinding): DotResultStoreBinding {
     file,
   });
 }
-/** Internal synchronous issuer, import-restricted to dot/dot-result-store.ts. No role is assumed. */
+/**
+ * Internal synchronous issuer, import-restricted to dot/dot-result-store.ts. No role is assumed:
+ * tier-guard treats the active grant itself as the authority for the I/O it covers.
+ */
 export function withDotResultStoreCapability<T>(
   input: DotResultStoreBinding,
   operation: DotResultStoreOperation,

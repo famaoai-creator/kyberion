@@ -16,10 +16,6 @@ import {
 } from './foundation/discussion-request-capability.js';
 import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
 import {
-  DOT_RESULT_STORE_ROLE,
-  isDotResultStoreCapability,
-} from './foundation/dot-result-store-capability.js';
-import {
   MEMORY_PROVENANCE_READER_ROLE,
   memoryProvenanceReadAllowed,
   isMemoryProvenanceStatePath,
@@ -41,7 +37,7 @@ import {
   CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
 } from './foundation/customer-decision-milestone-capability.js';
 import { narrowStoreRoleDenial } from './foundation/narrow-store-role-denial.js';
-import { dedicatedStoreGrantAllows } from './tier-guard-store-grants.js';
+import { dedicatedStoreGrantAllows, storeGrantAuthorizes } from './tier-guard-store-grants.js';
 import type { WriteContent } from './foundation/customer-decision-write-content.js';
 /**
  * TypeScript version of the Knowledge Tier Guard.
@@ -130,14 +126,6 @@ function isOutsideProjectRoot(relativePath: string): boolean {
   if (!relativePath) return false;
   const firstSegment = normalizePath(relativePath).split('/')[0];
   return firstSegment === '..';
-}
-
-function dotResultResourceAllowed(target: string, operation: ResourceAccessOperation): boolean {
-  return isDotResultStoreCapability(currentResourceAccessScope(), {
-    rootDir: projectRoot(),
-    target,
-    operation,
-  });
 }
 
 const logger = createLogger('tier-guard');
@@ -567,12 +555,11 @@ function isScopedStructuralMkdir(
   access: { kind: 'read' | 'write' | 'append' | 'mkdir'; role?: string }
 ): boolean {
   if (access.kind !== 'mkdir') return false;
-  if (access.role === DOT_RESULT_STORE_ROLE)
+  if (storeGrantAuthorizes(relativePath, 'mkdir', projectRoot()))
     return Boolean(
       tenantSlug &&
       isRegisteredActiveTenant(tenantSlug) &&
-      currentResourceAccessScope()?.tenantSlug === tenantSlug &&
-      dotResultResourceAllowed(relativePath, 'mkdir')
+      currentResourceAccessScope()?.tenantSlug === tenantSlug
     );
   if (access.role === PR_PUBLICATION_STORE_ROLE) {
     const publication = currentPrPublicationScope();
@@ -958,15 +945,6 @@ function requestResourceDenial(
       reason:
         '[CREDENTIAL_CAPABILITY_REQUIRED] Active exact credential material capability required',
     };
-  if (
-    normalizedRole === DOT_RESULT_STORE_ROLE &&
-    !denyCandidatePaths(relativePath).every((target) => dotResultResourceAllowed(target, operation))
-  )
-    return {
-      allowed: false,
-      reason:
-        '[DOT_RESULT_CAPABILITY_REQUIRED] Active exact DOT result operation capability required',
-    };
   // Old dedicated-store capability validators predate appendExact. An added append path
   // cannot enlarge their original write or metadata ceiling, even under ambient grants.
   // Name prefixes count only for a validator that checks them (`withNamePrefixes`).
@@ -1169,6 +1147,7 @@ export function validateWritePermission(
     { kind: operation, role: currentRole }
   );
   if (tenantDenial) return tenantDenial;
+  if (storeGrantAuthorizes(relativePath, operation, projectRoot())) return { allowed: true };
 
   // Durable state contains tier data; broad runtime defaults must not grant
   // knowledge-tier writes that this identity does not already possess.
@@ -1359,6 +1338,7 @@ export function inspectReadPermission(
         // role's deny_read carve-outs must still see the real ledger path.
         const roleDenial = roleDenyReadDecision(loaded.policy, relativePath, identity);
         if (roleDenial) return roleDenial;
+        if (storeGrantAuthorizes(relativePath, operation, projectRoot())) return { allowed: true };
         const ledgerTier = partitionedRuntimeTier(protectedMatch.prefix);
         if (!ledgerTier) return { allowed: true };
         // A narrow governed reader role (e.g. metrics_cap_reader, assumed by
