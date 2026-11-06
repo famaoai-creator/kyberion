@@ -10,8 +10,7 @@ import {
   prPublicationStoreGrantActive,
 } from './foundation/pr-publication-store-capability.js';
 import {
-  MEMORY_PROVENANCE_READER_ROLE,
-  memoryProvenanceReadAllowed,
+  memoryProvenanceReadDenial,
   isMemoryProvenanceStatePath,
 } from './knowledge/memory-provenance-capability.js';
 import { isCustomerDecisionInviteCapability } from './foundation/customer-decision-invite-capability.js';
@@ -925,14 +924,9 @@ function requestResourceDenial(
       );
     return true;
   };
-  if (
-    normalizedRole === MEMORY_PROVENANCE_READER_ROLE &&
-    !memoryProvenanceReadAllowed(relativePath, operation)
-  )
-    return {
-      allowed: false,
-      reason: '[MEMORY_PROVENANCE_READ_SCOPE] Read-only exact lineage capability required',
-    };
+  // G2: a live lineage read grant (no role) narrows every I/O made inside it.
+  const lineageDenial = memoryProvenanceReadDenial(relativePath, operation);
+  if (lineageDenial) return { allowed: false, reason: lineageDenial };
   if (
     (operation === 'write' || operation === 'append' || operation === 'mkdir') &&
     isMemoryProvenanceStatePath(relativePath) &&

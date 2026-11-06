@@ -12,4 +12,5 @@ export const RETIRED_STORE_ROLE_NAMES: ReadonlySet<string> = new Set([
   'autonomy_learning_store',
   'pipeline_journal_store',
   'credential_material_reader',
+  'memory_provenance_reader',
 ]);

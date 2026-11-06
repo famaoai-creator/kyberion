@@ -221,7 +221,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_writer", "memory_provenance_reader", "person_charter_store"],
+      "legacy_roles": ["dot_lifecycle_writer", "person_charter_store"],
       "sources": ["storage-floor", "role-policy"],
       "note": "Floors also hold a system/ partition (custody system).",
       "registration": {
@@ -539,7 +539,6 @@
         "note": "Per-owner subdirectories keyed by a hash of owner_nhi."
       },
       "status": "active",
-      "legacy_roles": ["memory_provenance_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -664,7 +663,6 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["memory_provenance_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -776,7 +774,6 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["memory_provenance_reader"],
       "sources": ["role-policy"]
     },
     {
