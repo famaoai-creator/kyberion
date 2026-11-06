@@ -609,23 +609,6 @@
       "sources": ["role-policy"]
     },
     {
-      "id": "runtime.provider-attestations",
-      "path": "active/shared/runtime/provider-attestations",
-      "custody": {
-        "kind": "derived",
-        "note": "System records live in system/attestations.json; person records live in personal/shared/<owner>.json. This mixed root has no tenant partition and does not establish one custodian or tier."
-      },
-      "status": "active",
-      "sources": ["runtime-state-roots"],
-      "registration": {
-        "family": "state",
-        "key": "provider_attestations",
-        "order": 15,
-        "partition_shape": "system_person",
-        "retention_path": "active/shared/runtime/provider-attestations"
-      }
-    },
-    {
       "id": "runtime.delegations",
       "path": "active/shared/runtime/delegation-records/confidential/<tenant>",
       "custody": {
@@ -651,14 +634,27 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["metrics_cap_reader"],
-      "sources": ["role-policy"],
+      "sources": ["scope-model"],
       "registration": {
         "family": "ledger",
         "key": "execution_metrics",
         "order": 2,
         "retention_path": "active/shared/runtime/execution-metrics"
       }
+    },
+    {
+      "id": "runtime.execution-metrics.tenant",
+      "path": "active/shared/runtime/execution-metrics/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "sources": ["role-policy", "scope-model"],
+      "note": "Tenant partition of the execution-metrics metrics ledger (protected prefixes active/shared/runtime/execution-metrics/<personal|confidential>/); the root stays an unscoped system ledger.",
+      "legacy_roles": ["metrics_cap_reader"]
     },
     {
       "id": "runtime.locks",
@@ -689,6 +685,23 @@
       "status": "active",
       "legacy_roles": ["concierge_management_reader", "concierge_management_writer"],
       "sources": ["role-policy"]
+    },
+    {
+      "id": "runtime.provider-attestations",
+      "path": "active/shared/runtime/provider-attestations",
+      "custody": {
+        "kind": "derived",
+        "note": "System records live in system/attestations.json; person records live in personal/shared/<owner>.json. This mixed root has no tenant partition and does not establish one custodian or tier."
+      },
+      "status": "active",
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "provider_attestations",
+        "order": 15,
+        "partition_shape": "system_person",
+        "retention_path": "active/shared/runtime/provider-attestations"
+      }
     },
     {
       "id": "runtime.service-bindings",
@@ -782,14 +795,27 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["metrics_cap_reader"],
-      "sources": ["role-policy"],
+      "sources": ["scope-model"],
       "registration": {
         "family": "ledger",
         "key": "resource_usage",
         "order": 1,
         "retention_path": "active/shared/runtime/usage-ledger"
       }
+    },
+    {
+      "id": "runtime.usage-ledger.tenant",
+      "path": "active/shared/runtime/usage-ledger/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "shared_segment": "system"
+      },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "sources": ["role-policy", "scope-model"],
+      "note": "Tenant partition of the usage-ledger metrics ledger (protected prefixes active/shared/runtime/usage-ledger/<personal|confidential>/); the root stays an unscoped system ledger.",
+      "legacy_roles": ["metrics_cap_reader"]
     },
     {
       "id": "runtime.vitest-approvals",
