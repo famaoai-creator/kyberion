@@ -21,6 +21,11 @@ export type ConciergeMessageKey = keyof (typeof vocabulary)['domains']['concierg
  * front-desk keys that were never meant for the `concierge` domain.
  */
 export type FrontDeskMessageKey = keyof (typeof vocabulary)['domains']['front_desk'];
+/**
+ * `presence_studio:*` keys a Concierge screen reuses for a page that moved
+ * into the one server (e.g. 設定 › エンジン from Studio `/engine-config`).
+ */
+export type PresenceStudioMessageKey = keyof (typeof vocabulary)['domains']['presence_studio'];
 type MessageParams = Record<string, string | number>;
 const browserVocabulary = createBrowserVocabularyResolver(vocabularyCatalog);
 
@@ -52,4 +57,13 @@ export function frontDeskText(
   params: MessageParams = {}
 ): string {
   return browserVocabulary.renderMessage(`front_desk:${String(key)}`, params, locale);
+}
+
+/** Renders a `presence_studio:*` vocabulary key (pages moved from presence-studio). */
+export function presenceStudioText(
+  key: PresenceStudioMessageKey,
+  locale: ConciergeLocale,
+  params: MessageParams = {}
+): string {
+  return browserVocabulary.renderMessage(`presence_studio:${String(key)}`, params, locale);
 }
