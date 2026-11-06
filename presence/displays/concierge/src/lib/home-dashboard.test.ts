@@ -327,6 +327,24 @@ describe('collectHomeDashboard', () => {
     expect(mocks.cost).not.toHaveBeenCalled();
   });
 
+  it('focuses one project without restricting the company tiles', () => {
+    mocks.missions.mockReturnValue([
+      { ...(mission('MSN-P1', 'active', 1) as object), organizationId: 'acme', projectId: 'p1' },
+      { ...(mission('MSN-P2', 'active', 1) as object), organizationId: 'acme', projectId: 'p2' },
+      mission('MSN-NONE', 'active', 1),
+    ]);
+    const home = collectHomeDashboard(viewer(['acme']), NOW, { projectId: 'p1' });
+    expect(home.missions.open.active).toBe(1);
+    expect(mocks.cost).toHaveBeenCalledWith(expect.objectContaining({ missionIds: ['MSN-P1'] }));
+    expect(mocks.deliverables).toHaveBeenCalledWith(
+      expect.objectContaining({ projectIds: ['p1'] })
+    );
+    // The focus is not a scope restriction: the company's key results stay.
+    expect(mocks.company).toHaveBeenCalledWith('acme');
+    // Without a focus, scope admission keeps project-less missions.
+    expect(collectHomeDashboard(viewer(['acme']), NOW).missions.open.active).toBe(3);
+  });
+
   it('shows no organization KRs for a multi-company or project-scoped viewer', () => {
     collectHomeDashboard(viewer(['acme', 'beta']), NOW);
     expect(mocks.company).not.toHaveBeenCalled();
