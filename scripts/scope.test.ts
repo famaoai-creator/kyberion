@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { inspectAssetScopeRead } from '@agent/core/governance/asset-scope-inspection';
+import {
+  assetReadCeilingFor,
+  inspectAssetScopeRead,
+} from '@agent/core/governance/asset-scope-inspection';
 import type { AssetScopeReadInspection } from '@agent/core/governance/asset-scope-inspection';
 import {
   clearScopeEnv,
@@ -12,6 +15,7 @@ import { clearProcessExitCode, getProcessExitCode } from './lib/harness.js';
 import { main } from './scope.js';
 
 vi.mock('@agent/core/governance/asset-scope-inspection', () => ({
+  assetReadCeilingFor: vi.fn(),
   inspectAssetScopeRead: vi.fn(),
 }));
 vi.mock('@agent/core/scope-context', () => ({
@@ -96,6 +100,35 @@ describe('scope inspect', () => {
     expectNoScopeAccess();
   });
 
+  it('compares against the ceiling of the process identity only when asked', async () => {
+    const ceiling = {
+      custodians: [{ kind: 'tenant' as const, ref: 'acme' }],
+      readTiers: ['confidential' as const],
+    };
+    vi.mocked(assetReadCeilingFor).mockReturnValue(ceiling);
+    vi.mocked(inspectAssetScopeRead).mockReturnValue({
+      decision: { allowed: true },
+      shadow: {
+        status: 'compared',
+        resolution: { status: 'resolved', address },
+        observation: { allowed: true, reason: 'within_ceiling' },
+        agrees: true,
+      },
+    });
+    await main(['inspect', address.path, '--compare-identity']);
+    expect(assetReadCeilingFor).toHaveBeenCalledExactlyOnceWith();
+    expect(inspectAssetScopeRead).toHaveBeenCalledExactlyOnceWith(address.path, ceiling);
+    expect(stdout).toContain('identity ceiling=within (within_ceiling); agrees=true');
+    expectNoScopeAccess();
+  });
+
+  it('reports an unbound identity as having no ceiling to compare', async () => {
+    vi.mocked(assetReadCeilingFor).mockReturnValue(undefined);
+    await main(['inspect', address.path, '--compare-identity', '--json']);
+    expect(inspectAssetScopeRead).toHaveBeenCalledExactlyOnceWith(address.path);
+    expect(JSON.parse(stdout[0]).limits.ceiling_comparison).toBe('identity_unbound');
+  });
+
   it.each(['planned', 'legacy-move'] as const)(
     'reports %s attribution without replacing the denied policy decision',
     async (location) => {
@@ -172,7 +205,7 @@ describe('scope inspect', () => {
     expect(stdout).toEqual([]);
     expect(JSON.parse(stderr[0])).toMatchObject({
       ok: false,
-      error: 'Usage: pnpm scope inspect <path> [--json]',
+      error: 'Usage: pnpm scope inspect <path> [--compare-identity] [--json]',
     });
     expect(inspectAssetScopeRead).not.toHaveBeenCalled();
     expectNoScopeAccess();

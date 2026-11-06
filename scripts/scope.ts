@@ -7,24 +7,44 @@ import {
   writeScopeEnv,
 } from '@agent/core/scope-context';
 import type { ScopeContextInput } from '@agent/core/scope-context';
-import { inspectAssetScopeRead } from '@agent/core/governance/asset-scope-inspection';
+import {
+  assetReadCeilingFor,
+  inspectAssetScopeRead,
+} from '@agent/core/governance/asset-scope-inspection';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import type { ScriptContext } from './lib/harness.js';
 
+const COMPARE_IDENTITY_FLAG = '--compare-identity';
+
 /** Diagnose current read policy and asset attribution without changing scope. */
-function runScopeInspectCli(context: Pick<ScriptContext, 'argv' | 'json' | 'print'>): void {
-  const args = context.argv.filter((arg) => arg !== '--json');
+function runScopeInspectCli(
+  context: Pick<ScriptContext, 'argv' | 'json' | 'print' | 'unknownFlags'>
+): void {
+  const compareFlags = context.unknownFlags.filter((flag) => flag === COMPARE_IDENTITY_FLAG);
+  const compareIdentity = compareFlags.length > 0;
+  const args = context.argv.filter((arg) => arg !== '--json' && arg !== COMPARE_IDENTITY_FLAG);
   if (
     args.length !== 2 ||
     args[0] !== 'inspect' ||
     !args[1]?.trim() ||
     args[1].startsWith('-') ||
-    context.argv.filter((arg) => arg === '--json').length > 1
+    context.argv.filter((arg) => arg === '--json').length > 1 ||
+    compareFlags.length > 1
   ) {
-    throw new ScriptExitError(2, 'Usage: pnpm scope inspect <path> [--json]');
+    throw new ScriptExitError(2, 'Usage: pnpm scope inspect <path> [--compare-identity] [--json]');
   }
-  // Selection flags are never translated into a trusted read ceiling.
-  const inspection = inspectAssetScopeRead(args[1]);
+  // Selection flags are never translated into a trusted read ceiling. With
+  // --compare-identity the ceiling comes only from this process's own resolved
+  // identity (its tenant binding), never from a flag value.
+  const ceiling = compareIdentity ? assetReadCeilingFor() : undefined;
+  const inspection = ceiling
+    ? inspectAssetScopeRead(args[1], ceiling)
+    : inspectAssetScopeRead(args[1]);
+  const ceilingComparison = !compareIdentity
+    ? 'not_requested'
+    : ceiling
+      ? 'identity'
+      : 'identity_unbound';
   if (context.json) {
     context.print({
       ...inspection,
@@ -33,7 +53,7 @@ function runScopeInspectCli(context: Pick<ScriptContext, 'argv' | 'json' | 'prin
         existence: 'undetermined',
         full_io_admission: 'not_evaluated',
         target_content: 'not_returned',
-        ceiling_comparison: 'not_requested',
+        ceiling_comparison: ceilingComparison,
       },
     });
     return;
@@ -52,7 +72,16 @@ function runScopeInspectCli(context: Pick<ScriptContext, 'argv' | 'json' | 'prin
   } else {
     context.print('asset=unavailable');
   }
-  context.print('trusted ceiling comparison=not requested');
+  if (inspection.shadow.status === 'compared') {
+    const { observation, agrees } = inspection.shadow;
+    context.print(
+      `identity ceiling=${observation.allowed ? 'within' : 'outside'} (${observation.reason}); agrees=${agrees}`
+    );
+  } else {
+    context.print(
+      `trusted ceiling comparison=${ceilingComparison === 'identity_unbound' ? 'unavailable (no tenant binding)' : 'not requested'}`
+    );
+  }
   context.print(
     'existence=undetermined; full IO admission=not evaluated; no target content output'
   );
@@ -132,7 +161,7 @@ export const main = defineScript({
       return;
     }
     throw new Error(
-      'Usage: pnpm scope show [--json] | pnpm scope inspect <path> [--json] | pnpm scope operator | pnpm scope use --tier <tier> [--tenant <slug>] [--organization <id>] [--project <id>] [--mission <id>] [--task <id>] | pnpm scope push | pnpm scope pop | pnpm scope clear'
+      'Usage: pnpm scope show [--json] | pnpm scope inspect <path> [--compare-identity] [--json] | pnpm scope operator | pnpm scope use --tier <tier> [--tenant <slug>] [--organization <id>] [--project <id>] [--mission <id>] [--task <id>] | pnpm scope push | pnpm scope pop | pnpm scope clear'
     );
   },
 });

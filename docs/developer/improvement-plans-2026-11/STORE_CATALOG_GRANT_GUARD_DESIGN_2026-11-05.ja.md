@@ -392,6 +392,33 @@ ledger 保護は `TENANT_STORE_LEDGER_ROOTS` に残す。登録は配置の宣�
 末端まで伝えて不明な binding を「競合なし」にしない。nonstrict discovery は既存の動作を
 維持する。既存 target の bytes 不変を回帰で確認し、CI と運用手順へ追加する。
 
+### 主体から組み立てた読み取り上限での比較（2026-11-06、主軸ブランチへ統合後）
+
+`feat/scope-independent-resolution-20261106` を `refactor/core-package-split` に統合し、
+以後の作業は後者で続ける。並行して作っていた住所解決の別実装は取り消し、
+`foundation/asset-address.ts` はこちらの実装を正とした。
+
+`governance/asset-read-ceiling.ts` の `assetReadCeilingFor` は、server 側で解決した
+identity（tenant の束縛と承認済みの仲介 tenant）だけから、`decide` の手順 1（管理者の範囲）
+に当たる読み取り上限を組み立てる。束縛のない identity は、今の門番が表せる管理者の制限を
+持たないので上限を返さない（比較は住所だけになる）。tier はここでは絞らない（手順 2 は別に比べる）。
+上限は観測用の上界であり、許可は生まない。
+
+比較の不変条件は「門番が許す読み取りは上限の内側にある」とした。上限は上界なので、
+門番が上限より狭いこと（ロールで拒否するなど）は食い違いではない。`tenant-deals` では、
+専用ロールと `mission_controller` を自 tenant・他 tenant に束縛した 4 通りで、門番と上限が
+一致した。全 tenant 管理の保存先（personal・confidential の tier）を、他 tenant に束縛した
+`mission_controller` で読んだ一巡では、門番が上限の外を許したのは次の 3 つだけで、
+いずれも保護プレフィックスが無い既知の抜けである（`tests/tenant-store-guard-gaps.test.ts` と同じ）。
+
+- `active/projects/personal/<tenant>/`
+- `active/shared/runtime/surface-management/{personal,confidential}/<tenant>/`
+
+public tier の tenant データは、今の門番が意図して tenant 範囲を掛けていない（tier は開示の上限）
+ので比較から外した。`detectTier` が台帳の区画を public と読む件、`stance-logs` が個人 tier を
+宣言しつつ public のログ置き場にある件と合わせて、G2 で扱う。カタログには使用量・実行指標の
+台帳の tenant 区画を追加した（77 保存先）。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |

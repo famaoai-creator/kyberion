@@ -11,6 +11,9 @@ import { pathResolver } from '../path-resolver.js';
 import { policyRelativePath } from '../policy-relative-path.js';
 import { inspectReadPermission, type ReadPermissionDecision } from '../tier-guard.js';
 
+/** The read ceiling of the current identity (G1, decide step 1). */
+export { assetReadCeilingFor } from './asset-read-ceiling.js';
+
 function loadStores(): readonly AssetStoreDeclaration[] {
   return defineCatalog<{ stores: AssetStoreDeclaration[] }>({
     id: 'asset-scope-stores',
