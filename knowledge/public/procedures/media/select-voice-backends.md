@@ -1,6 +1,6 @@
 ---
 title: '手順: Presence Studio で TTS / STT を選択する'
-last_updated: 2026-10-05
+last_updated: 2026-11-06
 ---
 
 # 手順: Presence Studio で TTS / STT を選択する
@@ -61,7 +61,7 @@ Presence Studio の音声入出力を、用途・プライバシー・品質・�
 UI の選択状態は次の API でも確認できる。
 
 ```bash
-curl -s http://127.0.0.1:3031/api/voice/selection
+curl -s http://127.0.0.1:3050/api/voice/selection
 ```
 
 確認する項目は `preferences.tts_engine_id`、`preferences.stt_backend`、`stt.selected_order`、各候補の `status` / `reason` である。変更は UI を優先し、API を直接使う場合も候補として `selectable: true` のものだけを指定する。
