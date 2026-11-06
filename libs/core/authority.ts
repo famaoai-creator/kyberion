@@ -3,10 +3,6 @@ import {
   personalApprovalIoAllowed,
 } from './foundation/personal-approval-io-capability.js';
 import {
-  MEMORY_PROVENANCE_READER_ROLE,
-  currentMemoryProvenanceReadCapability,
-} from './knowledge/memory-provenance-capability.js';
-import {
   isCustomerDecisionConsumerCapability,
   CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
 } from './foundation/customer-decision-consumer-capability.js';
@@ -87,7 +83,6 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   chronos_token_registry_reader: 'worker',
   workspace_graph_reader: 'worker',
   scope_locale_reader: 'worker',
-  memory_provenance_reader: 'worker',
   engine_runtime_preferences_operator: 'worker',
   workspace_tenant_registry_reader: 'worker',
   workspace_tenant_registry_index_reader: 'worker',
@@ -824,20 +819,6 @@ function prepareExecutionContext(
       `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant issuance right, not an assumable role`
     );
   assertTenantBoundReaderScope(normalizedRole, tenantSlug);
-  if (normalizedRole === MEMORY_PROVENANCE_READER_ROLE) {
-    const capability = currentMemoryProvenanceReadCapability();
-    const activeTenant = resolveIdentityContext().tenantSlug;
-    if (
-      !capability ||
-      capability.tenant_slug !== tenantSlug ||
-      (capability.tier === 'confidential' && (!activeTenant || activeTenant !== tenantSlug)) ||
-      (capability.tier === 'personal' &&
-        getRegisteredEnvText('KYBERION_NHI_ID') !== capability.owner_nhi)
-    )
-      throw new Error(
-        '[MEMORY_PROVENANCE_READ_SCOPE] Exact current tenant/owner read capability required'
-      );
-  }
   if (
     normalizedRole === CUSTOMER_DECISION_CONSUMER_STORE_ROLE &&
     (!isCustomerDecisionConsumerCapability(currentResourceAccessScope()) ||
