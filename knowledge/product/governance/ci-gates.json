@@ -373,6 +373,14 @@
       "rationale": "Checks runtime ESM integrity."
     },
     {
+      "id": "core-single-instance",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_core_single_instance.ts"],
+      "owner": "architecture",
+      "rationale": "Keeps one @agent/core instance per process: production code outside libs/core imports it by package name, never by a relative path into libs/core, except the listed build/clean bootstrap files (a second instance duplicates module-private grant registries)."
+    },
+    {
       "id": "dist-workspace-imports",
       "scope": "pr",
       "executable": "node",
