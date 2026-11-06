@@ -4,10 +4,6 @@ import {
   PERSONAL_APPROVAL_STORE_ROLE,
   personalApprovalIoAllowed,
 } from './foundation/personal-approval-io-capability.js';
-import {
-  TASK_SOURCE_WORKSPACE_ROLE,
-  taskSourceWorkspaceIoAllowed,
-} from './foundation/task-source-workspace-capability.js';
 import { personCharterResourceAccessAllowed } from './governance/person-charter-runtime.js';
 import {
   prPublicationResourceAllowed,
@@ -45,6 +41,7 @@ import {
   CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
 } from './foundation/customer-decision-milestone-capability.js';
 import { narrowStoreRoleDenial } from './foundation/narrow-store-role-denial.js';
+import { dedicatedStoreGrantAllows } from './tier-guard-store-grants.js';
 import type { WriteContent } from './foundation/customer-decision-write-content.js';
 /**
  * TypeScript version of the Knowledge Tier Guard.
@@ -1183,18 +1180,7 @@ export function validateWritePermission(
     // Dedicated receipt/publication roles grant only their bound real paths,
     // never knowledge-tier writes.
     // The exact request ceiling was checked before all ambient/default policy grants.
-    if (
-      (currentRole === DOT_RESULT_STORE_ROLE &&
-        dotResultResourceAllowed(relativePath, operation)) ||
-      (currentRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
-        isDiscussionRequestCapability(currentResourceAccessScope())) ||
-      (currentRole === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
-        isCustomerDecisionInviteCapability(currentResourceAccessScope())) ||
-      (currentRole === TASK_SOURCE_WORKSPACE_ROLE &&
-        taskSourceWorkspaceIoAllowed(relativePath, operation)) ||
-      (currentRole === PR_PUBLICATION_STORE_ROLE &&
-        prPublicationResourceAllowed(relativePath, operation))
-    )
+    if (dedicatedStoreGrantAllows(currentRole, relativePath, operation, projectRoot()))
       return personaTierWriteDecision(policy, relativePath, identity, operation);
     return personaTierWriteDecision(policy, stateKnowledgePath, identity, operation);
   }
@@ -1379,16 +1365,7 @@ export function inspectReadPermission(
         // libs/core for cap enforcement) holds an explicit read grant on the
         // ledger root itself; it never widens knowledge/ access.
         if (
-          ((identity.role === DOT_RESULT_STORE_ROLE &&
-            dotResultResourceAllowed(relativePath, operation)) ||
-            (identity.role === DISCUSSION_REQUEST_STORAGE_ROLE &&
-              isDiscussionRequestCapability(currentResourceAccessScope())) ||
-            (identity.role === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
-              isCustomerDecisionInviteCapability(currentResourceAccessScope())) ||
-            (identity.role === TASK_SOURCE_WORKSPACE_ROLE &&
-              taskSourceWorkspaceIoAllowed(relativePath, operation)) ||
-            (identity.role === PR_PUBLICATION_STORE_ROLE &&
-              prPublicationResourceAllowed(relativePath, operation)) ||
+          (dedicatedStoreGrantAllows(identity.role, relativePath, operation, projectRoot()) ||
             informationAssetCoverageReadAllowed(relativePath, identity.role)) &&
           loaded.policy.authority_role_permissions?.[identity.role]?.allow_read?.some(
             (pattern: string) => {
