@@ -1,24 +1,18 @@
 import * as path from 'node:path';
 import { customerDecisionConsumerWriteProblem } from './customer-decision-consumer-capability.js';
-import {
-  CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
-  customerDecisionMilestoneWriteProblem,
-} from './customer-decision-milestone-capability.js';
+import { customerDecisionMilestoneWriteProblem } from './customer-decision-milestone-capability.js';
 
 /** Content of a file write, when the caller writes whole bytes (secure-io `safeWriteFile`). */
 export type WriteContent = string | Buffer;
 
 /**
  * Stores whose rules are content rules (CD-09 / CD-10): the tier guard checks
- * each write made inside their grant (consumer locks, G2: no role) or under
- * their role (milestones) against the file on disk, so a process that calls
- * secure-io directly is held to the same rules as the store. A write without
- * content (append, copy, rename, link, unlink) is refused for them.
+ * each write made inside their live grant (G2: no role) against the file on
+ * disk, so a process that calls secure-io directly is held to the same rules as
+ * the store. A write without content (append, copy, rename, link, unlink) is
+ * refused for them.
  */
 export type ContentCheckedStore = 'consumer' | 'milestone';
-export const CONTENT_CHECKED_ROLES: ReadonlySet<string> = new Set([
-  CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
-]);
 
 /** An unparseable record: never undefined (that would read as "absent"). */
 function parseJsonOrInvalid(text: string): unknown {

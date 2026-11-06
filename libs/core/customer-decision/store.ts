@@ -49,8 +49,7 @@ import {
   safeReaddir,
   safeRmSync,
 } from '../secure-io.js';
-import { resolveRole } from '../authority.js';
-import { CUSTOMER_DECISION_MILESTONE_STORE_ROLE } from '../foundation/customer-decision-milestone-capability.js';
+import { customerDecisionMilestoneGrantActive } from '../foundation/customer-decision-milestone-capability.js';
 import { type CustomerDecisionConsumerSuperseded } from '../foundation/customer-decision-consumer-capability.js';
 import { withCustomerDecisionConsumerGrant } from './consumer-grant-access.js';
 
@@ -257,8 +256,8 @@ export function writeAgenda(
   assertBelongs(location, validated, 'agenda');
   assertAgendaLinks(validated);
   const file = agendaPath(location, validated.agenda_id);
-  if (resolveRole() === CUSTOMER_DECISION_MILESTONE_STORE_ROLE) {
-    // The milestone role (a shared core role) may only append milestones to an
+  if (customerDecisionMilestoneGrantActive()) {
+    // Inside the milestone grant (G2: no role) only milestones may be appended to an
     // existing agenda: re-read it here and refuse any other change.
     const previous = readAgenda(location, validated.agenda_id);
     if (!previous || !isMilestoneOnlyChange(previous, validated))
