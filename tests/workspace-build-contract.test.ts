@@ -26,7 +26,11 @@ function collectExportTargets(exportsField: any): string[] {
 
 describe('Workspace build contract', () => {
   it('keeps CI-built workspace package entrypoints aligned with built output files', () => {
-    const packageFiles = ['libs/core/package.json', 'libs/shared-voice/package.json'];
+    const packageFiles = [
+      'libs/core/package.json',
+      'libs/shared-voice/package.json',
+      'libs/shared-mobile/package.json',
+    ];
 
     const missing: string[] = [];
 
@@ -47,6 +51,26 @@ describe('Workspace build contract', () => {
     }
 
     expect(missing).toEqual([]);
+  });
+
+  it('keeps mobile runtime helpers in shared-mobile without closing legacy deep imports', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const mobile = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-mobile/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./mobile-runtime-helpers']).toBeUndefined();
+    expect(core.exports['./mobile-profile-validators']).toBeDefined();
+    expect(core.exports['./types']).toBeDefined();
+    expect(core.exports['./secure-io']).toBeDefined();
+    expect(mobile.exports).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/mobile-runtime-helpers.ts'))).toBe(false);
+    for (const filename of ['mobile-runtime-helpers.js', 'mobile-runtime-helpers.d.ts']) {
+      expect(safeExistsSync(path.join(rootDir, 'libs/shared-mobile/dist', filename))).toBe(true);
+    }
   });
 
   it('keeps two-stage barge-in in shared-voice and the shared energy detector in core', () => {
