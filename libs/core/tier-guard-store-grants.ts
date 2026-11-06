@@ -1,13 +1,9 @@
 /**
- * G2 of the store-catalog guard design: the dedicated store roles whose I/O is
- * allowed only inside an active, exact store grant, in one table instead of a
- * role-name branch at every tier-guard decision. Each entry answers one
- * question — does the active grant of this role's store cover this target and
- * operation? — and fails closed without one.
- *
- * Behaviour is unchanged: tier-guard asked exactly these questions, role by
- * role, for durable state and ledger partitions. The next step replaces the
- * roles themselves with the grant (store-catalog `issuer`).
+ * G2 of the store-catalog guard design: the dedicated store grants that are
+ * themselves the authority for the I/O they cover, asked in one place
+ * (`storeGrantAuthorizes`) instead of a role-name branch at every tier-guard
+ * decision. Every former dedicated store role in this table has been replaced
+ * by its grant, so the role-keyed table (`dedicatedStoreGrantAllows`) is gone.
  */
 import { isDiscussionRequestCapability } from './foundation/discussion-request-capability.js';
 import { isDotResultStoreCapability } from './foundation/dot-result-store-capability.js';
@@ -19,21 +15,7 @@ import {
   type ResourceAccessScope,
 } from './foundation/resource-access-scope.js';
 import { taskSourceWorkspaceGrantAllows } from './foundation/task-source-workspace-capability.js';
-import {
-  PR_PUBLICATION_STORE_ROLE,
-  prPublicationResourceAllowed,
-} from './governance/pr-publication-runtime.js';
-
-type StoreGrantCheck = (
-  target: string,
-  operation: ResourceAccessOperation,
-  rootDir: string
-) => boolean;
-
-const STORE_GRANTS: Readonly<Record<string, StoreGrantCheck>> = Object.freeze({
-  [PR_PUBLICATION_STORE_ROLE]: (target, operation) =>
-    prPublicationResourceAllowed(target, operation),
-});
+import { prPublicationGrantAuthorizes } from './foundation/pr-publication-store-capability.js';
 
 /**
  * Does the active invite capability cover this I/O? Its validator predates
@@ -77,6 +59,11 @@ function discussionRequestGrantAllows(
  * - Discussion request: an opaque issuer token over the two records of one
  *   request. Its facade checks the issuance right (the former role's RA-02
  *   assumption rule, Concierge only) before it issues.
+ * - Task source workspace: the module-private window over one live workspace file.
+ * - PR publication: the module-private grant of one synchronous store access of
+ *   a VCS host run (one of five kinds, one store each), inside its exact ceiling
+ *   and the roots the former role's policy grant covered. Its facade checks the
+ *   issuance right (the former shared core role's RA-02 rule) before it issues.
  */
 export function storeGrantAuthorizes(
   target: string,
@@ -88,17 +75,7 @@ export function storeGrantAuthorizes(
     isDotResultStoreCapability(scope, { rootDir, target, operation }) ||
     customerDecisionInviteGrantAllows(scope, target, operation) ||
     discussionRequestGrantAllows(scope, target, operation) ||
-    taskSourceWorkspaceGrantAllows(target, operation)
+    taskSourceWorkspaceGrantAllows(target, operation) ||
+    prPublicationGrantAuthorizes(target, operation)
   );
-}
-
-/** Does the active grant of `role`'s dedicated store cover this I/O? False for any other role. */
-export function dedicatedStoreGrantAllows(
-  role: string | undefined,
-  target: string,
-  operation: ResourceAccessOperation,
-  rootDir: string
-): boolean {
-  const check = role ? STORE_GRANTS[role] : undefined;
-  return check ? check(target, operation, rootDir) : false;
 }
