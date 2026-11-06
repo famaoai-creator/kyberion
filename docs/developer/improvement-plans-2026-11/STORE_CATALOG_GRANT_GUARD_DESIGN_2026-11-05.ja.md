@@ -559,8 +559,8 @@ public のログ置き場）で、スタンスの痕跡を個人 tier として�
   (3) 上限は呼び出し元が `runInResourceAccessScope` で組み立てた形の一致（読み取りだけ、組織付きの書き
   込み）で、発行者が 1 つに決まっていない。ロール名の分岐（構造上の mkdir、リクエストの拒否 2 つ）は
   そのまま残した。その後、(1)〜(3) は第 1 段階で解いた（下の「Concierge の Web 管理の許可証」。非同期の
-  寿命を持つ許可証、1 つの窓口、tier-guard の外の判断は許可証に尋ねる）。ロールを外す第 2 段階の状況は
-  同じ節に書く。
+  寿命を持つ許可証、1 つの窓口、tier-guard の外の判断は許可証に尋ねる）。ロールを外す第 2 段階は、
+  判定を揃えたままにする形が無かったのでしていない（理由は同じ節）。
 
 `narrowStoreRoleDenial` の、パスだけで絞る拒否だけのロール（`deliverable_inbox_writer`、
 `customer_channel_binding_store`、`archived_mission_state_reader`）は対象外である。これらは許可証では
@@ -1134,6 +1134,37 @@ Web 管理の仲介のロールである。呼び出し元（Concierge の管理
   使うのは 3 つの仲介だけ）。
 - tier-guard と `authority.ts` のロール名の分岐（構造上の mkdir、reader / writer の上限の確かめ）と、ロールの
   宣言はこの段階では残す。
+
+**第 2 段階（ロールを外す）はしていない。** 調べた結果、旧と新の判定を揃えたままロールを外す形が
+見つからなかった。理由は次のとおり。
+
+1. **ロールの権限が「パスの一覧」ではなく tier-guard の判定の手順そのものに効いている。** これまでの
+   保存先は、上限の正確な資源のうち、ロールの権限の根の下を許可証が認めれば揃った。ここでは、ロールの
+   `allow_read` / `allow_write`（`knowledge/product/governance/security-policy.json:909-943`。tenant と組織の
+   変数を含み、reader の読み取り 10 個、writer の読み取り 7 個と書き込み 6 個の型）が、ほかに 3 つの規則の
+   入力になっている。祖先のメタデータの規則（`libs/core/tier-guard.ts:1314`。上限のある間、ロールの型の
+   祖先のメタデータを認める）、祖先の mkdir の規則（`libs/core/tier-guard.ts:1086-1087`、`personaTierWriteDecision`）、情報資産の網羅の読み取り
+   （`libs/core/tier-guard.ts:1219`、ロールの `allow_read` の型との一致も求める）。ロールを外して許可証に
+   同じ判定をさせるには、許可証がこの型の表を持ち、3 つの規則を tier-guard の外で作り直すことになる。
+   これは「宣言が実質コードになっている」に当たる（上の「単純になったかの判定」）。
+2. **組織と実行の識別子を束縛するのに、引き受けたロールが要る。** writer の型は
+   `${KYBERION_ORGANIZATION_ID}` を含み、網羅の読み取りは実行の scope の組織と project を確かめる。ところが
+   `currentExecutionScope()` は、受け入れられた `assumedRole` の無い scope では組織と実行の識別子を落とした
+   写しを返す（`libs/core/foundation/execution-scope.ts:149-155`）。`/api/management` の GET
+   （`presence/displays/concierge/src/app/api/management/route.ts:32-45`）のように、呼び出し元がプロセスの
+   中でロールを引き受けていない経路があるので、「呼び出し元のロールのまま組織に束縛する」形
+   （これまでの許可証の形）が取れない。
+3. **ロールを外すと tier-guard の外の判定も変わる。** 管理のロールは persona を持たない
+   （`default_persona` は `unknown` で、引き受けで persona を消す）。中で動く project の操作は persona で
+   worker かを判定し（`libs/core/project/project-view-scope.ts:17-21`）、子プロセスの環境と監査の記録は引き受けたロールを
+   写す（`libs/core/secure-io.ts:252`）。呼び出し元のロールと persona を残すと、これらの値が変わる。
+
+このため、ロールの宣言（security-policy、authority role index とロール定義 2 件、`authority.ts` の上限の
+確かめ 2 つ、保存先カタログの `legacy_roles`）と、`tier-guard.ts` のロール名の分岐 3 つ（561 行の構造上の
+mkdir、949 行と 961 行の reader / writer の上限の確かめ）は残した。第 1 段階の許可証と窓口は、そのまま
+第 2 段階の入口になる（発行者は 1 つ、寿命と取り消しはある）。残る作業は、ロールの権限の 3 つの規則を
+保存先カタログの宣言として表し、許可証がそれを引くようにすることで、G3（カタログからの判定）と一緒に
+行うのが筋である。
 
 ## 既定で拒否であること
 
