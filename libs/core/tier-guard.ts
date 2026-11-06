@@ -1,4 +1,3 @@
-import { isCredentialMaterialCapability } from './foundation/credential-material-capability.js';
 import { engineRuntimeResourceAccessDenial as resourceAccessDenial } from './voice/engine-runtime-preferences-access.js';
 import {
   PERSONAL_APPROVAL_STORE_ROLE,
@@ -911,15 +910,6 @@ function requestResourceDenial(
     return {
       allowed: false,
       reason: `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant issuance right, not a role`,
-    };
-  if (
-    normalizedRole === 'credential_material_reader' &&
-    !isCredentialMaterialCapability(currentResourceAccessScope())
-  )
-    return {
-      allowed: false,
-      reason:
-        '[CREDENTIAL_CAPABILITY_REQUIRED] Active exact credential material capability required',
     };
   // Old dedicated-store capability validators predate appendExact. An added append path
   // cannot enlarge their original write or metadata ceiling, even under ambient grants.

@@ -1,6 +1,8 @@
 /** Local credential allocations reuse standing grants; material stays in the secret store. */
 import { timingSafeEqual } from 'node:crypto';
-import { withExecutionContext } from '../authority.js';
+import { assertStoreGrantIssuanceAllowed, withExecutionContext } from '../authority.js';
+import { currentExecutionScope, runInExecutionScope } from '../foundation/execution-scope.js';
+import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
 import {
   credentialExecutionIdentity,
   type TaskCredentialBinding,
@@ -25,7 +27,10 @@ import { decryptConnectionDocument, isEncryptedConnectionEnvelope } from './secr
 import { assertTaskCredentialClaim } from './shell-task-credential-binding.js';
 import type { ScopeContext } from '../foundation/scope-context-validation.js';
 import { assertPluginGrantAllows } from '../shell/sandbox-policy.js';
-import { withCredentialMaterialCapability } from '../foundation/credential-material-capability.js';
+import {
+  CREDENTIAL_MATERIAL_GRANT_ISSUANCE_RIGHT,
+  withCredentialMaterialCapability,
+} from '../foundation/credential-material-capability.js';
 import { getSecretResolver, registerSecretResolver } from './secret-resolver.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 
@@ -81,7 +86,15 @@ export function assertCredentialAllocation(
   });
 }
 
-/** Private broker read: only reached after allocation and current claim admission. */
+/**
+ * Private broker read: only reached after allocation and current claim admission. The exact
+ * material grant is the authority for the one connection file read (G2: no reader role). Who may
+ * issue it is unchanged: the rule that bounded assuming the former shared core role (RA-02)
+ * applies to the issuance right `credential_material_reader`. While the grant is active the
+ * caller keeps its own role and persona, bound to the allocation's tenant (no organization) and
+ * the claim's mission/task identity, as the role assumption bound them; a caller bound to another
+ * tenant is refused.
+ */
 function readAllocatedMaterial(tenant: string, grantId: string, provider: string): string {
   const descriptor = requireReasoningApiProvider(provider);
   const ref = descriptor.secret_refs![0]!;
@@ -91,9 +104,25 @@ function readAllocatedMaterial(tenant: string, grantId: string, provider: string
   assertPluginGrantAllows('secrets', `connection:${identity.serviceId}`);
   const file = `knowledge/personal/connections/${identity.serviceId}.json`;
   const owner = credentialExecutionIdentity();
-  return withCredentialMaterialCapability(tenant, file, () =>
-    withExecutionContext(
-      'credential_material_reader',
+  assertStoreGrantIssuanceAllowed(CREDENTIAL_MATERIAL_GRANT_ISSUANCE_RIGHT);
+  return withCredentialMaterialCapability(tenant, file, () => {
+    const active = resolvePolicyIdentityContext().tenantSlug;
+    if (active && active !== tenant)
+      throw new Error(
+        `[ROLE_TENANT_SCOPE_MISMATCH] credential material grant for tenant '${tenant}' used by a caller bound to '${active}'`
+      );
+    const {
+      tenantCleared: _cleared,
+      organizationId: _organization,
+      ...current
+    } = currentExecutionScope() ?? { tenantBound: false };
+    const executionIdentity = Object.freeze({
+      ...current.executionIdentity,
+      missionId: owner.missionId ?? null,
+      taskId: owner.taskId ?? null,
+    });
+    return runInExecutionScope(
+      { ...current, tenantBound: true, tenantSlug: tenant, executionIdentity },
       () =>
         withSensitivePathMediation(() => {
           const raw = readJson<unknown>(pathResolver.rootResolve(file));
@@ -104,13 +133,9 @@ function readAllocatedMaterial(tenant: string, grantId: string, provider: string
           const key = fields[identity.connectionField];
           if (typeof key !== 'string' || !key.trim()) throw denied();
           return key;
-        }),
-      undefined,
-      tenant,
-      undefined,
-      { missionId: owner.missionId ?? null, taskId: owner.taskId ?? null }
-    )
-  );
+        })
+    );
+  });
 }
 
 /** Called at the coordinated dispatch boundary, never from arbitrary CLI tenant flags. */

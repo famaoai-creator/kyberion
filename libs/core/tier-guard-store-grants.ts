@@ -18,6 +18,7 @@ import { taskSourceWorkspaceGrantAllows } from './foundation/task-source-workspa
 import { prPublicationGrantAuthorizes } from './foundation/pr-publication-store-capability.js';
 import { autonomyLearningGrantAllows } from './foundation/autonomy-learning-capability.js';
 import { pipelineJournalGrantAllows } from './foundation/pipeline-journal-capability.js';
+import { credentialMaterialGrantAllows } from './foundation/credential-material-capability.js';
 
 /**
  * Does the active invite capability cover this I/O? Its validator predates
@@ -72,6 +73,9 @@ function discussionRequestGrantAllows(
  * - Pipeline journal: the opaque issuer grant over one confidential library run journal of the
  *   caller's own tenant (journal, writer lease, lease metrics), under the store root. Its facade
  *   checks the issuance right (the former shared core role's RA-02 rule) before it issues.
+ * - Credential material: the opaque issuer grant of one allocated connection file read by the
+ *   admitted allocation broker (and its ancestors' metadata). Its facade checks the issuance right
+ *   (the former shared core role's RA-02 rule) before it issues.
  */
 export function storeGrantAuthorizes(
   target: string,
@@ -86,6 +90,7 @@ export function storeGrantAuthorizes(
     taskSourceWorkspaceGrantAllows(target, operation) ||
     prPublicationGrantAuthorizes(target, operation) ||
     autonomyLearningGrantAllows(target, operation) ||
-    pipelineJournalGrantAllows(target, operation)
+    pipelineJournalGrantAllows(target, operation) ||
+    credentialMaterialGrantAllows(target, operation)
   );
 }

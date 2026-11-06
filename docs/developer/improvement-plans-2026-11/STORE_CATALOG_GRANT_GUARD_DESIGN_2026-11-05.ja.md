@@ -836,6 +836,37 @@ SYSTEM_ROLE、`deliverable_inbox_writer`、`ecosystem_architect`）から問い�
 `deliverable_inbox_writer` の 9 件（呼び出し元の拒否だけのロールが効く。狭くなる側）だけで、別 tenant に
 束縛した呼び出し元と方針に無い SYSTEM_ROLE はどちらも同じ符号で拒否された。広がる側の違いは無い。
 
+### G2: 割り当て済みの資格情報の読み取りの許可証化（2026-11-06）
+
+`credential_material_reader` は、資格情報の割り当ての仲介（`secret/credential-allocations.ts` の
+`readAllocatedMaterial`）が、割り当てと作業の claim の受け入れを確かめた後に、接続の 1 ファイル
+（`knowledge/personal/connections/<service>.json`）を読む間だけ引き受けていた共有コアロールである。
+tenant に束縛し、claim の mission と task を実行の主体として結んでいた。
+
+**第 1 段階。** 許可証は最初から発行者ごとの不透明な許可証（`createSynchronousResourceGrantIssuer`）で、
+偽造・複製・別の発行者・非同期・持ち出し・例外の後の失効のテストもあった。無かったのは import の境界
+だけなので、それを足した（`tests/credential-material-capability-boundary.test.ts`。発行の関数は仲介
+だけが使う）。
+
+**第 2 段階: 許可証を権限にし、ロールを外した。**
+
+- `tier-guard` は tenant 範囲の検査の後に `storeGrantAuthorizes` → `credentialMaterialGrantAllows` で
+  問う。認めるのは上限の中（1 ファイルの読み取り、それと祖先のメタデータ、product の読み取り）で、
+  旧ロールの権限が届いた所だけである。旧ロールの security-policy の権限は接続のディレクトリの読み取り
+  で、範囲を持つロールのメタデータの規則によりその祖先（`knowledge`、`knowledge/personal`）の
+  メタデータも許されていた。新でもこの 2 つだけを認め、product の読み取りは呼び出し元の権限で決まる
+  （誰でも読める）。
+- 誰が発行できるかは変えていない。仲介は発行の前に、旧共有コアロールの引き受けと同じ規則を名前
+  `credential_material_reader` に対して確かめる。名前は `shared_core_roles` に発行の権利として残し、
+  退役したロールの名前の一覧に加えた。
+- 呼び出し元のロールと persona はそのまま使い、割り当ての tenant と claim の mission/task に結ぶ
+  （組織は引き継がない）。別 tenant に束縛された呼び出し元は `[ROLE_TENANT_SCOPE_MISMATCH]` で拒否する。
+- ロールの宣言（security-policy、`authority.ts` の tenant 束縛ロールの一覧と引き受けの検査、保存先
+  カタログの `legacy_roles` 1 件、`tier-guard` のロール名の分岐）を削除した。
+
+**比較。** 上限のファイル、その祖先、上限の外の 8 個のパスを 5 つの操作で、10 種類の呼び出し元から
+問い、旧と新を突き合わせた（385 件）。違いは無い（拒否の符号も同じ）。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |

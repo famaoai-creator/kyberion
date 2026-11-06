@@ -818,9 +818,6 @@
     "credential_allocation_reader": {
       "allow_read": ["active/shared/runtime/grants/confidential/${KYBERION_TENANT}/"]
     },
-    "credential_material_reader": {
-      "allow_read": ["knowledge/personal/connections/"]
-    },
     "credential_allocation_probe": {
       "allow_read": ["active/missions/confidential/${KYBERION_TENANT}/"],
       "allow_write": [
