@@ -36,7 +36,6 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
   const { locale } = useConciergeI18n();
   const [tenants, setTenants] = React.useState<CharterTenantView[]>([]);
   const [decisionOptions, setDecisionOptions] = React.useState<CharterDecisionOption[]>([]);
-  const [tenant, setTenant] = React.useState('');
   const [draft, updateDraft] = React.useState<CharterFormDraft>(DEFAULT_CHARTER_DRAFT);
   const [preview, setPreview] = React.useState<{ statement: string; sha: string } | null>(null);
   const [agreed, setAgreed] = React.useState(false);
@@ -50,7 +49,10 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
     setAgreed(false);
   }, []);
 
-  const current = tenants.find((entry) => entry.tenant_slug === tenant) ?? null;
+  // The server narrows this list to the company selected in the rail, so it
+  // holds that one company (or none in the personal / system views).
+  const current = tenants[0] ?? null;
+  const tenant = current?.tenant_slug ?? '';
 
   const load = React.useCallback(async () => {
     try {
@@ -60,9 +62,6 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
       if (!response.ok || !parsed) return;
       setTenants(parsed);
       setDecisionOptions(parseCharterDecisionOptions(body));
-      setTenant((prev) =>
-        parsed.some((e) => e.tenant_slug === prev) ? prev : (parsed[0]?.tenant_slug ?? '')
-      );
     } catch {
       // The pane stays empty; the server is the authority either way.
     }
@@ -218,7 +217,6 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
   return (
     <FormScope
       fields={{
-        'charter.tenant': (value) => setTenant(asText(value)),
         'charter.per_action': (v) => setDraft((d) => ({ ...d, per_action: asText(v) })),
         'charter.per_day': (v) => setDraft((d) => ({ ...d, per_day: asText(v) })),
         'charter.per_month': (v) => setDraft((d) => ({ ...d, per_month: asText(v) })),
@@ -262,19 +260,6 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
         title={t('setup.charter_title')}
         description={t('setup.charter_description')}
       >
-        {tenants.length > 1 ? (
-          <SettingRow label={t('setup.charter_tenant')}>
-            <Select
-              id="charter-tenant"
-              name="charter.tenant"
-              label={t('setup.charter_tenant')}
-              hide_label
-              value={tenant}
-              options={tenants.map((e) => ({ value: e.tenant_slug, label: e.tenant_slug }))}
-            />
-          </SettingRow>
-        ) : null}
-
         {current?.charter ? (
           <div className="charter-current settings-row-block">
             <p>{t('setup.charter_responsible', { name: current.charter.responsible })}</p>

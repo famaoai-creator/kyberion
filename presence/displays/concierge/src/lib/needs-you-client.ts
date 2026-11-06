@@ -1,4 +1,5 @@
 import { frontDeskFetch as fetch } from './front-desk-fetch';
+import { withPageProjectScope } from './project-selection';
 import { decideWithPasskey } from './passkey-client';
 import { readApprovalResponseFailure } from './approval-failure';
 import { parseConciergeMutationResponse } from './mutation-response';
@@ -72,17 +73,23 @@ export async function fetchNeedsYouPage(
   cursor?: string,
   signal?: AbortSignal
 ): Promise<NeedsYouPage> {
-  const response = await fetch(`/api/v1/needs-you${queryFor(filters, cursor)}`, {
-    cache: 'no-store',
-    signal,
-  });
+  const response = await fetch(
+    withPageProjectScope(`/api/v1/needs-you${queryFor(filters, cursor)}`),
+    {
+      cache: 'no-store',
+      signal,
+    }
+  );
   const body = (await response.json().catch(() => null)) as NeedsYouPage | null;
   if (!response.ok || !body?.ok || !Array.isArray(body.items)) throw new Error('needs-you');
   return body;
 }
 
 export async function fetchNeedsYouSummary(signal?: AbortSignal): Promise<NeedsYouSummary> {
-  const response = await fetch('/api/v1/needs-you/summary', { cache: 'no-store', signal });
+  const response = await fetch(withPageProjectScope('/api/v1/needs-you/summary'), {
+    cache: 'no-store',
+    signal,
+  });
   const body = (await response.json().catch(() => null)) as NeedsYouSummary | null;
   if (!response.ok || !body?.ok || typeof body.total !== 'number') throw new Error('needs-you');
   return body;
