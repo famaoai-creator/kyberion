@@ -38,8 +38,7 @@ describe('docs-honesty contract (QM-10)', () => {
     });
 
     it('the three data tiers the docs describe exist in tier-guard', () => {
-      // tier-guard classifies paths through tier-detect (detectTier).
-      const tierGuard = read('libs/core/tier-guard.ts') + read('libs/core/tier-detect.ts');
+      const tierGuard = read('libs/core/tier-guard.ts');
       for (const tier of ['personal', 'confidential', 'public']) {
         expect(tierGuard).toContain(`'${tier}'`);
       }

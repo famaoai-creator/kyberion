@@ -24,20 +24,8 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
+      "legacy_roles": ["archived_mission_state_reader", "workspace_graph_reader"],
       "sources": ["role-policy"]
-    },
-    {
-      "id": "archived-missions.tenant",
-      "path": "active/archive/missions/<tier>/<tenant>",
-      "custody": {
-        "kind": "tenant",
-        "ref": "<tenant>"
-      },
-      "tiers": ["personal", "confidential", "public"],
-      "status": "active",
-      "sources": ["role-policy", "scope-model"],
-      "note": "Tenant partition of archived missions (protected prefixes active/archive/missions/<personal|confidential>/).",
-      "legacy_roles": ["archived_mission_state_reader", "workspace_graph_reader"]
     },
     {
       "id": "autonomy-learning",
@@ -328,20 +316,8 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
+      "legacy_roles": ["workspace_graph_reader"],
       "sources": ["role-policy"]
-    },
-    {
-      "id": "missions.tenant",
-      "path": "active/missions/<tier>/<tenant>",
-      "custody": {
-        "kind": "tenant",
-        "ref": "<tenant>"
-      },
-      "tiers": ["personal", "confidential", "public"],
-      "status": "active",
-      "sources": ["role-policy", "scope-model"],
-      "note": "Tenant partition of mission state (protected prefixes active/missions/<personal|confidential>/). Legacy active/missions/<tier>/<MISSION_ID> stays under missions.",
-      "legacy_roles": ["workspace_graph_reader"]
     },
     {
       "id": "organizations",
@@ -543,20 +519,8 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
+      "legacy_roles": ["metrics_cap_reader"],
       "sources": ["role-policy"]
-    },
-    {
-      "id": "runtime.execution-metrics.tenant",
-      "path": "active/shared/runtime/execution-metrics/<tier>/<tenant>",
-      "custody": {
-        "kind": "tenant",
-        "ref": "<tenant>"
-      },
-      "tiers": ["personal", "confidential", "public"],
-      "status": "active",
-      "sources": ["role-policy", "scope-model"],
-      "note": "Tenant partition of the execution-metrics metrics ledger (protected prefixes active/shared/runtime/execution-metrics/<personal|confidential>/); the root stays an unscoped system ledger.",
-      "legacy_roles": ["metrics_cap_reader"]
     },
     {
       "id": "runtime.locks",
@@ -668,20 +632,8 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
+      "legacy_roles": ["metrics_cap_reader"],
       "sources": ["role-policy"]
-    },
-    {
-      "id": "runtime.usage-ledger.tenant",
-      "path": "active/shared/runtime/usage-ledger/<tier>/<tenant>",
-      "custody": {
-        "kind": "tenant",
-        "ref": "<tenant>"
-      },
-      "tiers": ["personal", "confidential", "public"],
-      "status": "active",
-      "sources": ["role-policy", "scope-model"],
-      "note": "Tenant partition of the usage-ledger metrics ledger (protected prefixes active/shared/runtime/usage-ledger/<personal|confidential>/); the root stays an unscoped system ledger.",
-      "legacy_roles": ["metrics_cap_reader"]
     },
     {
       "id": "runtime.vitest-approvals",
@@ -786,9 +738,10 @@
         "kind": "person",
         "ref": "installation-owner"
       },
+      "tiers": ["personal"],
       "status": "active",
       "sources": ["scope-model"],
-      "note": "Traces written while acting under a stance (default_allow covers active/shared/logs/). Lives on the public logs floor: the personal tier ceiling is not enforced there yet (G2)."
+      "note": "Traces written while acting under a stance (default_allow covers active/shared/logs/)."
     },
     {
       "id": "task-workspaces",
