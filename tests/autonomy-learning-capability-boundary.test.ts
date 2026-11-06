@@ -16,8 +16,13 @@ describeStoreGrantBoundary(
         'libs/core/governance/autonomy-action-state.ts',
         ['withAutonomyLearningCapability', 'AUTONOMY_LEARNING_GRANT_ISSUANCE_RIGHT'],
       ],
-      ['libs/core/tier-guard-store-grants.ts', ['autonomyLearningGrantAllows']],
     ]),
   },
-  { formerConsumers: ['libs/core/tier-guard.ts', 'libs/core/authority.ts'] }
+  {
+    formerConsumers: [
+      'libs/core/tier-guard.ts',
+      'libs/core/authority.ts',
+      'libs/core/tier-guard-store-grants.ts',
+    ],
+  }
 );

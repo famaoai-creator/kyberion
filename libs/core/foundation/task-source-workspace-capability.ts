@@ -24,6 +24,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { runtimeStatePath } from './runtime-state-roots.js';
 import { isValidTenantSlug } from './scope.js';
+import { registerStoreGrant } from './store-grant-registry.js';
 
 export type TaskSourceWorkspaceOperation = 'read' | 'write' | 'append' | 'mkdir' | 'metadata';
 
@@ -161,3 +162,11 @@ export function taskSourceWorkspaceGrantAllows(
   assertLive(current);
   return true;
 }
+
+// G3: tier-guard asks these rules through the store grant registry, not by importing this module.
+registerStoreGrant({
+  id: 'task-source-workspace',
+  active: () => currentWindow() !== undefined,
+  authorizes: (target, operation) => taskSourceWorkspaceGrantAllows(target, operation),
+  narrowing: ({ relativePath, operation }) => taskSourceWorkspaceIoDenial(relativePath, operation),
+});

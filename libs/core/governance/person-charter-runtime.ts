@@ -25,6 +25,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { parseNhiId } from '../contracts/nhi-id.js';
 import { isValidMemberId } from '../foundation/scope.js';
 import { STORAGE_FLOOR_ROOTS } from '../foundation/runtime-state-roots.js';
+import { registerStoreGrant } from '../foundation/store-grant-registry.js';
 
 /**
  * Issuance right of the person charter store grant (G2). The former shared core role of this name
@@ -256,3 +257,15 @@ export function personCharterGrantAuthorizes(
 ): boolean {
   return Boolean(liveGrant()) && personCharterIoAllowed(target, operation);
 }
+
+// G3: tier-guard asks these rules through the store grant registry, not by importing this module.
+registerStoreGrant({
+  id: 'person-charter',
+  active: personCharterStoreGrantActive,
+  authorizes: (target, operation) => personCharterGrantAuthorizes(target, operation),
+  narrowing: ({ candidates, operation }) =>
+    personCharterStoreGrantActive() &&
+    !candidates().every((target) => personCharterIoAllowed(target, operation))
+      ? '[PERSON_CHARTER_RESOURCE_DENIED] Person charter IO requires its installed owner and exact resource capability'
+      : null,
+});

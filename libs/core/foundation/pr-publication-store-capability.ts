@@ -26,6 +26,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type { CharterScope } from '../governance/accountability-charter.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS, STORAGE_FLOOR_ROOTS } from './runtime-state-roots.js';
 import { isValidTenantSlug } from './scope.js';
+import { registerStoreGrant } from './store-grant-registry.js';
 
 export type VcsPublicationOperation = 'vcs:pr_create' | 'vcs:push' | 'vcs:pr_merge';
 export type PrPublicationStoreKind =
@@ -310,3 +311,27 @@ export function prPublicationGrantAuthorizes(
       : [...charters, artifacts, ...shared];
   return roots.some((root) => within(target, root));
 }
+
+// G3: tier-guard asks these rules through the store grant registry, not by importing this module.
+registerStoreGrant({
+  id: 'pr-publication',
+  active: prPublicationStoreGrantActive,
+  authorizes: (target, operation) => prPublicationGrantAuthorizes(target, operation),
+  narrowing: ({ candidates, operation }) =>
+    prPublicationStoreGrantActive() &&
+    !candidates().every((target) => prPublicationResourceAllowed(target, operation))
+      ? '[PR_PUBLICATION_SCOPE] Publication store requires exact host resource capability'
+      : null,
+  // The live grant may create the confidential tier container of its own organization
+  // tenant's artifact floor or reservation store, and nothing else structurally.
+  structuralMkdir: (relativePath, _protectedPrefix, tenantSlug) =>
+    prPublicationStoreGrantActive()
+      ? tenantSlug !== undefined &&
+        prPublicationGrantTenant() === tenantSlug &&
+        [
+          `${STORAGE_FLOOR_ROOTS.artifact}/confidential`,
+          `${PARTITIONED_RUNTIME_STATE_ROOTS.external_operations}/confidential`,
+        ].includes(relativePath) &&
+        prPublicationResourceAllowed(relativePath, 'mkdir')
+      : undefined,
+});

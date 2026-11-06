@@ -1,21 +1,10 @@
 import type { ResourceAccessOperation, ResourceAccessScope } from './resource-access-scope.js';
 import {
-  personalApprovalIoAllowed,
-  personalApprovalIoNarrowing,
-} from './personal-approval-io-capability.js';
-import { taskSourceWorkspaceIoDenial } from './task-source-workspace-capability.js';
-import {
   ARCHIVED_MISSION_STATE_READER_ROLE,
   isArchivedMissionStateCapability,
 } from './archived-mission-state-capability.js';
-import { isCustomerDecisionInviteCapability } from './customer-decision-invite-capability.js';
-import { customerDecisionConsumerGrantActive } from './customer-decision-consumer-capability.js';
-import { customerDecisionInviteWriteDenial } from './customer-decision-invite-write-content.js';
-import {
-  customerDecisionWriteContentDenial,
-  type WriteContent,
-} from './customer-decision-write-content.js';
-import { customerDecisionMilestoneGrantActive } from './customer-decision-milestone-capability.js';
+import type { WriteContent } from './customer-decision-record-content.js';
+import { storeGrantNarrowingDenial, storeGrantRule } from './store-grant-registry.js';
 import {
   CUSTOMER_CHANNEL_BINDING_STORE_ROLE,
   customerChannelBindingStorePathAllowed,
@@ -54,51 +43,38 @@ export function narrowStoreRoleDenial(input: {
   const { role, relativePath } = input;
   // `shared` is the personal storage marker, never a tenant credential. An
   // unbound tenant-store reader must not reinterpret this owner namespace.
-  // G2: only the live personal approval owner window (no role) reaches an owner partition,
-  // and every I/O made while a window is entered is narrowed to it.
+  // G2: only the live personal approval owner window (no role) reaches an owner partition
+  // (G3: asked through the store grant registry; an unloaded window module admits nothing).
   if (
     /(?:^|\/)tenant-approvals\/personal\/shared\/owners(?:\/|$)/u.test(relativePath) &&
-    !personalApprovalIoAllowed(relativePath, input.operation)
+    storeGrantRule('personal-approval')?.pathAllowed?.(relativePath, input.operation) !== true
   )
     return '[PERSONAL_APPROVAL_SCOPE_REQUIRED] Personal owner partition requires exact owner IO';
-  if (!personalApprovalIoNarrowing(relativePath, input.operation))
-    return '[PERSONAL_APPROVAL_SCOPE_REQUIRED] Exact personal owner IO window required';
-  // G2: an open task source workspace window (no role) narrows every I/O made inside it;
-  // its liveness check runs with the window suspended, so it is never narrowed.
-  const workspaceDenial = taskSourceWorkspaceIoDenial(relativePath, input.operation);
-  if (workspaceDenial) return workspaceDenial;
+  // G2/G3: the live store grants narrow every I/O made inside them (no role), in registry order:
+  // the personal approval window, the task source workspace window (its liveness check runs
+  // with the window suspended, so it is never narrowed), the invite capability's tenant/content
+  // check, and the content checks of every write inside a consumer-lock or milestone grant.
+  const grantDenial = storeGrantNarrowingDenial(
+    [
+      'personal-approval',
+      'task-source-workspace',
+      'customer-decision-invite',
+      'customer-decision-consumer',
+      'customer-decision-milestone',
+    ],
+    {
+      relativePath,
+      operation: input.operation,
+      candidates: () => [relativePath],
+      scope: input.scope,
+      content: input.content,
+      readRepoFile: input.readRepoFile,
+    }
+  );
+  if (grantDenial) return grantDenial;
   // Append must retain every pre-existing write/content restriction, never fall through
   // a metadata/read branch merely because the resource ceiling distinguishes the verb.
   const operation = input.operation === 'append' ? 'write' : input.operation;
-  if (isCustomerDecisionInviteCapability(input.scope)) {
-    const inviteDenial = customerDecisionInviteWriteDenial({
-      tenantSlug: input.scope?.tenantSlug,
-      relativePath,
-      operation,
-      content: input.content,
-      readRepoFile: input.readRepoFile,
-    });
-    if (inviteDenial) return inviteDenial;
-  }
-  // G2: every write inside a live consumer-lock or milestone grant (no role) is content-checked.
-  const contentStore =
-    operation !== 'write'
-      ? undefined
-      : customerDecisionConsumerGrantActive()
-        ? ('consumer' as const)
-        : customerDecisionMilestoneGrantActive()
-          ? ('milestone' as const)
-          : undefined;
-  if (contentStore) {
-    const contentDenial = customerDecisionWriteContentDenial(
-      contentStore,
-      relativePath,
-      input.content,
-      input.scope?.metadataExact?.[0],
-      input.readRepoFile
-    );
-    if (contentDenial) return contentDenial;
-  }
   if (!role) return null;
   if (
     role === DELIVERABLE_INBOX_WRITER_ROLE &&

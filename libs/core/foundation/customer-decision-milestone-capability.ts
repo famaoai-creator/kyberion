@@ -8,6 +8,8 @@ import {
 } from './resource-access-scope.js';
 import { getProcessEnv } from './process-env.js';
 import { isValidTenantSlug } from './scope.js';
+import { registerStoreGrant, storeGrantActive } from './store-grant-registry.js';
+import { caseRecordWriteDenial } from './customer-decision-record-content.js';
 
 /**
  * CD-10 bolt-review milestones (libs/core/mission/mission-bolt-review.ts).
@@ -225,3 +227,25 @@ export function customerDecisionMilestoneGrantAllows(
 export function customerDecisionMilestoneGrantActive(): boolean {
   return isCustomerDecisionMilestoneCapability(currentResourceAccessScope());
 }
+
+// G3: tier-guard asks these rules through the store grant registry, not by importing this module.
+// Every write (append counts as a write) inside a live milestone grant is content-checked; a live
+// consumer-lock grant, whose check takes precedence, leaves the write to that check.
+registerStoreGrant({
+  id: 'customer-decision-milestone',
+  active: customerDecisionMilestoneGrantActive,
+  authorizes: (target, operation) => customerDecisionMilestoneGrantAllows(target, operation),
+  narrowing: ({ relativePath, operation, scope, content, readRepoFile }) =>
+    (operation === 'write' || operation === 'append') &&
+    !storeGrantActive('customer-decision-consumer') &&
+    customerDecisionMilestoneGrantActive()
+      ? caseRecordWriteDenial(
+          'milestone',
+          (_relative, previous, next) => customerDecisionMilestoneWriteProblem(previous, next),
+          relativePath,
+          content,
+          scope?.metadataExact?.[0],
+          readRepoFile
+        )
+      : null,
+});

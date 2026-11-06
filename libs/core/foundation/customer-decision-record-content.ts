@@ -1,6 +1,4 @@
 import * as path from 'node:path';
-import { customerDecisionConsumerWriteProblem } from './customer-decision-consumer-capability.js';
-import { customerDecisionMilestoneWriteProblem } from './customer-decision-milestone-capability.js';
 
 /** Content of a file write, when the caller writes whole bytes (secure-io `safeWriteFile`). */
 export type WriteContent = string | Buffer;
@@ -13,6 +11,14 @@ export type WriteContent = string | Buffer;
  * refused for them.
  */
 export type ContentCheckedStore = 'consumer' | 'milestone';
+
+/** A record problem: `relative` is the case-relative path; null when the change is allowed. */
+export type CaseRecordWriteProblem = (
+  relative: string,
+  previous: unknown,
+  next: unknown,
+  readCaseFile: (relative: string) => string | undefined
+) => string | null;
 
 /** An unparseable record: never undefined (that would read as "absent"). */
 function parseJsonOrInvalid(text: string): unknown {
@@ -27,10 +33,12 @@ function parseJsonOrInvalid(text: string): unknown {
  * The refusal reason of a content-checked store's write, or null when allowed.
  * `caseDir` is the case directory of the store's capability (repo-relative);
  * `readRepoFile` reads a repo-relative file raw (undefined when absent) — the
- * guard's own read, outside any caller scope.
+ * guard's own read, outside any caller scope. Dependency-free so each grant
+ * module registers its own content check (G3) without importing the others.
  */
-export function customerDecisionWriteContentDenial(
+export function caseRecordWriteDenial(
   store: ContentCheckedStore,
+  problem: CaseRecordWriteProblem,
   relativePath: string,
   content: WriteContent | undefined,
   caseDir: string | undefined,
@@ -49,7 +57,5 @@ export function customerDecisionWriteContentDenial(
     return '[CUSTOMER_DECISION_WRITE_CONTENT_REQUIRED] the record on disk could not be read for the content check';
   }
   const next = parseJsonOrInvalid(typeof content === 'string' ? content : content.toString('utf8'));
-  return store === 'consumer'
-    ? customerDecisionConsumerWriteProblem(relative, previous, next, readCaseFile)
-    : customerDecisionMilestoneWriteProblem(previous, next);
+  return problem(relative, previous, next, readCaseFile);
 }

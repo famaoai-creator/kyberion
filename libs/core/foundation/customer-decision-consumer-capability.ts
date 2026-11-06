@@ -10,6 +10,8 @@ import {
 } from './resource-access-scope.js';
 import { getProcessEnv } from './process-env.js';
 import { isValidTenantSlug } from './scope.js';
+import { registerStoreGrant } from './store-grant-registry.js';
+import { caseRecordWriteDenial } from './customer-decision-record-content.js';
 import {
   isStandingCustomerDecisionRecord,
   supersededDecisionIds,
@@ -767,3 +769,22 @@ export function customerDecisionConsumerGrantAllows(
 export function customerDecisionConsumerGrantActive(): boolean {
   return isCustomerDecisionConsumerCapability(currentResourceAccessScope());
 }
+
+// G3: tier-guard asks these rules through the store grant registry, not by importing this module.
+// Every write (append counts as a write) inside a live consumer-lock grant is content-checked.
+registerStoreGrant({
+  id: 'customer-decision-consumer',
+  active: customerDecisionConsumerGrantActive,
+  authorizes: (target, operation) => customerDecisionConsumerGrantAllows(target, operation),
+  narrowing: ({ relativePath, operation, scope, content, readRepoFile }) =>
+    (operation === 'write' || operation === 'append') && customerDecisionConsumerGrantActive()
+      ? caseRecordWriteDenial(
+          'consumer',
+          customerDecisionConsumerWriteProblem,
+          relativePath,
+          content,
+          scope?.metadataExact?.[0],
+          readRepoFile
+        )
+      : null,
+});

@@ -20,6 +20,7 @@ import {
   type ResourceAccessOperation,
   type ResourceAccessScope,
 } from './resource-access-scope.js';
+import { registerStoreGrant } from './store-grant-registry.js';
 import * as path from 'node:path';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from './runtime-state-roots.js';
 import { getProcessEnv } from './process-env.js';
@@ -152,3 +153,9 @@ export function pipelineJournalGrantAllows(
   if (target !== ROOT && !target.startsWith(ROOT + '/')) return false;
   return decideResourceAccess(scope!, target, operation).allowed;
 }
+
+// G3: tier-guard asks this rule through the store grant registry, not by importing this module.
+registerStoreGrant({
+  id: 'pipeline-journal',
+  authorizes: (target, operation) => pipelineJournalGrantAllows(target, operation),
+});

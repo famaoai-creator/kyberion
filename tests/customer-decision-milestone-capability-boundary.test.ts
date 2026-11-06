@@ -21,15 +21,6 @@ describeStoreGrantBoundary(
         ],
       ],
       ['libs/core/customer-decision/store.ts', ['customerDecisionMilestoneGrantActive']],
-      ['libs/core/tier-guard-store-grants.ts', ['customerDecisionMilestoneGrantAllows']],
-      [
-        'libs/core/foundation/narrow-store-role-denial.ts',
-        ['customerDecisionMilestoneGrantActive'],
-      ],
-      [
-        'libs/core/foundation/customer-decision-write-content.ts',
-        ['customerDecisionMilestoneWriteProblem'],
-      ],
       [
         'libs/core/foundation/customer-decision-consumer-capability.ts',
         ['caseRecordCanonicalJson'],
@@ -40,5 +31,12 @@ describeStoreGrantBoundary(
       ],
     ]),
   },
-  { formerConsumers: ['libs/core/tier-guard.ts', 'libs/core/authority.ts'] }
+  {
+    formerConsumers: [
+      'libs/core/tier-guard.ts',
+      'libs/core/authority.ts',
+      'libs/core/tier-guard-store-grants.ts',
+      'libs/core/foundation/narrow-store-role-denial.ts',
+    ],
+  }
 );
