@@ -173,7 +173,7 @@ export function runCustomerChannel(argv: readonly string[]): unknown {
       if (!content) {
         throw new ScriptExitError(
           2,
-          `no readable outbound content ${source} for tenant ${tenant} (only customer/<tenant>/deals/<deal>/<quote|contract>-v<n>.md)`
+          `no readable outbound content ${source} for tenant ${tenant} (only knowledge/confidential/<tenant>/deals/<deal>/<quote|contract>-v<n>.md)`
         );
       }
       return {

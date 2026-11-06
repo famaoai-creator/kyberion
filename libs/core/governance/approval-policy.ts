@@ -122,7 +122,7 @@ export function loadApprovalPolicy(): ApprovalPolicyFile {
  * request's requester identity is refused — the choke point is
  * `decideApprovalRequest` in `approval-store.ts`. The setting lives in
  * `approval-policy.json` and therefore follows that file's existing scoping:
- * the active customer overlay (`customer/{slug}/policy/approval-policy.json`)
+ * the active stance overlay (`knowledge/personal/stances/{slug}/policy/approval-policy.json`)
  * replaces the product default wholesale. There is no per-tenant or
  * per-organization override.
  */

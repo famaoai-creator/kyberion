@@ -70,7 +70,7 @@ export interface KnowledgeHint {
   learning_candidate_id?: string;
   confidence: number;
   tags?: string[];
-  tier?: 'public' | 'confidential' | 'personal' | 'product' | 'customer';
+  tier?: 'public' | 'confidential' | 'personal' | 'product';
   customerId?: string;
   /**
    * DA-07: lexical relevance score for the active query. Populated only when
@@ -271,15 +271,11 @@ function metadataScore(
  */
 export interface KnowledgeScope {
   /**
-   * Which tiers to scan. Order is irrelevant; results are merged.
-   *
-   * `'customer'` (DA-07) scans ONLY the `customer/{customerId}/` overlay
-   * directory (unlike `'personal'`, which scans the overlay AND
-   * `knowledge/personal/`). It requires `customerId` — without one it scans
-   * nothing (fail-closed), so a tenant-scoped index can never accidentally
-   * widen to another tenant's overlay.
+   * Which tiers to scan. Order is irrelevant; results are merged. A tenant's
+   * customer records live in its confidential subtree (S3), so there is no
+   * separate customer tier.
    */
-  tiers: Array<'public' | 'confidential' | 'personal' | 'product' | 'customer'>;
+  tiers: Array<'public' | 'confidential' | 'personal' | 'product'>;
   /**
    * Restrict 'confidential' scanning to one customer subdirectory.
    * Also activates customer/ overlay for 'personal' tier.
@@ -603,13 +599,6 @@ export async function buildScopedIndex(
           effectiveScope.systemAuthority === true
         );
         break;
-      case 'customer':
-        _scanCustomerOverlayTier(
-          knowledgeBase,
-          effectiveScope.scopeContext?.tenant_slug || effectiveScope.customerId,
-          hints
-        );
-        break;
     }
   }
 
@@ -889,26 +878,6 @@ function _scanPersonalTier(
       }
     }
   }
-}
-
-/**
- * DA-07: scan ONLY the `customer/{customerId}/` overlay directory. Unlike
- * `_scanPersonalTier` this never touches `knowledge/personal/`, so a
- * tenant-scoped index gets the overlay without pulling in the operator's
- * personal tier. `customerId` is mandatory — absent means scan nothing
- * (fail-closed): the caller must name the tenant positively.
- */
-function _scanCustomerOverlayTier(
-  knowledgeBase: string,
-  customerId: string | undefined,
-  hints: KnowledgeHint[]
-): void {
-  if (!customerId) return;
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(customerId)) return;
-  const projectRoot = path.dirname(knowledgeBase);
-  const overlayDir = path.join(projectRoot, 'customer', customerId);
-  if (!safeExistsSync(overlayDir)) return;
-  _scanMarkdownHints(overlayDir, knowledgeBase, 'customer', customerId, hints);
 }
 
 // ─── Low-level scanners ───────────────────────────────────────────────────────
