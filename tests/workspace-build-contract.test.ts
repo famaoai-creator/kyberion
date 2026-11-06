@@ -30,6 +30,7 @@ describe('Workspace build contract', () => {
       'libs/core/package.json',
       'libs/shared-voice/package.json',
       'libs/shared-mobile/package.json',
+      'libs/shared-media/package.json',
     ];
 
     const missing: string[] = [];
@@ -51,6 +52,28 @@ describe('Workspace build contract', () => {
     }
 
     expect(missing).toEqual([]);
+  });
+
+  it('keeps host image hand-off bookkeeping with its shared-media consumers', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const media = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-media/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./host-image-handoff']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/host-image-handoff.ts'))).toBe(false);
+    expect(media.exports['./host-image-handoff']).toEqual({
+      types: './dist/host-image-handoff.d.ts',
+      default: './dist/host-image-handoff.js',
+    });
+    // Persistence, path resolution, and security remain in core. Only the
+    // image-specific bookkeeping module moves beside its consumers.
+    for (const subpath of ['./foundation/json', './path-resolver', './secure-io']) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
   });
 
   it('keeps mobile runtime helpers in shared-mobile without closing legacy deep imports', () => {

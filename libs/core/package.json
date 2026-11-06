@@ -7728,10 +7728,6 @@
       "types": "./dist/provider-runtime-requirements.d.ts",
       "default": "./dist/provider-runtime-requirements.js"
     },
-    "./host-image-handoff": {
-      "types": "./dist/host-image-handoff.d.ts",
-      "default": "./dist/host-image-handoff.js"
-    },
     "./media/docx-xml": {
       "types": "./dist/media/docx-xml.d.ts",
       "default": "./dist/media/docx-xml.js"
