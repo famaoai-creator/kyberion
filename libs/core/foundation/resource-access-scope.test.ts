@@ -29,7 +29,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
-import { discussionRequestCapability } from './discussion-request-capability.js';
+import { withDiscussionRequestCapability } from './discussion-request-capability.js';
 import { pipelineJournalCapability } from './pipeline-journal-capability.js';
 import { autonomyLearningCapability } from './autonomy-learning-capability.js';
 import { narrowStoreRoleDenial } from './narrow-store-role-denial.js';
@@ -70,6 +70,31 @@ function scope(overrides: Partial<ResourceAccessScope> = {}): ResourceAccessScop
   };
 }
 const abs = (target: string) => path.resolve(ROOT, target);
+
+const DISCUSSION_REQUEST_DIRECTORY =
+  'active/shared/runtime/discussion-create-requests/confidential/acme-corp/by-actor/' +
+  'a'.repeat(64) +
+  '/' +
+  'b'.repeat(64) +
+  '/12345678-1234-4234-8234-123456789abc';
+/**
+ * The Discussion request grant is opaque: only its live issuer scope resolves, so the
+ * exact ceiling is observed inside the issuer. Copies of it (below) are lookalikes.
+ */
+function withStoreCapability(role: string, run: (capability: ResourceAccessScope) => void): void {
+  if (role === 'discussion_request_store')
+    withDiscussionRequestCapability(
+      { directory: DISCUSSION_REQUEST_DIRECTORY, tenant: 'acme-corp', write: true },
+      () => run(currentResourceAccessScope()!)
+    );
+  else {
+    const capability = pipelineJournalCapability(
+      'acme-corp',
+      'active/shared/runtime/pipeline-library-runs/confidential/acme-corp/run.jsonl'
+    );
+    runInResourceAccessScope(capability, () => run(capability));
+  }
+}
 
 function withProtectedFixture(run: (root: string) => void): void {
   const root = abs(base);
@@ -116,25 +141,10 @@ describe('request resource ceiling', () => {
   it.each(['discussion_request_store', 'pipeline_journal_store'])(
     'retains %s write-backed append and metadata ancestor access',
     (role) => {
-      const capability =
-        role === 'discussion_request_store'
-          ? discussionRequestCapability(
-              'active/shared/runtime/discussion-create-requests/confidential/acme-corp/by-actor/' +
-                'a'.repeat(64) +
-                '/' +
-                'b'.repeat(64) +
-                '/12345678-1234-4234-8234-123456789abc',
-              'acme-corp',
-              true
-            )
-          : pipelineJournalCapability(
-              'acme-corp',
-              'active/shared/runtime/pipeline-library-runs/confidential/acme-corp/run.jsonl'
-            );
       withProtectedFixture((root) => {
         process.env.SYSTEM_ROLE = role;
         process.env.KYBERION_TENANT = 'acme-corp';
-        runInResourceAccessScope(capability, () => {
+        withStoreCapability(role, (capability) => {
           const target = path.join(root, capability.writeExact[0]!);
           expect(validateWritePermission(target, 'append').allowed).toBe(true);
           expect(validateReadPermission(path.dirname(target), 'metadata').allowed).toBe(true);
@@ -180,43 +190,36 @@ describe('request resource ceiling', () => {
     'does not enlarge the original %s capability with forged append or metadata paths',
     (role) => {
       process.env.SYSTEM_ROLE = role;
-      const capability =
-        role === 'discussion_request_store'
-          ? discussionRequestCapability(
-              'active/shared/runtime/discussion-create-requests/confidential/acme-corp/by-actor/' +
-                'a'.repeat(64) +
-                '/' +
-                'b'.repeat(64) +
-                '/12345678-1234-4234-8234-123456789abc',
-              'acme-corp',
-              true
-            )
-          : pipelineJournalCapability(
-              'acme-corp',
-              'active/shared/runtime/pipeline-library-runs/confidential/acme-corp/run.jsonl'
-            );
-      const extra = base + '/forged/foreign.jsonl';
-      runInResourceAccessScope({ ...capability, appendExact: [extra] }, () => {
-        expect(validateWritePermission(abs(extra), 'append').allowed).toBe(false);
-        expect(() => safeAppendFileSync(abs(extra), 'forged')).toThrow(/RESOURCE_SCOPE_REQUIRED/);
-        expect(validateReadPermission(abs(base + '/forged'), 'metadata').allowed).toBe(false);
+      // A copy of the live ceiling, used outside it: for the opaque Discussion request
+      // grant the copy is itself a lookalike, and it never gains the forged paths either.
+      let capability!: ResourceAccessScope;
+      withStoreCapability(role, (live) => {
+        capability = { ...live };
       });
-      // A forged name prefix is not honoured by a validator that does not check it.
-      runInResourceAccessScope({ ...capability, namePrefixExact: [base + '/forged/'] }, () => {
-        expect(validateWritePermission(abs(extra)).allowed).toBe(false);
-      });
-      // Even a read-only old capability cannot grow a new append grant to its real file.
-      const readOnly = {
-        ...capability,
-        writeExact: [],
-        mkdirExact: [],
-        appendExact: [capability.readExact[0]!],
-      };
-      runInResourceAccessScope(readOnly, () => {
-        expect(validateWritePermission(abs(capability.readExact[0]!), 'append').allowed).toBe(
-          false
-        );
-      });
+      {
+        const extra = base + '/forged/foreign.jsonl';
+        runInResourceAccessScope({ ...capability, appendExact: [extra] }, () => {
+          expect(validateWritePermission(abs(extra), 'append').allowed).toBe(false);
+          expect(() => safeAppendFileSync(abs(extra), 'forged')).toThrow(/RESOURCE_SCOPE_REQUIRED/);
+          expect(validateReadPermission(abs(base + '/forged'), 'metadata').allowed).toBe(false);
+        });
+        // A forged name prefix is not honoured by a validator that does not check it.
+        runInResourceAccessScope({ ...capability, namePrefixExact: [base + '/forged/'] }, () => {
+          expect(validateWritePermission(abs(extra)).allowed).toBe(false);
+        });
+        // Even a read-only old capability cannot grow a new append grant to its real file.
+        const readOnly = {
+          ...capability,
+          writeExact: [],
+          mkdirExact: [],
+          appendExact: [capability.readExact[0]!],
+        };
+        runInResourceAccessScope(readOnly, () => {
+          expect(validateWritePermission(abs(capability.readExact[0]!), 'append').allowed).toBe(
+            false
+          );
+        });
+      }
     }
   );
 

@@ -69,7 +69,7 @@
     "foundation/customer-decision-standing": 0,
     "foundation/customer-decision-write-content": 5,
     "foundation/deliverable-inbox-writer-capability": 2,
-    "foundation/discussion-request-capability": 2,
+    "foundation/discussion-request-capability": 3,
     "foundation/dot-result-store-capability": 3,
     "foundation/env": 0,
     "foundation/execution-scope": 4,
