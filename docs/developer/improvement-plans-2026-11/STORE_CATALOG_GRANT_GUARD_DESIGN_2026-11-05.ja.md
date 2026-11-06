@@ -541,6 +541,7 @@ public のログ置き場）で、スタンスの痕跡を個人 tier として�
   種類で、置き換え先は保存先ごとの複数の許可証である（上の棚卸しの表）。ロールはインストール単位の
   追加移行（`publication-role-migration.ts` の `PUBLICATION_MIGRATION_ROLES`）の対象でもあり、
   外すには移行手続きの変更が要る。
+  棚卸しと、偽造できない許可証にした第 1 段階は「G2: PR の公開の保存先の許可証化」の節にある。
 
 ### G2 の前提: 1 つのプロセスに `@agent/core` は 1 つだけ（2026-11-06）
 
@@ -629,6 +630,65 @@ libs/core の外の本番のファイルが、libs/core のモジュールを相
   `tier-guard-store-grants.ts` の表の行、ロール名で効いた絞り込み）を削除した。保存先カタログの
   `legacy_roles` とロールの索引・定義には元から載っていなかった。旧ロール名を引き受けても何も
   許されない（`task-source-edit.private.integration.test.ts`）。
+
+### G2: PR の公開の保存先の許可証化（2026-11-06）
+
+`pr_publication_store` は、VCS host（`vcs/publication-host.ts`、`vcs/governance-host.ts`）が PR の作成・
+push・merge の 1 回の実行の中で、保存先の窓口ごとに引き受けていた共有コアロールである。
+
+**届く保存先と操作。** 窓口 1 回は 1 種類で、1 つの保存先だけに届く。
+
+| 種類                   | 窓口                                                                                       | 保存先（store-catalog）                                          | 対象                                                                                                                          | 操作                           |
+| ---------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `charter-read`         | charter registry の読み取り（`scopedCharterIo`、書き込み無し）                             | `personal-knowledge.charters` / `tenant-knowledge.charters`      | `knowledge/personal/charters`（person）か `knowledge/confidential/<tenant>/charters` の一覧、`<id>.json`、`<id>.ledger.jsonl` | 読む・メタデータ               |
+| `charter-ledger-write` | charter registry の台帳追記（組織の charter の消費・委任実行・拒否・開始・結果・tripwire） | `tenant-knowledge.charters`                                      | `knowledge/confidential/<tenant>/charters/<id>.ledger.jsonl`                                                                  | 読む・追記                     |
+| `review-write`         | publication-host の承認要求に付けるレビュー成果物                                          | `floor.artifact`（`confidential/<tenant>` か `personal/shared`） | `evidence/<pr-publication\|vcs-publication>/<invocation>/<hash>.json` と `artifacts-index.jsonl`                              | 読む・書く・追記・祖先の mkdir |
+| `body-stage`           | governance-host が由来を証明できない本文ファイルを複製する                                 | `floor.artifact`（`public/shared`）                              | `evidence/pr-publication/<invocation>/body-<hash>.md` と索引                                                                  | 書く・追記・祖先の mkdir       |
+| `reservation-write`    | external-operation-store の実行の予約（作成のみ）                                          | `external-operations`（vitest の中だけ `floor.scratch`）         | `external-operations/<floor>/<hash>.json`（vitest は `tmp/<floor>/vitest-external-operations/<a>/<b>/<hash>.json`）           | 書く・祖先の mkdir             |
+
+どの種類でも、`knowledge/product/` の読み取りとメタデータ（schema と catalog の検証）、対象の祖先の
+メタデータと mkdir が上限に入る。上限は `tier-guard` の `requestResourceDenial` がロール名で効かせて
+いた（拒否のみ）。許可はロールの security-policy の権限（allow_read: person と tenant の charters、
+artifacts の `personal/shared` と `confidential/<tenant>`、external-operations、tmp。allow_write: tenant の
+charters、artifacts、external-operations、tmp）と persona `worker` で決まり、構造上の mkdir
+（`active/shared/artifacts/confidential` と `external-operations/confidential`）はロール名の分岐で
+tenant の分類の例外にしていた。
+
+**発行と引き受け。**
+
+- 実行の束縛 `withPrPublicationRuntime`（scope、invocation hash、型付きの VCS 操作）は 2 つの VCS host
+  だけが開く。保存先の窓口 `withPrPublicationStoreAccess` は 2 つの host、charter registry、予約の窓口の
+  4 か所で、束縛の中で種類の上限に合う正確なファイルだけを受け付ける。束縛だけでは何も読み書きできない。
+- ロールは `role-assumption-policy.json` の共有コアロールなので、SYSTEM_ROLE の無いプロセスと、方針に
+  載っているすべての system role が引き受けられ、載っていない SYSTEM_ROLE は `[ROLE_ASSUMPTION_DENIED]`
+  になる。
+- 窓口は `withExecutionContext('pr_publication_store', action, 'worker', tenant)` で引き受けた。組織の
+  公開では束縛の tenant に束縛し（呼び出し元の組織は引き継がない）、person の公開では tenant を束縛
+  しない（`tenantBound: false`、つまり project scope の tenant）。persona は常に `worker`。呼び出し元の
+  別 tenant の束縛は検査せずに置き換えていた（束縛の tenant は host が呼び出し元の scope から作るので、
+  通常は一致する）。
+
+**`PUBLICATION_MIGRATION_ROLES` の意味。** governance-host は worktree の dist のコードを、インストールの
+governance root（main の checkout）を `KYBERION_ROOT` にした子プロセスで動かす。インストールの catalog が
+コードより古いとロールが無いので、`organization/publication-role-migration.ts` が source worktree から
+ロール定義、security-policy の権限、ロールの索引、共有コアロールの登録を、人の承認つきで追加する
+（`publication-role-installation-upgrade.ja.md`）。4 つの対象のうち保存先専用のロールはこれだけである。
+
+**許可証の形。** 窓口 1 回が既に 1 種類・1 保存先なので、「保存先ごとに 1 つの許可証」は今の種類
+そのものである。1 回の公開全体に複数の保存先の上限を持つ 1 つの許可証は要らない。種類ごとの同期の
+許可証で、許された場合と拒否された場合を保てるかを、下の比較で確かめた。
+
+**第 1 段階: 偽造できない許可証（ロールは残す）。**
+
+- 束縛と許可証の `AsyncLocalStorage` と発行済みの集合を `foundation/pr-publication-store-capability.ts`
+  のモジュールの中だけに置いた。2 つ目のモジュールは見ず、認めない。束縛は凍結し、取り出した scope を
+  書き換えても変わらない。許可証は同期だけで、Promise を返すと拒否し、捕まえた継続には許可証が無い。
+  束縛は await をまたげるが、実行が終われば失効し、捕まえた継続は束縛を見ない。
+- 発行の関数は `governance/pr-publication-runtime.ts` だけが使い、`withPrPublicationRuntime` は 2 つの
+  host だけ、`withPrPublicationStoreAccess` は 4 か所だけが使う（import の境界テスト
+  `tests/pr-publication-store-capability-boundary.test.ts`）。core の barrel（`index.ts`）は `export *` を
+  やめ、発行の関数を再公開しない。
+- 上限、ロール、引き受け、persona と tenant の束縛は変えていない。
 
 ## 既定で拒否であること
 
