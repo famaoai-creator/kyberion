@@ -191,7 +191,12 @@ export function needsYouBadgeText(total: number | null): string | undefined {
   return total > 99 ? '99+' : String(total);
 }
 
-function useNeedsYouTotal(enabled: boolean, scopeKey: string | null): number | null {
+function useNeedsYouTotal(
+  enabled: boolean,
+  scopeKey: string | null,
+  /** The page's organization/project narrowing; a change re-reads the count. */
+  projectKey: string
+): number | null {
   const [total, setTotal] = React.useState<number | null>(null);
   React.useEffect(() => {
     if (!enabled) {
@@ -222,7 +227,7 @@ function useNeedsYouTotal(enabled: boolean, scopeKey: string | null): number | n
       controller.abort();
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [enabled, scopeKey]);
+  }, [enabled, scopeKey, projectKey]);
   return total;
 }
 
@@ -465,7 +470,12 @@ function FrontDeskRailContent() {
   const badgeEnabled = Boolean(
     nav?.items.some((item) => item.id === NEEDS_YOU_RAIL_ID && item.allowed)
   );
-  const needsYouTotal = useNeedsYouTotal(badgeEnabled, scopeValue);
+  const projectHint = projectHintFromQuery(new URLSearchParams(searchParams?.toString() ?? ''));
+  const needsYouTotal = useNeedsYouTotal(
+    badgeEnabled,
+    scopeValue,
+    `${projectHint.organization_id ?? ''}|${projectHint.project_id ?? ''}`
+  );
   const badgeText = needsYouBadgeText(needsYouTotal);
   const railItems = (nav?.items || [])
     .filter((item) => item.allowed)
@@ -566,10 +576,7 @@ function FrontDeskRailContent() {
   // The project selector narrows the selected company (URL only, no cookie).
   // It appears once a company with registered projects is selected.
   const projects = me?.selection?.mode === 'tenant' ? (me.projects ?? []) : [];
-  const selectedProject = resolveSelectedProject(
-    projectHintFromQuery(new URLSearchParams(searchParams?.toString() ?? '')),
-    projects
-  );
+  const selectedProject = resolveSelectedProject(projectHint, projects);
   const allProjectsLabel = frontDeskText('project_all_label', locale);
   const projectContext =
     nav && projects.length > 0
