@@ -15,10 +15,6 @@ import {
   memoryProvenanceReadAllowed,
   isMemoryProvenanceStatePath,
 } from './knowledge/memory-provenance-capability.js';
-import {
-  isPipelineJournalCapability,
-  PIPELINE_JOURNAL_STORE_ROLE,
-} from './foundation/pipeline-journal-capability.js';
 import { isCustomerDecisionInviteCapability } from './foundation/customer-decision-invite-capability.js';
 import {
   isCustomerDecisionConsumerCapability,
@@ -574,13 +570,6 @@ function isScopedStructuralMkdir(
       PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites + '/confidential';
   if (inviteGrant) {
     // fall through to the shared checks
-  } else if (access.role === PIPELINE_JOURNAL_STORE_ROLE) {
-    if (
-      !isPipelineJournalCapability(currentResourceAccessScope()) ||
-      normalizePath(protectedPrefix) !==
-        PARTITIONED_RUNTIME_STATE_ROOTS.pipeline_library_runs + '/confidential'
-    )
-      return false;
   } else if (access.role !== 'concierge_management_writer') return false;
   const resource = currentResourceAccessScope();
   if (
@@ -984,15 +973,6 @@ function requestResourceDenial(
       allowed: false,
       reason:
         '[PERSON_CHARTER_RESOURCE_DENIED] Person charter IO requires its installed owner and exact resource capability',
-    };
-  if (
-    normalizedRole === PIPELINE_JOURNAL_STORE_ROLE &&
-    !legacyStoreCapability(isPipelineJournalCapability(currentResourceAccessScope()))
-  )
-    return {
-      allowed: false,
-      reason:
-        '[RESOURCE_SCOPE_REQUIRED] Pipeline journal access requires its exact tenant journal capability',
     };
   if (
     normalizedRole === CUSTOMER_DECISION_CONSUMER_STORE_ROLE &&

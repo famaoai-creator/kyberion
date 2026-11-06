@@ -552,7 +552,6 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["pipeline_journal_store"],
       "sources": ["runtime-state-roots", "role-policy"],
       "registration": {
         "family": "state",
@@ -1007,7 +1006,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["peer_responder_reader", "pipeline_journal_store"],
+      "legacy_roles": ["peer_responder_reader"],
       "sources": ["role-policy"],
       "note": "The tenant home. Company assets live directly in it (organization/tenant-home.ts TENANT_ASSET_ENTRIES: company.json, vision.md, organization-profile.json, org-chart.json, okr.json, decision-rights.json, finance/, brand/, design/); S2 moved them from customer/<tenant>/."
     },

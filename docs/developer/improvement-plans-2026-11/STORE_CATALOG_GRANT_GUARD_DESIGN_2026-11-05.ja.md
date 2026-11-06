@@ -798,6 +798,44 @@ SYSTEM_ROLE、`deliverable_inbox_writer`、`ecosystem_architect`）から問い�
 
 広がる側の違いは無い。
 
+### G2: パイプラインの実行記録の許可証化（2026-11-06）
+
+`pipeline_journal_store` は、tenant に束縛された呼び出し元がライブラリのパイプラインを実行するとき、
+その tenant の機密の実行記録（`pipeline/pipeline-run-journal.ts`）を読み書きする間だけ引き受けていた
+共有コアロールである。呼び出し元が既にその tenant に束縛されているときだけ使い、それ以外の記録
+（別 tenant、未束縛、mission、scope 無し）は呼び出し元のまま扱う。この選び方は変えていない。
+
+**届く範囲。** 上限（`pipelineJournalCapability`）は 1 回の実行の記録ファイル、書き手の lease と lease の
+計測、書くときはそこまでの 3 つのディレクトリの mkdir、product の schema の読み取りである。読むだけの
+上限には書き込みも mkdir も無い。ロールの security-policy の権限は保存先の根 `pipeline-library-runs`
+以下と `knowledge/confidential/<tenant>` を覆っていたが、上限が実際のファイルだけに絞っていた。
+プロセス間のロックとパイプラインの各段は上限の外で、呼び出し元のまま走る。
+
+**第 1 段階: 偽造できない許可証（ロールは残す）。** 自律の学習記録と同じく、上限を発行者ごとの不透明な
+許可証としてだけ発行する（`withPipelineJournalCapability`、窓口だけが使う。境界テスト
+`tests/pipeline-journal-capability-boundary.test.ts`）。束縛は tenant、記録ファイル、読むか書くかで、
+`isPipelineJournalCapability` はその発行者が今発行していて上限が束縛と一致する許可証だけを認める。
+
+**第 2 段階: 許可証を権限にし、ロールを外した。**
+
+- `tier-guard` はリクエストの上限と tenant 範囲の検査の後に、`storeGrantAuthorizes` →
+  `pipelineJournalGrantAllows` で問う。認めるのは上限の中で、保存先の根の下だけである。product の
+  schema の読み取りと Vitest の砂場の区画は根の外で、以前と同じく呼び出し元の権限で決まる（product は
+  誰でも読める）。tenant の器の構造上の mkdir は共通の分岐で判定する。
+- 誰が発行できるかは変えていない。窓口は I/O の前に、旧共有コアロールの引き受けと同じ規則を名前
+  `pipeline_journal_store` に対して確かめる。名前は `shared_core_roles` に発行の権利として残し、退役した
+  ロールの名前の一覧（`retired-store-roles.ts`）に加えた。
+- 呼び出し元のロールと persona はそのまま使い、記録の tenant に束縛する（組織は引き継がない。旧ロールの
+  引き受けも組織を落としていた）。別 tenant に束縛された呼び出し元は `[ROLE_TENANT_SCOPE_MISMATCH]` で
+  拒否する（窓口は束縛済みの呼び出し元にしか使わないので、実際には起きない）。
+- ロールの宣言（security-policy、`authority.ts` の persona の対応・tenant 束縛ロールの一覧・引き受けの
+  検査、保存先カタログの `legacy_roles` 2 件、`tier-guard` のロール名の分岐 2 つ）を削除した。
+
+**比較。** 書く窓口と読む窓口について、上限の 3 つのファイル、その祖先、上限の外の 9 個のパスを 5 つの
+操作で、自律の学習記録と同じ 10 種類の呼び出し元から問い、旧と新を突き合わせた（1260 件）。違いは
+`deliverable_inbox_writer` の 9 件（呼び出し元の拒否だけのロールが効く。狭くなる側）だけで、別 tenant に
+束縛した呼び出し元と方針に無い SYSTEM_ROLE はどちらも同じ符号で拒否された。広がる側の違いは無い。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |

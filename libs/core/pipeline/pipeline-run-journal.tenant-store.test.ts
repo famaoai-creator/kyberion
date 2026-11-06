@@ -13,6 +13,7 @@ let safeExistsSync: typeof import('../secure-io.js').safeExistsSync;
 let safeWriteFile: typeof import('../secure-io.js').safeWriteFile;
 let safeMkdir: typeof import('../secure-io.js').safeMkdir;
 let pathResolver: typeof import('../path-resolver.js').pathResolver;
+let validateWritePermission: typeof import('../tier-guard.js').validateWritePermission;
 let runInResourceAccessScope: typeof import('../foundation/resource-access-scope.js').runInResourceAccessScope;
 let pipelineJournalCapability: typeof import('../foundation/pipeline-journal-capability.js').pipelineJournalCapability;
 let withPipelineJournalCapability: typeof import('../foundation/pipeline-journal-capability.js').withPipelineJournalCapability;
@@ -47,6 +48,7 @@ beforeAll(async () => {
   ({ resolveRole, withExecutionContext } = await import('../authority.js'));
   ({ safeExistsSync, safeWriteFile, safeMkdir } = await import('../secure-io.js'));
   ({ pathResolver } = await import('../path-resolver.js'));
+  ({ validateWritePermission } = await import('../tier-guard.js'));
   ({ runInResourceAccessScope } = await import('../foundation/resource-access-scope.js'));
   ({ pipelineJournalCapability, withPipelineJournalCapability } =
     await import('../foundation/pipeline-journal-capability.js'));
@@ -162,19 +164,22 @@ describe('tenant confidential library run journal', () => {
       ).toThrow();
     });
     const file = `active/shared/runtime/pipeline-library-runs/confidential/${tenantSlug}/r.jsonl`;
+    const journal = pathResolver.rootResolve(file);
+    // G2: the former role name is an issuance right, not an assumable role.
     expect(() =>
       withExecutionContext('pipeline_journal_store', () => undefined, 'worker', tenantSlug)
-    ).toThrow('RESOURCE_SCOPE_REQUIRED');
-    // G2: a structural lookalike of the exact ceiling is not the issued grant.
-    expect(() =>
-      runInResourceAccessScope(pipelineJournalCapability(tenantSlug, file), () =>
-        withExecutionContext('pipeline_journal_store', () => undefined, 'worker', tenantSlug)
-      )
-    ).toThrow('RESOURCE_SCOPE_REQUIRED');
-    withPipelineJournalCapability(tenantSlug, file, true, () =>
-      withExecutionContext(
-        'pipeline_journal_store',
-        () => {
+    ).toThrow('ROLE_ASSUMPTION_DENIED');
+    // A role-less caller (no knowledge or journal grant of its own) bound to the tenant.
+    withExecutionContext(
+      'infrastructure_sentinel',
+      () => {
+        expect(validateWritePermission(journal, 'write')).toMatchObject({ allowed: false });
+        // A structural lookalike of the exact ceiling is not the issued grant.
+        runInResourceAccessScope(pipelineJournalCapability(tenantSlug, file), () =>
+          expect(validateWritePermission(journal, 'write')).toMatchObject({ allowed: false })
+        );
+        withPipelineJournalCapability(tenantSlug, file, true, () => {
+          expect(validateWritePermission(journal, 'write')).toMatchObject({ allowed: true });
           expect(() =>
             safeWriteFile(
               pathResolver.rootResolve(`knowledge/confidential/${tenantSlug}/r.jsonl`),
@@ -184,11 +189,20 @@ describe('tenant confidential library run journal', () => {
           expect(() =>
             safeWriteFile(pathResolver.rootResolve(file.replace('r.jsonl', 'q.jsonl')), '{}')
           ).toThrow('RESOURCE_SCOPE_DENIED');
-        },
-        'worker',
-        tenantSlug
-      )
+        });
+        // A read grant authorizes no write.
+        withPipelineJournalCapability(tenantSlug, file, false, () =>
+          expect(validateWritePermission(journal, 'write')).toMatchObject({ allowed: false })
+        );
+        expect(validateWritePermission(journal, 'write')).toMatchObject({ allowed: false });
+      },
+      'worker',
+      tenantSlug
     );
+    // A process still launched as the former role gets no I/O at all.
+    vi.stubEnv('SYSTEM_ROLE', 'pipeline_journal_store');
+    expect(validateWritePermission(journal, 'write').reason).toContain('ROLE_ASSUMPTION_DENIED');
+    vi.stubEnv('SYSTEM_ROLE', '');
     expect(() =>
       pipelineJournalCapability(tenantSlug, `knowledge/confidential/${tenantSlug}/r.jsonl`)
     ).toThrow('RESOURCE_SCOPE_INVALID');

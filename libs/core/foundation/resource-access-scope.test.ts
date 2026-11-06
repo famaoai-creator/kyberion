@@ -146,7 +146,7 @@ describe('request resource ceiling', () => {
     'retains %s write-backed append and metadata ancestor access',
     (role) => {
       withProtectedFixture((root) => {
-        process.env.SYSTEM_ROLE = role;
+        // G2: both grants are their own authority; the caller is a plain tenant-bound process.
         process.env.KYBERION_TENANT = 'acme-corp';
         withStoreCapability(role, (capability) => {
           const target = path.join(root, capability.writeExact[0]!);
@@ -194,24 +194,20 @@ describe('request resource ceiling', () => {
   it.each(['discussion_request_store', 'pipeline_journal_store'])(
     'does not enlarge the original %s capability with forged append or metadata paths',
     (role) => {
-      // G2: the Discussion request grant has no store role. A copy of its live ceiling,
-      // used outside it, is a lookalike that authorizes nothing in the protected store —
-      // so the forged paths sit there, where only the live grant could authorize I/O.
-      const discussion = role === 'discussion_request_store';
-      if (!discussion) process.env.SYSTEM_ROLE = role;
+      // G2: neither grant has a store role. A copy of its live ceiling, used outside it,
+      // is a lookalike that authorizes nothing in the protected store — so the forged
+      // paths sit there, where only the live grant could authorize I/O.
       let capability!: ResourceAccessScope;
       withStoreCapability(role, (live) => {
         capability = { ...live };
       });
       {
-        const forged = discussion
-          ? path.posix.dirname(capability.readExact[0]!) + '/forged'
-          : base + '/forged';
+        const forged = path.posix.dirname(capability.readExact[0]!) + '/forged';
         const extra = forged + '/foreign.jsonl';
         runInResourceAccessScope({ ...capability, appendExact: [extra] }, () => {
           expect(validateWritePermission(abs(extra), 'append').allowed).toBe(false);
           expect(() => safeAppendFileSync(abs(extra), 'forged')).toThrow(
-            discussion ? /SECURITY|POLICY|Higher tier required/ : /RESOURCE_SCOPE_REQUIRED/
+            /SECURITY|POLICY|Higher tier required|RESOURCE_SCOPE_DENIED/
           );
           expect(validateReadPermission(abs(forged), 'metadata').allowed).toBe(false);
         });

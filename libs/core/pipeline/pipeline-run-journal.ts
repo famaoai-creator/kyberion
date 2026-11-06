@@ -27,11 +27,12 @@ import {
   safeReaddir,
 } from '../secure-io.js';
 import { findMissionPath, knowledge, rootDir, shared } from '../path-resolver.js';
-import { resolveIdentityContext, withExecutionContext } from '../authority.js';
+import { assertStoreGrantIssuanceAllowed, resolveIdentityContext } from '../authority.js';
+import { currentExecutionScope, runInExecutionScope } from '../foundation/execution-scope.js';
 import { validateWritePermission } from '../tier-guard.js';
 import {
   pipelineJournalCapability,
-  PIPELINE_JOURNAL_STORE_ROLE,
+  PIPELINE_JOURNAL_GRANT_ISSUANCE_RIGHT,
   withPipelineJournalCapability,
 } from '../foundation/pipeline-journal-capability.js';
 import { missionTierScanDirs } from '../owner-scope.js';
@@ -168,11 +169,15 @@ function pipelineJournalCatalog(filePath: string): GovernedCatalog<PipelineRunJo
 type JournalStoreAccess = <R>(run: () => R) => R;
 
 /**
- * A caller bound to tenant T writes T's confidential library journal through
- * the narrow pipeline_journal_store role, limited to this one run's files: the
- * journal is engine bookkeeping, and the caller's own grants are never widened
- * (its effects still run under its own role). Any other journal — another
- * tenant's, an unbound caller's, mission or unscoped — keeps the caller's identity.
+ * A caller bound to tenant T writes T's confidential library journal inside the
+ * exact journal grant, which is the authority for this one run's files (G2: no
+ * store role): the journal is engine bookkeeping, and the caller's own grants are
+ * never widened (its effects still run under its own role and persona). Any other
+ * journal — another tenant's, an unbound caller's, mission or unscoped — keeps the
+ * caller's identity. Who may issue the grant is unchanged: the rule that bounded
+ * assuming the former shared core role (RA-02) applies to the issuance right
+ * `pipeline_journal_store`; the I/O stays bound to T (no organization), and a
+ * caller bound to another tenant is refused.
  */
 function journalStoreAccess(
   filePath: string,
@@ -187,10 +192,22 @@ function journalStoreAccess(
   } catch {
     return undefined;
   }
-  return <R>(run: () => R): R =>
-    withPipelineJournalCapability(tenant, relative, access === 'write', () =>
-      withExecutionContext(PIPELINE_JOURNAL_STORE_ROLE, run, undefined, tenant)
-    );
+  return <R>(run: () => R): R => {
+    assertStoreGrantIssuanceAllowed(PIPELINE_JOURNAL_GRANT_ISSUANCE_RIGHT);
+    return withPipelineJournalCapability(tenant, relative, access === 'write', () => {
+      const active = resolveIdentityContext().tenantSlug;
+      if (active && active !== tenant)
+        throw new Error(
+          `[ROLE_TENANT_SCOPE_MISMATCH] pipeline journal grant for tenant '${tenant}' used by a caller bound to '${active}'`
+        );
+      const {
+        tenantCleared: _cleared,
+        organizationId: _organization,
+        ...current
+      } = currentExecutionScope() ?? { tenantBound: false };
+      return runInExecutionScope({ ...current, tenantBound: true, tenantSlug: tenant }, run);
+    });
+  };
 }
 
 function withJournalStore<R>(
