@@ -5,6 +5,7 @@ import { withExecutionContext } from '@agent/core/authority';
 import { safeWriteFile, safeMkdir, safeRmSync } from '@agent/core/secure-io';
 import { clearProcessExitCode, getProcessExitCode } from './lib/harness.js';
 import { pathResolver } from '@agent/core/path-resolver';
+import { resolveAssetAddress } from '@agent/core/foundation/asset-address';
 import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
   PARTITIONED_RUNTIME_LEDGER_ROOTS,
@@ -37,6 +38,90 @@ const policies = [
 const frame = `// before\n${STORE_ROOTS_BEGIN}\nold\n${STORE_ROOTS_END}\n// after\n`;
 
 describe('catalog root projection', () => {
+  it('registers the existing mixed system/person attestation root without tenant inference', () => {
+    const root = 'active/shared/runtime/provider-attestations';
+    const provider: StoreRootSource = {
+      id: 'runtime.provider-attestations',
+      path: root,
+      custody: { kind: 'derived' },
+      status: 'active',
+      registration: {
+        family: 'state',
+        key: 'provider_attestations',
+        order: 15,
+        partition_shape: 'system_person',
+        retention_path: root,
+      },
+    };
+    const project = (entry: StoreRootSource) => projectStoreRoots([entry], [{ path: root }]);
+    expect(project(provider)).toEqual({
+      roots: { state: { provider_attestations: root }, ledger: {}, floor: {} },
+      violations: [],
+    });
+    for (const changed of [
+      { ...provider, custody: { kind: 'tenant' as const } },
+      { ...provider, registration: { ...provider.registration!, family: 'ledger' as const } },
+      { ...provider, path: root + '/<tier>/<tenant>' },
+      { ...provider, path: root + '/confidential/<tenant>', tiers: ['confidential'] },
+      { ...provider, tiers: ['personal'] },
+    ])
+      expect(project(changed).violations.join('\n')).toContain(
+        'system_person shape requires a derived state store'
+      );
+    expect(project({ ...provider, path: root + '-other' }).violations.join('\n')).toContain(
+      'does not cover root'
+    );
+    expect(
+      project({ ...provider, registration: { ...provider.registration!, key: 'another_store' } })
+        .violations
+    ).toEqual([]);
+    const { partition_shape: _shape, ...unshapedRegistration } = provider.registration!;
+    expect(
+      project({ ...provider, registration: unshapedRegistration }).violations.join('\n')
+    ).toContain('requires a canonical root with tier/tenant binding');
+    const catalog = JSON.parse(
+      readTextFile(pathResolver.rootResolve('knowledge/product/governance/store-catalog.json'))
+    );
+    const actual = catalog.stores.find((entry: StoreRootSource) => entry.id === provider.id);
+    expect(actual).toMatchObject(provider);
+    expect(actual).not.toHaveProperty('tiers');
+    for (const file of ['system/attestations.json', 'personal/shared/owner.json']) {
+      expect(resolveAssetAddress(`${root}/${file}`, catalog.stores)).toMatchObject({
+        status: 'unresolved',
+        reason: 'custody_unresolved',
+      });
+    }
+  });
+  it('registers the confidential delegation store as a ledger root without inventing legacy custody', () => {
+    const catalog = JSON.parse(
+      readTextFile(pathResolver.rootResolve('knowledge/product/governance/store-catalog.json'))
+    );
+    const delegation = catalog.stores.find(
+      (entry: StoreRootSource) => entry.id === 'runtime.delegations'
+    );
+    expect(delegation).toMatchObject({
+      path: 'active/shared/runtime/delegation-records/confidential/<tenant>',
+      custody: { kind: 'tenant', ref: '<tenant>' },
+      tiers: ['confidential'],
+      status: 'active',
+      legacy_roles: ['delegation_record_store'],
+      registration: {
+        family: 'ledger',
+        key: 'delegations',
+        order: 6,
+        retention_path: 'active/shared/runtime/delegation-records',
+      },
+    });
+    const projected = projectStoreRoots(
+      [delegation],
+      [{ path: 'active/shared/runtime/delegation-records' }]
+    );
+    expect(projected.violations).toEqual([]);
+    expect(projected.roots.ledger).toEqual({
+      delegations: 'active/shared/runtime/delegation-records',
+    });
+    expect(projected.roots.state).toEqual({});
+  });
   it('orders by explicit registration order independently of catalog order', () => {
     const projection = projectStoreRoots([store('second', 2), store('first', 1)], policies);
     expect(projection.violations).toEqual([]);
@@ -140,7 +225,7 @@ describe('bounded source generation', () => {
       clearProcessExitCode();
     }
   });
-  it.each(['tenant_ledger', 'tenant_approvals', 'tenant_audit_mirror'])(
+  it.each(['tenant_ledger', 'tenant_approvals', 'tenant_audit_mirror', 'delegations'])(
     'refuses omitted mandatory alias %s before fixture writes',
     async (missing) => {
       const fixtureRoot = pathResolver.rootResolve(
@@ -149,7 +234,12 @@ describe('bounded source generation', () => {
       const output = `${fixtureRoot}/runtime-state-roots.ts`;
       const productionPath = pathResolver.rootResolve(STORE_ROOTS_OUTPUT);
       const productionBefore = readTextFile(productionPath);
-      const stores: StoreRootSource[] = ['tenant_ledger', 'tenant_approvals', 'tenant_audit_mirror']
+      const stores: StoreRootSource[] = [
+        'tenant_ledger',
+        'tenant_approvals',
+        'tenant_audit_mirror',
+        'delegations',
+      ]
         .filter((key) => key !== missing)
         .map((key, index) => ({
           ...store(key, index + 1),

@@ -1,0 +1,95 @@
+{
+  "description": "Classification of every active/shared/observability/<store> a source file names. Gate: tests/tenant-observability-store-registration.test.ts. tenant_free = no tenant content (say why); tenant_namespaced = tenant content only under <store>/tenants/<slug>/ (name the offboarding path); legacy_read_only = pre-partition copy that no code appends to, scrubbed by tenant offboarding; unclassified_baseline = recorded when the gate was added (2026-11-05), classify before it carries tenant content (the list may only shrink).",
+  "stores": [
+    {
+      "store": "autonomy-outcomes",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    },
+    {
+      "store": "channels",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    },
+    {
+      "store": "chronos",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    },
+    {
+      "store": "co-sessions",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    },
+    {
+      "store": "delegations",
+      "disposition": "legacy_read_only",
+      "reason": "Pre-partition delegation trace (delegations.jsonl + rotated segments) and records (delegations/). Live data moved to the registered ledger root active/shared/runtime/delegation-records (store role delegation_record_store); delegated-task-observability.ts only reads these as an attributed fallback and migrates a record on its next write; scope-offboarding prunes a tenant's rows and soft-deletes its records."
+    },
+    {
+      "store": "meeting-notepad",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    },
+    {
+      "store": "mesh-hub",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    },
+    {
+      "store": "mission-control",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    },
+    {
+      "store": "ops-alerts",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    },
+    {
+      "store": "ops-findings",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    },
+    {
+      "store": "peer-conversations",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    },
+    {
+      "store": "peer-messaging",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    },
+    {
+      "store": "protocol-services",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    },
+    {
+      "store": "retrospectives",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    },
+    {
+      "store": "review-service",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    },
+    {
+      "store": "sketch-input",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    },
+    {
+      "store": "tenants",
+      "disposition": "tenant_namespaced",
+      "reason": "active/shared/observability/tenants/<slug>/ is the physicalScopedPath namespace of the 'active/shared/observability' base in scope-offboarding PHYSICAL_TENANT_LEARNING_ROOTS: tenant offboarding exports and soft-deletes it as a tenant_learning_tree (scripts/backup.ts includes it in tenant backups)."
+    },
+    {
+      "store": "work-coordination",
+      "disposition": "unclassified_baseline",
+      "reason": "Pre-existing store recorded when the gate was added (2026-11-05); not yet reviewed for tenant content. Classify it (tenant_free / tenant_namespaced) or move tenant content to a registered partitioned root before relying on it for tenant data."
+    }
+  ]
+}

@@ -9,7 +9,10 @@
  *   resolver and reasoning bootstrap already read;
  * - provider egress → the tenant provider attestation
  *   (`attestTenantProvider`, the same path as `pnpm tenant attest-provider`),
- *   which `checkProviderEgress` already honours.
+ *   which `checkProviderEgress` already honours; for material without a
+ *   tenant, `--custody system|person` records the installation's or the
+ *   person's attestation instead (`attestCustodyProvider`, same approval
+ *   flow), which both egress faces honour for system / person custody.
  *
  * Writes are dry-run unless `--apply`; an attestation also needs `--accept`
  * (a human statement about the purchased plan), and `training_use none` —
@@ -40,6 +43,15 @@ import {
   type ProviderAttestationApprovalRequest,
   type TenantProviderAttestationResult,
 } from '@agent/core/organization/tenant-governance';
+import {
+  attestCustodyProvider,
+  custodyCliArgs,
+  requestCustodyProviderAttestationApproval,
+  type AttestCustodyProviderInput,
+  type CustodyProviderAttestationResult,
+} from '@agent/core/provider/custody-provider-attestation-governance';
+import type { NonTenantCustodyOwner } from '@agent/core/provider/custody-provider-attestation-store';
+import { deriveCustodyOwner } from '@agent/core/custody-owner';
 import {
   describeProviderTierAvailability,
   loadProviderEgressPolicy,
@@ -89,6 +101,8 @@ const SPECS: Record<Verb, CliGuardSpec> = {
     manifestId: 'script.onboarding',
     options: [
       { flag: '--tenant', value: '<tenant-slug>' },
+      { flag: '--custody', value: '<tenant|system|person>' },
+      { flag: '--principal', value: '<principal-id>' },
       { flag: '--provider', value: '<provider-id>' },
       { flag: '--training-use', value: '<none|used|unknown>' },
       { flag: '--plan', value: '<text>' },
@@ -123,6 +137,11 @@ export function onboardingLlmUsage(): string {
     '         needs a human approval: --request-approval opens one, a human runs',
     '         `pnpm kyberion approvals --approve <id>`, then re-run with the same values and',
     '         --apply --accept --approval-request-id <id>. Audited; expires.',
+    '  attest --custody system|person [--principal <id>] --provider <id> --training-use ...',
+    '         Same claim for material that belongs to no tenant: system = the installation',
+    '         (e.g. system role drafts; decided by the installation owner), person = your own',
+    '         personal material (the current operator on a single-user install; --principal',
+    '         names one person). Same --request-approval / --apply --accept flow.',
   ].join('\n');
 }
 
@@ -470,8 +489,35 @@ function select(argv: readonly string[], print: Print, options: OnboardingLlmOpt
   );
 }
 
-function attest(argv: readonly string[], print: Print, options: OnboardingLlmOptions): void {
-  const tenant = requireTenant(argv, true)!;
+/** The mode flags of `attest`, read once and shared by the tenant and custody paths. */
+interface AttestModeFlags {
+  json: boolean;
+  requestApproval: boolean;
+  apply: boolean;
+  accept: boolean;
+}
+
+function attestModeFlags(argv: readonly string[]): AttestModeFlags {
+  return {
+    json: argv.includes('--json'),
+    requestApproval: argv.includes('--request-approval'),
+    apply: argv.includes('--apply'),
+    accept: argv.includes('--accept'),
+  };
+}
+
+interface ParsedAttestClaim {
+  provider: string;
+  trainingUse: 'none' | 'used' | 'unknown';
+  plan?: string;
+  basis?: string;
+  attestedBy?: string;
+  validForDays?: number;
+  approvalRequestId?: string;
+}
+
+/** The claim flags shared by tenant and custody attestations, validated at parse time. */
+function parseAttestClaim(argv: readonly string[]): ParsedAttestClaim {
   const provider = optionValue(argv, '--provider')?.trim();
   if (!provider) throw new Error('attest requires --provider <provider-id>');
   const loaded = loadProviderEgressPolicy();
@@ -510,6 +556,216 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
     throw new Error('--valid-for-days must be a finite positive number');
   }
   const approvalRequestId = optionValue(argv, '--approval-request-id');
+  return {
+    provider,
+    trainingUse,
+    ...(plan ? { plan } : {}),
+    ...(basis ? { basis } : {}),
+    ...(attestedBy ? { attestedBy } : {}),
+    ...(validForDays !== undefined ? { validForDays } : {}),
+    ...(approvalRequestId ? { approvalRequestId } : {}),
+  };
+}
+
+/**
+ * `--custody`: whose statement this is. `tenant` (the default whenever
+ * --tenant is given) keeps the tenant profile path; `system` / `person`
+ * record the attestation for material that belongs to no tenant.
+ */
+function requestedCustody(argv: readonly string[]): NonTenantCustodyOwner | undefined {
+  const raw = optionValue(argv, '--custody')?.trim();
+  const tenantFlag = optionValue(argv, '--tenant')?.trim();
+  const principal = optionValue(argv, '--principal')?.trim();
+  if (raw === undefined || raw === 'tenant') {
+    if (raw === 'tenant' && !tenantFlag) {
+      throw new Error('--custody tenant requires --tenant <tenant-slug>');
+    }
+    if (principal) throw new Error('--principal applies only to --custody person');
+    return undefined;
+  }
+  if (raw !== 'system' && raw !== 'person') {
+    throw new Error(`--custody '${raw}' must be one of tenant, system, person`);
+  }
+  if (tenantFlag) {
+    throw new Error(
+      `--custody ${raw} cannot be combined with --tenant: tenant material is attested with --tenant <slug> alone`
+    );
+  }
+  if (raw === 'system') {
+    if (principal) throw new Error('--principal applies only to --custody person');
+    return { kind: 'system' };
+  }
+  assertPrintableCommandValue('--principal', principal);
+  // Validates the principal id; a single-user install leaves it out (the operator).
+  const owner = deriveCustodyOwner({
+    tier: 'personal',
+    custody: principal ? { kind: 'person', principal_id: principal } : { kind: 'person' },
+  });
+  return owner as NonTenantCustodyOwner;
+}
+
+function custodyLabel(custody: NonTenantCustodyOwner): string {
+  return custody.kind === 'person' && custody.principal_id
+    ? `person:${custody.principal_id}`
+    : custody.kind;
+}
+
+/** Open (or reuse) the human approval a custody `training_use: none` attestation needs. */
+export function requestCustodyAttestationApproval(
+  input: AttestCustodyProviderInput
+): ProviderAttestationApprovalRequest {
+  return withExecutionContext('sovereign_concierge', () =>
+    requestCustodyProviderAttestationApproval(input)
+  );
+}
+
+/** Record a custody attestation (an approved request is required for `none`). */
+export function applyCustodyAttestation(
+  input: AttestCustodyProviderInput
+): CustodyProviderAttestationResult {
+  return withExecutionContext('sovereign_concierge', () => attestCustodyProvider(input));
+}
+
+function attestCustody(
+  flags: AttestModeFlags,
+  print: Print,
+  options: OnboardingLlmOptions,
+  custody: NonTenantCustodyOwner,
+  claim: ParsedAttestClaim
+): void {
+  const { provider, trainingUse, plan, basis, attestedBy, validForDays, approvalRequestId } = claim;
+  // Material without a tenant: a tenant-bound process must use --tenant.
+  const ambient = ambientTenant();
+  if (ambient) {
+    throw new Error(
+      `--custody ${custody.kind} is refused from the active tenant scope '${ambient}': attest tenant material with --tenant ${ambient}, or unset KYBERION_TENANT.`
+    );
+  }
+  const input: AttestCustodyProviderInput = {
+    custody,
+    provider,
+    training_use: trainingUse,
+    ...(plan ? { plan } : {}),
+    ...(basis ? { basis } : {}),
+    ...(attestedBy ? { attested_by: attestedBy } : {}),
+    ...(validForDays !== undefined ? { valid_for_days: validForDays } : {}),
+    ...(approvalRequestId ? { approvalRequestId } : {}),
+    invoker: captureCliAttestationInvoker(),
+  };
+  const { json } = flags;
+  const label = custodyLabel(custody);
+
+  if (flags.requestApproval) {
+    const request = requestCustodyAttestationApproval(input);
+    const applyCommand = [
+      'pnpm',
+      'onboarding',
+      'llm',
+      'attest',
+      ...custodyCliArgs(custody),
+      ...providerAttestationApplyArgs(
+        {
+          provider,
+          training_use: trainingUse,
+          plan,
+          basis,
+          attested_by: attestedBy,
+          valid_for_days: validForDays,
+        },
+        request.request_id
+      ),
+    ]
+      .map(shellQuoteArg)
+      .join(' ');
+    print(
+      json
+        ? JSON.stringify(
+            { ...request, custody, apply_command: applyCommand, apply_command_shell: 'posix' },
+            null,
+            2
+          )
+        : [
+            `${request.created ? 'Opened' : 'Reusing'} approval request ${request.request_id} (${request.status}${request.expires_at ? `, expires ${request.expires_at}` : ''})`,
+            custody.kind === 'person'
+              ? `${custody.principal_id ? `Only ${custody.principal_id}` : 'The person (on a single-user installation, the owner)'} decides — it is their own consent — with: ${request.approve_command}`
+              : `A human (the installation owner) decides with: ${request.approve_command}`,
+            ...(custody.kind === 'person'
+              ? [
+                  `Sending person material also needs the installation's no-training attestation: pnpm onboarding llm attest --custody system --provider ${provider} --training-use none ... --request-approval`,
+                ]
+              : []),
+            `Then apply with the same values (POSIX shell: sh/bash/zsh): ${applyCommand}`,
+          ].join('\n')
+    );
+    return;
+  }
+
+  const { apply } = flags;
+  if (apply && !flags.accept) {
+    throw new Error(
+      'attest --apply requires --accept: the attestation is your statement about the plan’s training-use terms'
+    );
+  }
+  if (!apply) {
+    const availability = availabilityFor(undefined, options);
+    const needsApproval = trainingUse === 'none' && !approvalRequestId;
+    const preview = {
+      dry_run: true,
+      attestation: { ...input, invoker: undefined },
+      ...(needsApproval ? { needs_approval: 'run with --request-approval first' } : {}),
+      current_availability: availability,
+    };
+    print(
+      json
+        ? JSON.stringify(preview, null, 2)
+        : [
+            `[dry-run] would attest custody=${label} provider=${provider} training_use=${trainingUse}`,
+            ...formatAvailability(availability),
+            needsApproval
+              ? 'training_use none opens egress for material without a tenant: run with --request-approval, have a human approve it, then --apply --accept --approval-request-id <id>.'
+              : 'Re-run with --apply --accept to record it.',
+          ].join('\n')
+    );
+    return;
+  }
+
+  const recorded = applyCustodyAttestation(input);
+  const availability = availabilityFor(undefined, options);
+  const output = {
+    applied: true,
+    custody,
+    provider,
+    attestation: recorded.attestation,
+    store_path: recorded.store_path,
+    ...(recorded.approval ? { approval: recorded.approval } : {}),
+    availability,
+  };
+  print(
+    json
+      ? JSON.stringify(output, null, 2)
+      : [
+          `Attested custody=${label} provider=${provider} training_use=${recorded.attestation.training_use}${recorded.attestation.expires_at ? ` (expires ${recorded.attestation.expires_at})` : ''}`,
+          `Recorded in ${recorded.store_path}; audit action provider.attest_custody${recorded.approval ? ` (approved by ${recorded.approval.approved_by}, request ${recorded.approval.request_id})` : ''}`,
+          ...formatAvailability(availability),
+        ].join('\n')
+  );
+}
+
+function attest(argv: readonly string[], print: Print, options: OnboardingLlmOptions): void {
+  const custody = requestedCustody(argv);
+  const claim = parseAttestClaim(argv);
+  const flags = attestModeFlags(argv);
+  if (custody) return attestCustody(flags, print, options, custody, claim);
+  if (!optionValue(argv, '--tenant')?.trim()) {
+    throw new Error(
+      '--tenant <tenant-slug> is required (or --custody system|person for material without a tenant)'
+    );
+  }
+  const tenant = requireTenant(argv, true)!;
+  const { provider, plan, basis, approvalRequestId } = claim;
+  const trainingUse = claim.trainingUse;
+  const attestedBy = claim.attestedBy;
+  const validForDays = claim.validForDays;
   // Capture who asked (and their tenant binding) before any elevation.
   const input: ProviderAttestationInput = {
     tenant,
@@ -525,9 +781,9 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
       ? { tenantRegistryRootDir: options.tenantRegistryRootDir }
       : {}),
   };
-  const json = argv.includes('--json');
+  const { json } = flags;
 
-  if (argv.includes('--request-approval')) {
+  if (flags.requestApproval) {
     const request = requestProviderAttestationApproval(input);
     // Print every bound value verbatim and shell-quoted: the approval is
     // hash-bound to plan/basis/attested_by/valid_for_days, so the command
@@ -578,8 +834,8 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
     return;
   }
 
-  const apply = argv.includes('--apply');
-  if (apply && !argv.includes('--accept')) {
+  const { apply } = flags;
+  if (apply && !flags.accept) {
     throw new Error(
       'attest --apply requires --accept: the attestation is your statement about the plan’s training-use terms'
     );

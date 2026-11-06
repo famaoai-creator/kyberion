@@ -194,10 +194,10 @@ describe('agent-dispatch', () => {
     const assertion = expect(run).rejects.toThrow('CANCELLED');
     await vi.waitFor(() => expect(backend.delegateTask).toHaveBeenCalledOnce());
     controller.abort();
-    await assertion;
+    // The dispatcher waits for the provider call to settle after an abort, so
+    // the late result arrives while it waits — and is still fenced.
     finish('x'.repeat(30_000));
-    await Promise.resolve();
-    await Promise.resolve();
+    await assertion;
   });
 
   it('continuable native handles select continuous execution while explicit bounded wins', async () => {
@@ -806,6 +806,116 @@ describe('XP-06 delegation concurrency governance (agent-dispatch wiring)', () =
     expect(out1).toBe('spawned:first');
     expect(out2).toBe('spawned:second');
     expect(order).toEqual(['start:first', 'end:first', 'start:second', 'end:second']);
+  });
+
+  describe('abort waits for the provider call before releasing the slot', () => {
+    const GRACE_MS = 1000;
+    // stopSettleBoundMs(GRACE_MS): SIGTERM + grace + SIGKILL + grace, plus 1s.
+    const BOUND_MS = 2 * GRACE_MS + 1000;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      process.env.KYBERION_DELEGATION_PROVIDER_MAX_CONCURRENCY = '1';
+      process.env.KYBERION_DELEGATION_KILL_GRACE_MS = String(GRACE_MS);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      delete process.env.KYBERION_DELEGATION_KILL_GRACE_MS;
+    });
+
+    /** First call: a provider that takes `stopMs` to stop its child after abort (or never). */
+    async function arrange(options: { stopMs?: number; abortWait?: 'immediate' } = {}) {
+      const { DelegationAbortedError } = await import('../mission/delegation-concurrency.js');
+      const backend = makeFakeBackend();
+      Object.assign(backend, { name: 'claude-cli' });
+      const started: string[] = [];
+      backend.delegateTask = vi
+        .fn()
+        .mockImplementationOnce(
+          (instruction: string, _context: unknown, callOptions: { signal: AbortSignal }) => {
+            started.push(instruction);
+            return new Promise<string>((_resolve, reject) => {
+              callOptions.signal.addEventListener('abort', () => {
+                if (options.stopMs === undefined) return; // never settles
+                setTimeout(
+                  () => reject(new DelegationAbortedError('exited', { signal: 'SIGTERM' })),
+                  options.stopMs
+                );
+              });
+            });
+          }
+        )
+        .mockImplementation(async (instruction: string) => {
+          started.push(instruction);
+          return `spawned:${instruction}`;
+        });
+      const controller = new AbortController();
+      const dispatcher = new ProcessSpawnDispatcher();
+      let firstError: unknown;
+      let firstSettled = false;
+      const first = dispatcher
+        .dispatch('first', undefined, backend, {
+          signal: controller.signal,
+          ...(options.abortWait ? { delegation_abort_wait: options.abortWait } : {}),
+        })
+        .catch((error: unknown) => {
+          firstError = error;
+        })
+        .finally(() => {
+          firstSettled = true;
+        });
+      const second = dispatcher.dispatch('second', undefined, backend);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(started).toEqual(['first']);
+      return {
+        controller,
+        first,
+        second,
+        started,
+        state: () => ({ firstSettled, firstError }),
+      };
+    }
+
+    it('keeps the slot until the provider call settles and rejects with its child-exit observation', async () => {
+      const { delegationAbortChildExit } = await import('../mission/delegation-concurrency.js');
+      const run = await arrange({ stopMs: 1500 });
+      run.controller.abort();
+      await vi.advanceTimersByTimeAsync(1499);
+      expect(run.state().firstSettled).toBe(false);
+      expect(run.started).toEqual(['first']);
+      await vi.advanceTimersByTimeAsync(1);
+      await run.first;
+      expect(delegationAbortChildExit(run.state().firstError)).toBe('exited');
+      await expect(run.second).resolves.toBe('spawned:second');
+      expect(run.started).toEqual(['first', 'second']);
+    });
+
+    it('bounds the wait and then rejects with child_exit=unconfirmed', async () => {
+      const { delegationAbortChildExit } = await import('../mission/delegation-concurrency.js');
+      const run = await arrange();
+      run.controller.abort();
+      await vi.advanceTimersByTimeAsync(BOUND_MS - 1);
+      expect(run.state().firstSettled).toBe(false);
+      expect(run.started).toEqual(['first']);
+      await vi.advanceTimersByTimeAsync(1);
+      await run.first;
+      expect(delegationAbortChildExit(run.state().firstError)).toBe('unconfirmed');
+      expect(String(run.state().firstError)).toContain('[DELEGATION_CANCELLED]');
+      await expect(run.second).resolves.toBe('spawned:second');
+    });
+
+    it("rejects at once and releases the slot with delegation_abort_wait: 'immediate'", async () => {
+      const { delegationAbortChildExit } = await import('../mission/delegation-concurrency.js');
+      const run = await arrange({ stopMs: 1500, abortWait: 'immediate' });
+      run.controller.abort();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(run.state().firstSettled).toBe(true);
+      expect(delegationAbortChildExit(run.state().firstError)).toBe('no_child');
+      await expect(run.second).resolves.toBe('spawned:second');
+      expect(run.started).toEqual(['first', 'second']);
+      await vi.advanceTimersByTimeAsync(1500);
+    });
   });
 
   it("buckets an unrecognized backend name under the shared 'unknown' provider", async () => {

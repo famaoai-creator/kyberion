@@ -64,6 +64,40 @@ core build と関連7ファイル・99テストが通過し、生成した依存
 期待値を維持したまま seeds 222・7・20261008 の各7ファイル・167テストが成功した。
 この最後の変更は test fixture と運用手順のみで、実装の認可条件は変えていない。
 
+### 最新 main との同期（2026-11-06 午前）
+
+参照 split は `4d34cf939` のままだが、main は `566e58bc2` へ進んだ。前回は main を
+参照しただけで、共通祖先からの未統合分は56コミット・112ファイルあった。今回これを
+統合し、Scope の生成 map と main の delegation・custody・egress の修正を両立させた。
+
+- `delegations` を confidential tenant ledger として順序6で登録した。通知キューも
+  同じ区画を使い、旧共有キューは legacy read-only のまま扱う。audit mirror と delegation
+  の専用ロール保護、offboarding disposition は双方を保持した。
+- `provider_attestations` を順序15の state root として登録した。system/person が混在する
+  既存の非 tenant 配置なので custody は derived とし、住所診断は未解決のまま返す。
+  `partition_shape: system_person` という配置メタデータで表し、state・derived・tier 指定なしの
+  canonical root だけを投影する。projector に個別パスの例外を増やさず、認可や tenant を
+  生成しない。
+- 登録は合計25件（state15・ledger6・floor4）、カタログは74保存先となった。
+  canonical alias の欠落、非 tenant root の誤った配置・種別・custody を回帰で拒否する。
+- main 由来の4公開 subpath を維持し、公開範囲の基準値は1944→1948へ更新した。
+  この同期で独自の公開 API は追加していない。secure-io の依存数は66を維持している。
+- SoD fixture を S1 後の `stance-resolver` / `stanceRoot` に追従させ、実際の有効化を
+  アサートした。system の自己承認拒否と person の本人同意を維持し、関連検査を PR gate
+  に追加した。統合の影響範囲21ファイル・442テストは成功した。
+
+実データ移行・provider attestation の設定・push は実施していない。全体テストと
+変更ゲートの最終結果は、この同期の mission evidence に記録する。
+
+全体実行は3279ファイル中3273成功・4失敗・2スキップ、34323テスト成功・5失敗・
+27スキップだった（24分12秒）。失敗は、並列 CLI fixture を走査した CD-09 の2件、
+移動済み cron module を指す旧 export の2検査、追加 fragment の形式検査だった。
+値の漏洩による失敗ではなかったが、oracle を弱めず CD-09 の root 全体を隔離し、
+実際の CLI P06/P07 と並列実行して22テスト成功、SoD と合わせた3シードも各32成功を
+確認した。cron の公開名は canonical `pipeline/cron-utils` へ付け替え、対応する
+runtime import・workspace build・fragment 検査の3ファイル8テストも成功した。
+この最終修正後の全体再実行は行わず、失敗の再現範囲と変更ゲートで確認する。
+
 門番（`libs/core/tier-guard.ts`）は、**資産の住所**と**許可証**だけを見て判定する。
 ドメインごとのロール名や capability モジュールを門番のコードに書かない。
 

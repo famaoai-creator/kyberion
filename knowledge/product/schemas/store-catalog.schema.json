@@ -67,7 +67,11 @@
             "family": { "enum": ["state", "ledger", "floor"] },
             "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
             "order": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-            "retention_path": { "type": "string", "minLength": 1 }
+            "retention_path": { "type": "string", "minLength": 1 },
+            "partition_shape": {
+              "enum": ["system_person"],
+              "description": "Placement-only mixed system/person state root with derived custody, a bare canonical path and no declared tier. Does not infer a custodian or grant access."
+            }
           }
         },
         "legacy_roles": {

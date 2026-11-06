@@ -71,7 +71,7 @@ export function projectStoreRootSource(
 
 /** Handwritten aliases outside the generated region require these canonical keys. */
 export function assertCanonicalStoreRootAliases(roots: StoreRootRegistries): void {
-  for (const key of ['tenant_ledger', 'tenant_approvals', 'tenant_audit_mirror']) {
+  for (const key of ['tenant_ledger', 'tenant_approvals', 'tenant_audit_mirror', 'delegations']) {
     if (!Object.hasOwn(roots.ledger, key))
       throw new Error(`Missing mandatory store registration ledger:${key} for foundation alias`);
   }
