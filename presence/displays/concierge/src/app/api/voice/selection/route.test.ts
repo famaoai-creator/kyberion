@@ -7,6 +7,7 @@ const core = vi.hoisted(() => ({
 }));
 const guard = vi.hoisted(() => ({ denied: null as Response | null }));
 const roles = vi.hoisted(() => [] as string[]);
+const viewer = vi.hoisted(() => ({ response: null as Response | null }));
 
 vi.mock('@agent/core/voice/voice-selection-preferences', async () => {
   const actual = await vi.importActual<
@@ -24,7 +25,11 @@ vi.mock('../../../../lib/api-guard', () => ({
   requireConciergeMutationAccess: vi.fn(() => guard.denied),
 }));
 vi.mock('../../../../lib/viewer-context', () => ({
-  resolveConciergeViewer: vi.fn(() => ({ context: { role: 'localadmin', tenantSlugs: 'all' } })),
+  resolveConciergeViewer: vi.fn(() =>
+    viewer.response
+      ? { response: viewer.response }
+      : { context: { role: 'localadmin', tenantSlugs: 'all', principalId: 'owner' } }
+  ),
   conciergeErrorResponse: vi.fn(() => new Response('error', { status: 500 })),
 }));
 
@@ -43,6 +48,8 @@ describe('/api/voice/selection (in-process)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     guard.denied = null;
+    roles.length = 0;
+    viewer.response = null;
     core.getVoiceSelectionSnapshot.mockReturnValue(snapshot);
     core.saveVoiceSelectionPreferences.mockReturnValue(snapshot);
   });
@@ -51,6 +58,13 @@ describe('/api/voice/selection (in-process)', () => {
     const body = await (await GET(get())).json();
     expect(body).toMatchObject({ ok: true, preferences: snapshot.preferences });
     expect(body).not.toHaveProperty('storage_path');
+    expect(roles).toEqual(['sovereign_concierge']);
+  });
+
+  it('GET is refused for an unresolved viewer', async () => {
+    viewer.response = new Response('no', { status: 401 });
+    expect((await GET(get())).status).toBe(401);
+    expect(core.getVoiceSelectionSnapshot).not.toHaveBeenCalled();
   });
 
   it('POST saves a valid selection', async () => {
@@ -58,7 +72,7 @@ describe('/api/voice/selection (in-process)', () => {
     expect(res.status).toBe(200);
     expect(core.saveVoiceSelectionPreferences).toHaveBeenCalledWith({ stt_backend: 'whisper' });
     // The personal profile is written as the Concierge personal-profile role.
-    expect(roles).toContain('sovereign_concierge');
+    expect(roles).toEqual(['sovereign_concierge']);
     expect(await res.json()).not.toHaveProperty('storage_path');
   });
 
@@ -77,8 +91,19 @@ describe('/api/voice/selection (in-process)', () => {
 
   it('POST reports an engine that cannot be selected as a 400', async () => {
     core.saveVoiceSelectionPreferences.mockImplementation(() => {
-      throw new Error('unknown tts engine');
+      throw new Error('Unknown TTS engine: nope');
     });
-    expect((await POST(post({ tts_engine_id: 'nope' }))).status).toBe(400);
+    const res = await POST(post({ tts_engine_id: 'nope' }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('Unknown TTS engine: nope');
+  });
+
+  it('POST hides a storage or role failure behind a 500', async () => {
+    core.saveVoiceSelectionPreferences.mockImplementation(() => {
+      throw new Error('[ROLE_VIOLATION] cannot write /Users/x/knowledge/personal/onboarding');
+    });
+    const res = await POST(post({ stt_backend: 'whisper' }));
+    expect(res.status).toBe(500);
+    expect(await res.text()).not.toContain('/Users/x');
   });
 });
