@@ -425,13 +425,17 @@ export function partitionedRuntimeStateTierInPath(filePath: string): StorageData
 
 /**
  * Tier-partitioned runtime roots that are neither state roots nor floors: the
- * ledger roots and the surface management partitions
+ * authority-evidence ledger roots and the surface management partitions
  * (`<root>/<personal|confidential|public>/<tenant>/`). detectTier reads their
  * tier from the path so a confidential ledger partition is never reported as
- * public (egress and publication checks key on it).
+ * public (egress and publication checks key on it). The metrics ledgers
+ * (resource usage, execution metrics) keep their legacy public classification:
+ * they hold counts, and their consumers rely on it.
  */
 export const TIER_PARTITIONED_RUNTIME_ROOTS: readonly string[] = [
-  ...Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS),
+  PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_ledger,
+  PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals,
+  PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_audit_mirror,
   SURFACE_MANAGEMENT_ROOT_PATH,
 ];
 
