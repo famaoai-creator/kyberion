@@ -31,6 +31,7 @@ import { readJson, readJsonLines } from './foundation/json.js';
 import * as pathResolver from './path-resolver.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { readTextFile } from './foundation/text.js';
+import { streamTextLines } from './jsonl-read.js';
 import { nowIso } from './foundation/time.js';
 import { logger } from './core.js';
 import {
@@ -65,6 +66,12 @@ import { withLockSync } from './foundation/lock-utils.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 import { revokeGrantsForTenantBestEffort } from './task/task-scoped-grants.js';
 import { assertPhysicalScopeSegment, PHYSICAL_TENANT_NAMESPACE } from './physical-namespace.js';
+import {
+  DELEGATION_NOTIFICATIONS_LOCK,
+  LEGACY_DELEGATION_NOTIFICATIONS_PATH,
+  LEGACY_DELEGATION_RECORD_DIR,
+  LEGACY_DELEGATION_TRACE_PATH,
+} from './foundation/runtime-state-roots.js';
 import { loadMissionStateAtPath } from './mission/mission-state-reader.js';
 import type { MissionState } from './mission/mission-types.js';
 
@@ -306,6 +313,13 @@ export type OffboardTargetKind =
   | 'tenant_approvals'
   /** The tenant's customer decision invite records (CD-06; one partition per tier). */
   | 'customer_decision_invites'
+  /** The tenant's delegation trace + record partition (delegated-task-observability.ts). */
+  | 'tenant_delegations'
+  /**
+   * A pre-partition delegation record (or child inbox) in the shared legacy
+   * directory attributed to the tenant (its `tenant_slug`, or its mission).
+   */
+  | 'delegation_legacy_record'
   /**
    * The tenant's partition of another registered runtime state root (pipeline
    * library runs, autonomy learning, external operations, hearing, discussion
@@ -358,6 +372,8 @@ export interface OffboardScopeResult {
   usage_ledger_legacy?: OffboardDedupRegistryResult;
   /** Tenant rows pruned from the shared (pre-partition) execution-metrics ledger. */
   execution_metrics_legacy?: OffboardDedupRegistryResult;
+  /** Tenant rows pruned from the shared (pre-partition) delegation trace and its segments. */
+  delegations_legacy?: OffboardDedupRegistryResult;
   /** EG-10: registry-backed artifact ownership query for the offboarded scope. */
   artifact_registry?: { matched: number; registry_path: string; records_retained: boolean };
   /** DA-08: automatic post-execute leftover check (execute mode only). */
@@ -444,7 +460,9 @@ const SCOPE_TIERS = ['personal', 'confidential', 'public'] as const;
  */
 export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   // Resident-dot state: load-bearing append-only state; the retention catalog
-  // requires audited review before tenant offboarding deletes it.
+  // requires audited review before tenant offboarding deletes it. (Its
+  // pre-partition dot/tenants/<slug>/ copies are offboarded automatically via
+  // PHYSICAL_LEGACY_TENANT_STATE_ROOTS.)
   dot: 'not_offboarded',
   // Registered source workspaces are removed through their owning ledger,
   // never by a tenant tree deletion that leaves live workspace records behind.
@@ -468,12 +486,19 @@ export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   browser_bridge_mailbox: 'tenant_runtime_state',
   // Tenant/organization/project seam provider defaults: tenant configuration, purge with the tenant.
   seam_selection_defaults: 'tenant_runtime_state',
+  // System / person custody provider attestations: never tenant-partitioned
+  // (tenant attestations live in the tenant profile), so nothing to offboard.
+  provider_attestations: 'not_offboarded',
   // R5 idempotency reservations hold replayable tenant delegation output: purge with the tenant.
   delegation_idempotency: 'tenant_runtime_state',
   // Provider-reported tenant generation costs: exported, then removed with the tenant.
   generation_cost_settlements: 'tenant_runtime_state',
   // Reasoning API credential proofs (valid for 15 minutes): purge with the tenant.
   api_verification: 'tenant_runtime_state',
+  // Delegation trace + records hold tenant instruction / context / result text:
+  // exported, then removed with the tenant (legacy shared copies: see
+  // computeLegacyDelegationTracePrunes / collectLegacyDelegationRecordTargets).
+  delegations: 'tenant_delegations',
 } as const satisfies Record<TenantRuntimePartitionKey, OffboardTargetKind | 'not_offboarded'>;
 
 /**
@@ -678,6 +703,11 @@ export const PHYSICAL_TENANT_LEARNING_ROOTS = [
  * tenant offboarding still removes what an older version left behind.
  */
 export const PHYSICAL_LEGACY_TENANT_STATE_ROOTS = [
+  // dot-state-paths.ts: pre-partition tenant dot state (dot/tenants/<slug>/). Live
+  // tenants keep the operator-reviewed `pnpm kyberion dot migrate-state` path;
+  // an offboarded tenant's leftover copy is exported and soft-deleted (owner
+  // decision 2026-11-05). The partitioned dot state itself stays 'not_offboarded'.
+  PARTITIONED_RUNTIME_STATE_ROOTS.dot,
   // generation-cost-settlement.ts: read fallback until the next write moves it.
   PARTITIONED_RUNTIME_STATE_ROOTS.generation_cost_settlements,
   // scripts/reasoning_credentials.ts: proofs expire after 15 minutes; no read fallback.
@@ -812,6 +842,227 @@ function collectPhysicalNamespaceTargets(
   return targets;
 }
 
+// ---------------------------------------------------------------------------
+// Legacy (pre-partition) delegation store
+// ---------------------------------------------------------------------------
+
+/** Pre-partition shared delegation trace (live file; rotated segments sit beside it). */
+export const DELEGATION_LEGACY_TRACE_REPO_PATH = LEGACY_DELEGATION_TRACE_PATH;
+/** Pre-partition shared delegation records (`<id>.json`, `child-inbox/<child>.jsonl`). */
+export const DELEGATION_LEGACY_RECORD_REPO_DIR = LEGACY_DELEGATION_RECORD_DIR;
+/** Pre-partition shared background-delegation notification queue (tenant-mixed). */
+export const DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH = LEGACY_DELEGATION_NOTIFICATIONS_PATH;
+const DELEGATION_LEGACY_EXPORT_DIR = 'delegations-legacy-removed';
+
+/**
+ * Upper-cased ids of the tenant's missions: mission trees declaring the tenant
+ * (already among `targets`) plus the tenant-partitioned mission directories
+ * (`active/[archive/]missions/<tier>/<tenant>/<id>`). Legacy delegation rows
+ * carry no tenant, so their mission is the only attribution available.
+ */
+function tenantMissionIds(tenantSlug: string, targets: readonly OffboardTarget[]): Set<string> {
+  const ids = new Set<string>();
+  for (const target of targets) {
+    if (target.kind === 'mission_tree') ids.add(path.posix.basename(target.path).toUpperCase());
+  }
+  for (const base of [
+    ['active', 'missions'],
+    ['active', 'archive', 'missions'],
+  ]) {
+    for (const tier of SCOPE_TIERS) {
+      const dir = safeOptionalRepositoryPath(
+        path.join(pathResolver.rootDir(), ...base, tier, tenantSlug)
+      );
+      if (!dir) continue;
+      for (const name of listDirEntries(dir)) ids.add(name.toUpperCase());
+    }
+  }
+  return ids;
+}
+
+/**
+ * Does a legacy delegation row / record belong to the tenant (its stamp, else
+ * its mission, else its delegation being one of the tenant's — `delegation_id`
+ * of a record or notification, `trace_id` of a trace row)?
+ */
+function legacyDelegationBelongsTo(
+  row: Record<string, unknown>,
+  tenantSlug: string,
+  missionIds: ReadonlySet<string>,
+  delegationIds: ReadonlySet<string> = new Set()
+): boolean {
+  const stamped = typeof row.tenant_slug === 'string' ? row.tenant_slug.trim().toLowerCase() : '';
+  if (stamped) return stamped === tenantSlug;
+  if (typeof row.mission_id === 'string' && missionIds.has(row.mission_id.trim().toUpperCase())) {
+    return true;
+  }
+  const delegationId =
+    typeof row.delegation_id === 'string'
+      ? row.delegation_id
+      : typeof row.trace_id === 'string'
+        ? row.trace_id
+        : '';
+  return Boolean(delegationId) && delegationIds.has(delegationId.trim());
+}
+
+/**
+ * Ids of the tenant's delegations: the records in its delegation-store
+ * partitions plus the legacy shared records attributed to it. Legacy
+ * notification rows written after the record moved to its partition carry
+ * neither a tenant stamp nor (always) a mission; their delegation id is the
+ * remaining attribution.
+ */
+function tenantDelegationIds(tenantSlug: string, missionIds: ReadonlySet<string>): Set<string> {
+  const ids = new Set<string>();
+  for (const tier of SCOPE_TIERS) {
+    const dir = safeOptionalRepositoryPath(
+      path.join(
+        pathResolver.rootDir(),
+        PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations,
+        tier,
+        tenantSlug,
+        'records'
+      )
+    );
+    if (!dir) continue;
+    let names: string[] = [];
+    try {
+      names = listDirEntries(dir);
+    } catch (error) {
+      logger.warn(
+        `[OFFBOARD_DELEGATION_IDS_UNREADABLE] tenant delegation records could not be listed — legacy notification rows attributed only by delegation id stay in place | next: rerun the offboarding with the sovereign persona | evidence: ${repoRelativePosix(dir)}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    for (const name of names) {
+      if (name.endsWith('.json')) ids.add(name.slice(0, -'.json'.length));
+    }
+  }
+  for (const target of collectLegacyDelegationRecordTargets(tenantSlug, missionIds)) {
+    const name = path.posix.basename(target.path);
+    if (
+      path.posix.dirname(target.path) === DELEGATION_LEGACY_RECORD_REPO_DIR &&
+      name.endsWith('.json')
+    ) {
+      ids.add(name.slice(0, -'.json'.length));
+    }
+  }
+  return ids;
+}
+
+/**
+ * Repo-relative legacy delegation JSONL files: the trace (live file plus its
+ * rotated segments) and the shared notification queue.
+ */
+function legacyDelegationLineFiles(): string[] {
+  return [...legacyDelegationTraceFiles(), DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH];
+}
+
+/** Repo-relative legacy trace files: the live file plus its rotated segments. */
+function legacyDelegationTraceFiles(): string[] {
+  const live = DELEGATION_LEGACY_TRACE_REPO_PATH;
+  const dir = path.posix.dirname(live);
+  const stem = path.posix.basename(live, '.jsonl');
+  const segment = new RegExp(`^${stem}-\\d{8}-\\d{6}(?:-\\d+)?\\.jsonl$`, 'u');
+  const files = listDirEntries(pathResolver.rootResolve(dir))
+    .filter((name) => name === `${stem}.jsonl` || segment.test(name))
+    .sort()
+    .map((name) => `${dir}/${name}`);
+  return files;
+}
+
+interface LegacyDelegationTracePrune {
+  path: string;
+  prune: DedupRegistryPrune;
+}
+
+/** The tenant's rows of each legacy trace / notification file (corrupt lines are kept). */
+function computeLegacyDelegationTracePrunes(
+  tenantSlug: string,
+  missionIds: ReadonlySet<string>,
+  delegationIds: ReadonlySet<string> = new Set()
+): LegacyDelegationTracePrune[] {
+  const tenant = tenantSlug.trim().toLowerCase();
+  const prunes: LegacyDelegationTracePrune[] = [];
+  for (const repoPath of legacyDelegationLineFiles()) {
+    const abs = safeOptionalRepositoryPath(pathResolver.rootResolve(repoPath));
+    if (!abs || !safeExistsSync(abs) || !safeLstat(abs).isFile()) continue;
+    const prune: DedupRegistryPrune = { removedLines: [], keptLines: [] };
+    // Streamed (constant memory). A line over the scan limit is never yielded,
+    // so a rewrite would drop it: refuse the prune instead (fail closed).
+    const lines = streamTextLines(abs, {
+      onOversized: (oversized) => {
+        throw new Error(
+          `[OFFBOARD_DELEGATION_TRACE_OVERSIZED_LINE] ${repoPath} line ${oversized.lineNumber} exceeds the scan limit — refusing to rewrite it | next: inspect the line and prune it by hand | evidence: ${repoPath}`
+        );
+      },
+    });
+    for (const { text } of lines) {
+      const trimmed = text.trim();
+      if (!trimmed) continue;
+      let matches = false;
+      try {
+        matches = legacyDelegationBelongsTo(
+          parseSafeJsonObjectValue(
+            parseSafeJsonInput(trimmed, 'delegation trace JSONL entry'),
+            'delegation trace JSONL entry'
+          ),
+          tenant,
+          missionIds,
+          delegationIds
+        );
+      } catch {
+        /* corrupt line: keep it — the trace readers skip it anyway */
+      }
+      (matches ? prune.removedLines : prune.keptLines).push(trimmed);
+    }
+    if (prune.removedLines.length > 0) prunes.push({ path: repoPath, prune });
+  }
+  return prunes;
+}
+
+/** Legacy shared delegation records (and their child inboxes) attributed to the tenant. */
+function collectLegacyDelegationRecordTargets(
+  tenantSlug: string,
+  missionIds: ReadonlySet<string>
+): OffboardTarget[] {
+  const tenant = tenantSlug.trim().toLowerCase();
+  const dir = pathResolver.rootResolve(DELEGATION_LEGACY_RECORD_REPO_DIR);
+  const targets: OffboardTarget[] = [];
+  for (const name of listDirEntries(dir)) {
+    if (!name.endsWith('.json')) continue;
+    const filePath = safeOptionalRepositoryPath(path.join(dir, name));
+    if (!filePath) continue;
+    const record = readJsonRecord(filePath);
+    if (!record || !legacyDelegationBelongsTo(record, tenant, missionIds)) continue;
+    targets.push({ path: repoRelativePosix(filePath), kind: 'delegation_legacy_record' });
+    const child =
+      typeof record.child_session_id === 'string'
+        ? record.child_session_id.trim().replace(/[^a-zA-Z0-9._-]+/g, '-')
+        : '';
+    if (!child) continue;
+    const inbox = safeOptionalRepositoryPath(path.join(dir, 'child-inbox', `${child}.jsonl`));
+    if (inbox && safeExistsSync(inbox)) {
+      targets.push({ path: repoRelativePosix(inbox), kind: 'delegation_legacy_record' });
+    }
+  }
+  return targets;
+}
+
+/** Extra inputs for tenant leftovers whose attribution outlives the tenant's trees. */
+export interface ScopeTargetOptions {
+  /**
+   * Mission ids known to belong to the tenant before its trees were removed
+   * (the post-offboard verification passes the ids of the plan, so legacy
+   * delegation rows attributed only by mission are still recognised).
+   */
+  legacyMissionIds?: ReadonlySet<string>;
+  /**
+   * Delegation ids known to belong to the tenant before its partitions were
+   * removed (legacy notification rows attributed only by delegation).
+   */
+  legacyDelegationIds?: ReadonlySet<string>;
+}
+
 /**
  * Everything that belongs to the scope: its project workspace tree(s), every
  * mission declaring it, and — for a tenant (DA-08) — the tenant's governed
@@ -824,7 +1075,8 @@ function collectPhysicalNamespaceTargets(
 export function collectScopeTargets(
   scopeType: OffboardScopeType,
   scopeId: string,
-  filter: PhysicalNamespaceFilter = {}
+  filter: PhysicalNamespaceFilter = {},
+  options: ScopeTargetOptions = {}
 ): OffboardTarget[] {
   const targets: OffboardTarget[] = [];
   const id = scopeId.trim();
@@ -955,6 +1207,13 @@ export function collectScopeTargets(
         const kind = TENANT_RUNTIME_PARTITION_TARGET_KINDS[partition.key];
         if (kind !== 'not_offboarded') targets.push({ path: partition.path, kind });
       }
+      // Pre-partition delegation records in the shared legacy directory that
+      // belong to this tenant (stamped, or by mission) go with it.
+      const missionIds = new Set([
+        ...(options.legacyMissionIds ?? []),
+        ...tenantMissionIds(id, targets),
+      ]);
+      targets.push(...collectLegacyDelegationRecordTargets(id, missionIds));
     }
   }
 
@@ -1094,12 +1353,13 @@ function computeLegacyLedgerPrune(
 export function verifyScopeOffboarded(
   scopeType: OffboardScopeType,
   scopeId: string,
-  filter: PhysicalNamespaceFilter = {}
+  filter: PhysicalNamespaceFilter = {},
+  options: ScopeTargetOptions = {}
 ): OffboardVerification {
   const id = String(scopeId || '').trim();
   let leftovers: string[];
   try {
-    leftovers = collectScopeTargets(scopeType, id, filter).map((target) => target.path);
+    leftovers = collectScopeTargets(scopeType, id, filter, options).map((target) => target.path);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { clean: false, leftovers: [message], error: message };
@@ -1125,6 +1385,25 @@ export function verifyScopeOffboarded(
       const rowsLeft = computeLegacyLedgerPrune(ledger, id).removedLines.length;
       if (rowsLeft > 0) {
         leftovers.push(`${ledger.legacy_path} (${rowsLeft} legacy row(s) of '${id}')`);
+      }
+    }
+    if (isValidTenantSlug(id)) {
+      const missionIds = new Set([
+        ...(options.legacyMissionIds ?? []),
+        ...tenantMissionIds(id, []),
+      ]);
+      const delegationIds = new Set([
+        ...(options.legacyDelegationIds ?? []),
+        ...tenantDelegationIds(id, missionIds),
+      ]);
+      for (const { path: tracePath, prune } of computeLegacyDelegationTracePrunes(
+        id,
+        missionIds,
+        delegationIds
+      )) {
+        leftovers.push(
+          `${tracePath} (${prune.removedLines.length} legacy delegation row(s) of '${id}')`
+        );
       }
     }
   }
@@ -1229,10 +1508,36 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
     for (const { ledger, prune } of ledgerPrunes) {
       result[ledger.result_key] = { matched: prune.removedLines.length, removed: 0 };
     }
+    // Pre-partition delegation trace rows attributed to the tenant (stamped,
+    // or by one of its missions — computed while the mission trees exist).
+    const legacyMissionIds =
+      scopeType === 'tenant' && isValidTenantSlug(scopeId)
+        ? tenantMissionIds(scopeId, result.targets)
+        : new Set<string>();
+    // …and its delegation ids (partition records + attributed legacy records),
+    // which attribute legacy notification rows carrying neither stamp nor mission.
+    const legacyDelegationIds =
+      scopeType === 'tenant' && isValidTenantSlug(scopeId)
+        ? tenantDelegationIds(scopeId, legacyMissionIds)
+        : new Set<string>();
+    const delegationTracePrunes =
+      scopeType === 'tenant' && isValidTenantSlug(scopeId)
+        ? computeLegacyDelegationTracePrunes(scopeId, legacyMissionIds, legacyDelegationIds)
+        : [];
+    if (delegationTracePrunes.length > 0) {
+      result.delegations_legacy = {
+        matched: delegationTracePrunes.reduce(
+          (sum, { prune }) => sum + prune.removedLines.length,
+          0
+        ),
+        removed: 0,
+      };
+    }
     if (
       result.targets.length === 0 &&
       !result.dedup_registry &&
       ledgerPrunes.length === 0 &&
+      delegationTracePrunes.length === 0 &&
       !result.artifact_registry
     ) {
       result.status = 'not_found';
@@ -1254,6 +1559,9 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
           : {}),
         ...(result.execution_metrics_legacy
           ? { execution_metrics_legacy_matched: result.execution_metrics_legacy.matched }
+          : {}),
+        ...(result.delegations_legacy
+          ? { delegations_legacy_matched: result.delegations_legacy.matched }
           : {}),
         ...(result.artifact_registry
           ? { artifact_registry_matched: result.artifact_registry.matched }
@@ -1328,6 +1636,9 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
         export_file: `${result.export_path}/${ledger.export_file}`,
       };
     }
+    if (result.delegations_legacy) {
+      result.delegations_legacy.export_file = `${result.export_path}/${DELEGATION_LEGACY_EXPORT_DIR}`;
+    }
     const manifestPath = assertSafeRepositoryPath(path.join(exportDirAbs, 'manifest.json'), {
       allowMissingLeaf: true,
     });
@@ -1349,6 +1660,7 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
           ...(result.execution_metrics_legacy
             ? { execution_metrics_legacy: result.execution_metrics_legacy }
             : {}),
+          ...(result.delegations_legacy ? { delegations_legacy: result.delegations_legacy } : {}),
           policy_ref: RETENTION_CATALOG_REPO_PATH,
         },
         null,
@@ -1443,6 +1755,68 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       });
     }
 
+    // The tenant's rows of the pre-partition shared delegation trace (and its
+    // rotated segments) and of the shared notification queue: no writer
+    // appends there any more, but the prune still runs under the file's lock
+    // (the notification queue's own lock, which every claim holds), recomputes
+    // the rows from the file as it is now, exports them verbatim, then applies
+    // one atomic rewrite. Audited.
+    if (delegationTracePrunes.length > 0) {
+      let removed = 0;
+      for (const { path: tracePath } of delegationTracePrunes) {
+        const traceAbs = assertSafeRepositoryPath(pathResolver.rootResolve(tracePath), {
+          allowMissingLeaf: true,
+        });
+        const isNotificationQueue = tracePath === DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH;
+        const lockId = isNotificationQueue
+          ? DELEGATION_NOTIFICATIONS_LOCK
+          : metricsLedgerLockId(traceAbs);
+        const prune = withLockSync(lockId, () => {
+          const current = computeLegacyDelegationTracePrunes(
+            scopeId,
+            legacyMissionIds,
+            legacyDelegationIds
+          ).find((entry) => entry.path === tracePath)?.prune;
+          if (!current || current.removedLines.length === 0) return current;
+          const exportPath = assertSafeRepositoryPath(
+            path.join(exportDirAbs, DELEGATION_LEGACY_EXPORT_DIR, path.posix.basename(tracePath)),
+            { allowMissingLeaf: true }
+          );
+          safeMkdir(path.dirname(exportPath), { recursive: true });
+          safeWriteFile(exportPath, `${current.removedLines.join('\n')}\n`);
+          safeWriteFile(
+            traceAbs,
+            current.keptLines.length > 0 ? `${current.keptLines.join('\n')}\n` : ''
+          );
+          return current;
+        });
+        if (!prune || prune.removedLines.length === 0) continue;
+        removed += prune.removedLines.length;
+        appendRetentionAudit({
+          event: isNotificationQueue
+            ? 'SCOPE_OFFBOARD_DELEGATION_NOTIFICATION_PRUNE'
+            : 'SCOPE_OFFBOARD_DELEGATION_TRACE_PRUNE',
+          scope_type: scopeType,
+          scope_id: scopeId,
+          path: tracePath,
+          removed_lines: prune.removedLines.length,
+          kept_lines: prune.keptLines.length,
+          export_path: result.export_path,
+          approved_by: approvedBy,
+          approved_at: approvedAt,
+          purpose,
+          policy_ref: RETENTION_CATALOG_REPO_PATH,
+          reason: isNotificationQueue
+            ? 'offboarding removed the tenant’s rows from the pre-partition shared delegation notification queue after export'
+            : 'offboarding removed the tenant’s rows from the pre-partition shared delegation trace after export',
+        });
+      }
+      if (result.delegations_legacy) {
+        result.delegations_legacy.matched = Math.max(result.delegations_legacy.matched, removed);
+        result.delegations_legacy.removed = removed;
+      }
+    }
+
     for (const target of result.targets) {
       const absolute = assertSafeRepositoryPath(pathResolver.rootResolve(target.path));
       try {
@@ -1490,7 +1864,10 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
     // DA-08 acceptance: prove there is no trace left. Best-effort — a
     // verification failure is reported, never thrown.
     try {
-      result.verification = verifyScopeOffboarded(scopeType, scopeId, physicalFilter);
+      result.verification = verifyScopeOffboarded(scopeType, scopeId, physicalFilter, {
+        legacyMissionIds,
+        legacyDelegationIds,
+      });
       appendRetentionAudit({
         event: 'SCOPE_OFFBOARD_VERIFIED',
         scope_type: scopeType,
@@ -1527,7 +1904,7 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
         result.reason = `[OFFBOARD_VERIFICATION_FAILED] post-offboard verification could not run — the scope may still hold data | next: fix the cause and rerun the offboarding (idempotent) | evidence: ${result.verification.error}`;
       } else if (partitionLeftovers.length > 0) {
         result.status = 'error';
-        result.reason = `[OFFBOARD_PARTITION_LEFTOVER] tenant runtime partition(s) were not removed — the tenant's records outlive it | next: check this process's write grant on the partitions (tenant ledger and approval partitions need the sovereign persona), then rerun the offboarding | evidence: ${partitionLeftovers.join(', ')}`;
+        result.reason = `[OFFBOARD_PARTITION_LEFTOVER] tenant runtime partition(s) were not removed — the tenant's records outlive it | next: check this process's write grant on the partitions (tenant ledger, approval and delegation partitions need the sovereign persona), then rerun the offboarding | evidence: ${partitionLeftovers.join(', ')}`;
       }
     } catch (err) {
       // An offboarding that cannot prove itself clean is not reported as done.

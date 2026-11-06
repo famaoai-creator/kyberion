@@ -218,7 +218,8 @@ export function protectedStorageFloorPrefixes(): string[] {
  * tenant-bound store role (`<root>/<tier>/<tenant>/…`, every tier including
  * `public`, which the stores never use but must not leave open). These
  * partitions are authority evidence (hash-chained audit entries, approval
- * decisions), so tier-guard does not let broad runtime defaults or other roles'
+ * decisions) or tenant prose (delegation instructions and results), so
+ * tier-guard does not let broad runtime defaults or other roles'
  * grants write them: only SUDO, a persona grant, or the store role's own grant
  * (bound to that tenant) may. The metrics ledgers are deliberately absent.
  */
@@ -234,6 +235,10 @@ export const TENANT_STORE_LEDGER_ROOTS = {
   tenant_audit_mirror: {
     root: PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_audit_mirror,
     storeRole: 'audit_mirror_writer',
+  },
+  delegations: {
+    root: PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations,
+    storeRole: 'delegation_record_store',
   },
 } as const;
 

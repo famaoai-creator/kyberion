@@ -37,11 +37,5 @@
       "reason": "One-shot migration tool that MOVES legacy flat records into the existing physical bases it enumerates; it creates no new store."
     }
   ],
-  "bases": [
-    {
-      "file": "libs/core/dot/dot-state-paths.ts",
-      "base": "active/shared/runtime/dot",
-      "reason": "Read-only legacy detection/migration of pre-partition dot state (dot/tenants/<slug>/): current dot state is the registered <tier>/<tenant> root, whose offboarding disposition is 'not_offboarded' (audited review required), so the legacy copy is deliberately not auto-removed either; `pnpm kyberion dot migrate-state` relocates it after operator review."
-    }
-  ]
+  "bases": []
 }

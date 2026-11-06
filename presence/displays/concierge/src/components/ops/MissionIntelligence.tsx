@@ -3,7 +3,8 @@
 import { opsApiPath } from '../../lib/ops/ops-api-path';
 import { useEffect, useRef, useState } from 'react';
 import { buildAttentionItems, type AttentionItem } from '../../lib/ops/operator-console';
-import { resolveChronosLocale, uxText, uxTextOr } from '../../lib/ops/ux-vocabulary';
+import { uxText, uxTextOr } from '../../lib/ops/ux-vocabulary';
+import { useChronosLocale } from '../../lib/ops/hooks';
 import { MissionIntelligenceMissionPanel } from './MissionIntelligenceMissionPanel';
 import { MissionIntelligenceApprovalsPanel } from './MissionIntelligenceApprovalsPanel';
 import { MissionIntelligenceRuntimePanel } from './MissionIntelligenceRuntimePanel';
@@ -40,14 +41,20 @@ export {
   resolveMissionThreadHotkeyAction,
 } from './MissionIntelligenceViewHelpers';
 
-function buildMissionIntentSummary(data: IntelligencePayload, mission: MissionSummary): string {
+type SupportedLocaleLike = Parameters<typeof uxTextOr>[2];
+
+function buildMissionIntentSummary(
+  data: IntelligencePayload,
+  mission: MissionSummary,
+  locale: SupportedLocaleLike
+): string {
   const latestHandoff = data.a2aHandoffs
     .filter((handoff) => handoff.missionId === mission.missionId)
     .sort((a, b) => b.ts.localeCompare(a.ts))[0];
   if (latestHandoff?.promptExcerpt) return latestHandoff.promptExcerpt;
   if (latestHandoff?.intent) return latestHandoff.intent;
   if (mission.missionType) return mission.missionType;
-  return uxTextOr('chronos_mi_durable_work_item', 'Durable work item', resolveChronosLocale());
+  return uxTextOr('chronos_mi_durable_work_item', 'Durable work item', locale);
 }
 
 export function MissionIntelligence({
@@ -72,8 +79,12 @@ export function MissionIntelligence({
   showMissionIntelligenceLabel?: boolean;
   tenant?: string;
 }) {
-  const locale = resolveChronosLocale();
+  // The hook starts at the SSR default and switches after mount, so the
+  // server HTML and the first client render agree (no hydration mismatch).
+  const locale = useChronosLocale();
   const mt = (key: string, fallbackEn: string) => uxTextOr(key, fallbackEn, locale);
+  const missionIntentSummary = (data: IntelligencePayload, mission: MissionSummary) =>
+    buildMissionIntentSummary(data, mission, locale);
   const missionActionText = (action: ControlActionDefinition) => missionActionLabel(action, locale);
   const missionIntelligenceEyebrow = showMissionIntelligenceLabel
     ? uxText('chronos_mission_intelligence', locale)
@@ -1089,7 +1100,7 @@ export function MissionIntelligence({
           focusedView,
           onClearFocus,
           locale,
-          buildMissionIntentSummary,
+          buildMissionIntentSummary: missionIntentSummary,
           resolveNextActionRoute,
           selectedProject,
           selectedMissionId,
@@ -1184,7 +1195,7 @@ export function MissionIntelligence({
           setExpandedMissionCardActionId,
           jumpToTarget,
           panelVisible,
-          buildMissionIntentSummary,
+          buildMissionIntentSummary: missionIntentSummary,
         }}
       />
 
@@ -1336,7 +1347,7 @@ export function MissionIntelligence({
           setMessageMissionFilter,
           setExpandedMissionCardActionId,
           panelVisible,
-          buildMissionIntentSummary,
+          buildMissionIntentSummary: missionIntentSummary,
         }}
       />
     </div>

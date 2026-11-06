@@ -1,4 +1,11 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  realpathSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -193,5 +200,154 @@ describe('primary-checkout authority store resolution', () => {
     expect(
       resolver.isAuthorityStoreRelativePath('active/shared/coordination/channels/slack/outbox')
     ).toBe(false);
+  });
+
+  it('names only the fixed ancestors of the authority stores, never their siblings', async () => {
+    const resolver = await loadResolver(worktree);
+    for (const rel of [
+      'active',
+      'active/shared',
+      'active/shared/coordination',
+      'active/shared/observability',
+      'active/shared/runtime',
+      'knowledge',
+      'knowledge/personal',
+      'knowledge/confidential',
+      'knowledge/confidential/acme',
+    ]) {
+      expect(resolver.isAuthorityStoreAncestorRelativePath(rel)).toBe(true);
+    }
+    for (const rel of [
+      '',
+      'active/shared/coordination/channels',
+      'active/shared/coordination/inbox',
+      'active/shared/runtime/other',
+      'knowledge/public',
+      'knowledge/confidential/acme/notes',
+    ]) {
+      expect(resolver.isAuthorityStoreAncestorRelativePath(rel)).toBe(false);
+    }
+  });
+
+  it('lets a linked worktree resolve the first approval path when the primary has no channels/', async () => {
+    // A primary checkout whose active/shared/coordination exists but has never
+    // held an approval: the missing-ancestor walk climbs past channels/ and
+    // used to refuse the existence probe of coordination/ as outside the repo.
+    mkdirSync(path.join(primary, 'active', 'shared', 'coordination'), { recursive: true });
+    await loadResolver(worktree);
+    const guard = await import('./secure-io-path-guard.js');
+    const requests = path.join(
+      primary,
+      'active/shared/coordination/channels/external-operation/approvals/requests'
+    );
+    for (const mode of ['follow', 'leaf'] as const) {
+      expect(guard.canonicalGuardPath(requests, mode)).toBe(requests);
+    }
+    expect(guard.entryExists(path.join(primary, 'active/shared/coordination'))).toBe(true);
+    // Non-authority paths in the primary stay outside: the ancestor probe grants nothing.
+    expect(() =>
+      guard.entryExists(path.join(primary, 'active/shared/coordination/inbox'))
+    ).toThrow();
+    expect(() =>
+      guard.canonicalGuardPath(path.join(primary, 'active/shared/coordination/inbox/x'), 'leaf')
+    ).toThrow();
+  });
+
+  it('creates the first approval directory in a primary whose real path differs from its spelling', async () => {
+    // The primary is reached through a symlink (deliberately, so this holds on
+    // every platform, not only where tmpdir itself is symlinked). mkdirGuarded
+    // compares each parent's canonical path with the checked one, so the
+    // ancestor must be spelled back under the logical primary root or the
+    // first mkdir is refused.
+    const linkedPrimary = path.join(tmp, 'primary-link');
+    symlinkSync(primary, linkedPrimary);
+    const linkedWorktree = path.join(tmp, 'worktrees', 'wt-linked');
+    makeCheckout(linkedWorktree);
+    const gitDir = path.join(linkedPrimary, '.git', 'worktrees', 'wt-linked');
+    mkdirSync(gitDir, { recursive: true });
+    writeFileSync(path.join(gitDir, 'commondir'), '../..\n');
+    writeFileSync(path.join(linkedWorktree, '.git'), `gitdir: ${gitDir}\n`);
+    mkdirSync(path.join(primary, 'active', 'shared', 'coordination'), { recursive: true });
+
+    const resolver = await loadResolver(linkedWorktree);
+    expect(resolver.primaryCheckoutRootDir()).toBe(linkedPrimary);
+    const guard = await import('./secure-io-path-guard.js');
+    const requests = path.join(
+      linkedPrimary,
+      'active/shared/coordination/channels/external-operation/approvals/requests'
+    );
+    const checked = guard.canonicalGuardPath(requests, 'follow');
+    expect(checked).toBe(requests);
+    guard.mkdirGuarded(requests, checked, requests);
+    expect(existsSync(requests)).toBe(true);
+    // The ancestor walk creates nothing outside the authority stores.
+    const inbox = path.join(linkedPrimary, 'active/shared/coordination/inbox/x');
+    expect(() => guard.mkdirGuarded(inbox, inbox, inbox)).toThrow();
+    expect(existsSync(path.join(primary, 'active/shared/coordination/inbox'))).toBe(false);
+  });
+
+  it('round-trips authority stores and their ancestors through the root translators', async () => {
+    // toLogicalRoot and toPhysicalRoot must be inverses for every primary path
+    // either one re-spells; a path only one direction knows breaks the
+    // physical-prefix open (macOS O_NOFOLLOW_ANY) or the parent comparison.
+    const linkedPrimary = path.join(tmp, 'primary-link');
+    symlinkSync(primary, linkedPrimary);
+    const linkedWorktree = path.join(tmp, 'worktrees', 'wt-linked');
+    makeCheckout(linkedWorktree);
+    const gitDir = path.join(linkedPrimary, '.git', 'worktrees', 'wt-linked');
+    mkdirSync(gitDir, { recursive: true });
+    writeFileSync(path.join(gitDir, 'commondir'), '../..\n');
+    writeFileSync(path.join(linkedWorktree, '.git'), `gitdir: ${gitDir}\n`);
+
+    await loadResolver(linkedWorktree);
+    const guard = await import('./secure-io-path-guard.js');
+    const { toLogicalRoot, toPhysicalRoot } = guard.rootTranslationForTesting;
+    const realPrimary = realpathSync.native(primary);
+    for (const rel of [
+      'active/shared/coordination',
+      'active/shared/runtime',
+      'knowledge/confidential/acme',
+      'active/shared/coordination/channels',
+      'active/shared/coordination/channels/external-operation/approvals/requests',
+      'knowledge/personal/charters/x.json',
+    ]) {
+      const logical = path.join(linkedPrimary, rel);
+      const physical = path.join(realPrimary, rel);
+      expect(toPhysicalRoot(logical)).toBe(physical);
+      expect(toLogicalRoot(physical)).toBe(logical);
+      expect(toLogicalRoot(toPhysicalRoot(logical))).toBe(logical);
+    }
+    // Non-authority primary paths are translated by neither direction.
+    const inbox = path.join(linkedPrimary, 'active/shared/coordination/inbox');
+    expect(toPhysicalRoot(inbox)).toBe(inbox);
+    const realInbox = path.join(realPrimary, 'active/shared/coordination/inbox');
+    expect(toLogicalRoot(realInbox)).toBe(realInbox);
+  });
+
+  it('does not create a missing ancestor of the authority store', async () => {
+    // Precondition of the fix: the fixed ancestors must already exist in the
+    // primary. When coordination/ itself is missing, nothing is created.
+    mkdirSync(path.join(primary, 'active', 'shared'), { recursive: true });
+    await loadResolver(worktree);
+    const guard = await import('./secure-io-path-guard.js');
+    const requests = path.join(
+      primary,
+      'active/shared/coordination/channels/external-operation/approvals/requests'
+    );
+    expect(() => guard.mkdirGuarded(requests, requests, requests)).toThrow();
+    expect(existsSync(path.join(primary, 'active/shared/coordination'))).toBe(false);
+  });
+
+  it('refuses a dangling-symlink ancestor in the primary', async () => {
+    mkdirSync(path.join(primary, 'active', 'shared'), { recursive: true });
+    symlinkSync(path.join(tmp, 'nowhere'), path.join(primary, 'active/shared/coordination'));
+    await loadResolver(worktree);
+    const guard = await import('./secure-io-path-guard.js');
+    expect(() =>
+      guard.canonicalGuardPath(
+        path.join(primary, 'active/shared/coordination/channels/external-operation/approvals'),
+        'follow'
+      )
+    ).toThrow();
   });
 });

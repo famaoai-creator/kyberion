@@ -233,6 +233,8 @@ describe('durable partitioned runtime state', () => {
       'active/shared/runtime/media-generation/cost-settlements/confidential/',
       'active/shared/runtime/health/api-verification/personal/',
       'active/shared/runtime/health/api-verification/confidential/',
+      'active/shared/runtime/provider-attestations/personal/',
+      'active/shared/runtime/provider-attestations/confidential/',
     ]);
     expect(
       partitionedRuntimeStateTierInPath(

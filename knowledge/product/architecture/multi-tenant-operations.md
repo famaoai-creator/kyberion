@@ -3,7 +3,7 @@ title: Multi-Tenant Operations
 category: Architecture
 tags: [multi-tenant, isolation, tier, governance, audit, operations]
 importance: 8
-last_updated: 2026-08-17
+last_updated: 2026-11-05
 ---
 
 # Multi-Tenant Operations
@@ -309,6 +309,62 @@ Each tenant typically configures its own:
 A practical pattern is one runtime process per tenant, each with its own
 env, sharing the same code base. This keeps the runtime layer simple and
 the tenant boundary explicit.
+
+## 6b. Provider Egress Attestations by Custody Owner
+
+Sending confidential or personal material to an external model needs a
+statement that the provider does not train on it (`training_use: none`).
+Whose statement applies is decided by the material's **custody owner**
+(`libs/core/custody-owner.ts`), not by its tier:
+
+| Custody  | Derived when                      | Attestation lives in                                                       | Recorded with                                                                |
+| -------- | --------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `tenant` | the payload names a `tenant_slug` | tenant profile `provider_attestations`                                     | `pnpm onboarding llm attest --tenant <slug>` / `pnpm tenant attest-provider` |
+| `system` | no tenant, tier `confidential`    | `active/shared/runtime/provider-attestations/system/attestations.json`     | `pnpm onboarding llm attest --custody system`                                |
+| `person` | no tenant, tier `personal`        | `active/shared/runtime/provider-attestations/personal/shared/<owner>.json` | `pnpm onboarding llm attest --custody person [--principal <id>]`             |
+
+- A payload scope may declare `custody` explicitly only to restate the scope
+  (e.g. person custody for tenantless confidential material). A declaration
+  that contradicts `tenant_slug`, or system custody for personal material,
+  fails closed (`[CUSTODY_OWNER_CONFLICT]`) before anything is sent.
+- Every kind has the same shape and rules: `training_use none|used|unknown`,
+  `attested_at`, optional `expires_at`, the policy TTL
+  (`attestation_ttl_days`, 180 days), and a `none` claim only under an
+  approved, hash-bound, single-use human approval, and every claim stores its
+  approval basis; a `none` without one reads as no attestation.
+- Who decides (decided 2026-11-05): a **system** claim is the installation
+  owner's statement that the provider does not train (`sovereign` / `owner`,
+  self-approval refused under separation of duties). A **person** claim is
+  that person's **consent** to send their own personal material under
+  `training_use: none` — not evidence that the provider does not train. Only
+  the person decides it: the request records the subject
+  (`accountability.consent`), the approval store refuses anyone else's
+  approval of a `--principal` person, and the person deciding a request they
+  opened is consent, not self-approval. On a single-user installation (no
+  `--principal`) the owner is the person, so the owner records the system
+  attestation and their own consent without a separation-of-duties deadlock.
+  A person record decided by someone else (e.g. by the owner before this
+  rule) stays on disk but reads as no consent; re-record it with the person
+  deciding.
+- Person egress needs both the person's consent and no-training evidence —
+  the installation's valid system attestation of `none` or a policy
+  declaration `training_use: none`. An `approved_providers` exception is
+  never no-training evidence: the reasoning send's `no_training` check
+  refuses it for every custody owner, while delegation keeps honouring it as
+  the operator exception it is.
+- The stores are read through a governed reader that refuses tenant-bound
+  callers: tenant material is never decided by the installation's or a
+  person's statement. Installation-specific contract facts never go in the
+  shipped `provider-egress-policy.json`.
+- Both outbound faces — the reasoning send (`reasoning-egress-scope.ts`) and
+  delegation (`provider-egress-gate.ts` `checkProviderEgress`) — decide with
+  the same evaluator (`evaluateProviderEgress`) and the same custody owner, so
+  identical inputs give identical answers
+  (`libs/core/provider/custody-egress-face-agreement.test.ts`). Tenantless
+  denials name `pnpm onboarding llm attest --custody system|person
+--request-approval` as the next step. The endpoint-domain layer
+  (`egress-policy.json` `tenant_allowed_domains['*']`) still applies to
+  tenantless material.
 
 ## 7. Cross-Tenant Knowledge Sharing
 
