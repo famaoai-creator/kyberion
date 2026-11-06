@@ -72,17 +72,11 @@ export interface RoleFitnessProbeCatalog {
   probes: RoleFitnessProbe[];
 }
 
-const FALLBACK_CATALOG: RoleFitnessProbeCatalog = {
-  version: '1.0.0',
-  pass_threshold: 0.75,
-  probes: [],
-};
-
+// A missing governed probe policy is not evidence that zero probes suffice.
 const probeCatalog = defineCatalog<RoleFitnessProbeCatalog>({
   id: 'model-role-fitness-probes',
   path: () => pathResolver.knowledge('product/governance/model-role-fitness-probes.json'),
   schema: pathResolver.knowledge('product/schemas/model-role-fitness-probes.schema.json'),
-  fallback: FALLBACK_CATALOG,
 });
 
 export function loadRoleFitnessProbeCatalog(): RoleFitnessProbeCatalog {

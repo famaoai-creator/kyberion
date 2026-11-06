@@ -1,5 +1,6 @@
 'use client';
 
+import { withPageProjectScope } from '../lib/project-selection';
 import * as React from 'react';
 import { PageHeader } from '@agent/shared-ui';
 import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
@@ -35,7 +36,9 @@ const REFRESH_MS = 60_000;
 function useLoadable<T>(
   path: string,
   parse: (body: unknown) => T | null,
-  version: number
+  version: number,
+  /** Carries the page's project narrowing (`organization_id` + `project_id`). */
+  projectScoped = false
 ): Loadable<T> & { reload: () => void } {
   const [state, setState] = React.useState<Loadable<T>>({ state: 'loading' });
   const [attempt, setAttempt] = React.useState(0);
@@ -44,7 +47,10 @@ function useLoadable<T>(
     const controller = new AbortController();
     // A background refresh keeps the last good numbers on screen.
     if (!hasData.current) setState({ state: 'loading' });
-    frontDeskFetch(path, { signal: controller.signal, cache: 'no-store' })
+    frontDeskFetch(projectScoped ? withPageProjectScope(path) : path, {
+      signal: controller.signal,
+      cache: 'no-store',
+    })
       .then(async (response) => {
         const body = await response.json().catch(() => null);
         if (controller.signal.aborted) return;
@@ -66,7 +72,7 @@ function useLoadable<T>(
         setState({ state: 'error', failure: 'failed' as HomeLoadFailure });
       });
     return () => controller.abort();
-  }, [path, parse, version, attempt]);
+  }, [path, parse, version, attempt, projectScoped]);
   const reload = React.useCallback(() => {
     hasData.current = false;
     setAttempt((n) => n + 1);
@@ -100,11 +106,12 @@ export default function HomePage() {
     };
   }, []);
 
-  const home = useLoadable<HomeDashboard>('/api/v1/home', parseHomeDashboard, version);
+  const home = useLoadable<HomeDashboard>('/api/v1/home', parseHomeDashboard, version, true);
   const needs = useLoadable<NeedsYouSummary>(
     '/api/v1/needs-you/summary',
     parseNeedsYouSummary,
-    version
+    version,
+    true
   );
   // Setup steps come from the one settings checklist (`setup.checklist`), so
   // Home and 設定 › はじめに always agree and link to the same cards.

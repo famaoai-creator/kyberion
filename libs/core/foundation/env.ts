@@ -166,6 +166,16 @@ const CHILD_PROCESS_ENV_KEYS = [
   'NODE_EXTRA_CA_CERTS',
   'SSL_CERT_FILE',
   'SSL_CERT_DIR',
+  // Proxy vars: added by buildProxyPassthroughEnv (loopback-guarded).
+] as const;
+
+/**
+ * Proxy env vars a child may inherit. The single source for every child-env
+ * allowlist (secure-io buildSafeExecEnv, provider child env, ACP mediator,
+ * safeChildEnv, the credential relay's upstream hop) — pass them only through
+ * {@link buildProxyPassthroughEnv} so the loopback guard below always applies.
+ */
+export const PROXY_ENV_KEYS = [
   'HTTP_PROXY',
   'HTTPS_PROXY',
   'NO_PROXY',
@@ -173,6 +183,65 @@ const CHILD_PROCESS_ENV_KEYS = [
   'https_proxy',
   'no_proxy',
 ] as const;
+
+export type ProxyEnvKey = (typeof PROXY_ENV_KEYS)[number];
+
+/** Hosts a child must always reach directly, never via a proxy. */
+export const LOOPBACK_NO_PROXY_HOSTS: readonly string[] = ['127.0.0.1', 'localhost', '::1'];
+
+const PROXY_URL_ENV_KEYS = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy'] as const;
+
+/** Append `hosts` to a NO_PROXY list: existing entries kept, case-insensitive dedupe. */
+export function appendNoProxyHosts(current: string | undefined, hosts: readonly string[]): string {
+  const entries = (current ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const present = new Set(entries.map((entry) => entry.toLowerCase()));
+  for (const host of hosts) {
+    if (present.has(host.toLowerCase())) continue;
+    present.add(host.toLowerCase());
+    entries.push(host);
+  }
+  return entries.join(',');
+}
+
+/**
+ * Return `env` with the loopback hosts appended to both NO_PROXY and
+ * no_proxy (existing entries kept, no duplicates). A child that honors
+ * HTTP(S)_PROXY would otherwise send its request for a loopback service (the
+ * credential relay, a local surface) to the proxy, which cannot reach the
+ * parent's 127.0.0.1.
+ */
+export function withLoopbackNoProxy<T extends Record<string, string | undefined>>(env: T): T {
+  return {
+    ...env,
+    NO_PROXY: appendNoProxyHosts(env.NO_PROXY, LOOPBACK_NO_PROXY_HOSTS),
+    no_proxy: appendNoProxyHosts(env.no_proxy, LOOPBACK_NO_PROXY_HOSTS),
+  };
+}
+
+/** A proxy URL var (HTTP(S)_PROXY, either case) is set to a non-empty value. */
+export function hasProxyEnv(env: Record<string, string | undefined>): boolean {
+  return PROXY_URL_ENV_KEYS.some((key) => Boolean(env[key]?.trim()));
+}
+
+/**
+ * The proxy subset of `source` a child may inherit. Whenever a proxy URL is
+ * passed, the loopback hosts are appended to NO_PROXY and no_proxy, so a
+ * child never routes a loopback URL it was handed through the proxy.
+ * No proxy URL ⇒ only the non-empty NO_PROXY vars pass through, unchanged.
+ */
+export function buildProxyPassthroughEnv(
+  source: Record<string, string | undefined>
+): Partial<Record<ProxyEnvKey, string>> {
+  const picked: Partial<Record<ProxyEnvKey, string>> = {};
+  for (const key of PROXY_ENV_KEYS) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim() !== '') picked[key] = value;
+  }
+  return hasProxyEnv(picked) ? withLoopbackNoProxy(picked) : picked;
+}
 
 /** Opt-in loopback credential relay flag (provider/provider-credential-relay.ts). */
 export const PROVIDER_CREDENTIAL_RELAY_ENV_VAR = 'KYBERION_PROVIDER_CREDENTIAL_RELAY';
@@ -230,5 +299,6 @@ export function safeChildEnv(
     const value = env[key];
     if (value) childEnv[key] = value;
   }
+  Object.assign(childEnv, buildProxyPassthroughEnv(env));
   return withoutRelayManagedCredentials(childEnv, env);
 }

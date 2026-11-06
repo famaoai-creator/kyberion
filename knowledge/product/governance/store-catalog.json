@@ -13,7 +13,13 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "sources": ["runtime-state-roots"]
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "api_verification",
+        "order": 14,
+        "retention_path": "active/shared/runtime/health"
+      }
     },
     {
       "id": "archived-missions",
@@ -38,7 +44,13 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["autonomy_learning_store"],
-      "sources": ["runtime-state-roots", "role-policy"]
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "state",
+        "key": "autonomy_learning",
+        "order": 4,
+        "retention_path": "active/shared/runtime/autonomy-learning"
+      }
     },
     {
       "id": "browser-bridge-mailbox",
@@ -50,7 +62,13 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "sources": ["runtime-state-roots"]
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "browser_bridge_mailbox",
+        "order": 10,
+        "retention_path": "active/shared/runtime/browser-bridge-mailbox"
+      }
     },
     {
       "id": "customer-decision-invites",
@@ -63,7 +81,13 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["customer_decision_invite_store"],
-      "sources": ["runtime-state-roots", "role-policy"]
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "state",
+        "key": "customer_decision_invites",
+        "order": 9,
+        "retention_path": "active/shared/runtime/customer-decision-invites"
+      }
     },
     {
       "id": "delegation-idempotency",
@@ -75,7 +99,13 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "sources": ["runtime-state-roots"]
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "delegation_idempotency",
+        "order": 12,
+        "retention_path": "active/shared/runtime/delegation-idempotency"
+      }
     },
     {
       "id": "discussion-create-requests",
@@ -88,7 +118,13 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["discussion_request_store"],
-      "sources": ["runtime-state-roots", "role-policy"]
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "state",
+        "key": "discussion_create_requests",
+        "order": 7,
+        "retention_path": "active/shared/runtime/discussion-create-requests"
+      }
     },
     {
       "id": "dot",
@@ -101,7 +137,13 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["concierge_management_reader", "dot_result_writer"],
-      "sources": ["runtime-state-roots", "role-policy"]
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "state",
+        "key": "dot",
+        "order": 2,
+        "retention_path": "active/shared/runtime/dot"
+      }
     },
     {
       "id": "dot-charters",
@@ -125,7 +167,13 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["person_charter_store", "pr_publication_store"],
-      "sources": ["runtime-state-roots", "role-policy"]
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "state",
+        "key": "external_operations",
+        "order": 5,
+        "retention_path": "active/shared/runtime/external-operations"
+      }
     },
     {
       "id": "floor.artifact",
@@ -139,7 +187,13 @@
       "status": "active",
       "legacy_roles": ["peer_task_artifact_writer", "pr_publication_store"],
       "sources": ["storage-floor", "role-policy"],
-      "note": "Floors also hold a system/ partition (custody system)."
+      "note": "Floors also hold a system/ partition (custody system).",
+      "registration": {
+        "family": "floor",
+        "key": "artifact",
+        "order": 4,
+        "retention_path": "active/shared/artifacts"
+      }
     },
     {
       "id": "floor.cache",
@@ -152,7 +206,13 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "sources": ["storage-floor"],
-      "note": "Floors also hold a system/ partition (custody system)."
+      "note": "Floors also hold a system/ partition (custody system).",
+      "registration": {
+        "family": "floor",
+        "key": "cache",
+        "order": 3,
+        "retention_path": "active/shared/cache"
+      }
     },
     {
       "id": "floor.scratch",
@@ -171,7 +231,13 @@
         "pr_publication_store"
       ],
       "sources": ["storage-floor", "role-policy"],
-      "note": "Floors also hold a system/ partition (custody system)."
+      "note": "Floors also hold a system/ partition (custody system).",
+      "registration": {
+        "family": "floor",
+        "key": "scratch",
+        "order": 1,
+        "retention_path": "active/shared/tmp"
+      }
     },
     {
       "id": "floor.staging",
@@ -184,7 +250,13 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "sources": ["storage-floor"],
-      "note": "Floors also hold a system/ partition (custody system)."
+      "note": "Floors also hold a system/ partition (custody system).",
+      "registration": {
+        "family": "floor",
+        "key": "staging",
+        "order": 2,
+        "retention_path": "active/shared/staging"
+      }
     },
     {
       "id": "generation-cost-settlements",
@@ -196,7 +268,13 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "sources": ["runtime-state-roots"]
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "generation_cost_settlements",
+        "order": 13,
+        "retention_path": "active/shared/runtime/media-generation/cost-settlements"
+      }
     },
     {
       "id": "grants",
@@ -209,7 +287,13 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["credential_allocation_reader"],
-      "sources": ["runtime-state-roots", "role-policy"]
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "state",
+        "key": "grants",
+        "order": 8,
+        "retention_path": "active/shared/runtime/grants"
+      }
     },
     {
       "id": "hearing",
@@ -221,7 +305,13 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "sources": ["runtime-state-roots"]
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "hearing",
+        "order": 6,
+        "retention_path": "active/shared/runtime/hearing"
+      }
     },
     {
       "id": "legacy.customer-audit-mirror",
@@ -471,7 +561,13 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["pipeline_journal_store"],
-      "sources": ["runtime-state-roots", "role-policy"]
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "state",
+        "key": "pipeline_library_runs",
+        "order": 3,
+        "retention_path": "active/shared/runtime/pipeline-library-runs"
+      }
     },
     {
       "id": "product-knowledge",
@@ -513,6 +609,42 @@
       "sources": ["role-policy"]
     },
     {
+      "id": "runtime.provider-attestations",
+      "path": "active/shared/runtime/provider-attestations",
+      "custody": {
+        "kind": "derived",
+        "note": "System records live in system/attestations.json; person records live in personal/shared/<owner>.json. This mixed root has no tenant partition and does not establish one custodian or tier."
+      },
+      "status": "active",
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "provider_attestations",
+        "order": 15,
+        "partition_shape": "system_person",
+        "retention_path": "active/shared/runtime/provider-attestations"
+      }
+    },
+    {
+      "id": "runtime.delegations",
+      "path": "active/shared/runtime/delegation-records/confidential/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "active",
+      "legacy_roles": ["delegation_record_store"],
+      "sources": ["runtime-state-roots", "role-policy"],
+      "registration": {
+        "family": "ledger",
+        "key": "delegations",
+        "order": 6,
+        "retention_path": "active/shared/runtime/delegation-records"
+      },
+      "note": "Tenant delegation traces, resumable records, child inboxes and completion notifications share this confidential partition. Untenanted delegations use the separate system/ partition; mixed legacy traces, records and notification queues are read-only fallbacks, not tenant custody inferred from this declaration."
+    },
+    {
       "id": "runtime.execution-metrics",
       "path": "active/shared/runtime/execution-metrics",
       "custody": {
@@ -520,7 +652,13 @@
       },
       "status": "active",
       "legacy_roles": ["metrics_cap_reader"],
-      "sources": ["role-policy"]
+      "sources": ["role-policy"],
+      "registration": {
+        "family": "ledger",
+        "key": "execution_metrics",
+        "order": 2,
+        "retention_path": "active/shared/runtime/execution-metrics"
+      }
     },
     {
       "id": "runtime.locks",
@@ -600,7 +738,13 @@
         "tenant_approval_partition_index_reader",
         "tenant_approval_store"
       ],
-      "sources": ["role-policy"]
+      "sources": ["role-policy"],
+      "registration": {
+        "family": "ledger",
+        "key": "tenant_approvals",
+        "order": 4,
+        "retention_path": "active/shared/runtime/tenant-approvals"
+      }
     },
     {
       "id": "runtime.tenant-ledger",
@@ -613,7 +757,13 @@
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
       "legacy_roles": ["tenant_ledger_store"],
-      "sources": ["role-policy"]
+      "sources": ["role-policy"],
+      "registration": {
+        "family": "ledger",
+        "key": "tenant_ledger",
+        "order": 3,
+        "retention_path": "active/shared/runtime/tenant-ledger"
+      }
     },
     {
       "id": "runtime.tenants",
@@ -633,7 +783,13 @@
       },
       "status": "active",
       "legacy_roles": ["metrics_cap_reader"],
-      "sources": ["role-policy"]
+      "sources": ["role-policy"],
+      "registration": {
+        "family": "ledger",
+        "key": "resource_usage",
+        "order": 1,
+        "retention_path": "active/shared/runtime/usage-ledger"
+      }
     },
     {
       "id": "runtime.vitest-approvals",
@@ -665,7 +821,13 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "sources": ["runtime-state-roots"]
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "seam_selection_defaults",
+        "order": 11,
+        "retention_path": "active/shared/runtime/seam-selection-defaults"
+      }
     },
     {
       "id": "shared.coordination",
@@ -753,7 +915,13 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "sources": ["runtime-state-roots"]
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "task_workspaces",
+        "order": 1,
+        "retention_path": "active/shared/runtime/workspaces"
+      }
     },
     {
       "id": "tenant-audit-mirror",
@@ -766,7 +934,13 @@
       "status": "active",
       "sources": ["scope-model", "role-policy"],
       "note": "S2 done: per-tenant copy of the master audit chain, written only by audit_mirror_writer (storage-layout TENANT_STORE_LEDGER_ROOTS).",
-      "legacy_roles": ["audit_mirror_writer"]
+      "legacy_roles": ["audit_mirror_writer"],
+      "registration": {
+        "family": "ledger",
+        "key": "tenant_audit_mirror",
+        "order": 5,
+        "retention_path": "active/shared/runtime/audit-mirror"
+      }
     },
     {
       "id": "tenant-channel-bindings",

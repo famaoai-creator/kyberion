@@ -31,6 +31,7 @@ import {
 import { pathResolver } from '../path-resolver.js';
 import { discussionRequestCapability } from './discussion-request-capability.js';
 import { pipelineJournalCapability } from './pipeline-journal-capability.js';
+import { autonomyLearningCapability } from './autonomy-learning-capability.js';
 import { narrowStoreRoleDenial } from './narrow-store-role-denial.js';
 import { DELIVERABLE_INBOX_ENTRIES_PATH } from './deliverable-inbox-writer-capability.js';
 
@@ -70,6 +71,24 @@ function scope(overrides: Partial<ResourceAccessScope> = {}): ResourceAccessScop
 }
 const abs = (target: string) => path.resolve(ROOT, target);
 
+function withProtectedFixture(run: (root: string) => void): void {
+  const root = abs(base);
+  safeWriteFile(
+    path.join(root, 'knowledge/personal/tenants/acme-corp.json'),
+    JSON.stringify({ tenant_slug: 'acme-corp', status: 'active' })
+  );
+  const rootDir = vi.spyOn(pathResolver, 'rootDir').mockReturnValue(root);
+  const rootResolve = vi
+    .spyOn(pathResolver, 'rootResolve')
+    .mockImplementation((target) => path.resolve(root, target));
+  try {
+    run(root);
+  } finally {
+    rootResolve.mockRestore();
+    rootDir.mockRestore();
+  }
+}
+
 beforeEach(() => {
   for (const key of ENV) {
     saved[key] = process.env[key];
@@ -94,6 +113,57 @@ afterEach(() => {
 });
 
 describe('request resource ceiling', () => {
+  it.each(['discussion_request_store', 'pipeline_journal_store'])(
+    'retains %s write-backed append and metadata ancestor access',
+    (role) => {
+      const capability =
+        role === 'discussion_request_store'
+          ? discussionRequestCapability(
+              'active/shared/runtime/discussion-create-requests/confidential/acme-corp/by-actor/' +
+                'a'.repeat(64) +
+                '/' +
+                'b'.repeat(64) +
+                '/12345678-1234-4234-8234-123456789abc',
+              'acme-corp',
+              true
+            )
+          : pipelineJournalCapability(
+              'acme-corp',
+              'active/shared/runtime/pipeline-library-runs/confidential/acme-corp/run.jsonl'
+            );
+      withProtectedFixture((root) => {
+        process.env.SYSTEM_ROLE = role;
+        process.env.KYBERION_TENANT = 'acme-corp';
+        runInResourceAccessScope(capability, () => {
+          const target = path.join(root, capability.writeExact[0]!);
+          expect(validateWritePermission(target, 'append').allowed).toBe(true);
+          expect(validateReadPermission(path.dirname(target), 'metadata').allowed).toBe(true);
+          expect(validateReadPermission(target + '.other', 'metadata').allowed).toBe(false);
+        });
+      });
+    }
+  );
+
+  it('retains supported autonomy maintenance prefixes for one component only', () => {
+    const capability = autonomyLearningCapability('acme-corp');
+    withProtectedFixture((root) => {
+      process.env.SYSTEM_ROLE = 'autonomy_learning_store';
+      process.env.KYBERION_TENANT = 'acme-corp';
+      runInResourceAccessScope(capability, () => {
+        for (const prefix of capability.namePrefixExact!) {
+          const target = path.join(root, prefix + 'segment.jsonl');
+          expect(validateWritePermission(target, 'append').allowed).toBe(true);
+          expect(validateReadPermission(target, 'metadata').allowed).toBe(true);
+          expect(validateWritePermission(target, 'mkdir').allowed).toBe(false);
+          expect(validateReadPermission(target + '/child', 'metadata').allowed).toBe(false);
+        }
+        const target = path.join(root, capability.writeExact[0]!);
+        expect(validateWritePermission(target, 'append').allowed).toBe(true);
+        expect(validateReadPermission(path.dirname(target), 'metadata').allowed).toBe(true);
+      });
+    });
+  });
+
   it('retains content-checked legacy write refusals for the actual append verb', () => {
     expect(
       narrowStoreRoleDenial({

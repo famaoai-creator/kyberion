@@ -4,7 +4,7 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import { readTenantProfile, tenantProfileDir } from './organization/tenant-registry.js';
 import { TENANT_CHANNEL_BINDINGS_FILE, tenantHomePath } from './organization/tenant-home.js';
 import { CUSTOMER_CHANNEL_BINDING_STORE_ROLE } from './foundation/customer-channel-binding-store-capability.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
 import { logger } from './core.js';
 import { isValidTenantSlug } from './foundation/scope.js';
 import { withExecutionContext } from './authority.js';
@@ -48,17 +48,28 @@ export interface CustomerChannelBindingListOptions {
   /** Repository root seam for hermetic callers; defaults to the live root. */
   rootDir?: string;
   /**
-   * Throw instead of yielding no bindings when this process may not read the
-   * tenant's bindings (a caller bound to another tenant). For checks that must
-   * fail closed, such as the cross-tenant conflict check of a bind.
+   * Throw on registry/binding read, path or validation failures instead of
+   * treating them as no bindings. Genuine absence still yields no bindings.
+   * For checks that must fail closed, such as a bind's cross-tenant check.
    */
   strict?: boolean;
 }
 
-function readBindingsFile(filePath: string, rootDir: string): CustomerChannelBinding[] {
+function readBindingsFile(
+  filePath: string,
+  rootDir: string,
+  strict = false
+): CustomerChannelBinding[] {
   try {
-    const safeFilePath = assertSafeRepositoryPath(filePath, { rootDir });
-    if (!safeExistsSync(safeFilePath)) return [];
+    const safeFilePath = assertSafeRepositoryPath(filePath, { rootDir, allowMissingLeaf: true });
+    if (strict) {
+      try {
+        safeLstat(safeFilePath);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+        throw err;
+      }
+    } else if (!safeExistsSync(safeFilePath)) return [];
     const parsed = defineCatalog<{ bindings: CustomerChannelBinding[] }>({
       id: 'customer-channel-binding',
       path: safeFilePath,
@@ -66,6 +77,7 @@ function readBindingsFile(filePath: string, rootDir: string): CustomerChannelBin
     }).load();
     return parsed.bindings;
   } catch (err) {
+    if (strict) throw err;
     const message = err instanceof Error ? err.message : String(err);
     logger.warn(`[customer-channel-binding] failed to read ${filePath}: ${message}`);
     return [];
@@ -105,11 +117,15 @@ export function isActiveCustomerTenant(
  * the role whose grant is exactly that file. Throws when the caller is bound to
  * another tenant ([ROLE_TENANT_SCOPE_MISMATCH]).
  */
-function readTenantBindingsFile(tenantSlug: string, rootDir: string): CustomerChannelBinding[] {
+function readTenantBindingsFile(
+  tenantSlug: string,
+  rootDir: string,
+  strict = false
+): CustomerChannelBinding[] {
   const filePath = tenantHomePath(tenantSlug, TENANT_CHANNEL_BINDINGS_FILE, rootDir);
   return withExecutionContext(
     CUSTOMER_CHANNEL_BINDING_STORE_ROLE,
-    () => readBindingsFile(filePath, rootDir),
+    () => readBindingsFile(filePath, rootDir, strict),
     'worker',
     tenantSlug
   );
@@ -162,11 +178,12 @@ export function listCustomerChannelBindings(
   const rootDir = path.resolve(options.rootDir ?? pathResolver.rootDir());
   const results: Array<ResolvedCustomerBinding & { file: string }> = [];
   // Only a registered, active tenant has bindings; each lives in that tenant's home.
-  for (const slug of [...activeRegisteredTenantSlugs(rootDir)].sort()) {
+  for (const slug of [...activeRegisteredTenantSlugs(rootDir, options.strict === true)].sort()) {
     let bindings: CustomerChannelBinding[];
     try {
-      bindings = readTenantBindingsFile(slug, rootDir);
-    } catch {
+      bindings = readTenantBindingsFile(slug, rootDir, options.strict === true);
+    } catch (err) {
+      if (options.strict) throw err;
       // A tenant this process may not read routes nothing here (fails closed).
       continue;
     }
@@ -202,7 +219,7 @@ export function resolveCustomerBinding(
  * CD-11: one tenant's bindings only (`knowledge/confidential/<tenant>/connections/channel-bindings.json`),
  * never a walk over other tenants, and none for a tenant that is not
  * registered and active (fails closed). A file that cannot be read or does
- * not validate is logged and yields no bindings.
+ * not validate is logged and yields no bindings, unless strict is requested.
  */
 export function readTenantCustomerChannelBindings(
   tenantSlug: string,
@@ -214,7 +231,7 @@ export function readTenantCustomerChannelBindings(
   // has bindings (a suspended tenant never messages its customers).
   if (!isActiveTenant(tenantSlug, rootDir, options.strict === true)) return [];
   try {
-    return readTenantBindingsFile(tenantSlug, rootDir);
+    return readTenantBindingsFile(tenantSlug, rootDir, options.strict === true);
   } catch (err) {
     if (options.strict) throw err;
     const message = err instanceof Error ? err.message : String(err);

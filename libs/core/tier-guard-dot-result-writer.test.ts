@@ -5,6 +5,7 @@ import * as paths from './path-resolver.js';
 import { resetRoleAssumptionPolicyCache, withExecutionContext } from './authority.js';
 import { validateReadPermission, validateWritePermission } from './tier-guard.js';
 import {
+  createSynchronousResourceGrantIssuer,
   currentResourceAccessScope,
   runInResourceAccessScope,
   type ResourceAccessScope,
@@ -13,6 +14,7 @@ import {
   withDotResultStoreCapability,
   isDotResultStoreCapability,
   type DotResultStoreBinding,
+  type DotResultStoreOperation,
 } from './foundation/dot-result-store-capability.js';
 import {
   safeMkdir,
@@ -82,6 +84,63 @@ afterEach(() => {
 });
 
 describe('internal DOT result capability under actual registered policy', () => {
+  it.each(['append_result', 'append_report_marker', 'read_state'] as const)(
+    'preserves the operation ceiling matrix for %s',
+    (domainOperation: DotResultStoreOperation) => {
+      const writing = domainOperation !== 'read_state';
+      withDotResultStoreCapability(binding(), domainOperation, () => {
+        const scope = currentResourceAccessScope();
+        const cases = [
+          { target: file, read: !writing, append: writing, mkdir: false, metadata: true },
+          {
+            target: path.posix.dirname(file),
+            read: false,
+            append: false,
+            mkdir: writing,
+            metadata: true,
+          },
+          { target: '', read: false, append: false, mkdir: false, metadata: true },
+          { target: file + '.other', read: false, append: false, mkdir: false, metadata: false },
+          { target: file + '/child', read: false, append: false, mkdir: false, metadata: false },
+          {
+            target: file.replace(tenant, 'other-tenant'),
+            read: false,
+            append: false,
+            mkdir: false,
+            metadata: false,
+          },
+        ];
+        for (const row of cases) {
+          for (const operation of ['read', 'append', 'mkdir', 'metadata'] as const)
+            expect(
+              isDotResultStoreCapability(scope, { rootDir: root, target: row.target, operation })
+            ).toBe(row[operation]);
+          expect(
+            isDotResultStoreCapability(scope, {
+              rootDir: root,
+              target: row.target,
+              operation: 'write',
+            })
+          ).toBe(false);
+          expect(
+            isDotResultStoreCapability(scope, {
+              rootDir: root,
+              target: row.target,
+              operation: 'delete' as 'metadata',
+            })
+          ).toBe(false);
+          expect(
+            isDotResultStoreCapability(scope, {
+              rootDir: sourceRoot,
+              target: row.target,
+              operation: 'metadata',
+            })
+          ).toBe(false);
+        }
+      });
+    }
+  );
+
   it('checks every cold and warm role assumption, including registered system-role metadata', () => {
     vi.stubEnv('SYSTEM_ROLE', 'operator_surface');
     expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/);
@@ -174,6 +233,15 @@ describe('internal DOT result capability under actual registered policy', () => 
     runInResourceAccessScope(forged, () =>
       expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/)
     );
+    const counterfeitIssuer = createSynchronousResourceGrantIssuer('DOT_RESULT_CAPABILITY');
+    const { opaqueStoreToken: _token, ...sameCeiling } = forged;
+    counterfeitIssuer.run(
+      Object.freeze({ binding: binding(), operation: 'append_result' }),
+      sameCeiling,
+      () => {
+        expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/);
+      }
+    );
   });
   it('invalidates escaped scope, spread copies, exceptions and queued asynchronous callbacks', async () => {
     let escaped: ResourceAccessScope | undefined;
@@ -186,6 +254,12 @@ describe('internal DOT result capability under actual registered policy', () => 
       expect(
         isDotResultStoreCapability(
           { ...escaped! },
+          { rootDir: root, target: file, operation: 'append' }
+        )
+      ).toBe(false);
+      expect(
+        isDotResultStoreCapability(
+          { ...escaped!, opaqueStoreToken: escaped!.opaqueStoreToken },
           { rootDir: root, target: file, operation: 'append' }
         )
       ).toBe(false);

@@ -536,6 +536,8 @@ describe('runAdaptiveStructuredLlmProfile provider egress gate', () => {
   };
 
   beforeEach(() => {
+    // Provider-selection fixtures must not inherit the runner's offline profile.
+    vi.stubEnv('KYBERION_WISDOM_LLM_PROFILE', undefined);
     calls.length = 0;
     disposers.push(
       registerStructuredRunner('egress-gate-claude', async () => {
@@ -546,6 +548,7 @@ describe('runAdaptiveStructuredLlmProfile provider egress gate', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     while (disposers.length) disposers.pop()?.();
   });
 
@@ -626,10 +629,13 @@ describe('invokeLlm provider egress gate', () => {
   };
 
   beforeEach(() => {
+    // Provider-selection fixtures must not inherit the runner's offline profile.
+    vi.stubEnv('KYBERION_WISDOM_LLM_PROFILE', undefined);
     process.env.KYBERION_CLAUDE_CLI_BIN = process.execPath;
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     if (originalBin === undefined) delete process.env.KYBERION_CLAUDE_CLI_BIN;
     else process.env.KYBERION_CLAUDE_CLI_BIN = originalBin;
   });

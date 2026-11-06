@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 
 let missionPath = '';
@@ -191,6 +191,8 @@ describe('mission-distill end-to-end promotion flow', () => {
   });
 
   beforeEach(() => {
+    // This describe mocks LLM resolution; offline runner defaults must not bypass it.
+    vi.stubEnv('KYBERION_WISDOM_LLM_PROFILE', undefined);
     withExecutionContext('ecosystem_architect', () => {
       safeRmSync(missionPath, { recursive: true, force: true });
       safeRmSync(queuePath, { force: true });
@@ -199,6 +201,10 @@ describe('mission-distill end-to-end promotion flow', () => {
       safeRmSync(`${promotedKnowledgeDir}/${promotedRecordBase}.md`, { force: true });
     });
     writeMissionState();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   afterAll(() => {

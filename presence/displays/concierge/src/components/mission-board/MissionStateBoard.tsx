@@ -24,8 +24,8 @@ export interface MissionStateBoardProps {
 }
 
 /**
- * `/work` 仕事 › ミッション: four state columns (進行中 / 入力待ち・停滞 /
- * レビュー待ち / 完了) with a count each and the most recent missions as
+ * `/work` 仕事 › ミッション: five state columns (計画中 / 進行中 /
+ * 入力待ち・停滞 / レビュー待ち / 完了) with a count each and the most recent missions as
  * links to their detail page. Read-only — mission state changes go through
  * the mission controller, never through this board. The columns scroll
  * inside their own container on narrow screens.

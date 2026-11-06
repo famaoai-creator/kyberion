@@ -11,6 +11,7 @@ import {
   safeRmSync,
   safeSymlinkSync,
   safeWriteFile,
+  safeCopyFileSync,
 } from './secure-io.js';
 
 const ROLE = 'reasoning_settings_writer';
@@ -23,13 +24,15 @@ const at = (file: string) => path.join(fixture, file);
 // The subprocess uses the real authority and secureIO singletons against a fresh
 // root. Only immutable product policy/schema inputs are copied into this fixture.
 function copyProductDirectory(relative: string): void {
+  safeMkdir(at(relative), { recursive: true });
   for (const name of safeReaddir(path.join(ROOT, relative))) {
     const file = path.join(relative, name);
     const source = path.join(ROOT, file);
     const stat = safeLstat(source);
     if (stat.isSymbolicLink()) throw new Error('Unexpected linked product fixture');
     if (stat.isDirectory()) copyProductDirectory(file);
-    else if (/\.(?:json|yaml)$/u.test(name)) safeWriteFile(at(file), safeReadFile(source));
+    // Product fixtures are regenerable; preserve secure path/link checks without per-file fsync.
+    else if (/\.(?:json|yaml)$/u.test(name)) safeCopyFileSync(source, at(file));
   }
 }
 

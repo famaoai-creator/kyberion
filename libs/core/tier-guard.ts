@@ -1,3 +1,4 @@
+import { isCredentialMaterialCapability } from './foundation/credential-material-capability.js';
 import { engineRuntimeResourceAccessDenial as resourceAccessDenial } from './voice/engine-runtime-preferences-access.js';
 import {
   PERSONAL_APPROVAL_STORE_ROLE,
@@ -94,7 +95,7 @@ import { currentExecutionScope } from './foundation/execution-scope.js';
 import { informationAssetCoverageReadAllowed } from './foundation/information-asset-coverage-capability.js';
 import {
   currentResourceAccessScope,
-  matchesNamePrefix,
+  decideResourceAccess,
   type ResourceAccessOperation,
 } from './foundation/resource-access-scope.js';
 import type {
@@ -131,6 +132,14 @@ function isOutsideProjectRoot(relativePath: string): boolean {
   if (!relativePath) return false;
   const firstSegment = normalizePath(relativePath).split('/')[0];
   return firstSegment === '..';
+}
+
+function dotResultResourceAllowed(target: string, operation: ResourceAccessOperation): boolean {
+  return isDotResultStoreCapability(currentResourceAccessScope(), {
+    rootDir: projectRoot(),
+    target,
+    operation,
+  });
 }
 
 const logger = createLogger('tier-guard');
@@ -565,11 +574,7 @@ function isScopedStructuralMkdir(
       tenantSlug &&
       isRegisteredActiveTenant(tenantSlug) &&
       currentResourceAccessScope()?.tenantSlug === tenantSlug &&
-      isDotResultStoreCapability(currentResourceAccessScope(), {
-        rootDir: projectRoot(),
-        target: relativePath,
-        operation: 'mkdir',
-      })
+      dotResultResourceAllowed(relativePath, 'mkdir')
     );
   if (access.role === PR_PUBLICATION_STORE_ROLE) {
     const publication = currentPrPublicationScope();
@@ -947,14 +952,17 @@ function requestResourceDenial(
     getRegisteredEnvText('MISSION_ROLE');
   const normalizedRole = role?.trim().toLowerCase().replace(/\s+/gu, '_');
   if (
+    normalizedRole === 'credential_material_reader' &&
+    !isCredentialMaterialCapability(currentResourceAccessScope())
+  )
+    return {
+      allowed: false,
+      reason:
+        '[CREDENTIAL_CAPABILITY_REQUIRED] Active exact credential material capability required',
+    };
+  if (
     normalizedRole === DOT_RESULT_STORE_ROLE &&
-    !denyCandidatePaths(relativePath).every((target) =>
-      isDotResultStoreCapability(currentResourceAccessScope(), {
-        rootDir: projectRoot(),
-        target,
-        operation,
-      })
-    )
+    !denyCandidatePaths(relativePath).every((target) => dotResultResourceAllowed(target, operation))
   )
     return {
       allowed: false,
@@ -969,30 +977,10 @@ function requestResourceDenial(
     const scope = currentResourceAccessScope();
     if (!scope) return false;
     if (!withNamePrefixes && (scope.namePrefixExact?.length ?? 0) > 0) return false;
-    const candidates = denyCandidatePaths(relativePath);
-    const prefixed = (target: string): boolean =>
-      withNamePrefixes && operation !== 'mkdir' && matchesNamePrefix(scope, target);
-    if (operation === 'append')
-      return candidates.every((target) => scope.writeExact.includes(target) || prefixed(target));
-    if (operation === 'metadata') {
-      const original = [
-        ...(scope.metadataExact ?? []),
-        ...scope.readExact,
-        ...scope.writeExact,
-        ...scope.mkdirExact,
-      ];
-      return candidates.every(
-        (target) =>
-          prefixed(target) ||
-          original.some(
-            (allowed) => target === allowed || target === '' || allowed.startsWith(target + '/')
-          ) ||
-          (scope.allowProductKnowledgeRead === true &&
-            (target === 'knowledge' ||
-              target === 'knowledge/product' ||
-              target.startsWith('knowledge/product/')))
+    if (operation === 'append' || operation === 'metadata')
+      return denyCandidatePaths(relativePath).every(
+        (target) => decideResourceAccess({ ...scope, appendExact: [] }, target, operation).allowed
       );
-    }
     return true;
   };
   if (
@@ -1196,11 +1184,7 @@ export function validateWritePermission(
     // The exact request ceiling was checked before all ambient/default policy grants.
     if (
       (currentRole === DOT_RESULT_STORE_ROLE &&
-        isDotResultStoreCapability(currentResourceAccessScope(), {
-          rootDir: projectRoot(),
-          target: relativePath,
-          operation,
-        })) ||
+        dotResultResourceAllowed(relativePath, operation)) ||
       (currentRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
         isDiscussionRequestCapability(currentResourceAccessScope())) ||
       (currentRole === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
@@ -1394,11 +1378,7 @@ export function inspectReadPermission(
         // ledger root itself; it never widens knowledge/ access.
         if (
           ((identity.role === DOT_RESULT_STORE_ROLE &&
-            isDotResultStoreCapability(currentResourceAccessScope(), {
-              rootDir: projectRoot(),
-              target: relativePath,
-              operation,
-            })) ||
+            dotResultResourceAllowed(relativePath, operation)) ||
             (identity.role === DISCUSSION_REQUEST_STORAGE_ROLE &&
               isDiscussionRequestCapability(currentResourceAccessScope())) ||
             (identity.role === CUSTOMER_DECISION_INVITE_STORE_ROLE &&

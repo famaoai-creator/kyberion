@@ -9675,6 +9675,11 @@
         "ja": "現在のスコープを確認",
         "qps-ploc": "⟦Ïñşṗėƈŧ ŧħė ȧƈŧïṽė şƈőṗė ŀőřėɱ ï⟧"
       },
+      "cli_cmd_scope_inspect": {
+        "en": "Inspect asset scope and the current read policy",
+        "ja": "資産スコープと現在の読取ポリシーを確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ȧşşėŧ şƈőṗė ȧñḓ ŧħė ƈůřřėñŧ řėȧḓ ṗőŀïƈẏ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
       "cli_cmd_script_bindings": {
         "en": "Inspect the runtime seam catalog",
         "ja": "ランタイムのシームカタログを確認",
@@ -12186,7 +12191,7 @@
       },
       "mission_planned": {
         "en": "planned",
-        "ja": "予定",
+        "ja": "計画中",
         "qps-ploc": "⟦ṗŀȧññėḓ ŀőř⟧"
       },
       "mission_active": {
@@ -20782,6 +20787,11 @@
         "en": "Missions by state",
         "ja": "状態別のミッション",
         "qps-ploc": "⟦Ɱïşşïőñş ƀẏ şŧȧŧė ŀőřėɱ⟧"
+      },
+      "ia_shell_mission_col_planned": {
+        "en": "Planned",
+        "ja": "計画中",
+        "qps-ploc": "⟦Ṗŀȧññėḓ ŀőř⟧"
       },
       "ia_shell_mission_col_in_progress": {
         "en": "In progress",
@@ -29458,6 +29468,21 @@
         "ja": "どのテナントにも属さない項目",
         "qps-ploc": "⟦Ïŧėɱş ñőŧ ȧşşïɠñėḓ ŧő ȧñẏ ŧėñȧñŧ ŀőřėɱ ïṗşů⟧"
       },
+      "project_all_label": {
+        "en": "All projects",
+        "ja": "すべてのプロジェクト",
+        "qps-ploc": "⟦Ȧŀŀ ṗřőĵėƈŧş ŀőř⟧"
+      },
+      "project_scope_detail": {
+        "en": "Project",
+        "ja": "プロジェクト",
+        "qps-ploc": "⟦Ṗřőĵėƈŧ ŀőř⟧"
+      },
+      "project_switch_aria": {
+        "en": "Narrow to a project",
+        "ja": "プロジェクトで絞り込む",
+        "qps-ploc": "⟦Ñȧřřőẇ ŧő ȧ ṗřőĵėƈŧ ŀőřėɱ ⟧"
+      },
       "personal_overview_title": {
         "en": "By tenant",
         "ja": "テナントごとのまとめ",
@@ -36059,7 +36084,7 @@
       },
       "status_planned": {
         "en": "Planned",
-        "ja": "予定",
+        "ja": "計画中",
         "qps-ploc": "⟦Ṗŀȧññėḓ ŀőř⟧"
       },
       "status_ready": {

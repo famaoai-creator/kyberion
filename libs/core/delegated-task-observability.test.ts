@@ -1,5 +1,4 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExistsSync,
@@ -16,6 +15,7 @@ import {
   createDelegationHandle,
   claimDelegatedTaskActivation,
   consumeDelegatedTaskInbox,
+  delegatedTaskRecordPath,
   delegatedTaskStoreDir,
   enqueueDelegatedTaskInbox,
   hasPendingDelegatedTaskInbox,
@@ -153,9 +153,7 @@ describe('KC-06 delegated-task-observability store', () => {
 
     completeDelegatedTaskTrace(traceWithSchema, { resultSummary: 'snapshot ready' });
 
-    const persistedPath = pathResolver.rootResolve(
-      path.join(STORE_OVERRIDE, `${trace.trace_id}.json`)
-    );
+    const persistedPath = delegatedTaskRecordPath(trace.trace_id);
     const persisted = JSON.parse(String(safeReadFile(persistedPath, { encoding: 'utf8' })));
     expect(persisted.$schema).toBeUndefined();
     expect(loadDelegatedTaskRecord(trace.trace_id)?.status).toBe('completed');
@@ -166,9 +164,7 @@ describe('KC-06 delegated-task-observability store', () => {
       owner: 'test-owner',
       instruction: 'Validate the persisted record boundary.',
     });
-    const persistedPath = pathResolver.rootResolve(
-      path.join(STORE_OVERRIDE, `${trace.trace_id}.json`)
-    );
+    const persistedPath = delegatedTaskRecordPath(trace.trace_id);
     safeWriteFile(persistedPath, JSON.stringify({ delegation_id: trace.trace_id }), {
       encoding: 'utf8',
     });

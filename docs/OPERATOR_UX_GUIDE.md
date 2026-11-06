@@ -520,6 +520,22 @@ pnpm capabilities
 pnpm dashboard -- --once --focus onboarding
 ```
 
+### Asset scope inspection(資産スコープの確認)
+
+保存先の管理者・tier・配置状態と、現在の読取ポリシーを確認する。
+
+```bash
+pnpm scope inspect knowledge/product/governance/store-catalog.json
+pnpm kyberion scope inspect knowledge/product/governance/store-catalog.json --json
+```
+
+これは Scope 設定を変更しない診断である。`decision` は既存の読取ポリシー判定であり、
+実際のファイル I/O や sensitive-path mediation の許可を保証しない。ファイルの存在は
+未判定、内容は非表示となる。信頼された比較用 ceiling は作らず、解決結果は
+`address_only` として表示する。legacy 配置の管理者が未確定なら未解決のまま示す。
+拒否も正常な診断結果(exit 0)で、引数不正は exit 2。`--tenant` / `--tier` などで
+この診断の権限を変えることはできない。既存 inspector の physical-alias 検査は継続する。
+
 ### Organization operating model(組織・目標・サービスの登録)
 
 まず対象の tenant と tier で組織を一覧し、表示された `organization_id` を選ぶ。

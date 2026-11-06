@@ -2,7 +2,7 @@
 title: 保存先カタログと許可証による権限判定（tier-guard の再設計）
 kind: design
 status: planned
-last_updated: 2026-11-05
+last_updated: 2026-11-06
 tags: [design, tier-guard, secure-io, scope, custody, grant, storage, governance]
 importance: 8
 ---
@@ -15,6 +15,111 @@ importance: 8
 スコープモデルの P1〜P4 の土台になるので、それらより先に独立して進める。
 
 ## 結論
+
+### 2026-11-06 早朝の実装状況
+
+作業ブランチは `feat/scope-independent-resolution-20261106`。参照ブランチは
+`4d34cf939` まで統合し、S2 の tenant home と固定 confidential audit mirror を維持した。
+保存先の root 登録は23件（state14・ledger5・floor4）で、生成 map と既存 alias を突合する。
+実際の利用者データの移行は実行していない。
+
+資産の住所の解決、操作上限の純粋判定、同期許可証の発行・失効、最終的な secure-io の
+認可を分けた。`scope inspect` は明示したパスを診断し、上限を指定しない場合は
+`address_only` とする。これは住所の構造の診断であり、tenant の登録・存在や完全な
+I/O 許可の証明ではない。新判定で旧認可を置き換える G1 全体、保存先専用ロールを
+除去する G2、system/person の許可証拡張 G4 は未完了である。
+
+公開 subpath は初期実装で3件追加した。credential 許可証の失効後にも残る権限を
+修正するため、secure-io の読み込み数は66から67へ増えた。これは pure proof module
+1件の明示した例外であり、core 全体の依存削減を達成したという意味ではない。
+
+全3267ファイルの最初の検証では3239成功・26失敗・2スキップ、34070テスト中
+33888成功・30失敗・152スキップだった。失敗を個別に分類し、継承された provider
+設定、古い partial mock、fixture の primary root と process-global audit singleton、
+再生成 fixture の大量 fsync、生成 gate 一覧の追従を修正している。
+この初回結果と後続の限定再実行は区別し、限定再実行だけで全体成功とは扱わない。
+
+修正後の28ファイルは516成功・1スキップ。続く全体再実行は3264ファイル成功・
+1失敗・2スキップ、テスト34151成功・1失敗・27スキップ（22分03秒）となり、
+実領域への書込みは検出されなかった。残った1件は test mock による非公開 AJV subpath
+参照で、公開 API を追加せず内部参照へ修正した後、actuator 3件と package boundary の
+4ファイル・101テストが通過した。この最後の test-only 修正後の全体再実行はしていない。
+
+続いて actor と person charter の2か所から、互換 wrapper ではなく既存の
+`foundation/scope` の同じ文法関数を直接参照した。wrapper と公開 API は残した。
+core build と関連7ファイル・99テストが通過し、生成した依存基準値では secure-io が
+67→66、JSON/AJV/catalog/state/service-endpoints の5基準点も各1減った。
+初期の66と比べると差引き0であり、G3 の40以下という目標達成ではない。
+次は権威ある viewer/authority から構築した上限で、一つの保存先の G1 比較を進める。
+
+最終の変更ゲートは `pnpm check -- --changed --base 5c37a7b48 --jobs 1` で
+80件すべて成功した（05:52 JST）。core build・関連99テスト・独立レビューも成功。
+初回検証で生成した合成 mirror の既知2ファイルは、既存の tenant-bound
+`audit_mirror_writer` と secure-io で削除し、親ディレクトリや他の記録には触れていない。
+参照ブランチは05:40時点で `4d34cf939`、main は `f1a6eec49` のままである。
+変更はローカルの専用ブランチに記録し、push・PR・remote CI は未実施である。
+
+最後の順序検査で、audit のキャッシュされた fixture root と、broker guard の lazy import
+が保持する mock sink の不一致を3アサーションで再現した。テストの状態隔離を修正し、
+期待値を維持したまま seeds 222・7・20261008 の各7ファイル・167テストが成功した。
+この最後の変更は test fixture と運用手順のみで、実装の認可条件は変えていない。
+
+### 最新 main との同期（2026-11-06 午前）
+
+参照 split は `4d34cf939` のままだが、main は `566e58bc2` へ進んだ。前回は main を
+参照しただけで、共通祖先からの未統合分は56コミット・112ファイルあった。今回これを
+統合し、Scope の生成 map と main の delegation・custody・egress の修正を両立させた。
+
+- `delegations` を confidential tenant ledger として順序6で登録した。通知キューも
+  同じ区画を使い、旧共有キューは legacy read-only のまま扱う。audit mirror と delegation
+  の専用ロール保護、offboarding disposition は双方を保持した。
+- `provider_attestations` を順序15の state root として登録した。system/person が混在する
+  既存の非 tenant 配置なので custody は derived とし、住所診断は未解決のまま返す。
+  `partition_shape: system_person` という配置メタデータで表し、state・derived・tier 指定なしの
+  canonical root だけを投影する。projector に個別パスの例外を増やさず、認可や tenant を
+  生成しない。
+- 登録は合計25件（state15・ledger6・floor4）、カタログは74保存先となった。
+  canonical alias の欠落、非 tenant root の誤った配置・種別・custody を回帰で拒否する。
+- main 由来の4公開 subpath を維持し、公開範囲の基準値は1944→1948へ更新した。
+  この同期で独自の公開 API は追加していない。secure-io の依存数は66を維持している。
+- SoD fixture を S1 後の `stance-resolver` / `stanceRoot` に追従させ、実際の有効化を
+  アサートした。system の自己承認拒否と person の本人同意を維持し、関連検査を PR gate
+  に追加した。統合の影響範囲21ファイル・442テストは成功した。
+
+実データ移行・provider attestation の設定・push は実施していない。全体テストと
+変更ゲートの最終結果は、この同期の mission evidence に記録する。
+
+全体実行は3279ファイル中3273成功・4失敗・2スキップ、34323テスト成功・5失敗・
+27スキップだった（24分12秒）。失敗は、並列 CLI fixture を走査した CD-09 の2件、
+移動済み cron module を指す旧 export の2検査、追加 fragment の形式検査だった。
+値の漏洩による失敗ではなかったが、oracle を弱めず CD-09 の root 全体を隔離し、
+実際の CLI P06/P07 と並列実行して22テスト成功、SoD と合わせた3シードも各32成功を
+確認した。cron の公開名は canonical `pipeline/cron-utils` へ付け替え、対応する
+runtime import・workspace build・fragment 検査の3ファイル8テストも成功した。
+この最終修正後の全体再実行は行わず、失敗の再現範囲と変更ゲートで確認する。
+
+### S3 の追従と migration 保全（2026-11-06）
+
+検証中に参照ブランチへ届いた `bc8e04f39` を追加統合した。deals は
+`knowledge/confidential/<tenant>/deals` の tenant 管理資産として active にし、
+customer 別配置は planned のままにする。旧 `customer/` の住所を active な移行先へ
+読み替えない。実カタログによる住所解決の回帰でも、この区別を確認した。
+カタログは75保存先、runtime 登録は25件のままである。
+
+S3 migration の合成 fixture で、非 UTF-8 添付の byte 破損と symlink の読み飛ばしを
+修正前に再現した。非 JSON は Buffer のままコピーし、JSON/JSONL だけ参照を再リンクする。
+全 tenant の事前検査を終えるまでコピー・削除をせず、特殊 entry と不正な README を拒否し、
+宛先への上書きも拒否する。実ポリシー・実ロールの隔離 root で11テストが成功し、
+S3 と Scope・rename・offboarding 等の28ファイル301テストも成功した。
+
+copy/delete は transaction ではない。途中の I/O 障害では部分的な宛先が残るため、
+既存宛先として停止し、原本を消さずに手動照合する。今回は実データ移行を実行していない。
+
+最終ビルド、生成物13種の drift 検査、migration の3シード（各11テスト）が成功した。
+main 同期前の `66eaa0442` から S3 までを合わせた174ファイルに対し、
+`pnpm check -- --changed --base 66eaa0442 --jobs 1` の84ゲートがすべて成功した。
+独立 reviewer に実装・認可・UX の未解消指摘はない。全体 suite は最後の修正後に
+再実行しておらず、全体結果と失敗再現範囲の再検証を区別している。
 
 門番（`libs/core/tier-guard.ts`）は、**資産の住所**と**許可証**だけを見て判定する。
 ドメインごとのロール名や capability モジュールを門番のコードに書かない。
@@ -143,8 +248,149 @@ tier-guard の read / write / append / mkdir / metadata の各入口はこれを
 | S2  | 会社の資産の移動 | 会社のプロフィール・デザイン・チャネルの紐づけ・監査ログの写しを `knowledge/confidential/<tenant>/` へ |
 | S3  | 顧客の情報の移動 | 商談・要件・エスカレーション・会話を `knowledge/confidential/<tenant>/customers/<customer>/` へ        |
 
-既存データは `migration/` の移行スクリプトで移す（一覧表示 → 確認 → 移動）。順番は
-G0 → S1 → S2 → S3 → G1。カタログに移動先を先に宣言し、ゲートで漏れを検出する。
+既存データは `migration/` の移行スクリプトで移す（一覧表示 → 確認 → 移動）。
+G0 の後は、保存配置の移行 S1 → S2 → S3 と、Scope の解決・比較を独立して進める。
+カタログに移動先を先に宣言し、ゲートで漏れを検出する。G1 の認可判定への切り替えは、
+対象保存先の管理者・tier が解決でき、既存判定との差異を検証した単位で行う。
+
+### Scope 解決・比較の独立実装（2026-11-06）
+
+- `contracts/asset-scope.ts` は資産の管理者・tier・物理的な保存先と、その解決結果を定義する。
+  実行主体と権限上限を持つ `ScopeEnvelope` は変更しない。Stance は権限を与えない。
+- `foundation/asset-address.ts` の `resolveAssetAddress(relativePath, stores)` は、検証済みカタログと
+  正準の repository-relative path だけを受け取る純粋関数である。I/O、環境変数、現在の tenant
+  から管理者を推測しない。`movesTo` は移行先の参照であり、現在の資産の管理者や tier を
+  移行先からコピーする権限ではない。
+- 同じ深さの候補が重なる配置、記録からの解決が必要な `derived`、`unscoped-legacy`、
+  tier が確定しない保存先は `unresolved`。特に旧 `customer/<slug>` と `customer/<tenant>`、
+  混在する connections は現行の粗い G0 宣言だけで認可に使わない。
+- `governance/asset-scope-inspection.ts` の `inspectAssetScopeRead(filePath, ceiling)` は明示的な
+  比較入口。`decision` は既存 `inspectReadPermission` の結果をそのまま返し、`shadow` に
+  資産 Scope の解決と閲覧上限の比較を付ける。カタログはこの入口で遅延して schema 検証付きで読む。
+  比較不能・例外があっても `decision` は変えない。既存 tier-guard / secure-io に hook を追加しない。
+- `shadow` は管理者と tier の上限だけの観測であり、ロール・broker・Grant・内容検査を含む
+  完全な新認可ではない。`agrees` もこの限定した比較結果であり、G1 の切り替え条件を満たした
+  証拠とはしない。既存のロール・Grant がより狭ければ不一致は正常に起こる。
+  `planned` の配置は解決しても閲覧上限の許可に使わない。明示的な呼出元は統合テストと
+  後述の `scope inspect` であり、本番 guard への配線は行わない。実 CLI consumer の追加に伴い、
+  診断 API の暫定 orphan 例外は削除する。
+- 新しい公開 subpath は上記3件のみ（core export baseline 1941 → 1944）。既存 foundation の
+  読み込み上限は上げず、新しい型モジュール0・純粋 resolver 2を登録する。
+
+この段階は G1 の判定関数・Grant 発行・保存先専用ロール廃止を完了したものではない。
+将来の S2/S3 は保存場所の対応を更新し、移動前後の管理者と tier の同一性を検証する。
+
+### 同期 Grant の共通寿命管理と DOT 採用（2026-11-06）
+
+次の単位として、既存 `foundation/resource-access-scope.ts` に
+`createSynchronousResourceGrantIssuer` を実装し、DOT result の既存発行 facade が採用した。
+issuer ごとに独立した WeakMap を持ち、生成した token と現在の凍結済み scope の identity で
+検証する。caller の文字列や構造の一致は発行証拠にしない。同期 callback の終了・例外で
+必ず失効し、Promise/thenable を拒否する。外側の scope の制限も継続して適用する。
+
+DOT 固有の binding/root/操作/対象検証と、`dot_result_writer`、origin permit、書込内容・
+hardlink・symlink の検査は既存のまま残す。issuer インスタンスも既存の private module 内に
+保持し、公開 factory を呼ぶだけでは DOT grant を偽造できない。token が同じでも複製した
+scope は拒否する。scope の一般的な deny-only 動作や非同期利用は変更しない。
+
+これは Grant の共通機構を実 consumer に採用する段階であり、カタログに基づく発行者認可、
+G1 の完全な `decide`、G2 の専用ロール削除、system/person scope への拡張ではない。
+既存モジュール内に置くことで公開 subpath と foundation の依存モジュール数を増やさない。
+
+### 操作上限の共通判定と実 guard での採用（2026-11-06）
+
+最新 split ブランチの S1 検証修正 `f8b5a3b67` を merge `2e3623c36` で取り込んだ後、
+`foundation/resource-access-scope.ts` に純粋関数 `decideResourceAccess` を実装した。
+正準パスと5操作を検証し、exact path・append-only・metadata 祖先探索・単一要素 prefix の
+上限を判定する。不明な実行時の操作値は metadata や prefix の許可に読み替えず拒否する。
+
+ResourceAccessScope の全上限交差と、DOT の実 capability guard がこの関数を使用する。
+DOT の発行済み scope は domain operation ごとの read/append/mkdir/metadata の違いを
+既に表しているため、末尾の独自の操作分岐を削除した。private issuer の真正性・寿命と
+root の一致検査、通常の role/tenant/内容検査は保持する。3つの domain operation の
+操作行列と不正操作・対象外パスを実 grant で検証する。
+
+これは G1 の操作上限判定の共通化であり、カタログによる管理者・発行者・ロール・内容の
+完全な `decide` や G2 のロール削除を完了したものではない。保存先の移行を前提にせず、
+新しい公開 subpath や foundation の runtime import も増やさない。
+
+### G0 登録と保持規則参照の補完（2026-11-06）
+
+従来の gate は state と floor だけを列挙し、ledger root と保持規則の参照を検証していなかった。
+既存22件（state14・ledger4・floor4）の store に `registration` を追加し、family/key と
+現在の保持規則の path を宣言する。gate は全登録の網羅、未知・重複 key、active 状態、
+partition 形状、存在する最も具体的な root 保持規則への参照を検証する。
+`--write-baseline` の前にも同じ登録検査を行うため、登録不整合を baseline 更新で隠せない。
+
+state/floor/通常 ledger は `<tier>/<tenant>` の binding を保持する。既存の
+`ledger:resource_usage` と `ledger:execution_metrics` の bare root だけは、現在の
+`unscoped-legacy` 宣言と一緒に互換維持する。登録を理由に管理者を推測しない。
+保持規則の action/TTL、runtime root、backup/offboarding の列挙は変更しない。
+後続の `2b0d8c329` で、22件に family 内の安定した `order` を追加し、既存 foundation module の
+マーク範囲だけに3種類の root map を生成した。ledger alias は map から導出し、必須 alias の
+登録欠落は書込前に拒否する。runtime の root 値・列挙順序・partition descriptor はコンパイル後の
+snapshot 比較で同一性を確認した。`store-roots --check` を CI と `resolve-generated` に登録し、
+混在ソースの全体を置き換える merge driver は追加しない。foundation の JSON 読込も追加しない。
+
+共通 catalog では fallback の schema 検証漏れも修正した。DOT の disabled default は無効のまま
+schema 範囲に合わせ、必須の fitness/security policy の欠落は明示的な失敗にする。
+
+### 旧ストアの操作上限の共通化（2026-11-06）
+
+`tier-guard` に残る旧ストア用の append・metadata matcher も `decideResourceAccess` を使用する。
+旧 capability が知らない `appendExact` は空にした view を評価し、偽造した append path が
+metadata の祖先探索まで広げないようにする。既存 capability 検証、未対応 prefix の拒否、
+literal/正準の全候補の検査、role・内容検査は維持する。他の操作の分岐は変更しない。
+discussion/journal の正規 append・metadata と autonomy maintenance prefix の行列、既存の
+偽造 capability 拒否を実 guard で検証する。専用ロールの削除や新しいカタログ認可ではない。
+
+### credential material の同期寿命の共通化（2026-11-06）
+
+credential material の既存 facade も private な共通 issuer を使用する。同期 callback の終了後に
+別途予約した Promise 継続へ role と exact Scope が残る場合を再現し、role 取得時だけでなく
+`tier-guard` の I/O 判定ごとにも capability の有効性を確認するようにした。返された Promise の
+拒否だけでは、外側が `undefined` を返す予約済み callback を止められないためである。
+元の exact connection path・tenant binding、allocation/claim/plugin の検査と sensitive-path
+mediation は維持する。再現した問題は失効後の permission 判定であり、secret byte の漏洩を
+実証したものではない。通常の非同期 deny-only Scope には同期寿命を導入しない。
+
+この修正では、直接の private issuer 検証により secure-io の依存が66→67、そこに依存する
+5つの foundation も各+1になることを実測した。identity bridge から authority 全体が
+読み込まれるという当初の想定は成立しなかった。置換可能な認可 callback を追加したり、
+汎用 scope module に credential policy を移したりせず、既存の同期寿命を回復する限定的な
+security 修正として、この6箇所だけを独立レビュー付きで更新する。新しい catalog/identity/network
+I/O や公開 subpath は増やさない。例外を workspace-package-layering にも明記する。
+
+### 資産 Scope の CLI 診断（2026-11-06）
+
+既存の `scope` コマンドに `inspect <path> [--json]` を追加する。カタログ上の資産の
+store・location・custody・tier と、既存 `inspectReadPermission` の読取 policy 判定を示す。
+選択中の tier/tenant や対象パスから信頼された ceiling を作らず、解決できた場合も
+`address_only` として比較未実施を明示する。既存の ceiling 付き caller の比較は維持する。
+未解決の legacy/derived 配置やカタログ取得不能も、許可や管理者の推測に置き換えない。
+
+対象は1パスだけとし、選択用 `--tier` / `--tenant` などの追加 flag は検査前に拒否する。
+Scope 設定の保存・変更は行わない。policy の拒否は診断結果なので exit 0、引数不正は exit 2。
+ファイルの存在は判定せず、内容を出力しない。既存 policy inspector による物理 alias や
+security metadata の検査は残し、sensitive-path mediation を含む実 I/O の許可保証とは区別する。
+
+### S2 更新の統合（2026-11-06）
+
+定期 fetch で `8f8d64abc`（tenant company 資産の S2）と `351ea97b8`（migration の
+`source_kind` 修正）を確認した。独立 Scope の CLI 実装をコミット後、この2件を統合する。
+company は tenant knowledge、channel binding と audit mirror は upstream の active 宣言を
+保持する。S3 の customer 所有モデルはこの作業で実施しない。実データの migration も実行しない。
+
+audit mirror を ledger の順序5で追加し、root 登録は state14・ledger5・floor4 の23件となる。
+固定の `confidential/<tenant>` を、対応する singleton `tiers` 宣言付きで検証する。
+`<tier>` へ書き換えて配置を広げず、tier 欠落・不一致・複数値は拒否する。既存22件の
+root 値・順序を維持し、新しい audit alias も生成 map から導出する。S2 の新しい専用
+ledger 保護は `TENANT_STORE_LEDGER_ROOTS` に残す。登録は配置の宣言であり認可を生成しない。
+
+統合レビューで、channel binding の strict な競合検査でも末端 reader が parse/schema failure を
+空配列へ変換する漏れを見つけた。実 bind の2ケースで修正前の進行を再現し、strict mode を
+末端まで伝えて不明な binding を「競合なし」にしない。nonstrict discovery は既存の動作を
+維持する。既存 target の bytes 不変を回帰で確認し、CI と運用手順へ追加する。
 
 ## 既定で拒否であること
 

@@ -49,6 +49,17 @@ import { resolveTenant } from '../organization/tenant-registry.js';
 import { resolveIdentityContext, withExecutionContext } from '../authority.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { resolveReasoningProviderDescriptor } from '../reasoning/reasoning-provider-registry.js';
+import {
+  CustodyOwnerConflictError,
+  custodyOwnerLabel,
+  deriveCustodyOwner,
+  type CustodyOwner,
+} from '../custody-owner.js';
+import {
+  personCustodyConsentGap,
+  readCustodyProviderAttestationEntry,
+  type NonTenantCustodyOwner,
+} from './custody-provider-attestation-store.js';
 
 const logger = createLogger('provider-egress-gate');
 
@@ -165,6 +176,13 @@ export interface ProviderEgressCheckInput {
    * active identity already has a tenant scope, this value must match it.
    */
   tenant_slug?: string;
+  /**
+   * Who is accountable for the payload (custody-owner.ts). Derived when
+   * omitted: tenant (requested or active) → tenant, personal tier without a
+   * tenant → person, otherwise system. An explicit value may only agree with
+   * the tenant; a contradiction denies.
+   */
+  custody?: CustodyOwner;
   /** Alternate repository root used by hermetic tenant registries. */
   tenant_registry_root_dir?: string;
 }
@@ -203,8 +221,9 @@ function denyAndAlert(
       context: { provider: input.provider, data_tier: input.dataTier },
       recommendation:
         'If this provider should receive this tier, add it to provider-egress-policy.json' +
-        ' (tier_policy.<tier>.approved_providers), record a tenant provider attestation with ' +
-        "'pnpm onboarding llm attest --request-approval' (training_use none needs a human approval; or 'pnpm tenant attest-provider'), or mark it 'local-only' if it truly never leaves this machine.",
+        ' (tier_policy.<tier>.approved_providers), record a provider attestation for the custody owner with ' +
+        "'pnpm onboarding llm attest --tenant <slug> --request-approval' (tenant material; or 'pnpm tenant attest-provider') or " +
+        "'pnpm onboarding llm attest --custody system|person --request-approval' (material without a tenant) — training_use none needs a human approval — or mark it 'local-only' if it truly never leaves this machine.",
       dedupe_key: `provider-egress-denied:${input.provider || 'unknown'}:${input.dataTier}`,
     });
   } catch (err) {
@@ -340,17 +359,8 @@ export interface TenantProviderAttestationLookup extends ResolvedTenantProviderA
   error?: string;
 }
 
-/**
- * Resolve one tenant's attestation for one provider through the same governed
- * path `checkProviderEgress` uses (tenant-scope conflict check, narrow
- * policy-input read of the profile, policy TTL). Never throws and never
- * returns the profile: a lookup that cannot complete reports `absent` with an
- * `error`, which callers must treat as "no attestation" (fail closed).
- *
- * Exists so the reasoning-send gate (`reasoning-egress-scope.ts`) can honour
- * the same attestations without duplicating the read or the expiry rule.
- */
-export function lookupTenantProviderAttestation(input: {
+/** Tenant arm of {@link lookupCustodyProviderAttestation}. */
+function lookupTenantAttestation(input: {
   tenant_slug: string;
   provider: string;
   tenant_registry_root_dir?: string;
@@ -403,6 +413,168 @@ export function lookupTenantProviderAttestation(input: {
   });
 }
 
+/** System / person attestation as policy input, read through the governed store reader. */
+function readNonTenantAttestationAsPolicyInput(
+  custody: NonTenantCustodyOwner,
+  provider: string
+): { profile?: TenantPolicyInput; error?: string } {
+  const read = readCustodyProviderAttestationEntry(custody, provider);
+  if (read.error) return { error: read.error };
+  if (!read.entry) return {};
+  const { training_use, attested_at, expires_at } = read.entry;
+  // A person record is the person's consent only when that person decided it
+  // (decided 2026-11-05); one decided by anyone else is kept but not read.
+  const consentGap =
+    training_use === 'none'
+      ? personCustodyConsentGap(custody, read.entry.approval?.approved_by)
+      : undefined;
+  if (consentGap) {
+    return {
+      error: `${custodySubject(custody)} attestation for '${provider}' is not the person's consent: ${consentGap}; re-record it with '${custodyAttestationRequestCommand(custody, provider)}' decided by the person`,
+    };
+  }
+  return {
+    profile: {
+      provider_attestations: {
+        [provider]: { training_use, attested_at, ...(expires_at ? { expires_at } : {}) },
+      },
+    },
+  };
+}
+
+/**
+ * Resolve the provider attestation that applies to one custody owner
+ * (custody-owner.ts) through the same governed path `checkProviderEgress`
+ * uses, honouring the policy TTL. Never throws and never returns the
+ * underlying profile or store: a lookup that cannot complete reports `absent`
+ * with an `error`, which callers must treat as "no attestation" (fail closed).
+ *
+ * - tenant → the tenant profile (tenant-scope conflict check, narrow
+ *   policy-input read);
+ * - system / person → the custody attestation store
+ *   (custody-provider-attestation-store.ts), which refuses a tenant-bound
+ *   caller and any `none` claim without its approval basis.
+ *
+ * Exists so the reasoning-send gate (`reasoning-egress-scope.ts`) can explain
+ * a denial with the same attestation the delegation gate decided on.
+ */
+export function lookupCustodyProviderAttestation(input: {
+  custody: CustodyOwner;
+  provider: string;
+  tenant_registry_root_dir?: string;
+}): TenantProviderAttestationLookup {
+  const custody = input.custody;
+  if (custody?.kind === 'tenant') {
+    return lookupTenantAttestation({
+      tenant_slug: custody.tenant_slug,
+      provider: input.provider,
+      ...(input.tenant_registry_root_dir
+        ? { tenant_registry_root_dir: input.tenant_registry_root_dir }
+        : {}),
+    });
+  }
+  if (custody?.kind !== 'system' && custody?.kind !== 'person') {
+    return { status: 'absent', training_use: 'unknown', error: 'custody owner is required' };
+  }
+  const provider = String(input.provider || '').trim();
+  if (!provider) {
+    return { status: 'absent', training_use: 'unknown', error: 'provider is required' };
+  }
+  const read = readNonTenantAttestationAsPolicyInput(custody, provider);
+  if (read.error) return { status: 'absent', training_use: 'unknown', error: read.error };
+  const loaded = loadProviderEgressPolicy();
+  return resolveTenantProviderAttestation({
+    profile: read.profile,
+    provider,
+    ttlDays: loaded.status === 'ok' ? loaded.policy.attestation_ttl_days : undefined,
+  });
+}
+
+/**
+ * Resolve one tenant's attestation for one provider. Kept for existing
+ * callers; equivalent to {@link lookupCustodyProviderAttestation} with tenant
+ * custody.
+ */
+export function lookupTenantProviderAttestation(input: {
+  tenant_slug: string;
+  provider: string;
+  tenant_registry_root_dir?: string;
+}): TenantProviderAttestationLookup {
+  return lookupCustodyProviderAttestation({
+    custody: { kind: 'tenant', tenant_slug: input.tenant_slug },
+    provider: input.provider,
+    ...(input.tenant_registry_root_dir
+      ? { tenant_registry_root_dir: input.tenant_registry_root_dir }
+      : {}),
+  });
+}
+
+export interface ResolvedProviderEgressCustody {
+  /** The custody owner the gate decides for (absent when `error` is set). */
+  custody?: CustodyOwner;
+  /** Effective tenant: the requested one, else the active tenant scope. */
+  tenant_slug?: string;
+  /** Why the custody could not be resolved; the gate denies. */
+  error?: string;
+}
+
+/**
+ * The custody owner `evaluateProviderEgress` decides for, from the requested
+ * tenant, the active tenant scope, the data tier and an optional explicit
+ * custody declaration. Exported so the reasoning-send gate explains its
+ * denials with exactly the custody the evaluator used.
+ */
+export function resolveProviderEgressCustody(input: {
+  dataTier: TierLevel;
+  tenant_slug?: string;
+  custody?: CustodyOwner;
+}): ResolvedProviderEgressCustody {
+  const requestedTenantSlug = input.tenant_slug?.trim() || undefined;
+  let activeTenantSlug: string | undefined;
+  try {
+    activeTenantSlug = resolveIdentityContext().tenantSlug?.trim() || undefined;
+  } catch (error) {
+    return {
+      error: `active tenant scope could not be resolved: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  if (requestedTenantSlug && activeTenantSlug && requestedTenantSlug !== activeTenantSlug) {
+    return {
+      error: `tenant '${requestedTenantSlug}' conflicts with the active tenant scope '${activeTenantSlug}'.`,
+    };
+  }
+  const tenantSlug = requestedTenantSlug || activeTenantSlug;
+  try {
+    const custody = deriveCustodyOwner({
+      tier: input.dataTier,
+      ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+      ...(input.custody ? { custody: input.custody } : {}),
+    });
+    return { custody, ...(tenantSlug ? { tenant_slug: tenantSlug } : {}) };
+  } catch (error) {
+    if (error instanceof CustodyOwnerConflictError) return { error: error.message };
+    return { error: `custody could not be resolved: ${String(error)}` };
+  }
+}
+
+/**
+ * The command that opens the approval-mediated attestation for a custody
+ * owner — the next step every denial names. Tenant material points at
+ * `--tenant <slug>`; material without a tenant at `--custody system|person`.
+ */
+export function custodyAttestationRequestCommand(custody: CustodyOwner, provider = '<id>'): string {
+  const target =
+    custody.kind === 'tenant' ? `--tenant ${custody.tenant_slug}` : `--custody ${custody.kind}`;
+  return `pnpm onboarding llm attest ${target} --provider ${provider} --training-use none --plan <plan> --basis <url|ref> --attested-by <who> --request-approval`;
+}
+
+/** How a denial names the custody owner (tenant wording kept from before P1). */
+function custodySubject(custody: CustodyOwner): string {
+  if (custody.kind === 'tenant') return `tenant '${custody.tenant_slug}'`;
+  if (custody.kind === 'person') return `person custody (${custodyOwnerLabel(custody)})`;
+  return 'the installation (system custody)';
+}
+
 /**
  * Side-effect-free evaluation of the tier x egress rule. A denial carries the
  * bare reason (no prefix) and emits no log line or ops-alert, so planning
@@ -428,39 +600,40 @@ export function evaluateProviderEgress(input: ProviderEgressCheckInput): Evaluat
     return deny(`no provider identified for a ${dataTier} payload; fail-closed.`);
   }
 
-  const requestedTenantSlug = input.tenant_slug?.trim();
-  let activeTenantSlug: string | undefined;
-  try {
-    activeTenantSlug = resolveIdentityContext().tenantSlug?.trim();
-  } catch (error) {
-    return deny(
-      `active tenant scope could not be resolved: ${error instanceof Error ? error.message : String(error)}`
-    );
+  const resolved = resolveProviderEgressCustody({
+    dataTier,
+    ...(input.tenant_slug ? { tenant_slug: input.tenant_slug } : {}),
+    ...(input.custody ? { custody: input.custody } : {}),
+  });
+  if (resolved.error || !resolved.custody) {
+    return deny(resolved.error || 'custody owner could not be resolved; fail-closed.');
   }
-  if (requestedTenantSlug && activeTenantSlug && requestedTenantSlug !== activeTenantSlug) {
-    return deny(
-      `tenant '${requestedTenantSlug}' conflicts with the active tenant scope '${activeTenantSlug}'.`
-    );
-  }
-  const tenantSlug = requestedTenantSlug || activeTenantSlug;
-  let tenantPolicyInput: TenantPolicyInput | undefined;
-  if (tenantSlug) {
+  const custody = resolved.custody;
+  const tenantSlug = resolved.tenant_slug;
+  let attestationInput: TenantPolicyInput | undefined;
+  if (custody.kind === 'tenant') {
     try {
       const policyInput = readTenantProfileAsPolicyInput(
-        tenantSlug,
+        custody.tenant_slug,
         provider,
         input.tenant_registry_root_dir
       );
-      tenantPolicyInput = policyInput;
+      attestationInput = policyInput;
       const allowed = policyInput.allowed_reasoning_backends;
       if (allowed?.length && !allowed.includes(provider)) {
-        return deny(`tenant '${input.tenant_slug}' does not allow provider '${provider}'.`);
+        return deny(`tenant '${custody.tenant_slug}' does not allow provider '${provider}'.`);
       }
     } catch (error) {
       return deny(
-        `tenant '${input.tenant_slug}' could not be resolved: ${error instanceof Error ? error.message : String(error)}`
+        `tenant '${custody.tenant_slug}' could not be resolved: ${error instanceof Error ? error.message : String(error)}`
       );
     }
+  } else {
+    // An unreadable or invalid system/person record is no attestation: the
+    // policy bases below still apply, and nothing opens on a broken claim.
+    const read = readNonTenantAttestationAsPolicyInput(custody, provider);
+    if (read.error) logger.debug(`custody attestation ignored — ${read.error}`);
+    attestationInput = read.profile;
   }
 
   const loaded = loadProviderEgressPolicy();
@@ -489,30 +662,41 @@ export function evaluateProviderEgress(input: ProviderEgressCheckInput): Evaluat
   // Local inference never leaves the machine, so training use cannot apply.
   if (declaration?.egress === 'local-only') return { allowed: true, basis: 'local-only' };
 
-  // The tenant's own attestation wins over the repository default: it is the
-  // one that knows which plan was actually purchased. The shipped policy
-  // deliberately declares every provider `unknown`, because contracts differ
-  // per installation and this file is public.
+  // The custody owner's own attestation (tenant profile, or the system /
+  // person store) wins over the repository default: it is the one that knows
+  // which plan was actually purchased. The shipped policy deliberately
+  // declares every provider `unknown`, because contracts differ per
+  // installation and this file is public.
   const attestation = resolveTenantProviderAttestation({
-    profile: tenantPolicyInput,
+    profile: attestationInput,
     provider,
     ttlDays: policy.attestation_ttl_days,
   });
+  // Person custody (decided 2026-11-05, option C): the person's attestation
+  // is their consent, not evidence that the provider does not train. It opens
+  // egress only together with that evidence — the installation's own
+  // training_use none attestation, or a policy declaration of none.
+  let personEvidenceGap = '';
   if (
     attestation.status === 'valid' &&
     attestation.training_use === 'none' &&
     (declaration || exceptions.includes(provider))
   ) {
-    return { allowed: true, basis: 'tenant-attestation' };
+    if (custody.kind !== 'person') return { allowed: true, basis: `${custody.kind}-attestation` };
+    const evidenceGap = noTrainingEvidenceGap(provider, declaration, policy.attestation_ttl_days);
+    if (!evidenceGap) return { allowed: true, basis: 'person-attestation' };
+    personEvidenceGap = `${custodySubject(custody)} consents to '${provider}', but its consent is not evidence that the provider does not train and ${evidenceGap} (record it with '${custodyAttestationRequestCommand({ kind: 'system' }, provider)}'); `;
   }
   if (attestation.status === 'expired') {
     return deny(
-      `'${provider}' attestation for tenant '${tenantSlug}' expired on ${attestation.expires_at}; re-verify the plan's training-use terms before sending ${dataTier} material.`
+      custody.kind === 'tenant'
+        ? `'${provider}' attestation for tenant '${tenantSlug}' expired on ${attestation.expires_at}; re-verify the plan's training-use terms before sending ${dataTier} material.`
+        : `'${provider}' attestation for ${custodySubject(custody)} expired on ${attestation.expires_at}; re-verify the plan's training-use terms before sending ${dataTier} material.`
     );
   }
   if (attestation.status === 'valid' && attestation.training_use !== 'none') {
     return deny(
-      `tenant '${tenantSlug}' attests training_use '${attestation.training_use}' for '${provider}'.`
+      `${custody.kind === 'tenant' ? `tenant '${tenantSlug}'` : custodySubject(custody)} attests training_use '${attestation.training_use}' for '${provider}'.`
     );
   }
 
@@ -526,14 +710,51 @@ export function evaluateProviderEgress(input: ProviderEgressCheckInput): Evaluat
 
   if (!declaration) {
     return deny(
-      `'${provider}' is not declared in provider-egress-policy.json; a tenant attestation alone cannot establish its egress identity.`
+      `${personEvidenceGap}'${provider}' is not declared in provider-egress-policy.json; a tenant attestation alone cannot establish its egress identity.`
     );
   }
 
   const trainingUse = declaration.training_use ?? 'unknown';
   return deny(
-    `'${provider}' has training_use '${trainingUse}'; ${dataTier} material may only go to a provider attested 'none' (or an explicit approved_providers exception).`
+    `${personEvidenceGap}'${provider}' has training_use '${trainingUse}'; ${dataTier} material may only go to a provider attested 'none' (or an explicit approved_providers exception).`
   );
+}
+
+/**
+ * Why nothing shows that `provider` does not train, else '' — the evidence a
+ * person's consent needs: a policy declaration `training_use: none`, or the
+ * installation's valid (unexpired) system attestation of `none`. An
+ * approved_providers exception is never that evidence. Exported for the
+ * reasoning-send gate's public-material arm; a policy that cannot be loaded
+ * leaves only the system attestation.
+ */
+export function personConsentNoTrainingEvidenceGap(provider: string): string {
+  const loaded = loadProviderEgressPolicy();
+  return loaded.status === 'ok'
+    ? noTrainingEvidenceGap(
+        provider,
+        loaded.policy.providers[provider],
+        loaded.policy.attestation_ttl_days
+      )
+    : noTrainingEvidenceGap(provider, undefined, undefined);
+}
+
+function noTrainingEvidenceGap(
+  provider: string,
+  declaration: ProviderEgressPolicyFile['providers'][string] | undefined,
+  ttlDays: number | undefined
+): string {
+  if (declaration?.training_use === 'none') return '';
+  const read = readNonTenantAttestationAsPolicyInput({ kind: 'system' }, provider);
+  if (read.error)
+    return `the installation (system custody) attestation could not be read: ${read.error}`;
+  const system = resolveTenantProviderAttestation({ profile: read.profile, provider, ttlDays });
+  if (system.status === 'valid' && system.training_use === 'none') return '';
+  return system.status === 'expired'
+    ? `the installation (system custody) attestation for '${provider}' expired on ${system.expires_at}`
+    : system.status === 'valid'
+      ? `the installation (system custody) attests training_use '${system.training_use}' for '${provider}'`
+      : `the installation (system custody) has no training_use none attestation for '${provider}' and the policy does not declare one`;
 }
 
 export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEgressCheckResult {
@@ -547,7 +768,9 @@ export type ProviderTierUsableBasis =
   | 'local-only'
   | 'policy-training-use-none'
   | 'approved-providers-exception'
-  | 'tenant-attestation';
+  | 'tenant-attestation'
+  | 'system-attestation'
+  | 'person-attestation';
 
 export interface ProviderTierAvailability {
   tier: TierLevel;
@@ -614,7 +837,9 @@ export function describeProviderTierAvailability(
     const external = usable.filter((entry) => entry.basis !== 'local-only');
     const enableHint = tenantSlug
       ? `attest a provider with 'pnpm onboarding llm attest --tenant ${tenantSlug} --provider <id> --training-use none ...' to enable it`
-      : "bind a tenant and attest a provider with 'pnpm onboarding llm attest' to enable it";
+      : `attest a provider for material without a tenant with '${custodyAttestationRequestCommand({
+          kind: tier === 'personal' ? 'person' : 'system',
+        })}' (or bind a tenant) to enable it`;
     let note: string;
     if (tier === 'public') {
       note = usable.length > 0 ? `public: ${names}` : 'public: no provider declared';

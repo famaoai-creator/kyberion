@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { parseNhiId } from '../contracts/nhi-id.js';
-import { isValidMemberId } from '../organization/member-id-grammar.js';
+import { isValidMemberId } from '../foundation/scope.js';
 
 type Binding = Readonly<{ ownerActor: string; agentId: string }>;
 const bindings = new AsyncLocalStorage<Binding>();

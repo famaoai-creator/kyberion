@@ -56,17 +56,31 @@ export function relinkDealRefs(text: string, slug: string): string {
 
 /** Every file under `dir`, relative to it (POSIX separators), depth first and sorted. */
 export function listFiles(dir: string, prefix = ''): string[] {
+  const stat = safeLstat(dir);
+  if (stat.isSymbolicLink() || !stat.isDirectory())
+    throw new Error(`[${id}] unsupported source directory: ${dir}`);
   const files: string[] = [];
   for (const entry of safeReaddir(dir).sort()) {
     const full = path.join(dir, entry);
     const relative = prefix ? `${prefix}/${entry}` : entry;
-    if (safeLstat(full).isDirectory()) files.push(...listFiles(full, relative));
-    else if (safeLstat(full).isFile()) files.push(relative);
+    const entryStat = safeLstat(full);
+    if (entryStat.isSymbolicLink()) throw new Error(`[${id}] unsupported symbolic link: ${full}`);
+    if (entryStat.isDirectory()) files.push(...listFiles(full, relative));
+    else if (entryStat.isFile()) files.push(relative);
+    else throw new Error(`[${id}] unsupported source entry: ${full}`);
   }
   return files;
 }
 
-function moveDeals(slug: string, dryRun: boolean): void {
+interface DealMove {
+  slug: string;
+  legacyTenant: string;
+  from: string;
+  to: string;
+  files: string[];
+}
+
+function planDeals(slug: string): DealMove | undefined {
   const root = pathResolver.rootDir();
   const legacyTenant = safe(path.join(root, LEGACY_DIR, slug));
   const from = safe(path.join(legacyTenant, TENANT_DEALS_DIR));
@@ -78,22 +92,23 @@ function moveDeals(slug: string, dryRun: boolean): void {
     );
     return;
   }
-  const files = listFiles(from);
-  logger.info(
-    `[${id}] ${dryRun ? 'would move' : 'move'} ${rel(from)} -> ${rel(to)} (${files.length} files)`
-  );
-  if (dryRun) return;
+  return { slug, legacyTenant, from, to, files: listFiles(from) };
+}
+
+function moveDeals({ slug, legacyTenant, from, to, files }: DealMove): void {
   // Only the tenant-bound deal store may write the tenant's deal folder.
   asDealStore(slug, () => {
     for (const file of files) {
       const source = safe(path.join(from, ...file.split('/')));
       const target = safe(path.join(to, ...file.split('/')));
-      const content = safeReadFile(source, { encoding: 'utf8' }) as string;
+      const relink = file.endsWith('.json') || file.endsWith('.jsonl');
+      // Only reference-bearing JSON is text. Attachments and every other file
+      // retain their exact bytes, including invalid UTF-8 and byte-order marks.
+      const content = relink
+        ? relinkDealRefs(safeReadFile(source, { encoding: 'utf8' }) as string, slug)
+        : safeReadFile(source, { encoding: null });
       safeMkdir(path.dirname(target), { recursive: true });
-      safeWriteFile(
-        target,
-        file.endsWith('.json') || file.endsWith('.jsonl') ? relinkDealRefs(content, slug) : content
-      );
+      safeWriteFile(target, content, { createOnly: true });
     }
   });
   safeRmSync(from, { recursive: true, force: true });
@@ -110,12 +125,31 @@ export async function migrate(opts: { dryRun: boolean }): Promise<void> {
   }
   // `onboarding` is the governed writer of the legacy customer/ tree it empties.
   withExecutionContext('onboarding', () => {
-    for (const slug of safeReaddir(legacyRoot).sort()) {
+    const plans: DealMove[] = [];
+    const entries = safeReaddir(legacyRoot).sort();
+    if (entries.includes('README.md')) {
+      const readme = safeLstat(path.join(legacyRoot, 'README.md'));
+      if (readme.isSymbolicLink() || !readme.isFile())
+        throw new Error(`[${id}] unsupported legacy README.md entry`);
+    }
+    for (const slug of entries) {
       if (!isValidTenantSlug(slug) || !safeLstat(path.join(legacyRoot, slug)).isDirectory())
         continue;
-      moveDeals(slug, opts.dryRun);
+      const plan = planDeals(slug);
+      if (plan) plans.push(plan);
     }
-    const left = safeReaddir(legacyRoot).filter((entry) => entry !== 'README.md');
+    // Validate every tenant before the first copy or deletion, even in dry-run.
+    for (const plan of plans) {
+      logger.info(
+        `[${id}] ${opts.dryRun ? 'would move' : 'move'} ${rel(plan.from)} -> ${rel(plan.to)} (${plan.files.length} files)`
+      );
+      if (!opts.dryRun) moveDeals(plan);
+    }
+    const left = safeReaddir(legacyRoot).filter((entry) => {
+      if (entry !== 'README.md') return true;
+      const readme = safeLstat(path.join(legacyRoot, entry));
+      return readme.isSymbolicLink() || !readme.isFile();
+    });
     if (!opts.dryRun && left.length === 0) {
       safeRmSync(legacyRoot, { recursive: true, force: true });
       logger.info(`[${id}] removed the empty legacy ${LEGACY_DIR}/ directory`);

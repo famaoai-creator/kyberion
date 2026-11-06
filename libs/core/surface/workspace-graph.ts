@@ -34,6 +34,7 @@ import {
   type PublicationPreview,
 } from './decision-brief.js';
 import { decisionReasonText } from './decision-reason-text.js';
+import { readableMissionName } from './display-humanize.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
 import {
   admitsTenant,
@@ -449,7 +450,7 @@ export function collectWorkspaceGraph(
     put({
       kind: 'mission',
       id: mission.id,
-      label: mission.goal || mission.id,
+      label: mission.goal || readableMissionName(mission.id),
       status: mission.status,
       tier: mission.tier,
       tenantSlug: mission.tenantSlug,

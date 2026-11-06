@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { stubReasoningBackend } from '../reasoning/reasoning-backend.js';
+import {
+  buildFailoverReasoningBackend,
+  stubReasoningBackend,
+  type ReasoningBackend,
+} from '../reasoning/reasoning-backend.js';
+import { bindReasoningRequestTimeout } from '../reasoning/reasoning-fixed-binding.js';
 import { runReasoningBackendConformance } from './reasoning-backend-conformance.js';
 
 describe('reasoning backend conformance', () => {
@@ -119,5 +124,46 @@ describe('reasoning backend conformance', () => {
       status: 'failed',
       evidence: expect.stringContaining('cancellation was ignored'),
     });
+  });
+
+  it('verifies abort only from the provider adapter itself', async () => {
+    const report = await runReasoningBackendConformance(stubReasoningBackend);
+    expect(report.checks.find((check) => check.name === 'abort')).toMatchObject({
+      status: 'verified',
+    });
+  });
+
+  // A provider that never looks at its signal: any abort error must have come
+  // from a layer between the probe and the provider.
+  const abortIgnoringProvider = () => ({
+    name: 'abort-ignoring-provider',
+    prompt: async (_prompt: string, _options?: { signal?: AbortSignal }) =>
+      'completed despite abort',
+    extractRequirements: async () => ({ functional_requirements: [] }),
+  });
+
+  it('does not let the request-timeout wrapper answer the abort probe for the provider', async () => {
+    const wrapped = bindReasoningRequestTimeout(
+      abortIgnoringProvider() as unknown as ReasoningBackend,
+      60_000
+    );
+    const report = await runReasoningBackendConformance(wrapped, { live: true });
+    expect(report.checks.find((check) => check.name === 'abort')).toMatchObject({
+      status: 'unavailable',
+      evidence: expect.stringContaining('forwarded by a wrapper'),
+    });
+    expect(report.passed).toBe(false);
+  });
+
+  it('does not let a failover chain answer the abort probe for the provider', async () => {
+    const chain = buildFailoverReasoningBackend([
+      { backend: abortIgnoringProvider() as unknown as ReasoningBackend, label: 'only' },
+    ]);
+    const report = await runReasoningBackendConformance(chain, { live: true });
+    expect(report.checks.find((check) => check.name === 'abort')).toMatchObject({
+      status: 'unavailable',
+      evidence: expect.stringContaining('pass the provider adapter itself'),
+    });
+    expect(report.passed).toBe(false);
   });
 });

@@ -3,7 +3,7 @@
 
 .mb-board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(13rem, 1fr));
+  grid-template-columns: repeat(5, minmax(13rem, 1fr));
   gap: var(--kb-ui-space-4);
   overflow-x: auto;
   min-width: 0;

@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkStoreCatalog,
+  checkStoreRegistrations,
   normalizePolicyPath,
   owningStore,
   templateCovers,
   type StoreEntry,
+  type StoreRootRegistries,
 } from './check_store_catalog.js';
 
 const store = (id: string, path: string, extra: Partial<StoreEntry> = {}): StoreEntry => ({
@@ -13,6 +15,183 @@ const store = (id: string, path: string, extra: Partial<StoreEntry> = {}): Store
   custody: { kind: 'tenant' },
   status: 'active',
   ...extra,
+});
+
+describe('runtime store registration coverage', () => {
+  const roots: StoreRootRegistries = {
+    state: { dot: 'active/shared/runtime/dot' },
+    ledger: { resource_usage: 'active/shared/runtime/usage-ledger' },
+    floor: { scratch: 'active/shared/tmp' },
+  };
+  const policies = [
+    { path: 'active/shared/runtime/dot' },
+    { path: 'active/shared/runtime/usage-ledger' },
+    { path: 'active/shared/tmp' },
+  ];
+  const registered = (): StoreEntry[] => [
+    store('dot', 'active/shared/runtime/dot/<tier>/<tenant>', {
+      registration: { family: 'state', key: 'dot', order: 1, retention_path: policies[0].path },
+    }),
+    // Registering an existing bare-root metrics store must not reinterpret custody.
+    store('usage', 'active/shared/runtime/usage-ledger', {
+      custody: { kind: 'unscoped-legacy' },
+      registration: {
+        family: 'ledger',
+        key: 'resource_usage',
+        order: 1,
+        retention_path: policies[1].path,
+      },
+    }),
+    store('scratch', 'active/shared/tmp/<tier>/<tenant>', {
+      registration: { family: 'floor', key: 'scratch', order: 1, retention_path: policies[2].path },
+    }),
+  ];
+
+  it('covers state, ledger and floor registrations without changing legacy custody', () => {
+    const stores = registered();
+    expect(checkStoreRegistrations(stores, roots, policies)).toEqual([]);
+    expect(stores[1].custody.kind).toBe('unscoped-legacy');
+  });
+
+  it('projects an explicitly confidential-only tenant ledger without widening its path', () => {
+    const audit = store('audit', 'active/shared/runtime/audit-mirror/confidential/<tenant>', {
+      tiers: ['confidential'],
+      registration: {
+        family: 'ledger',
+        key: 'tenant_audit_mirror',
+        order: 1,
+        retention_path: 'active/shared/runtime/audit-mirror',
+      },
+    });
+    const registries = {
+      state: {},
+      ledger: { tenant_audit_mirror: 'active/shared/runtime/audit-mirror' },
+      floor: {},
+    };
+    const policies = [{ path: 'active/shared/runtime/audit-mirror' }];
+    expect(checkStoreRegistrations([audit], registries, policies)).toEqual([]);
+    for (const tiers of [
+      undefined,
+      [],
+      ['personal'],
+      ['confidential', 'personal'],
+      ['confidential', 'confidential'],
+    ]) {
+      expect(
+        checkStoreRegistrations([{ ...audit, tiers }], registries, policies).join('\n')
+      ).toContain('tier/tenant binding');
+    }
+    for (const path of [
+      'active/shared/runtime/audit-mirror/personal/<tenant>',
+      'active/shared/runtime/audit-mirror/../audit-mirror/confidential/<tenant>',
+    ]) {
+      expect(
+        checkStoreRegistrations([{ ...audit, path }], registries, policies).join('\n')
+      ).toContain('tier/tenant binding');
+    }
+    expect(audit.path).toBe('active/shared/runtime/audit-mirror/confidential/<tenant>');
+  });
+
+  it('detects a missing ledger registration instead of accepting a broad parent store', () => {
+    expect(
+      checkStoreRegistrations(
+        registered()
+          .filter(({ id }) => id !== 'usage')
+          .concat(store('parent', 'active/shared/runtime')),
+        roots,
+        policies
+      )
+    ).toContain('missing store registration ledger:resource_usage');
+  });
+
+  it('rejects duplicate and unknown registry keys including inherited property names', () => {
+    for (const key of ['unknown', 'constructor', 'toString'])
+      expect(
+        checkStoreRegistrations(
+          [
+            ...registered(),
+            store('unknown', 'active/unknown', {
+              registration: { family: 'state', key, order: 2, retention_path: policies[0].path },
+            }),
+          ],
+          roots,
+          policies
+        )
+      ).toContain(`unknown: unknown registration state:${key}`);
+    const duplicate = { ...registered()[0], id: 'duplicate' };
+    expect(checkStoreRegistrations([...registered(), duplicate], roots, policies)).toContain(
+      'duplicate: duplicate registration state:dot'
+    );
+  });
+
+  it('rejects a mismatched or planned physical registration', () => {
+    const stores = registered();
+    stores[0] = { ...stores[0], path: 'active/shared/runtime/different', status: 'planned' };
+    expect(checkStoreRegistrations(stores, roots, policies)).toEqual(
+      expect.arrayContaining([
+        'dot: registered runtime root must be active',
+        'dot: registration state:dot does not match root active/shared/runtime/dot',
+      ])
+    );
+  });
+
+  it('does not lose state/floor tier and tenant bindings by accepting a bare root', () => {
+    for (const index of [0, 2]) {
+      const stores = registered();
+      stores[index] = {
+        ...stores[index],
+        path: stores[index].path.replace('/<tier>/<tenant>', ''),
+      };
+      expect(checkStoreRegistrations(stores, roots, policies).join('\n')).toContain(
+        'does not match root'
+      );
+    }
+    const stores = registered();
+    stores[1].custody = { kind: 'tenant' };
+    expect(checkStoreRegistrations(stores, roots, policies).join('\n')).toContain(
+      'does not match root'
+    );
+  });
+
+  it('requires an existing, covering and canonical retention policy reference', () => {
+    for (const retention_path of [
+      'active/missing',
+      '../escape',
+      'active/shared/runtime/usage-ledger',
+    ]) {
+      const stores = registered();
+      stores[0].registration = { ...stores[0].registration!, retention_path };
+      expect(checkStoreRegistrations(stores, roots, policies).join('\n')).toMatch(
+        /retention reference/
+      );
+    }
+  });
+
+  it('uses the existing most-specific root policy and rejects ambiguous references', () => {
+    const stores = registered();
+    stores[0].registration = {
+      ...stores[0].registration!,
+      retention_path: 'active/shared/runtime',
+    };
+    expect(
+      checkStoreRegistrations(stores, roots, [...policies, { path: 'active/shared/runtime' }])
+    ).toContain(
+      'dot: retention reference active/shared/runtime differs from effective root policy active/shared/runtime/dot'
+    );
+    expect(
+      checkStoreRegistrations(registered(), roots, [...policies, policies[0]]).join('\n')
+    ).toContain('retention reference active/shared/runtime/dot is ambiguous');
+  });
+
+  it('rejects noncanonical root declarations', () => {
+    expect(
+      checkStoreRegistrations(
+        registered(),
+        { ...roots, state: { dot: 'active/../runtime/dot' } },
+        policies
+      ).join('\n')
+    ).toContain('noncanonical runtime root');
+  });
 });
 
 describe('store catalog gate', () => {
