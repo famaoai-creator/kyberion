@@ -5,10 +5,8 @@ import {
   currentPrPublicationScope,
   withPrPublicationStoreAccess,
 } from './pr-publication-runtime.js';
-import {
-  currentInstalledPersonCharterRuntime,
-  withPersonCharterStoreAccess,
-} from './person-charter-runtime.js';
+import { currentInstalledPersonCharterRuntime } from './person-charter-runtime.js';
+import { withPersonCharterRegistryAccess } from './person-charter-store-access.js';
 /**
  * Accountability charter — persistence, acceptance and the consumption ledger.
  *
@@ -132,9 +130,7 @@ function scopedCharterIo<T>(
   }
   if (scope.kind === 'person' && currentInstalledPersonCharterRuntime()) {
     const relative = (file: string) => pathResolver.storeRelativePath(file);
-    return withPersonCharterStoreAccess(files.map(relative), writes.map(relative), () =>
-      withExecutionContext('person_charter_store', action, 'worker')
-    );
+    return withPersonCharterRegistryAccess(files.map(relative), writes.map(relative), action);
   }
   if (scope.kind !== 'organization' || !identity?.tenantSlug) return action();
   if (identity.tenantSlug !== scope.tenant_slug)

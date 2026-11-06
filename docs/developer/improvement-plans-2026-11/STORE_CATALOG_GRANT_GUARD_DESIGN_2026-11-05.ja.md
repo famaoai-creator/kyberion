@@ -903,6 +903,58 @@ Promise を返すと拒否し、捕まえた継続には窓が無いようにし
 所有者の NHI を持つ worker 2 種類）から問い、旧と新を突き合わせた（1315 件）。判定の違いは無い。
 拒否は同じ符号で、方針に無い SYSTEM_ROLE は引き受けではなく発行で拒否される。
 
+### G2: 個人の charter の保存先の許可証化（2026-11-06）
+
+`person_charter_store` は、導入済みの所有者（owner actor と NHI）に束縛された実行の中で、charter registry
+（`scopedCharterIo`、個人の charter と台帳）と外部操作の予約（`reserveExternalOperation`、個人の予約）が
+保存先に触る間だけ引き受けていた共有コアロールである。PR の公開の保存先の兄弟で、インストールの移行
+（`PUBLICATION_MIGRATION_ROLES`）の対象だった。
+
+**届く範囲。** registry の 1 回は、選んだ charter・台帳・charter のディレクトリの読み取りと、所有する charter
+の台帳への追記（とそのディレクトリの mkdir）である。予約の 1 回は、正規の個人の予約 1 ファイル（本番は
+`external-operations/personal/shared/<hash>.json`、Vitest は `tmp/personal/shared/vitest-external-operations/...`）
+である。ロールの security-policy の権限は `knowledge/personal/charters/`、個人の予約の区画、その Vitest の
+scratch を覆っていた。
+
+**比較で見つかったこと。** 旧ロールのまま本番の個人の予約の区画（`external-operations/personal/shared`）を
+問うと、読み取りも書き込みも拒否される（Sovereign Sanctuary）。個人の tier のランタイムの状態は、
+knowledge の写し（`knowledge/personal/...`）で判定されるのに、ロールの権限はランタイムのパスしか
+書いていないからである。テストは Vitest の scratch の予約しか通らないので、表に出ていなかった。
+許可証はこの判定をそのまま保つ（広げない）。本番の個人の予約を通すのは別の変更で、広げる側なので
+ここではしない。
+
+**第 1 段階。** 所有者の束縛と保存先の許可証を、モジュールの中だけの発行済みの集合に持たせた。束縛は
+凍結し、実行が終われば失効する（実行の中では await をまたげる）。許可証は同期だけで、Promise を返すと
+拒否し、捕まえた継続には許可証が無く、発行した束縛の中でだけ数える。境界テスト
+`tests/person-charter-store-capability-boundary.test.ts`。
+
+**第 2 段階: 許可証を権限にし、ロールを外した。**
+
+- 窓口を `governance/person-charter-store-access.ts` に置き、registry と予約はそこだけを通す（境界テスト）。
+- 絞り込み: 許可証が有効な間の I/O は、その正確な資源の中で、旧ロールが実際に許されていた所（個人の
+  charter と予約の Vitest の scratch）だけに絞る（`personCharterIoAllowed`）。本番の個人の予約は、許可証の
+  中では呼び出し元の権限に関わらず従来どおり拒否される。許可: `storeGrantAuthorizes` →
+  `personCharterGrantAuthorizes`（絞り込みが認めるものと同じ）。
+- 誰が発行できるかは変えていない。窓口は旧共有コアロールの引き受けと同じ規則を名前
+  `person_charter_store` に対して確かめる。所有者の束縛を開けるのは、導入済みの所有者を確かめる
+  信頼された seam だけである（変えていない）。
+- インストールの登録: 発行の権利の名前を role-assumption-policy に持たないインストールでは、許可証は
+  何も認めない（中の I/O はすべて拒否。ロールの無いインストールで何も認められなかったのと同じで、
+  呼び出し元の権限でも開かない）。`PUBLICATION_MIGRATION_ROLES` からこのロールを外し、
+  `PUBLICATION_MIGRATION_ISSUANCE_RIGHTS` に移した（共有コアロールの登録だけを移行する）。
+- 呼び出し元のロールと persona はそのまま使い、tenant を束縛しない（組織も引き継がない）。旧ロールの
+  引き受けも tenant 無しだった。
+- ロールの宣言（security-policy、authority role index、ロール定義、`authority.ts` の persona の対応、
+  保存先カタログの `legacy_roles` 3 件、`tier-guard` のロール名の分岐）を削除し、名前を退役したロールの
+  一覧に加えた。
+
+**比較。** registry の読み取り・台帳の追記、本番と Vitest の予約の 4 つについて、資源、その祖先、上限の
+外の 7 個のパスを 5 つの操作で、10 種類の呼び出し元から問い、旧と新を突き合わせた。違いは
+`deliverable_inbox_writer` の 6 件（呼び出し元の拒否だけのロールが効く。狭くなる側）だけで、方針に無い
+SYSTEM_ROLE は同じ符号で拒否された。最初の比較では、本番の予約が新で 27 件許されていた（上の
+「見つかったこと」と、tenant に束縛された呼び出し元が束縛を外されて自分の権限で読めたもの）。
+絞り込みを旧ロールが実際に許されていた所に限って、無くした。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |

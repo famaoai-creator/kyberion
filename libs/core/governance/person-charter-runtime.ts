@@ -12,12 +12,27 @@
  *
  * Both live in this module instance only: a second instance of @agent/core
  * neither sees nor honours them, and there is no registry to plant. Only the
- * charter registry and the external-operation store open a store grant (import
- * boundary test tests/person-charter-store-capability-boundary.test.ts).
+ * governed facade governance/person-charter-store-access.ts opens a store grant
+ * (import boundary test tests/person-charter-store-capability-boundary.test.ts).
+ *
+ * G2: the live store grant is itself the authority (there is no store role).
+ * While it is current every I/O is narrowed to its exact resources
+ * (`personCharterResourceAccessAllowed`, applied by tier-guard), and inside them it
+ * authorizes what the former role's policy grant covered
+ * (`personCharterGrantAuthorizes`).
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { parseNhiId } from '../contracts/nhi-id.js';
 import { isValidMemberId } from '../foundation/scope.js';
+import { STORAGE_FLOOR_ROOTS } from '../foundation/runtime-state-roots.js';
+
+/**
+ * Issuance right of the person charter store grant (G2). The former shared core role of this name
+ * is gone; the name stays only in role-assumption-policy `shared_core_roles`, which decides which
+ * processes may issue the grant (authority.ts assertStoreGrantIssuanceAllowed). It is not an
+ * assumable authority role.
+ */
+export const PERSON_CHARTER_GRANT_ISSUANCE_RIGHT = 'person_charter_store';
 
 type Binding = Readonly<{ ownerActor: string; agentId: string }>;
 type StoreGrant = Readonly<{
@@ -25,6 +40,8 @@ type StoreGrant = Readonly<{
   read: readonly string[];
   write: readonly string[];
   mkdir: readonly string[];
+  /** False in an installation that has not registered the issuance right: it admits nothing. */
+  authorizes: boolean;
 }>;
 const bindings = new AsyncLocalStorage<Binding>();
 const resources = new AsyncLocalStorage<StoreGrant>();
@@ -93,6 +110,7 @@ function runStoreGrant<T>(
   read: readonly string[],
   write: readonly string[],
   mkdir: readonly string[],
+  authorizes: boolean,
   action: () => T
 ): T {
   const grant: StoreGrant = Object.freeze({
@@ -100,6 +118,7 @@ function runStoreGrant<T>(
     read: Object.freeze([...read]),
     write: Object.freeze([...write]),
     mkdir: Object.freeze([...mkdir]),
+    authorizes: authorizes === true,
   });
   issuedGrants.add(grant);
   try {
@@ -119,12 +138,13 @@ function runStoreGrant<T>(
 }
 
 /**
- * Registry-only IO ceiling, import-restricted to governance/accountability-charter-registry.ts.
+ * Registry-only IO ceiling, import-restricted to governance/person-charter-store-access.ts.
  * The role is never held while a worker action runs.
  */
 export function withPersonCharterStoreAccess<T>(
   read: readonly string[],
   write: readonly string[],
+  authorizes: boolean,
   action: () => T
 ): T {
   const binding = liveBinding();
@@ -144,7 +164,7 @@ export function withPersonCharterStoreAccess<T>(
   )
     throw new Error('[PERSON_CHARTER_RESOURCE_DENIED] Exact charter resources required');
   const mkdir = write.map((p) => p.slice(0, p.lastIndexOf('/')));
-  return runStoreGrant(binding, read, write, mkdir, action);
+  return runStoreGrant(binding, read, write, mkdir, authorizes, action);
 }
 export function personCharterResourceAccessAllowed(
   target: string,
@@ -161,9 +181,13 @@ export function personCharterResourceAccessAllowed(
 
 /**
  * Canonical reservation writer only; no caller-supplied destinations. Import-restricted to
- * governance/external-operation-store.ts.
+ * governance/person-charter-store-access.ts.
  */
-export function withPersonExternalReservationAccess<T>(file: string, action: () => T): T {
+export function withPersonExternalReservationAccess<T>(
+  file: string,
+  authorizes: boolean,
+  action: () => T
+): T {
   const binding = liveBinding();
   if (
     !binding ||
@@ -173,5 +197,62 @@ export function withPersonExternalReservationAccess<T>(file: string, action: () 
     )
   )
     throw new Error('[PERSON_CHARTER_RESOURCE_DENIED] Canonical personal reservation required');
-  return runStoreGrant(binding, [file], [file], [file.slice(0, file.lastIndexOf('/'))], action);
+  return runStoreGrant(
+    binding,
+    [file],
+    [file],
+    [file.slice(0, file.lastIndexOf('/'))],
+    authorizes,
+    action
+  );
+}
+
+/** Is a live store grant of this instance current (inside its binding)? */
+export function personCharterStoreGrantActive(): boolean {
+  return Boolean(liveGrant());
+}
+
+function within(target: string, root: string): boolean {
+  return target === root || target.startsWith(root + '/');
+}
+
+/**
+ * Where the former `person_charter_store` role was effectively authorized: person charters and the
+ * Vitest scratch of personal reservations. Its policy grant also named the durable personal
+ * reservation partition, but that never took effect (personal-tier runtime state is decided on its
+ * knowledge mirror, which the grant did not name), so every I/O there was refused under the role.
+ */
+function effectiveRoot(target: string): boolean {
+  return [
+    'knowledge/personal/charters',
+    `${STORAGE_FLOOR_ROOTS.scratch}/personal/shared/vitest-external-operations`,
+  ].some((root) => within(target, root));
+}
+
+/**
+ * Deny-only narrowing of every I/O made while a store grant is live: its exact resources, and only
+ * where the former role was effectively authorized (so the durable personal reservation stays
+ * refused inside the grant, as it was under the role, whatever the caller's own policy). In an
+ * installation that predates the store (no registered issuance right) nothing is admitted, as the
+ * unregistered role granted nothing. True outside a live grant.
+ */
+export function personCharterIoAllowed(
+  target: string,
+  operation: 'read' | 'write' | 'append' | 'mkdir' | 'metadata'
+): boolean {
+  const grant = liveGrant();
+  if (!grant) return true;
+  return (
+    grant.authorizes &&
+    personCharterResourceAccessAllowed(target, operation) &&
+    effectiveRoot(target)
+  );
+}
+
+/** Does the live grant authorize this I/O? Exactly what its narrowing admits. */
+export function personCharterGrantAuthorizes(
+  target: string,
+  operation: 'read' | 'write' | 'append' | 'mkdir' | 'metadata'
+): boolean {
+  return Boolean(liveGrant()) && personCharterIoAllowed(target, operation);
 }

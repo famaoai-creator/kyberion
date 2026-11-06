@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { withExecutionContext } from '../authority.js';
+import { pathResolver } from '../path-resolver.js';
+import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
+import { withPersonCharterRegistryAccess } from './person-charter-store-access.js';
 import {
   currentInstalledPersonCharterRuntime,
+  personCharterGrantAuthorizes,
   personCharterResourceAccessAllowed,
   withInstalledPersonCharterRuntime,
   withPersonCharterStoreAccess,
@@ -13,12 +18,12 @@ const reservation = `active/shared/runtime/external-operations/personal/shared/$
 
 describe('person charter store grant (G2: module-private, synchronous)', () => {
   it('needs the installed owner binding and allows only its exact resources', () => {
-    expect(() => withPersonCharterStoreAccess([ledger], [ledger], () => undefined)).toThrow(
+    expect(() => withPersonCharterStoreAccess([ledger], [ledger], true, () => undefined)).toThrow(
       'PERSON_CHARTER_IDENTITY_REQUIRED'
     );
     withInstalledPersonCharterRuntime(owner, () => {
       expect(personCharterResourceAccessAllowed(ledger, 'read')).toBe(false);
-      withPersonCharterStoreAccess([ledger], [ledger], () => {
+      withPersonCharterStoreAccess([ledger], [ledger], true, () => {
         expect(personCharterResourceAccessAllowed(ledger, 'append')).toBe(true);
         expect(personCharterResourceAccessAllowed('knowledge/personal/charters', 'mkdir')).toBe(
           true
@@ -27,13 +32,13 @@ describe('person charter store grant (G2: module-private, synchronous)', () => {
           personCharterResourceAccessAllowed('knowledge/personal/charters/chr-b.json', 'read')
         ).toBe(false);
       });
-      withPersonExternalReservationAccess(reservation, () => {
+      withPersonExternalReservationAccess(reservation, true, () => {
         expect(personCharterResourceAccessAllowed(reservation, 'write')).toBe(true);
         expect(personCharterResourceAccessAllowed(ledger, 'append')).toBe(false);
       });
       expect(personCharterResourceAccessAllowed(ledger, 'append')).toBe(false);
       // A grant does not survive into another owner binding opened inside it.
-      withPersonCharterStoreAccess([ledger], [ledger], () =>
+      withPersonCharterStoreAccess([ledger], [ledger], true, () =>
         withInstalledPersonCharterRuntime({ ...owner, ownerActor: 'user:other' }, () =>
           expect(personCharterResourceAccessAllowed(ledger, 'append')).toBe(false)
         )
@@ -45,16 +50,16 @@ describe('person charter store grant (G2: module-private, synchronous)', () => {
   it('refuses outside-store resources, thenables and captured continuations', async () => {
     await withInstalledPersonCharterRuntime(owner, async () => {
       expect(() =>
-        withPersonCharterStoreAccess(['knowledge/personal/x.json'], [], () => undefined)
+        withPersonCharterStoreAccess(['knowledge/personal/x.json'], [], true, () => undefined)
       ).toThrow('PERSON_CHARTER_RESOURCE_DENIED');
       expect(() =>
-        withPersonExternalReservationAccess('active/shared/runtime/x.json', () => undefined)
+        withPersonExternalReservationAccess('active/shared/runtime/x.json', true, () => undefined)
       ).toThrow('PERSON_CHARTER_RESOURCE_DENIED');
       expect(() =>
-        withPersonCharterStoreAccess([ledger], [ledger], () => Promise.resolve(1))
+        withPersonCharterStoreAccess([ledger], [ledger], true, () => Promise.resolve(1))
       ).toThrow('synchronous only');
       let later: Promise<boolean> | undefined;
-      withPersonCharterStoreAccess([ledger], [ledger], () => {
+      withPersonCharterStoreAccess([ledger], [ledger], true, () => {
         later = new Promise((resolve) =>
           setTimeout(() => resolve(personCharterResourceAccessAllowed(ledger, 'append')), 0)
         );
@@ -79,6 +84,35 @@ describe('person charter store grant (G2: module-private, synchronous)', () => {
       expect(() => {
         live.ownerActor = 'user:other';
       }).toThrow();
+    });
+  });
+});
+
+describe('person charter store grant authority (G2: no store role)', () => {
+  it('authorizes its exact resources for a role-less caller, only while live and registered', () => {
+    const abs = pathResolver.rootResolve(ledger);
+    withExecutionContext('chronos_operator', () => {
+      expect(() => withExecutionContext('person_charter_store', () => undefined, 'worker')).toThrow(
+        'ROLE_ASSUMPTION_DENIED'
+      );
+      withInstalledPersonCharterRuntime(owner, () => {
+        expect(validateWritePermission(abs, 'append').allowed).toBe(false);
+        withPersonCharterRegistryAccess([ledger], [ledger], () => {
+          expect(personCharterGrantAuthorizes(ledger, 'append')).toBe(true);
+          expect(validateWritePermission(abs, 'append')).toMatchObject({ allowed: true });
+          expect(validateReadPermission(abs)).toMatchObject({ allowed: true });
+          expect(
+            validateReadPermission(pathResolver.rootResolve('knowledge/personal/profile.json'))
+              .reason
+          ).toContain('PERSON_CHARTER_RESOURCE_DENIED');
+        });
+        // An installation that predates the store: the grant admits nothing.
+        withPersonCharterStoreAccess([ledger], [ledger], false, () => {
+          expect(personCharterGrantAuthorizes(ledger, 'append')).toBe(false);
+          expect(validateWritePermission(abs, 'append').allowed).toBe(false);
+        });
+        expect(validateWritePermission(abs, 'append').allowed).toBe(false);
+      });
     });
   });
 });

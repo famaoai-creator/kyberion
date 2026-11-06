@@ -1,6 +1,7 @@
 /**
  * Explicit, additive installation upgrade for the PR host's narrow IO roles. The PR publication
- * store needs no role (G2: its grant is the authority); only its issuance right is registered.
+ * and person charter stores need no role (G2: their grants are the authority); only their
+ * issuance rights are registered.
  */
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
@@ -54,14 +55,16 @@ import {
 export const PUBLICATION_MIGRATION_ROLES = [
   'notification_preferences_reader',
   'tool_runtime_policy_reader',
-  'person_charter_store',
 ] as const;
 /**
  * Store-grant issuance rights the PR host needs registered (G2): no role card, permission or
  * index entry exists for them, only the role-assumption shared core role registration that
  * authority.ts assertStoreGrantIssuanceAllowed requires before the grant is issued.
  */
-export const PUBLICATION_MIGRATION_ISSUANCE_RIGHTS = ['pr_publication_store'] as const;
+export const PUBLICATION_MIGRATION_ISSUANCE_RIGHTS = [
+  'pr_publication_store',
+  'person_charter_store',
+] as const;
 const GOVERNANCE = 'knowledge/product/governance/';
 const CATALOGS = [
   'security-policy.json',

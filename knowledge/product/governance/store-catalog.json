@@ -163,7 +163,6 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["person_charter_store"],
       "sources": ["runtime-state-roots", "role-policy"],
       "registration": {
         "family": "state",
@@ -221,7 +220,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_writer", "person_charter_store"],
+      "legacy_roles": ["dot_lifecycle_writer"],
       "sources": ["storage-floor", "role-policy"],
       "note": "Floors also hold a system/ partition (custody system).",
       "registration": {
@@ -429,7 +428,6 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["person_charter_store"],
       "sources": ["role-policy"]
     },
     {

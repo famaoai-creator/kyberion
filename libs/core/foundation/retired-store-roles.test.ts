@@ -5,6 +5,7 @@ import { PR_PUBLICATION_GRANT_ISSUANCE_RIGHT } from './pr-publication-store-capa
 import { PIPELINE_JOURNAL_GRANT_ISSUANCE_RIGHT } from './pipeline-journal-capability.js';
 import { CREDENTIAL_MATERIAL_GRANT_ISSUANCE_RIGHT } from './credential-material-capability.js';
 import { MEMORY_PROVENANCE_GRANT_ISSUANCE_RIGHT } from '../knowledge/memory-provenance-capability.js';
+import { PERSON_CHARTER_GRANT_ISSUANCE_RIGHT } from '../governance/person-charter-runtime.js';
 import { safeReadFile } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 
@@ -15,6 +16,7 @@ describe('retired store role names (G2)', () => {
         AUTONOMY_LEARNING_GRANT_ISSUANCE_RIGHT,
         CREDENTIAL_MATERIAL_GRANT_ISSUANCE_RIGHT,
         MEMORY_PROVENANCE_GRANT_ISSUANCE_RIGHT,
+        PERSON_CHARTER_GRANT_ISSUANCE_RIGHT,
         PIPELINE_JOURNAL_GRANT_ISSUANCE_RIGHT,
         PR_PUBLICATION_GRANT_ISSUANCE_RIGHT,
       ].sort()
