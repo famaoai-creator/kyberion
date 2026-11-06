@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-05
+last_updated: 2026-11-06
 ---
 
 # Operations Hygiene Runbook
@@ -30,6 +30,39 @@ admission unchanged and must not be promoted into authenticated assurance. Run
 `libs/core/agent/agent-identity.test.ts` and
 `libs/core/organization/nhi-session-admission.test.ts` for history changes, including
 no-op rebinds, release/reassignment, malformed journals and credential exclusion.
+
+## Revocable synchronous storage capabilities
+
+An assumed role and its AsyncLocalStorage scope can survive in separately queued
+callbacks after a synchronous issuer returns. Check live capability membership
+at each I/O policy boundary, as well as at role entry; a `finally` revocation or
+rejection of returned Promises alone does not stop a queued callback whose outer
+callback returns `undefined`. Use the existing private synchronous grant issuer
+for credential material and DOT, retaining exact path, tenant, claim and content
+checks. Do not apply synchronous lifetime semantics to ordinary asynchronous,
+deny-only resource scopes.
+
+Gate credential lifetime with
+`libs/core/foundation/credential-material-capability.test.ts` in
+`registration-tests`: active exact-file admission, separately queued stale-role
+denial, counterfeit/clone refusal and exception/async revocation. Run the real
+credential-allocation unit, grant and dispatch integration suites for broker
+changes. A stale permission result is distinct from proof of secret-byte access;
+secure-io's sensitive-path mediation remains an independent boundary.
+
+## Strict cross-tenant conflict reads
+
+A uniqueness/conflict check must distinguish an absent binding file from a
+failed read. Thread strict mode through the lowest governed file reader:
+malformed JSON, schema errors, unsafe paths and denied I/O must propagate to the
+conflict caller, which refuses the write. Logging and returning an empty list is
+appropriate only for non-strict discovery; it must not turn unknown bindings
+into permission to reuse a channel. Preserve the existing tenant-bound read role.
+
+`customer-channel-binding.test.ts` and `scripts/customer_channel.test.ts` run in
+`registration-tests`. Their regressions cover strict/non-strict reads and real
+bind attempts against malformed/schema-invalid other-tenant data, asserting
+the target's existing bytes remain unchanged.
 
 ## Checkout and canonical implementation drift
 
@@ -461,15 +494,48 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
   keep a read fallback to the legacy copy while it may still hold live data (remove the legacy copy
   on the next write — `generation-cost-settlement.ts`), or skip the fallback when the data is
   short-lived (`scripts/reasoning_credentials.ts` proofs expire in 15 minutes). Add the old base to
-  `PHYSICAL_LEGACY_TENANT_STATE_ROOTS` so offboarding still removes leftovers. A store whose current
-  layout is already registered and only detects legacy copies for operator-reviewed migration
-  (`dot-state-paths.ts`) is a documented `bases` exception instead.
+  `PHYSICAL_LEGACY_TENANT_STATE_ROOTS` so offboarding still removes leftovers — also when the live
+  migration stays operator-reviewed: `dot-state-paths.ts` keeps `pnpm kyberion dot migrate-state`
+  for a live tenant, but an offboarded tenant's `dot/tenants/<slug>/` copy is exported and
+  soft-deleted automatically (owner decision 2026-11-05; no gate exception).
+- Tenant content in a shared observability store (`active/shared/observability/<store>`) has the
+  same defect: tier-guard, backup and offboarding cannot see it. The delegation trace and records
+  moved to the registered ledger root `active/shared/runtime/delegation-records/` (tenant partitions
+  only as the tenant-bound `delegation_record_store` role); their shared legacy copies are
+  read-only, attributed per row (stamp, else mission location), migrated on the next write and
+  scrubbed by tenant offboarding (export, then audited prune / soft-delete). A store that only
+  keeps tenant-free data says so in `tests/fixtures/tenant-observability-store-inventory.json`.
+  The same holds for a shared runtime queue: the background-delegation notification queue moved
+  from `active/shared/runtime/delegations/notifications.jsonl` into each delegation partition
+  (`<partition>/notifications.jsonl`). A queue with ack/claim state keeps it across the move:
+  claiming a legacy row appends the claimed copy to its partition, which shadows the legacy row
+  (never a runtime rewrite of the shared file), and offboarding prunes the tenant's legacy rows
+  under the queue's own lock (`SCOPE_OFFBOARD_DELEGATION_NOTIFICATION_PRUNE`).
 - Gates: `tests/tenant-runtime-store-registration.test.ts` (every `physicalScopedPath` base under
   `active/shared/runtime/` must be an offboarding `PHYSICAL_*` base; dynamic bases and deliberate
   exceptions go in `tests/fixtures/tenant-runtime-store-allowlist.json` with a reason),
+  `tests/tenant-observability-store-registration.test.ts` (every `active/shared/observability/<store>`
+  a source file names is classified; the unclassified baseline only shrinks; the delegation store
+  and its notification queue stay partitioned and offboarded; only `runtime-state-roots.ts` names
+  the legacy `active/shared/runtime/delegations/` queue),
   `storage-layout.test.ts` (protected prefixes), `scope-offboarding.test.ts` (one disposition per
   registered root; the tenant-state purge test), and the store's own partition test (e.g.
   `delegation-idempotency.test.ts`, `generation-cost-settlement.test.ts`).
+
+### Tenant data migration preflight
+
+- Plan and validate every tenant before the first copy or deletion, including in
+  dry-run. Reject symlinks and unsupported file types; a README exemption applies
+  only to a regular file, never a directory or link that recursive cleanup would
+  discard. Keep source writers quiesced during the operator-reviewed migration.
+- Relink only the declared JSON/JSONL reference files. Copy every other attachment
+  as bytes through secure-io and refuse destination overwrites. Keep real role and
+  path checks in synthetic migration fixtures; `migration/0003-deal-home.test.ts`
+  exercises dry-run, byte preservation, existing targets and preflight failures in
+  `registration-tests`.
+- Copy-and-delete is not a multi-tenant transaction. An I/O failure can leave a
+  partial destination while the source remains. Inspect and reconcile it manually;
+  do not delete originals or bypass the existing-target refusal to force a retry.
 
 ### Immutable scoped evidence attempts
 
@@ -567,6 +633,17 @@ supervisor and PTC IPC tests when changing a listener.
   including a consumer already waiting for its next chunk. Regression gates:
   `shell-streaming-stt-bridge.boundary.test.ts` and `shell-streaming-tts-bridge.test.ts` use real
   subprocesses and delay consumption until the worker exits.
+- **A child given a loopback URL gets loopback in NO_PROXY via the shared helper.** A child that
+  honors `HTTP(S)_PROXY` sends a request for `127.0.0.1` / `localhost` to the proxy, which cannot
+  reach the parent's loopback (the credential relay, a local surface). Pass proxy vars only
+  through `buildProxyPassthroughEnv` (it appends `127.0.0.1,localhost,::1` to `NO_PROXY` and
+  `no_proxy` whenever a proxy is passed) and build an env that carries a loopback `*_URL` /
+  `*_HOST` / `*_BASE_URL` with `withLoopbackNoProxy`, both from `libs/core/foundation/env.ts`
+  (`PROXY_ENV_KEYS` is the single proxy allowlist; do not re-list the keys in a new child-env
+  allowlist). Gates: `tests/loopback-child-env-no-proxy-boundary.test.ts` (registration-tests;
+  allowlist with a reason for exceptions) and `libs/core/foundation/proxy-passthrough-env.test.ts`.
+  A parent-side upstream hop that relies on Node's `http(s).Agent` `proxyEnv` warns once when the
+  runtime ignores it (Node before 24.5) rather than silently connecting direct.
 - **Selection requirements reach execution.** Streaming STT forwards the requested language per
   transcription through normal, replay, barge-in and calibration paths; shell adapters translate
   it into the worker environment without mutating process-wide defaults. Gate this with the
@@ -685,6 +762,39 @@ this contract; a faster Linux run alone is not evidence that macOS CI passed.
 - Tests never write live `active/` state. CI runs the leak guard in strict mode
   (`KYBERION_TEST_LEAK_STRICT=1`, forwarded to the Vitest child by `pnpm test`). Any created or
   grown file outside the sandbox roots fails the job.
+- Apply the existing Vitest live-path redirect to both the master audit stream and
+  tenant mirrors. A mirror must retain its fixed `confidential/<tenant>` partition;
+  a custom owned root must still work unchanged. `audit-chain-tenant.test.ts`
+  checks redirected writes, absence at the canonical mirror, and verification.
+  Root-isolated tests that temporarily disable Vitest redirection must also isolate
+  the process-global audit singleton: save its property descriptor, remove it before
+  importing the fixture stack, and restore it after work settles. Module resets
+  alone do not reset `Symbol.for('@kyberion/audit-chain')`.
+  Audit-only suites with mocked I/O must refresh both that singleton and the cached
+  audit module when selecting a new fixture root. For guards caching a lazy import,
+  restore the same hoisted mock sink after an import-failure case; replacing its
+  identity makes later assertions observe a different sink. Preserve failure and
+  reentrancy assertions, and run seeds 222, 7 and 20261008 under parallel load.
+- Copy regenerable policy/schema fixture files with guarded `safeCopyFileSync`,
+  rather than durable `safeWriteFile` for every copied file. Thousands of file and
+  parent-directory fsyncs can exhaust setup budgets under parallel load. Retain
+  secure path checks, real policy/schema contents and bounded hooks; do not change
+  production durability or raise timeouts to hide fixture preparation costs.
+- Tests of provider auto-selection must explicitly scope inherited backend/profile
+  environment variables and restore them afterward. Partial boundary mocks must
+  retain real grant issuers and compile real schemas; a new fallback validation
+  requirement is not a reason to replace validation with an always-valid stub.
+- Policy-overlay fixtures must assert the resolved policy switch before testing
+  permission decisions. A facade rename requires updating both the mocked module
+  and the method; an unused virtual mock can otherwise leave the default policy
+  active. `custody-provider-attestation-governance.test.ts` checks SoD is enabled
+  before its system self-approval and person-consent cases; `registration-tests`
+  runs it alongside the tenant observability store registration contract.
+- When merging a new public export across a module move, retain the public name
+  only with its types and runtime targets pointing at the canonical built module.
+  A subpath-count baseline does not prove those files exist. Run the workspace
+  build contract (`registration-tests`) and the full runtime import contract;
+  never recreate a deleted implementation just to satisfy an old alias path.
 - Shared seam mechanisms must remain real in boundary tests. Use a partial mock
   with `createSeamCatalog()` to isolate registration state, rather than copying
   the seam API into a hand-written mock that omits new lifecycle helpers or
@@ -709,6 +819,29 @@ this contract; a faster Linux run alone is not evidence that macOS CI passed.
   `beforeAll` with an explicit hook timeout (e.g. `60_000`) so its one-time load is not charged
   to the first test's 10s budget ([WRITING_TESTS](../../../docs/developer/WRITING_TESTS.md#fixture-roots)
   lists the accepted exceptions).
+- Tests of default protected-store paths must bind both the selected root and
+  primary-checkout root to an owned scratch fixture before the first authority
+  import or write. Seed real policy/schema inputs, set root environment first,
+  then import once and assert both roots before calling the default API. Never
+  clean up a tenant parent in the real primary checkout. The enforcing regression
+  includes `governance/delegated-execution.production-path.integration.test.ts`,
+  `pipeline/pipeline-run-journal.tenant-store.test.ts` and
+  `governance/autonomy-action-state.production-role.test.ts` in `registration-tests`;
+  they retain actual store roles and default path selection. Restore only the
+  per-test environment keys between cases; a blanket environment reset can drop
+  the suite's fixture root before a later lazy import. Shuffle the affected suites
+  with seeds 222, 7 and 20261008 when repairing root isolation.
+  Seed only installation prerequisites: `runtime-readiness.ts` requires
+  `active/shared/runtime`. Leave each store's domain/tier/tenant directories
+  absent so its bounded facade must create them; precreating those directories
+  would hide a first-use capability failure.
+- Content-leak oracles must scan every public output floor of their owned fixture,
+  including its scratch and mission files, rather than another suite's checkout
+  under shared scratch. Keep canonical directory errors visible; do not swallow
+  them or prune owned outputs to make the oracle pass. The CD-09 worker fixture
+  binds selected/primary/shared/mission paths to one real-policy root before its
+  first import. Reproduce it alongside CLI P06/P07 scratch creation/removal, then
+  run the standard three shuffle seeds; `registration-tests` enforces the oracle.
 - A test must not depend on load or order. Run a suspect file with
   `--sequence.shuffle --sequence.seed=<n>` (at least 222, 7 and 20261008) and under parallel load
   before calling it fixed. Five defect classes caused the 2026-10 load and order failures:
@@ -1100,6 +1233,12 @@ isolation and parent-capability denial with an ordinary organization operator.
 
 **Rules:**
 
+- **Typed provider results are redacted fail-closed.** A `runStructured<T>` exit returns through
+  `redactProviderStructuredResult` (directly or via `withRedactedProviderOutput`), which throws on
+  an oversized value instead of substituting marker strings that break `T`.
+  `redactProviderOutputValue` is for diagnostic sinks (`lastHarnessSubagentInfo`) only, and a raw
+  `*Unredacted` inner is called only inside `withRedactedProviderOutput`. Gate:
+  `tests/provider-structured-result-redaction-boundary.test.ts` (registration-tests).
 - **Check provider egress for the data tier before every send.** Any path that hands mission or
   tenant content to an LLM provider (CLI or API) first calls `checkProviderEgress` (provider, data
   tier, tenant) from `libs/core/provider/provider-egress-gate.ts` for each candidate provider.
@@ -1297,19 +1436,31 @@ or latency through either layer measures the wrapper: an abort "passes" for a pr
 stopped, and a long turn hits the route ceiling instead of the probe's own limit.
 
 - A measurement caller builds its backend with `requestTimeout: 'caller'` (task construction
-  only) and passes its own `timeoutMs`, so the wrapper is off and the provider adapters get the
-  probe's ceiling. `check:backend-live-scenarios` does this.
+  only), passes its own `timeoutMs` and bounds every call itself, so the wrapper is off and the
+  provider adapters get the probe's ceiling. Never measure on the installed chain
+  (`getReasoningBackend()`). `check:backend-live-scenarios` and the role-fitness runner
+  (`runModelRoleFitnessProbes`, `ROLE_FITNESS_PROBE_TIMEOUT_MS`) do this.
 - Abort with a distinctive non-Error reason (no abort/cancel wording). Governed adapters turn a
   non-Error reason into their own `[DELEGATION_CANCELLED]` error, so a rejection that is (or
-  quotes) the reason came from a forwarding layer and is `unreported`, never a pass.
+  quotes) the reason came from a forwarding layer and is `unreported`, never a pass. The rule
+  lives once in `libs/core/reasoning/reasoning-abort-measurement.ts`, shared by the live
+  scenarios and `runReasoningBackendConformance`.
+- A pre-aborted probe (conformance) is always answered by a failover chain's pre-flight guard,
+  so it takes the provider adapter itself; a failover chain reads `unavailable`.
+- A CLI adapter's abort rejection is not proof that work stopped. `withWallClockBudget` waits,
+  bounded (SIGTERM, grace, SIGKILL, grace), for the child to exit and reports it in
+  `DelegationAbortedError` (`child_exit=exited|not_exited|unobservable|no_child`); the abort
+  scenario passes only on `exited` (`requireChildExit`, off only for API backends with no child).
 - Judge a capability only from the step that measures it: a follow_up that failed on its M2
   instruction turn says nothing about session continuity (`continuity: 'unreported'`).
-- Known remaining site: `libs/core/testing/reasoning-backend-conformance.ts` checks abort with a
-  pre-aborted `Error('conformance abort')`, which the wrapper and the failover layer answer before
-  any provider runs. Apply the same reason rule before it is used against a wrapped backend.
-- Gates: `backend-live-scenarios.test.ts` (abort through the wrapper is `unreported`),
+- Gates: `tests/measurement-backend-construction.test.ts` (registration-tests: every measurement
+  entry point is registered and builds caller-bounded, never on the installed chain),
+  `backend-live-scenarios.test.ts` (abort through the wrapper is `unreported`; no observed child
+  exit is not a pass), `reasoning-backend-conformance.test.ts` (wrapper and failover chain cannot
+  verify abort), `delegation-concurrency.test.ts` (abort waits for child exit),
   `reasoning-task-backend.test.ts` (caller-bounded construction is unraced),
-  `check_backend_live_scenarios.test.ts` (the entrypoint opts out of the wrapper).
+  `check_backend_live_scenarios.test.ts` and `model-role-fitness-runner.test.ts` (the entry points
+  opt out of the wrapper).
 
 ---
 

@@ -44,7 +44,10 @@ describe('Developer tour contract', () => {
     expect(ext).toContain('meeting-actuator');
     expect(ext).toContain('voice-consent.json');
     expect(ext).toContain('PLUGIN_AUTHORING.md');
-    expect(ext).toContain('Resolution order: customer overlay → legacy personal fallback.');
+    expect(ext).toContain('stance overlay → legacy personal fallback');
+    expect(ext).toContain('Stance selection grants no tenant access.');
+    expect(ext).toContain('tenant assets use their tenant-bound facades');
+    expect(ext).toContain('90');
     expect(ext).toContain('Editing `knowledge/personal/` when `KYBERION_STANCE` is unset');
     expect(ext).toContain(
       'Editing `knowledge/personal/connections/` when `KYBERION_STANCE` is unset'

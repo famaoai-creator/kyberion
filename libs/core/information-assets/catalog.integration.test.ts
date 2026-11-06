@@ -54,26 +54,21 @@ function provision() {
     initialIO.safeRmSync(ROOT, { recursive: true, force: true });
     initialIO.safeWriteFile(path.join(ROOT, 'package.json'), '{"name":"information-assets-test"}');
     const copy = (relative: string) => {
+      initialIO.safeMkdir(path.join(ROOT, relative), { recursive: true });
       for (const name of initialIO.safeReaddir(path.join(SOURCE, relative))) {
         const file = path.join(relative, name);
         const stat = initialIO.safeLstat(path.join(SOURCE, file));
         if (stat.isSymbolicLink()) throw Error('Linked governance fixture');
         if (stat.isDirectory()) copy(file);
         else if (/\.(json|yaml)$/.test(name))
-          initialIO.safeWriteFile(
-            path.join(ROOT, file),
-            initialIO.safeReadFile(path.join(SOURCE, file))
-          );
+          initialIO.safeCopyFileSync(path.join(SOURCE, file), path.join(ROOT, file));
       }
     };
     copy('knowledge/product/governance');
     copy('knowledge/product/schemas');
-    initialIO.safeWriteFile(
-      path.join(ROOT, 'knowledge/product/orchestration/information-asset-types.json'),
-      initialIO.safeReadFile(
-        path.join(SOURCE, 'knowledge/product/orchestration/information-asset-types.json')
-      )
-    );
+    const types = 'knowledge/product/orchestration/information-asset-types.json';
+    initialIO.safeMkdir(path.join(ROOT, path.dirname(types)), { recursive: true });
+    initialIO.safeCopyFileSync(path.join(SOURCE, types), path.join(ROOT, types));
   });
 }
 beforeAll(async () => {

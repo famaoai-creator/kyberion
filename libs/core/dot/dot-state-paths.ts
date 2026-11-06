@@ -5,6 +5,8 @@
  * personal state adds the authenticated owner's hash. Private prose never
  * enters the shared control indexes. Legacy unclassified state is held for
  * explicit operator-reviewed migration rather than silently starting blank.
+ * Tenant offboarding exports and soft-deletes an offboarded tenant's legacy
+ * `dot/tenants/<slug>/` copy (scope-offboarding PHYSICAL_LEGACY_TENANT_STATE_ROOTS).
  */
 
 import { assertPhysicalScopeSegment, physicalScopedPath } from '../physical-namespace.js';
