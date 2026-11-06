@@ -12,8 +12,7 @@ import {
 import { authorizeOrganizationPeople } from '../organization/organization-people-access.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeLstat, assertSafeRepositoryPath } from '../secure-io.js';
-import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
-import { withExecutionContext } from '../authority.js';
+import { withConciergeManagementAccess } from '../surface/concierge-management-access.js';
 import type { InformationAssetScope, InformationAssetLocation } from './types.js';
 import { subjectAuthorization } from '../foundation/authorization-registry.js';
 
@@ -137,26 +136,19 @@ export function withInformationAssetResources<T>(
   for (const file of reads)
     for (let dir = path.posix.dirname(file); dir !== '.'; dir = path.posix.dirname(dir))
       parents.add(dir);
-  return runInResourceAccessScope(
+  return withConciergeManagementAccess(
     {
       tenantSlug: scope.tenant_slug,
       organizationId: scope.organization_id,
       ...(scope.project_id ? { projectId: scope.project_id } : {}),
-      readExact: reads,
-      writeExact: write ? exact : [],
-      metadataExact: [...reads, ...parents],
-      mkdirExact: write ? [...parents] : [],
-      allowProductKnowledgeRead: true,
+      reads,
+      writes: write ? exact : [],
+      metadata: [...reads, ...parents],
+      mkdir: write ? [...parents] : [],
+      writer: write,
+      identity: { projectId: scope.project_id ?? null },
     },
-    () =>
-      withExecutionContext(
-        write ? 'concierge_management_writer' : 'concierge_management_reader',
-        action,
-        undefined,
-        auth.tenantSlug,
-        scope.organization_id,
-        { projectId: scope.project_id ?? null }
-      )
+    action
   );
 }
 export function assertInformationAssetRegularPath(file: string): void {

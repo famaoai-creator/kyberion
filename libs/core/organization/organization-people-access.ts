@@ -2,6 +2,7 @@
 import * as path from 'node:path';
 import { withExecutionContext, withExecutionContextAsync, resolveRole } from '../authority.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+import { withConciergeManagementAccess } from '../surface/concierge-management-access.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertProjectLifecycleOwner } from '../project/project-lifecycle-guards.js';
 import {
@@ -93,19 +94,32 @@ export function withPeopleResourcesSync<T>(
   for (const file of writes)
     for (let dir = path.posix.dirname(relative(file)); dir !== '.'; dir = path.posix.dirname(dir))
       mkdir.add(dir);
+  const reads = [...new Set([...resources.reads, ...writes].map(relative))];
+  // An explicit broad role keeps its own policy; otherwise the request is a Concierge
+  // management reader or writer through the governed grant facade.
+  if (!resources.role)
+    return withConciergeManagementAccess(
+      {
+        tenantSlug: auth.tenantSlug,
+        ...(resources.organizationId ? { organizationId: resources.organizationId } : {}),
+        reads,
+        writes: writes.map(relative),
+        mkdir: [...mkdir],
+      },
+      action
+    );
   return runInResourceAccessScope(
     {
       tenantSlug: auth.tenantSlug,
       ...(resources.organizationId ? { organizationId: resources.organizationId } : {}),
-      readExact: [...new Set([...resources.reads, ...writes].map(relative))],
+      readExact: reads,
       writeExact: writes.map(relative),
       mkdirExact: [...mkdir],
       allowProductKnowledgeRead: true,
     },
     () =>
       withExecutionContext(
-        resources.role ??
-          (writes.length ? 'concierge_management_writer' : 'concierge_management_reader'),
+        resources.role!,
         action,
         undefined,
         auth.tenantSlug,

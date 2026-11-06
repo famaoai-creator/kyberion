@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
-import { executionPersonaText, currentExecutionScope } from '../foundation/execution-scope.js';
+import { executionPersonaText } from '../foundation/execution-scope.js';
 import { currentResourceAccessScope } from '../foundation/resource-access-scope.js';
+import { conciergeManagementGrantKind } from '../foundation/concierge-management-capability.js';
 import { listTenantProfileSlugs } from '../organization/tenant-registry.js';
 import { readTextFile } from '../foundation/text.js';
 import {
@@ -453,7 +454,10 @@ export function createManagedProject(input: ManagedProjectCreateInput): ProjectR
   return createManagedProjectInternal(input, false);
 }
 
-/** Only the admitted surface mediator may defer the legacy ambient-persona audit. */
+/**
+ * Only the admitted surface mediator (a live Concierge management writer grant) may defer the
+ * legacy ambient-persona audit.
+ */
 export function createManagedProjectForSurface(input: ManagedProjectCreateInput): ProjectRecord {
   assertSurfaceProjectMutationScope(input.project_id, input.tenant_slug, input.organization_id);
   return createManagedProjectInternal(input, true);
@@ -466,14 +470,13 @@ function assertSurfaceProjectMutationScope(
 ): void {
   const scope = currentResourceAccessScope();
   if (
-    currentExecutionScope()?.assumedRole !== 'concierge_management_writer' ||
+    conciergeManagementGrantKind() !== 'writer' ||
     !scope ||
     scope.tenantSlug !== tenantSlug ||
     scope.organizationId !== organizationId ||
     scope.projectId !== projectId
-  ) {
+  )
     throw new Error('Project surface mutation requires an admitted exact resource scope.');
-  }
 }
 
 /** Bounded facade: updates only metadata and its existing exact projection. */
