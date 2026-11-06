@@ -441,7 +441,7 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["chronos_token_registry_reader", "credential_material_reader"],
+      "legacy_roles": ["chronos_token_registry_reader"],
       "sources": ["role-policy"]
     },
     {
