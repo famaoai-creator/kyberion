@@ -7,10 +7,6 @@ import {
   TASK_SOURCE_WORKSPACE_ROLE,
   taskSourceWorkspaceIoActive,
 } from './foundation/task-source-workspace-capability.js';
-import {
-  isDiscussionRequestCapability,
-  DISCUSSION_REQUEST_STORAGE_ROLE,
-} from './foundation/discussion-request-capability.js';
 import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
 import {
   MEMORY_PROVENANCE_READER_ROLE,
@@ -589,6 +585,26 @@ function assertRoleAssumptionAllowed(role: string): void {
   );
 }
 
+/**
+ * G2 issuance right of a store grant that replaced a dedicated store role: a
+ * process may issue the grant only where it could have assumed the former role
+ * (the same RA-02 rule — processes without SYSTEM_ROLE are unaffected; with one,
+ * the name must be its own, a shared core role or listed in its `may_assume`).
+ * The name is a grant issuance right, never an assumable authority role.
+ */
+export function assertStoreGrantIssuanceAllowed(issuanceRight: string): void {
+  const systemRole = getRegisteredEnvText('SYSTEM_ROLE')?.trim();
+  const right = normalizeRoleName(issuanceRight.trim());
+  const allowed = !systemRole || isRoleAssumptionAllowed(systemRole, right);
+  traceRoleAssumption(systemRole, right, allowed);
+  if (allowed) return;
+  throw new Error(
+    `[ROLE_ASSUMPTION_DENIED] A process running as SYSTEM_ROLE=${normalizeRoleName(systemRole ?? '')} ` +
+      `may not issue the '${right}' store grant. Issuance rights are governed by ` +
+      `knowledge/${ROLE_ASSUMPTION_POLICY_PATH} (system_roles.<role>.may_assume).`
+  );
+}
+
 export function inferPersonaFromRole(role?: string): Persona {
   if (!role) return 'unknown';
   const normalized = role.toLowerCase().replace(/\s+/g, '_');
@@ -749,7 +765,6 @@ export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'customer_channel_binding_store',
   'customer_decision_deal_note_writer',
   'delegation_record_store',
-  DISCUSSION_REQUEST_STORAGE_ROLE,
   PIPELINE_JOURNAL_STORE_ROLE,
   'peer_catalog_reader',
   'peer_responder_reader',
@@ -833,14 +848,6 @@ function prepareExecutionContext(
       '[RESOURCE_SCOPE_REQUIRED] Autonomy learning access requires its exact tenant store capability'
     );
   }
-  if (
-    normalizedRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
-    (!isDiscussionRequestCapability(currentResourceAccessScope()) ||
-      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
-  )
-    throw new Error(
-      '[RESOURCE_SCOPE_REQUIRED] Discussion receipt access requires its exact tenant request capability'
-    );
   if (
     normalizedRole === PIPELINE_JOURNAL_STORE_ROLE &&
     (!isPipelineJournalCapability(currentResourceAccessScope()) ||
