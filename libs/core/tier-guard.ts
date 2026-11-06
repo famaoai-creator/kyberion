@@ -57,6 +57,9 @@ import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import { policyRelativePath } from './policy-relative-path.js';
 import { rawExistsSync, rawReadTextFile, rawRealpathSync } from './fs-primitives.js';
+import { shadowAssetAddress } from './tier-guard-asset-shadow.js';
+import { detectTier } from './tier-detect.js';
+export { detectTier };
 import { resolveProjectScope, resolveProjectScopeId } from './foundation/project-scope-env.js';
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { createLogger, emitConsoleLine } from './logger.js';
@@ -69,7 +72,6 @@ import {
   partitionedRuntimeStateTierInPath,
   STORAGE_FLOOR_ROOTS,
   storageFloorTier,
-  storageFloorTierInPath,
 } from './storage-layout.js';
 import { assertSandboxWriteAllowed } from './shell/sandbox-policy.js';
 import {
@@ -687,6 +689,7 @@ function checkTenantScope(
   const hasValidTenantSegment = Boolean(
     scoped && cfg.slugPattern.test(scoped.tenant) && isValidTenantSlug(scoped.tenant)
   );
+  shadowAssetAddress(projectRoot(), relativePath, hasValidTenantSegment ? scoped!.tenant : null);
   if (
     cfg.requireTenantBinding &&
     !tenantSlug &&
@@ -1294,30 +1297,6 @@ function personaTierWriteDecision(
     allowed: false,
     reason: `[POLICY_VIOLATION] Persona '${currentPersona}' with authority role '${currentRole || 'unknown'}' is NOT authorized to write to '${relativePath}'.`,
   };
-}
-
-/**
- * Determine the knowledge tier of a file based on its path.
- */
-export function detectTier(filePath: string): TierLevel {
-  const resolved = path.resolve(filePath);
-  if (
-    resolved.includes('/knowledge/personal/') ||
-    resolved.includes('/active/organizations/personal/') ||
-    resolved.includes('/active/projects/personal/')
-  )
-    return 'personal';
-  const stateTier = partitionedRuntimeStateTierInPath(resolved);
-  if (stateTier) return stateTier;
-  const floorTier = storageFloorTierInPath(resolved);
-  if (floorTier) return floorTier;
-  if (
-    resolved.includes('/knowledge/confidential/') ||
-    resolved.includes('/active/organizations/confidential/') ||
-    resolved.includes('/active/projects/confidential/')
-  )
-    return 'confidential';
-  return 'public';
 }
 
 /**
