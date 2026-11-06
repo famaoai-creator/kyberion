@@ -1166,6 +1166,132 @@ mkdir、949 行と 961 行の reader / writer の上限の確かめ）は残し�
 保存先カタログの宣言として表し、許可証がそれを引くようにすることで、G3（カタログからの判定）と一緒に
 行うのが筋である。
 
+### G3: 切り替えの計測と第 1 段階、考え直す条件での停止（2026-11-06）
+
+基準は `1e192972d`（`refactor/core-package-split`）。G3 の目標（上の「単純になったかの判定」）を
+最初に実測し、段階の計画を立て、第 1 段階（下の (a)）を実施した後、考え直す条件に当たったので止めた。
+
+**計測の方法。**
+
+- tier-guard のロール名による分岐: `libs/core/tier-guard.ts` と、tier-guard が判定を任せるモジュール
+  （`foundation/narrow-store-role-denial.ts`、`foundation/information-asset-coverage-capability.ts`、
+  `voice/engine-runtime-preferences-access.ts`）で、ロール名の文字列・定数・名前の一覧と比べる `if` を
+  1 つずつ数える（`grep -nE "Role|role" ...` で候補を出し、目で確かめた）。security-policy の
+  `authority_role_permissions` や `tenant_scope.system_registry_reads` をロール名で引く汎用の処理は、
+  ロール名がデータ側にあるので数えない。
+- 保存先専用の Authority Role: `security-policy.json` の `authority_role_permissions` のうち、名前が
+  `_store` / `_writer` / `_reader` で終わるもの（2026-11-05 の 40 件と同じ数え方）。authority role index
+  （53 件）は、このうち `ops_alert_store` と `credential_allocation_reader` 以外の 27 件を持つ。
+- secure-io の実行時の読み込み: `foundation-weight` ゲートと同じ方法（`libs/core/dist` の相対 import の
+  推移閉包、barrel を除く）。tier-guard の分は「secure-io → tier-guard の辺を外した閉包」との差で見た。
+- 保存先を 1 つ足すときに触るファイル: 直近の G2 の移行（許可証の保存先 1 つ）で、テスト以外に
+  触ったファイルを数えた。
+
+**計測の結果。**
+
+| 指標                                 | G3 の前（`1e192972d`）                                                                                                                                                                                                                                                      | 第 1 段階の後                                         | 目標    |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------- |
+| tier-guard のロール名による分岐      | 11（保存先のもの 8: Concierge の reader/writer 3、`narrowStoreRoleDenial` のパスだけのロール 4、退役したロール名の一覧 1。保存先ではないもの 3: 記憶の由来の書き手の一覧、網羅の読み取りの `chronos_operator`/`chronos_localadmin`、`engine_runtime_preferences_operator`） | 11（変えていない）                                    | 0       |
+| 保存先専用の Authority Role          | 29（40 → G2 で 11 件を外した）                                                                                                                                                                                                                                              | 29                                                    | 0       |
+| tier-guard が import する capability | 14 モジュール（直接 5、`tier-guard-store-grants.ts` 経由 13、`narrow-store-role-denial.ts` 経由 10。重複あり）                                                                                                                                                              | 4（記憶の由来のパスの判定と、パスだけのロール 3 つ）  | 0       |
+| secure-io の実行時の読み込み         | 69（tier-guard を除くと 33、tier-guard の閉包 55）                                                                                                                                                                                                                          | 53（tier-guard の閉包 38）                            | 40 以下 |
+| 保存先を 1 つ足すときに触るファイル  | 5〜8（カタログ、capability、facade、`tier-guard-store-grants.ts`、必要なら tier-guard / `narrow-store-role-denial.ts`、発行の権利、foundation-weight の baseline）                                                                                                          | 4〜6（`tier-guard-store-grants.ts` と門番が要らない） | 2       |
+| `shape` の種類                       | カタログに未宣言（0）                                                                                                                                                                                                                                                       | 0                                                     | 4〜6    |
+
+残っている保存先専用のロール 29 件: `ops_alert_store`、`operational_learning_writer`、
+`chronos_token_registry_reader`、`workspace_graph_reader`、`scope_locale_reader`、`peer_catalog_reader`、
+`peer_responder_reader`、`peer_task_artifact_writer`、`metrics_cap_reader`、`nhi_accountability_reader`、
+`audit_mirror_writer`、`tenant_ledger_store`、`delegation_record_store`、`tenant_approval_store`、
+`tenant_approval_partition_index_reader`、`credential_allocation_reader`、`concierge_management_reader`、
+`concierge_management_writer`、`dot_lifecycle_writer`、`first_job_tenant_status_reader`、
+`reasoning_settings_writer`、`customer_decision_deal_note_writer`、`notification_preferences_reader`、
+`tool_runtime_policy_reader`、`workspace_tenant_registry_reader`、`workspace_tenant_registry_index_reader`、
+`deliverable_inbox_writer`、`archived_mission_state_reader`、`customer_channel_binding_store`。
+このうち tier-guard に分岐があるのは Concierge の 2 件とパスだけのロール 3 件だけで、他の 24 件は
+security-policy のパスの一覧だけで効いている（門番のコードには出てこない）。
+
+**段階の計画。** どの段階も挙動を変えず、旧と新の tier-guard の判定を並べて確かめる。
+
+| 段階 | 内容                                                                                                                                                                                                | 状態                     |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| (a)  | 許可証の登録簿（`foundation/store-grant-registry.ts`）。各 capability モジュールが読み込まれたときに自分の判定（認可・絞り込み・内容検査・構造上の mkdir）を登録し、tier-guard は登録簿だけに尋ねる | 実施（下）               |
+| (b)  | カタログに `grant_required` / `issuer` / `content_check` / `shape` を宣言し、カタログのゲートが登録簿の id と発行者の登録を突き合わせる                                                             | 未実施                   |
+| (c)  | Concierge の Web 管理の 3 つの規則（祖先のメタデータ、祖先の mkdir、網羅の読み取り）をカタログの宣言にし、2 つのロールを外す                                                                        | 未実施（考え直す条件 1） |
+| (d)  | パスだけのロール 3 件と、門番に分岐の無い 24 件を許可証かカタログの形にする                                                                                                                         | 未実施（考え直す条件 1） |
+| (e)  | tier-guard の各入口を `decide(主体, 住所, 操作, 内容)` に通す                                                                                                                                       | 未実施                   |
+| (f)  | secure-io の import を削る                                                                                                                                                                          | 未実施（考え直す条件 2） |
+
+**第 1 段階 (a): 許可証の登録簿。**
+
+- `foundation/store-grant-registry.ts`（実行時の依存 0）は、許可証の id の固定の一覧
+  （`STORE_GRANT_IDS`、14 件。並びが判定の順序）と、モジュールの中だけの登録の表を持つ。登録は封じて
+  ある。一覧に無い id と、同じ id の 2 回目の登録は拒否する（`[STORE_GRANT_UNKNOWN]` /
+  `[STORE_GRANT_DUPLICATE]`）。`registerStoreGrant` を書けるのは 14 の capability モジュールだけである
+  （import の境界テスト `tests/store-grant-registry-boundary.test.ts`）。package の export には無い。
+  登録した判定は、どれも各モジュールの中だけにある許可証の状態を見るので、登録簿を持っても何も許されない。
+- なぜ挙動が変わらないか。許可証の状態はそのモジュールの中だけにあるので、モジュールが読み込まれて
+  いなければ、その許可証が有効なことは無い。登録されていない判定は「許可証が無い」と答えたのと同じに
+  なる。一方、モジュールが読み込まれていなくても効かなければならない規則（呼び出し元のロールで狭める
+  拒否、許可証だけが届くパス）は門番に残し、登録が無いときは拒否にした。個人の承認の所有者の区画
+  （`tenant-approvals/personal/shared/owners/`）は、登録が無ければ窓が無いのと同じく拒否する。
+- 顧客判断の招待の許可証だけは不透明な token ではなく形の一致で判定する。招待のモジュールが読み込まれて
+  いないプロセスで、呼び出し元が同じ形の上限を自分で組み立てた場合だけ、内容検査（拒否）と許可証による
+  許可の両方が効かなくなる。届く範囲は呼び出し元自身の権限だけで、その上限を組み立てずに同じ I/O を
+  するのと同じなので、広がらない（本番でこの形を組み立てるのは招待の窓口だけで、窓口は招待の
+  モジュールを読み込む）。
+- 内容検査は、検査する許可証のモジュールが自分で登録する（消費ロックと milestone）。両方が有効なときは
+  従来どおり消費ロックの検査だけを行う（milestone の判定は登録簿で消費ロックが有効かを見る）。
+  依存の輪を作らないよう、記録の比較の共通部分を依存の無い `foundation/customer-decision-record-content.ts`
+  に移し、使う所が無くなった `customer-decision-write-content.ts` と `tier-guard-store-grants.ts` を消した。
+- 判定の順序は従来と同じにした。tier-guard は、記憶の由来の絞り込み → 書き手の一覧（門番に残す）→
+  PR の公開と個人の charter の絞り込み（パスのすべての候補で）→ `narrowStoreRoleDenial`（所有者の区画、
+  個人の承認、作業場所、招待、消費ロック、milestone の順に登録簿へ、その後にパスだけのロール）→
+  Concierge のロール名の確かめ、の順で尋ねる。パスの候補（realpath を含む）は、尋ねる絞り込みが
+  あるときだけ計算する。構造上の mkdir は、PR の公開の許可証が自分で決め、次に許可証の認可、最後に
+  招待の許可証（共通の確かめへ進む）か Concierge の writer のロール名、の順のまま。
+- 網羅の読み取りの規則（`information-asset-coverage-capability.ts`）は、Concierge の許可証の種類を
+  登録簿に尋ねる。
+
+**比較（第 1 段階）。** G2 の比較の道具（`recordMatrix`）で、自律の学習記録、パイプラインの実行記録、
+資格情報、記憶の由来、個人の charter、消費ロック、milestone、個人の承認、PR の公開の 9 つの保存先の
+すべての窓口について、変更の前と後で同じ判定を記録し、拒否の文言まで文字列で突き合わせた。9 つとも
+同じだった。最初の並列の実行では、自律の学習記録とパイプラインの実行記録の tenant の器の mkdir が
+それぞれ 1 件違ったが、変更前のコードでも実行ごとに値が変わっていた（実リポジトリの tenant の登録
+ファイルを並列のテストが作り消しするため）。直列で旧と新を 3 回ずつ実行すると、すべてのセルが
+3 回とも同じで、旧と新も同じだった。DOT の結果、招待、議論のリクエスト、作業場所、Concierge は、
+既存の tier-guard と境界のテストで確かめた。
+
+**考え直す条件に当たったこと（ここで止めた）。**
+
+1. **許可証で表せないロールが 5 個以上ある。** 残る 29 件のうち、少なくとも次の 8 件は許可証
+   （「管理者 C の保存先 S について、操作 O を、この対象だけ許す」）の形にならない。
+   - 多くの保存先を横断して読む（棚卸しの第 2 の種類。開示 D2 / Viewer Scope の問い）:
+     `workspace_graph_reader`（10 の根）、`concierge_management_reader`（10 の型）、
+     `peer_responder_reader`（`knowledge/confidential/<tenant>/` 全体）。
+   - 業務の流れで複数の保存先に書く（第 3 の種類）: `concierge_management_writer`、
+     `dot_lifecycle_writer`（`active/shared/runtime/` 全体を含む）。後者は 1 つの許可証ではなく、
+     流れの facade が保存先ごとに複数を発行する形になり、流れの分解から必要になる。
+   - 呼び出し元のロールそのものを狭める拒否だけのロール: `deliverable_inbox_writer`、
+     `customer_channel_binding_store`、`archived_mission_state_reader`。権限は security-policy から来て、
+     許可証ではない。モジュールが読み込まれていなくても効く必要があるので、(a) でも門番に残した。
+     Concierge の 2 件は、G2 の節のとおり 3 つの規則と組織・実行の識別子の束縛が残る。
+2. **secure-io の実行時の読み込みが 50 を超える。** (a) の後で 53。secure-io は tier-guard を除いても 33 を
+   読み込み（audit chain、policy engine、governance action recorder など）、tier-guard 自身に要る
+   モジュール（storage layout、tenant 区画、identity bridge と seam、knowledge tier など 11）を足すと
+   44 になる。capability モジュールをすべて外しても 40 以下にはならない。残る 4 つ
+   （パスだけのロール 3 つと記憶の由来のパスの判定）はモジュールが読み込まれていなくても効く必要が
+   あるので、登録簿には移せない。50 以下にするには、これらの規則をデータ（security-policy かカタログ）に
+   するか、secure-io 自身の依存（audit chain など）を削る必要があり、G3 の範囲（tier-guard の切り替え）を
+   超える。
+3. 保存先を 1 つ足すときに触るファイルは 4〜6 で、まだ 3 か所以上（カタログ、capability モジュール、
+   facade、登録簿の id の一覧。発行の権利と foundation-weight の baseline が加わることがある）。
+   (b) で登録簿の id の一覧をカタログから作れば 1 つ減る。
+
+**次に決めること。** (1) 横断して読むロールを開示（D2）の問いとして扱うか（スコープモデル P4 と一緒に
+作る）、(2) 拒否だけのロールを security-policy の宣言（例: そのロールは自分の許可の外を書けない）に
+するか、(3) secure-io の 40 以下という目標を、tier-guard ではなく secure-io 自身の依存（audit chain、
+policy engine）の分離として別の段階に置くか。これらを決めてから (b) 以降に進む。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |
