@@ -63,6 +63,21 @@ describe('/api/voice/engine-config', () => {
     expect(core.update).not.toHaveBeenCalled();
   });
 
+  it('passes a mutation-guard answer through unchanged', async () => {
+    core.access = { response: new Response('slow down', { status: 429 }) };
+    expect((await POST(post({ expected_revision: 'a' }))).status).toBe(429);
+    expect(core.update).not.toHaveBeenCalled();
+  });
+
+  it('answers a core operator refusal with 403, not 500', async () => {
+    core.get.mockImplementationOnce(() => {
+      throw new Error('[ENGINE_RUNTIME_OPERATOR_DENIED]');
+    });
+    const res = await GET(get());
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe('engine_config_local_session_required');
+  });
+
   it('maps operator errors to 400 / 409 and hides anything else', async () => {
     expect((await POST(post([]))).status).toBe(400);
     core.update.mockImplementationOnce(() => {

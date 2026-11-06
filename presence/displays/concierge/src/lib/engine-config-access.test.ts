@@ -68,7 +68,10 @@ describe('resolveEngineConfigOperator', () => {
 
   it('refuses a cross-origin write and a non-admin viewer', () => {
     state.mutationDenied = true;
-    expect(resolveEngineConfigOperator(req(), true).principal).toBeUndefined();
+    const denied = resolveEngineConfigOperator(req(), true);
+    expect(denied.principal).toBeUndefined();
+    // The mutation guard's own answer (403 here; 429 / 401 alike) passes through.
+    expect(denied.response?.status).toBe(403);
     expect(resolveEngineConfigOperator(req(), false).principal).toBeDefined();
     state.mutationDenied = false;
     state.viewer = { role: 'readonly', principalId: 'human:viewer' };
