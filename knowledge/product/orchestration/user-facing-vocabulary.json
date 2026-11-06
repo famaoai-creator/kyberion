@@ -29463,6 +29463,21 @@
         "ja": "どのテナントにも属さない項目",
         "qps-ploc": "⟦Ïŧėɱş ñőŧ ȧşşïɠñėḓ ŧő ȧñẏ ŧėñȧñŧ ŀőřėɱ ïṗşů⟧"
       },
+      "project_all_label": {
+        "en": "All projects",
+        "ja": "すべてのプロジェクト",
+        "qps-ploc": "⟦Ȧŀŀ ṗřőĵėƈŧş ŀőř⟧"
+      },
+      "project_scope_detail": {
+        "en": "Project",
+        "ja": "プロジェクト",
+        "qps-ploc": "⟦Ṗřőĵėƈŧ ŀőř⟧"
+      },
+      "project_switch_aria": {
+        "en": "Narrow to a project",
+        "ja": "プロジェクトで絞り込む",
+        "qps-ploc": "⟦Ñȧřřőẇ ŧő ȧ ṗřőĵėƈŧ ŀőřėɱ ⟧"
+      },
       "personal_overview_title": {
         "en": "By tenant",
         "ja": "テナントごとのまとめ",
