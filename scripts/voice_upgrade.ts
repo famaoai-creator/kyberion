@@ -15,7 +15,7 @@
  * What it does (this is currently a *configurator*, not a runtime switch):
  *   1. Validates prerequisites for the target tier (API key, Python, etc).
  *   2. Writes the chosen tier to `voice_tier` in the user's
- *      customer/{slug}/voice/profile.json (or knowledge/personal/voice/profile.json).
+ *      knowledge/personal/stances/{slug}/voice/profile.json (or knowledge/personal/voice/profile.json).
  *   3. Prints the next-step commands needed to actually run that tier.
  *
  * The runtime selection (which TTS engine to actually call) is not yet wired

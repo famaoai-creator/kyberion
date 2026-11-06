@@ -90,7 +90,6 @@ async function scoped<T>(
       writeExact: writes.map(relative),
       mkdirExact: writes.length ? directories(writes) : [],
       allowProductKnowledgeRead: true,
-      metadataExact: ['customer/' + auth.tenantSlug],
     },
     () =>
       withExecutionContextAsync(

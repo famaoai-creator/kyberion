@@ -17,15 +17,20 @@ const store = (id: string, path: string, extra: Partial<StoreEntry> = {}): Store
 
 describe('store catalog gate', () => {
   it('normalizes policy placeholders', () => {
-    expect(normalizePolicyPath('customer/${KYBERION_TENANT}/deals/')).toBe(
-      'customer/<tenant>/deals'
+    expect(normalizePolicyPath('knowledge/confidential/${KYBERION_TENANT}/deals/')).toBe(
+      'knowledge/confidential/<tenant>/deals'
     );
     expect(normalizePolicyPath('customer/${KYBERION_STANCE}/logs/')).toBe('customer/<slug>/logs');
   });
 
   it('matches placeholders by kind: a stance slug never stands for a tenant', () => {
-    expect(templateCovers('customer/<tenant>/deals', 'customer/<tenant>/deals/x.json')).toBe(true);
-    expect(templateCovers('customer/<slug>', 'customer/<tenant>/deals')).toBe(false);
+    expect(
+      templateCovers(
+        'knowledge/confidential/<tenant>/deals',
+        'knowledge/confidential/<tenant>/deals/x.json'
+      )
+    ).toBe(true);
+    expect(templateCovers('customer/<slug>', 'knowledge/confidential/<tenant>/deals')).toBe(false);
     expect(templateCovers('runtime/dot/<tier>/<tenant>', 'runtime/dot/confidential/<tenant>')).toBe(
       true
     );
@@ -37,29 +42,31 @@ describe('store catalog gate', () => {
     expect(templateCovers('active/shared/tmp/<tier>/<tenant>', 'active/shared/tmp/personal')).toBe(
       true
     );
-    expect(templateCovers('customer/<tenant>/deals', 'customer/<tenant>')).toBe(false);
+    expect(templateCovers('knowledge/confidential/<tenant>/deals', 'customer/<tenant>')).toBe(
+      false
+    );
   });
 
   it('picks the most specific store and ignores planned ones', () => {
     const stores = [
       store('root', 'customer/<tenant>'),
-      store('deals', 'customer/<tenant>/deals'),
-      store('new', 'customer/<tenant>/deals/x', { status: 'planned' }),
+      store('deals', 'knowledge/confidential/<tenant>/deals'),
+      store('new', 'knowledge/confidential/<tenant>/deals/x', { status: 'planned' }),
     ];
-    expect(owningStore(stores, 'customer/<tenant>/deals/x')?.id).toBe('deals');
+    expect(owningStore(stores, 'knowledge/confidential/<tenant>/deals/x')?.id).toBe('deals');
     expect(owningStore(stores, 'customer/<tenant>/notes')?.id).toBe('root');
   });
 
   it('reports missing role coverage, stale role lists, bad moves and unscoped growth', () => {
     const stores = [
-      store('deals', 'customer/<tenant>/deals', { legacy_roles: ['old_store'] }),
+      store('deals', 'knowledge/confidential/<tenant>/deals', { legacy_roles: ['old_store'] }),
       store('legacy', 'customer/<slug>', { status: 'legacy-move', moves_to: 'nowhere' }),
       store('loose', 'active/shared/state', { custody: { kind: 'unscoped-legacy' } }),
     ];
     const report = checkStoreCatalog(
       { stores },
       {
-        deal_writer: { allow_write: ['customer/${KYBERION_TENANT}/deals/'] },
+        deal_writer: { allow_write: ['knowledge/confidential/${KYBERION_TENANT}/deals/'] },
         stray_reader: { allow_read: ['active/elsewhere/'] },
         mission_controller: { allow_write: ['active/elsewhere/'] },
       },

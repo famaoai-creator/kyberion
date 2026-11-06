@@ -47,7 +47,7 @@ pnpm mission kickoff MSN-<TOPIC>-<YYYYMMDD> \
 ```
 
 `--organization-id` selects organization defaults via `KYBERION_ORGANIZATION_ID`. It
-does **not** switch customer stance unless `customer/<org>/` exists.
+does **not** switch customer stance unless `knowledge/personal/stances/<org>/` exists.
 
 Learnings ship in the same PR as the code — see
 [execution.md step 5](../governance/phases/execution.md) and

@@ -321,7 +321,7 @@ describe('customer_channel_binding_store on the real guard', () => {
 describe('customer outbound approvals carry ids only (B2, real gate)', () => {
   it('keeps the message out of the shared approval store and worker events, and the approval binds it', async () => {
     const core = await import('@agent/core/customer-channel-binding');
-    const { openDeal } = await import('@agent/core/deal-store');
+    const { asDealStore, openDeal } = await import('@agent/core/deal-store');
     const { sendDealDocumentToCustomer } = await import('@agent/core/deal-documents');
     const { listApprovalRequests, decideApprovalRequest } =
       await import('@agent/core/governance/approval-store');
@@ -341,9 +341,17 @@ describe('customer outbound approvals carry ids only (B2, real gate)', () => {
       undefined,
       TENANT
     );
-    const docPath = path.join(ROOT, 'customer', TENANT, 'deals', deal.deal_id, 'quote-v1.md');
+    const docPath = path.join(
+      ROOT,
+      'knowledge',
+      'confidential',
+      TENANT,
+      'deals',
+      deal.deal_id,
+      'quote-v1.md'
+    );
     const body = `# Quote\n\n${BODY_MARKER}\n`;
-    initialContext('mission_controller', () => io.safeWriteFile(docPath, body));
+    asDealStore(TENANT, () => io.safeWriteFile(docPath, body));
     const sha = createHash('sha256').update(body, 'utf8').digest('hex');
     const deliver = vi.fn(async () => undefined);
     const send = () =>
@@ -412,7 +420,7 @@ describe('customer outbound approvals carry ids only (B2, real gate)', () => {
     });
 
     // An edited document is other text: the approval does not cover it.
-    initialContext('mission_controller', () => io.safeWriteFile(docPath, `${body}PS\n`));
+    asDealStore(TENANT, () => io.safeWriteFile(docPath, `${body}PS\n`));
     const edited = await send();
     expect(edited.sent).toBe(false);
     expect(deliver).not.toHaveBeenCalled();
@@ -429,7 +437,7 @@ describe('customer outbound approvals carry ids only (B2, real gate)', () => {
     ).toMatchObject({ matches_approval: false });
 
     // The exact approved text goes out.
-    initialContext('mission_controller', () => io.safeWriteFile(docPath, body));
+    asDealStore(TENANT, () => io.safeWriteFile(docPath, body));
     const sent = await send();
     expect(sent).toMatchObject({ sent: true, status: 'sent' });
     expect(deliver).toHaveBeenCalledWith(body);
@@ -504,7 +512,8 @@ describe('customer escalations carry ids only (real notifyOperator / ops alert)'
       const walk = (dir: string): void => {
         for (const name of io.safeReaddir(dir)) {
           const file = path.join(dir, name);
-          if (file.startsWith(path.join(ROOT, 'customer', TENANT, 'deals'))) continue;
+          if (file.startsWith(path.join(ROOT, 'knowledge', 'confidential', TENANT, 'deals')))
+            continue;
           if (file.startsWith(path.join(ROOT, 'knowledge'))) continue;
           const stat = io.safeLstat(file);
           if (stat.isDirectory()) walk(file);
