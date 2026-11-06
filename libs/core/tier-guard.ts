@@ -24,10 +24,7 @@ import {
   isPipelineJournalCapability,
   PIPELINE_JOURNAL_STORE_ROLE,
 } from './foundation/pipeline-journal-capability.js';
-import {
-  isCustomerDecisionInviteCapability,
-  CUSTOMER_DECISION_INVITE_STORE_ROLE,
-} from './foundation/customer-decision-invite-capability.js';
+import { isCustomerDecisionInviteCapability } from './foundation/customer-decision-invite-capability.js';
 import {
   isCustomerDecisionConsumerCapability,
   CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
@@ -573,7 +570,15 @@ function isScopedStructuralMkdir(
       prPublicationResourceAllowed(relativePath, 'mkdir')
     );
   }
-  if (access.role === DISCUSSION_REQUEST_STORAGE_ROLE) {
+  // G2: the invite capability itself (not a role) may create its tenant partition,
+  // under the same shared checks below as every scoped structural mkdir.
+  const inviteGrant =
+    isCustomerDecisionInviteCapability(currentResourceAccessScope()) &&
+    normalizePath(protectedPrefix) ===
+      PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites + '/confidential';
+  if (inviteGrant) {
+    // fall through to the shared checks
+  } else if (access.role === DISCUSSION_REQUEST_STORAGE_ROLE) {
     if (
       !isDiscussionRequestCapability(currentResourceAccessScope()) ||
       normalizePath(protectedPrefix) !==
@@ -592,13 +597,6 @@ function isScopedStructuralMkdir(
       !isPipelineJournalCapability(currentResourceAccessScope()) ||
       normalizePath(protectedPrefix) !==
         PARTITIONED_RUNTIME_STATE_ROOTS.pipeline_library_runs + '/confidential'
-    )
-      return false;
-  } else if (access.role === CUSTOMER_DECISION_INVITE_STORE_ROLE) {
-    if (
-      !isCustomerDecisionInviteCapability(currentResourceAccessScope()) ||
-      normalizePath(protectedPrefix) !==
-        PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites + '/confidential'
     )
       return false;
   } else if (access.role !== 'concierge_management_writer') return false;
@@ -1024,15 +1022,6 @@ function requestResourceDenial(
       allowed: false,
       reason:
         '[RESOURCE_SCOPE_REQUIRED] Pipeline journal access requires its exact tenant journal capability',
-    };
-  if (
-    normalizedRole === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
-    !legacyStoreCapability(isCustomerDecisionInviteCapability(currentResourceAccessScope()))
-  )
-    return {
-      allowed: false,
-      reason:
-        '[RESOURCE_SCOPE_REQUIRED] Customer decision invite access requires its exact tenant invite capability',
     };
   if (
     normalizedRole === CUSTOMER_DECISION_CONSUMER_STORE_ROLE &&

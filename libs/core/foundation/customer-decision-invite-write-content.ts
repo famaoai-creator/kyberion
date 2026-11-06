@@ -5,8 +5,8 @@ import type { ResourceAccessOperation } from './resource-access-scope.js';
 import { isValidTenantSlug } from './scope.js';
 
 /**
- * CD-10: the invite store (`customer_decision_invite_store`) writes only for a
- * tenant that is registered and active (`knowledge/personal/tenants/<t>.json`,
+ * CD-10: an active invite capability (formerly the `customer_decision_invite_store`
+ * role) writes only for a tenant that is registered and active (`knowledge/personal/tenants/<t>.json`,
  * matching `tenant_slug`, `status === 'active'` — the rule of tier-guard
  * `isRegisteredActiveTenant` and `isActiveCustomerTenant`). For any other
  * tenant the only write allowed is a revoke of an existing record; every
@@ -58,7 +58,7 @@ export function isRevokeOnlyInviteChange(previous: unknown, next: unknown): bool
 
 /**
  * The refusal reason of an invite store write / mkdir, or null when allowed.
- * `tenantSlug` is the tenant of the role's capability; reads are not checked.
+ * `tenantSlug` is the tenant of the active invite capability; reads are not checked.
  */
 export function customerDecisionInviteWriteDenial(input: {
   tenantSlug: string | undefined;

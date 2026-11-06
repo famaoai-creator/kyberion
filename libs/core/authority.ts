@@ -21,10 +21,6 @@ import {
   PIPELINE_JOURNAL_STORE_ROLE,
 } from './foundation/pipeline-journal-capability.js';
 import {
-  isCustomerDecisionInviteCapability,
-  CUSTOMER_DECISION_INVITE_STORE_ROLE,
-} from './foundation/customer-decision-invite-capability.js';
-import {
   isCustomerDecisionConsumerCapability,
   CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
 } from './foundation/customer-decision-consumer-capability.js';
@@ -748,7 +744,6 @@ export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'credential_material_reader',
   'autonomy_learning_store',
   CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
-  CUSTOMER_DECISION_INVITE_STORE_ROLE,
   CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
   ARCHIVED_MISSION_STATE_READER_ROLE,
   'customer_channel_binding_store',
@@ -853,14 +848,6 @@ function prepareExecutionContext(
   )
     throw new Error(
       '[RESOURCE_SCOPE_REQUIRED] Pipeline journal access requires its exact tenant journal capability'
-    );
-  if (
-    normalizedRole === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
-    (!isCustomerDecisionInviteCapability(currentResourceAccessScope()) ||
-      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
-  )
-    throw new Error(
-      '[RESOURCE_SCOPE_REQUIRED] Customer decision invite access requires its exact tenant invite capability'
     );
   if (
     normalizedRole === CUSTOMER_DECISION_CONSUMER_STORE_ROLE &&

@@ -270,18 +270,10 @@ describe('durable partitioned runtime state', () => {
     for (const [role, grant] of Object.entries(policy.authority_role_permissions))
       if (role !== 'discussion_request_store')
         expect(JSON.stringify(grant)).not.toContain('runtime/discussion-create-requests');
-    // Invite records: only the tenant-bound invite store role, only its own tenant.
-    expect(policy.authority_role_permissions.customer_decision_invite_store).toEqual({
-      allow_read: [
-        'active/shared/runtime/customer-decision-invites/confidential/${KYBERION_TENANT}/',
-      ],
-      allow_write: [
-        'active/shared/runtime/customer-decision-invites/confidential/${KYBERION_TENANT}/',
-      ],
-    });
-    for (const [role, grant] of Object.entries(policy.authority_role_permissions))
-      if (role !== 'customer_decision_invite_store')
-        expect(JSON.stringify(grant)).not.toContain('runtime/customer-decision-invites');
+    // Invite records (G2): no role grants them; only the exact invite capability does.
+    expect(policy.authority_role_permissions.customer_decision_invite_store).toBeUndefined();
+    for (const grant of Object.values(policy.authority_role_permissions))
+      expect(JSON.stringify(grant)).not.toContain('runtime/customer-decision-invites');
     for (const field of ['default_allow', 'persona_permissions', 'authority_permissions'])
       expect(JSON.stringify(policy[field])).not.toContain('runtime/customer-decision-invites');
     // Credential allocation administration and dispatch metadata access reuse

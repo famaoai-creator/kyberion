@@ -11,7 +11,7 @@ import {
   ARCHIVED_MISSION_STATE_READER_ROLE,
   isArchivedMissionStateCapability,
 } from './archived-mission-state-capability.js';
-import { CUSTOMER_DECISION_INVITE_STORE_ROLE } from './customer-decision-invite-capability.js';
+import { isCustomerDecisionInviteCapability } from './customer-decision-invite-capability.js';
 import { customerDecisionInviteWriteDenial } from './customer-decision-invite-write-content.js';
 import {
   CONTENT_CHECKED_ROLES,
@@ -38,8 +38,10 @@ import {
  *   - `customer_channel_binding_store`: writes / mkdirs only the bindings file;
  *   - content-checked roles (consumer / milestone store): every write is
  *     checked against the record on disk;
- *   - `customer_decision_invite_store`: writes / mkdirs only for a registered
- *     active tenant, except a content-checked revoke of an existing record.
+ *   - an active customer decision invite capability (G2: it replaced the
+ *     `customer_decision_invite_store` role, whatever role the caller holds):
+ *     writes / mkdirs only for a registered active tenant, except a
+ *     content-checked revoke of an existing record.
  * Returns the refusal reason, or null.
  */
 export function narrowStoreRoleDenial(input: {
@@ -73,6 +75,16 @@ export function narrowStoreRoleDenial(input: {
   // Append must retain every pre-existing write/content restriction, never fall through
   // a metadata/read branch merely because the resource ceiling distinguishes the verb.
   const operation = input.operation === 'append' ? 'write' : input.operation;
+  if (isCustomerDecisionInviteCapability(input.scope)) {
+    const inviteDenial = customerDecisionInviteWriteDenial({
+      tenantSlug: input.scope?.tenantSlug,
+      relativePath,
+      operation,
+      content: input.content,
+      readRepoFile: input.readRepoFile,
+    });
+    if (inviteDenial) return inviteDenial;
+  }
   if (!role) return null;
   if (
     role === DELIVERABLE_INBOX_WRITER_ROLE &&
@@ -108,16 +120,6 @@ export function narrowStoreRoleDenial(input: {
       !isArchivedMissionStateCapability(input.scope))
   )
     return '[RESOURCE_SCOPE_REQUIRED] Archived mission state reads require their exact read-only capability';
-  if (role === CUSTOMER_DECISION_INVITE_STORE_ROLE) {
-    const inviteDenial = customerDecisionInviteWriteDenial({
-      tenantSlug: input.scope?.tenantSlug,
-      relativePath,
-      operation,
-      content: input.content,
-      readRepoFile: input.readRepoFile,
-    });
-    if (inviteDenial) return inviteDenial;
-  }
   if (operation === 'write' && CONTENT_CHECKED_ROLES.has(role))
     return customerDecisionWriteContentDenial(
       role,
