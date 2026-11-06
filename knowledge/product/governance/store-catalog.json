@@ -357,10 +357,9 @@
         "ref": "<tenant>"
       },
       "status": "legacy-move",
-      "moves_to": "tenant-customer-records",
-      "legacy_roles": ["customer_decision_deal_note_writer"],
-      "sources": ["stance-overlay", "role-policy"],
-      "note": "deal-store.ts, deal-documents.ts, customer-conversation.ts"
+      "moves_to": "tenant-deals",
+      "sources": ["stance-overlay"],
+      "note": "Migration 0003-deal-home moves them into the tenant home deals/."
     },
     {
       "id": "legacy.customer-stance",
@@ -395,9 +394,8 @@
       },
       "status": "legacy-move",
       "moves_to": "tenant-knowledge",
-      "sources": ["stance-overlay", "role-policy"],
-      "note": "Whole legacy directory read by tenant slug (peer_responder_reader); its contents split across S1-S3.",
-      "legacy_roles": ["peer_responder_reader"]
+      "sources": ["stance-overlay"],
+      "note": "The whole legacy directory; migrations 0001-0003 empty it and remove it."
     },
     {
       "id": "missions",
@@ -967,7 +965,20 @@
       "tiers": ["confidential"],
       "status": "planned",
       "sources": ["scope-model"],
-      "note": "S3: deals, requirements, escalations and conversations about one customer of the tenant."
+      "note": "Planned: per-customer grouping once a deal names its customer (deals carry no customer key yet; S3 moved them to tenant-deals). customers/<customer>/ already holds the decision ledger actor registry."
+    },
+    {
+      "id": "tenant-deals",
+      "path": "knowledge/confidential/<tenant>/deals",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "active",
+      "legacy_roles": ["customer_decision_deal_note_writer"],
+      "sources": ["scope-model", "role-policy"],
+      "note": "S3 done: the tenant's customer records (deals, deal documents, requirements captures, escalations, deal log), read and written only as the tenant-bound deal store (libs/core/deal-store.ts asDealStore)."
     },
     {
       "id": "tenant-knowledge",

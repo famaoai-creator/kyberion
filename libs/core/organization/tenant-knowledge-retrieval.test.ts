@@ -172,13 +172,12 @@ describe('retrieval outcome contract', () => {
 });
 
 describe('buildTenantKnowledgeScopeSet (positive allowlist)', () => {
-  it('builds own-subtree + overlay + common scopes for a non-strict tenant', () => {
+  it('builds own-subtree + common scopes for a non-strict tenant', () => {
     const set = buildTenantKnowledgeScopeSet('tenant-x', { rootDir: fixtureRoot, env: fixtureEnv });
     expect(set).not.toBeNull();
     expect(set!.strictIsolation).toBe(false);
     expect(set!.scopes).toEqual([
       { tiers: ['confidential'], customerId: 'tenant-x' },
-      { tiers: ['customer'], customerId: 'tenant-x' },
       { tiers: ['confidential'], customerId: 'common' },
     ]);
   });
@@ -190,10 +189,7 @@ describe('buildTenantKnowledgeScopeSet (positive allowlist)', () => {
     });
     expect(set).not.toBeNull();
     expect(set!.strictIsolation).toBe(true);
-    expect(set!.scopes).toEqual([
-      { tiers: ['confidential'], customerId: 'tenant-strict' },
-      { tiers: ['customer'], customerId: 'tenant-strict' },
-    ]);
+    expect(set!.scopes).toEqual([{ tiers: ['confidential'], customerId: 'tenant-strict' }]);
   });
 
   it('returns null (fail-open, nothing scanned) for an unregistered tenant', () => {
@@ -223,7 +219,7 @@ describe('normalizeTenantKnowledgeSourcePath', () => {
 });
 
 describe('queryTenantKnowledge (reachability + isolation)', () => {
-  it('reaches the tenant subtree, customer overlay, and common with repo-relative paths', async () => {
+  it('reaches the tenant subtree and common with repo-relative paths, never the legacy customer/ tree', async () => {
     const hits = await queryAsFixtureTenant({
       tenantSlug: 'tenant-x',
       topic: TOPIC,
@@ -233,7 +229,8 @@ describe('queryTenantKnowledge (reachability + isolation)', () => {
     });
     const paths = hits.map((hit) => hit.path);
     expect(paths).toContain('knowledge/confidential/tenant-x/quantum-billing-runbook.md');
-    expect(paths).toContain('customer/tenant-x/quantum-billing-overlay.md');
+    // S3: customer records live in the tenant subtree; the legacy customer/ tree is not scanned.
+    expect(paths).not.toContain('customer/tenant-x/quantum-billing-overlay.md');
     expect(paths).toContain('knowledge/confidential/common/quantum-billing-common.md');
     for (const hit of hits) {
       expect(hit.tenant_slug).toBe('tenant-x');

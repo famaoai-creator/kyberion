@@ -522,6 +522,21 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
   registered root; the tenant-state purge test), and the store's own partition test (e.g.
   `delegation-idempotency.test.ts`, `generation-cost-settlement.test.ts`).
 
+### Tenant data migration preflight
+
+- Plan and validate every tenant before the first copy or deletion, including in
+  dry-run. Reject symlinks and unsupported file types; a README exemption applies
+  only to a regular file, never a directory or link that recursive cleanup would
+  discard. Keep source writers quiesced during the operator-reviewed migration.
+- Relink only the declared JSON/JSONL reference files. Copy every other attachment
+  as bytes through secure-io and refuse destination overwrites. Keep real role and
+  path checks in synthetic migration fixtures; `migration/0003-deal-home.test.ts`
+  exercises dry-run, byte preservation, existing targets and preflight failures in
+  `registration-tests`.
+- Copy-and-delete is not a multi-tenant transaction. An I/O failure can leave a
+  partial destination while the source remains. Inspect and reconcile it manually;
+  do not delete originals or bypass the existing-target refusal to force a retry.
+
 ### Immutable scoped evidence attempts
 
 - Use `writeScopedArtifactAttempt` / `readScopedArtifactAttempt` in `libs/core/workforce/artifact-store.ts` for immutable, repeatable evidence. Keep the full evaluation binding in the parent key and keep the effect identity stable across evaluation revisions. Use the existing owner scope, artifact class and index; never introduce a parallel ledger or put tenant evidence in the system partition.

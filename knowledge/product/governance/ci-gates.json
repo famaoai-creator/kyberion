@@ -1023,6 +1023,7 @@
         "tests/provider-structured-result-redaction-boundary.test.ts",
         "tests/package-boundary-contract.test.ts",
         "tests/workspace-build-contract.test.ts",
+        "migration/0003-deal-home.test.ts",
         "tests/plugin-execution-guard-boundary.test.ts",
         "tests/service-channel-boundary.test.ts",
         "tests/runtime-surface-boundary.test.ts",

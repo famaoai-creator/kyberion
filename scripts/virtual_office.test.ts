@@ -268,8 +268,8 @@ describe('virtual office surface', () => {
         assigned_role: 'operator',
       })
     );
-    const betaRoot = path.join(tmpRoot, 'customer', 'beta');
-    const acmeTenantRoot = path.join(tmpRoot, 'customer', 'acme-prod');
+    const betaRoot = path.join(tmpRoot, 'knowledge', 'confidential', 'beta');
+    const acmeTenantRoot = path.join(tmpRoot, 'knowledge', 'confidential', 'acme-prod');
     fs.mkdirSync(path.join(acmeTenantRoot, 'deals'), { recursive: true });
     fs.writeFileSync(
       path.join(acmeTenantRoot, 'deals', 'DEAL-ACME-PROD.json'),

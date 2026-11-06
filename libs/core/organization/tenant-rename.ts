@@ -46,7 +46,7 @@ export type TenantLifecycleVerb = 'create' | 'update' | 'suspend' | 'resume' | '
 
 /** One directory or file relocation the rename performs. */
 export interface TenantRenameMove {
-  kind: 'profile' | 'knowledge_root' | 'organization_state' | 'audit_mirror' | 'customer_overlay';
+  kind: 'profile' | 'knowledge_root' | 'organization_state' | 'audit_mirror';
   from: string;
   to: string;
 }
@@ -104,7 +104,6 @@ const RENAME_SCAN_ROOTS = [
   'active/organizations',
   runtimeStatePath('organization.projectsRoot').physicalPath,
   'active/missions',
-  'customer',
 ] as const;
 
 const RENAME_SCAN_EXTENSIONS = ['.json', '.md', '.css', '.ts', '.html'];
@@ -334,7 +333,7 @@ export function renameTenantWithPlan(input: TenantRenameInput): TenantRenameResu
     }
   }
 
-  // 4a. The tenant's audit mirror partition. Moving it under the audit chain
+  // 4. The tenant's audit mirror partition. Moving it under the audit chain
   //     lock keeps every append on one side of the move, and the marker records
   //     where: mirror reconcile counts the old slug's earlier entries as the new
   //     slug's (see audit_mirror_reconcile.ts).
@@ -370,19 +369,6 @@ export function renameTenantWithPlan(input: TenantRenameInput): TenantRenameResu
         mirrorMovedId = auditChain.recordHeld(mirrorMovedEntry).id;
       });
     }
-  }
-
-  // 4b. The legacy customer/{tenant}/ directory, which still holds the tenant's
-  //     customer records until S3 moves them into the tenant home.
-  const fromOverlay = path.join(rootDir, 'customer', fromSlug);
-  if (safeExistsSync(fromOverlay)) {
-    const toOverlay = path.join(rootDir, 'customer', toSlug);
-    moves.push({
-      kind: 'customer_overlay',
-      from: relative(rootDir, fromOverlay),
-      to: relative(rootDir, toOverlay),
-    });
-    if (apply) safeMoveSync(fromOverlay, toOverlay);
   }
 
   // 5. Profile last: it is the registry entry, so it flips only once the

@@ -12,7 +12,7 @@ Kyberion を fork せずに、1 つのチェックアウトを複数の主体と
 
 > **命名について**: 本ドキュメントと `customer/` ディレクトリは FDE 案件を念頭に書かれており、そこでは「運用主体（stance）」がたまたま顧客だった。それは用途の 1 つであって定義ではない。一般概念は **stance**（いま自分はどの主体として振る舞っているか）であり、複数の独立法人で役割を兼務して 1 つずつ演じる用途も同格に正当である。さらに stance は **テナント**（機密境界）とも、**テナント自身の顧客**とも別の層である — 会話ではこの 3 つが全部「顧客」と呼ばれる。→ [stance-tenant-customer-model](../../knowledge/product/architecture/stance-tenant-customer-model.md)。以下の「顧客」は「stance」と読み替えること。環境変数とディレクトリ名は歴史的経緯のまま維持する。
 
-詳細な英語版は [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md) を参照。日々の利用方法は [`customer/README.md`](../../customer/README.md)。
+詳細な英語版は [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md) を参照。日々の利用方法は [`templates/stance/README.md`](../../templates/stance/README.md)。
 
 ## 1. 課題
 
