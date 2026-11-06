@@ -116,7 +116,6 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["discussion_request_store"],
       "sources": ["runtime-state-roots", "role-policy"],
       "registration": {
         "family": "state",

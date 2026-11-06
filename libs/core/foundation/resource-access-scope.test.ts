@@ -189,22 +189,29 @@ describe('request resource ceiling', () => {
   it.each(['discussion_request_store', 'pipeline_journal_store'])(
     'does not enlarge the original %s capability with forged append or metadata paths',
     (role) => {
-      process.env.SYSTEM_ROLE = role;
-      // A copy of the live ceiling, used outside it: for the opaque Discussion request
-      // grant the copy is itself a lookalike, and it never gains the forged paths either.
+      // G2: the Discussion request grant has no store role. A copy of its live ceiling,
+      // used outside it, is a lookalike that authorizes nothing in the protected store —
+      // so the forged paths sit there, where only the live grant could authorize I/O.
+      const discussion = role === 'discussion_request_store';
+      if (!discussion) process.env.SYSTEM_ROLE = role;
       let capability!: ResourceAccessScope;
       withStoreCapability(role, (live) => {
         capability = { ...live };
       });
       {
-        const extra = base + '/forged/foreign.jsonl';
+        const forged = discussion
+          ? path.posix.dirname(capability.readExact[0]!) + '/forged'
+          : base + '/forged';
+        const extra = forged + '/foreign.jsonl';
         runInResourceAccessScope({ ...capability, appendExact: [extra] }, () => {
           expect(validateWritePermission(abs(extra), 'append').allowed).toBe(false);
-          expect(() => safeAppendFileSync(abs(extra), 'forged')).toThrow(/RESOURCE_SCOPE_REQUIRED/);
-          expect(validateReadPermission(abs(base + '/forged'), 'metadata').allowed).toBe(false);
+          expect(() => safeAppendFileSync(abs(extra), 'forged')).toThrow(
+            discussion ? /SECURITY|POLICY|Higher tier required/ : /RESOURCE_SCOPE_REQUIRED/
+          );
+          expect(validateReadPermission(abs(forged), 'metadata').allowed).toBe(false);
         });
         // A forged name prefix is not honoured by a validator that does not check it.
-        runInResourceAccessScope({ ...capability, namePrefixExact: [base + '/forged/'] }, () => {
+        runInResourceAccessScope({ ...capability, namePrefixExact: [forged + '/'] }, () => {
           expect(validateWritePermission(abs(extra)).allowed).toBe(false);
         });
         // Even a read-only old capability cannot grow a new append grant to its real file.

@@ -7,7 +7,13 @@ import {
 import { isValidTenantSlug } from './scope.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from './runtime-state-roots.js';
 
-export const DISCUSSION_REQUEST_STORAGE_ROLE = 'discussion_request_store';
+/**
+ * Issuance right of the Discussion request grant (G2). The former store role of this name is
+ * gone: the grant alone authorizes receipt I/O. The name stays only in
+ * role-assumption-policy `may_assume` (Concierge), which decides which processes may issue the
+ * grant (authority.ts assertStoreGrantIssuanceAllowed); it is not an assumable authority role.
+ */
+export const DISCUSSION_REQUEST_GRANT_ISSUANCE_RIGHT = 'discussion_request_store';
 const ROOT = PARTITIONED_RUNTIME_STATE_ROOTS.discussion_create_requests;
 const HASH = /^[a-f0-9]{64}$/u;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -61,8 +67,10 @@ function discussionRequestCeiling(
 }
 
 /**
- * Internal synchronous issuer, import-restricted to discussion/discussion-request-storage-scope.ts.
- * The opaque grant exists only while `internalFn` runs; a structural lookalike resolves nothing.
+ * Internal synchronous issuer, import-restricted to discussion/discussion-request-storage-scope.ts,
+ * which checks the issuance right first. No role is assumed: tier-guard treats the active grant
+ * itself as the authority for the I/O it covers. The opaque grant exists only while
+ * `internalFn` runs; a structural lookalike resolves nothing.
  */
 export function withDiscussionRequestCapability<T>(
   input: DiscussionRequestBinding,

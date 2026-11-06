@@ -198,7 +198,7 @@ describe('durable partitioned runtime state', () => {
     ).toBeUndefined();
   });
 
-  it('registers protected state partitions with only the dedicated receipt grant and no shared exemptions', () => {
+  it('registers protected state partitions with no role grant on receipts and no shared exemptions', () => {
     const policy = JSON.parse(
       safeReadFile(path.join(rootDir(), 'knowledge/product/governance/security-policy.json'), {
         encoding: 'utf8',
@@ -258,18 +258,10 @@ describe('durable partitioned runtime state', () => {
     ).toBe(false);
     for (const field of ['default_allow', 'persona_permissions', 'authority_permissions'])
       expect(JSON.stringify(policy[field])).not.toContain('runtime/discussion-create-requests');
-    const receiptGrant = policy.authority_role_permissions.discussion_request_store;
-    expect(receiptGrant).toEqual({
-      allow_read: [
-        'active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/',
-      ],
-      allow_write: [
-        'active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/',
-      ],
-    });
-    for (const [role, grant] of Object.entries(policy.authority_role_permissions))
-      if (role !== 'discussion_request_store')
-        expect(JSON.stringify(grant)).not.toContain('runtime/discussion-create-requests');
+    // Discussion request receipts (G2): no role grants them; only the opaque request grant does.
+    expect(policy.authority_role_permissions.discussion_request_store).toBeUndefined();
+    for (const grant of Object.values(policy.authority_role_permissions))
+      expect(JSON.stringify(grant)).not.toContain('runtime/discussion-create-requests');
     // Invite records (G2): no role grants them; only the exact invite capability does.
     expect(policy.authority_role_permissions.customer_decision_invite_store).toBeUndefined();
     for (const grant of Object.values(policy.authority_role_permissions))

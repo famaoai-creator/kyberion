@@ -9,10 +9,7 @@
  * role, for durable state and ledger partitions. The next step replaces the
  * roles themselves with the grant (store-catalog `issuer`).
  */
-import {
-  DISCUSSION_REQUEST_STORAGE_ROLE,
-  isDiscussionRequestCapability,
-} from './foundation/discussion-request-capability.js';
+import { isDiscussionRequestCapability } from './foundation/discussion-request-capability.js';
 import { isDotResultStoreCapability } from './foundation/dot-result-store-capability.js';
 import { isCustomerDecisionInviteCapability } from './foundation/customer-decision-invite-capability.js';
 import {
@@ -37,8 +34,6 @@ type StoreGrantCheck = (
 ) => boolean;
 
 const STORE_GRANTS: Readonly<Record<string, StoreGrantCheck>> = Object.freeze({
-  [DISCUSSION_REQUEST_STORAGE_ROLE]: () =>
-    isDiscussionRequestCapability(currentResourceAccessScope()),
   [TASK_SOURCE_WORKSPACE_ROLE]: (target, operation) =>
     taskSourceWorkspaceIoAllowed(target, operation),
   [PR_PUBLICATION_STORE_ROLE]: (target, operation) =>
@@ -60,6 +55,20 @@ function customerDecisionInviteGrantAllows(
 }
 
 /**
+ * Does the live Discussion request grant cover this I/O? Its issuer-frozen ceiling
+ * (the two records of one request; read-only recovery has no write or mkdir) has no
+ * append, metadata or name-prefix grant to enlarge.
+ */
+function discussionRequestGrantAllows(
+  scope: ResourceAccessScope | undefined,
+  target: string,
+  operation: ResourceAccessOperation
+): boolean {
+  if (!scope || !isDiscussionRequestCapability(scope)) return false;
+  return decideResourceAccess(scope, target, operation).allowed;
+}
+
+/**
  * Stores whose active, exact grant is itself the authority for the I/O it
  * covers — no dedicated role (G2). The grant is issued only by the store's
  * governed facade, which also binds the grant's tenant. tier-guard still runs
@@ -70,6 +79,9 @@ function customerDecisionInviteGrantAllows(
  * - Customer decision invite: the exact structural ceiling of one record (or a
  *   read-only listing). Its former role was a shared core role any in-process
  *   caller could assume with that ceiling, so removing it adds no reach.
+ * - Discussion request: an opaque issuer token over the two records of one
+ *   request. Its facade checks the issuance right (the former role's RA-02
+ *   assumption rule, Concierge only) before it issues.
  */
 export function storeGrantAuthorizes(
   target: string,
@@ -79,7 +91,8 @@ export function storeGrantAuthorizes(
   const scope = currentResourceAccessScope();
   return (
     isDotResultStoreCapability(scope, { rootDir, target, operation }) ||
-    customerDecisionInviteGrantAllows(scope, target, operation)
+    customerDecisionInviteGrantAllows(scope, target, operation) ||
+    discussionRequestGrantAllows(scope, target, operation)
   );
 }
 
