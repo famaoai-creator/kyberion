@@ -90,7 +90,7 @@
     "foundation/pcm-wav": 0,
     "foundation/persistent-instruction-effect": 0,
     "foundation/personal-approval-io-capability": 0,
-    "foundation/pipeline-journal-capability": 3,
+    "foundation/pipeline-journal-capability": 4,
     "foundation/pr-publication-store-capability": 2,
     "foundation/primitives": 0,
     "foundation/process-env": 0,
