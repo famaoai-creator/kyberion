@@ -31,8 +31,8 @@ const boundaries: Boundary[] = [
       ['withPrPublicationBinding', [runtime]],
       ['withPrPublicationStoreGrant', [runtime]],
     ]),
-    // G2: the grant alone authorizes; tier-guard asks its predicates, authority.ts only
-    // refuses the issuance right as a role, and the store-grant table asks the authority.
+    // G2: the grant alone authorizes; tier-guard asks its predicates and the store-grant
+    // table asks the authority (authority.ts refuses the name through retired-store-roles).
     consumers: new Map([
       [
         runtime,
@@ -52,7 +52,6 @@ const boundaries: Boundary[] = [
         ],
       ],
       ['libs/core/tier-guard-store-grants.ts', ['prPublicationGrantAuthorizes']],
-      ['libs/core/authority.ts', ['PR_PUBLICATION_GRANT_ISSUANCE_RIGHT']],
     ]),
   },
   {

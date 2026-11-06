@@ -8,15 +8,30 @@
  * tests/autonomy-learning-capability-boundary.test.ts). A structural lookalike,
  * a copy, a grant of another issuer, a captured continuation or a grant of a
  * second module instance resolves nothing (`isAutonomyLearningCapability`).
+ *
+ * G2: the live grant is itself the authority for the I/O it covers
+ * (`autonomyLearningGrantAllows`, asked by tier-guard's store-grant table);
+ * there is no store role.
  */
 import {
   createSynchronousResourceGrantIssuer,
+  currentResourceAccessScope,
+  decideResourceAccess,
+  type ResourceAccessOperation,
   type ResourceAccessScope,
 } from './resource-access-scope.js';
 import * as path from 'node:path';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from './runtime-state-roots.js';
 import { getProcessEnv } from './process-env.js';
 import { isValidTenantSlug } from './scope.js';
+
+/**
+ * Issuance right of the autonomy learning grant (G2). The former shared core role of this name
+ * is gone; the name stays only in role-assumption-policy `shared_core_roles`, which decides which
+ * processes may issue the grant (authority.ts assertStoreGrantIssuanceAllowed). It is not an
+ * assumable authority role.
+ */
+export const AUTONOMY_LEARNING_GRANT_ISSUANCE_RIGHT = 'autonomy_learning_store';
 
 /** Internal store ceiling; contains no caller supplied paths or broader knowledge aliases. */
 export function autonomyLearningCapability(
@@ -113,4 +128,21 @@ export function isAutonomyLearningCapability(scope: ResourceAccessScope | undefi
   } catch {
     return false;
   }
+}
+
+/**
+ * Does the live grant authorize this I/O? Only inside its exact ceiling (no append or metadata
+ * enlargement: the issuer attaches none) and only under the store root the former
+ * `autonomy_learning_store` policy grant covered. The Vitest sandbox partition stays with the
+ * caller's own policy, as it did under the role.
+ */
+export function autonomyLearningGrantAllows(
+  target: string,
+  operation: ResourceAccessOperation
+): boolean {
+  const scope = currentResourceAccessScope();
+  if (!isAutonomyLearningCapability(scope)) return false;
+  const root = PARTITIONED_RUNTIME_STATE_ROOTS.autonomy_learning;
+  if (target !== root && !target.startsWith(root + '/')) return false;
+  return decideResourceAccess(scope!, target, operation).allowed;
 }

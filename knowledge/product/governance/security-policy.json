@@ -1063,28 +1063,6 @@
       "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/decisions/"],
       "allow_write": ["knowledge/confidential/${KYBERION_TENANT}/decisions/"]
     },
-    "autonomy_learning_store": {
-      "allow_read": [
-        "active/shared/runtime/autonomy-learning/confidential/${KYBERION_TENANT}",
-        "active/shared/runtime/autonomy-learning/confidential/${KYBERION_TENANT}/autonomy-outcomes.jsonl",
-        "knowledge/confidential/${KYBERION_TENANT}/autonomy-outcomes.jsonl",
-        "active/shared/runtime/autonomy-learning/confidential/${KYBERION_TENANT}/autonomy-action-overrides.json",
-        "knowledge/confidential/${KYBERION_TENANT}/autonomy-action-overrides.json",
-        "active/shared/runtime/autonomy-learning",
-        "active/shared/runtime/autonomy-learning/confidential",
-        "knowledge/confidential/${KYBERION_TENANT}"
-      ],
-      "allow_write": [
-        "active/shared/runtime/autonomy-learning/confidential/${KYBERION_TENANT}",
-        "active/shared/runtime/autonomy-learning/confidential/${KYBERION_TENANT}/autonomy-outcomes.jsonl",
-        "knowledge/confidential/${KYBERION_TENANT}/autonomy-outcomes.jsonl",
-        "active/shared/runtime/autonomy-learning/confidential/${KYBERION_TENANT}/autonomy-action-overrides.json",
-        "knowledge/confidential/${KYBERION_TENANT}/autonomy-action-overrides.json",
-        "active/shared/runtime/autonomy-learning",
-        "active/shared/runtime/autonomy-learning/confidential",
-        "knowledge/confidential/${KYBERION_TENANT}"
-      ]
-    },
     "pipeline_journal_store": {
       "allow_read": [
         "active/shared/runtime/pipeline-library-runs",
