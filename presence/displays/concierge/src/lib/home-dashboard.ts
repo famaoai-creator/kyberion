@@ -365,8 +365,21 @@ export function countsOnlyHomeDashboard(dashboard: HomeDashboard): HomeDashboard
   };
 }
 
+export interface HomeDashboardFocus {
+  /**
+   * One project the viewer chose to look at (already validated against its
+   * scope): only missions recording exactly this project count, and only its
+   * deliverables are listed. Authorization still comes from the viewer.
+   */
+  projectId?: string;
+}
+
 /** Reads every source once for this viewer (already narrowed to the shell's scope). */
-export function collectHomeDashboard(viewer: ViewerContext, now = Date.now()): HomeDashboard {
+export function collectHomeDashboard(
+  viewer: ViewerContext,
+  now = Date.now(),
+  focus: HomeDashboardFocus = {}
+): HomeDashboard {
   const failed: HomeSection[] = [];
   const read = <T>(section: HomeSection, fn: () => T): T | undefined => {
     try {
@@ -398,18 +411,22 @@ export function collectHomeDashboard(viewer: ViewerContext, now = Date.now()): H
         undefined,
         ''
       );
-      return projectMissionHistoryItems(states, [], { limit: 100_000 }).filter((mission) =>
-        viewerAdmitsNode(authorization, {
-          kind: 'mission',
-          id: mission.missionId,
-          label: mission.missionId,
-          status: mission.status,
-          tier: mission.tier,
-          ...(mission.tenantSlug ? { tenantSlug: mission.tenantSlug } : {}),
-          ...(mission.organizationId ? { organizationId: mission.organizationId } : {}),
-          ...(mission.projectId ? { projectId: mission.projectId } : {}),
-          missionId: mission.missionId,
-        })
+      return projectMissionHistoryItems(states, [], { limit: 100_000 }).filter(
+        (mission) =>
+          // Scope admission lets project-less missions through; a project
+          // focus is an exact match, like the workspace list and needs-you.
+          (!focus.projectId || mission.projectId === focus.projectId) &&
+          viewerAdmitsNode(authorization, {
+            kind: 'mission',
+            id: mission.missionId,
+            label: mission.missionId,
+            status: mission.status,
+            tier: mission.tier,
+            ...(mission.tenantSlug ? { tenantSlug: mission.tenantSlug } : {}),
+            ...(mission.organizationId ? { organizationId: mission.organizationId } : {}),
+            ...(mission.projectId ? { projectId: mission.projectId } : {}),
+            missionId: mission.missionId,
+          })
       );
     } catch {
       failed.push('missions');
@@ -511,7 +528,7 @@ export function collectHomeDashboard(viewer: ViewerContext, now = Date.now()): H
       tenantSlugs,
       ...(viewer.includeUntenanted ? { includeUntenanted: true } : {}),
       organizationIds,
-      projectIds,
+      projectIds: focus.projectId ? [focus.projectId] : projectIds,
     })
   );
 
