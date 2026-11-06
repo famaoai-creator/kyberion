@@ -534,14 +534,9 @@ public のログ置き場）で、スタンスの痕跡を個人 tier として�
 
 ### G2: 案 A のまま外せなかった専用ロール（2026-11-06）
 
-次のものは、許可証だけを権限にするとロールが守っていた性質が失われるので、ロールを残した
-（`discussion_request_store` と `task_source_workspace` はそれぞれの節で外した）。
-
-- `pr_publication_store`: 業務の流れで複数の保存先（charter の台帳、成果物、外部操作の記録）に書く
-  種類で、置き換え先は保存先ごとの複数の許可証である（上の棚卸しの表）。ロールはインストール単位の
-  追加移行（`publication-role-migration.ts` の `PUBLICATION_MIGRATION_ROLES`）の対象でもあり、
-  外すには移行手続きの変更が要る。
-  棚卸しと、偽造できない許可証にした第 1 段階は「G2: PR の公開の保存先の許可証化」の節にある。
+当初ここに入れた専用ロールは、すべてそれぞれの節で外した（`discussion_request_store`、
+`task_source_workspace`、`pr_publication_store`）。`tier-guard-store-grants.ts` の役割名の表
+（`dedicatedStoreGrantAllows`）は空になったので削除した。
 
 ### G2 の前提: 1 つのプロセスに `@agent/core` は 1 つだけ（2026-11-06）
 
@@ -689,6 +684,56 @@ governance root（main の checkout）を `KYBERION_ROOT` にした子プロセ�
   `tests/pr-publication-store-capability-boundary.test.ts`）。core の barrel（`index.ts`）は `export *` を
   やめ、発行の関数を再公開しない。
 - 上限、ロール、引き受け、persona と tenant の束縛は変えていない。
+
+**第 2 段階: 許可証を権限にし、ロールを外した。**
+
+- `tier-guard` は、有効な許可証かを `storeGrantAuthorizes` → `prPublicationGrantAuthorizes` で問う
+  （書き込みとランタイムの読み取りは従来どおりリクエストの上限と tenant 範囲の検査の後。knowledge と
+  保存先の floor の読み取りにも、tenant 範囲の検査の直後に同じ問いを足した。他の許可証の上限は
+  ランタイムの記録だけなので、そこで何も変わらない）。許可証が認めるのは、上限の中で、旧ロールの
+  security-policy の権限が覆っていた根の下だけである（読み取り: person と束縛の tenant の charters、
+  束縛の artifact の floor、external-operations、tmp。書く・追記・mkdir: tenant の charters、artifacts、
+  external-operations、tmp）。上限の中でも根より上の祖先（`active/shared` など）と公開の読み取りは、
+  同じ絞り込みのまま呼び出し元の権限で決まる。
+- 絞り込み: 許可証が有効な間の I/O はすべて上限に絞る（`requestResourceDenial`、ロール名ではなく
+  `prPublicationStoreGrantActive`）。構造上の mkdir（`active/shared/artifacts/confidential`、
+  `external-operations/confidential`）も、許可証の tenant が対象の tenant と同じときだけ認める。
+  ロールが引き受けられていたのは窓口の I/O の間だけだったので、絞る対象は変わらない。
+- 誰が発行できるかは変えていない。窓口は発行の後、I/O の前に、旧共有コアロールの引き受けと同じ規則を
+  名前 `pr_publication_store` に対して確かめる（`assertStoreGrantIssuanceAllowed`）。名前は
+  `role-assumption-policy.json` の `shared_core_roles` に、ロールではなく発行の権利として残した（説明文に
+  明記）。ロールとして引き受けると `[ROLE_ASSUMPTION_DENIED]` になる（`authority.ts`。古い catalog を
+  持つインストールで旧ロールの権限が絞り込み無しに効くのを防ぐ）。
+- インストールの登録: governance-host はコードと catalog の版が違いうる。発行の権利の名前を
+  role-assumption-policy に持たないインストール（この保存先より古い）では、許可証は絞り込みだけを行い、
+  何も認めない。旧ロールの権限が無いインストールで何も認められなかったのと同じで、予約の書き込みは
+  拒否される（`scripts/vcs-worktree-approval.integration.test.ts`）。`PUBLICATION_MIGRATION_ROLES` から
+  このロールを外し、代わりに `PUBLICATION_MIGRATION_ISSUANCE_RIGHTS` として共有コアロールの登録だけを
+  移行する（ロール定義・権限・索引は移行しない）。
+- persona と tenant: 呼び出し元のロールと persona をそのまま使う。組織の公開は束縛の tenant に束縛し
+  （組織は引き継がない）、別 tenant に束縛された呼び出し元は `[ROLE_TENANT_SCOPE_MISMATCH]` で拒否する
+  （DOT と議論のリクエストと同じ。以前は検査せずに置き換えていた）。person の公開は以前と同じく
+  tenant を束縛しない（`tenantBound: false`）。
+- ロールの宣言（security-policy、authority role index、ロール定義、保存先カタログの `legacy_roles` 5 件、
+  `tier-guard` のロール名の分岐 2 つと表の行）を削除した。表が空になったので `dedicatedStoreGrantAllows`
+  とその呼び出し 2 か所も消した。
+
+**比較（同じ判定を旧と新で並べた）。** 10 個の窓口（5 種類 × person/組織、vitest の予約を含む）について、
+対象のファイル、その祖先、上限の外の 8 個のパスを 5 つの操作（読む・メタデータ・書く・追記・mkdir）で、
+8 種類の呼び出し元（ロール無し、`mission_controller`、SYSTEM_ROLE `slack_bridge` と tenant、別 tenant に
+束縛、同じ tenant と組織に束縛、方針に無い SYSTEM_ROLE、`deliverable_inbox_writer`、`ecosystem_architect`）
+から `tier-guard` に問い、旧（ロールあり）と新の結果を突き合わせた。
+
+| 呼び出し元                     | 違い                                                                                                                                                                                                                                         |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ロール無し（CLI）              | 無し                                                                                                                                                                                                                                         |
+| 方針に無い SYSTEM_ROLE         | 無し（どちらも `[ROLE_ASSUMPTION_DENIED]`）                                                                                                                                                                                                  |
+| 別 tenant に束縛（組織の公開） | 新は `[ROLE_TENANT_SCOPE_MISMATCH]` で拒否（狭くなる側）                                                                                                                                                                                     |
+| `deliverable_inbox_writer`     | 新は 75 件拒否（呼び出し元の拒否だけのロールが効く。狭くなる側。task source と同じ）                                                                                                                                                         |
+| 広いロール（4 種類、計 37 件） | 根より上の祖先（`knowledge/personal`・`knowledge/confidential/acme` のメタデータ、`active/shared`・`knowledge` の mkdir）と charters の mkdir が、呼び出し元自身の権限で許される。窓の外でも同じ呼び出し元ができることで、届く範囲は増えない |
+
+許可証が認める範囲（根の下）では、旧で許されたものはすべて新でも許され、旧で拒否されたものは新でも
+拒否される。旧と新が違うのは、狭くなる側か、呼び出し元が自分の権限で既にできる I/O だけである。
 
 ## 既定で拒否であること
 

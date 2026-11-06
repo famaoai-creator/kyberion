@@ -31,16 +31,28 @@ const boundaries: Boundary[] = [
       ['withPrPublicationBinding', [runtime]],
       ['withPrPublicationStoreGrant', [runtime]],
     ]),
+    // G2: the grant alone authorizes; tier-guard asks its predicates, authority.ts only
+    // refuses the issuance right as a role, and the store-grant table asks the authority.
     consumers: new Map([
       [
         runtime,
         [
           'currentPrPublicationBinding',
-          'prPublicationResourceAllowed',
+          'PR_PUBLICATION_GRANT_ISSUANCE_RIGHT',
           'withPrPublicationBinding',
           'withPrPublicationStoreGrant',
         ],
       ],
+      [
+        'libs/core/tier-guard.ts',
+        [
+          'prPublicationGrantTenant',
+          'prPublicationResourceAllowed',
+          'prPublicationStoreGrantActive',
+        ],
+      ],
+      ['libs/core/tier-guard-store-grants.ts', ['prPublicationGrantAuthorizes']],
+      ['libs/core/authority.ts', ['PR_PUBLICATION_GRANT_ISSUANCE_RIGHT']],
     ]),
   },
   {
@@ -198,14 +210,14 @@ describe('PR publication grant trusted import boundary', () => {
         `export * from '${foundation}';`,
         `export {withPrPublicationStoreGrant as facade} from '${foundation}';`,
         `import {withPrPublicationStoreGrant as hidden} from '${foundation}';`,
-        `import {prPublicationResourceAllowed} from '${foundation}';`,
+        `import {prPublicationGrantAuthorizes} from '${foundation}';`,
         `const cap = require('${foundation}');`,
         `const cap = import('${foundation}');`,
         `import * as host from '${governance}';`,
         `import host from '${governance}';`,
         `export * from '${governance}';`,
         `export {withPrPublicationRuntime} from '${governance}';`,
-        `export {prPublicationResourceAllowed} from '${foundation}';`,
+        `export {prPublicationGrantAuthorizes} from '${foundation}';`,
         `import {withPrPublicationRuntime} from '${governance}';`,
         `import {withPrPublicationStoreAccess} from '${governance}';`,
         `import {withPrPublicationStoreAccess as hidden} from '${governance}';`,
@@ -243,6 +255,18 @@ describe('PR publication grant trusted import boundary', () => {
       ).toEqual([]);
       expect(
         violations('libs/core/index.ts', `export {currentPrPublicationScope} from '${governance}';`)
+      ).toEqual([]);
+      expect(
+        violations(
+          'libs/core/tier-guard.ts',
+          `import {prPublicationStoreGrantActive, prPublicationResourceAllowed} from '${foundation}';`
+        )
+      ).toEqual([]);
+      expect(
+        violations(
+          'libs/core/tier-guard-store-grants.ts',
+          `import {prPublicationGrantAuthorizes} from '${foundation}';`
+        )
       ).toEqual([]);
     }
   });

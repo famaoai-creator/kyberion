@@ -15,15 +15,30 @@
  * Both live in this module instance only: a second instance of @agent/core
  * neither sees nor honours them (scripts/check_core_single_instance.ts keeps a
  * production process on one instance), and there is no registry to plant.
+ *
+ * G2: the live grant is itself the authority (there is no store role). While it
+ * is current every I/O is narrowed to its ceiling (`prPublicationResourceAllowed`,
+ * applied by tier-guard), and inside that ceiling it authorizes what the former
+ * role's policy grant covered (`prPublicationGrantAuthorizes`); the rest of the
+ * ceiling (ancestors above those roots) stays with the caller's own policy.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { CharterScope } from '../governance/accountability-charter.js';
+import { PARTITIONED_RUNTIME_STATE_ROOTS, STORAGE_FLOOR_ROOTS } from './runtime-state-roots.js';
 import { isValidTenantSlug } from './scope.js';
 
 export type VcsPublicationOperation = 'vcs:pr_create' | 'vcs:push' | 'vcs:pr_merge';
 export type PrPublicationStoreKind =
   'charter-read' | 'charter-ledger-write' | 'review-write' | 'reservation-write' | 'body-stage';
 export type PrPublicationOperation = 'read' | 'write' | 'append' | 'mkdir' | 'metadata';
+
+/**
+ * Issuance right of the PR publication store grant (G2). The former shared core role of this
+ * name is gone; the name stays only in role-assumption-policy `shared_core_roles`, which decides
+ * which processes may issue the grant (authority.ts assertStoreGrantIssuanceAllowed). It is not
+ * an assumable authority role.
+ */
+export const PR_PUBLICATION_GRANT_ISSUANCE_RIGHT = 'pr_publication_store';
 
 interface PublicationBinding {
   readonly scope: CharterScope;
@@ -35,6 +50,8 @@ interface StoreGrant {
   readonly kind: PrPublicationStoreKind;
   readonly read: readonly string[];
   readonly write: readonly string[];
+  /** False in an installation that has not registered the issuance right: narrowing only. */
+  readonly authorizes: boolean;
 }
 
 const OPERATIONS: readonly VcsPublicationOperation[] = [
@@ -201,6 +218,7 @@ export function withPrPublicationStoreGrant<T>(
   kind: PrPublicationStoreKind,
   read: readonly string[],
   write: readonly string[],
+  authorizes: boolean,
   action: () => T
 ): T {
   const binding = currentBinding();
@@ -217,6 +235,7 @@ export function withPrPublicationStoreGrant<T>(
     kind,
     read: Object.freeze([...read]),
     write: Object.freeze([...write]),
+    authorizes: authorizes === true,
   });
   issuedGrants.add(grant);
   try {
@@ -254,4 +273,40 @@ export function prPublicationResourceAllowed(
   return [...grant.read, ...grant.write].some(
     (file) => file === target || target === '' || file.startsWith(target + '/')
   );
+}
+
+function within(target: string, root: string): boolean {
+  return target === root || target.startsWith(root + '/');
+}
+
+/**
+ * Does the live grant authorize this I/O? Only inside its ceiling, and only under the roots the
+ * former `pr_publication_store` policy grant covered for the binding's tenant (reads: person and
+ * tenant charters, the binding's artifact floor, external operations, scratch; writes, appends and
+ * mkdir: tenant charters, artifacts, external operations, scratch). Ancestors above these roots
+ * (e.g. `active/shared`) and public reads are decided by the caller's own policy, under the same
+ * narrowing.
+ */
+export function prPublicationGrantAuthorizes(
+  target: string,
+  operation: PrPublicationOperation
+): boolean {
+  const grant = currentGrant();
+  if (!grant?.authorizes || !prPublicationResourceAllowed(target, operation)) return false;
+  const tenant =
+    grant.binding.scope.kind === 'organization' ? grant.binding.scope.tenant_slug : undefined;
+  const charters = tenant ? [`knowledge/confidential/${tenant}/charters`] : [];
+  const artifacts = STORAGE_FLOOR_ROOTS.artifact;
+  const shared = [PARTITIONED_RUNTIME_STATE_ROOTS.external_operations, STORAGE_FLOOR_ROOTS.scratch];
+  const roots =
+    operation === 'read' || operation === 'metadata'
+      ? [
+          'knowledge/personal/charters',
+          ...charters,
+          `${artifacts}/personal/shared`,
+          ...(tenant ? [`${artifacts}/confidential/${tenant}`] : []),
+          ...shared,
+        ]
+      : [...charters, artifacts, ...shared];
+  return roots.some((root) => within(target, root));
 }

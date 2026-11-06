@@ -56,6 +56,7 @@ import {
   type ExecutionIdentityBinding,
 } from './foundation/execution-scope.js';
 import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
+import { PR_PUBLICATION_GRANT_ISSUANCE_RIGHT } from './foundation/pr-publication-store-capability.js';
 import { traceRoleAssumption } from './organization/role-assumption-trace.js';
 import { resolveTenant } from './organization/tenant-registry.js';
 import {
@@ -601,6 +602,21 @@ export function assertStoreGrantIssuanceAllowed(issuanceRight: string): void {
   );
 }
 
+/**
+ * Does this installation's role-assumption policy name the store-grant issuance right (as a
+ * shared core role or a may_assume entry)? G2: a grant that replaced a role an installation had
+ * to register (pr_publication_store) authorizes nothing in an installation that predates it.
+ */
+export function isStoreGrantIssuanceRightRegistered(issuanceRight: string): boolean {
+  const right = normalizeRoleName(issuanceRight.trim());
+  const policy = loadRoleAssumptionPolicy();
+  return Boolean(
+    policy &&
+    (policy.sharedCoreRoles.has(right) ||
+      [...policy.systemRoles.values()].some((rights) => rights.has(right)))
+  );
+}
+
 export function inferPersonaFromRole(role?: string): Persona {
   if (!role) return 'unknown';
   const normalized = role.toLowerCase().replace(/\s+/g, '_');
@@ -812,6 +828,12 @@ function prepareExecutionContext(
       throw new Error('[SCOPE_CONTEXT_INVALID] invalid execution identity');
   }
   assertRoleAssumptionAllowed(normalizedRole);
+  // G2: the former PR publication store role is only a grant issuance right now. Refusing it
+  // keeps an installation whose catalogs still declare the old role from granting its policy.
+  if (normalizedRole === PR_PUBLICATION_GRANT_ISSUANCE_RIGHT)
+    throw new Error(
+      `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant issuance right, not an assumable role`
+    );
   assertTenantBoundReaderScope(normalizedRole, tenantSlug);
   if (
     normalizedRole === 'credential_material_reader' &&

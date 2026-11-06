@@ -6,10 +6,10 @@ import {
 } from './foundation/personal-approval-io-capability.js';
 import { personCharterResourceAccessAllowed } from './governance/person-charter-runtime.js';
 import {
+  prPublicationGrantTenant,
   prPublicationResourceAllowed,
-  PR_PUBLICATION_STORE_ROLE,
-  currentPrPublicationScope,
-} from './governance/pr-publication-runtime.js';
+  prPublicationStoreGrantActive,
+} from './foundation/pr-publication-store-capability.js';
 import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
 import {
   MEMORY_PROVENANCE_READER_ROLE,
@@ -30,7 +30,7 @@ import {
   CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
 } from './foundation/customer-decision-milestone-capability.js';
 import { narrowStoreRoleDenial } from './foundation/narrow-store-role-denial.js';
-import { dedicatedStoreGrantAllows, storeGrantAuthorizes } from './tier-guard-store-grants.js';
+import { storeGrantAuthorizes } from './tier-guard-store-grants.js';
 import type { WriteContent } from './foundation/customer-decision-write-content.js';
 /**
  * TypeScript version of the Knowledge Tier Guard.
@@ -548,24 +548,24 @@ function isScopedStructuralMkdir(
   access: { kind: 'read' | 'write' | 'append' | 'mkdir'; role?: string }
 ): boolean {
   if (access.kind !== 'mkdir') return false;
-  if (storeGrantAuthorizes(relativePath, 'mkdir', projectRoot()))
-    return Boolean(
-      tenantSlug &&
-      isRegisteredActiveTenant(tenantSlug) &&
-      currentResourceAccessScope()?.tenantSlug === tenantSlug
-    );
-  if (access.role === PR_PUBLICATION_STORE_ROLE) {
-    const publication = currentPrPublicationScope();
+  // G2: the live PR publication grant (not a role) may create the confidential tier
+  // container of its own organization tenant's artifact floor or reservation store.
+  if (prPublicationStoreGrantActive())
     return (
-      publication?.kind === 'organization' &&
-      publication.tenant_slug === tenantSlug &&
+      tenantSlug !== undefined &&
+      prPublicationGrantTenant() === tenantSlug &&
       [
         `${STORAGE_FLOOR_ROOTS.artifact}/confidential`,
         `${PARTITIONED_RUNTIME_STATE_ROOTS.external_operations}/confidential`,
       ].includes(relativePath) &&
       prPublicationResourceAllowed(relativePath, 'mkdir')
     );
-  }
+  if (storeGrantAuthorizes(relativePath, 'mkdir', projectRoot()))
+    return Boolean(
+      tenantSlug &&
+      isRegisteredActiveTenant(tenantSlug) &&
+      currentResourceAccessScope()?.tenantSlug === tenantSlug
+    );
   // G2: the invite capability itself (not a role) may create its tenant partition,
   // under the same shared checks below as every scoped structural mkdir.
   const inviteGrant =
@@ -963,8 +963,9 @@ function requestResourceDenial(
       allowed: false,
       reason: '[MEMORY_PROVENANCE_AUTHORITY] Lineage is outside worker-mutable state',
     };
+  // G2: a live PR publication grant (no role) narrows every I/O made inside it.
   if (
-    normalizedRole === PR_PUBLICATION_STORE_ROLE &&
+    prPublicationStoreGrantActive() &&
     !denyCandidatePaths(relativePath).every((target) =>
       prPublicationResourceAllowed(target, operation)
     )
@@ -1125,11 +1126,6 @@ export function validateWritePermission(
     stateKnowledgePath &&
     isProtectedStorageFloorTier(partitionedRuntimeStateTierInPath(relativePath))
   ) {
-    // Dedicated receipt/publication roles grant only their bound real paths,
-    // never knowledge-tier writes.
-    // The exact request ceiling was checked before all ambient/default policy grants.
-    if (dedicatedStoreGrantAllows(currentRole, relativePath, operation, projectRoot()))
-      return personaTierWriteDecision(policy, relativePath, identity, operation);
     return personaTierWriteDecision(policy, stateKnowledgePath, identity, operation);
   }
 
@@ -1314,8 +1310,7 @@ export function inspectReadPermission(
         // libs/core for cap enforcement) holds an explicit read grant on the
         // ledger root itself; it never widens knowledge/ access.
         if (
-          (dedicatedStoreGrantAllows(identity.role, relativePath, operation, projectRoot()) ||
-            informationAssetCoverageReadAllowed(relativePath, identity.role)) &&
+          informationAssetCoverageReadAllowed(relativePath, identity.role) &&
           loaded.policy.authority_role_permissions?.[identity.role]?.allow_read?.some(
             (pattern: string) => {
               const expanded = expandPolicyPath(
@@ -1408,6 +1403,7 @@ export function inspectReadPermission(
     { kind: 'read', role: identity.role }
   );
   if (tenantDenial) return tenantDenial;
+  if (storeGrantAuthorizes(relativePath, operation, projectRoot())) return { allowed: true };
 
   if (operation === 'metadata' && currentResourceAccessScope() && identity.role) {
     const rules = policy.authority_role_permissions?.[identity.role];

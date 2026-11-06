@@ -164,7 +164,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["person_charter_store", "pr_publication_store"],
+      "legacy_roles": ["person_charter_store"],
       "sources": ["runtime-state-roots", "role-policy"],
       "registration": {
         "family": "state",
@@ -183,7 +183,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["peer_task_artifact_writer", "pr_publication_store"],
+      "legacy_roles": ["peer_task_artifact_writer"],
       "sources": ["storage-floor", "role-policy"],
       "note": "Floors also hold a system/ partition (custody system).",
       "registration": {
@@ -222,12 +222,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": [
-        "dot_lifecycle_writer",
-        "memory_provenance_reader",
-        "person_charter_store",
-        "pr_publication_store"
-      ],
+      "legacy_roles": ["dot_lifecycle_writer", "memory_provenance_reader", "person_charter_store"],
       "sources": ["storage-floor", "role-policy"],
       "note": "Floors also hold a system/ partition (custody system).",
       "registration": {
@@ -435,7 +430,7 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["person_charter_store", "pr_publication_store"],
+      "legacy_roles": ["person_charter_store"],
       "sources": ["role-policy"]
     },
     {
@@ -1054,7 +1049,6 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["pr_publication_store"],
       "sources": ["role-policy"]
     },
     {
