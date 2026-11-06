@@ -1055,11 +1055,10 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
       const milestone = await import('./foundation/customer-decision-milestone-capability.js');
       const agendaFile = 'agendas/agd-boundary01.json';
       const asMilestone = (fn: () => unknown) =>
-        resourceScope.runInResourceAccessScope(
-          milestone.customerDecisionMilestoneCapability(TENANT, caseDir(TENANT), {
-            read: [agendaFile],
-            write: agendaFile,
-          }),
+        milestone.withCustomerDecisionMilestoneCapability(
+          TENANT,
+          caseDir(TENANT),
+          { read: [agendaFile], write: agendaFile },
           () =>
             authority.withExecutionContext(
               milestone.CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
