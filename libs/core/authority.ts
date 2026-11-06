@@ -86,7 +86,6 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   engine_runtime_preferences_operator: 'worker',
   workspace_tenant_registry_reader: 'worker',
   workspace_tenant_registry_index_reader: 'worker',
-  person_charter_store: 'worker',
   peer_catalog_reader: 'worker',
   peer_responder_reader: 'worker',
   peer_task_artifact_writer: 'worker',

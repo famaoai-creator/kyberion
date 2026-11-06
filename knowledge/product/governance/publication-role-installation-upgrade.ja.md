@@ -18,7 +18,7 @@ last_updated: '2026-11-06'
 pnpm organization role migrate-publication-store --source-root <built-worktree>
 ```
 
-Preview はファイルを変更しない。差分の本文、before/after SHA256、`digest`、`requestedEffect` を確認する。対象は `notification_preferences_reader`、`tool_runtime_policy_reader`、`person_charter_store` の role card、security-policy の対象 role permission、authority-role-index の対象 entry、role-assumption-policy の shared core role 登録に限定する。PR publication store 自体は role を持たない（G2: 同期の store grant が権限）。この手続きは role card・permission・index を追加せず、発行の権利の名前 `pr_publication_store` を shared core role に登録するだけである。登録の無い installation では grant は絞り込みだけを行い何も認めないので、外部操作の予約は拒否される。通知先と tool availability の読み取りは、承認要求を人に届ける既存の実行経路で必要になる。
+Preview はファイルを変更しない。差分の本文、before/after SHA256、`digest`、`requestedEffect` を確認する。対象は `notification_preferences_reader`、`tool_runtime_policy_reader` の role card、security-policy の対象 role permission、authority-role-index の対象 entry、role-assumption-policy の shared core role 登録に限定する。PR publication store と person charter store 自体は role を持たない（G2: 同期の store grant が権限）。この手続きはそれらの role card・permission・index を追加せず、発行の権利の名前 `pr_publication_store` と `person_charter_store` を shared core role に登録するだけである。登録の無い installation では grant は絞り込みだけを行い何も認めないので、外部操作の予約は拒否される。通知先と tool availability の読み取りは、承認要求を人に届ける既存の実行経路で必要になる。
 
 terminal channel の authenticated human approval を取得する。`accountability.finalDecision` は `human_only`、`justification.requestedEffects` は preview の `requestedEffect` と全 `changes[].path` を、それぞれ完全一致する文字列として含める。agent が人の判断を代行して承認してはならない。
 

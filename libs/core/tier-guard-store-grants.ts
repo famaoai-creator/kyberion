@@ -20,6 +20,7 @@ import { autonomyLearningGrantAllows } from './foundation/autonomy-learning-capa
 import { pipelineJournalGrantAllows } from './foundation/pipeline-journal-capability.js';
 import { credentialMaterialGrantAllows } from './foundation/credential-material-capability.js';
 import { memoryProvenanceGrantAllows } from './knowledge/memory-provenance-capability.js';
+import { personCharterGrantAuthorizes } from './governance/person-charter-runtime.js';
 
 /**
  * Does the active invite capability cover this I/O? Its validator predates
@@ -80,6 +81,9 @@ function discussionRequestGrantAllows(
  * - Memory provenance: the module-private synchronous grant of one exact lineage state read, under
  *   the roots the former reader role covered. Its facade checks the issuance right (the former
  *   shared core role's RA-02 rule) and the tenant / owner binding before it issues.
+ * - Person charter: the module-private grant of one synchronous registry access or canonical personal
+ *   reservation inside the installed owner binding, under the roots the former role covered. Its
+ *   facade checks the issuance right (the former shared core role's RA-02 rule) before the I/O.
  */
 export function storeGrantAuthorizes(
   target: string,
@@ -96,6 +100,7 @@ export function storeGrantAuthorizes(
     autonomyLearningGrantAllows(target, operation) ||
     pipelineJournalGrantAllows(target, operation) ||
     credentialMaterialGrantAllows(target, operation) ||
-    memoryProvenanceGrantAllows(target, operation)
+    memoryProvenanceGrantAllows(target, operation) ||
+    personCharterGrantAuthorizes(target, operation)
   );
 }
