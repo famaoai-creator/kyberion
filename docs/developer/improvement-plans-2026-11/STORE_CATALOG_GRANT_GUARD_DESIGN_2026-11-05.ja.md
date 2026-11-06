@@ -419,6 +419,32 @@ public tier の tenant データは、今の門番が意図して tenant 範囲�
 宣言しつつ public のログ置き場にある件と合わせて、G2 で扱う。カタログには使用量・実行指標の
 台帳の tenant 区画を追加した（77 保存先）。
 
+### tier の上限での比較（decide の手順 2、2026-11-06）
+
+読み取り上限の tier を、主体の Authority Role が宣言する `tier_access`（authority role index）
+から作るようにした（`declaredReadTiers`）。public は誰にでも開示されるので常に含める。宣言の無い
+ロールは、門番に他の tier の記述が無いので全 tier とする。門番の tier の判定はロール・persona の
+パス許可で決まり、宣言された tier を見ていない。そこで「門番が許す読み取りは、ロールが宣言した
+tier の内側にある」を、宣言のある 60 ロール × 全保存先（personal・confidential）で確かめた。
+
+最初の一巡では 38 ロールが宣言外の tier を読めた。分類すると次の 4 つだった。
+
+| 分類                                       | 内容                                                                                       | 扱い                                               |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| `stance-logs`                              | 個人 tier と宣言しているが、public のログ置き場にある                                      | 既知（G2）                                         |
+| `runtime.surface-management`               | 保護プレフィックスが無く誰でも読める                                                       | 既知の抜け（G2）                                   |
+| tenant の floor（scratch・staging・cache） | その tenant に束縛された主体は、ロールの tier に関係なく読める                             | floor の設計（束縛が許可）。意図した違いとして記録 |
+| 宣言より広いパス許可を持つロール           | 10 ロール（`chronos_operator` の個人 tier の project、`knowledge_steward` のスタンスなど） | 宣言と許可のずれ                                   |
+
+最後の分類は G1 の方針（今の挙動の写し）に従い、`tier_access` に `personal` を足して宣言を
+許可に合わせた。対象は `chronos_localadmin`、`chronos_operator`、`chronos_tenant_runner`、
+`generation_scheduler`、`surface_runtime`、`dot_lifecycle_writer`、`knowledge_steward`、
+`ruthless_auditor`、`slack_bridge`、`software_developer`。このうち `knowledge_steward` と
+`ruthless_auditor` のスタンス読み取りは S1 で旧 `customer/` の許可を引き継いだものである。
+`tier_access` は認可に使われていない（org chart と role draft の記述だけ）ので挙動は変わらない。
+許可そのものが妥当かは G2 で見直す。残りは上の既知の 3 分類だけで、
+`governance/asset-read-ceiling.test.ts` が新しいずれを失敗にする。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |

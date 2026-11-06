@@ -5,5 +5,5 @@
   "write_scopes": [],
   "scope_classes": ["communication_surface"],
   "allowed_actuators": ["presence-actuator"],
-  "tier_access": ["public", "confidential"]
+  "tier_access": ["public", "confidential", "personal"]
 }

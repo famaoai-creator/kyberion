@@ -10,5 +10,5 @@
   ],
   "scope_classes": ["operations_runtime"],
   "allowed_actuators": [],
-  "tier_access": ["public", "confidential"]
+  "tier_access": ["public", "confidential", "personal"]
 }

@@ -18,5 +18,5 @@
     "audit"
   ],
   "allowed_actuators": ["presence-actuator", "artifact-actuator", "approval-actuator"],
-  "tier_access": ["public", "confidential"]
+  "tier_access": ["public", "confidential", "personal"]
 }
