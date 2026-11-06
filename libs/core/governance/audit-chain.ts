@@ -510,7 +510,10 @@ export function registerAuditChainIo(io: AuditChainIo): () => void {
 
 /** Mirrors are confidential: tenant audit entries never land in a public partition. */
 function tenantMirrorRoot(root: string): string {
-  return path.join(root, TENANT_AUDIT_MIRROR_ROOT_PATH, 'confidential');
+  const mirror = path.join(root, TENANT_AUDIT_MIRROR_ROOT_PATH, 'confidential');
+  return typeof pathResolver.vitestLivePath === 'function'
+    ? pathResolver.vitestLivePath(mirror)
+    : mirror;
 }
 
 function safeAuditPath(

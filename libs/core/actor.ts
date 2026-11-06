@@ -43,7 +43,7 @@
 // time (surfaced as `TypeError: __name is not a function` deep inside
 // `governed-catalog.ts`, a re-entrant-circular-import symptom).
 import { parseNhiId } from './contracts/nhi-id.js';
-import { isValidMemberId } from './organization/member-id-grammar.js';
+import { isValidMemberId } from './foundation/scope.js';
 
 // ---------------------------------------------------------------------------
 // Model

@@ -21,8 +21,28 @@ import {
   safeLstat,
   safeMkdir,
   safeReaddir,
+  safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
+import {
+  LEGACY_DELEGATION_RECORD_DIR,
+  LEGACY_DELEGATION_TRACE_PATH,
+} from './foundation/runtime-state-roots.js';
+import { tenantStoreLedgerPartitionOf } from './storage-layout.js';
+import {
+  asDelegationStore,
+  asDelegationStoreAsync,
+  boundDelegationTenant as boundTenantSlug,
+  DELEGATION_RECORD_STORE_ROLE,
+  delegationPartitionDir as partitionDir,
+  delegationRecordPathIn as recordPathIn,
+  delegationRecordsDirFor as recordsDirFor,
+  delegationStoreRootOverride as storeRootOverride,
+  legacyDelegationTenant as legacyRecordTenant,
+  listDelegationTenantPartitions as listTenantPartitions,
+  normalizeDelegationTenant as normalizeTenant,
+  safeDelegationLeafId as safeLeafId,
+} from './delegation-store-partition.js';
 import { withLockSync } from './foundation/lock-utils.js';
 import { spawnManagedProcess, type ManagedProcessHandle } from './managed-process.js';
 import {
@@ -39,6 +59,8 @@ export interface DelegatedTaskTrace {
   created_at: string;
   completed_at?: string;
   status: 'started' | 'completed' | 'failed' | 'cancelled';
+  /** Tenant partition this delegation belongs to (absent: system). */
+  tenant_slug?: string;
   owner: string;
   instruction: string;
   context?: string;
@@ -144,28 +166,77 @@ export interface DelegatedTaskWorkerWake {
 
 export type DelegatedTaskWorkerHandler = (wake: DelegatedTaskWorkerWake) => Promise<void> | void;
 
-// Tests namespace the trace/store via KYBERION_DELEGATION_TRACE_PATH /
-// KYBERION_DELEGATION_STORE_DIR so parallel suites never clobber the real
-// observability files (resolved lazily per call).
-/** Where delegation traces are appended (honours the test override). */
-export function delegatedTaskTracePath(): string {
-  return resolveTracePath();
-}
+/**
+ * Store layout (runtime-storage-layout "Delegation trace and records"):
+ * `<root>/system/` holds untenanted delegations, `<root>/confidential/<tenant>/`
+ * tenant ones — `delegations.jsonl` (append-only audit trace) and
+ * `records/<id>.json` (+ `records/child-inbox/<child>.jsonl`). `<root>` is the
+ * registered ledger root `active/shared/runtime/delegation-records`, whose tenant
+ * partitions only the tenant-bound `delegation_record_store` role may read or
+ * write (tier-guard tenant check + dedicated-store rule).
+ *
+ * Tests namespace the store via KYBERION_DELEGATION_STORE_DIR (the partitions
+ * and a hermetic `legacy/` fallback directory lie under it) and may pin one
+ * trace file for every scope via KYBERION_DELEGATION_TRACE_PATH, so parallel
+ * suites never clobber the real files (resolved lazily per call).
+ */
+export { DELEGATION_RECORD_STORE_ROLE };
+const DELEGATION_TRACE_FILE = 'delegations.jsonl';
 
-function resolveTracePath(): string {
+function tracePathFor(tenant: string | undefined): string {
   const override = getRegisteredEnvText('KYBERION_DELEGATION_TRACE_PATH')?.trim();
-  const candidate = override
-    ? pathResolver.rootResolve(override)
-    : pathResolver.shared('observability/delegations.jsonl');
-  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+  if (override) {
+    return assertSafeRepositoryPath(pathResolver.rootResolve(override), { allowMissingLeaf: true });
+  }
+  return assertSafeRepositoryPath(path.join(partitionDir(tenant), DELEGATION_TRACE_FILE), {
+    allowMissingLeaf: true,
+  });
 }
 
-function resolveStoreDir(): string {
-  const override = getRegisteredEnvText('KYBERION_DELEGATION_STORE_DIR')?.trim();
-  const candidate = override
-    ? pathResolver.rootResolve(override)
-    : pathResolver.shared('observability/delegations');
-  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+/**
+ * Pre-partition shared copies (tenant-mixed). Test runs with a store override
+ * use `<override>/legacy/` instead, so they never read the live legacy files.
+ */
+function legacyLocation(): { tracePath: string; recordDir: string } {
+  const override = storeRootOverride();
+  const base = override ? path.posix.join(override, 'legacy') : undefined;
+  return {
+    tracePath: assertSafeRepositoryPath(
+      pathResolver.rootResolve(
+        base ? path.posix.join(base, 'delegations.jsonl') : LEGACY_DELEGATION_TRACE_PATH
+      ),
+      { allowMissingLeaf: true }
+    ),
+    recordDir: assertSafeRepositoryPath(
+      pathResolver.rootResolve(
+        base ? path.posix.join(base, 'delegations') : LEGACY_DELEGATION_RECORD_DIR
+      ),
+      { allowMissingLeaf: true }
+    ),
+  };
+}
+
+function legacyRecordPath(delegationId: string): string {
+  return assertSafeRepositoryPath(
+    path.join(legacyLocation().recordDir, `${safeLeafId(delegationId, 'Delegation id')}.json`),
+    { allowMissingLeaf: true }
+  );
+}
+
+/** The trace this process's scope appends to (honours the test override). */
+export function delegatedTaskTracePath(): string {
+  return tracePathFor(boundTenantSlug());
+}
+
+/**
+ * Tenant-free trace files for system-scope readers (learning signals keep
+ * closed tokens only): the system partition plus the legacy shared trace.
+ */
+export function systemDelegationTracePaths(): string[] {
+  const paths = [tracePathFor(undefined)];
+  const legacy = legacyLocation().tracePath;
+  if (!paths.includes(legacy)) paths.push(legacy);
+  return paths;
 }
 
 /**
@@ -183,14 +254,18 @@ function writeObservabilityLeaf(filePath: string, serialized: string, append: bo
   for (let current = directory; !safeExistsSync(current); current = path.dirname(current)) {
     mkdirPaths.push(current);
   }
-  const write = () => {
-    if (mkdirPaths.length) safeMkdir(directory, { recursive: true });
-    if (append) safeAppendFileSync(filePath, serialized);
-    else safeWriteFile(filePath, serialized, { mkdir: false });
-  };
+  const write = () =>
+    asDelegationStore(filePath, () => {
+      if (mkdirPaths.length) safeMkdir(directory, { recursive: true });
+      if (append) safeAppendFileSync(filePath, serialized);
+      else safeWriteFile(filePath, serialized, { mkdir: false });
+    });
   const policy = getActiveSandboxPolicy();
   const scope = currentResourceAccessScope();
-  const tenantSlug = scope?.tenantSlug ?? resolvePolicyIdentityContext().tenantSlug;
+  const tenantSlug =
+    tenantStoreLedgerPartitionOf(filePath)?.tenant ||
+    scope?.tenantSlug ||
+    resolvePolicyIdentityContext().tenantSlug;
   if (policy?.mode !== 'read-only') return write();
   // A read-only delegation still owns its host bookkeeping: narrow the sandbox
   // to exactly this leaf instead of writing under the read-only policy, for
@@ -219,17 +294,7 @@ function writeObservabilityLeaf(filePath: string, serialized: string, append: bo
 
 function appendTrace(record: DelegatedTaskTrace): void {
   const serialized = `${JSON.stringify(record)}\n`;
-  writeObservabilityLeaf(resolveTracePath(), serialized, true);
-}
-
-function recordPath(delegationId: string): string {
-  const safeId = String(delegationId || '')
-    .trim()
-    .replace(/[^a-zA-Z0-9._-]+/g, '-');
-  if (!safeId) throw new Error('Delegation id is required.');
-  return assertSafeRepositoryPath(path.join(resolveStoreDir(), `${safeId}.json`), {
-    allowMissingLeaf: true,
-  });
+  writeObservabilityLeaf(tracePathFor(normalizeTenant(record.tenant_slug)), serialized, true);
 }
 
 const DELEGATED_TASK_RECORD_SCHEMA_PATH = pathResolver.knowledge(
@@ -244,18 +309,104 @@ function delegatedTaskRecordCatalog(filePath: string) {
   });
 }
 
-function loadDelegatedTaskRecordCatalog(filePath: string): DelegatedTaskRecord {
-  return delegatedTaskRecordCatalog(filePath).load();
+function readRecordFile(filePath: string): DelegatedTaskRecord | null {
+  return asDelegationStore(filePath, () => {
+    if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return null;
+    return delegatedTaskRecordCatalog(filePath).load();
+  });
 }
 
-function childInboxPath(childSessionId: string): string {
-  const safeId = String(childSessionId || '')
-    .trim()
-    .replace(/[^a-zA-Z0-9._-]+/g, '-');
-  if (!safeId) throw new Error('Child session id is required.');
-  return assertSafeRepositoryPath(path.join(resolveStoreDir(), 'child-inbox', `${safeId}.jsonl`), {
-    allowMissingLeaf: true,
-  });
+interface LocatedDelegatedTaskRecord {
+  record: DelegatedTaskRecord;
+  /** Partition tenant (undefined = system). */
+  tenant?: string;
+  /** Found in the shared pre-partition directory. */
+  legacy: boolean;
+}
+
+function loadFromPartition(
+  tenant: string | undefined,
+  delegationId: string
+): LocatedDelegatedTaskRecord | null {
+  try {
+    const record = readRecordFile(recordPathIn(tenant, delegationId));
+    if (!record) return null;
+    if (normalizeTenant(record.tenant_slug) !== tenant) {
+      logger.warn(
+        `delegation record refused — its tenant stamp does not match its partition | next: inspect the record before reuse | evidence: ${delegationId}`
+      );
+      return null;
+    }
+    return { record, tenant, legacy: false };
+  } catch (error) {
+    logger.debug(
+      `delegation record unreadable — ${error instanceof Error ? error.message : String(error)} | next: none | evidence: ${delegationId}`
+    );
+    return null;
+  }
+}
+
+/**
+ * Legacy fallback: the shared pre-partition record, only when attributed to
+ * `tenant` (a tenant-bound reader) or for an unbound reader (which may read
+ * the shared directory, as before) — never another tenant's record.
+ */
+function loadFromLegacy(
+  delegationId: string,
+  boundTenant: string | undefined
+): LocatedDelegatedTaskRecord | null {
+  let record: DelegatedTaskRecord | null;
+  try {
+    record = readRecordFile(legacyRecordPath(delegationId));
+  } catch {
+    return null;
+  }
+  if (!record) return null;
+  const attribution = legacyRecordTenant(record);
+  if (boundTenant) {
+    if (attribution?.tenant !== boundTenant) return null;
+  } else if (!attribution) {
+    return null;
+  }
+  const tenant = attribution?.tenant;
+  return {
+    record: { ...record, ...(tenant ? { tenant_slug: tenant } : {}) },
+    tenant,
+    legacy: true,
+  };
+}
+
+/**
+ * Find a delegation record. A tenant-bound process looks only in its own
+ * partition (then the legacy copies attributed to it); an unbound process
+ * looks in the system partition, then every tenant partition (read as the
+ * store role bound to that tenant), then the legacy directory.
+ */
+function locateDelegatedTaskRecord(delegationId: string): LocatedDelegatedTaskRecord | null {
+  const bound = boundTenantSlug();
+  if (bound) return loadFromPartition(bound, delegationId) ?? loadFromLegacy(delegationId, bound);
+  const direct = loadFromPartition(undefined, delegationId);
+  if (direct) return direct;
+  for (const tenant of listTenantPartitions()) {
+    const found = loadFromPartition(tenant, delegationId);
+    if (found) return found;
+  }
+  return loadFromLegacy(delegationId, undefined);
+}
+
+/** Inbox of a continuable child, next to its record (legacy inbox kept while it still holds input). */
+function childInboxPath(record: DelegatedTaskRecord): string {
+  const leaf = `${safeLeafId(record.child_session_id ?? '', 'Child session id')}.jsonl`;
+  const partitioned = assertSafeRepositoryPath(
+    path.join(recordsDirFor(normalizeTenant(record.tenant_slug)), 'child-inbox', leaf),
+    { allowMissingLeaf: true }
+  );
+  const legacy = assertSafeRepositoryPath(
+    path.join(legacyLocation().recordDir, 'child-inbox', leaf),
+    { allowMissingLeaf: true }
+  );
+  const partitionedExists = asDelegationStore(partitioned, () => safeExistsSync(partitioned));
+  return !partitionedExists && safeExistsSync(legacy) ? legacy : partitioned;
 }
 
 function requireDelegatedTaskRecord(
@@ -275,11 +426,15 @@ function requireDelegatedTaskRecord(
   return record;
 }
 
-function childInboxQueue(record: DelegatedTaskRecord) {
-  return getMissionAgentInputQueue({
-    missionId: record.child_session_id!,
-    queuePath: childInboxPath(record.child_session_id!),
-  });
+/** Run a child-inbox queue operation as the store role of the inbox's partition. */
+function withChildInbox<T>(
+  record: DelegatedTaskRecord,
+  fn: (queue: ReturnType<typeof getMissionAgentInputQueue>) => Promise<T>
+): Promise<T> {
+  const queuePath = childInboxPath(record);
+  return asDelegationStoreAsync(queuePath, () =>
+    fn(getMissionAgentInputQueue({ missionId: record.child_session_id!, queuePath }))
+  );
 }
 
 interface DelegatedTaskWorkerRegistration {
@@ -292,6 +447,8 @@ export interface DelegatedTaskWorkerProcessSpec {
   resourceId: string;
   delegationId: string;
   owner: string;
+  /** Tenant of the delegation: the worker process is bound to it (KYBERION_TENANT). */
+  tenantSlug?: string;
   command: string;
   args: string[];
   metadata: Record<string, string>;
@@ -312,10 +469,12 @@ export function buildDelegatedTaskWorkerProcessSpec(
     );
   }
   const resourceId = `delegated-task-worker:${delegationId}`;
+  const tenantSlug = normalizeTenant(record.tenant_slug);
   return {
     resourceId,
     delegationId,
     owner,
+    ...(tenantSlug ? { tenantSlug } : {}),
     command: process.execPath,
     args: [
       '--import',
@@ -331,6 +490,7 @@ export function buildDelegatedTaskWorkerProcessSpec(
       childSessionId: record.child_session_id!,
       owner,
       workerKind: 'continuable-delegation',
+      ...(tenantSlug ? { tenantSlug } : {}),
     },
   };
 }
@@ -350,7 +510,9 @@ export function spawnDelegatedTaskWorkerProcess(
     args: spec.args,
     spawnOptions: {
       cwd: pathResolver.rootDir(),
-      env: process.env,
+      // A tenant delegation's worker runs bound to that tenant, so it reads and
+      // settles the record in the tenant's own partition only.
+      env: spec.tenantSlug ? { ...process.env, KYBERION_TENANT: spec.tenantSlug } : process.env,
       stdio: 'ignore',
     },
     shutdownPolicy: 'manual',
@@ -373,9 +535,9 @@ async function wakeRegisteredDelegatedTaskWorker(
   if (!registration) return false;
   const record = requireDelegatedTaskRecord(delegationId, requestedBy);
   if (record.status === 'started') return false;
-  const pending = await childInboxQueue(record).peek('next_run', 1, {
-    sessionId: record.child_session_id,
-  });
+  const pending = await withChildInbox(record, (queue) =>
+    queue.peek('next_run', 1, { sessionId: record.child_session_id })
+  );
   if (pending.length === 0) return false;
   if (registration.wakeInFlight) {
     await registration.wakeInFlight;
@@ -458,12 +620,14 @@ export async function enqueueDelegatedTaskInbox(
   input: DelegatedTaskInboxInput
 ): Promise<AgentInputQueueEntry> {
   const record = requireDelegatedTaskRecord(delegationId, input.requestedBy);
-  const entry = await childInboxQueue(record).enqueue({
-    delivery: 'next_run',
-    text: input.text,
-    ...(input.metadata ? { metadata: input.metadata } : {}),
-    scope: { sessionId: record.child_session_id },
-  });
+  const entry = await withChildInbox(record, (queue) =>
+    queue.enqueue({
+      delivery: 'next_run',
+      text: input.text,
+      ...(input.metadata ? { metadata: input.metadata } : {}),
+      scope: { sessionId: record.child_session_id },
+    })
+  );
   if (input.wake !== false) {
     void wakeRegisteredDelegatedTaskWorker(delegationId, input.requestedBy).catch((error) => {
       logger.warn(
@@ -482,9 +646,9 @@ export async function hasPendingDelegatedTaskInbox(
   requestedBy?: string
 ): Promise<boolean> {
   const record = requireDelegatedTaskRecord(delegationId, requestedBy);
-  const pending = await childInboxQueue(record).peek('next_run', 1, {
-    sessionId: record.child_session_id,
-  });
+  const pending = await withChildInbox(record, (queue) =>
+    queue.peek('next_run', 1, { sessionId: record.child_session_id })
+  );
   return pending.length > 0;
 }
 
@@ -494,9 +658,9 @@ export async function consumeDelegatedTaskInbox(
   options: { requestedBy?: string; limit?: number } = {}
 ): Promise<AgentInputQueueEntry[]> {
   const record = requireDelegatedTaskRecord(delegationId, options.requestedBy);
-  return childInboxQueue(record).consume('next_run', options.limit ?? 32, {
-    sessionId: record.child_session_id,
-  });
+  return withChildInbox(record, (queue) =>
+    queue.consume('next_run', options.limit ?? 32, { sessionId: record.child_session_id })
+  );
 }
 
 function persistRecord(trace: DelegatedTaskTrace): void {
@@ -512,13 +676,34 @@ function persistRecord(trace: DelegatedTaskTrace): void {
   }
 }
 
+/**
+ * Write the record to its own tenant's partition (`tenant_slug`, stamped at
+ * start; system when absent). A legacy shared copy of the same delegation is
+ * removed once the partitioned copy is written (migration on first write).
+ */
 function persistRecordStrict(trace: DelegatedTaskTrace): void {
   const { trace_id, ...rest } = trace;
   const record: DelegatedTaskRecord = { delegation_id: trace_id, ...rest };
-  const filePath = recordPath(trace_id);
+  const filePath = recordPathIn(normalizeTenant(record.tenant_slug), trace_id);
   const canonical = delegatedTaskRecordCatalog(filePath).validate(record, filePath);
   const serialized = `${JSON.stringify(canonical, null, 2)}\n`;
   writeObservabilityLeaf(filePath, serialized, false);
+  removeLegacyRecordCopy(trace_id);
+}
+
+function removeLegacyRecordCopy(delegationId: string): void {
+  const legacyPath = legacyRecordPath(delegationId);
+  try {
+    if (!safeExistsSync(legacyPath) || !safeLstat(legacyPath).isFile()) return;
+    safeUnlinkSync(legacyPath);
+    logger.info(
+      `[delegated-task] legacy shared record migrated into its partition: ${delegationId}`
+    );
+  } catch (error) {
+    logger.warn(
+      `delegation legacy record not removed — ${error instanceof Error ? error.message : String(error)} | next: the partitioned copy is authoritative; tenant offboarding scrubs the legacy copy | evidence: ${legacyPath}`
+    );
+  }
 }
 
 export function startDelegatedTaskTrace(input: {
@@ -534,12 +719,27 @@ export function startDelegatedTaskTrace(input: {
   taskId?: string;
   /** DH-12: make this delegation a durable child session resumable once. */
   continuable?: boolean;
+  /**
+   * Tenant partition of the trace/record. Defaults to the bound tenant; a
+   * resume passes its source record's tenant so the resumed prompt (which
+   * embeds the original instruction) never lands in the system partition.
+   */
+  tenantSlug?: string;
 }): DelegatedTaskTrace {
+  const bound = boundTenantSlug();
+  const requested = normalizeTenant(input.tenantSlug);
+  if (bound && requested && requested !== bound) {
+    throw new Error(
+      `[DELEGATION_TENANT_SCOPE_MISMATCH] this process is bound to tenant '${bound}'; a delegation for another tenant is refused`
+    );
+  }
+  const tenantSlug = requested ?? bound;
   const trace: DelegatedTaskTrace = {
     trace_id: randomUUID(),
     kind: 'delegated_task',
     created_at: nowIso(),
     status: 'started',
+    ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
     owner: input.owner,
     instruction: input.instruction,
     ...(input.context ? { context: input.context } : {}),
@@ -613,6 +813,8 @@ export function completeDelegatedTaskTrace(
       enqueueDelegationNotification({
         delegationId: completed.trace_id,
         owner: completed.owner,
+        // The notification lands in the delegation's own partition.
+        ...(completed.tenant_slug ? { tenantSlug: completed.tenant_slug } : {}),
         ...(completed.mission_id ? { missionId: completed.mission_id } : {}),
         ...(completed.task_id ? { taskId: completed.task_id } : {}),
         ...(completed.child_session_id ? { childSessionId: completed.child_session_id } : {}),
@@ -883,32 +1085,124 @@ export function createDelegationHandle(input: {
   };
 }
 
+/**
+ * A delegation record visible to this process: a tenant-bound process sees its
+ * own partition (and legacy shared records attributed to it) only — never
+ * another tenant's; an unbound process searches the system partition, every
+ * tenant partition, then the legacy shared directory.
+ */
 export function loadDelegatedTaskRecord(delegationId: string): DelegatedTaskRecord | null {
   try {
-    const filePath = recordPath(delegationId);
-    if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return null;
-    return loadDelegatedTaskRecordCatalog(filePath);
+    return locateDelegatedTaskRecord(delegationId)?.record ?? null;
   } catch {
     return null;
   }
 }
 
 /**
- * Still-running delegations (status `started`), newest first. Feeds the
- * post-compaction active-task snapshot (bounded by `limit`).
+ * Which partitions a delegation reader reads. Omitted: the process's own scope
+ * (its bound tenant, or the system partition when unbound). A tenant-bound
+ * process may only narrow to its own tenant; named tenants or the system
+ * partition beyond that are dropped (a caller-supplied scope never broadens).
  */
-export function listActiveDelegatedTaskRecords(limit = 8): DelegatedTaskRecord[] {
-  const boundedLimit = Math.max(0, Math.floor(limit));
-  if (boundedLimit === 0) return [];
-  const dir = assertSafeRepositoryPath(resolveStoreDir(), { allowMissingLeaf: true });
+export interface DelegationReadScope {
+  tenants?: readonly string[];
+  includeSystem?: boolean;
+}
+
+function effectiveReadScope(read?: DelegationReadScope): {
+  tenants: string[];
+  includeSystem: boolean;
+} {
+  const bound = boundTenantSlug();
+  const requested = (read?.tenants ?? [])
+    .map((tenant) => normalizeTenant(tenant))
+    .filter((tenant): tenant is string => Boolean(tenant));
+  if (bound) {
+    if (read && (read.includeSystem || requested.some((tenant) => tenant !== bound))) {
+      logger.debug(
+        `delegation read narrowed — a tenant-bound process reads only its own partition | next: none | evidence: bound=${bound}`
+      );
+    }
+    return { tenants: !read || requested.includes(bound) ? [bound] : [], includeSystem: false };
+  }
+  if (!read) return { tenants: [], includeSystem: true };
+  return { tenants: [...new Set(requested)], includeSystem: read.includeSystem === true };
+}
+
+function readPartitionRecords(tenant: string | undefined): DelegatedTaskRecord[] {
+  const dir = recordsDirFor(tenant);
+  try {
+    return asDelegationStore(dir, () => {
+      if (!safeExistsSync(dir)) return [];
+      return safeReaddir(dir)
+        .filter((entry) => entry.endsWith('.json'))
+        .map((entry) => loadFromPartition(tenant, entry.slice(0, -'.json'.length))?.record)
+        .filter((record): record is DelegatedTaskRecord => Boolean(record));
+    });
+  } catch (error) {
+    logger.debug(
+      `delegation partition skipped — ${error instanceof Error ? error.message : String(error)} | next: read it from a process scoped to that tenant | evidence: ${dir}`
+    );
+    return [];
+  }
+}
+
+/** Legacy shared records whose attribution falls inside the read scope. */
+function readLegacyRecords(scope: { tenants: string[]; includeSystem: boolean }) {
+  const dir = legacyLocation().recordDir;
   if (!safeExistsSync(dir)) return [];
   const records: DelegatedTaskRecord[] = [];
   for (const entry of safeReaddir(dir)) {
     if (!entry.endsWith('.json')) continue;
-    const record = loadDelegatedTaskRecord(entry.slice(0, -'.json'.length));
-    if (record?.status === 'started') records.push(record);
+    let record: DelegatedTaskRecord | null = null;
+    try {
+      record = readRecordFile(legacyRecordPath(entry.slice(0, -'.json'.length)));
+    } catch {
+      continue;
+    }
+    if (!record) continue;
+    const attribution = legacyRecordTenant(record);
+    if (!attribution) continue;
+    const visible = attribution.tenant
+      ? scope.tenants.includes(attribution.tenant)
+      : scope.includeSystem;
+    if (visible) {
+      records.push({
+        ...record,
+        ...(attribution.tenant ? { tenant_slug: attribution.tenant } : {}),
+      });
+    }
   }
-  return records
+  return records;
+}
+
+/** Every record in the read scope (partitioned first, then unmigrated legacy copies). */
+function listDelegatedTaskRecords(read?: DelegationReadScope): DelegatedTaskRecord[] {
+  const scope = effectiveReadScope(read);
+  const records = [
+    ...(scope.includeSystem ? readPartitionRecords(undefined) : []),
+    ...scope.tenants.flatMap((tenant) => readPartitionRecords(tenant)),
+  ];
+  const seen = new Set(records.map((record) => record.delegation_id));
+  for (const record of readLegacyRecords(scope)) {
+    if (!seen.has(record.delegation_id)) records.push(record);
+  }
+  return records;
+}
+
+/**
+ * Still-running delegations (status `started`), newest first. Feeds the
+ * post-compaction active-task snapshot (bounded by `limit`).
+ */
+export function listActiveDelegatedTaskRecords(
+  limit = 8,
+  read?: DelegationReadScope
+): DelegatedTaskRecord[] {
+  const boundedLimit = Math.max(0, Math.floor(limit));
+  if (boundedLimit === 0) return [];
+  return listDelegatedTaskRecords(read)
+    .filter((record) => record.status === 'started')
     .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
     .slice(0, boundedLimit);
 }
@@ -1012,6 +1306,7 @@ export async function resumeDelegatedTask(
       resumedFrom: record.delegation_id,
       ...(record.mission_id ? { missionId: record.mission_id } : {}),
       ...(record.task_id ? { taskId: record.task_id } : {}),
+      ...(record.tenant_slug ? { tenantSlug: record.tenant_slug } : {}),
     });
     const result = await backend.delegateTask(prompt, record.context);
     const completed = completeDelegatedTaskTrace(trace, { resultSummary: result });
@@ -1042,6 +1337,12 @@ export async function resumeDelegatedTask(
   }
 }
 
+/** Records directory of this process's scope (bound tenant partition, else system). */
 export function delegatedTaskStoreDir(): string {
-  return resolveStoreDir();
+  return recordsDirFor(boundTenantSlug());
+}
+
+/** Where the record of `delegationId` lives (or would live) in this process's scope. */
+export function delegatedTaskRecordPath(delegationId: string): string {
+  return recordPathIn(boundTenantSlug(), delegationId);
 }

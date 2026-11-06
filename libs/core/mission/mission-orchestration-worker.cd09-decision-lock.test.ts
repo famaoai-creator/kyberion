@@ -1,4 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 
 // CD-09: the worker pins the case's customer decisions right before the task's
 // WorkItem import and reconciles them just before the WorkItem goes `done`.
@@ -184,6 +186,47 @@ vi.mock('../workforce/work-coordination.js', async (importOriginal) => {
 });
 
 const MISSION_ID = 'MSN-CD09-WORKER';
+
+// The leak oracle scans every public output of this file, including scratch.
+// Give the entire cached worker stack one owned root instead of scanning other
+// concurrently running suites' scratch checkouts under the source root.
+const sourceRoot = process.cwd();
+const fixtureRoot = path.join(sourceRoot, 'active/shared/tmp', `cd09-worker-root-${randomUUID()}`);
+const auditChainKey = Symbol.for('@kyberion/audit-chain');
+let sourceAuditChainDescriptor: PropertyDescriptor | undefined;
+let sourceIo: typeof import('../secure-io.js');
+let sourceContext: typeof import('../authority.js').withExecutionContext;
+beforeAll(async () => {
+  const { seedFirstJobTestRoot } =
+    await import('../../../scripts/fixtures/first-job-approval-fixture.js');
+  sourceIo = await import('../secure-io.js');
+  ({ withExecutionContext: sourceContext } = await import('../authority.js'));
+  seedFirstJobTestRoot(sourceRoot, fixtureRoot);
+  sourceAuditChainDescriptor = Object.getOwnPropertyDescriptor(globalThis, auditChainKey);
+  process.chdir(fixtureRoot);
+  vi.stubEnv('KYBERION_ROOT', fixtureRoot);
+  vi.stubEnv('VITEST', '');
+  expect(Reflect.deleteProperty(globalThis, auditChainKey)).toBe(true);
+  vi.resetModules();
+  const { pathResolver, missionDir } = await import('../path-resolver.js');
+  expect(pathResolver.rootDir()).toBe(fixtureRoot);
+  expect(pathResolver.primaryCheckoutRootDir()).toBe(fixtureRoot);
+  expect(pathResolver.shared('')).toBe(path.join(fixtureRoot, 'active/shared'));
+  expect(pathResolver.sharedTmp('')).toBe(path.join(fixtureRoot, 'active/shared/tmp'));
+  expect(missionDir(MISSION_ID, 'public').startsWith(fixtureRoot + path.sep)).toBe(true);
+}, 60000);
+afterAll(() => {
+  if (sourceAuditChainDescriptor)
+    Object.defineProperty(globalThis, auditChainKey, sourceAuditChainDescriptor);
+  else Reflect.deleteProperty(globalThis, auditChainKey);
+  process.chdir(sourceRoot);
+  vi.unstubAllEnvs();
+  if (sourceContext && sourceIo)
+    sourceContext('ecosystem_architect', () =>
+      sourceIo.safeRmSync(fixtureRoot, { recursive: true, force: true })
+    );
+  vi.resetModules();
+});
 
 // Full dispatch flow through real module wiring (kp04-needs style); only the
 // CD-09 lock seam is mocked — its behavior is covered by mission-decision-lock.test.ts.
@@ -469,7 +512,12 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
           }
         }
       };
-      for (const root of new Set(roots)) walk(root);
+      // All public runtime/scratch outputs must stay inside this file's root.
+      // Do not prune unknown owned directories: an unexpected leak must fail.
+      for (const root of new Set(roots)) {
+        expect(root === fixtureRoot || root.startsWith(fixtureRoot + nodePath.sep)).toBe(true);
+        walk(root);
+      }
       return hits;
     }
 

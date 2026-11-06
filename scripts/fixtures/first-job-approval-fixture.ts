@@ -4,9 +4,9 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
+  safeCopyFileSync,
 } from '@agent/core/secure-io';
 
 export const FIRST_JOB_TEST_ISSUER = 'https://fixture.example';
@@ -26,7 +26,9 @@ export function seedFirstJobTestRoot(sourceRoot: string, root: string): void {
     } else if (/\.(json|ya?ml)$/.test(relative)) {
       const target = path.join(root, relative);
       safeMkdir(path.dirname(target), { recursive: true });
-      safeWriteFile(target, safeReadFile(source, { encoding: 'utf8' }));
+      // Re-creatable fixture copies need no durable write/fsync per policy file.
+      // Keep secure-io's path, tier and link validation rather than raw filesystem I/O.
+      safeCopyFileSync(source, target);
     }
   };
   safeMkdir(root, { recursive: true });

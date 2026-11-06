@@ -126,6 +126,8 @@ describe('distillMission provider egress gate', () => {
   let dispose: (() => void) | undefined;
 
   beforeEach(() => {
+    // Exercise the registered mock provider even under an offline test runner.
+    vi.stubEnv('KYBERION_WISDOM_LLM_PROFILE', undefined);
     hoisted.llmCalls.length = 0;
     dispose = registerStructuredRunner('distill-egress-claude', async ({ prompt }) => {
       hoisted.llmCalls.push(prompt);
@@ -146,6 +148,7 @@ describe('distillMission provider egress gate', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     dispose?.();
   });
 

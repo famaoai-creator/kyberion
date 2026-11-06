@@ -350,6 +350,11 @@ export * from './provider/provider-capability-registry.js';
 
 export * from './provider/provider-egress-gate.js';
 
+// Information-asset scope P1: custody owner + system/person provider attestations.
+export * from './custody-owner.js';
+export * from './provider/custody-provider-attestation-store.js';
+export * from './provider/custody-provider-attestation-governance.js';
+
 export * from './provider/provider-backend-resolver.js'; // XP-07 close-out: real per-provider backend resolver
 
 export * from './best-of-providers.js'; // XP-07: model-diverse best-of-N delegation

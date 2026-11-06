@@ -355,6 +355,16 @@ function NavContext({ context }: { context: KbNavContext }) {
 }
 
 /**
+ * A further context block under the rail's `context` slot (e.g. a project
+ * inside the selected company), with the same markup and behaviour. Passed
+ * to `NavRail` as a child; not part of the A2UI `ui:nav-rail` payload.
+ */
+export function NavRailContext({ context }: { context: KbNavContext }) {
+  if (!context || typeof context.label !== 'string' || !context.label) return null;
+  return <NavContext context={context} />;
+}
+
+/**
  * `ui:nav-rail` → `nav.kb-nav-rail` (optional `__brand` and `__context`
  * slots, `ul.__list` of `a.__item`, optional `__footer`).
  */

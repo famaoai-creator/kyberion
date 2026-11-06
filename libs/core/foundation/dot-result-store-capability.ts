@@ -3,7 +3,8 @@ import * as path from 'node:path';
 import { isValidTenantSlug } from './scope.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from './runtime-state-roots.js';
 import {
-  runInResourceAccessScope,
+  createSynchronousResourceGrantIssuer,
+  decideResourceAccess,
   type ResourceAccessScope,
   type ResourceAccessOperation,
 } from './resource-access-scope.js';
@@ -21,13 +22,7 @@ export interface DotResultStoreBinding {
   file: string;
 }
 export type DotResultStoreOperation = 'append_result' | 'append_report_marker' | 'read_state';
-interface ActiveBinding {
-  binding: DotResultStoreBinding;
-  operation: DotResultStoreOperation;
-  scope: ResourceAccessScope;
-  active: boolean;
-}
-const active = new WeakMap<object, ActiveBinding>();
+const grants = createSynchronousResourceGrantIssuer<DotResultStoreBinding>('DOT_RESULT_CAPABILITY');
 const ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 function normalized(input: DotResultStoreBinding): DotResultStoreBinding {
   const plain = (value: object): boolean =>
@@ -88,7 +83,6 @@ export function withDotResultStoreCapability<T>(
   const binding = normalized(input);
   if (!['append_result', 'append_report_marker', 'read_state'].includes(operation))
     throw new Error('[DOT_RESULT_CAPABILITY_INVALID] Unknown operation');
-  const token = Object.freeze({});
   const write = operation !== 'read_state';
   const directories: string[] = [];
   if (write)
@@ -107,68 +101,16 @@ export function withDotResultStoreCapability<T>(
     appendExact: write ? [binding.file] : [],
     mkdirExact: directories,
     metadataExact: [binding.file],
-    opaqueStoreToken: token,
   };
-  const record: ActiveBinding = { binding, operation, scope, active: true };
-  active.set(token, record);
-  try {
-    return runInResourceAccessScope(scope, () => {
-      const result = internalFn();
-      if (
-        result &&
-        (typeof result === 'object' || typeof result === 'function') &&
-        'then' in result
-      ) {
-        void Promise.resolve(result).catch(() => undefined);
-        throw new Error('[DOT_RESULT_CAPABILITY_ASYNC] Storage capability is synchronous only');
-      }
-      const seen = new WeakSet<object>();
-      const escapes = (value: unknown): boolean => {
-        if (!value || typeof value !== 'object') return false;
-        if (active.has(value) || Object.hasOwn(value, 'opaqueStoreToken')) return true;
-        if (seen.has(value)) return false;
-        seen.add(value);
-        return Object.values(value).some(escapes);
-      };
-      if (escapes(result))
-        throw new Error('[DOT_RESULT_CAPABILITY_ESCAPE] Internal capability cannot be returned');
-      return result;
-    });
-  } finally {
-    record.active = false;
-    active.delete(token);
-  }
+  return grants.run(binding, scope, internalFn);
 }
 /** Pure mandatory guard; structural lookalikes and expired asynchronous contexts fail closed. */
 export function isDotResultStoreCapability(
   scope: ResourceAccessScope | undefined,
   request: { rootDir: string; target: string; operation: ResourceAccessOperation }
 ): boolean {
-  const record = scope?.opaqueStoreToken ? active.get(scope.opaqueStoreToken) : undefined;
-  if (!scope || !record?.active || record.binding.rootDir !== request.rootDir) return false;
-  const expected = record.scope;
-  if (
-    scope.tenantSlug !== expected.tenantSlug ||
-    scope.organizationId !== expected.organizationId ||
-    scope.projectId !== expected.projectId ||
-    scope.allowProductKnowledgeRead === true ||
-    ['readExact', 'writeExact', 'appendExact', 'mkdirExact', 'metadataExact'].some(
-      (field) =>
-        JSON.stringify(scope[field as keyof ResourceAccessScope] ?? []) !==
-        JSON.stringify(expected[field as keyof ResourceAccessScope] ?? [])
-    )
-  )
-    return false;
-  if (request.operation === 'read')
-    return record.operation === 'read_state' && request.target === record.binding.file;
-  if (request.operation === 'append')
-    return record.operation !== 'read_state' && request.target === record.binding.file;
-  if (request.operation === 'mkdir') return expected.mkdirExact.includes(request.target);
-  if (request.operation === 'metadata')
-    return (
-      request.target === record.binding.file ||
-      request.target === '' ||
-      record.binding.file.startsWith(request.target + '/')
-    );
-  return false;
+  const grant = grants.resolve(scope);
+  if (!grant) return false;
+  if (grant.binding.rootDir !== request.rootDir) return false;
+  return decideResourceAccess(grant.scope, request.target, request.operation).allowed;
 }

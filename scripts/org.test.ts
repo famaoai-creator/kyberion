@@ -121,6 +121,12 @@ describe('org role create', () => {
     return printed.join('\n');
   }
 
+  it('refuses role planning when the security policy is missing', () => {
+    expect(() => org.collectExistingRoleIds(path.join(tempRoot, 'missing-policy'))).toThrow(
+      /Catalog security-policy is missing/
+    );
+  });
+
   it('resolves existing authority roles through the governed directory loader', () => {
     const source = fs.readFileSync(fileURLToPath(new URL('./org.ts', import.meta.url)), 'utf8');
 

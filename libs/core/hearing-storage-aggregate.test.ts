@@ -27,8 +27,8 @@ const keys = [
 const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 let io = initialIO;
 let context = initialContext;
-const privileged = <T,>(fn: () => T) => context('ecosystem_architect', fn);
-const restricted = <T,>(role: string, fn: () => T) => context(role, fn, undefined, TENANT);
+const privileged = <T>(fn: () => T) => context('ecosystem_architect', fn);
+const restricted = <T>(role: string, fn: () => T) => context(role, fn, undefined, TENANT);
 
 function provision() {
   initialContext('ecosystem_architect', () => {
@@ -43,11 +43,12 @@ function provision() {
         const stat = initialIO.safeLstat(path.join(SOURCE, file));
         if (stat.isSymbolicLink()) throw new Error('Linked governance fixture');
         if (stat.isDirectory()) copy(file);
-        else if (/\.(?:json|yaml)$/u.test(name))
-          initialIO.safeWriteFile(
-            path.join(ROOT, file),
-            initialIO.safeReadFile(path.join(SOURCE, file))
-          );
+        else if (/\.(?:json|yaml)$/u.test(name)) {
+          const target = path.join(ROOT, file);
+          initialIO.safeMkdir(path.dirname(target), { recursive: true });
+          // Re-creatable policy fixtures retain guarded copy checks without per-file fsync.
+          initialIO.safeCopyFileSync(path.join(SOURCE, file), target);
+        }
       }
     };
     copy('knowledge/product/governance');

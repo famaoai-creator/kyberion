@@ -18,6 +18,7 @@
   "properties": {
     "notification_id": { "type": "string", "minLength": 1 },
     "delegation_id": { "type": "string", "minLength": 1 },
+    "tenant_slug": { "type": "string", "minLength": 1 },
     "owner": { "type": "string", "minLength": 1 },
     "mission_id": { "type": "string", "minLength": 1 },
     "task_id": { "type": "string", "minLength": 1 },

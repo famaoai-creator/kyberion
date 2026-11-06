@@ -37,6 +37,11 @@ import {
   captureAttestationInvoker,
   PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
 } from '@agent/core/organization/tenant-governance';
+import { CUSTODY_PROVIDER_ATTESTATION_APPROVAL_CHANNEL } from '@agent/core/provider/custody-provider-attestation-governance';
+import {
+  CUSTODY_PROVIDER_ATTESTATION_ROOT,
+  readCustodyProviderAttestationEntry,
+} from '@agent/core/provider/custody-provider-attestation-store';
 import { checkProviderEgress } from '@agent/core/provider/provider-egress-gate';
 import { resolveReasoningRoute } from '@agent/core/reasoning/reasoning-route-resolver';
 import { main } from './onboarding_llm.js';
@@ -424,6 +429,220 @@ describe('pnpm onboarding llm', () => {
       expect(() =>
         run(['attest', '--tenant', 'acme', '--provider', 'claude', '--training-use', 'none'])
       ).toThrow(/requires --plan, --basis, --attested-by/);
+    });
+  });
+
+  describe('attest --custody system|person (material without a tenant)', () => {
+    const requestIds: string[] = [];
+    const claimArgs = [
+      '--provider',
+      'claude',
+      '--training-use',
+      'none',
+      '--plan',
+      'Claude Team',
+      '--basis',
+      'https://www.anthropic.com/legal/commercial-terms',
+      '--attested-by',
+      'human:owner',
+    ];
+    const systemArgs = ['attest', '--custody', 'system', ...claimArgs];
+    const tenantlessEgress = (dataTier: 'confidential' | 'personal') =>
+      checkProviderEgress({ provider: 'claude', dataTier }).allowed;
+
+    function humanApproves(id: string): void {
+      const pending = loadApprovalRequest(CUSTODY_PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id)!;
+      decideApprovalRequest('mission_controller', {
+        channel: pending.channel,
+        storageChannel: pending.storageChannel,
+        requestId: id,
+        decision: 'approved',
+        decidedBy: 'human-owner',
+        decidedByRole: 'owner',
+        authMethod: 'manual',
+        decidedByType: 'human',
+        authenticated: true,
+        payloadHash: pending.accountability?.payloadHash,
+        effectBinding: pending.accountability?.effectBinding,
+      });
+    }
+
+    afterEach(() => {
+      for (const id of requestIds.splice(0)) {
+        safeRmSync(approvalRequestLogicalPath(CUSTODY_PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id), {
+          force: true,
+        });
+      }
+      safeRmSync(approvalEventLogicalPath(CUSTODY_PROVIDER_ATTESTATION_APPROVAL_CHANNEL), {
+        force: true,
+      });
+      withExecutionContext('sovereign_concierge', () =>
+        safeRmSync(pathResolver.rootResolve(CUSTODY_PROVIDER_ATTESTATION_ROOT), {
+          recursive: true,
+          force: true,
+        })
+      );
+    });
+
+    it('system custody: request approval, the installation owner approves, apply opens tenantless confidential egress', () => {
+      expect(tenantlessEgress('confidential')).toBe(false);
+      const preview = run(systemArgs).join('\n');
+      expect(preview).toContain('[dry-run] would attest custody=system provider=claude');
+      expect(preview).toContain('--request-approval');
+      expect(() => run([...systemArgs, '--apply', '--accept'])).toThrow(
+        /needs a human approval: request one with 'pnpm onboarding llm attest --custody system --provider claude/
+      );
+
+      const request = JSON.parse(run([...systemArgs, '--request-approval', '--json'])[0]!);
+      requestIds.push(request.request_id);
+      expect(request.custody).toEqual({ kind: 'system' });
+      expect(request.approve_command).toBe(
+        `pnpm kyberion approvals --approve ${request.request_id}`
+      );
+      expect(shellWords(request.apply_command).slice(0, 6)).toEqual([
+        'pnpm',
+        'onboarding',
+        'llm',
+        'attest',
+        '--custody',
+        'system',
+      ]);
+      const stored = loadApprovalRequest(
+        CUSTODY_PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
+        request.request_id
+      )!;
+      expect(stored.workflow?.requiredRoles).toEqual(['sovereign', 'owner']);
+      expect(stored.accountability).toMatchObject({
+        finalDecision: 'human_only',
+        effectBinding: 'custody:system:attest-provider:claude',
+      });
+      expect(() =>
+        run([...systemArgs, '--apply', '--accept', '--approval-request-id', request.request_id])
+      ).toThrow(/is pending/);
+
+      humanApproves(request.request_id);
+      const applied = JSON.parse(
+        run([...shellWords(request.apply_command).slice(3), '--json'])[0]!
+      );
+      expect(applied).toMatchObject({
+        applied: true,
+        custody: { kind: 'system' },
+        approval: { request_id: request.request_id, approved_by: 'human-owner' },
+        store_path: `${CUSTODY_PROVIDER_ATTESTATION_ROOT}/system/attestations.json`,
+      });
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'provider.attest_custody',
+          metadata: expect.objectContaining({ custody: 'system', approved_by: 'human-owner' }),
+        })
+      );
+      expect(tenantlessEgress('confidential')).toBe(true);
+      // The installation's statement never speaks for tenant material or personal material.
+      expect(
+        checkProviderEgress({
+          provider: 'claude',
+          dataTier: 'confidential',
+          tenant_slug: 'acme',
+          tenant_registry_root_dir: path.join(ROOT, 'repo'),
+        }).allowed
+      ).toBe(false);
+      expect(tenantlessEgress('personal')).toBe(false);
+      // At most once.
+      expect(() =>
+        run([...systemArgs, '--apply', '--accept', '--approval-request-id', request.request_id])
+      ).toThrow(/already used/);
+    });
+
+    it("person custody: the operator's (single-user) consent opens tenantless personal egress only with the system attestation", () => {
+      const personArgs = ['attest', '--custody', 'person', ...claimArgs];
+      const request = JSON.parse(run([...personArgs, '--request-approval', '--json'])[0]!);
+      requestIds.push(request.request_id);
+      expect(
+        loadApprovalRequest(CUSTODY_PROVIDER_ATTESTATION_APPROVAL_CHANNEL, request.request_id)!
+          .accountability?.consent
+      ).toEqual({ subject: 'user:owner', subject_only: false });
+      humanApproves(request.request_id);
+      const applied = JSON.parse(
+        run([
+          ...personArgs,
+          '--apply',
+          '--accept',
+          '--approval-request-id',
+          request.request_id,
+          '--json',
+        ])[0]!
+      );
+      expect(applied.store_path).toBe(
+        `${CUSTODY_PROVIDER_ATTESTATION_ROOT}/personal/shared/operator.json`
+      );
+      // The consent is not evidence that the provider does not train.
+      expect(tenantlessEgress('personal')).toBe(false);
+      const system = JSON.parse(run([...systemArgs, '--request-approval', '--json'])[0]!);
+      requestIds.push(system.request_id);
+      humanApproves(system.request_id);
+      run([...systemArgs, '--apply', '--accept', '--approval-request-id', system.request_id]);
+      expect(tenantlessEgress('personal')).toBe(true);
+    });
+
+    it('a system approval does not apply to person custody, and vice versa', () => {
+      const request = JSON.parse(run([...systemArgs, '--request-approval', '--json'])[0]!);
+      requestIds.push(request.request_id);
+      humanApproves(request.request_id);
+      expect(() =>
+        run([
+          'attest',
+          '--custody',
+          'person',
+          ...claimArgs,
+          '--apply',
+          '--accept',
+          '--approval-request-id',
+          request.request_id,
+        ])
+      ).toThrow(/different custody owner or provider/);
+      expect(tenantlessEgress('personal')).toBe(false);
+    });
+
+    it('records used/unknown directly, and a used claim keeps tenantless egress denied', () => {
+      const used = [
+        'attest',
+        '--custody',
+        'system',
+        '--provider',
+        'claude',
+        '--training-use',
+        'used',
+      ];
+      const applied = JSON.parse(run([...used, '--apply', '--accept', '--json'])[0]!);
+      expect(applied.attestation.training_use).toBe('used');
+      expect(applied.approval).toBeUndefined();
+      expect(readCustodyProviderAttestationEntry({ kind: 'system' }, 'claude').entry).toMatchObject(
+        { training_use: 'used' }
+      );
+      expect(tenantlessEgress('confidential')).toBe(false);
+    });
+
+    it('rejects contradictory or tenant-bound custody requests', () => {
+      expect(() =>
+        run(['attest', '--custody', 'system', '--tenant', 'acme', ...claimArgs])
+      ).toThrow(/cannot be combined with --tenant/);
+      expect(() => run(['attest', '--custody', 'galaxy', ...claimArgs])).toThrow(
+        /must be one of tenant, system, person/
+      );
+      expect(() =>
+        run(['attest', '--custody', 'system', '--principal', 'alice', ...claimArgs])
+      ).toThrow(/--principal applies only to --custody person/);
+      expect(() => run(['attest', ...claimArgs])).toThrow(
+        /--tenant <tenant-slug> is required \(or --custody system\|person/
+      );
+      expect(() =>
+        withExecutionContext(
+          'mission_controller',
+          () => run([...systemArgs, '--request-approval']),
+          undefined,
+          'acme'
+        )
+      ).toThrow(/refused from the active tenant scope 'acme'/);
     });
   });
 

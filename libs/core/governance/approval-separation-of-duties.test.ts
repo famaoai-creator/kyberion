@@ -31,6 +31,7 @@ import { resolveActivationStatus } from '../plugin/plugin-activation-status.js';
 import { clearSessionApprovalCache } from './approval-store.js';
 import {
   APPROVAL_PLACEHOLDER_DECIDERS,
+  approvalConsentDecisionRefusal,
   evaluateApprovalUsability,
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
@@ -614,5 +615,45 @@ describe('approval separation of duties', () => {
     );
     expect(evaluateSeparationOfDuties({ requestedBy: '' }, 'alice')).toBe('missing_requester');
     expect(evaluateSeparationOfDuties({ requestedBy: 'worker' }, '')).toBe('missing_decider');
+  });
+
+  it('treats a data subject deciding their own consent as consent — only on a consent channel and only for that subject', () => {
+    const consent = { subject: 'user:alice', subject_only: true };
+    const record = {
+      requestedBy: 'user:alice',
+      storageChannel: 'custody-provider-attestation',
+      accountability: { finalDecision: 'human_only' as const, consent },
+    };
+    expect(evaluateSeparationOfDuties(record, 'user:alice')).toBeNull();
+    // Another channel never honours a consent field.
+    expect(evaluateSeparationOfDuties({ ...record, storageChannel: channel }, 'user:alice')).toBe(
+      'self_approval'
+    );
+    // A requester who is not the subject is still refused self-approval.
+    expect(evaluateSeparationOfDuties({ ...record, requestedBy: 'user:bob' }, 'user:bob')).toBe(
+      'self_approval'
+    );
+    // Placeholder / caller-supplied deciders are not let through by consent.
+    expect(evaluateSeparationOfDuties(record, 'user:alice', 'caller_supplied')).toBe(
+      'unverified_decider'
+    );
+
+    expect(approvalConsentDecisionRefusal({ ...record, id: 'r1' }, 'alice')).toBeUndefined();
+    expect(approvalConsentDecisionRefusal({ ...record, id: 'r1' }, 'user:owner')).toMatch(
+      /^\[POLICY_VIOLATION\] approval refused — request r1 records the consent of 'user:alice'.* \| next: .* \| evidence: decided_by=user:owner consent_subject=user:alice$/
+    );
+    expect(
+      approvalConsentDecisionRefusal(
+        {
+          ...record,
+          id: 'r1',
+          accountability: {
+            ...record.accountability,
+            consent: { ...consent, subject_only: false },
+          },
+        },
+        'user:owner'
+      )
+    ).toBeUndefined();
   });
 });

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { safeWriteFile } from './secure-io.js';
 
 const mocks = vi.hoisted(() => ({
   rootResolve: vi.fn(),
@@ -151,6 +152,31 @@ describe('customer-channel-binding', () => {
     expect(listCustomerChannelBindings({ rootDir })).toEqual([]);
   });
 
+  it.each(['{ malformed', JSON.stringify({ bindings: [{ surface: 'fax' }] })])(
+    'strict reads reject invalid binding data while discovery stays tolerant: %s',
+    (invalid) => {
+      safeWriteFile(
+        path.join(rootDir, 'knowledge/confidential/acme/connections/channel-bindings.json'),
+        invalid
+      );
+      expect(() => readTenantCustomerChannelBindings('acme', { rootDir, strict: true })).toThrow();
+      expect(() => listCustomerChannelBindings({ rootDir, strict: true })).toThrow();
+      expect(readTenantCustomerChannelBindings('acme', { rootDir })).toEqual([]);
+      expect(listCustomerChannelBindings({ rootDir })).toEqual([]);
+    }
+  );
+
+  it('strict reads preserve genuine missing bindings as empty', () => {
+    expect(readTenantCustomerChannelBindings('acme', { rootDir, strict: true })).toEqual([]);
+    expect(listCustomerChannelBindings({ rootDir, strict: true })).toEqual([]);
+  });
+
+  it('strict listing propagates invalid active-tenant registry data', () => {
+    safeWriteFile(path.join(rootDir, 'knowledge/personal/tenants/acme.json'), '{ malformed');
+    expect(() => listCustomerChannelBindings({ rootDir, strict: true })).toThrow();
+    expect(listCustomerChannelBindings({ rootDir })).toEqual([]);
+  });
+
   it('ignores a customer overlay that has no active tenant profile', () => {
     const file = path.join(
       rootDir,
@@ -209,5 +235,7 @@ describe('customer-channel-binding', () => {
     fs.symlinkSync(outside, linked, 'dir');
 
     expect(resolveCustomerBinding('slack', 'ESCAPED', { rootDir })).toBeNull();
+    expect(() => readTenantCustomerChannelBindings('acme', { rootDir, strict: true })).toThrow();
+    expect(() => listCustomerChannelBindings({ rootDir, strict: true })).toThrow();
   });
 });
