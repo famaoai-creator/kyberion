@@ -18,7 +18,14 @@ export * from './governance/external-operation.js';
 export * from './governance/external-operation-occurrence.js';
 export * from './governance/external-operation-runtime.js';
 export * from './governance/external-operation-store.js';
-export * from './governance/pr-publication-runtime.js';
+// G2: the binding and store-access issuers are not re-exported (import boundary test).
+export {
+  PR_PUBLICATION_STORE_ROLE,
+  currentPrPublicationScope,
+  currentVcsPublicationOperation,
+  prPublicationResourceAllowed,
+  type VcsPublicationOperation,
+} from './governance/pr-publication-runtime.js';
 export * from './vcs/publication-host.js';
 export * from './vcs/governance-host.js';
 export * from './meeting/calendar-external-effect.js';
