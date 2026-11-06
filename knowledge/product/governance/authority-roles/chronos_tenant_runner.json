@@ -5,5 +5,5 @@
   "write_scopes": [],
   "scope_classes": ["operations_runtime", "audit"],
   "allowed_actuators": ["ingest-actuator"],
-  "tier_access": ["public", "confidential"]
+  "tier_access": ["public", "confidential", "personal"]
 }

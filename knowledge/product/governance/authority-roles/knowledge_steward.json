@@ -5,5 +5,5 @@
   "write_scopes": ["knowledge/"],
   "scope_classes": ["knowledge_core"],
   "allowed_actuators": ["wisdom-actuator", "artifact-actuator"],
-  "tier_access": ["public", "confidential"]
+  "tier_access": ["public", "confidential", "personal"]
 }

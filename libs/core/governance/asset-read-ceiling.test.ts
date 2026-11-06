@@ -3,12 +3,14 @@ import { withExecutionContext } from '../authority.js';
 import type { AssetStoreDeclaration } from '../contracts/asset-scope.js';
 import { readJson } from '../foundation/json.js';
 import { pathResolver } from '../path-resolver.js';
-import { assetReadCeilingFor } from './asset-read-ceiling.js';
+import { assetReadCeilingFor, declaredReadTiers } from './asset-read-ceiling.js';
+import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
 import { inspectAssetScopeRead } from './asset-scope-inspection.js';
 
 const stores = readJson<{ stores: Array<AssetStoreDeclaration & { path: string }> }>(
   pathResolver.knowledge('product/governance/store-catalog.json')
 ).stores;
+const roleIndex = loadAuthorityRoleIndex();
 
 /** The guard's decision and the catalog ceiling's observation, inside one identity. */
 function compare(role: string, tenant: string | undefined, relative: string) {
@@ -17,7 +19,8 @@ function compare(role: string, tenant: string | undefined, relative: string) {
     () => {
       const result = inspectAssetScopeRead(
         pathResolver.rootResolve(relative),
-        assetReadCeilingFor()
+        assetReadCeilingFor(undefined, () => roleIndex),
+        { loadStores: () => stores }
       );
       return {
         guard: result.decision.allowed,
@@ -88,4 +91,59 @@ describe('asset read ceiling (G1, decide step 1)', () => {
       'runtime.surface-management:personal',
     ]);
   });
+
+  it('takes the tier ceiling from the role declaration, public always included', () => {
+    const roles = () => ({ reader: { tier_access: ['confidential'] }, none: {} });
+    expect(declaredReadTiers('reader', roles)).toEqual(['public', 'confidential']);
+    expect(declaredReadTiers('none', roles)).toEqual(['public', 'confidential', 'personal']);
+    expect(declaredReadTiers(undefined, roles)).toEqual(['public', 'confidential', 'personal']);
+  });
+
+  it('never lets the guard read a tier a role does not declare, except the known classes', () => {
+    // Accepted for now, each for a recorded reason (G2):
+    // - stance-logs: declared personal, but lives on the public logs floor;
+    // - runtime.surface-management: no protected prefix, readable by anyone;
+    // - tenant floors: the bound tenant's scratch, staging and cache partitions are
+    //   readable by any role bound to that tenant, whatever the role's tiers.
+    const known = new Set([
+      'stance-logs',
+      'runtime.surface-management',
+      'floor.cache',
+      'floor.scratch',
+      'floor.staging',
+    ]);
+    const outside: string[] = [];
+    for (const role of Object.keys(roleIndex).sort()) {
+      for (const store of stores) {
+        if (store.status !== 'active') continue;
+        // Public is inside every ceiling by construction; compare the protected tiers only.
+        const tiers = store.path.includes('<tier>')
+          ? ['personal', 'confidential']
+          : store.tiers?.includes('public') && store.tiers.length === 1
+            ? []
+            : [''];
+        for (const tier of tiers) {
+          const relative = `${store.path
+            .replace('<tier>', tier)
+            .replace('<tenant>', 'acme')
+            .replace('<slug>', 'me')
+            .replace(/<[a-z]+>/gu, 'x1')}/item.json`;
+          let result: ReturnType<typeof compare>;
+          try {
+            result = compare(role, 'acme', relative);
+          } catch {
+            continue; // a role that cannot be bound to this tenant reads nothing here
+          }
+          if (
+            result.status === 'compared' &&
+            result.guard &&
+            result.ceiling === false &&
+            !known.has(store.id)
+          )
+            outside.push(`${role}:${store.id}:${tier}`);
+        }
+      }
+    }
+    expect(outside).toEqual([]);
+  }, 120_000);
 });

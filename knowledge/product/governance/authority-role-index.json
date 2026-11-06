@@ -61,7 +61,7 @@
         "audit"
       ],
       "allowed_actuators": ["presence-actuator", "artifact-actuator", "approval-actuator"],
-      "tier_access": ["public", "confidential"]
+      "tier_access": ["public", "confidential", "personal"]
     },
     "chronos_mirror_v2": {
       "description": "Chronos UI mirror authority for interacting with the orchestration system and observability logs.",
@@ -80,7 +80,7 @@
       "write_scopes": [],
       "scope_classes": ["communication_surface"],
       "allowed_actuators": ["presence-actuator"],
-      "tier_access": ["public", "confidential"]
+      "tier_access": ["public", "confidential", "personal"]
     },
     "chronos_tenant_runner": {
       "description": "Chronos tenant-scoped pipeline runner. Entered ONLY in the child process chronos spawns for a schedule discovered under knowledge/confidential/{tenant}/pipelines/ (and, in the daemon, synchronously while listing/reading that tenant's pipeline files), always bound to that tenant (KYBERION_TENANT / execution-scope tenant, KYBERION_TENANT_SCOPE_REQUIRED=1 in the child). Grants resolve through ${KYBERION_TENANT}, so reads are limited to the bound tenant's confidential root plus the tenant registry; knowledge landings go through ingest:commit (ingest_commit role); writes are limited to that tenant's audit/trace mirrors.",
@@ -88,7 +88,7 @@
       "write_scopes": [],
       "scope_classes": ["operations_runtime", "audit"],
       "allowed_actuators": ["ingest-actuator"],
-      "tier_access": ["public", "confidential"]
+      "tier_access": ["public", "confidential", "personal"]
     },
     "chronos_token_registry_reader": {
       "description": "TR-01: least-privilege reader of the Chronos viewer token registry (knowledge/personal/connections/chronos-access.json, SHA-256 token hashes only). Surfaces launched with a SYSTEM_ROLE that cannot read the personal tier assume it only to resolve a bearer/cookie viewer token; it grants no other read and no role write grant (persona worker, so only the worker persona and default_allow write paths remain).",
@@ -249,7 +249,7 @@
       ],
       "scope_classes": ["operations_runtime"],
       "allowed_actuators": [],
-      "tier_access": ["public", "confidential"]
+      "tier_access": ["public", "confidential", "personal"]
     },
     "ecosystem_architect": {
       "description": "Core architecture and repo evolution authority.",
@@ -305,7 +305,7 @@
       ],
       "scope_classes": ["operations_runtime", "observability", "audit"],
       "allowed_actuators": ["media-generation-actuator", "artifact-actuator"],
-      "tier_access": ["public", "confidential"]
+      "tier_access": ["public", "confidential", "personal"]
     },
     "infrastructure_sentinel": {
       "description": "Shared core role assumed internally by coordination store writers (work coordination, peer messaging, mesh, the stimuli journal) and by resident dots whose charters bind it (e.g. repo-guardian). Narrow coordination/observability/runtime write scope only — it reports and delegates, it does not reconfigure.",
@@ -327,7 +327,7 @@
       "write_scopes": ["knowledge/"],
       "scope_classes": ["knowledge_core"],
       "allowed_actuators": ["wisdom-actuator", "artifact-actuator"],
-      "tier_access": ["public", "confidential"]
+      "tier_access": ["public", "confidential", "personal"]
     },
     "metrics_cap_reader": {
       "description": "R4: least-privilege, read-only reader of the tier/tenant-partitioned metrics ledgers (active/shared/runtime/execution-metrics/, active/shared/runtime/usage-ledger/). libs/core metrics.ts assumes it only inside aggregateMetricsForEnforcement, bound to the caller's tenant, so cap enforcers (spend guard, org budget governor, generation-cost dedup) count every tier of their scope whatever the caller's persona; the call returns numbers only, never rows. No write, no knowledge/ access (persona worker).",
@@ -502,7 +502,7 @@
       "write_scopes": ["active/audit/", "knowledge/incidents/"],
       "scope_classes": ["knowledge_core", "audit"],
       "allowed_actuators": ["artifact-actuator", "approval-actuator"],
-      "tier_access": ["public", "confidential"]
+      "tier_access": ["public", "confidential", "personal"]
     },
     "scope_locale_reader": {
       "description": "IT-05/S2: least-privilege reader of a tenant's stored reply locale (knowledge/confidential/<tenant>/locale.json). libs/core locale resolution assumes it, bound to the turn's tenant scope, so surface runtimes whose role cannot read the confidential tier still reply in the tenant locale; it grants that single file only and no write (persona worker). It is a tenant-bound reader (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
@@ -525,7 +525,7 @@
       ],
       "scope_classes": ["communication_surface", "coordination_runtime", "observability", "audit"],
       "allowed_actuators": ["presence-actuator", "artifact-actuator", "approval-actuator"],
-      "tier_access": ["public", "confidential"]
+      "tier_access": ["public", "confidential", "personal"]
     },
     "software_developer": {
       "description": "Implementation authority for test and product code paths.",
@@ -533,7 +533,7 @@
       "write_scopes": ["active/projects/", "tests/", "libs/actuators/"],
       "scope_classes": ["project_delivery", "codebase_core", "quality_validation"],
       "allowed_actuators": ["code-actuator", "file-actuator", "system-actuator"],
-      "tier_access": ["public", "confidential"]
+      "tier_access": ["public", "confidential", "personal"]
     },
     "sovereign_concierge": {
       "description": "Personal onboarding and identity synchronization authority.",
@@ -567,7 +567,7 @@
       ],
       "scope_classes": ["communication_surface", "operations_runtime", "audit"],
       "allowed_actuators": ["presence-actuator", "artifact-actuator"],
-      "tier_access": ["public", "confidential"]
+      "tier_access": ["public", "confidential", "personal"]
     },
     "system_configurator": {
       "description": "Configuration authority for intentional, governed changes to Kyberion's own capabilities. Covers service integration setup, voice engine registration, and tenant bootstrapping. Changes under this role are always executed via a config mission — not ad-hoc.",
