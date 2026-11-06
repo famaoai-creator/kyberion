@@ -538,6 +538,41 @@ public のログ置き場）で、スタンスの痕跡を個人 tier として�
 `task_source_workspace`、`pr_publication_store`）。`tier-guard-store-grants.ts` の役割名の表
 （`dedicatedStoreGrantAllows`）は空になったので削除した。
 
+続く移行（自律の学習記録、パイプラインの実行記録、資格情報、記憶の由来、個人の charter、顧客判断の
+消費ロックと milestone。それぞれ下の節）の後に、次の 2 つが残った。
+
+- **`personal_approval_store`（第 1 段階だけ）。** 所有者の I/O の窓は、モジュールの中だけの同期の窓に
+  した（`globalThis` の登録簿をやめ、Promise を返すと拒否、境界テスト
+  `tests/personal-approval-capability-boundary.test.ts`）。窓を権限にしてロールを外すのは、この変更では
+  していない。旧ロールの判定は、窓の中の I/O を `personaTierWriteDecision`（ロールの権限と persona
+  `worker`）に回し、ランタイムの既定の許可（`default_allow: active/shared/runtime/`）を通らない形だった。
+  窓の祖先（`active/shared/runtime/tenant-approvals/...` より上や `active/shared`）の mkdir は、このため
+  ロールのときは拒否されていた。ロールを外して窓だけを残すと、呼び出し元の権限（既定の許可を含む）が
+  それらを決める。ロールを引き受けずに窓だけを開いたときの判定を旧と並べると、広がる側が 230 件
+  あった（絞り込みがロール名で効いていることによるものが大半で、窓で効かせれば消えるが、祖先の mkdir
+  は残る）。個人の charter と同じく、絞り込みを「窓の中で旧ロールが実際に許されていた所」に限れば
+  揃えられる見込みだが、ロールが実際に許されていた所（tier の写しの判定、owner の区画の分岐）を
+  比較で確かめる作業が残っている。
+- **`concierge_management_reader` / `concierge_management_writer`。** Concierge だけが引き受ける
+  （`may_assume`）Web 管理のロールで、許可証の候補だったが外せなかった。理由は 3 つある。(1) 引き受けが
+  非同期にまたがる。`presence/displays/concierge/src/lib/management-server.ts` は
+  `withExecutionContextAsync('concierge_management_reader', ...)` で await を含む処理全体を包み、
+  `organization/organization-people-access.ts`、`surface/surface-management-mutations.ts`、
+  `information-assets/access.ts` も同じロールを引き受ける。これまでの許可証はすべて同期の 1 回の
+  アクセスで、非同期の処理全体に許可証を持たせるには発行の仕組み（寿命と取り消し）から作る必要が
+  ある。(2) ロール名が tier-guard の外でも判断に使われている。`project/project-management.ts` は
+  `assumedRole === 'concierge_management_writer'` を確かめ、`informationAssetCoverageReadAllowed`
+  （対象外として残すもの）はリーダーのロール名で許可を決める。ロールを外すとこれらの判断が変わる。
+  (3) 上限は呼び出し元が `runInResourceAccessScope` で組み立てた形の一致（読み取りだけ、組織付きの書き
+  込み）で、発行者が 1 つに決まっていない。ロール名の分岐（構造上の mkdir、リクエストの拒否 2 つ）は
+  そのまま残した。
+
+`narrowStoreRoleDenial` の、パスだけで絞る拒否だけのロール（`deliverable_inbox_writer`、
+`customer_channel_binding_store`、`archived_mission_state_reader`）は対象外である。これらは許可証では
+なく、呼び出し元のロールそのものを狭める（拒否だけで、権限は security-policy から来る）。この一連の
+移行では、許可証の中で呼び出し元のロールが残るので、これらの拒否が許可証の中でも効くようになった
+（比較の `deliverable_inbox_writer` の行。狭くなる側）。
+
 ### G2 の前提: 1 つのプロセスに `@agent/core` は 1 つだけ（2026-11-06）
 
 `task_source_workspace` の窓（`foundation/task-source-workspace-capability.ts`）は、登録簿を
