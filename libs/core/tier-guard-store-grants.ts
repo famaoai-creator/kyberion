@@ -23,6 +23,7 @@ import { memoryProvenanceGrantAllows } from './knowledge/memory-provenance-capab
 import { personCharterGrantAuthorizes } from './governance/person-charter-runtime.js';
 import { customerDecisionConsumerGrantAllows } from './foundation/customer-decision-consumer-capability.js';
 import { customerDecisionMilestoneGrantAllows } from './foundation/customer-decision-milestone-capability.js';
+import { personalApprovalGrantAuthorizes } from './foundation/personal-approval-io-capability.js';
 
 /**
  * Does the active invite capability cover this I/O? Its validator predates
@@ -92,6 +93,10 @@ function discussionRequestGrantAllows(
  * - Customer decision milestone: the opaque issuer grant of one bolt-review milestone operation of
  *   one case (CD-10), under the tenant decisions root; its writes are content-checked. The bolt
  *   review checks the issuance right before it issues.
+ * - Personal approval owner window: the module-private synchronous window over one exact owner
+ *   file of the personal approval store, under the roots the former role's grant covered (writes
+ *   only under the personal owner partitions and the Vitest approval store). Its facade
+ *   (governance/personal-approval-runtime.ts) checks the issuance right before the I/O.
  */
 export function storeGrantAuthorizes(
   target: string,
@@ -111,6 +116,7 @@ export function storeGrantAuthorizes(
     memoryProvenanceGrantAllows(target, operation) ||
     personCharterGrantAuthorizes(target, operation) ||
     customerDecisionConsumerGrantAllows(target, operation) ||
-    customerDecisionMilestoneGrantAllows(target, operation)
+    customerDecisionMilestoneGrantAllows(target, operation) ||
+    personalApprovalGrantAuthorizes(target, operation)
   );
 }
