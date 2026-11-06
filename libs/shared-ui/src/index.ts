@@ -86,6 +86,7 @@ export {
 export {
   AppShell,
   NavRail,
+  NavRailContext,
   PageHeader,
   Tabs,
   customPropertiesOnly,

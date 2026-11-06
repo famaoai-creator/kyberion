@@ -3,18 +3,60 @@ title: Customer Aggregation Point
 category: Developer
 tags: [fde, customer, configuration, aggregation]
 importance: 9
-last_updated: 2026-05-07
+last_updated: 2026-11-06
 ---
 
 # Customer Aggregation Point
 
 How Kyberion isolates **per-stance configuration** from the rest of the codebase, so that one checkout can be operated as several distinct entities without forking the repo.
 
-> **Naming note.** This document and the `customer/` directory were written for the FDE case, where the stance you operate from happens to be a customer's. That is one use of the mechanism, not its definition — the general concept is a **stance** ("which entity am I acting as right now"), and holding concurrent roles at several independent legal entities is an equally valid use. A stance is also distinct from a **tenant** (a confidentiality boundary) and from a **tenant's own customers**; all three get called "customer" in conversation. → [stance-tenant-customer-model](../../knowledge/product/architecture/stance-tenant-customer-model.md). Read "customer" below as "stance"; the environment variable and directory keep their historical names.
+## Current v2 contract (draft)
 
-This document defines the contract. For day-to-day usage, see [`templates/stance/README.md`](../../templates/stance/README.md).
+Stance (the operating entity), tenant (the confidentiality boundary), and a tenant's customer are separate concepts. `customer/` is now a legacy migration source only. The current stance template is `templates/stance/`; the directory and API descriptions below the historical heading do not describe current behavior.
 
-## 1. Problem
+| Purpose                                 | Current home / API                                                                   |
+| --------------------------------------- | ------------------------------------------------------------------------------------ |
+| Stance configuration                    | `knowledge/personal/stances/{stance}/`, `stance.json`; activation: `KYBERION_STANCE` |
+| Tenant company assets                   | `knowledge/confidential/{tenant}/`, `company.json`                                   |
+| Tenant deals, documents and escalations | `knowledge/confidential/{tenant}/deals/`                                             |
+| Stance traces                           | `active/shared/logs/stances/{stance}/traces/`                                        |
+| Tenant audit mirror                     | `active/shared/runtime/audit-mirror/confidential/{tenant}/`                          |
+
+Use published APIs, keeping selection separate from authorization:
+
+```ts
+import {
+  activeStance,
+  stanceRoot,
+  resolveOverlay,
+  overlayCandidates,
+} from '@agent/core/stance-resolver';
+import { tenantHomePath } from '@agent/core/organization/tenant-registry';
+
+const stance = activeStance();
+const connection = stanceRoot('connections/slack.json');
+const company = tenantHomePath('acme-corp', 'company.json');
+```
+
+`activeCustomer` / `customerRoot` are historical v1 names; use `activeStance` / `stanceRoot`. A resolved path or active stance is not an access grant. Tenant reads/writes still pass through tenant-bound facades and secure I/O. Generic helpers use published foundation subpaths such as `@agent/core/foundation/text`; domain APIs use their published domain subpaths, not internal files.
+
+### Migration order and compatibility status
+
+Run `pnpm migration --dry-run` and review the plan before applying migrations, in this order:
+
+| Migration          | Legacy source → current destination                                                                                                                                                             |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0001-stance-home` | Stance configuration from `customer/{slug}/` → `knowledge/personal/stances/{slug}/`; constructs `stance.json` from legacy `customer.json`; traces → `active/shared/logs/stances/{slug}/traces/` |
+| `0002-tenant-home` | Tenant company assets from `customer/{tenant}/` → `knowledge/confidential/{tenant}/`; `customer.json` → `company.json`; audit logs → confidential audit mirror                                  |
+| `0003-deal-home`   | `customer/{tenant}/deals/` → `knowledge/confidential/{tenant}/deals/`; JSON/JSONL references follow the move                                                                                    |
+
+The old v1 layout and resolver were stable. This is a breaking v2 proposal, requiring root/core major versions. The minimum 90-day deprecation period in [Extension Points §6](./EXTENSION_POINTS.md#6-deprecation) has **not been met**. Publication is **draft**; a maintainer exception decision is **pending**, not approved. No migration of user data is implied by this documentation.
+
+## Archived v1 design — historical only
+
+The remainder preserves the earlier design and API examples as historical evidence. Old commands, paths, resolver names and completion checklists below are not current instructions. For current usage, see [the stance template](../../templates/stance/README.md) and [the stance / tenant / customer model](../../knowledge/product/architecture/stance-tenant-customer-model.md).
+
+### 1. Problem
 
 Kyberion's previous configuration model assumed a legacy personal fallback:
 
@@ -31,7 +73,7 @@ For FDE / SI engagements, we need to:
 
 A single `knowledge/personal/` cannot satisfy these.
 
-## 2. Design
+### 2. Design
 
 A new top-level directory `customer/` aggregates everything that varies per customer.
 
@@ -51,7 +93,7 @@ customer/
     └── secrets.json          (optional, gitignored regardless)
 ```
 
-### 2.1 Activation
+#### 2.1 Activation
 
 The active customer is selected via the `KYBERION_STANCE` environment variable:
 
@@ -61,7 +103,7 @@ export KYBERION_STANCE=acme-corp
 
 When unset, Kyberion falls back to the legacy `knowledge/personal/` behavior.
 
-### 2.2 Resolution Order
+#### 2.2 Resolution Order
 
 For a given config sub-path (e.g. `connections/slack.json`):
 
@@ -71,7 +113,7 @@ For a given config sub-path (e.g. `connections/slack.json`):
 
 The resolver returns the first existing path. For writes, when a customer is active, writes go to the customer overlay path.
 
-### 2.3 Slug Validation
+#### 2.3 Slug Validation
 
 ```
 ^[a-z0-9][a-z0-9_-]*$
@@ -83,7 +125,7 @@ The resolver returns the first existing path. For writes, when a customer is act
 
 The validator is in `libs/core/customer-resolver.ts`. Any caller that uses `KYBERION_STANCE` must go through this resolver — direct path joins are forbidden.
 
-### 2.4 Secrets
+#### 2.4 Secrets
 
 Secrets must **never** live in the customer overlay, even though `knowledge/personal/stances/{slug}/` is gitignored. Use one of:
 
@@ -91,7 +133,7 @@ Secrets must **never** live in the customer overlay, even though `knowledge/pers
 2. Environment variables for short-lived credentials.
 3. `knowledge/personal/stances/{slug}/secrets.json` for local dev only — gitignored, not loaded by default. Loading requires explicit opt-in via secret-actuator.
 
-## 3. What Goes Where
+### 3. What Goes Where
 
 | File            | Customer overlay (`knowledge/personal/stances/{slug}/`) | Legacy personal fallback (`knowledge/personal/`) | Public default (`knowledge/public/`) |
 | --------------- | ------------------------------------------------------- | ------------------------------------------------ | ------------------------------------ |
@@ -104,7 +146,7 @@ Secrets must **never** live in the customer overlay, even though `knowledge/pers
 | Path scope      | `policy/path-scope-policy.json`                         | —                                                | `governance/path-scope-policy.json`  |
 | Mission seeds   | `mission-seeds/*.json`                                  | —                                                | (additive only)                      |
 
-## 4. Migration from Existing Single-User Setup
+### 4. Migration from Existing Single-User Setup
 
 For users who already have a `knowledge/personal/` filled in:
 
@@ -119,7 +161,7 @@ For users who already have a `knowledge/personal/` filled in:
 
    The conversion is a one-time copy; after it, edits to `customer/my-org/*` take precedence over `knowledge/personal/*`.
 
-## 5. Resolver API
+### 5. Resolver API
 
 ```typescript
 import { customerResolver } from '@agent/core';
@@ -138,14 +180,14 @@ const resolved = customerResolver.resolveOverlay('connections/slack.json');
 const { overlay, base } = customerResolver.overlayCandidates('policy/approval-policy.json');
 ```
 
-## 6. Out of Scope (Future Work)
+### 6. Out of Scope (Future Work)
 
 - **Live customer switching within a session** — currently requires restarting the process. A `pnpm stance:switch` command is a Phase D'-1 follow-up.
 - **Concurrent multi-customer execution** — the current model assumes one active customer per process. Concurrent runs require separate processes with different env vars.
 - **Customer-scoped trace storage** — trace files currently land under `active/shared/logs/`. Phase B-1 will extend this to `knowledge/personal/stances/{slug}/logs/` when a customer is active.
 - **Stance-scoped `confidential/` tier** — this document covers the overlay only. Confidential data is separated by **tenant**, not by stance: that is the existing `knowledge/confidential/{tenant-slug}/` mechanism, and it is unchanged. A stance selects which tenants you can see; it never becomes a confidentiality boundary of its own.
 
-## 7. Relationship to Existing Tier System
+### 7. Relationship to Existing Tier System
 
 The customer overlay is an **additional resolution layer** on top of the existing 3-tier system, not a replacement.
 
@@ -159,7 +201,7 @@ Read order for config:
 
 The 3-tier system continues to govern **tier hygiene** (no leaks from confidential to public). Customer overlay sits at the same trust level as `personal` and inherits its tier rules; `knowledge/personal/` remains the legacy personal fallback when no customer is active.
 
-## 8. Implementation Status
+### 8. Implementation Status
 
 - [x] Directory structure (`customer/`, `templates/stance/`, `.gitignore` rules)
 - [x] Resolver API (`libs/core/customer-resolver.ts`)
