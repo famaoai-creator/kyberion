@@ -1063,20 +1063,6 @@
       "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/decisions/"],
       "allow_write": ["knowledge/confidential/${KYBERION_TENANT}/decisions/"]
     },
-    "pipeline_journal_store": {
-      "allow_read": [
-        "active/shared/runtime/pipeline-library-runs",
-        "active/shared/runtime/pipeline-library-runs/confidential",
-        "active/shared/runtime/pipeline-library-runs/confidential/${KYBERION_TENANT}",
-        "knowledge/confidential/${KYBERION_TENANT}"
-      ],
-      "allow_write": [
-        "active/shared/runtime/pipeline-library-runs",
-        "active/shared/runtime/pipeline-library-runs/confidential",
-        "active/shared/runtime/pipeline-library-runs/confidential/${KYBERION_TENANT}",
-        "knowledge/confidential/${KYBERION_TENANT}"
-      ]
-    },
     "notification_preferences_reader": {
       "allow_read": ["knowledge/personal/notification-preferences.json"],
       "allow_write": []

@@ -17,6 +17,7 @@ import {
 import { taskSourceWorkspaceGrantAllows } from './foundation/task-source-workspace-capability.js';
 import { prPublicationGrantAuthorizes } from './foundation/pr-publication-store-capability.js';
 import { autonomyLearningGrantAllows } from './foundation/autonomy-learning-capability.js';
+import { pipelineJournalGrantAllows } from './foundation/pipeline-journal-capability.js';
 
 /**
  * Does the active invite capability cover this I/O? Its validator predates
@@ -68,6 +69,9 @@ function discussionRequestGrantAllows(
  * - Autonomy learning: the opaque issuer grant over one tenant partition (outcomes ledger,
  *   overrides, their rewrite siblings and archive), under the store root. Its facade checks the
  *   issuance right (the former shared core role's RA-02 rule) before it issues.
+ * - Pipeline journal: the opaque issuer grant over one confidential library run journal of the
+ *   caller's own tenant (journal, writer lease, lease metrics), under the store root. Its facade
+ *   checks the issuance right (the former shared core role's RA-02 rule) before it issues.
  */
 export function storeGrantAuthorizes(
   target: string,
@@ -81,6 +85,7 @@ export function storeGrantAuthorizes(
     discussionRequestGrantAllows(scope, target, operation) ||
     taskSourceWorkspaceGrantAllows(target, operation) ||
     prPublicationGrantAuthorizes(target, operation) ||
-    autonomyLearningGrantAllows(target, operation)
+    autonomyLearningGrantAllows(target, operation) ||
+    pipelineJournalGrantAllows(target, operation)
   );
 }
