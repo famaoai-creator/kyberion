@@ -239,12 +239,12 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
   it('the narrow role cannot write the ledger or an agenda, nor read another tenant', () => {
     seedCase(TENANT);
     seedCase(OTHER);
-    const scope = capability.customerDecisionConsumerCapability(TENANT, caseDir(TENANT), {
+    const access = {
       read: ['decisions.jsonl', 'agendas'],
       write: 'consumers/mission-MSN-X.t.json',
-    });
+    };
     const asStore = (fn: () => unknown) =>
-      resourceScope.runInResourceAccessScope(scope, () =>
+      capability.withCustomerDecisionConsumerCapability(TENANT, caseDir(TENANT), access, () =>
         authority.withExecutionContext(
           capability.CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
           fn,
@@ -252,6 +252,19 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
           TENANT
         )
       );
+    // G2: a structural lookalike of the exact ceiling is not the issued grant.
+    expect(() =>
+      resourceScope.runInResourceAccessScope(
+        capability.customerDecisionConsumerCapability(TENANT, caseDir(TENANT), access),
+        () =>
+          authority.withExecutionContext(
+            capability.CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
+            () => undefined,
+            undefined,
+            TENANT
+          )
+      )
+    ).toThrow(/RESOURCE_SCOPE_REQUIRED/u);
     const inCase = (tenant: string, relative: string) => path.join(ROOT, caseDir(tenant), relative);
     expect(() =>
       asStore(() => io.safeWriteFile(inCase(TENANT, 'decisions.jsonl'), '{}\n'))
@@ -419,10 +432,24 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
     const sweepScope = capability.runInCustomerDecisionConsumerSweep(() =>
       capability.customerDecisionConsumerCapability(TENANT, caseDir(TENANT), sweepAccess)
     );
+    // G2: only the issued grant counts, and a sweep-kind grant only inside the sweep.
     expect(capability.isCustomerDecisionConsumerCapability(sweepScope)).toBe(false);
     expect(
       capability.runInCustomerDecisionConsumerSweep(() =>
         capability.isCustomerDecisionConsumerCapability(sweepScope)
+      )
+    ).toBe(false);
+    expect(
+      capability.runInCustomerDecisionConsumerSweep(() =>
+        capability.withCustomerDecisionConsumerCapability(
+          TENANT,
+          caseDir(TENANT),
+          sweepAccess,
+          () =>
+            capability.isCustomerDecisionConsumerCapability(
+              resourceScope.currentResourceAccessScope()
+            )
+        )
       )
     ).toBe(true);
     // A task-boundary caller holding a sweep-shaped scope outside the sweep is refused.
@@ -470,11 +497,10 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
     const lockFile = `consumers/${consumer}.json`;
     const inCase = (relative: string) => path.join(ROOT, caseDir(TENANT), relative);
     const asConsumer = (access: { read: string[]; write?: string }, fn: () => unknown): unknown =>
-      resourceScope.runInResourceAccessScope(
-        capability.customerDecisionConsumerCapability(TENANT, caseDir(TENANT), {
-          ...access,
-          owner: consumer,
-        }),
+      capability.withCustomerDecisionConsumerCapability(
+        TENANT,
+        caseDir(TENANT),
+        { ...access, owner: consumer },
         () =>
           authority.withExecutionContext(
             capability.CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
