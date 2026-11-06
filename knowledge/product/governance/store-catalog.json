@@ -565,7 +565,6 @@
       },
       "tiers": ["public"],
       "status": "active",
-      "legacy_roles": ["personal_approval_store"],
       "sources": ["role-policy"]
     },
     {
@@ -733,11 +732,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": [
-        "personal_approval_store",
-        "tenant_approval_partition_index_reader",
-        "tenant_approval_store"
-      ],
+      "legacy_roles": ["tenant_approval_partition_index_reader", "tenant_approval_store"],
       "sources": ["role-policy"],
       "registration": {
         "family": "ledger",
@@ -810,7 +805,6 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["personal_approval_store"],
       "sources": ["role-policy"]
     },
     {

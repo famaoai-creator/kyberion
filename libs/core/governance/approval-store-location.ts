@@ -58,7 +58,6 @@ import {
 } from './approval-store-paths.js';
 import type { ApprovalRequestRecord } from './approval-store.js';
 import {
-  PERSONAL_APPROVAL_STORE_ROLE,
   currentPersonalApprovalOwnerHash,
   personalApprovalOwnerHash,
   withPersonalApprovalIo,
@@ -290,9 +289,7 @@ function asPersonalApprovalStore<T>(
   writing: boolean,
   fn: () => T
 ): T {
-  return withPersonalApprovalIo(partition.owner_hash, logicalPath, writing, () =>
-    withExecutionContext(PERSONAL_APPROVAL_STORE_ROLE, fn, 'worker')
-  );
+  return withPersonalApprovalIo(partition.owner_hash, logicalPath, writing, fn);
 }
 
 // ---------------------------------------------------------------------------

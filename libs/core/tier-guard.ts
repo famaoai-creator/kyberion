@@ -1,9 +1,5 @@
 import { engineRuntimeResourceAccessDenial as resourceAccessDenial } from './voice/engine-runtime-preferences-access.js';
 import {
-  PERSONAL_APPROVAL_STORE_ROLE,
-  personalApprovalIoAllowed,
-} from './foundation/personal-approval-io-capability.js';
-import {
   personCharterIoAllowed,
   personCharterStoreGrantActive,
 } from './governance/person-charter-runtime.js';
@@ -1045,11 +1041,6 @@ export function validateWritePermission(
   }
 
   // Dedicated-store tenant partitions skip runtime defaults (tier-guard-tenant-store-partitions.ts).
-  if (
-    currentRole === PERSONAL_APPROVAL_STORE_ROLE &&
-    personalApprovalIoAllowed(relativePath, operation)
-  )
-    return personaTierWriteDecision(policy, relativePath, identity, operation);
   const storeDecision = tenantStorePartitionWriteDecision(policy, relativePath, identity, {
     operation,
     sudoAllows: (scope) => hasScopedSudoAccess(relativePath, scope),

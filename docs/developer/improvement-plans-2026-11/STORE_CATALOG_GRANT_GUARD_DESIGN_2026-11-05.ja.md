@@ -539,20 +539,13 @@ public のログ置き場）で、スタンスの痕跡を個人 tier として�
 （`dedicatedStoreGrantAllows`）は空になったので削除した。
 
 続く移行（自律の学習記録、パイプラインの実行記録、資格情報、記憶の由来、個人の charter、顧客判断の
-消費ロックと milestone。それぞれ下の節）の後に、次の 2 つが残った。
+消費ロックと milestone。それぞれ下の節）の後に、次の 2 つが残り、そのうち個人の承認は後で外した。
 
-- **`personal_approval_store`（第 1 段階だけ）。** 所有者の I/O の窓は、モジュールの中だけの同期の窓に
-  した（`globalThis` の登録簿をやめ、Promise を返すと拒否、境界テスト
-  `tests/personal-approval-capability-boundary.test.ts`）。窓を権限にしてロールを外すのは、この変更では
-  していない。旧ロールの判定は、窓の中の I/O を `personaTierWriteDecision`（ロールの権限と persona
-  `worker`）に回し、ランタイムの既定の許可（`default_allow: active/shared/runtime/`）を通らない形だった。
-  窓の祖先（`active/shared/runtime/tenant-approvals/...` より上や `active/shared`）の mkdir は、このため
-  ロールのときは拒否されていた。ロールを外して窓だけを残すと、呼び出し元の権限（既定の許可を含む）が
-  それらを決める。ロールを引き受けずに窓だけを開いたときの判定を旧と並べると、広がる側が 230 件
-  あった（絞り込みがロール名で効いていることによるものが大半で、窓で効かせれば消えるが、祖先の mkdir
-  は残る）。個人の charter と同じく、絞り込みを「窓の中で旧ロールが実際に許されていた所」に限れば
-  揃えられる見込みだが、ロールが実際に許されていた所（tier の写しの判定、owner の区画の分岐）を
-  比較で確かめる作業が残っている。
+- **`personal_approval_store`。** 後で外した（下の「個人の承認の所有者の窓の許可証化」）。最初の試みでは、
+  ロールを引き受けずに窓だけを開くと広がる側が 230 件あった。旧ロールは窓の中の I/O を
+  `personaTierWriteDecision`（ロールの権限）に回し、ランタイムの既定の許可を通らなかったので、窓の祖先の
+  mkdir（`tenant-approvals/personal` より上）を拒否していたためである。絞り込みを旧ロールが実際に
+  許されていた所に限って揃えた。
 - **`concierge_management_reader` / `concierge_management_writer`。** Concierge だけが引き受ける
   （`may_assume`）Web 管理のロールで、許可証の候補だったが外せなかった。理由は 3 つある。(1) 引き受けが
   非同期にまたがる。`presence/displays/concierge/src/lib/management-server.ts` は
@@ -1059,6 +1052,53 @@ agenda の読み取り、agenda 1 つの書き込みで、書き込みは milest
 **比較。** 書く・読む窓口について、上限、その祖先、上限の外の 8 個のパスを 5 つの操作で（agenda は
 内容のある書き込みも）、10 種類の呼び出し元から問い、旧と新を突き合わせた（1085 件）。違いは
 `deliverable_inbox_writer` の 1 件（狭くなる側）だけだった。
+
+### G2: 個人の承認の所有者の窓の許可証化（2026-11-06）
+
+`personal_approval_store` は、承認の保存先（`governance/approval-store-location.ts`）が、個人の所有者の
+区画（`active/shared/runtime/tenant-approvals/personal/shared/owners/<owner-hash>/`、Vitest は
+`active/shared/runtime/vitest-approvals/.../tenant-approvals/personal/shared/owners/...`）の 1 ファイルに
+触る間だけ、persona `worker` で、tenant に束縛せずに引き受けていた共有コアロールである。窓
+（`foundation/personal-approval-io-capability.ts`）は、呼び出し元が実際にその所有者であるとき
+（`currentPersonalApprovalOwnerHash`）だけ `governance/personal-approval-runtime.ts` が開く。
+
+**第 1 段階（0c23e2a86）。** 窓をモジュールの中だけの同期の窓にした（`globalThis` の登録簿をやめた。
+Promise を返すと拒否し、捕まえた継続には窓が無い）。境界テスト
+`tests/personal-approval-capability-boundary.test.ts`。
+
+**旧ロールが実際に許されていた所（比較で確かめたこと）。** 窓の中の I/O は、窓の判定
+（`personalApprovalIoAllowed`: 窓のファイル、その祖先の読み取りとメタデータ、書き込み中は祖先の mkdir、
+product の読み取り）に通ったうえで、書き込みは `personaTierWriteDecision`（ロールの権限）だけで決まって
+いた。ランタイムの既定の許可（`default_allow: active/shared/runtime/`）を通らないので、ロールの
+`allow_write`（`tenant-approvals/personal/shared/` と `vitest-approvals/`）の外にある祖先
+（`tenant-approvals/personal`、`tenant-approvals`、`active/shared/runtime`、`active/shared`、`active`）の
+mkdir は拒否されていた。読み取りは窓の中ではすべて許されていた（tenant に束縛された呼び出し元を除く）。
+
+**第 2 段階: 窓を権限にし、ロールを外した。**
+
+- 絞り込み: 窓に入っている間（発行済みでも、捕まえた継続でも）のすべての I/O を窓の判定に絞り、書き込みは
+  旧ロールの書き込みの根の下だけにする（`personalApprovalIoNarrowing`、`narrow-store-role-denial.ts` が
+  ロール名ではなく窓で効かせる）。窓が発行済みでない（継続）か所有者がもう現在でないときは、何も
+  認めない（ロールが残っていた継続で何も認められなかったのと同じ）。所有者の区画は、窓の外では
+  どのロールでも拒否される（従来の規則を窓で効かせる）。
+- 許可: `storeGrantAuthorizes` → `personalApprovalGrantAuthorizes`（窓の判定が認めるもののうち、書き込みは
+  上の根、読み取りはそれに `knowledge/product` を加えた根の下。旧ロールの権限が覆っていた所と同じ）。
+- 誰が開けるかは変えていない。窓口は旧共有コアロールの引き受けと同じ規則を名前 `personal_approval_store`
+  に対して確かめる（`assertStoreGrantIssuanceAllowed`。Concierge のように方針に無い SYSTEM_ROLE は
+  `[ROLE_ASSUMPTION_DENIED]`）。名前は role-assumption-policy の `shared_core_roles` に発行の権利として残す。
+  インストールの移行の対象ではなかったので、登録の有無の確かめ（個人の charter の
+  `isStoreGrantIssuanceRightRegistered`）は足していない（自律の学習記録などと同じ）。
+- 呼び出し元のロールと persona はそのまま使い、tenant を束縛しない（組織も引き継がない）。旧ロールの
+  引き受けも tenant 無しだった。
+- ロールの宣言（security-policy、`authority.ts` の窓が無いときの引き受けの拒否、保存先カタログの
+  `legacy_roles` 3 件、`tier-guard` のロール名の分岐）を削除し、名前を退役したロールの一覧に加えた
+  （authority role index とロール定義はもともと無い）。
+
+**比較。** 書き込み・読み取り・一覧・mkdir（本番の区画）と、Vitest の区画の書き込み・読み取り、窓の外の
+計 7 つの場合について、資源、その祖先、上限の外の 10 個のパスを 5 つの操作で、10 種類の呼び出し元から
+問い、旧と新を突き合わせた（6800 件）。広がる側は 0 件。違いは `deliverable_inbox_writer` の 28 件
+（呼び出し元の拒否だけのロールが窓の中でも効く。狭くなる側）と、方針に無い SYSTEM_ROLE の拒否の文言
+（同じ `[ROLE_ASSUMPTION_DENIED]`、「引き受け」が「発行」になった）だけだった。
 
 ## 既定で拒否であること
 

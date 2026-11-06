@@ -289,17 +289,6 @@
     }
   },
   "authority_role_permissions": {
-    "personal_approval_store": {
-      "allow_read": [
-        "knowledge/product/",
-        "active/shared/runtime/tenant-approvals/personal/shared/",
-        "active/shared/runtime/vitest-approvals/"
-      ],
-      "allow_write": [
-        "active/shared/runtime/tenant-approvals/personal/shared/",
-        "active/shared/runtime/vitest-approvals/"
-      ]
-    },
     "mission_controller": {
       "allow_read": [
         "active/missions/",

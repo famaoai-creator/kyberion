@@ -117,7 +117,7 @@ describe('actual personal owner approval partition', () => {
     );
     expect(() =>
       authority.withExecutionContext('personal_approval_store', () => undefined)
-    ).toThrow('PERSONAL_APPROVAL_SCOPE_REQUIRED');
+    ).toThrow('ROLE_ASSUMPTION_DENIED');
   });
   it('fences legacy system personal visibility and cached seed scope after leaving its owner', () => {
     const owner = 'legacy-personal-owner';
