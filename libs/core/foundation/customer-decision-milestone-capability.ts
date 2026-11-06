@@ -1,5 +1,8 @@
 import * as path from 'node:path';
-import type { ResourceAccessScope } from './resource-access-scope.js';
+import {
+  createSynchronousResourceGrantIssuer,
+  type ResourceAccessScope,
+} from './resource-access-scope.js';
 import { getProcessEnv } from './process-env.js';
 import { isValidTenantSlug } from './scope.js';
 
@@ -61,9 +64,34 @@ export function customerDecisionMilestoneCapability(
   };
 }
 
+const grants = createSynchronousResourceGrantIssuer<
+  Readonly<{ tenantSlug: string; caseDir: string }>
+>('CUSTOMER_DECISION_MILESTONE_CAPABILITY');
+
+/**
+ * Internal synchronous issuer of one exact milestone ceiling (G2), import-restricted to
+ * mission/mission-bolt-review.ts (boundary test
+ * tests/customer-decision-milestone-capability-boundary.test.ts). The opaque grant exists only
+ * while `internalFn` runs; a structural lookalike, copy or counterfeit resolves nothing.
+ */
+export function withCustomerDecisionMilestoneCapability<T>(
+  tenantSlug: string,
+  caseDir: string,
+  access: CustomerDecisionMilestoneAccess,
+  internalFn: () => T
+): T {
+  const scope = customerDecisionMilestoneCapability(tenantSlug, caseDir, access);
+  return grants.run(Object.freeze({ tenantSlug, caseDir }), scope, internalFn);
+}
+
+/** Pure mandatory guard: only this issuer's live grant with a milestone ceiling resolves. */
 export function isCustomerDecisionMilestoneCapability(
   scope: ResourceAccessScope | undefined
 ): boolean {
+  return Boolean(grants.resolve(scope)) && isMilestoneCeiling(scope);
+}
+
+function isMilestoneCeiling(scope: ResourceAccessScope | undefined): boolean {
   if (
     !scope ||
     scope.organizationId ||
