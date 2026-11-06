@@ -4,6 +4,7 @@ export * from './realtime-voice-conversation.js';
 export * from './realtime-voice-loop.js';
 export * from './realtime-voice-preferences.js';
 export * from './tts-loopback-verifier.js';
+export * from './two-stage-barge-in.js';
 export * from './vad-turn-recorder.js';
 export * from './voice-capability-bridge.js';
 export * from './voice-eot-scorer.js';
