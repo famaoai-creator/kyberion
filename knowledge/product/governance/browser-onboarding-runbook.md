@@ -1,7 +1,7 @@
 ---
 title: Browser onboarding runbook (Concierge web flow)
 tags: [onboarding, concierge, surfaces, passkey, attestation, operations]
-last_updated: 2026-10-24
+last_updated: 2026-11-06
 ---
 
 # Browser onboarding runbook
@@ -14,13 +14,12 @@ hold for each step to work.
 
 ```bash
 pnpm surfaces --action start --surface concierge        # :3050 (this surface)
-pnpm surfaces --action start --surface presence-studio  # :3031 — settings page deps
 pnpm surfaces --action start --surface dev-idp          # :9099 — OIDC sign-in
 ```
 
-- **presence-studio down → `/settings` fails wholesale.** The settings load
-  chain proxies `/api/training/catalog` and `/api/voice/selection` to it;
-  503 there surfaces as "could not load settings" — not a per-section error.
+- **presence-studio is not a settings dependency.** `/api/training/catalog`
+  and `/api/voice/selection` are served in-process by Concierge (Kyberion
+  server phase 2); settings load with presence-studio stopped.
 - **dev-idp down → "Sign in with Dev IdP" 502s.** `/auth/start` proxies it.
 
 ## Server process environment — passkeys refuse under agent env
