@@ -11,6 +11,8 @@ const allowedImporters = new Set([
   'libs/core/foundation/project-scope-env.ts',
   'libs/core/path-resolver.ts',
   'libs/core/tier-guard.ts',
+  // G1 shadow: reads the store catalog with the guard's own raw reader (no secure-io recursion).
+  'libs/core/tier-guard-asset-shadow.ts',
   // Policy-enforced snapshot wrapper delegates only its low-level file mechanics.
   'libs/core/secure-io.ts',
   'libs/core/secret/vault-mount.ts',
