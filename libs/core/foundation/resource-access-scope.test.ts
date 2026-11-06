@@ -31,7 +31,10 @@ import {
 import { pathResolver } from '../path-resolver.js';
 import { withDiscussionRequestCapability } from './discussion-request-capability.js';
 import { pipelineJournalCapability } from './pipeline-journal-capability.js';
-import { autonomyLearningCapability } from './autonomy-learning-capability.js';
+import {
+  autonomyLearningCapability,
+  withAutonomyLearningCapability,
+} from './autonomy-learning-capability.js';
 import { narrowStoreRoleDenial } from './narrow-store-role-denial.js';
 import { DELIVERABLE_INBOX_ENTRIES_PATH } from './deliverable-inbox-writer-capability.js';
 
@@ -159,7 +162,8 @@ describe('request resource ceiling', () => {
     withProtectedFixture((root) => {
       process.env.SYSTEM_ROLE = 'autonomy_learning_store';
       process.env.KYBERION_TENANT = 'acme-corp';
-      runInResourceAccessScope(capability, () => {
+      const directory = 'active/shared/runtime/autonomy-learning/confidential/acme-corp';
+      withAutonomyLearningCapability('acme-corp', directory, () => {
         for (const prefix of capability.namePrefixExact!) {
           const target = path.join(root, prefix + 'segment.jsonl');
           expect(validateWritePermission(target, 'append').allowed).toBe(true);
