@@ -35,7 +35,6 @@ const STATUS_KEYS = {
 export function InvitesPane({ t }: { t: SettingsTranslate }) {
   const { locale } = useConciergeI18n();
   const [tenants, setTenants] = React.useState<InviteOverviewTenant[]>([]);
-  const [tenant, setTenant] = React.useState('');
   const [role, setRole] = React.useState<InviteRole>('viewer');
   const [ttl, setTtl] = React.useState('72');
   const [link, setLink] = React.useState<string | null>(null);
@@ -44,7 +43,10 @@ export function InvitesPane({ t }: { t: SettingsTranslate }) {
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState<Message>(null);
 
-  const current = tenants.find((entry) => entry.tenant_slug === tenant) ?? null;
+  // The server narrows this list to the company selected in the rail, so it
+  // holds that one company (or none in the personal / system views).
+  const current = tenants[0] ?? null;
+  const tenant = current?.tenant_slug ?? '';
 
   const load = React.useCallback(async () => {
     try {
@@ -52,9 +54,6 @@ export function InvitesPane({ t }: { t: SettingsTranslate }) {
       const parsed = parseInviteOverview(await response.json().catch(() => null));
       if (!response.ok || !parsed) return;
       setTenants(parsed);
-      setTenant((prev) =>
-        parsed.some((e) => e.tenant_slug === prev) ? prev : (parsed[0]?.tenant_slug ?? '')
-      );
     } catch {
       // The pane stays empty; the server is the authority either way.
     }
@@ -173,7 +172,6 @@ export function InvitesPane({ t }: { t: SettingsTranslate }) {
   return (
     <FormScope
       fields={{
-        'invite.tenant': (v) => setTenant(asText(v)),
         'invite.role': (v) => setRole(asText(v) as InviteRole),
         'invite.ttl': (v) => setTtl(asText(v)),
         'invite.email': (v) => setEmail(asText(v)),
@@ -184,18 +182,6 @@ export function InvitesPane({ t }: { t: SettingsTranslate }) {
         title={t('setup.invite_title')}
         description={t('setup.invite_description')}
       >
-        {tenants.length > 1 ? (
-          <SettingRow label={t('setup.invite_tenant')}>
-            <Select
-              id="invite-tenant"
-              name="invite.tenant"
-              label={t('setup.invite_tenant')}
-              hide_label
-              value={tenant}
-              options={tenants.map((e) => ({ value: e.tenant_slug, label: e.tenant_slug }))}
-            />
-          </SettingRow>
-        ) : null}
         {current ? (
           <>
             <SettingRow label={t('setup.invite_role')}>

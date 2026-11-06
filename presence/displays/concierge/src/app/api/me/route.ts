@@ -6,6 +6,7 @@ import { ensureOwnerMember } from '@agent/core/organization/member-registry';
 import { getBrowserOnboardingState } from '@agent/core/browser/browser-onboarding';
 import { conciergeAvailableOperations } from '../../../lib/headless-projections';
 import { resolveConciergeSelectedViewer } from '../../../lib/selected-tenant';
+import { readSelectableProjects } from '../../../lib/selected-project';
 import { conciergeErrorResponse } from '../../../lib/viewer-context';
 
 const logger = createLogger('concierge-me');
@@ -61,6 +62,11 @@ export function GET(req: NextRequest) {
         ? me.viewing
         : null;
     const profileNames = new Map(me.tenants.map((t) => [t.tenant_slug, t.display_name]));
+    // Projects narrow one company: offered only while a company is selected.
+    const projects =
+      selection.mode === 'tenant'
+        ? readSelectableProjects(resolved.context, selection.tenant_slug)
+        : [];
     return NextResponse.json(
       {
         ...me,
@@ -79,6 +85,7 @@ export function GET(req: NextRequest) {
             display_name: profileNames.get(slug) || slug,
           })),
         },
+        projects,
       },
       { headers: { 'Cache-Control': 'no-store' } }
     );

@@ -6,7 +6,13 @@ import { frontDeskFetch as fetch } from '../lib/front-desk-fetch';
 import * as React from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { renderMessage } from '@agent/core/message-format';
-import { A2UIActionProvider, Dialog, NavRail, useA2UIActions } from '@agent/shared-ui';
+import {
+  A2UIActionProvider,
+  Dialog,
+  NavRail,
+  NavRailContext,
+  useA2UIActions,
+} from '@agent/shared-ui';
 import {
   railSelectionValue,
   railSwitcherOptions,
@@ -24,6 +30,12 @@ import {
   selectionSwitchHref,
   withSelectedTenant,
 } from '../lib/tenant-context';
+import {
+  projectHintFromQuery,
+  projectSwitchHref,
+  resolveSelectedProject,
+  type SelectableProject,
+} from '../lib/project-selection';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { frontDeskText, type ConciergeLocale, type FrontDeskMessageKey } from '../lib/i18n';
 import { getStoredFrontDeskToken, isLoopbackHostname } from '../lib/front-desk-auth-token';
@@ -43,6 +55,9 @@ import { getStoredFrontDeskToken, isLoopbackHostname } from '../lib/front-desk-a
 
 /** `ui:nav-rail` context switcher action (payload `{ value: tenant_slug | 'personal' | 'shared' }`). */
 const TENANT_SWITCH_ACTION = 'tenant.switch';
+/** Project selector action (payload `{ value: project_id | ALL_PROJECTS_VALUE }`). */
+const PROJECT_SWITCH_ACTION = 'project.switch';
+const ALL_PROJECTS_VALUE = '*';
 
 interface FrontDeskNavItemPayload {
   id: string;
@@ -87,6 +102,8 @@ interface FrontDeskMeResponse {
   /** The server-validated selection for this request (URL/cookie are only hints). */
   selection?: RailSelection;
   switcher?: RailSwitcherPayload;
+  /** The selected company's projects (empty outside a company selection). */
+  projects?: SelectableProject[];
 }
 
 /**
@@ -183,7 +200,8 @@ function useNeedsYouTotal(enabled: boolean, scopeKey: string | null): number | n
     }
     const controller = new AbortController();
     const load = () =>
-      fetch(withSelectedTenant('/api/v1/needs-you/summary', scopeKey), {
+      // snake_case: the needs-you API reads `organization_id` / `project_id`.
+      fetch(withSelectedTenant('/api/v1/needs-you/summary', scopeKey, 'snake'), {
         cache: 'no-store',
         signal: controller.signal,
       })
@@ -388,6 +406,19 @@ function FrontDeskRailContent() {
         });
         return;
       }
+      if (actionId === PROJECT_SWITCH_ACTION && typeof payload?.value === 'string') {
+        const value = payload.value;
+        const project =
+          value === ALL_PROJECTS_VALUE
+            ? null
+            : (me?.projects ?? []).find((candidate) => candidate.project_id === value);
+        if (project === undefined) return;
+        // A full navigation, as for a company switch: every screen reads again
+        // under the narrowed scope.
+        const target = projectSwitchHref(window.location.href, project);
+        requestLeave(target, () => window.location.assign(target));
+        return;
+      }
       if (actionId === TENANT_SWITCH_ACTION && typeof payload?.value === 'string') {
         setDestinationId(null);
         const value = payload.value;
@@ -532,6 +563,36 @@ function FrontDeskRailContent() {
         }
       : undefined;
 
+  // The project selector narrows the selected company (URL only, no cookie).
+  // It appears once a company with registered projects is selected.
+  const projects = me?.selection?.mode === 'tenant' ? (me.projects ?? []) : [];
+  const selectedProject = resolveSelectedProject(
+    projectHintFromQuery(new URLSearchParams(searchParams?.toString() ?? '')),
+    projects
+  );
+  const allProjectsLabel = frontDeskText('project_all_label', locale);
+  const projectContext =
+    nav && projects.length > 0
+      ? {
+          label: selectedProject?.name ?? allProjectsLabel,
+          detail: frontDeskText('project_scope_detail', locale),
+          switch_label: frontDeskText('project_switch_aria', locale),
+          action: { id: PROJECT_SWITCH_ACTION },
+          options: [
+            {
+              value: ALL_PROJECTS_VALUE,
+              label: allProjectsLabel,
+              selected: selectedProject === null,
+            },
+            ...projects.map((project) => ({
+              value: project.project_id,
+              label: project.name,
+              selected: project.project_id === selectedProject?.project_id,
+            })),
+          ],
+        }
+      : undefined;
+
   return (
     <A2UIActionProvider
       onAction={onAction}
@@ -544,7 +605,9 @@ function FrontDeskRailContent() {
         context={context}
         items={items}
         {...(footerItems.length ? { footer_items: footerItems } : {})}
-      />
+      >
+        {projectContext ? <NavRailContext context={projectContext} /> : null}
+      </NavRail>
       <Dialog
         id="workspace-destination"
         open={destinationId !== null}
