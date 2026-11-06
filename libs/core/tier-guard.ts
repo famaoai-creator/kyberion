@@ -3,7 +3,10 @@ import {
   PERSONAL_APPROVAL_STORE_ROLE,
   personalApprovalIoAllowed,
 } from './foundation/personal-approval-io-capability.js';
-import { personCharterResourceAccessAllowed } from './governance/person-charter-runtime.js';
+import {
+  personCharterIoAllowed,
+  personCharterStoreGrantActive,
+} from './governance/person-charter-runtime.js';
 import {
   prPublicationGrantTenant,
   prPublicationResourceAllowed,
@@ -947,11 +950,10 @@ function requestResourceDenial(
       allowed: false,
       reason: '[PR_PUBLICATION_SCOPE] Publication store requires exact host resource capability',
     };
+  // G2: a live person charter store grant (no role) narrows every I/O made inside it.
   if (
-    normalizedRole === 'person_charter_store' &&
-    !denyCandidatePaths(relativePath).every((target) =>
-      personCharterResourceAccessAllowed(target, operation)
-    )
+    personCharterStoreGrantActive() &&
+    !denyCandidatePaths(relativePath).every((target) => personCharterIoAllowed(target, operation))
   )
     return {
       allowed: false,

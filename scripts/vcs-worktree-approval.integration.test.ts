@@ -94,13 +94,10 @@ const catalogNames = [
   'authority-role-index.json',
   'role-assumption-policy.json',
 ];
-const roles = [
-  'notification_preferences_reader',
-  'tool_runtime_policy_reader',
-  'person_charter_store',
-];
-// G2: the PR publication store has no role; an old installation lacks only its issuance right.
-const issuanceRights = ['pr_publication_store'];
+const roles = ['notification_preferences_reader', 'tool_runtime_policy_reader'];
+// G2: the PR publication and person charter stores have no role; an old installation lacks
+// only their issuance rights.
+const issuanceRights = ['pr_publication_store', 'person_charter_store'];
 let originalCatalogs = new Map<string, string>();
 
 function gitSource(args: string[]): string {
@@ -140,9 +137,10 @@ function prepareFixture(legacyWithoutPerson: boolean) {
   });
   const reference = referenceResult.status === 0 ? referenceResult.stdout.trim() : 'HEAD';
   const omittedRoles = [
-    ...roles.filter((role) => legacyWithoutPerson || role !== 'person_charter_store'),
-    // An installation that predates the PR publication store (its former role included).
-    ...issuanceRights,
+    ...roles,
+    // An installation that predates the PR publication store (its former role included), and,
+    // when legacyWithoutPerson, the person charter store too.
+    ...issuanceRights.filter((right) => legacyWithoutPerson || right !== 'person_charter_store'),
   ];
   const rolePaths = gitSource([
     'ls-tree',
