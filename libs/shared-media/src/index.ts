@@ -6,6 +6,7 @@ export * from './document-contents-policy.js';
 export * from './document-inference-policy.js';
 export * from './document-outline-label-policy.js';
 export * from './font-stack.js';
+export * from './host-image-handoff.js';
 export * from './image-generation-bridge.js';
 export * from './image-generation-policy.js';
 export * from './image-generation-types.js';

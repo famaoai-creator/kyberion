@@ -516,7 +516,7 @@
       "note": "`kyberion draw` tmp-root check that limits which provider byproducts are removed"
     },
     {
-      "file": "libs/core/host-image-handoff.ts",
+      "file": "libs/shared-media/src/host-image-handoff.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "per-target host image hand-off request marker (target + prompt + requested_at), consumed by the rerun that collects the host's image; an expired marker just means the image is requested again"

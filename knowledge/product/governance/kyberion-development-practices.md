@@ -420,7 +420,7 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
 
 - **Detect an external answer by content, not by existence or clocks.**
   When a flow hands work to someone else and collects the result on a rerun
-  (host image hand-off, `libs/core/host-image-handoff.ts`), record the
+  (host image hand-off, `libs/shared-media/src/host-image-handoff.ts`), record the
   target's content hash (or its absence) when the request is made, and
   collect only when the content differs — for the same request (prompt).
   File existence attributes stale files to the helper; comparing mtimes
