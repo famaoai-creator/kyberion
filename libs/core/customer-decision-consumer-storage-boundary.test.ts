@@ -43,6 +43,7 @@ let ledger: typeof import('./decision-ledger/ledger.js');
 let lockModule: typeof import('./mission/mission-decision-lock.js');
 let capability: typeof import('./foundation/customer-decision-consumer-capability.js');
 let resourceScope: typeof import('./foundation/resource-access-scope.js');
+let grantAccess: typeof import('./customer-decision/consumer-grant-access.js');
 let coordination: typeof import('./workforce/work-coordination.js');
 
 const profile = (tenant: string) => ({
@@ -179,6 +180,7 @@ beforeAll(async () => {
   lockModule = await import('./mission/mission-decision-lock.js');
   capability = await import('./foundation/customer-decision-consumer-capability.js');
   resourceScope = await import('./foundation/resource-access-scope.js');
+  grantAccess = await import('./customer-decision/consumer-grant-access.js');
   coordination = await import('./workforce/work-coordination.js');
   expect((await import('./path-resolver.js')).rootDir()).toBe(ROOT);
   process.env.KYBERION_PERSONA = 'sovereign';
@@ -243,29 +245,22 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
       read: ['decisions.jsonl', 'agendas'],
       write: 'consumers/mission-MSN-X.t.json',
     };
+    // G2: the grant (no store role) is the authority; the caller keeps its own identity.
     const asStore = (fn: () => unknown) =>
-      capability.withCustomerDecisionConsumerCapability(TENANT, caseDir(TENANT), access, () =>
-        authority.withExecutionContext(
-          capability.CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
-          fn,
-          undefined,
-          TENANT
-        )
-      );
-    // G2: a structural lookalike of the exact ceiling is not the issued grant.
+      grantAccess.withCustomerDecisionConsumerGrant(TENANT, caseDir(TENANT), access, fn);
+    const inCase = (tenant: string, relative: string) => path.join(ROOT, caseDir(tenant), relative);
+    const lock = JSON.stringify({
+      consumer: 'mission-MSN-X.t',
+      status: 'in_progress',
+      decisions: [],
+    });
+    // A structural lookalike of the exact ceiling is not the issued grant.
     expect(() =>
       resourceScope.runInResourceAccessScope(
         capability.customerDecisionConsumerCapability(TENANT, caseDir(TENANT), access),
-        () =>
-          authority.withExecutionContext(
-            capability.CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
-            () => undefined,
-            undefined,
-            TENANT
-          )
+        () => io.safeWriteFile(inCase(TENANT, 'consumers/mission-MSN-X.t.json'), lock)
       )
-    ).toThrow(/RESOURCE_SCOPE_REQUIRED/u);
-    const inCase = (tenant: string, relative: string) => path.join(ROOT, caseDir(tenant), relative);
+    ).toThrow(/Higher tier required|POLICY|SECURITY|tenant/u);
     expect(() =>
       asStore(() => io.safeWriteFile(inCase(TENANT, 'decisions.jsonl'), '{}\n'))
     ).toThrow(/RESOURCE_SCOPE_DENIED/u);
@@ -275,23 +270,24 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
     expect(() =>
       asStore(() => io.safeReadFile(inCase(OTHER, 'agendas/agd-boundary01.json')))
     ).toThrow(/RESOURCE_SCOPE_DENIED|tenant\.scope_violation/u);
-    // The named consumer lock is writable.
+    // The named consumer lock is writable, and only with content (an append is refused).
     asStore(() => {
       io.safeMkdir(inCase(TENANT, 'consumers'), { recursive: true });
-      io.safeWriteFile(
-        inCase(TENANT, 'consumers/mission-MSN-X.t.json'),
-        JSON.stringify({ consumer: 'mission-MSN-X.t', status: 'in_progress', decisions: [] })
-      );
+      io.safeWriteFile(inCase(TENANT, 'consumers/mission-MSN-X.t.json'), lock);
+      expect(() =>
+        io.safeAppendFileSync(inCase(TENANT, 'consumers/mission-MSN-X.t.json'), '\n')
+      ).toThrow(/CUSTOMER_DECISION_WRITE_CONTENT_REQUIRED/u);
     });
-    // No capability → the role is refused; a capability never names another tenant's case.
+    // The former role name is only the grant's issuance right; a capability never names
+    // another tenant's case.
     expect(() =>
       authority.withExecutionContext(
-        capability.CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
+        capability.CUSTOMER_DECISION_CONSUMER_GRANT_ISSUANCE_RIGHT,
         () => undefined,
         undefined,
         TENANT
       )
-    ).toThrow(/RESOURCE_SCOPE_REQUIRED/u);
+    ).toThrow(/ROLE_ASSUMPTION_DENIED/u);
     expect(() =>
       capability.customerDecisionConsumerCapability(TENANT, caseDir(OTHER), { read: [] })
     ).toThrow(/RESOURCE_SCOPE_INVALID/u);
@@ -452,17 +448,10 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
         )
       )
     ).toBe(true);
-    // A task-boundary caller holding a sweep-shaped scope outside the sweep is refused.
-    expect(() =>
-      resourceScope.runInResourceAccessScope(sweepScope, () =>
-        authority.withExecutionContext(
-          capability.CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
-          () => undefined,
-          undefined,
-          TENANT
-        )
-      )
-    ).toThrow(/RESOURCE_SCOPE/u);
+    // A task-boundary caller holding a sweep-shaped scope outside the sweep gets no grant.
+    resourceScope.runInResourceAccessScope(sweepScope, () =>
+      expect(capability.customerDecisionConsumerGrantActive()).toBe(false)
+    );
     // Task proposals go through the same own-lock path on the real guard.
     seedCase(TENANT);
     const recorded = lockModule.recordTaskDecisionProposals(
@@ -497,17 +486,11 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
     const lockFile = `consumers/${consumer}.json`;
     const inCase = (relative: string) => path.join(ROOT, caseDir(TENANT), relative);
     const asConsumer = (access: { read: string[]; write?: string }, fn: () => unknown): unknown =>
-      capability.withCustomerDecisionConsumerCapability(
+      grantAccess.withCustomerDecisionConsumerGrant(
         TENANT,
         caseDir(TENANT),
         { ...access, owner: consumer },
-        () =>
-          authority.withExecutionContext(
-            capability.CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
-            fn,
-            undefined,
-            TENANT
-          )
+        fn
       );
     const readLock = () =>
       asConsumer({ read: [lockFile] }, () =>

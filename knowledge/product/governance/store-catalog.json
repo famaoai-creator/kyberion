@@ -1059,7 +1059,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["customer_decision_consumer_store", "customer_decision_milestone_store"],
+      "legacy_roles": ["customer_decision_milestone_store"],
       "sources": ["role-policy"]
     },
     {

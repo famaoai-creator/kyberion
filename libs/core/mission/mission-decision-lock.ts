@@ -30,13 +30,12 @@ import { withExecutionContext } from '../authority.js';
 import { logger } from '../core.js';
 import { listDeals, type DealRecord } from '../deal-store.js';
 import {
-  CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
   customerDecisionsRootDir,
   runInCustomerDecisionConsumerSweep,
-  withCustomerDecisionConsumerCapability,
   type CustomerDecisionConsumerAccess,
 } from '../foundation/customer-decision-consumer-capability.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+import { withCustomerDecisionConsumerGrant } from '../customer-decision/consumer-grant-access.js';
 import {
   ARCHIVED_MISSION_STATE_READER_ROLE,
   archivedMissionStateCapability,
@@ -224,8 +223,8 @@ function warnOnce(missionId: string, what: string, error: unknown, evidence: str
 }
 
 /**
- * Run `fn` as the narrow consumer store role bound to the case's tenant,
- * inside the exact deny-only capability for `access` (case-relative paths).
+ * Run `fn` inside the exact consumer-lock grant for `access` (case-relative
+ * paths), bound to the case's tenant (G2: the grant is the authority).
  */
 function asConsumerStore<T>(
   tenantSlug: string,
@@ -234,9 +233,7 @@ function asConsumerStore<T>(
   fn: () => T
 ): T {
   const caseDir = pathResolver.toRepoRelative(ledgerDir(location));
-  return withCustomerDecisionConsumerCapability(tenantSlug, caseDir, access, () =>
-    withExecutionContext(CUSTOMER_DECISION_CONSUMER_STORE_ROLE, fn, undefined, tenantSlug)
-  );
+  return withCustomerDecisionConsumerGrant(tenantSlug, caseDir, access, fn);
 }
 
 /** Reads exactly `knowledge/personal/tenants/<tenant>.json` (shared core role). */
@@ -371,16 +368,11 @@ function writeLock(
   );
 }
 
-/** The tenant's decisions root, checked as the narrow store role (existence only). */
+/** The tenant's decisions root, checked inside the consumer grant (existence only). */
 function defaultDecisionsRootExists(tenantSlug: string): boolean {
   const root = customerDecisionsRootDir(tenantSlug);
-  return withCustomerDecisionConsumerCapability(tenantSlug, root, { read: [] }, () =>
-    withExecutionContext(
-      CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
-      () => safeExistsSync(pathResolver.rootResolve(root)),
-      undefined,
-      tenantSlug
-    )
+  return withCustomerDecisionConsumerGrant(tenantSlug, root, { read: [] }, () =>
+    safeExistsSync(pathResolver.rootResolve(root))
   );
 }
 

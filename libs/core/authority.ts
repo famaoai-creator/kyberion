@@ -3,10 +3,6 @@ import {
   personalApprovalIoAllowed,
 } from './foundation/personal-approval-io-capability.js';
 import {
-  isCustomerDecisionConsumerCapability,
-  CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
-} from './foundation/customer-decision-consumer-capability.js';
-import {
   isCustomerDecisionMilestoneCapability,
   CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
 } from './foundation/customer-decision-milestone-capability.js';
@@ -755,7 +751,6 @@ interface PreparedExecutionContext {
  */
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'credential_allocation_reader',
-  CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
   CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
   ARCHIVED_MISSION_STATE_READER_ROLE,
   'customer_channel_binding_store',
@@ -818,14 +813,6 @@ function prepareExecutionContext(
       `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant issuance right, not an assumable role`
     );
   assertTenantBoundReaderScope(normalizedRole, tenantSlug);
-  if (
-    normalizedRole === CUSTOMER_DECISION_CONSUMER_STORE_ROLE &&
-    (!isCustomerDecisionConsumerCapability(currentResourceAccessScope()) ||
-      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
-  )
-    throw new Error(
-      '[RESOURCE_SCOPE_REQUIRED] Customer decision consumer lock access requires its exact case capability'
-    );
   if (
     normalizedRole === CUSTOMER_DECISION_MILESTONE_STORE_ROLE &&
     (!isCustomerDecisionMilestoneCapability(currentResourceAccessScope()) ||

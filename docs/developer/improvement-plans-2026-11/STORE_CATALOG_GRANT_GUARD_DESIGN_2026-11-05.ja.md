@@ -955,6 +955,45 @@ SYSTEM_ROLE は同じ符号で拒否された。最初の比較では、本番�
 「見つかったこと」と、tenant に束縛された呼び出し元が束縛を外されて自分の権限で読めたもの）。
 絞り込みを旧ロールが実際に許されていた所に限って、無くした。
 
+### G2: 顧客判断の消費ロックの許可証化（2026-11-06）
+
+`customer_decision_consumer_store`（CD-09）は、mission の作業の境目（dispatch、record-task、
+record-evidence）と顧客の回答の後に `mission/mission-decision-lock.ts` が、再質問の書き込みで
+`customer-decision/store.ts`（`asCustomerDecisionConsumerOwner`）が、判断の case の tenant に束縛して
+引き受けていた共有コアロールである。上限は case の読み取り（台帳、switches、agendas、consumers）と
+消費ロック 1 つの書き込み（作業の境目は自分のロックだけ、一覧と複数のロックは sweep だけ）、または
+decisions の根の存在確認だけである。書き込みはすべて `tier-guard` が内容の規則（CD-09: rework を落とさない、
+完了した pin を書き換えない、追記・削除しない、など）で確かめていた（ロール名で効いていた）。
+
+**第 1 段階。** 上限を発行者ごとの不透明な許可証としてだけ発行するようにした
+（`withCustomerDecisionConsumerCapability`）。`isCustomerDecisionConsumerCapability` はその発行者が今発行して
+いる許可証だけを認め、sweep の種類は sweep の中でだけ認める（以前と同じく使うたびに確かめる）。sweep の
+目印を `globalThis` の登録簿からモジュールの中に移した。境界テスト
+`tests/customer-decision-consumer-capability-boundary.test.ts`。
+
+**第 2 段階: 許可証を権限にし、ロールを外した。**
+
+- 窓口を `customer-decision/consumer-grant-access.ts` に置き、mission の判断ロックと再質問の窓口は
+  そこだけを通す。窓口は発行の前に、旧共有コアロールの引き受けと同じ規則を名前
+  `customer_decision_consumer_store` に対して確かめ、呼び出し元のロールと persona のまま case の tenant に
+  束縛する（組織は引き継がない）。別 tenant に束縛された呼び出し元は `[ROLE_TENANT_SCOPE_MISMATCH]`
+  （旧ロールの引き受けと同じ符号）。
+- 許可: `storeGrantAuthorizes` → `customerDecisionConsumerGrantAllows`。上限の中で、旧ロールの権限が
+  届いた所（tenant の decisions の根の下と、範囲を持つロールのメタデータの規則による根の祖先の
+  メタデータ）だけを認める。最初の比較で `knowledge/confidential/<tenant>` のメタデータが狭くなって
+  いたので、祖先のメタデータを足して揃えた。
+- 内容の規則はそのまま残した。ロール名ではなく、有効な許可証の中の書き込みすべてに効かせる
+  （`narrow-store-role-denial.ts` → `customerDecisionConsumerGrantActive`）。内容の無い書き込み（追記など）は
+  従来どおり拒否する。規則が通った後も、呼び出し元の拒否だけのロールが効く。
+- ロールの宣言（security-policy、authority role index、ロール定義、`authority.ts` の tenant 束縛ロールの
+  一覧と引き受けの検査、保存先カタログの `legacy_roles` 1 件、`tier-guard` のロール名の分岐）を削除し、
+  名前を退役したロールの一覧に加えた。
+
+**比較。** 書く（自分のロック）・読む・根の存在確認の 3 つの窓口について、上限、その祖先、上限の外の
+9 個のパスを 5 つの操作で（ロックは正しい内容の書き込みも）、10 種類の呼び出し元から問い、旧と新を
+突き合わせた（1610 件）。違いは `deliverable_inbox_writer` の 2 件（狭くなる側）だけで、拒否は同じ符号
+だった。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |
