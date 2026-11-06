@@ -1,6 +1,6 @@
 ---
 title: 'Kyberion Development Practices — Hard-Won Rules for Changing This Repo'
-last_updated: 2026-11-05
+last_updated: 2026-11-06
 ---
 
 # Kyberion Development Practices — Hard-Won Rules for Changing This Repo
@@ -423,6 +423,18 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
   timestamp-preserving copies. Keep collection idempotent and a same-request
   re-request non-destructive, so multi-pass resumes (avatar sets) do not
   re-request finished parts or orphan an answer written in between.
+
+- **Moving a route to another process re-checks its path authority.** Each
+  surface process runs under its own `SYSTEM_ROLE`, and secure-io authorizes
+  paths per role. A handler that worked in one process (presence-studio) can
+  fail with `ROLE_VIOLATION` in another (Concierge), for example when it
+  writes `knowledge/personal/`. Route tests that mock core cannot see this.
+  Before moving such a handler, run its real read and write once under the
+  target role, e.g. `SYSTEM_ROLE=concierge node <script>` against the
+  built `libs/core/dist`. Then wrap it in `withExecutionContext(<role>)` using
+  a role the process already may assume (`role-assumption-policy.json`), and
+  name the route in that role's rationale. Never widen the process role.
+  (MSN-SERVER-STUDIO-P2A-20261106: the voice selection save.)
 
 ## 6. Process discipline for repo work
 

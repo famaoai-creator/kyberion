@@ -231,6 +231,11 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     expect(useVoiceSelection).toContain("method: 'POST'");
     expect(settings).toContain('useVoiceSelection');
     expect(voiceSelectionRoute).toContain('requireConciergeMutationAccess');
+    // Served in-process by the one server, never proxied to presence-studio.
+    for (const route of [voiceSelectionRoute, trainingCatalogRoute]) {
+      expect(route).not.toContain('fetch(');
+      expect(route).not.toContain('presenceStudioUrl');
+    }
 
     // 組織とメンバー: accountable agents render by display name + accountable
     // member only — the raw nhi_id must never reach the rendered copy (plan
