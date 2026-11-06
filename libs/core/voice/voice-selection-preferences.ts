@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { z } from 'zod';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
@@ -329,3 +330,17 @@ export function saveVoiceSelectionPreferences(input: {
   safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   return getVoiceSelectionSnapshot();
 }
+
+/**
+ * The body a surface accepts to change the voice selection (HTTP
+ * `POST /api/voice/selection`): at least one of the two choices, nothing else.
+ */
+export const voiceSelectionRequestSchema = z
+  .object({
+    tts_engine_id: z.string().trim().min(1).max(120).optional(),
+    stt_backend: z.string().trim().min(1).max(64).optional(),
+  })
+  .strict()
+  .refine((value) => value.tts_engine_id !== undefined || value.stt_backend !== undefined, {
+    message: 'tts_engine_id or stt_backend is required',
+  });
