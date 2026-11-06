@@ -30,7 +30,7 @@ import {
 } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import { withDiscussionRequestCapability } from './discussion-request-capability.js';
-import { pipelineJournalCapability } from './pipeline-journal-capability.js';
+import { withPipelineJournalCapability } from './pipeline-journal-capability.js';
 import {
   autonomyLearningCapability,
   withAutonomyLearningCapability,
@@ -91,11 +91,12 @@ function withStoreCapability(role: string, run: (capability: ResourceAccessScope
       () => run(currentResourceAccessScope()!)
     );
   else {
-    const capability = pipelineJournalCapability(
+    withPipelineJournalCapability(
       'acme-corp',
-      'active/shared/runtime/pipeline-library-runs/confidential/acme-corp/run.jsonl'
+      'active/shared/runtime/pipeline-library-runs/confidential/acme-corp/run.jsonl',
+      true,
+      () => run(currentResourceAccessScope()!)
     );
-    runInResourceAccessScope(capability, () => run(capability));
   }
 }
 

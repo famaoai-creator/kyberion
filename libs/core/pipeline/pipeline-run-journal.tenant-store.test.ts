@@ -15,6 +15,7 @@ let safeMkdir: typeof import('../secure-io.js').safeMkdir;
 let pathResolver: typeof import('../path-resolver.js').pathResolver;
 let runInResourceAccessScope: typeof import('../foundation/resource-access-scope.js').runInResourceAccessScope;
 let pipelineJournalCapability: typeof import('../foundation/pipeline-journal-capability.js').pipelineJournalCapability;
+let withPipelineJournalCapability: typeof import('../foundation/pipeline-journal-capability.js').withPipelineJournalCapability;
 let assertPipelineRunJournalCreatable: typeof import('./pipeline-run-journal.js').assertPipelineRunJournalCreatable;
 let createPipelineRunJournal: typeof import('./pipeline-run-journal.js').createPipelineRunJournal;
 let loadPipelineRunJournal: typeof import('./pipeline-run-journal.js').loadPipelineRunJournal;
@@ -47,7 +48,8 @@ beforeAll(async () => {
   ({ safeExistsSync, safeWriteFile, safeMkdir } = await import('../secure-io.js'));
   ({ pathResolver } = await import('../path-resolver.js'));
   ({ runInResourceAccessScope } = await import('../foundation/resource-access-scope.js'));
-  ({ pipelineJournalCapability } = await import('../foundation/pipeline-journal-capability.js'));
+  ({ pipelineJournalCapability, withPipelineJournalCapability } =
+    await import('../foundation/pipeline-journal-capability.js'));
   ({
     assertPipelineRunJournalCreatable,
     createPipelineRunJournal,
@@ -163,7 +165,13 @@ describe('tenant confidential library run journal', () => {
     expect(() =>
       withExecutionContext('pipeline_journal_store', () => undefined, 'worker', tenantSlug)
     ).toThrow('RESOURCE_SCOPE_REQUIRED');
-    runInResourceAccessScope(pipelineJournalCapability(tenantSlug, file), () =>
+    // G2: a structural lookalike of the exact ceiling is not the issued grant.
+    expect(() =>
+      runInResourceAccessScope(pipelineJournalCapability(tenantSlug, file), () =>
+        withExecutionContext('pipeline_journal_store', () => undefined, 'worker', tenantSlug)
+      )
+    ).toThrow('RESOURCE_SCOPE_REQUIRED');
+    withPipelineJournalCapability(tenantSlug, file, true, () =>
       withExecutionContext(
         'pipeline_journal_store',
         () => {

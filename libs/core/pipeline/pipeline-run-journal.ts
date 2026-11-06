@@ -29,10 +29,10 @@ import {
 import { findMissionPath, knowledge, rootDir, shared } from '../path-resolver.js';
 import { resolveIdentityContext, withExecutionContext } from '../authority.js';
 import { validateWritePermission } from '../tier-guard.js';
-import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import {
   pipelineJournalCapability,
   PIPELINE_JOURNAL_STORE_ROLE,
+  withPipelineJournalCapability,
 } from '../foundation/pipeline-journal-capability.js';
 import { missionTierScanDirs } from '../owner-scope.js';
 import {
@@ -181,14 +181,14 @@ function journalStoreAccess(
   const relative = path.relative(rootDir(), filePath).split(path.sep).join('/');
   const tenant = relative.split('/').at(-2);
   if (!tenant || resolveIdentityContext().tenantSlug !== tenant) return undefined;
-  let capability: ReturnType<typeof pipelineJournalCapability>;
   try {
-    capability = pipelineJournalCapability(tenant, relative, access === 'write');
+    // Only a journal of the bound tenant's own confidential partition has a store grant.
+    pipelineJournalCapability(tenant, relative, access === 'write');
   } catch {
     return undefined;
   }
   return <R>(run: () => R): R =>
-    runInResourceAccessScope(capability, () =>
+    withPipelineJournalCapability(tenant, relative, access === 'write', () =>
       withExecutionContext(PIPELINE_JOURNAL_STORE_ROLE, run, undefined, tenant)
     );
 }
