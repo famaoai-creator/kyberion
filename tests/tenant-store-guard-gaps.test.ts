@@ -50,6 +50,13 @@ describe('tenant store guard coverage', () => {
           : [];
       })
     );
-    expect(misread.sort()).toEqual([]);
+    // The metrics ledgers keep their legacy public classification on purpose
+    // (they hold counts; see TIER_PARTITIONED_RUNTIME_ROOTS in storage-layout.ts).
+    expect(misread.sort()).toEqual([
+      'runtime.execution-metrics.tenant:confidential',
+      'runtime.execution-metrics.tenant:personal',
+      'runtime.usage-ledger.tenant:confidential',
+      'runtime.usage-ledger.tenant:personal',
+    ]);
   });
 });

@@ -454,10 +454,12 @@ G1 の比較で見つかった門番の抜けを塞いだ。
   他 tenant に束縛された主体は、これらの tenant 区画を読み書きできなくなる。束縛の無い主体と
   同じ tenant の主体の挙動は変わらない。`surface-management` を使うのは tenant に束縛した
   管理画面のロール（confidential のみ）だけである。
-- `detectTier` が台帳の区画（`PARTITIONED_RUNTIME_LEDGER_ROOTS`）と `surface-management`
+- `detectTier` が権限の証跡を持つ台帳の区画（tenant ledger・tenant approvals・audit mirror）と `surface-management`
   の tier をパスから読むようにした（`storage-layout.ts` の `partitionedRuntimeTierInPath`）。
   これまで public と読んでいたため、provider への送信判定や git 公開判定が confidential の
   台帳区画を public 扱いしうる状態だった。判定はより厳しくなる方向だけに変わる。
+  使用量・実行指標の台帳は件数だけを持ち、利用側が public の分類を前提にしているので、
+  意図して従来の分類のまま残した（`storage-layout.ts` の `TIER_PARTITIONED_RUNTIME_ROOTS`）。
 
 `tests/tenant-store-guard-gaps.test.ts` は抜けの一覧から「抜けが無いこと」の検査に変わり、
 新しい抜けを失敗にする。主体の上限との比較でも、他 tenant の読み取りを門番が上限の外で
