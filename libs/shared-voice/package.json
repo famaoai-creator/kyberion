@@ -39,6 +39,10 @@
       "types": "./dist/tts-loopback-verifier.d.ts",
       "default": "./dist/tts-loopback-verifier.js"
     },
+    "./two-stage-barge-in": {
+      "types": "./dist/two-stage-barge-in.d.ts",
+      "default": "./dist/two-stage-barge-in.js"
+    },
     "./vad-turn-recorder": {
       "types": "./dist/vad-turn-recorder.d.ts",
       "default": "./dist/vad-turn-recorder.js"
