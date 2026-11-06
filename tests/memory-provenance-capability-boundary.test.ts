@@ -20,9 +20,8 @@ describeStoreGrantBoundary(
           'withMemoryProvenanceReadCapability',
         ],
       ],
-      ['libs/core/tier-guard.ts', ['memoryProvenanceReadDenial', 'isMemoryProvenanceStatePath']],
-      ['libs/core/tier-guard-store-grants.ts', ['memoryProvenanceGrantAllows']],
+      ['libs/core/tier-guard.ts', ['isMemoryProvenanceStatePath']],
     ]),
   },
-  { formerConsumers: ['libs/core/authority.ts'] }
+  { formerConsumers: ['libs/core/authority.ts', 'libs/core/tier-guard-store-grants.ts'] }
 );

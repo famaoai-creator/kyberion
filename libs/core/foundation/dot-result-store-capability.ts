@@ -2,6 +2,7 @@
 import * as path from 'node:path';
 import { isValidTenantSlug } from './scope.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from './runtime-state-roots.js';
+import { registerStoreGrant } from './store-grant-registry.js';
 import {
   createSynchronousResourceGrantIssuer,
   decideResourceAccess,
@@ -121,3 +122,10 @@ export function isDotResultStoreCapability(
   if (grant.binding.rootDir !== request.rootDir) return false;
   return decideResourceAccess(grant.scope, request.target, request.operation).allowed;
 }
+
+// G3: tier-guard asks these rules through the store grant registry, not by importing this module.
+registerStoreGrant({
+  id: 'dot-result',
+  authorizes: (target, operation, { rootDir, scope }) =>
+    isDotResultStoreCapability(scope, { rootDir, target, operation }),
+});

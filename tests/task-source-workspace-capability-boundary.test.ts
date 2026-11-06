@@ -10,12 +10,10 @@ const facade = 'libs/core/workforce/task-source-workspace-io.ts';
 const issuerName = 'withTaskSourceWorkspaceCapability';
 // Named, value-only consumers of the capability module and the names each may import.
 // G2: the window alone authorizes (no task_source_workspace role), so authority.ts no longer
-// imports it; the predicates are read by the tier-guard store-grant table (authorization)
-// and the narrow store denial (narrowing every I/O made inside a window).
+// imports it. G3: the module registers its authorization and narrowing rules with the store
+// grant registry, so neither the guard nor the narrow store denial imports it.
 const consumers = new Map<string, readonly string[]>([
   [facade, [issuerName, 'taskSourceWorkspaceIoActive']],
-  ['libs/core/tier-guard-store-grants.ts', ['taskSourceWorkspaceGrantAllows']],
-  ['libs/core/foundation/narrow-store-role-denial.ts', ['taskSourceWorkspaceIoDenial']],
 ]);
 
 function violations(relative: string, text: string): string[] {
@@ -147,18 +145,20 @@ describe('Task source workspace window trusted import boundary', () => {
           'presence/displays/concierge/app/api/foreign.ts',
         ])
           expect(violations(consumer, text).length, `${consumer}: ${text}`).toBeGreaterThan(0);
+      // G3: tier-guard asks the store grant registry, which the grant module registers into.
       expect(
         violations(
           'libs/core/tier-guard-store-grants.ts',
           `import {taskSourceWorkspaceGrantAllows} from '${target}';`
-        )
-      ).toEqual([]);
+        ).length
+      ).toBeGreaterThan(0);
+      // G3: tier-guard asks the store grant registry, which the grant module registers into.
       expect(
         violations(
           'libs/core/foundation/narrow-store-role-denial.ts',
           `import {taskSourceWorkspaceIoDenial} from '${target}';`
-        )
-      ).toEqual([]);
+        ).length
+      ).toBeGreaterThan(0);
       // The former role gate in authority.ts is gone; it, tier-guard and the
       // task source edit tool reach the window only through the facade.
       for (const former of [

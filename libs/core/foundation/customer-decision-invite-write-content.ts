@@ -1,5 +1,5 @@
 import { caseRecordCanonicalJson } from './customer-decision-milestone-capability.js';
-import type { WriteContent } from './customer-decision-write-content.js';
+import type { WriteContent } from './customer-decision-record-content.js';
 import { isRecord } from './primitives.js';
 import type { ResourceAccessOperation } from './resource-access-scope.js';
 import { isValidTenantSlug } from './scope.js';

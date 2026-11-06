@@ -28,15 +28,16 @@ describeStoreGrantBoundary(
         ['customerDecisionsRootDir', 'runInCustomerDecisionConsumerSweep'],
       ],
       ['libs/core/customer-decision/store.ts', ['taskProposalRelinkProblem']],
-      ['libs/core/tier-guard-store-grants.ts', ['customerDecisionConsumerGrantAllows']],
-      ['libs/core/foundation/narrow-store-role-denial.ts', ['customerDecisionConsumerGrantActive']],
-      [
-        'libs/core/foundation/customer-decision-write-content.ts',
-        ['customerDecisionConsumerWriteProblem'],
-      ],
     ]),
   },
-  { formerConsumers: ['libs/core/tier-guard.ts', 'libs/core/authority.ts'] }
+  {
+    formerConsumers: [
+      'libs/core/tier-guard.ts',
+      'libs/core/authority.ts',
+      'libs/core/tier-guard-store-grants.ts',
+      'libs/core/foundation/narrow-store-role-denial.ts',
+    ],
+  }
 );
 
 describeStoreGrantBoundary('Customer decision consumer grant facade trusted import boundary', {

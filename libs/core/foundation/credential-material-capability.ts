@@ -14,6 +14,7 @@ import {
   type ResourceAccessOperation,
   type ResourceAccessScope,
 } from './resource-access-scope.js';
+import { registerStoreGrant } from './store-grant-registry.js';
 
 /**
  * Issuance right of the credential material grant (G2). The former shared core role of this name
@@ -67,3 +68,9 @@ export function credentialMaterialGrantAllows(
   if (!under && !ancestor) return false;
   return decideResourceAccess(scope!, target, operation).allowed;
 }
+
+// G3: tier-guard asks this rule through the store grant registry, not by importing this module.
+registerStoreGrant({
+  id: 'credential-material',
+  authorizes: (target, operation) => credentialMaterialGrantAllows(target, operation),
+});

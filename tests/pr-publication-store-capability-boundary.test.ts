@@ -31,8 +31,9 @@ const boundaries: Boundary[] = [
       ['withPrPublicationBinding', [runtime]],
       ['withPrPublicationStoreGrant', [runtime]],
     ]),
-    // G2: the grant alone authorizes; tier-guard asks its predicates and the store-grant
-    // table asks the authority (authority.ts refuses the name through retired-store-roles).
+    // G2: the grant alone authorizes (authority.ts refuses the name through retired-store-roles).
+    // G3: the module registers its predicates with the store grant registry, so tier-guard and
+    // the store-grant table (gone) no longer import it.
     consumers: new Map([
       [
         runtime,
@@ -43,15 +44,6 @@ const boundaries: Boundary[] = [
           'withPrPublicationStoreGrant',
         ],
       ],
-      [
-        'libs/core/tier-guard.ts',
-        [
-          'prPublicationGrantTenant',
-          'prPublicationResourceAllowed',
-          'prPublicationStoreGrantActive',
-        ],
-      ],
-      ['libs/core/tier-guard-store-grants.ts', ['prPublicationGrantAuthorizes']],
     ]),
   },
   {
@@ -255,18 +247,19 @@ describe('PR publication grant trusted import boundary', () => {
       expect(
         violations('libs/core/index.ts', `export {currentPrPublicationScope} from '${governance}';`)
       ).toEqual([]);
+      // G3: the guard asks the store grant registry, which the grant module registers into.
       expect(
         violations(
           'libs/core/tier-guard.ts',
           `import {prPublicationStoreGrantActive, prPublicationResourceAllowed} from '${foundation}';`
-        )
-      ).toEqual([]);
+        ).length
+      ).toBeGreaterThan(0);
       expect(
         violations(
           'libs/core/tier-guard-store-grants.ts',
           `import {prPublicationGrantAuthorizes} from '${foundation}';`
-        )
-      ).toEqual([]);
+        ).length
+      ).toBeGreaterThan(0);
     }
   });
 });

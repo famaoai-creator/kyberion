@@ -16,8 +16,13 @@ describeStoreGrantBoundary(
         'libs/core/secret/credential-allocations.ts',
         ['withCredentialMaterialCapability', 'CREDENTIAL_MATERIAL_GRANT_ISSUANCE_RIGHT'],
       ],
-      ['libs/core/tier-guard-store-grants.ts', ['credentialMaterialGrantAllows']],
     ]),
   },
-  { formerConsumers: ['libs/core/tier-guard.ts', 'libs/core/authority.ts'] }
+  {
+    formerConsumers: [
+      'libs/core/tier-guard.ts',
+      'libs/core/authority.ts',
+      'libs/core/tier-guard-store-grants.ts',
+    ],
+  }
 );

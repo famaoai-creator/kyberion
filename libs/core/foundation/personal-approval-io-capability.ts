@@ -18,6 +18,7 @@
  * held there admitted nothing.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { registerStoreGrant } from './store-grant-registry.js';
 
 /**
  * Issuance right of the personal approval owner window (G2). The former shared core role of this
@@ -143,3 +144,15 @@ export function personalApprovalGrantAuthorizes(
     return false;
   return writeRootsCover(target) || (!isWrite(operation) && within(target, PRODUCT_READ_ROOT));
 }
+
+// G3: tier-guard asks these rules through the store grant registry, not by importing this module.
+registerStoreGrant({
+  id: 'personal-approval',
+  active: () => personalApprovalIoAllowed(),
+  authorizes: (target, operation) => personalApprovalGrantAuthorizes(target, operation),
+  pathAllowed: (target, operation) => personalApprovalIoAllowed(target, operation),
+  narrowing: ({ relativePath, operation }) =>
+    personalApprovalIoNarrowing(relativePath, operation)
+      ? null
+      : '[PERSONAL_APPROVAL_SCOPE_REQUIRED] Exact personal owner IO window required',
+});

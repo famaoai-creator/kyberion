@@ -20,8 +20,13 @@ describeStoreGrantBoundary(
           'withPipelineJournalCapability',
         ],
       ],
-      ['libs/core/tier-guard-store-grants.ts', ['pipelineJournalGrantAllows']],
     ]),
   },
-  { formerConsumers: ['libs/core/tier-guard.ts', 'libs/core/authority.ts'] }
+  {
+    formerConsumers: [
+      'libs/core/tier-guard.ts',
+      'libs/core/authority.ts',
+      'libs/core/tier-guard-store-grants.ts',
+    ],
+  }
 );

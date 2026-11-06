@@ -19,6 +19,7 @@ import { createHash } from 'node:crypto';
 import { runtimeStatePath, type RuntimeStateScope } from '../foundation/runtime-state-roots.js';
 import { isVitestProcess } from '../foundation/env.js';
 import { storageFloorRelativePath } from '../storage-layout.js';
+import { registerStoreGrant } from '../foundation/store-grant-registry.js';
 
 /**
  * Issuance right of the lineage read grant (G2). The former shared core role of this name is
@@ -157,3 +158,11 @@ export function memoryProvenanceGrantAllows(
   ];
   return roots.some((root) => target === root || target.startsWith(root + '/'));
 }
+
+// G3: tier-guard asks these rules through the store grant registry, not by importing this module.
+registerStoreGrant({
+  id: 'memory-provenance',
+  active: () => Boolean(liveBinding()),
+  authorizes: (target, operation) => memoryProvenanceGrantAllows(target, operation),
+  narrowing: ({ relativePath, operation }) => memoryProvenanceReadDenial(relativePath, operation),
+});

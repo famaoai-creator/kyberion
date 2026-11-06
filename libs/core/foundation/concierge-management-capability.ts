@@ -15,6 +15,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { innermostExecutionScopeIdentity } from './execution-scope.js';
+import { registerStoreGrant } from './store-grant-registry.js';
 
 export type ConciergeManagementGrantKind = 'reader' | 'writer';
 
@@ -99,3 +100,11 @@ export function conciergeManagementGrantKind(): ConciergeManagementGrantKind | u
     return undefined;
   return grant.kind;
 }
+
+// G3: the information asset coverage rule asks the live grant's kind through the store grant
+// registry, so the guard's dependencies do not import this module.
+registerStoreGrant({
+  id: 'concierge-management',
+  active: () => conciergeManagementGrantKind() !== undefined,
+  kind: conciergeManagementGrantKind,
+});
