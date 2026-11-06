@@ -16,3 +16,11 @@ export {
   mirrorStateFilePath,
 } from './mirror-session.js';
 export type { MirrorDaemonSessionOptions, MirrorSessionInfo } from './mirror-session.js';
+export {
+  ensureParentDir,
+  safeOrigin,
+  resolveObjectRef,
+  resolveAppProfile,
+  buildSessionHandoffArtifact,
+} from './mobile-runtime-helpers.js';
+export type { MobilePlatform } from './mobile-runtime-helpers.js';

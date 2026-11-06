@@ -3,7 +3,7 @@ import {
   buildSessionHandoffArtifact,
   ensureParentDir,
   resolveAppProfile,
-} from '@agent/core/mobile-runtime-helpers';
+} from '@agent/shared-mobile';
 import { resolveAxeBin, resolveXcrunBin } from '@agent/core/tool/tool-binary-resolvers';
 import {
   assertSafeRepositoryPath,

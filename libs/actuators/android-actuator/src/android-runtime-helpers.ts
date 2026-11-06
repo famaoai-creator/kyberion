@@ -3,7 +3,7 @@ import {
   buildSessionHandoffArtifact,
   ensureParentDir,
   resolveAppProfile,
-} from '@agent/core/mobile-runtime-helpers';
+} from '@agent/shared-mobile';
 import { decodeEntities } from '@agent/core/foundation/text-escaping';
 import {
   assertSafeRepositoryPath,
