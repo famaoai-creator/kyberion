@@ -3,10 +3,6 @@ import {
   personalApprovalIoAllowed,
 } from './foundation/personal-approval-io-capability.js';
 import {
-  isCustomerDecisionMilestoneCapability,
-  CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
-} from './foundation/customer-decision-milestone-capability.js';
-import {
   isArchivedMissionStateCapability,
   ARCHIVED_MISSION_STATE_READER_ROLE,
 } from './foundation/archived-mission-state-capability.js';
@@ -751,7 +747,6 @@ interface PreparedExecutionContext {
  */
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'credential_allocation_reader',
-  CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
   ARCHIVED_MISSION_STATE_READER_ROLE,
   'customer_channel_binding_store',
   'customer_decision_deal_note_writer',
@@ -813,14 +808,6 @@ function prepareExecutionContext(
       `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant issuance right, not an assumable role`
     );
   assertTenantBoundReaderScope(normalizedRole, tenantSlug);
-  if (
-    normalizedRole === CUSTOMER_DECISION_MILESTONE_STORE_ROLE &&
-    (!isCustomerDecisionMilestoneCapability(currentResourceAccessScope()) ||
-      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
-  )
-    throw new Error(
-      '[RESOURCE_SCOPE_REQUIRED] Customer decision milestone access requires its exact case capability'
-    );
   if (
     normalizedRole === ARCHIVED_MISSION_STATE_READER_ROLE &&
     (!isArchivedMissionStateCapability(currentResourceAccessScope()) ||

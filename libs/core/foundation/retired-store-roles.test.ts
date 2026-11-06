@@ -7,6 +7,7 @@ import { CREDENTIAL_MATERIAL_GRANT_ISSUANCE_RIGHT } from './credential-material-
 import { MEMORY_PROVENANCE_GRANT_ISSUANCE_RIGHT } from '../knowledge/memory-provenance-capability.js';
 import { PERSON_CHARTER_GRANT_ISSUANCE_RIGHT } from '../governance/person-charter-runtime.js';
 import { CUSTOMER_DECISION_CONSUMER_GRANT_ISSUANCE_RIGHT } from './customer-decision-consumer-capability.js';
+import { CUSTOMER_DECISION_MILESTONE_GRANT_ISSUANCE_RIGHT } from './customer-decision-milestone-capability.js';
 import { safeReadFile } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 
@@ -17,6 +18,7 @@ describe('retired store role names (G2)', () => {
         AUTONOMY_LEARNING_GRANT_ISSUANCE_RIGHT,
         CREDENTIAL_MATERIAL_GRANT_ISSUANCE_RIGHT,
         CUSTOMER_DECISION_CONSUMER_GRANT_ISSUANCE_RIGHT,
+        CUSTOMER_DECISION_MILESTONE_GRANT_ISSUANCE_RIGHT,
         MEMORY_PROVENANCE_GRANT_ISSUANCE_RIGHT,
         PERSON_CHARTER_GRANT_ISSUANCE_RIGHT,
         PIPELINE_JOURNAL_GRANT_ISSUANCE_RIGHT,

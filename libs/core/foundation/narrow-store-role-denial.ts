@@ -12,10 +12,10 @@ import { isCustomerDecisionInviteCapability } from './customer-decision-invite-c
 import { customerDecisionConsumerGrantActive } from './customer-decision-consumer-capability.js';
 import { customerDecisionInviteWriteDenial } from './customer-decision-invite-write-content.js';
 import {
-  CONTENT_CHECKED_ROLES,
   customerDecisionWriteContentDenial,
   type WriteContent,
 } from './customer-decision-write-content.js';
+import { customerDecisionMilestoneGrantActive } from './customer-decision-milestone-capability.js';
 import {
   CUSTOMER_CHANNEL_BINDING_STORE_ROLE,
   customerChannelBindingStorePathAllowed,
@@ -34,9 +34,8 @@ import {
  *     and may only append to the shared entries file;
  *   - `archived_mission_state_reader`: reads only under its exact capability;
  *   - `customer_channel_binding_store`: writes / mkdirs only the bindings file;
- *   - content-checked stores: every write inside a live consumer-lock grant
- *     (G2: no role) and every write of the milestone store role is checked
- *     against the record on disk;
+ *   - content-checked stores: every write inside a live consumer-lock or
+ *     milestone grant (G2: no role) is checked against the record on disk;
  *   - an active customer decision invite capability (G2: it replaced the
  *     `customer_decision_invite_store` role, whatever role the caller holds):
  *     writes / mkdirs only for a registered active tenant, except a
@@ -83,10 +82,18 @@ export function narrowStoreRoleDenial(input: {
     });
     if (inviteDenial) return inviteDenial;
   }
-  // G2: every write inside a live consumer-lock grant (no role) is content-checked.
-  if (operation === 'write' && customerDecisionConsumerGrantActive()) {
+  // G2: every write inside a live consumer-lock or milestone grant (no role) is content-checked.
+  const contentStore =
+    operation !== 'write'
+      ? undefined
+      : customerDecisionConsumerGrantActive()
+        ? ('consumer' as const)
+        : customerDecisionMilestoneGrantActive()
+          ? ('milestone' as const)
+          : undefined;
+  if (contentStore) {
     const contentDenial = customerDecisionWriteContentDenial(
-      'consumer',
+      contentStore,
       relativePath,
       input.content,
       input.scope?.metadataExact?.[0],
@@ -129,13 +136,5 @@ export function narrowStoreRoleDenial(input: {
       !isArchivedMissionStateCapability(input.scope))
   )
     return '[RESOURCE_SCOPE_REQUIRED] Archived mission state reads require their exact read-only capability';
-  if (operation === 'write' && CONTENT_CHECKED_ROLES.has(role))
-    return customerDecisionWriteContentDenial(
-      'milestone',
-      relativePath,
-      input.content,
-      input.scope?.metadataExact?.[0],
-      input.readRepoFile
-    );
   return null;
 }

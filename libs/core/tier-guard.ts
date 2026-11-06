@@ -17,10 +17,6 @@ import {
   isMemoryProvenanceStatePath,
 } from './knowledge/memory-provenance-capability.js';
 import { isCustomerDecisionInviteCapability } from './foundation/customer-decision-invite-capability.js';
-import {
-  isCustomerDecisionMilestoneCapability,
-  CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
-} from './foundation/customer-decision-milestone-capability.js';
 import { narrowStoreRoleDenial } from './foundation/narrow-store-role-denial.js';
 import { RETIRED_STORE_ROLE_NAMES } from './foundation/retired-store-roles.js';
 import { storeGrantAuthorizes } from './tier-guard-store-grants.js';
@@ -75,7 +71,6 @@ import { currentExecutionScope } from './foundation/execution-scope.js';
 import { informationAssetCoverageReadAllowed } from './foundation/information-asset-coverage-capability.js';
 import {
   currentResourceAccessScope,
-  decideResourceAccess,
   type ResourceAccessOperation,
 } from './foundation/resource-access-scope.js';
 import type {
@@ -909,20 +904,6 @@ function requestResourceDenial(
       allowed: false,
       reason: `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant issuance right, not a role`,
     };
-  // Old dedicated-store capability validators predate appendExact. An added append path
-  // cannot enlarge their original write or metadata ceiling, even under ambient grants.
-  // Their validators do not check name prefixes, so a prefix-carrying lookalike is refused.
-  const legacyStoreCapability = (valid: boolean): boolean => {
-    if (!valid) return false;
-    const scope = currentResourceAccessScope();
-    if (!scope) return false;
-    if ((scope.namePrefixExact?.length ?? 0) > 0) return false;
-    if (operation === 'append' || operation === 'metadata')
-      return denyCandidatePaths(relativePath).every(
-        (target) => decideResourceAccess({ ...scope, appendExact: [] }, target, operation).allowed
-      );
-    return true;
-  };
   // G2: a live lineage read grant (no role) narrows every I/O made inside it.
   const lineageDenial = memoryProvenanceReadDenial(relativePath, operation);
   if (lineageDenial) return { allowed: false, reason: lineageDenial };
@@ -955,15 +936,6 @@ function requestResourceDenial(
       allowed: false,
       reason:
         '[PERSON_CHARTER_RESOURCE_DENIED] Person charter IO requires its installed owner and exact resource capability',
-    };
-  if (
-    normalizedRole === CUSTOMER_DECISION_MILESTONE_STORE_ROLE &&
-    !legacyStoreCapability(isCustomerDecisionMilestoneCapability(currentResourceAccessScope()))
-  )
-    return {
-      allowed: false,
-      reason:
-        '[RESOURCE_SCOPE_REQUIRED] Customer decision milestone access requires its exact case capability',
     };
   const narrowDenial = narrowStoreRoleDenial({
     role: normalizedRole,
