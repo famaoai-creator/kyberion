@@ -2,10 +2,12 @@
 import * as path from 'node:path';
 import {
   createSynchronousResourceGrantIssuer,
+  decideResourceAccess,
   type ResourceAccessScope,
 } from './resource-access-scope.js';
 import { isValidTenantSlug } from './scope.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from './runtime-state-roots.js';
+import { registerStoreGrant } from './store-grant-registry.js';
 
 /**
  * Issuance right of the Discussion request grant (G2). The former store role of this name is
@@ -117,3 +119,14 @@ export function isDiscussionRequestCapability(scope: ResourceAccessScope | undef
     return false;
   }
 }
+
+// G3: tier-guard asks these rules through the store grant registry, not by importing this module.
+// Its issuer-frozen ceiling (the two records of one request; read-only recovery has no write or
+// mkdir) has no append, metadata or name-prefix grant to enlarge.
+registerStoreGrant({
+  id: 'discussion-request',
+  authorizes: (target, operation, { scope }) =>
+    !!scope &&
+    isDiscussionRequestCapability(scope) &&
+    decideResourceAccess(scope, target, operation).allowed,
+});
