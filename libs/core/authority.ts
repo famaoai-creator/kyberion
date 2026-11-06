@@ -1,4 +1,3 @@
-import { isCredentialMaterialCapability } from './foundation/credential-material-capability.js';
 import {
   PERSONAL_APPROVAL_STORE_ROLE,
   personalApprovalIoAllowed,
@@ -762,7 +761,6 @@ interface PreparedExecutionContext {
  */
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'credential_allocation_reader',
-  'credential_material_reader',
   CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
   CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
   ARCHIVED_MISSION_STATE_READER_ROLE,
@@ -826,12 +824,6 @@ function prepareExecutionContext(
       `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant issuance right, not an assumable role`
     );
   assertTenantBoundReaderScope(normalizedRole, tenantSlug);
-  if (
-    normalizedRole === 'credential_material_reader' &&
-    (!isCredentialMaterialCapability(currentResourceAccessScope()) ||
-      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
-  )
-    throw new Error('[CREDENTIAL_CAPABILITY_REQUIRED] Admitted exact credential read required');
   if (normalizedRole === MEMORY_PROVENANCE_READER_ROLE) {
     const capability = currentMemoryProvenanceReadCapability();
     const activeTenant = resolveIdentityContext().tenantSlug;

@@ -3,6 +3,7 @@ import { RETIRED_STORE_ROLE_NAMES } from './retired-store-roles.js';
 import { AUTONOMY_LEARNING_GRANT_ISSUANCE_RIGHT } from './autonomy-learning-capability.js';
 import { PR_PUBLICATION_GRANT_ISSUANCE_RIGHT } from './pr-publication-store-capability.js';
 import { PIPELINE_JOURNAL_GRANT_ISSUANCE_RIGHT } from './pipeline-journal-capability.js';
+import { CREDENTIAL_MATERIAL_GRANT_ISSUANCE_RIGHT } from './credential-material-capability.js';
 import { safeReadFile } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 
@@ -11,6 +12,7 @@ describe('retired store role names (G2)', () => {
     expect([...RETIRED_STORE_ROLE_NAMES].sort()).toEqual(
       [
         AUTONOMY_LEARNING_GRANT_ISSUANCE_RIGHT,
+        CREDENTIAL_MATERIAL_GRANT_ISSUANCE_RIGHT,
         PIPELINE_JOURNAL_GRANT_ISSUANCE_RIGHT,
         PR_PUBLICATION_GRANT_ISSUANCE_RIGHT,
       ].sort()
