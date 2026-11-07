@@ -331,21 +331,6 @@ export * from './subagent-prompt-framing.js';
 export * from './provider/claude-native-subagent.js';
 
 export {
-  buildBridgeErrorReplyText,
-  buildBridgeEmptyReplyText,
-  shouldPostBridgeError,
-  resetBridgeErrorRateLimiter,
-  postBridgeError,
-  chunkBridgeMessage,
-  chunkSurfaceMessage,
-  getSurfaceCapability,
-  listSurfaceCapabilities,
-  isSurfaceFormatError,
-  stripSurfaceMarkup,
-  sendSurfaceTextWithFallback,
-} from './bridge-error-reply.js';
-
-export {
   recordConfigFallback,
   listFallbacks,
   markResolved,

@@ -15,6 +15,10 @@
       "types": "./dist/backchannel-policy.d.ts",
       "default": "./dist/backchannel-policy.js"
     },
+    "./bridge-error-reply": {
+      "types": "./dist/bridge-error-reply.d.ts",
+      "default": "./dist/bridge-error-reply.js"
+    },
     "./conversation-engine": {
       "types": "./dist/conversation-engine.d.ts",
       "default": "./dist/conversation-engine.js"

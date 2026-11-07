@@ -728,10 +728,6 @@
       "types": "./dist/brand-tokens.d.ts",
       "default": "./dist/brand-tokens.js"
     },
-    "./bridge-error-reply": {
-      "types": "./dist/bridge-error-reply.d.ts",
-      "default": "./dist/bridge-error-reply.js"
-    },
     "./bridge-poll-loop": {
       "types": "./dist/bridge-poll-loop.d.ts",
       "default": "./dist/bridge-poll-loop.js"
