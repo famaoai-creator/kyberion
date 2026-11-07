@@ -38,6 +38,7 @@ export function archivedMissionStateCapability(
 export function isArchivedMissionStateCapability(scope: ResourceAccessScope | undefined): boolean {
   if (
     !scope ||
+    (scope.custody !== undefined && scope.custody.kind !== 'tenant') ||
     scope.organizationId ||
     scope.projectId ||
     scope.allowProductKnowledgeRead !== true ||
