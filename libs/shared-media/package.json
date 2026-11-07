@@ -24,6 +24,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./deck-theme-direction": {
+      "types": "./dist/deck-theme-direction.d.ts",
+      "default": "./dist/deck-theme-direction.js"
+    },
     "./document-contents-policy": {
       "types": "./dist/document-contents-policy.d.ts",
       "default": "./dist/document-contents-policy.js"
@@ -103,6 +107,10 @@
     "./image-reference-consent": {
       "types": "./dist/image-reference-consent.d.ts",
       "default": "./dist/image-reference-consent.js"
+    },
+    "./legacy-media-ops": {
+      "types": "./dist/legacy-media-ops.d.ts",
+      "default": "./dist/legacy-media-ops.js"
     },
     "./media-aws-icon-rules": {
       "types": "./dist/media-aws-icon-rules.d.ts",
@@ -284,6 +292,14 @@
       "types": "./dist/native-xlsx-engine/worksheet.d.ts",
       "default": "./dist/native-xlsx-engine/worksheet.js"
     },
+    "./spreadsheet-style-policy": {
+      "types": "./dist/spreadsheet-style-policy.d.ts",
+      "default": "./dist/spreadsheet-style-policy.js"
+    },
+    "./tracker-sheet-policy": {
+      "types": "./dist/tracker-sheet-policy.d.ts",
+      "default": "./dist/tracker-sheet-policy.js"
+    },
     "./video-generation/admission": {
       "types": "./dist/video-generation/admission.d.ts",
       "default": "./dist/video-generation/admission.js"
@@ -323,6 +339,10 @@
     "./video-generation/types": {
       "types": "./dist/video-generation/types.d.ts",
       "default": "./dist/video-generation/types.js"
+    },
+    "./visual-workflow-compiler": {
+      "types": "./dist/visual-workflow-compiler.d.ts",
+      "default": "./dist/visual-workflow-compiler.js"
     }
   }
 }

@@ -795,6 +795,10 @@ this contract; a faster Linux run alone is not evidence that macOS CI passed.
   A subpath-count baseline does not prove those files exist. Run the workspace
   build contract (`registration-tests`) and the full runtime import contract;
   never recreate a deleted implementation just to satisfy an old alias path.
+  After moving or removing package sources, run the canonical clean `pnpm build`
+  before checking built ownership: incremental package builds can leave the old
+  `.js`, `.d.ts` and source maps behind. Keep the workspace contract's negative
+  assertions for retired outputs as well as its checks of the new targets.
 - Shared seam mechanisms must remain real in boundary tests. Use a partial mock
   with `createSeamCatalog()` to isolate registration state, rather than copying
   the seam API into a hand-written mock that omits new lifecycle helpers or
@@ -835,6 +839,14 @@ this contract; a faster Linux run alone is not evidence that macOS CI passed.
   `active/shared/runtime`. Leave each store's domain/tier/tenant directories
   absent so its bounded facade must create them; precreating those directories
   would hide a first-use capability failure.
+- Strict snapshot fixtures must bind each process's trusted root to their owned
+  fixture, including resumed children, and assert selected/primary root agreement.
+  Snapshot checks include ancestor namespace metadata up to that root: unrelated
+  creation or removal under shared scratch can correctly reject an otherwise
+  stable leaf. Keep the ancestor checks and real policy/schema inputs; isolate
+  the trusted namespace rather than retrying a rejected snapshot or mocking the
+  guard. `dot-event-continuation.test.ts` retains the 2001-event durable resume
+  and duplicate-effect checks under this boundary.
 - Content-leak oracles must scan every public output floor of their owned fixture,
   including its scratch and mission files, rather than another suite's checkout
   under shared scratch. Keep canonical directory errors visible; do not swallow

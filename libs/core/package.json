@@ -1216,10 +1216,6 @@
       "types": "./dist/decision-rights.d.ts",
       "default": "./dist/decision-rights.js"
     },
-    "./deck-theme-direction": {
-      "types": "./dist/deck-theme-direction.d.ts",
-      "default": "./dist/deck-theme-direction.js"
-    },
     "./delegated-task-observability": {
       "types": "./dist/delegated-task-observability.d.ts",
       "default": "./dist/delegated-task-observability.js"
@@ -2599,10 +2595,6 @@
     "./ledger": {
       "types": "./dist/ledger.d.ts",
       "default": "./dist/ledger.js"
-    },
-    "./legacy-media-ops": {
-      "types": "./dist/legacy-media-ops.d.ts",
-      "default": "./dist/legacy-media-ops.js"
     },
     "./lifecycle-hook-engine": {
       "types": "./dist/lifecycle-hook-engine.d.ts",
@@ -5956,10 +5948,6 @@
       "types": "./dist/voice/speech-to-text-bridge.d.ts",
       "default": "./dist/voice/speech-to-text-bridge.js"
     },
-    "./spreadsheet-style-policy": {
-      "types": "./dist/spreadsheet-style-policy.d.ts",
-      "default": "./dist/spreadsheet-style-policy.js"
-    },
     "./src/actuator-capability": {
       "types": "./dist/actuator/actuator-capability.d.ts",
       "default": "./dist/actuator/actuator-capability.js"
@@ -6728,10 +6716,6 @@
       "types": "./dist/analysis/trace-schema.d.ts",
       "default": "./dist/analysis/trace-schema.js"
     },
-    "./tracker-sheet-policy": {
-      "types": "./dist/tracker-sheet-policy.d.ts",
-      "default": "./dist/tracker-sheet-policy.js"
-    },
     "./training-catalog": {
       "types": "./dist/training-catalog.d.ts",
       "default": "./dist/training-catalog.js"
@@ -7079,10 +7063,6 @@
     "./visual-review-loop": {
       "types": "./dist/visual-review-loop.d.ts",
       "default": "./dist/visual-review-loop.js"
-    },
-    "./visual-workflow-compiler": {
-      "types": "./dist/visual-workflow-compiler.d.ts",
-      "default": "./dist/visual-workflow-compiler.js"
     },
     "./vocabulary-catalog": {
       "types": "./dist/knowledge/vocabulary-catalog.d.ts",

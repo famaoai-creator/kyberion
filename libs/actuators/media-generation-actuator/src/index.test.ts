@@ -99,8 +99,8 @@ vi.mock('@agent/shared-media/music-workflow-compiler', async (importOriginal) =>
   compileMusicGenerationADF: mocks.compileMusicGenerationADF,
 }));
 
-vi.mock('@agent/core/visual-workflow-compiler', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/visual-workflow-compiler')>()),
+vi.mock('@agent/shared-media/visual-workflow-compiler', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/shared-media/visual-workflow-compiler')>()),
   compileImageGenerationADF: mocks.compileImageGenerationADF,
   compileVideoGenerationADF: mocks.compileVideoGenerationADF,
 }));

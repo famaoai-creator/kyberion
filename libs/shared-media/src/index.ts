@@ -80,3 +80,19 @@ export {
   pptxToMarkdown,
   DOCX_IMAGE_MARKER,
 } from './media-contracts.js';
+
+export * from './deck-theme-direction.js';
+
+export {
+  compileImageGenerationADF,
+  compileVideoGenerationADF,
+} from './visual-workflow-compiler.js';
+
+export { isLegacyMediaOp, loadLegacyMediaOpsCatalog } from './legacy-media-ops.js';
+
+export {
+  loadSpreadsheetStylePolicyCatalog,
+  resolveSpreadsheetStyleIndex,
+} from './spreadsheet-style-policy.js';
+
+export { loadTrackerSheetPolicyCatalog } from './tracker-sheet-policy.js';

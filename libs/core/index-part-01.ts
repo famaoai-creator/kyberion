@@ -317,8 +317,6 @@ export * from './workforce/artifact-verification.js';
 export * from './training-catalog.js';
 export * from './hearing-scenario-catalog.js';
 
-export * from './deck-theme-direction.js';
-
 export * from './semantic-decide.js';
 
 export * from './observation-distill.js';
