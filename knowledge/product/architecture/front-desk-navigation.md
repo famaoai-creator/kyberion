@@ -26,7 +26,7 @@ The shared catalog in [front-desk-nav.ts](../../../libs/core/front-desk-nav.ts) 
 | Materials and learning | Import materials    | Concierge /ingest                 | operator                |
 | Materials and learning | Knowledge           | Chronos /?section=knowledge       | viewer                  |
 | Materials and learning | Discussion          | Chronos /?section=discussion      | viewer                  |
-| Materials and learning | First job           | Presence Studio /first-job        | approver                |
+| Materials and learning | First job           | Concierge /first-job              | approver                |
 | Materials and learning | Help and training   | Presence Studio /help             | viewer                  |
 | Management             | Organization editor | Concierge /management             | owner                   |
 | Management             | Agent operations    | Chronos /?section=operations      | owner                   |

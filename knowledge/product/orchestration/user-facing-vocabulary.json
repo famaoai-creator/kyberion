@@ -32173,21 +32173,6 @@
         "ja": "準備状況",
         "qps-ploc": "⟦Ẇħȧŧ ïş řėȧḓẏ? ŀőřė⟧"
       },
-      "first_job_identity_unknown": {
-        "en": "Identity setup: not checked by this diagnostic.",
-        "ja": "利用者の基本設定：この診断では未確認です。",
-        "qps-ploc": "⟦Ïḓėñŧïŧẏ şėŧůṗ: ñőŧ ƈħėƈķėḓ ƀẏ ŧħïş ḓïȧɠñőşŧïƈ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
-      },
-      "first_job_baseline_unknown": {
-        "en": "Environment baseline: not checked by this diagnostic.",
-        "ja": "環境の基本チェック：この診断では未確認です。",
-        "qps-ploc": "⟦Ėñṽïřőñɱėñŧ ƀȧşėŀïñė: ñőŧ ƈħėƈķėḓ ƀẏ ŧħïş ḓïȧɠñőşŧïƈ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
-      },
-      "first_job_reasoning_unknown": {
-        "en": "External AI readiness: not checked and not needed for this job.",
-        "ja": "外部AIの準備状況：未確認です。この仕事には不要です。",
-        "qps-ploc": "⟦Ėẋŧėřñȧŀ ȦÏ řėȧḓïñėşş: ñőŧ ƈħėƈķėḓ ȧñḓ ñőŧ ñėėḓėḓ ƒőř ŧħïş ĵőƀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
-      },
       "first_job_loading": {
         "en": "Checking the saved diagnostic setup…",
         "ja": "保存済みの診断設定を確認中…",
@@ -32577,11 +32562,6 @@
         "en": "Local public diagnostic receipt",
         "ja": "ローカルの公開用診断記録",
         "qps-ploc": "⟦Ŀőƈȧŀ ṗůƀŀïƈ ḓïȧɠñőşŧïƈ řėƈėïṗŧ ŀőřėɱ ïṗşů⟧"
-      },
-      "first_job_approval_expires": {
-        "en": "Approval expires",
-        "ja": "承認依頼の有効期限",
-        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ėẋṗïřėş ŀőřėɱ⟧"
       },
       "first_job_approval_payload_digest": {
         "en": "Exact diagnostic payload digest",
@@ -33357,6 +33337,21 @@
         "en": "Preparation could not be checked. Read the error below and try Refresh; do not assume a previous request failed or send it again.",
         "ja": "準備状況を確認できませんでした。下のエラーを確認し、「再確認」を試してください。前の依頼が失敗したと決めつけたり、再送したりしないでください。",
         "qps-ploc": "⟦Ṗřėṗȧřȧŧïőñ ƈőůŀḓ ñőŧ ƀė ƈħėƈķėḓ. Řėȧḓ ŧħė ėřřőř ƀėŀőẇ ȧñḓ ŧřẏ Řėƒřėşħ; ḓő ñőŧ ȧşşůɱė ȧ ṗřėṽïőůş řėɋůėşŧ ƒȧïŀėḓ őř şėñḓ ïŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
+      },
+      "first_job_access_denied": {
+        "en": "This guide is only for the owner of this computer, signed in on this computer. Sign in as the owner, or open it on the computer itself. Nothing was sent.",
+        "ja": "このガイドは、このコンピューターの所有者が、このコンピューター上でサインインしているときだけ使えます。所有者としてサインインするか、このコンピューター本体で開いてください。何も送信していません。",
+        "qps-ploc": "⟦Ŧħïş ɠůïḓė ïş őñŀẏ ƒőř ŧħė őẇñėř őƒ ŧħïş ƈőɱṗůŧėř, şïɠñėḓ ïñ őñ ŧħïş ƈőɱṗůŧėř. Şïɠñ ïñ ȧş ŧħė őẇñėř, őř őṗėñ ïŧ őñ ŧħė ƈőɱṗůŧėř ïŧşėŀƒ. Ñőŧħïñɠ ẇȧş şėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőř⟧"
+      },
+      "first_job_rate_limited": {
+        "en": "Too many requests in a short time, so nothing was sent. Wait a moment, refresh, then try again.",
+        "ja": "短時間に操作が多すぎたため、何も送信していません。少し待ってから再確認し、もう一度お試しください。",
+        "qps-ploc": "⟦Ŧőő ɱȧñẏ řėɋůėşŧş ïñ ȧ şħőřŧ ŧïɱė, şő ñőŧħïñɠ ẇȧş şėñŧ. Ẇȧïŧ ȧ ɱőɱėñŧ, řėƒřėşħ, ŧħėñ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "first_job_origin_denied": {
+        "en": "This action did not come from this page, so nothing was sent. Reload the page and try again.",
+        "ja": "このページからの操作ではなかったため、何も送信していません。ページを再読み込みしてからやり直してください。",
+        "qps-ploc": "⟦Ŧħïş ȧƈŧïőñ ḓïḓ ñőŧ ƈőɱė ƒřőɱ ŧħïş ṗȧɠė, şő ñőŧħïñɠ ẇȧş şėñŧ. Řėŀőȧḓ ŧħė ṗȧɠė ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
       },
       "workspace_destination_loading": {
         "en": "Checking available workspaces for this destination. Stay here to cancel without changing your current scope.",

@@ -130,10 +130,11 @@ export const FRONT_DESK_LINKED_DESTINATIONS: readonly FrontDeskMenuItem[] = [
     icon: 'chat',
   },
   {
+    // 初めての仕事 is a Concierge page (Kyberion server phase 2).
     id: 'first-job',
     label_key: 'front_desk:nav_first_job',
     sublabel_key: 'front_desk:nav_first_job_sub',
-    surface: 'presence-studio',
+    surface: 'concierge',
     path: '/first-job',
     min_role: 'approver',
     group_key: 'front_desk:nav_group_resources',
