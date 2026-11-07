@@ -14,6 +14,8 @@ Viewer の person IDs と tenant allowlist は認証済み server context から
 
 本人への表示と同じ tenant の他メンバーへの表示は区別する。他メンバーの graph node を許可した場合も、viewer の範囲外の tenant 所属・役割は返さない。owner / audience の制約は shell と MCP の両 reader で検証する。
 
+reader で許可したレコードを queue card に変換するときも owner / audience を保持する。helper 単体だけでなく、実 reader の結果を queue builder に渡し、tenant を持つ本人の owner-only card と audience の共有 card が残り、他人や明示 tenant 選択では除外されることを確認する。
+
 変更時は surface authorization / workspace graph / needs-you sources と Concierge の discussion・memory・distill scope テストを実行する。public-only viewer、permission がない viewer、本人、同じ tenant の他人、未知の principal、および明示 tenant 選択で owner/system レコードが除外されるケースを含める。
 
 ## 所在を登録する
