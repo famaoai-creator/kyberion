@@ -82,26 +82,40 @@ export function HelpPage({ links, trackId }: { links: HelpLinks; trackId: string
       const response = await fetch(url, { cache: 'no-store' });
       return { ok: response.ok, body: await response.json().catch(() => null) };
     };
-    void Promise.allSettled([
-      read('/api/training/catalog'),
-      read('/api/training/me'),
-      read(`/api/front-desk/nav?locale=${locale}`),
-    ]).then(([catalog, own, nav]) => {
-      if (!live) return;
-      const tracks =
-        catalog.status === 'fulfilled' && catalog.value.ok
-          ? parseHelpCatalog(catalog.value.body)
-          : null;
-      setLoad(tracks ? { state: 'ready', tracks } : { state: 'failed' });
-      if (own.status === 'fulfilled' && own.value.ok && !marked.current) {
-        setProgress(parseHelpProgress(own.value.body));
+    void Promise.allSettled([read('/api/training/catalog'), read('/api/training/me')]).then(
+      ([catalog, own]) => {
+        if (!live) return;
+        const tracks =
+          catalog.status === 'fulfilled' && catalog.value.ok
+            ? parseHelpCatalog(catalog.value.body)
+            : null;
+        setLoad(tracks ? { state: 'ready', tracks } : { state: 'failed' });
+        if (own.status === 'fulfilled' && own.value.ok && !marked.current) {
+          setProgress(parseHelpProgress(own.value.body));
+        }
       }
-      if (nav.status === 'fulfilled' && nav.value.ok) setAccess(parseHelpAccess(nav.value.body));
-    });
+    );
     return () => {
       live = false;
     };
-  }, [locale]);
+  }, []);
+
+  // Access follows the selected tenant, exactly as the rail asks for it.
+  React.useEffect(() => {
+    let live = true;
+    const url = withSelectedTenant(`/api/front-desk/nav?locale=${locale}`, scope.tenant || null);
+    void fetch(url, { cache: 'no-store' })
+      .then(async (response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (live && body) setAccess(parseHelpAccess(body));
+      })
+      .catch(() => {
+        /* access stays unknown; each destination enforces its own role */
+      });
+    return () => {
+      live = false;
+    };
+  }, [locale, scope.tenant]);
 
   const markDone = async (lessonId: string) => {
     setMarks((current) => ({ ...current, [lessonId]: { state: 'saving' } }));

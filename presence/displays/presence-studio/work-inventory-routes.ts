@@ -35,8 +35,7 @@ import { hearingNamespace } from './hearing-runtime.js';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
 
 // WI-11: exactly the `front_desk` keys `static/progress.js` renders for the
-// "業務の自動化候補" panel. Mirrors `TRAINING_VOCABULARY_KEYS` in
-// `training-routes.ts` — its own `/api/work-inventory-vocabulary` endpoint
+// "業務の自動化候補" panel, served by its own `/api/work-inventory-vocabulary` endpoint
 // (same read-only, viewer-scoped, no client-supplied widening shape as
 // `/api/progress-vocabulary`) rather than extending `PROGRESS_VOCABULARY_KEYS`
 // (owned by the FD-05 route split).
@@ -257,8 +256,7 @@ export function registerWorkInventoryRoutes(app: express.Express): void {
   });
 
   // WI-11: exactly the `front_desk` keys `static/progress.js`'s
-  // work-inventory panel renders. Mirrors `/api/training/vocabulary` /
-  // `/api/progress-vocabulary`'s shape.
+  // work-inventory panel renders. Same shape as `/api/progress-vocabulary`.
   app.get('/api/work-inventory-vocabulary', (req, res) => {
     const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
     const texts = Object.fromEntries(
