@@ -16,6 +16,7 @@ import { createLogger } from '../logger.js';
 import { nowIso } from './time.js';
 import { pathResolver } from '../path-resolver.js';
 import { isVitestProcess } from './env.js';
+import { registerAuditIoConsumer } from './deferrable-audit-sink.js';
 
 const logger = createLogger('lock-utils');
 
@@ -56,6 +57,18 @@ export function registerLockIo(io: LockIo | undefined): LockIo | undefined {
   lockIo = io;
   return previous;
 }
+
+// Symmetric registration through the sink: secure-io publishes the guarded
+// adapter on this channel whether this module loads before or after it.
+// In vitest the only legitimate adapter is the suite's own fixture — a
+// process-provided one would write locks into the real repo tree.
+registerAuditIoConsumer('lockIo', (io) => {
+  if (isVitestProcess()) {
+    lockIo ??= testLockIo();
+    return;
+  }
+  registerLockIo(io as LockIo);
+});
 
 function requireLockIo(): LockIo {
   lockIo ||= testLockIo();

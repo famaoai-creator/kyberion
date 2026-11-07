@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { registerAuditIoConsumer } from './foundation/deferrable-audit-sink.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
@@ -28,6 +29,17 @@ function testChainIntegrityIo(): ChainIntegrityIo | undefined {
 export function registerChainIntegrityIo(io: ChainIntegrityIo): void {
   chainIo = io;
 }
+
+// Symmetric registration through the sink: secure-io publishes the guarded
+// adapter on this channel whether this module loads before or after it.
+// In vitest the only legitimate adapter is the suite's own fixture.
+registerAuditIoConsumer('chainIntegrityIo', (io) => {
+  if (isVitestProcess()) {
+    chainIo ??= testChainIntegrityIo();
+    return;
+  }
+  registerChainIntegrityIo(io as ChainIntegrityIo);
+});
 
 export const GENESIS_HASH = '0'.repeat(64);
 
