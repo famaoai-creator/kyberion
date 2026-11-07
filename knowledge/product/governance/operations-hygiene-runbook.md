@@ -3189,6 +3189,14 @@ checks do not provide an atomic conditional rename against an arbitrary external
 The derivation receipt authority contract and adversarial derivation/offboarding tests
 enforce these boundaries, including aggregate rename/removal of the receipt directory.
 
+Operator offboarding must use the scope-limited lineage query, not a producer-role wrapper.
+The query authorizes the requested tenant's index through ordinary policy before testing
+existence, reads the exact system receipt file through a synchronous private store grant,
+revokes that grant before planning, and returns only the requested custodian's derived paths.
+Raw receipt reads remain producer-only. Test the ordinary operator identity with an
+unrelated receipt present, a foreign-tenant denial, raw-read denial and grant revocation;
+mocked offboarding I/O alone cannot establish this entrypoint's usability or isolation.
+
 ## Intake extension CI checks
 
 When adding a service operation, validate the shipped discovery count and service-harness operation inventory together with the exact kind/risk/approval assertions. Registry-overlay fixtures must assert the shipped exact declarations as well as the mutation fallback. For boundary tests, partially mock shared path resolvers so new legitimate imports retain their real APIs; a minimal hand-built resolver can fail during module initialization before the tested gate runs. Run the impacted existing tests in addition to the extension fixtures. For single-use admission capabilities, compare private in-memory snapshots of request and configuration values. Do not send credential-bearing configuration into hash or HMAC APIs: keyed fast hashes still trigger password-hashing checks and are unnecessary when the capability's private WeakMap already supplies the trust boundary. Never log or persist these snapshots.

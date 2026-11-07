@@ -38,7 +38,11 @@ import { withLockSync } from '../foundation/lock-utils.js';
 import { nowIso } from '../foundation/time.js';
 import { KNOWLEDGE_TIER_RANK } from '../foundation/knowledge-tier.js';
 import type { KnowledgeTier } from '../foundation/knowledge-tier.js';
-import { detectTier } from '../tier-guard.js';
+import { detectTier, validateReadPermission } from '../tier-guard.js';
+import {
+  currentAssetDerivationReceiptSnapshot,
+  withAssetDerivationReceiptSnapshot,
+} from './asset-derivation-read-capability.js';
 import { isValidTenantSlug, isValidMemberId } from '../foundation/scope.js';
 import { COMMON_TENANT_SLUG } from './ingest-asset-ledger.js';
 import { tenantOfPath } from '../governance/path-tenant-attribution.js';
@@ -767,6 +771,11 @@ function readLedger(
   custody: DerivationCustody,
   options: DerivationPathOptions
 ): AssetDerivationRecord[] {
+  const snapshot = currentAssetDerivationReceiptSnapshot(rootOf(options));
+  if (snapshot)
+    return snapshot
+      .filter((entry) => custodyEquals(entry.partition, custody))
+      .map((entry) => entry.record);
   const file = ledgerPath(custody, options);
   if (options.strictLineage) {
     assertRepoRelative(`${custodyPartition(custody)}/${DERIVATIONS_FILENAME}`, options);
@@ -1057,6 +1066,8 @@ interface LedgerEntry {
  * under-delete, never delete-overreach).
  */
 function recordsAllCustodians(options: DerivationPathOptions): LedgerEntry[] {
+  const snapshot = currentAssetDerivationReceiptSnapshot(rootOf(options));
+  if (snapshot) return snapshot;
   const root = path.join(rootOf(options), DERIVATION_LEDGER_ROOT);
   if (!safeExistsSync(root)) return [];
   const partitions: DerivationCustody[] = [{ kind: 'system' }];
@@ -1210,6 +1221,40 @@ export function listHonoredDerivedPathsForCustodian(
   custody: DerivationCustody,
   options: DerivationPathOptions = {}
 ): string[] {
+  const root = path.resolve(rootOf(options));
+  const canonical = root === path.resolve(pathResolver.rootDir());
+  const producer = ['mission_controller', 'knowledge_steward', 'chronos_gateway'].includes(
+    resolveRole() ?? ''
+  );
+  if ((!canonical || custody.kind !== 'tenant') && !producer)
+    throw new Error(
+      '[DERIVATION_READ_SCOPE] noncanonical, personal and system lineage queries require producer authority'
+    );
+  const bound =
+    custody.kind === 'system'
+      ? { kind: 'system' as const }
+      : custody.kind === 'tenant'
+        ? { kind: 'tenant' as const, ref: custody.ref }
+        : { kind: 'person' as const, ...(custody.ref ? { ref: custody.ref } : {}) };
+  const strict = { rootDir: root, strictLineage: true };
+  const permission = validateReadPermission(ledgerPath(bound, strict));
+  if (!permission.allowed)
+    throw new Error(`[DERIVATION_READ_SCOPE] own lineage index denied: ${permission.reason}`);
+  const own = readLedger(bound, strict);
+  return withAssetDerivationReceiptSnapshot(
+    root,
+    bound,
+    own,
+    () => readLedger({ kind: 'system' }, strict),
+    () => listHonoredDerivedPathsInSnapshot(bound, strict),
+    canonical
+  );
+}
+
+function listHonoredDerivedPathsInSnapshot(
+  custody: DerivationCustody,
+  options: DerivationPathOptions
+): string[] {
   const strict = { ...options, strictLineage: true };
   const entries = recordsAllCustodians(strict);
   const targets = new Set<string>();
@@ -1219,9 +1264,11 @@ export function listHonoredDerivedPathsForCustodian(
       !custodyEquals(entry.partition, custody) &&
       !(
         entry.partition.kind === 'system' &&
-        inheritedRecordSources(entry.record, strict, entries, new Set()).some((source) =>
-          custodyEquals(source.custody, custody)
-        )
+        (custody.kind === 'tenant'
+          ? entry.record.taint.tenants.includes(custody.ref)
+          : inheritedRecordSources(entry.record, strict, entries, new Set()).some((source) =>
+              custodyEquals(source.custody, custody)
+            ))
       )
     )
       continue;
