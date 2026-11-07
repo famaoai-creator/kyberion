@@ -294,6 +294,46 @@ describe('Workspace build contract', () => {
     }
   });
 
+  it('keeps bridge error replies in shared-interaction with its satellite consumers', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const interaction = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-interaction/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./bridge-error-reply']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/bridge-error-reply.ts'))).toBe(false);
+    expect(interaction.exports['./bridge-error-reply']).toEqual({
+      types: './dist/bridge-error-reply.d.ts',
+      default: './dist/bridge-error-reply.js',
+    });
+    for (const satellite of [
+      'discord-bridge',
+      'imessage-bridge',
+      'slack-bridge',
+      'telegram-bridge',
+    ]) {
+      const manifest = JSON.parse(
+        safeReadFile(path.join(rootDir, `satellites/${satellite}/package.json`), {
+          encoding: 'utf8',
+        }) as string
+      );
+      expect(manifest.dependencies['@agent/shared-interaction']).toBe('workspace:*');
+    }
+    // Error classification, vocabulary rendering, rate limiting, and runtime
+    // control policy stay in core; only the presentation helpers moved.
+    for (const subpath of [
+      './error-classifier',
+      './ux-vocabulary',
+      './foundation/rate-limit',
+      './runtime-control-policy',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
   it('keeps the desktop AX bridge in shared-perception with its system-actuator consumer', () => {
     const core = JSON.parse(
       safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
