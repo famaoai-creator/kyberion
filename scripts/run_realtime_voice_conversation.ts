@@ -58,7 +58,7 @@ import {
   installReasoningBackends,
 } from '@agent/core/reasoning/reasoning-bootstrap';
 import { installShellStreamingTtsBridgeFromEnv } from '@agent/core/shell/shell-streaming-tts-bridge';
-import { installSileroVadBackend } from '@agent/core/silero-vad-bridge';
+import { installSileroVadBackend } from '@agent/shared-voice/silero-vad-bridge';
 import { installTenVadBackend } from '@agent/shared-voice/ten-vad-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
 import { probeAudioPlayback } from '@agent/core/voice/audio-playback';

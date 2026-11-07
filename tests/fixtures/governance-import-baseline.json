@@ -246,7 +246,7 @@
     "libs/core/shell/shell-grok-cli-backend.ts",
     "libs/core/shell/shell-streaming-stt-bridge.ts",
     "libs/core/shell/shell-streaming-tts-bridge.ts",
-    "libs/core/silero-vad-bridge.ts",
+    "libs/shared-voice/src/silero-vad-bridge.ts",
     "libs/core/streaming-voice-playback.ts",
     "libs/core/ten-vad-bridge.ts",
     "libs/core/virtual/desktop-event-feed.ts",
