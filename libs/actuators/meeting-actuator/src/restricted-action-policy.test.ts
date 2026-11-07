@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
-import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   loadRestrictedActionRules,
   matchRestrictedAction,
