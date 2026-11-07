@@ -2,9 +2,14 @@
  * PR mutations run through the governed vcs-host seam (gh-cli by default,
  * github-rest where gh is absent); push stays on the git vcs-backend. */
 import { pathResolver } from '../path-resolver.js';
-import type { ghPrCreate, ghPrMerge } from './github.js';
 import { gitPush, type VcsCommandResult, type VcsCommandRunner } from './git.js';
-import { vcsHostOptionsForRunner, vcsHostPrCreate, vcsHostPrMerge } from './vcs-host-verbs.js';
+import {
+  vcsHostOptionsForRunner,
+  vcsHostPrCreate,
+  vcsHostPrMerge,
+  type VcsHostPrCreateParams,
+  type VcsHostPrMergeParams,
+} from './vcs-host-verbs.js';
 import { computeApprovalPayloadHash } from '../governance/approval-store.js';
 import {
   ExternalOperationApprovalRequired,
@@ -23,9 +28,13 @@ import {
   PR_PUBLICATION_STORE_ROLE,
 } from '../governance/pr-publication-runtime.js';
 
+/** Provider selection stays with the approval host (it injects the runner-backed provider). */
+type HostMutationParams<T> = Omit<T, 'provider' | 'hostProvider' | 'git'>;
+export type PrPublicationParams = HostMutationParams<VcsHostPrCreateParams>;
+
 export type VcsHostMutation =
-  | { operation: 'pr_create'; params: Parameters<typeof ghPrCreate>[0] }
-  | { operation: 'pr_merge'; params: Parameters<typeof ghPrMerge>[0] }
+  | { operation: 'pr_create'; params: PrPublicationParams }
+  | { operation: 'pr_merge'; params: HostMutationParams<VcsHostPrMergeParams> }
   | {
       operation: 'push';
       params: { cwd: string; remote?: string; ref?: string; setUpstream?: boolean };
@@ -168,7 +177,7 @@ export async function runVcsMutationWithApproval(
 
 /** Compatibility entry point used by governed PR publication. */
 export function publishWithApproval(
-  publication: Parameters<typeof ghPrCreate>[0],
+  publication: PrPublicationParams,
   invocationId: string,
   print: (value: unknown) => void,
   runner?: VcsCommandRunner
