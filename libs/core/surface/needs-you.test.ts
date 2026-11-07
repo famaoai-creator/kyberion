@@ -313,7 +313,17 @@ describe('needs-you scope narrowing', () => {
       organizationIds: 'all',
       projectIds: 'all',
     } as const;
-    expect(ids(buildNeedsYouQueue(data, { viewer, now: NOW }))).toEqual(['famao', 'personal']);
+    // Custody admission (P4): an untenanted item is system custody — it needs
+    // the server-resolved system selection, not just any tenant viewer.
+    expect(ids(buildNeedsYouQueue(data, { viewer, now: NOW }))).toEqual(['famao']);
+    expect(
+      ids(
+        buildNeedsYouQueue(data, {
+          viewer: { ...viewer, includeUntenanted: true },
+          now: NOW,
+        })
+      )
+    ).toEqual(['famao', 'personal']);
   });
 
   it('a client tenant narrows but never widens', () => {
@@ -349,11 +359,11 @@ describe('needs-you scope narrowing', () => {
 
   it('organization and project narrowing keep only items that name them', () => {
     expect(
-      narrowNeedsYouItem({ tenant_slug: 'a', organization_id: 'o1' }, ALL, {
+      narrowNeedsYouItem({ tenant_slug: 'acme', organization_id: 'o1' }, ALL, {
         organization_id: 'o1',
       })
     ).toBe(true);
-    expect(narrowNeedsYouItem({ tenant_slug: 'a' }, ALL, { organization_id: 'o1' })).toBe(false);
+    expect(narrowNeedsYouItem({ tenant_slug: 'acme' }, ALL, { organization_id: 'o1' })).toBe(false);
     expect(
       narrowNeedsYouItem(
         { project_id: 'p2' },

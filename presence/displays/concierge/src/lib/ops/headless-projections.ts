@@ -8,6 +8,7 @@ import {
 } from '@agent/core/workforce/work-coordination';
 import type { EventScopeKind } from '@agent/core/event-scope';
 import type { OperatorHomeScopeFilter } from '@agent/core/surface/operator-home-summary';
+import { viewerPersonIds } from '@agent/core/surface/surface-authorization';
 import {
   buildWorkVisibilityProjection,
   type WorkVisibilityScope,
@@ -77,6 +78,9 @@ export function readHeadlessOperatorHome(
     tenantSlugs: scope.tenantSlugs,
     organizationIds: scope.organizationIds,
     projectIds: scope.projectIds,
+    // The viewer's person ids admit person-custody records to their owner.
+    personIds: viewerPersonIds(viewer),
+    ...(viewer.includeUntenanted ? { includeUntenanted: true } : {}),
   };
   return withViewerExecutionContext(viewer, () =>
     collectOperatorHomeSummary({
