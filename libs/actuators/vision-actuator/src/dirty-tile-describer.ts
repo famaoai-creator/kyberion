@@ -1,20 +1,20 @@
 import { randomUUID } from 'node:crypto';
-import { KNOWLEDGE_TIER_RANK } from './foundation/knowledge-tier.js';
+import { KNOWLEDGE_TIER_RANK } from '@agent/core/foundation/knowledge-tier';
 import path from 'node:path';
-import { classifyStorageFloorPath } from './storage-layout.js';
-import { resolveProjectScope } from './foundation/project-scope-env.js';
+import { classifyStorageFloorPath } from '@agent/core/storage-layout';
+import { resolveProjectScope } from '@agent/core/foundation/project-scope-env';
 import { Jimp } from 'jimp';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { dhashRegion, hamming } from './media/image-dhash.js';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { dhashRegion, hamming } from '@agent/core/media/image-dhash';
 import {
   createReasoningVisionDescribeFn,
   inferImagePayloadTier,
   type DescribeFn,
   type PayloadTier,
-} from './media/image-description-bridge.js';
-import { assertVolatileId, pathResolver } from './path-resolver.js';
-import { redactScreenCaptureFile } from './virtual/screen-frame-redaction.js';
-import { tenantOfPath } from './path-tenant-attribution.js';
+} from '@agent/core/media/image-description-bridge';
+import { assertVolatileId, pathResolver } from '@agent/core/path-resolver';
+import { redactScreenCaptureFile } from '@agent/core/virtual/screen-frame-redaction';
+import { tenantOfPath } from '@agent/core/path-tenant-attribution';
 import {
   safeExistsSync,
   safeMkdir,
@@ -23,7 +23,7 @@ import {
   safeWriteFile,
   safeRealpath,
   validateFileSize,
-} from './secure-io.js';
+} from '@agent/core/secure-io';
 
 /**
  * Dirty-tile screen description.

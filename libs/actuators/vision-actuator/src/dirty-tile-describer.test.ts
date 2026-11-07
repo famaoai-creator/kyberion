@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Jimp } from 'jimp';
-import { resolveStorageFloor } from './storage-layout.js';
-import { withExecutionContextAsync } from './authority.js';
+import { resolveStorageFloor } from '@agent/core/storage-layout';
+import { withExecutionContextAsync } from '@agent/core/authority';
 import {
   APPROX_TOKENS_PER_TILE,
   describeScreenDelta,
@@ -15,19 +15,19 @@ import {
   ImageDescriptionUnavailableError,
   createReasoningVisionDescribeFn,
   type DescribeFn,
-} from './media/image-description-bridge.js';
-import type { ReasoningBackend } from './reasoning/reasoning-backend-contracts.js';
-import { pathResolver } from './path-resolver.js';
+} from '@agent/core/media/image-description-bridge';
+import type { ReasoningBackend } from '@agent/core/reasoning/reasoning-backend-contracts';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeExistsSync,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
   safeSymlinkSync,
-} from './secure-io.js';
+} from '@agent/core/secure-io';
 
 const appleMocks = vi.hoisted(() => ({ gate: vi.fn(), prompt: vi.fn() }));
-vi.mock('./apple-intelligence-bridge.js', () => ({
+vi.mock('@agent/core/apple-intelligence-bridge', () => ({
   gateAppleLane: appleMocks.gate,
   appleFmPromptWithImage: appleMocks.prompt,
 }));
@@ -36,8 +36,8 @@ beforeEach(() => {
   appleMocks.prompt.mockReset();
 });
 const defaultVisionMocks = vi.hoisted(() => ({ factory: vi.fn(), describe: vi.fn() }));
-vi.mock('./media/image-description-bridge.js', async (original) => {
-  const actual = await original<typeof import('./media/image-description-bridge.js')>();
+vi.mock('@agent/core/media/image-description-bridge', async (original) => {
+  const actual = await original<typeof import('@agent/core/media/image-description-bridge')>();
   return {
     ...actual,
     createReasoningVisionDescribeFn: (
