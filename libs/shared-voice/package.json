@@ -7,10 +7,6 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    "./segmented-voice-playback": {
-      "types": "./dist/segmented-voice-playback.d.ts",
-      "default": "./dist/segmented-voice-playback.js"
-    },
     "./streaming-voice-playback": {
       "types": "./dist/streaming-voice-playback.d.ts",
       "default": "./dist/streaming-voice-playback.js"
@@ -18,6 +14,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./apple-speech-file-stt-bridge": {
+      "types": "./dist/apple-speech-file-stt-bridge.d.ts",
+      "default": "./dist/apple-speech-file-stt-bridge.js"
     },
     "./audio-text-similarity": {
       "types": "./dist/audio-text-similarity.d.ts",
@@ -31,6 +31,10 @@
       "types": "./dist/gemini-live-client.d.ts",
       "default": "./dist/gemini-live-client.js"
     },
+    "./native-tts": {
+      "types": "./dist/native-tts.d.ts",
+      "default": "./dist/native-tts.js"
+    },
     "./realtime-voice-conversation": {
       "types": "./dist/realtime-voice-conversation.d.ts",
       "default": "./dist/realtime-voice-conversation.js"
@@ -42,6 +46,18 @@
     "./realtime-voice-preferences": {
       "types": "./dist/realtime-voice-preferences.d.ts",
       "default": "./dist/realtime-voice-preferences.js"
+    },
+    "./segmented-voice-playback": {
+      "types": "./dist/segmented-voice-playback.d.ts",
+      "default": "./dist/segmented-voice-playback.js"
+    },
+    "./silero-vad-bridge": {
+      "types": "./dist/silero-vad-bridge.d.ts",
+      "default": "./dist/silero-vad-bridge.js"
+    },
+    "./ten-vad-bridge": {
+      "types": "./dist/ten-vad-bridge.d.ts",
+      "default": "./dist/ten-vad-bridge.js"
     },
     "./tts-loopback-verifier": {
       "types": "./dist/tts-loopback-verifier.d.ts",
@@ -138,10 +154,6 @@
     "./voice-workbench": {
       "types": "./dist/voice-workbench.d.ts",
       "default": "./dist/voice-workbench.js"
-    },
-    "./native-tts": {
-      "types": "./dist/native-tts.d.ts",
-      "default": "./dist/native-tts.js"
     }
   },
   "scripts": {

@@ -80,7 +80,7 @@ import {
   chunkSurfaceMessage,
   postBridgeError,
   sendSurfaceTextWithFallback,
-} from '@agent/core/bridge-error-reply';
+} from '@agent/shared-interaction/bridge-error-reply';
 import { resolveCustomerBinding } from '@agent/core/customer-channel-binding';
 import { runCustomerConversation } from '@agent/core/customer-conversation';
 import {
@@ -121,7 +121,7 @@ import {
   buildAutomationSlackModal,
   extractAutomationSlackFormValues,
   parseAutomationSlackModalMetadata,
-} from '@agent/core/automation-blueprint-slack';
+} from '@agent/shared-interaction/automation-blueprint-slack';
 import {
   findAutomationBlueprint,
   parseAutomationSlashRequest,

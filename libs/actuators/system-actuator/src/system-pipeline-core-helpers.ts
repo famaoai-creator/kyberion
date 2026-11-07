@@ -39,7 +39,7 @@ import {
 import { createScreenDisplayInventoryBridge } from '@agent/core/virtual/screen-display-inventory-bridge';
 import { listToolRuntimeInventory } from '@agent/core/tool/tool-runtime-registry';
 import { listServiceRuntimeInventory } from '@agent/core/service/service-runtime-registry';
-import { probeSileroVad } from '@agent/core/silero-vad-bridge';
+import { probeSileroVad } from '@agent/shared-voice/silero-vad-bridge';
 import { buildUnknownActuatorOpError } from '@agent/core/actuator/actuator-op-registry';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import type {

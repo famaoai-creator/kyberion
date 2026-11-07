@@ -84,9 +84,19 @@ Pure helpers must not acquire those dependencies just because both are low-level
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `provider-chain-router`, `provider-registry`, `provider-runtime-requirements`                                                                                   | `core/provider/`    | Provider registration, routing and runtime prerequisites used by core; retain existing public subpath keys.                                                                                              |
 | `llm-selection-preferences`, `llm-selection-state`, `backend-capability-profile`, `backend-capability-honesty`, `backend-conformance`, `backend-live-scenarios` | `core/reasoning/`   | Reasoning selection state, declared capabilities and observed conformance; retain existing public subpath keys and measurement protections.                                                              |
-| `barge-in-controller`, `blackhole-routing-guard`, `pulse-audio-bus`, `blackhole-audio-bus`, `coreaudio-device-inventory`, `coreaudio-output-bridge`             | `core/voice/`       | Device and audio-route primitives used by core meeting/audio services; retain existing public subpath keys. Native Swift helper paths remain unchanged.                                                  |
+| `barge-in-controller`, `pulse-audio-bus`, `blackhole-audio-bus`, `coreaudio-device-inventory`, `coreaudio-output-bridge`                                        | `core/voice/`       | Device and audio-route primitives used by core meeting/audio services; retain existing public subpath keys. Native Swift helper paths remain unchanged.                                                  |
 | `business-calendar`, `temporal-context`                                                                                                                         | `core/temporal/`    | Business-day, timezone and working-hours interpretation shared by meeting and organization; domain policy rather than foundation. Preserve the calendar subpath and temporal-context root export.        |
 | `segmented-voice-playback`, `streaming-voice-playback`                                                                                                          | `shared-voice/src/` | Speech synthesis/playback orchestration with no incoming core implementation dependency. Move the closure and its tests, remove core reexports/subpaths, and migrate consumers to `@agent/shared-voice`. |
+
+PR #1436 is integrated with these boundaries: script-only BlackHole routing state lives
+in `scripts/lib`, while the Cowork/MCP leaves, device-specific sensing providers and
+single-consumer actuator policies live beside their owners. Both playback modules stay
+in shared-voice; the preserved core subpath targets and manifest-derived Vitest aliases
+remain in effect. Historical PR measurements are rechecked on the combined checkout.
+
+The next core-domain slice places `bounded-video-queue` in `video/`, `html-to-markdown`
+in `media/`, `ranking-signals` in `knowledge/`, and `bridge-typing` / `bridge-poll-loop`
+in `integrations/`. Their behavior and existing public import keys remain unchanged.
 
 The playback extraction deliberately changes those two package import paths; core must
 not reexport shared-voice to preserve an old import. Internal core relocations preserve
@@ -151,18 +161,18 @@ Core itself is layered `foundation → contracts → domain → orchestration`
 
 ## Placement guide
 
-| Package              | Holds                                                                                               | Stays in core instead                                                |
-| -------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `shared-video`       | ingest, composition compile/render, filters, recut                                                  | video contracts, design system, frame bus/route/lease/archive        |
-| `shared-media`       | document generation engines, image/music/video generation, layout and drawio policies               | document reader, docx/xlsx/pptx utils, pdf parser, image description |
-| `shared-voice`       | realtime voice conversation loops, voice generation runtime, samples, selection, turn-taking        | audio bus/route, STT/TTS bridges, VAD, voice-engine registries       |
-| `shared-vision`      | browser automation bridge, extension mailbox, browser conversation, onboarding, procedure promotion | extension bridge, recording compiler, Chrome meeting driver          |
-| `shared-perception`  | observation scoping, audio analysis, visual change, tracking, semantic index (+ Python helpers)     | STT/VAD/OCR/image-description bridges it calls                       |
-| `shared-interaction` | modality-independent conversation control                                                           | —                                                                    |
-| `shared-network`     | MCP client/server runtime, HTTP transport and protocol-facing tool adaptation                       | authority, governed network I/O and core service registries          |
-| `shared-ui`          | React and vanilla renderers for the shared A2UI/component catalog                                   | viewer authorization and domain decisions                            |
-| `shared-mobile`      | device-independent frame sources, input injection and live-mirror runtime                           | platform facts and governed OS actions                               |
-| `shared-nerve`       | reflex-engine runtime composition                                                                   | core sensing bridges, authority and lifecycle ownership              |
+| Package              | Holds                                                                                               | Stays in core instead                                                              |
+| -------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `shared-video`       | ingest, composition compile/render, filters, recut                                                  | video contracts, design system, frame bus/route/lease/archive                      |
+| `shared-media`       | document generation engines, image/music/video generation, layout and drawio policies               | document reader, docx/xlsx/pptx utils, pdf parser, image description               |
+| `shared-voice`       | realtime voice conversation loops, voice generation runtime, samples, selection, turn-taking        | audio bus/route, shared STT/TTS contracts and bridges, VAD/voice-engine registries |
+| `shared-vision`      | browser automation bridge, extension mailbox, browser conversation, onboarding, procedure promotion | extension bridge, recording compiler, Chrome meeting driver                        |
+| `shared-perception`  | observation scoping, audio analysis, visual change, tracking, semantic index (+ Python helpers)     | STT/VAD/OCR/image-description bridges it calls                                     |
+| `shared-interaction` | modality-independent conversation control                                                           | —                                                                                  |
+| `shared-network`     | MCP client/server runtime, HTTP transport, Cowork runtime and MCP request context                   | authority, governed network I/O and core service registries                        |
+| `shared-ui`          | React and vanilla renderers for the shared A2UI/component catalog                                   | viewer authorization and domain decisions                                          |
+| `shared-mobile`      | device-independent frame sources, input injection and live-mirror runtime                           | platform facts and governed OS actions                                             |
+| `shared-nerve`       | reflex-engine runtime composition                                                                   | core sensing bridges, authority and lifecycle ownership                            |
 
 ## Listen, think, speak: layer by role, not by sense
 

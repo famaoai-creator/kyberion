@@ -184,8 +184,6 @@ export * from './chronos-delivery.js';
 
 export * from './automation-blueprint.js';
 
-export * from './automation-blueprint-slack.js';
-
 export * from './programmatic-tool-calling.js';
 
 export * from './managed-process.js';

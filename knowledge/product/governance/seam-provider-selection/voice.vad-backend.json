@@ -39,7 +39,7 @@
             "footprint": "declared"
           },
           "evidence": [
-            "libs/core/silero-vad-bridge.ts (neural VAD over an onnxruntime Python subprocess; one chunk late; needs KYBERION_SILERO_VAD_MODEL)"
+            "libs/shared-voice/src/silero-vad-bridge.ts (neural VAD over an onnxruntime Python subprocess; one chunk late; needs KYBERION_SILERO_VAD_MODEL)"
           ]
         },
         "ten_vad": {

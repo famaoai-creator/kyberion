@@ -26,7 +26,7 @@ import {
   loadKnowledgeRankingWeights,
   type KnowledgeRankingMetadata,
   type KnowledgeRankingWeights,
-} from '../ranking-signals.js';
+} from './ranking-signals.js';
 import { loadKnowledgeUsageAggregateAtPath } from './knowledge-usage-aggregate.js';
 import {
   loadKnowledgeIndexCacheAtPath,

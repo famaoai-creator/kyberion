@@ -177,6 +177,7 @@ describe('Workspace build contract', () => {
       'spreadsheet-style-policy',
       'tracker-sheet-policy',
       'visual-workflow-compiler',
+      'windows-native-image-generation-bridge',
     ]) {
       expect(core.exports[`./${name}`]).toBeUndefined();
       expect(media.exports[`./${name}`]).toEqual({
@@ -272,5 +273,497 @@ describe('Workspace build contract', () => {
       types: './dist/voice/barge-in-controller.d.ts',
       default: './dist/voice/barge-in-controller.js',
     });
+  });
+
+  it('keeps the TEN VAD bridge in shared-voice beside the other VAD installers', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const voice = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-voice/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./ten-vad-bridge']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/ten-vad-bridge.ts'))).toBe(false);
+    expect(voice.exports['./ten-vad-bridge']).toEqual({
+      types: './dist/ten-vad-bridge.d.ts',
+      default: './dist/ten-vad-bridge.js',
+    });
+    // The VAD registry, bridge protocol, and detector contract stay in core;
+    // only the optional TEN backend installer moved.
+    for (const subpath of [
+      './voice/vad-registry',
+      './voice/vad-bridge-protocol',
+      './voice/voice-activity-detector',
+      './meeting/meeting-session-types',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
+  it('keeps bridge error replies in shared-interaction with its satellite consumers', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const interaction = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-interaction/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./bridge-error-reply']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/bridge-error-reply.ts'))).toBe(false);
+    expect(interaction.exports['./bridge-error-reply']).toEqual({
+      types: './dist/bridge-error-reply.d.ts',
+      default: './dist/bridge-error-reply.js',
+    });
+    for (const satellite of [
+      'discord-bridge',
+      'imessage-bridge',
+      'slack-bridge',
+      'telegram-bridge',
+    ]) {
+      const manifest = JSON.parse(
+        safeReadFile(path.join(rootDir, `satellites/${satellite}/package.json`), {
+          encoding: 'utf8',
+        }) as string
+      );
+      expect(manifest.dependencies['@agent/shared-interaction']).toBe('workspace:*');
+    }
+    // Error classification, vocabulary rendering, rate limiting, and runtime
+    // control policy stay in core; only the presentation helpers moved.
+    for (const subpath of [
+      './error-classifier',
+      './ux-vocabulary',
+      './foundation/rate-limit',
+      './runtime-control-policy',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
+  it('keeps segmented voice playback in shared-voice with its realtime loop consumer', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const voice = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-voice/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./segmented-voice-playback']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/segmented-voice-playback.ts'))).toBe(false);
+    expect(voice.exports['./segmented-voice-playback']).toEqual({
+      types: './dist/segmented-voice-playback.d.ts',
+      default: './dist/segmented-voice-playback.js',
+    });
+    // The device player and text chunking stay in core; both playback
+    // orchestration modes live beside their realtime loop consumer.
+    expect(core.exports['./streaming-voice-playback']).toBeUndefined();
+    expect(voice.exports['./streaming-voice-playback']).toEqual({
+      types: './dist/streaming-voice-playback.d.ts',
+      default: './dist/streaming-voice-playback.js',
+    });
+    for (const subpath of ['./voice/audio-playback', './voice/voice-text-chunking']) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
+  it('keeps the MCP request context in shared-network with its facade consumers', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    expect(core.exports['./mcp-request-context']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/mcp-request-context.ts'))).toBe(false);
+    expect(
+      safeExistsSync(path.join(rootDir, 'libs/shared-network/src/mcp-request-context.ts'))
+    ).toBe(true);
+    const network = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-network/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(network.exports['./mcp-request-context']).toEqual({
+      types: './dist/mcp-request-context.d.ts',
+      default: './dist/mcp-request-context.js',
+    });
+    // The NHI claim resolver stays in core and is now a published subpath so
+    // shared-network can reach it; event scope and the env registry remain
+    // public core services.
+    for (const subpath of ['./contracts/nhi-id', './event-scope', './foundation/env']) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
+  it('keeps the Cowork cluster in shared-network beside its MCP engine consumer', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    for (const name of [
+      'cowork-artifact-packet',
+      'cowork-health-check',
+      'cowork-knowledge-bridge',
+      'cowork-surface',
+    ]) {
+      for (const subpath of [`./${name}`, `./${name}.js`]) {
+        expect(core.exports[subpath]).toBeUndefined();
+      }
+      for (const suffix of ['.ts', '.test.ts']) {
+        expect(safeExistsSync(path.join(rootDir, `libs/core/${name}${suffix}`))).toBe(false);
+        expect(safeExistsSync(path.join(rootDir, `libs/shared-network/src/${name}${suffix}`))).toBe(
+          true
+        );
+      }
+      for (const suffix of ['.js', '.d.ts', '.js.map', '.d.ts.map']) {
+        expect(safeExistsSync(path.join(rootDir, `libs/core/dist/${name}${suffix}`))).toBe(false);
+        expect(
+          safeExistsSync(path.join(rootDir, `libs/shared-network/dist/${name}${suffix}`))
+        ).toBe(true);
+      }
+      const network = JSON.parse(
+        safeReadFile(path.join(rootDir, 'libs/shared-network/package.json'), {
+          encoding: 'utf8',
+        }) as string
+      );
+      expect(network.exports[`./${name}`]).toEqual({
+        types: `./dist/${name}.d.ts`,
+        default: `./dist/${name}.js`,
+      });
+    }
+    // The governed approval adapter, artifact store, memory promotion queue,
+    // and scope plumbing stay in core; only the Cowork-facing modules moved.
+    for (const subpath of [
+      './governance/approval-cowork-adapter',
+      './workforce/artifact-store',
+      './knowledge/memory-promotion-queue',
+      './knowledge/memory-scope',
+      './scope-context',
+      './physical-namespace',
+      './intent/intent-resolution-contract',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
+  it('keeps the Silero VAD bridge in shared-voice beside the TEN backend', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const voice = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-voice/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./silero-vad-bridge']).toBeUndefined();
+    for (const suffix of ['.ts', '.test.ts']) {
+      expect(safeExistsSync(path.join(rootDir, `libs/core/silero-vad-bridge${suffix}`))).toBe(
+        false
+      );
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/shared-voice/src/silero-vad-bridge${suffix}`))
+      ).toBe(true);
+    }
+    for (const suffix of ['.js', '.d.ts', '.js.map', '.d.ts.map']) {
+      expect(safeExistsSync(path.join(rootDir, `libs/core/dist/silero-vad-bridge${suffix}`))).toBe(
+        false
+      );
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/shared-voice/dist/silero-vad-bridge${suffix}`))
+      ).toBe(true);
+    }
+    expect(voice.exports['./silero-vad-bridge']).toEqual({
+      types: './dist/silero-vad-bridge.d.ts',
+      default: './dist/silero-vad-bridge.js',
+    });
+    // The VAD registry/protocol/detector contracts, secure exec env, path
+    // resolution, and managed-tool runtime stay in core; only the Silero
+    // backend moved. The Python bridge script stays with voice-actuator.
+    for (const subpath of [
+      './voice/vad-registry',
+      './voice/vad-bridge-protocol',
+      './voice/voice-activity-detector',
+      './secure-io',
+      './path-resolver',
+      './tool/tool-runtime-registry',
+      './meeting/meeting-session-types',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
+  it('keeps the Slack blueprint formatter, intake vectors, and the tile describer beside their consumers', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const interaction = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-interaction/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    for (const name of ['automation-blueprint-slack', 'intake-vectors', 'dirty-tile-describer']) {
+      expect(core.exports[`./${name}`]).toBeUndefined();
+      expect(safeExistsSync(path.join(rootDir, `libs/core/${name}.ts`))).toBe(false);
+    }
+    expect(interaction.exports['./automation-blueprint-slack']).toEqual({
+      types: './dist/automation-blueprint-slack.d.ts',
+      default: './dist/automation-blueprint-slack.js',
+    });
+    for (const suffix of ['.ts', '.test.ts']) {
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/shared-interaction/src/automation-blueprint-slack${suffix}`)
+        )
+      ).toBe(true);
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/actuators/vision-actuator/src/dirty-tile-describer${suffix}`)
+        )
+      ).toBe(true);
+    }
+    expect(safeExistsSync(path.join(rootDir, 'scripts/lib/intake-vectors.ts'))).toBe(true);
+    // The blueprint contract, project-scope env, vision describe bridge, and
+    // governed catalog stay published from core; only the leaf adapters moved.
+    for (const subpath of [
+      './automation-blueprint',
+      './foundation/project-scope-env',
+      './media/image-description-bridge',
+      './foundation/governed-catalog',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
+  it('keeps the restricted-action policy inside the meeting actuator', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    expect(core.exports['./restricted-action-policy']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/restricted-action-policy.ts'))).toBe(false);
+    for (const suffix of ['.ts', '.test.ts']) {
+      expect(
+        safeExistsSync(
+          path.join(
+            rootDir,
+            `libs/actuators/meeting-actuator/src/restricted-action-policy${suffix}`
+          )
+        )
+      ).toBe(true);
+    }
+    // design-qa stays in core: the virtual-office palette test dog-foods it
+    // through the core barrel alongside the media actuator consumers.
+    expect(core.exports['./design-qa']).toBeDefined();
+  });
+
+  it('keeps the ingest quota and sync cursors inside the ingest actuator', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    for (const name of ['ingest-quota', 'ingest-sync-cursors']) {
+      expect(core.exports[`./${name}`]).toBeUndefined();
+      for (const suffix of ['.ts', '.test.ts']) {
+        expect(safeExistsSync(path.join(rootDir, `libs/core/${name}${suffix}`))).toBe(false);
+        expect(
+          safeExistsSync(path.join(rootDir, `libs/actuators/ingest-actuator/src/${name}${suffix}`))
+        ).toBe(true);
+      }
+    }
+    // The tier gate keeps script + actuator consumers and stays in core with
+    // the ledger, PII scrubber, and governed-catalog plumbing the moved
+    // modules still import.
+    for (const subpath of [
+      './ingest-tier-gate',
+      './ingest-asset-ledger',
+      './pii-scrubber',
+      './foundation/governed-catalog',
+      './entity-scope',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
+  it('keeps the BlackHole routing guard beside its pipeline-execution consumers', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    expect(core.exports['./blackhole-routing-guard']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/blackhole-routing-guard.ts'))).toBe(false);
+    expect(safeExistsSync(path.join(rootDir, 'scripts/lib/blackhole-routing-guard.ts'))).toBe(true);
+  });
+
+  it('keeps the Apple speech file STT bridge in shared-voice with the VAD backends', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const voice = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-voice/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./apple-speech-file-stt-bridge']).toBeUndefined();
+    for (const suffix of ['.ts', '.test.ts']) {
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/core/apple-speech-file-stt-bridge${suffix}`))
+      ).toBe(false);
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/shared-voice/src/apple-speech-file-stt-bridge${suffix}`)
+        )
+      ).toBe(true);
+    }
+    for (const suffix of ['.js', '.d.ts', '.js.map', '.d.ts.map']) {
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/core/dist/apple-speech-file-stt-bridge${suffix}`))
+      ).toBe(false);
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/shared-voice/dist/apple-speech-file-stt-bridge${suffix}`)
+        )
+      ).toBe(true);
+    }
+    expect(voice.exports['./apple-speech-file-stt-bridge']).toEqual({
+      types: './dist/apple-speech-file-stt-bridge.d.ts',
+      default: './dist/apple-speech-file-stt-bridge.js',
+    });
+    // The STT seam contract, local backend discovery, locale/env plumbing,
+    // and secure exec stay in core; only the Apple Speech backend moved.
+    for (const subpath of [
+      './voice/speech-to-text-bridge',
+      './local-stt-discovery',
+      './locale',
+      './foundation/env',
+      './secure-io',
+      './path-resolver',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
+  it('keeps the OBS virtual-camera output in shared-video with its filter provider', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const video = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-video/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./obs-virtual-camera-output']).toBeUndefined();
+    for (const suffix of ['.ts', '.test.ts']) {
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/core/obs-virtual-camera-output${suffix}`))
+      ).toBe(false);
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/shared-video/src/obs-virtual-camera-output${suffix}`)
+        )
+      ).toBe(true);
+    }
+    for (const suffix of ['.js', '.d.ts', '.js.map', '.d.ts.map']) {
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/core/dist/obs-virtual-camera-output${suffix}`))
+      ).toBe(false);
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/shared-video/dist/obs-virtual-camera-output${suffix}`)
+        )
+      ).toBe(true);
+    }
+    expect(video.exports['./obs-virtual-camera-output']).toEqual({
+      types: './dist/obs-virtual-camera-output.d.ts',
+      default: './dist/obs-virtual-camera-output.js',
+    });
+    const actuator = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/actuators/voice-actuator/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(actuator.dependencies['@agent/shared-video']).toBe('workspace:*');
+    // The camera-output seam contract and env registry stay in core; only the
+    // OBS backend moved.
+    for (const subpath of ['./camera-output-bridge', './foundation/env', './video/video-route']) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
+  it('keeps the v4l2 virtual-camera output in shared-video with the OBS backend', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const video = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-video/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./v4l2-virtual-camera-output']).toBeUndefined();
+    for (const suffix of ['.ts', '.test.ts']) {
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/core/v4l2-virtual-camera-output${suffix}`))
+      ).toBe(false);
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/shared-video/src/v4l2-virtual-camera-output${suffix}`)
+        )
+      ).toBe(true);
+    }
+    for (const suffix of ['.js', '.d.ts', '.js.map', '.d.ts.map']) {
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/core/dist/v4l2-virtual-camera-output${suffix}`))
+      ).toBe(false);
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/shared-video/dist/v4l2-virtual-camera-output${suffix}`)
+        )
+      ).toBe(true);
+    }
+    expect(video.exports['./v4l2-virtual-camera-output']).toEqual({
+      types: './dist/v4l2-virtual-camera-output.d.ts',
+      default: './dist/v4l2-virtual-camera-output.js',
+    });
+    // The seam contract, the governed injection bridge the adapter wraps, the
+    // device lease, and exec/path plumbing stay in core; only the v4l2 adapter
+    // moved.
+    for (const subpath of [
+      './camera-output-bridge',
+      './virtual/virtual-camera-injection-bridge',
+      './secure-io',
+      './video/video-device-lease',
+      './video/video-route',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
+  it('keeps the desktop AX bridge in shared-perception with its system-actuator consumer', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const perception = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-perception/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./desktop-ax-bridge']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/desktop-ax-bridge.ts'))).toBe(false);
+    expect(perception.exports['./desktop-ax-bridge']).toEqual({
+      types: './dist/desktop-ax-bridge.d.ts',
+      default: './dist/desktop-ax-bridge.js',
+    });
+    const system = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/actuators/system-actuator/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(system.dependencies['@agent/shared-perception']).toBe('workspace:*');
+    // Path resolution, scoped I/O, and managed-tool resolution remain in
+    // core; moving the AX bridge must not reverse that dependency.
+    for (const subpath of [
+      './path-resolver',
+      './secure-io',
+      './foundation/runtime-state-roots',
+      './tool/tool-binary-resolvers',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+    expect(core.dependencies?.['@agent/shared-perception']).toBeUndefined();
   });
 });

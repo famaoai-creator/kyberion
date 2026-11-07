@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-06
+last_updated: 2026-11-07
 ---
 
 # Operations Hygiene Runbook
@@ -715,6 +715,13 @@ it (for example `mission_controller`) print them, and check every pipeline op th
 gets clean JSON.
 
 ## §5 Tests: pollution and host dependencies
+
+Production source inventories must exclude runtime storage roots before traversing
+them. The single-instance scan skips legacy root-level `work/` metrics, whose I/O is
+redirected into a per-test fixture; it still scans nested code directories named
+`work`. Do not suppress filesystem denials or missing-source errors to hide a scan
+failure. Gate: `scripts/check_core_single_instance.test.ts`, including the real
+production inventory and exact manifest-only import exception.
 
 When a store module also exports pure admission/security checks, partially mock the module
 with typed `importOriginal` and replace only the I/O reader. A full-module mock can hide

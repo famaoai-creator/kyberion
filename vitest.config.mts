@@ -277,6 +277,10 @@ export default defineConfig({
         replacement: path.resolve(rootDir, './libs/shared-ui/src/index.ts'),
       },
       {
+        find: /^@agent\/shared-network\/(.*)$/,
+        replacement: path.resolve(rootDir, './libs/shared-network/src/$1'),
+      },
+      {
         find: '@agent/shared-network',
         replacement: path.resolve(rootDir, './libs/shared-network/src/index.ts'),
       },

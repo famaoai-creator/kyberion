@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { startMicCapture } from '@agent/core/mic-capture';
-import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/core/apple-speech-file-stt-bridge';
+import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/shared-voice/apple-speech-file-stt-bridge';
 import {
   getSpeechToTextBridge,
   installAvailableSpeechToTextBridges,
