@@ -287,10 +287,10 @@ pnpm pipeline --input pipelines/meeting-followup.json --context '{"mission_id":"
 6. customer 提供まで finish する。
 
 ```bash
-KYBERION_CUSTOMER=<slug> pnpm mission finish MSN-...
+KYBERION_STANCE=<slug> pnpm mission finish MSN-...
 ```
 
-失敗したら `KYBERION_CUSTOMER` と `--tenant-slug` を一致させ、`customer/<slug>/` が存在することを確認してから finish を再実行する。
+失敗したら `KYBERION_STANCE` と `--tenant-slug` を一致させ、`knowledge/personal/stances/<slug>/` が存在することを確認してから finish を再実行する。
 
 For Google Workspace email and Meet work:
 
@@ -502,7 +502,7 @@ The most useful directory model for operators is by purpose.
 
 Practical rules:
 
-- connection material goes in the active private overlay: `customer/{slug}/connections/` when `KYBERION_CUSTOMER` is set, otherwise `knowledge/personal/connections/`
+- connection material goes in the active private overlay: `knowledge/personal/stances/{slug}/connections/` when `KYBERION_STANCE` is set, otherwise `knowledge/personal/connections/`
 - durable mission evidence goes in `active/missions/`
 - shared logs and tmp artifacts go in `active/shared/`
 - reusable policies, schemas, and procedures belong in `knowledge/public/`
@@ -519,6 +519,22 @@ pnpm kyberion doctor
 pnpm capabilities
 pnpm dashboard -- --once --focus onboarding
 ```
+
+### Asset scope inspection(資産スコープの確認)
+
+保存先の管理者・tier・配置状態と、現在の読取ポリシーを確認する。
+
+```bash
+pnpm scope inspect knowledge/product/governance/store-catalog.json
+pnpm kyberion scope inspect knowledge/product/governance/store-catalog.json --json
+```
+
+これは Scope 設定を変更しない診断である。`decision` は既存の読取ポリシー判定であり、
+実際のファイル I/O や sensitive-path mediation の許可を保証しない。ファイルの存在は
+未判定、内容は非表示となる。信頼された比較用 ceiling は作らず、解決結果は
+`address_only` として表示する。legacy 配置の管理者が未確定なら未解決のまま示す。
+拒否も正常な診断結果(exit 0)で、引数不正は exit 2。`--tenant` / `--tier` などで
+この診断の権限を変えることはできない。既存 inspector の physical-alias 検査は継続する。
 
 ### Organization operating model(組織・目標・サービスの登録)
 
@@ -590,7 +606,7 @@ pnpm kyberion deals --requirements DEAL-XXXX # 要件ヒアリングで収集済
 pnpm kyberion deals --ingest-audio DEAL-XXXX --audio 録音.aiff # 通話録音→要件ドラフト取り込み
 ```
 
-顧客チャネル(`customer/<tenant>/connections/channel-bindings.json`)に紐づく会話は
+顧客チャネル(`knowledge/confidential/<tenant>/connections/channel-bindings.json`)に紐づく会話は
 deal stage に応じて自動でモードが切り替わる: 営業(inquiry〜contract)/
 要件ヒアリング(discovery — 構造化ドラフトを増分収集)/ サポート(won 以降 —
 `knowledge/confidential/<tenant>/support/known-issues.md` を接地)。binding の

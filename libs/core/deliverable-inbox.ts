@@ -6,7 +6,7 @@ import { defineCatalog, type GovernedCatalog } from './foundation/governed-catal
 import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import type { RejectionReasonCategory } from './rejection-reason.js';
+import type { RejectionReasonCategory } from './contracts/rejection-reason.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,

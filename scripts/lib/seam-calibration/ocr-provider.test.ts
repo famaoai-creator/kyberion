@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { OcrProvider } from '@agent/core/ocr-types';
+import type { OcrProvider } from '@agent/core/contracts/ocr-types';
 import { characterErrorRate, ocrProviderCalibrationAdapter } from './ocr-provider.js';
 
 describe('characterErrorRate', () => {

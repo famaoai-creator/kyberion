@@ -11,7 +11,7 @@ import * as path from 'node:path';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
-import { reconcileScheduledPipelines } from '@agent/core/pipeline-scheduler';
+import { reconcileScheduledPipelines } from '@agent/core/pipeline/pipeline-scheduler';
 
 type ScheduledPipelineInput = Parameters<typeof reconcileScheduledPipelines>[1][number];
 

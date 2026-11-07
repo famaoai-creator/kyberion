@@ -72,7 +72,7 @@ import {
   AgentIdentityFormatError,
   buildNhiId,
   parseNhiId,
-} from '../nhi-id.js';
+} from '../contracts/nhi-id.js';
 
 // ---------------------------------------------------------------------------
 // NHI id: kyberion://agent/<org>/<slug> (SPIFFE-shaped URI; NI-05 maps it out)
@@ -131,7 +131,7 @@ export type AgentIdentityLifecycleStatus = (typeof AGENT_IDENTITY_LIFECYCLE_STAT
 const agentIdentityAffiliationSchema = z
   .object({
     organization_id: z.string(),
-    /** Canonical tenant boundary; customer/{slug} is only a stance overlay. */
+    /** Canonical tenant boundary; knowledge/personal/stances/{slug} is only a stance overlay. */
     tenant_slug: z.string().refine(isValidTenantSlug, 'invalid tenant slug').optional(),
     project_id: z.string().optional(),
     mission_id: z.string().optional(),

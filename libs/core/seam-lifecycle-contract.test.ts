@@ -11,7 +11,7 @@ import {
   registerBrowserAutomationRuntimeBridge,
   resetBrowserAutomationRuntimeBridges,
   resolveBrowserAutomationRuntime,
-} from './browser/browser-automation-runtime-bridge.js';
+} from '@agent/shared-vision/browser-automation-runtime-bridge';
 import {
   getStreamingSttBridge,
   listStreamingSttBridges,

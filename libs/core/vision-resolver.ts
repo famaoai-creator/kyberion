@@ -1,7 +1,7 @@
 import * as path from 'node:path';
-import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { activeTenantSlug } from './organization/tenant-home.js';
 import { readTextFile } from './foundation/text.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 
@@ -10,7 +10,7 @@ export type VisionSectionKey = 'soul' | 'steering' | 'destination';
 export interface ResolvedVision {
   tenant_slug: string | null;
   source_path: string;
-  source_kind: 'customer' | 'tenant' | 'global';
+  source_kind: 'tenant' | 'global';
   title: string | null;
   raw: string;
   sections: Record<VisionSectionKey, string[]>;
@@ -71,13 +71,6 @@ function buildCandidatePaths(
     if (!isValidTenantSlug(tenantSlug)) {
       throw new Error(`[VISION_TENANT_SCOPE] invalid tenant slug: ${tenantSlug}`);
     }
-    candidates.push({
-      path: assertSafeRepositoryPath(path.join(baseDir, 'customer', tenantSlug, 'vision.md'), {
-        allowMissingLeaf: true,
-        rootDir: baseDir,
-      }),
-      kind: 'customer',
-    });
     candidates.push({
       path: assertSafeRepositoryPath(
         path.join(baseDir, 'knowledge', 'confidential', tenantSlug, 'vision.md'),
@@ -220,7 +213,7 @@ export function resolveGoldenRulePriorityOrder(
 }
 
 export function resolveVision(tenantSlug?: string | null, rootDir?: string): ResolvedVision {
-  const resolvedTenantSlug = tenantSlug?.trim() || customerResolver.activeCustomer() || null;
+  const resolvedTenantSlug = tenantSlug?.trim() || activeTenantSlug() || null;
   const candidates = buildCandidatePaths(resolvedTenantSlug, rootDir);
 
   for (const candidate of candidates) {

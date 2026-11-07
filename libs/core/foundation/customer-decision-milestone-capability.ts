@@ -1,17 +1,32 @@
 import * as path from 'node:path';
-import type { ResourceAccessScope } from './resource-access-scope.js';
+import {
+  createSynchronousResourceGrantIssuer,
+  currentResourceAccessScope,
+  decideResourceAccess,
+  type ResourceAccessOperation,
+  type ResourceAccessScope,
+} from './resource-access-scope.js';
 import { getProcessEnv } from './process-env.js';
 import { isValidTenantSlug } from './scope.js';
+import { registerStoreGrant, storeGrantActive } from './store-grant-registry.js';
+import { caseRecordWriteDenial } from './customer-decision-record-content.js';
 
 /**
- * Narrow store role for CD-10 bolt-review milestones
- * (libs/core/mission/mission-bolt-review.ts). `startMission` assumes it to mark
- * the `bolt-after:<MISSION>` milestone passed on the open bolt-review agendas
- * of the mission's decision case: it may list `agendas/`, read named agenda
- * files and write exactly one agenda file per operation. Never the ledger,
- * receipts, switches, consumers, attachments, invites or customers/.
+ * CD-10 bolt-review milestones (libs/core/mission/mission-bolt-review.ts).
+ * `startMission` opens the exact milestone grant to mark the
+ * `bolt-after:<MISSION>` milestone passed on the open bolt-review agendas of the
+ * mission's decision case: it may list `agendas/`, read named agenda files and
+ * write exactly one agenda file per operation, every write held to the
+ * milestone-only content rule. Never the ledger, receipts, switches, consumers,
+ * attachments, invites or customers/.
+ *
+ * G2: the live grant is itself the authority for the I/O it covers
+ * (`customerDecisionMilestoneGrantAllows`); there is no store role. The former
+ * role name is the grant's issuance right (role-assumption-policy
+ * `shared_core_roles`, checked by authority.ts assertStoreGrantIssuanceAllowed);
+ * it is not an assumable authority role.
  */
-export const CUSTOMER_DECISION_MILESTONE_STORE_ROLE = 'customer_decision_milestone_store';
+export const CUSTOMER_DECISION_MILESTONE_GRANT_ISSUANCE_RIGHT = 'customer_decision_milestone_store';
 
 const CASE_DIR =
   /^knowledge\/confidential\/([a-z][a-z0-9-]{1,30})\/decisions\/[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/u;
@@ -61,9 +76,34 @@ export function customerDecisionMilestoneCapability(
   };
 }
 
+const grants = createSynchronousResourceGrantIssuer<
+  Readonly<{ tenantSlug: string; caseDir: string }>
+>('CUSTOMER_DECISION_MILESTONE_CAPABILITY');
+
+/**
+ * Internal synchronous issuer of one exact milestone ceiling (G2), import-restricted to
+ * mission/mission-bolt-review.ts (boundary test
+ * tests/customer-decision-milestone-capability-boundary.test.ts). The opaque grant exists only
+ * while `internalFn` runs; a structural lookalike, copy or counterfeit resolves nothing.
+ */
+export function withCustomerDecisionMilestoneCapability<T>(
+  tenantSlug: string,
+  caseDir: string,
+  access: CustomerDecisionMilestoneAccess,
+  internalFn: () => T
+): T {
+  const scope = customerDecisionMilestoneCapability(tenantSlug, caseDir, access);
+  return grants.run(Object.freeze({ tenantSlug, caseDir }), scope, internalFn);
+}
+
+/** Pure mandatory guard: only this issuer's live grant with a milestone ceiling resolves. */
 export function isCustomerDecisionMilestoneCapability(
   scope: ResourceAccessScope | undefined
 ): boolean {
+  return Boolean(grants.resolve(scope)) && isMilestoneCeiling(scope);
+}
+
+function isMilestoneCeiling(scope: ResourceAccessScope | undefined): boolean {
   if (
     !scope ||
     scope.organizationId ||
@@ -163,3 +203,49 @@ export function customerDecisionMilestoneWriteProblem(
     return refused('the milestone store may change only milestones_passed and updated_at');
   return null;
 }
+
+/**
+ * Does the live grant authorize this I/O? Only inside its exact ceiling and only where the former
+ * `customer_decision_milestone_store` policy grant reached: under the tenant decisions root, and
+ * the metadata of that root's ancestors (the role-policy metadata rule for a scoped role). Product
+ * schema reads and the Vitest sandbox case stay with the caller's own policy, as under the role.
+ */
+export function customerDecisionMilestoneGrantAllows(
+  target: string,
+  operation: ResourceAccessOperation
+): boolean {
+  const scope = currentResourceAccessScope();
+  if (!scope || !isCustomerDecisionMilestoneCapability(scope)) return false;
+  const root = `knowledge/confidential/${scope.tenantSlug}/decisions`;
+  const under = target === root || target.startsWith(root + '/');
+  const ancestor = operation === 'metadata' && root.startsWith(target + '/');
+  if (!under && !ancestor) return false;
+  return decideResourceAccess(scope, target, operation).allowed;
+}
+
+/** Is a live milestone grant current (its writes are content-checked)? */
+export function customerDecisionMilestoneGrantActive(): boolean {
+  return isCustomerDecisionMilestoneCapability(currentResourceAccessScope());
+}
+
+// G3: tier-guard asks these rules through the store grant registry, not by importing this module.
+// Every write (append counts as a write) inside a live milestone grant is content-checked; a live
+// consumer-lock grant, whose check takes precedence, leaves the write to that check.
+registerStoreGrant({
+  id: 'customer-decision-milestone',
+  active: customerDecisionMilestoneGrantActive,
+  authorizes: (target, operation) => customerDecisionMilestoneGrantAllows(target, operation),
+  narrowing: ({ relativePath, operation, scope, content, readRepoFile }) =>
+    (operation === 'write' || operation === 'append') &&
+    !storeGrantActive('customer-decision-consumer') &&
+    customerDecisionMilestoneGrantActive()
+      ? caseRecordWriteDenial(
+          'milestone',
+          (_relative, previous, next) => customerDecisionMilestoneWriteProblem(previous, next),
+          relativePath,
+          content,
+          scope?.metadataExact?.[0],
+          readRepoFile
+        )
+      : null,
+});

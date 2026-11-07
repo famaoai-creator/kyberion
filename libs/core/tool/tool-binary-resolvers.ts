@@ -204,7 +204,7 @@ export function resolveTailscaleBin(
   return registryCommand('tailscale') ?? 'tailscale';
 }
 
-/** yt-dlp video fetcher for libs/core/video-ingest (never self-updated). */
+/** yt-dlp video fetcher for libs/shared-video/src/ingest (never self-updated). */
 export function resolveYtDlpBin(): string {
   return resolveExternalToolBin('yt_dlp', ['KYBERION_YTDLP_BIN'], 'yt-dlp');
 }

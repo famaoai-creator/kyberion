@@ -1,50 +1,13 @@
 import { engineRuntimeResourceAccessDenial as resourceAccessDenial } from './voice/engine-runtime-preferences-access.js';
-import {
-  PERSONAL_APPROVAL_STORE_ROLE,
-  personalApprovalIoAllowed,
-} from './foundation/personal-approval-io-capability.js';
-import {
-  TASK_SOURCE_WORKSPACE_ROLE,
-  taskSourceWorkspaceIoAllowed,
-} from './foundation/task-source-workspace-capability.js';
-import { personCharterResourceAccessAllowed } from './governance/person-charter-runtime.js';
-import {
-  prPublicationResourceAllowed,
-  PR_PUBLICATION_STORE_ROLE,
-  currentPrPublicationScope,
-} from './governance/pr-publication-runtime.js';
-import {
-  isDiscussionRequestCapability,
-  DISCUSSION_REQUEST_STORAGE_ROLE,
-} from './foundation/discussion-request-capability.js';
-import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
-import {
-  DOT_RESULT_STORE_ROLE,
-  isDotResultStoreCapability,
-} from './foundation/dot-result-store-capability.js';
-import {
-  MEMORY_PROVENANCE_READER_ROLE,
-  memoryProvenanceReadAllowed,
-  isMemoryProvenanceStatePath,
-} from './knowledge/memory-provenance-capability.js';
-import {
-  isPipelineJournalCapability,
-  PIPELINE_JOURNAL_STORE_ROLE,
-} from './foundation/pipeline-journal-capability.js';
-import {
-  isCustomerDecisionInviteCapability,
-  CUSTOMER_DECISION_INVITE_STORE_ROLE,
-} from './foundation/customer-decision-invite-capability.js';
-import {
-  isCustomerDecisionConsumerCapability,
-  CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
-} from './foundation/customer-decision-consumer-capability.js';
-import {
-  isCustomerDecisionMilestoneCapability,
-  CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
-} from './foundation/customer-decision-milestone-capability.js';
+import { isMemoryProvenanceStatePath } from './knowledge/memory-provenance-capability.js';
 import { narrowStoreRoleDenial } from './foundation/narrow-store-role-denial.js';
-import type { WriteContent } from './foundation/customer-decision-write-content.js';
+import { RETIRED_STORE_ROLE_NAMES } from './foundation/retired-store-roles.js';
+import {
+  storeGrantAuthorizes as registeredStoreGrantAuthorizes,
+  storeGrantNarrowingDenial,
+  storeGrantRules,
+} from './foundation/store-grant-registry.js';
+import type { WriteContent } from './foundation/customer-decision-record-content.js';
 /**
  * TypeScript version of the Knowledge Tier Guard.
  * v2.2 - POLICY-AS-CODE (ADF DRIVEN) with Persona Integration
@@ -67,7 +30,7 @@ import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
   partitionedRuntimeStateKnowledgePath,
   partitionedRuntimeStateTierInPath,
-  STORAGE_FLOOR_ROOTS,
+  partitionedRuntimeTierInPath,
   storageFloorTier,
   storageFloorTierInPath,
 } from './storage-layout.js';
@@ -94,7 +57,6 @@ import { currentExecutionScope } from './foundation/execution-scope.js';
 import { informationAssetCoverageReadAllowed } from './foundation/information-asset-coverage-capability.js';
 import {
   currentResourceAccessScope,
-  matchesNamePrefix,
   type ResourceAccessOperation,
 } from './foundation/resource-access-scope.js';
 import type {
@@ -110,6 +72,18 @@ export { TierLevel, TierScope, TierWeightMap, TierValidation, MarkerScanResult }
 
 /** Numeric weight for each tier (higher = more sensitive). */
 export { KNOWLEDGE_TIER_RANK as TIERS } from './foundation/knowledge-tier.js';
+
+/** Does a live store grant authorize this I/O? (G3: asked through the store grant registry.) */
+function storeGrantAuthorizes(
+  target: string,
+  operation: ResourceAccessOperation,
+  rootDir: string
+): boolean {
+  return registeredStoreGrantAuthorizes(target, operation, {
+    rootDir,
+    scope: currentResourceAccessScope(),
+  });
+}
 
 const POLICY_PATH = pathResolver.knowledge('product/governance/security-policy.json');
 
@@ -293,10 +267,10 @@ function expandPolicyPath(pattern: string, missionId?: string, tenantSlug?: stri
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(projectId)) return null;
     pattern = pattern.split(PROJECT_ID_PLACEHOLDER).join(projectId);
   }
-  const customerSlug = getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || 'NONE';
+  const slug = getRegisteredEnvText('KYBERION_STANCE') || getRegisteredEnvText('KYBERION_CUSTOMER');
   return pattern
     .replace('${MISSION_ID}', missionId || 'NONE')
-    .replace('${KYBERION_CUSTOMER}', customerSlug);
+    .replace('${KYBERION_STANCE}', slug?.trim() || 'NONE');
 }
 
 function policyPathMatches(
@@ -560,58 +534,28 @@ function isScopedStructuralMkdir(
   access: { kind: 'read' | 'write' | 'append' | 'mkdir'; role?: string }
 ): boolean {
   if (access.kind !== 'mkdir') return false;
-  if (access.role === DOT_RESULT_STORE_ROLE)
+  // G3: a live store grant may decide its own structural container (the PR publication grant:
+  // the confidential tier container of its own organization tenant's artifact floor or
+  // reservation store), asked through the store grant registry.
+  const scope = currentResourceAccessScope();
+  const prefix = normalizePath(protectedPrefix);
+  const grantRules = storeGrantRules();
+  for (const rule of grantRules) {
+    const decided = rule.structuralMkdir?.(relativePath, prefix, tenantSlug, scope);
+    if (typeof decided === 'boolean') return decided;
+  }
+  if (storeGrantAuthorizes(relativePath, 'mkdir', projectRoot()))
     return Boolean(
       tenantSlug &&
       isRegisteredActiveTenant(tenantSlug) &&
-      currentResourceAccessScope()?.tenantSlug === tenantSlug &&
-      isDotResultStoreCapability(currentResourceAccessScope(), {
-        rootDir: projectRoot(),
-        target: relativePath,
-        operation: 'mkdir',
-      })
+      currentResourceAccessScope()?.tenantSlug === tenantSlug
     );
-  if (access.role === PR_PUBLICATION_STORE_ROLE) {
-    const publication = currentPrPublicationScope();
-    return (
-      publication?.kind === 'organization' &&
-      publication.tenant_slug === tenantSlug &&
-      [
-        `${STORAGE_FLOOR_ROOTS.artifact}/confidential`,
-        `${PARTITIONED_RUNTIME_STATE_ROOTS.external_operations}/confidential`,
-      ].includes(relativePath) &&
-      prPublicationResourceAllowed(relativePath, 'mkdir')
-    );
-  }
-  if (access.role === DISCUSSION_REQUEST_STORAGE_ROLE) {
-    if (
-      !isDiscussionRequestCapability(currentResourceAccessScope()) ||
-      normalizePath(protectedPrefix) !==
-        PARTITIONED_RUNTIME_STATE_ROOTS.discussion_create_requests + '/confidential'
-    )
-      return false;
-  } else if (access.role === 'autonomy_learning_store') {
-    if (
-      !isAutonomyLearningCapability(currentResourceAccessScope()) ||
-      normalizePath(protectedPrefix) !==
-        PARTITIONED_RUNTIME_STATE_ROOTS.autonomy_learning + '/confidential'
-    )
-      return false;
-  } else if (access.role === PIPELINE_JOURNAL_STORE_ROLE) {
-    if (
-      !isPipelineJournalCapability(currentResourceAccessScope()) ||
-      normalizePath(protectedPrefix) !==
-        PARTITIONED_RUNTIME_STATE_ROOTS.pipeline_library_runs + '/confidential'
-    )
-      return false;
-  } else if (access.role === CUSTOMER_DECISION_INVITE_STORE_ROLE) {
-    if (
-      !isCustomerDecisionInviteCapability(currentResourceAccessScope()) ||
-      normalizePath(protectedPrefix) !==
-        PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites + '/confidential'
-    )
-      return false;
-  } else if (access.role !== 'concierge_management_writer') return false;
+  // G2: the invite capability itself (not a role) may create its tenant partition,
+  // under the same shared checks below as every scoped structural mkdir.
+  const sharedChecks = grantRules.some(
+    (rule) => rule.structuralMkdir?.(relativePath, prefix, tenantSlug, scope) === 'shared-checks'
+  );
+  if (!sharedChecks && access.role !== 'concierge_management_writer') return false;
   const resource = currentResourceAccessScope();
   if (
     !tenantSlug ||
@@ -946,63 +890,29 @@ function requestResourceDenial(
     getRegisteredEnvText('SYSTEM_ROLE') ||
     getRegisteredEnvText('MISSION_ROLE');
   const normalizedRole = role?.trim().toLowerCase().replace(/\s+/gu, '_');
-  if (
-    normalizedRole === DOT_RESULT_STORE_ROLE &&
-    !denyCandidatePaths(relativePath).every((target) =>
-      isDotResultStoreCapability(currentResourceAccessScope(), {
-        rootDir: projectRoot(),
-        target,
-        operation,
-      })
-    )
-  )
+  // G2: a former store role name is only its grant's issuance right; a process still running
+  // as one (SYSTEM_ROLE / MISSION_ROLE env) gets no I/O, as the role granted none outside it.
+  if (normalizedRole && RETIRED_STORE_ROLE_NAMES.has(normalizedRole))
     return {
       allowed: false,
-      reason:
-        '[DOT_RESULT_CAPABILITY_REQUIRED] Active exact DOT result operation capability required',
+      reason: `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant issuance right, not a role`,
     };
-  // Old dedicated-store capability validators predate appendExact. An added append path
-  // cannot enlarge their original write or metadata ceiling, even under ambient grants.
-  // Name prefixes count only for a validator that checks them (`withNamePrefixes`).
-  const legacyStoreCapability = (valid: boolean, withNamePrefixes = false): boolean => {
-    if (!valid) return false;
-    const scope = currentResourceAccessScope();
-    if (!scope) return false;
-    if (!withNamePrefixes && (scope.namePrefixExact?.length ?? 0) > 0) return false;
-    const candidates = denyCandidatePaths(relativePath);
-    const prefixed = (target: string): boolean =>
-      withNamePrefixes && operation !== 'mkdir' && matchesNamePrefix(scope, target);
-    if (operation === 'append')
-      return candidates.every((target) => scope.writeExact.includes(target) || prefixed(target));
-    if (operation === 'metadata') {
-      const original = [
-        ...(scope.metadataExact ?? []),
-        ...scope.readExact,
-        ...scope.writeExact,
-        ...scope.mkdirExact,
-      ];
-      return candidates.every(
-        (target) =>
-          prefixed(target) ||
-          original.some(
-            (allowed) => target === allowed || target === '' || allowed.startsWith(target + '/')
-          ) ||
-          (scope.allowProductKnowledgeRead === true &&
-            (target === 'knowledge' ||
-              target === 'knowledge/product' ||
-              target.startsWith('knowledge/product/')))
-      );
-    }
-    return true;
+  const readRepoFile = (relative: string) => {
+    const target = path.join(projectRoot(), relative);
+    return rawExistsSync(target) ? rawReadTextFile(target) : undefined;
   };
-  if (
-    normalizedRole === MEMORY_PROVENANCE_READER_ROLE &&
-    !memoryProvenanceReadAllowed(relativePath, operation)
-  )
-    return {
-      allowed: false,
-      reason: '[MEMORY_PROVENANCE_READ_SCOPE] Read-only exact lineage capability required',
-    };
+  let candidates: string[] | undefined;
+  const grantInput = {
+    relativePath,
+    operation,
+    candidates: () => (candidates ??= denyCandidatePaths(relativePath)),
+    scope: currentResourceAccessScope(),
+    content,
+    readRepoFile,
+  };
+  // G2: a live lineage read grant (no role) narrows every I/O made inside it.
+  const lineageDenial = storeGrantNarrowingDenial(['memory-provenance'], grantInput);
+  if (lineageDenial) return { allowed: false, reason: lineageDenial };
   if (
     (operation === 'write' || operation === 'append' || operation === 'mkdir') &&
     isMemoryProvenanceStatePath(relativePath) &&
@@ -1012,92 +922,17 @@ function requestResourceDenial(
       allowed: false,
       reason: '[MEMORY_PROVENANCE_AUTHORITY] Lineage is outside worker-mutable state',
     };
-  if (
-    normalizedRole === PR_PUBLICATION_STORE_ROLE &&
-    !denyCandidatePaths(relativePath).every((target) =>
-      prPublicationResourceAllowed(target, operation)
-    )
-  )
-    return {
-      allowed: false,
-      reason: '[PR_PUBLICATION_SCOPE] Publication store requires exact host resource capability',
-    };
-  if (
-    normalizedRole === 'person_charter_store' &&
-    !denyCandidatePaths(relativePath).every((target) =>
-      personCharterResourceAccessAllowed(target, operation)
-    )
-  )
-    return {
-      allowed: false,
-      reason:
-        '[PERSON_CHARTER_RESOURCE_DENIED] Person charter IO requires its installed owner and exact resource capability',
-    };
-  if (
-    normalizedRole === 'autonomy_learning_store' &&
-    !legacyStoreCapability(isAutonomyLearningCapability(currentResourceAccessScope()), true)
-  ) {
-    return {
-      allowed: false,
-      reason:
-        '[RESOURCE_SCOPE_REQUIRED] Autonomy learning access requires its exact tenant store capability',
-    };
-  }
-  if (
-    normalizedRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
-    !legacyStoreCapability(isDiscussionRequestCapability(currentResourceAccessScope()))
-  )
-    return {
-      allowed: false,
-      reason:
-        '[RESOURCE_SCOPE_REQUIRED] Discussion receipt access requires its exact tenant request capability',
-    };
-  if (
-    normalizedRole === PIPELINE_JOURNAL_STORE_ROLE &&
-    !legacyStoreCapability(isPipelineJournalCapability(currentResourceAccessScope()))
-  )
-    return {
-      allowed: false,
-      reason:
-        '[RESOURCE_SCOPE_REQUIRED] Pipeline journal access requires its exact tenant journal capability',
-    };
-  if (
-    normalizedRole === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
-    !legacyStoreCapability(isCustomerDecisionInviteCapability(currentResourceAccessScope()))
-  )
-    return {
-      allowed: false,
-      reason:
-        '[RESOURCE_SCOPE_REQUIRED] Customer decision invite access requires its exact tenant invite capability',
-    };
-  if (
-    normalizedRole === CUSTOMER_DECISION_CONSUMER_STORE_ROLE &&
-    !legacyStoreCapability(isCustomerDecisionConsumerCapability(currentResourceAccessScope()))
-  )
-    return {
-      allowed: false,
-      reason:
-        '[RESOURCE_SCOPE_REQUIRED] Customer decision consumer lock access requires its exact case capability',
-    };
-  if (
-    normalizedRole === CUSTOMER_DECISION_MILESTONE_STORE_ROLE &&
-    !legacyStoreCapability(isCustomerDecisionMilestoneCapability(currentResourceAccessScope()))
-  )
-    return {
-      allowed: false,
-      reason:
-        '[RESOURCE_SCOPE_REQUIRED] Customer decision milestone access requires its exact case capability',
-    };
+  // G2: a live PR publication or person charter store grant (no role) narrows every I/O made
+  // inside it, over every literal and canonical candidate of the path.
+  const storeDenial = storeGrantNarrowingDenial(['pr-publication', 'person-charter'], grantInput);
+  if (storeDenial) return { allowed: false, reason: storeDenial };
   const narrowDenial = narrowStoreRoleDenial({
     role: normalizedRole,
     relativePath,
     operation,
     scope: currentResourceAccessScope(),
     content,
-    readRepoFile: (relative) => {
-      const target = path.join(projectRoot(), relative);
-      return rawExistsSync(target) ? rawReadTextFile(target) : undefined;
-    },
+    readRepoFile,
   });
   if (narrowDenial) return { allowed: false, reason: narrowDenial };
   if (
@@ -1183,6 +1018,7 @@ export function validateWritePermission(
     { kind: operation, role: currentRole }
   );
   if (tenantDenial) return tenantDenial;
+  if (storeGrantAuthorizes(relativePath, operation, projectRoot())) return { allowed: true };
 
   // Durable state contains tier data; broad runtime defaults must not grant
   // knowledge-tier writes that this identity does not already possess.
@@ -1191,35 +1027,10 @@ export function validateWritePermission(
     stateKnowledgePath &&
     isProtectedStorageFloorTier(partitionedRuntimeStateTierInPath(relativePath))
   ) {
-    // Dedicated receipt/publication roles grant only their bound real paths,
-    // never knowledge-tier writes.
-    // The exact request ceiling was checked before all ambient/default policy grants.
-    if (
-      (currentRole === DOT_RESULT_STORE_ROLE &&
-        isDotResultStoreCapability(currentResourceAccessScope(), {
-          rootDir: projectRoot(),
-          target: relativePath,
-          operation,
-        })) ||
-      (currentRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
-        isDiscussionRequestCapability(currentResourceAccessScope())) ||
-      (currentRole === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
-        isCustomerDecisionInviteCapability(currentResourceAccessScope())) ||
-      (currentRole === TASK_SOURCE_WORKSPACE_ROLE &&
-        taskSourceWorkspaceIoAllowed(relativePath, operation)) ||
-      (currentRole === PR_PUBLICATION_STORE_ROLE &&
-        prPublicationResourceAllowed(relativePath, operation))
-    )
-      return personaTierWriteDecision(policy, relativePath, identity, operation);
     return personaTierWriteDecision(policy, stateKnowledgePath, identity, operation);
   }
 
   // Dedicated-store tenant partitions skip runtime defaults (tier-guard-tenant-store-partitions.ts).
-  if (
-    currentRole === PERSONAL_APPROVAL_STORE_ROLE &&
-    personalApprovalIoAllowed(relativePath, operation)
-  )
-    return personaTierWriteDecision(policy, relativePath, identity, operation);
   const storeDecision = tenantStorePartitionWriteDecision(policy, relativePath, identity, {
     operation,
     sudoAllows: (scope) => hasScopedSudoAccess(relativePath, scope),
@@ -1307,7 +1118,8 @@ export function detectTier(filePath: string): TierLevel {
     resolved.includes('/active/projects/personal/')
   )
     return 'personal';
-  const stateTier = partitionedRuntimeStateTierInPath(resolved);
+  const stateTier =
+    partitionedRuntimeStateTierInPath(resolved) ?? partitionedRuntimeTierInPath(resolved);
   if (stateTier) return stateTier;
   const floorTier = storageFloorTierInPath(resolved);
   if (floorTier) return floorTier;
@@ -1387,27 +1199,14 @@ export function inspectReadPermission(
         // role's deny_read carve-outs must still see the real ledger path.
         const roleDenial = roleDenyReadDecision(loaded.policy, relativePath, identity);
         if (roleDenial) return roleDenial;
+        if (storeGrantAuthorizes(relativePath, operation, projectRoot())) return { allowed: true };
         const ledgerTier = partitionedRuntimeTier(protectedMatch.prefix);
         if (!ledgerTier) return { allowed: true };
         // A narrow governed reader role (e.g. metrics_cap_reader, assumed by
         // libs/core for cap enforcement) holds an explicit read grant on the
         // ledger root itself; it never widens knowledge/ access.
         if (
-          ((identity.role === DOT_RESULT_STORE_ROLE &&
-            isDotResultStoreCapability(currentResourceAccessScope(), {
-              rootDir: projectRoot(),
-              target: relativePath,
-              operation,
-            })) ||
-            (identity.role === DISCUSSION_REQUEST_STORAGE_ROLE &&
-              isDiscussionRequestCapability(currentResourceAccessScope())) ||
-            (identity.role === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
-              isCustomerDecisionInviteCapability(currentResourceAccessScope())) ||
-            (identity.role === TASK_SOURCE_WORKSPACE_ROLE &&
-              taskSourceWorkspaceIoAllowed(relativePath, operation)) ||
-            (identity.role === PR_PUBLICATION_STORE_ROLE &&
-              prPublicationResourceAllowed(relativePath, operation)) ||
-            informationAssetCoverageReadAllowed(relativePath, identity.role)) &&
+          informationAssetCoverageReadAllowed(relativePath, identity.role) &&
           loaded.policy.authority_role_permissions?.[identity.role]?.allow_read?.some(
             (pattern: string) => {
               const expanded = expandPolicyPath(
@@ -1500,6 +1299,7 @@ export function inspectReadPermission(
     { kind: 'read', role: identity.role }
   );
   if (tenantDenial) return tenantDenial;
+  if (storeGrantAuthorizes(relativePath, operation, projectRoot())) return { allowed: true };
 
   if (operation === 'metadata' && currentResourceAccessScope() && identity.role) {
     const rules = policy.authority_role_permissions?.[identity.role];

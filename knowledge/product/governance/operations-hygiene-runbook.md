@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-05
+last_updated: 2026-11-06
 ---
 
 # Operations Hygiene Runbook
@@ -30,6 +30,39 @@ admission unchanged and must not be promoted into authenticated assurance. Run
 `libs/core/agent/agent-identity.test.ts` and
 `libs/core/organization/nhi-session-admission.test.ts` for history changes, including
 no-op rebinds, release/reassignment, malformed journals and credential exclusion.
+
+## Revocable synchronous storage capabilities
+
+An assumed role and its AsyncLocalStorage scope can survive in separately queued
+callbacks after a synchronous issuer returns. Check live capability membership
+at each I/O policy boundary, as well as at role entry; a `finally` revocation or
+rejection of returned Promises alone does not stop a queued callback whose outer
+callback returns `undefined`. Use the existing private synchronous grant issuer
+for credential material and DOT, retaining exact path, tenant, claim and content
+checks. Do not apply synchronous lifetime semantics to ordinary asynchronous,
+deny-only resource scopes.
+
+Gate credential lifetime with
+`libs/core/foundation/credential-material-capability.test.ts` in
+`registration-tests`: active exact-file admission, separately queued stale-role
+denial, counterfeit/clone refusal and exception/async revocation. Run the real
+credential-allocation unit, grant and dispatch integration suites for broker
+changes. A stale permission result is distinct from proof of secret-byte access;
+secure-io's sensitive-path mediation remains an independent boundary.
+
+## Strict cross-tenant conflict reads
+
+A uniqueness/conflict check must distinguish an absent binding file from a
+failed read. Thread strict mode through the lowest governed file reader:
+malformed JSON, schema errors, unsafe paths and denied I/O must propagate to the
+conflict caller, which refuses the write. Logging and returning an empty list is
+appropriate only for non-strict discovery; it must not turn unknown bindings
+into permission to reuse a channel. Preserve the existing tenant-bound read role.
+
+`customer-channel-binding.test.ts` and `scripts/customer_channel.test.ts` run in
+`registration-tests`. Their regressions cover strict/non-strict reads and real
+bind attempts against malformed/schema-invalid other-tenant data, asserting
+the target's existing bytes remain unchanged.
 
 ## Checkout and canonical implementation drift
 
@@ -489,6 +522,21 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
   registered root; the tenant-state purge test), and the store's own partition test (e.g.
   `delegation-idempotency.test.ts`, `generation-cost-settlement.test.ts`).
 
+### Tenant data migration preflight
+
+- Plan and validate every tenant before the first copy or deletion, including in
+  dry-run. Reject symlinks and unsupported file types; a README exemption applies
+  only to a regular file, never a directory or link that recursive cleanup would
+  discard. Keep source writers quiesced during the operator-reviewed migration.
+- Relink only the declared JSON/JSONL reference files. Copy every other attachment
+  as bytes through secure-io and refuse destination overwrites. Keep real role and
+  path checks in synthetic migration fixtures; `migration/0003-deal-home.test.ts`
+  exercises dry-run, byte preservation, existing targets and preflight failures in
+  `registration-tests`.
+- Copy-and-delete is not a multi-tenant transaction. An I/O failure can leave a
+  partial destination while the source remains. Inspect and reconcile it manually;
+  do not delete originals or bypass the existing-target refusal to force a retry.
+
 ### Immutable scoped evidence attempts
 
 - Use `writeScopedArtifactAttempt` / `readScopedArtifactAttempt` in `libs/core/workforce/artifact-store.ts` for immutable, repeatable evidence. Keep the full evaluation binding in the parent key and keep the effect identity stable across evaluation revisions. Use the existing owner scope, artifact class and index; never introduce a parallel ledger or put tenant evidence in the system partition.
@@ -714,6 +762,49 @@ this contract; a faster Linux run alone is not evidence that macOS CI passed.
 - Tests never write live `active/` state. CI runs the leak guard in strict mode
   (`KYBERION_TEST_LEAK_STRICT=1`, forwarded to the Vitest child by `pnpm test`). Any created or
   grown file outside the sandbox roots fails the job.
+- Apply the existing Vitest live-path redirect to both the master audit stream and
+  tenant mirrors. A mirror must retain its fixed `confidential/<tenant>` partition;
+  a custom owned root must still work unchanged. `audit-chain-tenant.test.ts`
+  checks redirected writes, absence at the canonical mirror, and verification.
+  Root-isolated tests that temporarily disable Vitest redirection must also isolate
+  the process-global audit singleton: save its property descriptor, remove it before
+  importing the fixture stack, and restore it after work settles. Module resets
+  alone do not reset `Symbol.for('@kyberion/audit-chain')`.
+  Audit-only suites with mocked I/O must refresh both that singleton and the cached
+  audit module when selecting a new fixture root. For guards caching a lazy import,
+  restore the same hoisted mock sink after an import-failure case; replacing its
+  identity makes later assertions observe a different sink. Preserve failure and
+  reentrancy assertions, and run seeds 222, 7 and 20261008 under parallel load.
+- Copy regenerable policy/schema fixture files with guarded `safeCopyFileSync`,
+  rather than durable `safeWriteFile` for every copied file. Thousands of file and
+  parent-directory fsyncs can exhaust setup budgets under parallel load. Retain
+  secure path checks, real policy/schema contents and bounded hooks; do not change
+  production durability or raise timeouts to hide fixture preparation costs.
+- Tests of provider auto-selection must explicitly scope inherited backend/profile
+  environment variables and restore them afterward. Partial boundary mocks must
+  retain real grant issuers and compile real schemas; a new fallback validation
+  requirement is not a reason to replace validation with an always-valid stub.
+- Policy-overlay fixtures must assert the resolved policy switch before testing
+  permission decisions. A facade rename requires updating both the mocked module
+  and the method; an unused virtual mock can otherwise leave the default policy
+  active. `custody-provider-attestation-governance.test.ts` checks SoD is enabled
+  before its system self-approval and person-consent cases; `registration-tests`
+  runs it alongside the tenant observability store registration contract.
+- When merging a new public export across a module move, retain the public name
+  only with its types and runtime targets pointing at the canonical built module.
+  A subpath-count baseline does not prove those files exist. Run the workspace
+  build contract (`registration-tests`) and the full runtime import contract;
+  never recreate a deleted implementation just to satisfy an old alias path.
+  After moving or removing package sources, run the canonical clean `pnpm build`
+  before checking built ownership: incremental package builds can leave the old
+  `.js`, `.d.ts` and source maps behind. Keep the workspace contract's negative
+  assertions for retired outputs as well as its checks of the new targets.
+  Audit workflow inline probes too: use the published package subpath and current
+  API rather than a retired direct dist path. The workspace build contract pins
+  the Cross-OS stance probe so source moves cannot silently strand that lane.
+  Keep moved tests in the CI dispatcher's selection too: core/unit suites include
+  shared libraries. Verify the actual Vitest file filters after a package move;
+  the root Vitest include list alone does not establish sharded CI coverage.
 - Shared seam mechanisms must remain real in boundary tests. Use a partial mock
   with `createSeamCatalog()` to isolate registration state, rather than copying
   the seam API into a hand-written mock that omits new lifecycle helpers or
@@ -738,6 +829,37 @@ this contract; a faster Linux run alone is not evidence that macOS CI passed.
   `beforeAll` with an explicit hook timeout (e.g. `60_000`) so its one-time load is not charged
   to the first test's 10s budget ([WRITING_TESTS](../../../docs/developer/WRITING_TESTS.md#fixture-roots)
   lists the accepted exceptions).
+- Tests of default protected-store paths must bind both the selected root and
+  primary-checkout root to an owned scratch fixture before the first authority
+  import or write. Seed real policy/schema inputs, set root environment first,
+  then import once and assert both roots before calling the default API. Never
+  clean up a tenant parent in the real primary checkout. The enforcing regression
+  includes `governance/delegated-execution.production-path.integration.test.ts`,
+  `pipeline/pipeline-run-journal.tenant-store.test.ts` and
+  `governance/autonomy-action-state.production-role.test.ts` in `registration-tests`;
+  they retain actual store roles and default path selection. Restore only the
+  per-test environment keys between cases; a blanket environment reset can drop
+  the suite's fixture root before a later lazy import. Shuffle the affected suites
+  with seeds 222, 7 and 20261008 when repairing root isolation.
+  Seed only installation prerequisites: `runtime-readiness.ts` requires
+  `active/shared/runtime`. Leave each store's domain/tier/tenant directories
+  absent so its bounded facade must create them; precreating those directories
+  would hide a first-use capability failure.
+- Strict snapshot fixtures must bind each process's trusted root to their owned
+  fixture, including resumed children, and assert selected/primary root agreement.
+  Snapshot checks include ancestor namespace metadata up to that root: unrelated
+  creation or removal under shared scratch can correctly reject an otherwise
+  stable leaf. Keep the ancestor checks and real policy/schema inputs; isolate
+  the trusted namespace rather than retrying a rejected snapshot or mocking the
+  guard. `dot-event-continuation.test.ts` retains the 2001-event durable resume
+  and duplicate-effect checks under this boundary.
+- Content-leak oracles must scan every public output floor of their owned fixture,
+  including its scratch and mission files, rather than another suite's checkout
+  under shared scratch. Keep canonical directory errors visible; do not swallow
+  them or prune owned outputs to make the oracle pass. The CD-09 worker fixture
+  binds selected/primary/shared/mission paths to one real-policy root before its
+  first import. Reproduce it alongside CLI P06/P07 scratch creation/removal, then
+  run the standard three shuffle seeds; `registration-tests` enforces the oracle.
 - A test must not depend on load or order. Run a suspect file with
   `--sequence.shuffle --sequence.seed=<n>` (at least 222, 7 and 20261008) and under parallel load
   before calling it fixed. Five defect classes caused the 2026-10 load and order failures:
@@ -1096,7 +1218,7 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
    `scope-offboarding.test.ts` case for the purge.
 3. Verify onboarding-flow commands with the real CLI in a throwaway worktree.
    - Create the throwaway company with `pnpm onboarding company … --slug probe-co --tenant-slug probe-co`.
-   - Then run `tenant:activation plan|probe` and `work create-item` with `KYBERION_CUSTOMER`,
+   - Then run `tenant:activation plan|probe` and `work create-item` with `KYBERION_STANCE`,
      `KYBERION_TENANT_SCOPE_REQUIRED=true` and `KYBERION_PERSONA=sovereign`.
    - Remove the throwaway state afterwards: `customer/`, `knowledge/personal/tenants/`,
      `knowledge/confidential/`, `active/organizations/`.
@@ -2233,7 +2355,7 @@ Persist a fresh UUID, original minimal routing and the canonical scope digest be
 
 The server exclusively publishes a permanent reservation in the protected confidential tenant receipt store before creating the deterministic room. Store only actor/scope metadata and the normalized intent digest, not another copy of the goal. Only the reservation winner may create the original bound room event and publish the immutable accepted receipt, then return the single launch decision. Duplicates and recovery GETs never launch, repair or create a replacement room, even when the original process stopped before its first provider claim. Readiness blockers can publish a permanent rejection only before room creation; accepted and rejected receipts share one exclusive terminal path and cannot overwrite one another.
 
-The dedicated discussion_request_store role requires an exact deny-only two-file capability for that tenant, actor, scope and UUID. It grants no knowledge access and cannot read room logs or call providers. Recovery has no write or mkdir paths. Reauthorize the original canonical mission and current confidential viewer scope before receipt lookup; validate the immutable room_created event and binding before returning its exact room. A strictly verified original room event can recover that room read-only when its terminal receipt is missing; created means room existence, never proof that provider execution started. Missing room/binding evidence and inaccessible, malformed, torn or conflicting evidence remain unconfirmed. Never use room-list presence or a generic HTTP error as proof of matching intent or nonexecution.
+Receipt I/O is authorized by the opaque Discussion request grant alone (no store role): an exact deny-only two-file grant for that tenant, actor, scope and UUID, issued only by the receipt facade where the discussion_request_store issuance right is held (role-assumption-policy, Concierge). It grants no knowledge access and cannot read room logs or call providers. Recovery has no write or mkdir paths. Reauthorize the original canonical mission and current confidential viewer scope before receipt lookup; validate the immutable room_created event and binding before returning its exact room. A strictly verified original room event can recover that room read-only when its terminal receipt is missing; created means room existence, never proof that provider execution started. Missing room/binding evidence and inaccessible, malformed, torn or conflicting evidence remain unconfirmed. Never use room-list presence or a generic HTTP error as proof of matching intent or nonexecution.
 
 Bound the HTTP wait through body parsing. A timeout or abort ends only the browser wait, not server/provider execution. Preserve unresolved handles across reload, Back and navigation; block replacement generation in every mode. Read-only Check request can reconcile each retained handle independently. A late result must not steal navigation; open a positively matched room only through its explicit read-only action. Clear a pending handle only after exact created evidence or a durable terminal rejection; GET absence remains inconclusive while the first POST may still arrive. Storage failures before POST must fail closed.
 

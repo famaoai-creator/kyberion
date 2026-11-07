@@ -9,7 +9,7 @@
  * the Host header) and `requestOrigin`.
  */
 
-import { fixedWindowLimiter } from '../rate-limit.js';
+import { fixedWindowLimiter } from '../foundation/rate-limit.js';
 import { loadRuntimeControlPolicy } from '../runtime-control-policy.js';
 import {
   completeOidcLogin,

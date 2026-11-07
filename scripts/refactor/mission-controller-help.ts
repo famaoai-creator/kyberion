@@ -173,7 +173,7 @@ Maintenance Commands:
     sync                           Sync mission registry
   organization-catalogs [--json] [--organization-id <ORG>] [--selected-only] [--summary]
                                  List available organization team template catalogs
-  organization-profiles [--json] [--organization-id <ORG>] [--active-only] [--ready-only] [--missing-only] [--source <customer|public>] [--summary]
+  organization-profiles [--json] [--organization-id <ORG>] [--active-only] [--ready-only] [--missing-only] [--source <tenant|public>] [--summary]
                                  List available organization profiles
   organization-profile [--json] [--organization-id <ORG>] [--summary]
                                  Show the resolved organization profile and defaults
@@ -195,10 +195,10 @@ Mission Input Contract:
     --tier <personal|confidential|public>
     --tenant-id <TENANT>
     --tenant-slug <slug>           # multi-tenant isolation (^[a-z][a-z0-9-]{1,30}$)
-    --organization-id <ORG>        # selects KYBERION_CUSTOMER for org-specific defaults
+    --organization-id <ORG>        # selects KYBERION_STANCE for org-specific defaults
     --org <ORG>                    # alias for --organization-id
     --mission-type <TYPE>          # e.g. development | code_change | refactoring | operations_report
-    --vision-ref <REF>            Defaults to the active customer vision when KYBERION_CUSTOMER is set
+    --vision-ref <REF>            Defaults to the active customer vision when KYBERION_STANCE is set
     --persona <NAME>
     --dry-run
     --relationships <JSON>
@@ -213,7 +213,7 @@ Organization Selection:
   --active-only                  Filter organization-profiles to the selected organization only
   --ready-only                   Filter organization-profiles to ready profiles only
   --missing-only                 Filter organization-profiles to missing profiles only
-  --source <customer|public>     Filter organization-profiles by source
+  --source <tenant|public>       Filter organization-profiles by source
   Guide: knowledge/product/orchestration/organization-selection-guide.md
 
 Organization Discovery:

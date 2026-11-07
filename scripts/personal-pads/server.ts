@@ -18,7 +18,7 @@ import {
 } from '../lib/local-artifact-pad.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { handlePadUiAsset, resolvePadLocale } from '../lib/pad-ui.js';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import type { PluginHost } from '@agent/core/plugin/plugin-host';
 import { PluginViewError, pluginViewErrorStatus } from '@agent/core/plugin/plugin-view-contract';
 import type { VocabularyKey } from '@agent/core/t';

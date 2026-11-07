@@ -3,7 +3,7 @@ import {
   listScheduledPipelines,
   isScheduledPipelineDue,
   type ScheduledPipeline,
-} from '@agent/core/pipeline-scheduler';
+} from '@agent/core/pipeline/pipeline-scheduler';
 import { listGenerationSchedules } from '@agent/core/generation-scheduler';
 import { pathResolver } from '@agent/core/path-resolver';
 import { statusColor, theme } from '../theme.js';

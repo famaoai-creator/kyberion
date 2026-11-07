@@ -28,7 +28,7 @@ import {
 } from '@agent/core/secure-io';
 import { getRetryDefaults } from '@agent/core/async-utils';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '@agent/core/seam';
-import { VoiceGenerationRuntime } from '@agent/core/voice/voice-generation-runtime';
+import { VoiceGenerationRuntime } from '@agent/shared-voice/voice-generation-runtime';
 import { waitForJob } from '@agent/core/job-lifecycle';
 import { getRegisteredEnvText, isRecord, parseSafeJsonInput } from '@agent/core/foundation';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';

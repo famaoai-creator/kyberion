@@ -11,7 +11,7 @@ import { ResourceTemplate, type McpServer } from '@modelcontextprotocol/sdk/serv
 import { z } from 'zod';
 import { resolveMcpRequestContext } from '@agent/core/mcp-request-context';
 import { resolveScopeResolution } from '@agent/core/scope-context';
-import { formatWireError } from '@agent/core/wire-error';
+import { formatWireError } from '@agent/core/contracts/wire-error';
 import {
   getTransferableSkill,
   listTransferableSkills,

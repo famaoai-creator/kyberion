@@ -78,13 +78,13 @@ verification half of a reproduction run — extract → render via the
 `media-docx-roundtrip` template, then `pnpm kyberion diff <source> <output>`.
 
 `draw` is the inverse of `see`. The unifier is the image-generation bridge
-(`generateImage` / `planImageGeneration` in `libs/core/media/image-generation-bridge.ts`),
+(`generateImage` / `planImageGeneration` in `libs/shared-media/src/image-generation-bridge.ts`),
 which already hides the provider behind one router. What kept the row empty was the
 egress decision, so the verb owns exactly that and nothing else: by default only
 providers that keep the data on this machine and finish unattended are eligible;
 `--allow-cloud` adds cloud providers and `--allow-handoff` adds host-agent hand-off as
 a last resort (exit 100; the rerun collects the image only if the host saved it for
-that request — `libs/core/host-image-handoff.ts` — never a file that was already there). The gate is an explicit provider allowlist
+that request — `libs/shared-media/src/host-image-handoff.ts` — never a file that was already there). The gate is an explicit provider allowlist
 (`ImageGenerationRequest.allowedProviders`) that the router enforces on every selection
 path — `mode: 'local_only'` alone is not enough, because host bridges run locally but
 forward the request to the host agent's model. Reference images (`--ref`) follow PA-10:

@@ -2,7 +2,10 @@ import * as path from 'node:path';
 import { readConfiguredActorIdentity } from '../identity-context-bridge.js';
 import { auditChain, withAuditChainLock } from '../governance/audit-chain.js';
 import { readJson, writeJson } from '../foundation/json.js';
-import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
+import {
+  runtimeStatePath,
+  TENANT_AUDIT_MIRROR_ROOT_PATH,
+} from '../foundation/runtime-state-roots.js';
 import {
   defaultTenantKnowledgeRoot,
   readTenantProfile,
@@ -12,13 +15,16 @@ import {
   type TenantRegistryPathOptions,
 } from './tenant-registry.js';
 import { pathResolver } from '../path-resolver.js';
+import { withExecutionContext } from '../authority.js';
 import {
   safeExistsSync,
   safeMkdir,
   safeMoveSync,
   safeReadFile,
   safeReaddir,
+  safeRmSync,
   safeStat,
+  safeWriteFile,
 } from '../secure-io.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 
@@ -40,7 +46,7 @@ export type TenantLifecycleVerb = 'create' | 'update' | 'suspend' | 'resume' | '
 
 /** One directory or file relocation the rename performs. */
 export interface TenantRenameMove {
-  kind: 'profile' | 'knowledge_root' | 'organization_state' | 'customer_overlay';
+  kind: 'profile' | 'knowledge_root' | 'organization_state' | 'audit_mirror';
   from: string;
   to: string;
 }
@@ -98,7 +104,6 @@ const RENAME_SCAN_ROOTS = [
   'active/organizations',
   runtimeStatePath('organization.projectsRoot').physicalPath,
   'active/missions',
-  'customer',
 ] as const;
 
 const RENAME_SCAN_EXTENSIONS = ['.json', '.md', '.css', '.ts', '.html'];
@@ -328,22 +333,39 @@ export function renameTenantWithPlan(input: TenantRenameInput): TenantRenameResu
     }
   }
 
-  // 4. Customer stance overlay, if the tenant has one.
-  const fromOverlay = path.join(rootDir, 'customer', fromSlug);
-  if (safeExistsSync(fromOverlay)) {
-    const toOverlay = path.join(rootDir, 'customer', toSlug);
+  // 4. The tenant's audit mirror partition. Moving it under the audit chain
+  //     lock keeps every append on one side of the move, and the marker records
+  //     where: mirror reconcile counts the old slug's earlier entries as the new
+  //     slug's (see audit_mirror_reconcile.ts).
+  const fromMirror = path.join(rootDir, TENANT_AUDIT_MIRROR_ROOT_PATH, 'confidential', fromSlug);
+  if (safeExistsSync(fromMirror)) {
+    const toMirror = path.join(rootDir, TENANT_AUDIT_MIRROR_ROOT_PATH, 'confidential', toSlug);
     moves.push({
-      kind: 'customer_overlay',
-      from: relative(rootDir, fromOverlay),
-      to: relative(rootDir, toOverlay),
+      kind: 'audit_mirror',
+      from: relative(rootDir, fromMirror),
+      to: relative(rootDir, toMirror),
     });
     if (apply) {
-      // The overlay holds the tenant's audit mirror. Moving it under the audit
-      // chain lock keeps every append on one side of the move, and the marker
-      // records where: mirror reconcile counts the old slug's earlier entries
-      // as the new slug's (see audit_mirror_reconcile.ts).
+      // Only audit_mirror_writer, bound to one tenant, may write a mirror
+      // partition: copy into the new slug's partition, then clear the old one.
       withAuditChainLock(() => {
-        safeMoveSync(fromOverlay, toOverlay);
+        const files = safeReaddir(fromMirror).sort();
+        withExecutionContext(
+          'audit_mirror_writer',
+          () => {
+            safeMkdir(toMirror, { recursive: true });
+            for (const file of files)
+              safeWriteFile(path.join(toMirror, file), safeReadFile(path.join(fromMirror, file)));
+          },
+          undefined,
+          toSlug
+        );
+        withExecutionContext(
+          'audit_mirror_writer',
+          () => safeRmSync(fromMirror, { recursive: true, force: true }),
+          undefined,
+          fromSlug
+        );
         mirrorMovedId = auditChain.recordHeld(mirrorMovedEntry).id;
       });
     }

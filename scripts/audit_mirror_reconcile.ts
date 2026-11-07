@@ -1,5 +1,6 @@
 /**
- * SA-01: reconcile customer stance audit mirrors against the master chain.
+ * SA-01: reconcile the per-tenant audit mirrors
+ * (active/shared/runtime/audit-mirror/confidential/{tenant}/) against the master chain.
  *
  * The master chain is authoritative. A stale mirror is never deleted: it is
  * moved to the governed recoverable archive, and a mirror is rebuilt only when
@@ -39,13 +40,15 @@ import {
 } from '@agent/core/governance/approval-store';
 import { consumeApprovalWithin } from '@agent/core/governance/approval-revocation';
 import { missionEvidenceDir, pathResolver } from '@agent/core/path-resolver';
+import { PARTITIONED_RUNTIME_LEDGER_ROOTS } from '@agent/core/storage-layout';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeMoveSync,
+  safeReadFile,
   safeReaddir,
   safeLstat,
+  safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
@@ -294,18 +297,18 @@ function collectFindingsAndMaster(rootDir: string): {
   findings: AuditMirrorFinding[];
   masterByTenant: Map<string, AuditEntry[]>;
 } {
-  const customersRoot = assertSafeRepositoryPath(path.join(rootDir, 'customer'), {
-    allowMissingLeaf: true,
-    rootDir,
-  });
+  const mirrorsRoot = assertSafeRepositoryPath(
+    path.join(rootDir, PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_audit_mirror, 'confidential'),
+    { allowMissingLeaf: true, rootDir }
+  );
   const master = loadMasterEntries(rootDir);
   const masterByTenant = masterEntriesByTenant(rootDir, master);
   // Every readable master copy, of any tenant or none: an entry readable there is not lost.
   const masterCopies = new Set(master.map((entry) => `${entry.id}\u0000${entry.currentHash}`));
   const findings: AuditMirrorFinding[] = [];
 
-  for (const slug of directories(customersRoot, rootDir)) {
-    const mirrorDir = assertSafeRepositoryPath(path.join(customersRoot, slug, 'logs', 'audit'), {
+  for (const slug of directories(mirrorsRoot, rootDir)) {
+    const mirrorDir = assertSafeRepositoryPath(path.join(mirrorsRoot, slug), {
       allowMissingLeaf: true,
       rootDir,
     });
@@ -432,7 +435,7 @@ export function openAuditMirrorApproval(input: {
     kind: 'mission_gate',
     draft: {
       title: `SA-01 audit mirror reconciliation: ${missionId}`,
-      summary: `Approve quarantine of stale stance mirrors and rebuild from the master chain.${mirrorOnlyNote}`,
+      summary: `Approve quarantine of stale tenant audit mirrors and rebuild from the master chain.${mirrorOnlyNote}`,
       details: JSON.stringify(findings, null, 2),
       severity: 'high',
     },
@@ -445,7 +448,7 @@ export function openAuditMirrorApproval(input: {
     },
     justification: {
       reason: 'SA-01 tenant audit mirrors no longer match the authoritative master chain.',
-      impactSummary: `Only the existing customer/{slug}/logs/audit mirror is moved to recoverable archive; master audit records are retained.${mirrorOnlyNote}`,
+      impactSummary: `Only the existing tenant audit mirror (active/shared/runtime/audit-mirror/confidential/{slug}/) is moved to recoverable archive; master audit records are retained.${mirrorOnlyNote}`,
       requestedEffects: [AUDIT_MIRROR_EFFECT_BINDING],
     },
     risk: {
@@ -642,20 +645,31 @@ export function runAuditMirrorReconciliation(input: {
                   allowMissingLeaf: true,
                   rootDir,
                 });
-                safeMkdir(path.dirname(destination), { recursive: true });
-                safeMoveSync(source, destination);
+                // Copy into the archive, then clear the mirror as its only writer
+                // (audit_mirror_writer, bound to the mirror's tenant).
+                safeMkdir(destination, { recursive: true });
+                for (const file of safeReaddir(source).sort())
+                  safeWriteFile(
+                    path.join(destination, file),
+                    safeReadFile(path.join(source, file))
+                  );
+                const entries = masterByTenant.get(finding.slug) || [];
+                withExecutionContext(
+                  'audit_mirror_writer',
+                  () => {
+                    safeRmSync(source, { recursive: true, force: true });
+                    if (finding.action === 'quarantine_and_rebuild')
+                      rebuildMirror(source, entries, rootDir);
+                  },
+                  undefined,
+                  finding.slug
+                );
                 receipt.archived.push({
                   from: finding.path,
                   to: path.relative(rootDir, destination).replaceAll(path.sep, '/'),
                 });
 
                 if (finding.action === 'quarantine_and_rebuild') {
-                  const mirrorDir = assertSafeRepositoryPath(path.join(rootDir, finding.path), {
-                    allowMissingLeaf: true,
-                    rootDir,
-                  });
-                  const entries = masterByTenant.get(finding.slug) || [];
-                  rebuildMirror(mirrorDir, entries, rootDir);
                   receipt.rebuilt.push({
                     slug: finding.slug,
                     path: finding.path,

@@ -34,7 +34,7 @@ import {
   listApprovalRequests,
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
-import { normalizeRejectionReasonCategory } from '@agent/core/rejection-reason';
+import { normalizeRejectionReasonCategory } from '@agent/core/contracts/rejection-reason';
 import { t as catalogT } from '@agent/core/t';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { parseSafeJsonObjectInput } from '../lib/json-input.js';
@@ -43,7 +43,7 @@ import { loadMissionBriefAtPath } from './mission-brief.js';
 import type { MissionBrief } from './mission-brief.js';
 import { renderMissionBriefHtml } from './render-brief.js';
 import { resolvePadLocale } from '../lib/pad-ui.js';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 
 const ALIGNMENT_CHANNEL = 'brief';
 const MAX_BODY_BYTES = 256 * 1024;

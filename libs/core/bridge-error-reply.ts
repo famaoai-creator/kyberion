@@ -1,7 +1,7 @@
 import { buildUserFacingError } from './error-classifier.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
 import { logger } from './core.js';
-import { fixedWindowLimiter } from './rate-limit.js';
+import { fixedWindowLimiter } from './foundation/rate-limit.js';
 import { loadRuntimeControlPolicy } from './runtime-control-policy.js';
 
 /**

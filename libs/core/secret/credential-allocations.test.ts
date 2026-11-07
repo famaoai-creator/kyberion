@@ -7,6 +7,8 @@ import {
   withTaskCredentialBinding,
 } from '../foundation/credential-binding.js';
 import { resolveRole, withExecutionContext } from '../authority.js';
+import { isCredentialMaterialCapability } from '../foundation/credential-material-capability.js';
+import { currentResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { mintScopeEnvelope, withScopeEnvelope } from '../scope-envelope.js';
 const state = vi.hoisted(() => ({
   key: 'allocated-test-key',
@@ -72,7 +74,9 @@ vi.mock('../foundation/json.js', async (original) => {
       const normalized = path.replaceAll('\\', '/');
       if (!normalized.includes('/personal/connections/')) return actual.readJson(path);
       state.read(path);
-      expect(resolveRole()).toBe('credential_material_reader');
+      // G2: the live material grant (not a reader role) authorizes the read.
+      expect(resolveRole()).not.toBe('credential_material_reader');
+      expect(isCredentialMaterialCapability(currentResourceAccessScope())).toBe(true);
       expect(normalized).toMatch(/knowledge\/personal\/connections\/anthropic\.json$/);
       return { api_key: state.key };
     },

@@ -19,7 +19,7 @@ import {
   resetOcrProviders,
   ensureBuiltinOcrProviders,
 } from './ocr-bridge.js';
-import { OcrProvider } from './ocr-types.js';
+import { OcrProvider } from './contracts/ocr-types.js';
 
 describe('OCR execution budget', () => {
   it('cancels a pending provider at the shared deadline without starting a fallback', async () => {

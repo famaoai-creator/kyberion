@@ -1,22 +1,48 @@
+/** Internal exact Discussion request receipt ceiling. Only the governed receipt facade may issue it. */
 import * as path from 'node:path';
-import type { ResourceAccessScope } from './resource-access-scope.js';
+import {
+  createSynchronousResourceGrantIssuer,
+  decideResourceAccess,
+  type ResourceAccessScope,
+} from './resource-access-scope.js';
 import { isValidTenantSlug } from './scope.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from './runtime-state-roots.js';
+import { registerStoreGrant } from './store-grant-registry.js';
 
-export const DISCUSSION_REQUEST_STORAGE_ROLE = 'discussion_request_store';
+/**
+ * Issuance right of the Discussion request grant (G2). The former store role of this name is
+ * gone: the grant alone authorizes receipt I/O. The name stays only in
+ * role-assumption-policy `may_assume` (Concierge), which decides which processes may issue the
+ * grant (authority.ts assertStoreGrantIssuanceAllowed); it is not an assumable authority role.
+ */
+export const DISCUSSION_REQUEST_GRANT_ISSUANCE_RIGHT = 'discussion_request_store';
 const ROOT = PARTITIONED_RUNTIME_STATE_ROOTS.discussion_create_requests;
 const HASH = /^[a-f0-9]{64}$/u;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
-/** A capability is limited to the two immutable records of one scoped request. */
-export function discussionRequestCapability(
+export interface DiscussionRequestBinding {
+  /** Repository-relative request directory: `<root>/confidential/<tenant>/by-actor/<hash>/<hash>/<uuid>`. */
+  directory: string;
+  tenant: string;
+  write: boolean;
+}
+const grants = createSynchronousResourceGrantIssuer<DiscussionRequestBinding>(
+  'DISCUSSION_REQUEST_CAPABILITY'
+);
+
+/** The ceiling is limited to the two immutable records of one scoped request. */
+function discussionRequestCeiling(
   directory: string,
   tenant: string,
   write: boolean
 ): ResourceAccessScope {
   const prefix = ROOT + '/confidential/' + tenant + '/by-actor/';
-  const parts = directory.startsWith(prefix) ? directory.slice(prefix.length).split('/') : [];
+  const parts =
+    typeof directory === 'string' && directory.startsWith(prefix)
+      ? directory.slice(prefix.length).split('/')
+      : [];
   if (
+    typeof write !== 'boolean' ||
     !isValidTenantSlug(tenant) ||
     path.posix.normalize(directory) !== directory ||
     parts.length !== 3 ||
@@ -42,30 +68,65 @@ export function discussionRequestCapability(
   };
 }
 
+/**
+ * Internal synchronous issuer, import-restricted to discussion/discussion-request-storage-scope.ts,
+ * which checks the issuance right first. No role is assumed: tier-guard treats the active grant
+ * itself as the authority for the I/O it covers. The opaque grant exists only while
+ * `internalFn` runs; a structural lookalike resolves nothing.
+ */
+export function withDiscussionRequestCapability<T>(
+  input: DiscussionRequestBinding,
+  internalFn: () => T
+): T {
+  const binding = Object.freeze({
+    directory: input?.directory,
+    tenant: input?.tenant,
+    write: input?.write,
+  });
+  const scope = discussionRequestCeiling(binding.directory, binding.tenant, binding.write);
+  return grants.run(binding, scope, internalFn);
+}
+
+/** Pure mandatory guard: only this issuer's live, exact grant resolves. */
 export function isDiscussionRequestCapability(scope: ResourceAccessScope | undefined): boolean {
+  const grant = grants.resolve(scope);
+  if (!grant) return false;
+  const live = grant.scope;
   if (
-    !scope ||
-    scope.readExact.length !== 2 ||
-    (scope.metadataExact?.length ?? 0) !== 0 ||
-    scope.allowProductKnowledgeRead === true ||
-    scope.organizationId ||
-    scope.projectId
+    (live.metadataExact?.length ?? 0) !== 0 ||
+    (live.appendExact?.length ?? 0) !== 0 ||
+    (live.namePrefixExact?.length ?? 0) !== 0 ||
+    live.allowProductKnowledgeRead === true ||
+    live.organizationId ||
+    live.projectId
   )
     return false;
   try {
-    const expected = discussionRequestCapability(
-      path.posix.dirname(scope.readExact[0]!),
-      scope.tenantSlug,
-      scope.writeExact.length > 0
+    const expected = discussionRequestCeiling(
+      grant.binding.directory,
+      grant.binding.tenant,
+      grant.binding.write
     );
     const same = (a: readonly string[], b: readonly string[]) =>
       a.length === b.length && a.every((item, i) => item === b[i]);
     return (
-      same(scope.readExact, expected.readExact) &&
-      same(scope.writeExact, expected.writeExact) &&
-      same(scope.mkdirExact, expected.mkdirExact)
+      live.tenantSlug === expected.tenantSlug &&
+      same(live.readExact, expected.readExact) &&
+      same(live.writeExact, expected.writeExact) &&
+      same(live.mkdirExact, expected.mkdirExact)
     );
   } catch {
     return false;
   }
 }
+
+// G3: tier-guard asks these rules through the store grant registry, not by importing this module.
+// Its issuer-frozen ceiling (the two records of one request; read-only recovery has no write or
+// mkdir) has no append, metadata or name-prefix grant to enlarge.
+registerStoreGrant({
+  id: 'discussion-request',
+  authorizes: (target, operation, { scope }) =>
+    !!scope &&
+    isDiscussionRequestCapability(scope) &&
+    decideResourceAccess(scope, target, operation).allowed,
+});

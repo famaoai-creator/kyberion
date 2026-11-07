@@ -1,5 +1,5 @@
 import { governVcsCommand } from './external-vcs.js';
-import { computeApprovalPayloadHash } from '../governance/approval-store.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
 import { assertNotFlagLike } from './git-arguments.js';
 export { assertNotFlagLike } from './git-arguments.js';
 import {

@@ -9,7 +9,7 @@ import {
   listBrowserAutomationRuntimeBridges,
   resolveBrowserAutomationRuntime,
   type BrowserAutomationRuntimeCapabilities,
-} from '@agent/core/browser/browser-automation-runtime-bridge';
+} from '@agent/shared-vision/browser-automation-runtime-bridge';
 import { logger } from '@agent/core/core';
 import {
   resolveSeamProviderDecision,

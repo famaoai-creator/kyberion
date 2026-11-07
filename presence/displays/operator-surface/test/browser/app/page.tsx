@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { KbI18nProvider } from '@agent/shared-ui';
-import { pickByLocale } from '@agent/core/locale-normalize';
+import { pickByLocale } from '@agent/core/foundation/locale-normalize';
 import SelectionSettings from '../../../src/components/SelectionSettings';
 import { operatorUiMessages, type OperatorLocale } from '../../../src/lib/i18n';
 import {

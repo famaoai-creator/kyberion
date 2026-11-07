@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
 import { isRecord } from '../foundation/text.js';
-import { OcrResult, OcrProvider } from '../ocr-types.js';
+import { OcrResult, OcrProvider } from '../contracts/ocr-types.js';
 
 export function providerDataPolicy(provider: OcrProvider): NonNullable<OcrProvider['dataPolicy']> {
   if (provider.dataPolicy) return provider.dataPolicy;

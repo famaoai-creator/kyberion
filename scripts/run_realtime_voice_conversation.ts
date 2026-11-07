@@ -11,7 +11,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { pcmToWav } from '@agent/core/pcm-wav';
+import { pcmToWav } from '@agent/core/foundation/pcm-wav';
 import { loadVoiceTurnTakingLexicon } from '@agent/core/voice/voice-turn-taking-lexicon';
 import { checkMeetingParticipationConsent } from '@agent/core/meeting/meeting-participation-coordinator';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -24,15 +24,15 @@ import {
   recordRealtimeVoiceConversationExchange,
   runRealtimeVoiceConversationTurn,
   synthesizeRealtimeVoice,
-} from '@agent/core/voice/realtime-voice-conversation';
-import { loadRealtimeVoiceConversationPreferences } from '@agent/core/voice/realtime-voice-preferences';
+} from '@agent/shared-voice/realtime-voice-conversation';
+import { loadRealtimeVoiceConversationPreferences } from '@agent/shared-voice/realtime-voice-preferences';
 import type {
   RealtimeVoiceReasoningEffort,
   RealtimeVoiceReasoningTier,
-} from '@agent/core/voice/realtime-voice-preferences';
+} from '@agent/shared-voice/realtime-voice-preferences';
 import type { PlaybackHandle } from '@agent/core/voice/audio-playback';
 import type { AudioChunk } from '@agent/core/meeting/meeting-session-types';
-import { createVoiceHubSegmentPlayback } from '@agent/core/voice/voice-hub-playback';
+import { createVoiceHubSegmentPlayback } from '@agent/shared-voice/voice-hub-playback';
 import { resolveSurfaceUrl } from '@agent/core/surface/surface-url';
 import { dispatchPresenceFrame, reflectPresenceAgentReply } from '@agent/core/presence-bridge';
 import {
@@ -65,7 +65,7 @@ import { probeAudioPlayback } from '@agent/core/voice/audio-playback';
 import { playPcmAudioStream, probePcmAudioStreaming } from '@agent/core/streaming-voice-playback';
 import { probeMicCapture, resolveMicDevice } from '@agent/core/mic-capture';
 import { resolveFfmpegBin } from '@agent/core/tool/tool-binary-resolvers';
-import { recordVadTurn, type VadTurnState } from '@agent/core/voice/vad-turn-recorder';
+import { recordVadTurn, type VadTurnState } from '@agent/shared-voice/vad-turn-recorder';
 import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
 import { resolveVadBackend } from '@agent/core/voice/vad-registry';
 import {
@@ -78,7 +78,7 @@ import {
   type RealtimeVoiceBargeInMode,
   type VoiceCostTier,
   type VoicePowerSource,
-} from '@agent/core/voice/realtime-voice-loop';
+} from '@agent/shared-voice/realtime-voice-loop';
 import type { StreamingSpeechToTextBridge } from '@agent/core/voice/streaming-stt-bridge';
 import type { StreamingTextToSpeechBridge } from '@agent/core/voice/streaming-tts-bridge';
 import { getRegisteredEnvText } from '@agent/core/foundation';

@@ -12,7 +12,7 @@ const TARGETS = [
   'scripts/onboarding_apply.ts',
   'scripts/onboarding_wizard.ts',
   'libs/core/browser/browser-extension-bridge.ts',
-  'libs/core/browser/browser-conversation-session.ts',
+  'libs/shared-vision/src/browser-conversation-session.ts',
   'libs/core/pipeline/pipeline-contract.ts',
   'libs/core/organization/organization-operating-model-persistence.ts',
 ] as const;

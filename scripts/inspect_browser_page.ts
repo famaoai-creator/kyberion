@@ -12,9 +12,9 @@
  */
 
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { normalizeBrowserBridgeScope } from '@agent/core/browser/browser-bridge-mailbox';
+import { normalizeBrowserBridgeScope } from '@agent/shared-vision/browser-bridge-mailbox';
 import { htmlToMarkdown, extractHtmlTitle } from '@agent/core/html-to-markdown';
-import { stripTags } from '@agent/core/html-sanitize';
+import { stripTags } from '@agent/core/foundation/html-sanitize';
 import {
   assertSupportedNodeEngine,
   loadBrowserActuator,

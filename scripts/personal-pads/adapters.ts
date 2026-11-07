@@ -8,7 +8,7 @@
  * literal text. `getPadAdapter(padId, locale)` resolves them for one request
  * locale; the browser receives the localized descriptors.
  */
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import type { VocabularyKey } from '@agent/core/t';
 import { defaultPadLocale, padsText } from './i18n.js';
 import { getPadRegistryEntry, PAD_REGISTRY, type PadId, type PadInputKind } from './registry.js';

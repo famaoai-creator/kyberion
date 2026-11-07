@@ -22,7 +22,7 @@ import {
   registerProviderTransport,
   resolveProviderTransport,
   type ProviderTransport,
-} from './provider-transport.js';
+} from './provider/provider-transport.js';
 import './provider/loopback-transport.js';
 import {
   OTLP_HTTP_TRACE_EXPORTER_ID,

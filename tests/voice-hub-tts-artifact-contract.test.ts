@@ -10,7 +10,7 @@ describe('voice-hub TTS artifact lifecycle contract', () => {
       })
     );
     expect(source).toContain(
-      "import { buildNativeTtsCommand } from '@agent/core/media/native-tts';"
+      "import { buildNativeTtsCommand } from '@agent/shared-voice/native-tts';"
     );
     expect(source).toContain('const command = buildNativeTtsCommand(text, {');
     expect(source).not.toContain("process.platform !== 'darwin'");

@@ -9,7 +9,7 @@
 import { defineCatalog } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { t } from '@agent/core/t';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 
 export interface MissionBriefFlowStep {
   step?: string | number;

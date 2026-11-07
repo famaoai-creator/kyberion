@@ -93,12 +93,12 @@ describe('tenant-registry', () => {
 });
 
 // DA-01: resolveTenant is the single spine that maps a tenant slug to its
-// knowledge root and customer overlay root. Hermetic: fixtures are seeded
+// knowledge root. Hermetic: fixtures are seeded
 // under a temp root (active/shared/tmp — the governed temp location) via the
 // TenantRegistryPathOptions seam; the real knowledge/ tree is never touched.
 describe('resolveTenant (DA-01 spine)', () => {
   const FIXTURE_PARENT = path.join(pathResolver.rootDir(), 'active', 'shared', 'tmp');
-  const EMPTY_ENV = {} as NodeJS.ProcessEnv; // no KYBERION_CUSTOMER → personal tenants dir
+  const EMPTY_ENV = {} as NodeJS.ProcessEnv; // no KYBERION_STANCE → personal tenants dir
   let fixtureRoot = '';
 
   beforeEach(() => {
@@ -124,7 +124,7 @@ describe('resolveTenant (DA-01 spine)', () => {
     fs.writeFileSync(path.join(dir, `${slug}.json`), JSON.stringify(profile, null, 2));
   }
 
-  it('resolves the default knowledge_root and a null overlay when no customer dir exists', () => {
+  it('resolves the default knowledge_root', () => {
     seedProfile('acme-corp');
     const resolved = resolveTenant('acme-corp', { rootDir: fixtureRoot, env: EMPTY_ENV });
     expect(resolved.profile.tenant_slug).toBe('acme-corp');
@@ -133,21 +133,20 @@ describe('resolveTenant (DA-01 spine)', () => {
     expect(resolved.knowledge_root_path).toBe(
       path.join(fixtureRoot, 'knowledge', 'confidential', 'acme-corp')
     );
-    expect(resolved.customer_overlay_root).toBeNull();
+    // S3: the legacy customer/ overlay is gone; a tenant resolves to its knowledge root only.
+    expect(resolved).not.toHaveProperty('customer_overlay_root');
   });
 
-  it('respects an explicit knowledge_root and resolves the customer overlay when present', () => {
+  it('respects an explicit knowledge_root', () => {
     seedProfile('acme-corp', {
       knowledge_root: 'knowledge/confidential/acme-corp/main',
       ingest_sources: [{ source_system: 'confluence', enabled: true, note: 'pilot' }],
     });
-    fs.mkdirSync(path.join(fixtureRoot, 'customer', 'acme-corp'), { recursive: true });
     const resolved = resolveTenant('acme-corp', { rootDir: fixtureRoot, env: EMPTY_ENV });
     expect(resolved.knowledge_root).toBe('knowledge/confidential/acme-corp/main');
     expect(resolved.knowledge_root_path).toBe(
       path.join(fixtureRoot, 'knowledge', 'confidential', 'acme-corp', 'main')
     );
-    expect(resolved.customer_overlay_root).toBe(path.join(fixtureRoot, 'customer', 'acme-corp'));
     expect(resolved.profile.ingest_sources).toEqual([
       { source_system: 'confluence', enabled: true, note: 'pilot' },
     ]);
@@ -212,19 +211,6 @@ describe('resolveTenant (DA-01 spine)', () => {
     fs.symlinkSync(outsideProfile, path.join(profileDir, 'acme-corp.json'));
 
     expect(listTenantProfileSlugs({ rootDir: fixtureRoot, env: EMPTY_ENV })).toEqual([]);
-  });
-
-  it('rejects a symlinked customer overlay before exposing its root', () => {
-    const outsideRoot = path.join(fixtureRoot, 'outside-customer');
-    const customerRoot = path.join(fixtureRoot, 'customer');
-    fs.mkdirSync(outsideRoot, { recursive: true });
-    fs.mkdirSync(customerRoot, { recursive: true });
-    fs.symlinkSync(outsideRoot, path.join(customerRoot, 'acme-corp'), 'dir');
-    seedProfile('acme-corp');
-
-    expect(() => resolveTenant('acme-corp', { rootDir: fixtureRoot, env: EMPTY_ENV })).toThrow(
-      /customer overlay traverses a symbolic link/
-    );
   });
 
   it('throws for a slug with no profile (unregistered tenants cannot resolve)', () => {
@@ -295,24 +281,26 @@ describe('resolveTenant (DA-01 spine)', () => {
     );
   });
 
-  it('resolves every seeded tenant to exactly one knowledge_root + overlay pair', () => {
+  it('resolves every seeded tenant to exactly one knowledge_root', () => {
     seedProfile('acme-corp');
     seedProfile('beta-co');
-    fs.mkdirSync(path.join(fixtureRoot, 'customer', 'beta-co'), { recursive: true });
     const options = { rootDir: fixtureRoot, env: EMPTY_ENV };
     const slugs = listTenantProfileSlugs(options);
     expect(slugs).toEqual(['acme-corp', 'beta-co']);
     const roots = slugs.map((slug) => resolveTenant(slug, options).knowledge_root);
     expect(new Set(roots).size).toBe(slugs.length);
-    expect(resolveTenant('acme-corp', options).customer_overlay_root).toBeNull();
-    expect(resolveTenant('beta-co', options).customer_overlay_root).toBe(
-      path.join(fixtureRoot, 'customer', 'beta-co')
-    );
   });
 
   it('keeps the tenant registry authoritative when customer stance changes', () => {
     seedProfile('acme-corp');
-    const customerDir = path.join(fixtureRoot, 'customer', 'engagement-a', 'tenants');
+    const customerDir = path.join(
+      fixtureRoot,
+      'knowledge',
+      'personal',
+      'stances',
+      'engagement-a',
+      'tenants'
+    );
     fs.mkdirSync(customerDir, { recursive: true });
     fs.writeFileSync(
       path.join(customerDir, 'acme-corp.json'),
@@ -325,13 +313,13 @@ describe('resolveTenant (DA-01 spine)', () => {
     );
     const resolved = resolveTenant('acme-corp', {
       rootDir: fixtureRoot,
-      env: { KYBERION_CUSTOMER: 'engagement-a' },
+      env: { KYBERION_STANCE: 'engagement-a' },
     });
     expect(resolved.profile.display_name).toBe('Tenant acme-corp');
     expect(
       listTenantProfileSlugs({
         rootDir: fixtureRoot,
-        env: { KYBERION_CUSTOMER: 'engagement-a' },
+        env: { KYBERION_STANCE: 'engagement-a' },
       })
     ).toEqual(['acme-corp']);
   });

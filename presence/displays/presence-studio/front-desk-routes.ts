@@ -16,7 +16,7 @@ import {
   presenceFrontDeskConversationViewer,
 } from '@agent/core/surface/front-desk-conversation-store';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import { normalizeLocale } from '@agent/core/locale-normalize';
+import { normalizeLocale } from '@agent/core/foundation/locale-normalize';
 import { readFrontDeskMe } from '@agent/core/front-desk-identity';
 import {
   memberBindingDenied,

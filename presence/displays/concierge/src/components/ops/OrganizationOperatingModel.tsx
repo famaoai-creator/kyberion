@@ -16,7 +16,7 @@ import {
   Table,
   Tabs,
 } from '@agent/shared-ui';
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import { ChronosDiagram, ChronosInline, ChronosMeta, ChronosToolbar } from './chronos-ui';
 import { useChronosLocale } from '../../lib/ops/hooks';
 import { uxMessage, uxText, type SupportedLocale } from '../../lib/ops/ux-vocabulary';

@@ -27,11 +27,14 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
-vi.mock('./governance/audit-chain.js', () => ({
+// The statically imported guard caches this module promise. Keep its sink
+// identity across the import-failure case's resetModules/doMock ceremony.
+const auditMock = vi.hoisted(() => ({
   auditChain: {
     record: vi.fn(),
   },
 }));
+vi.mock('./governance/audit-chain.js', () => auditMock);
 
 const ROOT = pathResolver.rootDir();
 
@@ -429,8 +432,11 @@ describe('tier-guard tenant scope (IP-1)', () => {
   });
 
   it('allows run_pipeline to persist traces and temp artifacts', () => {
-    process.env.KYBERION_CUSTOMER = 'story-demo';
-    const traceTarget = path.join(ROOT, 'customer/story-demo/logs/traces/traces-2026-05-08.jsonl');
+    process.env.KYBERION_STANCE = 'story-demo';
+    const traceTarget = path.join(
+      ROOT,
+      'active/shared/logs/stances/story-demo/traces/traces-2026-05-08.jsonl'
+    );
     const tmpTarget = path.join(ROOT, 'active/shared/tmp/pipeline-step.json');
     const productVoiceProfileTarget = path.join(
       ROOT,
@@ -457,8 +463,11 @@ describe('tier-guard tenant scope (IP-1)', () => {
   });
 
   it('allows run_super_pipeline to write temporary dispatch artifacts', () => {
-    process.env.KYBERION_CUSTOMER = 'story-demo';
-    const traceTarget = path.join(ROOT, 'customer/story-demo/logs/traces/traces-2026-05-08.jsonl');
+    process.env.KYBERION_STANCE = 'story-demo';
+    const traceTarget = path.join(
+      ROOT,
+      'active/shared/logs/stances/story-demo/traces/traces-2026-05-08.jsonl'
+    );
     const tmpTarget = path.join(ROOT, 'active/shared/tmp/super-pipeline.json');
 
     withExecutionContext(
@@ -1144,7 +1153,7 @@ describe('tier-guard audit module load failure', () => {
     } finally {
       stderr.mockRestore();
       vi.unstubAllEnvs();
-      vi.doMock('./governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
+      vi.doMock('./governance/audit-chain.js', () => auditMock);
       vi.resetModules();
     }
   });

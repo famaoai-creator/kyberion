@@ -5,6 +5,8 @@ import { defineCatalog, type GovernedCatalog } from './foundation/governed-catal
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
+import { TENANT_DEALS_DIR, TENANT_HOME_ROOT } from './organization/tenant-home.js';
+import { withExecutionContext } from './authority.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -85,12 +87,24 @@ function dealCatalogAtPath(filePath: string) {
   });
 }
 
+/**
+ * The deal store's own role: a tenant's deal files are read and written as the
+ * tenant-bound deal store, whose only grant is `knowledge/confidential/<tenant>/deals/`.
+ * Callers keep their own role for everything else (notifications, the memory
+ * promotion queue); only the deal file IO runs under it.
+ */
+export const DEAL_STORE_ROLE = 'customer_decision_deal_note_writer';
+
+export function asDealStore<T>(tenantSlug: string, fn: () => T): T {
+  return withExecutionContext(DEAL_STORE_ROLE, fn, 'worker', tenantSlug);
+}
+
 function dealsDir(tenantSlug: string): string {
   if (!isValidTenantSlug(tenantSlug)) {
     throw new Error(`[DEAL_SCOPE] invalid tenant slug: ${tenantSlug}`);
   }
   return assertSafeRepositoryPath(
-    pathResolver.rootResolve(path.join('customer', tenantSlug, 'deals')),
+    pathResolver.rootResolve(path.join(TENANT_HOME_ROOT, tenantSlug, TENANT_DEALS_DIR)),
     { allowMissingLeaf: true }
   );
 }
@@ -115,8 +129,10 @@ function dealLogPath(tenantSlug: string): string {
 
 function appendDealLog(tenantSlug: string, event: Record<string, unknown>): void {
   try {
-    safeMkdir(dealsDir(tenantSlug), { recursive: true });
-    appendJsonLine(dealLogPath(tenantSlug), { ts: nowIso(), ...event });
+    asDealStore(tenantSlug, () => {
+      safeMkdir(dealsDir(tenantSlug), { recursive: true });
+      appendJsonLine(dealLogPath(tenantSlug), { ts: nowIso(), ...event });
+    });
   } catch {
     // deal log is observability; never block the deal transition itself
   }
@@ -125,8 +141,10 @@ function appendDealLog(tenantSlug: string, event: Record<string, unknown>): void
 function writeDeal(deal: DealRecord): DealRecord {
   const filePath = dealPath(deal.tenant_slug, deal.deal_id);
   const validated = validateDealRecord(dealCatalogAtPath(filePath).validate(deal, filePath));
-  safeMkdir(dealsDir(deal.tenant_slug), { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
+  asDealStore(deal.tenant_slug, () => {
+    safeMkdir(dealsDir(deal.tenant_slug), { recursive: true });
+    safeWriteFile(filePath, JSON.stringify(validated, null, 2));
+  });
   return validated;
 }
 
@@ -140,6 +158,10 @@ function validateDealRecord(deal: DealRecord): DealRecord {
 
 /** Load a deal through schema, regular-file, tenant, and filename bindings. */
 export function loadDealAtPath(filePath: string, tenantSlug: string, dealId: string): DealRecord {
+  return asDealStore(tenantSlug, () => loadDealAtPathAsStore(filePath, tenantSlug, dealId));
+}
+
+function loadDealAtPathAsStore(filePath: string, tenantSlug: string, dealId: string): DealRecord {
   const expectedPath = dealPath(tenantSlug, dealId);
   const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
   if (!safeLstat(safeFilePath).isFile()) {
@@ -158,7 +180,7 @@ export function loadDealAtPath(filePath: string, tenantSlug: string, dealId: str
 export function getDeal(tenantSlug: string, dealId: string): DealRecord | null {
   const filePath = dealPath(tenantSlug, dealId);
   try {
-    if (!safeExistsSync(filePath)) return null;
+    if (!asDealStore(tenantSlug, () => safeExistsSync(filePath))) return null;
     return loadDealAtPath(filePath, tenantSlug, dealId);
   } catch {
     return null;
@@ -167,10 +189,9 @@ export function getDeal(tenantSlug: string, dealId: string): DealRecord | null {
 
 export function listDeals(tenantSlug: string): DealRecord[] {
   const dir = dealsDir(tenantSlug);
-  if (!safeExistsSync(dir)) return [];
   let entries: string[] = [];
   try {
-    entries = safeReaddir(dir);
+    entries = asDealStore(tenantSlug, () => (safeExistsSync(dir) ? safeReaddir(dir) : []));
   } catch {
     return [];
   }
@@ -296,6 +317,10 @@ export function advanceDealStage(input: {
 
 function snapshotDealAgreement(deal: DealRecord): void {
   if (!deal.agreed) return;
+  asDealStore(deal.tenant_slug, () => writeDealAgreementSnapshot(deal));
+}
+
+function writeDealAgreementSnapshot(deal: DealRecord): void {
   const dir = assertSafeRepositoryPath(
     path.join(dealsDir(deal.tenant_slug), requireSafeDealId(deal.deal_id)),
     { allowMissingLeaf: true }
@@ -361,7 +386,7 @@ function queueDealDistillCandidate(deal: DealRecord): void {
       .filter(Boolean)
       .join('\n'),
     evidenceRefs: [
-      path.join('customer', deal.tenant_slug, 'deals', `${deal.deal_id}.json`),
+      path.join(TENANT_HOME_ROOT, deal.tenant_slug, TENANT_DEALS_DIR, `${deal.deal_id}.json`),
       ...(deal.quote_ref ? [deal.quote_ref] : []),
       ...(deal.contract_ref ? [deal.contract_ref] : []),
     ],

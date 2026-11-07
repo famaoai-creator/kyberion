@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import * as customerResolver from '@agent/core/customer-resolver';
+import { TENANT_HOME_ROOT, activeTenantSlug } from '@agent/core/organization/tenant-registry';
 import {
   listOrganizationMissionTeamTemplateCatalogSummariesForOrganization,
   resolveOrganizationMissionTeamTemplateCatalogId,
@@ -115,23 +115,26 @@ export function listOrganizationProfiles(
   const readyOnly = argv.includes('--ready-only');
   const missingOnly = argv.includes('--missing-only');
   const sourceFilter = getOptionValue('--source', [...argv])?.trim();
-  const customerRoot = path.join(rootDir, 'customer');
-  const activeCustomer = customerResolver.activeCustomer();
-  const requestedLabel = organizationId?.trim() || activeCustomer || 'default';
+  // Organization profiles are company assets in each tenant home (S2).
+  const tenantHomeRoot = path.join(rootDir, TENANT_HOME_ROOT);
+  const activeTenant = activeTenantSlug();
+  const requestedLabel = organizationId?.trim() || activeTenant || 'default';
   const resolvedOrganizationProfile = organizationId
-    ? withOrganizationContext(organizationId, () => loadOrganizationProfile())
+    ? withOrganizationContext(organizationId, () =>
+        loadOrganizationProfile(undefined, organizationId)
+      )
     : null;
   const selectedOrganizationId =
-    resolvedOrganizationProfile?.organization_id || organizationId || activeCustomer || 'default';
+    resolvedOrganizationProfile?.organization_id || organizationId || activeTenant || 'default';
   const rows: Array<{
     slug: string;
     active: boolean;
     ready: boolean;
     profile: ReturnType<typeof loadOrganizationProfile> | null;
-    source: 'customer' | 'public';
+    source: 'tenant' | 'public';
   }> = [];
 
-  const publicProfile = loadOrganizationProfile();
+  const publicProfile = loadOrganizationProfile(undefined, null);
   const publicProfileLabel = publicProfile
     ? `${publicProfile.name} (${publicProfile.organization_id})`
     : 'default';
@@ -143,21 +146,21 @@ export function listOrganizationProfiles(
     source: 'public',
   });
 
-  if (safeExistsSync(customerRoot) && safeLstat(customerRoot).isDirectory()) {
-    for (const entry of safeReaddir(customerRoot).sort()) {
-      if (entry === 'README.md' || entry === '_template') continue;
-      const full = path.join(customerRoot, entry);
+  if (safeExistsSync(tenantHomeRoot) && safeLstat(tenantHomeRoot).isDirectory()) {
+    for (const entry of safeReaddir(tenantHomeRoot).sort()) {
+      const full = path.join(tenantHomeRoot, entry);
       if (!safeLstat(full).isDirectory()) continue;
       const profilePath = path.join(full, 'organization-profile.json');
-      const profile = safeExistsSync(profilePath)
-        ? withOrganizationContext(entry, () => loadOrganizationProfile())
-        : null;
+      if (!safeExistsSync(profilePath)) continue;
+      const profile = withOrganizationContext(entry, () =>
+        loadOrganizationProfile(undefined, entry)
+      );
       rows.push({
         slug: entry,
         active: entry === selectedOrganizationId,
         ready: Boolean(profile),
         profile,
-        source: 'customer',
+        source: 'tenant',
       });
     }
   }
@@ -184,7 +187,7 @@ export function listOrganizationProfiles(
     total_count: filteredRows.length,
     ready_count: filteredRows.filter((row) => row.ready).length,
     missing_count: filteredRows.filter((row) => !row.ready).length,
-    customer_count: filteredRows.filter((row) => row.source === 'customer').length,
+    tenant_count: filteredRows.filter((row) => row.source === 'tenant').length,
     public_count: filteredRows.filter((row) => row.source === 'public').length,
     active_count: filteredRows.filter((row) => row.active).length,
   };
@@ -246,7 +249,7 @@ export function listOrganizationProfiles(
     );
   }
   logger.info(
-    `[organization] summary total=${summary.total_count} ready=${summary.ready_count} missing=${summary.missing_count} customer=${summary.customer_count} public=${summary.public_count} active=${summary.active_count}`
+    `[organization] summary total=${summary.total_count} ready=${summary.ready_count} missing=${summary.missing_count} tenant=${summary.tenant_count} public=${summary.public_count} active=${summary.active_count}`
   );
   if (summaryOnly) {
     return;

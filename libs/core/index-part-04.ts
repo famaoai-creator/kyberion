@@ -1,11 +1,5 @@
 /** Generated public API barrel part. Keep exports in source order. */
 
-export * from './voice/voice-selection-preferences.js';
-
-export * from './voice/realtime-voice-preferences.js';
-
-export * from './media/native-speech-listen-bridge.js';
-
 export {
   AppleVisionOcrProvider,
   LlmApiOcrProvider,
@@ -17,7 +11,7 @@ export {
   AdaptivePolicyRouter as OcrAdaptivePolicyRouter,
 } from './ocr-bridge.js';
 
-export * from './ocr-types.js';
+export * from './contracts/ocr-types.js';
 
 export * from './knowledge/knowledge-context.js';
 
@@ -30,18 +24,6 @@ export * from './secret/secret-types.js';
 export * from './integrations/email-bridge.js';
 
 export * from './integrations/email-types.js';
-
-export * from './media/image-generation-bridge.js';
-
-export * from './media/image-generation-types.js';
-
-export * from './media/image-generation-policy.js';
-
-export * from './media/music-generation-bridge.js';
-
-export * from './media/music-generation-types.js';
-
-export * from './media/music-generation-policy.js';
 
 export * from './tool/tool-runtime-policy.js';
 
@@ -56,15 +38,7 @@ export * from './service/service-runtime-registry.js';
 
 export * from './service/service-pid-registry.js';
 
-export * from './voice/voice-tts-config.js';
-
-export * from './voice/voice-runtime-policy.js';
-
 export * from './voice/voice-profile-registry.js';
-
-export * from './voice/voice-transcript-alignment.js';
-
-export * from './voice/voice-profile-promotion.js';
 
 export * from './presentation-preference-registry.js';
 
@@ -86,31 +60,13 @@ export * from './actuator/adapter-default-selection.js';
 
 export * from './intent/intent-execution-profile-registry.js';
 
-export * from './voice/voice-sample-ingestion-policy.js';
-
-export * from './voice/voice-sample-collection.js';
-
-export * from './voice/voice-sample-recorder.js';
-
 export * from './voice/voice-text-chunking.js';
-
-export * from './voice/voice-generation-runtime.js';
 
 export * from './video/video-composition-contract.js';
 
 export * from './video/video-content-brief-contract.js';
 
-export * from './video/video-composition-template-registry.js';
-
-export * from './video/video-render-runtime-policy.js';
-
-export * from './video/video-render-runtime.js';
-
-export * from './video/video-composition-compiler.js';
-
 export * from './video/narrated-video-brief-compiler.js';
-
-export * from './video/video-render-backend.js';
 
 export * from './platform.js';
 
@@ -373,8 +329,6 @@ export * from './agent/agent-pane-runtime-bridge.js';
 export * from './agent/agent-exec-adapter-bridge.js';
 
 export * from './voice/audio-bus-bridge.js';
-
-export * from './browser/browser-automation-runtime-bridge.js';
 
 export * from './meeting/calendar-provider-bridge.js';
 

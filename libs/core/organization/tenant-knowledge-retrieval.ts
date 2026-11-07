@@ -11,9 +11,7 @@
  *
  *   1. the tenant's own confidential subtree (`ResolvedTenant.knowledge_root`,
  *      default `knowledge/confidential/{slug}`),
- *   2. the tenant's `customer/{slug}/` overlay (scanned via the dedicated
- *      `'customer'` index tier, which never touches `knowledge/personal/`),
- *   3. `knowledge/confidential/common` — UNLESS the tenant profile declares
+ *   2. `knowledge/confidential/common` — UNLESS the tenant profile declares
  *      `isolation_policy.strict_isolation === true`, in which case only the
  *      tenant's own subtree (and overlay) is in scope.
  *
@@ -56,7 +54,7 @@ const EXCERPT_MAX_CHARS = 400;
 
 /** One tenant-scoped retrieval hit, repo-relative and pack-hint shaped. */
 export interface TenantKnowledgeHit {
-  /** Repo-relative path (e.g. `knowledge/confidential/tenant-masked-a/x.md`, `customer/tenant-masked-a/y.md`). */
+  /** Repo-relative path (e.g. `knowledge/confidential/tenant-masked-a/x.md`). */
   path: string;
   title: string;
   excerpt: string;
@@ -86,7 +84,7 @@ export interface QueryTenantKnowledgeInput {
   /** Maximum hits returned across all scopes. */
   limit: number;
   /**
-   * Test seam: repo root containing the fixture `knowledge/`, `customer/`,
+   * Test seam: repo root containing the fixture `knowledge/`
    * and tenant profile directories. Defaults to the real repo root.
    */
   rootDir?: string;
@@ -176,8 +174,6 @@ export function buildTenantKnowledgeScopeSet(
     // The tenant's own confidential subtree — customerId restricts the
     // confidential scanner to exactly this subdirectory.
     ownScope,
-    // The customer/{slug}/ overlay — 'customer' tier scans ONLY the overlay.
-    { tiers: ['customer'], customerId: tenantSlug },
   ];
   if (!strictIsolation) {
     scopes.push({ tiers: ['confidential'], customerId: 'common' });
@@ -210,9 +206,6 @@ function isTenantKnowledgeHitPathAllowed(
   hitPath: string,
   tenantSlug: string
 ): boolean {
-  if (hitPath.startsWith(`customer/${tenantSlug}/`)) {
-    return hint.tier === 'customer' && hint.customerId === tenantSlug;
-  }
   if (hitPath.startsWith('knowledge/confidential/common/')) {
     return hint.tier === 'confidential' && !hint.customerId;
   }
@@ -312,7 +305,7 @@ export async function queryTenantKnowledgeOutcome(
     let failedScopes = 0;
     for (const scope of scopeSet.scopes) {
       // A scope the reader may not see (e.g. a tenant-bound surface without
-      // the customer overlay grant) contributes nothing; it never fails the
+      // the common-tier grant) contributes nothing; it never fails the
       // tenant's own subtree.
       let index;
       try {

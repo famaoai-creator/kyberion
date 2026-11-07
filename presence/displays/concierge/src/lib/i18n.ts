@@ -1,6 +1,9 @@
 import type vocabulary from '../../../../../knowledge/product/orchestration/user-facing-vocabulary.json';
 import vocabularyCatalog from '../../../../../knowledge/product/orchestration/user-facing-vocabulary.json';
-import { coerceLocale, createBrowserVocabularyResolver } from '@agent/core/locale-normalize';
+import {
+  coerceLocale,
+  createBrowserVocabularyResolver,
+} from '@agent/core/foundation/locale-normalize';
 
 /**
  * CS-04 (I18N-04): concierge strings live in the shared user-facing

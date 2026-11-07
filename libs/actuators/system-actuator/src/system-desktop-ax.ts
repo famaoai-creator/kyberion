@@ -11,7 +11,7 @@ import {
   dispositionFor,
   stampOutcome,
   type ComputerInteractionDelivery,
-} from '@agent/core/computer-interaction-outcome';
+} from '@agent/core/contracts/computer-interaction-outcome';
 import { randomUUID } from 'node:crypto';
 
 /**

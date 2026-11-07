@@ -1,41 +1,3 @@
-import { isCredentialMaterialCapability } from './foundation/credential-material-capability.js';
-import {
-  PERSONAL_APPROVAL_STORE_ROLE,
-  personalApprovalIoAllowed,
-} from './foundation/personal-approval-io-capability.js';
-import {
-  TASK_SOURCE_WORKSPACE_ROLE,
-  taskSourceWorkspaceIoActive,
-} from './foundation/task-source-workspace-capability.js';
-import {
-  isDiscussionRequestCapability,
-  DISCUSSION_REQUEST_STORAGE_ROLE,
-} from './foundation/discussion-request-capability.js';
-import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
-import {
-  DOT_RESULT_STORE_ROLE,
-  isDotResultStoreCapability,
-} from './foundation/dot-result-store-capability.js';
-import {
-  MEMORY_PROVENANCE_READER_ROLE,
-  currentMemoryProvenanceReadCapability,
-} from './knowledge/memory-provenance-capability.js';
-import {
-  isPipelineJournalCapability,
-  PIPELINE_JOURNAL_STORE_ROLE,
-} from './foundation/pipeline-journal-capability.js';
-import {
-  isCustomerDecisionInviteCapability,
-  CUSTOMER_DECISION_INVITE_STORE_ROLE,
-} from './foundation/customer-decision-invite-capability.js';
-import {
-  isCustomerDecisionConsumerCapability,
-  CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
-} from './foundation/customer-decision-consumer-capability.js';
-import {
-  isCustomerDecisionMilestoneCapability,
-  CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
-} from './foundation/customer-decision-milestone-capability.js';
 import {
   isArchivedMissionStateCapability,
   ARCHIVED_MISSION_STATE_READER_ROLE,
@@ -72,6 +34,7 @@ import {
   type ExecutionIdentityBinding,
 } from './foundation/execution-scope.js';
 import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
+import { RETIRED_STORE_ROLE_NAMES } from './foundation/retired-store-roles.js';
 import { traceRoleAssumption } from './organization/role-assumption-trace.js';
 import { resolveTenant } from './organization/tenant-registry.js';
 import {
@@ -108,18 +71,13 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   chronos_token_registry_reader: 'worker',
   workspace_graph_reader: 'worker',
   scope_locale_reader: 'worker',
-  memory_provenance_reader: 'worker',
   engine_runtime_preferences_operator: 'worker',
   workspace_tenant_registry_reader: 'worker',
   workspace_tenant_registry_index_reader: 'worker',
-  person_charter_store: 'worker',
   peer_catalog_reader: 'worker',
   peer_responder_reader: 'worker',
   peer_task_artifact_writer: 'worker',
   metrics_cap_reader: 'worker',
-  autonomy_learning_store: 'worker',
-  pipeline_journal_store: 'worker',
-  dot_result_writer: 'worker',
   audit_mirror_writer: 'worker',
   tenant_ledger_store: 'worker',
   tenant_approval_store: 'worker',
@@ -598,6 +556,41 @@ function assertRoleAssumptionAllowed(role: string): void {
   );
 }
 
+/**
+ * G2 issuance right of a store grant that replaced a dedicated store role: a
+ * process may issue the grant only where it could have assumed the former role
+ * (the same RA-02 rule — processes without SYSTEM_ROLE are unaffected; with one,
+ * the name must be its own, a shared core role or listed in its `may_assume`).
+ * The name is a grant issuance right, never an assumable authority role.
+ */
+export function assertStoreGrantIssuanceAllowed(issuanceRight: string): void {
+  const systemRole = getRegisteredEnvText('SYSTEM_ROLE')?.trim();
+  const right = normalizeRoleName(issuanceRight.trim());
+  const allowed = !systemRole || isRoleAssumptionAllowed(systemRole, right);
+  traceRoleAssumption(systemRole, right, allowed);
+  if (allowed) return;
+  throw new Error(
+    `[ROLE_ASSUMPTION_DENIED] A process running as SYSTEM_ROLE=${normalizeRoleName(systemRole ?? '')} ` +
+      `may not issue the '${right}' store grant. Issuance rights are governed by ` +
+      `knowledge/${ROLE_ASSUMPTION_POLICY_PATH} (system_roles.<role>.may_assume).`
+  );
+}
+
+/**
+ * Does this installation's role-assumption policy name the store-grant issuance right (as a
+ * shared core role or a may_assume entry)? G2: a grant that replaced a role an installation had
+ * to register (pr_publication_store) authorizes nothing in an installation that predates it.
+ */
+export function isStoreGrantIssuanceRightRegistered(issuanceRight: string): boolean {
+  const right = normalizeRoleName(issuanceRight.trim());
+  const policy = loadRoleAssumptionPolicy();
+  return Boolean(
+    policy &&
+    (policy.sharedCoreRoles.has(right) ||
+      [...policy.systemRoles.values()].some((rights) => rights.has(right)))
+  );
+}
+
 export function inferPersonaFromRole(role?: string): Persona {
   if (!role) return 'unknown';
   const normalized = role.toLowerCase().replace(/\s+/g, '_');
@@ -750,18 +743,10 @@ interface PreparedExecutionContext {
  */
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'credential_allocation_reader',
-  'credential_material_reader',
-  'autonomy_learning_store',
-  CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
-  CUSTOMER_DECISION_INVITE_STORE_ROLE,
-  CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
   ARCHIVED_MISSION_STATE_READER_ROLE,
   'customer_channel_binding_store',
   'customer_decision_deal_note_writer',
   'delegation_record_store',
-  DISCUSSION_REQUEST_STORAGE_ROLE,
-  PIPELINE_JOURNAL_STORE_ROLE,
-  'dot_result_writer',
   'peer_catalog_reader',
   'peer_responder_reader',
   'peer_task_artifact_writer',
@@ -805,101 +790,18 @@ function prepareExecutionContext(
 ): PreparedExecutionContext {
   const normalizedRole = normalizeRoleName(role.trim());
   const executionIdentity = { ...currentExecutionScope()?.executionIdentity, ...identity };
-  if (normalizedRole === PERSONAL_APPROVAL_STORE_ROLE && !personalApprovalIoAllowed())
-    throw new Error('[PERSONAL_APPROVAL_SCOPE_REQUIRED] Exact personal owner IO window required');
-  if (normalizedRole === TASK_SOURCE_WORKSPACE_ROLE && !taskSourceWorkspaceIoActive())
-    throw new Error('[TASK_SOURCE_SCOPE_DENIED] Active exact workspace IO capability required');
   for (const value of Object.values(executionIdentity)) {
     if (value !== null && value !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(value))
       throw new Error('[SCOPE_CONTEXT_INVALID] invalid execution identity');
   }
-  if (normalizedRole === DOT_RESULT_STORE_ROLE) {
-    const scope = currentResourceAccessScope();
-    const target = scope?.appendExact?.[0] ?? scope?.readExact[0] ?? '';
-    if (
-      scope?.tenantSlug !== tenantSlug ||
-      scope?.organizationId !== organizationId ||
-      !isDotResultStoreCapability(scope, {
-        rootDir: pathResolver.rootDir(),
-        target,
-        operation: scope?.appendExact?.length ? 'append' : 'read',
-      })
-    )
-      throw new Error(
-        '[DOT_RESULT_CAPABILITY_REQUIRED] Bound active exact DOT result capability required'
-      );
-  }
   assertRoleAssumptionAllowed(normalizedRole);
+  // G2: former store roles are only grant issuance rights now. Refusing them keeps an
+  // installation whose catalogs still declare an old role from granting its policy.
+  if (RETIRED_STORE_ROLE_NAMES.has(normalizedRole))
+    throw new Error(
+      `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant issuance right, not an assumable role`
+    );
   assertTenantBoundReaderScope(normalizedRole, tenantSlug);
-  if (
-    normalizedRole === 'credential_material_reader' &&
-    (!isCredentialMaterialCapability(currentResourceAccessScope()) ||
-      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
-  )
-    throw new Error('[CREDENTIAL_CAPABILITY_REQUIRED] Admitted exact credential read required');
-  if (normalizedRole === MEMORY_PROVENANCE_READER_ROLE) {
-    const capability = currentMemoryProvenanceReadCapability();
-    const activeTenant = resolveIdentityContext().tenantSlug;
-    if (
-      !capability ||
-      capability.tenant_slug !== tenantSlug ||
-      (capability.tier === 'confidential' && (!activeTenant || activeTenant !== tenantSlug)) ||
-      (capability.tier === 'personal' &&
-        getRegisteredEnvText('KYBERION_NHI_ID') !== capability.owner_nhi)
-    )
-      throw new Error(
-        '[MEMORY_PROVENANCE_READ_SCOPE] Exact current tenant/owner read capability required'
-      );
-  }
-  if (
-    normalizedRole === 'autonomy_learning_store' &&
-    (!isAutonomyLearningCapability(currentResourceAccessScope()) ||
-      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
-  ) {
-    throw new Error(
-      '[RESOURCE_SCOPE_REQUIRED] Autonomy learning access requires its exact tenant store capability'
-    );
-  }
-  if (
-    normalizedRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
-    (!isDiscussionRequestCapability(currentResourceAccessScope()) ||
-      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
-  )
-    throw new Error(
-      '[RESOURCE_SCOPE_REQUIRED] Discussion receipt access requires its exact tenant request capability'
-    );
-  if (
-    normalizedRole === PIPELINE_JOURNAL_STORE_ROLE &&
-    (!isPipelineJournalCapability(currentResourceAccessScope()) ||
-      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
-  )
-    throw new Error(
-      '[RESOURCE_SCOPE_REQUIRED] Pipeline journal access requires its exact tenant journal capability'
-    );
-  if (
-    normalizedRole === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
-    (!isCustomerDecisionInviteCapability(currentResourceAccessScope()) ||
-      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
-  )
-    throw new Error(
-      '[RESOURCE_SCOPE_REQUIRED] Customer decision invite access requires its exact tenant invite capability'
-    );
-  if (
-    normalizedRole === CUSTOMER_DECISION_CONSUMER_STORE_ROLE &&
-    (!isCustomerDecisionConsumerCapability(currentResourceAccessScope()) ||
-      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
-  )
-    throw new Error(
-      '[RESOURCE_SCOPE_REQUIRED] Customer decision consumer lock access requires its exact case capability'
-    );
-  if (
-    normalizedRole === CUSTOMER_DECISION_MILESTONE_STORE_ROLE &&
-    (!isCustomerDecisionMilestoneCapability(currentResourceAccessScope()) ||
-      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
-  )
-    throw new Error(
-      '[RESOURCE_SCOPE_REQUIRED] Customer decision milestone access requires its exact case capability'
-    );
   if (
     normalizedRole === ARCHIVED_MISSION_STATE_READER_ROLE &&
     (!isArchivedMissionStateCapability(currentResourceAccessScope()) ||
@@ -1414,11 +1316,11 @@ registerOperationalTenantMembership((tenant, rootDir) =>
 registerOperationalAlertStore((fn) => withExecutionContext('ops_alert_store', fn, 'worker'));
 
 /**
- * G17: the audit chain's tenant mirror (customer/{slug}/logs/audit/) is written
+ * G17: the audit chain's tenant mirror (active/shared/runtime/audit-mirror/confidential/{slug}/) is written
  * as audit_mirror_writer bound to the entry's tenant — a dedicated shared core
  * store-writer role whose only grant is that tenant-parameterised path — so the
  * mirror never depends on (or borrows) the caller's own grants, and no other
- * store writer or resident dot (infrastructure_sentinel) holds a customer/ grant.
+ * store writer or resident dot (infrastructure_sentinel) holds a mirror grant.
  */
 const TENANT_AUDIT_MIRROR_WRITER_ROLE = 'audit_mirror_writer';
 // Guarded lookup, as in secure-io's registerOptionalAuditIo: a test's reduced

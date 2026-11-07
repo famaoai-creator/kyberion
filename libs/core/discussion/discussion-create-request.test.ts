@@ -703,7 +703,6 @@ describe('real child-process reservation and restart boundaries', () => {
         'env-registry.json',
         'mission-management-config.json',
         'authority-roles/chronos_localadmin.json',
-        'authority-roles/discussion_request_store.json',
       ]) {
         const relative = 'knowledge/product/governance/' + file;
         safeWriteFile(

@@ -4,7 +4,7 @@
  */
 
 import { type ZodType } from 'zod';
-import * as customerResolver from '../customer-resolver.js';
+import * as customerResolver from '../stance-resolver.js';
 import { logger } from '../core.js';
 import { formatDiagnostic } from '../logger.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -191,7 +191,7 @@ function registerDefaultStructuredRunners(): void {
 
 export function loadUserLlmTools(): UserLlmTools {
   const identityPath =
-    customerResolver.customerRoot('my-identity.json') ??
+    customerResolver.stanceRoot('my-identity.json') ??
     pathResolver.knowledge('personal/my-identity.json');
   const identity = loadPersonalIdentityAtPath(identityPath);
   const llmTools = identity?.llm_tools;

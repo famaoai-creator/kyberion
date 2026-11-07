@@ -12,13 +12,13 @@ Targets: power users delegating personal life logistics, family / household coor
 
 ## Customer-specific inputs
 
-| Input | Where to find it | Example |
-|---|---|---|
-| `RESERVATION_DOMAINS` | List of sites the user has accounts on | `["tabelog.com", "ozmall.co.jp", "hot-pepper-beauty"]` |
-| `PREFERENCES_PATH` | User's preferences file | `customer/{slug}/preferences/lifestyle.json` |
-| `CALENDAR_CONNECTION` | Google Calendar / etc. | (from `connections/google-workspace.json`) |
-| `AUTO_CONFIRM_BELOW` | Spend threshold for auto-confirm | `5000` (yen) |
-| `NOTIFICATION_CHANNEL` | Where to confirm to user | `slack:@you` or `email:you@example.com` |
+| Input                  | Where to find it                       | Example                                                        |
+| ---------------------- | -------------------------------------- | -------------------------------------------------------------- |
+| `RESERVATION_DOMAINS`  | List of sites the user has accounts on | `["tabelog.com", "ozmall.co.jp", "hot-pepper-beauty"]`         |
+| `PREFERENCES_PATH`     | User's preferences file                | `knowledge/personal/stances/{slug}/preferences/lifestyle.json` |
+| `CALENDAR_CONNECTION`  | Google Calendar / etc.                 | (from `connections/google-workspace.json`)                     |
+| `AUTO_CONFIRM_BELOW`   | Spend threshold for auto-confirm       | `5000` (yen)                                                   |
+| `NOTIFICATION_CHANNEL` | Where to confirm to user               | `slack:@you` or `email:you@example.com`                        |
 
 ## Smoke test
 

@@ -72,7 +72,7 @@ describe('mcp-actuator-invoke', () => {
     expect(String(result.error)).toContain('from');
   });
 
-  it('does not gate dry_run on an inferred-legacy input schema', async () => {
+  it('rejects a missing path under the authored exists input schema', async () => {
     const result = await invokeAllowlistedActuator({
       actuator: 'file-actuator',
       op: 'exists',
@@ -81,7 +81,9 @@ describe('mcp-actuator-invoke', () => {
       allowlist: [{ actuator: 'file-actuator', op: 'exists' }],
       callerRole: 'cowork',
     });
-    expect(result.error ?? '').not.toContain('path');
+    expect(result.validated).toBe(false);
+    expect(String(result.error)).toContain('params');
+    expect(String(result.error)).toContain('path');
   });
 
   it('keeps a discovery-only op bare on an actuator without a pipeline entry', async () => {

@@ -12,7 +12,7 @@
       "note": "Consumable TTS audio for the optional Python bridge. Canonical checkout resolution preserves the existing voice-out default; explicit output overrides remain supported. Durable voice deliverables require separate scoped publication."
     },
     {
-      "file": "libs/core/video/video-recut.ts",
+      "file": "libs/shared-video/src/video-recut.ts",
       "count": 3,
       "classification": "legit-tmp",
       "note": "Read-only canonical boundary checks for user-supplied consumable local video/VTT inputs and explicitly requested scratch previews. Default output uses the governed runtime workspace; durable delivery is promoted separately."
@@ -84,7 +84,7 @@
       "note": "default ComfyUI output dir; generated media are deliverables"
     },
     {
-      "file": "libs/core/media/video-generation/provider-support.ts",
+      "file": "libs/shared-media/src/video-generation/provider-support.ts",
       "count": 1,
       "classification": "migrate-candidate",
       "note": "downloaded generated video; deliverable"
@@ -168,7 +168,7 @@
       "note": "provider sandbox probe scratch dir; disposable per-probe"
     },
     {
-      "file": "libs/core/browser/browser-conversation-session.ts",
+      "file": "libs/shared-vision/src/browser-conversation-session.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "temp screenshots/prompt files for browser sessions; call sites consolidated into a single browserConversationTempPath() helper"
@@ -282,7 +282,7 @@
       "note": "IPC socket dir"
     },
     {
-      "file": "libs/core/voice/realtime-voice-conversation.ts",
+      "file": "libs/shared-voice/src/realtime-voice-conversation.ts",
       "count": 1,
       "classification": "migrate-candidate",
       "note": "conversation recording artifact; session-scoped"
@@ -366,25 +366,25 @@
       "note": "visual-review raster fallback; review artifact"
     },
     {
-      "file": "libs/core/voice/voice-path-policy.ts",
+      "file": "libs/shared-voice/src/voice-path-policy.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "policy check of the tmp root itself"
     },
     {
-      "file": "libs/core/voice/voice-profile-promotion.ts",
+      "file": "libs/shared-voice/src/voice-profile-promotion.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "promotion staging dir (promoted copies leave tmp)"
     },
     {
-      "file": "libs/core/voice/voice-sample-collection.ts",
+      "file": "libs/shared-voice/src/voice-sample-collection.ts",
       "count": 1,
       "classification": "migrate-candidate",
       "note": "collected voice samples feed profile promotion; scoped artifacts"
     },
     {
-      "file": "libs/core/voice/voice-sample-recorder.ts",
+      "file": "libs/shared-voice/src/voice-sample-recorder.ts",
       "count": 1,
       "classification": "migrate-candidate",
       "note": "recorded voice samples feed profile promotion; scoped artifacts"
@@ -516,7 +516,7 @@
       "note": "`kyberion draw` tmp-root check that limits which provider byproducts are removed"
     },
     {
-      "file": "libs/core/host-image-handoff.ts",
+      "file": "libs/shared-media/src/host-image-handoff.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "per-target host image hand-off request marker (target + prompt + requested_at), consumed by the rerun that collects the host's image; an expired marker just means the image is requested again"

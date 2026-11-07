@@ -2694,26 +2694,32 @@ describe('storage-janitor', () => {
       const liveDay = path.join(logsDir, 'audit', 'audit-2026-06-01.jsonl');
       const mirrorDay = path.join(
         root,
-        'customer',
+        'active',
+        'shared',
+        'runtime',
+        'audit-mirror',
+        'confidential',
         'acme',
-        'logs',
-        'audit',
         'audit-2026-01-01.jsonl'
       );
       const mirrorLive = path.join(
         root,
-        'customer',
+        'active',
+        'shared',
+        'runtime',
+        'audit-mirror',
+        'confidential',
         'acme',
-        'logs',
-        'audit',
         'audit-2026-06-01.jsonl'
       );
       const otherDay = path.join(
         root,
-        'customer',
+        'active',
+        'shared',
+        'runtime',
+        'audit-mirror',
+        'confidential',
         'globex',
-        'logs',
-        'audit',
         'audit-2026-01-01.jsonl'
       );
       for (const file of [masterDay, liveDay, mirrorDay, mirrorLive, otherDay]) writeFile(file);
@@ -2733,16 +2739,21 @@ describe('storage-janitor', () => {
         { src: otherDay, locked: true },
         { src: masterDay, locked: true },
       ]);
-      expect(fs.existsSync(archiveFileOf('customer/acme/logs/audit/audit-2026-01-01.jsonl'))).toBe(
-        true
-      );
+      expect(
+        fs.existsSync(
+          archiveFileOf(
+            'active/shared/runtime/audit-mirror/confidential/acme/audit-2026-01-01.jsonl'
+          )
+        )
+      ).toBe(true);
       expect(fs.existsSync(mirrorLive)).toBe(true);
       expect(fs.existsSync(liveDay)).toBe(true);
       expect(
         readRetentionAudit().some(
           (r) =>
             r.event === 'RETENTION_ARCHIVE' &&
-            r.path === 'customer/acme/logs/audit/audit-2026-01-01.jsonl' &&
+            r.path ===
+              'active/shared/runtime/audit-mirror/confidential/acme/audit-2026-01-01.jsonl' &&
             r.audit_master_day === 'active/shared/logs/audit/audit-2026-01-01.jsonl'
         )
       ).toBe(true);
@@ -2763,13 +2774,24 @@ describe('storage-janitor', () => {
       });
       const root = pathResolverMock.rootDir;
       const masterDay = path.join(logsDir, 'audit', 'audit-2026-01-01.jsonl');
-      const acme = path.join(root, 'customer', 'acme', 'logs', 'audit', 'audit-2026-01-01.jsonl');
+      const acme = path.join(
+        root,
+        'active',
+        'shared',
+        'runtime',
+        'audit-mirror',
+        'confidential',
+        'acme',
+        'audit-2026-01-01.jsonl'
+      );
       const globex = path.join(
         root,
-        'customer',
+        'active',
+        'shared',
+        'runtime',
+        'audit-mirror',
+        'confidential',
         'globex',
-        'logs',
-        'audit',
         'audit-2026-01-01.jsonl'
       );
       for (const file of [masterDay, acme, globex]) writeFile(file);
@@ -2791,7 +2813,7 @@ describe('storage-janitor', () => {
         readRetentionAudit().some(
           (r) =>
             r.event === 'RETENTION_ROLLED_BACK' &&
-            r.path === 'customer/acme/logs/audit/audit-2026-01-01.jsonl'
+            r.path === 'active/shared/runtime/audit-mirror/confidential/acme/audit-2026-01-01.jsonl'
         )
       ).toBe(true);
     });
@@ -2810,18 +2832,31 @@ describe('storage-janitor', () => {
       });
       const root = pathResolverMock.rootDir;
       const masterDay = path.join(logsDir, 'audit', 'audit-2026-01-01.jsonl');
-      const acme = path.join(root, 'customer', 'acme', 'logs', 'audit', 'audit-2026-01-01.jsonl');
+      const acme = path.join(
+        root,
+        'active',
+        'shared',
+        'runtime',
+        'audit-mirror',
+        'confidential',
+        'acme',
+        'audit-2026-01-01.jsonl'
+      );
       const globex = path.join(
         root,
-        'customer',
+        'active',
+        'shared',
+        'runtime',
+        'audit-mirror',
+        'confidential',
         'globex',
-        'logs',
-        'audit',
         'audit-2026-01-01.jsonl'
       );
       for (const file of [masterDay, acme, globex]) writeFile(file);
       setMtime(masterDay, 65 * RETENTION_DAY_MS);
-      const acmeArchived = archiveFileOf('customer/acme/logs/audit/audit-2026-01-01.jsonl');
+      const acmeArchived = archiveFileOf(
+        'active/shared/runtime/audit-mirror/confidential/acme/audit-2026-01-01.jsonl'
+      );
       moveHook.onMove = (src) => {
         if (src === globex) throw new Error('EPERM: globex mirror');
         if (src === acmeArchived) throw new Error('EPERM: acme restore');
@@ -2854,10 +2889,12 @@ describe('storage-janitor', () => {
       const masterDay = path.join(logsDir, 'audit', 'audit-2026-01-01.jsonl');
       const acme = path.join(
         pathResolverMock.rootDir,
-        'customer',
+        'active',
+        'shared',
+        'runtime',
+        'audit-mirror',
+        'confidential',
         'acme',
-        'logs',
-        'audit',
         'audit-2026-01-01.jsonl'
       );
       writeFile(masterDay);

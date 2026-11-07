@@ -9,11 +9,11 @@ vi.mock('../organization/member-registry.js', async (importOriginal) => {
       ownerMember.present === false ? null : actual.resolveMemberByPrincipal(...args),
   };
 });
-vi.mock('../customer-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../customer-resolver.js')>();
+vi.mock('../stance-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../stance-resolver.js')>();
   const { customerRootWithSodOverlay } =
     await import('../governance/__tests__/sod-overlay-state.js');
-  return { ...actual, customerRoot: customerRootWithSodOverlay(actual.customerRoot) };
+  return { ...actual, stanceRoot: customerRootWithSodOverlay(actual.stanceRoot) };
 });
 // A worker's board write landing inside reconcile-work's WorkItem update.
 const workItemHook = vi.hoisted(() => ({ afterUpdate: undefined as undefined | (() => void) }));

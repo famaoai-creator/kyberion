@@ -10,7 +10,7 @@ import {
 import { evaluateEgressPolicy } from '../egress-policy.js';
 import type { PipelineAdf, PipelineAdfStep, StepHook } from './pipeline-contract.js';
 import { deriveExecutionGraph } from '../graph-scheduler.js';
-import { isJudgeRouteCondition, resolveMaxRouteHops } from '../judge-route.js';
+import { isJudgeRouteCondition, resolveMaxRouteHops } from '../contracts/judge-route.js';
 import { type SandboxPolicy, requireSandboxEnforcement } from '../shell/sandbox-policy.js';
 
 export interface AdfGuardrailFinding {

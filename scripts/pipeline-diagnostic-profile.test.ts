@@ -1,5 +1,5 @@
 import { getDefaultWorkerEventStream } from '@agent/core/workforce/worker-event-stream';
-import { TraceContext } from '@agent/core/trace';
+import { TraceContext } from '@agent/core/analysis/trace';
 import { registerScenarioOpOverride } from '@agent/core/actuator/actuator-op-registry';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { safeMkdir, safeRmSync, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
@@ -34,7 +34,7 @@ vi.mock('@agent/core/error-classifier-judgment', () => ({
 vi.mock('@agent/core/reasoning/reasoning-bootstrap', () => ({
   installReasoningBackends: calls.bootstrap,
 }));
-vi.mock('@agent/core/feedback-loop', () => ({ runFeedbackLoop: calls.feedback }));
+vi.mock('@agent/core/knowledge/feedback-loop', () => ({ runFeedbackLoop: calls.feedback }));
 
 import * as bootstrap from './pipeline-execution-part-bootstrap.js';
 import { executePipelineFile, runValidatedSteps } from './pipeline-execution-part-results.js';

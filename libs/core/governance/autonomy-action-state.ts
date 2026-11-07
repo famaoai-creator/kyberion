@@ -53,9 +53,13 @@ import { withLockSync } from '../foundation/lock-utils.js';
 import { loadAutonomyLearningPolicy } from './autonomy-learning-policy.js';
 import { appendRetentionAudit } from '../storage-retention-expiry.js';
 import type { AutonomousOpsDecision } from './autonomous-ops-gate.js';
-import { withExecutionContext } from '../authority.js';
-import { autonomyLearningCapability } from '../foundation/autonomy-learning-capability.js';
-import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+import { assertStoreGrantIssuanceAllowed } from '../authority.js';
+import {
+  AUTONOMY_LEARNING_GRANT_ISSUANCE_RIGHT,
+  withAutonomyLearningCapability,
+} from '../foundation/autonomy-learning-capability.js';
+import { currentExecutionScope, runInExecutionScope } from '../foundation/execution-scope.js';
+import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
 
 const logger = createLogger('autonomy-action-state');
 
@@ -191,17 +195,38 @@ export interface AutonomyStateDeps {
   tenantSlug?: string;
 }
 
-/** Only this store's typed operations receive the bounded tenant writer role.
- * Alternate fixture roots retain the original caller's permissions. */
+/**
+ * Only this store's typed operations run inside the tenant partition grant, which is the
+ * authority for them (G2: no store role). Alternate fixture roots retain the original caller's
+ * permissions.
+ *
+ * Who may issue the grant is unchanged: the rule that bounded assuming the former shared core
+ * role (RA-02, role-assumption-policy `shared_core_roles`) applies to the issuance right
+ * `autonomy_learning_store`. While the grant is active the caller keeps its own role and persona,
+ * bound to the store's tenant (no organization), as the role assumption bound it; a caller already
+ * bound to another tenant is refused.
+ */
 function withTenantAutonomyStore<T>(deps: AutonomyStateDeps, operation: () => T): T {
   if (!deps.tenantSlug || (deps.rootDir && path.resolve(deps.rootDir) !== pathResolver.rootDir()))
     return operation();
+  const tenant = deps.tenantSlug;
   const directory = pathResolver.toRepoRelative(
     path.dirname(filePath(deps, AUTONOMY_OUTCOMES_PATH))
   );
-  return runInResourceAccessScope(autonomyLearningCapability(deps.tenantSlug, directory), () =>
-    withExecutionContext('autonomy_learning_store', operation, undefined, deps.tenantSlug)
-  );
+  assertStoreGrantIssuanceAllowed(AUTONOMY_LEARNING_GRANT_ISSUANCE_RIGHT);
+  return withAutonomyLearningCapability(tenant, directory, () => {
+    const active = resolvePolicyIdentityContext().tenantSlug;
+    if (active && active !== tenant)
+      throw new Error(
+        `[ROLE_TENANT_SCOPE_MISMATCH] autonomy learning grant for tenant '${tenant}' used by a caller bound to '${active}'`
+      );
+    const {
+      tenantCleared: _cleared,
+      organizationId: _organization,
+      ...current
+    } = currentExecutionScope() ?? { tenantBound: false };
+    return runInExecutionScope({ ...current, tenantBound: true, tenantSlug: tenant }, operation);
+  });
 }
 
 function filePath(deps: AutonomyStateDeps, rel: string): string {

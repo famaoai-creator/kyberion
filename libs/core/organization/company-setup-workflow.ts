@@ -1,4 +1,5 @@
 /** Bounded, transport-independent setup for an already authenticated tenant owner. */
+import { STANCES_DIR } from '../stance-resolver.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { withExecutionContextAsync } from '../authority.js';
@@ -30,7 +31,7 @@ import {
   requestTenantActivationApproval,
   applyApprovedTenantActivation,
 } from './tenant-activation-approval.js';
-import { loadApprovalRequest } from '../governance/approval-store.js';
+import { loadApprovalRequest } from '../governance/approval-store-reader.js';
 import { computeApprovalPresentedDigest } from '../governance/approval-presentation.js';
 
 export type CompanySetupAction =
@@ -80,7 +81,7 @@ function scope(auth: SurfaceManagementAuthorization) {
   };
 }
 function locations(auth: SurfaceManagementAuthorization) {
-  const dir = path.join(pathResolver.rootDir(), 'customer', auth.tenantSlug, 'onboarding');
+  const dir = path.join(pathResolver.rootDir(), STANCES_DIR, auth.tenantSlug, 'onboarding');
   return {
     dir,
     receipt: path.join(dir, 'web-company-setup.json'),

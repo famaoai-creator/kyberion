@@ -11,7 +11,7 @@ function read(relPath: string): string {
 describe('slack onboarding customer overlay contract', () => {
   it('uses the active customer root for environment initialization and persistence', () => {
     const script = read('libs/core/integrations/slack-onboarding.ts');
-    expect(script).toContain('customerResolver.customerRoot');
+    expect(script).toContain('customerResolver.stanceRoot');
     expect(script).toContain('function profileRoot()');
     expect(script).toContain("path.join(root, 'my-identity.json')");
     expect(script).toContain("path.join(root, 'my-vision.md')");

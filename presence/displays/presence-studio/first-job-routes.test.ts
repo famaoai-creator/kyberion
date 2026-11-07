@@ -42,9 +42,11 @@ vi.mock('@agent/core/surface/channel-surface', () => ({
 vi.mock('@agent/core/authority', () => ({
   withExecutionContext: (_role: string, fn: () => unknown) => fn(),
 }));
-vi.mock('@agent/core/lock-utils', () => ({
-  withLockSync: (_key: string, fn: () => unknown) => {
-    state.locks++;
+vi.mock('@agent/core/foundation/lock-utils', () => ({
+  withLockSync: (key: string, fn: () => unknown) => {
+    // The audit chain serialises its append-only log with this lock; only
+    // locks around diagnostic/decision state count as a mutation here.
+    if (!key.startsWith('audit-chain')) state.locks++;
     return fn();
   },
 }));

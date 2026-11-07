@@ -3,7 +3,7 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExec, safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
-import { writeVideoCompositionBundle } from '@agent/core/video/video-composition-compiler';
+import { writeVideoCompositionBundle } from '@agent/shared-video/video-composition-compiler';
 import type { VideoCompositionADF } from '@agent/core/video/video-composition-contract';
 
 const PROOF_ROOT = 'active/shared/tmp/ds04-video-visual-proof/client-a';
