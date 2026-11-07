@@ -93,7 +93,7 @@ function knowledgeFor(viewer: SurfaceAuthorizationContext): NeedsYouKnowledgeInp
       const sourceTier = (scope?.tier ?? candidate.sensitivity_tier) as Tier;
       if (!tiers.includes(candidate.sensitivity_tier as Tier) || !tiers.includes(sourceTier))
         return false;
-      if (scope?.allowed_audience?.length || scope?.owner_nhi) return false;
+      if (scope?.allowed_audience?.length || scope?.owner_nhi || scope?.nhi_id) return false;
       return sourceTier === 'public' || admitsCustody(viewer, custodyOfScope(scope));
     })
     .map((candidate) => needsYouKnowledgeFromCandidate(candidate));

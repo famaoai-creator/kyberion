@@ -61,6 +61,30 @@ const run = (tenant = 'acme') =>
     viewer,
     'approval_decision'
   );
+// An untenanted person-custody record only reaches the decision when the
+// viewer scope is 'all' (a finite scope already 403s on the missing tenant),
+// so the owner check below is the last gate before the write.
+const runAsAll = (overrides: Record<string, unknown> = {}) =>
+  INTELLIGENCE_ACTION_HANDLERS.approval_decision(
+    {
+      action: 'approval_decision',
+      requestId: 'review',
+      storageChannel: 'terminal',
+      channel: 'terminal',
+      decision: 'approved',
+      presentedDigest: 'shown-digest',
+    },
+    {
+      context: {
+        ...viewer.context,
+        tenantSlugs: 'all' as const,
+        organizationIds: 'all' as const,
+        projectIds: 'all' as const,
+        ...overrides,
+      },
+    },
+    'approval_decision'
+  );
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.load.mockReturnValue(row);
@@ -119,5 +143,53 @@ describe('scoped learning shared decision boundary', () => {
     mocks.decide.mockReturnValue({ ...row, accountability: undefined, status: 'approved' });
     expect((await run()).status).toBe(200);
     expect(mocks.notify).toHaveBeenCalledOnce();
+  });
+  it.each(['owner_nhi', 'nhi_id'] as const)(
+    'denies a person-custody request to an all-scope viewer who is not the owner (%s)',
+    async (personField) => {
+      mocks.load.mockReturnValue({
+        ...row,
+        scope: { tier: 'confidential', [personField]: 'human:alice' },
+      });
+      expect((await runAsAll()).status).toBe(403);
+      expect(mocks.decide).not.toHaveBeenCalled();
+      expect(mocks.notify).not.toHaveBeenCalled();
+    }
+  );
+  it('still denies a person-custody request when no member resolves', async () => {
+    mocks.load.mockReturnValue({
+      ...row,
+      // `nhi_id` is the governed (event-scope) person-binding field.
+      scope: { tier: 'confidential', nhi_id: 'human:alice' },
+    });
+    mocks.member.mockReturnValue(undefined);
+    expect((await runAsAll()).status).toBe(403);
+    expect(mocks.decide).not.toHaveBeenCalled();
+  });
+  it('admits the owner of a person-custody request', async () => {
+    mocks.load.mockReturnValue({
+      ...row,
+      scope: { tier: 'confidential', nhi_id: 'human:alice' },
+    });
+    mocks.member.mockReturnValue({
+      member_id: 'alice',
+      memberships: [{ tenant_slug: 'acme', role: 'owner' }],
+    });
+    expect((await runAsAll({ principalId: 'human:alice' })).status).toBe(200);
+    expect(mocks.decide).toHaveBeenCalledWith(
+      'chronos_localadmin',
+      expect.objectContaining({ requestId: 'review', decidedBy: 'user:alice' })
+    );
+  });
+  it('treats a tenant-scoped record as tenant custody even with owner_nhi set', async () => {
+    mocks.load.mockReturnValue({
+      ...row,
+      scope: { ...scope, owner_nhi: 'human:alice' },
+    });
+    expect((await run()).status).toBe(200);
+    expect(mocks.decide).toHaveBeenCalledWith(
+      'chronos_localadmin',
+      expect.objectContaining({ decidedBy: 'user:reviewer', decidedByRole: 'approver' })
+    );
   });
 });

@@ -751,7 +751,7 @@ export function buildApprovalQueueItems(query: ApprovalQueueQuery = {}): Approva
       }
       // Custody admission is unconditional — a caller that forgets the scope
       // resolves to 'all', which still never admits person custody.
-      const approvalScope = record.scope as { owner_nhi?: string } | undefined;
+      const approvalScope = record.scope as { owner_nhi?: string; nhi_id?: string } | undefined;
       if (
         !admitsCustody(
           {
@@ -759,7 +759,11 @@ export function buildApprovalQueueItems(query: ApprovalQueueQuery = {}): Approva
             includeUntenanted: query.includeUntenanted,
             personIds: query.viewer ? viewerPersonIds(query.viewer) : [],
           },
-          custodyOfScope({ tenant_slug: resolvedTenant, owner_nhi: approvalScope?.owner_nhi })
+          custodyOfScope({
+            tenant_slug: resolvedTenant,
+            owner_nhi: approvalScope?.owner_nhi,
+            nhi_id: approvalScope?.nhi_id,
+          })
         )
       )
         return false;

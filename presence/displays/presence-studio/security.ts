@@ -22,7 +22,12 @@ import {
   isSameOriginMutation,
   SURFACE_SESSION_TOKEN_PREFIX,
 } from '@agent/core/surface/surface-session-cookie';
-import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
+import {
+  admitsCustody,
+  custodyOfScope,
+  viewerPersonIds,
+  type SurfaceAuthorizationContext,
+} from '@agent/core/surface/surface-authorization';
 import { eventScopeFromRecord, type EventScopeInput } from '@agent/core/event-scope';
 export {
   parsePersonalAgentIdentity as parsePresenceStudioAgentIdentity,
@@ -386,6 +391,20 @@ function recordTenant(value: unknown): string | undefined {
   return undefined;
 }
 
+function recordOwnerNhi(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  for (const key of ['owner_nhi', 'ownerNhi', 'nhi_id']) {
+    const direct = record[key];
+    if (typeof direct === 'string' && direct.trim()) return direct.trim();
+  }
+  for (const key of ['scope', 'project', 'project_context', 'requestedByContext', 'context']) {
+    const nested = recordOwnerNhi(record[key]);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
 /** Unknown tenant records are denied for a scoped remote viewer. */
 export function presenceStudioRecordInScope(
   viewer: PresenceStudioViewerContext,
@@ -393,6 +412,18 @@ export function presenceStudioRecordInScope(
 ): boolean {
   const allowed = toFrontDeskViewerScope(viewer);
   const tenant = recordTenant(value);
+  // Custody admission first — an owner-bound record is person custody and an
+  // 'all'-tenant viewer never admits another person's records (P4).
+  if (
+    !admitsCustody(
+      {
+        tenantSlugs: allowed.tenantSlugs,
+        personIds: viewerPersonIds(allowed),
+      },
+      custodyOfScope({ tenant_slug: tenant, owner_nhi: recordOwnerNhi(value) })
+    )
+  )
+    return false;
   if (allowed.tenantSlugs !== 'all' && (!tenant || !allowed.tenantSlugs.includes(tenant)))
     return false;
   if (allowed.organizationIds === 'all' && allowed.projectIds === 'all') return true;

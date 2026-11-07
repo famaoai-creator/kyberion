@@ -376,4 +376,61 @@ describe('operator home summary', () => {
     expect(tenant.pendingApprovals.map((item) => item.id)).toEqual(['APR-TENANT']);
     vi.doUnmock('../governance/approval-store-reader.js');
   });
+
+  it('denies foreign person custody even when the scope filter is unscoped or all', async () => {
+    const approval = (id: string, scope: Record<string, string> | undefined) => ({
+      id,
+      title: id,
+      status: 'pending',
+      severity: 'normal',
+      ...(scope ? { scope } : {}),
+    });
+    vi.doMock('../governance/approval-store-reader.js', () => ({
+      listApprovalRequests: () => [
+        approval('APR-OTHER-PERSON', { owner_nhi: 'person-other' }),
+        approval('APR-MY-PERSON', { owner_nhi: 'person-me' }),
+        // Governed records bind the owner through `nhi_id` (event-scope
+        // vocabulary) — one custody binding with owner_nhi.
+        approval('APR-NHI-PERSON', { nhi_id: 'person-other' }),
+        approval('APR-TENANT', { tier: 'public', tenant_slug: 'tenant-a' }),
+        approval('APR-UNSCOPED', undefined),
+      ],
+    }));
+    const { collectOperatorHomeSummary } = await import('./operator-home-summary.js');
+
+    // No scope filter at all: the operator console sees the whole store —
+    // but person custody still admits only a matching person id.
+    const unscoped = collectOperatorHomeSummary({});
+    expect(unscoped.pendingApprovals.map((item) => item.id).sort()).toEqual([
+      'APR-TENANT',
+      'APR-UNSCOPED',
+    ]);
+
+    // A resolved 'all' filter is not "the console": it admits every tenant
+    // and system record, never another person's records.
+    const allViewer = collectOperatorHomeSummary({
+      scope: { tenantSlugs: 'all', organizationIds: 'all', projectIds: 'all' },
+    });
+    expect(allViewer.pendingApprovals.map((item) => item.id).sort()).toEqual([
+      'APR-TENANT',
+      'APR-UNSCOPED',
+    ]);
+
+    // The same 'all' filter carrying the owner's person ids admits the
+    // owner's rows too.
+    const ownerViewer = collectOperatorHomeSummary({
+      scope: {
+        tenantSlugs: 'all',
+        organizationIds: 'all',
+        projectIds: 'all',
+        personIds: ['person-me'],
+      },
+    });
+    expect(ownerViewer.pendingApprovals.map((item) => item.id).sort()).toEqual([
+      'APR-MY-PERSON',
+      'APR-TENANT',
+      'APR-UNSCOPED',
+    ]);
+    vi.doUnmock('../governance/approval-store-reader.js');
+  });
 });

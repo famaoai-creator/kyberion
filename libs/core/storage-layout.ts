@@ -241,12 +241,24 @@ export const TENANT_STORE_LEDGER_ROOTS = {
     root: PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations,
     storeRole: 'delegation_record_store',
   },
+  asset_derivations: {
+    root: PARTITIONED_RUNTIME_LEDGER_ROOTS.asset_derivations,
+    storeRole: 'asset_derivation_store',
+    /**
+     * The derivation lineage ledgers partition as `confidential/<tenant>`,
+     * `personal/<member-ref>` and `system/` — the `system/` segment is a
+     * store partition of this root only (reported with tier 'system' and an
+     * empty tenant), so ambient runtime writers cannot append to it. Other
+     * roots' `system/` segments keep the ordinary rules.
+     */
+    systemPartition: true,
+  },
 } as const;
 
 export interface TenantStoreLedgerPartition {
   root: string;
   storeRole: string;
-  tier: StorageDataTier;
+  tier: StorageDataTier | 'system';
   /** Empty for the bare tier directory itself (`<root>/<tier>`). */
   tenant: string;
 }
@@ -261,11 +273,14 @@ export function tenantStoreLedgerPartitionOf(
   filePath: string
 ): TenantStoreLedgerPartition | undefined {
   const relative = toPosixRelative(filePath);
-  for (const { root, storeRole } of Object.values(TENANT_STORE_LEDGER_ROOTS)) {
+  for (const { root, storeRole, ...extra } of Object.values(TENANT_STORE_LEDGER_ROOTS)) {
     if (!relative.startsWith(root + '/')) continue;
     const [tier, tenant = ''] = relative.slice(root.length + 1).split('/');
     if (STORAGE_DATA_TIERS.includes(tier as StorageDataTier)) {
       return { root, storeRole, tier: tier as StorageDataTier, tenant };
+    }
+    if (tier === 'system' && 'systemPartition' in extra && extra.systemPartition) {
+      return { root, storeRole, tier: 'system', tenant };
     }
   }
   return undefined;

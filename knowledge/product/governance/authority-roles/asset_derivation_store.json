@@ -1,0 +1,13 @@
+{
+  "role": "asset_derivation_store",
+  "description": "Store role of the asset-derivation lineage ledgers (libs/core/asset-derivation.ts): derivations.jsonl and derivation-deletions.jsonl under active/shared/runtime/asset-derivations/. The module assumes it (withExecutionContext) inside its lock, for every ledger append — recordDerivation and the deletion-propagation audit — so no ambient runtime persona can forge lineage records into any partition. Tenant-custodian writes bind the custodian's tenant (confidential/${KYBERION_TENANT}/ resolves to that one partition); the member-keyed personal/<ref> partitions and the system/ partition admit the role's literal grants (member refs are not tenant slugs — honoring, not the grant, binds a record to its custodian). Not tenant-bound (not in TENANT_BOUND_READER_ROLES): the role must reach member and system partitions from an unbound context. The inter-process lock and all non-ledger I/O stay under the caller's role. No knowledge, mission, artifact, legacy observability or customer/ grant.",
+  "default_persona": "worker",
+  "write_scopes": [
+    "active/shared/runtime/asset-derivations/confidential/${KYBERION_TENANT}/",
+    "active/shared/runtime/asset-derivations/personal/",
+    "active/shared/runtime/asset-derivations/system/"
+  ],
+  "scope_classes": ["audit"],
+  "allowed_actuators": [],
+  "tier_access": ["confidential"]
+}
