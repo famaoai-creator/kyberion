@@ -202,7 +202,21 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
       resolvedViewer.context,
       typeof body?.tenant === 'string' ? body.tenant : undefined
     );
-    if (allowedTenants !== 'all' && (!approvalTenant || !allowedTenants.includes(approvalTenant))) {
+    const approvalCustody = custodyOfScope(approvalRecord.scope);
+    if (approvalCustody.kind === 'invalid') {
+      return NextResponse.json({ error: 'Invalid approval custody' }, { status: 403 });
+    }
+    if (approvalCustody.kind === 'person' && typeof body.tenant === 'string') {
+      return NextResponse.json(
+        { error: 'Approval is outside the selected tenant' },
+        { status: 403 }
+      );
+    }
+    if (
+      approvalCustody.kind !== 'person' &&
+      allowedTenants !== 'all' &&
+      (!approvalTenant || !allowedTenants.includes(approvalTenant))
+    ) {
       return NextResponse.json(
         { error: 'Approval is outside the viewer tenant scope' },
         { status: 403 }

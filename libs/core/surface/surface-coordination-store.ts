@@ -25,9 +25,9 @@ import {
   eventScopeMatches,
   type EventScope,
   type EventScopeInput,
-} from '../event-scope.js';
+} from '../event/event-scope.js';
 import { scopeContextKey } from '../scope-context.js';
-import { physicalScopedPath } from '../physical-namespace.js';
+import { physicalScopedPath } from '../storage/physical-namespace.js';
 import type {
   SlackOutboxMessage,
   SurfaceAsyncChannel,

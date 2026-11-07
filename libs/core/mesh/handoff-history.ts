@@ -5,7 +5,7 @@
  */
 
 import type { AuditEntry } from '../governance/audit-chain.js';
-import type { AiDlcPhaseState } from '../aidlc-phase-state.js';
+import type { AiDlcPhaseState } from '../mission/aidlc-phase-state.js';
 import type { CoordinationEvent } from '../workforce/work-coordination.js';
 import type { MissionState } from '../mission/mission-types.js';
 

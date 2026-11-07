@@ -17,7 +17,7 @@ status: archived
 
 - **オンボーディング全文英語**: `scripts/onboarding_wizard.ts:278-284,316-353,433-459,505-509,613,622`。フェーズ名も英語単一文字列(`knowledge/product/governance/onboarding-flow-policy.json:3-14`、locale マップ無し)。
 - **cli.ts**: `t()` は存在する(`:199-204`)が `printOperatorPacket` 等のラベル約15語のみ。`printHelp`(`:294-361`)・全エラーメッセージは英語固定。`--locale ja` はほぼ機能しない。
-- **明確化質問が英語生成**: `libs/core/question-resolver.ts:162-166,395-400,453-454`(`Please provide ...` / `More context is required before execution`)。日本語で依頼したユーザーに英語の質問が返る。
+- **明確化質問が英語生成**: `libs/core/intent/question-resolver.ts:162-166,395-400,453-454`(`Please provide ...` / `More context is required before execution`)。日本語で依頼したユーザーに英語の質問が返る。
 - **chronos の EN/JA 混在**: `page.tsx:102-210`(Quick Action 群・ステータスカードが英語固定)vs `page.tsx:422-428`(hero が日本語固定)。`FirstRunBanner.tsx:68-78` 英語固定。`SovereignChat.tsx:18-35,208,233` 英語固定。**言語切替 UI が無く** `navigator.language` のみで決まる(`src/lib/hooks.ts:10-18`)。
 - **`uxText` の fallback 文字列がカタログと乖離**(死んだ文言): `SovereignChat.tsx:226-229,293`。
 - **operator-surface / presence-studio / computer-surface**: i18n ゼロ(presence-studio の状態語 "Ready/Error/Listening" は `static/index.html:718,1099,1193` 等で英語固定)。
@@ -74,7 +74,7 @@ status: archived
 
 ## 実装メモ
 
-- `libs/core/question-resolver.ts` の固定英語文を `knowledge/product/orchestration/user-facing-vocabulary.json` の `question_*` キー経由に置換した。
+- `libs/core/intent/question-resolver.ts` の固定英語文を `knowledge/product/orchestration/user-facing-vocabulary.json` の `question_*` キー経由に置換した。
 - `question-resolver.test.ts` に ja/en の期待値を追加し、明確化質問のロケール差分を固定した。
 
 ## 実装状況 追記 (2026-07-12)

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { registerEmbeddingBackend, resetEmbeddingBackend } from '../embedding-backend.js';
+import { registerEmbeddingBackend, resetEmbeddingBackend } from '../reasoning/embedding-backend.js';
 import * as knowledgeIndex from '../knowledge/knowledge-index.js';
 import { withExecutionContextAsync } from '../authority.js';
 import * as path from 'node:path';

@@ -13,7 +13,7 @@ import {
   type SeamProviderMetadata,
 } from '../seam.js';
 import type { TaskToolRuntime } from '../workforce/task-tool-runtime.js';
-import type { EventScopeInput } from '../event-scope.js';
+import type { EventScopeInput } from '../event/event-scope.js';
 
 export interface AgentExecAdapterRequest {
   provider: string;

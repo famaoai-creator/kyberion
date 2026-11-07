@@ -7,8 +7,8 @@
  * count with the one builder.
  *
  * Admission is conservative: tier and tenant come from the server-resolved
- * viewer (tenant admission is `admitsTenant`, shared with every surface); a memory candidate with an audience or an owner restriction is left
- * out because this reader cannot prove who the caller is.
+ * viewer. Owner/audience restrictions use the same authenticated identity
+ * admission as the Concierge reader.
  */
 
 import { createHash } from 'node:crypto';
@@ -17,8 +17,8 @@ import {
   notificationMatchesScope,
   toCeoApprovalItem,
   type CeoApprovalItem,
-} from '../ceo-surface-summary.js';
-import { listInboxEntries } from '../deliverable-inbox.js';
+} from './ceo-surface-summary.js';
+import { listInboxEntries } from '../task/deliverable-inbox.js';
 import { listApprovalRequests } from '../governance/approval-store-reader.js';
 import { readApprovalPublicationPreview } from './approval-publication-preview.js';
 import { listSurfaceNotificationsAcrossChannels } from './surface-ux.js';
@@ -39,6 +39,7 @@ import type {
 } from './needs-you.js';
 import {
   admitsCustody,
+  admitsScopeAudience,
   custodyOfScope,
   viewerPersonIds,
   type SurfaceAuthorizationContext,
@@ -55,6 +56,11 @@ const TIERS: readonly Tier[] = ['personal', 'confidential', 'public'];
 
 function tiersOf(viewer: SurfaceAuthorizationContext): Tier[] {
   return TIERS.filter((tier) => tier !== 'personal' && viewer.tierAccess.includes(tier));
+}
+
+function personCustodyFields(scope: Parameters<typeof custodyOfScope>[0]): { owner_nhi?: string } {
+  const custody = custodyOfScope(scope);
+  return custody.kind === 'person' ? { owner_nhi: custody.ref } : {};
 }
 
 /** A memory candidate as the queue card shows it (summary clamped, origin humanized). */
@@ -81,6 +87,10 @@ export function needsYouKnowledgeFromCandidate(
       ? { organization_id: candidate.scope.organization_id }
       : {}),
     ...(candidate.scope?.project_id ? { project_id: candidate.scope.project_id } : {}),
+    ...personCustodyFields(candidate.scope),
+    ...(candidate.scope?.allowed_audience
+      ? { allowed_audience: candidate.scope.allowed_audience }
+      : {}),
   };
 }
 
@@ -93,8 +103,25 @@ function knowledgeFor(viewer: SurfaceAuthorizationContext): NeedsYouKnowledgeInp
       const sourceTier = (scope?.tier ?? candidate.sensitivity_tier) as Tier;
       if (!tiers.includes(candidate.sensitivity_tier as Tier) || !tiers.includes(sourceTier))
         return false;
-      if (scope?.allowed_audience?.length || scope?.owner_nhi || scope?.nhi_id) return false;
-      return sourceTier === 'public' || admitsCustody(viewer, custodyOfScope(scope));
+      if (!admitsScopeAudience(viewer, scope)) return false;
+      if (
+        viewer.organizationIds !== 'all' &&
+        (!scope?.organization_id || !viewer.organizationIds.includes(scope.organization_id))
+      )
+        return false;
+      if (
+        viewer.projectIds !== 'all' &&
+        (!scope?.project_id || !viewer.projectIds.includes(scope.project_id))
+      )
+        return false;
+      const ids = viewerPersonIds(viewer);
+      const audience = scope?.allowed_audience ?? [];
+      const audienceMatch = audience.some((id) => ids.includes(id));
+      if (audience.length && !audienceMatch) return false;
+      if (scope?.owner_nhi && !ids.includes(scope.owner_nhi) && !audienceMatch) return false;
+      if (sourceTier === 'personal' && custodyOfScope(scope).kind !== 'person' && !audienceMatch)
+        return false;
+      return true;
     })
     .map((candidate) => needsYouKnowledgeFromCandidate(candidate));
 }
@@ -156,7 +183,7 @@ function approvalsFor(viewer: SurfaceAuthorizationContext): CeoApprovalItem[] {
       // A public untenanted approval is everyone's — except when it names
       // an owner: person custody is identity-bound, never broadcast.
       const custody = custodyOfScope(record.scope);
-      if (!tenant && tier === 'public' && custody.kind !== 'person') return true;
+      if (!tenant && tier === 'public' && custody.kind === 'system') return true;
       return admitsCustody(viewer, custody);
     })
     .map((record) =>
@@ -177,6 +204,7 @@ function outcomesFor(viewer: SurfaceAuthorizationContext): NeedsYouOutcomeInput[
       updated_at: entry.updated_at,
       ...(entry.kind ? { kind: entry.kind } : {}),
       ...(entry.tenant_slug ? { tenant_slug: entry.tenant_slug } : {}),
+      ...personCustodyFields(entry),
     }));
 }
 
@@ -237,6 +265,11 @@ export function readNeedsYouFailures(
         surface: String(notification.surface || 'presence'),
         created_at: String(notification.created_at || ''),
         ...(tenant ? { tenant_slug: tenant } : {}),
+        ...personCustodyFields(
+          notification.scope && typeof notification.scope === 'object'
+            ? (notification.scope as Record<string, unknown>)
+            : notification
+        ),
       };
     });
 }

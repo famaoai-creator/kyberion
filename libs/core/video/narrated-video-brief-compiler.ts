@@ -9,7 +9,7 @@ import { clamp } from '../foundation/text.js';
 import { createLogger } from '../logger.js';
 
 const logger = createLogger('narrated-video-brief-compiler');
-import { resolveCreativeDesign } from '../creative-design-resolver.js';
+import { resolveCreativeDesign } from '../design/creative-design-resolver.js';
 import type {
   VideoCompositionADF,
   VideoCompositionAssetRef,

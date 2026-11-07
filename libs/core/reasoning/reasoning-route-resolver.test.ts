@@ -13,7 +13,7 @@ const { resolveActiveProfileRootMock } = vi.hoisted(() => ({
   resolveActiveProfileRootMock: vi.fn(),
 }));
 
-vi.mock('../profile-root.js', () => ({
+vi.mock('../authn/profile-root.js', () => ({
   resolveActiveProfileRoot: resolveActiveProfileRootMock,
 }));
 

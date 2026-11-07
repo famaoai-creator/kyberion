@@ -1,6 +1,6 @@
 /** Request-only bridge from verified browser authentication to canonical human ownership. */
 import { verifiedBrowserSessionIdentity } from '../authn/authn-providers.js';
-import type { ResolvedPrincipal } from '../authn-principal-resolver.js';
+import type { ResolvedPrincipal } from '../authn/authn-principal-resolver.js';
 import { auditChain } from '../governance/audit-chain.js';
 import type { SurfaceViewerScope } from './surface-viewer-scope-contract.js';
 import {

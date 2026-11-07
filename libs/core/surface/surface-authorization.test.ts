@@ -127,6 +127,42 @@ describe('admitsTenant (row-level tenant admission)', () => {
 });
 
 describe('admitsCustody (P4 — custody-kind row admission)', () => {
+  it('validates both literal owner aliases before choosing custody', () => {
+    const viewer = { tenantSlugs: 'all' as const, principalId: 'alice' };
+    expect(admitsCustody(viewer, custodyOfScope({ nhi_id: 'alice' }))).toBe(true);
+    expect(admitsCustody(viewer, custodyOfScope({ owner_nhi: 'alice', nhi_id: 'alice' }))).toBe(
+      true
+    );
+    for (const scope of [
+      { owner_nhi: '', nhi_id: 'alice' },
+      { owner_nhi: 'alice', nhi_id: '' },
+      { owner_nhi: 'alice', nhi_id: 'bob' },
+      { nhi_id: ' alice ' },
+      { nhi_id: 12 },
+    ])
+      expect(admitsCustody(viewer, custodyOfScope(scope))).toBe(false);
+  });
+  it('fails closed on malformed identities and declarations without widening legacy tenant absence', () => {
+    const all = { tenantSlugs: 'all' as const, principalId: 'owner' };
+    for (const scope of [
+      { owner_nhi: '' },
+      { owner_nhi: ' owner ' },
+      { owner_nhi: 123 },
+      { tenant_slug: 'bad tenant' },
+      { tenant_slug: 123 },
+    ])
+      expect(admitsCustody(all, custodyOfScope(scope as never))).toBe(false);
+    expect(custodyOfScope({ tenant_slug: '' })).toEqual({ kind: 'system' });
+    expect(custodyOfScope({ tenant_slug: null })).toEqual({ kind: 'system' });
+    expect(viewerPersonIds({ personIds: ['', ' ', '*', 123, 'owner'] as never })).toEqual([
+      'owner',
+    ]);
+    expect(admitsCustody(all, { kind: 'unknown', ref: 'owner' } as never)).toBe(false);
+    expect(admitsScopeAudience(all, { owner_nhi: 'owner', allowed_audience: ['*'] })).toBe(false);
+    expect(
+      admitsScopeAudience(all, { owner_nhi: 'owner', allowed_audience: 'owner' as never })
+    ).toBe(false);
+  });
   it('tenant custody follows the same rule admitsTenant always had', () => {
     expect(admitsCustody({ tenantSlugs: 'all' }, { kind: 'tenant', ref: 'acme' })).toBe(true);
     expect(admitsCustody({ tenantSlugs: ['acme'] }, { kind: 'tenant', ref: 'acme' })).toBe(true);

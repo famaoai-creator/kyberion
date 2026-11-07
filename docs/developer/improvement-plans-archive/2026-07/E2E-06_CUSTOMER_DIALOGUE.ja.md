@@ -83,7 +83,7 @@ status: archived
      ]
    }
    ```
-2. `libs/core/customer-channel-binding.ts`: `resolveCustomerBinding(surface, channelId): { tenantSlug, binding } | null`(全 customer overlay を走査。tier-guard 下の読み)。
+2. `libs/core/organization/customer-channel-binding.ts`: `resolveCustomerBinding(surface, channelId): { tenantSlug, binding } | null`(全 customer overlay を走査。tier-guard 下の読み)。
 3. 各ブリッジの会話ハンドラ(UX-01 で触った箇所)で受信時に resolve し、ヒットしたら `runSurfaceMessageConversation` に `audience: 'customer'`, `tenantSlug`, `disclosureLevel` を渡す(パラメータは Task 2 で受ける。**operator 判定より先に評価** — telegram の allowlist 拒否より前に顧客判定)。
 4. **検証**: unit test(binding 解決/非該当/inactive)/ 既存ブリッジテスト緑。
 
@@ -107,7 +107,7 @@ status: archived
 
 ### Task 4: deal 状態機械 — `claude-sonnet-4` 相当
 
-1. `libs/core/deal-store.ts`: `customer/<slug>/deals/<deal_id>.json` + `deal-log.jsonl`(遷移履歴)。
+1. `libs/core/organization/deal-store.ts`: `customer/<slug>/deals/<deal_id>.json` + `deal-log.jsonl`(遷移履歴)。
    ```ts
    type DealStage =
      | 'inquiry'
@@ -188,10 +188,10 @@ Task 1(バインディング)→ Task 2(ガードレール)→ Task 3(カタロ�
 
 ### 完了
 
-- **Task 1 — チャネルバインディング**: `schemas/customer-channel-binding.schema.json`、`customer/_template/connections/channel-bindings.json`、`libs/core/customer-channel-binding.ts`(`resolveCustomerBinding` — inactive は不一致、`_`/`.` プレフィックスのディレクトリは走査除外)。Slack ブリッジは operator 処理より前、Telegram ブリッジは **allowlist 判定より前**に顧客判定を挿入(顧客は operator ではないので default-deny で無言拒否しない)。
-- **Task 2 — 顧客モードガードレール**: `libs/core/customer-conversation.ts`。**計画からの意図的な逸脱**: operator 会話パスに `audience: 'customer'` を通すのではなく、**完全に独立したハンドラ** `runCustomerConversation` を実装。顧客は構造上ミッション状態・pipelines・他テナント文脈に到達できない(denial by architecture)。接地は solution catalog + price book + `knowledge/confidential/<slug>/sales/notes.md` + deal 履歴のみ。範囲外は `[NEEDS_OPERATOR]` マーカー → マーカー除去済み保留返信 + エスカレーション。backend 障害時も即エスカレーション(即興回答しない)。能動送信は `sendToCustomer()` のみで、`intentId: 'customer:outbound'` を **approval-policy に requires_approval ルールとして追加**(既定 fallback が `requires_approval: false` のため、ルール無しでは素通りだった)。
+- **Task 1 — チャネルバインディング**: `schemas/customer-channel-binding.schema.json`、`customer/_template/connections/channel-bindings.json`、`libs/core/organization/customer-channel-binding.ts`(`resolveCustomerBinding` — inactive は不一致、`_`/`.` プレフィックスのディレクトリは走査除外)。Slack ブリッジは operator 処理より前、Telegram ブリッジは **allowlist 判定より前**に顧客判定を挿入(顧客は operator ではないので default-deny で無言拒否しない)。
+- **Task 2 — 顧客モードガードレール**: `libs/core/organization/customer-conversation.ts`。**計画からの意図的な逸脱**: operator 会話パスに `audience: 'customer'` を通すのではなく、**完全に独立したハンドラ** `runCustomerConversation` を実装。顧客は構造上ミッション状態・pipelines・他テナント文脈に到達できない(denial by architecture)。接地は solution catalog + price book + `knowledge/confidential/<slug>/sales/notes.md` + deal 履歴のみ。範囲外は `[NEEDS_OPERATOR]` マーカー → マーカー除去済み保留返信 + エスカレーション。backend 障害時も即エスカレーション(即興回答しない)。能動送信は `sendToCustomer()` のみで、`intentId: 'customer:outbound'` を **approval-policy に requires_approval ルールとして追加**(既定 fallback が `requires_approval: false` のため、ルール無しでは素通りだった)。
 - **Task 3 — 接地の正本**: `schemas/solution-catalog.schema.json`(limitations 必須)、`schemas/price-book.schema.json`(CO-03 移行メモ入り)、`knowledge/public/sales/solution-catalog.json`、`knowledge/product/sales/price-book.json`。
-- **Task 4 — deal 状態機械**: `libs/core/deal-store.ts`。`customer/<slug>/deals/DEAL-XXXX.json` + `deal-log.jsonl`。前進のみ(`lost` は任意段階から可)、巻き戻しは `operator: true` 必須。`getActiveDealForChannel` で「昨日の続き」が成立。
+- **Task 4 — deal 状態機械**: `libs/core/organization/deal-store.ts`。`customer/<slug>/deals/DEAL-XXXX.json` + `deal-log.jsonl`。前進のみ(`lost` は任意段階から可)、巻き戻しは `operator: true` 必須。`getActiveDealForChannel` で「昨日の続き」が成立。
 - **Task 5(決定論部分)— 見積計算**: `buildQuoteFromPriceBook`(deal-store.ts 内)。price book の estimate_rules のみで算出、未知の task_kind は unquotable として operator へ。LLM は演算しない。
 - **Task 8(前半)— E2E テスト**: `tests/customer-dialogue-e2e.test.ts`(8 テスト)。バインディング解決 / 接地回答+deal 継続 / 範囲外エスカレーション(マーカー非漏洩)/ backend 障害 / 見積決定論 / ステージ前進・巻き戻しガード / 送付の承認ブロック→承認→配信失敗 / approval-policy ルール存在。
 
@@ -201,7 +201,7 @@ E2E-04 Task 2 の `notifyOperator` 実装(2026-07-07)に伴い、顧客エスカ
 
 ### 追記(2026-07-07): Task 5〜8 後半も実装完了
 
-- **Task 5 — 見積・契約書生成と送付ゲート**: `libs/core/deal-documents.ts`。`generateQuoteForDeal`(price book 決定論計算 → `customer/<slug>/deals/<id>/quote-vN.{json,md}` → stage=quote → notifyOperator(approval_required)。見積不能は operator へ通知しステージを進めない)。`draftContractForDeal`(`knowledge/product/sales/contract-templates/basic-service-agreement.md` 雛形置換、合意(scope+amount)無しでは throw)。**防御層③の実体**: `sendDealDocumentToCustomer` は契約書について `contract-review-vN.json`(verdict=approve、`recordContractReview` で記録)が無い限り**構造的に送付拒否**(approval gate にすら到達しない)。**逸脱**: xlsx/pdf 生成(media-actuator)ではなく md+json、pipeline ではなく core 関数として実装。contract-review は既存 `pipelines/contract-review.json` を operator が実行し `recordContractReview` で記録する運用(自動チェーンは残余)。
+- **Task 5 — 見積・契約書生成と送付ゲート**: `libs/core/organization/deal-documents.ts`。`generateQuoteForDeal`(price book 決定論計算 → `customer/<slug>/deals/<id>/quote-vN.{json,md}` → stage=quote → notifyOperator(approval_required)。見積不能は operator へ通知しステージを進めない)。`draftContractForDeal`(`knowledge/product/sales/contract-templates/basic-service-agreement.md` 雛形置換、合意(scope+amount)無しでは throw)。**防御層③の実体**: `sendDealDocumentToCustomer` は契約書について `contract-review-vN.json`(verdict=approve、`recordContractReview` で記録)が無い限り**構造的に送付拒否**(approval gate にすら到達しない)。**逸脱**: xlsx/pdf 生成(media-actuator)ではなく md+json、pipeline ではなく core 関数として実装。contract-review は既存 `pipelines/contract-review.json` を operator が実行し `recordContractReview` で記録する運用(自動チェーンは残余)。
 - **Task 6 — 影響分析と SDLC handoff**: code-actuator に `impact_analysis` op(`schemas/impact-analysis.schema.json`、決定論ファイルインベントリ + reasoning backend、size S/M/L が estimate_rules へ接続)。`handoffWonDealToSdlc` が won 遷移 + IL-01 `writeIntentGoalHandoff`(**顧客の言葉がミッションゴールになる**)+ `deal.mission_ids` 記録、次段は E2E-05 の `pipelines/sdlc-cycle.json`。
 - **Task 7 — 合意記録と還流**: `advanceDealStage` の遷移フックとして実装。won/delivering/delivered/invoiced で `agreement-vN.json` スナップショット、delivered/lost で memory-promotion-queue に confidential 候補(ratification 必須)を enqueue。
 - **Task 8 後半**: `tests/customer-dialogue-e2e.test.ts` を 13 テストに拡張(見積の金額固定・契約レビュー無し送付ブロック・won→handoff・distill 還流・**他テナント notes がプロンプトに混入しないこと**)+ `tests/impact-analysis.test.ts`。
@@ -214,7 +214,7 @@ E2E-04 Task 2 の `notifyOperator` 実装(2026-07-07)に伴い、顧客エスカ
 
 ## 追記(2026-07-08)— 対話モード(営業/サポート/要件ヒアリング)
 
-- `libs/core/customer-conversation-modes.ts`: deal stage からモードを導出(`binding.mode` で上書き可)。inquiry〜contract=sales / discovery=requirements_hearing / won 以降=support。開示ポリシーはモード非依存で不変。
+- `libs/core/organization/customer-conversation-modes.ts`: deal stage からモードを導出(`binding.mode` で上書き可)。inquiry〜contract=sales / discovery=requirements_hearing / won 以降=support。開示ポリシーはモード非依存で不変。
 - **sales**: need→決裁→時期→予算の順で最初のギャップを埋める。カタログ実在ソリューションのみ提案。
 - **support**: `knowledge/confidential/<tenant>/support/known-issues.md` を接地し、記載のワークアラウンドをそのまま案内。障害/データ消失/セキュリティは即エスカレーション。
 - **requirements_hearing**: カバレッジチェックリスト(ゴール→利用者→機能→非機能→制約→スコープ外)に沿って、最もブロッキングな open question を1問ずつ。各ターン後に `extractRequirements` で deal 単位の構造化ドラフト(`customer/<tenant>/deals/<id>/requirements.json`)へ増分キャプチャ(fire-and-forget、失敗しても返信は壊さない)。

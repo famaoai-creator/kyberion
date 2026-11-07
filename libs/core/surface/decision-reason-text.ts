@@ -10,7 +10,7 @@
  * browser-safe and receives this through `DecisionBriefOptions.reasonText`.
  */
 import { SUPPORTED_LOCALES } from '../foundation/locale-normalize.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import type { VocabularyKey } from '../knowledge/vocabulary-keys.generated.js';
 import type { DisplayText } from './display-humanize.js';
 

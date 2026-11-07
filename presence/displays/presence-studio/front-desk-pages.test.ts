@@ -14,7 +14,6 @@ import {
   frontDeskTemplateRedirect,
   registerFrontDeskHomeWorkPages,
   registerFrontDeskAuxPages,
-  FIRST_JOB_VOCABULARY_KEYS,
   ASK_VOCABULARY_KEYS,
   PRESENCE_STUDIO_VOCABULARY_KEYS,
   renderFrontDeskPageTemplate,
@@ -22,14 +21,7 @@ import {
 } from './front-desk-pages.js';
 
 const STATIC_DIR = 'presence/displays/presence-studio/static';
-const SHELL_PAGES = [
-  'home.html',
-  'ask.html',
-  'progress.html',
-  'index.html',
-  'first-job.html',
-  'engine-config.html',
-];
+const SHELL_PAGES = ['home.html', 'ask.html', 'index.html', 'engine-config.html'];
 // The OBS projection has no navigation shell, but is still a localized template.
 const PAGES = [...SHELL_PAGES, 'live-avatar.html'];
 
@@ -119,7 +111,7 @@ describe('renderFrontDeskPageTemplate', () => {
   });
 
   it('keeps presence-studio stylesheets on --kb-ui-* tokens (no raw hex / rgb colors, no teal)', () => {
-    const sheets = ['design-system.css', 'home.css', 'ask.css', 'progress.css', 'work.css'];
+    const sheets = ['design-system.css', 'home.css', 'ask.css', 'work.css'];
     for (const sheet of sheets) {
       const css = readStatic(sheet);
       expect(css, sheet).not.toMatch(/#[0-9a-f]{3,8}\b/i);
@@ -197,17 +189,32 @@ describe('raw template files are never served unrendered', () => {
   }
 
   it('covers every page template and maps it to its canonical route', () => {
-    // `/help.html` stays mapped after the page moved to Concierge, so an old
-    // bookmark still lands on 使い方 (via the /help redirect).
+    // `/help.html`, `/progress.html` and `/first-job.html` stay mapped after
+    // their pages moved to Concierge, so an old bookmark still lands there
+    // (via the redirects).
     expect(Object.keys(FRONT_DESK_TEMPLATE_FILE_REDIRECTS).sort()).toEqual(
-      [...PAGES, 'help.html'].map((page) => `/${page}`).sort()
+      [...PAGES, 'help.html', 'progress.html', 'first-job.html'].map((page) => `/${page}`).sort()
     );
+    expect(frontDeskTemplateRedirect('/first-job.html?x=1')).toBe('/first-job?x=1');
     expect(frontDeskTemplateRedirect('/engine-config.html')).toBe('/engine-config');
     expect(frontDeskTemplateRedirect('/home.html')).toBe('/home');
     expect(frontDeskTemplateRedirect('/progress.html?tenant=acme#x')).toBe(
       '/progress?tenant=acme#x'
     );
     expect(frontDeskTemplateRedirect('/ui-gallery.html')).toBeNull();
+  });
+
+  it('hands /first-job to Concierge, keeping the query', () => {
+    const { routes } = recordRoutes();
+    const concierge = readFrontDeskSurfaceUrls().concierge;
+    const res = fakeRes();
+    routes.get('/first-job')!({ originalUrl: '/first-job?locale=ja', params: {} }, res);
+    expect(res.statusCode).toBe(302);
+    expect(res.location).toBe(concierge + '/first-job?locale=ja');
+    expect(res.sent).toBeUndefined();
+    const bare = fakeRes();
+    routes.get('/first-job')!({ originalUrl: '/first-job', params: {} }, bare);
+    expect(bare.location).toBe(concierge + '/first-job');
   });
 
   it('hands /help and /help/<track> to Concierge, keeping the query', () => {
@@ -225,6 +232,23 @@ describe('raw template files are never served unrendered', () => {
     expect(track.statusCode).toBe(302);
     expect(track.location).toBe(concierge + '/help/first%20steps');
     expect(track.sent).toBeUndefined();
+  });
+
+  it('hands /progress to Concierge 仕事 › 依頼, keeping the query in one query string', () => {
+    const { routes } = recordRoutes();
+    const concierge = readFrontDeskSurfaceUrls().concierge;
+    const bare = fakeRes();
+    routes.get('/progress')!({ originalUrl: '/progress', params: {} }, bare);
+    expect(bare.statusCode).toBe(302);
+    expect(bare.location).toBe(concierge + '/work?tab=requests');
+    const linked = fakeRes();
+    routes.get('/progress')!(
+      { originalUrl: '/progress?request=req-1&tenant=acme&tab=missions', params: {} },
+      linked
+    );
+    expect(linked.statusCode).toBe(302);
+    expect(linked.location).toBe(concierge + '/work?tab=requests&request=req-1&tenant=acme');
+    expect(linked.sent).toBeUndefined();
   });
 
   it('renders the settings editor in the requested locale with a disabled form and shared navigation', () => {
@@ -277,74 +301,12 @@ describe('raw template files are never served unrendered', () => {
     }
     expect(runGuard(middleware, '/ui-gallery.html', fakeRes())).toBe(true);
     // The canonical routes still render the template (no placeholder left).
-    const firstJob = fakeRes();
-    routes.get('/first-job')!({ headers: { 'accept-language': 'ja' } }, firstJob);
-    expect(String(firstJob.sent)).toContain('<html lang="ja"');
-    expect(String(firstJob.sent)).not.toMatch(/{{(t|partial|locale)[:}]/);
-    expect(String(firstJob.sent)).toContain('#first-job-approval-panel');
-    expect(String(firstJob.sent)).toContain('/login?next=%2Ffirst-job');
-    expect(String(firstJob.sent)).not.toContain('/work#approval-panel');
-    expect(String(firstJob.sent)).not.toContain('first-job-new-request');
-    expect(String(firstJob.sent)).toContain(
-      'pnpm onboarding first-job --tenant &lt;test-tenant&gt;'
-    );
+    // Home's 初めての仕事 entry follows Studio's /first-job redirect to Concierge.
     expect(readStatic('home.html')).toContain('href="/first-job"');
-    for (const key of FIRST_JOB_VOCABULARY_KEYS)
-      expect(PRESENCE_STUDIO_VOCABULARY_KEYS).toContain(key);
     const home = fakeRes();
     routes.get('/home')!({ headers: { 'accept-language': 'ja' } }, home);
     expect(String(home.sent)).toContain('<html lang="ja"');
     expect(String(home.sent)).not.toMatch(/\{\{(t|partial|locale)[:}]/);
-  });
-});
-
-describe('First-job setup vocabulary delivery', () => {
-  it('delivers every dynamically selected setup message through the browser vocabulary endpoint', () => {
-    const catalog = loadVocabularyCatalog();
-    expect(catalog).not.toBeNull();
-    const keys = Object.keys(catalog!.domains.front_desk).filter(
-      (key) => key.startsWith('first_job_setup_') || key.startsWith('first_job_next_')
-    );
-    expect(keys.length).toBeGreaterThan(0);
-    for (const key of keys) {
-      const qualified = ('front_desk:' + key) as VocabularyKey;
-      expect(FIRST_JOB_VOCABULARY_KEYS).toContain(qualified);
-      expect(PRESENCE_STUDIO_VOCABULARY_KEYS).toContain(qualified);
-      for (const locale of ['en', 'ja', 'qps-ploc'] as const) {
-        expect(catalogT(qualified, undefined, locale)).not.toBe(qualified);
-        expect(catalogT(qualified, undefined, locale)).not.toBe('');
-      }
-    }
-  });
-});
-
-describe('First-job receipt viewer chrome', () => {
-  it('labels each exact-body selector and scrollable plain-text pane in all supported locales', () => {
-    const source = readStatic('first-job.html');
-    for (const locale of ['en', 'ja'] as const) {
-      const html = renderFrontDeskPageTemplate(source, locale, readStatic);
-      expect(html).not.toMatch(/\{\{(t|partial|locale)[:}]/);
-      for (const slot of ['body', 'left', 'right']) {
-        expect(html).toContain('for="first-job-' + slot + '-select"');
-        expect(html).toContain('id="first-job-' + slot + '-select"');
-        expect(html).toMatch(new RegExp('<pre\\s+id="first-job-' + slot + '-content"'));
-        expect(html).toContain('id="first-job-' + slot + '-metadata"');
-      }
-      for (const part of ['last-checked', 'refresh-mode', 'refresh-error', 'compare-status'])
-        expect(html).toContain('id="first-job-' + part + '"');
-      expect(html).not.toMatch(/file:\/\/|href="[^" ]*artifact_path/);
-    }
-    for (const match of source.matchAll(/\{\{t:(front_desk:first_job_[a-z0-9_]+)\}\}/g)) {
-      expect(FIRST_JOB_VOCABULARY_KEYS).toContain(match[1]);
-    }
-    for (const key of FIRST_JOB_VOCABULARY_KEYS) {
-      for (const locale of ['en', 'ja', 'qps-ploc'] as const) {
-        expect(catalogT(key, undefined, locale)).not.toBe(key);
-        expect(catalogT(key, undefined, locale)).not.toBe('');
-      }
-    }
-    expect(readStatic('home.css')).toContain('@media (max-width: 48rem)');
-    expect(readStatic('home.css')).toContain('white-space: pre-wrap');
   });
 });
 
@@ -390,17 +352,4 @@ it('loads draft actions before Ask and bounds multiline context', () => {
   const button = css.match(/\.ask-turn-next-actions button \{([\s\S]*?)\}/)?.[1];
   expect(button).toContain('white-space: normal');
   expect(button).toContain('overflow-wrap: anywhere');
-});
-
-describe('Progress correction helper delivery', () => {
-  it('loads the correction helper before Progress and serves localized scope copy', () => {
-    for (const locale of ['en', 'ja'] as const) {
-      const html = renderFrontDeskPageTemplate(readStatic('progress.html'), locale, readStatic);
-      expect(html.indexOf('src="/progress-correction.js"')).toBeGreaterThan(-1);
-      expect(html.indexOf('src="/progress-correction.js"')).toBeLessThan(
-        html.indexOf('src="/progress.js"')
-      );
-    }
-    expect(readStatic('progress-correction.js')).toContain('window.KyberionProgressCorrection');
-  });
 });

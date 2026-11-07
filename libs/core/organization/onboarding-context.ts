@@ -6,7 +6,7 @@ import {
   readTenantProfile,
   type TenantProfile,
 } from './tenant-registry.js';
-import { stanceDirForSlug } from '../stance-resolver.js';
+import { stanceDirForSlug } from '../authn/stance-resolver.js';
 import { tenantHomePath } from './tenant-home.js';
 import { isTenantActivationActive } from './tenant-activation.js';
 import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';

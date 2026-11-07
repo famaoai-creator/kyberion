@@ -2,7 +2,7 @@
 title: 保存先カタログと許可証による権限判定（tier-guard の再設計）
 kind: design
 status: planned
-last_updated: 2026-11-06
+last_updated: 2026-11-08
 tags: [design, tier-guard, secure-io, scope, custody, grant, storage, governance]
 importance: 8
 ---
@@ -1213,14 +1213,14 @@ security-policy のパスの一覧だけで効いている（門番のコード�
 
 **段階の計画。** どの段階も挙動を変えず、旧と新の tier-guard の判定を並べて確かめる。
 
-| 段階 | 内容                                                                                                                                                                                                | 状態                                      |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| (a)  | 許可証の登録簿（`foundation/store-grant-registry.ts`）。各 capability モジュールが読み込まれたときに自分の判定（認可・絞り込み・内容検査・構造上の mkdir）を登録し、tier-guard は登録簿だけに尋ねる | 実施（下）                                |
-| (b)  | カタログに `grant_required` / `issuer` / `content_check` / `shape` を宣言し、カタログのゲートが登録簿の id と発行者の登録を突き合わせる                                                             | 未実施                                    |
-| (c)  | Concierge の Web 管理の 3 つの規則（祖先のメタデータ、祖先の mkdir、網羅の読み取り）をカタログの宣言にし、2 つのロールを外す                                                                        | 実施（G3 第 2 段階）                      |
-| (d)  | パスだけのロール 3 件と、門番に分岐の無い 24 件を許可証かカタログの形にする                                                                                                                         | 実施（G3 第 2 段階）                      |
-| (e)  | tier-guard の各入口を `decide(主体, 住所, 操作, 内容)` に通す                                                                                                                                       | 実施（G3 第 2 段階）                      |
-| (f)  | secure-io の import を削る                                                                                                                                                                          | 実施（MSN-SCOPE-SECIO-20261107、50 → 40） |
+| 段階 | 内容                                                                                                                                                                                                | 状態                               |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| (a)  | 許可証の登録簿（`foundation/store-grant-registry.ts`）。各 capability モジュールが読み込まれたときに自分の判定（認可・絞り込み・内容検査・構造上の mkdir）を登録し、tier-guard は登録簿だけに尋ねる | 実施（下）                         |
+| (b)  | カタログに `grant_required` / `issuer` / `content_check` / `shape` を宣言し、カタログのゲートが登録簿の id と発行者の登録を突き合わせる                                                             | 未実施                             |
+| (c)  | Concierge の Web 管理の 3 つの規則（祖先のメタデータ、祖先の mkdir、網羅の読み取り）をカタログの宣言にし、2 つのロールを外す                                                                        | 実施（G3 第 2 段階）               |
+| (d)  | パスだけのロール 3 件と、門番に分岐の無い 24 件を許可証かカタログの形にする                                                                                                                         | 実施（G3 第 2 段階）               |
+| (e)  | tier-guard の各入口を `decide(主体, 住所, 操作, 内容)` に通す                                                                                                                                       | 実施（G3 第 2 段階）               |
+| (f)  | secure-io の import を削る                                                                                                                                                                          | identity 分離を実施、40 以下は未達 |
 
 **第 1 段階 (a): 許可証の登録簿。**
 
@@ -1340,18 +1340,19 @@ policy engine）の分離として別の段階に置くか。これらを決め�
   governance action recorder など）を、遅延の読み込みか別の package に分ける。G3 の前に決めた 40 以下は
   この段階の目標にする。
 
-  **実施済み（MSN-SCOPE-SECIO-20261107、50 → 40）。** 「遅延の読み込み」ではなく依存の向きを反転させた:
-  - `foundation/deferrable-audit-sink.ts`（実行時の依存 0）が録画系の対称登録簿。secure-io は
-    `recordDeferrableAudit` / `recordGovernanceActionReport` / `provideAuditIo` だけを呼び、
-    audit-chain・governance-action-recorder・chain-integrity・lock-utils が読み込まれたときに自分の
-    recorder と IO consumer を登録する（どちらが先に読み込まれても、後着側の登録時に接続される）。
-    recorder 未到着の記録は 256 件までの bounded queue に残り、登録時に順序どおり flush される。
-    認可の判定（policy-engine / tier-guard）は静的 import のまま — 動くのは監視経路だけで、
-    `governance-action-recorder` が元から持つ「sink 未登録なら best-effort」契約と同じ取り決め。
+  **統合レビュー（MSN-SCOPE-SECIO-REVIEW-20261108）。** 当初の 50 → 40 という計測値は、
+  監査の永続化を未登録 recorder 待ちのキューへ変える案によるもので、採用しない。
+  - 未登録時のキューは送信時の tenant/authority を保持せず、別テナントで登録されたときに監査を
+    付け替える危険がある。recorder が読み込まれなければ永続化されず、256 件を超える記録も失う。
+    従来の `auditChain.recordDeferrable` は送信時に帰属を検査し、audit lock の内側だけ検証済みの
+    記録を解放時へ遅延する。governance-action の任意 sink と同じ契約ではない。
+  - secure-io は canonical audit-chain と governance-action-recorder を引き続き静的に読み込み、
+    従来の同期記録・帰属検査・lock 解放時の drain を維持する。新しいキューと IO 登録簿は追加しない。
   - `foundation/identity-context.ts` に sole-resolver の軽量登録簿と defaultResolver を移し、
     `identity-context-bridge.ts` は seam 登録 + 軽量登録簿の二重登録だけを行う（公開 API は再輸出で
     不変）。tier-guard / `engine-runtime-preferences-access` が bridge → seam → invariants の
-    3 本を引かなくなった。
+    3 本を引かなくなった。既存ゲートの計数規則で再計測した結果は **50 → 48**。
+    実測値に baseline を下げ、40 以下の目標達成とは扱わない。
   - 残るゲート常駐の規則（policy-engine = fail-closed の実判定、shell/sandbox-policy の SSRF 検査）は
     静的 import のまま — 未読み込み時に黙って素通しになる形にはしない。
 
@@ -1459,12 +1460,13 @@ secure-io の 40 以下は別の段階）。上の表は G0 の時点の見込�
   `concierge_management_reader`、`peer_responder_reader` は「プロセスが複数テナントの保存先を
   読める」という I/O 権限であり、P4 で揃えた custody admission はその内側で「viewer にどの行を
   開示するか」を決める別の層。ロールを外すには保存先レベルの許可証化（流れの分解の段階）が要る。
-- **派生台帳に storeRole（P3 F9）。** `asset_derivations` を `TENANT_STORE_LEDGER_ROOTS` に登録し、
-  新ロール `asset_derivation_store` を発行した。`confidential/<tenant>` は custodian のテナント束縛、
-  メンバー区画 `personal/<ref>` と `system/` はロールのリテラル許可（メンバー ref はテナント slug
-  ではないため honoring が custodian 束縛を担う）。`tenantStoreLedgerPartitionOf` にルートごとの
-  `systemPartition` オプトインを追加し、ambient な runtime 書き込み権では台帳に追記できないように
-  した（`delegation-records/system/` など他ルートの `system/` セグメントは従来どおり）。
+- **派生台帳の storeRole 案（P3 F9）は統合レビューで置き換えた。** 当初案の
+  `asset_derivation_store` は、共有ロールへの切替と tenant 束縛の解除で他の区画にも書けるため、
+  producer の証明を安全に担えない。PR1442 の保護された producer receipt と限定された同期読取りを
+  正本とし、新しい共有ロール・権限宣言・バックアップ時のロール切替は追加しない。
+  custodian index は探索用であり、それだけでは削除権限にならない。来歴の記録は既存の governed
+  producer 3 ロールに限定し、source/output の世代・ハッシュ・custody を証明で検証する。
+  `personal/<ref>` はメンバー区画であり tenant としてバックアップ・削除しない。
 - **janitor 配線は既に充足。** retention カタログの
   `active/shared/runtime/asset-derivations`（`action: review_required`）が台帳を「報告するが自動削除
   しない」状態にしている — 削除は派生関係グラフ（R-09）に従うため。`runtime-store-retention` ゲートが
@@ -1481,10 +1483,10 @@ secure-io の 40 以下は別の段階）。上の表は G0 の時点の見込�
     `tenant_slug > owner_nhi/nhi_id > system` の順で決める。なお knowledge ドメインの
     「`nhi_id` から personal 置き場を推論しない」契約は保存先推論の層の話であり、開示層では
     `nhi_id` を person 束縛として扱う方が fail-closed で整合する。
-  - `asAssetDerivationStore` は `withExecutionContext(role, fn, undefined, '')` — 第 4 引数に
-    `undefined` を渡すと呼び出し側の ambient テナント束縛が残り、`personal/<member>` 追記が
-    tenant-bound プロセスから必ず `tenant.scope_violation` で弾かれる。`''`（tenantCleared）で
-    束縛を明示クリアする。tenant custody の書き込みだけは custodian slug を束縛する。
+  - 当初の `asAssetDerivationStore` は personal/system 追記時に ambient tenant を解除していたが、
+    解除は authority の代わりにならない。統合版ではこの helper 自体を採用せず、既存の呼出し元の
+    権限・resource ceiling を保つ。system producer 権限と confidential tenant-container の権限は
+    別に検査し、保護された来歴を混合テナントのエラー詳細から漏らさない。
 
 ## スコープモデルとの対応
 
@@ -1497,6 +1499,13 @@ secure-io の 40 以下は別の段階）。上の表は G0 の時点の見込�
 | R-01 作成時の管理者                  | カタログの `custody` 宣言、G0 の突合ゲート            |
 | R-05 判定関数の共有                  | `decide` 一つ                                         |
 | R-09 派生をたどる削除                | カタログの `derived_from` と `retention`（P3 で使う） |
+
+## 統合時の安全性補強（2026-11-08）
+
+- narrow 宣言は schema と同じく、各階層の未知キー、空の拒否理由・パス・matcher・content ID を拒否する。不正な policy / role コンテナーを「宣言なし」と扱わない。
+- 明示された役割の I/O は policy 欠落・破損時に `[ROLE_NARROWING_POLICY_UNAVAILABLE]` で拒否する。役割なし bootstrap は従来の残余判定を維持する。
+- 1 回の I/O の narrow・基本権限・structural mkdir は、遅延読込みした同じ policy snapshot を使う。異なる版の許可条件を組み合わせない。
+- 回帰検証は `role-narrowing-denial.test.ts`、`tier-guard-policy-corruption.test.ts`、`resource-access-scope.test.ts` で、正常な宣言と不正入力・policy 変更／欠落の双方を確認する。
 
 ## 非目標
 

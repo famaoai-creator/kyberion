@@ -18,7 +18,7 @@ const { storeSecret, storeConnectionDocument, ledgerRecord } = vi.hoisted(() => 
 }));
 vi.mock('./secret-bridge.js', () => ({ storeSecret, fetchSecretSync: () => null }));
 vi.mock('./secret-guard.js', () => ({ getSecret: () => null, storeConnectionDocument }));
-vi.mock('../ledger.js', () => ({ ledger: { record: ledgerRecord } }));
+vi.mock('../governance/ledger.js', () => ({ ledger: { record: ledgerRecord } }));
 
 const expected: SecretIntroductionApplyExpectation = {
   principalId: 'local-operator-test',

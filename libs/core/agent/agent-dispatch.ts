@@ -22,7 +22,7 @@ import {
   getSubagentCapabilityProfile,
   listSubagentCapabilityProfileNames,
   type SubagentCapabilityProfile,
-} from '../subagent-capability-profiles.js';
+} from '../workforce/subagent-capability-profiles.js';
 import {
   advanceToolCallRepeatGovernor,
   createToolCallRepeatGovernorState,
@@ -46,13 +46,16 @@ import type {
   ToolDefinition,
   GenerateWithToolsResult,
 } from '../reasoning/reasoning-backend.js';
-import { createDelegationHandle, type DelegationHandle } from '../delegated-task-observability.js';
+import {
+  createDelegationHandle,
+  type DelegationHandle,
+} from '../workforce/delegated-task-observability.js';
 import { runOpPreflight } from '../pipeline/op-preflight.js';
 import { ensureDefaultOpPreflight } from '../pipeline/op-preflight-defaults.js';
 import { recordGovernanceAction } from '../governance/governance-action-recorder.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { projectDelegationResult } from './delegation-result-projection.js';
-import { getUsageAttribution, type UsageAttribution } from '../usage-accounting.js';
+import { getUsageAttribution, type UsageAttribution } from '../finance/usage-accounting.js';
 
 /** Default tier for an in-session delegation that does not name one (backward compatible). */
 const DEFAULT_SUBAGENT_PROFILE = 'implementer';

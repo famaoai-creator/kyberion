@@ -2,7 +2,7 @@ import { logger } from '../core.js';
 import { ocrImage } from '../ocr-bridge.js';
 import type { OcrRequest, OcrResult, OcrRoutingMode } from '../contracts/ocr-types.js';
 import { OsAccessibilityDetector } from '../virtual/os-accessibility-detector.js';
-import { PixelRegionDetector } from '../pixel-region-detector.js';
+import { PixelRegionDetector } from '../virtual/pixel-region-detector.js';
 import {
   coreSeamCatalog,
   createSeam,
@@ -13,14 +13,14 @@ import {
   resolveSeamProviderDecision,
   type SeamProviderCandidate,
   type SeamProviderDecision,
-} from '../seam-provider-selection.js';
+} from '../provider/seam-provider-selection.js';
 import {
   candidatesFromDomSnapshot,
   candidatesFromOcr,
   type SomCandidate,
   type SomDomElement,
   type SomImageSize,
-} from '../set-of-marks.js';
+} from '../virtual/set-of-marks.js';
 
 /**
  * `ui-element-detector` seam: sources of Set-of-Marks candidate boxes.

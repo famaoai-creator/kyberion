@@ -260,15 +260,16 @@ describe('RN-01 role assumption trace', () => {
   it('skips authority and node-internal frames and makes paths checkout-relative', () => {
     const stack = [
       'Error',
-      '    at traceRoleAssumption (/repo/libs/core/dist/role-assumption-trace.js:10:5)',
+      // An unrecognised function name must still be excluded by its defining module.
+      '    at traceBoundaryWrapper (/repo/libs/core/dist/organization/role-assumption-trace.js:10:5)',
       '    at assertRoleAssumptionAllowed (/repo/libs/core/dist/authority.js:20:3)',
       '    at withExecutionContext (file:///repo/libs/core/dist/authority.js:30:3)',
       '    at processTicksAndRejections (node:internal/process/task_queues:95:5)',
-      '    at withMissionRole (/repo/libs/core/dist/mission-role.js:5:1)',
+      '    at withMissionRole (/repo/libs/core/dist/mission/mission-role.js:5:1)',
       '    at /repo/presence/displays/chronos-mirror-v2/.next/server/chunk.js:1:2',
     ].join('\n');
     expect(callerFramesFromStack(stack)).toEqual([
-      'libs/core/dist/mission-role.js:5:1 (withMissionRole)',
+      'libs/core/dist/mission/mission-role.js:5:1 (withMissionRole)',
       'presence/displays/chronos-mirror-v2/.next/server/chunk.js:1:2',
     ]);
   });

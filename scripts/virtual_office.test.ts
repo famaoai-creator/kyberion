@@ -11,6 +11,10 @@ let core: typeof import('@agent/core') | undefined;
 
 describe('virtual office surface', () => {
   beforeAll(async () => {
+    // This operator-owned fixture reads personal tenant registrations and
+    // confidential alerts; do not inherit the test wrapper's ambient identity.
+    vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+    vi.stubEnv('MISSION_ROLE', 'mission_controller');
     vi.resetModules();
     tmpRoot = path.join(os.tmpdir(), `kyb-office-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
@@ -46,6 +50,7 @@ describe('virtual office surface', () => {
     // (schemas are already covered wholesale by the knowledge/product/schemas
     // copy above).
     const REQUIRED_GOVERNED_CATALOGS = [
+      'product/governance/security-policy.json',
       'product/governance/provider-config.json',
       'product/governance/tasktype-artifact-map.json',
       'public/common/project_standards.json',
@@ -566,6 +571,7 @@ describe('virtual office surface', () => {
   afterAll(() => {
     core?.clearWorkCoordinationStore();
     core?.setWorkCoordinationNamespace(null);
+    vi.unstubAllEnvs();
     delete process.env.KYBERION_ROOT;
     delete process.env.KYBERION_STANCE;
     fs.rmSync(tmpRoot, { recursive: true, force: true });

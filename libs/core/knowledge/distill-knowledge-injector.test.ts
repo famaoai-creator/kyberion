@@ -11,7 +11,7 @@ import {
   registerEmbeddingBackend,
   resetEmbeddingBackend,
   type EmbeddingBackend,
-} from '../embedding-backend.js';
+} from '../reasoning/embedding-backend.js';
 
 describe('distill-knowledge-injector (E5)', () => {
   it('returns empty when topic and tags are both empty', async () => {

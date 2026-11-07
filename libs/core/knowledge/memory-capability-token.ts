@@ -17,7 +17,7 @@
  */
 
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
-import { resolveAuditChainKey } from '../chain-integrity.js';
+import { resolveAuditChainKey } from '../governance/chain-integrity.js';
 import { isRecord } from '../foundation/primitives.js';
 import { nowIso, parseIso } from '../foundation/time.js';
 import { KNOWLEDGE_TIERS, type KnowledgeTier } from '../foundation/knowledge-tier.js';

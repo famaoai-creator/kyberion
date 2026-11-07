@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it, vi } from 'vitest';
-vi.mock('../stance-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../stance-resolver.js')>();
+vi.mock('../authn/stance-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../authn/stance-resolver.js')>();
   const { customerRootWithSodOverlay } =
     await import('../governance/__tests__/sod-overlay-state.js');
   return { ...actual, stanceRoot: customerRootWithSodOverlay(actual.stanceRoot) };
@@ -202,7 +202,7 @@ describe('evaluateProjectTrustDelegation', () => {
 
   it('lets a charter delegating pipeline_trust_grant stand in for approval', async () => {
     const { acceptCharter } = await import('../governance/accountability-charter-registry.js');
-    const { humanActor } = await import('../actor.js');
+    const { humanActor } = await import('../contracts/actor.js');
     const { evaluateProjectTrustDelegation } = await import('./project-trust.js');
     const { safeWriteFile } = await import('../secure-io.js');
     root = pathResolver.sharedTmp(`pt-delegation-${randomUUID()}`);

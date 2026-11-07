@@ -1,4 +1,7 @@
-import { A2ATaskContractSchema, formatZodIssues } from '../structured-output-contracts.js';
+import {
+  A2ATaskContractSchema,
+  formatZodIssues,
+} from '../contracts/structured-output-contracts.js';
 import type { A2ATaskContract } from '../surface/channel-surface-types.js';
 
 export interface A2ATaskContractValidationResult {

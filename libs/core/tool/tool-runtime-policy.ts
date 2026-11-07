@@ -7,7 +7,7 @@ import {
 } from '../storage-layout.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { resolveActiveProfileRoot } from '../profile-root.js';
+import { resolveActiveProfileRoot } from '../authn/profile-root.js';
 import { withExecutionContext } from '../authority.js';
 import {
   assertSafeRepositoryPath,

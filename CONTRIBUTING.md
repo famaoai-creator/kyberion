@@ -116,7 +116,7 @@ catch (err) {
 }
 ```
 
-If you observe a real-world error that the classifier returns `'unknown'` for, add a rule in `libs/core/error-classifier.ts` (with a test).
+If you observe a real-world error that the classifier returns `'unknown'` for, add a rule in `libs/core/analysis/error-classifier.ts` (with a test).
 
 ### Tests
 

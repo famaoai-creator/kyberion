@@ -17,7 +17,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { validateTraceReplay } from './trace-schema.js';
-import { withTriggerCorrelation } from '../trigger-correlation.js';
+import { withTriggerCorrelation } from '../event/trigger-correlation.js';
 
 const originalEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 const originalFetch = globalThis.fetch;

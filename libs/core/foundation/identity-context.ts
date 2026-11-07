@@ -31,21 +31,26 @@ export function readConfiguredActorIdentity(
   };
 }
 
-const REGISTRY_KEY = Symbol.for('kyberion.identity-context-resolver');
+// Match the seam catalog's module lifetime: a fresh module graph must not
+// inherit a resolver whose authority module belonged to a discarded graph.
+const resolverRegistry: { resolver?: IdentityContextResolver } = {};
 
 function registry(): { resolver?: IdentityContextResolver } {
-  const globals = globalThis as typeof globalThis & {
-    [REGISTRY_KEY]?: { resolver?: IdentityContextResolver };
-  };
-  return (globals[REGISTRY_KEY] ??= {});
+  return resolverRegistry;
 }
 
 /** Install the complete resolver; returns a restore for the previous one. */
 export function registerPolicyIdentityResolver(next: IdentityContextResolver): () => void {
   const reg = registry();
+  if (reg.resolver) {
+    throw new Error('Identity context resolver is already registered');
+  }
   const previous = reg.resolver;
   reg.resolver = next;
+  let active = true;
   return () => {
+    if (!active) return;
+    active = false;
     if (reg.resolver === next) reg.resolver = previous;
   };
 }

@@ -189,16 +189,16 @@
     "libs/core/agent/agent-runtime-supervisor.ts": {
       "json_state_write_budget": 2
     },
-    "libs/core/aidlc-phase-state.ts": {
+    "libs/core/mission/aidlc-phase-state.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/analysis/trace.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/apple-intelligence-bridge.ts": {
+    "libs/core/provider/apple-intelligence-bridge.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/assistant-compiler-request.ts": {
+    "libs/core/intent/assistant-compiler-request.ts": {
       "json_state_write_budget": 2
     },
     "libs/core/authn/passkey-credential-store.ts": {
@@ -207,86 +207,98 @@
     "libs/core/authority.ts": {
       "env_direct_read_budget": 5
     },
-    "libs/core/baseline-check-cache.ts": {
+    "libs/core/daemon/baseline-check-cache.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/bridge-error-reply.ts": {
+    "libs/shared-interaction/src/bridge-error-reply.ts": {
       "rate_limiter_impl_budget": 1
     },
+    "libs/shared-vision/src/browser-conversation-session.ts": {
+      "json_state_write_budget": 4
+    },
     "libs/core/browser/browser-extension-bridge.ts": {
+      "json_state_write_budget": 1
+    },
+    "libs/shared-vision/src/browser-golden-evidence.ts": {
+      "json_state_write_budget": 1
+    },
+    "libs/shared-vision/src/browser-onboarding-state.ts": {
+      "json_state_write_budget": 1
+    },
+    "libs/shared-vision/src/browser-procedure-promotion.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/browser/chrome-extension-meeting-driver.ts": {
       "json_state_write_budget": 2
     },
-    "libs/core/capability-broker.ts": {
+    "libs/core/provider/capability-broker.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/cli-usage-metering.ts": {
+    "libs/core/provider/cli-usage-metering.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/cloudflare-os-control-plane.ts": {
+    "libs/core/governance/cloudflare-os-control-plane.ts": {
       "env_direct_read_budget": 1,
       "json_state_write_budget": 1
     },
-    "libs/core/cloudflare-os-journal-store.ts": {
+    "libs/core/governance/cloudflare-os-journal-store.ts": {
       "env_direct_read_budget": 1,
       "json_state_write_budget": 1
     },
-    "libs/core/cloudflare-os-journal.ts": {
+    "libs/core/governance/cloudflare-os-journal.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/cloudflare-os-shared.ts": {
+    "libs/core/governance/cloudflare-os-shared.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/co-session.ts": {
+    "libs/core/workforce/co-session.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/config-fallback-registry.ts": {
+    "libs/core/governance/config-fallback-registry.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/contextual-intent-memory.ts": {
+    "libs/core/intent/contextual-intent-memory.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/core.ts": {
       "env_direct_read_budget": 3,
       "bespoke_cli_parser_budget": 1
     },
-    "libs/core/cowork-health-check.ts": {
+    "libs/shared-network/src/cowork-health-check.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/cowork-knowledge-bridge.ts": {
+    "libs/shared-network/src/cowork-knowledge-bridge.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/customer-conversation-modes.ts": {
+    "libs/core/organization/customer-conversation-modes.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/daemon-heartbeat.ts": {
+    "libs/core/daemon/daemon-heartbeat.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/daemon/specs.ts": {
       "runtime_path_literal_budget": 3
     },
-    "libs/core/data-vault.ts": {
+    "libs/core/storage/data-vault.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/deal-documents.ts": {
+    "libs/core/organization/deal-documents.ts": {
       "json_state_write_budget": 2
     },
-    "libs/core/deal-store.ts": {
+    "libs/core/organization/deal-store.ts": {
       "json_state_write_budget": 2
     },
-    "libs/core/delegated-task-observability.ts": {
+    "libs/core/workforce/delegated-task-observability.ts": {
       "env_direct_read_budget": 2
     },
-    "libs/core/deliverable-inbox.ts": {
+    "libs/core/task/deliverable-inbox.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/dependency-vulnerability-ledger.ts": {
+    "libs/core/governance/dependency-vulnerability-ledger.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/dirty-tile-describer.ts": {
+    "libs/actuators/vision-actuator/src/dirty-tile-describer.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/discussion/discussion-readiness.ts": {
@@ -327,35 +339,26 @@
     "libs/core/dot/dot-state-paths.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/dot/dot-token-usage.ts": {
-      "runtime_path_literal_budget": 1
-    },
-    "libs/core/egress-policy.ts": {
+    "libs/core/governance/egress-policy.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/environment-capability.ts": {
+    "libs/core/daemon/environment-capability.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/execution-feedback-candidates.ts": {
+    "libs/core/knowledge/execution-feedback-candidates.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/execution-feedback.ts": {
+    "libs/core/knowledge/execution-feedback.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/external-service-registry.ts": {
+    "libs/core/service/external-service-registry.ts": {
       "json_state_write_budget": 1
-    },
-    "libs/core/foundation/credential-binding.ts": {
-      "env_direct_read_budget": 2
     },
     "libs/core/foundation/execution-scope.ts": {
       "env_direct_read_budget": 1
     },
     "libs/core/foundation/governed-catalog.ts": {
       "json_state_write_budget": 1
-    },
-    "libs/core/foundation/identity-context.ts": {
-      "env_direct_read_budget": 2
     },
     "libs/core/foundation/json.ts": {
       "json_state_write_budget": 1
@@ -366,18 +369,18 @@
     "libs/core/foundation/project-scope-env.ts": {
       "env_direct_read_budget": 2
     },
-    "libs/core/front-desk-identity.ts": {
+    "libs/core/surface/front-desk-identity.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/generation-cost-settlement.ts": {
+    "libs/core/finance/generation-cost-settlement.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/generation-quota.ts": {
+    "libs/core/finance/generation-quota.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/generation-scheduler.ts": {
+    "libs/core/daemon/generation-scheduler.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 2
     },
@@ -410,7 +413,7 @@
     "libs/core/governance/policy-engine.ts": {
       "rate_limiter_impl_budget": 1
     },
-    "libs/core/graph-run-artifact.ts": {
+    "libs/core/pipeline/graph-run-artifact.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/harnessing/contrastive-session.ts": {
@@ -419,27 +422,30 @@
     "libs/core/harnessing/recursive-session.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/heuristic-feedback.ts": {
+    "libs/core/knowledge/heuristic-feedback.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/history-search-index.ts": {
+    "libs/core/search/history-search-index.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/i18n-coverage-history.ts": {
+    "libs/core/localization/i18n-coverage-history.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/i18n-hardcoding-baseline.ts": {
+    "libs/core/localization/i18n-hardcoding-baseline.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/ingest-quota.ts": {
+    "libs/core/foundation/identity-context.ts": {
+      "env_direct_read_budget": 2
+    },
+    "libs/actuators/ingest-actuator/src/ingest-quota.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/ingest-sync-cursors.ts": {
+    "libs/actuators/ingest-actuator/src/ingest-sync-cursors.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/injection-signal.ts": {
+    "libs/core/governance/injection-signal.ts": {
       "env_direct_read_budget": 2,
       "json_state_write_budget": 1
     },
@@ -509,13 +515,31 @@
     "libs/core/knowledge/procedure-self-repair.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/llm-selection-preferences.ts": {
+    "libs/core/reasoning/llm-selection-preferences.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/logger.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "libs/core/marketing-workload.ts": {
+    "libs/core/organization/marketing-workload.ts": {
+      "exported_type_name_duplication_budget": 1
+    },
+    "libs/shared-media/src/image-generation/provider-support.ts": {
+      "rate_limiter_impl_budget": 1
+    },
+    "libs/shared-media/src/image-generation/providers/host-bridge.ts": {
+      "json_state_write_budget": 1
+    },
+    "libs/shared-media/src/image-generation/providers/llm-api.ts": {
+      "json_state_write_budget": 2
+    },
+    "libs/shared-media/src/image-generation/providers/local-flux.ts": {
+      "bespoke_cli_parser_budget": 2
+    },
+    "libs/shared-media/src/music-generation/providers/musicgen-mlx.ts": {
+      "bespoke_cli_parser_budget": 1
+    },
+    "libs/shared-voice/src/native-tts.ts": {
       "exported_type_name_duplication_budget": 1
     },
     "libs/core/mesh/a2a-envelope-signature.ts": {
@@ -544,10 +568,10 @@
     "libs/core/mesh/peer-runtime-recovery.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/metrics.ts": {
+    "libs/core/analysis/metrics.ts": {
       "env_direct_read_budget": 2
     },
-    "libs/core/migration-state.ts": {
+    "libs/core/storage/migration-state.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/mission/delegation-child-registry.ts": {
@@ -620,20 +644,17 @@
     "libs/core/mission/mission-working-memory.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/nerve-bridge.ts": {
+    "libs/core/ingress/nerve-bridge.ts": {
       "env_direct_read_budget": 1
     },
     "libs/core/network.ts": {
       "env_direct_read_budget": 5
     },
-    "libs/core/oauth-session-store.ts": {
+    "libs/core/authn/oauth-session-store.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/operation-policy-gate.ts": {
+    "libs/core/governance/operation-policy-gate.ts": {
       "env_direct_read_budget": 1
-    },
-    "libs/core/ops-health-probe.ts": {
-      "runtime_path_literal_budget": 1
     },
     "libs/core/organization/company-bootstrap.ts": {
       "json_state_write_budget": 1
@@ -694,10 +715,10 @@
     "libs/core/path-resolver.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/pending-intent-store.ts": {
+    "libs/core/intent/pending-intent-store.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/personal-identity-state.ts": {
+    "libs/core/authn/personal-identity-state.ts": {
       "json_state_write_budget": 2
     },
     "libs/core/pfc/PfcController.ts": {
@@ -719,20 +740,17 @@
     "libs/core/plugin/plugin-pack.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/plugin/plugin-publication.ts": {
-      "json_state_write_budget": 2
-    },
     "libs/core/plugin/skill-wrapper.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "libs/core/presence-avatar.ts": {
+    "libs/core/surface/presence-avatar.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/presentation-preference-registry.ts": {
+    "libs/core/design/presentation-preference-registry.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/process-logger.ts": {
+    "libs/core/daemon/process-logger.ts": {
       "env_direct_read_budget": 1
     },
     "libs/core/project/project-management.ts": {
@@ -755,10 +773,10 @@
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/promoted-memory.ts": {
+    "libs/core/knowledge/promoted-memory.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/promotion-candidates.ts": {
+    "libs/core/pipeline/promotion-candidates.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
@@ -815,19 +833,19 @@
     "libs/core/reasoning/reasoning-route-resolver.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/reconcile-ops.ts": {
+    "libs/core/daemon/reconcile-ops.ts": {
       "json_state_write_budget": 4
     },
-    "libs/core/reflex-terminal.ts": {
+    "libs/core/shell/reflex-terminal.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/relationship-graph-store.ts": {
+    "libs/core/organization/relationship-graph-store.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/report-ops.ts": {
+    "libs/core/daemon/report-ops.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/requirements-draft-store.ts": {
+    "libs/core/mission/requirements-draft-store.ts": {
       "json_state_write_budget": 1,
       "exported_type_name_duplication_budget": 1
     },
@@ -837,22 +855,22 @@
     "libs/core/scope-context.ts": {
       "json_state_write_budget": 2
     },
-    "libs/core/scope-offboarding.ts": {
+    "libs/core/storage/scope-offboarding.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 7
     },
-    "libs/core/sdlc-artifact-store.ts": {
+    "libs/core/mission/sdlc-artifact-store.ts": {
       "json_state_write_budget": 2,
       "exported_type_name_duplication_budget": 1
     },
-    "libs/core/seam-calibration.ts": {
+    "libs/core/provider/seam-calibration.ts": {
       "env_direct_read_budget": 1,
       "json_state_write_budget": 1
     },
-    "libs/core/seam-provider-selection.ts": {
+    "libs/core/provider/seam-provider-selection.ts": {
       "env_direct_read_budget": 3
     },
-    "libs/core/seam-selection-rules.ts": {
+    "libs/core/provider/seam-selection-rules.ts": {
       "env_direct_read_budget": 2,
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
@@ -870,11 +888,11 @@
     "libs/core/secure-io-path-guard.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/semantic-degradation-log.ts": {
+    "libs/core/reasoning/semantic-degradation-log.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/semantic-design-tokens.ts": {
+    "libs/core/design/semantic-design-tokens.ts": {
       "env_direct_read_budget": 1
     },
     "libs/core/service/service-binding-registry.ts": {
@@ -896,28 +914,28 @@
     "libs/core/service/service-runtime-registry.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/share-grant-live-sessions.ts": {
+    "libs/core/governance/share-grant-live-sessions.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/shell/terminal-bridge.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/soak-evidence-manifest.ts": {
+    "libs/core/testing/soak-evidence-manifest.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/soak-restart-state.ts": {
+    "libs/core/testing/soak-restart-state.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/spend-guard.ts": {
+    "libs/core/finance/spend-guard.ts": {
       "env_direct_read_budget": 3
     },
-    "libs/core/storage-janitor.ts": {
+    "libs/core/storage/storage-janitor.ts": {
       "json_state_write_budget": 5
     },
-    "libs/core/storage-retention-catalog.ts": {
+    "libs/core/storage/storage-retention-catalog.ts": {
       "runtime_path_literal_budget": 4
     },
-    "libs/core/storage-runtime-coverage.ts": {
+    "libs/core/storage/storage-runtime-coverage.ts": {
       "runtime_path_literal_budget": 2
     },
     "libs/core/surface/__tests__/parked-recovery-engine-worker.ts": {
@@ -978,28 +996,37 @@
     "libs/core/tool/tool-runtime-registry.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/training-catalog.ts": {
+    "libs/core/organization/training-catalog.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/trigger-runner.ts": {
+    "libs/core/daemon/trigger-runner.ts": {
       "env_direct_read_budget": 1,
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/trust-engine.ts": {
+    "libs/core/governance/trust-engine.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/unclassified-error-registry.ts": {
+    "libs/core/daemon/unclassified-error-registry.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/unhandled-intent-registry.ts": {
+    "libs/core/intent/unhandled-intent-registry.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/untrusted-content.ts": {
+    "libs/core/governance/untrusted-content.ts": {
       "env_direct_read_budget": 1,
       "json_state_write_budget": 1
     },
+    "libs/shared-video/src/ingest/video-brief.ts": {
+      "json_state_write_budget": 1
+    },
+    "libs/shared-video/src/video-composition-compiler.ts": {
+      "json_state_write_budget": 1
+    },
     "libs/core/video/video-device-lease.ts": {
+      "json_state_write_budget": 1
+    },
+    "libs/shared-video/src/video-recut.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/virtual/computer-surface.ts": {
@@ -1014,13 +1041,34 @@
     "libs/core/voice/audio-device-lease.ts": {
       "json_state_write_budget": 1
     },
+    "libs/shared-voice/src/realtime-voice-conversation.ts": {
+      "json_state_write_budget": 1
+    },
+    "libs/shared-voice/src/realtime-voice-preferences.ts": {
+      "json_state_write_budget": 2
+    },
     "libs/core/voice/speech-to-text-bridge.ts": {
       "json_state_write_budget": 2
+    },
+    "libs/shared-voice/src/tts-loopback-verifier.ts": {
+      "json_state_write_budget": 1
+    },
+    "libs/shared-voice/src/voice-first-phrase-cache.ts": {
+      "json_state_write_budget": 1
+    },
+    "libs/shared-voice/src/voice-profile-promotion.ts": {
+      "json_state_write_budget": 1
     },
     "libs/core/voice/voice-profile-registry.ts": {
       "json_state_write_budget": 2
     },
-    "libs/core/volatile-knowledge.ts": {
+    "libs/shared-voice/src/voice-sample-collection.ts": {
+      "json_state_write_budget": 1
+    },
+    "libs/shared-voice/src/voice-selection-preferences.ts": {
+      "json_state_write_budget": 1
+    },
+    "libs/core/knowledge/volatile-knowledge.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/workforce/agent-worktree.ts": {
@@ -1083,81 +1131,14 @@
     "libs/core/workforce/workspace-sweep.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/writer-lease.ts": {
+    "libs/core/lease/writer-lease.ts": {
       "json_state_write_budget": 2
-    },
-    "libs/shared-media/src/image-generation/provider-support.ts": {
-      "rate_limiter_impl_budget": 1
-    },
-    "libs/shared-media/src/image-generation/providers/host-bridge.ts": {
-      "json_state_write_budget": 1
-    },
-    "libs/shared-media/src/image-generation/providers/llm-api.ts": {
-      "json_state_write_budget": 2
-    },
-    "libs/shared-media/src/image-generation/providers/local-flux.ts": {
-      "bespoke_cli_parser_budget": 2
-    },
-    "libs/shared-media/src/music-generation/providers/musicgen-mlx.ts": {
-      "bespoke_cli_parser_budget": 1
-    },
-    "libs/shared-mobile/src/mirror-daemon.ts": {
-      "bespoke_cli_parser_budget": 1,
-      "json_state_write_budget": 1
-    },
-    "libs/shared-mobile/src/mirror-session.ts": {
-      "json_state_write_budget": 0
     },
     "libs/shared-network/src/mcp-actuator-invoke.ts": {
       "json_state_write_budget": 1
     },
     "libs/shared-network/src/mcp-server-engine.ts": {
       "env_direct_read_budget": 1
-    },
-    "libs/shared-video/src/ingest/video-brief.ts": {
-      "json_state_write_budget": 1
-    },
-    "libs/shared-video/src/video-composition-compiler.ts": {
-      "json_state_write_budget": 1
-    },
-    "libs/shared-video/src/video-recut.ts": {
-      "json_state_write_budget": 1
-    },
-    "libs/shared-vision/src/browser-conversation-session.ts": {
-      "json_state_write_budget": 4
-    },
-    "libs/shared-vision/src/browser-golden-evidence.ts": {
-      "json_state_write_budget": 1
-    },
-    "libs/shared-vision/src/browser-onboarding-state.ts": {
-      "json_state_write_budget": 1
-    },
-    "libs/shared-vision/src/browser-procedure-promotion.ts": {
-      "json_state_write_budget": 1
-    },
-    "libs/shared-voice/src/native-tts.ts": {
-      "exported_type_name_duplication_budget": 1
-    },
-    "libs/shared-voice/src/realtime-voice-conversation.ts": {
-      "json_state_write_budget": 1
-    },
-    "libs/shared-voice/src/realtime-voice-preferences.ts": {
-      "json_state_write_budget": 2
-    },
-    "libs/shared-voice/src/tts-loopback-verifier.ts": {
-      "json_state_write_budget": 1
-    },
-    "libs/shared-voice/src/voice-first-phrase-cache.ts": {
-      "json_state_write_budget": 1
-    },
-    "libs/shared-voice/src/voice-profile-promotion.ts": {
-      "json_state_write_budget": 1
-    },
-    "libs/shared-voice/src/voice-sample-collection.ts": {
-      "json_state_write_budget": 1
-    },
-    "libs/shared-voice/src/voice-selection-preferences.ts": {
-      "json_state_write_budget": 1
     },
     "presence/bridge/nexus-daemon.ts": {
       "json_state_write_budget": 3,
@@ -1166,12 +1147,6 @@
     "presence/bridge/terminal/server.ts": {
       "json_state_write_budget": 4,
       "runtime_path_literal_budget": 1
-    },
-    "presence/displays/computer-surface/auth.ts": {
-      "env_direct_read_budget": 1
-    },
-    "presence/displays/computer-surface/os-control-plane.ts": {
-      "env_direct_read_budget": 1
     },
     "presence/displays/concierge/src/app/api/ops/agent/route.ts": {
       "json_state_write_budget": 1
@@ -1182,15 +1157,11 @@
     "presence/displays/concierge/src/app/api/ops/mission-asset/route.ts": {
       "runtime_path_literal_budget": 1
     },
-    "presence/displays/concierge/src/app/api/setup/avatar-actions.ts": {
-      "json_state_write_budget": 1
-    },
-    "presence/displays/concierge/src/app/api/setup/route.ts": {
-      "env_direct_read_budget": 3,
-      "json_state_write_budget": 3
-    },
     "presence/displays/concierge/src/components/ops/MissionIntelligenceTypes.ts": {
       "exported_type_name_duplication_budget": 1
+    },
+    "presence/displays/concierge/src/lib/ops/ops-request-guard.ts": {
+      "rate_limiter_impl_budget": 2
     },
     "presence/displays/concierge/src/lib/ops/browser-session-control.ts": {
       "json_state_write_budget": 1
@@ -1204,11 +1175,21 @@
     "presence/displays/concierge/src/lib/ops/json-record.ts": {
       "exported_type_name_duplication_budget": 1
     },
-    "presence/displays/concierge/src/lib/ops/ops-request-guard.ts": {
-      "rate_limiter_impl_budget": 2
-    },
     "presence/displays/concierge/src/lib/ops/ops-viewer.ts": {
       "env_direct_read_budget": 1
+    },
+    "presence/displays/computer-surface/auth.ts": {
+      "env_direct_read_budget": 1
+    },
+    "presence/displays/computer-surface/os-control-plane.ts": {
+      "env_direct_read_budget": 1
+    },
+    "presence/displays/concierge/src/app/api/setup/avatar-actions.ts": {
+      "json_state_write_budget": 1
+    },
+    "presence/displays/concierge/src/app/api/setup/route.ts": {
+      "env_direct_read_budget": 3,
+      "json_state_write_budget": 3
     },
     "presence/displays/concierge/src/lib/passkey-server.ts": {
       "rate_limiter_impl_budget": 1
@@ -1337,14 +1318,14 @@
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_contract_schemas.ts": {
-      "runtime_path_literal_budget": 3
-    },
     "scripts/check_contract_schemas_checks_1.ts": {
       "runtime_path_literal_budget": 1
     },
     "scripts/check_contract_schemas_policy_checks.ts": {
       "runtime_path_literal_budget": 2
+    },
+    "scripts/check_contract_schemas.ts": {
+      "runtime_path_literal_budget": 3
     },
     "scripts/check_contract_semver.ts": {
       "json_state_write_budget": 1,
@@ -1458,6 +1439,9 @@
     "scripts/cowork_knowledge_bridge.ts": {
       "bespoke_cli_parser_budget": 1
     },
+    "scripts/stance_migrate_from_personal.ts": {
+      "json_state_write_budget": 1
+    },
     "scripts/daily-desk/server.ts": {
       "env_direct_read_budget": 1,
       "json_state_write_budget": 3
@@ -1536,25 +1520,25 @@
     "scripts/install_git_merge_driver.mjs": {
       "bespoke_cli_parser_budget": 1
     },
+    "scripts/intent_smoke.ts": {
+      "json_state_write_budget": 1
+    },
     "scripts/intent.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/intent_smoke.ts": {
-      "json_state_write_budget": 1
+    "scripts/knowledge_feedback.ts": {
+      "env_direct_read_budget": 1
     },
     "scripts/knowledge.ts": {
       "env_direct_read_budget": 1,
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/knowledge_feedback.ts": {
-      "env_direct_read_budget": 1
-    },
-    "scripts/kyberion.ts": {
-      "bespoke_cli_parser_budget": 1
-    },
     "scripts/kyberion_home.ts": {
       "env_direct_read_budget": 2,
       "json_state_write_budget": 4,
+      "bespoke_cli_parser_budget": 1
+    },
+    "scripts/kyberion.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/lib/cli-approval-requester.ts": {
@@ -1585,10 +1569,6 @@
     "scripts/marketing_video_dry_run.ts": {
       "json_state_write_budget": 4
     },
-    "scripts/meeting-notepad/server.ts": {
-      "env_direct_read_budget": 1,
-      "json_state_write_budget": 4
-    },
     "scripts/meeting_orchestrator.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
@@ -1598,6 +1578,10 @@
     },
     "scripts/meeting_readiness_check.ts": {
       "bespoke_cli_parser_budget": 1
+    },
+    "scripts/meeting-notepad/server.ts": {
+      "env_direct_read_budget": 1,
+      "json_state_write_budget": 4
     },
     "scripts/memory-capture/server.ts": {
       "env_direct_read_budget": 1,
@@ -1635,13 +1619,13 @@
     "scripts/onboarding_context.ts": {
       "bespoke_cli_parser_budget": 4
     },
+    "scripts/onboarding_first_job_status.ts": {
+      "env_direct_read_budget": 3
+    },
     "scripts/onboarding_first_job.ts": {
       "env_direct_read_budget": 2,
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 3
-    },
-    "scripts/onboarding_first_job_status.ts": {
-      "env_direct_read_budget": 3
     },
     "scripts/onboarding_llm.ts": {
       "bespoke_cli_parser_budget": 8
@@ -1694,6 +1678,10 @@
       "env_direct_read_budget": 1,
       "json_state_write_budget": 4
     },
+    "scripts/pipeline_promote.ts": {
+      "json_state_write_budget": 1,
+      "bespoke_cli_parser_budget": 3
+    },
     "scripts/pipeline-execution-part-bootstrap.ts": {
       "json_state_write_budget": 1
     },
@@ -1702,10 +1690,6 @@
     },
     "scripts/pipeline-reasoning-visibility.ts": {
       "env_direct_read_budget": 1
-    },
-    "scripts/pipeline_promote.ts": {
-      "json_state_write_budget": 1,
-      "bespoke_cli_parser_budget": 3
     },
     "scripts/presence-controller.ts": {
       "json_state_write_budget": 2
@@ -1756,18 +1740,18 @@
     "scripts/registry_manager.ts": {
       "json_state_write_budget": 2
     },
-    "scripts/report-review/server.ts": {
-      "env_direct_read_budget": 1,
-      "json_state_write_budget": 1
-    },
-    "scripts/report-review/stamp.ts": {
-      "bespoke_cli_parser_budget": 1
-    },
     "scripts/report_i18n_translation_coverage.ts": {
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
     "scripts/report_team_decision_support.ts": {
+      "bespoke_cli_parser_budget": 1
+    },
+    "scripts/report-review/server.ts": {
+      "env_direct_read_budget": 1,
+      "json_state_write_budget": 1
+    },
+    "scripts/report-review/stamp.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/resolve_generated.ts": {
@@ -1853,9 +1837,6 @@
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "scripts/stance_migrate_from_personal.ts": {
-      "json_state_write_budget": 1
-    },
     "scripts/summarize_memory_promotion_queue.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 4
@@ -1910,6 +1891,25 @@
     "scripts/write_core_dist_scope.mjs": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 2
+    },
+    "libs/shared-mobile/src/mirror-daemon.ts": {
+      "bespoke_cli_parser_budget": 1,
+      "json_state_write_budget": 1
+    },
+    "libs/shared-mobile/src/mirror-session.ts": {
+      "json_state_write_budget": 0
+    },
+    "libs/core/foundation/credential-binding.ts": {
+      "env_direct_read_budget": 2
+    },
+    "libs/core/plugin/plugin-publication.ts": {
+      "json_state_write_budget": 2
+    },
+    "libs/core/dot/dot-token-usage.ts": {
+      "runtime_path_literal_budget": 1
+    },
+    "libs/core/daemon/ops-health-probe.ts": {
+      "runtime_path_literal_budget": 1
     }
   },
   "exported_types": {
@@ -1919,9 +1919,9 @@
       "libs/actuators/terminal-actuator/src/terminal-actuator-helpers.ts"
     ],
     "GateResult": [
-      "libs/core/marketing-workload.ts",
-      "libs/core/requirements-draft-store.ts",
-      "libs/core/sdlc-artifact-store.ts"
+      "libs/core/organization/marketing-workload.ts",
+      "libs/core/mission/requirements-draft-store.ts",
+      "libs/core/mission/sdlc-artifact-store.ts"
     ],
     "MissionSummary": [
       "libs/core/mission/mission-read-model.ts",

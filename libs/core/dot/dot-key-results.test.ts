@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import type { DotCharter } from './dot-charter.js';
-import type { KeyResultSpec } from '../key-result-spec.js';
+import type { KeyResultSpec } from '../organization/key-result-spec.js';
 import {
   assertDotKrFilePathAllowed,
   dotGoalGapLines,

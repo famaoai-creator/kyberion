@@ -148,6 +148,7 @@ export function collectWorkspaceOverview(
     'library',
     () =>
       collectDeliverableInbox({
+        requestedTenant: selection.tenant_slug,
         tenantSlugs: scope.tenantSlugs,
         includeUntenanted: viewer.includeUntenanted,
         personIds: viewerPersonIds(viewer),

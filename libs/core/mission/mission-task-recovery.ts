@@ -4,7 +4,7 @@ import { withExecutionContext } from '../authority.js';
 import { logger } from '../core.js';
 import { nowIso } from '../foundation/time.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
-import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../governance/owner-scope.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import {
   claimWorkItem,

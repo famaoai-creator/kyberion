@@ -18,7 +18,7 @@ const {
   SpeechToTextSelectionError,
   stubSpeechToTextBridge,
 } = await import('./speech-to-text-bridge.js');
-const { createAppleSpeechToTextBridge } = await import('../apple-intelligence-bridge.js');
+const { createAppleSpeechToTextBridge } = await import('../provider/apple-intelligence-bridge.js');
 type Bridge = import('./speech-to-text-bridge.js').SpeechToTextBridge;
 
 const fake = (name: string, priority: number, capabilities: Bridge['capabilities']): Bridge => ({

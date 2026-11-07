@@ -15,7 +15,7 @@ import {
 import { readTrustLedger, recordAgentRuntimeEvent } from './mission-governance.js';
 import { deriveMissionBranchName, getCurrentBranch, getGitHash } from './mission-git.js';
 import { isValidTenantSlug } from '../entity-scope.js';
-import { readOrNullOnMissionRefusal } from '../mission-lookup.js';
+import { readOrNullOnMissionRefusal } from './mission-lookup.js';
 import { grantAccess, grantAccessGuarded } from '../secret/secret-guard.js';
 import type { HumanDecidedBy } from './mission-types.js';
 import { repairLegacyMissionExecutionLedger } from './mission-team-binding.js';

@@ -108,7 +108,7 @@ surfaces:         server 解決の viewer principal × tenant で投影（共有
 
 **実装**:
 
-1. **型の一本化**: `ScopeEnvelope = { identity: ScopeContext; policy: ScopePolicy; minted_at; mint_ref }` を `libs/core/context-security-scope.ts` に定義。`identity` は既存 `ScopeContext`（`scope-context-validation.ts`）をそのまま使い、新しい識別型を作らない。`ContextSecurityScope` は `ScopeEnvelope` からの互換射影として残し（読み取りのみ）、producer は新型へ移行する。
+1. **型の一本化**: `ScopeEnvelope = { identity: ScopeContext; policy: ScopePolicy; minted_at; mint_ref }` を `libs/core/governance/context-security-scope.ts` に定義。`identity` は既存 `ScopeContext`（`scope-context-validation.ts`）をそのまま使い、新しい識別型を作らない。`ContextSecurityScope` は `ScopeEnvelope` からの互換射影として残し（読み取りのみ）、producer は新型へ移行する。
 2. **mint を runtime に限定**: `mintScopeEnvelope(source)` を dispatch 境界（mission_controller の task 発行 / worker spawn / pipeline runner / `delegateTask`）だけが呼べる関数として置く。identity は入力からではなく、登録 env（`MISSION_ID` 等）・work-item claim・session から owner-scope resolver（`resolveOwnerScope`）で導出する。`mint_ref` は runtime 内の発行台帳へのハンドルで、自己申告の `stamped_by` は廃止。
 3. **入力中の封筒は narrow 要求として扱う**: 既存 `scopeResult` は「入力の `security_scope` が mint 済み封筒の部分集合か」を検証する段に変える。identity の不一致・policy の拡大（read_tiers 追加、write_tier 格下げ禁止の緩和、external_egress を allow へ）は `[OP_SCOPE_DENIED]`。
 4. **委譲時の減衰**: `delegateTask` / co-session worker へ渡す封筒は親の policy 以下に narrow したものだけ。子が親より広い封筒を持つ経路を型レベルで作れないようにする（`narrowScopeEnvelope(parent, request)` のみが子封筒を返す）。

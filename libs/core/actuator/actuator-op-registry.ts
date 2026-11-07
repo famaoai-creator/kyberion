@@ -2,7 +2,7 @@ import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { suggestClosestStrings } from '../pipeline/op-suggestions.js';
 import { isSafeActuatorId, loadActuatorManifestCatalog } from './actuator-manifest-index.js';
-import { assertCapabilityAllowed } from '../capability-restriction-policy.js';
+import { assertCapabilityAllowed } from '../governance/capability-restriction-policy.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export type PipelineStepType = 'capture' | 'transform' | 'apply' | 'control';

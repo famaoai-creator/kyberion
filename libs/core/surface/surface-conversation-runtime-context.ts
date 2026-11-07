@@ -1,6 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { normalizeEventScope, parseEventScopeInput, type EventScope } from '../event-scope.js';
+import {
+  normalizeEventScope,
+  parseEventScopeInput,
+  type EventScope,
+} from '../event/event-scope.js';
 import { getAgentManifest, resolveAgentSelectionHints } from '../agent/agent-manifest.js';
 import { ensureAgentRuntime, stopAgentRuntime } from '../agent/agent-runtime-supervisor.js';
 import {
@@ -11,7 +15,7 @@ import {
 } from '../agent/agent-runtime-supervisor-client.js';
 import type { AgentHandle } from '../agent/agent-lifecycle.js';
 import { pathResolver } from '../path-resolver.js';
-import { wrapUntrusted } from '../untrusted-content.js';
+import { wrapUntrusted } from '../governance/untrusted-content.js';
 import { logger } from '../core.js';
 import type {
   SurfaceConversationInput,

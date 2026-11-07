@@ -43,9 +43,9 @@ import {
   readAgenda,
   withCustomerDecisionCaseLock,
 } from '../customer-decision/store.js';
-import { addInboxEntry } from '../deliverable-inbox.js';
+import { addInboxEntry } from '../task/deliverable-inbox.js';
 import { notifyOperatorWithReceiptSync } from '../surface/operator-notifications.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { WorkCoordinationError } from '../workforce/work-coordination-error.js';
 import { createWorkItemIfAbsent, getWorkItem } from '../workforce/work-coordination.js';
 import {

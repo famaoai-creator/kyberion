@@ -251,7 +251,7 @@ export interface ConversationSignalSummary {
 
 /**
  * A clarification is abandoned when no answer arrived within the pending-intent
- * TTL (libs/core/pending-intent-store.ts, 24 h). It is derived at read time from
+ * TTL (libs/core/intent/pending-intent-store.ts, 24 h). It is derived at read time from
  * `clarification_asked` / `clarification_answered` pairs rather than stored: the
  * pending record carries no tenant scope, so its expiry cannot be attributed.
  */

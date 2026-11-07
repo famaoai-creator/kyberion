@@ -13,7 +13,7 @@ import {
   calendarDateInZone,
   isJapaneseBankBusinessDay,
   type CalendarDate,
-} from '../business-calendar.js';
+} from '../temporal/business-calendar.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { executionPersonaText } from '../foundation/execution-scope.js';
@@ -48,7 +48,7 @@ import { localeToBcp47, type SupportedLocale } from '../foundation/locale-normal
 import type { MessageParams } from '../foundation/message-format.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import type { VocabularyKey } from '../knowledge/vocabulary-keys.generated.js';
 
 export const ORGANIZATION_DIGEST_DEFAULT_TIMEZONE = 'Asia/Tokyo';
