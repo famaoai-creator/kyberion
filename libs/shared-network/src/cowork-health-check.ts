@@ -12,9 +12,9 @@
  * Also callable standalone via the cowork-integration-review pipeline.
  */
 
-import { pathResolver } from './path-resolver.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { defineCatalog } from '@agent/core/foundation/governed-catalog';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 
 const SYNC_STATE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/cowork-sync-state.schema.json'

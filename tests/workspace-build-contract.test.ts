@@ -334,6 +334,108 @@ describe('Workspace build contract', () => {
     }
   });
 
+  it('keeps segmented voice playback in shared-voice with its realtime loop consumer', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const voice = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-voice/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./segmented-voice-playback']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/segmented-voice-playback.ts'))).toBe(false);
+    expect(voice.exports['./segmented-voice-playback']).toEqual({
+      types: './dist/segmented-voice-playback.d.ts',
+      default: './dist/segmented-voice-playback.js',
+    });
+    // Playback, text chunking, and the streaming gate stay in core; only the
+    // segmenter moved beside its sole consumer.
+    for (const subpath of [
+      './voice/audio-playback',
+      './voice/voice-text-chunking',
+      './streaming-voice-playback',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
+  it('keeps the MCP request context in shared-network with its facade consumers', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    expect(core.exports['./mcp-request-context']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/mcp-request-context.ts'))).toBe(false);
+    expect(
+      safeExistsSync(path.join(rootDir, 'libs/shared-network/src/mcp-request-context.ts'))
+    ).toBe(true);
+    const network = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-network/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(network.exports['./mcp-request-context']).toEqual({
+      types: './dist/mcp-request-context.d.ts',
+      default: './dist/mcp-request-context.js',
+    });
+    // The NHI claim resolver stays in core and is now a published subpath so
+    // shared-network can reach it; event scope and the env registry remain
+    // public core services.
+    for (const subpath of ['./contracts/nhi-id', './event-scope', './foundation/env']) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
+  it('keeps the Cowork cluster in shared-network beside its MCP engine consumer', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    for (const name of [
+      'cowork-artifact-packet',
+      'cowork-health-check',
+      'cowork-knowledge-bridge',
+      'cowork-surface',
+    ]) {
+      for (const subpath of [`./${name}`, `./${name}.js`]) {
+        expect(core.exports[subpath]).toBeUndefined();
+      }
+      for (const suffix of ['.ts', '.test.ts']) {
+        expect(safeExistsSync(path.join(rootDir, `libs/core/${name}${suffix}`))).toBe(false);
+        expect(safeExistsSync(path.join(rootDir, `libs/shared-network/src/${name}${suffix}`))).toBe(
+          true
+        );
+      }
+      for (const suffix of ['.js', '.d.ts', '.js.map', '.d.ts.map']) {
+        expect(safeExistsSync(path.join(rootDir, `libs/core/dist/${name}${suffix}`))).toBe(false);
+        expect(
+          safeExistsSync(path.join(rootDir, `libs/shared-network/dist/${name}${suffix}`))
+        ).toBe(true);
+      }
+      const network = JSON.parse(
+        safeReadFile(path.join(rootDir, 'libs/shared-network/package.json'), {
+          encoding: 'utf8',
+        }) as string
+      );
+      expect(network.exports[`./${name}`]).toEqual({
+        types: `./dist/${name}.d.ts`,
+        default: `./dist/${name}.js`,
+      });
+    }
+    // The governed approval adapter, artifact store, memory promotion queue,
+    // and scope plumbing stay in core; only the Cowork-facing modules moved.
+    for (const subpath of [
+      './governance/approval-cowork-adapter',
+      './workforce/artifact-store',
+      './knowledge/memory-promotion-queue',
+      './knowledge/memory-scope',
+      './scope-context',
+      './physical-namespace',
+      './intent/intent-resolution-contract',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
   it('keeps the desktop AX bridge in shared-perception with its system-actuator consumer', () => {
     const core = JSON.parse(
       safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string

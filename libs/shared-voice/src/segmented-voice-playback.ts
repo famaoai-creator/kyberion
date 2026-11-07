@@ -13,12 +13,12 @@
  * backend-agnostic and hermetic to test.
  */
 
-import { playAudioFile, type PlaybackHandle } from './voice/audio-playback.js';
-import { splitVoiceTextIntoChunks } from './voice/voice-text-chunking.js';
+import { playAudioFile, type PlaybackHandle } from '@agent/core/voice/audio-playback';
+import { splitVoiceTextIntoChunks } from '@agent/core/voice/voice-text-chunking';
 import {
   createPlaybackPauseGate,
   type PausablePlaybackHandle,
-} from './streaming-voice-playback.js';
+} from '@agent/core/streaming-voice-playback';
 
 /** Sentence-sized segments: small enough that the first chunk synthesizes fast. */
 export const DEFAULT_SPEECH_SEGMENT_CHARS = 160;

@@ -13,14 +13,14 @@
 
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { pathResolver } from './path-resolver.js';
-import { nowIso } from './foundation/time.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { nowIso } from '@agent/core/foundation/time';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import {
   writeGovernedArtifactJson,
   ensureGovernedArtifactDir,
-} from './workforce/artifact-store.js';
-import type { IntentResolutionContract } from './intent/intent-resolution-contract.js';
+} from '@agent/core/workforce/artifact-store';
+import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract';
 import {
   loadCoworkArtifactPacketAtPath,
   validateCoworkArtifactPacket,

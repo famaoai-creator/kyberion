@@ -57,7 +57,7 @@ const {
   };
 });
 
-vi.mock('./secure-io.js', () => ({
+vi.mock('@agent/core/secure-io', () => ({
   assertSafeRepositoryPath: mockAssertSafeRepositoryPath,
   safeExistsSync: mockSafeExistsSync,
   safeReaddir: mockSafeReaddir,
@@ -70,11 +70,11 @@ vi.mock('./secure-io.js', () => ({
   safeRmSync: vi.fn(),
 }));
 
-vi.mock('./foundation/json.js', () => ({
+vi.mock('@agent/core/foundation/json', () => ({
   readJson: mockReadJson,
 }));
 
-vi.mock('./foundation/io.js', () => ({
+vi.mock('@agent/core/foundation/io', () => ({
   getFoundationIo: () => ({
     exists: (filePath: string) => mockSafeExistsSync(filePath),
     readFile: (filePath: string) => String(mockSafeReadFile(filePath) || ''),
@@ -82,7 +82,7 @@ vi.mock('./foundation/io.js', () => ({
   }),
 }));
 
-vi.mock('./workforce/artifact-store.js', () => ({
+vi.mock('@agent/core/workforce/artifact-store', () => ({
   writeGovernedArtifactJson: mockWriteGovernedArtifactJson,
   ensureGovernedArtifactDir: mockEnsureGovernedArtifactDir,
   resolveGovernedArtifactPath: vi.fn((p: string) => `/repo/${p}`),
@@ -94,7 +94,7 @@ vi.mock('./cowork-artifact-packet.js', () => ({
   loadCoworkArtifactPacketAtPath: mockLoadCoworkArtifactPacketAtPath,
 }));
 
-vi.mock('./path-resolver.js', () => ({
+vi.mock('@agent/core/path-resolver', () => ({
   pathResolver: {
     rootDir: () => '/repo',
     resolve: (p: string) => `/repo/${p}`,

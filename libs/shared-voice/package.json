@@ -35,6 +35,10 @@
       "types": "./dist/realtime-voice-preferences.d.ts",
       "default": "./dist/realtime-voice-preferences.js"
     },
+    "./segmented-voice-playback": {
+      "types": "./dist/segmented-voice-playback.d.ts",
+      "default": "./dist/segmented-voice-playback.js"
+    },
     "./ten-vad-bridge": {
       "types": "./dist/ten-vad-bridge.d.ts",
       "default": "./dist/ten-vad-bridge.js"
