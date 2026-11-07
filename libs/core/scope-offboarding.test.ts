@@ -1122,6 +1122,112 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     expect(result.verification?.clean).toBe(true);
   });
 
+  it('collects out-of-tree derived assets from the tenant derivation ledger (P3 R-09)', () => {
+    const ledgerDir = `active/shared/runtime/asset-derivations/confidential/${TENANT}`;
+    const outOfTree = `active/shared/cache/confidential/${TENANT}/spec.index`;
+    const inTree = `${KNOWLEDGE_ROOT}/reports/summary.md`;
+    const alreadyDeleted = `active/shared/cache/confidential/${TENANT}/old.index`;
+    const taint = { highestTier: 'confidential', tenants: [TENANT], prohibitExternal: true };
+    const at = '2026-11-08T00:00:00.000Z';
+    // The claimed `asset:` source must resolve in the tenant's ingest ledger —
+    // partition-bounded honoring refuses records whose sources don't verify.
+    writeJsonl(`${KNOWLEDGE_ROOT}/_ledger/assets.jsonl`, [
+      {
+        asset_id: 'ing-aaaa',
+        version: 1,
+        target_path: `${KNOWLEDGE_ROOT}/reports/q1.md`,
+        status: 'active',
+      },
+    ]);
+    fs.mkdirSync(abs(`${KNOWLEDGE_ROOT}/reports`), { recursive: true });
+    fs.writeFileSync(abs(`${KNOWLEDGE_ROOT}/reports/q1.md`), '# Q1');
+    writeJsonl(`${ledgerDir}/derivations.jsonl`, [
+      {
+        derived: { ref: `path:${outOfTree}`, path: outOfTree, kind: 'cache' },
+        sources: [`asset:${TENANT}:ing-aaaa@v1`],
+        taint,
+        recorded_at: at,
+      },
+      {
+        derived: { ref: `path:${inTree}`, path: inTree, kind: 'summary' },
+        sources: [`asset:${TENANT}:ing-aaaa@v1`],
+        taint,
+        recorded_at: at,
+      },
+      {
+        derived: { ref: `path:${alreadyDeleted}`, path: alreadyDeleted, kind: 'cache' },
+        sources: [`asset:${TENANT}:ing-aaaa@v1`],
+        taint,
+        recorded_at: at,
+      },
+    ]);
+    writeJsonl(`${ledgerDir}/derivation-deletions.jsonl`, [
+      {
+        source_ref: `asset:${TENANT}:ing-aaaa@v1`,
+        deleted_paths: [alreadyDeleted],
+        deleted_at: at,
+      },
+    ]);
+    fs.mkdirSync(abs(`${KNOWLEDGE_ROOT}/reports`), { recursive: true });
+    fs.writeFileSync(abs(inTree), 's');
+    fs.mkdirSync(path.dirname(abs(outOfTree)), { recursive: true });
+    fs.writeFileSync(abs(outOfTree), 'idx');
+
+    const targets = collectScopeTargets('tenant', TENANT);
+    // Out-of-tree derived path is reached through the ledger, not a hand list.
+    expect(targets).toEqual(expect.arrayContaining([{ path: outOfTree, kind: 'derived_asset' }]));
+    // The tenant's ledger partition itself is swept as a registered runtime root.
+    expect(targets).toEqual(
+      expect.arrayContaining([{ path: ledgerDir, kind: 'tenant_runtime_state' }])
+    );
+    // In-tree derived paths stay on their tree target; propagated deletions are skipped.
+    const paths = targets.map((t) => t.path);
+    expect(paths).not.toContain(inTree);
+    expect(paths).not.toContain(alreadyDeleted);
+  });
+
+  it('refuses a ledger line landing outside the offboarding tenant (no export exfil)', () => {
+    const ledgerDir = `active/shared/runtime/asset-derivations/confidential/${TENANT}`;
+    const victimPath = 'knowledge/confidential/victim-co/docs/keep.md';
+    const taint = { highestTier: 'confidential', tenants: ['victim-co'], prohibitExternal: true };
+    // Forged record inside THIS tenant's partition claiming a verified
+    // foreign source — partition-bounded honoring refuses the landing, so
+    // the victim file is neither collected nor copied into the export.
+    fs.mkdirSync(abs('knowledge/confidential/victim-co/_ledger'), { recursive: true });
+    writeJsonl('knowledge/confidential/victim-co/_ledger/assets.jsonl', [
+      {
+        asset_id: 'ing-real',
+        version: 1,
+        target_path: 'knowledge/confidential/victim-co/docs/real.md',
+        status: 'active',
+      },
+    ]);
+    fs.mkdirSync(abs('knowledge/confidential/victim-co/docs'), { recursive: true });
+    fs.writeFileSync(abs(victimPath), 'victim data');
+    writeJsonl(`${ledgerDir}/derivations.jsonl`, [
+      {
+        derived: { ref: `path:${victimPath}`, path: victimPath, kind: 'summary' },
+        sources: ['asset:victim-co:ing-real@v1', `path:${KNOWLEDGE_ROOT}/docs/a.md`],
+        taint,
+        recorded_at: '2026-11-08T00:00:00.000Z',
+      },
+    ]);
+    fs.mkdirSync(abs(`${KNOWLEDGE_ROOT}/docs`), { recursive: true });
+    fs.writeFileSync(abs(`${KNOWLEDGE_ROOT}/docs/a.md`), 'a');
+
+    const targets = collectScopeTargets('tenant', TENANT);
+    expect(targets.map((t) => t.path)).not.toContain(victimPath);
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(fs.existsSync(abs(victimPath))).toBe(true);
+    expect(fs.existsSync(abs(`${result.export_path}/${victimPath}`))).toBe(false);
+  });
+
   it('reports a tenant runtime partition it could not remove as a failed offboarding', () => {
     const parent = 'active/shared/runtime/external-operations/confidential';
     fs.mkdirSync(abs(`${parent}/${TENANT}`), { recursive: true });

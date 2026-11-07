@@ -71,6 +71,8 @@
       "active/shared/runtime/tenant-ledger/confidential/",
       "active/shared/runtime/tenant-approvals/personal/",
       "active/shared/runtime/tenant-approvals/confidential/",
+      "active/shared/runtime/asset-derivations/personal/",
+      "active/shared/runtime/asset-derivations/confidential/",
       "active/shared/runtime/audit-mirror/personal/",
       "active/shared/runtime/audit-mirror/confidential/",
       "active/shared/runtime/surface-management/personal/",

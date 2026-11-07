@@ -286,11 +286,27 @@ export interface TenantRuntimePartitionRoot {
   hashChained: boolean;
   /** Dedicated tenant-bound store role that alone may write the partition. */
   storeRole?: string;
+  /**
+   * Tiers under which this root's partitions are TENANT-keyed (default: all
+   * storage tiers). The derivation ledger's `personal/` segment is
+   * member-keyed, so only `confidential/` names a tenant there.
+   */
+  tenantTiers?: readonly StorageDataTier[];
 }
 
 function storeRoleOfRoot(root: string): string | undefined {
   return Object.values(TENANT_STORE_LEDGER_ROOTS).find((entry) => entry.root === root)?.storeRole;
 }
+
+/**
+ * Roots whose non-confidential partitions are member- (or otherwise non-tenant-)
+ * keyed. The derivation ledger's `personal/{ref}` partitions name MEMBERS, so
+ * enumerating `personal/{slug}` as a tenant partition would make a tenant
+ * offboarding sweep a member's lineage ledger.
+ */
+const ROOT_TENANT_TIERS: Readonly<Record<string, readonly StorageDataTier[]>> = {
+  [PARTITIONED_RUNTIME_LEDGER_ROOTS.asset_derivations]: ['confidential'],
+};
 
 /**
  * Every tenant-partitioned runtime root, derived from the two registries —
@@ -310,6 +326,7 @@ export const TENANT_RUNTIME_PARTITION_ROOTS: readonly TenantRuntimePartitionRoot
     appendOnly: true,
     hashChained: key === 'tenant_ledger',
     ...(storeRoleOfRoot(root) ? { storeRole: storeRoleOfRoot(root) } : {}),
+    ...(ROOT_TENANT_TIERS[root] ? { tenantTiers: ROOT_TENANT_TIERS[root] } : {}),
   })),
   ...(
     Object.entries(PARTITIONED_RUNTIME_STATE_ROOTS) as [
@@ -323,6 +340,7 @@ export const TENANT_RUNTIME_PARTITION_ROOTS: readonly TenantRuntimePartitionRoot
     appendOnly: false,
     hashChained: false,
     ...(storeRoleOfRoot(root) ? { storeRole: storeRoleOfRoot(root) } : {}),
+    ...(ROOT_TENANT_TIERS[root] ? { tenantTiers: ROOT_TENANT_TIERS[root] } : {}),
   })),
 ];
 
@@ -359,7 +377,7 @@ export function tenantRuntimePartitionPaths(
 ): TenantRuntimePartitionPath[] {
   const slug = assertPartitionTenant(tenant);
   return TENANT_RUNTIME_PARTITION_ROOTS.flatMap((entry) =>
-    STORAGE_DATA_TIERS.map((tier) => ({
+    (entry.tenantTiers ?? STORAGE_DATA_TIERS).map((tier) => ({
       ...entry,
       tier,
       tenant: slug,
@@ -380,10 +398,12 @@ export function tenantRuntimePartitionOf(
   | { key: TenantRuntimePartitionKey; root: string; tier: StorageDataTier; tenant: string }
   | undefined {
   const relative = toPosixRelative(filePath);
-  for (const { key, root } of TENANT_RUNTIME_PARTITION_ROOTS) {
+  for (const entry of TENANT_RUNTIME_PARTITION_ROOTS) {
+    const { key, root } = entry;
     if (!relative.startsWith(root + '/')) continue;
     const [tier, tenant = ''] = relative.slice(root.length + 1).split('/');
-    if (!STORAGE_DATA_TIERS.includes(tier as StorageDataTier)) return undefined;
+    if (!(entry.tenantTiers ?? STORAGE_DATA_TIERS).includes(tier as StorageDataTier))
+      return undefined;
     if (
       !tenant ||
       !isValidTenantSlug(tenant) ||
@@ -436,6 +456,7 @@ export const TIER_PARTITIONED_RUNTIME_ROOTS: readonly string[] = [
   PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_ledger,
   PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals,
   PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_audit_mirror,
+  PARTITIONED_RUNTIME_LEDGER_ROOTS.asset_derivations,
   SURFACE_MANAGEMENT_ROOT_PATH,
 ];
 
