@@ -104,6 +104,6 @@ policy (`knowledge/product/governance/seam-provider-selection/*.json`).
 Shared iOS/Android pipeline primitives
 (`ensureParentDir`, `safeOrigin`, `resolveObjectRef`, `resolveAppProfile`,
 `buildSessionHandoffArtifact`) live in
-`libs/core/mobile-runtime-helpers.ts`. The platform-specific `opApply` /
+`libs/shared-mobile/src/mobile-runtime-helpers.ts`. The platform-specific `opApply` /
 `opCapture` / `opTransform` implementations stay in each actuator — their
 selector strategies and device pipelines genuinely differ.

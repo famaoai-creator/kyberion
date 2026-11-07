@@ -15,7 +15,7 @@ import {
   TwoStageBargeIn,
   countBargeInWords,
   type TwoStageBargeInOptions,
-} from '@agent/core/two-stage-barge-in';
+} from './two-stage-barge-in.js';
 import { EotHoldAggregator, scoreEndOfTurn } from './voice-eot-scorer.js';
 import { isOwnTtsEcho, shouldRespondToVoiceTurn } from '@agent/core/voice/voice-respond-gate';
 import {

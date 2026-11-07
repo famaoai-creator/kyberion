@@ -25,7 +25,7 @@ vi.mock('@agent/core/tool/tool-runtime-registry', () => ({
   probeToolRuntime: mocks.probeToolRuntime,
 }));
 vi.mock('@agent/core/service/service-runtime-registry', () => ({ probeServiceRuntime: vi.fn() }));
-vi.mock('@agent/core/host-image-handoff', () => ({
+vi.mock('./host-image-handoff.js', () => ({
   isHostImageHandoffOutput: mocks.isHostOutput,
   recordHostImageHandoffRequest: mocks.recordHostRequest,
 }));

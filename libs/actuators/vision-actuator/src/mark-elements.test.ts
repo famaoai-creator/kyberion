@@ -10,8 +10,12 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { clearMarks, marksStatePath, resolveMarkTarget } from '@agent/core/mark-target-resolver';
-import type { SomRedactFn } from '@agent/core/som-overlay';
+import {
+  clearMarks,
+  marksStatePath,
+  resolveMarkTarget,
+} from '@agent/shared-perception/mark-target-resolver';
+import type { SomRedactFn } from '@agent/shared-perception/som-overlay';
 import { handleMarkElements } from './mark-elements.js';
 
 const dir = pathResolver.sharedTmp(`vision-mark-elements-tests/${process.pid}`);

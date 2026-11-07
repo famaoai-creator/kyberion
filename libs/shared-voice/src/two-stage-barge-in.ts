@@ -8,11 +8,11 @@
  * already run their own VAD can drive stage 1 with `observeVadStart/End`.
  */
 
-import { loadVoiceTurnTakingLexicon } from './voice/voice-turn-taking-lexicon.js';
-import type { AudioChunk } from './meeting/meeting-session-types.js';
-import { BargeInController } from './barge-in-controller.js';
-import { computeChunkDurationMs, computeChunkRms } from './voice/voice-activity-detector.js';
-import { isPureDisfluency } from './voice/voice-respond-gate.js';
+import { loadVoiceTurnTakingLexicon } from '@agent/core/voice/voice-turn-taking-lexicon';
+import type { AudioChunk } from '@agent/core/meeting/meeting-session-types';
+import { BargeInController } from '@agent/core/barge-in-controller';
+import { computeChunkDurationMs, computeChunkRms } from '@agent/core/voice/voice-activity-detector';
+import { isPureDisfluency } from '@agent/core/voice/voice-respond-gate';
 
 export type BargeInAction =
   | { type: 'pause_tts' }

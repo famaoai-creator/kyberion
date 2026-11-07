@@ -24,10 +24,10 @@
  */
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import { logger } from './core.js';
-import { readJsonIfPresent, writeJson } from './foundation/json.js';
-import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { logger } from '@agent/core/core';
+import { readJsonIfPresent, writeJson } from '@agent/core/foundation/json';
+import * as pathResolver from '@agent/core/path-resolver';
+import { safeExistsSync, safeMkdir, safeReadFile } from '@agent/core/secure-io';
 
 interface HostImageHandoffRequest {
   provider_id: string;

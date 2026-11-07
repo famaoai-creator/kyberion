@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Jimp } from 'jimp';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeRmSync } from '@agent/core/secure-io';
-import { clearMarks, saveMarks } from '@agent/core/mark-target-resolver';
+import { clearMarks, saveMarks } from '@agent/shared-perception/mark-target-resolver';
 import {
   browserSnapshotId,
   isMarkTarget,

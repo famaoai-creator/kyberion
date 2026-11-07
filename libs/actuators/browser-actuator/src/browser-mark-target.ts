@@ -5,7 +5,7 @@ import {
   resolveMarkTarget,
   type MarkTargetResolution,
   type ResolveMarkTargetOptions,
-} from '@agent/core/mark-target-resolver';
+} from '@agent/shared-perception/mark-target-resolver';
 
 /**
  * `click_ref` with a Set-of-Marks target (`mark:<n>` from vision

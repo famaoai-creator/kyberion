@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   MarkTargetResolution,
   ResolveMarkTargetOptions,
-} from '@agent/core/mark-target-resolver';
+} from '@agent/shared-perception/mark-target-resolver';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 
@@ -19,8 +19,8 @@ const mocks = vi.hoisted(() => ({
   performMouseOperation: vi.fn(),
 }));
 
-vi.mock('@agent/core/mark-target-resolver', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/mark-target-resolver')>()),
+vi.mock('@agent/shared-perception/mark-target-resolver', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/shared-perception/mark-target-resolver')>()),
   resolveMarkTarget: mocks.resolveMarkTarget,
   loadMarks: mocks.loadMarks,
 }));
