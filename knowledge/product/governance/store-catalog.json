@@ -630,7 +630,7 @@
         "order": 7,
         "retention_path": "active/shared/runtime/asset-derivations"
       },
-      "note": "P3 asset-derivation lineage ledger, keyed on the SOURCE custodian: derivations.jsonl records each artifact derived from the custodian's assets; derivation-deletions.jsonl audits propagated deletions. Non-tenant custodians use the separate system/ and personal/<ref> partitions (never enumerated as tenants). Deletion follows this graph (R-09), not hand-written target lists."
+      "note": "P3 source-custodian derivation indexes and deletion audit. Protected system/derivations.jsonl holds producer issuance receipts binding source/output paths and hashes; a custodian index alone is not deletion authority. The tenant offboarding facade checks ordinary permission on its own index before an exact synchronous receipt read grant, then plans from a filtered private snapshot after grant revocation. Foreign tenant indexes are not enumerated. personal/<ref> is member-keyed and never swept as a tenant partition."
     },
     {
       "id": "runtime.execution-metrics",

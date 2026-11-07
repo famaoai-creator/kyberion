@@ -825,17 +825,6 @@ export function safeCopyFileSync(srcPath: string, destPath: string): void {
  * the source of permission; there is no role-name exception.
  */
 function assertRuntimeStateAggregateAccess(resolved: string, canonical: string): void {
-  const receipts = path.join(
-    pathResolver.rootDir(),
-    PARTITIONED_RUNTIME_LEDGER_ROOTS.asset_derivations,
-    'system'
-  );
-  // Guard ancestors as well as the receipt directory itself; an aggregate
-  // rename/removal must not bypass the protected producer issuance boundary.
-  if (isInside(resolved, receipts) !== undefined || isInside(canonical, receipts) !== undefined) {
-    const decision = validateWritePermission(receipts);
-    if (!decision.allowed) throw new Error(decision.reason);
-  }
   for (const relativeRoot of Object.values(PARTITIONED_RUNTIME_STATE_ROOTS)) {
     const root = path.join(pathResolver.rootDir(), relativeRoot);
     if (isInside(resolved, root) === undefined && isInside(canonical, root) === undefined) continue;
@@ -866,6 +855,17 @@ function assertRuntimeStateAggregateAccess(resolved: string, canonical: string):
     if (stat?.isDirectory() && !stat.isSymbolicLink()) {
       for (const tier of ['personal', 'confidential']) inspect(path.join(root, tier));
     }
+  }
+  const receipts = path.join(
+    pathResolver.rootDir(),
+    PARTITIONED_RUNTIME_LEDGER_ROOTS.asset_derivations,
+    'system'
+  );
+  // Preserve existing descendant-denial diagnostics, then also guard the
+  // receipt directory and its ancestors before any aggregate mutation.
+  if (isInside(resolved, receipts) !== undefined || isInside(canonical, receipts) !== undefined) {
+    const decision = validateWritePermission(receipts);
+    if (!decision.allowed) throw new Error(decision.reason);
   }
 }
 
