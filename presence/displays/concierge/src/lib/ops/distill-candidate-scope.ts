@@ -8,7 +8,9 @@ import {
   type DistillCandidateRecord,
 } from '@agent/core/knowledge/distill-candidate-registry';
 import type { MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
+import { admitsScopeAudience, viewerPersonIds } from '@agent/core/surface/surface-authorization';
 import {
+  viewerCanReadTier,
   defaultTierAccess,
   strictViewerScopeOrganizationIds,
   strictViewerScopeProjectIds,
@@ -55,10 +57,24 @@ export function distillCandidateVisibleToViewer(
   const organizations = strictViewerScopeOrganizationIds(viewer);
   const projects = strictViewerScopeProjectIds(viewer);
   const scope = candidate.scope ?? legacyScope(candidate);
+  if (!viewerCanReadTier(viewer, scope.tier)) return false;
+  if (requestedTenant && scope.tenant_slug !== requestedTenant) return false;
   const tiers = viewer.tierAccess ?? defaultTierAccess(viewer.role);
   if (scope.tier === 'personal' || !tiers.includes(scope.tier)) return false;
   if (candidate.tier && candidate.tier !== scope.tier) return false;
-  if (tenants !== 'all' && (!scope.tenant_slug || !tenants.includes(scope.tenant_slug)))
+  // Custody admission plus the record's own audience grant: person custody
+  // stays identity-bound for every viewer, 'all' included; a listed audience
+  // member is admitted by identity — never by scope.
+  if (
+    !admitsScopeAudience(
+      {
+        tenantSlugs: tenants,
+        includeUntenanted: viewer.includeUntenanted,
+        personIds: viewerPersonIds(viewer),
+      },
+      scope
+    )
+  )
     return false;
   if (
     organizations !== 'all' &&
@@ -67,7 +83,7 @@ export function distillCandidateVisibleToViewer(
     return false;
   if (projects !== 'all' && (!scope.project_id || !projects.includes(scope.project_id)))
     return false;
-  const principals = [viewer.principal?.actor.id, viewer.principalId].filter(Boolean);
+  const principals = viewerPersonIds(viewer);
   const audience = scope.allowed_audience ?? [];
   const audienceMatch = audience.some((id) => principals.includes(id));
   if (audience.length && !audienceMatch) return false;

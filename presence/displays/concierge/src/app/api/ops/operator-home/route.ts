@@ -13,6 +13,7 @@ import {
   readChronosOptionalStringParam,
   readChronosStringParam,
 } from '../../../../lib/ops/request-input';
+import { viewerPersonIds } from '@agent/core/surface/surface-authorization';
 
 export function GET(req: NextRequest) {
   const denied = guardOpsRequest(req);
@@ -44,7 +45,15 @@ export function GET(req: NextRequest) {
         budgetUsd: Number.isFinite(budgetUsd) && budgetUsd > 0 ? budgetUsd : undefined,
         since: readChronosOptionalStringParam(url.searchParams.get('since')),
         limit: Number.isFinite(limit) && limit > 0 ? limit : 8,
-        scope: { tenantSlugs, organizationIds, projectIds },
+        scope: {
+          tenantSlugs,
+          organizationIds,
+          projectIds,
+          // The viewer's own person ids admit person-custody rows to their
+          // owner — same wiring as the headless projection.
+          personIds: viewerPersonIds(resolvedViewer.context),
+          ...(resolvedViewer.context.includeUntenanted ? { includeUntenanted: true } : {}),
+        },
       })
     );
     return NextResponse.json({ summary });

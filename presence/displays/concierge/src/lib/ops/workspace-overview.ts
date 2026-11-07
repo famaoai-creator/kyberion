@@ -148,6 +148,7 @@ export function collectWorkspaceOverview(
     () =>
       collectDeliverableInbox({
         tenantSlugs: scope.tenantSlugs,
+        includeUntenanted: viewer.includeUntenanted,
         organizationIds: scope.organizationIds,
         projectIds: scope.projectIds,
         tier: selection.tier ?? '',
@@ -167,6 +168,7 @@ export function collectWorkspaceOverview(
         viewer: narrowedViewer,
         workspace: scope,
         tenantSlugs: scope.tenantSlugs,
+        includeUntenanted: viewer.includeUntenanted,
         limit: 50,
       }).map((item) => ({ id: item.id, title: item.title, status: item.status })),
     []

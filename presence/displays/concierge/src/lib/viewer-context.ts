@@ -34,6 +34,8 @@ let conciergeRateLimiter: ReturnType<typeof fixedWindowLimiter> | undefined;
 const conciergeRateLimitedRequests = new WeakSet<object>();
 
 export interface ConciergeViewerContext {
+  /** Optional server-resolved replacement set; an empty set grants no read. */
+  permissions?: SurfaceAuthorizationContext['permissions'];
   role: ChronosAccessRole;
   tenantSlugs: string[] | 'all';
   organizationIds: string[] | 'all';
@@ -321,6 +323,7 @@ export function toSurfaceAuthorizationContext(
   viewer: ConciergeViewerContext
 ): SurfaceAuthorizationContext {
   return {
+    ...(viewer.permissions !== undefined ? { permissions: viewer.permissions } : {}),
     role: viewer.role,
     tenantSlugs: viewer.tenantSlugs,
     organizationIds: viewer.organizationIds,

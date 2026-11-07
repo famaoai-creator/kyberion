@@ -4,6 +4,7 @@ import { stanceLogDir } from '@agent/core/stance-resolver';
 import { parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { admitsCustody, custodyOfScope } from '@agent/core/surface/surface-authorization';
 import {
   normalizePersistedTrace,
   summarizePersistedTrace,
@@ -46,7 +47,7 @@ export function resolveSafeTraceLogPath(logicalPath: string): string | null {
 export function filterTraceLogContent(
   content: string,
   tracePath: string,
-  scope: Pick<TraceFeedOptions, 'tenantSlugs' | 'tierAccess'>
+  scope: Pick<TraceFeedOptions, 'tenantSlugs' | 'tierAccess' | 'includeUntenanted'>
 ): string {
   const lines: string[] = [];
   for (const line of content.split('\n')) {
@@ -62,7 +63,10 @@ export function filterTraceLogContent(
       if (
         scope.tenantSlugs !== undefined &&
         scope.tenantSlugs !== 'all' &&
-        (!summary.tenantSlug || !scope.tenantSlugs.includes(summary.tenantSlug))
+        !admitsCustody(
+          { tenantSlugs: scope.tenantSlugs, includeUntenanted: scope.includeUntenanted },
+          custodyOfScope({ tenant_slug: summary.tenantSlug })
+        )
       ) {
         continue;
       }

@@ -45,6 +45,7 @@ export function GET(req: NextRequest) {
         tier: 'confidential',
         tenant: readChronosOptionalStringParam(url.searchParams.get('tenant')),
         tenantSlugs,
+        includeUntenanted: resolvedViewer.context.includeUntenanted,
         kind: readChronosOptionalStringParam(url.searchParams.get('kind')),
         missionId: readChronosOptionalStringParam(url.searchParams.get('missionId')),
         limit: Number(readChronosStringParam(url.searchParams.get('limit')) || 24),
