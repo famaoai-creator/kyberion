@@ -13,7 +13,7 @@ import {
 import {
   compileImageGenerationADF,
   compileVideoGenerationADF,
-} from '@agent/core/visual-workflow-compiler';
+} from '@agent/shared-media/visual-workflow-compiler';
 import {
   getMediaBackendRecord,
   listMediaBackends,

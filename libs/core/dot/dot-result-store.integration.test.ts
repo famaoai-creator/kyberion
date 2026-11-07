@@ -3,12 +3,15 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, afterAll, afterEach, describe, it, expect, vi } from 'vitest';
+import * as bootstrap from '../secure-io.js';
 import type { DotCharter } from './dot-charter.js';
 import type { DotWorkResultRow } from './dot-state-paths.js';
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const root = path.join(sourceRoot, 'active/shared/tmp', `vitest-dot-result-hook-${randomUUID()}`);
 const initialTime = Date.parse('2026-10-31T00:00:00.000Z');
-let bootstrap: typeof import('../secure-io.js'), io: typeof import('../secure-io.js');
+let io: typeof import('../secure-io.js');
+const auditKey = Symbol.for('@kyberion/audit-chain');
+let sourceAudit: PropertyDescriptor | undefined;
 let executor: typeof import('./dot-executor.js'),
   reports: typeof import('./dot-executor-reports.js');
 let dispatch: typeof import('./dot-dispatch.js'), proposals: typeof import('./dot-proposals.js');
@@ -22,7 +25,6 @@ let projects: typeof import('../project/project-registry.js'),
 let json: typeof import('../foundation/json.js');
 let serial = 0;
 beforeAll(async () => {
-  bootstrap = await import('../secure-io.js');
   bootstrap.safeMkdir(root, { recursive: true });
   const copy = (from: string, to: string): void => {
     if (bootstrap.safeLstat(from).isDirectory()) {
@@ -56,7 +58,9 @@ beforeAll(async () => {
     })
   );
   bootstrap.safeWriteFile(path.join(root, 'package.json'), '{}');
+  sourceAudit = Object.getOwnPropertyDescriptor(globalThis, auditKey);
   vi.stubEnv('KYBERION_ROOT', root);
+  expect(Reflect.deleteProperty(globalThis, auditKey)).toBe(true);
   vi.stubEnv('KYBERION_PERSONA', 'sovereign');
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
   vi.stubEnv('KYBERION_TENANT', 'result-hook');
@@ -79,6 +83,9 @@ beforeAll(async () => {
   state = await import('./dot-state-paths.js');
   authority = await import('../authority.js');
   json = await import('../foundation/json.js');
+  const { pathResolver } = await import('../path-resolver.js');
+  expect(pathResolver.rootDir()).toBe(root);
+  expect(pathResolver.primaryCheckoutRootDir()).toBe(root);
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -87,6 +94,8 @@ afterEach(() => {
 });
 afterAll(() => {
   vi.useRealTimers();
+  if (sourceAudit) Object.defineProperty(globalThis, auditKey, sourceAudit);
+  else Reflect.deleteProperty(globalThis, auditKey);
   vi.unstubAllEnvs();
   bootstrap?.safeRmSync(root, { recursive: true, force: true });
   vi.resetModules();
