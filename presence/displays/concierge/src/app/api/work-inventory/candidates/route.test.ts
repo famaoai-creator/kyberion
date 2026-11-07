@@ -11,6 +11,11 @@ import type { NextRequest } from 'next/server';
 // viewer and the member resolution are stubbed.
 const viewer = vi.hoisted(() => ({ value: undefined as unknown }));
 const member = vi.hoisted(() => ({ id: null as string | null }));
+// The installation-owner decision has its own tests; here only its wiring.
+const installation = vi.hoisted(() => ({ allowed: false }));
+vi.mock('../../../../lib/installation-access', () => ({
+  resolveConciergeInstallationAccess: () => ({ allowed: installation.allowed }),
+}));
 
 vi.mock('../../../../lib/viewer-context', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../lib/viewer-context')>()),
@@ -193,6 +198,7 @@ afterAll(async () => {
 beforeEach(() => {
   viewer.value = scopedViewer(['alpha']);
   member.id = null;
+  installation.allowed = false;
 });
 
 describe('concierge /api/work-inventory/candidates (依頼 › 業務の自動化候補)', () => {
@@ -230,6 +236,19 @@ describe('concierge /api/work-inventory/candidates (依頼 › 業務の自動�
       'My personal chore',
     ]);
     expect(JSON.stringify(body)).not.toMatch(/Alpha monthly report|Beta invoice run/);
+  });
+
+  it('shows the signed-in installation owner their personal inventory in the personal view', async () => {
+    // The normal case on a bound install: the owner's browser sends its session.
+    viewer.value = scopedViewer('all', 'token', 'localadmin');
+    installation.allowed = true;
+    const { body } = await readPanel('?tenant=personal');
+    expect(body).toMatchObject({ ok: true, scoped: true });
+    expect(body.candidates.map((row: { title: string }) => row.title)).toEqual([
+      'My personal chore',
+    ]);
+    const system = await readPanel('?tenant=shared');
+    expect(JSON.stringify(system.body)).not.toContain('My personal chore');
   });
 
   it.each([
