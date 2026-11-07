@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { guardOpsRequest, requireOpsAccess } from '../../../../lib/ops/ops-request-guard';
 import { collectDeliverableInbox } from '../../../../lib/ops/deliverable-inbox';
+import { viewerPersonIds } from '@agent/core/surface/surface-authorization';
 import {
   resolveOpsViewerForRequest,
   strictViewerTier,
@@ -61,6 +62,8 @@ export async function GET(req: NextRequest) {
       tierAccess: resolvedViewer.context.tierAccess ?? ['public', 'confidential'],
       limit: Number.isFinite(limit) ? limit : 50,
       tenantSlugs,
+      includeUntenanted: resolvedViewer.context.includeUntenanted === true,
+      personIds: viewerPersonIds(resolvedViewer.context),
       organizationIds,
       projectIds,
     })

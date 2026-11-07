@@ -6,7 +6,11 @@ import { clamp } from '@agent/core/foundation';
 import { loadState } from '@agent/core/mission/mission-state';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
-import { admitsTenant } from '@agent/core/surface/surface-authorization';
+import {
+  admitsCustody,
+  custodyOfScope,
+  type ViewerRecordCustody,
+} from '@agent/core/surface/surface-authorization';
 import { loadDeliverableReviewState } from './deliverable-review';
 
 export interface DeliverableInboxItem {
@@ -24,6 +28,11 @@ export interface DeliverableInboxItem {
   missionId?: string;
   projectId?: string;
   tenantSlug?: string;
+  /**
+   * Owner binding carried from the record when the schema grows one — an
+   * owner-bound record is person custody and never joins the public carve-out.
+   */
+  ownerNhi?: string;
   /** Security tier resolved from the mission state, record metadata, or path. */
   tier?: OsKnowledgeTier;
   organizationId?: string;
@@ -61,6 +70,8 @@ export interface DeliverableInboxQuery {
   tenantSlugs?: string[] | 'all';
   /** Server-resolved only (the system selection): also admit company-less records. */
   includeUntenanted?: boolean;
+  /** Server-resolved viewer identity — admits the viewer's own person custody. */
+  personIds?: readonly string[];
   organizationIds?: string[] | 'all';
   projectIds?: string[] | 'all';
   limit?: number;
@@ -238,6 +249,14 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
         missing: targetMissing,
         missionId: record.mission_id,
         tenantSlug: record.tenant_slug || missionContext.tenantSlug,
+        // Latent person custody: carry whichever owner binding the record
+        // declares (owner_nhi on memory-scope records, nhi_id on governed
+        // ones) so it reaches the custody check below.
+        ...(() => {
+          const owner = record as ArtifactRecord & { owner_nhi?: string; nhi_id?: string };
+          const personRef = owner.owner_nhi ?? owner.nhi_id;
+          return personRef ? { ownerNhi: personRef } : {};
+        })(),
         ...(tier ? { tier } : {}),
         organizationId: record.organization_id,
         projectId: record.project_id || missionContext.projectId,
@@ -268,20 +287,27 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
       } satisfies DeliverableInboxItem;
     })
     .filter((item) => (missionId ? item.missionId?.toUpperCase() === missionId : true))
-    // A record with no tenant is org-shared: admitted to a finite scope at
-    // public tier, or to the system selection (`includeUntenanted`); any other
-    // confidential/personal record without an owner stays hidden.
-    .filter(
-      (item) =>
-        (!item.tenantSlug && item.tier === 'public') ||
-        admitsTenant(
+    // Custody admission first: a record with no tenant is org-shared —
+    // admitted to a finite scope at public tier, or to the system selection
+    // (`includeUntenanted`) — unless it names an owner, which makes it person
+    // custody and identity-bound to that owner only.
+    .filter((item) => {
+      const custody: ViewerRecordCustody = custodyOfScope({
+        tenant_slug: item.tenantSlug,
+        owner_nhi: item.ownerNhi,
+      });
+      return (
+        (custody.kind !== 'person' && !item.tenantSlug && item.tier === 'public') ||
+        admitsCustody(
           {
             tenantSlugs: input.tenantSlugs ?? 'all',
             includeUntenanted: input.includeUntenanted === true,
+            personIds: input.personIds ?? [],
           },
-          item.tenantSlug
+          custody
         )
-    )
+      );
+    })
     .filter((item) =>
       input.organizationIds && input.organizationIds !== 'all'
         ? Boolean(item.organizationId && input.organizationIds.includes(item.organizationId))

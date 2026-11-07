@@ -138,6 +138,13 @@
     "delegation_record_store": {
       "allow": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"]
     },
+    "asset_derivation_store": {
+      "allow": [
+        "active/shared/runtime/asset-derivations/confidential/${KYBERION_TENANT}/",
+        "active/shared/runtime/asset-derivations/personal/",
+        "active/shared/runtime/asset-derivations/system/"
+      ]
+    },
     "tenant_approval_store": {
       "allow": [
         "active/shared/runtime/tenant-approvals/personal/${KYBERION_TENANT}/",

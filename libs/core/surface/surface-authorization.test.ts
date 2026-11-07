@@ -169,6 +169,13 @@ describe('admitsCustody (P4 — custody-kind row admission)', () => {
       ref: 'acme',
     });
     expect(custodyOfScope({ owner_nhi: 'human:x' })).toEqual({ kind: 'person', ref: 'human:x' });
+    // `nhi_id` is the governed (event-scope) person-binding field — one
+    // binding vocabulary with owner_nhi (approval-review-scope equivalence).
+    expect(custodyOfScope({ nhi_id: 'human:x' })).toEqual({ kind: 'person', ref: 'human:x' });
+    expect(custodyOfScope({ tenant_slug: 'acme', nhi_id: 'human:x' })).toEqual({
+      kind: 'tenant',
+      ref: 'acme',
+    });
     expect(custodyOfScope({})).toEqual({ kind: 'system' });
     expect(custodyOfScope(null)).toEqual({ kind: 'system' });
     expect(custodyOfScope(undefined)).toEqual({ kind: 'system' });
