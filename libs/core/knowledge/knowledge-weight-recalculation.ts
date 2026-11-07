@@ -19,7 +19,7 @@ import {
   loadKnowledgeRankingWeightConfig,
   type KnowledgeRankingWeightConfig,
   type KnowledgeRankingWeights,
-} from '../ranking-signals.js';
+} from './ranking-signals.js';
 import type { ScopeContext } from '../scope-context.js';
 
 export interface KnowledgeRankingWeightProposal {

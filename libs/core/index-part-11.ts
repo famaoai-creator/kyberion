@@ -142,7 +142,7 @@ export * from './workforce/work-inventory-observation.js';
 export * from './workforce/work-inventory-decompose.js';
 export * from './workforce/work-inventory-harvest.js';
 export * from './workforce/work-inventory-promotion.js';
-export * from './html-to-markdown.js';
+export * from './media/html-to-markdown.js';
 export * from './foundation/html-sanitize.js';
 
 // Dot charters: declarative standing-responsibility contracts for resident

@@ -52,7 +52,7 @@ import {
 import type { PdfDesignProtocol, PdfPage } from '../contracts/pdf-protocol.js';
 import { dropBrokenTextElements, pageNeedsRender, renderPdfPages } from './pdf-page-raster.js';
 import { loadPdfParseConstructor } from './pdf-parse-runtime.js';
-import { extractHtmlTitle, htmlToMarkdown } from '../html-to-markdown.js';
+import { extractHtmlTitle, htmlToMarkdown } from './html-to-markdown.js';
 import { extractOoxmlCoreTitle, OOXML_PLACEHOLDER_TITLES } from './ooxml-core-props.js';
 
 export type OfficeDocumentFormat = 'pdf' | 'pptx' | 'docx' | 'xlsx';

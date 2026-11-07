@@ -24,14 +24,15 @@
     "libs/core/secret/secret-introduction.web.test.ts": 1,
     "libs/core/secure-io.symlink-canonical.test.ts": 1,
     "libs/core/security-screen.test.ts": 1,
-    "libs/shared-voice/src/segmented-voice-playback.test.ts": 12,
-    "libs/core/silero-vad-bridge.test.ts": 1,
     "libs/shared-voice/src/streaming-voice-playback.test.ts": 10,
     "libs/core/surface/front-desk-recovery.engine.integration.test.ts": 1,
     "libs/core/trigger-correlation.test.ts": 3,
     "libs/core/virtual/os-accessibility-detector.live.test.ts": 1,
-    "libs/shared-voice/src/realtime-voice-loop.test.ts": 1,
     "libs/core/workforce/worker-goal-driver.test.ts": 1,
+    "libs/shared-mobile/src/mirror-server.test.ts": 2,
+    "libs/shared-voice/src/realtime-voice-loop.test.ts": 1,
+    "libs/shared-voice/src/segmented-voice-playback.test.ts": 12,
+    "libs/shared-voice/src/silero-vad-bridge.test.ts": 1,
     "presence/displays/concierge/src/app/api/setup/avatar-generation/route.test.ts": 1,
     "presence/displays/operator-surface/test/selection-browser.test.ts": 4,
     "presence/displays/terminal-hud/src/voice/voice-capture.test.ts": 1,
@@ -40,7 +41,6 @@
     "scripts/oauth_callback_surface.test.ts": 1,
     "scripts/run_checks.concurrency.test.ts": 1,
     "tests/best-of-n-judge.test.ts": 1,
-    "tests/resource-arbitration.test.ts": 2,
-    "libs/shared-mobile/src/mirror-server.test.ts": 2
+    "tests/resource-arbitration.test.ts": 2
   }
 }

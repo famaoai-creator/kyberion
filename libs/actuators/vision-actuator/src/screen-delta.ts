@@ -7,7 +7,7 @@ import {
   type DirtyTileDescriberDeps,
   type ScreenDeltaResult,
   type TileGrid,
-} from '@agent/core/dirty-tile-describer';
+} from './dirty-tile-describer.js';
 import type { PayloadTier } from '@agent/core/media/image-description-bridge';
 import {
   assertMissionTenant,

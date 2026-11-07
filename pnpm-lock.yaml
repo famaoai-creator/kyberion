@@ -727,6 +727,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-video':
+        specifier: workspace:*
+        version: link:../../shared-video
       '@agent/shared-voice':
         specifier: workspace:*
         version: link:../../shared-voice
@@ -902,6 +905,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../core
+      ws:
+        specifier: ^8.22.0
+        version: 8.22.0
 
   libs/shared-vision:
     dependencies:
@@ -1055,6 +1061,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../../libs/core
+      '@agent/shared-voice':
+        specifier: workspace:*
+        version: link:../../../libs/shared-voice
       chokidar:
         specifier: ^5.0.0
         version: 5.0.0
@@ -1086,6 +1095,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../libs/core
+      '@agent/shared-interaction':
+        specifier: workspace:*
+        version: link:../../libs/shared-interaction
       discord.js:
         specifier: ^14.27.0
         version: 14.27.0
@@ -1105,6 +1117,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../libs/core
+      '@agent/shared-interaction':
+        specifier: workspace:*
+        version: link:../../libs/shared-interaction
       express:
         specifier: ^5.3.0
         version: 5.3.0(supports-color@7.2.0)
@@ -1127,6 +1142,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../libs/core
+      '@agent/shared-interaction':
+        specifier: workspace:*
+        version: link:../../libs/shared-interaction
       '@slack/bolt':
         specifier: ^5.1.0
         version: 5.1.0(@types/express@5.0.6)(supports-color@7.2.0)(undici@7.30.1)
@@ -1149,6 +1167,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../libs/core
+      '@agent/shared-interaction':
+        specifier: workspace:*
+        version: link:../../libs/shared-interaction
     devDependencies:
       '@types/node':
         specifier: ^26.6.5
