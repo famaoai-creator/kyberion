@@ -189,7 +189,8 @@ export function defaultTierAccess(role: ChronosAccessRole): ConciergeViewerConte
   return maskPersonalTier(defaultSurfaceViewerTierAccess(role));
 }
 
-function serverTenant(): string {
+/** The server-bound tenant (`KYBERION_TENANT`, else the persisted scope); '' when unbound. */
+export function serverTenant(): string {
   try {
     return (
       getRegisteredEnvText('KYBERION_TENANT')?.trim() ||
