@@ -232,7 +232,7 @@ tool runtime — Kyberion works unchanged without it.
   `pnpm tool:setup -- --tool agent_desktop --apply`; resolution order is
   `KYBERION_AGENT_DESKTOP_BIN` → managed env binary → registry command →
   PATH (`resolveAgentDesktopBin`).
-- **Bridge**: `libs/core/desktop-ax-bridge.ts` spawns the binary with an
+- **Bridge**: `libs/shared-perception/src/desktop-ax-bridge.ts` spawns the binary with an
   allowlisted subcommand set (`snapshot`, `find`, `click`, `type`, `press`,
   `scroll`, `set-value`, `select`, `list-windows`, window geometry
   (`focus-window`, `resize-window`, `move-window`, `minimize`, `maximize`,

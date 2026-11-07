@@ -5,6 +5,32 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./cowork-artifact-packet": {
+      "types": "./dist/cowork-artifact-packet.d.ts",
+      "default": "./dist/cowork-artifact-packet.js"
+    },
+    "./cowork-health-check": {
+      "types": "./dist/cowork-health-check.d.ts",
+      "default": "./dist/cowork-health-check.js"
+    },
+    "./cowork-knowledge-bridge": {
+      "types": "./dist/cowork-knowledge-bridge.d.ts",
+      "default": "./dist/cowork-knowledge-bridge.js"
+    },
+    "./cowork-surface": {
+      "types": "./dist/cowork-surface.d.ts",
+      "default": "./dist/cowork-surface.js"
+    },
+    "./mcp-request-context": {
+      "types": "./dist/mcp-request-context.d.ts",
+      "default": "./dist/mcp-request-context.js"
+    }
+  },
   "scripts": {
     "build": "tsc -b tsconfig.json && node ../../scripts/write_core_dist_scope.mjs --run"
   },

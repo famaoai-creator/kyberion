@@ -87,7 +87,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/apple-speech-file-stt-bridge.ts (SFSpeechRecognizer with on-device recognition enforced)"
+            "libs/shared-voice/src/apple-speech-file-stt-bridge.ts (SFSpeechRecognizer with on-device recognition enforced)"
           ]
         },
         "speech_cpp": {
