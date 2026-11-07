@@ -58,7 +58,7 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/voice/speech-to-text-bridge.ts',
   'libs/core/pfc/PhysicalLayer.ts',
   'libs/core/streaming-voice-playback.ts',
-  'libs/core/ten-vad-bridge.ts',
+  'libs/shared-voice/src/ten-vad-bridge.ts',
   'libs/shared-video/src/video-render-backend.ts',
   'libs/core/virtual/virtual-audio-input-recording-bridge.ts',
   'satellites/voice-hub/server.ts',

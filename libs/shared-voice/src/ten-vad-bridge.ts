@@ -2,18 +2,18 @@
 /** Optional TEN VAD bridge using the upstream Python binding over NDJSON. */
 
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { getRegisteredEnvText } from './foundation/env.js';
-import { assertSafeRepositoryPath, buildSafeExecEnv, safeExistsSync } from './secure-io.js';
-import { rootResolve } from './path-resolver.js';
-import { registerVadBackend, type VadFactoryOptions } from './voice/vad-registry.js';
-import { parseVadBridgeLine } from './voice/vad-bridge-protocol.js';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { assertSafeRepositoryPath, buildSafeExecEnv, safeExistsSync } from '@agent/core/secure-io';
+import { rootResolve } from '@agent/core/path-resolver';
+import { registerVadBackend, type VadFactoryOptions } from '@agent/core/voice/vad-registry';
+import { parseVadBridgeLine } from '@agent/core/voice/vad-bridge-protocol';
 import {
   computeChunkDurationMs,
   EnergyVad,
   type VoiceActivityDetector,
   type VoiceActivityState,
-} from './voice/voice-activity-detector.js';
-import type { AudioChunk } from './meeting/meeting-session-types.js';
+} from '@agent/core/voice/voice-activity-detector';
+import type { AudioChunk } from '@agent/core/meeting/meeting-session-types';
 
 export interface TenVadOptions {
   pythonBin?: string;

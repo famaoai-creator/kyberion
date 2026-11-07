@@ -321,7 +321,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
   },
   'voice.vad-backend': {
     declaration: 'libs/core/voice/vad-registry.ts',
-    consumers: ['libs/core/ten-vad-bridge.ts', 'libs/core/silero-vad-bridge.ts'],
+    consumers: ['libs/shared-voice/src/ten-vad-bridge.ts', 'libs/core/silero-vad-bridge.ts'],
   },
   'build.readiness-inspector': {
     declaration: 'libs/core/build-readiness.ts',
