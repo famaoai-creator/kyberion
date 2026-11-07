@@ -93,9 +93,18 @@ function readFailed(what: string, error: unknown): void {
   );
 }
 
-/** The local machine owner: a loopback localadmin session. */
-function isLocalOwner(viewer: ConciergeViewerContext): boolean {
-  return viewer.source === 'loopback' && viewer.role === 'localadmin';
+/**
+ * The local machine owner. On a bound installation the owner arrives signed
+ * in (a session or token credential), so the route decides it with the
+ * installation-owner check (attested loopback peer + the bound owner's
+ * principal) and passes `installationOwner`. A credential-less loopback
+ * localadmin exists only during bootstrap or with the anonymous-loopback
+ * escape hatch, which is how presence-studio files the entry.
+ */
+function isLocalOwner(viewer: ConciergeViewerContext, installationOwner?: boolean): boolean {
+  return (
+    installationOwner === true || (viewer.source === 'loopback' && viewer.role === 'localadmin')
+  );
 }
 
 /**
@@ -105,13 +114,14 @@ function isLocalOwner(viewer: ConciergeViewerContext): boolean {
  */
 export function workInventoryPanelScope(
   viewer: ConciergeViewerContext,
-  options: { personalView?: boolean } = {}
+  options: { personalView?: boolean; installationOwner?: boolean } = {}
 ): WorkInventoryScope | null {
-  const scope = resolveWorkInventoryScopeForViewer(viewer);
-  if (!scope) return null;
-  if (!scope.tenant_slug) {
-    return options.personalView && isLocalOwner(viewer) ? scope : null;
+  if (options.personalView) {
+    // The personal scope `{}` is the owner's own inventory; nobody else's.
+    return isLocalOwner(viewer, options.installationOwner) ? {} : null;
   }
+  const scope = resolveWorkInventoryScopeForViewer(viewer);
+  if (!scope?.tenant_slug) return null;
   return viewer.tierAccess.includes('confidential') ? scope : null;
 }
 
@@ -171,7 +181,7 @@ function readConsent(viewer: ConciergeViewerContext): WorkInventoryPanel['consen
 /** Never throws: an unreadable store yields an empty panel, logged. */
 export function readWorkInventoryPanel(
   viewer: ConciergeViewerContext,
-  options: { personalView?: boolean } = {}
+  options: { personalView?: boolean; installationOwner?: boolean } = {}
 ): WorkInventoryPanel {
   const scope = workInventoryPanelScope(viewer, options);
   const { candidates, counts } = scope
