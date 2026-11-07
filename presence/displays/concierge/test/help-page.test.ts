@@ -1,8 +1,7 @@
-/* eslint-disable no-restricted-imports */
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { safeReadFile } from '@agent/core';
 import {
   FRONT_DESK_HELP_LINK,
   FRONT_DESK_LINKED_DESTINATIONS,
@@ -11,7 +10,8 @@ import {
 import { buildFrontDeskNavPayload } from '../src/lib/front-desk-nav';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (relativePath: string) => fs.readFileSync(path.join(appDir, relativePath), 'utf8');
+const read = (relativePath: string) =>
+  String(safeReadFile(path.join(appDir, relativePath), { encoding: 'utf8' }));
 
 const HELP_SOURCES = [
   'src/app/help/help-page.tsx',
