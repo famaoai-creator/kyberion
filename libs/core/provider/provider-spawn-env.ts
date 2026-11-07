@@ -9,14 +9,14 @@
 
 import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
-import { childDelegationEnv } from '../operation-policy-gate.js';
+import { childDelegationEnv } from '../governance/operation-policy-gate.js';
 import {
   buildProviderChildEnv,
   type ProviderId,
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
-import { prepareSessionGitIndex } from '../session-git-index.js';
-import { markDelegationExecutionStarted } from '../delegation-execution-tracker.js';
+import { prepareSessionGitIndex } from '../vcs/session-git-index.js';
+import { markDelegationExecutionStarted } from '../workforce/delegation-execution-tracker.js';
 import {
   applyProviderCredentialRelay,
   prepareProviderCredentialRelay,

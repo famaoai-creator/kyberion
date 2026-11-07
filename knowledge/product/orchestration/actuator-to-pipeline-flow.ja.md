@@ -112,12 +112,12 @@ accept の断絶（仕様）:
 
 繰り返し検知は機械的です: `pipelines/` 外の ADF 実行が成功するたび
 `active/shared/runtime/feedback-loop/adhoc-pipeline-runs.json` に集計され
-（`libs/core/promotion-candidates.ts`）、同一 ADF が3回成功すると昇格候補として
+（`libs/core/pipeline/promotion-candidates.ts`）、同一 ADF が3回成功すると昇格候補として
 実行出力と operator status packet に提示されます。パイプライン化されなかった
 不確定な依頼は unhandled-intent registry に溜まり
 （`pipelines/reconcile-unhandled-intents.json` が提案 stub を生成。スケジュールは
 既定で無効・opt-in）。昇格後の最終段は accepted binding
-（`libs/core/accepted-pipeline-bindings.ts`）: 昇格済み pipeline + 成功 run journal
+（`libs/core/pipeline/accepted-pipeline-bindings.ts`）: 昇格済み pipeline + 成功 run journal
 
 - 人間承認で `intent_id → pipelines/<slug>.json` を束ね、`run_intent` がその
   発話クラスの LLM compile をバイパスします（shape=pipeline・risk=low・confidence

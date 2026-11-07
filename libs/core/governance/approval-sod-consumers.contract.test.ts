@@ -39,7 +39,7 @@ const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
   { file: 'libs/core/secret/secret-introduction.ts', consumer: 'secret_introduction' },
   { file: 'libs/core/workforce/background-review-patch.ts', consumer: 'background_review_patch' },
   { file: 'libs/core/mesh/peer-runtime-recovery.ts', consumer: 'peer_runtime_recovery' },
-  { file: 'libs/core/marketing-workload.ts', consumer: 'marketing_publication' },
+  { file: 'libs/core/organization/marketing-workload.ts', consumer: 'marketing_publication' },
   { file: 'libs/core/governance/approval-linked-usability.ts', consumer: 'held_action_apply' },
   { file: 'libs/core/agent/agent-prompt-approval.ts', consumer: 'agent_prompt_approval' },
   {
@@ -67,7 +67,7 @@ const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
     consumer: 'service_recording_promotion',
   },
   { file: 'libs/core/governance/grant-store.ts', consumer: 'grant_standing' },
-  { file: 'libs/core/shortcut-bridge.ts', consumer: 'apple_shortcut_run' },
+  { file: 'libs/core/virtual/shortcut-bridge.ts', consumer: 'apple_shortcut_run' },
 ];
 
 /**

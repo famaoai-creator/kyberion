@@ -1,7 +1,7 @@
 /** Post-baseline observer contract with an offline fixture hook; no production wallet/provider or effects. */
 import { z } from 'zod';
-import { normalizeEventScope } from '../event-scope.js';
-import { getUsageAttribution, withUsageAttribution } from '../usage-accounting.js';
+import { normalizeEventScope } from '../event/event-scope.js';
+import { getUsageAttribution, withUsageAttribution } from '../finance/usage-accounting.js';
 import { judgmentBindingSchema, judgmentScopeSchema } from '../organization/judgment-contract.js';
 import { judgmentCanonicalHash } from '../organization/judgment-precedents.js';
 import {

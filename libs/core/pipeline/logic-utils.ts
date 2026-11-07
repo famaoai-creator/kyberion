@@ -1,4 +1,4 @@
-import { resolveRepositoryPathToken } from '../path-token-resolver.js';
+import { resolveRepositoryPathToken } from '../storage/path-token-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 
 /**

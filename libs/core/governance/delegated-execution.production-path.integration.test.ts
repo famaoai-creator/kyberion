@@ -15,7 +15,7 @@ vi.mock('./approval-policy.js', () => ({
     mandatoryApproval: false,
   }),
 }));
-vi.mock('../decision-rights.js', () => ({
+vi.mock('../organization/decision-rights.js', () => ({
   resolveDecisionRightsMatrix: () => ({}),
   evaluateDecisionRights: () => null,
 }));
@@ -43,7 +43,7 @@ let paths: typeof import('../path-resolver.js');
 let tenants: typeof import('../organization/tenant-registry.js');
 let charters: typeof import('./accountability-charter-registry.js');
 let delegated: typeof import('./delegated-execution.js');
-let actor: typeof import('../actor.js');
+let actor: typeof import('../contracts/actor.js');
 
 beforeAll(async () => {
   seedFirstJobTestRoot(sourceRoot, root);
@@ -72,7 +72,7 @@ beforeAll(async () => {
   tenants = await import('../organization/tenant-registry.js');
   charters = await import('./accountability-charter-registry.js');
   delegated = await import('./delegated-execution.js');
-  actor = await import('../actor.js');
+  actor = await import('../contracts/actor.js');
 }, 60000);
 
 afterAll(() => {

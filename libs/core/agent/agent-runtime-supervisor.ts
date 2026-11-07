@@ -23,11 +23,15 @@ import {
   safeOpenAppendFile,
   safeWriteFile,
 } from '../secure-io.js';
-import { spawnManagedProcess } from '../managed-process.js';
+import { spawnManagedProcess } from '../tool/managed-process.js';
 import { runtimeSupervisor } from '../tool/runtime-supervisor.js';
 import { logger } from '../core.js';
-import { metrics, resolveCostRates } from '../metrics.js';
-import { parseEventScopeInput, type EventScope, type EventScopeInput } from '../event-scope.js';
+import { metrics, resolveCostRates } from '../analysis/metrics.js';
+import {
+  parseEventScopeInput,
+  type EventScope,
+  type EventScopeInput,
+} from '../event/event-scope.js';
 import { isAgentRuntimeApprovalPendingError } from './agent-prompt-approval-port.js';
 import {
   assertRuntimeNhiScope,

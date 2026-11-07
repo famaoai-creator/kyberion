@@ -5,7 +5,7 @@
  *
  * A reader that loads a store whole goes through the 100MB read cap, so once
  * the store outgrows the cap every read throws (the trigger-deliveries crash
- * loop) and memory scales with the store. `libs/core/jsonl-read.ts` reads by
+ * loop) and memory scales with the store. `libs/core/storage/jsonl-read.ts` reads by
  * purpose in fixed chunks instead. The gate counts whole-file JSONL reads per
  * production file and fails when a file gains one.
  *
@@ -61,12 +61,12 @@ const WHOLE_FILE_TEXT_READERS = new Set([
 const JSONL_PATH = /\.jsonl\b/u;
 
 export const RUNTIME_STORE_WHOLE_READ_FIX_HINT = [
-  'Read append-only JSONL stores by purpose with libs/core/jsonl-read.ts (size never makes a read fail):',
+  'Read append-only JSONL stores by purpose with libs/core/storage/jsonl-read.ts (size never makes a read fail):',
   '  - last record     → readLastJsonLine / readJsonLinesBackward',
   '  - recent window   → readJsonLinesSince(path, { cutoff, timeOf })',
   '  - full history    → streamJsonLines (constant memory, forward)',
   "Tolerate torn lines with { onMalformed: 'skip' } unless the store contract is strict.",
-  'Bound growth at the writer with maintainStoreAfterAppend (libs/core/append-only-store.ts).',
+  'Bound growth at the writer with maintainStoreAfterAppend (libs/core/storage/append-only-store.ts).',
 ].join('\n');
 
 export interface WholeReadSite {

@@ -81,7 +81,7 @@ describe('runtime recovery replay across abrupt process termination', () => {
       };
       f.killed(
         'oauth-interrupted',
-        `import { savePendingOAuthSession, acquirePendingOAuthCallback, finishOAuthOperation } from ${f.source('oauth-session-store')};
+        `import { savePendingOAuthSession, acquirePendingOAuthCallback, finishOAuthOperation } from ${f.source('authn/oauth-session-store')};
          const session = ${JSON.stringify(session)};
          savePendingOAuthSession(session);
          const claim = acquirePendingOAuthCallback(session.serviceId, session.state, ${now});
@@ -91,7 +91,7 @@ describe('runtime recovery replay across abrupt process termination', () => {
       f.success(
         'oauth-restarted',
         `import assert from 'node:assert/strict';
-         import { acquirePendingOAuthCallback, readOAuthOperation, serviceSessionPath } from ${f.source('oauth-session-store')};
+         import { acquirePendingOAuthCallback, readOAuthOperation, serviceSessionPath } from ${f.source('authn/oauth-session-store')};
          import { safeExistsSync } from ${f.source('secure-io')};
          const session = ${JSON.stringify(session)};
          // A callback can reach token exchange only after this existing claim seam.

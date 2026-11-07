@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { t } from '../t.js';
-import type { VocabularyKey } from '../t.js';
+import { t } from '../localization/t.js';
+import type { VocabularyKey } from '../localization/t.js';
 import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
 import { decisionReasonText } from './decision-reason-text.js';
 import {

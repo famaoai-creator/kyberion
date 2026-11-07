@@ -22,14 +22,7 @@ import {
 } from './front-desk-pages.js';
 
 const STATIC_DIR = 'presence/displays/presence-studio/static';
-const SHELL_PAGES = [
-  'home.html',
-  'ask.html',
-  'progress.html',
-  'index.html',
-  'first-job.html',
-  'engine-config.html',
-];
+const SHELL_PAGES = ['home.html', 'ask.html', 'index.html', 'first-job.html', 'engine-config.html'];
 // The OBS projection has no navigation shell, but is still a localized template.
 const PAGES = [...SHELL_PAGES, 'live-avatar.html'];
 
@@ -119,7 +112,7 @@ describe('renderFrontDeskPageTemplate', () => {
   });
 
   it('keeps presence-studio stylesheets on --kb-ui-* tokens (no raw hex / rgb colors, no teal)', () => {
-    const sheets = ['design-system.css', 'home.css', 'ask.css', 'progress.css', 'work.css'];
+    const sheets = ['design-system.css', 'home.css', 'ask.css', 'work.css'];
     for (const sheet of sheets) {
       const css = readStatic(sheet);
       expect(css, sheet).not.toMatch(/#[0-9a-f]{3,8}\b/i);
@@ -197,10 +190,10 @@ describe('raw template files are never served unrendered', () => {
   }
 
   it('covers every page template and maps it to its canonical route', () => {
-    // `/help.html` stays mapped after the page moved to Concierge, so an old
-    // bookmark still lands on 使い方 (via the /help redirect).
+    // `/help.html` and `/progress.html` stay mapped after their pages moved to
+    // Concierge, so an old bookmark still lands there (via the redirects).
     expect(Object.keys(FRONT_DESK_TEMPLATE_FILE_REDIRECTS).sort()).toEqual(
-      [...PAGES, 'help.html'].map((page) => `/${page}`).sort()
+      [...PAGES, 'help.html', 'progress.html'].map((page) => `/${page}`).sort()
     );
     expect(frontDeskTemplateRedirect('/engine-config.html')).toBe('/engine-config');
     expect(frontDeskTemplateRedirect('/home.html')).toBe('/home');
@@ -225,6 +218,23 @@ describe('raw template files are never served unrendered', () => {
     expect(track.statusCode).toBe(302);
     expect(track.location).toBe(concierge + '/help/first%20steps');
     expect(track.sent).toBeUndefined();
+  });
+
+  it('hands /progress to Concierge 仕事 › 依頼, keeping the query in one query string', () => {
+    const { routes } = recordRoutes();
+    const concierge = readFrontDeskSurfaceUrls().concierge;
+    const bare = fakeRes();
+    routes.get('/progress')!({ originalUrl: '/progress', params: {} }, bare);
+    expect(bare.statusCode).toBe(302);
+    expect(bare.location).toBe(concierge + '/work?tab=requests');
+    const linked = fakeRes();
+    routes.get('/progress')!(
+      { originalUrl: '/progress?request=req-1&tenant=acme&tab=missions', params: {} },
+      linked
+    );
+    expect(linked.statusCode).toBe(302);
+    expect(linked.location).toBe(concierge + '/work?tab=requests&request=req-1&tenant=acme');
+    expect(linked.sent).toBeUndefined();
   });
 
   it('renders the settings editor in the requested locale with a disabled form and shared navigation', () => {
@@ -390,17 +400,4 @@ it('loads draft actions before Ask and bounds multiline context', () => {
   const button = css.match(/\.ask-turn-next-actions button \{([\s\S]*?)\}/)?.[1];
   expect(button).toContain('white-space: normal');
   expect(button).toContain('overflow-wrap: anywhere');
-});
-
-describe('Progress correction helper delivery', () => {
-  it('loads the correction helper before Progress and serves localized scope copy', () => {
-    for (const locale of ['en', 'ja'] as const) {
-      const html = renderFrontDeskPageTemplate(readStatic('progress.html'), locale, readStatic);
-      expect(html.indexOf('src="/progress-correction.js"')).toBeGreaterThan(-1);
-      expect(html.indexOf('src="/progress-correction.js"')).toBeLessThan(
-        html.indexOf('src="/progress.js"')
-      );
-    }
-    expect(readStatic('progress-correction.js')).toContain('window.KyberionProgressCorrection');
-  });
 });

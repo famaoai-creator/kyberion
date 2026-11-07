@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ExecutionFeedbackInput } from '../execution-feedback.js';
+import type { ExecutionFeedbackInput } from '../knowledge/execution-feedback.js';
 import type { SurfaceConversationMessageInput } from './channel-surface-types.js';
 
 const mocks = vi.hoisted(() => ({
@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   background: vi.fn(),
   route: vi.fn(),
 }));
-vi.mock('../execution-feedback.js', async (original) => ({
+vi.mock('../knowledge/execution-feedback.js', async (original) => ({
   ...(await original<object>()),
   recordExecutionFeedback: mocks.record,
 }));

@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ResolvedPrincipal } from '../authn-principal-resolver.js';
+import type { ResolvedPrincipal } from '../authn/authn-principal-resolver.js';
 import { withExecutionContext, withExecutionContextAsync } from '../authority.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { readJson, writeJson } from '../foundation/json.js';
@@ -113,7 +113,7 @@ vi.mock('../surface/surface-management-mutations.js', () => ({
       throw new Error('An active owner membership is required.');
   },
 }));
-vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
+vi.mock('../daemon/ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 
 const auth = {
   actorId: 'user:founder',

@@ -16,7 +16,7 @@ import {
 } from './adapter-default-preferences.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
-import { resolveActiveProfileRoot } from '../profile-root.js';
+import { resolveActiveProfileRoot } from '../authn/profile-root.js';
 import { assertSafeRepositoryPath, safeLstat, safeWriteFile } from '../secure-io.js';
 import { getServiceRuntimeRegistry } from '../service/service-runtime-registry.js';
 import { listToolRuntimes, getToolRuntimeRegistry } from '../tool/tool-runtime-registry.js';

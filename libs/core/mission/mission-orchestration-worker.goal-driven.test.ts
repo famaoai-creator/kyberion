@@ -27,7 +27,7 @@ import {
   runGoalDrivenWorkItem,
 } from './mission-orchestration-worker.js';
 import { buildMissionContextPack, type MissionContextPack } from './mission-context-pack.js';
-import { DynamicInjectionRegistry } from '../dynamic-injection.js';
+import { DynamicInjectionRegistry } from '../reasoning/dynamic-injection.js';
 import type { GenerateWithToolsResult, ReasoningBackend } from '../reasoning/reasoning-backend.js';
 import { WorkerEventStream, type WorkerEventEnvelope } from '../workforce/worker-event-stream.js';
 import { WorkerStateJournal } from '../workforce/worker-state-journal.js';

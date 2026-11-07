@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import path from 'node:path';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
-import { loadPersistedTrustLedger } from './trust-engine.js';
+import { loadPersistedTrustLedger } from './governance/trust-engine.js';
 
 describe('persisted trust ledger catalog', () => {
   it('loads a personal-tier trust ledger through the governed catalog', () => {

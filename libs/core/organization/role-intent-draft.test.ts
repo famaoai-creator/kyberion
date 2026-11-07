@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
-import { _resetEgressPolicyCacheForTests } from '../egress-policy.js';
+import { _resetEgressPolicyCacheForTests } from '../governance/egress-policy.js';
 import { _resetProviderEgressPolicyCacheForTests } from '../provider/provider-egress-gate.js';
 import { stubReasoningBackend, type ReasoningBackend } from '../reasoning/reasoning-backend.js';
 import {

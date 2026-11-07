@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { ContextSecurityScope } from '../context-security-scope.js';
+import type { ContextSecurityScope } from '../governance/context-security-scope.js';
 import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 
 export type ActuatorForwardStatus = 'succeeded' | 'failed' | 'blocked';

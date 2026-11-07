@@ -1,5 +1,5 @@
 import { logger } from '../core.js';
-import { validateReasoningEgress } from '../context-security-scope.js';
+import { validateReasoningEgress } from '../governance/context-security-scope.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
 import { loadTeamRoleIndex } from '../mission/mission-team-index.js';
 import { loadMissionTeamPlan } from '../mission/mission-team-plan-composer.js';

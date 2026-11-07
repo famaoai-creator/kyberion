@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getCoordinatedAgentExecutionPort } from '../coordinated-agent-execution-port.js';
+import { getCoordinatedAgentExecutionPort } from './coordinated-agent-execution-port.js';
 import { SupervisorAgentExecutionPort, resetAgentExecutionPort } from './agent-execution-port.js';
 import { agentLifecycle } from './agent-lifecycle.js';
 import * as bridge from './agent-exec-adapter-bridge.js';

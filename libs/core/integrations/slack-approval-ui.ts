@@ -11,7 +11,7 @@ import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { nowIso } from '../foundation/time.js';
 import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import { resolveApprovalLocale } from '../governance/approval-decision-card.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import type { RejectionReasonCategory } from '../contracts/rejection-reason.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
 import {

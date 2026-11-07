@@ -9,10 +9,9 @@ vi.mock('../secure-io.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../apple-event-bridge.js', async () => {
-  const actual = await vi.importActual<typeof import('../apple-event-bridge.js')>(
-    '../apple-event-bridge.js'
-  );
+vi.mock('./apple-event-bridge.js', async () => {
+  const actual =
+    await vi.importActual<typeof import('./apple-event-bridge.js')>('./apple-event-bridge.js');
   return {
     ...actual,
     activateApplication: vi.fn(),

@@ -20,7 +20,7 @@
             "zero_config": "declared"
           },
           "evidence": [
-            "libs/core/mlx-embedding-backend.ts (MlxEmbeddingBackend: local mlx_embeddings via Apple Silicon; isMlxAvailable() platform gate)"
+            "libs/core/provider/mlx-embedding-backend.ts (MlxEmbeddingBackend: local mlx_embeddings via Apple Silicon; isMlxAvailable() platform gate)"
           ]
         },
         "gemini": {
@@ -42,7 +42,7 @@
             "zero_config": "declared"
           },
           "evidence": [
-            "libs/core/embedding-backend.ts (FNV-1a token-hash buckets, VECTOR_SIZE=64; quality 'approximate', always available)"
+            "libs/core/reasoning/embedding-backend.ts (FNV-1a token-hash buckets, VECTOR_SIZE=64; quality 'approximate', always available)"
           ]
         }
       },

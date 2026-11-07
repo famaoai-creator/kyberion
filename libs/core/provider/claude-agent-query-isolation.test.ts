@@ -12,7 +12,7 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => ({ query: mocks.query }));
 vi.mock('../reasoning/reasoning-egress-scope.js', () => ({
   assertReasoningEgressAllowed: vi.fn(),
 }));
-vi.mock('../metrics.js', () => ({
+vi.mock('../analysis/metrics.js', () => ({
   metrics: { record: vi.fn(), increment: vi.fn(), observe: vi.fn() },
 }));
 // Hermetic: route the governed scratch helper to a per-run ledger + root.

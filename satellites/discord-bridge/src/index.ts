@@ -31,7 +31,7 @@ import {
   chunkSurfaceMessage,
   postBridgeError,
   sendSurfaceTextWithFallback,
-} from '@agent/core/bridge-error-reply';
+} from '@agent/shared-interaction/bridge-error-reply';
 import {
   createSurfaceOutboxDrainGuard,
   drainSurfaceOutbox,

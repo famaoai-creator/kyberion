@@ -1,6 +1,6 @@
 import { detectTextLocale, type SupportedLocale } from '../foundation/locale-normalize.js';
-import { resolveLocale } from '../locale.js';
-import { t, type VocabularyKey } from '../t.js';
+import { resolveLocale } from '../localization/locale.js';
+import { t, type VocabularyKey } from '../localization/t.js';
 
 export interface SurfaceUxContractInput {
   text: string;

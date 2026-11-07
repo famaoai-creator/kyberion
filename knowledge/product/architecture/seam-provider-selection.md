@@ -37,9 +37,9 @@ between them is **deterministic**, **audited**, **pinned per mission** and,
 where nobody knows the right answer yet, **decided by a human after a
 side-by-side calibration run**. It is not an LLM judgment.
 
-Code: `libs/core/seam-provider-selection.ts` (decision),
-`libs/core/seam-selection-rules.ts` (operator rules + measured traits),
-`libs/core/seam-calibration.ts` (calibration runner),
+Code: `libs/core/provider/seam-provider-selection.ts` (decision),
+`libs/core/provider/seam-selection-rules.ts` (operator rules + measured traits),
+`libs/core/provider/seam-calibration.ts` (calibration runner),
 `libs/core/provider/provider-pins-store.ts` (mission pins). Product policy: one file per
 seam under `knowledge/product/governance/seam-provider-selection/<seam>.json`.
 Operator overlay: `active/shared/runtime/seam-selection/rules.json` — shared
@@ -81,7 +81,7 @@ rule / rationale). Seams that walk a fallback chain use `decision.ranked`.
 ## Saved defaults — "use X for this seam unless told otherwise"
 
 A human can save a default provider per seam, layered by scope
-(`libs/core/seam-selection-defaults.ts`). The first layer that names the seam
+(`libs/core/provider/seam-selection-defaults.ts`). The first layer that names the seam
 wins:
 
 | Layer          | Where                                                                                                 |

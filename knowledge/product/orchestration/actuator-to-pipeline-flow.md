@@ -145,7 +145,7 @@ mission evidence), promote only on reuse
 The repetition detector is mechanical: every successful ad-hoc ADF run (input
 outside `pipelines/`) is tallied in
 `active/shared/runtime/feedback-loop/adhoc-pipeline-runs.json`
-(`libs/core/promotion-candidates.ts`); at ≥3 runs the same ADF surfaces as a
+(`libs/core/pipeline/promotion-candidates.ts`); at ≥3 runs the same ADF surfaces as a
 promotion candidate in the run output and in the operator status packet.
 Uncertain requests that never became a pipeline accumulate in the
 unhandled-intent registry instead (`libs/core/unhandled-intent-registry.ts`;
@@ -181,7 +181,7 @@ Schedules additionally need a `schedule{id,cron,timezone,enabled}` block and
 `pnpm kyberion schedule register`.
 
 The last crystallization rung is the accepted binding
-(`libs/core/accepted-pipeline-bindings.ts`): a promoted pipeline + a
+(`libs/core/pipeline/accepted-pipeline-bindings.ts`): a promoted pipeline + a
 successful run journal + authenticated human approval binds an `intent_id` to
 `pipelines/<slug>.json`, and `run_intent` then bypasses LLM compile for that
 utterance class. The bar is deliberately high — `shape: pipeline`,

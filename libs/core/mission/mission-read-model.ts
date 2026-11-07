@@ -5,7 +5,7 @@
 
 import { findMissionPath } from '../path-resolver.js';
 import { listMissionsInSearchDirs, loadState } from './mission-state.js';
-import { readOrNullOnMissionRefusal } from '../mission-lookup.js';
+import { readOrNullOnMissionRefusal } from './mission-lookup.js';
 import type { MissionState } from './mission-types.js';
 
 export type DistillationDisclosure =

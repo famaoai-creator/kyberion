@@ -26,7 +26,7 @@ status: archived
 ### Task 1: 共通ランナーの設計・実装 — `claude-sonnet-4`
 
 1. 27 個の `index.ts` の `main()` を読み比べ、差異(出力形式、追加フラグ、VITEST ガードの有無)を一覧化する。
-2. `libs/core/cli-utils.ts`(`createStandardYargs` の既存の家)に以下のシグネチャで実装する:
+2. `libs/core/harnessing/cli-utils.ts`(`createStandardYargs` の既存の家)に以下のシグネチャで実装する:
 
    ```ts
    export async function runActuatorCli(opts: {
@@ -39,7 +39,7 @@ status: archived
 
    - `safeReadFile` による入力読込、`JSON.parse` の try/catch(失敗時は `[<name>] invalid JSON input: <message>` を stderr に出し exit 1)、schema 指定時の Ajv 検証、`handleAction` 例外時の構造化エラー出力と exit 1、直接実行ガード(`!process.env.VITEST`)を内包する。
 
-3. `libs/core/cli-utils.test.ts` にテストを追加: 正常系 / 不正 JSON / スキーマ違反 / handleAction 例外 の 4 ケース。
+3. `libs/core/harnessing/cli-utils.test.ts` にテストを追加: 正常系 / 不正 JSON / スキーマ違反 / handleAction 例外 の 4 ケース。
 4. `libs/core/index.ts`(バレル)からエクスポートする。
 
 ### Task 2: パイロット移行(3件)— `claude-sonnet-4`
@@ -68,6 +68,6 @@ status: archived
 
 ## 実装メモ
 
-- 2026-07-04: `libs/core/cli-utils.ts` に `runActuatorCli()` を実装し、`cli-utils.test.ts` で正常系 / 不正 JSON / schema 逸脱 / `handleAction` 例外を確認した。
+- 2026-07-04: `libs/core/harnessing/cli-utils.ts` に `runActuatorCli()` を実装し、`cli-utils.test.ts` で正常系 / 不正 JSON / schema 逸脱 / `handleAction` 例外を確認した。
 - 2026-07-04: `process-actuator` をパイロットとして置き換えた後、`process-actuator` 以外の CLI 入口を共通ランナーへ横展開した。`daemon-actuator` は退役済みのため移行対象外のまま残している。
 - 2026-07-04: `pnpm run validate` を通過確認済み。

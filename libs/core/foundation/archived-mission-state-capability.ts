@@ -41,6 +41,7 @@ export function isArchivedMissionStateCapability(scope: ResourceAccessScope | un
     (scope.custody !== undefined && scope.custody.kind !== 'tenant') ||
     scope.organizationId ||
     scope.projectId ||
+    (scope.namePrefixExact?.length ?? 0) > 0 ||
     scope.allowProductKnowledgeRead !== true ||
     (scope.metadataExact?.length ?? 0) > 0 ||
     scope.readExact.length !== 1 ||

@@ -25,7 +25,7 @@ import { readTextFile } from '../foundation/text.js';
 import { logger } from '../core.js';
 import * as pathResolver from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from '../secure-io.js';
-import type { RetentionArtifactClass } from '../storage-retention-catalog.js';
+import type { RetentionArtifactClass } from '../storage/storage-retention-catalog.js';
 import {
   ensureRegularScopedArtifactIndex,
   parseScopedArtifactIndexEntry,

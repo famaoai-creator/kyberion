@@ -1,7 +1,7 @@
 /** Offline semantic evaluation only. No production backend factory, execution route, or authority. */
 import { z } from 'zod';
 import { delegateStructured } from '../reasoning/reasoning-backend.js';
-import { frameUntrustedInput } from '../untrusted-input-framing.js';
+import { frameUntrustedInput } from '../governance/untrusted-input-framing.js';
 import {
   JUDGMENT_MODEL_INPUT_MAX_BYTES,
   JUDGMENT_MODEL_OUTPUT_MAX_BYTES,

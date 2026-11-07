@@ -30,7 +30,7 @@ import {
   deriveMissionOutcome,
   readHeuristic,
   validateMissionHeuristics,
-} from './heuristic-feedback.js';
+} from './knowledge/heuristic-feedback.js';
 
 describe('heuristic mission validation', () => {
   let tmpDir = '';

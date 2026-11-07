@@ -44,7 +44,7 @@
             "real_meeting": "declared"
           },
           "evidence": [
-            "libs/core/in-room-meeting-driver.ts (supported_platforms ['in_room']: local microphone/speaker for a physical-room meeting, no URL)"
+            "libs/core/meeting/in-room-meeting-driver.ts (supported_platforms ['in_room']: local microphone/speaker for a physical-room meeting, no URL)"
           ]
         },
         "stub": {

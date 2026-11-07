@@ -1,4 +1,4 @@
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import type { ValidateFunction } from 'ajv';

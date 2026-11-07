@@ -75,7 +75,7 @@ Kyberion の決定論基盤(ADF パイプライン)は制御フローが弱く�
 - `libs/core/pipeline/adf-guardrails.ts` と `libs/core/pipeline/pipeline-preview.ts` / `.js` に `accumulate` を認識させ、ガードレール検査と preview 表示で子ステップを追えるようにした。
 - `scripts/demos/workflow-as-code-example.ts` は parallel / accumulate / effort / budget の例を載せるデモに更新し、`scripts/refactor/adf-input.test.ts` で検証対象に含めた。
 - `scripts/run_pipeline.ts` / `scripts/run_pipeline.js` は `.ts/.js/.mjs/.cjs` の workflow module を直接読む入口になり、JSON ADF と同じ検証・実行系に乗るようにした。
-- `libs/core/question-resolver.ts` は省略された明確化質問数を `logger.info` で記録し、`libs/core/question-resolver.test.ts` でログ発火を固定した。
+- `libs/core/intent/question-resolver.ts` は省略された明確化質問数を `logger.info` で記録し、`libs/core/intent/question-resolver.test.ts` でログ発火を固定した。
 - `scripts/run_pipeline.test.ts` で `accumulate` と `retry_until_quality` の到達条件を固定し、実行系の回帰を防ぐようにした。
 
 ### Task 3 slice — 2026-07-05

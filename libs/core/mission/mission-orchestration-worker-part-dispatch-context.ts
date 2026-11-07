@@ -6,12 +6,15 @@ import type { MissionTeamAssignment } from './mission-team-plan-composer.js';
  */
 import { missionCoordinationBus } from './mission-coordination-bus.js';
 import { logger } from '../core.js';
-import { buildWorkingPrinciplesLines, canonicalizeTeamRole } from '../working-principles.js';
+import {
+  buildWorkingPrinciplesLines,
+  canonicalizeTeamRole,
+} from '../workforce/working-principles.js';
 import {
   buildWorkingPrinciplesInjectionProvider,
   getMissionDynamicInjectionRegistry,
   renderInjectionsAsSystemReminders,
-} from '../dynamic-injection.js';
+} from '../reasoning/dynamic-injection.js';
 import { pathResolver } from '../path-resolver.js';
 import { type MissionContextPackPruningSummary } from './mission-context-pack.js';
 import { provisionTaskKnowledge } from '../task/task-knowledge-provisioning.js';
@@ -26,7 +29,7 @@ import {
   evaluateContextFragment,
   resolveTenantAlias,
   type ContextSecurityScope,
-} from '../context-security-scope.js';
+} from '../governance/context-security-scope.js';
 import type { ConfidentialTaskDecisionValues } from '../customer-decision/task-decision-values.js';
 import {
   buildArtifactReviewLines,
@@ -155,7 +158,7 @@ export async function buildTaskDispatchContext(input: {
   missionContextPackPath?: string;
   missionContextPackSummary: string;
   missionContextPackPruningSummary?: MissionContextPackPruningSummary;
-  securityScope?: import('../context-security-scope.js').ContextSecurityScope;
+  securityScope?: import('../governance/context-security-scope.js').ContextSecurityScope;
   /** KP-05: knowledge actually delivered as part of this dispatch's context pack. */
   deliveredKnowledgeRefs: DeliveredKnowledgeRef[];
   /** CD-09: present when the task had confirmed customer decisions to receive. */

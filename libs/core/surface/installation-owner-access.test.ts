@@ -4,8 +4,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import * as pathResolver from '../path-resolver.js';
 import { safeRmSync } from '../secure-io.js';
 import { withExecutionContext } from '../authority.js';
-import { humanActor, serviceActor, agentActor } from '../actor.js';
-import type { ResolvedPrincipal } from '../authn-principal-resolver.js';
+import { humanActor, serviceActor, agentActor } from '../contracts/actor.js';
+import type { ResolvedPrincipal } from '../authn/authn-principal-resolver.js';
 
 const secretStore = vi.hoisted(() => new Map<string, Record<string, unknown>>());
 vi.mock('../secret/secret-guard.js', () => ({

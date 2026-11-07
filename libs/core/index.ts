@@ -30,7 +30,7 @@ export * from './meeting/calendar-external-effect.js';
 
 // Preserve the original explicit export precedence for names also surfaced by
 // broad compatibility barrels.
-export type { NextActionType } from './next-action.js';
+export type { NextActionType } from './surface/next-action.js';
 
 export {
   completedConversationContext,
@@ -92,8 +92,8 @@ export * from './workforce/work-effect-ownership.js';
 
 export * from './reasoning/reasoning-selection-settings.js';
 
-export * from './macos-native-automation.js';
-export * from './macos-permission-warmup.js';
+export * from './virtual/macos-native-automation.js';
+export * from './virtual/macos-permission-warmup.js';
 
 export * from './organization/continuous-operations-policy.js';
 export * from './organization/continuous-operations.js';
@@ -127,8 +127,8 @@ export * from './workforce/task-pipeline-tool.js';
 export * from './knowledge/reusable-learning.js';
 export * from './knowledge/knowledge-reuse-contract.js';
 
-export * from './shortcut-bridge.js';
-export * from './persona-identity.js';
+export * from './virtual/shortcut-bridge.js';
+export * from './authn/persona-identity.js';
 
 export * from './information-assets/types.js';
 export * from './information-assets/catalog.js';

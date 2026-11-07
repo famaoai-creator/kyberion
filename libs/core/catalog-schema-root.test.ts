@@ -2,8 +2,8 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { loadOutcomeCatalog } from './workforce/work-design.js';
-import { loadIntentRoutingMap } from './router-contract.js';
-import { classifyError } from './error-classifier.js';
+import { loadIntentRoutingMap } from './intent/router-contract.js';
+import { classifyError } from './analysis/error-classifier.js';
 
 /**
  * PE-02 regression: Chronos runs with its package directory as cwd

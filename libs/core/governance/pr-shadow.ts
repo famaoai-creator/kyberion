@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { isVitestProcess } from '../foundation/env.js';
 import { appendJsonLine } from '../foundation/json.js';
-import { fileEndsWithNewline, streamJsonLines } from '../jsonl-read.js';
+import { fileEndsWithNewline, streamJsonLines } from '../storage/jsonl-read.js';
 import { createLogger } from '../logger.js';
 import * as pathResolver from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from '../secure-io.js';

@@ -69,9 +69,9 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   // Attributes a legacy shared delegation record / notification row to its
   // mission's tenant; a hidden/ambiguous mission must leave it unattributed
   // (hidden from tenants).
-  'libs/core/delegation-store-partition.ts': 'scope-derivation',
-  'libs/core/history-search-index.ts': 'scope-derivation',
-  'libs/core/injection-signal.ts': 'scope-derivation',
+  'libs/core/workforce/delegation-store-partition.ts': 'scope-derivation',
+  'libs/core/search/history-search-index.ts': 'scope-derivation',
+  'libs/core/governance/injection-signal.ts': 'scope-derivation',
   'libs/shared-perception/src/mark-target-resolver.ts': 'scope-derivation',
   'libs/core/mesh/a2a-conversation-store.ts': 'scope-derivation',
   'libs/core/mission/mission-read-model.ts': 'scope-derivation',
@@ -80,8 +80,8 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'libs/core/scope-context.ts': 'scope-derivation',
   'libs/core/service/service-binding-registry.ts': 'scope-derivation',
   'libs/core/tool/runtime-scope.ts': 'scope-derivation',
-  'libs/core/untrusted-content.ts': 'scope-derivation',
-  'libs/core/visual-raster.ts': 'scope-derivation',
+  'libs/core/governance/untrusted-content.ts': 'scope-derivation',
+  'libs/core/media/visual-raster.ts': 'scope-derivation',
   'presence/displays/concierge/src/app/api/ops/deliverable-preview/route.ts': 'scope-derivation',
   'presence/displays/concierge/src/lib/ops/su-surface-data.ts': 'scope-derivation',
   // The operations console inside Concierge (moved from Chronos, MSN-KYBERION-SERVER-20261104).
@@ -92,7 +92,7 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts': 'placement',
   'libs/actuators/vision-actuator/src/vision-scope.ts': 'placement',
   'libs/actuators/wisdom-actuator/src/wisdom-pipeline-helpers.ts': 'placement',
-  'libs/core/ledger.ts': 'placement',
+  'libs/core/governance/ledger.ts': 'placement',
   'libs/core/mission/mission-context-pack.ts': 'placement',
   'libs/core/mission/mission-state.ts': 'placement',
   'libs/core/mission/mission-ticket-dispatch.ts': 'placement',

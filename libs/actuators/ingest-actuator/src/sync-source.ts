@@ -10,7 +10,7 @@ import {
   readSyncCursor,
   recordSyncFailure,
   type SyncCursorKind,
-} from '@agent/core/ingest-sync-cursors';
+} from './ingest-sync-cursors.js';
 import { executeServicePreset } from '@agent/core/service/service-engine';
 import {
   getSourceWalker,

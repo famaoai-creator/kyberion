@@ -46,7 +46,7 @@ IT企業として重要性が増している(1)ソフトウェア資材管理(SB
 | 版管理・リリースタグ  | judgment      | `VERSION_TAGGED`           | version-record.json     | semver・成果物ハッシュ                       |
 | 資材台帳登録          | approval      | `ASSET_REGISTERED` (+人間) | asset-ledger-entry.json | SBOM/脆弱性/鍵/版とトレース                  |
 
-**ツール現状**（`CAPABILITIES_GUIDE.md`）: SBOM専用アクチュエータ(syft/cyclonedx)は未実装のため SBOM フェーズは実装者/エージェントが生成。脆弱性は `scripts/scan_dependency_vulns.ts`（pnpm audit/outdated、自リポジトリ対象）。鍵は `secret-actuator`（macOS Keychain・参照のみ、AWS KMS ではない）。版は `libs/core/sdlc-artifact-store.ts`(bumpVersion) + `artifact-actuator` 台帳。外部成果物の SBOM 生成を決定化する場合は syft/cyclonedx バイナリを `system:exec` で呼ぶステップを追加する（拡張ポイント）。
+**ツール現状**（`CAPABILITIES_GUIDE.md`）: SBOM専用アクチュエータ(syft/cyclonedx)は未実装のため SBOM フェーズは実装者/エージェントが生成。脆弱性は `scripts/scan_dependency_vulns.ts`（pnpm audit/outdated、自リポジトリ対象）。鍵は `secret-actuator`（macOS Keychain・参照のみ、AWS KMS ではない）。版は `libs/core/mission/sdlc-artifact-store.ts`(bumpVersion) + `artifact-actuator` 台帳。外部成果物の SBOM 生成を決定化する場合は syft/cyclonedx バイナリを `system:exec` で呼ぶステップを追加する（拡張ポイント）。
 
 ## 2. IT運用自動化 (`it-operations-automation`)
 

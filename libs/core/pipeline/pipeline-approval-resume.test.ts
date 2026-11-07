@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   assertSafeRepositoryPath: vi.fn((value: string) => value),
 }));
 
-vi.mock('../managed-process.js', () => ({
+vi.mock('../tool/managed-process.js', () => ({
   spawnManagedProcess: mocks.spawnManagedProcess,
 }));
 vi.mock('./pipeline-run-journal.js', () => ({

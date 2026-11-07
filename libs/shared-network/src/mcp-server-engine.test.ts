@@ -127,7 +127,7 @@ vi.mock('@agent/core/protocol-service-registry', async () => {
   };
 });
 
-vi.mock('@agent/core/cowork-surface.js', () => ({
+vi.mock('./cowork-surface.js', () => ({
   deliverToCowork: mockDeliverToCowork,
   listCoworkOutbox: mockListCoworkOutbox,
 }));
@@ -138,7 +138,7 @@ vi.mock('@agent/core/governance/approval-cowork-adapter', () => ({
   recordAuditExportRequest: mockRecordAuditExport,
 }));
 
-vi.mock('@agent/core/cowork-knowledge-bridge.js', () => ({
+vi.mock('./cowork-knowledge-bridge.js', () => ({
   runCoworkKnowledgeSync: mockRunCoworkKnowledgeSync,
 }));
 

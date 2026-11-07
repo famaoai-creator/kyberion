@@ -35,10 +35,13 @@ import {
 import type { CharterPathOptions } from '../governance/accountability-charter-registry.js';
 import { readTextFile } from '../foundation/text.js';
 import { safeExistsSync, safeLstat } from '../secure-io.js';
-import { isBuiltinPipelineResource } from '../trust-requiring-resources.js';
-import { describeExternalHookCommands, type ExternalHookSource } from '../external-hook-bridge.js';
+import { isBuiltinPipelineResource } from '../governance/trust-requiring-resources.js';
+import {
+  describeExternalHookCommands,
+  type ExternalHookSource,
+} from '../harnessing/external-hook-bridge.js';
 import { parseSafeJsonObjectInput } from '../foundation/json.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 
 /**
  * What the approver is trusting. The binding (path + content hash) is the

@@ -1,7 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import { logger } from '../core.js';
-import { assessContextualClarification } from '../contextual-intent-clarification-policy.js';
-import { buildContextualIntentFrame } from '../contextual-intent-frame.js';
+import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
+import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { pathResolver } from '../path-resolver.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
@@ -19,7 +19,7 @@ import {
   resolveCapabilityBundleForIntent,
   summarizeRelevantCapabilityBundlesForIntentIds,
   summarizeRelevantCapabilityBundlesForIntentIdsCompact,
-} from '../capability-bundle-registry.js';
+} from '../plugin/capability-bundle-registry.js';
 import {
   resolveExecutionProfileForIntent,
   summarizeRelevantExecutionProfilesForIntentIds,
@@ -59,8 +59,8 @@ import {
   buildFallbackExecutionBrief,
   normalizeExecutionBrief,
   type ExecutionBriefSeed,
-} from '../execution-brief.js';
-import { resolveQuestionInteractionPacket } from '../question-resolver.js';
+} from './execution-brief.js';
+import { resolveQuestionInteractionPacket } from './question-resolver.js';
 import {
   normalizeExecutionShape,
   projectExecutionShapeToWorkflowShape,

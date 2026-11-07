@@ -2,7 +2,7 @@
 title: 保存先カタログと許可証による権限判定（tier-guard の再設計）
 kind: design
 status: planned
-last_updated: 2026-11-06
+last_updated: 2026-11-08
 tags: [design, tier-guard, secure-io, scope, custody, grant, storage, governance]
 importance: 8
 ---
@@ -1448,6 +1448,13 @@ secure-io の 40 以下は別の段階）。上の表は G0 の時点の見込�
 | R-01 作成時の管理者                  | カタログの `custody` 宣言、G0 の突合ゲート            |
 | R-05 判定関数の共有                  | `decide` 一つ                                         |
 | R-09 派生をたどる削除                | カタログの `derived_from` と `retention`（P3 で使う） |
+
+## 統合時の安全性補強（2026-11-08）
+
+- narrow 宣言は schema と同じく、各階層の未知キー、空の拒否理由・パス・matcher・content ID を拒否する。不正な policy / role コンテナーを「宣言なし」と扱わない。
+- 明示された役割の I/O は policy 欠落・破損時に `[ROLE_NARROWING_POLICY_UNAVAILABLE]` で拒否する。役割なし bootstrap は従来の残余判定を維持する。
+- 1 回の I/O の narrow・基本権限・structural mkdir は、遅延読込みした同じ policy snapshot を使う。異なる版の許可条件を組み合わせない。
+- 回帰検証は `role-narrowing-denial.test.ts`、`tier-guard-policy-corruption.test.ts`、`resource-access-scope.test.ts` で、正常な宣言と不正入力・policy 変更／欠落の双方を確認する。
 
 ## 非目標
 

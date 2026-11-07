@@ -7,7 +7,7 @@
  */
 
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
-import { spawnManagedProcess } from '../managed-process.js';
+import { spawnManagedProcess } from '../tool/managed-process.js';
 import { loadPipelineRunJournal } from './pipeline-run-journal.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath } from '../secure-io.js';

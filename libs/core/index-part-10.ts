@@ -44,22 +44,13 @@ export type {
 
 // JSON repair (Paper2Any pattern — lightweight structural repair before LLM escalation)
 
-export { tryRepairJson, repairJsonString } from './json-repair.js';
+export { tryRepairJson, repairJsonString } from './foundation/json-repair.js';
 
 // Semaphore (Paper2Any pattern — LLM concurrency guard, prevents 429 rate-limit errors)
 
-export { Semaphore, llmSemaphore } from './semaphore.js';
+export { Semaphore, llmSemaphore } from './foundation/semaphore.js';
 
 // Prompt constraints (Paper2Any pattern — reusable output constraint fragments)
-
-// BlackHole routing guard (SIGINT safety — restores system mic on Ctrl+C)
-
-export {
-  markRouterActive,
-  markRouterInactive,
-  isRouterActive,
-  resetRouterSync,
-} from './blackhole-routing-guard.js';
 
 // ---------------------------------------------------------------------------
 // Intent-driven automation (P0-P4) — procedure catalog, compiler, dispatcher,
@@ -188,13 +179,16 @@ export { SERVICE_EXTERNAL_EFFECT_OP } from './knowledge/procedure-dispatcher.js'
 
 // KD-04: untrusted input injection framing contract
 
-export type { FrameUntrustedInputParams } from './untrusted-input-framing.js';
+export type { FrameUntrustedInputParams } from './governance/untrusted-input-framing.js';
 
-export { frameUntrustedInput, UNTRUSTED_DATA_BOILERPLATE } from './untrusted-input-framing.js';
+export {
+  frameUntrustedInput,
+  UNTRUSTED_DATA_BOILERPLATE,
+} from './governance/untrusted-input-framing.js';
 
 // SA-03 Prompt Injection & Untrusted Content Defense
 
-export type { ScanOptions } from './untrusted-content.js';
+export type { ScanOptions } from './governance/untrusted-content.js';
 
 export {
   wrapUntrusted,
@@ -205,7 +199,7 @@ export {
   processUntrustedContent,
   processUntrustedContentAsync,
   sanitizeUntrustedContentAsync,
-} from './untrusted-content.js';
+} from './governance/untrusted-content.js';
 
 // QM-04: inbound security-screening primitives (shadow rollout, fail-closed
 // verdicts, quarantine, posture floor). QM-05 lives in shell-command-normalize
@@ -220,7 +214,7 @@ export type {
   ShadowAgreement,
   ShadowComparison,
   QuarantineRecord,
-} from './security-screen.js';
+} from './governance/security-screen.js';
 
 export {
   POSTURE_RANK,
@@ -238,7 +232,7 @@ export {
   listQuarantineRecords,
   quarantineStub,
   filterTaintedForModelContext,
-} from './security-screen.js';
+} from './governance/security-screen.js';
 
 export {
   compileSafeRegex,
@@ -286,7 +280,7 @@ export type {
   GrammarSamplingRequest,
   ThinkingLevel,
   ThinkingLevelMap,
-} from './backend-capability-profile.js';
+} from './reasoning/backend-capability-profile.js';
 
 export {
   BACKEND_CAPABILITY_PROFILES,
@@ -298,4 +292,4 @@ export {
   modesWithUtilityFit,
   resolveConstrainedSampling,
   resolveThinkingLevel,
-} from './backend-capability-profile.js';
+} from './reasoning/backend-capability-profile.js';

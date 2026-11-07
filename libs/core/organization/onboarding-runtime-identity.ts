@@ -2,8 +2,8 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
-import { resolveActiveProfileRoot } from '../profile-root.js';
-import { readPersonalAgentIdentityStrictAtPath as loadPersonalAgentIdentityAtPath } from '../personal-identity-state.js';
+import { resolveActiveProfileRoot } from '../authn/profile-root.js';
+import { readPersonalAgentIdentityStrictAtPath as loadPersonalAgentIdentityAtPath } from '../authn/personal-identity-state.js';
 import {
   getAgentIdentity,
   deriveAgentNhiId,
@@ -11,7 +11,10 @@ import {
   type RuntimeBindingReference,
 } from '../agent/agent-identity.js';
 import { parseNhiId } from '../contracts/nhi-id.js';
-import { resolvePersonaIdentity, personaIdentityBindingsSchema } from '../persona-identity.js';
+import {
+  resolvePersonaIdentity,
+  personaIdentityBindingsSchema,
+} from '../authn/persona-identity.js';
 import { getPluginExecutionContext } from '../shell/sandbox-policy.js';
 import {
   findLiveSessionAdmission,

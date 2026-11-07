@@ -1,5 +1,5 @@
 import { providerCanProjectProfile } from '../provider/provider-permission-profiles.js';
-import { resolveDelegationCapabilityProfile } from '../subagent-capability-profiles.js';
+import { resolveDelegationCapabilityProfile } from '../workforce/subagent-capability-profiles.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { withExecutionContext } from '../authority.js';

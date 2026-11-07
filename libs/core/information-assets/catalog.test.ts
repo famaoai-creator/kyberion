@@ -56,7 +56,7 @@ vi.mock('../organization/organization-people-access.js', () => ({
   withOrganizationPeopleMutation: async (action: () => unknown) => action(),
   recordPeopleManagementAudit: async () => {},
 }));
-vi.mock('../ingest-asset-ledger.js', () => ({
+vi.mock('./ingest-asset-ledger.js', () => ({
   findAssetBySource: async () => null,
   assetProvenanceRef: () => '',
 }));

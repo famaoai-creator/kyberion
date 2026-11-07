@@ -57,7 +57,7 @@ status: archived
 - `pnpm exec vitest run libs/core/provider/provider-capability-catalog.test.ts libs/core/provider/provider-capability-catalog-writer.test.ts libs/core/agent/agent-provider-resolution.test.ts`
 - `pnpm lint`
 - `pnpm run typecheck`
-- `rg -n "claude-|gemini-|gpt-" libs/core/provider/provider-discovery.ts libs/core/metrics.ts` はヒットなし
+- `rg -n "claude-|gemini-|gpt-" libs/core/provider/provider-discovery.ts libs/core/analysis/metrics.ts` はヒットなし
 
 ## リスクと注意
 

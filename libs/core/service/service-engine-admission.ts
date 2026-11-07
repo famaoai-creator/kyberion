@@ -1,4 +1,4 @@
-import type { ContextSecurityScope } from '../context-security-scope.js';
+import type { ContextSecurityScope } from '../governance/context-security-scope.js';
 import type { DelegatedExecutionTarget } from '../governance/delegated-execution.js';
 import type { HumanExecutionReference } from '../governance/human-execution.js';
 

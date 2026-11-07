@@ -1,0 +1,29 @@
+{
+  "record_id": "mem-MSN-PR1441-CI-REPAIR-20261108-2026_11_07",
+  "kind": "sop_candidate",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "CI repair keeps authorization fixtures honest and parser cost bounded",
+  "summary": "Classify overlapping CI failures by root cause, reproduce the CI identity, preserve security oracles and distinguish bounded local verification from full remote results.",
+  "candidate_id": "mem-MSN-PR1441-CI-REPAIR-20261108-2026_11_07",
+  "evidence_refs": [
+    "active/missions/public/MSN-PR1441-CI-REPAIR-20261108/evidence/implementation-report.md",
+    "active/missions/public/MSN-PR1441-CI-REPAIR-20261108/evidence/test-report.md",
+    "active/missions/public/MSN-PR1441-CI-REPAIR-20261108/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-11-07T18:23:05.218Z",
+  "procedure_steps": [
+    "Collect every original CI result before a consolidated update. Role-bound store fixtures must copy canonical security and agent policies and bind legitimate personas; absent policy must remain denied. Negative tests should assert the first stronger policy diagnostic and retain independent roleless bootstrap controls. Tenant-bound organization discovery scans only its own protected partition instead of enumerating the tier root. Split independent expensive real-store and rate-limit scenarios while preserving all snapshot, identity, privacy, lease and side-effect assertions. Placeholder scanning must preserve the exact token grammar while walking unmatched delimiters linearly. Metadata-only credential lookup hashes require evidence and explicit owner approval for an external false-positive disposition, not a breaking storage-key change. An interrupted full-suite run is never final green evidence; report focused build/gate results and remote CI separately."
+  ],
+  "safety_notes": [
+    "Require approval before irreversible or high-risk actions.",
+    "Capture evidence before and after the action."
+  ],
+  "escalation_conditions": [
+    "Unexpected runtime failure",
+    "Policy or approval mismatch",
+    "Result does not match the expected state"
+  ],
+  "source_branch": "refactor/core-placement-20261107",
+  "source_commit": "07604c0b7ce0f1471f8207547988ef840dd7f090"
+}

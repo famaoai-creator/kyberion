@@ -7,7 +7,7 @@ import {
   assertWorkClaimsAllowed,
 } from '../workforce/work-coordination-error.js';
 import { resolveSurfaceApprovalReply } from '../surface/surface-approval-ui.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from './approval-decision-card.js';
 import { routeAutonomousDecision } from './approval-decision-routing.js';
 import { approvalStoreRoots } from './approval-store.js';

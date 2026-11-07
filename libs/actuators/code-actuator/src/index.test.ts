@@ -68,7 +68,7 @@ vi.mock('@agent/core/async-utils', async (importOriginal) => {
 
 // `buildRetryOptions()` resolves its manifest through governed-catalog, which
 // fail-closes when the catalog can't be loaded (main removed the silent
-// `{}` fallback — see libs/core/recovery-policy.ts `loadRecoveryPolicy`).
+// `{}` fallback — see libs/core/pipeline/recovery-policy.ts `loadRecoveryPolicy`).
 // The mocked `rootResolve` above points manifest paths at `/mock/root/...`,
 // a sentinel that never exists on real disk, so the real catalog load always
 // throws. `mocks.retry` above already bypasses all retry-option semantics

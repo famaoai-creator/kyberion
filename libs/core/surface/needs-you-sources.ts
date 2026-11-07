@@ -17,8 +17,8 @@ import {
   notificationMatchesScope,
   toCeoApprovalItem,
   type CeoApprovalItem,
-} from '../ceo-surface-summary.js';
-import { listInboxEntries } from '../deliverable-inbox.js';
+} from './ceo-surface-summary.js';
+import { listInboxEntries } from '../task/deliverable-inbox.js';
 import { listApprovalRequests } from '../governance/approval-store-reader.js';
 import { readApprovalPublicationPreview } from './approval-publication-preview.js';
 import { listSurfaceNotificationsAcrossChannels } from './surface-ux.js';

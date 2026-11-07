@@ -11,7 +11,7 @@ import {
 } from '../secure-io.js';
 import { logger } from '../core.js';
 import { findMissionPath } from '../path-resolver.js';
-import { Semaphore } from '../semaphore.js';
+import { Semaphore } from '../foundation/semaphore.js';
 
 export interface ConversationTurn {
   ts: string; // ISO timestamp

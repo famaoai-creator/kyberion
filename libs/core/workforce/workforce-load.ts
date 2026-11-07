@@ -1,7 +1,7 @@
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import * as pathResolver from '../path-resolver.js';
 import { listWorkItems } from './work-coordination.js';
-import { resolveCostRateModelKey, resolveCostRates } from '../metrics.js';
+import { resolveCostRateModelKey, resolveCostRates } from '../analysis/metrics.js';
 
 /**
  * TC-08: the workforce's observed load and price, as data.

@@ -27,7 +27,7 @@
  * fall back to the heuristic path with a `warnings[]` entry explaining why.
  */
 import { getReasoningBackend, type ReasoningBackend } from '../reasoning/reasoning-backend.js';
-import { parseStructuredJson } from '../structured-reasoning.js';
+import { parseStructuredJson } from '../reasoning/structured-reasoning.js';
 import { nowIso } from '../foundation/time.js';
 import {
   applyClassification,

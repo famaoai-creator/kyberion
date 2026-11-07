@@ -31,7 +31,7 @@ import {
 import { withExecutionContext } from '../authority.js';
 import { listTenantProfileSlugs, resolveTenant } from '../organization/tenant-registry.js';
 import { createLogger } from '../logger.js';
-import type { KeyResultSpec, ObjectiveRef } from '../key-result-spec.js';
+import type { KeyResultSpec, ObjectiveRef } from '../organization/key-result-spec.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -73,7 +73,7 @@ export type DotTrigger =
   | {
       kind: 'probe';
       /** Declarative external-state spec; evaluated by libs/core/state-probe. */
-      probe: import('../state-probe.js').StateProbeSpec;
+      probe: import('../pipeline/state-probe.js').StateProbeSpec;
       /** Minimum seconds between evaluations (default: one per sweep). */
       every_s?: number;
     }
@@ -152,7 +152,7 @@ export interface DotCharter {
     /** Measurable form of success_signals: a signal is healthy while its probe matches. */
     signal_probes?: Array<{
       signal: string;
-      probe: import('../state-probe.js').StateProbeSpec;
+      probe: import('../pipeline/state-probe.js').StateProbeSpec;
       every_s?: number;
     }>;
     budget?: {

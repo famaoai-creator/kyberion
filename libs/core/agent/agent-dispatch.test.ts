@@ -15,7 +15,7 @@ import {
   SUBAGENT_CAPABILITY_PROFILES,
   SUBAGENT_PROFILE_CLI_TOOLS,
   getSubagentCapabilityProfile,
-} from '../subagent-capability-profiles.js';
+} from '../workforce/subagent-capability-profiles.js';
 import { a2aBridge } from '../mesh/a2a-bridge.js';
 import {
   getDefaultWorkerEventStream,
@@ -25,8 +25,8 @@ import {
 import { registerOpPreflightListener, resetOpPreflight } from '../pipeline/op-preflight.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
-import { withUsageAttribution } from '../usage-accounting.js';
-import * as delegationObservability from '../delegated-task-observability.js';
+import { withUsageAttribution } from '../finance/usage-accounting.js';
+import * as delegationObservability from '../workforce/delegated-task-observability.js';
 
 const a2aRoute = vi.hoisted(() =>
   vi.fn(async () => ({ payload: { content: 'sub-agent-result' } }))
