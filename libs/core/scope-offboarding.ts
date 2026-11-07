@@ -74,6 +74,7 @@ import {
 } from './foundation/runtime-state-roots.js';
 import { loadMissionStateAtPath } from './mission/mission-state-reader.js';
 import type { MissionState } from './mission/mission-types.js';
+import { collectDerivedAssetTargets } from './scope-offboarding-derived.js';
 
 // ---------------------------------------------------------------------------
 // Mission runtime residue
@@ -325,7 +326,13 @@ export type OffboardTargetKind =
    * library runs, autonomy learning, external operations, hearing, discussion
    * create requests, standing grants; one partition per root and tier).
    */
-  | 'tenant_runtime_state';
+  | 'tenant_runtime_state'
+  /**
+   * P3 (R-09): an artifact derived from the tenant's assets whose path sits
+   * OUTSIDE the tenant's own trees — recorded in the tenant's derivation
+   * ledger and deleted by derivation, not by a hand-written target list.
+   */
+  | 'derived_asset';
 
 export interface OffboardTarget {
   /** Repo-relative POSIX path. */
@@ -499,6 +506,10 @@ export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   // exported, then removed with the tenant (legacy shared copies: see
   // computeLegacyDelegationTracePrunes / collectLegacyDelegationRecordTargets).
   delegations: 'tenant_delegations',
+  // P3 asset-derivation lineage ledger of the tenant as SOURCE custodian:
+  // purged with the tenant; the out-of-tree derived paths it names are
+  // collected separately as 'derived_asset' targets (R-09).
+  asset_derivations: 'tenant_runtime_state',
 } as const satisfies Record<TenantRuntimePartitionKey, OffboardTargetKind | 'not_offboarded'>;
 
 /**
@@ -1079,6 +1090,10 @@ export function collectScopeTargets(
   options: ScopeTargetOptions = {}
 ): OffboardTarget[] {
   const targets: OffboardTarget[] = [];
+  // Tenant runtime partitions are emitted AFTER derived_asset targets (the
+  // derivation ledger among them names the derived paths — it must still be
+  // on disk while they are deleted; see the end of this function).
+  const deferredRuntimePartitions: OffboardTarget[] = [];
   const id = scopeId.trim();
   if (!id) return targets;
   assertPhysicalScopeSegment(id, `${scopeType} scopeId`);
@@ -1205,7 +1220,8 @@ export function collectScopeTargets(
       };
       for (const partition of tenantRuntimePartitionPaths(id, present)) {
         const kind = TENANT_RUNTIME_PARTITION_TARGET_KINDS[partition.key];
-        if (kind !== 'not_offboarded') targets.push({ path: partition.path, kind });
+        if (kind !== 'not_offboarded')
+          deferredRuntimePartitions.push({ path: partition.path, kind });
       }
       // Pre-partition delegation records in the shared legacy directory that
       // belong to this tenant (stamped, or by mission) go with it.
@@ -1227,6 +1243,19 @@ export function collectScopeTargets(
   // complete lineage when an explicit project scope is used; unscoped legacy
   // entries are never silently assigned to a tenant/org.
   targets.push(...collectDataVaultEntryTargets(scopeType, id, filter));
+
+  // P3 (R-09): artifacts derived from the tenant's assets that live OUTSIDE
+  // every collected tree (shared caches, cross-partition results) are reached
+  // through the tenant's derivation ledger — not a hand-written target list.
+  // They are deleted BEFORE the derivation-ledger partition itself, so the
+  // ledger that names them still exists while they are being removed.
+  if (scopeType === 'tenant' && isValidTenantSlug(id)) {
+    targets.push(...collectDerivedAssetTargets(id, targets));
+  }
+
+  // Tenant runtime partitions go last: the derivation ledger among them is
+  // the source of the derived_asset targets above, so it must outlive them.
+  targets.push(...deferredRuntimePartitions);
 
   return targets;
 }
@@ -1603,10 +1632,21 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
     result.export_path = repoRelativePosix(exportDirAbs);
 
     // Export first: the deletion below is only reached once every target has
-    // a copy under the export directory.
+    // a copy under the export directory. A target that vanished between
+    // collection and export (e.g. a stale derived_asset ledger line naming a
+    // file the janitor already swept) is skipped, not fatal — the ceremony
+    // must stay idempotent.
     for (const target of result.targets) {
+      const absolute = pathResolver.rootResolve(target.path);
+      if (!safeExistsSync(absolute)) {
+        if (target.kind === 'derived_asset')
+          logger.warn(
+            `[scope-offboarding] derived_asset target '${target.path}' vanished before export — skipping (stale ledger line)`
+          );
+        continue;
+      }
       copyTree(
-        assertSafeRepositoryPath(pathResolver.rootResolve(target.path)),
+        assertSafeRepositoryPath(absolute),
         path.join(exportDirAbs, ...target.path.split('/'))
       );
     }
@@ -1868,6 +1908,23 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
         legacyMissionIds,
         legacyDelegationIds,
       });
+      // The ledger that names derived_asset targets is itself soft-deleted
+      // in the loop above, so a failed derived deletion is invisible to the
+      // re-collected target scan — check the collected targets directly.
+      const stillPresent = result.targets
+        .filter((target) => !result.soft_deleted.includes(target.path))
+        .map((target) => target.path)
+        .filter((targetPath) => {
+          try {
+            return safeExistsSync(pathResolver.rootResolve(targetPath));
+          } catch {
+            return true;
+          }
+        });
+      if (stillPresent.length > 0) {
+        result.verification.leftovers.push(...stillPresent);
+        result.verification.clean = false;
+      }
       appendRetentionAudit({
         event: 'SCOPE_OFFBOARD_VERIFIED',
         scope_type: scopeType,
