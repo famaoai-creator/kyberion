@@ -5844,10 +5844,6 @@
       "types": "./dist/shell/terminal-keys.d.ts",
       "default": "./dist/shell/terminal-keys.js"
     },
-    "./silero-vad-bridge": {
-      "types": "./dist/silero-vad-bridge.d.ts",
-      "default": "./dist/silero-vad-bridge.js"
-    },
     "./skill-index": {
       "types": "./dist/plugin/skill-index.d.ts",
       "default": "./dist/plugin/skill-index.js"

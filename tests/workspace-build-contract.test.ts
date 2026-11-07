@@ -436,6 +436,52 @@ describe('Workspace build contract', () => {
     }
   });
 
+  it('keeps the Silero VAD bridge in shared-voice beside the TEN backend', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const voice = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-voice/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./silero-vad-bridge']).toBeUndefined();
+    for (const suffix of ['.ts', '.test.ts']) {
+      expect(safeExistsSync(path.join(rootDir, `libs/core/silero-vad-bridge${suffix}`))).toBe(
+        false
+      );
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/shared-voice/src/silero-vad-bridge${suffix}`))
+      ).toBe(true);
+    }
+    for (const suffix of ['.js', '.d.ts', '.js.map', '.d.ts.map']) {
+      expect(safeExistsSync(path.join(rootDir, `libs/core/dist/silero-vad-bridge${suffix}`))).toBe(
+        false
+      );
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/shared-voice/dist/silero-vad-bridge${suffix}`))
+      ).toBe(true);
+    }
+    expect(voice.exports['./silero-vad-bridge']).toEqual({
+      types: './dist/silero-vad-bridge.d.ts',
+      default: './dist/silero-vad-bridge.js',
+    });
+    // The VAD registry/protocol/detector contracts, secure exec env, path
+    // resolution, and managed-tool runtime stay in core; only the Silero
+    // backend moved. The Python bridge script stays with voice-actuator.
+    for (const subpath of [
+      './voice/vad-registry',
+      './voice/vad-bridge-protocol',
+      './voice/voice-activity-detector',
+      './secure-io',
+      './path-resolver',
+      './tool/tool-runtime-registry',
+      './meeting/meeting-session-types',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
   it('keeps the OBS virtual-camera output in shared-video with its filter provider', () => {
     const core = JSON.parse(
       safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string

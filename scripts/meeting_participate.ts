@@ -46,7 +46,7 @@ import { selectStreamingSttBridge } from '@agent/core/voice/streaming-stt-bridge
 import { getStreamingTtsBridge } from '@agent/core/voice/streaming-tts-bridge';
 import { getVoiceProfileRegistry } from '@agent/core/voice/voice-profile-registry';
 import { installShellStreamingSttBridgeFromEnv } from '@agent/core/shell/shell-streaming-stt-bridge';
-import { installSileroVadBackend } from '@agent/core/silero-vad-bridge';
+import { installSileroVadBackend } from '@agent/shared-voice/silero-vad-bridge';
 import { installTenVadBackend } from '@agent/shared-voice/ten-vad-bridge';
 import { resolveVadBackend, shouldSelectVadBackend } from '@agent/core/voice/vad-registry';
 import type { VoiceActivityDetector } from '@agent/core/voice/voice-activity-detector';
