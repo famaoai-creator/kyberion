@@ -41,6 +41,7 @@ export const DEPRECATED_SYNC_GH_VERBS: Readonly<Record<string, string>> = {
   ghPrChecksWait: 'vcsHostPrChecksWait',
   ghPrMerge: 'vcsHostPrMerge',
   ghPrCreate: 'vcsHostPrCreate',
+  ghRepositoryVisibility: 'vcsHostRepositoryVisibility',
 };
 
 /** Files allowed to exec `gh` directly, with the reason. Keep this list short. */

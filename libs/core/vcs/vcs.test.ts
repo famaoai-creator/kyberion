@@ -246,7 +246,7 @@ describe('libs/core/vcs', () => {
     expect(argv).not.toContain('ignored');
   });
 
-  it('rejects flag-like values in every argv position (injection guard)', () => {
+  it('rejects flag-like values in every argv position (injection guard)', async () => {
     const { run } = stubRunner([]);
     expect(() => gitCheckout('/x', '--force', {}, run)).toThrow(/VCS_GIT_INVALID/);
     const ghOps = [
@@ -255,7 +255,7 @@ describe('libs/core/vcs', () => {
       () => ghPrCreate({ title: 't', head: '--repo=evil/x' }, run),
     ];
     for (const call of ghOps) expect(call).toThrow(/VCS_GIT_INVALID/);
-    expect(() => gitPush('/x', { ref: '--force' }, run)).toThrow(/VCS_GIT_INVALID/);
+    await expect(gitPush('/x', { ref: '--force' }, run)).rejects.toThrow(/VCS_GIT_INVALID/);
     expect(() => gitPull('/x', { remote: '--all' }, run)).toThrow(/VCS_GIT_INVALID/);
     expect(() => gitWorktree('/x', 'add', { path: '-b' }, run)).toThrow(/VCS_GIT_INVALID/);
   });

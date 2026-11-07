@@ -5,7 +5,10 @@ import {
   normalizeRepositoryTarget,
   parseExternalOperationGrant,
 } from '@agent/core/governance/external-operation-target';
-import { ghRepositoryVisibility } from '@agent/core/vcs/github';
+import {
+  vcsHostOptionsForRunner,
+  vcsHostRepositoryVisibility,
+} from '@agent/core/vcs/vcs-host-verbs';
 import type { VcsCommandRunner } from '@agent/core/vcs/git';
 import yargs from 'yargs';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -42,7 +45,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { withExecutionContext } from '@agent/core/authority';
+import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { withLock } from '@agent/core/foundation/lock-utils';
 import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
@@ -152,7 +155,7 @@ function delegationInputPath(): string {
 /** Human-editable template for the grant-mode authority request: prefilled
  * with this repository's own vcs targets so the operator can pick which exact
  * operations the charter delegates after activation. */
-export function buildDelegationInput(
+export async function buildDelegationInput(
   now: Date,
   options: { verifyVisibility?: boolean; run?: VcsCommandRunner; remote?: string } = {}
 ) {
@@ -178,13 +181,10 @@ export function buildDelegationInput(
   const privateRepository = Boolean(
     options.verifyVisibility &&
     target &&
-    ghRepositoryVisibility(
-      {
-        cwd: pathResolver.rootDir(),
-        repository: { host: target.host, slug: target.pathname.replace(/^\//, '') },
-      },
-      options.run
-    ) === 'private'
+    (await vcsHostRepositoryVisibility({
+      ...vcsHostOptionsForRunner({ cwd: pathResolver.rootDir() }, options.run),
+      repository: { host: target.host, slug: target.pathname.replace(/^\//, '') },
+    })) === 'private'
   );
   const visibility = privateRepository ? { visibility: 'private' as const } : {};
   const grants = repository
@@ -240,11 +240,21 @@ export async function prepareActivationSetup(
   const runtime = inspectInstalledOnboardingRuntime({ kind: 'person' });
   if (!runtime.ready) return { status: 'unavailable' };
   await withLock('onboarding-development-input', async () => {
+    const pending = withExecutionContext(
+      'sovereign_concierge',
+      () => !safeExistsSync(delegationInputPath())
+    );
+    if (!pending) return;
+    // The visibility probe is async (vcs-host seam); the governed write stays
+    // in the env-mirrored sync context, as before.
+    const input = await withExecutionContextAsync('sovereign_concierge', () =>
+      buildDelegationInput(now, options)
+    );
     withExecutionContext('sovereign_concierge', () => {
       const delegation = delegationInputPath();
       if (!safeExistsSync(delegation)) {
         ensureDir(path.dirname(delegation));
-        writeGovernedJson(delegation, buildDelegationInput(now, options), { createOnly: true });
+        writeGovernedJson(delegation, input, { createOnly: true });
       }
     });
   });

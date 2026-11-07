@@ -102,8 +102,8 @@ describe('canonical VCS external governance', () => {
     mocks.body = 'reviewed body';
     mocks.gate.mockReturnValue({ allowed: false, status: 'human_required' });
   });
-  it('blocks direct canonical push/create/merge with no trusted authority', () => {
-    expect(() => gitPush('/fixture', { ref: 'feature' }, run)).toThrow(
+  it('blocks direct canonical push/create/merge with no trusted authority', async () => {
+    await expect(gitPush('/fixture', { ref: 'feature' }, run)).rejects.toThrow(
       'EXTERNAL_APPROVAL_REQUIRED'
     );
     expect(() =>
@@ -114,13 +114,13 @@ describe('canonical VCS external governance', () => {
     );
     expect(sent()).toEqual([]);
   });
-  it('pins push to approved remote URL and commit SHA, then sets upstream locally', () => {
+  it('pins push to approved remote URL and commit SHA, then sets upstream locally', async () => {
     mocks.gate.mockReturnValue({
       allowed: true,
       status: 'approved',
       requestId: 'exact-fixture-approval',
     });
-    trusted(() => gitPush('/fixture', { ref: 'feature', setUpstream: true }, run));
+    await trusted(() => gitPush('/fixture', { ref: 'feature', setUpstream: true }, run));
     expect(sent()[0].args).toEqual(['push', '--', remote, `${sha}:refs/heads/feature`]);
     expect(
       calls.some(({ args }) => args[0] === 'config' && args[1] === 'branch.feature.remote')
@@ -129,24 +129,29 @@ describe('canonical VCS external governance', () => {
       expect.objectContaining({ metadata: expect.objectContaining({ outcome: 'succeeded' }) })
     );
   });
-  it.each(['sha', 'remote'])('rejects changed push %s after approval before sending', (field) => {
-    mocks.gate.mockImplementation(() => {
-      if (field === 'sha') sha = 'b'.repeat(40);
-      else remote = 'https://github.com/evil/repo.git';
-      return { allowed: true, status: 'approved', requestId: 'exact-fixture-approval' };
-    });
-    expect(() => trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).toThrow(
-      'VCS_SNAPSHOT_CHANGED'
-    );
-    expect(sent()).toEqual([]);
-  });
-  it('binds deleted personal history and verified privacy into the real push effect', () => {
+  it.each(['sha', 'remote'])(
+    'rejects changed push %s after approval before sending',
+    async (field) => {
+      mocks.gate.mockImplementation(() => {
+        if (field === 'sha') sha = 'b'.repeat(40);
+        else remote = 'https://github.com/evil/repo.git';
+        return { allowed: true, status: 'approved', requestId: 'exact-fixture-approval' };
+      });
+      await expect(trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).rejects.toThrow(
+        'VCS_SNAPSHOT_CHANGED'
+      );
+      expect(sent()).toEqual([]);
+    }
+  );
+  it('binds deleted personal history and verified privacy into the real push effect', async () => {
     history = 'src/index.ts\0\nknowledge/personal/deleted.md\0';
     privateRepository = true;
     mocks.runtimeTier = 'personal';
     mocks.gate.mockReturnValue({ allowed: true, status: 'approved', requestId: 'exact' });
     const resolver = vi.fn(() => ({ agentId: 'owner', invocationId: 'private-history' }));
-    withExternalOperationAuthority(resolver, () => gitPush('/fixture', { ref: 'feature' }, run));
+    await withExternalOperationAuthority(resolver, () =>
+      gitPush('/fixture', { ref: 'feature' }, run)
+    );
     expect(resolver).toHaveBeenCalledWith(
       expect.objectContaining({
         operationId: 'vcs:push',
@@ -159,7 +164,7 @@ describe('canonical VCS external governance', () => {
     );
     expect(sent()).toHaveLength(1);
   });
-  it('rejects changed private repository visibility before sending an approved push', () => {
+  it('rejects changed private repository visibility before sending an approved push', async () => {
     history = 'knowledge/personal/deleted.md\0';
     privateRepository = true;
     mocks.runtimeTier = 'personal';
@@ -167,45 +172,45 @@ describe('canonical VCS external governance', () => {
       privateRepository = false;
       return { allowed: true, status: 'approved', requestId: 'exact' };
     });
-    expect(() => trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).toThrow(
+    await expect(trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).rejects.toThrow(
       'VCS_SNAPSHOT_CHANGED'
     );
     expect(sent()).toEqual([]);
   });
-  it('does not need GitHub CLI access for a public source in a public runtime', () => {
+  it('does not need GitHub CLI access for a public source in a public runtime', async () => {
     mocks.gate.mockReturnValue({ allowed: true, status: 'approved', requestId: 'exact' });
     const gitOnly: VcsCommandRunner = (command, args, options) => {
       if (command === 'gh') throw new Error('gh not installed');
       return run(command, args, options);
     };
-    trusted(() => gitPush('/fixture', { ref: 'feature' }, gitOnly));
+    await trusted(() => gitPush('/fixture', { ref: 'feature' }, gitOnly));
     expect(sent()).toHaveLength(1);
   });
-  it('does not let exact approval override a public runtime reading personal history', () => {
+  it('does not let exact approval override a public runtime reading personal history', async () => {
     history = 'knowledge/personal/deleted.md\0';
     privateRepository = true;
     mocks.gate.mockReturnValue({ allowed: true, status: 'approved', requestId: 'exact' });
-    expect(() => trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).toThrow(
+    await expect(trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).rejects.toThrow(
       'VCS_SOURCE_SCOPE_DENIED'
     );
     expect(mocks.gate).not.toHaveBeenCalled();
     expect(sent()).toEqual([]);
   });
-  it('does not let exact approval publish a personal runtime to a public repository', () => {
+  it('does not let exact approval publish a personal runtime to a public repository', async () => {
     mocks.runtimeTier = 'personal';
     mocks.gate.mockReturnValue({ allowed: true, status: 'approved', requestId: 'exact' });
-    expect(() => trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).toThrow(
+    await expect(trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).rejects.toThrow(
       'VCS_SOURCE_SCOPE_DENIED'
     );
     expect(mocks.gate).not.toHaveBeenCalled();
     expect(sent()).toEqual([]);
   });
-  it('rechecks the actual remote baseline after approval instead of trusting tracking refs', () => {
+  it('rechecks the actual remote baseline after approval instead of trusting tracking refs', async () => {
     mocks.gate.mockImplementation(() => {
       advertisedHead = 'e'.repeat(40);
       return { allowed: true, status: 'approved', requestId: 'exact' };
     });
-    expect(() => trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).toThrow(
+    await expect(trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).rejects.toThrow(
       'VCS_SNAPSHOT_CHANGED'
     );
     expect(sent()).toEqual([]);
@@ -306,14 +311,14 @@ describe('canonical VCS external governance', () => {
     expect(() => trusted(() => ghPrMerge({ ref: '7' }, run))).toThrow('VCS_SNAPSHOT_CHANGED');
     expect(sent()).toEqual([]);
   });
-  it('never retries an ambiguous push and records unknown', () => {
+  it('never retries an ambiguous push and records unknown', async () => {
     mocks.gate.mockReturnValue({
       allowed: true,
       status: 'approved',
       requestId: 'exact-fixture-approval',
     });
     mutationStatus = 1;
-    trusted(() => gitPush('/fixture', { ref: 'feature' }, run));
+    await trusted(() => gitPush('/fixture', { ref: 'feature' }, run));
     expect(sent()).toHaveLength(1);
     expect(mocks.audit).toHaveBeenCalledWith(
       expect.objectContaining({ metadata: expect.objectContaining({ outcome: 'unknown' }) })
@@ -341,8 +346,10 @@ describe('canonical VCS external governance', () => {
     expect(() => gitRun(args, '/fixture', transport)).toThrow('VCS_TYPED_VERB_REQUIRED');
     expect(transport).not.toHaveBeenCalled();
   });
-  it('does not reinterpret a tag ref as a branch publication target', () => {
-    expect(() => gitPush('/fixture', { ref: 'refs/tags/v1' }, run)).toThrow('VCS_GIT_INVALID');
+  it('does not reinterpret a tag ref as a branch publication target', async () => {
+    await expect(gitPush('/fixture', { ref: 'refs/tags/v1' }, run)).rejects.toThrow(
+      'VCS_GIT_INVALID'
+    );
     expect(sent()).toEqual([]);
     expect(mocks.gate).not.toHaveBeenCalled();
   });
