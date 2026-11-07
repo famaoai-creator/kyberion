@@ -121,7 +121,12 @@ describe('onboarding authority HTTP owner contract with actual stores', () => {
     const applied = await posted({ action: 'apply', scope_kind: 'person', request_id: id });
     expect(applied.body.ok).toBe(true);
     const repeat = await posted({ action: 'apply', scope_kind: 'person', request_id: id });
-    expect(repeat.response.status).not.toBe(200);
+    // A repeated apply is a refusal the person can read, not an internal 500.
+    expect(repeat.response.status).toBeGreaterThanOrEqual(400);
+    expect(repeat.response.status).toBeLessThan(500);
+    expect(repeat.body.ok).toBe(false);
+    expect(typeof repeat.body.error).toBe('string');
+    expect(repeat.body.error).not.toMatch(/\/(?:Volumes|srv|Users|home)\//u);
     const current = await route.GET(
       new NextRequest('http://localhost:3050/api/onboarding-authority?scope_kind=person')
     );
