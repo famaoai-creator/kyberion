@@ -25,21 +25,20 @@ function moduleBase(boundary: StoreGrantBoundary): string {
   return path.posix.basename(boundary.implementation).replace(/\.ts$/, '');
 }
 
-function modulePattern(boundary: StoreGrantBoundary): RegExp {
-  const base = moduleBase(boundary).replace(/[-]/g, '\\-');
-  return new RegExp(`(?:^|/)${base}(?:\\.(?:ts|tsx|js|jsx|mjs|cjs|mts|cts))?$`);
-}
-
 export function storeGrantBoundaryViolations(
   boundary: StoreGrantBoundary,
   relative: string,
   text: string
 ): string[] {
   if (relative === boundary.implementation) return [];
-  const pattern = modulePattern(boundary);
+  const base = moduleBase(boundary);
+  const extensions = ['ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'mts', 'cts'];
   const problems: string[] = [];
-  const module = (value: ts.Node | undefined) =>
-    value && ts.isStringLiteralLike(value) && pattern.test(value.text.replace(/\\/g, '/'));
+  const module = (value: ts.Node | undefined) => {
+    if (!value || !ts.isStringLiteralLike(value)) return false;
+    const name = path.posix.basename(value.text.replace(/\\/g, '/'));
+    return name === base || extensions.some((extension) => name === `${base}.${extension}`);
+  };
   const allowed = boundary.consumers.get(relative);
   const visit = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node) && module(node.moduleSpecifier)) {

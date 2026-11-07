@@ -6,6 +6,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as zlib from 'node:zlib';
 import { pathResolver } from '@agent/core/path-resolver';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 
 const OUT = pathResolver.sharedTmp('tests/native-pdf/test-native.pdf');
 
@@ -1109,29 +1116,62 @@ trailer<< /Size 7 /Root 1 0 R /Info 6 0 R >>
     expect(t).toContain('/N ');
   });
 
-  // ── P3-4: AES-256 Encryption ─────────────────────────────
+  // Encryption is explicitly unavailable until a complete security handler exists.
+  it.each([
+    { ownerPassword: 'synthetic-owner', userPassword: 'synthetic-user', algorithm: 'AES256' },
+    { ownerPassword: '' },
+    { userPassword: 'synthetic-user' },
+    { permissions: 0 },
+    {},
+    null,
+    false,
+  ])('refuses explicit encryption without creating an output: %j', async (encrypt) => {
+    const output = OUT + '.encryption-unsupported';
+    safeRmSync(output, { force: true });
+    try {
+      for (const source of ['options', 'protocol'] as const) {
+        const protocol = {
+          version: '1.0.0',
+          generatedAt: new Date().toISOString(),
+          source: { format: 'markdown', body: 'Synthetic confidential sentinel' },
+          ...(source === 'protocol' ? { renderOptions: { encrypt } } : {}),
+        };
+        await expect(
+          generateNativePdf(
+            protocol as any,
+            output,
+            source === 'options' ? ({ encrypt } as any) : undefined
+          )
+        ).rejects.toThrow('PDF_ENCRYPTION_UNSUPPORTED');
+        expect(safeExistsSync(output)).toBe(false);
+      }
+    } finally {
+      safeRmSync(output, { recursive: true, force: true });
+    }
+  });
 
-  it('should generate /Encrypt dict with V=5 R=7 AES-256', async () => {
-    ensureDir(OUT);
-    await generateNativePdf(
-      {
+  it('refuses encryption before any output-path I/O and preserves an existing artifact', async () => {
+    safeMkdir(path.dirname(OUT), { recursive: true });
+    const original = Buffer.from('synthetic existing artifact bytes');
+    const output = OUT + '.preserved';
+    safeWriteFile(output, original);
+    try {
+      const protocol = {
         version: '1.0.0',
         generatedAt: new Date().toISOString(),
-        source: { format: 'markdown', body: 'Encrypted document' },
-      } as any,
-      OUT,
-      {
-        compress: false,
-        encrypt: { ownerPassword: 'owner123', userPassword: 'user456', algorithm: 'AES256' },
-      }
-    );
-    const t = fs.readFileSync(OUT, 'binary');
-    expect(t).toContain('/Filter /Standard');
-    expect(t).toContain('/V 5');
-    expect(t).toContain('/R 7');
-    expect(t).toContain('/CFM /AESV3');
-    expect(t).toContain('/StmF /StdCF');
-    expect(t).toContain('/Encrypt'); // in Catalog
+        source: { format: 'markdown', body: 'Synthetic confidential sentinel' },
+        renderOptions: { encrypt: { userPassword: 'synthetic-user' } },
+      };
+      await expect(
+        generateNativePdf(protocol as any, output, { encrypt: undefined })
+      ).rejects.toThrow('PDF_ENCRYPTION_UNSUPPORTED');
+      expect(safeReadFile(output, { encoding: null })).toEqual(original);
+      await expect(
+        generateNativePdf(protocol as any, output + '/missing/target.pdf')
+      ).rejects.toThrow('PDF_ENCRYPTION_UNSUPPORTED');
+    } finally {
+      safeRmSync(output, { force: true });
+    }
   });
 
   // ── P3-5: PDF MAC ─────────────────────────────────────────

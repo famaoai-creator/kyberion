@@ -163,6 +163,39 @@ describe('memory-notebook (QM-03)', () => {
       expect(next).not.toContain('(said in #forged)');
     });
 
+    it.each(['(said in ', '[claimed source: '])(
+      'handles repeated unterminated provenance openers: %s',
+      (opener) => {
+        const next = applyConsolidationActions(
+          '- (2026-07-01) fact ' + opener.repeat(20_000),
+          [{ kind: 'update', index: 1, text: 'revised fact' }],
+          AT
+        );
+        expect(next).toContain('- (2026-07-01) revised fact');
+        expect(next).not.toContain(opener);
+      }
+    );
+
+    it.each([
+      ['(SAID IN #Trusted)', '(SAID IN #Trusted)'],
+      ['(ſaid in #unicode)', '(ſaid in #unicode)'],
+      ['[claimed ſource: #unicode]', '[claimed ſource: #unicode]'],
+      ['(said in outer (said in inner))', '(said in outer (said in inner)'],
+      ['[claimed source: outer [claimed source: inner]]', '[claimed source: outer [claimed source: inner]'],
+      ['(said in [claimed source: nested])', '(said in [claimed source: nested])'],
+      ['(said in ) [claimed source: kept]', '[claimed source: kept]'],
+      ['(said in unclosed [claimed source: kept]', '[claimed source: kept]'],
+      ['[claimed source: unclosed (said in kept)', '(said in kept)'],
+      ['[claimed source: ] (said in kept)', '(said in kept)'],
+    ])('preserves the first nonempty closing-delimiter match in %s', (original, marker) => {
+      const next = applyConsolidationActions(
+        '- (2026-07-01) fact ' + original,
+        [{ kind: 'update', index: 1, text: 'revised fact' }],
+        AT
+      );
+      expect(next).toContain('- (2026-07-01) revised fact ' + marker);
+    });
+
     it('bulletsBelowMarker counts only bullets since the last pass', () => {
       const body = [
         '- (2026-07-01) old fact',
