@@ -1,7 +1,8 @@
 /**
  * Low-level environment boundary for foundational modules that cannot import
  * the registry-backed env loader without creating a path-resolver cycle.
- * Feature code must use getRegisteredEnvText instead.
+ * Feature code must use `@agent/core/foundation/config` (`config.text` / `config.get`)
+ * or `getRegisteredEnvText` instead.
  */
 export function getProcessEnv(
   name: string,
