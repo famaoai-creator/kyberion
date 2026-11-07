@@ -89,7 +89,7 @@ export function parseStringUnion(source: string, typeName: string): string[] {
  * no way in, the unification claim is false for that value.
  */
 export function checkTriggerSourceWiring(sources: EventWiringSources): string[] {
-  const declaringFile = 'libs/core/trigger-runner.ts';
+  const declaringFile = 'libs/core/daemon/trigger-runner.ts';
   const source = sources.files[declaringFile];
   if (!source)
     return [`${declaringFile}: missing — TriggerRunner is the trigger gate's single source`];

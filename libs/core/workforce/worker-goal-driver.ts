@@ -62,7 +62,7 @@ registerTaskGoalLoop(runGoalDrivenLoop);
 
 import { logger } from '../core.js';
 import { awaitGoalOperation, goalTurnLimit } from './goal-execution-control.js';
-import { frameUntrustedInput } from '../untrusted-input-framing.js';
+import { frameUntrustedInput } from '../governance/untrusted-input-framing.js';
 import {
   ManualDriveActionController,
   registerAgentRuntimeManualDriver,
@@ -70,8 +70,8 @@ import {
   type ManualDriveApprovalGate,
   type ManualDriveMode,
 } from '../agent/agent-runtime-manual-drive.js';
-import type { EventScopeInput } from '../event-scope.js';
-import { buildContextRewindToolDefinition, RewindableWorkerContext } from '../context-rewind.js';
+import type { EventScopeInput } from '../event/event-scope.js';
+import { buildContextRewindToolDefinition, RewindableWorkerContext } from './context-rewind.js';
 import {
   buildUntrustedDataInjectionProvider,
   DynamicInjectionRegistry,
@@ -80,8 +80,8 @@ import {
   renderInjectionsAsSystemReminders,
   ScopedDynamicInjectionRegistry,
   type DynamicInjectionProvider,
-} from '../dynamic-injection.js';
-import type { ScopedRegistryScope } from '../scoped-registry.js';
+} from '../reasoning/dynamic-injection.js';
+import type { ScopedRegistryScope } from '../governance/scoped-registry.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
 import type {
   GenerateWithToolsResult,

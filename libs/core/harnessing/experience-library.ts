@@ -9,7 +9,7 @@
  */
 
 import * as path from 'node:path';
-import { frameUntrustedInput } from '../untrusted-input-framing.js';
+import { frameUntrustedInput } from '../governance/untrusted-input-framing.js';
 import { logger } from '../core.js';
 import { appendJsonLine } from '../foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeReadFile } from '../secure-io.js';

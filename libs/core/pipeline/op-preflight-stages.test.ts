@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeWriteFile } from '../secure-io.js';
 import { auditChain } from '../governance/audit-chain.js';
-import { _resetEgressPolicyCacheForTests } from '../egress-policy.js';
+import { _resetEgressPolicyCacheForTests } from '../governance/egress-policy.js';
 import {
   introductionResult,
   opPreflightStageCounts,
@@ -14,8 +14,14 @@ import {
   setOpPreflightRolloutForTests,
   taintResult,
 } from './op-preflight-stages.js';
-import { setControlPlaneRuntimeRootForTests, readJournalTail } from '../cloudflare-os-journal.js';
-import { resetSharedControlPlaneForTests, sharedControlPlane } from '../cloudflare-os-shared.js';
+import {
+  setControlPlaneRuntimeRootForTests,
+  readJournalTail,
+} from '../governance/cloudflare-os-journal.js';
+import {
+  resetSharedControlPlaneForTests,
+  sharedControlPlane,
+} from '../governance/cloudflare-os-shared.js';
 import {
   mintScopeEnvelope,
   resetScopeEnvelopeState,

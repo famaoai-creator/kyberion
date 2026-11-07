@@ -78,7 +78,7 @@ vi.mock('./mission-team-plan-composer.js', () => ({
   buildMissionTeamView: mocks.buildMissionTeamView,
 }));
 
-vi.mock('../ledger.js', () => ({
+vi.mock('../governance/ledger.js', () => ({
   ledger: {
     record: mocks.record,
   },

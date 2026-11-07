@@ -27,9 +27,7 @@ import {
   TENANT_STORE_LEDGER_ROOTS,
   tenantRuntimePartitionOf,
   tenantRuntimePartitionPaths,
-  tenantStoreLedgerPartitionOf,
 } from './storage-layout.js';
-import { tenantStorePartitionWriteDecision } from './tier-guard-tenant-store-partitions.js';
 
 describe('storage-layout floors', () => {
   it('re-exports the single foundation state-root registry used by secure I/O', () => {
@@ -453,88 +451,6 @@ describe('tenant runtime partitions', () => {
     }
     expect(tenantRuntimePartitionOf('active/shared/runtime/unregistered/confidential/acme')).toBe(
       undefined
-    );
-  });
-});
-
-describe('asset-derivations store partitions', () => {
-  const ROOT = PARTITIONED_RUNTIME_LEDGER_ROOTS.asset_derivations;
-
-  it('attributes tenant, member and system partitions to the store role', () => {
-    expect(tenantStoreLedgerPartitionOf(`${ROOT}/confidential/acme/derivations.jsonl`)).toEqual({
-      root: ROOT,
-      storeRole: 'asset_derivation_store',
-      tier: 'confidential',
-      tenant: 'acme',
-    });
-    // `personal/` is member-keyed here — the member ref reports as the
-    // partition's tenant segment; the role's literal `personal/` grant admits.
-    expect(tenantStoreLedgerPartitionOf(`${ROOT}/personal/owner-1/derivations.jsonl`)).toEqual({
-      root: ROOT,
-      storeRole: 'asset_derivation_store',
-      tier: 'personal',
-      tenant: 'owner-1',
-    });
-    // `system/` is a store partition of this root only.
-    expect(tenantStoreLedgerPartitionOf(`${ROOT}/system/derivations.jsonl`)).toEqual({
-      root: ROOT,
-      storeRole: 'asset_derivation_store',
-      tier: 'system',
-      tenant: 'derivations.jsonl',
-    });
-    // Other roots keep the ordinary rules for their system segment.
-    expect(
-      tenantStoreLedgerPartitionOf(
-        `${PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations}/system/delegations.jsonl`
-      )
-    ).toBeUndefined();
-  });
-
-  it('admits the store role and refuses ambient personas on every partition', () => {
-    const policy = {
-      authority_role_permissions: {
-        asset_derivation_store: {
-          allow_write: [
-            `${ROOT}/confidential/\${KYBERION_TENANT}/`,
-            `${ROOT}/personal/`,
-            `${ROOT}/system/`,
-          ],
-        },
-        broad_runtime: { allow_write: ['active/shared/runtime/'] },
-      },
-      persona_permissions: {},
-    };
-    const decide = (role: string | undefined, file: string) =>
-      tenantStorePartitionWriteDecision(
-        policy as never,
-        file,
-        {
-          persona: 'worker',
-          role,
-          authorities: [],
-          sudoScope: undefined,
-        },
-        {
-          operation: 'append',
-          sudoAllows: () => false,
-          // Literal-prefix approximation of policyPathMatches for these paths:
-          // the tenant-bound pattern substitutes the bound tenant ('acme').
-          matches: (p) => file.startsWith(p.replace('${KYBERION_TENANT}', 'acme')),
-        }
-      );
-    expect(decide('asset_derivation_store', `${ROOT}/confidential/acme/d.jsonl`)?.allowed).toBe(
-      true
-    );
-    expect(decide('asset_derivation_store', `${ROOT}/personal/owner-1/d.jsonl`)?.allowed).toBe(
-      true
-    );
-    expect(decide('asset_derivation_store', `${ROOT}/system/d.jsonl`)?.allowed).toBe(true);
-    // An ambient runtime grant — the F9 hole — no longer reaches any partition.
-    expect(decide('broad_runtime', `${ROOT}/confidential/acme/d.jsonl`)?.allowed).toBe(false);
-    expect(decide('broad_runtime', `${ROOT}/personal/owner-1/d.jsonl`)?.allowed).toBe(false);
-    expect(decide('broad_runtime', `${ROOT}/system/d.jsonl`)?.allowed).toBe(false);
-    expect(decide('broad_runtime', `${ROOT}/system/d.jsonl`)?.reason).toContain(
-      'asset_derivation_store'
     );
   });
 });

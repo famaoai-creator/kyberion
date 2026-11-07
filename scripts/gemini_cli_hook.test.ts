@@ -68,13 +68,13 @@ describe('handleGeminiHookEvent', () => {
     acquireCoSessionLease({
       session_id: 'cos-g4',
       provider: 'claude',
-      path: 'libs/core/co-session.ts',
+      path: 'libs/core/workforce/co-session.ts',
       participant_id: 'claude-owner',
     });
     const out = handleGeminiHookEvent('BeforeTool', {
       session_id: 'g-1',
       tool_name: 'write_file',
-      tool_input: { file_path: 'libs/core/co-session.ts', content: 'x' },
+      tool_input: { file_path: 'libs/core/workforce/co-session.ts', content: 'x' },
     });
     const parsed = JSON.parse(out!);
     expect(parsed.decision).toBe('deny');
@@ -87,14 +87,14 @@ describe('handleGeminiHookEvent', () => {
       handleGeminiHookEvent('BeforeTool', {
         session_id: 'g-1',
         tool_name: 'write_file',
-        tool_input: { file_path: 'libs/core/co-session.ts' },
+        tool_input: { file_path: 'libs/core/workforce/co-session.ts' },
       })
     ).toBeUndefined();
     expect(
       handleGeminiHookEvent('BeforeTool', {
         session_id: 'g-1',
         tool_name: 'read_file',
-        tool_input: { file_path: 'libs/core/co-session.ts' },
+        tool_input: { file_path: 'libs/core/workforce/co-session.ts' },
       })
     ).toBeUndefined();
   });
@@ -104,7 +104,7 @@ describe('handleGeminiHookEvent', () => {
     acquireCoSessionLease({
       session_id: 'cos-g6',
       provider: 'gemini',
-      path: 'libs/core/co-session.ts',
+      path: 'libs/core/workforce/co-session.ts',
       participant_id: 'gemini-g-7',
     });
     handleGeminiHookEvent('SessionEnd', { session_id: 'g-7' });
@@ -112,7 +112,7 @@ describe('handleGeminiHookEvent', () => {
       handleGeminiHookEvent('BeforeTool', {
         session_id: 'anyone',
         tool_name: 'write_file',
-        tool_input: { file_path: 'libs/core/co-session.ts' },
+        tool_input: { file_path: 'libs/core/workforce/co-session.ts' },
       })
     ).toBeUndefined();
   });

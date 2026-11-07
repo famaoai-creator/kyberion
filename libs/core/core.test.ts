@@ -31,8 +31,8 @@ const visionResolverMock = vi.hoisted(() => ({
   resolveVision: vi.fn(),
 }));
 
-vi.mock('./vision-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./vision-resolver.js')>();
+vi.mock('./organization/vision-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./organization/vision-resolver.js')>();
   return {
     ...actual,
     resolveVision: visionResolverMock.resolveVision,

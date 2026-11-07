@@ -35,7 +35,7 @@
             "zero_config": "declared"
           },
           "evidence": [
-            "libs/core/laya-mlx-judgment-backend.ts (egress 'local-only', deterministic open-weights encoder on MLX; 24 ms p50 warm, 6/6 with option descriptions; resident Python worker, opt-in via KYBERION_JUDGMENT_PROVIDERS)"
+            "libs/core/provider/laya-mlx-judgment-backend.ts (egress 'local-only', deterministic open-weights encoder on MLX; 24 ms p50 warm, 6/6 with option descriptions; resident Python worker, opt-in via KYBERION_JUDGMENT_PROVIDERS)"
           ]
         },
         "typesafe-jev": {
@@ -47,7 +47,7 @@
             "zero_config": "declared"
           },
           "evidence": [
-            "libs/core/typesafe-jev-judgment-backend.ts (egress 'external-api', hosted System One API; 235-278 ms over the network, 4/6 on the same set, non-deterministic; API key + opt-in via KYBERION_JUDGMENT_PROVIDERS)"
+            "libs/core/provider/typesafe-jev-judgment-backend.ts (egress 'external-api', hosted System One API; 235-278 ms over the network, 4/6 on the same set, non-deterministic; API key + opt-in via KYBERION_JUDGMENT_PROVIDERS)"
           ]
         }
       },

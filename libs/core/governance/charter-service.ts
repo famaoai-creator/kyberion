@@ -18,10 +18,10 @@ import {
  */
 
 import { createHash } from 'node:crypto';
-import type { ActorRef } from '../actor.js';
+import type { ActorRef } from '../contracts/actor.js';
 import { isValidMemberId } from '../organization/member-id-grammar.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import {
   INFORMATION_CATEGORIES,
   RECIPIENT_CLASSES,

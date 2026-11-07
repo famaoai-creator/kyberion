@@ -10,8 +10,8 @@ import type {
 } from './approval-store.js';
 import { auditChain } from './audit-chain.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
-import { detectAgentExecutionContext } from '../agent-execution-context.js';
-import type { ResolvedPrincipal } from '../authn-principal-resolver.js';
+import { detectAgentExecutionContext } from '../agent/agent-execution-context.js';
+import type { ResolvedPrincipal } from '../authn/authn-principal-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import {
   approvalPresentedDigestMatches,

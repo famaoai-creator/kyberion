@@ -14,8 +14,11 @@ import {
 } from '../secure-io.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
-import { streamJsonLinesAcrossCompaction } from '../jsonl-parked-read.js';
-import { maintainStoreAfterAppend, type MaintainStoreOutcome } from '../append-only-store.js';
+import { streamJsonLinesAcrossCompaction } from '../storage/jsonl-parked-read.js';
+import {
+  maintainStoreAfterAppend,
+  type MaintainStoreOutcome,
+} from '../storage/append-only-store.js';
 import { logger } from '../core.js';
 import { isRecord, sanitizeIdSegment } from '../foundation/text.js';
 import { isValidTenantSlug } from '../entity-scope.js';

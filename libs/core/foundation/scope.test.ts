@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isValidChronosScopeId, isValidMemberId, isValidTenantSlug } from './scope.js';
-import { isValidChronosScopeId as legacyScopeId } from '../chronos-access-registry.js';
+import { isValidChronosScopeId as legacyScopeId } from '../authn/chronos-access-registry.js';
 import { isValidMemberId as legacyMemberId } from '../organization/member-id-grammar.js';
 
 describe('pure scope grammar compatibility', () => {

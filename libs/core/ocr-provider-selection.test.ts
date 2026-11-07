@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeRmSync } from './secure-io.js';
-import { setSeamSelectionRule } from './seam-selection-rules.js';
+import { setSeamSelectionRule } from './provider/seam-selection-rules.js';
 import { ocrTrainingUse } from './ocr/router.js';
 
 // Mirrors libs/actuators/browser-actuator/src/browser-runtime-selection.test.ts:

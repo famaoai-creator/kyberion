@@ -2,9 +2,9 @@ import { createHash } from 'node:crypto';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
 import { segmentWords } from '../foundation/locale-normalize.js';
-import { frameUntrustedInput } from '../untrusted-input-framing.js';
-import { scanForInjection } from '../untrusted-content.js';
-import { parseStructuredJson } from '../structured-reasoning.js';
+import { frameUntrustedInput } from '../governance/untrusted-input-framing.js';
+import { scanForInjection } from '../governance/untrusted-content.js';
+import { parseStructuredJson } from '../reasoning/structured-reasoning.js';
 import { getReasoningBackend, type ReasoningBackend } from '../reasoning/reasoning-backend.js';
 import {
   ReasoningEgressDeniedError,

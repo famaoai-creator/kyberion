@@ -74,7 +74,7 @@ const DEFAULT_PAGES: PageSpec[] = [
   { surface: 'concierge', pageName: 'settings', path: '/settings' },
   { surface: 'presence-studio', pageName: 'home', path: '/' },
   { surface: 'presence-studio', pageName: 'ask', path: '/ask' },
-  { surface: 'presence-studio', pageName: 'progress', path: '/progress' },
+  { surface: 'concierge', pageName: 'work-requests', path: '/work?tab=requests' },
   // The operations console (former Chronos) is a single page inside Concierge;
   // its scopes are reachable via `/ops?section=<scope>` (src/app/ops/page.tsx).
   { surface: 'concierge', pageName: 'ops-home', path: '/ops' },

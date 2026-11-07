@@ -66,7 +66,7 @@ vi.mock('@agent/core/path-resolver', async (importOriginal) => ({
 // The manifest path above is a fixture-only sentinel, not a real file, so it
 // must never reach governed-catalog's fail-closed loader (main now throws
 // instead of silently falling back to {} on a load error — see
-// libs/core/recovery-policy.ts `loadRecoveryPolicy`). These tests only care
+// libs/core/pipeline/recovery-policy.ts `loadRecoveryPolicy`). These tests only care
 // that `retry` is invoked, not the specific policy values, so bypass catalog
 // loading entirely and hand back the builder's own defaults.
 vi.mock('@agent/core/recovery-policy', async (importOriginal) => {

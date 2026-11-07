@@ -1,0 +1,1865 @@
+/**
+ * AL-04 hermetic tests: scope-linked GC (mission runtime residue) and the
+ * tenant/project offboarding verb (dry-run → export → delete, human approval
+ * gated, soft-deleted and audited).
+ *
+ * Everything runs against a temp repo root: secure-io is stubbed onto real
+ * fs and path-resolver is repointed, so no test ever touches `active/`.
+ */
+
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+
+/**
+ * `var`, and created on first access: audit-chain (pulled in transitively by
+ * NI-05's governance hook) builds its singleton the moment path-resolver is
+ * imported and calls `rootDir()` right then — before any `let` in this file
+ * is initialized and before beforeEach runs. A `var` has no TDZ, and the
+ * lazy accessor hands that early caller a real directory. Each test then
+ * repoints it to a fresh root.
+ */
+// The vi.mock factory below is hoisted into a separate evaluation context —
+// it closes over a *copy* of any module-level `var`, so a shared module var
+// drifts out of sync (the mock kept seeing `undefined` and minted a fresh
+// mkdtemp per call). Keep the fixture root on globalThis, which both the
+// hoisted factory and the module body resolve identically.
+const ROOT_STATE_KEY = '__kyberion_al04_root__';
+const CREATED_ROOTS_KEY = '__kyberion_al04_created__';
+const sharedState = globalThis as Record<string, string | string[] | undefined>;
+
+function rootDirState(): string | undefined {
+  return sharedState[ROOT_STATE_KEY] as string | undefined;
+}
+function setRootDirState(value: string | undefined): void {
+  sharedState[ROOT_STATE_KEY] = value;
+}
+function createdRoots(): string[] {
+  if (!Array.isArray(sharedState[CREATED_ROOTS_KEY])) sharedState[CREATED_ROOTS_KEY] = [];
+  return sharedState[CREATED_ROOTS_KEY] as string[];
+}
+
+function currentRoot(): string {
+  const existing = rootDirState();
+  if (existing) return existing;
+  const created = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-al04-'));
+  setRootDirState(created);
+  createdRoots().push(created);
+  return created;
+}
+
+vi.mock('../secure-io.js', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+  return {
+    assertSafeRepositoryPath: (filePath: string, options: { allowMissingLeaf?: boolean } = {}) => {
+      const root = path.resolve(currentRoot());
+      const resolved = path.resolve(filePath);
+      const relative = path.relative(root, resolved);
+      if (
+        !relative ||
+        relative === '..' ||
+        relative.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(relative)
+      ) {
+        throw new Error(
+          `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${filePath}`
+        );
+      }
+      let current = root;
+      for (const segment of relative.split(path.sep)) {
+        current = path.join(current, segment);
+        try {
+          if (actual.lstatSync(current).isSymbolicLink()) {
+            throw new Error(
+              `[RESOURCE_PATH_SYMLINK] resource path cannot traverse a symbolic link: ${filePath}`
+            );
+          }
+        } catch (error: unknown) {
+          const code =
+            error && typeof error === 'object' && 'code' in error
+              ? (error as { code?: string }).code
+              : undefined;
+          if (code === 'ENOENT') break;
+          throw error;
+        }
+      }
+      if (!options.allowMissingLeaf && !actual.existsSync(resolved)) {
+        throw new Error(`Resource path does not exist: ${resolved}`);
+      }
+      return resolved;
+    },
+    safeReaddir: (dir: string) => {
+      const denied = (globalThis as Record<string, unknown>).__kyberion_al04_deny_readdir__;
+      if (typeof denied === 'string' && path.resolve(dir) === path.resolve(denied)) {
+        throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to read directory '${dir}'`);
+      }
+      return actual.readdirSync(dir);
+    },
+    safeStat: (p: string) => actual.statSync(p),
+    safeLstat: (p: string) => actual.lstatSync(p),
+    safeUnlinkSync: (p: string) => actual.unlinkSync(p),
+    safeRmSync: (p: string, opts: any) => actual.rmSync(p, opts),
+    safeExistsSync: (p: string) => actual.existsSync(p),
+    safeReadFile: (p: string, opts: any) => actual.readFileSync(p, opts),
+    MAX_SNAPSHOT_READ_BYTES: 64 * 1024 * 1024,
+    safeReadFileSnapshot: (p: string, maxBytes: number) => {
+      const bytes = actual.readFileSync(p);
+      if (bytes.length > maxBytes) throw new Error('snapshot byte limit');
+      return bytes;
+    },
+    loadJson: (p: string) => JSON.parse(actual.readFileSync(p, 'utf8')),
+    safeMkdir: (p: string, opts: any) => actual.mkdirSync(p, opts),
+    safeWriteFile: (p: string, data: string) => {
+      // Test hook (on globalThis, like the fixture root): runs before a write,
+      // e.g. to append ledger rows between offboarding's plan and its prune.
+      (
+        globalThis as { __kyberion_offboard_write_hook__?: (target: string) => void }
+      ).__kyberion_offboard_write_hook__?.(p);
+      actual.mkdirSync(path.dirname(p), { recursive: true });
+      actual.writeFileSync(p, data);
+    },
+    safeAppendFileSync: (p: string, data: string) => {
+      actual.mkdirSync(path.dirname(p), { recursive: true });
+      actual.appendFileSync(p, data);
+    },
+    safeMoveSync: (src: string, dest: string) => {
+      actual.mkdirSync(path.dirname(dest), { recursive: true });
+      actual.renameSync(src, dest);
+    },
+    safeCopyFileSync: (src: string, dest: string) => {
+      actual.mkdirSync(path.dirname(dest), { recursive: true });
+      actual.copyFileSync(src, dest);
+    },
+  };
+});
+
+vi.mock('../foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),
+    loadJsonIfPresent: (p: string) => {
+      if (!fs.existsSync(p)) return null;
+      try {
+        return JSON.parse(fs.readFileSync(p, 'utf8'));
+      } catch {
+        return null;
+      }
+    },
+    appendFile: (p: string, data: string) => {
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.appendFileSync(p, data);
+    },
+    exists: (p: string) => fs.existsSync(p),
+    readFile: (p: string) => fs.readFileSync(p, 'utf8'),
+    readRange: (p: string, position: number, length: number) => {
+      const fd = fs.openSync(p, 'r');
+      try {
+        const buffer = Buffer.alloc(length);
+        return buffer.subarray(0, fs.readSync(fd, buffer, 0, length, position));
+      } finally {
+        fs.closeSync(fd);
+      }
+    },
+    stat: (p: string) => fs.statSync(p),
+    writeFile: (p: string, data: string) => {
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, data);
+    },
+  }),
+  registerFoundationIo: vi.fn(),
+}));
+
+vi.mock('../path-resolver.js', async () => {
+  const original =
+    await vi.importActual<typeof import('../path-resolver.js')>('../path-resolver.js');
+  // This factory is hoisted: it cannot see the module-level helpers above
+  // (TDZ) and module `var`s would be captured stale. Reach the SAME fixture
+  // root via globalThis and lazily imported node modules only.
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const nodePath = await import('node:path');
+  const g = globalThis as Record<string, string | undefined>;
+  const factoryRoot = (): string => {
+    if (!g.__kyberion_al04_root__) {
+      g.__kyberion_al04_root__ = mkdtempSync(nodePath.join(tmpdir(), 'kyberion-al04-'));
+    }
+    return g.__kyberion_al04_root__;
+  };
+  const resolver = {
+    ...original.pathResolver,
+    rootDir: () => factoryRoot(),
+    active: (sub = '') => nodePath.join(factoryRoot(), 'active', sub),
+    rootResolve: (rel: string) =>
+      nodePath.isAbsolute(rel)
+        ? rel
+        : nodePath.join(rel.startsWith('knowledge/product/') ? process.cwd() : factoryRoot(), rel),
+    resolve: (rel: string) => (nodePath.isAbsolute(rel) ? rel : nodePath.join(factoryRoot(), rel)),
+    shared: (sub = '') => nodePath.join(factoryRoot(), 'active', 'shared', sub),
+    sharedTmp: (sub = '') => nodePath.join(factoryRoot(), 'active', 'shared', 'tmp', sub),
+    sharedExports: (sub = '') => nodePath.join(factoryRoot(), 'active', 'shared', 'exports', sub),
+    sharedLogsAudit: (sub = '') =>
+      nodePath.join(factoryRoot(), 'active', 'shared', 'logs', 'audit', sub),
+    // `knowledge/product/*` (schemas, governed catalogs) are read-only
+    // fixtures — resolve them against the real repository. Tenant-scoped
+    // knowledge trees stay inside the disposable tmp root.
+    knowledge: (sub = '') =>
+      sub.startsWith('product/')
+        ? nodePath.join(process.cwd(), 'knowledge', sub)
+        : nodePath.join(factoryRoot(), 'knowledge', sub),
+    findMissionPath: () => null,
+  };
+  // `pathResolver` (the namespace-style export) is what audit-chain — pulled
+  // in transitively by NI-05's governance hook — reads at construction.
+  return { ...original, ...resolver, pathResolver: resolver };
+});
+
+vi.mock('../core.js', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), success: vi.fn() },
+}));
+
+import {
+  collectScopeTargets,
+  gcMissionRuntimeResidue,
+  INGEST_DEDUP_REGISTRY_REPO_PATH,
+  offboardScope,
+  OFFBOARDING_EXPORT_SUBDIR,
+  PHYSICAL_LEGACY_TENANT_STATE_ROOTS,
+  TENANT_RUNTIME_PARTITION_TARGET_KINDS,
+  DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH,
+  verifyScopeOffboarded,
+} from './scope-offboarding.js';
+import { TENANT_RUNTIME_PARTITION_ROOTS } from '../storage-layout.js';
+import { restoreFromTrash, TRASH_REPO_SUBPATH } from './storage-janitor.js';
+import { STORAGE_RETENTION_AUDIT_FILENAME } from './storage-retention-catalog.js';
+import { withExecutionContext } from '../authority.js';
+import { recordDerivation } from '../information-assets/asset-derivation.js';
+
+const MISSION_ID = 'MIS-AL04-TEST';
+
+function writeJson(filePath: string, value: unknown): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
+}
+
+function abs(repoRelative: string): string {
+  return path.join(currentRoot(), ...repoRelative.split('/'));
+}
+
+function missionState(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    mission_id: 'MIS-AL04-TEST',
+    tier: 'public',
+    status: 'active',
+    execution_mode: 'local',
+    priority: 1,
+    assigned_persona: 'worker',
+    confidence_score: 1,
+    git: {
+      branch: 'scope-offboarding-test',
+      start_commit: 'abc123',
+      latest_commit: 'abc123',
+      checkpoints: [],
+    },
+    history: [],
+    ...overrides,
+  };
+}
+
+function trashPathOf(repoRelative: string): string {
+  return path.join(currentRoot(), ...TRASH_REPO_SUBPATH.split('/'), ...repoRelative.split('/'));
+}
+
+function auditEvents(): Array<Record<string, any>> {
+  const auditPath = path.join(
+    currentRoot(),
+    'active',
+    'shared',
+    'logs',
+    'audit',
+    STORAGE_RETENTION_AUDIT_FILENAME
+  );
+  if (!fs.existsSync(auditPath)) return [];
+  return fs
+    .readFileSync(auditPath, 'utf8')
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line));
+}
+
+beforeEach(() => {
+  vi.stubEnv('MISSION_ROLE', 'mission_controller');
+  vi.stubEnv('SYSTEM_ROLE', '');
+  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_TENANT', '');
+  setRootDirState(undefined);
+  const root = currentRoot();
+  const schemaPath = path.join(root, 'knowledge/product/schemas/mission-state.schema.json');
+  fs.mkdirSync(path.dirname(schemaPath), { recursive: true });
+  fs.copyFileSync(
+    path.resolve(process.cwd(), 'knowledge/product/schemas/mission-state.schema.json'),
+    schemaPath
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  const root = rootDirState();
+  if (root) fs.rmSync(root, { recursive: true, force: true });
+});
+
+afterAll(() => {
+  for (const root of createdRoots()) fs.rmSync(root, { recursive: true, force: true });
+});
+
+describe('AL-04 mission runtime residue GC', () => {
+  function seedResidue(): void {
+    writeJson(abs('active/shared/runtime/artifacts/ART-MINE.json'), {
+      artifact_id: 'ART-MINE',
+      mission_id: MISSION_ID,
+      kind: 'doc',
+      storage_class: 'repo',
+    });
+    writeJson(abs('active/shared/runtime/artifacts/ART-OTHER.json'), {
+      artifact_id: 'ART-OTHER',
+      mission_id: 'MIS-SOMEONE-ELSE',
+      kind: 'doc',
+      storage_class: 'repo',
+    });
+    writeJson(abs('active/shared/runtime/task-sessions/ts-mine.json'), {
+      session_id: 'ts-mine',
+      artifact: { mission_id: MISSION_ID },
+    });
+    writeJson(abs('active/shared/runtime/task-sessions/ts-top-level.json'), {
+      session_id: 'ts-top-level',
+      mission_id: MISSION_ID.toLowerCase(),
+    });
+    writeJson(abs('active/shared/runtime/task-sessions/ts-other.json'), {
+      session_id: 'ts-other',
+      artifact: { mission_id: 'MIS-SOMEONE-ELSE' },
+    });
+    writeJson(abs(`active/shared/runtime/session/${MISSION_ID}/state.json`), { ok: true });
+    writeJson(abs(`active/shared/runtime/session/${MISSION_ID}-task-7/state.json`), { ok: true });
+    writeJson(abs('active/shared/runtime/session/unrelated-session/state.json'), { ok: true });
+    // Load-bearing state that must never be touched by a residue sweep.
+    writeJson(abs('active/shared/runtime/state/janitor-last-run.json'), { completed_at: 'x' });
+  }
+
+  it('collects only this mission’s residue and leaves every other scope alone', () => {
+    seedResidue();
+    const result = gcMissionRuntimeResidue({ missionId: MISSION_ID, dryRun: true });
+
+    expect(result.status).toBe('gc');
+    expect(result.soft_deleted).toEqual([]); // dry run writes nothing
+    expect(result.candidates.map((c) => c.path).sort()).toEqual([
+      'active/shared/runtime/artifacts/ART-MINE.json',
+      `active/shared/runtime/session/${MISSION_ID}`,
+      `active/shared/runtime/session/${MISSION_ID}-task-7`,
+      'active/shared/runtime/task-sessions/ts-mine.json',
+      'active/shared/runtime/task-sessions/ts-top-level.json',
+    ]);
+    expect(fs.existsSync(abs('active/shared/runtime/artifacts/ART-MINE.json'))).toBe(true);
+  });
+
+  it('fails closed for residue records containing dangerous JSON keys', () => {
+    writeJson(abs('active/shared/runtime/artifacts/ART-DANGEROUS.json'), {
+      artifact_id: 'ART-DANGEROUS',
+      mission_id: MISSION_ID,
+      ['__proto__']: { poisoned: true },
+    });
+
+    expect(gcMissionRuntimeResidue({ missionId: MISSION_ID, dryRun: true })).toMatchObject({
+      status: 'noop',
+      candidates: [],
+    });
+  });
+
+  it('soft-deletes the residue, audits each removal, and stays idempotent', () => {
+    seedResidue();
+    const result = gcMissionRuntimeResidue({ missionId: MISSION_ID });
+
+    expect(result.status).toBe('gc');
+    expect(result.soft_deleted).toHaveLength(5);
+    expect(fs.existsSync(abs('active/shared/runtime/artifacts/ART-MINE.json'))).toBe(false);
+    expect(fs.existsSync(abs(`active/shared/runtime/session/${MISSION_ID}/state.json`))).toBe(
+      false
+    );
+    // Other scopes untouched.
+    expect(fs.existsSync(abs('active/shared/runtime/artifacts/ART-OTHER.json'))).toBe(true);
+    expect(fs.existsSync(abs('active/shared/runtime/task-sessions/ts-other.json'))).toBe(true);
+    expect(fs.existsSync(abs('active/shared/runtime/session/unrelated-session/state.json'))).toBe(
+      true
+    );
+    expect(fs.existsSync(abs('active/shared/runtime/state/janitor-last-run.json'))).toBe(true);
+
+    // Recoverable: everything went to the trash, not to /dev/null.
+    const trashed = trashPathOf('active/shared/runtime/artifacts/ART-MINE.json');
+    expect(fs.existsSync(trashed)).toBe(true);
+    expect(restoreFromTrash('active/shared/runtime/artifacts/ART-MINE.json').restored).toBe(true);
+    expect(fs.existsSync(abs('active/shared/runtime/artifacts/ART-MINE.json'))).toBe(true);
+
+    const residueAudit = auditEvents().filter((e) => e.event === 'MISSION_RESIDUE_SOFT_DELETE');
+    expect(residueAudit).toHaveLength(5);
+    expect(residueAudit[0]).toMatchObject({ mission_id: MISSION_ID });
+    expect(new Set(residueAudit.map((e) => e.probe))).toEqual(
+      new Set(['runtime_artifacts', 'task_sessions', 'session_volatile'])
+    );
+
+    // Second run (the restored artifact aside) finds nothing new to reclaim.
+    fs.rmSync(abs('active/shared/runtime/artifacts/ART-MINE.json'));
+    expect(gcMissionRuntimeResidue({ missionId: MISSION_ID })).toMatchObject({
+      status: 'noop',
+      soft_deleted: [],
+    });
+  });
+
+  it('reports an error instead of throwing when the mission id is empty', () => {
+    expect(gcMissionRuntimeResidue({ missionId: '  ' })).toMatchObject({ status: 'error' });
+  });
+});
+
+describe('AL-04 tenant/project offboarding', () => {
+  function seedTenant(): void {
+    writeJson(abs('active/projects/public/tenant-alpha/workspace/plan.json'), { a: 1 });
+    writeJson(
+      abs('active/missions/public/MIS-ALPHA-1/mission-state.json'),
+      missionState({
+        mission_id: 'MIS-ALPHA-1',
+        tenant_slug: 'tenant-alpha',
+        relationships: { project: { project_id: 'proj-x', relationship_type: 'belongs_to' } },
+      })
+    );
+    // Another tenant's mission — must never be swept in.
+    writeJson(
+      abs('active/missions/public/MIS-BETA-1/mission-state.json'),
+      missionState({ mission_id: 'MIS-BETA-1', tenant_slug: 'tenant-beta' })
+    );
+    writeJson(abs('active/missions/public/MIS-INVALID/mission-state.json'), {
+      mission_id: 'MIS-INVALID',
+      tenant_slug: 'tenant-alpha',
+    });
+  }
+
+  it('discovers the scope’s active/ trees (project workspace + declaring missions)', () => {
+    seedTenant();
+    expect(collectScopeTargets('tenant', 'tenant-alpha')).toEqual([
+      { path: 'active/projects/public/tenant-alpha', kind: 'project_tree' },
+      { path: 'active/missions/public/MIS-ALPHA-1', kind: 'mission_tree' },
+    ]);
+    expect(collectScopeTargets('project', 'proj-x')).toEqual([
+      { path: 'active/missions/public/MIS-ALPHA-1', kind: 'mission_tree' },
+    ]);
+    expect(collectScopeTargets('tenant', 'tenant-unknown')).toEqual([]);
+  });
+
+  it('discovers tenant and project physical namespaces outside the mission tree', () => {
+    writeJson(
+      abs(
+        'active/shared/runtime/media-generation/schedules/tenants/tenant-alpha/organizations/org-a/projects/proj-x/monthly.json'
+      ),
+      { schedule_id: 'monthly' }
+    );
+    writeJson(
+      abs(
+        'active/shared/coordination/channels/discord/tenants/tenant-alpha/organizations/org-a/projects/proj-x/outbox/msg.json'
+      ),
+      { message_id: 'msg' }
+    );
+    writeJson(
+      abs('active/shared/runtime/presence/tenants/tenant-alpha/notifications/presence.json'),
+      { notification_id: 'presence' }
+    );
+
+    expect(collectScopeTargets('tenant', 'tenant-alpha')).toEqual([
+      {
+        path: 'active/shared/runtime/media-generation/schedules/tenants/tenant-alpha',
+        kind: 'tenant_physical_namespace',
+      },
+      {
+        path: 'active/shared/coordination/channels/discord/tenants/tenant-alpha',
+        kind: 'tenant_physical_namespace',
+      },
+      {
+        path: 'active/shared/runtime/presence/tenants/tenant-alpha',
+        kind: 'tenant_physical_namespace',
+      },
+    ]);
+    expect(
+      collectScopeTargets('project', 'proj-x', {
+        tenantSlug: 'tenant-alpha',
+        organizationId: 'org-a',
+      })
+    ).toEqual([
+      {
+        path: 'active/shared/runtime/media-generation/schedules/tenants/tenant-alpha/organizations/org-a/projects/proj-x',
+        kind: 'project_physical_namespace',
+      },
+      {
+        path: 'active/shared/coordination/channels/discord/tenants/tenant-alpha/organizations/org-a/projects/proj-x',
+        kind: 'project_physical_namespace',
+      },
+    ]);
+  });
+
+  it('removes <base>/tenants/<slug> for every learning base and pre-migration legacy root', () => {
+    // Real writers of the physical layout: memory.tenantRoot / physicalScopedPath
+    // on 'active/shared/runtime', the feedback loop, and pre-migration copies of
+    // stores that now live in registered partitions.
+    const leaves = [
+      'active/shared/runtime/tenants/tenant-alpha/memory/promotion-queue.jsonl',
+      'active/shared/runtime/feedback-loop/tenants/tenant-alpha/ledger.jsonl',
+      'active/shared/observability/tenants/tenant-alpha/events.jsonl',
+      'active/shared/coordination/tenants/tenant-alpha/state.json',
+      'active/shared/runtime/media-generation/cost-settlements/tenants/tenant-alpha/job-1.json',
+      'active/shared/runtime/health/api-verification/tenants/tenant-alpha/anthropic.json',
+      'active/shared/runtime/front-desk-execution/tenants/tenant-alpha/wi-1.json',
+      'active/shared/coordination/channels/concierge/conversations/tenants/tenant-alpha/c.json',
+      // Another tenant's tree is never claimed.
+      'active/shared/runtime/tenants/tenant-beta/memory/promotion-queue.jsonl',
+    ];
+    for (const leaf of leaves) writeJson(abs(leaf), { leaf });
+
+    const learning = collectScopeTargets('tenant', 'tenant-alpha').filter(
+      (target) => target.kind === 'tenant_learning_tree'
+    );
+    expect(learning.map((target) => target.path).sort()).toEqual(
+      [
+        'active/shared/coordination/channels/concierge/conversations/tenants/tenant-alpha',
+        'active/shared/coordination/tenants/tenant-alpha',
+        'active/shared/observability/tenants/tenant-alpha',
+        'active/shared/runtime/front-desk-execution/tenants/tenant-alpha',
+        'active/shared/runtime/feedback-loop/tenants/tenant-alpha',
+        'active/shared/runtime/health/api-verification/tenants/tenant-alpha',
+        'active/shared/runtime/media-generation/cost-settlements/tenants/tenant-alpha',
+        'active/shared/runtime/tenants/tenant-alpha',
+      ].sort()
+    );
+  });
+
+  it('fails closed for overlapping project namespaces and unsafe scope IDs', () => {
+    writeJson(
+      abs(
+        'active/shared/runtime/media-generation/schedules/tenants/tenant-a/organizations/org-a/projects/proj-overlap/job.json'
+      ),
+      { schedule_id: 'job' }
+    );
+    writeJson(
+      abs(
+        'active/shared/runtime/media-generation/schedules/tenants/tenant-b/organizations/org-b/projects/proj-overlap/job.json'
+      ),
+      { schedule_id: 'job' }
+    );
+
+    expect(() => collectScopeTargets('project', 'proj-overlap')).toThrow(
+      'PROJECT_PHYSICAL_NAMESPACE_AMBIGUOUS'
+    );
+    expect(offboardScope({ scopeType: 'tenant', scopeId: '../outside' })).toMatchObject({
+      status: 'error',
+    });
+  });
+
+  it('ignores a symlinked mission tree during scope discovery', () => {
+    const tierDir = abs('active/missions/public');
+    const externalMission = abs('active/shared/tmp/offboarding-external-mission');
+    const linkedMission = path.join(tierDir, 'MIS-SYMLINK-TENANT');
+    fs.mkdirSync(tierDir, { recursive: true });
+    fs.mkdirSync(externalMission, { recursive: true });
+    writeJson(
+      path.join(externalMission, 'mission-state.json'),
+      missionState({ mission_id: 'MIS-SYMLINK-TENANT', tenant_slug: 'tenant-alpha' })
+    );
+    fs.symlinkSync(externalMission, linkedMission, 'dir');
+    try {
+      expect(
+        collectScopeTargets('tenant', 'tenant-alpha').some((target) =>
+          target.path.includes('MIS-SYMLINK-TENANT')
+        )
+      ).toBe(false);
+      expect(fs.existsSync(path.join(externalMission, 'mission-state.json'))).toBe(true);
+    } finally {
+      fs.unlinkSync(linkedMission);
+      fs.rmSync(externalMission, { recursive: true, force: true });
+    }
+  });
+
+  it('applies tenant and organization lineage to project workspaces and missions', () => {
+    writeJson(abs('active/projects/confidential/tenant-a/proj-shared/state/project-state.json'), {
+      tenant_slug: 'tenant-a',
+      organization_id: 'org-a',
+    });
+    writeJson(abs('active/projects/confidential/tenant-b/proj-shared/state/project-state.json'), {
+      tenant_slug: 'tenant-b',
+      organization_id: 'org-b',
+    });
+    writeJson(
+      abs('active/missions/confidential/MIS-PROJ-A/mission-state.json'),
+      missionState({
+        mission_id: 'MIS-PROJ-A',
+        tier: 'confidential',
+        tenant_slug: 'tenant-a',
+        organization_id: 'org-a',
+        relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
+      })
+    );
+    writeJson(
+      abs('active/missions/confidential/MIS-PROJ-B/mission-state.json'),
+      missionState({
+        mission_id: 'MIS-PROJ-B',
+        tier: 'confidential',
+        tenant_slug: 'tenant-b',
+        organization_id: 'org-b',
+        relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
+      })
+    );
+
+    expect(() => collectScopeTargets('project', 'proj-shared')).toThrow(
+      'PROJECT_WORKSPACE_AMBIGUOUS'
+    );
+    expect(
+      collectScopeTargets('project', 'proj-shared', {
+        tenantSlug: 'tenant-a',
+        organizationId: 'org-a',
+      })
+    ).toEqual([
+      { path: 'active/projects/confidential/tenant-a/proj-shared', kind: 'project_tree' },
+      { path: 'active/missions/confidential/MIS-PROJ-A', kind: 'mission_tree' },
+    ]);
+  });
+
+  it('refuses to claim an unscoped data-vault entry during project offboarding', () => {
+    writeJson(abs('active/shared/data-vault/shared-project.json'), {
+      sourceType: 'confluence',
+      key: 'shared',
+      projectId: 'proj-shared',
+      tier: 'confidential',
+    });
+
+    expect(() =>
+      collectScopeTargets('project', 'proj-shared', {
+        tenantSlug: 'tenant-a',
+        organizationId: 'org-a',
+      })
+    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
+  });
+
+  it('exports and soft-deletes physical namespaces during tenant offboarding', () => {
+    const scheduleRoot = 'active/shared/runtime/media-generation/schedules/tenants/tenant-alpha';
+    const channelRoot = 'active/shared/coordination/channels/discord/tenants/tenant-alpha';
+    writeJson(abs(`${scheduleRoot}/monthly.json`), { schedule_id: 'monthly' });
+    writeJson(abs(`${channelRoot}/outbox/msg.json`), { message_id: 'msg' });
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: 'tenant-alpha',
+      mode: 'execute',
+      approval: { approved_by: 'human:test', purpose: 'physical namespace test' },
+      nowIso: '2026-08-16T00:00:00.000Z',
+    });
+
+    expect(result.status).toBe('offboarded');
+    expect(result.soft_deleted).toEqual(expect.arrayContaining([scheduleRoot, channelRoot]));
+    expect(fs.existsSync(abs(`${scheduleRoot}/monthly.json`))).toBe(false);
+    expect(fs.existsSync(abs(`${channelRoot}/outbox/msg.json`))).toBe(false);
+    expect(result.verification).toEqual({ clean: true, leftovers: [] });
+    expect(fs.existsSync(trashPathOf(scheduleRoot))).toBe(true);
+    expect(fs.existsSync(trashPathOf(channelRoot))).toBe(true);
+  });
+
+  it('dry run reports the targets, writes nothing, and needs no approval', () => {
+    seedTenant();
+    const result = offboardScope({ scopeType: 'tenant', scopeId: 'tenant-alpha' });
+
+    expect(result.status).toBe('dry_run');
+    expect(result.targets).toHaveLength(2);
+    expect(result.soft_deleted).toEqual([]);
+    expect(result.export_path).toBeUndefined();
+    expect(fs.existsSync(abs('active/projects/public/tenant-alpha/workspace/plan.json'))).toBe(
+      true
+    );
+    expect(auditEvents().map((e) => e.event)).toContain('SCOPE_OFFBOARD_DRY_RUN');
+  });
+
+  it('refuses to delete without a human approval (fail-closed) and audits the denial', () => {
+    seedTenant();
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: 'tenant-alpha',
+      mode: 'execute',
+    });
+
+    expect(result.status).toBe('approval_required');
+    expect(result.soft_deleted).toEqual([]);
+    expect(fs.existsSync(abs('active/projects/public/tenant-alpha/workspace/plan.json'))).toBe(
+      true
+    );
+    expect(auditEvents().map((e) => e.event)).toContain('SCOPE_OFFBOARD_DENIED');
+
+    // A half-filled approval is no approval.
+    expect(
+      offboardScope({
+        scopeType: 'tenant',
+        scopeId: 'tenant-alpha',
+        mode: 'execute',
+        approval: { approved_by: 'operator', purpose: '   ' },
+      }).status
+    ).toBe('approval_required');
+  });
+
+  it('exports before deleting, soft-deletes the originals, and audits every step', () => {
+    seedTenant();
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: 'tenant-alpha',
+      mode: 'execute',
+      approval: {
+        approved_by: 'operator@example',
+        purpose: 'contract ended — tenant offboarding',
+        approved_at: '2026-07-26T00:00:00.000Z',
+      },
+      nowIso: '2026-07-26T01:02:03.000Z',
+    });
+
+    expect(result.status).toBe('offboarded');
+    expect(result.export_path).toBe(
+      `active/shared/exports/${OFFBOARDING_EXPORT_SUBDIR}/tenant-tenant-alpha-2026-07-26T01-02-03-000Z`
+    );
+    expect(result.soft_deleted).toEqual([
+      'active/projects/public/tenant-alpha',
+      'active/missions/public/MIS-ALPHA-1',
+    ]);
+
+    // Export holds a full copy, keyed by the original repo-relative path.
+    const exported = abs(
+      `${result.export_path}/active/projects/public/tenant-alpha/workspace/plan.json`
+    );
+    expect(JSON.parse(fs.readFileSync(exported, 'utf8'))).toEqual({ a: 1 });
+    const manifest = JSON.parse(
+      fs.readFileSync(abs(`${result.export_path}/manifest.json`), 'utf8')
+    );
+    expect(manifest).toMatchObject({
+      scope_type: 'tenant',
+      scope_id: 'tenant-alpha',
+      approval: {
+        approved_by: 'operator@example',
+        approved_at: '2026-07-26T00:00:00.000Z',
+        purpose: 'contract ended — tenant offboarding',
+      },
+    });
+
+    // Originals gone from active/, recoverable from the trash.
+    expect(fs.existsSync(abs('active/projects/public/tenant-alpha'))).toBe(false);
+    expect(fs.existsSync(abs('active/missions/public/MIS-ALPHA-1'))).toBe(false);
+    expect(
+      fs.existsSync(trashPathOf('active/projects/public/tenant-alpha/workspace/plan.json'))
+    ).toBe(true);
+    // The other tenant is untouched.
+    expect(fs.existsSync(abs('active/missions/public/MIS-BETA-1/mission-state.json'))).toBe(true);
+
+    const events = auditEvents().map((e) => e.event);
+    expect(events).toContain('SCOPE_OFFBOARD_EXPORTED');
+    expect(events.filter((e) => e === 'SCOPE_OFFBOARD_SOFT_DELETE')).toHaveLength(2);
+    const deleteRecord = auditEvents().find((e) => e.event === 'SCOPE_OFFBOARD_SOFT_DELETE');
+    expect(deleteRecord).toMatchObject({
+      scope_type: 'tenant',
+      scope_id: 'tenant-alpha',
+      approved_by: 'operator@example',
+      purpose: 'contract ended — tenant offboarding',
+    });
+
+    // Idempotent: nothing left to offboard.
+    expect(
+      offboardScope({
+        scopeType: 'tenant',
+        scopeId: 'tenant-alpha',
+        mode: 'execute',
+        approval: { approved_by: 'operator@example', purpose: 'retry' },
+      }).status
+    ).toBe('not_found');
+  });
+
+  it('restores an offboarded tree from the trash (soft-delete grace)', () => {
+    seedTenant();
+    offboardScope({
+      scopeType: 'tenant',
+      scopeId: 'tenant-alpha',
+      mode: 'execute',
+      approval: { approved_by: 'operator', purpose: 'mistake incoming' },
+    });
+
+    expect(restoreFromTrash('active/projects/public/tenant-alpha').restored).toBe(true);
+    expect(
+      JSON.parse(
+        fs.readFileSync(abs('active/projects/public/tenant-alpha/workspace/plan.json'), 'utf8')
+      )
+    ).toEqual({
+      a: 1,
+    });
+  });
+
+  it('never verifies a scope clean when a listing is refused', () => {
+    writeJson(abs('active/shared/data-vault/other-entry.json'), { projectId: 'someone-else' });
+    expect(verifyScopeOffboarded('tenant', 'tenant-alpha')).toEqual({ clean: true, leftovers: [] });
+    const state = globalThis as Record<string, unknown>;
+    state.__kyberion_al04_deny_readdir__ = abs('active/shared/data-vault');
+    try {
+      const verification = verifyScopeOffboarded('tenant', 'tenant-alpha');
+      expect(verification.clean).toBe(false);
+      expect(verification.leftovers.join('\n')).toMatch(/ROLE_VIOLATION/);
+    } finally {
+      delete state.__kyberion_al04_deny_readdir__;
+    }
+  });
+
+  it('reports not_found for an unknown scope and error for a blank id', () => {
+    expect(offboardScope({ scopeType: 'project', scopeId: 'nope' })).toMatchObject({
+      status: 'not_found',
+    });
+    expect(offboardScope({ scopeType: 'project', scopeId: '' })).toMatchObject({ status: 'error' });
+  });
+});
+
+describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vault', () => {
+  const TENANT = 'tenant-alpha';
+  const KNOWLEDGE_ROOT = `knowledge/confidential/${TENANT}`;
+  const ALPHA_HASH = 'a'.repeat(64);
+  const ALPHA_HASH_2 = 'c'.repeat(64);
+  const BETA_HASH = 'b'.repeat(64);
+
+  function writeJsonl(repoRelative: string, lines: unknown[]): void {
+    const filePath = abs(repoRelative);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(
+      filePath,
+      `${lines.map((line) => (typeof line === 'string' ? line : JSON.stringify(line))).join('\n')}\n`
+    );
+  }
+
+  function registryLines(): string[] {
+    return fs
+      .readFileSync(abs(INGEST_DEDUP_REGISTRY_REPO_PATH), 'utf8')
+      .split('\n')
+      .filter((line) => line.trim().length > 0);
+  }
+
+  function seedIngestResidue(): void {
+    // Tenant knowledge tree with the DA-05 asset ledger inside.
+    fs.mkdirSync(abs(`${KNOWLEDGE_ROOT}/reports`), { recursive: true });
+    fs.writeFileSync(abs(`${KNOWLEDGE_ROOT}/reports/q1.md`), '# Q1');
+    writeJsonl(`${KNOWLEDGE_ROOT}/_ledger/assets.jsonl`, [
+      {
+        asset_id: 'ing-alpha1',
+        source_system: 'confluence',
+        source_id: 'PAGE-1',
+        content_sha256: ALPHA_HASH,
+        target_path: `${KNOWLEDGE_ROOT}/reports/q1.md`,
+        version: 1,
+        status: 'active',
+      },
+    ]);
+    // Another tenant's knowledge tree — must survive untouched.
+    fs.mkdirSync(abs('knowledge/confidential/tenant-beta'), { recursive: true });
+    fs.writeFileSync(abs('knowledge/confidential/tenant-beta/x.md'), '# Beta');
+    // Sync cursors + quota counters for both tenants.
+    writeJson(abs(`active/shared/runtime/ingest-cursors/${TENANT}/confluence.json`), { c: 1 });
+    writeJson(abs('active/shared/runtime/ingest-cursors/tenant-beta/confluence.json'), { c: 2 });
+    writeJson(abs(`active/shared/runtime/ingest/quota/${TENANT}/2026-07-28.json`), {
+      files: 3,
+      bytes: 100,
+    });
+    // Shared dedup registry: two alpha lines (one by ledger hash, one only by
+    // landing-path prefix), one beta line, one corrupt line.
+    writeJsonl(INGEST_DEDUP_REGISTRY_REPO_PATH, [
+      { content_sha256: ALPHA_HASH, source_system: 'confluence', source_id: 'PAGE-1' },
+      { content_sha256: ALPHA_HASH_2, target_path: `${KNOWLEDGE_ROOT}/reports/q2.md` },
+      { content_sha256: BETA_HASH, target_path: 'knowledge/confidential/tenant-beta/x.md' },
+      '{corrupt line',
+    ]);
+    // Data-vault entries keyed by projectId.
+    writeJson(abs('active/shared/data-vault/alpha-entry.json'), {
+      sourceType: 'confluence',
+      key: 'k1',
+      projectId: TENANT,
+      tier: 'confidential',
+      data: { secret: 1 },
+    });
+    writeJson(abs('active/shared/data-vault/other-entry.json'), {
+      sourceType: 'confluence',
+      key: 'k2',
+      projectId: 'someone-else',
+      tier: 'confidential',
+      data: { keep: true },
+    });
+    // Classic active/ residue so the pre-DA-08 flow is exercised together.
+    writeJson(abs(`active/projects/public/${TENANT}/workspace/plan.json`), { a: 1 });
+  }
+
+  it('dry run surfaces every residue class and writes nothing', () => {
+    seedIngestResidue();
+    const result = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+
+    expect(result.status).toBe('dry_run');
+    expect(result.targets).toEqual(
+      expect.arrayContaining([
+        { path: `active/projects/public/${TENANT}`, kind: 'project_tree' },
+        { path: KNOWLEDGE_ROOT, kind: 'tenant_knowledge_tree' },
+        { path: `active/shared/runtime/ingest-cursors/${TENANT}`, kind: 'ingest_cursors_tree' },
+        { path: `active/shared/runtime/ingest/quota/${TENANT}`, kind: 'ingest_cursors_tree' },
+        { path: 'active/shared/data-vault/alpha-entry.json', kind: 'data_vault_entry' },
+      ])
+    );
+    expect(result.targets.map((t) => t.path)).not.toContain(
+      'active/shared/data-vault/other-entry.json'
+    );
+    expect(result.dedup_registry).toEqual({ matched: 2, removed: 0 });
+
+    // Nothing changed on disk.
+    expect(fs.existsSync(abs(`${KNOWLEDGE_ROOT}/_ledger/assets.jsonl`))).toBe(true);
+    expect(fs.existsSync(abs(`active/shared/runtime/ingest-cursors/${TENANT}`))).toBe(true);
+    expect(fs.existsSync(abs('active/shared/data-vault/alpha-entry.json'))).toBe(true);
+    expect(registryLines()).toHaveLength(4);
+
+    // And the standalone verification agrees there are still traces.
+    const verification = verifyScopeOffboarded('tenant', TENANT);
+    expect(verification.clean).toBe(false);
+    expect(verification.leftovers.length).toBeGreaterThan(0);
+  });
+
+  it("purges the tenant's resource-usage ledger partitions through the audited ceremony", () => {
+    const ledger = (tier: string, tenant: string) =>
+      `active/shared/runtime/usage-ledger/${tier}/${tenant}`;
+    writeJsonl(`${ledger('confidential', TENANT)}/resource-usage.jsonl`, [{ usage_id: 'a-1' }]);
+    writeJsonl(`${ledger('public', TENANT)}/resource-usage.jsonl`, [{ usage_id: 'a-2' }]);
+    writeJsonl(`${ledger('confidential', 'tenant-beta')}/resource-usage.jsonl`, [
+      { usage_id: 'b-1' },
+    ]);
+    // Pre-partition rows in the shared ledger: two of this tenant (one via the
+    // legacy tenant_id alias), one of tenant-beta, one system row, one corrupt.
+    const legacyLedger = 'work/metrics/resource-usage.jsonl';
+    writeJsonl(legacyLedger, [
+      { usage_id: 'legacy-a', scope: { tier: 'confidential', tenant_slug: TENANT } },
+      { usage_id: 'legacy-a2', scope: { tier: 'confidential', tenant_id: TENANT } },
+      { usage_id: 'legacy-b', scope: { tier: 'confidential', tenant_slug: 'tenant-beta' } },
+      { usage_id: 'legacy-sys', scope: { tier: 'public' } },
+      '{corrupt line',
+    ]);
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining([
+        { path: ledger('confidential', TENANT), kind: 'tenant_usage_ledger' },
+        { path: ledger('public', TENANT), kind: 'tenant_usage_ledger' },
+      ])
+    );
+    expect(dryRun.targets.map((t) => t.path)).not.toContain(ledger('confidential', 'tenant-beta'));
+    expect(dryRun.usage_ledger_legacy).toEqual({ matched: 2, removed: 0 });
+    expect(fs.readFileSync(abs(legacyLedger), 'utf8')).toContain('legacy-a');
+
+    // Removal is approval-gated: nothing is pruned without one.
+    const denied = offboardScope({ scopeType: 'tenant', scopeId: TENANT, mode: 'execute' });
+    expect(denied.status).toBe('approval_required');
+    expect(fs.readFileSync(abs(legacyLedger), 'utf8')).toContain('legacy-a2');
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(result.verification).toEqual({ clean: true, leftovers: [] });
+    expect(fs.existsSync(abs(ledger('confidential', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(ledger('public', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(ledger('confidential', 'tenant-beta')))).toBe(true);
+    // Export-before-delete, and every removal audited.
+    expect(
+      fs.existsSync(
+        abs(`${result.export_path}/${ledger('confidential', TENANT)}/resource-usage.jsonl`)
+      )
+    ).toBe(true);
+    const softDeletes = auditEvents().filter((e) => e.event === 'SCOPE_OFFBOARD_SOFT_DELETE');
+    expect(softDeletes.map((e) => e.path)).toEqual(
+      expect.arrayContaining([ledger('confidential', TENANT), ledger('public', TENANT)])
+    );
+    // Legacy rows: exported verbatim, pruned from the shared ledger, audited.
+    const kept = fs.readFileSync(abs(legacyLedger), 'utf8');
+    expect(kept).not.toContain('"legacy-a"');
+    expect(kept).not.toContain('legacy-a2');
+    expect(kept).toContain('legacy-b');
+    expect(kept).toContain('legacy-sys');
+    expect(kept).toContain('{corrupt line');
+    expect(result.usage_ledger_legacy).toMatchObject({ matched: 2, removed: 2 });
+    const removedCopy = fs.readFileSync(
+      abs(`${result.export_path}/usage-ledger-legacy-removed.jsonl`),
+      'utf8'
+    );
+    expect(removedCopy).toContain('legacy-a');
+    expect(removedCopy).toContain('legacy-a2');
+    expect(removedCopy).not.toContain('legacy-b');
+    expect(
+      auditEvents().find((e) => e.event === 'SCOPE_OFFBOARD_USAGE_LEDGER_PRUNE')
+    ).toMatchObject({
+      scope_id: TENANT,
+      removed_lines: 2,
+      kept_lines: 3,
+      approved_by: 'operator@example',
+    });
+  });
+
+  it("exports and removes the tenant's hybrid-ledger partitions (D9), never another tenant's", () => {
+    const partition = (tier: string, tenant: string) =>
+      `active/shared/runtime/tenant-ledger/${tier}/${tenant}`;
+    writeJsonl(`${partition('confidential', TENANT)}/ledger.jsonl`, [
+      { type: 'MISSION_EVENT:MISSION_CREATE', mission_id: 'MSN-OFF-A' },
+    ]);
+    writeJsonl(`${partition('confidential', 'tenant-beta')}/ledger.jsonl`, [
+      { type: 'MISSION_EVENT:MISSION_CREATE', mission_id: 'MSN-OFF-B' },
+    ]);
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining([{ path: partition('confidential', TENANT), kind: 'tenant_ledger' }])
+    );
+    expect(dryRun.targets.map((t) => t.path)).not.toContain(
+      partition('confidential', 'tenant-beta')
+    );
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(fs.existsSync(abs(partition('confidential', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(partition('confidential', 'tenant-beta')))).toBe(true);
+    expect(
+      fs.existsSync(abs(`${result.export_path}/${partition('confidential', TENANT)}/ledger.jsonl`))
+    ).toBe(true);
+  });
+
+  it("exports and removes the tenant's approval store partitions, never another tenant's", () => {
+    const partition = (tier: string, tenant: string) =>
+      `active/shared/runtime/tenant-approvals/${tier}/${tenant}`;
+    writeJsonl(`${partition('confidential', TENANT)}/terminal/approvals.jsonl`, [
+      { event: 'approval_requested', request_id: 'req-a' },
+    ]);
+    writeJsonl(`${partition('personal', TENANT)}/terminal/approvals.jsonl`, [
+      { event: 'approval_requested', request_id: 'req-a2' },
+    ]);
+    writeJsonl(`${partition('confidential', 'tenant-beta')}/terminal/approvals.jsonl`, [
+      { event: 'approval_requested', request_id: 'req-b' },
+    ]);
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining([
+        { path: partition('confidential', TENANT), kind: 'tenant_approvals' },
+        { path: partition('personal', TENANT), kind: 'tenant_approvals' },
+      ])
+    );
+    expect(dryRun.targets.map((t) => t.path)).not.toContain(
+      partition('confidential', 'tenant-beta')
+    );
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(fs.existsSync(abs(partition('confidential', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(partition('personal', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(partition('confidential', 'tenant-beta')))).toBe(true);
+    expect(
+      fs.existsSync(
+        abs(`${result.export_path}/${partition('confidential', TENANT)}/terminal/approvals.jsonl`)
+      )
+    ).toBe(true);
+  });
+
+  it('decides an offboarding disposition for every registered tenant runtime partition root', () => {
+    expect(Object.keys(TENANT_RUNTIME_PARTITION_TARGET_KINDS).sort()).toEqual(
+      TENANT_RUNTIME_PARTITION_ROOTS.map((entry) => entry.key).sort()
+    );
+  });
+
+  it("exports and removes the tenant's other runtime state partitions, never another tenant's", () => {
+    const roots = [
+      'active/shared/runtime/pipeline-library-runs',
+      'active/shared/runtime/autonomy-learning',
+      'active/shared/runtime/external-operations',
+      'active/shared/runtime/grants',
+      'active/shared/runtime/delegation-idempotency',
+      'active/shared/runtime/media-generation/cost-settlements',
+      'active/shared/runtime/health/api-verification',
+    ];
+    // Durable receipts: review-required, never auto-offboarded.
+    const kept = [
+      'active/shared/runtime/hearing',
+      'active/shared/runtime/discussion-create-requests',
+    ];
+    const record = (root: string, tenant: string) => `${root}/confidential/${tenant}/state.json`;
+    for (const root of [...roots, ...kept])
+      for (const tenant of [TENANT, 'tenant-beta']) {
+        fs.mkdirSync(path.dirname(abs(record(root, tenant))), { recursive: true });
+        fs.writeFileSync(abs(record(root, tenant)), JSON.stringify({ tenant }));
+      }
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining(
+        roots.map((root) => ({
+          path: `${root}/confidential/${TENANT}`,
+          kind: 'tenant_runtime_state',
+        }))
+      )
+    );
+    expect(dryRun.targets.map((t) => t.path).filter((p) => p.includes('tenant-beta'))).toEqual([]);
+    expect(
+      dryRun.targets.map((t) => t.path).filter((p) => kept.some((root) => p.startsWith(root)))
+    ).toEqual([]);
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    for (const root of roots) {
+      expect(fs.existsSync(abs(`${root}/confidential/${TENANT}`))).toBe(false);
+      expect(fs.existsSync(abs(record(root, 'tenant-beta')))).toBe(true);
+      expect(fs.existsSync(abs(`${result.export_path}/${record(root, TENANT)}`))).toBe(true);
+    }
+    for (const root of kept) expect(fs.existsSync(abs(record(root, TENANT)))).toBe(true);
+    expect(result.verification?.clean).toBe(true);
+  });
+
+  it('collects out-of-tree derived assets from the tenant derivation ledger (P3 R-09)', () => {
+    const ledgerDir = `active/shared/runtime/asset-derivations/confidential/${TENANT}`;
+    const outOfTree = `active/shared/cache/confidential/${TENANT}/spec.index`;
+    const inTree = `${KNOWLEDGE_ROOT}/reports/summary.md`;
+    const alreadyDeleted = `active/shared/cache/confidential/${TENANT}/old.index`;
+    const at = '2026-11-08T00:00:00.000Z';
+    // The claimed `asset:` source must resolve in the tenant's ingest ledger —
+    // partition-bounded honoring refuses records whose sources don't verify.
+    writeJsonl(`${KNOWLEDGE_ROOT}/_ledger/assets.jsonl`, [
+      {
+        asset_id: 'ing-aaaa',
+        version: 1,
+        target_path: `${KNOWLEDGE_ROOT}/reports/q1.md`,
+        status: 'active',
+      },
+    ]);
+    fs.mkdirSync(abs(`${KNOWLEDGE_ROOT}/reports`), { recursive: true });
+    fs.writeFileSync(abs(`${KNOWLEDGE_ROOT}/reports/q1.md`), '# Q1');
+    writeJsonl(`${ledgerDir}/derivation-deletions.jsonl`, [
+      {
+        source_ref: `asset:${TENANT}:ing-aaaa@v1`,
+        deleted_paths: [alreadyDeleted],
+        deleted_at: at,
+      },
+    ]);
+    fs.mkdirSync(abs(`${KNOWLEDGE_ROOT}/reports`), { recursive: true });
+    fs.writeFileSync(abs(inTree), 's');
+    fs.mkdirSync(path.dirname(abs(outOfTree)), { recursive: true });
+    fs.writeFileSync(abs(outOfTree), 'idx');
+    withExecutionContext('mission_controller', () => {
+      for (const derived of [outOfTree, inTree])
+        recordDerivation({
+          derived: { path: derived, kind: 'cache' },
+          sources: [{ kind: 'asset', tenant: TENANT, assetId: 'ing-aaaa', version: 1 }],
+          options: { rootDir: currentRoot() },
+        });
+    });
+
+    const targets = collectScopeTargets('tenant', TENANT);
+    // Out-of-tree derived path is reached through the ledger, not a hand list.
+    expect(targets).toEqual(expect.arrayContaining([{ path: outOfTree, kind: 'derived_asset' }]));
+    // The tenant's ledger partition itself is swept as a registered runtime root.
+    expect(targets).toEqual(
+      expect.arrayContaining([{ path: ledgerDir, kind: 'tenant_runtime_state' }])
+    );
+    // In-tree derived paths stay on their tree target; propagated deletions are skipped.
+    const paths = targets.map((t) => t.path);
+    expect(paths).not.toContain(inTree);
+    expect(paths).not.toContain(alreadyDeleted);
+  });
+
+  function seedDerivedChain(): { source: string; middle: string; leaf: string; ledger: string } {
+    const source = `${KNOWLEDGE_ROOT}/docs/origin.md`;
+    const middle = `active/shared/cache/confidential/${TENANT}/middle.txt`;
+    const leaf = `active/shared/artifacts/confidential/${TENANT}/leaf.txt`;
+    for (const file of [source, middle, leaf]) {
+      fs.mkdirSync(path.dirname(abs(file)), { recursive: true });
+      fs.writeFileSync(abs(file), file);
+    }
+    withExecutionContext('mission_controller', () => {
+      for (const [input, output] of [
+        [source, middle],
+        [middle, leaf],
+      ])
+        recordDerivation({
+          derived: { path: output!, kind: 'cache' },
+          sources: [{ kind: 'path', path: input! }],
+          options: { rootDir: currentRoot() },
+        });
+    });
+    return {
+      source,
+      middle,
+      leaf,
+      ledger: `active/shared/runtime/asset-derivations/confidential/${TENANT}`,
+    };
+  }
+
+  it('offboards a trusted transitive chain despite a stale path tombstone', () => {
+    const { middle, leaf, ledger } = seedDerivedChain();
+    writeJsonl(`${ledger}/derivation-deletions.jsonl`, [{ deleted_paths: [middle] }]);
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+    });
+    expect(result.status).toBe('offboarded');
+    expect(result.verification?.clean).toBe(true);
+    for (const file of [middle, leaf]) {
+      expect(result.soft_deleted).toContain(file);
+      expect(fs.existsSync(abs(file))).toBe(false);
+      expect(fs.existsSync(abs(`${result.export_path}/${file}`))).toBe(true);
+    }
+  });
+
+  it.each(['directory', 'replacement', 'modified'] as const)(
+    'refuses a derived %s swapped after export and preserves its lineage ledger',
+    (swap) => {
+      const { middle, ledger } = seedDerivedChain();
+      const original = fs.readFileSync(abs(middle), 'utf8');
+      const hooks = globalThis as { __kyberion_offboard_write_hook__?: (target: string) => void };
+      hooks.__kyberion_offboard_write_hook__ = (target) => {
+        if (path.basename(target) !== 'manifest.json') return;
+        delete hooks.__kyberion_offboard_write_hook__;
+        if (swap === 'modified') fs.writeFileSync(abs(middle), 'changed generation');
+        else {
+          fs.renameSync(abs(middle), `${abs(middle)}.original`);
+          if (swap === 'directory') {
+            fs.mkdirSync(abs(middle));
+            fs.writeFileSync(path.join(abs(middle), 'keep.txt'), 'unrelated child');
+          } else fs.writeFileSync(abs(middle), original);
+        }
+      };
+      try {
+        const result = offboardScope({
+          scopeType: 'tenant',
+          scopeId: TENANT,
+          mode: 'execute',
+          approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+        });
+        expect(result.status).toBe('error');
+        expect(result.soft_deleted).not.toContain(middle);
+        expect(result.verification?.clean).not.toBe(true);
+        expect(fs.existsSync(abs(middle))).toBe(true);
+        expect(fs.existsSync(abs(`${ledger}/derivations.jsonl`))).toBe(true);
+        expect(fs.readFileSync(abs(`${result.export_path}/${middle}`), 'utf8')).toBe(original);
+        if (swap === 'directory')
+          expect(fs.readFileSync(path.join(abs(middle), 'keep.txt'), 'utf8')).toBe(
+            'unrelated child'
+          );
+      } finally {
+        delete hooks.__kyberion_offboard_write_hook__;
+      }
+    }
+  );
+
+  it('refuses a ledger line landing outside the offboarding tenant (no export exfil)', () => {
+    const ledgerDir = `active/shared/runtime/asset-derivations/confidential/${TENANT}`;
+    const victimPath = 'knowledge/confidential/victim-co/docs/keep.md';
+    const taint = { highestTier: 'confidential', tenants: ['victim-co'], prohibitExternal: true };
+    // Forged record inside THIS tenant's partition claiming a verified
+    // foreign source — partition-bounded honoring refuses the landing, so
+    // the victim file is neither collected nor copied into the export.
+    fs.mkdirSync(abs('knowledge/confidential/victim-co/_ledger'), { recursive: true });
+    writeJsonl('knowledge/confidential/victim-co/_ledger/assets.jsonl', [
+      {
+        asset_id: 'ing-real',
+        version: 1,
+        target_path: 'knowledge/confidential/victim-co/docs/real.md',
+        status: 'active',
+      },
+    ]);
+    fs.mkdirSync(abs('knowledge/confidential/victim-co/docs'), { recursive: true });
+    fs.writeFileSync(abs(victimPath), 'victim data');
+    writeJsonl(`${ledgerDir}/derivations.jsonl`, [
+      {
+        derived: { ref: `path:${victimPath}`, path: victimPath, kind: 'summary' },
+        sources: ['asset:victim-co:ing-real@v1', `path:${KNOWLEDGE_ROOT}/docs/a.md`],
+        taint,
+        recorded_at: '2026-11-08T00:00:00.000Z',
+      },
+    ]);
+    fs.mkdirSync(abs(`${KNOWLEDGE_ROOT}/docs`), { recursive: true });
+    fs.writeFileSync(abs(`${KNOWLEDGE_ROOT}/docs/a.md`), 'a');
+
+    expect(() => collectScopeTargets('tenant', TENANT)).toThrow();
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(fs.existsSync(abs(victimPath))).toBe(true);
+    expect(result.status).toBe('error');
+    expect(fs.existsSync(abs(`${result.export_path}/${victimPath}`))).toBe(false);
+  });
+
+  it('reports a tenant runtime partition it could not remove as a failed offboarding', () => {
+    const parent = 'active/shared/runtime/external-operations/confidential';
+    fs.mkdirSync(abs(`${parent}/${TENANT}`), { recursive: true });
+    fs.writeFileSync(abs(`${parent}/${TENANT}/session.json`), '{}');
+    fs.chmodSync(abs(parent), 0o555);
+    try {
+      const result = offboardScope({
+        scopeType: 'tenant',
+        scopeId: TENANT,
+        mode: 'execute',
+        approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+        nowIso: '2026-10-08T01:02:03.000Z',
+      });
+      expect(fs.existsSync(abs(`${parent}/${TENANT}`))).toBe(true);
+      expect(result.status).toBe('error');
+      expect(result.reason).toContain('OFFBOARD_PARTITION_LEFTOVER');
+      expect(result.reason).toContain(`${parent}/${TENANT}`);
+    } finally {
+      fs.chmodSync(abs(parent), 0o755);
+    }
+  });
+
+  it("exports and removes the tenant's customer decision invites, never another tenant's", () => {
+    const partition = (tenant: string) =>
+      `active/shared/runtime/customer-decision-invites/confidential/${tenant}`;
+    const record = (tenant: string) => `${partition(tenant)}/inv-00000000000000aa.json`;
+    for (const tenant of [TENANT, 'tenant-beta']) {
+      fs.mkdirSync(abs(partition(tenant)), { recursive: true });
+      fs.writeFileSync(abs(record(tenant)), JSON.stringify({ invite_id: 'inv-00000000000000aa' }));
+    }
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining([{ path: partition(TENANT), kind: 'customer_decision_invites' }])
+    );
+    expect(dryRun.targets.map((t) => t.path)).not.toContain(partition('tenant-beta'));
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(fs.existsSync(abs(partition(TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(record('tenant-beta')))).toBe(true);
+    expect(fs.existsSync(abs(`${result.export_path}/${record(TENANT)}`))).toBe(true);
+  });
+
+  it("purges the tenant's execution-metrics partitions and legacy rows through the same ceremony", () => {
+    const partition = (tier: string, tenant: string) =>
+      `active/shared/runtime/execution-metrics/${tier}/${tenant}`;
+    writeJsonl(`${partition('confidential', TENANT)}/execution-metrics.jsonl`, [
+      { component: 'anthropic-sdk', duration_ms: 1 },
+    ]);
+    writeJsonl(`${partition('personal', TENANT)}/execution-metrics.jsonl`, [
+      { component: 'agent-runtime:ask', duration_ms: 2 },
+    ]);
+    writeJsonl(`${partition('confidential', 'tenant-beta')}/execution-metrics.jsonl`, [
+      { component: 'beta', duration_ms: 3 },
+    ]);
+    const legacyLedger = 'work/metrics/execution-metrics.jsonl';
+    writeJsonl(legacyLedger, [
+      { component: 'legacy-a', scope: { tier: 'confidential', tenant_slug: TENANT } },
+      { component: 'legacy-b', scope: { tier: 'confidential', tenant_slug: 'tenant-beta' } },
+      { component: 'legacy-sys', mission_id: 'MSN-SYS' },
+      '{corrupt line',
+    ]);
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining([
+        { path: partition('confidential', TENANT), kind: 'tenant_execution_metrics' },
+        { path: partition('personal', TENANT), kind: 'tenant_execution_metrics' },
+      ])
+    );
+    expect(dryRun.targets.map((t) => t.path)).not.toContain(
+      partition('confidential', 'tenant-beta')
+    );
+    expect(dryRun.execution_metrics_legacy).toEqual({ matched: 1, removed: 0 });
+
+    const denied = offboardScope({ scopeType: 'tenant', scopeId: TENANT, mode: 'execute' });
+    expect(denied.status).toBe('approval_required');
+    expect(fs.readFileSync(abs(legacyLedger), 'utf8')).toContain('legacy-a');
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(result.verification).toEqual({ clean: true, leftovers: [] });
+    expect(fs.existsSync(abs(partition('confidential', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(partition('personal', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(partition('confidential', 'tenant-beta')))).toBe(true);
+    expect(
+      fs.existsSync(
+        abs(`${result.export_path}/${partition('confidential', TENANT)}/execution-metrics.jsonl`)
+      )
+    ).toBe(true);
+    const kept = fs.readFileSync(abs(legacyLedger), 'utf8');
+    expect(kept).not.toContain('legacy-a');
+    expect(kept).toContain('legacy-b');
+    expect(kept).toContain('legacy-sys');
+    expect(kept).toContain('{corrupt line');
+    expect(result.execution_metrics_legacy).toMatchObject({ matched: 1, removed: 1 });
+    expect(
+      fs.readFileSync(abs(`${result.export_path}/execution-metrics-legacy-removed.jsonl`), 'utf8')
+    ).toContain('legacy-a');
+    expect(
+      auditEvents().find((e) => e.event === 'SCOPE_OFFBOARD_EXECUTION_METRICS_PRUNE')
+    ).toMatchObject({
+      scope_id: TENANT,
+      path: legacyLedger,
+      removed_lines: 1,
+      kept_lines: 3,
+      approved_by: 'operator@example',
+    });
+  });
+
+  it('keeps rows appended to the hot ledger between plan and prune; prunes legacy top-level tenants', () => {
+    const legacyLedger = 'work/metrics/execution-metrics.jsonl';
+    writeJsonl(legacyLedger, [
+      { component: 'legacy-a', scope: { tier: 'confidential', tenant_slug: TENANT } },
+      // Pre-canonical rows name the tenant at top level only (shared resolver).
+      { component: 'legacy-top', tenant_slug: TENANT },
+      { component: 'legacy-sys' },
+    ]);
+    const hooks = globalThis as { __kyberion_offboard_write_hook__?: (target: string) => void };
+    let appended = false;
+    hooks.__kyberion_offboard_write_hook__ = (target) => {
+      // After the plan (the manifest is written once the plan is fixed) and
+      // before the prune, live appenders keep writing to the ledger.
+      if (appended || !target.endsWith('manifest.json')) return;
+      appended = true;
+      fs.appendFileSync(
+        abs(legacyLedger),
+        `${JSON.stringify({ component: 'late-other', scope: { tier: 'public' } })}\n` +
+          `${JSON.stringify({ component: 'late-tenant', scope: { tier: 'confidential', tenant_slug: TENANT } })}\n`
+      );
+    };
+    try {
+      const result = offboardScope({
+        scopeType: 'tenant',
+        scopeId: TENANT,
+        mode: 'execute',
+        approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+        nowIso: '2026-10-08T01:02:03.000Z',
+      });
+      expect(appended).toBe(true);
+      expect(result.status).toBe('offboarded');
+      const kept = fs.readFileSync(abs(legacyLedger), 'utf8');
+      expect(kept).toContain('legacy-sys');
+      expect(kept).toContain('late-other');
+      expect(kept).not.toContain('legacy-top');
+      expect(kept).not.toContain('late-tenant');
+      expect(result.execution_metrics_legacy).toMatchObject({ matched: 3, removed: 3 });
+      const exported = fs.readFileSync(
+        abs(`${result.export_path}/execution-metrics-legacy-removed.jsonl`),
+        'utf8'
+      );
+      expect(exported).toContain('late-tenant');
+      expect(exported).toContain('legacy-top');
+      expect(result.verification).toEqual({ clean: true, leftovers: [] });
+    } finally {
+      delete hooks.__kyberion_offboard_write_hook__;
+    }
+  });
+
+  it('keeps a dedup line with a dangerous JSON key as an unreadable record', () => {
+    seedIngestResidue();
+    fs.appendFileSync(
+      abs(INGEST_DEDUP_REGISTRY_REPO_PATH),
+      `{"content_sha256":"${ALPHA_HASH}","target_path":"${KNOWLEDGE_ROOT}","meta":{"__proto__":{}}}\n`
+    );
+
+    const result = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+
+    expect(result.status).toBe('dry_run');
+    expect(result.dedup_registry).toEqual({ matched: 2, removed: 0 });
+    expect(registryLines()).toHaveLength(5);
+  });
+
+  it('does not read a dedup registry replaced by a directory', () => {
+    seedIngestResidue();
+    const registryPath = abs(INGEST_DEDUP_REGISTRY_REPO_PATH);
+    fs.rmSync(registryPath, { force: true });
+    fs.mkdirSync(registryPath, { recursive: true });
+
+    const result = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+
+    expect(result.status).toBe('dry_run');
+    expect(result.dedup_registry).toBeUndefined();
+  });
+
+  it('execute leaves zero trace — knowledge, ledger, cursors, quota, dedup lines, vault — all audited', () => {
+    seedIngestResidue();
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-07-28T01:02:03.000Z',
+    });
+
+    expect(result.status).toBe('offboarded');
+
+    // DA-08 acceptance: no trace of the tenant remains anywhere.
+    expect(result.verification).toEqual({ clean: true, leftovers: [] });
+    expect(fs.existsSync(abs(KNOWLEDGE_ROOT))).toBe(false);
+    expect(fs.existsSync(abs(`active/shared/runtime/ingest-cursors/${TENANT}`))).toBe(false);
+    expect(fs.existsSync(abs(`active/shared/runtime/ingest/quota/${TENANT}`))).toBe(false);
+    expect(fs.existsSync(abs('active/shared/data-vault/alpha-entry.json'))).toBe(false);
+
+    // The dedup registry kept exactly the other tenant's line + the corrupt line.
+    const kept = registryLines();
+    expect(kept).toHaveLength(2);
+    expect(kept.some((line) => line.includes(BETA_HASH))).toBe(true);
+    expect(kept.some((line) => line.includes('{corrupt line'))).toBe(true);
+    expect(kept.some((line) => line.includes(ALPHA_HASH))).toBe(false);
+    expect(result.dedup_registry).toMatchObject({ matched: 2, removed: 2 });
+
+    // Everything else survives.
+    expect(fs.existsSync(abs('knowledge/confidential/tenant-beta/x.md'))).toBe(true);
+    expect(fs.existsSync(abs('active/shared/runtime/ingest-cursors/tenant-beta'))).toBe(true);
+    expect(fs.existsSync(abs('active/shared/data-vault/other-entry.json'))).toBe(true);
+
+    // Export-before-delete: knowledge (incl. ledger), and the removed
+    // dedup-registry lines as a verbatim JSONL copy.
+    const exported = abs(`${result.export_path}/${KNOWLEDGE_ROOT}/_ledger/assets.jsonl`);
+    expect(fs.existsSync(exported)).toBe(true);
+    const removedCopy = fs.readFileSync(
+      abs(`${result.export_path}/dedup-registry-removed.jsonl`),
+      'utf8'
+    );
+    expect(removedCopy).toContain(ALPHA_HASH);
+    expect(removedCopy).toContain(ALPHA_HASH_2);
+
+    // Every purge audited: soft-deletes per target, dedup prune, verification.
+    const events = auditEvents();
+    const softDeletes = events.filter((e) => e.event === 'SCOPE_OFFBOARD_SOFT_DELETE');
+    expect(softDeletes.map((e) => e.path)).toEqual(
+      expect.arrayContaining([
+        KNOWLEDGE_ROOT,
+        `active/shared/runtime/ingest-cursors/${TENANT}`,
+        `active/shared/runtime/ingest/quota/${TENANT}`,
+        'active/shared/data-vault/alpha-entry.json',
+      ])
+    );
+    expect(events.find((e) => e.event === 'SCOPE_OFFBOARD_DEDUP_REGISTRY_PRUNE')).toMatchObject({
+      scope_id: TENANT,
+      removed_lines: 2,
+      kept_lines: 2,
+      approved_by: 'operator@example',
+    });
+    expect(events.find((e) => e.event === 'SCOPE_OFFBOARD_VERIFIED')).toMatchObject({
+      scope_id: TENANT,
+      clean: true,
+    });
+
+    // Idempotent: a second execute finds nothing.
+    expect(
+      offboardScope({
+        scopeType: 'tenant',
+        scopeId: TENANT,
+        mode: 'execute',
+        approval: { approved_by: 'operator@example', purpose: 'retry' },
+      }).status
+    ).toBe('not_found');
+  });
+
+  it('refuses to touch the residue without approval (fail-closed carries over)', () => {
+    seedIngestResidue();
+    const result = offboardScope({ scopeType: 'tenant', scopeId: TENANT, mode: 'execute' });
+    expect(result.status).toBe('approval_required');
+    expect(fs.existsSync(abs(`${KNOWLEDGE_ROOT}/_ledger/assets.jsonl`))).toBe(true);
+    expect(registryLines()).toHaveLength(4);
+  });
+});
+
+describe('tenant offboarding — delegation trace and records (partitioned + legacy shared copies)', () => {
+  const TENANT = 'tenant-alpha';
+  const OTHER = 'tenant-beta';
+  const ROOT = 'active/shared/runtime/delegation-records';
+  const LEGACY_TRACE = 'active/shared/observability/delegations.jsonl';
+  const LEGACY_SEGMENT = 'active/shared/observability/delegations-20261001-010203.jsonl';
+  const LEGACY_RECORDS = 'active/shared/observability/delegations';
+  const TENANT_MISSION = 'MSN-ALPHA-DELEGATION';
+
+  function writeLines(repoRelative: string, rows: unknown[]): void {
+    fs.mkdirSync(path.dirname(abs(repoRelative)), { recursive: true });
+    fs.writeFileSync(abs(repoRelative), `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
+  }
+
+  function lines(repoRelative: string): Array<Record<string, unknown>> {
+    return fs
+      .readFileSync(abs(repoRelative), 'utf8')
+      .split('\n')
+      .filter((line) => line.trim())
+      .map((line) => JSON.parse(line));
+  }
+
+  function seed(): void {
+    for (const tenant of [TENANT, OTHER]) {
+      writeJson(abs(`${ROOT}/confidential/${tenant}/records/d-${tenant}.json`), {
+        delegation_id: `d-${tenant}`,
+        tenant_slug: tenant,
+        instruction: `secret instruction of ${tenant}`,
+      });
+      writeLines(`${ROOT}/confidential/${tenant}/delegations.jsonl`, [
+        { trace_id: `d-${tenant}`, tenant_slug: tenant, instruction: 'x' },
+      ]);
+    }
+    writeJson(abs(`${ROOT}/system/records/d-system.json`), { delegation_id: 'd-system' });
+    // The tenant's (partition-layout) mission locates its legacy rows.
+    writeJson(abs(`active/missions/confidential/${TENANT}/${TENANT_MISSION}/mission-state.json`), {
+      mission_id: TENANT_MISSION,
+    });
+    writeLines(LEGACY_TRACE, [
+      { trace_id: 'l-1', mission_id: TENANT_MISSION, instruction: 'alpha prose' },
+      { trace_id: 'l-2', mission_id: 'MSN-BETA-ONLY', instruction: 'beta prose' },
+      { trace_id: 'l-3', instruction: 'unattributed prose' },
+      { trace_id: 'l-4', tenant_slug: TENANT, instruction: 'stamped alpha prose' },
+    ]);
+    writeLines(LEGACY_SEGMENT, [
+      { trace_id: 'l-5', mission_id: TENANT_MISSION.toLowerCase(), instruction: 'older alpha' },
+      { trace_id: 'l-6', instruction: 'older unattributed' },
+    ]);
+    writeJson(abs(`${LEGACY_RECORDS}/l-1.json`), {
+      delegation_id: 'l-1',
+      mission_id: TENANT_MISSION,
+      child_session_id: 'child-alpha',
+    });
+    writeLines(`${LEGACY_RECORDS}/child-inbox/child-alpha.jsonl`, [{ text: 'alpha follow-up' }]);
+    writeJson(abs(`${LEGACY_RECORDS}/l-2.json`), {
+      delegation_id: 'l-2',
+      mission_id: 'MSN-BETA-ONLY',
+    });
+    writeJson(abs(`${LEGACY_RECORDS}/l-3.json`), { delegation_id: 'l-3' });
+  }
+
+  it('plans the tenant partition and its legacy records/rows, never another tenant or the system partition', () => {
+    seed();
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.status).toBe('dry_run');
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining([
+        { path: `${ROOT}/confidential/${TENANT}`, kind: 'tenant_delegations' },
+        { path: `${LEGACY_RECORDS}/l-1.json`, kind: 'delegation_legacy_record' },
+        {
+          path: `${LEGACY_RECORDS}/child-inbox/child-alpha.jsonl`,
+          kind: 'delegation_legacy_record',
+        },
+      ])
+    );
+    const paths = dryRun.targets.map((target) => target.path);
+    expect(paths).not.toContain(`${ROOT}/confidential/${OTHER}`);
+    expect(paths).not.toContain(`${ROOT}/system`);
+    expect(paths).not.toContain(`${LEGACY_RECORDS}/l-2.json`);
+    expect(paths).not.toContain(`${LEGACY_RECORDS}/l-3.json`);
+    expect(dryRun.delegations_legacy).toEqual({ matched: 3, removed: 0 });
+    // Dry run writes nothing.
+    expect(lines(LEGACY_TRACE)).toHaveLength(4);
+    expect(TENANT_RUNTIME_PARTITION_TARGET_KINDS.delegations).toBe('tenant_delegations');
+  });
+
+  it('exports, then removes the partition, the legacy records and the legacy trace rows (audited)', () => {
+    seed();
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-11-05T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(result.verification).toMatchObject({ clean: true });
+    expect(fs.existsSync(abs(`${ROOT}/confidential/${TENANT}`))).toBe(false);
+    expect(fs.existsSync(abs(`${ROOT}/confidential/${OTHER}/records/d-${OTHER}.json`))).toBe(true);
+    expect(fs.existsSync(abs(`${ROOT}/system/records/d-system.json`))).toBe(true);
+    expect(fs.existsSync(abs(`${LEGACY_RECORDS}/l-1.json`))).toBe(false);
+    expect(fs.existsSync(abs(`${LEGACY_RECORDS}/child-inbox/child-alpha.jsonl`))).toBe(false);
+    expect(fs.existsSync(abs(`${LEGACY_RECORDS}/l-2.json`))).toBe(true);
+    expect(fs.existsSync(abs(`${LEGACY_RECORDS}/l-3.json`))).toBe(true);
+    // Soft-deleted (restorable), not destroyed.
+    expect(fs.existsSync(trashPathOf(`${LEGACY_RECORDS}/l-1.json`))).toBe(true);
+
+    expect(lines(LEGACY_TRACE).map((row) => row.trace_id)).toEqual(['l-2', 'l-3']);
+    expect(lines(LEGACY_SEGMENT).map((row) => row.trace_id)).toEqual(['l-6']);
+    const exportDir = `${result.export_path}/delegations-legacy-removed`;
+    expect(lines(`${exportDir}/delegations.jsonl`).map((row) => row.trace_id)).toEqual([
+      'l-1',
+      'l-4',
+    ]);
+    expect(
+      lines(`${exportDir}/delegations-20261001-010203.jsonl`).map((row) => row.trace_id)
+    ).toEqual(['l-5']);
+    expect(fs.existsSync(abs(`${result.export_path}/${ROOT}/confidential/${TENANT}`))).toBe(true);
+    expect(result.delegations_legacy).toMatchObject({ matched: 3, removed: 3 });
+
+    const prunes = auditEvents().filter(
+      (event) => event.event === 'SCOPE_OFFBOARD_DELEGATION_TRACE_PRUNE'
+    );
+    expect(prunes.map((event) => [event.path, event.removed_lines, event.kept_lines])).toEqual([
+      [LEGACY_SEGMENT, 1, 1],
+      [LEGACY_TRACE, 2, 2],
+    ]);
+    expect(prunes[0]).toMatchObject({ approved_by: 'operator@example', scope_id: TENANT });
+    expect(
+      auditEvents()
+        .filter((event) => event.event === 'SCOPE_OFFBOARD_SOFT_DELETE')
+        .map((event) => event.kind)
+    ).toEqual(expect.arrayContaining(['tenant_delegations', 'delegation_legacy_record']));
+  });
+
+  it('exports, then prunes the tenant rows of the legacy notification queue (audited); the partition queue goes with the partition', () => {
+    seed();
+    const LEGACY_QUEUE = 'active/shared/runtime/delegations/notifications.jsonl';
+    writeLines(`${ROOT}/confidential/${TENANT}/notifications.jsonl`, [
+      { notification_id: 'p-1', delegation_id: `d-${TENANT}`, tenant_slug: TENANT },
+    ]);
+    writeLines(LEGACY_QUEUE, [
+      { notification_id: 'n-1', delegation_id: 'x-1', tenant_slug: TENANT, claimed: true },
+      { notification_id: 'n-2', delegation_id: 'x-2', mission_id: TENANT_MISSION },
+      // Attributed only by its delegation, whose record sits in the tenant partition.
+      { notification_id: 'n-3', delegation_id: `d-${TENANT}` },
+      { notification_id: 'n-4', delegation_id: `d-${OTHER}`, tenant_slug: OTHER },
+      { notification_id: 'n-5', delegation_id: 'x-5' },
+    ]);
+    expect(DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH).toBe(LEGACY_QUEUE);
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.delegations_legacy).toEqual({ matched: 6, removed: 0 });
+    expect(lines(LEGACY_QUEUE)).toHaveLength(5);
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-11-05T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(result.verification).toMatchObject({ clean: true });
+    expect(lines(LEGACY_QUEUE).map((row) => row.notification_id)).toEqual(['n-4', 'n-5']);
+    const exportDir = `${result.export_path}/delegations-legacy-removed`;
+    expect(lines(`${exportDir}/notifications.jsonl`).map((row) => row.notification_id)).toEqual([
+      'n-1',
+      'n-2',
+      'n-3',
+    ]);
+    expect(fs.existsSync(abs(`${ROOT}/confidential/${TENANT}/notifications.jsonl`))).toBe(false);
+    expect(
+      lines(`${result.export_path}/${ROOT}/confidential/${TENANT}/notifications.jsonl`).map(
+        (row) => row.notification_id
+      )
+    ).toEqual(['p-1']);
+    const prunes = auditEvents().filter(
+      (event) => event.event === 'SCOPE_OFFBOARD_DELEGATION_NOTIFICATION_PRUNE'
+    );
+    expect(prunes.map((event) => [event.path, event.removed_lines, event.kept_lines])).toEqual([
+      [LEGACY_QUEUE, 3, 2],
+    ]);
+    expect(prunes[0]).toMatchObject({ approved_by: 'operator@example', scope_id: TENANT });
+  });
+
+  it('reports legacy delegation rows and records still attributed to the tenant as leftovers', () => {
+    seed();
+    const verification = verifyScopeOffboarded(
+      'tenant',
+      TENANT,
+      {},
+      { legacyMissionIds: new Set([TENANT_MISSION]) }
+    );
+    expect(verification.clean).toBe(false);
+    expect(verification.leftovers).toEqual(
+      expect.arrayContaining([
+        `${LEGACY_TRACE} (2 legacy delegation row(s) of '${TENANT}')`,
+        `${LEGACY_RECORDS}/l-1.json`,
+      ])
+    );
+  });
+});
+
+describe('tenant offboarding — legacy resident-dot copies (dot/tenants/<slug>)', () => {
+  const TENANT = 'tenant-alpha';
+  const OTHER = 'tenant-beta';
+  const DOT = 'active/shared/runtime/dot';
+
+  function seedDot(): void {
+    for (const tenant of [TENANT, OTHER]) {
+      writeJson(abs(`${DOT}/tenants/${tenant}/memory/dot-${tenant}.json`), {
+        dot_id: `dot-${tenant}`,
+      });
+      fs.writeFileSync(
+        abs(`${DOT}/tenants/${tenant}/work-results.jsonl`),
+        `${JSON.stringify({ dot_id: `dot-${tenant}`, summary: `${tenant} prose` })}\n`
+      );
+    }
+    // Current (partitioned) dot state stays review-required.
+    writeJson(abs(`${DOT}/confidential/${TENANT}/memory/dot-${TENANT}.json`), {
+      dot_id: `dot-${TENANT}`,
+    });
+  }
+
+  it('exports and soft-deletes the tenant legacy copy only (audited), keeping the partitioned dot state', () => {
+    seedDot();
+    expect(PHYSICAL_LEGACY_TENANT_STATE_ROOTS).toContain(DOT);
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining([{ path: `${DOT}/tenants/${TENANT}`, kind: 'tenant_learning_tree' }])
+    );
+    const planned = dryRun.targets.map((target) => target.path);
+    expect(planned).not.toContain(`${DOT}/tenants/${OTHER}`);
+    expect(planned).not.toContain(`${DOT}/confidential/${TENANT}`);
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-11-05T02:03:04.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(result.verification).toMatchObject({ clean: true });
+    expect(fs.existsSync(abs(`${DOT}/tenants/${TENANT}`))).toBe(false);
+    expect(fs.existsSync(trashPathOf(`${DOT}/tenants/${TENANT}/work-results.jsonl`))).toBe(true);
+    expect(
+      fs.existsSync(abs(`${result.export_path}/${DOT}/tenants/${TENANT}/memory/dot-${TENANT}.json`))
+    ).toBe(true);
+    expect(fs.existsSync(abs(`${DOT}/tenants/${OTHER}/work-results.jsonl`))).toBe(true);
+    expect(fs.existsSync(abs(`${DOT}/confidential/${TENANT}/memory/dot-${TENANT}.json`))).toBe(
+      true
+    );
+    expect(
+      auditEvents().find(
+        (event) =>
+          event.event === 'SCOPE_OFFBOARD_SOFT_DELETE' && event.path === `${DOT}/tenants/${TENANT}`
+      )
+    ).toMatchObject({ kind: 'tenant_learning_tree', approved_by: 'operator@example' });
+  });
+});

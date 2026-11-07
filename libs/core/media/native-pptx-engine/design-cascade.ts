@@ -3,8 +3,8 @@ import {
   type CreativeDesignConstraints,
   type CreativeDesignTypography,
   type MediaThemeRecord,
-} from '../../creative-design-resolver.js';
-import { resolveEastAsianFontFamily } from '../../design-fonts.js';
+} from '../../design/creative-design-resolver.js';
+import { resolveEastAsianFontFamily } from '../../design/design-fonts.js';
 import type { PptxDesignProtocol, PptxElement, PptxStyle } from '../../contracts/pptx-protocol.js';
 
 /**

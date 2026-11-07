@@ -14,201 +14,6 @@ import { safeReadFile } from '@agent/core';
 import { readFrontDeskSurfaceUrls } from '@agent/core/front-desk-nav';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 
-export const FIRST_JOB_VOCABULARY_KEYS = [
-  'front_desk:first_job_setup_title',
-  'front_desk:first_job_setup_preview',
-  'front_desk:first_job_setup_apply',
-  'front_desk:first_job_setup_profile_unknown',
-  'front_desk:first_job_setup_profile_present',
-  'front_desk:first_job_setup_profile_missing',
-  'front_desk:first_job_setup_profile_unavailable',
-  'front_desk:first_job_setup_oidc_unknown',
-  'front_desk:first_job_setup_oidc_configured',
-  'front_desk:first_job_setup_oidc_configuration_required',
-  'front_desk:first_job_setup_oidc_unavailable',
-  'front_desk:first_job_setup_browser_user_unknown',
-  'front_desk:first_job_setup_browser_user_verified',
-  'front_desk:first_job_setup_browser_user_sign_in_required',
-  'front_desk:first_job_setup_browser_user_binding_required',
-  'front_desk:first_job_setup_browser_user_unavailable',
-  'front_desk:first_job_setup_approval_scope_unknown',
-  'front_desk:first_job_setup_approval_scope_ready',
-  'front_desk:first_job_setup_approval_scope_mapping_required',
-  'front_desk:first_job_setup_approval_scope_authentication_required',
-  'front_desk:first_job_setup_approval_scope_owner_unavailable',
-  'front_desk:first_job_setup_approval_scope_owner_mismatch',
-  'front_desk:first_job_setup_approval_scope_tenant_membership_required',
-  'front_desk:first_job_setup_approval_scope_unavailable',
-  'front_desk:first_job_setup_baseline_unknown',
-  'front_desk:first_job_setup_baseline_unchecked',
-  'front_desk:first_job_setup_reasoning_unknown',
-  'front_desk:first_job_setup_reasoning_not_required',
-  'front_desk:first_job_setup_advancement_unknown',
-  'front_desk:first_job_setup_advancement_not_started',
-  'front_desk:first_job_setup_advancement_review_or_tick',
-  'front_desk:first_job_setup_advancement_running',
-  'front_desk:first_job_setup_advancement_receipt_verified',
-  'front_desk:first_job_setup_advancement_unavailable',
-  'front_desk:first_job_setup_owner_user',
-  'front_desk:first_job_setup_owner_operator',
-  'front_desk:first_job_setup_action_inspect_profile',
-  'front_desk:first_job_setup_action_complete_profile',
-  'front_desk:first_job_setup_action_inspect_mapping',
-  'front_desk:first_job_setup_action_configure_login',
-  'front_desk:first_job_setup_action_sign_in',
-  'front_desk:first_job_setup_action_inspect_member_binding',
-  'front_desk:first_job_setup_action_inspect_approval_scope',
-  'front_desk:first_job_setup_action_inspect_baseline',
-  'front_desk:first_job_setup_action_review_or_tick',
-  'front_desk:first_job_setup_action_wait',
-  'front_desk:first_job_setup_action_inspect_execution',
-  'front_desk:first_job_setup_action_refresh',
-  'front_desk:first_job_body_title',
-  'front_desk:first_job_body_notice',
-  'front_desk:first_job_body_select',
-  'front_desk:first_job_body_empty',
-  'front_desk:first_job_body_loading',
-  'front_desk:first_job_body_ready',
-  'front_desk:first_job_body_unavailable',
-  'front_desk:first_job_body_forbidden',
-  'front_desk:first_job_body_failed',
-  'front_desk:first_job_body_retry',
-  'front_desk:first_job_compare_title',
-  'front_desk:first_job_compare_notice',
-  'front_desk:first_job_compare_left',
-  'front_desk:first_job_compare_right',
-  'front_desk:first_job_compare_empty',
-  'front_desk:first_job_compare_same_version',
-  'front_desk:first_job_compare_same',
-  'front_desk:first_job_compare_different',
-  'front_desk:first_job_compare_wait',
-  'front_desk:first_job_last_checked',
-  'front_desk:first_job_not_checked',
-  'front_desk:first_job_refresh_active',
-  'front_desk:first_job_refresh_hidden',
-  'front_desk:first_job_refresh_paused',
-  'front_desk:first_job_refresh_backoff',
-  'front_desk:first_job_refresh_failed',
-  'front_desk:first_job_prerequisites',
-  'front_desk:first_job_identity_explanation',
-  'front_desk:first_job_next_title',
-  'front_desk:first_job_next_loading',
-  'front_desk:first_job_next_signin_setup',
-  'front_desk:first_job_next_signin',
-  'front_desk:first_job_next_account',
-  'front_desk:first_job_next_mapping',
-  'front_desk:first_job_next_review',
-  'front_desk:first_job_next_ready',
-  'front_desk:first_job_setup_details',
-  'front_desk:first_job_next_recovery',
-  'front_desk:first_job_next_pending',
-  'front_desk:first_job_next_running',
-  'front_desk:first_job_next_result',
-  'front_desk:first_job_next_unavailable',
-  'front_desk:first_job_title',
-  'front_desk:first_job_summary',
-  'front_desk:first_job_home_link',
-  'front_desk:first_job_readiness',
-  'front_desk:first_job_identity_unknown',
-  'front_desk:first_job_baseline_unknown',
-  'front_desk:first_job_reasoning_unknown',
-  'front_desk:first_job_loading',
-  'front_desk:first_job_ready',
-  'front_desk:first_job_mapping_missing',
-  'front_desk:first_job_mapping_mismatch',
-  'front_desk:first_job_mapping_ambiguous',
-  'front_desk:first_job_mapping_unavailable',
-  'front_desk:first_job_mapping_changed',
-  'front_desk:first_job_steps',
-  'front_desk:first_job_step_start',
-  'front_desk:first_job_step_review',
-  'front_desk:first_job_step_receipt',
-  'front_desk:first_job_step_revise',
-  'front_desk:first_job_start',
-  'front_desk:first_job_refresh',
-  'front_desk:first_job_approval',
-  'front_desk:first_job_wait',
-  'front_desk:first_job_empty',
-  'front_desk:first_job_pending',
-  'front_desk:first_job_recorded',
-  'front_desk:first_job_verified',
-  'front_desk:first_job_load_failed',
-  'front_desk:first_job_uncertain',
-  'front_desk:first_job_retry_safe',
-  'front_desk:first_job_retry',
-  'front_desk:first_job_storage_required',
-  'front_desk:first_job_history',
-  'front_desk:first_job_revision',
-  'front_desk:first_job_request',
-  'front_desk:first_job_digest',
-  'front_desk:first_job_format',
-  'front_desk:first_job_format_compact',
-  'front_desk:first_job_format_readable',
-  'front_desk:first_job_revise_compact',
-  'front_desk:first_job_revise_readable',
-  'front_desk:first_job_revision_notice',
-  'front_desk:first_job_status',
-  'front_desk:first_job_status_unknown',
-  'front_desk:first_job_status_awaiting_approval',
-  'front_desk:first_job_status_queued',
-  'front_desk:first_job_status_running',
-  'front_desk:first_job_status_blocked',
-  'front_desk:first_job_status_work_completed',
-  'front_desk:first_job_status_uncertain',
-  'front_desk:first_job_older',
-  'front_desk:first_job_latest',
-  'front_desk:first_job_requested',
-  'front_desk:first_job_checked_at',
-  'front_desk:first_job_status_cancel_requested',
-  'front_desk:first_job_scope',
-  'front_desk:first_job_advance',
-  'front_desk:first_job_approval_title',
-  'front_desk:first_job_approval_unknown',
-  'front_desk:first_job_approval_auth_needed',
-  'front_desk:first_job_approval_signin',
-  'front_desk:first_job_approval_signin_hint',
-  'front_desk:first_job_approval_forbidden',
-  'front_desk:first_job_approval_loading',
-  'front_desk:first_job_approval_empty',
-  'front_desk:first_job_approval_ready',
-  'front_desk:first_job_approval_effect',
-  'front_desk:first_job_approval_id',
-  'front_desk:first_job_approval_effect_digest',
-  'front_desk:first_job_approval_binding_digest',
-  'front_desk:first_job_approval_accept',
-  'front_desk:first_job_approval_reject',
-  'front_desk:first_job_approval_refresh',
-  'front_desk:first_job_approval_sending',
-  'front_desk:first_job_approval_recorded',
-  'front_desk:first_job_approval_failed',
-  'front_desk:first_job_approval_uncertain',
-  'front_desk:first_job_approval_changed',
-  'front_desk:first_job_approval_configuration',
-  'front_desk:first_job_approval_diagnostic_unavailable',
-  'front_desk:first_job_approval_destination',
-  'front_desk:first_job_approval_destination_local',
-  'front_desk:first_job_approval_expires',
-  'front_desk:first_job_approval_payload_digest',
-  'front_desk:first_job_approval_execution_deadline',
-  'front_desk:first_job_approval_validity',
-  'front_desk:first_job_approval_held',
-  'front_desk:first_job_approval_held_detail',
-  'front_desk:first_job_status_terminated_unstarted',
-  'front_desk:first_job_recovery_eligible',
-  'front_desk:first_job_recovery_effect',
-  'front_desk:first_job_recovery_review',
-  'front_desk:first_job_recovery_confirm',
-  'front_desk:first_job_recovery_cancel',
-  'front_desk:first_job_recovery_confirm_detail',
-  'front_desk:first_job_recovery_terminated',
-  'front_desk:first_job_recovery_terminated_detail',
-  'front_desk:first_job_recovery_readback',
-  'front_desk:first_job_recovery_uncertain',
-  'front_desk:first_job_recovery_changed',
-  'front_desk:first_job_restart',
-  'front_desk:first_job_restart_detail',
-] as const satisfies readonly VocabularyKey[];
-
 export const ENGINE_CONFIG_VOCABULARY_KEYS = [
   'presence_studio:engine_config_title',
   'presence_studio:engine_config_description',
@@ -252,7 +57,6 @@ export const ENGINE_CONFIG_VOCABULARY_KEYS = [
 
 export const PRESENCE_STUDIO_VOCABULARY_KEYS = [
   ...ENGINE_CONFIG_VOCABULARY_KEYS,
-  ...FIRST_JOB_VOCABULARY_KEYS,
   'presence_studio:record_mission_placeholder',
   'presence_studio:record_start',
   'presence_studio:record_stop',
@@ -474,96 +278,8 @@ export const HOME_VOCABULARY_KEYS = [
   'presence_studio:home_metric_decide',
 ] as const satisfies readonly VocabularyKey[];
 
-// FD-05: exactly the `front_desk` keys `static/progress.js` renders. Mirrors
-// `HOME_VOCABULARY_KEYS` above — see `GET /api/progress-vocabulary` in
-// `front-desk-routes.ts`.
-export const PROGRESS_VOCABULARY_KEYS = [
-  'front_desk:progress_open_work',
-  'front_desk:progress_recorded_subtitle',
-  'front_desk:progress_task_state_collecting_requirements',
-  'front_desk:progress_task_state_awaiting_input',
-  'front_desk:progress_task_state_awaiting_confirmation',
-  'front_desk:progress_task_state_planning',
-  'front_desk:progress_task_state_executing',
-  'front_desk:progress_task_state_verifying',
-  'front_desk:progress_task_state_paused',
-  'front_desk:progress_task_state_blocked',
-  'front_desk:progress_task_state_completed',
-  'front_desk:progress_task_state_failed',
-  'front_desk:progress_task_state_released',
-  'front_desk:progress_task_state_unknown',
-  'front_desk:progress_task_recorded_state',
-  'front_desk:progress_task_latest_update',
-  'front_desk:progress_task_next_input',
-  'front_desk:progress_task_next_confirmation',
-  'front_desk:progress_task_next_refresh',
-  'front_desk:progress_task_next_inspect',
-  'front_desk:progress_task_next_result',
-  'front_desk:progress_leave_title',
-  'front_desk:progress_leave_draft',
-  'front_desk:progress_leave_pending',
-  'front_desk:progress_leave_uncertain',
-  'front_desk:progress_leave_stay',
-  'front_desk:progress_leave_stay_page',
-  'front_desk:progress_leave_discard',
-  'front_desk:progress_leave_anyway',
-  'front_desk:progress_leave_unavailable',
-  'front_desk:progress_delivery_verdict_scope',
-  'front_desk:progress_correction_unavailable',
-  'front_desk:progress_correction_draft_note',
-  'front_desk:progress_correction_save',
-  'front_desk:progress_correction_discard',
-  'front_desk:progress_correction_recorded',
-  'front_desk:progress_correction_prepare',
-  'front_desk:progress_loading',
-  'front_desk:progress_refreshing',
-  'front_desk:progress_detail_loading',
-  'front_desk:progress_detail_failed',
-  'front_desk:progress_detail_ready',
-  'front_desk:progress_detail_retry',
-  'front_desk:progress_scope_required',
-  'front_desk:progress_storage_required',
-  'front_desk:progress_phase_estimate',
-  'front_desk:progress_history',
-  'front_desk:progress_status_released',
-  'front_desk:progress_recovery',
-  'front_desk:progress_load_failed',
-  'front_desk:progress_action_failed',
-  'front_desk:progress_request_pending',
-  'front_desk:progress_item_unavailable',
-  'front_desk:progress_refresh',
-  'ui:status_completed',
-  'ui:status_failed',
-  'concierge:home.status.accepted',
-  'concierge:home.status.rejected',
-  'concierge:home.status.changes_requested',
-  'front_desk:progress_filter_active',
-  'front_desk:progress_filter_delivered',
-  'front_desk:progress_filter_done',
-  'front_desk:progress_delivered_title',
-  'front_desk:progress_delivered_waiting',
-  'front_desk:progress_empty_active',
-  'front_desk:progress_empty_delivered',
-  'front_desk:progress_select_hint',
-  'front_desk:progress_detail_requested',
-  'front_desk:progress_detail_now',
-  'front_desk:progress_detail_next',
-  'front_desk:progress_detail_log',
-  'front_desk:progress_action_note',
-  'front_desk:progress_open_mirror',
-  // The prefilled "ask about this item" text (word order is per locale).
-  'front_desk:progress_ask_about',
-  'front_desk:action_open',
-  'front_desk:action_receive',
-  'front_desk:action_revise',
-  'front_desk:count_items',
-  // UI-06: row status pill labels.
-  'front_desk:tag_in_progress',
-  'front_desk:tag_delivered',
-] as const satisfies readonly VocabularyKey[];
-
 // FD-03: exactly the keys `static/ask.js` renders. Mirrors
-// `HOME_VOCABULARY_KEYS` / `PROGRESS_VOCABULARY_KEYS` above — see
+// `HOME_VOCABULARY_KEYS` above — see
 // `GET /api/ask-vocabulary` in `front-desk-routes.ts`. Mixes the `front_desk`
 // domain with the shared `tui` authority/outcome labels (same mix
 // `PRESENCE_STUDIO_VOCABULARY_KEYS` above already uses for `index.html`'s own
@@ -595,15 +311,6 @@ export const ASK_VOCABULARY_KEYS = [
   'front_desk:ask_pending_review',
   'front_desk:ask_keyboard_hint',
   'front_desk:ask_draft_too_long',
-  'front_desk:ask_correction_loading',
-  'front_desk:ask_correction_failed',
-  'front_desk:ask_correction_retry',
-  'front_desk:ask_correction_prepared',
-  'front_desk:ask_correction_draft_intro',
-  'front_desk:ask_correction_entry',
-  'front_desk:ask_correction_artifact',
-  'front_desk:ask_correction_title',
-  'front_desk:ask_correction_note',
   'front_desk:work_home_resume_readonly',
   'front_desk:work_home_request_unavailable',
   'front_desk:conversation_access_required',
@@ -831,9 +538,11 @@ export const FRONT_DESK_TEMPLATE_FILE_REDIRECTS: Readonly<Record<string, string>
   '/home.html': '/home',
   '/index.html': '/work',
   '/ask.html': '/ask',
+  // Retired page (now Concierge 仕事 › 依頼): old bookmarks follow /progress's redirect.
   '/progress.html': '/progress',
   // Retired page (now Concierge 使い方): old bookmarks follow /help's redirect.
   '/help.html': '/help',
+  // Retired page (now Concierge 初めての仕事): old bookmarks follow /first-job's redirect.
   '/first-job.html': '/first-job',
   '/live-avatar.html': '/live-avatar',
   '/engine-config.html': '/engine-config',
@@ -911,13 +620,25 @@ export function registerFrontDeskHomeWorkPages(app: express.Express, staticDir: 
   });
 }
 
+/** Concierge 仕事 › 依頼 with an old `/progress` query kept (its own `tab` wins). */
+export function conciergeRequestsPath(query: string): string {
+  const params = new URLSearchParams(query);
+  params.delete('tab');
+  const rest = params.toString();
+  return '/work?tab=requests' + (rest ? '&' + rest : '');
+}
+
 // FD-06/03/05/08: the remaining front-desk page routes, registered after
 // `express.static` (a literal `/onboarding`, `/ask`, `/progress`, or `/help`
 // path only matches a static file named exactly that, with no extension, so
 // `express.static` never intercepts them).
 export function registerFrontDeskAuxPages(app: express.Express, staticDir: string): void {
+  // 初めての仕事 is served by Concierge (Kyberion server phase 2); the old
+  // address hands the person there, query string kept.
   app.get('/first-job', (req, res) => {
-    sendFrontDeskPage(req, res, staticDir, 'first-job.html');
+    const queryIndex = req.originalUrl.indexOf('?');
+    const query = queryIndex === -1 ? '' : req.originalUrl.slice(queryIndex);
+    res.redirect(302, readFrontDeskSurfaceUrls().concierge + '/first-job' + query);
   });
 
   // FD-06: the setup wizard is folded into the concierge 設定 page; the
@@ -935,10 +656,17 @@ export function registerFrontDeskAuxPages(app: express.Express, staticDir: strin
     sendFrontDeskPage(req, res, staticDir, 'ask.html');
   });
 
-  // FD-05: the dedicated "進み具合" page, replacing the interim `/work`
-  // redirect.
+  // 進み具合 is served by Concierge as 仕事 › 依頼 (`/work?tab=requests`,
+  // Kyberion server phase 2). The old address hands the person there with its
+  // query kept (`request`, `tenant`, …); the fragment (`#<id>`) follows the
+  // redirect in the browser.
   app.get('/progress', (req, res) => {
-    sendFrontDeskPage(req, res, staticDir, 'progress.html');
+    const queryIndex = req.originalUrl.indexOf('?');
+    res.redirect(
+      302,
+      readFrontDeskSurfaceUrls().concierge +
+        conciergeRequestsPath(queryIndex === -1 ? '' : req.originalUrl.slice(queryIndex + 1))
+    );
   });
 
   // 使い方 (`/help`, `/help/<track>`) is served by Concierge (Kyberion server

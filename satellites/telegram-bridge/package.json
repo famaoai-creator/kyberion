@@ -10,7 +10,8 @@
     "start": "node ../../dist/satellites/telegram-bridge/src/index.js"
   },
   "dependencies": {
-    "@agent/core": "workspace:*"
+    "@agent/core": "workspace:*",
+    "@agent/shared-interaction": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

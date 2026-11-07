@@ -3,7 +3,7 @@ import { nowIso } from '../foundation/time.js';
 import { randomUUID } from 'node:crypto';
 import * as nodePath from 'node:path';
 import { pathResolver } from '../path-resolver.js';
-import { resolveMissionDir } from '../owner-scope.js';
+import { resolveMissionDir } from '../governance/owner-scope.js';
 import { locateMissionForScope } from './mission-orchestration-event-loader.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { resolveSharedObservabilityDir } from '../analysis/observability-gate.js';
@@ -16,7 +16,7 @@ import {
   resolveEventScopeAgainstAuthority,
   type EventScope,
   type EventScopeInput,
-} from '../event-scope.js';
+} from '../event/event-scope.js';
 
 export type MissionTaskEventType =
   | 'task_issued'

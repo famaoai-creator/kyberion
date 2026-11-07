@@ -14,7 +14,7 @@ let learningApproval: typeof import('../knowledge/scoped-learning-approval.js');
 let domain: typeof import('../knowledge/scoped-learning-domain.js');
 let publication: typeof import('../knowledge/scoped-learning-publication.js');
 let retrieval: typeof import('../knowledge/scoped-learning-retrieval.js');
-let promoted: typeof import('../promoted-memory.js');
+let promoted: typeof import('../knowledge/promoted-memory.js');
 let distill: typeof import('../knowledge/distill-candidate-registry.js');
 let reasoning: typeof import('../reasoning/reasoning-backend.js');
 let authority: typeof import('../authority.js');
@@ -53,7 +53,7 @@ beforeAll(async () => {
   domain = await import('../knowledge/scoped-learning-domain.js');
   publication = await import('../knowledge/scoped-learning-publication.js');
   retrieval = await import('../knowledge/scoped-learning-retrieval.js');
-  promoted = await import('../promoted-memory.js');
+  promoted = await import('../knowledge/promoted-memory.js');
   distill = await import('../knowledge/distill-candidate-registry.js');
   reasoning = await import('../reasoning/reasoning-backend.js');
   authority = await import('../authority.js');

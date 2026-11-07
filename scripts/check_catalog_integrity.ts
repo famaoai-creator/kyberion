@@ -678,20 +678,42 @@ function findUndefinedKeyReferences(files: string[]): string[] {
  * risk. I18N-08's translation-ops audit is the place to make this stricter
  * once a lower-false-positive detector exists.
  */
+/** Raw quoted substrings, not a language parser: comments and escapes count too.
+ * Every consecutive delimiter pair is considered, including overlapping pairs.
+ */
+function indexQuotedSegments(haystack: string, quote: string, maxLength: number): Set<string> {
+  const values = new Set<string>();
+  let opening = haystack.indexOf(quote);
+  while (opening >= 0) {
+    const closing = haystack.indexOf(quote, opening + 1);
+    if (closing < 0) break;
+    if (closing - opening - 1 <= maxLength) {
+      values.add(haystack.slice(opening + 1, closing));
+    }
+    opening = closing;
+  }
+  return values;
+}
+
 export function findUnusedVocabularyKeys(
   catalog: VocabularyCatalogShape,
   haystack: string
 ): string[] {
+  let maxLength = 0;
+  for (const [namespace, entries] of Object.entries(catalog.domains || {})) {
+    for (const key of Object.keys(entries || {})) {
+      maxLength = Math.max(maxLength, key.length, namespace.length + 1 + key.length);
+    }
+  }
+  const singleQuoted = indexQuotedSegments(haystack, "'", maxLength);
+  const doubleQuoted = indexQuotedSegments(haystack, '"', maxLength);
+  const referenced = (value: string): boolean =>
+    (value.includes("'") ? haystack.includes(`'${value}'`) : singleQuoted.has(value)) ||
+    (value.includes('"') ? haystack.includes(`"${value}"`) : doubleQuoted.has(value));
   const unused: string[] = [];
   for (const [namespace, entries] of Object.entries(catalog.domains || {})) {
     for (const key of Object.keys(entries || {})) {
-      const quotedForms = [
-        `'${key}'`,
-        `"${key}"`,
-        `'${namespace}:${key}'`,
-        `"${namespace}:${key}"`,
-      ];
-      if (!quotedForms.some((quotedKey) => haystack.includes(quotedKey))) {
+      if (!referenced(key) && !referenced(`${namespace}:${key}`)) {
         unused.push(
           `user-facing-vocabulary: ${namespace}.${key} is not referenced anywhere scanned`
         );

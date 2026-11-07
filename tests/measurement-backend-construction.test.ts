@@ -29,7 +29,7 @@ import { getAllFiles } from '@agent/core/fs-utils';
 type Construction = 'caller-bounded' | 'receives';
 
 const MEASUREMENT_ENTRY_POINTS: Record<string, { construction: Construction; reason: string }> = {
-  'libs/core/backend-live-scenarios.ts': {
+  'libs/core/reasoning/backend-live-scenarios.ts': {
     construction: 'receives',
     reason: 'drives the backend its caller built; defines runBackendLiveScenarios',
   },

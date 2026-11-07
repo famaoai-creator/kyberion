@@ -592,12 +592,19 @@ describe('tenant runtime partitions in backup and restore', () => {
       pathExists: (repoPath) => existing.has(repoPath),
       tenantResolver: () => undefined,
     });
-    for (const { root } of TENANT_RUNTIME_PARTITION_ROOTS) {
-      expect(plan.entries).toContain(`${root}/personal/acme`);
+    for (const { root, tenantTiers } of TENANT_RUNTIME_PARTITION_ROOTS) {
+      if (!tenantTiers || tenantTiers.includes('personal'))
+        expect(plan.entries).toContain(`${root}/personal/acme`);
+      else expect(plan.entries).not.toContain(`${root}/personal/acme`);
       expect(plan.entries).toContain(`${root}/confidential/acme`);
     }
     expect(plan.entries.filter((entry) => /\/(other|system)(\/|$)/u.test(entry))).toEqual([]);
-    expect(plan.tenantRuntimePartitions).toHaveLength(TENANT_RUNTIME_PARTITION_ROOTS.length * 2);
+    expect(plan.tenantRuntimePartitions).toHaveLength(
+      TENANT_RUNTIME_PARTITION_ROOTS.reduce(
+        (count, root) => count + (root.tenantTiers?.length ?? 2),
+        0
+      )
+    );
   });
 
   it("accepts the tenant's own partitions and rejects another tenant's in a tenant archive", () => {
@@ -1274,7 +1281,10 @@ describe('backup file selection', () => {
     safeSymlinkSync(`${root}/vault/keys.enc`, `${root}/active/keys-alias`, 'file');
     // Short path: a unix socket path is limited to ~104 bytes.
     server = createServer();
-    await new Promise<void>((resolve) => server!.listen(`${root}/active/s.sock`, resolve));
+    await new Promise<void>((resolve, reject) => {
+      server!.once('error', reject);
+      server!.listen(path.relative(process.cwd(), `${root}/active/s.sock`), resolve);
+    });
 
     const exclusions = resolveBackupExclusions({
       rootDir: root,

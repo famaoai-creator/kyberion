@@ -24,7 +24,7 @@
  *
  * Model: knowledge/product/governance/installation-owner-authorization.md
  */
-import type { ResolvedPrincipal } from '../authn-principal-resolver.js';
+import type { ResolvedPrincipal } from '../authn/authn-principal-resolver.js';
 import {
   INSTALLATION_STEP_UP_WINDOW_MS,
   readFreshInstallationStepUp,

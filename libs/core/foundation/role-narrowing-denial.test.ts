@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { safeReadFile } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import type { ResourceAccessScope } from './resource-access-scope.js';
+import { isArchivedMissionStateCapability } from './archived-mission-state-capability.js';
 import {
   narrowDeclarationValid,
   roleNarrowAllowsStructuralMkdir,
@@ -270,6 +271,18 @@ describe('customer_channel_binding_store narrowing declaration', () => {
 });
 
 describe('archived_mission_state_reader narrowing declaration', () => {
+  it('rejects a name-prefix ceiling added to an otherwise exact archive capability', () => {
+    expect(isArchivedMissionStateCapability(archivedScope)).toBe(true);
+    const scope = {
+      ...archivedScope,
+      namePrefixExact: ['active/archive/missions/confidential/acme-corp/MSN-B/'],
+    };
+    expect(isArchivedMissionStateCapability(scope)).toBe(false);
+    for (const operation of ['read', 'metadata'] as const)
+      expect(
+        deny({ role: 'archived_mission_state_reader', relativePath: ARCHIVED, operation, scope })
+      ).toContain('RESOURCE_SCOPE_REQUIRED');
+  });
   it('never writes, appends or creates directories', () => {
     for (const operation of ['write', 'append', 'mkdir'] as const)
       expect(
@@ -391,6 +404,36 @@ describe('narrow declaration evaluation itself', () => {
   it('fails closed on a malformed declaration', () => {
     for (const narrow of [
       'not-an-object',
+      null,
+      [],
+      { unknown: true },
+      { deny_reason: '' },
+      { only_reason: '' },
+      { deny: ['write'], deny_reason: '' },
+      { only: { write: [{ path: 'allowed' }] }, only_reason: '' },
+      { only: [] },
+      { only: { unknown: [{ path: 'x' }] } },
+      { only: { write: [{ path: '' }] } },
+      { only: { write: [{ prefix: '' }] } },
+      { only: { write: [{ pattern: '' }] } },
+      { only: { write: [{ path: 'x', typo: 'y' }] } },
+      { content_check: [{ path: '', kind: 'append_only_jsonl', id_field: 'id' }] },
+      { content_check: [{ path: 'x', kind: 'append_only_jsonl', id_field: '' }] },
+      {
+        content_check: [
+          { path: 'x', kind: 'append_only_jsonl', id_field: 'id', refusal_prefix: '' },
+        ],
+      },
+      { content_check: [{ path: 'x', kind: 'append_only_jsonl', id_field: 'id', typo: true }] },
+      { require_scope: { reason: '' } },
+      { require_scope: { fields: [] } },
+      { require_scope: { fields: [''] } },
+      { require_scope: { typo: true } },
+      { require_scope: { exact: { typo: true } } },
+      { require_scope: { exact: { read_path_pattern: '' } } },
+      { require_scope: { exact: { read_path_tenant_group: 1.5 } } },
+      { require_scope: { exact: { read_path_tenant_group: Infinity } } },
+      { require_scope: { exact: { read_path_tenant_group: NaN } } },
       { deny: 'write' },
       { deny: [] },
       { deny: ['explode'] },
@@ -435,6 +478,59 @@ describe('narrow declaration evaluation itself', () => {
         readRepoFile: () => undefined,
       });
       expect(reason).toContain('ROLE_NARROWING_INVALID');
+      expect(
+        roleNarrowAllowsStructuralMkdir(
+          { authority_role_permissions: { bad_role: { narrow } } },
+          'bad_role'
+        )
+      ).toBe(false);
+    }
+  });
+
+  it('refuses malformed permission containers and role records instead of treating them as absent', () => {
+    for (const policy of [
+      undefined,
+      null,
+      [],
+      {},
+      { authority_role_permissions: null },
+      { authority_role_permissions: [] },
+      { authority_role_permissions: 'invalid' },
+      { authority_role_permissions: { bad_role: null } },
+      { authority_role_permissions: { bad_role: [] } },
+      { authority_role_permissions: { bad_role: 'invalid' } },
+    ]) {
+      expect(
+        roleNarrowingDenial({
+          policy,
+          role: 'bad_role',
+          relativePath: 'x',
+          operation: 'write',
+          scope: undefined,
+          content: '',
+          readRepoFile: () => undefined,
+        })
+      ).toContain('ROLE_NARROWING_INVALID');
+      expect(roleNarrowAllowsStructuralMkdir(policy, 'bad_role')).toBe(false);
+    }
+  });
+
+  it('keeps an absent role or an ordinary role without a narrowing declaration unrestricted', () => {
+    for (const policy of [
+      { authority_role_permissions: {} },
+      { authority_role_permissions: { ordinary: { allow_read: ['x'] } } },
+    ]) {
+      expect(
+        roleNarrowingDenial({
+          policy,
+          role: 'ordinary',
+          relativePath: 'x',
+          operation: 'read',
+          scope: undefined,
+          content: undefined,
+          readRepoFile: () => undefined,
+        })
+      ).toBeNull();
     }
   });
 

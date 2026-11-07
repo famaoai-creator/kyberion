@@ -96,7 +96,7 @@
             "external_idp": "declared",
             "synthetic": "declared"
           },
-          "evidence": ["libs/core/chronos-access-registry.ts"]
+          "evidence": ["libs/core/authn/chronos-access-registry.ts"]
         },
         "agent-context": {
           "traits": {
@@ -117,7 +117,7 @@
             "external_idp": "declared",
             "synthetic": "declared"
           },
-          "evidence": ["libs/core/nhi-actor-verification.ts"]
+          "evidence": ["libs/core/agent/nhi-actor-verification.ts"]
         },
         "agent-token": {
           "traits": {

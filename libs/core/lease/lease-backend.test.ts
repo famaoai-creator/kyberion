@@ -10,7 +10,7 @@ import {
   withFencedWriterLease,
   withFencedWriterLeaseSync,
   renewFencedWriterLeaseSync,
-} from '../writer-lease.js';
+} from './writer-lease.js';
 import { LOCAL_LEASE_BACKEND_ID, getLeaseBackend, resolveLeaseBackend } from './lease-backend.js';
 import './local-lease-backend.js';
 import { MEMORY_LEASE_BACKEND_ID, createMemoryLeaseBackend } from './memory-lease-backend.js';

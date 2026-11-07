@@ -39,7 +39,7 @@ Each persona directory holds:
    (`libs/core/mission/mission-orchestration-worker.ts`) reads that `ROLE_PROCEDURE.md` back and
    registers it as a one-shot dynamic injection — it enters the first task's worker prompt
    for that mission, and re-fires after any context-compaction event, the same lifecycle
-   `working-principles` uses (`libs/core/dynamic-injection.ts`).
+   `working-principles` uses (`libs/core/reasoning/dynamic-injection.ts`).
 
 Renaming a persona directory or moving `PROCEDURE.md` breaks step 2 silently (falls through to
 "no procedure found, using default") rather than erroring — grep for the slug in

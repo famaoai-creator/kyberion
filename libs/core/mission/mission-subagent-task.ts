@@ -3,18 +3,18 @@ import { isRecord } from '../foundation/text.js';
 import { getRegisteredEnvText, setRegisteredEnv } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import type { AgentExecutionReceipt } from '../agent/agent-execution-port.js';
-import type { AgentContextMode } from '../context-boundary.js';
+import type { AgentContextMode } from '../contracts/context-boundary.js';
 import type { ReasoningBackend } from '../reasoning/reasoning-backend.js';
 import {
   buildTaskReasoningBackend,
   type TaskReasoningBackendOptions,
 } from '../workforce/task-execution-port.js';
 import type { WorkItem } from '../workforce/work-coordination.js';
-import type { ContextSecurityScope } from '../context-security-scope.js';
+import type { ContextSecurityScope } from '../governance/context-security-scope.js';
 import {
   delegateCoordinatedCliSubagentTask,
   type CoordinatedAgentExecutionReceipt,
-} from '../coordinated-agent-execution-port.js';
+} from '../agent/coordinated-agent-execution-port.js';
 import { HarnessSubagentDispatcher } from '../agent/agent-dispatch.js';
 import {
   assertProviderCanProjectProfile,

@@ -1,14 +1,14 @@
 /** Durable transcript schema and request admission snapshots. No dispatch, results or status projection. */
 import { createHash } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
-import { physicalScopedPath } from '../physical-namespace.js';
+import { physicalScopedPath } from '../storage/physical-namespace.js';
 import {
   readGovernedArtifactJson,
   writeGovernedArtifactJson,
 } from '../workforce/artifact-store.js';
 import type { SurfaceViewerScope } from './surface-mutation-guard.js';
 import { canonicalHumanOwner } from './verified-human-request-identity.js';
-import type { EventScopeInput } from '../event-scope.js';
+import type { EventScopeInput } from '../event/event-scope.js';
 import { isFirstJobDiagnosticMapping } from './first-job-admission.js';
 import {
   getFrontDeskExecutionMapping,

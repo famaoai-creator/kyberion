@@ -48,7 +48,7 @@ import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import { resolveRole, withExecutionContext } from '../authority.js';
 import { logger } from '../core.js';
-import { enforceNhiActorPolicy } from '../nhi-actor-verification.js';
+import { enforceNhiActorPolicy } from '../agent/nhi-actor-verification.js';
 import {
   EventSourcingKernel,
   appendValidatedJournalEvent,

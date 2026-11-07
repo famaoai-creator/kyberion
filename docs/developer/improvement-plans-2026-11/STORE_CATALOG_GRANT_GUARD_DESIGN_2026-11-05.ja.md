@@ -2,7 +2,7 @@
 title: 保存先カタログと許可証による権限判定（tier-guard の再設計）
 kind: design
 status: planned
-last_updated: 2026-11-06
+last_updated: 2026-11-08
 tags: [design, tier-guard, secure-io, scope, custody, grant, storage, governance]
 importance: 8
 ---
@@ -1443,12 +1443,13 @@ secure-io の 40 以下は別の段階）。上の表は G0 の時点の見込�
   `concierge_management_reader`、`peer_responder_reader` は「プロセスが複数テナントの保存先を
   読める」という I/O 権限であり、P4 で揃えた custody admission はその内側で「viewer にどの行を
   開示するか」を決める別の層。ロールを外すには保存先レベルの許可証化（流れの分解の段階）が要る。
-- **派生台帳に storeRole（P3 F9）。** `asset_derivations` を `TENANT_STORE_LEDGER_ROOTS` に登録し、
-  新ロール `asset_derivation_store` を発行した。`confidential/<tenant>` は custodian のテナント束縛、
-  メンバー区画 `personal/<ref>` と `system/` はロールのリテラル許可（メンバー ref はテナント slug
-  ではないため honoring が custodian 束縛を担う）。`tenantStoreLedgerPartitionOf` にルートごとの
-  `systemPartition` オプトインを追加し、ambient な runtime 書き込み権では台帳に追記できないように
-  した（`delegation-records/system/` など他ルートの `system/` セグメントは従来どおり）。
+- **派生台帳の storeRole 案（P3 F9）は統合レビューで置き換えた。** 当初案の
+  `asset_derivation_store` は、共有ロールへの切替と tenant 束縛の解除で他の区画にも書けるため、
+  producer の証明を安全に担えない。PR1442 の保護された producer receipt と限定された同期読取りを
+  正本とし、新しい共有ロール・権限宣言・バックアップ時のロール切替は追加しない。
+  custodian index は探索用であり、それだけでは削除権限にならない。来歴の記録は既存の governed
+  producer 3 ロールに限定し、source/output の世代・ハッシュ・custody を証明で検証する。
+  `personal/<ref>` はメンバー区画であり tenant としてバックアップ・削除しない。
 - **janitor 配線は既に充足。** retention カタログの
   `active/shared/runtime/asset-derivations`（`action: review_required`）が台帳を「報告するが自動削除
   しない」状態にしている — 削除は派生関係グラフ（R-09）に従うため。`runtime-store-retention` ゲートが
@@ -1465,10 +1466,10 @@ secure-io の 40 以下は別の段階）。上の表は G0 の時点の見込�
     `tenant_slug > owner_nhi/nhi_id > system` の順で決める。なお knowledge ドメインの
     「`nhi_id` から personal 置き場を推論しない」契約は保存先推論の層の話であり、開示層では
     `nhi_id` を person 束縛として扱う方が fail-closed で整合する。
-  - `asAssetDerivationStore` は `withExecutionContext(role, fn, undefined, '')` — 第 4 引数に
-    `undefined` を渡すと呼び出し側の ambient テナント束縛が残り、`personal/<member>` 追記が
-    tenant-bound プロセスから必ず `tenant.scope_violation` で弾かれる。`''`（tenantCleared）で
-    束縛を明示クリアする。tenant custody の書き込みだけは custodian slug を束縛する。
+  - 当初の `asAssetDerivationStore` は personal/system 追記時に ambient tenant を解除していたが、
+    解除は authority の代わりにならない。統合版ではこの helper 自体を採用せず、既存の呼出し元の
+    権限・resource ceiling を保つ。system producer 権限と confidential tenant-container の権限は
+    別に検査し、保護された来歴を混合テナントのエラー詳細から漏らさない。
 
 ## スコープモデルとの対応
 
@@ -1481,6 +1482,13 @@ secure-io の 40 以下は別の段階）。上の表は G0 の時点の見込�
 | R-01 作成時の管理者                  | カタログの `custody` 宣言、G0 の突合ゲート            |
 | R-05 判定関数の共有                  | `decide` 一つ                                         |
 | R-09 派生をたどる削除                | カタログの `derived_from` と `retention`（P3 で使う） |
+
+## 統合時の安全性補強（2026-11-08）
+
+- narrow 宣言は schema と同じく、各階層の未知キー、空の拒否理由・パス・matcher・content ID を拒否する。不正な policy / role コンテナーを「宣言なし」と扱わない。
+- 明示された役割の I/O は policy 欠落・破損時に `[ROLE_NARROWING_POLICY_UNAVAILABLE]` で拒否する。役割なし bootstrap は従来の残余判定を維持する。
+- 1 回の I/O の narrow・基本権限・structural mkdir は、遅延読込みした同じ policy snapshot を使う。異なる版の許可条件を組み合わせない。
+- 回帰検証は `role-narrowing-denial.test.ts`、`tier-guard-policy-corruption.test.ts`、`resource-access-scope.test.ts` で、正常な宣言と不正入力・policy 変更／欠落の双方を確認する。
 
 ## 非目標
 

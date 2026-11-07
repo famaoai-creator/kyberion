@@ -79,7 +79,7 @@ work-item claim(リース・排他)          ノード排他の基盤として�
 ### 1.6 delegateTask にノード同一性がない
 
 - `ReasoningBackend.delegateTask`(`libs/core/reasoning/reasoning-backend.ts:470-560`)は `(instruction, context?, options?) => Promise<string>`。**タスク ID なし・状態なし・join/cancel なし**。構造は返答テキストの JSON 再パースで復元している(`parseTaskResultResponse`)。
-- 最も近い既存物は `DelegatedTaskRecord.delegation_id`(`libs/core/delegated-task-observability.ts`)だが観測専用。グラフランタイムがノードとして委譲を扱うには、アドレス可能なハンドルが必要。
+- 最も近い既存物は `DelegatedTaskRecord.delegation_id`(`libs/core/workforce/delegated-task-observability.ts`)だが観測専用。グラフランタイムがノードとして委譲を扱うには、アドレス可能なハンドルが必要。
 
 ### 1.7 guardrails のグラフ盲点
 
@@ -127,7 +127,7 @@ work-item claim(リース・排他)          ノード排他の基盤として�
 
 1. エッジ未宣言 pipeline の実行結果はバイト等価(後方互換 100%)。
 2. グラフ実行はスケジュール順が非決定でも、**結果とジャーナルは決定論的に検証可能**(ノード完了イベントの半順序 + 各ノード出力ハッシュ)。
-3. ミッションワーカーと pipeline エンジンのスケジューラ核は同一ライブラリ(`libs/core/graph-scheduler.ts`)を共有する。
+3. ミッションワーカーと pipeline エンジンのスケジューラ核は同一ライブラリ(`libs/core/pipeline/graph-scheduler.ts`)を共有する。
 
 ## 4. 実装タスク
 
@@ -149,7 +149,7 @@ work-item claim(リース・排他)          ノード排他の基盤として�
 
 > 優先度 P1 / 規模 L / 依存: GE-01
 
-`libs/core/graph-scheduler.ts` を新設(純粋な ready-set 計算 + 完了駆動の frontier 前進。I/O なし・注入されたノード実行関数を呼ぶだけ)し、`executeAdfSteps` をその上に載せ替える。エッジ未宣言(線形チェーン)の場合は従来と同一の逐次挙動に厳密に縮退する。並行実行は (a) `ResourceClaim` の衝突検査(`tool-call-scheduler.ts` を流用)、(b) `delegation-concurrency` の slot、(c) pipeline `options.max_concurrency`(既定 1 = 完全互換)の 3 制約の交差で決める。fan-in はマージポリシーを契約化: `merge: 'collect'(既定: 配列に集約)| 'namespace'(step id 下に格納)| 'last'(現行互換・明示時のみ)`。`core:parallel_foreach` の last-wins 合流(診断 1.3)を `collect` 既定に修正し、部分失敗モード(`on_item_error: skip|abort`)を追加する。ループノード(`core:while` 系)はスケジューラから見て単一ノード(原則 3)。
+`libs/core/pipeline/graph-scheduler.ts` を新設(純粋な ready-set 計算 + 完了駆動の frontier 前進。I/O なし・注入されたノード実行関数を呼ぶだけ)し、`executeAdfSteps` をその上に載せ替える。エッジ未宣言(線形チェーン)の場合は従来と同一の逐次挙動に厳密に縮退する。並行実行は (a) `ResourceClaim` の衝突検査(`tool-call-scheduler.ts` を流用)、(b) `delegation-concurrency` の slot、(c) pipeline `options.max_concurrency`(既定 1 = 完全互換)の 3 制約の交差で決める。fan-in はマージポリシーを契約化: `merge: 'collect'(既定: 配列に集約)| 'namespace'(step id 下に格納)| 'last'(現行互換・明示時のみ)`。`core:parallel_foreach` の last-wins 合流(診断 1.3)を `collect` 既定に修正し、部分失敗モード(`on_item_error: skip|abort`)を追加する。ループノード(`core:while` 系)はスケジューラから見て単一ノード(原則 3)。
 
 **受入条件**
 

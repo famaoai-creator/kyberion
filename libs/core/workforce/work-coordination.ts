@@ -10,7 +10,7 @@ import { nowIso } from '../foundation/time.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { withExecutionContext } from '../authority.js';
 import { withImmutableWorkItemInventorySnapshot } from './work-coordination-snapshot.js';
-import { enforceNhiActorPolicy } from '../nhi-actor-verification.js';
+import { enforceNhiActorPolicy } from '../agent/nhi-actor-verification.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeRmSync } from '../secure-io.js';
 import { buildWorkItemHandoffPacket, type HandoffPacket } from '../mesh/handoff-packet.js';
 import { auditChain } from '../governance/audit-chain.js';

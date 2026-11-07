@@ -11,7 +11,7 @@ import { appendJsonLine } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
 import { reviewMemoryPromotionQueue } from './memory-promotion-review.js';
 import { createWorkItemIfAbsent } from '../workforce/work-coordination.js';
-import { OPS_FINDINGS_PATH, OPS_WORK_ITEM_DOT_ID } from '../ops-health-probe.js';
+import { OPS_FINDINGS_PATH, OPS_WORK_ITEM_DOT_ID } from '../daemon/ops-health-probe.js';
 
 const logger = createLogger('knowledge-hygiene-probe');
 

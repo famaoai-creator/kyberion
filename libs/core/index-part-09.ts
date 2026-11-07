@@ -16,7 +16,7 @@ export * from './workforce/worker-assignment-policy.js';
 
 export * from './pipeline/pipeline-contract.js';
 
-export * from './graph-scheduler.js';
+export * from './pipeline/graph-scheduler.js';
 
 export * from './mission/mission-graph-handoff.js';
 
@@ -26,11 +26,11 @@ export * from './pipeline/pipeline-run-journal.js';
 
 export * from './pipeline/pipeline-approval-resume.js';
 export * from './pipeline/pipeline-await-resume.js';
-export * from './state-probe.js';
+export * from './pipeline/state-probe.js';
 
-export * from './graph-run-artifact.js';
+export * from './pipeline/graph-run-artifact.js';
 
-export * from './realtime-media-session.js';
+export * from './media/realtime-media-session.js';
 
 export * from './surface/surface-coordination-store.js';
 
@@ -40,29 +40,23 @@ export * from './surface/surface-mutation-guard.js';
 
 export * from './surface/surface-request-input.js';
 
-export * from './ceo-surface-summary.js';
+export * from './surface/ceo-surface-summary.js';
 
-export * from './mic-capture.js';
+export * from './voice/mic-capture.js';
 
-export * from './in-room-minutes-recorder.js';
+export * from './meeting/in-room-minutes-recorder.js';
 
 export * from './foundation/pcm-wav.js';
 
 export * from './voice/audio-playback.js';
 
-export * from './segmented-voice-playback.js';
-
-export * from './streaming-voice-playback.js';
-
 export * from './voice/audio-tee.js';
 
 export * from './voice/vad-registry.js';
 
-export * from './silero-vad-bridge.js';
-
 export * from './actuator/actuator-serve-client.js';
 
-export * from './in-room-meeting-driver.js';
+export * from './meeting/in-room-meeting-driver.js';
 
 export * from './browser/chrome-extension-meeting-driver.js';
 
@@ -105,27 +99,17 @@ export type { OnErrorConfig, RefParams } from './pipeline/pipeline-engine.js';
 
 export * from './surface/channel-surface.js';
 
-export * from './cowork-surface.js';
-export {
-  loadCoworkArtifactPacketAtPath,
-  validateCoworkArtifactPacket,
-} from './cowork-artifact-packet.js';
-
-export * from './cowork-knowledge-bridge.js';
-
 export {
   delegationChildrenRegistryPath,
   loadDelegationChildrenRegistryAtPath,
   writeDelegationChildrenRegistryAtPath,
 } from './mission/delegation-child-registry.js';
 
-export * from './cowork-health-check.js';
-
 export * from './surface/surface-runtime-router.js';
 
 export * from './surface/surface-runtime-orchestrator.js';
 
-export * from './location-fallback.js';
+export * from './surface/location-fallback.js';
 
 export * from './surface/surface-response-blocks.js';
 
@@ -139,7 +123,7 @@ export * from './integrations/slack-onboarding.js';
 
 export * from './agent/agent-activity-board.js';
 
-export * from './event-vocabulary.js';
+export * from './event/event-vocabulary.js';
 
 export * from './agent/agent-collaboration-events.js';
 
@@ -167,11 +151,11 @@ export * from './mission/mission-seed-assessment.js';
 
 export * from './mission/mission-assessment.js';
 
-export * from './presence-surface.js';
+export * from './surface/presence-surface.js';
 
-export * from './presence-avatar.js';
+export * from './surface/presence-avatar.js';
 
-export * from './presence-bridge.js';
+export * from './surface/presence-bridge.js';
 
 export * from './surface/surface-agent-catalog.js';
 
@@ -189,9 +173,9 @@ export * from './intent/intent-resolution-contract.js';
 
 export * from './intent/intent-track-resolver.js';
 
-export * from './capability-bundle-registry.js';
+export * from './plugin/capability-bundle-registry.js';
 
-export * from './outcome-contract.js';
+export * from './task/outcome-contract.js';
 
 export * from './analysis/analysis-contract.js';
 
@@ -199,7 +183,7 @@ export * from './intent/intent-reconciliation.js';
 
 export * from './governance/approval-policy.js';
 
-export * from './router-contract.js';
+export * from './intent/router-contract.js';
 
 export * from './intent/intent-outcome-patterns.js';
 
@@ -211,9 +195,9 @@ export * from './workforce/work-scope-decision.js';
 
 export * from './mission/mission-execution-surface.js';
 
-export * from './productivity-task-plan.js';
+export * from './task/productivity-task-plan.js';
 
-export * from './presentation-preference-profile.js';
+export * from './design/presentation-preference-profile.js';
 
 export * from './project/project-registry.js';
 
@@ -223,7 +207,7 @@ export * from './project/project-operational-state-registry.js';
 
 export * from './project/project-track-registry.js';
 
-export * from './sdlc-gate-readiness.js';
+export * from './mission/sdlc-gate-readiness.js';
 
 export * from './service/service-binding-registry.js';
 
@@ -233,42 +217,40 @@ export * from './workforce/artifact-bundle.js';
 
 export * from './workforce/artifact-registry.js';
 
-export * from './control-plane-client.js';
+export * from './surface/control-plane-client.js';
 
 export * from './virtual/computer-surface.js';
 
-export * from './apple-event-bridge.js';
+export * from './virtual/apple-event-bridge.js';
 
 export * from './virtual/os-automation-platform.js';
 
-export * from './platform-command-adapters.js';
+export * from './tool/platform-command-adapters.js';
 
 export * from './virtual/desktop-launch-adapter.js';
 
-export * from './windows-native-image-generation-bridge.js';
-
 export * from './virtual/os-automation-bridge.js';
 
-export * from './macos-automation-bridge.js';
+export * from './virtual/macos-automation-bridge.js';
 
 export * from './virtual/os-app-adapters.js';
 
 export * from './service/service-binding.js';
 
-export * from './oauth-broker.js';
+export * from './authn/oauth-broker.js';
 
-export * from './cloudflare-os-control-plane.js';
-export * from './cloudflare-os-shared.js';
+export * from './governance/cloudflare-os-control-plane.js';
+export * from './governance/cloudflare-os-shared.js';
 
-export * from './cloudflare-os-surface.js';
+export * from './governance/cloudflare-os-surface.js';
 
-export * from './share-grant-graph.js';
+export * from './governance/share-grant-graph.js';
 
-export * from './share-grant-live-sessions.js';
+export * from './governance/share-grant-live-sessions.js';
 
-export * from './share-grant-authorizer.js';
+export * from './governance/share-grant-authorizer.js';
 
-export * from './provenance-taint.js';
+export * from './governance/provenance-taint.js';
 
 export * from './organization/tenant-registry.js';
 
@@ -280,15 +262,11 @@ export * from './entity-scope.js';
 
 export * from './organization/tenant-knowledge-retrieval.js';
 
-export * from './ingest-asset-ledger.js';
+export * from './information-assets/ingest-asset-ledger.js';
 
-export * from './ingest-quota.js';
+export * from './governance/pii-scrubber.js';
 
-export * from './ingest-sync-cursors.js';
-
-export * from './pii-scrubber.js';
-
-export * from './frame-redaction.js';
+export * from './virtual/frame-redaction.js';
 
 export * from './virtual/screen-frame-redaction.js';
 
@@ -306,11 +284,11 @@ export * from './virtual/desktop-intent-reconstruction.js';
 
 export * from './media/native-op-mapping.js';
 
-export * from './ingest-tier-gate.js';
+export * from './knowledge/ingest-tier-gate.js';
 
-export * from './generation-scheduler.js';
+export * from './daemon/generation-scheduler.js';
 
-export * from './generation-quota.js';
+export * from './finance/generation-quota.js';
 
 export * from './pipeline/pipeline-scheduler.js';
 
@@ -320,59 +298,47 @@ export * from './pipeline/pipeline-preview.js';
 
 export * from './governance/policy-engine.js';
 
-export * from './trust-engine.js';
+export * from './governance/trust-engine.js';
 
 export * from './governance/audit-chain.js';
 
 export * from './governance/kill-switch.js';
 
-export * from './subagent-capability-profiles.js';
+export * from './workforce/subagent-capability-profiles.js';
 
-export * from './subagent-prompt-framing.js';
+export * from './workforce/subagent-prompt-framing.js';
 
 export * from './provider/claude-native-subagent.js';
-
-export {
-  buildBridgeErrorReplyText,
-  buildBridgeEmptyReplyText,
-  shouldPostBridgeError,
-  resetBridgeErrorRateLimiter,
-  postBridgeError,
-  chunkBridgeMessage,
-  chunkSurfaceMessage,
-  getSurfaceCapability,
-  listSurfaceCapabilities,
-  isSurfaceFormatError,
-  stripSurfaceMarkup,
-  sendSurfaceTextWithFallback,
-} from './bridge-error-reply.js';
 
 export {
   recordConfigFallback,
   listFallbacks,
   markResolved,
   pruneResolved,
-} from './config-fallback-registry.js';
+} from './governance/config-fallback-registry.js';
 
-export type { ConfigFallbackEntry, ConfigFallbackReason } from './config-fallback-registry.js';
+export type {
+  ConfigFallbackEntry,
+  ConfigFallbackReason,
+} from './governance/config-fallback-registry.js';
 
 export {
   recordUnclassifiedError,
   listUnclassifiedErrors,
   markReconciled as markUnclassifiedReconciled,
   pruneReconciled as pruneUnclassifiedReconciled,
-} from './unclassified-error-registry.js';
+} from './daemon/unclassified-error-registry.js';
 
-export type { UnclassifiedErrorEntry } from './unclassified-error-registry.js';
+export type { UnclassifiedErrorEntry } from './daemon/unclassified-error-registry.js';
 
 export {
   recordUnhandledIntent,
   listUnhandledIntents,
   markIntentsReconciled,
   pruneReconciledIntents,
-} from './unhandled-intent-registry.js';
+} from './intent/unhandled-intent-registry.js';
 
-export type { UnhandledIntentEntry, IntentMissType } from './unhandled-intent-registry.js';
+export type { UnhandledIntentEntry, IntentMissType } from './intent/unhandled-intent-registry.js';
 
 // Shared Business Types
 

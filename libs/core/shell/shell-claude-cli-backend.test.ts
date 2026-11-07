@@ -14,7 +14,7 @@ import {
 } from './shell-claude-cli-backend.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
 import { DelegationWallClockExceededError } from '../mission/delegation-concurrency.js';
-import { metrics } from '../metrics.js';
+import { metrics } from '../analysis/metrics.js';
 
 beforeEach(() => {
   vi.spyOn(metrics, 'record').mockImplementation(() => undefined as never);
@@ -54,7 +54,7 @@ const { prepareSessionGitIndexMock, sessionIndexDisposeMock } = vi.hoisted(() =>
   prepareSessionGitIndexMock: vi.fn(),
   sessionIndexDisposeMock: vi.fn(),
 }));
-vi.mock('../session-git-index.js', () => ({
+vi.mock('../vcs/session-git-index.js', () => ({
   prepareSessionGitIndex: prepareSessionGitIndexMock,
 }));
 

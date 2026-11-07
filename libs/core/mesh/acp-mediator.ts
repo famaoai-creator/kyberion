@@ -5,7 +5,7 @@ import {
   withoutRelayManagedCredentials,
 } from '../foundation/env.js';
 import { ptyEngine } from '../shell/pty-engine.js';
-import { dispatchA2UI } from '../a2ui.js';
+import { dispatchA2UI } from '../surface/a2ui.js';
 import {
   evaluateAcpManifestToolPolicy,
   isAcpReadOnlyTitleFragment,
@@ -16,14 +16,14 @@ import {
   spawnManagedProcess,
   stopManagedProcess,
   type ManagedProcessWatchHandle,
-} from '../managed-process.js';
-import { armTriggerWatch, resolveCurrentTriggerAuthority } from '../trigger-runner.js';
+} from '../tool/managed-process.js';
+import { armTriggerWatch, resolveCurrentTriggerAuthority } from '../daemon/trigger-runner.js';
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
 import { pathResolver } from '../path-resolver.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { evaluateShellCommandPolicy } from '../shell/shell-command-policy.js';
-import { requireRiskyApproval } from '../risky-op-approval-port.js';
+import { requireRiskyApproval } from '../governance/risky-op-approval-port.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { isRecord } from '../foundation/text.js';
 import type {

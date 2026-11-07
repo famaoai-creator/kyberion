@@ -11,9 +11,9 @@ import {
   markSurfaceDeadTarget,
   updateSurfaceOutboxMessage,
 } from './surface-coordination-store.js';
-import { sendOpsAlert } from '../ops-alert.js';
+import { sendOpsAlert } from '../daemon/ops-alert.js';
 import { withLock } from '../foundation/lock-utils.js';
-import { resolveCustomerBinding } from '../customer-channel-binding.js';
+import { resolveCustomerBinding } from '../organization/customer-channel-binding.js';
 import { resolveTenant } from '../organization/tenant-registry.js';
 import { clamp } from '../foundation/text.js';
 import { recordApprovalDeliveryReceipt } from '../governance/approval-veto-window.js';

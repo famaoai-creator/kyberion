@@ -23,7 +23,7 @@ import { loadOrganizationOperationalState } from '../organization/organization-o
 import { listTenantProfileSlugs, readTenantProfile } from '../organization/tenant-registry.js';
 import { listMemberIds, readMemberProfile } from '../organization/member-registry.js';
 import { findMissionPath, pathResolver } from '../path-resolver.js';
-import { missionPathOrNull } from '../mission-lookup.js';
+import { missionPathOrNull } from '../mission/mission-lookup.js';
 import { readJson } from '../foundation/json.js';
 import { listProjectRecords } from '../project/project-registry.js';
 import { safeExistsSync, safeReaddir } from '../secure-io.js';
@@ -598,6 +598,15 @@ const GRAPH_READ_POLICY = {
  */
 export function viewerAdmitsNode(viewer: SurfaceAuthorizationContext, node: GraphNode): boolean {
   if (node.kind === 'actor' && node.facts?.actor_type === 'member') {
+    // Custody membership cannot bypass the independent operation/tier ceiling.
+    if (
+      !authorizeSurfaceOperation({
+        context: viewer,
+        operation: GRAPH_READ_POLICY,
+        resource: { ...(node.tier ? { tier: node.tier } : {}) },
+      }).allowed
+    )
+      return false;
     const memberTenants = String(node.facts.tenants || '')
       .split(',')
       .filter(Boolean);
@@ -631,7 +640,27 @@ export function filterWorkspaceGraph(
 ): WorkspaceGraph {
   return {
     ...graph,
-    nodes: graph.nodes.filter((node) => viewerAdmitsNode(viewer, node)),
+    nodes: graph.nodes
+      .filter((node) => viewerAdmitsNode(viewer, node))
+      .map((node) => {
+        if (
+          node.kind !== 'actor' ||
+          node.facts?.actor_type !== 'member' ||
+          viewer.tenantSlugs === 'all' ||
+          admitsCustody(viewer, { kind: 'person', ref: node.id })
+        )
+          return node;
+        const tenants = String(node.facts.tenants || '')
+          .split(',')
+          .filter((tenant) => admitsCustody(viewer, { kind: 'tenant', ref: tenant }));
+        const roles = String(node.facts.roles || '')
+          .split(',')
+          .filter((role) => tenants.includes(role.split(':')[0]!));
+        return {
+          ...node,
+          facts: { ...node.facts, tenants: tenants.join(','), roles: roles.join(',') },
+        };
+      }),
     // A scoped viewer must not learn other tenants' store failures.
     degraded:
       viewer.tenantSlugs === 'all'

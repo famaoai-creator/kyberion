@@ -28,9 +28,9 @@ import {
 import { runOpPreflight } from '../pipeline/op-preflight.js';
 import { getSecret } from '../secret/secret-guard.js';
 import type { ActuatorOperationHandler } from '../actuator/actuator-op-registry.js';
-import { resolveFacets } from '../facet-registry.js';
+import { resolveFacets } from './facet-registry.js';
 import { coreSeamCatalog } from '../seam.js';
-import '../environment-capability.js';
+import '../daemon/environment-capability.js';
 import { resetReasoningProviderRegistryForTests } from '../reasoning/reasoning-provider-registry.js';
 
 afterEach(() => {

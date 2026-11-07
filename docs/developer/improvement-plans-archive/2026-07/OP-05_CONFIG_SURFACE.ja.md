@@ -33,7 +33,7 @@ status: archived
 
 ### Task 2: 起動時検証 — `claude-sonnet-4`
 
-1. `libs/core/env-validator.ts` を新設: レジストリに対して現在の env を検証(型・enum 値・必須)。`validateEnv(): { errors, warnings, unknown }`。
+1. `libs/core/harnessing/env-validator.ts` を新設: レジストリに対して現在の env を検証(型・enum 値・必須)。`validateEnv(): { errors, warnings, unknown }`。
 2. doctor(`doctor_core.ts`)と baseline-check に env 検証を追加。既定は warn(未知 env・型不正を報告)だが、**明確に破壊的な誤設定(必須シークレット欠落等)は fail-fast**。
 3. 集中ローダー: `.env` 読み込みを 1 箇所(`env-validator` の初期化)に集約し、各モジュールの散在直読みは段階的にレジストリ経由アクセサ(`getEnv('KYBERION_X')`)へ寄せる(全面移行は大きいので、新規コードと本改善計画群の新 env から適用)。
 4. test: 未知 env / 型不正 / 必須欠落 / 正常。

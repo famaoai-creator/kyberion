@@ -124,6 +124,7 @@ graph TD
   actuator_vision --> agent_shared_perception
   actuator_vision --> agent_shared_video
   actuator_voice --> agent_core
+  actuator_voice --> agent_shared_video
   actuator_voice --> agent_shared_voice
   actuator_wisdom --> agent_core
   actuator_working_memory --> agent_core
@@ -140,9 +141,13 @@ graph TD
   agent_shared_voice --> agent_core
   agent_shared_voice --> agent_shared_interaction
   kyberion_discord_bridge --> agent_core
+  kyberion_discord_bridge --> agent_shared_interaction
   kyberion_imessage_bridge --> agent_core
+  kyberion_imessage_bridge --> agent_shared_interaction
   kyberion_slack_bridge --> agent_core
+  kyberion_slack_bridge --> agent_shared_interaction
   kyberion_telegram_bridge --> agent_core
+  kyberion_telegram_bridge --> agent_shared_interaction
   presence_chronos_mirror_v2 --> agent_core
   presence_concierge --> agent_core
   presence_concierge --> agent_shared_ui
@@ -150,6 +155,7 @@ graph TD
   presence_operator_surface --> agent_core
   presence_operator_surface --> agent_shared_ui
   presence_terminal_hud --> agent_core
+  presence_terminal_hud --> agent_shared_voice
   kyberion --> actuator_meeting_browser_driver
   kyberion --> actuator_service
   kyberion --> actuator_system

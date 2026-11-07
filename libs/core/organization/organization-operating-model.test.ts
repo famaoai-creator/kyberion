@@ -61,7 +61,7 @@ import {
   type OrganizationServiceRecord,
   type OrganizationServiceState,
 } from './organization-operating-model.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { nowIso } from '../foundation/index.js';
 import { pathResolver } from '@agent/core/path-resolver';
 import { orgKrLedgerPath } from '../dot/dot-state-paths.js';

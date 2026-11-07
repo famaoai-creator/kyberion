@@ -60,7 +60,7 @@ status: active
 ### AC-03: 有界読み込み(G3)
 
 - `ComposeCollaborationProjectionOptions` に `bounded?: { maxBytesPerFile?: number; recentDays?: number; includeStepEvents?: boolean }` を追加。既定 `{ maxBytesPerFile: 2MiB, recentDays: 2, includeStepEvents: false }`。`bounded: false` で従来の全読み。
-- 実装は `libs/core/jsonl-tail.ts` の既存 helper(`createJsonlTail` / `splitCompleteLines`)を再利用し、ファイル末尾から byte 上限で読む。日付付きファイル(`worker-events-YYYY-MM-DD.jsonl`)は `recentDays` でファイル選別。
+- 実装は `libs/core/storage/jsonl-tail.ts` の既存 helper(`createJsonlTail` / `splitCompleteLines`)を再利用し、ファイル末尾から byte 上限で読む。日付付きファイル(`worker-events-YYYY-MM-DD.jsonl`)は `recentDays` でファイル選別。
 - `buildAgentCollaborationProjection` の既存呼び出し元(HUD、Chronos `api/collaboration`、`headless-projections`、`vital_check`)は既定の有界で動く。全読みが必要な箇所があれば明示的に `bounded: false` を渡す(監査対象: `vital_check.ts`)。
 
 受入: 29MB の supervisor ファイルを与えても読み込みが 2MiB 分で止まるテスト(fixture で生成)。`partial: true` と `status_flags` に `bounded_read` を追加して「切り詰めた」ことを利用者に見せる。

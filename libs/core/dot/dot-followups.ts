@@ -19,7 +19,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { readJsonLines } from '../foundation/json.js';
 import { withLockSync } from '../foundation/lock-utils.js';
-import { readJsonLinesCachedAcrossCompaction } from '../jsonl-parked-read.js';
+import { readJsonLinesCachedAcrossCompaction } from '../storage/jsonl-parked-read.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
 import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';

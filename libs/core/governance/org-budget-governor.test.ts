@@ -11,7 +11,7 @@ import {
   type OrgBudgetPolicy,
 } from './org-budget-governor.js';
 import type { LoadedDotCharter } from '../dot/dot-charter.js';
-import { metrics, MetricsCollector } from '../metrics.js';
+import { metrics, MetricsCollector } from '../analysis/metrics.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 
 const now = () => new Date('2026-10-04T10:00:00Z');

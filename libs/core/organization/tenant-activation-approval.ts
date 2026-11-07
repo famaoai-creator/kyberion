@@ -2,8 +2,8 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import type { ResolvedPrincipal } from '../authn-principal-resolver.js';
-import { humanActor } from '../actor.js';
+import type { ResolvedPrincipal } from '../authn/authn-principal-resolver.js';
+import { humanActor } from '../contracts/actor.js';
 import { getAgentIdentity } from '../agent/agent-identity.js';
 import { parseNhiId } from '../contracts/nhi-id.js';
 import { acquireLock, releaseLock } from '../foundation/lock-utils.js';

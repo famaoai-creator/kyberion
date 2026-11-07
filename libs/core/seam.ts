@@ -6,7 +6,7 @@
  * instead of silently selecting the last registration.
  */
 
-import { assertModuleInvariant } from './invariants.js';
+import { assertModuleInvariant } from './foundation/invariants.js';
 import { isVitestProcess } from './foundation/env.js';
 import { createLogger } from './logger.js';
 

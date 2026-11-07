@@ -21,14 +21,14 @@ vi.mock('./audit-chain.js', async () => ({
 }));
 vi.mock('./governance-action-recorder.js', () => ({ recordGovernanceAction: vi.fn() }));
 vi.mock('../surface/operator-notifications.js', () => ({ notifyOperator: vi.fn() }));
-vi.mock('../decision-rights.js', () => ({
+vi.mock('../organization/decision-rights.js', () => ({
   resolveDecisionRightsMatrix: vi.fn(() => null),
   evaluateDecisionRights: vi.fn(() => null),
 }));
-import { evaluateDecisionRights } from '../decision-rights.js';
+import { evaluateDecisionRights } from '../organization/decision-rights.js';
 
 import * as pathResolver from '../path-resolver.js';
-import { humanActor } from '../actor.js';
+import { humanActor } from '../contracts/actor.js';
 import { safeRmSync } from '../secure-io.js';
 import { enforceApprovalGate } from './approval-gate.js';
 import { readCharterLedger, findActiveCharter } from './accountability-charter-registry.js';

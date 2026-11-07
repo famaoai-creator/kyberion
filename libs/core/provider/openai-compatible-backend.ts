@@ -53,7 +53,10 @@ import type {
   ReasoningCallOptions,
   ToolDefinition,
 } from '../reasoning/reasoning-backend.js';
-import { runStructuredReasoningOp, structuredReasoningSpecs } from '../structured-reasoning.js';
+import {
+  runStructuredReasoningOp,
+  structuredReasoningSpecs,
+} from '../reasoning/structured-reasoning.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning/reasoning-egress-scope.js';
 import {
   computeCompletionTokenBudget,
@@ -65,12 +68,12 @@ import {
   type StablePrefixSnapshot,
 } from '../reasoning/prompt-cache-discipline.js';
 import type { ReasoningToolName, SamplingParams } from '../reasoning/reasoning-route-resolver.js';
-import type { ConstrainedSampling } from '../backend-capability-profile.js';
+import type { ConstrainedSampling } from '../reasoning/backend-capability-profile.js';
 import {
   markDelegationExecutionStarted,
   reportDelegationResultMetadata,
   runStartReportingDelegation,
-} from '../delegation-execution-tracker.js';
+} from '../workforce/delegation-execution-tracker.js';
 
 export type LocalLlmProviderPreset =
   'generic' | 'ollama' | 'vllm' | 'lmstudio' | 'llamacpp' | 'mlx' | 'localai';

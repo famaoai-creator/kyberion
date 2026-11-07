@@ -48,7 +48,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { readJsonLines } from '../foundation/json.js';
-import { streamJsonLines } from '../jsonl-read.js';
+import { streamJsonLines } from '../storage/jsonl-read.js';
 import { nowIso } from '../foundation/time.js';
 import { isVitestProcess } from '../foundation/env.js';
 import { pathResolver } from '../path-resolver.js';

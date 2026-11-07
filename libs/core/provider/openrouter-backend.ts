@@ -51,13 +51,16 @@ import type {
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
 } from '../reasoning/reasoning-backend.js';
-import { runStructuredReasoningOp, structuredReasoningSpecs } from '../structured-reasoning.js';
+import {
+  runStructuredReasoningOp,
+  structuredReasoningSpecs,
+} from '../reasoning/structured-reasoning.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning/reasoning-egress-scope.js';
 import type { ReasoningToolName } from '../reasoning/reasoning-route-resolver.js';
 import {
   markDelegationExecutionStarted,
   runStartReportingDelegation,
-} from '../delegation-execution-tracker.js';
+} from '../workforce/delegation-execution-tracker.js';
 
 export interface OpenRouterBackendOptions {
   apiKey: string;

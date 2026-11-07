@@ -9,7 +9,7 @@ import {
   type MissionTeamOrganizationProfileSummary,
 } from './mission-team-plan-composer.js';
 import { staffMissionTeamRoles } from './mission-team-binding.js';
-import type { EventScopeInput } from '../event-scope.js';
+import type { EventScopeInput } from '../event/event-scope.js';
 
 export interface MissionTeamRuntimeAssignment extends MissionTeamAssignment {
   runtime_status: 'spawned' | 'already_ready' | 'standby' | 'unfilled' | 'failed';

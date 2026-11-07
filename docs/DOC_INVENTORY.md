@@ -131,12 +131,12 @@ Files with names suggesting "snapshot at a point in time" or one-off evaluation:
 
 ### 3.2 Generated artifact dirs
 
-| Subdir                         | Action                                                                                                                                                                                                                    |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `common/patterns/generated/`   | **Reset on 2026-05-07** (Phase C'-1 + Phase B-3 work). 184 fallback test artifacts deleted; the emitter now refuses to write meaningless candidates. See `libs/core/promoted-memory.ts` `isMeaningfulPromotionCandidate`. |
-| `common/operations/generated/` | Currently empty in public tier. Safe.                                                                                                                                                                                     |
-| `common/wisdom/generated/`     | Currently empty in public tier. Safe.                                                                                                                                                                                     |
-| `common/templates/generated/`  | Currently empty in public tier. Safe.                                                                                                                                                                                     |
+| Subdir                         | Action                                                                                                                                                                                                                              |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `common/patterns/generated/`   | **Reset on 2026-05-07** (Phase C'-1 + Phase B-3 work). 184 fallback test artifacts deleted; the emitter now refuses to write meaningless candidates. See `libs/core/knowledge/promoted-memory.ts` `isMeaningfulPromotionCandidate`. |
+| `common/operations/generated/` | Currently empty in public tier. Safe.                                                                                                                                                                                               |
+| `common/wisdom/generated/`     | Currently empty in public tier. Safe.                                                                                                                                                                                               |
+| `common/templates/generated/`  | Currently empty in public tier. Safe.                                                                                                                                                                                               |
 
 ## 4. Recommended next passes
 

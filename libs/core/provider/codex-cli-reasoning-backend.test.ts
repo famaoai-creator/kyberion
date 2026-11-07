@@ -15,7 +15,7 @@ import {
 import {
   STRUCTURED_REASONING_SYSTEM_PROMPT,
   structuredReasoningSpecs,
-} from '../structured-reasoning.js';
+} from '../reasoning/structured-reasoning.js';
 
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
 import type { ReasoningCallOptions } from '../reasoning/reasoning-backend-contracts.js';

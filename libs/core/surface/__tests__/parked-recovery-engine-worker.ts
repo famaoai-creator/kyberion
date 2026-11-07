@@ -1,6 +1,6 @@
 import type { DotWorkResultRow } from '../../dot/dot-state-paths.js';
 import { appendActionRecord } from '../../dot/dot-action-ledger.js';
-import { physicalScopedPath } from '../../physical-namespace.js';
+import { physicalScopedPath } from '../../storage/physical-namespace.js';
 /** Source-loaded child fixture. Every store, authority check and lock is real. */
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -173,7 +173,7 @@ function seed() {
       payloadHash: effect.payloadHash,
       effectBinding: effect.effectBinding,
     },
-    scope: effect.effect.scope as import('../../event-scope.js').EventScopeInput,
+    scope: effect.effect.scope as import('../../event/event-scope.js').EventScopeInput,
     draft: { title: 'Synthetic diagnostic', summary: 'Unverifiable legacy approval fixture' },
   });
   const unsigned: Omit<FirstJobDecisionProof, 'signature'> = {
@@ -357,7 +357,7 @@ function seedRevision(validChildProof = false) {
       payloadHash: effect.payloadHash,
       effectBinding: effect.effectBinding,
     },
-    scope: effect.effect.scope as import('../../event-scope.js').EventScopeInput,
+    scope: effect.effect.scope as import('../../event/event-scope.js').EventScopeInput,
     draft: { title: 'Synthetic parked revision', summary: 'Unverifiable child fixture' },
   });
   const unsigned: Omit<FirstJobDecisionProof, 'signature'> = {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 
 const mocks = vi.hoisted(() => ({
   ask: vi.fn<(prompt: string, options?: unknown) => Promise<string>>(),

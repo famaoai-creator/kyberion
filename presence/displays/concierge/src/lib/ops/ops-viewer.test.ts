@@ -36,6 +36,11 @@ describe('operations viewer helpers (one viewer model)', () => {
     expect(ViewerContextError).toBe(ConciergeViewerError);
   });
 
+  it('preserves an empty server permission replacement separately from role defaults', () => {
+    expect(toSurfaceAuthorizationContext(scoped).permissions).toBeUndefined();
+    expect(toSurfaceAuthorizationContext({ ...scoped, permissions: [] }).permissions).toEqual([]);
+  });
+
   it('narrows but never widens the tenant set', () => {
     expect(strictViewerScopeTenantSlugs(scoped, 'acme')).toEqual(['acme']);
     expect(strictViewerScopeTenantSlugs(scoped)).toEqual(['acme']);

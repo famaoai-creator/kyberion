@@ -12,7 +12,7 @@
  *                                   caller owns (the audio graph is never
  *                                   created, connected or closed here)
  *   - `applyCue(cue)`              `AnimationCue`-shaped objects
- *                                   (libs/core/realtime-media-session.ts):
+ *                                   (libs/core/media/realtime-media-session.ts):
  *                                   `blendshape` `mouth_open`, `viseme` via
  *                                   the canonical-viseme openness table,
  *                                   `expression` passed to `onExpression`

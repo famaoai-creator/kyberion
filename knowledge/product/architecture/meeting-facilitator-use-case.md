@@ -95,7 +95,7 @@ After every run, a summary is printed:
 | Component                                                                 | Purpose                                                                                                                                                                                                                           |
 | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `schemas/action-item.schema.json`                                         | Canonical action-item shape (used by validators and AJV-based contract checks)                                                                                                                                                    |
-| `libs/core/action-item-store.ts`                                          | Append-only JSONL store (`action-items.jsonl`) under the mission's evidence directory; provides `recordActionItem`, `updateActionItemStatus`, `appendReminder`, `listActionItems`, `listOperatorSelfPending`, `listOthersPending` |
+| `libs/core/meeting/action-item-store.ts`                                  | Append-only JSONL store (`action-items.jsonl`) under the mission's evidence directory; provides `recordActionItem`, `updateActionItemStatus`, `appendReminder`, `listActionItems`, `listOperatorSelfPending`, `listOthersPending` |
 | `wisdom:extract_action_items`                                             | LLM-driven transcript → structured items + persistence                                                                                                                                                                            |
 | `wisdom:generate_facilitation_script`                                     | Short utterances for opening / transition / wrap-up                                                                                                                                                                               |
 | `wisdom:generate_reminder_message`                                        | Per-item reminder draft (channel + text)                                                                                                                                                                                          |
@@ -174,7 +174,7 @@ operator's slice is dispatched while the context is fresh.
 
 Unit / contract tests:
 
-- `libs/core/action-item-store.test.ts` (8 cases) — record / update /
+- `libs/core/meeting/action-item-store.test.ts` (8 cases) — record / update /
   reminders / list filters
 - `libs/actuators/meeting-actuator/src/index.test.ts` (9 cases) —
   schema + voice-consent gate
@@ -302,7 +302,7 @@ Talking-avatar video (`voice:render_talking_avatar`):
 Camera output (`voice:output_to_virtual_camera`):
 
 - Thin dispatcher over the `camera-output-bridge` seam
-  (`libs/core/camera-output-bridge.ts`): capability-declared,
+  (`libs/core/media/camera-output-bridge.ts`): capability-declared,
   probe-gated, named backends — the same adopter pattern as the
   voice-side bridges. `backend` selects explicitly (`obs-virtual-cam`
   today; `auto` takes the first probed-available backend and never
@@ -321,7 +321,7 @@ Camera output (`voice:output_to_virtual_camera`):
 ## 7. Reference
 
 - [`schemas/action-item.schema.json`](../schemas/action-item.schema.json)
-- [`libs/core/action-item-store.ts`](../../../libs/core/action-item-store.ts)
+- [`libs/core/meeting/action-item-store.ts`](../../../libs/core/meeting/action-item-store.ts)
 - [`libs/actuators/meeting-actuator/`](../../../libs/actuators/meeting-actuator)
 - [`knowledge/product/pipeline-templates/meeting-facilitation-workflow.json`](../pipeline-templates/meeting-facilitation-workflow.json)
 - [`knowledge/product/pipeline-templates/action-item-execute-self.json`](../pipeline-templates/action-item-execute-self.json)

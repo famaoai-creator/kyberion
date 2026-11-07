@@ -92,11 +92,11 @@
     },
     {
       "layer": "contracts",
-      "pattern": "libs/core/structured-output-contracts.ts"
+      "pattern": "libs/core/contracts/structured-output-contracts.ts"
     },
     {
       "layer": "contracts",
-      "pattern": "libs/core/context-boundary.ts"
+      "pattern": "libs/core/contracts/context-boundary.ts"
     },
     {
       "layer": "contracts",
@@ -156,11 +156,11 @@
     },
     {
       "layer": "domain",
-      "pattern": "libs/core/report-contract.ts"
+      "pattern": "libs/core/task/report-contract.ts"
     },
     {
       "layer": "domain",
-      "pattern": "libs/core/router-contract.ts"
+      "pattern": "libs/core/intent/router-contract.ts"
     },
     {
       "layer": "domain",
@@ -359,5 +359,231 @@
       "pattern": "libs/core/*/*/*worker*.ts"
     }
   ],
-  "default_layer": "domain"
+  "default_layer": "domain",
+  "core_placement": {
+    "root_modules": {
+      "authority.ts": {
+        "responsibility": "Canonical authority bootstrap and execution-context boundary; retain stable root composition/security issuer entry.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Canonical authority bootstrap and execution-context boundary; retain stable root composition/security issuer entry."
+      },
+      "core.ts": {
+        "responsibility": "Deliberate multi-module runtime facade composing logger, UI/SRE and cache exports.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Deliberate multi-module runtime facade composing logger, UI/SRE and cache exports."
+      },
+      "entity-scope.ts": {
+        "responsibility": "Canonical entity-scope vocabulary and individually watched bootstrap contract.",
+        "reason": "Stable shared scope boundary used by security bootstrap and independently constrained by the foundation-weight gate."
+      },
+      "entry-ledger.ts": {
+        "responsibility": "Composes kernel ledger reexport with installation of governed local-fs backend as an intentional side effect.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Composes kernel ledger reexport with installation of governed local-fs backend as an intentional side effect."
+      },
+      "fs-primitives.ts": {
+        "responsibility": "Raw filesystem bootstrap boundary used where importing secure-io would cycle; private path-boundary enforcement.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Raw filesystem bootstrap boundary used where importing secure-io would cycle; private path-boundary enforcement."
+      },
+      "governance.ts": {
+        "responsibility": "Deliberate multi-module facade combining authority, tier checks and approval APIs.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Deliberate multi-module facade combining authority, tier checks and approval APIs."
+      },
+      "identity-context-bridge.ts": {
+        "responsibility": "Synchronous tier-guard/secure-I/O bootstrap bridge avoids importing full authority before its resolver is installed.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Synchronous tier-guard/secure-I/O bootstrap bridge avoids importing full authority before its resolver is installed."
+      },
+      "index-part-01.ts": {
+        "responsibility": "Deliberate package-root export facade preserves coherent public API and initialization order.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Deliberate package-root export facade preserves coherent public API and initialization order."
+      },
+      "index-part-02.ts": {
+        "responsibility": "Deliberate package-root export facade preserves coherent public API and initialization order.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Deliberate package-root export facade preserves coherent public API and initialization order."
+      },
+      "index-part-03.ts": {
+        "responsibility": "Deliberate package-root export facade preserves coherent public API and initialization order.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Deliberate package-root export facade preserves coherent public API and initialization order."
+      },
+      "index-part-04.ts": {
+        "responsibility": "Deliberate package-root export facade preserves coherent public API and initialization order.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Deliberate package-root export facade preserves coherent public API and initialization order."
+      },
+      "index-part-05.ts": {
+        "responsibility": "Deliberate package-root export facade preserves coherent public API and initialization order.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Deliberate package-root export facade preserves coherent public API and initialization order."
+      },
+      "index-part-06.ts": {
+        "responsibility": "Deliberate package-root export facade preserves coherent public API and initialization order.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Deliberate package-root export facade preserves coherent public API and initialization order."
+      },
+      "index-part-07.ts": {
+        "responsibility": "Deliberate package-root export facade preserves coherent public API and initialization order.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Deliberate package-root export facade preserves coherent public API and initialization order."
+      },
+      "index-part-08.ts": {
+        "responsibility": "Deliberate package-root export facade preserves coherent public API and initialization order.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Deliberate package-root export facade preserves coherent public API and initialization order."
+      },
+      "index-part-09.ts": {
+        "responsibility": "Deliberate package-root export facade preserves coherent public API and initialization order.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Deliberate package-root export facade preserves coherent public API and initialization order."
+      },
+      "index-part-10.ts": {
+        "responsibility": "Deliberate package-root export facade preserves coherent public API and initialization order.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Deliberate package-root export facade preserves coherent public API and initialization order."
+      },
+      "index-part-11.ts": {
+        "responsibility": "Deliberate package-root export facade preserves coherent public API and initialization order.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Deliberate package-root export facade preserves coherent public API and initialization order."
+      },
+      "index.ts": {
+        "responsibility": "Deliberate package-root export facade preserves coherent public API and initialization order.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Deliberate package-root export facade preserves coherent public API and initialization order."
+      },
+      "logger.ts": {
+        "responsibility": "Canonical dependency-free logging bootstrap/console boundary imported by secure I/O and every runtime.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Canonical dependency-free logging bootstrap/console boundary imported by secure I/O and every runtime."
+      },
+      "network.ts": {
+        "responsibility": "Stable governed secureFetch/redaction facade composes egress, secrets, audit and operation authorization.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Stable governed secureFetch/redaction facade composes egress, secrets, audit and operation authorization."
+      },
+      "ocr-bridge.ts": {
+        "responsibility": "Deliberate multi-provider public OCR facade composes contracts, registry, routing and builtin adapters.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Deliberate multi-provider public OCR facade composes contracts, registry, routing and builtin adapters."
+      },
+      "path-resolver.ts": {
+        "responsibility": "Canonical source/dist repository-root and governed-path resolver used by compiler bootstrap.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Canonical source/dist repository-root and governed-path resolver used by compiler bootstrap."
+      },
+      "platform-facts.ts": {
+        "responsibility": "Canonical dependency-free OS facts entrypoint explicitly named by AGENTS.md and platform-read enforcement.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Canonical dependency-free OS facts entrypoint explicitly named by AGENTS.md and platform-read enforcement."
+      },
+      "platform.ts": {
+        "responsibility": "Stable multi-platform OSDriver public facade explicitly named by AGENTS.md.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Stable multi-platform OSDriver public facade explicitly named by AGENTS.md."
+      },
+      "policy-relative-path.ts": {
+        "responsibility": "Canonical permission-policy path normalization directly consumed by tier-guard bootstrap.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Canonical permission-policy path normalization directly consumed by tier-guard bootstrap."
+      },
+      "schema-loader.ts": {
+        "responsibility": "Stable foundation-class Ajv compatibility entry; keeps compiler/bootstrap schema loading at its canonical core boundary.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Stable foundation-class Ajv compatibility entry; keeps compiler/bootstrap schema loading at its canonical core boundary."
+      },
+      "scope-context.ts": {
+        "responsibility": "Canonical cross-cutting tenant/entity/NHI scope resolution and environment transport boundary.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Canonical cross-cutting tenant/entity/NHI scope resolution and environment transport boundary."
+      },
+      "scope-envelope.ts": {
+        "responsibility": "Canonical execution-scope envelope, AsyncLocalStorage and credential-binding registration; security bootstrap singleton boundary.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Canonical execution-scope envelope, AsyncLocalStorage and credential-binding registration; security bootstrap singleton boundary."
+      },
+      "script-harness.ts": {
+        "responsibility": "Canonical pre-build CLI execution, diagnostics, authority and process-lifecycle entry contract used by compiler bootstrap.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Canonical pre-build CLI execution, diagnostics, authority and process-lifecycle entry contract used by compiler bootstrap."
+      },
+      "seam.ts": {
+        "responsibility": "Core-wide capability seam catalog and registry primitive shared across every subsystem; stable startup singleton boundary.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Core-wide capability seam catalog and registry primitive shared across every subsystem; stable startup singleton boundary."
+      },
+      "secure-io-path-guard.ts": {
+        "responsibility": "Literal/canonical path permission enforcement inside the secure-I/O bootstrap, with explicit module-layer exceptions.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Literal/canonical path permission enforcement inside the secure-I/O bootstrap, with explicit module-layer exceptions."
+      },
+      "secure-io.ts": {
+        "responsibility": "Canonical governed filesystem/process/network I/O entry point and security bootstrap boundary.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Canonical governed filesystem/process/network I/O entry point and security bootstrap boundary."
+      },
+      "sensitive-path-policy.ts": {
+        "responsibility": "Credential-path deny policy enforced before tier, persona or approval admission in secure I/O.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Credential-path deny policy enforced before tier, persona or approval admission in secure I/O."
+      },
+      "storage-layout.ts": {
+        "responsibility": "Canonical runtime purpose/tier/tenant path classification contract used directly by I/O enforcement.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Canonical runtime purpose/tier/tenant path classification contract used directly by I/O enforcement."
+      },
+      "tier-guard-tenant-store-partitions.ts": {
+        "responsibility": "Partition matching rules of the tier guard bootstrap for protected ledger/store writes.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Partition matching rules of the tier guard bootstrap for protected ledger/store writes."
+      },
+      "tier-guard.ts": {
+        "responsibility": "Canonical tier/tenant permission enforcement entry point beneath every governed I/O operation.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Canonical tier/tenant permission enforcement entry point beneath every governed I/O operation."
+      },
+      "types.ts": {
+        "responsibility": "Stable ecosystem type facade reexporting canonical contracts and tier vocabulary for existing consumers.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Stable ecosystem type facade reexporting canonical contracts and tier vocabulary for existing consumers."
+      },
+      "validate.ts": {
+        "responsibility": "Stable lightweight schema-validation boundary with fixed source-relative schema lookup; relocation would change import.meta-based path semantics.",
+        "reason": "Retained as a root bootstrap or shared kernel seam: Stable lightweight schema-validation boundary with fixed source-relative schema lookup; relocation would change import.meta-based path semantics."
+      },
+      "binary-availability.mjs": {
+        "responsibility": "Prebuild binary availability discovery.",
+        "reason": "Plain JavaScript bootstrap dependency required before TypeScript compilation."
+      },
+      "private-host-cache.mjs": {
+        "responsibility": "Shared host capability cache used by bootstrap and runtime.",
+        "reason": "Plain JavaScript bootstrap dependency required before TypeScript compilation."
+      },
+      "repository-path-boundary.mjs": {
+        "responsibility": "Prebuild repository path normalization and boundary checks.",
+        "reason": "Plain JavaScript bootstrap dependency required before TypeScript compilation."
+      }
+    },
+    "domain_roles": {
+      "actuator": "Actuator discovery, manifests and execution adapters.",
+      "agent": "Agent runtime lifecycle, supervision and agent contracts.",
+      "analysis": "Analysis plans and structured analytical results.",
+      "authn": "Identity, authentication, profiles and acting stance.",
+      "browser": "Browser sessions, automation and page interaction.",
+      "contracts": "Shared data contracts and validation shapes without domain execution.",
+      "customer-decision": "Customer decision context and decision-facing records.",
+      "daemon": "Background processes, operational health and readiness.",
+      "decision-ledger": "Durable decision records, provenance and decision lifecycle.",
+      "design": "Creative design resolution and organization design systems.",
+      "discussion": "Discussion sessions and collaborative deliberation.",
+      "dot": "Resident-agent charters, standing responsibilities, lifecycle and WorkItem delegation.",
+      "event": "Observed events, stimuli and sensory journals.",
+      "finance": "Financial records and financial domain operations.",
+      "foundation": "Small shared primitives and deterministic utilities.",
+      "governance": "Authorization, approvals, audit and governed control-plane policy.",
+      "harnessing": "CLI, build and execution harnesses, evaluation probes and experience feedback.",
+      "information-assets": "Information asset registration, ownership and lifecycle.",
+      "ingress": "Inbound requests, intake routing and ingress envelopes.",
+      "integrations": "External service integration adapters.",
+      "intent": "Intent capture, interpretation and goal alignment.",
+      "knowledge": "Knowledge retrieval, indexing and governed knowledge lifecycle.",
+      "lease": "Lease ownership, renewal and coordination.",
+      "localization": "Locale selection, translated messages and user vocabulary.",
+      "media": "Media assets and media processing coordination.",
+      "meeting": "Meeting sessions, participants and meeting outcomes.",
+      "mesh": "Runtime mesh discovery and peer connectivity.",
+      "mission": "Mission lifecycle, planning and mission-wide evidence.",
+      "ocr": "Optical text recognition and recognition adapters.",
+      "organization": "Organizations, customers, strategic context and operating models.",
+      "pfc": "Layered readiness and recovery state, recovery attempts and circuit breaking.",
+      "pipeline": "Declarative workflow binding, execution and repair.",
+      "plugin": "Plugin discovery, provenance and lifecycle.",
+      "project": "Managed project lifecycle and project context.",
+      "provider": "Reasoning provider transports, selection and native bridges.",
+      "reasoning": "Reasoning orchestration, context and model interaction.",
+      "scenario": "Repeatable task scenarios and scenario execution.",
+      "search": "Search queries, retrieval and ranking.",
+      "secret": "Secret storage, vault access and sensitive credentials.",
+      "service": "Shared service lifecycle and service coordination.",
+      "shell": "Shell execution, sandboxing and terminal policy.",
+      "storage": "Persistence backends and storage operations.",
+      "surface": "Viewer-facing projections, surfaces and presentation protocols.",
+      "task": "Task contracts, work items and task lifecycle.",
+      "temporal": "Time semantics, scheduling and temporal coordination.",
+      "testing": "Verification, quality checks and test support.",
+      "tool": "Tool registration, invocation and tool contracts.",
+      "vcs": "Version control operations and repository workflows.",
+      "video": "Video composition and video processing.",
+      "virtual": "Operating-system interaction, virtual devices and native automation.",
+      "voice": "Voice input, output and voice session processing.",
+      "workforce": "Worker delegation, co-session coordination and execution outcomes."
+    }
+  }
 }

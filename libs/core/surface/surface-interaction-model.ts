@@ -12,8 +12,8 @@ import {
   enqueueSurfaceOutboxMessage,
   enqueueSurfaceNotification,
 } from './surface-coordination-store.js';
-import { resolveCustomerBinding } from '../customer-channel-binding.js';
-import { renderStatus } from '../ux-vocabulary.js';
+import { resolveCustomerBinding } from '../organization/customer-channel-binding.js';
+import { renderStatus } from '../localization/ux-vocabulary.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 import type {
@@ -27,8 +27,12 @@ import type {
   SurfaceNotificationRecord,
 } from './channel-surface-types.js';
 import type { SupportedLocale } from '../foundation/locale-normalize.js';
-import type { ExecutionFeedbackInput } from '../execution-feedback.js';
-import { normalizeEventScope, type EventScope, type EventScopeInput } from '../event-scope.js';
+import type { ExecutionFeedbackInput } from '../knowledge/execution-feedback.js';
+import {
+  normalizeEventScope,
+  type EventScope,
+  type EventScopeInput,
+} from '../event/event-scope.js';
 import {
   resolveChannelMessageShape,
   type ChannelMessageShape,

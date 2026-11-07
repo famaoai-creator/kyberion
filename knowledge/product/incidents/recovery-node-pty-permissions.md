@@ -36,7 +36,7 @@ find node_modules/.pnpm/node-pty@* -name "pty.node" -o -name "spawn-helper" | xa
 
 ## 4. 恒久対策
 
-Kyberion の `libs/core/reflex-terminal.ts` は **Self-Healing Edition (v3.0)** にアップデートされている. これにより、物理的な故障が発生しても `child_process` エミュレーションモードへ自動フォールバックするため、システム全体のクラッシュは回避される.
+Kyberion の `libs/core/shell/reflex-terminal.ts` は **Self-Healing Edition (v3.0)** にアップデートされている. これにより、物理的な故障が発生しても `child_process` エミュレーションモードへ自動フォールバックするため、システム全体のクラッシュは回避される.
 
 ---
 

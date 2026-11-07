@@ -400,7 +400,7 @@ function parseQuoteLines(raw: string | undefined): QuoteLineRequest[] | null {
 
 /**
  * E2E-06 Tasks 5/6 from the operator console: quote, contract draft, contract
- * review record and the won → SDLC handoff (libs/core/deal-documents.ts).
+ * review record and the won → SDLC handoff (libs/core/organization/deal-documents.ts).
  * Sending a document to the customer is not offered here — it needs the
  * customer channel binding and stays on the approval-gated
  * sendDealDocumentToCustomer path of the conversation runtime.

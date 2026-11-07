@@ -12,7 +12,7 @@ import {
   safeMoveSync,
   safeRmSync,
 } from '../secure-io.js';
-import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../governance/owner-scope.js';
 
 export type MissionCoordinationChannel = 'task_contract' | 'handoff' | 'review' | 'runtime_notice';
 

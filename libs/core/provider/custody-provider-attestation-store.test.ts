@@ -6,7 +6,7 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
+vi.mock('../daemon/ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';

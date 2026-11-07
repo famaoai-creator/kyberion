@@ -272,6 +272,7 @@ describe('synthetic judgment routing with actual isolated persisted receipts', (
     });
     for (const name of [
       'agent-policies.yaml',
+      'security-policy.json',
       'autonomous-ops-policy.json',
       'dot-execution-policy.json',
       'autonomy-learning-policy.json',

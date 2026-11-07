@@ -11,7 +11,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
-import { browserSessionKey } from '../authn-browser-session-key.js';
+import { browserSessionKey } from '../authn/authn-browser-session-key.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { secretGuard } from '../secret/secret-guard.js';
