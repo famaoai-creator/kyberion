@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generated_at": "2026-11-01T14:37:50.033Z",
-  "total": 131,
+  "generated_at": "2026-11-07T16:00:07.376Z",
+  "total": 130,
   "files": {
     "libs/actuators/blockchain-actuator/src/index.ts": 1,
     "libs/core/action-item-store.ts": 1,
@@ -35,7 +35,6 @@
     "libs/core/governance/charter-payment-settlement.ts": 1,
     "libs/core/harnessing/experience-library.ts": 1,
     "libs/core/history-search-index.ts": 5,
-    "libs/core/ingest-asset-ledger.ts": 1,
     "libs/core/intent/conversation-signals.ts": 1,
     "libs/core/intent/intent-snapshot-store.ts": 1,
     "libs/core/jsonl-parked-read.ts": 1,
@@ -97,8 +96,8 @@
     "scripts/decisions.ts": 1,
     "scripts/egress_warn_report.ts": 1,
     "scripts/export_validation_bundle.ts": 1,
-    "scripts/intent.ts": 1,
     "scripts/intent_trace.ts": 1,
+    "scripts/intent.ts": 1,
     "scripts/lib/backup-tenant-partitions.ts": 1,
     "scripts/migrate_physical_namespaces.ts": 3,
     "scripts/onboarding_first_job_status.ts": 1,
