@@ -31,7 +31,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 
-const EMPTY_ENV = {} as NodeJS.ProcessEnv; // no KYBERION_CUSTOMER → personal tenants dir
+const EMPTY_ENV = {} as NodeJS.ProcessEnv; // no KYBERION_STANCE → personal tenants dir
 const HASH_V1 = 'a'.repeat(64);
 const HASH_V2 = 'b'.repeat(64);
 const HASH_V3 = 'c'.repeat(64);

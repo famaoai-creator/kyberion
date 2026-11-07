@@ -17,8 +17,8 @@ import { currentDotActions, type DotActionRecord } from '../dot/dot-dispatch.js'
 import { readDotWorkResults } from '../dot/dot-executor.js';
 import { readOrganizationKrMeasurements } from '../dot/dot-key-results.js';
 import type { DotWorkResultRow, KrMeasurementRow } from '../dot/dot-state-paths.js';
-import { localeToBcp47, type SupportedLocale } from '../locale-normalize.js';
-import type { MessageParams } from '../message-format.js';
+import { localeToBcp47, type SupportedLocale } from '../foundation/locale-normalize.js';
+import type { MessageParams } from '../foundation/message-format.js';
 import type { VocabularyKey } from '../knowledge/vocabulary-keys.generated.js';
 import { t } from '../t.js';
 import { notifyOperatorSync } from '../surface/operator-notifications.js';

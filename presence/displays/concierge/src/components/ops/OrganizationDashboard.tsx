@@ -7,7 +7,7 @@ import { stripIdPrefix } from '@agent/core/surface/display-humanize';
 import * as React from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Badge, Button, Callout, Metric, Section } from '@agent/shared-ui';
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import {
   workspaceQuery,
   workspaceSectionHref,

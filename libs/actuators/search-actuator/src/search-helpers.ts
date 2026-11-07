@@ -2,10 +2,10 @@ import { logger } from '@agent/core/core';
 import { classifyError } from '@agent/core/error-classifier';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import * as pathResolver from '@agent/core/path-resolver';
-import { persistTrace, TraceContext } from '@agent/core/trace';
+import { persistTrace, TraceContext } from '@agent/core/analysis/trace';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
-import { stripElementBlocks, stripTags } from '@agent/core/html-sanitize';
-import { decodeEntities } from '@agent/core/text-escaping';
+import { stripElementBlocks, stripTags } from '@agent/core/foundation/html-sanitize';
+import { decodeEntities } from '@agent/core/foundation/text-escaping';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { createAjv } from '@agent/core/foundation';
 import {

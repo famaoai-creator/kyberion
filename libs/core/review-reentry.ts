@@ -9,7 +9,7 @@ import {
 import { logger } from './core.js';
 import { persistHints } from './knowledge/feedback-loop.js';
 import { queueMissionMemoryPromotionCandidate } from './knowledge/memory-promotion-queue.js';
-import type { RejectionReasonCategory } from './rejection-reason.js';
+import type { RejectionReasonCategory } from './contracts/rejection-reason.js';
 
 /**
  * LC-11 (LOOP_CLOSURE_PLAN): the reject → amended re-execution channel.

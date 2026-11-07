@@ -21,10 +21,8 @@ import {
   type PrBodySourceTier,
 } from './github.js';
 import { runVcsMutationWithApproval, type VcsHostMutation } from './publication-host.js';
-import { computeApprovalPayloadHash } from '../governance/approval-store.js';
-import { withExecutionContext } from '../authority.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
 import {
-  PR_PUBLICATION_STORE_ROLE,
   withPrPublicationRuntime,
   withPrPublicationStoreAccess,
 } from '../governance/pr-publication-runtime.js';
@@ -132,21 +130,15 @@ function stageUnprovablePrBodyFile(
       invocationId,
       () =>
         withPrPublicationStoreAccess('body-stage', [], [artifactPath, indexPath], () =>
-          withExecutionContext(
-            PR_PUBLICATION_STORE_ROLE,
-            () =>
-              writeScopedArtifact({
-                // Public shared floor — the body is published verbatim to the PR
-                // either way; staging under the acting tenant blurs provenance.
-                scope: { tenant: 'shared' },
-                tier: 'public',
-                artifact_class: 'evidence',
-                name,
-                content,
-              }),
-            'worker',
-            scope.tenant_slug
-          )
+          writeScopedArtifact({
+            // Public shared floor — the body is published verbatim to the PR
+            // either way; staging under the acting tenant blurs provenance.
+            scope: { tenant: 'shared' },
+            tier: 'public',
+            artifact_class: 'evidence',
+            name,
+            content,
+          })
         ),
       'vcs:pr_create'
     );
@@ -236,7 +228,7 @@ export async function runVcsMutationWithWorktreeGovernance(
       MISSION_ID: scope.mission_id ?? '',
       KYBERION_NHI_ID: scope.nhi_id ?? '',
       KYBERION_NHI_SESSION: getRegisteredEnvText('KYBERION_NHI_SESSION') ?? '',
-      KYBERION_CUSTOMER: scope.customer_stance ?? '',
+      KYBERION_STANCE: scope.customer_stance ?? '',
       KYBERION_VIEWER_PRINCIPAL: scope.viewer_principal ?? '',
       SYSTEM_ROLE: getRegisteredEnvText('SYSTEM_ROLE'),
       GH_TOKEN: credentials?.GH_TOKEN ?? getRegisteredEnvText('GH_TOKEN'),

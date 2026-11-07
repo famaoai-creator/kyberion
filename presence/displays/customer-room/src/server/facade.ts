@@ -12,8 +12,8 @@
  * process's env reaches it — in particular not SYSTEM_ROLE: under
  * `pnpm surfaces` this process runs as SYSTEM_ROLE=customer_room, and the
  * facade is a separate governed program that assumes its own narrow roles
- * (decision_ledger, customer_decision_invite_store,
- * customer_decision_deal_note_writer), exactly as when an operator runs it.
+ * (decision_ledger, customer_decision_deal_note_writer) and issues its own
+ * exact invite capability, exactly as when an operator runs it.
  * That is the secure-io exec helpers' default (they drop SYSTEM_ROLE unless
  * the caller passes it back in), so no role assumption policy is needed for
  * customer_room.

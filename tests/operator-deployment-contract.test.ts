@@ -13,7 +13,7 @@ describe('Operator deployment contract', () => {
     const doc = read('docs/operator/DEPLOYMENT.md');
     expect(doc).toContain('pnpm stance:create customer-slug');
     expect(doc).toContain('pnpm stance:switch customer-slug');
-    expect(doc).toContain('source active/shared/runtime/customer.env');
+    expect(doc).toContain('source active/shared/runtime/stance.env');
     expect(doc).not.toContain('cp -R customer/_template customer/customer-slug');
   });
 });

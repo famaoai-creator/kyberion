@@ -8,7 +8,7 @@ import {
 } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import { resolveLocale } from '@agent/core/locale';
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
@@ -29,7 +29,7 @@ import {
   getBrowserAutomationRuntimeCapabilities,
   resolveBrowserAutomationRuntime,
   type BrowserAutomationRuntimeBridge,
-} from '@agent/core/browser/browser-automation-runtime-bridge';
+} from '@agent/shared-vision/browser-automation-runtime-bridge';
 import type { Browser, BrowserContext, Frame, Page } from '@playwright/test';
 import * as path from 'node:path';
 import { isIP } from 'node:net';

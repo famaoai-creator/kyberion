@@ -39,11 +39,11 @@ Kyberion には Slack へ届く道が3つある。**同じ `chat.postMessage` �
 
 Satellite は受信チャネルごとに会話モードを決める(`libs/core/surface/channel-mode-policy.ts`)。
 
-| モード               | 宣言                                                      | 反応する条件                               | 話者                                     | 開示上限                            | 承認できる人                |
-| -------------------- | --------------------------------------------------------- | ------------------------------------------ | ---------------------------------------- | ----------------------------------- | --------------------------- |
-| `owner_direct`(既定) | 何もしない                                                | 全メッセージ                               | `KYBERION_SURFACE_ALLOWLISTS`(未設定=開) | personal                            | allowlist の話者            |
-| `team`               | `KYBERION_SURFACE_CHANNEL_MODES`                          | @メンション、または Bot が参加済みスレッド | allowlist 必須(未設定=**拒否**)          | `max_tier`(既定・上限 confidential) | チャネルの `approvers` のみ |
-| `customer`           | `customer/{slug}/connections/channel-bindings.json`(既存) | 顧客会話モード                             | —                                        | public catalog                      | 不可                        |
+| モード               | 宣言                                                                        | 反応する条件                               | 話者                                     | 開示上限                            | 承認できる人                |
+| -------------------- | --------------------------------------------------------------------------- | ------------------------------------------ | ---------------------------------------- | ----------------------------------- | --------------------------- |
+| `owner_direct`(既定) | 何もしない                                                                  | 全メッセージ                               | `KYBERION_SURFACE_ALLOWLISTS`(未設定=開) | personal                            | allowlist の話者            |
+| `team`               | `KYBERION_SURFACE_CHANNEL_MODES`                                            | @メンション、または Bot が参加済みスレッド | allowlist 必須(未設定=**拒否**)          | `max_tier`(既定・上限 confidential) | チャネルの `approvers` のみ |
+| `customer`           | `knowledge/personal/stances/{slug}/connections/channel-bindings.json`(既存) | 顧客会話モード                             | —                                        | public catalog                      | 不可                        |
 
 ```json
 {

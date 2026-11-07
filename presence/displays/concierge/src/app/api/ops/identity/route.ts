@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardOpsRequest } from '../../../../lib/ops/ops-request-guard';
-import * as customerResolver from '@agent/core/customer-resolver';
+import * as customerResolver from '@agent/core/stance-resolver';
 import {
   loadPersonalAgentIdentityAtPath,
   loadPersonalIdentityAtPath,
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
 
   return withViewerExecutionContext(resolvedViewer.context, () => {
-    // ONB-03 Task 5: prefer the active customer overlay (KYBERION_CUSTOMER)
+    // ONB-03 Task 5: prefer the active customer overlay (KYBERION_STANCE)
     // over knowledge/personal/, matching operator-identity.ts's resolution
     // order, so vital-check and FirstRunBanner don't misreport identity as
     // missing under a tenant overlay.

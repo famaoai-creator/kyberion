@@ -37,7 +37,7 @@ import { buildCompletionNextAction, type CompletionNextAction } from '../next-ac
 import { recordIntentContractOutcome } from '../intent/intent-contract-learning.js';
 import { currentScope } from '../scope-context.js';
 import { reconcileCompletionStructurally } from '../intent/intent-reconciliation.js';
-import { matchesAnyTextRule, type TextMatchRule } from '../text-rule-matcher.js';
+import { matchesAnyTextRule, type TextMatchRule } from '../foundation/text-rule-matcher.js';
 import { buildFallbackExecutionBrief, type ExecutionBriefSeed } from '../execution-brief.js';
 import {
   findServiceByTopic,

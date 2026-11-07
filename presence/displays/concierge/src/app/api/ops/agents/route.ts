@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardOpsRequest, requireOpsAccess } from '../../../../lib/ops/ops-request-guard';
-import { toWireError } from '@agent/core/wire-error';
+import { toWireError } from '@agent/core/contracts/wire-error';
 import {
   resolveOpsViewerForRequest,
   viewerErrorResponse,

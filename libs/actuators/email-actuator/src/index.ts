@@ -13,7 +13,7 @@
 
 import * as path from 'node:path';
 import { logger } from '@agent/core/core';
-import { resolveVars } from '@agent/core/logic-utils';
+import { resolveVars } from '@agent/core/pipeline/logic-utils';
 import { sendEmail, createDraft } from '@agent/core/integrations/email-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
 import {

@@ -216,7 +216,7 @@ export async function main(args: string[] = []): Promise<IntentGatewayResult> {
     (context as any)?.tenant_slug ||
     (context as any)?.tenantSlug ||
     (getRegisteredEnv<string>('KYBERION_TENANT') as string | undefined) ||
-    (getRegisteredEnv<string>('KYBERION_CUSTOMER') as string | undefined);
+    (getRegisteredEnv<string>('KYBERION_STANCE') as string | undefined);
   const packet = resolveIntentResolutionPacket(intent, {
     tier,
     tenantId: typeof tenantId === 'string' ? tenantId : undefined,

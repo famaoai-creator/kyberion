@@ -40,9 +40,9 @@ E. 組織の運営       purpose → service / operation → cadence / decision 
 
 ### ルート 2（AI 会社）の実行順
 
-ルート 2 の stance（`customer/<company-slug>/`）は Step 5 の `onboard company` が作る。そのため
+ルート 2 の stance（`knowledge/personal/stances/<company-slug>/`）は Step 5 の `onboard company` が作る。そのため
 Step 3 の identity は **2 回**保存する: まず個人 profile に（Step 3）、次に company stance に切り替えて
-もう一度（Step 5 の直後）。stance を有効にすると profile root が `customer/<company-slug>/` に
+もう一度（Step 5 の直後）。stance を有効にすると profile root が `knowledge/personal/stances/<company-slug>/` に
 切り替わり、mission start はそこにある `my-identity.json` / `my-vision.md` / `agent-identity.json`
 を要求するためである（無いと `Sovereign profile incomplete` で停止する）。
 
@@ -73,7 +73,7 @@ export KYBERION_PERSONA=sovereign
 
 | 名前              | 意味                                                | 正本・用途                                                                                       |
 | ----------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `customer_slug`   | いまどの主体として振る舞うかという stance           | `customer/{slug}/` と `KYBERION_CUSTOMER`。認可境界ではない                                      |
+| `customer_slug`   | いまどの主体として振る舞うかという stance           | `knowledge/personal/stances/{slug}/` と `KYBERION_STANCE`。認可境界ではない                      |
 | `tenant_slug`     | 機密性、認可、監査の境界                            | `knowledge/personal/tenants/{slug}.json` の registry profile と `knowledge/confidential/{slug}/` |
 | `organization_id` | tenant をどう運営するかという目的・責任・運用モデル | governed organization facade が管理する状態                                                      |
 
@@ -83,7 +83,7 @@ export KYBERION_PERSONA=sovereign
 tenant_slug → organization_id → project_id → mission_id → task_id → session
 ```
 
-`customer/{slug}` はこの chain の一階層ではなく stance overlay である。customer 側にある
+`knowledge/personal/stances/{slug}` はこの chain の一階層ではなく stance overlay である。customer 側にある
 tenant JSON は表示・契約上の facet になり得るが、tenant registry の代替にはならない。
 
 ## 3. 標準手順
@@ -197,9 +197,9 @@ pnpm surfaces reconcile
 identity の保存先は stance で決まる。baseline の L3 も同じ場所を見るため、**identity を保存する前に**
 stance を決める。
 
-- 自分として使う（ルート 1）: `KYBERION_CUSTOMER` を設定しない。保存先は `knowledge/personal/`。
+- 自分として使う（ルート 1）: `KYBERION_STANCE` を設定しない。保存先は `knowledge/personal/`。
 - 顧客・会社として使う: 先に `pnpm stance:switch <customer-slug>` で stance を切り替える。保存先は
-  `customer/{customer-slug}/`。ルート 2 の `pnpm onboarding company` はこの overlay を作るので、
+  `knowledge/personal/stances/{customer-slug}/`。ルート 2 の `pnpm onboarding company` はこの overlay を作るので、
   ルート 2 では上の「ルート 2 の実行順」に従い、company stance でもう一度 identity を保存する。
 
 identity は次のどれかで保存する。
@@ -309,11 +309,11 @@ pnpm onboarding company --vertical saas-product-company --slug <company-slug> \
 作られる。続けて company stance に切り替え、その stance の identity を保存する。
 
 ```bash
-pnpm stance:switch <company-slug> && source active/shared/runtime/customer.env
+pnpm stance:switch <company-slug> && source active/shared/runtime/stance.env
 pnpm onboarding apply --identity <reviewed-identity-json>
 ```
 
-`customer/<company-slug>/onboarding/ai-company-readiness.json` と `first-work-plan.md` を
+`knowledge/personal/stances/<company-slug>/onboarding/ai-company-readiness.json` と `first-work-plan.md` を
 確認する。consistency check と Step 7 の activation は省略しない。
 
 ### Step 5.1: 使うモデルと provider への送信許可を決める（C）
@@ -369,7 +369,7 @@ pnpm onboarding llm attest --tenant <tenant-slug> --provider claude --training-u
   拒否され、同じ承認は 1 回しか使えない。承認は認証済みの人間だけが行え、エージェントの決定は承認ストアが拒否する。
 - 既定では、依頼者本人が承認しても通る（1 人の operator で運用する前提）。依頼者と承認者を必ず分けたい場合は
   `approval-policy.json` の `separation_of_duties.enabled` を `true` にする（customer overlay
-  `customer/<slug>/policy/approval-policy.json` でもよい）。ON にすると、依頼者と同じ identity による承認は
+  `knowledge/personal/stances/<slug>/policy/approval-policy.json` でもよい）。ON にすると、依頼者と同じ identity による承認は
   `[POLICY_VIOLATION] Separation of duties` で拒否・監査され、依頼は pending のまま残る。OFF のときに
   本人が承認した依頼は、ON にした後の手順 4 で拒否される。そのときはメッセージに出る `--request-approval`
   付きのコマンドで新しい依頼を作り（古い承認は再利用されない）、別の人に承認してもらう。
@@ -438,7 +438,7 @@ pnpm onboarding:context bind \
   --apply --json
 ```
 
-この apply は `customer/{customer-slug}/onboarding/organization-context.json` と、
+この apply は `knowledge/personal/stances/{customer-slug}/onboarding/organization-context.json` と、
 tenant に紐づく organization state を作成または再利用する。これは activation ではない。
 
 Web の初回利用では、既存 first-run の本人登録後に `/setup/company` から会社登録・probe・本人承認・最初の仕事の準備を進められる。対象はその credential が許可する既存 tenant に限る。詳細は [Web 会社設定](../../../docs/developer/COMPANY_WEB_ONBOARDING.ja.md) を参照。
@@ -475,7 +475,7 @@ pnpm tenant:activation activate \
 
 `--accept` は人間の受け入れを表す。現状このフラグは CLI 実行者の声明で、attest のような
 承認依頼との hash 照合はない。運用では人間が実行すること。成功すると
-`customer/<customer-slug>/onboarding/tenant-activation/<tenant>/<organization>/<tier>/activation.json`
+`knowledge/personal/stances/<customer-slug>/onboarding/tenant-activation/<tenant>/<organization>/<tier>/activation.json`
 に activation receipt が保存され、status が `active` になる。receipt には stance、tenant、
 organization、tier、owner、NHI、次の行動、operation contract（task lease、heartbeat watchdog、
 quota と budget、approval gate、pause と escalation、drift watcher）、各 probe の監査証跡 ref が記録される。
@@ -740,7 +740,7 @@ pnpm work project-next-tasks --mission-id MSN-<...> --project-id PRJ-<ID> --tena
   その目標は「unmeasured」のままになる。KR が 1 つでも未計測なら目標全体の進捗も出ない）。
   ファイルを用意できないうちは `objective kr record` で値を記録すれば進捗が出る。
 - `manual` 型の KR は `measure` では計測されない。`record` で記録した値が最新の計測値になる。
-- mission は company stance の identity を要求する（`--organization-id` が `customer/<org>/` の
+- mission は company stance の identity を要求する（`--organization-id` が `knowledge/personal/stances/<org>/` の
   stance を選ぶため）。Step 5 の後に stance で `onboarding apply` を済ませておく。
 - 朝会（`pipelines/organization-standup.json`）と振り返り（`organization-retro.json`）は、
   運用・決定・目標の変化を組織ごとにまとめて `active/organizations/.../artifacts/report/` に保存する。

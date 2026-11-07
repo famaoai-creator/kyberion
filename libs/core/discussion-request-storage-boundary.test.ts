@@ -73,8 +73,12 @@ beforeAll(async () => {
         const stat = initialIO.safeLstat(source);
         if (stat.isSymbolicLink()) throw new Error('Linked governance fixture');
         if (stat.isDirectory()) copy(file);
-        else if (/\.(?:json|yaml)$/u.test(name))
-          initialIO.safeWriteFile(path.join(ROOT, file), initialIO.safeReadFile(source));
+        else if (/\.(?:json|yaml)$/u.test(name)) {
+          const target = path.join(ROOT, file);
+          initialIO.safeMkdir(path.dirname(target), { recursive: true });
+          // Re-creatable policy fixtures retain guarded copy checks without per-file fsync.
+          initialIO.safeCopyFileSync(source, target);
+        }
       }
     };
     copy('knowledge/product/governance');
@@ -372,22 +376,31 @@ it('allows only the two exact records under the dedicated capability, without kn
     expect(() => safeWriteFile(reservation, 'mutation')).toThrow(/RESOURCE_SCOPE_DENIED/);
   });
 });
-it('does not permit an ambient role or a forged broad capability', async () => {
-  expect(() =>
-    withExecutionContext('discussion_request_store', () => undefined, undefined, TENANT)
-  ).toThrow(/RESOURCE_SCOPE_REQUIRED/);
+it('does not permit the former role name or a forged broad capability', async () => {
+  // G2: no store role exists. Assuming the former name grants nothing, with or without
+  // a broad lookalike ceiling, and a process running as it reads and writes nothing.
+  const asFormerRole = <T>(fn: () => T) =>
+    withExecutionContext('discussion_request_store', fn, undefined, TENANT);
+  const reservation = path.join(directory(), 'reservation.json');
+  asFormerRole(() => {
+    expect(guard.validateReadPermission(session()).allowed).toBe(false);
+    expect(guard.validateWritePermission(reservation).allowed).toBe(false);
+  });
   const { runInResourceAccessScope } = await import('./foundation/resource-access-scope.js');
-  expect(() =>
-    runInResourceAccessScope(
-      {
-        tenantSlug: TENANT,
-        readExact: [path.relative(ROOT, session())],
-        writeExact: [path.relative(ROOT, session())],
-        mkdirExact: [],
-      },
-      () => withExecutionContext('discussion_request_store', () => undefined, undefined, TENANT)
-    )
-  ).toThrow(/RESOURCE_SCOPE_REQUIRED/);
+  runInResourceAccessScope(
+    {
+      tenantSlug: TENANT,
+      readExact: [path.relative(ROOT, session()), path.relative(ROOT, reservation)],
+      writeExact: [path.relative(ROOT, session()), path.relative(ROOT, reservation)],
+      mkdirExact: [],
+    },
+    () =>
+      asFormerRole(() => {
+        expect(guard.validateReadPermission(session()).allowed).toBe(false);
+        expect(guard.validateWritePermission(session()).allowed).toBe(false);
+        expect(guard.validateWritePermission(reservation).allowed).toBe(false);
+      })
+  );
   process.env.SYSTEM_ROLE = 'discussion_request_store';
   try {
     expect(guard.validateReadPermission(session()).allowed).toBe(false);
@@ -411,19 +424,65 @@ it('requires an exact selected tenant and rejects other surfaces', async () => {
       () => undefined
     )
   ).toThrow(/RESOURCE_SCOPE_INVALID/);
-  // Only the surface that owns discussions (Concierge, /api/ops/discussions)
-  // may assume the receipt mediator; the Chronos redirect app may not.
+  // Only the surface that owns discussions (Concierge, /api/ops/discussions) holds the
+  // issuance right (role-assumption-policy may_assume); the Chronos redirect app and every
+  // other surface cannot issue the grant, and their callback never runs.
   for (const systemRole of ['slack_bridge', 'chronos_mirror_v2']) {
     process.env.SYSTEM_ROLE = systemRole;
     try {
+      let ran = false;
       await expect(
-        receiptAccess(false, () => undefined),
+        receiptAccess(false, () => {
+          ran = true;
+        }),
         systemRole
       ).rejects.toThrow(/ROLE_ASSUMPTION_DENIED/);
+      expect(ran, systemRole).toBe(false);
     } finally {
       delete process.env.SYSTEM_ROLE;
     }
   }
+  process.env.SYSTEM_ROLE = 'concierge';
+  try {
+    await receiptAccess(false, () =>
+      expect(guard.validateReadPermission(path.join(directory(), 'reservation.json')).allowed).toBe(
+        true
+      )
+    );
+  } finally {
+    delete process.env.SYSTEM_ROLE;
+  }
+});
+it('binds the I/O to the grant tenant, keeps the caller role and refuses another tenant', async () => {
+  const { currentExecutionScope } = await import('./foundation/execution-scope.js');
+  const { resolvePolicyIdentityContext } = await import('./identity-context-bridge.js');
+  await withExecutionContext(
+    'chronos_tenant_runner',
+    () =>
+      receiptAccess(false, () => {
+        const scope = currentExecutionScope();
+        expect(scope?.assumedRole).toBe('chronos_tenant_runner');
+        expect(scope?.tenantSlug).toBe(TENANT);
+        expect(scope?.organizationId).toBeUndefined();
+        expect(resolvePolicyIdentityContext().tenantSlug).toBe(TENANT);
+      }),
+    undefined,
+    TENANT,
+    'org-a'
+  );
+  let ran = false;
+  await expect(
+    withExecutionContext(
+      'chronos_tenant_runner',
+      () =>
+        receiptAccess(false, () => {
+          ran = true;
+        }),
+      undefined,
+      OTHER
+    )
+  ).rejects.toThrow(/ROLE_TENANT_SCOPE_MISMATCH/);
+  expect(ran).toBe(false);
 });
 it('cannot follow symlink or hard-link receipt aliases outside its exact capability', async () => {
   const reservation = path.join(directory(), 'reservation.json');
@@ -486,4 +545,162 @@ it('does not bootstrap a protected container for an inactive tenant', async () =
       /tenant.scope_invalid_prefix/
     )
   );
+});
+
+describe('the Discussion request grant is opaque and live-only', () => {
+  const binding = (write = true) => ({
+    directory: path.relative(ROOT, directory()).split(path.sep).join('/'),
+    tenant: TENANT,
+    write,
+  });
+  // G2: the live grant alone authorizes; every lookalike authorizes nothing.
+  const reservation = () => path.join(directory(), 'reservation.json');
+  const authorized = () =>
+    guard.validateWritePermission(reservation()).allowed ||
+    guard.validateReadPermission(reservation()).allowed;
+  async function grantModules() {
+    const capability = await import('./foundation/discussion-request-capability.js');
+    const scope = await import('./foundation/resource-access-scope.js');
+    return { ...capability, ...scope };
+  }
+
+  it('resolves only inside its issuer', async () => {
+    const {
+      withDiscussionRequestCapability,
+      isDiscussionRequestCapability,
+      currentResourceAccessScope,
+    } = await grantModules();
+    expect(isDiscussionRequestCapability(currentResourceAccessScope())).toBe(false);
+    withDiscussionRequestCapability(binding(), () => {
+      expect(isDiscussionRequestCapability(currentResourceAccessScope())).toBe(true);
+      expect(authorized()).toBe(true);
+    });
+    expect(authorized()).toBe(false);
+  });
+
+  it('denies a forged scope with the exact ceiling and a fake token', async () => {
+    const {
+      withDiscussionRequestCapability,
+      runInResourceAccessScope,
+      currentResourceAccessScope,
+    } = await grantModules();
+    let ceiling!: import('./foundation/resource-access-scope.js').ResourceAccessScope;
+    withDiscussionRequestCapability(binding(), () => {
+      ceiling = { ...currentResourceAccessScope()! };
+    });
+    expect(Object.hasOwn(ceiling, 'opaqueStoreToken')).toBe(false);
+    runInResourceAccessScope(ceiling, () => expect(authorized()).toBe(false));
+    runInResourceAccessScope({ ...ceiling, opaqueStoreToken: {} } as never, () =>
+      expect(authorized()).toBe(false)
+    );
+  });
+
+  it('denies a copy of the live grant nested inside it', async () => {
+    const {
+      withDiscussionRequestCapability,
+      runInResourceAccessScope,
+      currentResourceAccessScope,
+    } = await grantModules();
+    withDiscussionRequestCapability(binding(), () => {
+      const live = currentResourceAccessScope()!;
+      runInResourceAccessScope({ ...live }, () => expect(authorized()).toBe(false));
+    });
+  });
+
+  it('cannot return its grant, and an escaped or expired scope resolves nothing', async () => {
+    const {
+      withDiscussionRequestCapability,
+      isDiscussionRequestCapability,
+      runInResourceAccessScope,
+      currentResourceAccessScope,
+    } = await grantModules();
+    expect(() =>
+      withDiscussionRequestCapability(binding(), () => currentResourceAccessScope())
+    ).toThrow(/DISCUSSION_REQUEST_CAPABILITY_ESCAPE/);
+    let escaped: ReturnType<typeof currentResourceAccessScope>;
+    withDiscussionRequestCapability(binding(), () => {
+      escaped = currentResourceAccessScope();
+    });
+    expect(isDiscussionRequestCapability(escaped)).toBe(false);
+    expect(runInResourceAccessScope(escaped!, authorized)).toBe(false);
+  });
+
+  it('is synchronous only: an async body loses the grant before it can run', async () => {
+    const {
+      withDiscussionRequestCapability,
+      isDiscussionRequestCapability,
+      currentResourceAccessScope,
+    } = await grantModules();
+    let later: boolean | undefined;
+    expect(() =>
+      withDiscussionRequestCapability(binding(), () =>
+        Promise.resolve().then(() => {
+          later = isDiscussionRequestCapability(currentResourceAccessScope());
+        })
+      )
+    ).toThrow(/DISCUSSION_REQUEST_CAPABILITY_ASYNC/);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(later).toBe(false);
+  });
+
+  it('does not accept a counterfeit issuer with the same ceiling', async () => {
+    const {
+      withDiscussionRequestCapability,
+      createSynchronousResourceGrantIssuer,
+      currentResourceAccessScope,
+    } = await grantModules();
+    let ceiling!: import('./foundation/resource-access-scope.js').ResourceAccessScope;
+    withDiscussionRequestCapability(binding(), () => {
+      ceiling = { ...currentResourceAccessScope()! };
+    });
+    const counterfeit = createSynchronousResourceGrantIssuer('DISCUSSION_REQUEST_CAPABILITY');
+    counterfeit.run(Object.freeze(binding()), ceiling, () => expect(authorized()).toBe(false));
+  });
+
+  it('rejects invalid bindings before issuing', async () => {
+    const { withDiscussionRequestCapability } = await grantModules();
+    for (const bad of [
+      { ...binding(), tenant: OTHER },
+      { ...binding(), directory: binding().directory + '/..' },
+      { ...binding(), directory: binding().directory.replace('a'.repeat(64), 'x') },
+      { ...binding(), write: 'yes' as never },
+    ])
+      expect(() => withDiscussionRequestCapability(bad, () => undefined)).toThrow(
+        /RESOURCE_SCOPE_INVALID/
+      );
+  });
+
+  it('a read-only grant never writes and a write grant covers only its two records', async () => {
+    const { withDiscussionRequestCapability } = await grantModules();
+    withDiscussionRequestCapability(binding(false), () => {
+      expect(guard.validateReadPermission(reservation()).allowed).toBe(true);
+      expect(guard.validateWritePermission(reservation()).allowed).toBe(false);
+      expect(guard.validateWritePermission(directory(), 'mkdir').allowed).toBe(false);
+    });
+    withDiscussionRequestCapability(binding(true), () => {
+      expect(guard.validateWritePermission(reservation()).allowed).toBe(true);
+      expect(guard.validateWritePermission(path.join(directory(), 'receipt.json')).allowed).toBe(
+        true
+      );
+      for (const file of [
+        path.join(directory(), 'other.json'),
+        session(),
+        session(OTHER),
+        path.join(ROOT, 'knowledge/confidential', TENANT, 'other.md'),
+      ]) {
+        expect(guard.validateWritePermission(file).allowed, file).toBe(false);
+        expect(guard.validateReadPermission(file).allowed, file).toBe(false);
+      }
+    });
+  });
+
+  it('gives a caller bound to another tenant nothing from the grant', async () => {
+    const { withDiscussionRequestCapability } = await grantModules();
+    withExecutionContext(
+      'chronos_tenant_runner',
+      () => withDiscussionRequestCapability(binding(), () => expect(authorized()).toBe(false)),
+      undefined,
+      OTHER
+    );
+  });
 });

@@ -439,7 +439,7 @@ function syncIntentContractMemorySnapshot(id: string, stage: 'verify' | 'finish'
 
 async function createCheckpoint(taskId: string, note: string, explicitMissionId?: string) {
   const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
-  const { TraceContext, persistTrace } = await import('@agent/core/trace');
+  const { TraceContext, persistTrace } = await import('@agent/core/analysis/trace');
   const result = await missionLifecycleService.createCheckpoint(taskId, note, explicitMissionId);
   try {
     const tc = new TraceContext('mission:checkpoint', {
@@ -507,7 +507,7 @@ async function recordEvidence(
   taskBinding?: import('@agent/core/mission/mission-task-evidence-binding').TaskEvidenceBinding
 ) {
   const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
-  const { TraceContext, persistTrace } = await import('@agent/core/trace');
+  const { TraceContext, persistTrace } = await import('@agent/core/analysis/trace');
   const result = await missionLifecycleService.recordEvidence(
     missionId,
     taskId,

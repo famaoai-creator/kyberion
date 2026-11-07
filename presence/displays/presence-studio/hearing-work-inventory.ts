@@ -12,7 +12,7 @@
  * `saveWorkInventoryEntry`.
  */
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import {
   proposeWorkDecomposition,
   type ProposeWorkDecompositionInput,

@@ -185,7 +185,7 @@ not position alone.
 Both executors now stamp this vocabulary: `system-actuator` and
 `browser-actuator` `computer_interaction` results carry `code` / `disposition`
 / `recovery`, and thrown errors carry the same fields for in-process callers
-(`libs/core/computer-interaction-outcome.ts`). Native error codes pass through
+(`libs/core/contracts/computer-interaction-outcome.ts`). Native error codes pass through
 unchanged — the mark domain (`MARK_STALE`, `MARK_INVALID`), the snake_case
 native-bridge codes (`macos_accessibility_denied`,
 `macos_focused_input_unavailable`, `native_mouse_failed`, …) with per-class

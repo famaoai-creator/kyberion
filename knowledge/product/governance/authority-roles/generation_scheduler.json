@@ -11,5 +11,5 @@
   ],
   "scope_classes": ["operations_runtime", "observability", "audit"],
   "allowed_actuators": ["media-generation-actuator", "artifact-actuator"],
-  "tier_access": ["public", "confidential"]
+  "tier_access": ["public", "confidential", "personal"]
 }

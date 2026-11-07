@@ -1,4 +1,4 @@
-import { normalizeRejectionReasonCategory } from '@agent/core/rejection-reason';
+import { normalizeRejectionReasonCategory } from '@agent/core/contracts/rejection-reason';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import {
   runAdfActuatorPipeline,
@@ -7,8 +7,8 @@ import {
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
-import { resolveVars } from '@agent/core/logic-utils';
+} from '@agent/core/contracts/execution-bounds';
+import { resolveVars } from '@agent/core/pipeline/logic-utils';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { nowIso } from '@agent/core/foundation';
@@ -26,7 +26,7 @@ import {
   type ApprovalTargetDescriptor,
   type ApprovalWorkflowState,
 } from '@agent/core/governance';
-import type { GovernedArtifactRole } from '@agent/core/artifacts';
+import type { GovernedArtifactRole } from '@agent/core/workforce/artifact-store';
 import * as pathResolver from '@agent/core/path-resolver';
 import { evaluateDecisionRightsOp, requestReviewOp } from './approval-ops.js';
 

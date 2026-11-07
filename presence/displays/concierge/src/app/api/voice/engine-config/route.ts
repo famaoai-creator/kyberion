@@ -5,7 +5,7 @@ import {
   getOperatorEngineRuntimePreferences,
   updateOperatorEngineRuntimePreferences,
   type EngineRuntimeOperatorUpdate,
-} from '@agent/core/voice/engine-runtime-preferences-operator';
+} from '@agent/shared-voice/engine-runtime-preferences-operator';
 import { resolveEngineConfigOperator } from '../../../../lib/engine-config-access';
 
 export const dynamic = 'force-dynamic';

@@ -3,7 +3,7 @@ title: Kyberion Extension Points
 category: Developer
 tags: [extension, semver, contract, plugin, actuator]
 importance: 10
-last_updated: 2026-10-30
+last_updated: 2026-11-06
 ---
 
 # Kyberion Extension Points
@@ -90,7 +90,7 @@ The contract between Kyberion's pipeline engine and an actuator.
 - The wording of human-readable `description` fields.
 - The set of capability `requirements.bin/lib/env` (additive only is non-breaking).
 - Internal support helpers like `libs/actuators/meeting-browser-driver/` are implementation details of `meeting-actuator`, not a public extension point.
-- Shared utility functions such as `slugify`, `retry`, `chunk`, `sleep`, `loadJson`, and `ensureDir` should be imported from `@agent/core` rather than redefined locally.
+- Shared utilities must use their published foundation or domain subpaths (for example `@agent/core/foundation/text` and `@agent/core/async-utils`); consult `libs/core/package.json` exports rather than importing internal source files or redefining helpers.
 
 ### 2.2 ADF Pipeline Format — **Stable (v1)**
 
@@ -161,17 +161,24 @@ The 3-tier directory layout: `knowledge/{personal,confidential,public}/`.
 
 - The internal scanning / indexing strategy.
 
-### 2.6 Customer Aggregation — **Stable (v1) as of 2026-05-07**
+### 2.6 Stance and Tenant Homes — **v2 draft; breaking stable v1 change**
 
-See [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md).
+See [the current contract and archived v1 design](./CUSTOMER_AGGREGATION.md).
+The proposed v2 contract separates operating stance from tenant confidentiality:
 
-**Stable**:
+- Stance configuration: `knowledge/personal/stances/{stance}/`, activated by `KYBERION_STANCE`.
+- Tenant company assets: `knowledge/confidential/{tenant}/`; deals: `knowledge/confidential/{tenant}/deals/`.
+- Resolver: `activeStance`, `stanceRoot`, `resolveOverlay`, `overlayCandidates` from `@agent/core/stance-resolver`. Stance selection grants no tenant access.
+- Stance resolution remains stance overlay → legacy personal fallback; tenant assets use their tenant-bound facades rather than stance fallback.
+- `customer/` is a legacy migration source, not the current configuration or tenant home. Run migration preflight in order `0001-stance-home` → `0002-tenant-home` → `0003-deal-home`; the contract document maps each destination.
 
-- The `customer/` directory layout and `_template/` schema.
-- The `KYBERION_CUSTOMER` env var as the activation mechanism.
-- The slug pattern `^[a-z0-9][a-z0-9_-]*$`.
-- The resolver API (`activeCustomer`, `customerRoot`, `resolveOverlay`, `overlayCandidates`).
-- Resolution order: customer overlay → legacy personal fallback.
+**Historical v1 (stable since 2026-05-07):** `customer/` layout and `_template/`,
+`activeCustomer` / `customerRoot`, the stance slug grammar and overlay fallback
+were promised stable. The new directory layout and resolver names break that
+contract; root and core require a major version bump under §3.
+The §6 minimum deprecation period has not been met. This change remains a
+**draft**, with a maintainer exception decision **pending**; neither the major
+version bump nor this document constitutes approval to waive the policy.
 
 ### 2.7 Trace Format — **Beta** (will be lifted to v1 after Phase B-1)
 
@@ -337,14 +344,14 @@ The stable extension point for meeting participation is the actuator / CLI contr
 
 For FDE / customer engagements:
 
-| Need                                      | Use this                                                    | Avoid                                                                       |
-| ----------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Customer-specific identity / vision       | `customer/{slug}/identity.json`, `vision.md`                | Editing `knowledge/personal/` when `KYBERION_CUSTOMER` is unset             |
-| Customer-specific connections             | `customer/{slug}/connections/`                              | Editing `knowledge/personal/connections/` when `KYBERION_CUSTOMER` is unset |
-| Customer-specific policy override         | `customer/{slug}/policy/`                                   | Editing `knowledge/product/governance/`                                     |
-| Customer-specific mission templates       | `customer/{slug}/mission-seeds/`                            | Modifying core `pipelines/`                                                 |
-| Customer-specific actuator                | A new actuator under `libs/actuators/` with its own version | Patching an existing actuator's behavior                                    |
-| Customer-specific actuator behavior tweak | A wrapper actuator that calls the core one                  | Forking the core actuator                                                   |
+| Need                                      | Use this                                                       | Avoid                                                                     |
+| ----------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Customer-specific identity / vision       | `knowledge/personal/stances/{slug}/identity.json`, `vision.md` | Editing `knowledge/personal/` when `KYBERION_STANCE` is unset             |
+| Customer-specific connections             | `knowledge/personal/stances/{slug}/connections/`               | Editing `knowledge/personal/connections/` when `KYBERION_STANCE` is unset |
+| Customer-specific policy override         | `knowledge/personal/stances/{slug}/policy/`                    | Editing `knowledge/product/governance/`                                   |
+| Customer-specific mission templates       | `knowledge/personal/stances/{slug}/mission-seeds/`             | Modifying core `pipelines/`                                               |
+| Customer-specific actuator                | A new actuator under `libs/actuators/` with its own version    | Patching an existing actuator's behavior                                  |
+| Customer-specific actuator behavior tweak | A wrapper actuator that calls the core one                     | Forking the core actuator                                                 |
 
 If you find yourself wanting to modify something that isn't listed in §2 as Stable, that's a signal to either:
 
@@ -369,7 +376,7 @@ Stable surfaces are deprecated for **at least one minor version** before removal
 
 Common helpers (`slugify`, `retry`, `sleep`, `chunk`, `loadJson`/`ensureDir`) have exactly one canonical implementation in `@agent/core` (`libs/core/foundation/text.ts`, `libs/core/async-utils.ts`, `libs/core/secure-io.ts`). See IP-09 (`docs/developer/improvement-plans-archive/2026-07/IP-09_SHARED_UTILITY_CONSOLIDATION.ja.md`) for the history of why: independently-drifted local copies previously produced ID/output mismatches (mission dir names, file names) across call sites.
 
-**Do not add a new local `function slugify(...)` / `function retry(...)` / etc.** Import the canonical version from `@agent/core` instead. If a call site genuinely needs different behavior (e.g. a different separator, max length, or fallback), pass options to the canonical function rather than hand-rolling a variant — see `SlugifyOptions` in `libs/core/foundation/text.ts`.
+**Do not add a new local `function slugify(...)` / `function retry(...)` / etc.** Import the canonical version from its published foundation or domain subpath instead (for example `@agent/core/foundation/text` for `slugify` and `@agent/core/async-utils` for `retry`). If a call site genuinely needs different behavior (e.g. a different separator, max length, or fallback), pass options to the canonical function rather than hand-rolling a variant — see `SlugifyOptions` in `libs/core/foundation/text.ts`.
 
 # Marketing Workload Extension
 

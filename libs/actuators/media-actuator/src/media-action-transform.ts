@@ -1,10 +1,10 @@
 import { listDesignStyles } from '@agent/core/design-foundation';
-import { draftDeckSectionBodies, selectDeckTheme } from '@agent/core/deck-theme-direction';
+import { draftDeckSectionBodies, selectDeckTheme } from '@agent/shared-media/deck-theme-direction';
 import { DECK_CANVAS_4_3, DECK_CANVAS_16_9, htmlToDeckProtocol } from './html-deck-helpers.js';
 import { buildDeckMeasurementScript, geometryToDeckProtocol } from './deck-geometry-helpers.js';
 import { logger } from '@agent/core/core';
 import { resolveLocale } from '@agent/core/locale';
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import { clamp, nowIso } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
@@ -28,9 +28,9 @@ import {
   lockMediaBrief,
   inferredDecisions,
   formatBriefForConfirmation,
-} from '@agent/core/media/media-brief-lock';
+} from '@agent/shared-media/media-brief-lock';
 import { validateThemeContrast } from '@agent/core/design-qa';
-import { type PdfDesignProtocol } from '@agent/core/media/media-contracts';
+import { type PdfDesignProtocol } from '@agent/shared-media/media-contracts';
 import {
   buildPptxProtocolFromPdfDesign as buildPptxProtocolFromPdfDesignHelper,
   buildXlsxProtocolFromPdfDesign as buildXlsxProtocolFromPdfDesignHelper,

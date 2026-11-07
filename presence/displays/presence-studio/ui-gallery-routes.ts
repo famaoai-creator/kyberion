@@ -28,7 +28,7 @@ import * as path from 'node:path';
 import type express from 'express';
 import { getUiMessageBundle, pathResolver, safeReaddir, safeReadFile } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
-import { SUPPORTED_LOCALES, type SupportedLocale } from '@agent/core/locale-normalize';
+import { SUPPORTED_LOCALES, type SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 
 export const UI_GALLERY_ROUTE = '/ui-gallery';

@@ -94,12 +94,10 @@ const catalogNames = [
   'authority-role-index.json',
   'role-assumption-policy.json',
 ];
-const roles = [
-  'notification_preferences_reader',
-  'tool_runtime_policy_reader',
-  'person_charter_store',
-  'pr_publication_store',
-];
+const roles = ['notification_preferences_reader', 'tool_runtime_policy_reader'];
+// G2: the PR publication and person charter stores have no role; an old installation lacks
+// only their issuance rights.
+const issuanceRights = ['pr_publication_store', 'person_charter_store'];
 let originalCatalogs = new Map<string, string>();
 
 function gitSource(args: string[]): string {
@@ -115,7 +113,7 @@ function withoutMigratedRoles(relative: string, raw: string) {
     for (const role of roles) delete value.authority_roles[role];
   if (relative.endsWith('/role-assumption-policy.json'))
     value.shared_core_roles.roles = value.shared_core_roles.roles.filter(
-      (role: string) => !roles.includes(role)
+      (role: string) => !roles.includes(role) && !issuanceRights.includes(role)
     );
   return value;
 }
@@ -138,9 +136,12 @@ function prepareFixture(legacyWithoutPerson: boolean) {
     cwd: pathResolver.rootDir(),
   });
   const reference = referenceResult.status === 0 ? referenceResult.stdout.trim() : 'HEAD';
-  const omittedRoles = roles.filter(
-    (role) => legacyWithoutPerson || role !== 'person_charter_store'
-  );
+  const omittedRoles = [
+    ...roles,
+    // An installation that predates the PR publication store (its former role included), and,
+    // when legacyWithoutPerson, the person charter store too.
+    ...issuanceRights.filter((right) => legacyWithoutPerson || right !== 'person_charter_store'),
+  ];
   const rolePaths = gitSource([
     'ls-tree',
     '-r',
@@ -262,7 +263,7 @@ function invoke(worktree: string, action = 'publish') {
       KYBERION_PROJECT_ID: '',
       KYBERION_TASK_ID: '',
       KYBERION_NHI_ACTOR: '',
-      KYBERION_CUSTOMER: '',
+      KYBERION_STANCE: '',
       KYBERION_PERSONA: '',
       SYSTEM_ROLE: '',
       MISSION_ROLE: '',

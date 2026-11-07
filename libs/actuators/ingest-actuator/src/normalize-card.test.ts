@@ -158,7 +158,7 @@ describe('ingest:normalize_card (DA-04 acceptance 2)', () => {
 
 describe('ingest:normalize_card tenant-aware target paths (DA-01 spine)', () => {
   const FIXTURE_PARENT = path.join(pathResolver.rootDir(), 'active', 'shared', 'tmp');
-  const EMPTY_ENV = {} as NodeJS.ProcessEnv; // no KYBERION_CUSTOMER → personal tenants dir
+  const EMPTY_ENV = {} as NodeJS.ProcessEnv; // no KYBERION_STANCE → personal tenants dir
   let fixtureRoot = '';
 
   beforeAll(() => {

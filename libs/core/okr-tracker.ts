@@ -30,7 +30,7 @@ export interface OkrPeriod {
 export interface OkrTracker {
   company_id: string;
   tenant_slug: string | null;
-  source_kind: 'customer' | 'confidential' | 'public' | 'derived';
+  source_kind: 'confidential' | 'public' | 'derived';
   source_path: string;
   period: OkrPeriod;
   objectives: OkrObjective[];
@@ -91,7 +91,6 @@ function toNumber(value: unknown): number | null {
 function resolveOkrPaths(baseDir: string, tenantSlug: string | null): string[] {
   const candidates = tenantSlug
     ? [
-        path.join(baseDir, 'customer', tenantSlug, 'okr.json'),
         path.join(baseDir, 'knowledge', 'confidential', tenantSlug, 'okr.json'),
         path.join(baseDir, 'knowledge', 'product', 'governance', 'okr.json'),
       ]
@@ -158,11 +157,7 @@ export function resolveOkrTracker(tenantSlug?: string | null, rootDir?: string):
       company_id: companyId,
       tenant_slug: resolvedTenantSlug,
       source_path: candidate,
-      source_kind: candidate.includes('/customer/')
-        ? 'customer'
-        : candidate.includes('/confidential/')
-          ? 'confidential'
-          : 'public',
+      source_kind: candidate.includes('/confidential/') ? 'confidential' : 'public',
       objectives: parsed.objectives.map(normalizeObjective),
     };
   }

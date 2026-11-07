@@ -29,7 +29,7 @@ import {
 } from '@agent/core/secure-io';
 import { appendJsonLine, isRecord, nowIso } from '@agent/core/foundation';
 import { fileEndsWithNewline, streamJsonLines } from '@agent/core/jsonl-read';
-import { withLockSync } from '@agent/core/lock-utils';
+import { withLockSync } from '@agent/core/foundation/lock-utils';
 
 export const DEFAULT_INGEST_REGISTRY_PATH =
   'active/shared/runtime/ingest/content-hash-registry.jsonl';

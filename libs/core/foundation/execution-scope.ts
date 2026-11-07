@@ -155,6 +155,15 @@ export function currentExecutionScope(): ExecutionScope | undefined {
   });
 }
 
+/**
+ * The innermost in-process scope object itself, for identity comparison only (a grant bound to
+ * the scope it was opened in; a nested assumption is a different object). Undefined outside any
+ * in-process assumption.
+ */
+export function innermostExecutionScopeIdentity(): object | undefined {
+  return registry.storage.getStore();
+}
+
 /** The role assumed by the innermost withExecutionContext*, if any (policy-checked). */
 export function scopedAssumedRole(): string | undefined {
   const role = currentExecutionScope()?.assumedRole?.trim();

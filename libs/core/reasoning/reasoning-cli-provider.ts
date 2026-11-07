@@ -9,5 +9,8 @@ export {
   buildCliProviderBundle,
   listCliProviderBundleModes,
   registerCliProviderBundle,
-} from '../cli-provider-bundle.js';
-export type { CliProviderBuildOptions, CliProviderBundleFactory } from '../cli-provider-bundle.js';
+} from '../provider/cli-provider-bundle.js';
+export type {
+  CliProviderBuildOptions,
+  CliProviderBundleFactory,
+} from '../provider/cli-provider-bundle.js';

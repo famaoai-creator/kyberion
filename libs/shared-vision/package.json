@@ -12,5 +12,43 @@
   "dependencies": {
     "@agent/core": "workspace:*",
     "puppeteer": "^25.14.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./browser-automation-runtime-bridge": {
+      "types": "./dist/browser-automation-runtime-bridge.d.ts",
+      "default": "./dist/browser-automation-runtime-bridge.js"
+    },
+    "./browser-bridge-mailbox": {
+      "types": "./dist/browser-bridge-mailbox.d.ts",
+      "default": "./dist/browser-bridge-mailbox.js"
+    },
+    "./browser-conversation-session": {
+      "types": "./dist/browser-conversation-session.d.ts",
+      "default": "./dist/browser-conversation-session.js"
+    },
+    "./browser-golden-evidence": {
+      "types": "./dist/browser-golden-evidence.d.ts",
+      "default": "./dist/browser-golden-evidence.js"
+    },
+    "./browser-judgment": {
+      "types": "./dist/browser-judgment.d.ts",
+      "default": "./dist/browser-judgment.js"
+    },
+    "./browser-onboarding": {
+      "types": "./dist/browser-onboarding.d.ts",
+      "default": "./dist/browser-onboarding.js"
+    },
+    "./browser-onboarding-state": {
+      "types": "./dist/browser-onboarding-state.d.ts",
+      "default": "./dist/browser-onboarding-state.js"
+    },
+    "./browser-procedure-promotion": {
+      "types": "./dist/browser-procedure-promotion.d.ts",
+      "default": "./dist/browser-procedure-promotion.js"
+    }
   }
 }

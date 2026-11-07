@@ -19,9 +19,9 @@ const scope = { customerSlug: 'acme-ai', tenantSlug: 'acme-prod', organizationId
 const nhiId = 'kyberion://agent/org-acme-ai/planner';
 
 function seed(strict = true, tenantSlug = scope.tenantSlug): void {
-  safeMkdir(path.join(rootDir, 'customer', 'acme-ai'), { recursive: true });
+  safeMkdir(path.join(rootDir, 'knowledge', 'personal', 'stances', 'acme-ai'), { recursive: true });
   safeWriteFile(
-    path.join(rootDir, 'customer', 'acme-ai', 'organization-profile.json'),
+    path.join(rootDir, 'knowledge', 'confidential', 'acme-ai', 'organization-profile.json'),
     JSON.stringify({
       version: '1.0.0',
       organization_id: 'org-acme-ai',
@@ -106,7 +106,8 @@ describe('tenant activation probe', () => {
       seed();
       const profilePath = path.join(
         rootDir,
-        'customer',
+        'knowledge',
+        'confidential',
         scope.customerSlug,
         'organization-profile.json'
       );
@@ -137,7 +138,15 @@ describe('tenant activation probe', () => {
     safeRmSync(path.join(rootDir, 'knowledge', 'personal', 'tenants', scope.tenantSlug + '.json'));
     expect(createTenantActivationProbeDeps(input).registryCheck().exitCode).toBe(1);
     safeRmSync(
-      path.join(rootDir, 'customer', scope.customerSlug, 'onboarding', 'organization-context.json')
+      path.join(
+        rootDir,
+        'knowledge',
+        'personal',
+        'stances',
+        scope.customerSlug,
+        'onboarding',
+        'organization-context.json'
+      )
     );
     expect(createTenantActivationProbeDeps(input).registryCheck().exitCode).toBe(1);
   });

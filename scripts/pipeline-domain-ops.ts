@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { grantVoiceConsent } from '@agent/core/voice/voice-consent';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveVars } from '@agent/core/logic-utils';
+import { resolveVars } from '@agent/core/pipeline/logic-utils';
 import { safeExecResult, safeMkdir, safeRmSync } from '@agent/core/secure-io';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
@@ -61,7 +61,7 @@ import {
 import { runOrganizationRetro } from '@agent/core/organization/organization-retro';
 import type { OrganizationTier } from '@agent/core/organization/organization-operating-model';
 import { runAccountabilityDigest } from '@agent/core/governance/accountability-digest';
-import { normalizeLocale } from '@agent/core/locale-normalize';
+import { normalizeLocale } from '@agent/core/foundation/locale-normalize';
 import {
   parseOrganizationRecordRunParams,
   recordOrganizationOperationRunWithDefaults,

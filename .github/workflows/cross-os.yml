@@ -249,20 +249,20 @@ jobs:
       - name: Pipeline shell independence
         run: pnpm run check -- --scope full --only pipeline-shell-independence
 
-      - name: Customer aggregation smoke
+      - name: Stance resolution smoke
         env:
-          KYBERION_CUSTOMER: smoke-test
+          KYBERION_STANCE: smoke-test
           KYBERION_PERSONA: ecosystem_architect
           MISSION_ROLE: mission_controller
         run: |
-          # Verify customer overlay path resolution doesn't panic on either OS.
-          node -e "
-          const r = require('./libs/core/dist/customer-resolver.js');
-          if (!r.activeCustomer({ KYBERION_CUSTOMER: 'smoke-test' })) {
-            console.error('customer resolver failed to detect active slug');
+          # Exercise the published stance API on every OS, not a retired dist path.
+          node --input-type=module -e "
+          import { activeStance } from '@agent/core/stance-resolver';
+          if (activeStance({ KYBERION_STANCE: 'smoke-test' }) !== 'smoke-test') {
+            console.error('stance resolver failed to detect active slug');
             process.exit(1);
           }
-          console.log('customer resolver OK');
+          console.log('stance resolver OK');
           "
 
       - name: Contract semver baseline check
@@ -335,8 +335,8 @@ jobs:
         run: >-
           pnpm exec vitest run
           libs/core/windows-local-assist-bridge.test.ts
-          libs/core/media/native-speech-listen-bridge.test.ts
-          libs/core/media/native-tts.test.ts
+          libs/shared-media/src/native-speech-listen-bridge.test.ts
+          libs/shared-voice/src/native-tts.test.ts
           libs/core/environment-capability.test.ts
           libs/core/platform.test.ts
           libs/core/virtual/os-accessibility-detector.test.ts

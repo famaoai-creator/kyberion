@@ -32,7 +32,7 @@ import {
   type VoiceEngineArtifactFormat,
   type VoiceEngineRecord,
 } from '@agent/core/voice/voice-engine-registry';
-import { getVoiceTtsLanguageConfig } from '@agent/core/voice/voice-tts-config';
+import { getVoiceTtsLanguageConfig } from '@agent/shared-voice/voice-tts-config';
 
 export interface VoiceTtsEngineCalibrationInput {
   text: string;

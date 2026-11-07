@@ -3,7 +3,7 @@ import {
   buildSessionHandoffArtifact,
   ensureParentDir,
   resolveAppProfile,
-} from '@agent/core/mobile-runtime-helpers';
+} from '@agent/shared-mobile';
 import { resolveAxeBin, resolveXcrunBin } from '@agent/core/tool/tool-binary-resolvers';
 import {
   assertSafeRepositoryPath,
@@ -14,7 +14,7 @@ import {
   safeExistsSync,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolvePipelineContextValues } from '@agent/core/logic-utils';
+import { resolvePipelineContextValues } from '@agent/core/pipeline/logic-utils';
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { isRecord, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
@@ -31,7 +31,7 @@ import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
+} from '@agent/core/contracts/execution-bounds';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';

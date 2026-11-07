@@ -66,7 +66,7 @@ kyberion.knowledge.cowork_sync(direction: "cowork-to-kyberion", cowork_artifact_
 
 ## Customer Customization
 
-Enterprise deployments can extend this plugin via `customer/{slug}/plugin-overrides/kyberion.json` to:
+Enterprise deployments can extend this plugin via `knowledge/personal/stances/{slug}/plugin-overrides/kyberion.json` to:
 
 - Expand `permissions.tier_visibility` to include specific `confidential/{project}` tiers
 - Override `mcp_server.env` for tenant-specific personas

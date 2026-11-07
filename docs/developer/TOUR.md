@@ -83,7 +83,7 @@ Three-tier filesystem isolation for what an agent reads and writes:
 | Confidential             | `knowledge/confidential/{tenant-slug}/` (gitignored) | One tenant — a confidentiality boundary, resolved from the tenant registry |
 | Public                   | `knowledge/public/` (committed)                      | Reusable, shared                                                           |
 
-When `KYBERION_CUSTOMER` is set, `customer/{slug}/` becomes the preferred overlay root for identity, vision, connections, policy, voice, and onboarding state before falling back to `knowledge/personal/`. That overlay is a **stance** — which entity Kyberion is acting as — and is a different layer from the tenant boundary above: the stance is runtime configuration, the tenant is a data boundary, and a tenant's own end customers live inside that tenant at `knowledge/confidential/{tenant-slug}/customers/`. See [stance-tenant-customer-model](../../knowledge/product/architecture/stance-tenant-customer-model.md).
+When `KYBERION_STANCE` is set, `knowledge/personal/stances/{slug}/` becomes the preferred overlay root for identity, vision, connections, policy, voice, and onboarding state before falling back to `knowledge/personal/`. That overlay is a **stance** — which entity Kyberion is acting as — and is a different layer from the tenant boundary above: the stance is runtime configuration, the tenant is a data boundary, and a tenant's own end customers live inside that tenant at `knowledge/confidential/{tenant-slug}/customers/`. See [stance-tenant-customer-model](../../knowledge/product/architecture/stance-tenant-customer-model.md).
 
 Enforced at the file-IO boundary by `secure-io.ts` + `tier-guard.ts`. There is no "trusted code" exception — everything goes through the boundary.
 
@@ -93,7 +93,7 @@ Code: `libs/core/secure-io.ts`, `libs/core/tier-guard.ts`, `knowledge/`.
 
 OTel-inspired structured tracing per pipeline run. Captures spans, events, artifacts, knowledge references.
 
-- Persisted as JSONL under `active/shared/logs/traces/` (or `customer/{slug}/logs/traces/` when active).
+- Persisted as JSONL under `active/shared/logs/traces/` (or `knowledge/personal/stances/{slug}/logs/traces/` when active).
 - Read by Chronos (the operator viewer), distillation (failure → reusable hint), and the error classifier.
 
 Code: `libs/core/analysis/trace.ts`, `docs/developer/TRACE_MIGRATION_TEMPLATE.md`.
@@ -292,6 +292,6 @@ Meeting-specific orientation:
 - **Don't** add behavior to `main()` of a script — extract into a tested function.
 - **Don't** add a new actuator manifest without bumping its semver if it changes existing ops.
 - **Don't** commit secrets — `secret-actuator` reads from OS keychain. CI rejects committed secrets.
-- **Don't** write to `customer/{slug}/` without explicit user consent — that directory is theirs.
+- **Don't** write to `knowledge/personal/stances/{slug}/` without explicit user consent — that directory is theirs.
 
 If you're tempted to do any of the above, that's a signal to read [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md).

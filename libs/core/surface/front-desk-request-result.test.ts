@@ -5,7 +5,7 @@ const state = vi.hoisted(() => ({ files: new Map<string, unknown>(), writes: 0, 
 vi.mock('../authority.js', () => ({
   withExecutionContext: (_role: string, fn: () => unknown) => fn(),
 }));
-vi.mock('../lock-utils.js', () => ({
+vi.mock('../foundation/lock-utils.js', () => ({
   withLockSync: (_key: string, fn: () => unknown) => {
     state.locks++;
     return fn();

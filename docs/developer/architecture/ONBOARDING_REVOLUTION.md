@@ -44,7 +44,7 @@ Kyberion の初回起動体験を、単なる設定ウィザードではなく�
 
 1. `Smart Probe` が接続候補を収集する
 2. 候補は「提案」として提示する
-3. ユーザーが承認したものだけ `customer/{slug}/connections/*.json` に保存する。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/connections/*.json` に保存する
+3. ユーザーが承認したものだけ `knowledge/personal/stances/{slug}/connections/*.json` に保存する。`KYBERION_STANCE` 未設定時は `knowledge/personal/connections/*.json` に保存する
 
 対象例:
 
@@ -80,7 +80,7 @@ Kyberion の初回起動体験を、単なる設定ウィザードではなく�
 1. 1 tenant を入力
 2. schema を検証
 3. 必要に応じて broker 条件を確認
-4. `pnpm tenant create {tenant_slug} --display-name "..." --apply` で canonical registry に登録する。`customer/{slug}/tenants/{tenant_slug}.json` は必要な場合だけ stance 側の参照 facet として扱い、registry の代替にはしない
+4. `pnpm tenant create {tenant_slug} --display-name "..." --apply` で canonical registry に登録する。`knowledge/personal/stances/{slug}/tenants/{tenant_slug}.json` は必要な場合だけ stance 側の参照 facet として扱い、registry の代替にはしない
 
 注意:
 

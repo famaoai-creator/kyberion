@@ -1,4 +1,4 @@
-import { validateNextActionContract } from './next-action-contract.js';
+import { validateNextActionContract } from './contracts/next-action-contract.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';

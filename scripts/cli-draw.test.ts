@@ -9,7 +9,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core';
-import type { ImageGenerationRequest } from '@agent/core/media/image-generation-types';
+import type { ImageGenerationRequest } from '@agent/shared-media/image-generation-types';
 import {
   DRAW_HANDOFF_EXIT_CODE,
   DRAW_USAGE,
@@ -67,8 +67,8 @@ function createFakeDrawDeps(
   const requests: ImageGenerationRequest[] = [];
   const plans: ImageGenerationRequest[] = [];
   const media: { tool: MediaTool; args: string[] }[] = [];
-  /** Pending host hand-offs by target, like libs/core/host-image-handoff.ts. */
-  /** Host hand-off requests by target (prompt + file before the request), like libs/core/host-image-handoff.ts. */
+  /** Pending host hand-offs by target, like libs/shared-media/src/host-image-handoff.ts. */
+  /** Host hand-off requests by target (prompt + file before the request), like libs/shared-media/src/host-image-handoff.ts. */
   const handoffs = new Map<string, { prompt: string; prior: string | null }>();
   const contents = (file: string) =>
     safeExistsSync(file) ? String(safeReadFile(file, { encoding: 'utf8' })) : null;

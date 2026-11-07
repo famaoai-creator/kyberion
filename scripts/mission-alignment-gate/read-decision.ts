@@ -12,7 +12,7 @@
  */
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
-import { decodeEntities } from '@agent/core/text-escaping';
+import { decodeEntities } from '@agent/core/foundation/text-escaping';
 import { t as catalogT } from '@agent/core/t';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { loadMissionBriefAtPath } from './mission-brief.js';

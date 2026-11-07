@@ -611,7 +611,7 @@ function customersSharingChannel(
 
 /**
  * CD-11 `--channel <surface>:<channel_id>`: a channel the tenant has bound
- * (`customer/<tenant>/connections/channel-bindings.json`, active) — reminders
+ * (`knowledge/confidential/<tenant>/connections/channel-bindings.json`, active) — reminders
  * for the actor go there. `none` clears it (null); undefined when absent.
  */
 function parseActorChannel(
@@ -632,7 +632,7 @@ function parseActorChannel(
   if (!findTenantCustomerChannelBinding(tenant, known, channelId)) {
     throw new ScriptExitError(
       2,
-      `channel ${known}:${channelId} is not an active binding of tenant ${tenant} (customer/${tenant}/connections/channel-bindings.json); bind it first`
+      `channel ${known}:${channelId} is not an active binding of tenant ${tenant} (knowledge/confidential/${tenant}/connections/channel-bindings.json); bind it first`
     );
   }
   return { surface: known, channel_id: channelId };

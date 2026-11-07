@@ -5,7 +5,6 @@
 
 import * as path from 'node:path';
 import { composeMissionTeamPlan, writeMissionTeamPlan } from './mission-team-plan-composer.js';
-import * as customerResolver from '../customer-resolver.js';
 import { resolveCompany, buildCompanyVisionRef } from '../company.js';
 import * as pathResolver from '../path-resolver.js';
 import {
@@ -120,10 +119,8 @@ export function normalizeMissionVisionRef(
     return raw;
   }
 
-  const company = resolveCompany(
-    tenantSlug || customerResolver.activeCustomer() || 'default',
-    rootDir
-  );
+  // resolveCompany falls back to the active tenant, then 'default'.
+  const company = resolveCompany(tenantSlug || null, rootDir);
   const structuredRef = buildCompanyVisionRef(company.tenant_slug);
   if (!raw) {
     return structuredRef;

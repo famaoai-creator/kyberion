@@ -25,7 +25,7 @@ import { createHash } from 'node:crypto';
 import { defineCatalog } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import type { HearingRecord } from './hearing.js';
 
 // -- Mission brief (duplicated shape; see module doc) -----------------------

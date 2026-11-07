@@ -66,8 +66,8 @@ import {
   projectExecutionShapeToWorkflowShape,
   type ExecutionShape,
   type WorkflowExecutionShape,
-} from '../execution-shape.js';
-import { matchesAnyTextRule, type TextMatchRule } from '../text-rule-matcher.js';
+} from '../contracts/execution-shape.js';
+import { matchesAnyTextRule, type TextMatchRule } from '../foundation/text-rule-matcher.js';
 import type { TraceContext } from '../analysis/trace.js';
 import type { ActuatorExecutionBrief } from '../contracts/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from '../contracts/operator-interaction-packet.js';

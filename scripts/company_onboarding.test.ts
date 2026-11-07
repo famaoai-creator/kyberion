@@ -71,7 +71,7 @@ describe('AI company onboarding', () => {
     });
     expect(result.status).toBe('ready');
     const profile = JSON.parse(
-      safeReadFile(`${rootDir}/customer/acme-ai/organization-profile.json`, {
+      safeReadFile(`${rootDir}/knowledge/confidential/acme-ai/organization-profile.json`, {
         encoding: 'utf8',
       }) as string
     );
@@ -97,7 +97,7 @@ describe('AI company onboarding', () => {
         status: 'active',
         assigned_role: 'owner',
       },
-      { rootDir, env: { KYBERION_CUSTOMER: 'acme-ai' } }
+      { rootDir, env: { KYBERION_STANCE: 'acme-ai' } }
     );
 
     expect(() =>
@@ -110,11 +110,17 @@ describe('AI company onboarding', () => {
         rootDir,
       })
     ).toThrow("Tenant 'acme-prod' already belongs to 'Another Company'");
-    expect(safeExistsSync(`${rootDir}/customer/acme-ai/organization-profile.json`)).toBe(false);
-    expect(safeExistsSync(`${rootDir}/customer/acme-ai/onboarding/ai-company-readiness.json`)).toBe(
-      false
-    );
-    expect(safeExistsSync(`${rootDir}/customer/acme-ai/onboarding/first-work-plan.md`)).toBe(false);
+    expect(
+      safeExistsSync(`${rootDir}/knowledge/confidential/acme-prod/organization-profile.json`)
+    ).toBe(false);
+    expect(
+      safeExistsSync(
+        `${rootDir}/knowledge/personal/stances/acme-ai/onboarding/ai-company-readiness.json`
+      )
+    ).toBe(false);
+    expect(
+      safeExistsSync(`${rootDir}/knowledge/personal/stances/acme-ai/onboarding/first-work-plan.md`)
+    ).toBe(false);
   });
 
   it('registers a new strictly isolated tenant and seeds the org-chart domains', () => {

@@ -264,7 +264,7 @@ arbitrary procedures.
    service, preflight may check CLI auth, a local runtime, or bridge health too.
 
 Personal connections resolve through `knowledge/personal/`; a customer stance
-selected by `KYBERION_CUSTOMER` uses its private `customer/{slug}/` overlay.
+selected by `KYBERION_STANCE` uses its private `knowledge/personal/stances/{slug}/` overlay.
 That overlay is a stance for connection/configuration resolution, not the
 tenant containment scope. Tenant-scoped durable data belongs under
 `knowledge/confidential/{tenant}/` and must follow the tenant registry and
@@ -334,7 +334,7 @@ credential-isolated. Run `pnpm service:setup` and
 
 Separately, if the tenant will send confidential or personal data to the
 service, the destination domain must be approved in the tenant-specific egress
-policy. Registering a service globally or selecting a `KYBERION_CUSTOMER`
+policy. Registering a service globally or selecting a `KYBERION_STANCE`
 stance does not grant that tenant data-egress permission. Some direct
 older integrations that do not opt into `tenant_binding_required` continue
 using their existing service-level credential and authority paths. Do not

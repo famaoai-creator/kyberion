@@ -1,5 +1,5 @@
-import type { Observation } from '@agent/core/perception/observation';
-import type { VisualFingerprint, VisualChange } from '@agent/core/perception/visual-change';
+import type { Observation } from '@agent/shared-perception/observation';
+import type { VisualFingerprint, VisualChange } from '@agent/shared-perception/visual-change';
 import {
   PERCEPTION_OPTIONS_HELP,
   validatePerceptionOptions,
@@ -18,7 +18,7 @@ import {
  */
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolvePerceptionScope } from '@agent/core/perception/observation';
+import { resolvePerceptionScope } from '@agent/shared-perception/observation';
 import { safeMkdir, safeReaddir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import type { TranscriptSegment } from '@agent/core/voice/speech-to-text-bridge';
 import { ScriptExitError } from './lib/harness.js';
@@ -93,10 +93,10 @@ export interface WatchFrame {
 }
 
 export interface WatchResult {
-  source?: import('@agent/core/perception/observation').PerceptionSource;
+  source?: import('@agent/shared-perception/observation').PerceptionSource;
   observations?: Observation[];
-  analysis?: import('@agent/core/perception/audio-analysis').AudioAnalysisResult;
-  tracking?: import('@agent/core/perception/tracking').TrackingResult;
+  analysis?: import('@agent/shared-perception/audio-analysis').AudioAnalysisResult;
+  tracking?: import('@agent/shared-perception/tracking').TrackingResult;
   animation_cues?: unknown[];
   index?: unknown;
   file: string;
@@ -509,7 +509,7 @@ export async function runWatchCommand(
         throw new ScriptExitError(1, '[watch] requested audio analysis but video has no audio');
       const wav = path.join(workDir, 'analysis-16k-mono.wav');
       await extractSttWav(deps, absolute, wav, 601);
-      const audio = await import('@agent/core/perception/audio-analysis');
+      const audio = await import('@agent/shared-perception/audio-analysis');
       analysis = await withPerceptionMediaRole(inputScope, () =>
         (deps.enhancements?.analyzeAudio ?? audio.analyzeAudio)({
           path: wav,
@@ -559,7 +559,7 @@ export async function runWatchCommand(
     let tracking: WatchResult['tracking'];
     let animation_cues: unknown[] | undefined;
     if (options.track) {
-      const tracker = await import('@agent/core/perception/tracking');
+      const tracker = await import('@agent/shared-perception/tracking');
       tracking = await withPerceptionMediaRole(inputScope, () =>
         (deps.enhancements?.track ?? tracker.trackMedia)({
           path: absolute,
@@ -587,7 +587,7 @@ export async function runWatchCommand(
     if (options.index && source) {
       const indexMedia =
         deps.enhancements?.index ??
-        (await import('@agent/core/perception/semantic-index')).indexMedia;
+        (await import('@agent/shared-perception/semantic-index')).indexMedia;
       index = await withPerceptionMediaRole(inputScope, () =>
         indexMedia({
           indexId: options.index!,

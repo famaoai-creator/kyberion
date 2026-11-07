@@ -9,7 +9,7 @@ import {
   generateNativePdf,
   generateNativePptx,
   generateNativeXlsx,
-} from '@agent/core/media/media-contracts';
+} from '@agent/shared-media/media-contracts';
 import type { PdfDesignProtocol } from '@agent/core/contracts/pdf-protocol';
 import type { PptxDesignProtocol, PptxSlide } from '@agent/core/contracts/pptx-protocol';
 import type { XlsxDesignProtocol } from '@agent/core/contracts/xlsx-protocol';

@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { agentActor, parseActorRef, type ActorRef } from './actor.js';
 import { resolveIdentityContext } from './authority.js';
-import { assertScopeContext, type ScopeContext } from './scope-context-validation.js';
+import { assertScopeContext, type ScopeContext } from './foundation/scope-context-validation.js';
 import type { Authority, Persona } from './types.js';
 
 /** Attribution projection, never authentication proof or an authorization grant. */

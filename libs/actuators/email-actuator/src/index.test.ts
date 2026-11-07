@@ -23,8 +23,8 @@ vi.mock('@agent/core/integrations/email-bridge', async (importOriginal) => ({
   sendEmail: mocks.sendEmail,
 }));
 
-vi.mock('@agent/core/logic-utils', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/logic-utils')>()),
+vi.mock('@agent/core/pipeline/logic-utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/pipeline/logic-utils')>()),
   resolveVars: mocks.resolveVars,
 }));
 

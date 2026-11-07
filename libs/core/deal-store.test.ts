@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { getDeal, loadDealAtPath, loadPriceBook, openDeal } from './deal-store.js';
+import { asDealStore, getDeal, loadDealAtPath, loadPriceBook, openDeal } from './deal-store.js';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
@@ -11,8 +11,8 @@ describe('deal-store price book loader', () => {
 
   afterEach(() => {
     safeRmSync(rootDir, { recursive: true, force: true });
-    withExecutionContext('mission_controller', () =>
-      safeRmSync(pathResolver.rootResolve(`customer/${dealTenant}`), {
+    withExecutionContext('onboarding', () =>
+      safeRmSync(pathResolver.rootResolve(`knowledge/confidential/${dealTenant}`), {
         recursive: true,
         force: true,
       })
@@ -83,11 +83,13 @@ describe('deal-store price book loader', () => {
         summary: 'canonical deal',
       })
     );
-    const filePath = pathResolver.rootResolve(`customer/${dealTenant}/deals/${deal.deal_id}.json`);
+    const filePath = pathResolver.rootResolve(
+      `knowledge/confidential/${dealTenant}/deals/${deal.deal_id}.json`
+    );
 
     expect(loadDealAtPath(filePath, dealTenant, deal.deal_id)).toEqual(deal);
 
-    withExecutionContext('mission_controller', () =>
+    asDealStore(dealTenant, () =>
       safeWriteFile(filePath, JSON.stringify({ ...deal, tenant_slug: 'other-tenant' }))
     );
     expect(() => loadDealAtPath(filePath, dealTenant, deal.deal_id)).toThrow(
@@ -97,15 +99,17 @@ describe('deal-store price book loader', () => {
   });
 
   it('rejects a directory at the persisted deal path', () => {
-    const filePath = pathResolver.rootResolve(`customer/${dealTenant}/deals/DEAL-DIRECTORY.json`);
-    withExecutionContext('mission_controller', () => safeMkdir(filePath, { recursive: true }));
+    const filePath = pathResolver.rootResolve(
+      `knowledge/confidential/${dealTenant}/deals/DEAL-DIRECTORY.json`
+    );
+    asDealStore(dealTenant, () => safeMkdir(filePath, { recursive: true }));
     try {
       expect(() => loadDealAtPath(filePath, dealTenant, 'DEAL-DIRECTORY')).toThrow(
         'deal must be a regular file'
       );
     } finally {
-      withExecutionContext('mission_controller', () =>
-        safeRmSync(pathResolver.rootResolve(`customer/${dealTenant}`), {
+      withExecutionContext('onboarding', () =>
+        safeRmSync(pathResolver.rootResolve(`knowledge/confidential/${dealTenant}`), {
           recursive: true,
           force: true,
         })

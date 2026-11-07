@@ -109,7 +109,7 @@ Per Phase B-1.5: `mission_controller` checkpoint events now emit Trace spans.
 - `project_ledger.sync` — outside the lock
 - `intent_delta.emit` — outside the lock
 
-The trace is persisted via `persistTrace()` to `active/shared/logs/traces/` (or `customer/{slug}/logs/traces/` when KYBERION_CUSTOMER is active). Persistence failures are logged as warnings and never fail the checkpoint itself.
+The trace is persisted via `persistTrace()` to `active/shared/logs/traces/` (or `knowledge/personal/stances/{slug}/logs/traces/` when KYBERION_STANCE is active). Persistence failures are logged as warnings and never fail the checkpoint itself.
 
 ## 3. What This PR Changes
 

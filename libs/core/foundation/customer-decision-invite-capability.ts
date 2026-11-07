@@ -1,15 +1,18 @@
 import * as path from 'node:path';
-import type { ResourceAccessScope } from './resource-access-scope.js';
+import { decideResourceAccess, type ResourceAccessScope } from './resource-access-scope.js';
 import { getProcessEnv } from './process-env.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from './runtime-state-roots.js';
 import { isValidTenantSlug } from './scope.js';
+import { registerStoreGrant } from './store-grant-registry.js';
+import { customerDecisionInviteWriteDenial } from './customer-decision-invite-write-content.js';
 
 /**
- * Narrow store role for one tenant's customer decision invite records
+ * Exact capability for one tenant's customer decision invite records
  * (`active/shared/runtime/customer-decision-invites/confidential/<tenant>/`,
- * libs/core/customer-decision/invite.ts). It grants no knowledge access.
+ * libs/core/customer-decision/invite.ts). G2: the active capability itself is
+ * the authority for the I/O it covers — the former `customer_decision_invite_store`
+ * role is removed. It grants no knowledge access.
  */
-export const CUSTOMER_DECISION_INVITE_STORE_ROLE = 'customer_decision_invite_store';
 
 const ROOT = PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites;
 const FILE = /^inv-[a-f0-9]{16}\.json$/u;
@@ -78,3 +81,32 @@ export function isCustomerDecisionInviteCapability(
     return false;
   }
 }
+
+// G3: tier-guard asks these rules through the store grant registry, not by importing this module.
+registerStoreGrant({
+  id: 'customer-decision-invite',
+  // Its validator predates appendExact and name prefixes, so neither can enlarge its write ceiling.
+  authorizes: (target, operation, { scope }) =>
+    !!scope &&
+    isCustomerDecisionInviteCapability(scope) &&
+    (scope.namePrefixExact?.length ?? 0) === 0 &&
+    decideResourceAccess({ ...scope, appendExact: [] }, target, operation).allowed,
+  // An active invite capability (whatever role the caller holds) writes / mkdirs only for a
+  // registered active tenant, except a content-checked revoke of an existing record.
+  narrowing: ({ relativePath, operation, scope, content, readRepoFile }) =>
+    isCustomerDecisionInviteCapability(scope)
+      ? customerDecisionInviteWriteDenial({
+          tenantSlug: scope?.tenantSlug,
+          relativePath,
+          operation: operation === 'append' ? 'write' : operation,
+          content,
+          readRepoFile,
+        })
+      : null,
+  // It may create its tenant partition, under the guard's shared scoped structural mkdir checks.
+  structuralMkdir: (_relativePath, protectedPrefix, _tenantSlug, scope) =>
+    isCustomerDecisionInviteCapability(scope) &&
+    protectedPrefix === PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites + '/confidential'
+      ? 'shared-checks'
+      : undefined,
+});

@@ -1,22 +1,37 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import * as path from 'node:path';
 import { caseRecordCanonicalJson } from './customer-decision-milestone-capability.js';
-import type { ResourceAccessScope } from './resource-access-scope.js';
+import {
+  createSynchronousResourceGrantIssuer,
+  currentResourceAccessScope,
+  decideResourceAccess,
+  type ResourceAccessOperation,
+  type ResourceAccessScope,
+} from './resource-access-scope.js';
 import { getProcessEnv } from './process-env.js';
 import { isValidTenantSlug } from './scope.js';
+import { registerStoreGrant } from './store-grant-registry.js';
+import { caseRecordWriteDenial } from './customer-decision-record-content.js';
 import {
   isStandingCustomerDecisionRecord,
   supersededDecisionIds,
 } from './customer-decision-standing.js';
 
 /**
- * Narrow store role for CD-09 task decision locks
+ * CD-09 task decision locks
  * (`knowledge/confidential/<tenant>/decisions/<case>/consumers/<consumer>.json`,
- * libs/core/mission/mission-decision-lock.ts). Mission processes assume it at
- * task boundaries instead of the full `decision_ledger` role: it may read the
- * case's ledger, switches and agendas and write exactly one consumer lock.
+ * libs/core/mission/mission-decision-lock.ts). Mission processes open the exact
+ * consumer-lock grant at task boundaries instead of the full `decision_ledger`
+ * role: it may read the case's ledger, switches and agendas and write exactly one
+ * consumer lock, every write held to the content rules below.
+ *
+ * G2: the live grant is itself the authority for the I/O it covers
+ * (`customerDecisionConsumerGrantAllows`); there is no store role. The former role
+ * name is the grant's issuance right (role-assumption-policy `shared_core_roles`,
+ * checked by authority.ts assertStoreGrantIssuanceAllowed); it is not an assumable
+ * authority role.
  */
-export const CUSTOMER_DECISION_CONSUMER_STORE_ROLE = 'customer_decision_consumer_store';
+export const CUSTOMER_DECISION_CONSUMER_GRANT_ISSUANCE_RIGHT = 'customer_decision_consumer_store';
 
 const CASE_DIR =
   /^knowledge\/confidential\/([a-z][a-z0-9-]{1,30})\/decisions\/[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/u;
@@ -34,13 +49,12 @@ const READABLE = new Set(['decisions.jsonl', 'switches.jsonl', 'agendas', 'consu
  * is built and again whenever the guard validates it). A task boundary
  * builds an owner-bound capability and can never obtain the sweep kind by
  * construction. A single consumer file is structurally the same either way.
+ *
+ * G2: the sweep marker lives in this module instance only (no globalThis
+ * registry; scripts/check_core_single_instance.ts keeps a production process on
+ * one instance), so a second instance can neither open nor honour a sweep.
  */
-const SWEEP_KEY = Symbol.for('kyberion.core.customer-decision-consumer-sweep.v1');
-const sweepRegistry = globalThis as typeof globalThis & {
-  [SWEEP_KEY]?: AsyncLocalStorage<true>;
-};
-const sweepStorage =
-  sweepRegistry[SWEEP_KEY] ?? (sweepRegistry[SWEEP_KEY] = new AsyncLocalStorage());
+const sweepStorage = new AsyncLocalStorage<true>();
 
 /** Run the case-wide consumer sweep (`sweepDecisionConsumers` only). */
 export function runInCustomerDecisionConsumerSweep<T>(fn: () => T): T {
@@ -156,9 +170,56 @@ export function customerDecisionConsumerCapability(
   };
 }
 
+interface ConsumerBinding {
+  readonly tenantSlug: string;
+  readonly caseDir: string;
+  /** A listing or several consumer locks: valid only inside the sweep. */
+  readonly sweep: boolean;
+}
+const grants = createSynchronousResourceGrantIssuer<ConsumerBinding>(
+  'CUSTOMER_DECISION_CONSUMER_CAPABILITY'
+);
+
+/**
+ * Internal synchronous issuer of one exact consumer-lock ceiling (G2), import-restricted to
+ * customer-decision/consumer-grant-access.ts (boundary test
+ * tests/customer-decision-consumer-capability-boundary.test.ts). The opaque grant exists only
+ * while `internalFn` runs; a structural lookalike, copy or counterfeit resolves nothing.
+ */
+export function withCustomerDecisionConsumerCapability<T>(
+  tenantSlug: string,
+  caseDir: string,
+  access: CustomerDecisionConsumerAccess,
+  internalFn: () => T
+): T {
+  const scope = customerDecisionConsumerCapability(tenantSlug, caseDir, access);
+  const prefix = `${caseDir}/`;
+  const binding: ConsumerBinding = Object.freeze({
+    tenantSlug,
+    caseDir,
+    sweep: sweepShaped(
+      [...scope.readExact, ...scope.writeExact].map((target) =>
+        target.startsWith(prefix) ? target.slice(prefix.length) : ''
+      )
+    ),
+  });
+  return grants.run(binding, scope, internalFn);
+}
+
+/**
+ * Pure mandatory guard: only this issuer's live grant resolves, and a sweep-kind grant only while
+ * the sweep runs (re-checked at every use, as when the capability was built).
+ */
 export function isCustomerDecisionConsumerCapability(
   scope: ResourceAccessScope | undefined
 ): boolean {
+  const grant = grants.resolve(scope);
+  if (!grant || (grant.binding.sweep && !inSweep())) return false;
+  return isConsumerCeiling(scope);
+}
+
+/** The structural ceiling check of one consumer-lock capability (any issuer). */
+function isConsumerCeiling(scope: ResourceAccessScope | undefined): boolean {
   if (
     !scope ||
     scope.organizationId ||
@@ -684,3 +745,46 @@ export function customerDecisionConsumerWriteProblem(
   }
   return null;
 }
+
+/**
+ * Does the live grant authorize this I/O? Only inside its exact ceiling and only where the former
+ * `customer_decision_consumer_store` policy grant reached: under the tenant decisions root, and the
+ * metadata of that root's ancestors (the role-policy metadata rule for a scoped role). Product
+ * schema reads and the Vitest sandbox case stay with the caller's own policy, as under the role.
+ */
+export function customerDecisionConsumerGrantAllows(
+  target: string,
+  operation: ResourceAccessOperation
+): boolean {
+  const scope = currentResourceAccessScope();
+  if (!scope || !isCustomerDecisionConsumerCapability(scope)) return false;
+  const root = customerDecisionsRootDir(scope.tenantSlug);
+  const under = target === root || target.startsWith(root + '/');
+  const ancestor = operation === 'metadata' && root.startsWith(target + '/');
+  if (!under && !ancestor) return false;
+  return decideResourceAccess(scope, target, operation).allowed;
+}
+
+/** Is a live consumer-lock grant current (its writes are content-checked)? */
+export function customerDecisionConsumerGrantActive(): boolean {
+  return isCustomerDecisionConsumerCapability(currentResourceAccessScope());
+}
+
+// G3: tier-guard asks these rules through the store grant registry, not by importing this module.
+// Every write (append counts as a write) inside a live consumer-lock grant is content-checked.
+registerStoreGrant({
+  id: 'customer-decision-consumer',
+  active: customerDecisionConsumerGrantActive,
+  authorizes: (target, operation) => customerDecisionConsumerGrantAllows(target, operation),
+  narrowing: ({ relativePath, operation, scope, content, readRepoFile }) =>
+    (operation === 'write' || operation === 'append') && customerDecisionConsumerGrantActive()
+      ? caseRecordWriteDenial(
+          'consumer',
+          customerDecisionConsumerWriteProblem,
+          relativePath,
+          content,
+          scope?.metadataExact?.[0],
+          readRepoFile
+        )
+      : null,
+});

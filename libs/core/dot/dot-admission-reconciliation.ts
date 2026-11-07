@@ -10,7 +10,7 @@ import {
   AUTONOMY_APPROVAL_CHANNEL,
   resolveInterventionLevel,
 } from '../governance/approval-decision-card.js';
-import { loadApprovalRequest } from '../governance/approval-store.js';
+import { loadApprovalRequest } from '../governance/approval-store-reader.js';
 import { approvalUsabilityRefusal } from '../governance/approval-linked-usability.js';
 import { isOperationsHalted } from '../governance/operations-halt.js';
 import {

@@ -1,0 +1,5 @@
+---
+category: Changed
+---
+
+- **Tenant customer records moved into the tenant home `knowledge/confidential/<tenant>/deals/`, and the top-level `customer/` directory is gone** — deals, deal documents (quotes, contracts, reviews), requirements captures, escalations and the deal log are tenant data, so they now live inside the tenant's confidentiality boundary. Every deal file read and write runs as the tenant-bound deal store role (`customer_decision_deal_note_writer`, `asDealStore` in `@agent/core/deal-store`), so no surface needs a confidential-tier grant to converse with a bound customer. Stored references (`quote_ref`, `contract_ref`) and outbound `--source deals/...` paths are relative to the tenant home. Removed with the directory: the knowledge index `customer` tier (DA-07; deal documents are indexed with the tenant's confidential subtree), `ResolvedTenant.customer_overlay_root`, and the `customer/` grants of roles that no longer need them. Migration required: run `pnpm migration --dry-run`, then `pnpm migration` (`0003-deal-home`, after `0001` and `0002`); an emptied `customer/` is removed.

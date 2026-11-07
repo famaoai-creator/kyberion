@@ -4,7 +4,7 @@ import { recordReasoningTierDeclaration } from '../reasoning/reasoning-tier-decl
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { clamp, readTextFile } from '../foundation/text.js';
-import { segmentWords } from '../locale-normalize.js';
+import { segmentWords } from '../foundation/locale-normalize.js';
 import {
   buildCompletionNextAction,
   type CompletionGoal,

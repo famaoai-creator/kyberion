@@ -131,7 +131,7 @@ describe('actual personal owner approval partition', () => {
     );
     expect(() =>
       authority.withExecutionContext('personal_approval_store', () => undefined)
-    ).toThrow('PERSONAL_APPROVAL_SCOPE_REQUIRED');
+    ).toThrow('ROLE_ASSUMPTION_DENIED');
   });
   it('lists the owner partition even when the process carries a tenant binding', () => {
     // A persisted `pnpm scope use <tenant>` binds the whole process; the personal partition is not tenant data and must stay
@@ -221,6 +221,32 @@ describe('actual personal owner approval partition', () => {
       vi.stubEnv('KYBERION_TENANT', '');
     }
   });
+  it('keeps an explicitly tenant-bound execution fenced from the owner partition', () => {
+    const owner = 'personal-owner-explicit-bound';
+    const channel = 'personal-explicit-bound-source';
+    const record = asOwner(owner, () =>
+      store.createApprovalRequest('mission_controller', {
+        channel,
+        requestedBy: owner,
+        threadTs: '1',
+        correlationId: 'personal-explicit-bound',
+        scope: { scope_kind: 'system', tier: 'personal', nhi_id: owner },
+        draft: { title: 'Owner fixture', summary: 'explicit binding fixture' },
+      })
+    );
+    expect(asOwner(owner, () => store.loadApprovalRequest(channel, record.id))?.id).toBe(record.id);
+    expect(() =>
+      asOwner(owner, () =>
+        authority.withExecutionContext(
+          'mission_controller',
+          () => store.listApprovalRequests({ storageChannels: [channel] }),
+          undefined,
+          'acme-explicit'
+        )
+      )
+    ).toThrow(/PERSONAL_APPROVAL_SCOPE_REQUIRED/u);
+  });
+
   it('fences legacy system personal visibility and cached seed scope after leaving its owner', () => {
     const owner = 'legacy-personal-owner';
     const scope = { scope_kind: 'system' as const, tier: 'personal' as const, nhi_id: owner };

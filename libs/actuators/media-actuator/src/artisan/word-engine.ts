@@ -1,6 +1,6 @@
 import { marked } from 'marked';
 import HTMLtoDOCX from 'html-to-docx';
-import { DocumentArtifact } from '@agent/core/shared-business-types';
+import { DocumentArtifact } from '@agent/core/contracts/shared-business-types';
 
 export interface WordMasterSpecs {
   master_name: string;
@@ -61,7 +61,10 @@ export async function generateWordArtifact(
 /**
  * Wrapper for the CLI.
  */
-export async function generateWordContent(markdown: string, specs: WordMasterSpecs): Promise<Buffer> {
+export async function generateWordContent(
+  markdown: string,
+  specs: WordMasterSpecs
+): Promise<Buffer> {
   const artifact: DocumentArtifact = {
     title: 'Document',
     body: markdown,

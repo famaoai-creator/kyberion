@@ -2,7 +2,7 @@
 import * as path from 'node:path';
 import { nowIso } from '@agent/core/foundation';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
-import { withLock } from '@agent/core/lock-utils';
+import { withLock } from '@agent/core/foundation/lock-utils';
 import { findMissionPath } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
 import {

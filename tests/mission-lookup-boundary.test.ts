@@ -72,7 +72,7 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'libs/core/delegation-store-partition.ts': 'scope-derivation',
   'libs/core/history-search-index.ts': 'scope-derivation',
   'libs/core/injection-signal.ts': 'scope-derivation',
-  'libs/core/mark-target-resolver.ts': 'scope-derivation',
+  'libs/shared-perception/src/mark-target-resolver.ts': 'scope-derivation',
   'libs/core/mesh/a2a-conversation-store.ts': 'scope-derivation',
   'libs/core/mission/mission-read-model.ts': 'scope-derivation',
   'libs/core/mission/mission-team-plan-composer.ts': 'scope-derivation',
@@ -101,7 +101,7 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'libs/core/organization/organization-operation-run-recording.ts': 'placement',
   'libs/core/path-resolver.ts': 'placement',
   'libs/core/pipeline/pipeline-run-journal.ts': 'placement',
-  'libs/core/video/ingest/video-brief.ts': 'placement',
+  'libs/shared-video/src/ingest/video-brief.ts': 'placement',
 };
 
 const rootDir = process.cwd();

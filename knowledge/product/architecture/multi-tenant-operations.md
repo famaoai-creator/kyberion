@@ -33,7 +33,7 @@ Three neighbouring concepts are **not** tenants, and confusing them puts records
 on the wrong side of this boundary
 ([stance-tenant-customer-model](./stance-tenant-customer-model.md)):
 
-- A **stance** (`customer/{slug}/` + `KYBERION_CUSTOMER`) is runtime configuration
+- A **stance** (`knowledge/personal/stances/{slug}/` + `KYBERION_STANCE`) is runtime configuration
   for which entity Kyberion is acting as. It selects which tenants are in view; it
   is not itself a boundary.
 - A **tenant's own end customers** live inside that tenant at
@@ -51,7 +51,7 @@ Runtime scope is resolved through `ScopeResolution`, which reports both the
 effective scope and each field's provenance. Operators can inspect or switch
 the persisted focus with `pnpm scope show --json`, `pnpm scope use ...`, and
 `pnpm scope clear`; `kyberion.scope.current` exposes the same read-only view to
-MCP callers. `KYBERION_CUSTOMER` remains a stance selector and must not be used
+MCP callers. `KYBERION_STANCE` remains a stance selector and must not be used
 as a tenant fallback. Knowledge writes use `pnpm knowledge place` so the
 containment chain is materialized in the path and frontmatter.
 

@@ -24,7 +24,7 @@ import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { resolveTaskCredential } from '../foundation/credential-binding.js';
 import type { TaskCredentialBinding } from '../foundation/credential-binding.js';
-import type { ScopeContext } from '../scope-context-validation.js';
+import type { ScopeContext } from '../foundation/scope-context-validation.js';
 export {
   withTaskCredentialBinding,
   type TaskCredentialBinding,

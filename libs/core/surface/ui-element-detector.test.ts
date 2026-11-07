@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { OcrRequest, OcrResult } from '../ocr-types.js';
+import type { OcrRequest, OcrResult } from '../contracts/ocr-types.js';
 
 // Real seam + real selection policy file; only the audit chain is mocked and
 // MISSION_ID stays unset so no pin is written (mirrors ocr-provider-selection.test.ts).

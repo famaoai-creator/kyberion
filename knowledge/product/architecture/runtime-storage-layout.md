@@ -606,6 +606,27 @@ only counts and artifact paths — never the joined all-tenant text.
 - Legacy `outputs/` and `work/` at the repo root are outside this layout; new
   deliverables go to scoped artifacts instead.
 
+## Store root registration and generation
+
+`store-catalog.json` is the authoring source for registered state, ledger and
+floor roots. Each registration declares its family, exported key, positive
+family-local `order`, and effective retention-policy reference. Preserve order
+when editing an existing registration: prefix classification and exported arrays
+depend on it. Registrations describe placement; they do not grant access.
+Fixed-tier stores such as the audit mirror retain `confidential/<tenant>` and
+declare the matching singleton `tiers` value. Generation never widens that
+binding into a generic `<tier>` location; missing or inconsistent fixed-tier
+declarations fail validation.
+
+Run `node --import ./scripts/ts-loader.mjs scripts/generate_store_roots.ts`
+after changing registrations. The generator validates the catalog and retention
+references before replacing only the marked region in
+`libs/core/foundation/runtime-state-roots.ts`. `storage-layout.ts` imports and
+reexports those static definitions. No catalog is loaded by the runtime foundation.
+The `store-roots` CI gate runs the generator with `--check`; the `store-catalog`
+gate independently checks registration coverage. `resolve-generated` includes
+the same generator, without a whole-file merge driver for the mixed source file.
+
 ## References
 
 - `libs/core/storage-layout.ts` — floor resolver and classifier

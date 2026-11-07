@@ -1,6 +1,6 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { buildNextAction, formatNextAction } from '@agent/core/next-action';
-import * as customerResolver from '@agent/core/customer-resolver';
+import * as customerResolver from '@agent/core/stance-resolver';
 import { inspectServiceAuth } from '@agent/core/service/service-validator';
 import { loadServiceConnectionAtPath } from '@agent/core/service/service-engine-helpers';
 import {

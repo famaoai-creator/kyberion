@@ -62,7 +62,7 @@ export * from './approval-presentation.js';
 import type { ApprovalStoreRole } from './approval-store-role.js';
 export type { ApprovalStoreRole } from './approval-store-role.js';
 import { nowIso } from '../foundation/time.js';
-import type { RejectionReasonCategory } from '../rejection-reason.js';
+import type { RejectionReasonCategory } from '../contracts/rejection-reason.js';
 import type { SurfaceAsyncChannel } from '../surface/channel-surface-types.js';
 import type { DecisionCard } from './decision-card.js';
 import type { ApprovalVetoWindow } from './approval-veto-window.js';

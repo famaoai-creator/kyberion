@@ -20,7 +20,7 @@
 import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import * as customerResolver from '@agent/core/customer-resolver';
+import * as customerResolver from '@agent/core/stance-resolver';
 import { listApprovalRequests } from '@agent/core/governance/approval-store';
 import { listCustomerChannelBindings } from '@agent/core/customer-channel-binding';
 import { listDeals } from '@agent/core/deal-store';
@@ -359,7 +359,7 @@ function missionMatchesTenant(
 }
 
 export function collectOfficeSnapshot(): OfficeSnapshot {
-  const customerSlug = customerResolver.activeCustomer();
+  const customerSlug = customerResolver.activeStance();
   const requestedTenantSlug = normalizeTenantSlug(getRegisteredEnvText('KYBERION_TENANT'));
   const rootDir = pathResolver.rootDir();
   let tenantRegistryReadable = true;
@@ -387,13 +387,15 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
   const allowUnscopedRecords = !requestedTenantSlug && tenantRegistryReadable;
   const tenantSlug = requestedTenantSlug || customerSlug;
   const tenantScopeReadable = visibleTenantSlugs === null || visibleTenantSlugs.size > 0;
-  const organizationProfile = tenantScopeReadable ? loadOrganizationProfile() : null;
+  const organizationProfile = tenantScopeReadable
+    ? loadOrganizationProfile(undefined, tenantSlug ?? null)
+    : null;
   const contextBinding =
     tenantScopeReadable && customerSlug
       ? loadOnboardingContextBinding(customerSlug, rootDir)
       : null;
   const organizationChartData = tenantScopeReadable
-    ? resolveOrganizationOrgChart(customerSlug || tenantSlug, rootDir)
+    ? resolveOrganizationOrgChart(tenantSlug, rootDir)
     : null;
   const organizationChart = summarizeOrganizationOrgChart(organizationChartData);
   const rooms: OfficeRoom[] = [];

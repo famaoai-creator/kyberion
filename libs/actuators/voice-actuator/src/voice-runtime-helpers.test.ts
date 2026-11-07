@@ -227,7 +227,7 @@ vi.mock('@agent/core/voice/voice-engine-registry', () => ({
   getVoiceEngineRegistry: mocks.getVoiceEngineRegistry,
   resolveVoiceEngineForPlatform: mocks.getVoiceEngineRecord,
 }));
-vi.mock('@agent/core/voice/voice-tts-config', () => ({
+vi.mock('@agent/shared-voice/voice-tts-config', () => ({
   getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
 }));
 vi.mock('@agent/core/async-utils', () => ({

@@ -9,7 +9,7 @@
  */
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import type { VocabularyKey } from '@agent/core/t';
 import { padT, renderPadHeader, renderPadPage } from '../lib/pad-ui.js';
 

@@ -3814,6 +3814,17 @@
       "group": "inspect"
     },
     {
+      "id": "script.scope.inspect",
+      "module": "scripts/scope.ts",
+      "args": ["inspect"],
+      "command": "scope inspect",
+      "noun": "scope",
+      "verb": "inspect",
+      "audience": "operator",
+      "description": "cli_cmd_scope_inspect",
+      "group": "inspect"
+    },
+    {
       "id": "script.scratch.promote",
       "script": "scratch:promote",
       "command": "scratch promote",
@@ -4005,7 +4016,7 @@
       "noun": "stance",
       "verb": "create",
       "audience": "operator",
-      "description": "cli_cmd_script_customer_create",
+      "description": "cli_cmd_script_stance_create",
       "group": "operate",
       "native_help": true
     },
@@ -4016,7 +4027,7 @@
       "noun": "stance",
       "verb": "list",
       "audience": "operator",
-      "description": "cli_cmd_script_customer_list",
+      "description": "cli_cmd_script_stance_list",
       "group": "inspect"
     },
     {
@@ -4026,7 +4037,7 @@
       "noun": "stance",
       "verb": "migrate-from-personal",
       "audience": "operator",
-      "description": "cli_cmd_script_customer_migrate_from_personal",
+      "description": "cli_cmd_script_stance_migrate_from_personal",
       "group": "operate",
       "native_help": true
     },
@@ -4037,7 +4048,7 @@
       "noun": "stance",
       "verb": "switch",
       "audience": "operator",
-      "description": "cli_cmd_script_customer_switch",
+      "description": "cli_cmd_script_stance_switch",
       "group": "operate",
       "native_help": true
     },

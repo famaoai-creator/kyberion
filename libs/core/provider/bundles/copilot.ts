@@ -1,4 +1,4 @@
-import { cliProviderEnv, registerCliProviderBundle } from '../../cli-provider-bundle.js';
+import { cliProviderEnv, registerCliProviderBundle } from '../cli-provider-bundle.js';
 import { buildCopilotAcpBackendFromEnv } from '../copilot-acp-reasoning-backend.js';
 
 registerCliProviderBundle('copilot', (options) => {

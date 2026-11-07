@@ -7,7 +7,7 @@ import {
   markInboxEntry,
 } from '@agent/core/deliverable-inbox';
 import { enqueueReviewReentryRequest } from '@agent/core/review-reentry';
-import { type RejectionReasonCategory } from '@agent/core/rejection-reason';
+import { type RejectionReasonCategory } from '@agent/core/contracts/rejection-reason';
 import { guardOpsRequest, requireOpsAccess } from '../../../../lib/ops/ops-request-guard';
 import {
   resolveOpsViewerForRequest,

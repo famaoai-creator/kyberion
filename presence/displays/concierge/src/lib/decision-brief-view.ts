@@ -1,4 +1,4 @@
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import type { DecisionBrief, DisplayText } from '@agent/core/surface/decision-brief';
 import { describeActor, humanizeSummary } from '@agent/core/surface/display-humanize';
 import { conciergeText, type ConciergeLocale, type ConciergeMessageKey } from './i18n';

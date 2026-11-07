@@ -15,7 +15,7 @@
  *      `A` -> `Ȧ`, ...). This makes pseudo-localized text visually distinct
  *      at a glance without needing a special font.
  *   2. `{name}` and `{count, plural, one {...} other {...}}` placeholders —
- *      the ICU MessageFormat subset `libs/core/message-format.ts` supports —
+ *      the ICU MessageFormat subset `libs/core/foundation/message-format.ts` supports —
  *      are preserved byte-for-byte. Mangling a placeholder would corrupt the
  *      rendered message, and `scripts/check_catalog_integrity.ts`'s
  *      placeholder-consistency check (via `extractPlaceholderNames`) exists
@@ -95,7 +95,7 @@ type TemplateSegment = { type: 'text' | 'placeholder'; value: string };
  * top-level `{` — this covers both simple `{name}` interpolation and
  * `{count, plural, one {...} other {...}}` blocks (nested braces stay inside
  * the same segment), matching the two constructs
- * `libs/core/message-format.ts` supports. Segmenting this way — rather than
+ * `libs/core/foundation/message-format.ts` supports. Segmenting this way — rather than
  * only recognizing `{name}` — means a plural block's structure (including
  * its `#` shorthand and any nested `{name}`) is preserved exactly, satisfying
  * the "preserve placeholders exactly" requirement without needing to parse

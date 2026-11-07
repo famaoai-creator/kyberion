@@ -36,7 +36,7 @@
  * each started with `tsx scripts/<pad>/server.ts [port]` on its default port.
  */
 
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import { chromium, type Browser, type BrowserContext } from 'playwright';
 import { safeWriteFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';

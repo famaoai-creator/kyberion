@@ -1,11 +1,38 @@
-import type { ResourceAccessScope } from './resource-access-scope.js';
+/**
+ * Tenant pipeline run journal store grant (G2 of the store-catalog guard design).
+ *
+ * The exact ceiling of one confidential library run journal
+ * (`pipelineJournalCapability`) is issued only as an opaque, synchronous grant
+ * of this module's private issuer (`withPipelineJournalCapability`,
+ * import-restricted to pipeline/pipeline-run-journal.ts by
+ * tests/pipeline-journal-capability-boundary.test.ts). A structural lookalike,
+ * a copy, a grant of another issuer, a captured continuation or a grant of a
+ * second module instance resolves nothing (`isPipelineJournalCapability`).
+ *
+ * G2: the live grant is itself the authority for the I/O it covers
+ * (`pipelineJournalGrantAllows`, asked by tier-guard's store-grant table);
+ * there is no store role.
+ */
+import {
+  createSynchronousResourceGrantIssuer,
+  currentResourceAccessScope,
+  decideResourceAccess,
+  type ResourceAccessOperation,
+  type ResourceAccessScope,
+} from './resource-access-scope.js';
+import { registerStoreGrant } from './store-grant-registry.js';
 import * as path from 'node:path';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from './runtime-state-roots.js';
 import { getProcessEnv } from './process-env.js';
 import { isValidTenantSlug } from './scope.js';
 
-/** Narrow store role that writes one tenant's confidential library pipeline run journal. */
-export const PIPELINE_JOURNAL_STORE_ROLE = 'pipeline_journal_store';
+/**
+ * Issuance right of the pipeline journal grant (G2). The former shared core role of this name is
+ * gone; the name stays only in role-assumption-policy `shared_core_roles`, which decides which
+ * processes may issue the grant (authority.ts assertStoreGrantIssuanceAllowed). It is not an
+ * assumable authority role.
+ */
+export const PIPELINE_JOURNAL_GRANT_ISSUANCE_RIGHT = 'pipeline_journal_store';
 
 const ROOT = PARTITIONED_RUNTIME_STATE_ROOTS.pipeline_library_runs;
 const FILE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.jsonl$/u;
@@ -49,9 +76,47 @@ export function pipelineJournalCapability(
   };
 }
 
+interface PipelineJournalBinding {
+  readonly tenantSlug: string;
+  readonly journalFile: string;
+  readonly write: boolean;
+}
+const grants = createSynchronousResourceGrantIssuer<PipelineJournalBinding>(
+  'PIPELINE_JOURNAL_CAPABILITY'
+);
+
+/**
+ * Internal synchronous issuer of the exact journal ceiling, import-restricted to
+ * pipeline/pipeline-run-journal.ts. The opaque grant exists only while `internalFn` runs.
+ */
+export function withPipelineJournalCapability<T>(
+  tenantSlug: string,
+  journalFile: string,
+  write: boolean,
+  internalFn: () => T
+): T {
+  const binding: PipelineJournalBinding = Object.freeze({
+    tenantSlug,
+    journalFile,
+    write: write === true,
+  });
+  return grants.run(
+    binding,
+    pipelineJournalCapability(tenantSlug, journalFile, binding.write),
+    internalFn
+  );
+}
+
+/** Pure mandatory guard: only this issuer's live grant with its exact ceiling resolves. */
 export function isPipelineJournalCapability(scope: ResourceAccessScope | undefined): boolean {
+  const grant = grants.resolve(scope);
+  if (!grant || !scope) return false;
   if (
-    !scope ||
+    scope.tenantSlug !== grant.binding.tenantSlug ||
+    scope.readExact[0] !== grant.binding.journalFile ||
+    scope.writeExact.length > 0 !== grant.binding.write ||
+    (scope.appendExact?.length ?? 0) !== 0 ||
+    (scope.namePrefixExact?.length ?? 0) !== 0 ||
     scope.organizationId ||
     scope.projectId ||
     scope.allowProductKnowledgeRead !== true ||
@@ -73,3 +138,24 @@ export function isPipelineJournalCapability(scope: ResourceAccessScope | undefin
     return false;
   }
 }
+
+/**
+ * Does the live grant authorize this I/O? Only inside its exact ceiling and only under the store
+ * root the former `pipeline_journal_store` policy grant covered. Product schema reads and the
+ * Vitest sandbox partition stay with the caller's own policy, as they did under the role.
+ */
+export function pipelineJournalGrantAllows(
+  target: string,
+  operation: ResourceAccessOperation
+): boolean {
+  const scope = currentResourceAccessScope();
+  if (!isPipelineJournalCapability(scope)) return false;
+  if (target !== ROOT && !target.startsWith(ROOT + '/')) return false;
+  return decideResourceAccess(scope!, target, operation).allowed;
+}
+
+// G3: tier-guard asks this rule through the store grant registry, not by importing this module.
+registerStoreGrant({
+  id: 'pipeline-journal',
+  authorizes: (target, operation) => pipelineJournalGrantAllows(target, operation),
+});

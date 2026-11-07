@@ -2,7 +2,7 @@ import {
   assertScopeContext,
   type ScopeContext,
   type ScopeContextInput,
-} from './scope-context-validation.js';
+} from './foundation/scope-context-validation.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import type { TierLevel } from './types.js';
 

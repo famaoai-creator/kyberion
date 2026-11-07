@@ -1,5 +1,5 @@
 import { recordGovernanceAction } from '@agent/core/governance/governance-action-recorder';
-import { TraceContext, finalizeAndPersist, persistTrace } from '@agent/core/trace';
+import { TraceContext, finalizeAndPersist, persistTrace } from '@agent/core/analysis/trace';
 import { logger } from '@agent/core/core';
 import {
   safeExecResult,
@@ -10,7 +10,7 @@ import {
   type SafeShell,
 } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
-import { resolveVars } from '@agent/core/logic-utils';
+import { resolveVars } from '@agent/core/pipeline/logic-utils';
 import { capabilityEntry, pathResolver } from '@agent/core/path-resolver';
 import type { ReasoningCallOptions } from '@agent/core/reasoning/reasoning-backend';
 import { buildWorkingPrinciplesLines } from '@agent/core/working-principles';
@@ -18,7 +18,7 @@ import {
   determineActuatorStepType,
   resolveActuatorOperation,
 } from '@agent/core/actuator/actuator-op-registry';
-import { checkActuatorCapabilities } from '@agent/core/actuator-capability';
+import { checkActuatorCapabilities } from '@agent/core/actuator/actuator-capability';
 import { validateOpInput } from '@agent/core/pipeline/op-input-contracts';
 import { getRegisteredEnv } from '@agent/core/foundation/env';
 import { nowIso } from '@agent/core/foundation/time';

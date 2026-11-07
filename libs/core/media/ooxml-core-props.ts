@@ -4,7 +4,7 @@
  * surface the same way PDF Info / XMP titles do.
  */
 import AdmZip from 'adm-zip';
-import { decodeEntities } from '../text-escaping.js';
+import { decodeEntities } from '../foundation/text-escaping.js';
 
 /** Writer placeholders — never treat these as a real document title. */
 export const OOXML_PLACEHOLDER_TITLES = new Set([

@@ -2,7 +2,7 @@ import { serverChildEnv } from '../../../../lib/server-child-env';
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'node:path';
 import { resolveRuntimeModelId } from '@agent/core/reasoning/reasoning-model-routing';
-import { toWireError } from '@agent/core/wire-error';
+import { toWireError } from '@agent/core/contracts/wire-error';
 import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver as projectPathResolver } from '@agent/core/path-resolver';
 import { guardOpsRequest, requireOpsAccess } from '../../../../lib/ops/ops-request-guard';
@@ -24,7 +24,7 @@ import {
   uxTextOr,
   type SupportedLocale,
 } from '../../../../lib/ops/ux-vocabulary';
-import { normalizeLocale } from '@agent/core/locale-normalize';
+import { normalizeLocale } from '@agent/core/foundation/locale-normalize';
 import {
   collectActiveMissions,
   runCommandQuickAction,

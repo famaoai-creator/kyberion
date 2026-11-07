@@ -25,7 +25,7 @@ import { missionEvidenceDir, rootResolve } from './path-resolver.js';
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { nowIso } from './foundation/time.js';
 import { readTextFile } from './foundation/text.js';
-import { wavHeader } from './pcm-wav.js';
+import { wavHeader } from './foundation/pcm-wav.js';
 import { getSpeechToTextBridge } from './voice/speech-to-text-bridge.js';
 import {
   assertSafeRepositoryPath,

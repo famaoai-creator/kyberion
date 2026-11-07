@@ -41,7 +41,8 @@ describe('scanFileForLocaleTokens', () => {
     it('flags hardcoded BCP-47 literals outside the locale modules', () => {
       expect(scan("const tag = 'ja-JP'; const e = `en-US`;").counts.locale_literal).toBe(2);
       expect(
-        scan("export const x = 'ja-JP';", 'libs/core/locale-normalize.ts').counts.locale_literal
+        scan("export const x = 'ja-JP';", 'libs/core/foundation/locale-normalize.ts').counts
+          .locale_literal
       ).toBe(0);
       expect(scan("if (locale === 'ja') {}", 'libs/core/locale.ts').counts.locale_compare).toBe(0);
     });
@@ -79,6 +80,15 @@ describe('scanFileForLocaleTokens', () => {
       const code = "const a = '#1E3A5F'; const b = 'rgba(0,0,0,0.5)'; const c = `fill:#fff`;";
       expect(scan(code, engine).counts.engine_hex).toBe(3);
       expect(scan(code, 'libs/core/other.ts').counts.engine_hex).toBe(0);
+    });
+
+    it('keeps scanning the engines that moved into the shared media/video packages', () => {
+      const code = "const a = '#1E3A5F';";
+      expect(scan(code, 'libs/shared-media/src/native-pptx-engine/x.ts').counts.engine_hex).toBe(1);
+      expect(
+        scan(code, 'libs/shared-video/src/video-composition-compiler.ts').counts.engine_hex
+      ).toBe(1);
+      expect(scan(code, 'libs/shared-voice/src/x.ts').counts.engine_hex).toBe(0);
     });
 
     it('ignores colour-looking text in comments and non-colour strings', () => {

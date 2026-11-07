@@ -26,7 +26,7 @@ import type {
   SurfaceConversationMessageInput,
   SurfaceNotificationRecord,
 } from './channel-surface-types.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import type { ExecutionFeedbackInput } from '../execution-feedback.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from '../event-scope.js';
 import {

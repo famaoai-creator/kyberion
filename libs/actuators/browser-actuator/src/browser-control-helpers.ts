@@ -1,4 +1,4 @@
-import { evaluateCondition } from '@agent/core/logic-utils';
+import { evaluateCondition } from '@agent/core/pipeline/logic-utils';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import { isRecord } from '@agent/core/foundation';
@@ -273,7 +273,7 @@ async function executeControl(
       });
     }
     case 'ref': {
-      const { resolveRef } = await import('@agent/core/pipeline-engine');
+      const { resolveRef } = await import('@agent/core/pipeline/pipeline-engine');
       const resolvedPath = resolve(params.path);
       if (typeof resolvedPath !== 'string' || !resolvedPath.trim()) {
         throw new Error('Browser-Actuator ref control requires a non-empty path');

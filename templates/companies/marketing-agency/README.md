@@ -15,7 +15,7 @@ CEO のみ `held_by: human`(最終決裁は人間)。他ポジションはエー
 
 ```bash
 pnpm onboarding company bootstrap --vertical marketing-agency --slug <会社スラッグ> --name "<会社名>"
-export KYBERION_CUSTOMER=<会社スラッグ>
+export KYBERION_STANCE=<会社スラッグ>
 node dist/scripts/mission_controller.js organization-profile --summary
 ```
 

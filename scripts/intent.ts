@@ -6,7 +6,7 @@ import {
   stripSharedScriptFlags,
 } from './lib/harness.js';
 import { auditChain } from '@agent/core/governance/audit-chain';
-import * as customerResolver from '@agent/core/customer-resolver';
+import * as customerResolver from '@agent/core/stance-resolver';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { currentScope } from '@agent/core/scope-context';
 import { loadIntentContractMemorySnapshot } from '@agent/core/intent/intent-contract-learning';
@@ -24,7 +24,7 @@ import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
 import type { AuditEntry } from '@agent/core/governance/audit-chain';
 import type { IntentContractMemoryEntry } from '@agent/core/intent/intent-contract-learning';
 import type { IntentDelta, IntentSnapshot } from '@agent/core/intent/intent-delta';
-import type { Trace } from '@agent/core/trace';
+import type { Trace } from '@agent/core/analysis/trace';
 import {
   getActiveMissionSearchDirs,
   listMissionsInSearchDirs,
@@ -350,7 +350,7 @@ function loadTraceRecords(traceDir: string): IntentTraceTraceHit[] {
 
 function resolveTraceSearchDirs(): string[] {
   const dirs = [
-    customerResolver.customerRoot('logs/traces') || null,
+    customerResolver.stanceLogDir('traces') || null,
     pathResolver.shared('logs/traces'),
   ].filter((dir): dir is string => Boolean(dir));
   return Array.from(new Set(dirs));

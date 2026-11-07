@@ -38,7 +38,7 @@ beforeAll(async () => {
     'KYBERION_TENANT',
     'KYBERION_PROJECT_ID',
     'KYBERION_TASK_ID',
-    'KYBERION_CUSTOMER',
+    'KYBERION_STANCE',
   ])
     vi.stubEnv(key, '');
   vi.stubEnv('KYBERION_TIER', 'public');

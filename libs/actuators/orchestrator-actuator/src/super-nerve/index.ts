@@ -2,13 +2,13 @@ import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
 import { classifyError } from '@agent/core/error-classifier';
 import { recordGovernanceAction } from '@agent/core/governance/governance-action-recorder';
 import { determineActuatorStepType } from '@agent/core/actuator/actuator-op-registry';
-import { evaluateCondition, resolveVars } from '@agent/core/logic-utils';
+import { evaluateCondition, resolveVars } from '@agent/core/pipeline/logic-utils';
 import { skipAdfStep } from '@agent/core/pipeline/adf-engine';
 import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
+} from '@agent/core/contracts/execution-bounds';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertProjectTrustApproval } from '@agent/core/project/project-trust';

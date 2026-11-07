@@ -4,7 +4,7 @@ import {
   buildUiMessageBundle,
   type SupportedLocale,
   type UiMessageBundle,
-} from '../locale-normalize.js';
+} from '../foundation/locale-normalize.js';
 
 /**
  * I18N-02: shared catalog loader + key resolution for the namespaced

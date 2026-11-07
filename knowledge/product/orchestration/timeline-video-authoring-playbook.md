@@ -62,7 +62,7 @@ Parent: [`narrated-video-production-playbook.md`](./narrated-video-production-pl
 ## Authoring a `timeline-html` scene
 
 Each scene supplies `html` (body markup) and optional `css`. The runtime
-(`libs/core/video/video-timeline-runtime.ts`) makes the scene seekable for
+(`libs/shared-video/src/video-timeline-runtime.ts`) makes the scene seekable for
 HyperFrames, and provides these cues. Times are seconds from scene start, plus
 `f ×` that scene's narration length:
 

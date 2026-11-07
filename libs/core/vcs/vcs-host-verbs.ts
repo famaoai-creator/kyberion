@@ -8,7 +8,7 @@
 
 import { runExternalOperation } from '../governance/external-operation.js';
 import { isDelegableExternalOperation } from '../governance/external-operation-target.js';
-import { computeApprovalPayloadHash } from '../governance/approval-store.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
 import { safeExecResult, safeReadFile } from '../secure-io.js';
 import { assertNotFlagLike } from './git-arguments.js';
 import {

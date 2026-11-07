@@ -74,7 +74,7 @@ describe('virtual office surface', () => {
       }
     }
     process.env.KYBERION_ROOT = tmpRoot;
-    process.env.KYBERION_CUSTOMER = 'acme';
+    process.env.KYBERION_STANCE = 'acme';
 
     // one active mission with mixed task states
     const missionDir = path.join(tmpRoot, 'active', 'missions', 'MSN-OFFICE-1');
@@ -175,72 +175,77 @@ describe('virtual office surface', () => {
         history: [],
       })
     );
-    const customerRoot = path.join(tmpRoot, 'customer', 'acme');
-    fs.mkdirSync(customerRoot, { recursive: true });
-    fs.writeFileSync(
-      path.join(customerRoot, 'organization-profile.json'),
-      JSON.stringify(
-        {
-          $schema: 'https://kyberion.local/schemas/organization-profile.schema.json',
-          version: '1.0.0',
-          organization_id: 'acme',
-          name: 'Acme Org',
-          mission_defaults: {
-            default_mission_class: 'operations_and_release',
-            default_team_template: 'default',
-            default_agent_profile: 'implementation-architect',
-          },
-          team_defaults: {
-            default_team_template: 'default',
-            team_template_catalog_id: 'default',
-            default_lifecycle_template: 'default',
-            max_parallel_missions: 4,
-          },
-          llm: {
-            default_profile: 'standard',
-          },
-        },
-        null,
-        2
-      )
-    );
-    fs.writeFileSync(
-      path.join(customerRoot, 'org-chart.json'),
-      JSON.stringify(
-        {
-          version: '1.0.0',
-          organization_id: 'acme',
-          name: 'Acme Org Chart',
-          source_kind: 'customer',
-          source_path: 'customer/acme/org-chart.json',
-          domains: [
-            {
-              domain_id: 'delivery',
-              name: 'Delivery',
-              role_ids: ['planner', 'implementer'],
+    // Company files live in a tenant home: the unscoped view reads the stance's
+    // own company (acme), the tenant-scoped view the bound tenant's (acme-prod).
+    for (const home of ['acme', 'acme-prod'].map((slug) =>
+      path.join(tmpRoot, 'knowledge', 'confidential', slug)
+    )) {
+      fs.mkdirSync(home, { recursive: true });
+      fs.writeFileSync(
+        path.join(home, 'organization-profile.json'),
+        JSON.stringify(
+          {
+            $schema: 'https://kyberion.local/schemas/organization-profile.schema.json',
+            version: '1.0.0',
+            organization_id: 'acme',
+            name: 'Acme Org',
+            mission_defaults: {
+              default_mission_class: 'operations_and_release',
+              default_team_template: 'default',
+              default_agent_profile: 'implementation-architect',
             },
-          ],
-          positions: [
-            {
-              role_id: 'planner',
-              reports_to: null,
-              held_by: 'implementation-architect',
-              responsibility_scope: 'mission intake and sequencing',
-              authority_role_ref: 'ecosystem_architect',
+            team_defaults: {
+              default_team_template: 'default',
+              team_template_catalog_id: 'default',
+              default_lifecycle_template: 'default',
+              max_parallel_missions: 4,
             },
-            {
-              role_id: 'implementer',
-              reports_to: 'planner',
-              held_by: 'implementation-architect',
-              responsibility_scope: 'build execution',
-              authority_role_ref: 'software_developer',
+            llm: {
+              default_profile: 'standard',
             },
-          ],
-        },
-        null,
-        2
-      )
-    );
+          },
+          null,
+          2
+        )
+      );
+      fs.writeFileSync(
+        path.join(home, 'org-chart.json'),
+        JSON.stringify(
+          {
+            version: '1.0.0',
+            organization_id: 'acme',
+            name: 'Acme Org Chart',
+            source_kind: 'confidential',
+            source_path: `${path.relative(tmpRoot, home)}/org-chart.json`,
+            domains: [
+              {
+                domain_id: 'delivery',
+                name: 'Delivery',
+                role_ids: ['planner', 'implementer'],
+              },
+            ],
+            positions: [
+              {
+                role_id: 'planner',
+                reports_to: null,
+                held_by: 'implementation-architect',
+                responsibility_scope: 'mission intake and sequencing',
+                authority_role_ref: 'ecosystem_architect',
+              },
+              {
+                role_id: 'implementer',
+                reports_to: 'planner',
+                held_by: 'implementation-architect',
+                responsibility_scope: 'build execution',
+                authority_role_ref: 'software_developer',
+              },
+            ],
+          },
+          null,
+          2
+        )
+      );
+    }
     const tenantProfilesRoot = path.join(tmpRoot, 'knowledge', 'personal', 'tenants');
     fs.mkdirSync(tenantProfilesRoot, { recursive: true });
     fs.writeFileSync(
@@ -263,8 +268,8 @@ describe('virtual office surface', () => {
         assigned_role: 'operator',
       })
     );
-    const betaRoot = path.join(tmpRoot, 'customer', 'beta');
-    const acmeTenantRoot = path.join(tmpRoot, 'customer', 'acme-prod');
+    const betaRoot = path.join(tmpRoot, 'knowledge', 'confidential', 'beta');
+    const acmeTenantRoot = path.join(tmpRoot, 'knowledge', 'confidential', 'acme-prod');
     fs.mkdirSync(path.join(acmeTenantRoot, 'deals'), { recursive: true });
     fs.writeFileSync(
       path.join(acmeTenantRoot, 'deals', 'DEAL-ACME-PROD.json'),
@@ -562,7 +567,7 @@ describe('virtual office surface', () => {
     core?.clearWorkCoordinationStore();
     core?.setWorkCoordinationNamespace(null);
     delete process.env.KYBERION_ROOT;
-    delete process.env.KYBERION_CUSTOMER;
+    delete process.env.KYBERION_STANCE;
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 

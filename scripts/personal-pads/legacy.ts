@@ -5,7 +5,7 @@
  * migration window, but payload normalization and the handoff shape are owned
  * here so a new unified adapter cannot silently diverge from an old CLI.
  */
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import type { PadRecord } from './storage.js';
 import { getPadAdapter, type AdapterCaptureInput, type AdapterCaptureResult } from './adapters.js';
 import type { PadId } from './registry.js';

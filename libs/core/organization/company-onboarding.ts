@@ -2,6 +2,8 @@
  * AI company onboarding: materialize a vertical, bind human accountability,
  * create the initial AI workforce, and leave one reviewed first-work plan.
  */
+import { isStanceEntry, stanceDirForSlug } from '../stance-resolver.js';
+import { tenantHomeDir } from './tenant-home.js';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { writeJson } from '../foundation/json.js';
@@ -53,7 +55,10 @@ export interface AiCompanyOnboardingInput {
 
 export interface AiCompanyOnboardingResult {
   status: 'planned' | 'ready';
-  customerDir: string;
+  /** knowledge/confidential/{tenant}/ — the company files (organization profile, org chart, …). */
+  tenantDir: string;
+  /** knowledge/personal/stances/{slug}/ — the company stance and its onboarding state. */
+  stanceDir: string;
   readinessPath: string;
   firstWorkPath: string;
   contextBindingPath?: string;
@@ -191,28 +196,31 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
   };
   validateInput(normalized);
   const rootDir = normalized.rootDir || pathResolver.rootDir();
-  const customerDir = assertSafeRepositoryPath(path.join(rootDir, 'customer', normalized.slug), {
+  // The stance (identity, onboarding state) lives in the personal space.
+  const stanceDir = assertSafeRepositoryPath(stanceDirForSlug(normalized.slug, rootDir), {
     allowMissingLeaf: true,
     rootDir,
   });
+  // Company files live in the tenant home (the bound tenant when given, else the slug).
+  const tenantDir = tenantHomeDir(normalized.tenantSlug || normalized.slug, rootDir);
   const readinessPath = assertSafeRepositoryPath(
-    path.join(customerDir, 'onboarding', 'ai-company-readiness.json'),
+    path.join(stanceDir, 'onboarding', 'ai-company-readiness.json'),
     { allowMissingLeaf: true, rootDir }
   );
   const firstWorkPath = assertSafeRepositoryPath(
-    path.join(customerDir, 'onboarding', 'first-work-plan.md'),
+    path.join(stanceDir, 'onboarding', 'first-work-plan.md'),
     { allowMissingLeaf: true, rootDir }
   );
   const tenantSlug = normalized.tenantSlug || '<registered-tenant>';
   const organizationId = normalized.tenantSlug ? normalized.slug : '<organization>';
   const nextCommands = [
-    `pnpm stance:switch ${normalized.slug} && source active/shared/runtime/customer.env`,
+    `pnpm stance:switch ${normalized.slug} && source active/shared/runtime/stance.env`,
     'export KYBERION_TENANT_SCOPE_REQUIRED=true',
     // pnpm scripts do not load .env.local: without these exports the governed
     // commands below fail with ROLE_VIOLATION / tenant.scope_missing.
     'export KYBERION_PERSONA=sovereign',
     `export KYBERION_TENANT=${tenantSlug}`,
-    // The stance has its own profile root (customer/<slug>/): missions refuse
+    // The stance has its own profile root (knowledge/personal/stances/<slug>/): missions refuse
     // to start until my-identity.json / my-vision.md / agent-identity.json exist there.
     'pnpm onboarding apply --identity <reviewed-identity-json>',
     'pnpm kyberion setup report --persona first-time-user',
@@ -239,7 +247,8 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
   if (normalized.dryRun) {
     return {
       status: 'planned',
-      customerDir,
+      tenantDir,
+      stanceDir,
       readinessPath,
       firstWorkPath,
       writtenFiles: [],
@@ -247,17 +256,17 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
     };
   }
 
-  const profilePath = assertSafeRepositoryPath(
-    path.join(customerDir, 'organization-profile.json'),
-    { allowMissingLeaf: true, rootDir }
-  );
+  const profilePath = assertSafeRepositoryPath(path.join(tenantDir, 'organization-profile.json'), {
+    allowMissingLeaf: true,
+    rootDir,
+  });
   const templateDir = assertSafeRepositoryPath(
     path.join(pathResolver.rootDir(), 'templates', 'companies', normalized.vertical),
     { rootDir: pathResolver.rootDir() }
   );
   const templatePaths = safeExistsSync(templateDir)
     ? safeReaddir(templateDir).map((entry) =>
-        assertSafeRepositoryPath(path.join(customerDir, entry), {
+        assertSafeRepositoryPath(path.join(isStanceEntry(entry) ? stanceDir : tenantDir, entry), {
           allowMissingLeaf: true,
           rootDir,
         })
@@ -271,6 +280,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
     const bootstrapped = bootstrapCompany({
       vertical: normalized.vertical,
       slug: normalized.slug,
+      tenantSlug: normalized.tenantSlug,
       companyName: normalized.companyName,
       rootDir,
       force: normalized.force,
@@ -353,11 +363,11 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
     // authority `pnpm tenant` assumes, so no operator persona is needed.
     if (tenantSlugToBind)
       withExecutionContext('sovereign_concierge', () => {
-        const previousCustomer = getRegisteredEnvText('KYBERION_CUSTOMER');
-        setRegisteredEnv('KYBERION_CUSTOMER', normalized.slug);
+        const previousCustomer = getRegisteredEnvText('KYBERION_STANCE');
+        setRegisteredEnv('KYBERION_STANCE', normalized.slug);
         const tenantPath = tenantProfilePath(normalized.tenantSlug, {
           rootDir,
-          env: { ...process.env, KYBERION_CUSTOMER: normalized.slug },
+          env: { ...process.env, KYBERION_STANCE: normalized.slug },
         });
         const safeTenantPath = assertSafeRepositoryPath(tenantPath, {
           allowMissingLeaf: true,
@@ -369,7 +379,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
         try {
           const existingTenant = readTenantProfile(normalized.tenantSlug, {
             rootDir,
-            env: { ...process.env, KYBERION_CUSTOMER: normalized.slug },
+            env: { ...process.env, KYBERION_STANCE: normalized.slug },
           });
           if (existingTenant && existingTenant.display_name !== normalized.companyName) {
             throw new Error(
@@ -388,7 +398,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
                 isolation_policy: { ...DEFAULT_TENANT_ISOLATION_POLICY },
                 metadata: { onboarding_source: 'onboard company', purpose: normalized.firstWork },
               },
-              { rootDir, env: { ...process.env, KYBERION_CUSTOMER: normalized.slug } }
+              { rootDir, env: { ...process.env, KYBERION_STANCE: normalized.slug } }
             );
           const binding = applyOnboardingContextBinding({
             customerSlug: normalized.slug,
@@ -404,7 +414,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
             entry.endsWith('organization-context.json')
           );
           seededDomains = seedOrgChartDomains({
-            orgChartPath: path.join(customerDir, 'org-chart.json'),
+            orgChartPath: path.join(tenantDir, 'org-chart.json'),
             organizationId: normalized.slug,
             tenantSlug: tenant.tenant_slug,
             rootDir,
@@ -419,7 +429,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
           }
           throw error;
         } finally {
-          setRegisteredEnv('KYBERION_CUSTOMER', previousCustomer);
+          setRegisteredEnv('KYBERION_STANCE', previousCustomer);
         }
       });
     // Issue the declared AI worker's NHI so tenant activation's
@@ -438,7 +448,8 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
     );
     return {
       status: 'ready',
-      customerDir,
+      tenantDir,
+      stanceDir,
       readinessPath,
       firstWorkPath,
       ...(contextBindingPath ? { contextBindingPath } : {}),

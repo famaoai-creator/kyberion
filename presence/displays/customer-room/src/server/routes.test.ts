@@ -7,7 +7,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { resolveRoomTenant } from '../../server.js';
 import type { FacadeOutcome, FacadeSpawner, FacadeVerb } from './facade.js';
-import { parseTrustedProxies } from '@agent/core/rate-limit';
+import { parseTrustedProxies } from '@agent/core/foundation/rate-limit';
 import { CONTENT_SECURITY_POLICY, MAX_BODY_BYTES, registerCustomerRoomRoutes } from './routes.js';
 
 const TOKEN = 'inv-0123456789abcdef.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbCdE';

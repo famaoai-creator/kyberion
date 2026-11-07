@@ -7,9 +7,13 @@ import { resolveFinancialModel, type FinancialModel } from './financial-model.js
 import { resolveOkrTracker, type OkrTracker } from './okr-tracker.js';
 import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+import { safeExistsSync, safeLstat } from './secure-io.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import * as customerResolver from './customer-resolver.js';
+import {
+  activeTenantSlug,
+  tenantHomePath,
+  TENANT_COMPANY_FILE,
+} from './organization/tenant-home.js';
 import { loadOrganizationProfileAtPath } from './organization/organization-profile.js';
 
 export interface CompanyComponentRef<T = unknown> {
@@ -23,8 +27,8 @@ export interface CompanyAggregate {
   tenant_slug: string;
   name: string;
   sovereign: string | null;
-  customer_ref: CompanyComponentRef<Record<string, unknown>>;
-  identity_ref: CompanyComponentRef<Record<string, unknown>>;
+  /** The company descriptor, `knowledge/confidential/{tenant}/company.json`. */
+  company_ref: CompanyComponentRef<Record<string, unknown>>;
   organization_profile_ref: CompanyComponentRef<OrganizationProfile>;
   vision_ref: ResolvedVision;
   org_chart_ref: CompanyComponentRef<OrganizationOrgChart>;
@@ -40,13 +44,6 @@ export function buildCompanyVisionRef(tenantSlug?: string | null): string {
 
 function resolveBaseDir(rootDir?: string): string {
   return rootDir ? path.resolve(rootDir) : pathResolver.rootDir();
-}
-
-function candidatePath(rootDir: string, tenantSlug: string, relativePath: string): string {
-  return assertSafeRepositoryPath(path.join(rootDir, 'customer', tenantSlug, relativePath), {
-    allowMissingLeaf: true,
-    rootDir,
-  });
 }
 
 function loadJsonComponent<T>(filePath: string): CompanyComponentRef<T> {
@@ -82,12 +79,7 @@ function loadCompanyOrganizationProfile(
   baseDir: string,
   tenantSlug: string
 ): CompanyComponentRef<OrganizationProfile> {
-  const customerProfilePath = path.join(
-    baseDir,
-    'customer',
-    tenantSlug,
-    'organization-profile.json'
-  );
+  const tenantProfilePath = tenantHomePath(tenantSlug, 'organization-profile.json', baseDir);
   const publicProfilePath = path.join(
     baseDir,
     'knowledge',
@@ -98,7 +90,7 @@ function loadCompanyOrganizationProfile(
   const fallbackProfilePath = pathResolver.knowledge(
     'product/governance/organization-profile.json'
   );
-  const candidates = [customerProfilePath, publicProfilePath, fallbackProfilePath];
+  const candidates = [tenantProfilePath, publicProfilePath, fallbackProfilePath];
 
   for (const candidate of candidates) {
     if (!safeExistsSync(candidate)) continue;
@@ -110,7 +102,7 @@ function loadCompanyOrganizationProfile(
     }
   }
 
-  return { path: customerProfilePath, exists: false, data: null };
+  return { path: tenantProfilePath, exists: false, data: null };
 }
 
 function loadCompanyDecisionRights(
@@ -125,56 +117,45 @@ function loadCompanyDecisionRights(
   };
 }
 
-function resolveCompanyIdentityName(
-  customer: CompanyComponentRef<Record<string, unknown>>,
-  identity: CompanyComponentRef<Record<string, unknown>>,
+function resolveCompanyName(
+  company: CompanyComponentRef<Record<string, unknown>>,
   organizationProfile: CompanyComponentRef<OrganizationProfile>,
   tenantSlug: string
 ): string {
-  const customerRecord = customer.data as Record<string, unknown> | null;
-  const identityRecord = identity.data as Record<string, unknown> | null;
-  const customerName =
-    readStringField(customerRecord, 'display_name') || readStringField(customerRecord, 'name');
+  const companyRecord = company.data as Record<string, unknown> | null;
+  const companyName =
+    readStringField(companyRecord, 'display_name') || readStringField(companyRecord, 'name');
   const profileName = readStringField(
     organizationProfile.data as unknown as Record<string, unknown> | null,
     'name'
   );
-  const identityName =
-    readStringField(identityRecord, 'name') || readStringField(identityRecord, 'display_name');
-
-  return customerName || profileName || identityName || tenantSlug;
+  return companyName || profileName || tenantSlug;
 }
 
+/** The company's accountable person: its primary contact, else the profile name. */
 function resolveSovereignName(
-  identity: CompanyComponentRef<Record<string, unknown>>,
-  customer: CompanyComponentRef<Record<string, unknown>>,
+  company: CompanyComponentRef<Record<string, unknown>>,
   organizationProfile: CompanyComponentRef<OrganizationProfile>
 ): string | null {
-  const identityName = readStringField(identity.data as Record<string, unknown> | null, 'name');
-  if (identityName) return identityName;
-
-  const customerRecord = customer.data as Record<string, unknown> | null;
-  const primaryContact = customerRecord?.primary_contact as Record<string, unknown> | null;
+  const companyRecord = company.data as Record<string, unknown> | null;
+  const primaryContact = companyRecord?.primary_contact as Record<string, unknown> | null;
   const contactName = readStringField(primaryContact, 'name');
   if (contactName) return contactName;
-
-  const profileName = readStringField(
+  return readStringField(
     organizationProfile.data as unknown as Record<string, unknown> | null,
     'name'
   );
-  return profileName;
 }
 
 export function resolveCompany(tenantSlug?: string | null, rootDir?: string): CompanyAggregate {
   const baseDir = resolveBaseDir(rootDir);
-  const resolvedTenantSlug = tenantSlug?.trim() || customerResolver.activeCustomer() || 'default';
+  const resolvedTenantSlug = tenantSlug?.trim() || activeTenantSlug() || 'default';
   if (!isValidTenantSlug(resolvedTenantSlug)) {
     throw new Error(`[COMPANY_TENANT_SCOPE] invalid tenant slug: ${resolvedTenantSlug}`);
   }
-  const customerPath = candidatePath(baseDir, resolvedTenantSlug, 'customer.json');
-  const identityPath = candidatePath(baseDir, resolvedTenantSlug, 'identity.json');
-  const customer = loadJsonComponent<Record<string, unknown>>(customerPath);
-  const identity = loadJsonComponent<Record<string, unknown>>(identityPath);
+  const company = loadJsonComponent<Record<string, unknown>>(
+    tenantHomePath(resolvedTenantSlug, TENANT_COMPANY_FILE, baseDir)
+  );
   const organizationProfile = loadCompanyOrganizationProfile(baseDir, resolvedTenantSlug);
   const vision = resolveVision(resolvedTenantSlug, baseDir);
   const orgChart = resolveOrganizationOrgChart(resolvedTenantSlug, baseDir);
@@ -184,10 +165,9 @@ export function resolveCompany(tenantSlug?: string | null, rootDir?: string): Co
   return {
     company_id: resolvedTenantSlug,
     tenant_slug: resolvedTenantSlug,
-    name: resolveCompanyIdentityName(customer, identity, organizationProfile, resolvedTenantSlug),
-    sovereign: resolveSovereignName(identity, customer, organizationProfile),
-    customer_ref: customer,
-    identity_ref: identity,
+    name: resolveCompanyName(company, organizationProfile, resolvedTenantSlug),
+    sovereign: resolveSovereignName(company, organizationProfile),
+    company_ref: company,
     organization_profile_ref: organizationProfile,
     vision_ref: vision,
     org_chart_ref: { path: orgChart.source_path, exists: true, data: orgChart },

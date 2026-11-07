@@ -17,7 +17,7 @@ import {
   narrowSurfaceViewerTier,
   resolveSurfaceViewerTierAccess,
 } from '@agent/core/surface/surface-mutation-guard';
-import { toWireError } from '@agent/core/wire-error';
+import { toWireError } from '@agent/core/contracts/wire-error';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';

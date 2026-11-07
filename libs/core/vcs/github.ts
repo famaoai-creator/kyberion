@@ -10,7 +10,7 @@ import { classifyStorageFloorPath } from '../storage-layout.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { isTenantOwnedPolicyPath } from '../tier-guard.js';
 import { governVcsCommand } from './external-vcs.js';
-import { computeApprovalPayloadHash } from '../governance/approval-store.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import type { VcsCommandResult, VcsCommandRunner } from './git.js';
 import { assertNotFlagLike } from './git-arguments.js';

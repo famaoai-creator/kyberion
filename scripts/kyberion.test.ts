@@ -137,6 +137,18 @@ describe('kyberion command router', () => {
     expect(resolveCommandPath(['onboarding', 'context', '--json'])).toBe('onboarding context');
   });
 
+  it('routes asset scope inspection without consuming the target path', () => {
+    expect(resolveCommandPath(['scope', 'inspect', 'knowledge/product/example.md', '--json'])).toBe(
+      'scope inspect'
+    );
+    expect(resolveScriptCommand('scope inspect')).toMatchObject({
+      id: 'script.scope.inspect',
+      module: 'scripts/scope.ts',
+      args: ['inspect'],
+    });
+    expect(resolveScriptCommand('scope')).toMatchObject({ script: 'scope' });
+  });
+
   it('dispatches module-backed commands without a package-script alias', async () => {
     expect(resolveScriptCommand('scheduler uninstall')).toMatchObject({
       module: 'scripts/install_chronos_launchd.ts',

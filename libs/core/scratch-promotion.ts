@@ -222,10 +222,6 @@ export function classifyPromotionSourceScope(
       location: `${prefix}/${tier}`,
     };
   }
-  if (relative.startsWith('customer/')) {
-    const tenant = tenantSegment(relative.split('/')[1]);
-    return { tier: 'confidential', ...(tenant ? { tenant } : {}), location: 'customer' };
-  }
   return null;
 }
 

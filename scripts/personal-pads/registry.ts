@@ -5,7 +5,7 @@
  * are migrated. The unified surface only depends on this typed registry and
  * never starts those legacy listeners as a side effect.
  */
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import type { VocabularyKey } from '@agent/core/t';
 import { padsT } from './i18n.js';
 

@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-import { customerDirForSlug } from '../customer-resolver.js';
 import * as pathResolver from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
@@ -90,8 +89,6 @@ export interface ResolvedTenant {
   knowledge_root: string;
   /** Absolute path of knowledge_root. */
   knowledge_root_path: string;
-  /** Absolute path of the customer/{slug}/ overlay directory, or null when absent on disk. */
-  customer_overlay_root: string | null;
 }
 
 export interface TenantGroupProfile {
@@ -167,7 +164,7 @@ export function tenantProfileDir(options: TenantRegistryPathOptions = {}): strin
   const rootDir = options.rootDir ?? pathResolver.rootDir();
   // The registry is durable authority, not a stance overlay. A customer stance
   // may contain a tenant facet for presentation, but changing
-  // KYBERION_CUSTOMER must never change which tenant profile is authoritative.
+  // KYBERION_STANCE must never change which tenant profile is authoritative.
   return path.join(rootDir, 'knowledge', 'personal', 'tenants');
 }
 
@@ -212,6 +209,19 @@ function assertTenantProfile(profile: unknown): asserts profile is TenantProfile
     throw new Error(`[tenant-registry] invalid tenant profile '${slug}': ${error}`);
   }
 }
+
+// Company assets of a tenant live in its home (S2); see tenant-home.ts.
+export {
+  TENANT_ASSET_ENTRIES,
+  TENANT_CHANNEL_BINDINGS_FILE,
+  TENANT_COMPANY_FILE,
+  TENANT_DEALS_DIR,
+  TENANT_HOME_ROOT,
+  activeTenantSlug,
+  isTenantAssetEntry,
+  tenantHomeDir,
+  tenantHomePath,
+} from './tenant-home.js';
 
 /** Default repo-relative knowledge root for a tenant (DA-01). */
 export function defaultTenantKnowledgeRoot(slug: string): string {
@@ -482,30 +492,10 @@ export function resolveTenant(
   assertTenantOperational(profile, 'tenant-bound operation');
   const knowledgeRoot = profile.knowledge_root ?? defaultTenantKnowledgeRoot(slug);
   const knowledgeRootPath = resolveTenantKnowledgeRootPath(rootDir, slug, knowledgeRoot);
-  let safeOverlayDir: string | null = null;
-  try {
-    const overlayDir = customerDirForSlug(slug, rootDir);
-    const candidate = assertSafeRepositoryPath(overlayDir, {
-      allowMissingLeaf: true,
-      rootDir,
-    });
-    if (safeExistsSync(candidate)) safeOverlayDir = candidate;
-  } catch (error) {
-    const reason = String((error as Error)?.message ?? error);
-    if (reason.includes('[RESOURCE_PATH_SYMLINK]')) {
-      throw new Error(
-        `[tenant-registry] tenant '${slug}' customer overlay traverses a symbolic link`
-      );
-    }
-    throw new Error(
-      `[tenant-registry] tenant '${slug}' customer overlay could not be inspected safely`
-    );
-  }
   return {
     profile,
     knowledge_root: knowledgeRoot,
     knowledge_root_path: knowledgeRootPath,
-    customer_overlay_root: safeOverlayDir,
   };
 }
 

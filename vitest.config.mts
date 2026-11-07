@@ -104,6 +104,7 @@ export default defineConfig({
       // @agent/shared-ui React components (renderToStaticMarkup, no DOM).
       'libs/shared-*/**/*.test.tsx',
       'scripts/**/*.test.ts',
+      'migration/**/*.test.ts',
       'tests/**/*.test.ts',
     ],
     exclude: [
@@ -170,7 +171,7 @@ export default defineConfig({
         'libs/core/reflex-terminal.ts',
         'libs/core/sensor-engine.ts',
         'libs/core/shell/terminal-bridge.ts',
-        'libs/core/voice/voice-synth.ts',
+        'libs/shared-voice/src/voice-synth.ts',
         // Large script refactors are covered indirectly through command/build paths.
         'scripts/refactor/**/*.ts',
       ],
@@ -201,11 +202,51 @@ export default defineConfig({
         replacement: path.resolve(rootDir, './libs/kernel/src/$1'),
       },
       {
-        find: '@agent/shared-media',
+        find: /^@agent\/shared-media\/(.*)$/,
+        replacement: path.resolve(rootDir, './libs/shared-media/src/$1'),
+      },
+      {
+        find: /^@agent\/shared-media$/,
         replacement: path.resolve(rootDir, './libs/shared-media/src/index.ts'),
       },
       {
-        find: '@agent/shared-vision',
+        find: /^@agent\/shared-video\/(.*)$/,
+        replacement: path.resolve(rootDir, './libs/shared-video/src/$1'),
+      },
+      {
+        find: /^@agent\/shared-video$/,
+        replacement: path.resolve(rootDir, './libs/shared-video/src/index.ts'),
+      },
+      {
+        find: /^@agent\/shared-interaction\/(.*)$/,
+        replacement: path.resolve(rootDir, './libs/shared-interaction/src/$1'),
+      },
+      {
+        find: /^@agent\/shared-interaction$/,
+        replacement: path.resolve(rootDir, './libs/shared-interaction/src/index.ts'),
+      },
+      {
+        find: /^@agent\/shared-perception\/(.*)$/,
+        replacement: path.resolve(rootDir, './libs/shared-perception/src/$1'),
+      },
+      {
+        find: /^@agent\/shared-perception$/,
+        replacement: path.resolve(rootDir, './libs/shared-perception/src/index.ts'),
+      },
+      {
+        find: /^@agent\/shared-voice\/(.*)$/,
+        replacement: path.resolve(rootDir, './libs/shared-voice/src/$1'),
+      },
+      {
+        find: /^@agent\/shared-voice$/,
+        replacement: path.resolve(rootDir, './libs/shared-voice/src/index.ts'),
+      },
+      {
+        find: /^@agent\/shared-vision\/(.*)$/,
+        replacement: path.resolve(rootDir, './libs/shared-vision/src/$1'),
+      },
+      {
+        find: /^@agent\/shared-vision$/,
         replacement: path.resolve(rootDir, './libs/shared-vision/src/index.ts'),
       },
       // Exact match only: `@agent/shared-ui/vanilla` must keep resolving via the package exports.

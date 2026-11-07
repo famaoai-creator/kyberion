@@ -8,7 +8,7 @@ vi.mock('@agent/core/shell/shell-streaming-stt-bridge', () => ({
 
 const { registerStreamingSttBridge, resetStreamingSttBridges } =
   await import('@agent/core/voice/streaming-stt-bridge');
-const { pcmToWav } = await import('@agent/core/pcm-wav');
+const { pcmToWav } = await import('@agent/core/foundation/pcm-wav');
 const { pathResolver } = await import('@agent/core/path-resolver');
 const { safeMkdir, safeRmSync, safeWriteFile } = await import('@agent/core/secure-io');
 const {

@@ -179,9 +179,18 @@ describe('actual private task source IO under canonical policy', () => {
       ).toThrow();
       vi.stubEnv('KYBERION_TIER', tier);
       vi.stubEnv('KYBERION_TENANT', tier === 'confidential' ? 'acme' : '');
-      expect(() => withExecutionContext('task_source_workspace', () => undefined)).toThrow(
-        'TASK_SOURCE_SCOPE_DENIED'
-      );
+      // G2: the former role name grants nothing; only the live window authorizes.
+      expect(
+        withExecutionContext(
+          'task_source_workspace',
+          () => validateReadPermission(path.join(root, relative)).allowed
+        )
+      ).toBe(false);
+      expect(() =>
+        withExecutionContext('task_source_workspace', () =>
+          safeWriteFile(path.join(root, relative), 'role only')
+        )
+      ).toThrow();
       workspace.owner.task_id = 'other-task';
       await expect(
         tool.execute({ path: relative, content: 'wrong task' }, binding)

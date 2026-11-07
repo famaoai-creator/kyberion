@@ -7,18 +7,22 @@ import {
 } from './customer-conversation-modes.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { withExecutionContext } from './authority.js';
+import { asDealStore } from './deal-store.js';
 
 const testTenant = `tenant-capture-${process.pid}`;
 const testDeal = 'DEAL-ABC';
 const capturePath = pathResolver.rootResolve(
-  path.join('customer', testTenant, 'deals', testDeal, 'requirements.json')
+  path.join('knowledge', 'confidential', testTenant, 'deals', testDeal, 'requirements.json')
 );
 
 afterEach(() => {
-  safeRmSync(pathResolver.rootResolve(path.join('customer', testTenant)), {
-    recursive: true,
-    force: true,
-  });
+  withExecutionContext('onboarding', () =>
+    safeRmSync(pathResolver.rootResolve(path.join('knowledge', 'confidential', testTenant)), {
+      recursive: true,
+      force: true,
+    })
+  );
   vi.unstubAllEnvs();
 });
 
@@ -79,13 +83,17 @@ describe('customer conversation requirements paths', () => {
     });
     expect(readDealRequirementsCapture(testTenant, testDeal)).toEqual(saved);
 
-    safeWriteFile(capturePath, JSON.stringify({ ...saved, unexpected: true }), {
-      encoding: 'utf8',
-    });
+    asDealStore(testTenant, () =>
+      safeWriteFile(capturePath, JSON.stringify({ ...saved, unexpected: true }), {
+        encoding: 'utf8',
+      })
+    );
     expect(readDealRequirementsCapture(testTenant, testDeal)).toBeNull();
 
-    safeRmSync(capturePath, { recursive: true, force: true });
-    safeMkdir(capturePath, { recursive: true });
+    asDealStore(testTenant, () => {
+      safeRmSync(capturePath, { recursive: true, force: true });
+      safeMkdir(capturePath, { recursive: true });
+    });
     expect(readDealRequirementsCapture(testTenant, testDeal)).toBeNull();
   });
 });

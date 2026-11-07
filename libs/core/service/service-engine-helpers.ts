@@ -3,7 +3,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { createLogger } from '../logger.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 const logger = createLogger('service-engine-helpers');
-import * as customerResolver from '../customer-resolver.js';
+import * as customerResolver from '../stance-resolver.js';
 import { pathResolver } from '../path-resolver.js';
 import { resolveRepositoryPathToken } from '../path-token-resolver.js';
 import { resolveServiceBinding } from './service-binding.js';

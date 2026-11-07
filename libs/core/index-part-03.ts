@@ -65,8 +65,6 @@ export { distillXlsxDesign } from './media/xlsx-utils.js';
 
 export { distillDocxDesign } from './media/docx-utils.js';
 
-export { generateNativePdf } from './media/native-pdf-engine/engine.js';
-
 export { generateNativePptx, patchPptxText } from './media/native-pptx-engine/engine.js';
 
 export {
@@ -78,37 +76,7 @@ export {
   type PptxDesignDefaultsInput,
 } from './media/native-pptx-engine/design-cascade.js';
 
-export {
-  fitTextToBox,
-  measureTextBlock,
-  measureTextWidthPt,
-  splitLinesBalanced,
-  wrapLine,
-  type LayoutFitRequest,
-  type LayoutFitResult,
-  type TextMeasurement,
-} from './media/native-pptx-engine/text-metrics.js';
-
-export {
-  PPTX_PALETTE,
-  resolvePptxPalette,
-  createPptxLayoutKit,
-  type PptxLayoutKit,
-  type PptxPalette,
-  textElement,
-  shapeElement,
-  lineElement,
-  sectionHeaderElements,
-  footerElements,
-  type SectionHeaderOptions,
-  type FooterOptions,
-} from './media/native-pptx-engine/layout-primitives.js';
-
 export type { PptxDesignProtocol, PptxElement, PptxSlide } from './contracts/pptx-protocol.js';
-
-export { generateNativeXlsx } from './media/native-xlsx-engine/engine.js';
-
-export { generateNativeDocx } from './media/native-docx-engine/engine.js';
 
 export {
   protocolToMarkdown,
@@ -251,13 +219,6 @@ export {
   resolveServiceBinding,
 } from './service/service-binding.js';
 
-export { compileMusicGenerationADF } from './media/music-workflow-compiler.js';
-
-export {
-  compileImageGenerationADF,
-  compileVideoGenerationADF,
-} from './visual-workflow-compiler.js';
-
 export * as secretGuard from './secret/secret-guard.js';
 
 export {
@@ -276,7 +237,7 @@ export * from './output-artifacts.js';
 
 export * from './workforce/worker-context-compaction.js';
 
-export * from './completion-token-budget.js';
+export * from './provider/completion-token-budget.js';
 
 export * from './workforce/worker-event-stream.js';
 
@@ -335,7 +296,7 @@ export * from './reconcile-ops.js';
 
 export * from './report-ops.js';
 
-export * from './execution-bounds.js';
+export * from './contracts/execution-bounds.js';
 
 export * from './intent/intent-handoff.js';
 
@@ -363,8 +324,6 @@ export * as docxUtils from './media/docx-utils.js';
 // export * as mcpClient from './mcp-client-engine.js';
 
 // Voice & Presentation
-
-export { say, speak } from './voice/voice-synth.js';
 
 export * from './voice/voice-stt.js';
 

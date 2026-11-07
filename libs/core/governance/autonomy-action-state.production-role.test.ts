@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as path from 'node:path';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { seedFirstJobTestRoot } from '../../../scripts/fixtures/first-job-approval-fixture.js';
+import { safeRmSync as removeFixture } from '../secure-io.js';
+import { withExecutionContext as inSourceContext } from '../authority.js';
+import type { AutonomyOutcomeRow } from './autonomy-action-state.js';
 
 // Keep the retention audit out of the shared audit log during tests.
 const retentionAudits = vi.hoisted(() => [] as Array<Record<string, unknown>>);
@@ -11,65 +16,114 @@ vi.mock('../storage-retention-expiry.js', async (importOriginal) => {
   };
 });
 
-import { resolveRole, withExecutionContext } from '../authority.js';
-import { safeReaddir, safeWriteFile, safeRmSync } from '../secure-io.js';
-import { pathResolver } from '../path-resolver.js';
-import { validateWritePermission } from '../tier-guard.js';
-import { streamJsonLines } from '../jsonl-read.js';
-import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
-import { autonomyLearningCapability } from '../foundation/autonomy-learning-capability.js';
-import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
-import {
-  AUTONOMY_OUTCOMES_MIN_RETENTION_MS,
-  AUTONOMY_OUTCOMES_RETENTION_MARGIN_MS,
-  setAutonomyOutcomesStoreTuningForTests,
-  listAutonomyActionIds,
-  type AutonomyOutcomeRow,
-  actionAutonomyStats,
-  recordAutonomyExecution,
-  recordAutonomyOutcome,
-  sweepAutonomyActionStates,
-  applyAutonomyOverride,
-} from './autonomy-action-state.js';
+const sourceRoot = process.cwd();
+const fixtureRoot = path.join(sourceRoot, 'active/shared/tmp', `tenant-autonomy-${randomUUID()}`);
+let resolveRole: typeof import('../authority.js').resolveRole;
+let withExecutionContext: typeof import('../authority.js').withExecutionContext;
+let safeReaddir: typeof import('../secure-io.js').safeReaddir;
+let safeWriteFile: typeof import('../secure-io.js').safeWriteFile;
+let safeMkdir: typeof import('../secure-io.js').safeMkdir;
+let pathResolver: typeof import('../path-resolver.js').pathResolver;
+let validateWritePermission: typeof import('../tier-guard.js').validateWritePermission;
+let streamJsonLines: typeof import('../jsonl-read.js').streamJsonLines;
+let resetAppendOnlyStoreMaintenanceState: typeof import('../append-only-store.js').resetAppendOnlyStoreMaintenanceState;
+let autonomyLearningCapability: typeof import('../foundation/autonomy-learning-capability.js').autonomyLearningCapability;
+let withAutonomyLearningCapability: typeof import('../foundation/autonomy-learning-capability.js').withAutonomyLearningCapability;
+let runInResourceAccessScope: typeof import('../foundation/resource-access-scope.js').runInResourceAccessScope;
+let AUTONOMY_OUTCOMES_MIN_RETENTION_MS: typeof import('./autonomy-action-state.js').AUTONOMY_OUTCOMES_MIN_RETENTION_MS;
+let AUTONOMY_OUTCOMES_RETENTION_MARGIN_MS: typeof import('./autonomy-action-state.js').AUTONOMY_OUTCOMES_RETENTION_MARGIN_MS;
+let setAutonomyOutcomesStoreTuningForTests: typeof import('./autonomy-action-state.js').setAutonomyOutcomesStoreTuningForTests;
+let listAutonomyActionIds: typeof import('./autonomy-action-state.js').listAutonomyActionIds;
+let actionAutonomyStats: typeof import('./autonomy-action-state.js').actionAutonomyStats;
+let recordAutonomyExecution: typeof import('./autonomy-action-state.js').recordAutonomyExecution;
+let recordAutonomyOutcome: typeof import('./autonomy-action-state.js').recordAutonomyOutcome;
+let sweepAutonomyActionStates: typeof import('./autonomy-action-state.js').sweepAutonomyActionStates;
+let applyAutonomyOverride: typeof import('./autonomy-action-state.js').applyAutonomyOverride;
 
-describe('production tenant autonomy store role mediation', () => {
+beforeAll(async () => {
+  seedFirstJobTestRoot(sourceRoot, fixtureRoot);
+  process.chdir(fixtureRoot);
+  vi.stubEnv('KYBERION_ROOT', fixtureRoot);
+  vi.stubEnv('VITEST', '');
+  vi.stubEnv('MISSION_ROLE', 'mission_controller');
+  vi.stubEnv('KYBERION_PERSONA', 'ecosystem_architect');
+  for (const key of [
+    'SYSTEM_ROLE',
+    'MISSION_ID',
+    'KYBERION_TENANT',
+    'KYBERION_TASK_ID',
+    'KYBERION_ORGANIZATION_ID',
+    'KYBERION_PROJECT_ID',
+    'KYBERION_SUDO',
+    'KYBERION_STANCE',
+    'KYBERION_CUSTOMER',
+  ])
+    vi.stubEnv(key, '');
+  vi.resetModules();
+  ({ resolveRole, withExecutionContext } = await import('../authority.js'));
+  ({ safeReaddir, safeWriteFile, safeMkdir } = await import('../secure-io.js'));
+  ({ pathResolver } = await import('../path-resolver.js'));
+  ({ validateWritePermission } = await import('../tier-guard.js'));
+  ({ streamJsonLines } = await import('../jsonl-read.js'));
+  ({ resetAppendOnlyStoreMaintenanceState } = await import('../append-only-store.js'));
+  ({ autonomyLearningCapability, withAutonomyLearningCapability } =
+    await import('../foundation/autonomy-learning-capability.js'));
+  ({ runInResourceAccessScope } = await import('../foundation/resource-access-scope.js'));
+  ({
+    AUTONOMY_OUTCOMES_MIN_RETENTION_MS,
+    AUTONOMY_OUTCOMES_RETENTION_MARGIN_MS,
+    setAutonomyOutcomesStoreTuningForTests,
+    listAutonomyActionIds,
+    actionAutonomyStats,
+    recordAutonomyExecution,
+    recordAutonomyOutcome,
+    sweepAutonomyActionStates,
+    applyAutonomyOverride,
+  } = await import('./autonomy-action-state.js'));
+  expect(pathResolver.rootDir()).toBe(fixtureRoot);
+  expect(pathResolver.primaryCheckoutRootDir()).toBe(fixtureRoot);
+  // runtime-readiness.ts requires this onboarding floor; the bounded API
+  // must create the absent store root, tier and tenant partition itself.
+  withExecutionContext('ecosystem_architect', () => safeMkdir(pathResolver.shared('runtime')));
+  expect(safeReaddir(pathResolver.shared('runtime'))).not.toContain('autonomy-learning');
+}, 60000);
+
+afterAll(() => {
+  process.chdir(sourceRoot);
+  vi.unstubAllEnvs();
+  inSourceContext('ecosystem_architect', () =>
+    removeFixture(fixtureRoot, { recursive: true, force: true })
+  );
+  vi.resetModules();
+});
+
+describe('production tenant autonomy store grant mediation', () => {
   let tenantSlug: string;
   beforeEach(() => {
     tenantSlug = `vitest-learning-${randomUUID().slice(0, 8)}`;
-    // Exercise real permission floors, not the deliberately writable Vitest sandbox.
-    vi.stubEnv('VITEST', '');
+    vi.stubEnv('SYSTEM_ROLE', '');
+    expect(pathResolver.rootDir()).toBe(fixtureRoot);
+    expect(pathResolver.primaryCheckoutRootDir()).toBe(fixtureRoot);
+    expect(pathResolver.shared(`runtime/autonomy-learning/confidential/${tenantSlug}`)).toBe(
+      path.join(fixtureRoot, 'active/shared/runtime/autonomy-learning/confidential', tenantSlug)
+    );
     withExecutionContext(
       'ecosystem_architect',
       () =>
         safeWriteFile(
           pathResolver.rootResolve(`knowledge/personal/tenants/${tenantSlug}.json`),
-          JSON.stringify({ tenant_slug: tenantSlug, status: 'active' })
+          JSON.stringify({
+            tenant_slug: tenantSlug,
+            status: 'active',
+            display_name: 'Synthetic autonomy tenant',
+            assigned_role: 'owner',
+          })
         ),
       'ecosystem_architect'
     );
   });
   afterEach(() => {
-    withExecutionContext(
-      'ecosystem_architect',
-      () =>
-        safeRmSync(
-          pathResolver.rootResolve(
-            `active/shared/runtime/autonomy-learning/confidential/${tenantSlug}`
-          ),
-          { recursive: true, force: true }
-        ),
-      'ecosystem_architect',
-      tenantSlug
-    );
-    withExecutionContext(
-      'ecosystem_architect',
-      () =>
-        safeRmSync(pathResolver.rootResolve(`knowledge/personal/tenants/${tenantSlug}.json`), {
-          force: true,
-        }),
-      'ecosystem_architect'
-    );
-    vi.unstubAllEnvs();
+    vi.stubEnv('SYSTEM_ROLE', '');
   });
   it.each(['mission_controller', 'organization_operator', 'chronos_gateway'])(
     'persists actual tenant receipts under %s without elevating callbacks or caller',
@@ -135,70 +189,75 @@ describe('production tenant autonomy store role mediation', () => {
     );
   });
 
-  it('the bounded role cannot mutate arbitrary tenant knowledge or another tenant', () => {
+  it('the grant alone authorizes its exact tenant ceiling; the former role grants nothing', () => {
+    const directory = `active/shared/runtime/autonomy-learning/confidential/${tenantSlug}`;
+    const outcomes = pathResolver.rootResolve(`${directory}/autonomy-outcomes.jsonl`);
+    // G2: the former role name is an issuance right, not an assumable role.
     expect(() =>
       withExecutionContext('autonomy_learning_store', () => undefined, 'worker', tenantSlug)
-    ).toThrow('RESOURCE_SCOPE_REQUIRED');
-    runInResourceAccessScope(autonomyLearningCapability(tenantSlug), () =>
-      withExecutionContext(
-        'autonomy_learning_store',
-        () => {
-          expect(() =>
-            safeWriteFile(
-              pathResolver.rootResolve(`knowledge/confidential/${tenantSlug}/unrelated.json`),
-              '{}'
-            )
-          ).toThrow();
-          expect(() =>
-            safeWriteFile(
-              pathResolver.shared(
-                'runtime/autonomy-learning/confidential/other-tenant/autonomy-outcomes.jsonl'
-              ),
-              '{}'
-            )
-          ).toThrow();
-          expect(() =>
-            safeWriteFile(
-              pathResolver.rootResolve(
-                `knowledge/confidential/${tenantSlug}/autonomy-outcomes.jsonl`
-              ),
-              '{}'
-            )
-          ).toThrow('RESOURCE_SCOPE_DENIED');
-        },
-        'worker',
-        tenantSlug
-      )
-    );
-    expect(() =>
-      runInResourceAccessScope(
-        {
-          tenantSlug,
-          readExact: [`knowledge/confidential/${tenantSlug}/unrelated.json`],
-          writeExact: [`knowledge/confidential/${tenantSlug}/unrelated.json`],
-          mkdirExact: [],
-        },
-        () => withExecutionContext('autonomy_learning_store', () => undefined, 'worker', tenantSlug)
-      )
-    ).toThrow('RESOURCE_SCOPE_REQUIRED');
+    ).toThrow('ROLE_ASSUMPTION_DENIED');
+    // A role-less caller (persona worker, no store grant of its own) bound to the tenant.
+    const caller = <T>(fn: () => T): T =>
+      withExecutionContext('chronos_gateway', fn, 'worker', tenantSlug);
+    caller(() => {
+      expect(validateWritePermission(outcomes, 'append')).toMatchObject({ allowed: false });
+      // A structural lookalike of the exact ceiling is not the issued grant.
+      runInResourceAccessScope(autonomyLearningCapability(tenantSlug), () =>
+        expect(validateWritePermission(outcomes, 'append')).toMatchObject({ allowed: false })
+      );
+      withAutonomyLearningCapability(tenantSlug, directory, () => {
+        expect(resolveRole()).toBe('chronos_gateway');
+        expect(validateWritePermission(outcomes, 'append')).toMatchObject({ allowed: true });
+        expect(() =>
+          safeWriteFile(
+            pathResolver.rootResolve(`knowledge/confidential/${tenantSlug}/unrelated.json`),
+            '{}'
+          )
+        ).toThrow();
+        expect(() =>
+          safeWriteFile(
+            pathResolver.shared(
+              'runtime/autonomy-learning/confidential/other-tenant/autonomy-outcomes.jsonl'
+            ),
+            '{}'
+          )
+        ).toThrow();
+        expect(() =>
+          safeWriteFile(
+            pathResolver.rootResolve(
+              `knowledge/confidential/${tenantSlug}/autonomy-outcomes.jsonl`
+            ),
+            '{}'
+          )
+        ).toThrow('RESOURCE_SCOPE_DENIED');
+      });
+      expect(validateWritePermission(outcomes, 'append')).toMatchObject({ allowed: false });
+    });
+    // A process still launched as the former role gets no I/O at all.
     vi.stubEnv('SYSTEM_ROLE', 'autonomy_learning_store');
+    expect(validateWritePermission(outcomes, 'write').reason).toContain('ROLE_ASSUMPTION_DENIED');
+    vi.stubEnv('SYSTEM_ROLE', '');
+  });
+
+  it('issues the grant only where the former shared role could be assumed', () => {
+    vi.stubEnv('SYSTEM_ROLE', 'zz_unlisted_surface');
     expect(() =>
-      safeWriteFile(
-        pathResolver.shared(
-          `runtime/autonomy-learning/confidential/${tenantSlug}/autonomy-outcomes.jsonl`
-        ),
-        '{}'
+      recordAutonomyOutcome(
+        { action_id: 'never', receipt_id: randomUUID(), decision: 'approve', executed: false },
+        { tenantSlug }
       )
-    ).toThrow('RESOURCE_SCOPE_REQUIRED');
-    vi.unstubAllEnvs();
-    vi.stubEnv('VITEST', '');
+    ).toThrow('ROLE_ASSUMPTION_DENIED');
+    vi.stubEnv('SYSTEM_ROLE', '');
   });
 
   describe('write-time retention of the tenant partition', () => {
     const partition = () => `active/shared/runtime/autonomy-learning/confidential/${tenantSlug}`;
     const asStore = <T>(fn: () => T): T =>
-      runInResourceAccessScope(autonomyLearningCapability(tenantSlug), () =>
-        withExecutionContext('autonomy_learning_store', fn, 'worker', tenantSlug)
+      withExecutionContext(
+        'chronos_gateway',
+        () => withAutonomyLearningCapability(tenantSlug, partition(), fn),
+        'worker',
+        tenantSlug
       );
     const asOperator = <T>(fn: () => T): T =>
       withExecutionContext('ecosystem_architect', fn, 'ecosystem_architect', tenantSlug);

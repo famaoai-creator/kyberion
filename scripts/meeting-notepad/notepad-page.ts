@@ -9,10 +9,10 @@
  * clear confirmation (`ui:dialog`). Every user-visible string comes from the
  * `meeting_notepad` vocabulary for the request's locale.
  */
-import { coerceLocale } from '@agent/core/locale-normalize';
+import { coerceLocale } from '@agent/core/foundation/locale-normalize';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import type { VocabularyKey } from '@agent/core/t';
 import { padT, renderPadHeader, renderPadPage, renderPadStickyHost } from '../lib/pad-ui.js';
 

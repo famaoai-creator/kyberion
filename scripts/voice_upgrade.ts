@@ -15,7 +15,7 @@
  * What it does (this is currently a *configurator*, not a runtime switch):
  *   1. Validates prerequisites for the target tier (API key, Python, etc).
  *   2. Writes the chosen tier to `voice_tier` in the user's
- *      customer/{slug}/voice/profile.json (or knowledge/personal/voice/profile.json).
+ *      knowledge/personal/stances/{slug}/voice/profile.json (or knowledge/personal/voice/profile.json).
  *   3. Prints the next-step commands needed to actually run that tier.
  *
  * The runtime selection (which TTS engine to actually call) is not yet wired
@@ -23,11 +23,11 @@
  */
 
 import * as path from 'node:path';
-import * as customerResolver from '@agent/core/customer-resolver';
+import * as customerResolver from '@agent/core/stance-resolver';
 import { classifyError, formatClassification } from '@agent/core/error-classifier';
 import { getRegisteredEnv } from '@agent/core/env-validator';
 import { pathResolver } from '@agent/core/path-resolver';
-import { probeNativeTts } from '@agent/core/media/native-tts';
+import { probeNativeTts } from '@agent/shared-voice/native-tts';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -165,7 +165,7 @@ function checkTier2(): { name: string; ok: boolean; detail?: string }[] {
 
 function profilePath(): string {
   // Prefer customer overlay when active, else fall back to personal.
-  const customerOverlay = customerResolver.customerRoot('voice/profile.json');
+  const customerOverlay = customerResolver.stanceRoot('voice/profile.json');
   if (customerOverlay) return customerOverlay;
   return pathResolver.knowledge('personal/voice/profile.json');
 }

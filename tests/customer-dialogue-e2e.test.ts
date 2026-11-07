@@ -181,7 +181,8 @@ describe('customer dialogue (E2E-06)', () => {
     // fixture tenant binding
     const bindingsPath = path.join(
       tmpRoot,
-      'customer',
+      'knowledge',
+      'confidential',
       SLUG,
       'connections',
       'channel-bindings.json'
@@ -212,7 +213,9 @@ describe('customer dialogue (E2E-06)', () => {
       })
     );
     // underscore-prefixed dirs (e.g. _template) must be ignored
-    fs.mkdirSync(path.join(tmpRoot, 'customer', '_template', 'connections'), { recursive: true });
+    fs.mkdirSync(path.join(tmpRoot, 'knowledge', 'confidential', '_template', 'connections'), {
+      recursive: true,
+    });
 
     // I18N-06: the deterministic "we will confirm and get back to you" hold
     // reply (used on backend failure — no LLM turn to phrase it) is now
@@ -316,7 +319,8 @@ describe('customer dialogue (E2E-06)', () => {
     fs.writeFileSync(otherNotes, 'OTHER-TENANT-SECRET-PRICING-MEMO');
     const otherBindings = path.join(
       tmpRoot,
-      'customer',
+      'knowledge',
+      'confidential',
       'other-tenant',
       'connections',
       'channel-bindings.json'
@@ -613,7 +617,15 @@ describe('customer dialogue (E2E-06)', () => {
     );
     const unquotable = JSON.parse(
       fs.readFileSync(
-        path.join(tmpRoot, 'customer', SLUG, 'deals', deal.deal_id, 'quote-unquotable.json'),
+        path.join(
+          tmpRoot,
+          'knowledge',
+          'confidential',
+          SLUG,
+          'deals',
+          deal.deal_id,
+          'quote-unquotable.json'
+        ),
         'utf8'
       )
     );
@@ -752,7 +764,8 @@ describe('customer dialogue (E2E-06)', () => {
     });
     const snapshot = path.join(
       tmpRoot,
-      'customer',
+      'knowledge',
+      'confidential',
       SLUG,
       'deals',
       deal.deal_id,

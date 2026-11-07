@@ -6,7 +6,7 @@ import {
   isFullwidthChar,
   measureTextWidthPt,
   splitLinesBalanced,
-} from '@agent/core/media/native-pptx-engine/text-metrics';
+} from '@agent/shared-media/native-pptx-engine/text-metrics';
 import { buildStructuredSlideBody } from './media-structured-pptx.js';
 import { ensureReadableOn, validateThemeContrast } from '@agent/core/design-qa';
 import { classifyRenderSemantic } from './media-document-helpers.js';

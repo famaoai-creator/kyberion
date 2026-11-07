@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import { escapeXml } from '../text-escaping.js';
+import { escapeXml } from '../foundation/text-escaping.js';
 import { daemonBoundEnvironment } from './render-context.js';
 import type { DaemonManager, DaemonRenderContext, DaemonServiceSpec } from './service-manager.js';
 

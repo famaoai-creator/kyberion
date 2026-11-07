@@ -24,7 +24,7 @@ last_updated: 2026-10-05
 | G5 Publication Approval | exact artifacts and effect payload                                                       | unexpired authenticated human approval, required count, all bindings match | approval ID and hashes            | publication denied               |
 | G6 Verification         | publication result                                                                       | URL, visibility, hash, CTA, captions, thumbnail verified                   | verification record/screenshot    | Mission cannot complete          |
 
-Risk controls are resolved from `knowledge/product/governance/marketing-risk-policy.json` with a customer overlay at `customer/<slug>/policy/marketing-risk-policy.json`. Dry-runs never represent an external publication.
+Risk controls are resolved from `knowledge/product/governance/marketing-risk-policy.json` with a customer overlay at `knowledge/personal/stances/<slug>/policy/marketing-risk-policy.json`. Dry-runs never represent an external publication.
 
 ## Executable Dry-run Publisher
 
@@ -38,4 +38,4 @@ Before G5 evaluation, the publisher scans the title, description, captions, Mark
 
 For marketing, campaign, and publication Mission types, the existing Mission finish quality gate discovers the newest `completion-evidence.json`, recomputes every bound artifact hash, and calls the marketing completion evaluator. Missing evidence, failed required gates, public dry-runs, sensitive-data findings, or changed artifacts block the existing finish lifecycle. No parallel marketing lifecycle is introduced.
 
-Customer policy resolution is exercised through real temporary `customer/<slug>/policy/marketing-risk-policy.json` overlays. Distinct `KYBERION_CUSTOMER` values resolve distinct channel and CTA policies; no-customer execution falls back to the product policy. Test fixtures are created and removed through governed mission-controller authority rather than bypassing secure I/O.
+Customer policy resolution is exercised through real temporary `knowledge/personal/stances/<slug>/policy/marketing-risk-policy.json` overlays. Distinct `KYBERION_STANCE` values resolve distinct channel and CTA policies; no-customer execution falls back to the product policy. Test fixtures are created and removed through governed mission-controller authority rather than bypassing secure I/O.

@@ -876,7 +876,7 @@
     },
     "browser.click_verb": {
       "old_regex": "/押して|click|tap|クリック/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:1090"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:1090"],
       "match": [
         "押して",
         "ねえ 押して して",
@@ -915,7 +915,7 @@
     },
     "browser.confirm_affirmative": {
       "old_regex": "/^(それ|はい|yes|ok|そのまま|それで|お願いします)$/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:217"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:217"],
       "match": ["それ", "はい", "そのまま", "それで", "お願いします", "yes", "YES", "ok", "OK"],
       "no_match": [
         "ねえ それ して",
@@ -934,7 +934,7 @@
     },
     "browser.control_back": {
       "old_regex": "/back|戻って/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:998"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:998"],
       "match": [
         "戻って",
         "ねえ 戻って して",
@@ -965,7 +965,7 @@
     },
     "browser.control_command": {
       "old_regex": "/^(止めて|停止|キャンセル|やめて|stop|cancel|pause|resume|続けて|再開|戻って|back)\\b/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:990"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:990"],
       "match": [
         "stop",
         "STOP",
@@ -1019,7 +1019,7 @@
     },
     "browser.control_pause": {
       "old_regex": "/pause/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:1000"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:1000"],
       "match": ["pause", "PAUSE", "ねえ pause して", "pause ok"],
       "no_match": [
         "来週の予定教えて",
@@ -1038,7 +1038,7 @@
     },
     "browser.control_resume": {
       "old_regex": "/resume|続けて|再開/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:996"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:996"],
       "match": [
         "続けて",
         "ねえ 続けて して",
@@ -1070,9 +1070,9 @@
     "browser.enter_key": {
       "old_regex": "/(enter|return|エンター)/i",
       "sites": [
-        "libs/core/browser/browser-conversation-session.ts:1045",
-        "libs/core/browser/browser-conversation-session.ts:1090",
-        "libs/core/browser/browser-conversation-session.ts:1102"
+        "libs/shared-vision/src/browser-conversation-session.ts:1045",
+        "libs/shared-vision/src/browser-conversation-session.ts:1090",
+        "libs/shared-vision/src/browser-conversation-session.ts:1102"
       ],
       "match": [
         "エンター",
@@ -1111,8 +1111,8 @@
     "browser.fill_verb": {
       "old_regex": "/入力|入れて|type|fill/i",
       "sites": [
-        "libs/core/browser/browser-conversation-session.ts:1055",
-        "libs/core/browser/browser-conversation-session.ts:1113"
+        "libs/shared-vision/src/browser-conversation-session.ts:1055",
+        "libs/shared-vision/src/browser-conversation-session.ts:1113"
       ],
       "match": [
         "入力",
@@ -1157,7 +1157,7 @@
     },
     "browser.input_text_extract": {
       "old_regex": "/「(.+?)」を.*(?:入力|入れて)|\"(.+?)\".*(?:input|type|fill)|(.+?)\\s*と入力/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts"],
       "match": [
         "「abc」を入力して",
         "abcと入力",
@@ -1168,7 +1168,7 @@
     },
     "browser.open_verb": {
       "old_regex": "/開いて|open|表示して|show/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:1140"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:1140"],
       "match": [
         "開いて",
         "ねえ 開いて して",
@@ -1206,7 +1206,7 @@
     },
     "browser.ordinal_first": {
       "old_regex": "/^(最初|1つ目|一つ目|1番目|一番目|first)$/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:220"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:220"],
       "match": ["最初", "1つ目", "一つ目", "1番目", "一番目", "first", "FIRST"],
       "no_match": [
         "ねえ 最初 して",
@@ -1225,7 +1225,7 @@
     },
     "browser.ordinal_second": {
       "old_regex": "/^(2つ目|二つ目|2番目|二番目|second)$/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:223"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:223"],
       "match": ["2つ目", "二つ目", "2番目", "二番目", "second", "SECOND"],
       "no_match": [
         "ねえ 2つ目 して",
@@ -1244,7 +1244,7 @@
     },
     "browser.ordinal_third": {
       "old_regex": "/^(3つ目|三つ目|3番目|三番目|third)$/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:226"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:226"],
       "match": ["3つ目", "三つ目", "3番目", "三番目", "third", "THIRD"],
       "no_match": [
         "ねえ 3つ目 して",
@@ -1263,7 +1263,7 @@
     },
     "browser.page_target": {
       "old_regex": "/(ページ|tab|タブ|ブラウザ|chrome|サイト|url|画面)/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:1141"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:1141"],
       "match": [
         "ページ",
         "ねえ ページ して",
@@ -1308,8 +1308,8 @@
     "browser.press_verb": {
       "old_regex": "/押して|press|enter/i",
       "sites": [
-        "libs/core/browser/browser-conversation-session.ts:1045",
-        "libs/core/browser/browser-conversation-session.ts:1102"
+        "libs/shared-vision/src/browser-conversation-session.ts:1045",
+        "libs/shared-vision/src/browser-conversation-session.ts:1102"
       ],
       "match": [
         "押して",
@@ -1350,7 +1350,7 @@
     },
     "browser.region_bottom_left": {
       "old_regex": "/左下|bottom left/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:1006"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:1006"],
       "match": [
         "左下",
         "ねえ 左下 して",
@@ -1379,7 +1379,7 @@
     },
     "browser.region_bottom_right": {
       "old_regex": "/右下|bottom right/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:1008"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:1008"],
       "match": [
         "右下",
         "ねえ 右下 して",
@@ -1406,7 +1406,7 @@
     },
     "browser.region_center": {
       "old_regex": "/中央|center|真ん中/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:1014"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:1014"],
       "match": [
         "中央",
         "ねえ 中央 して",
@@ -1436,7 +1436,7 @@
     },
     "browser.region_top_left": {
       "old_regex": "/左上|top left/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:1010"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:1010"],
       "match": [
         "左上",
         "ねえ 左上 して",
@@ -1463,7 +1463,7 @@
     },
     "browser.region_top_right": {
       "old_regex": "/右上|top right/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:1012"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:1012"],
       "match": [
         "右上",
         "ねえ 右上 して",
@@ -1491,8 +1491,8 @@
     "browser.scroll_verb": {
       "old_regex": "/スクロール|scroll/i",
       "sites": [
-        "libs/core/browser/browser-conversation-session.ts:1070",
-        "libs/core/browser/browser-conversation-session.ts:1129"
+        "libs/shared-vision/src/browser-conversation-session.ts:1070",
+        "libs/shared-vision/src/browser-conversation-session.ts:1129"
       ],
       "match": [
         "スクロール",
@@ -1521,13 +1521,13 @@
     },
     "browser.target_region_prefix": {
       "old_regex": "/^(?:左下|右下|左上|右上|中央|真ん中)\\s*の?/",
-      "sites": ["libs/core/browser/browser-conversation-session.ts"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts"],
       "match": ["左下の保存", "中央ボタン", "右上 メニュー"],
       "no_match": ["保存ボタン", "メニュー左下"]
     },
     "browser.target_role_button": {
       "old_regex": "/ボタン|button/i",
-      "sites": ["libs/core/browser/browser-conversation-session.ts:1031"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts:1031"],
       "match": [
         "ボタン",
         "ねえ ボタン して",
@@ -1557,7 +1557,7 @@
     },
     "browser.target_text_extract": {
       "old_regex": "/「(.+?)」|\"(.+?)\"|『(.+?)』|(.+?)を押して|(.+?)をクリック|(.+?)をタップ|(.+?)ボタン/",
-      "sites": ["libs/core/browser/browser-conversation-session.ts"],
+      "sites": ["libs/shared-vision/src/browser-conversation-session.ts"],
       "match": [
         "「保存」を押して",
         "\"Save\" please",

@@ -10,7 +10,7 @@ import {
   type VcsHostPrCreateParams,
   type VcsHostPrMergeParams,
 } from './vcs-host-verbs.js';
-import { computeApprovalPayloadHash } from '../governance/approval-store.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
 import {
   ExternalOperationApprovalRequired,
   hasExternalOperationAuthority,
@@ -21,11 +21,9 @@ import { withInstalledOnboardingAuthority } from '../organization/onboarding-aut
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import { resolveScopeContext } from '../scope-context.js';
 import { writeScopedArtifact } from '../workforce/artifact-store.js';
-import { withExecutionContext } from '../authority.js';
 import {
   withPrPublicationRuntime,
   withPrPublicationStoreAccess,
-  PR_PUBLICATION_STORE_ROLE,
 } from '../governance/pr-publication-runtime.js';
 
 /** Provider selection stays with the approval host (it injects the runner-backed provider). */
@@ -139,19 +137,13 @@ export async function runVcsMutationWithApproval(
               const root = `active/shared/artifacts/${floor}`;
               const paths = [`${root}/evidence/${name}`, `${root}/artifacts-index.jsonl`];
               review = withPrPublicationStoreAccess('review-write', paths, paths, () =>
-                withExecutionContext(
-                  PR_PUBLICATION_STORE_ROLE,
-                  () =>
-                    writeScopedArtifact({
-                      scope: { tenant: scope.tenant_slug ?? 'shared' },
-                      tier: scope.tenant_slug ? 'confidential' : 'personal',
-                      artifact_class: 'evidence',
-                      name,
-                      content: effect,
-                    }),
-                  'worker',
-                  scope.tenant_slug
-                )
+                writeScopedArtifact({
+                  scope: { tenant: scope.tenant_slug ?? 'shared' },
+                  tier: scope.tenant_slug ? 'confidential' : 'personal',
+                  artifact_class: 'evidence',
+                  name,
+                  content: effect,
+                })
               );
               return [review.repo_relative_path];
             },

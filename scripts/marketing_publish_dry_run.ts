@@ -26,7 +26,7 @@ import {
   loadApprovalRequest,
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
-import { escapeHtml } from '@agent/core/text-escaping';
+import { escapeHtml } from '@agent/core/foundation/text-escaping';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { defineScript, isDirectScript } from './lib/harness.js';
 

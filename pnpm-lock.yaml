@@ -78,6 +78,9 @@ importers:
       '@agent/kernel':
         specifier: workspace:*
         version: link:libs/kernel
+      '@agent/shared-interaction':
+        specifier: workspace:*
+        version: link:libs/shared-interaction
       '@agent/shared-media':
         specifier: workspace:*
         version: link:libs/shared-media
@@ -90,9 +93,18 @@ importers:
       '@agent/shared-network':
         specifier: workspace:*
         version: link:libs/shared-network
+      '@agent/shared-perception':
+        specifier: workspace:*
+        version: link:libs/shared-perception
+      '@agent/shared-video':
+        specifier: workspace:*
+        version: link:libs/shared-video
       '@agent/shared-vision':
         specifier: workspace:*
         version: link:libs/shared-vision
+      '@agent/shared-voice':
+        specifier: workspace:*
+        version: link:libs/shared-voice
       '@agentclientprotocol/sdk':
         specifier: ^1.9.0
         version: 1.9.0(zod@4.6.7)
@@ -346,6 +358,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-perception':
+        specifier: workspace:*
+        version: link:../../shared-perception
       '@agent/shared-vision':
         specifier: workspace:*
         version: link:../../shared-vision
@@ -497,6 +512,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-media':
+        specifier: workspace:*
+        version: link:../../shared-media
 
   libs/actuators/meeting-actuator:
     dependencies:
@@ -643,9 +661,15 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-perception':
+        specifier: workspace:*
+        version: link:../../shared-perception
       '@agent/shared-vision':
         specifier: workspace:*
         version: link:../../shared-vision
+      '@agent/shared-voice':
+        specifier: workspace:*
+        version: link:../../shared-voice
       chalk:
         specifier: ^6.0.1
         version: 6.0.1
@@ -679,6 +703,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-video':
+        specifier: workspace:*
+        version: link:../../shared-video
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
@@ -688,12 +715,21 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-perception':
+        specifier: workspace:*
+        version: link:../../shared-perception
+      '@agent/shared-video':
+        specifier: workspace:*
+        version: link:../../shared-video
 
   libs/actuators/voice-actuator:
     dependencies:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-voice':
+        specifier: workspace:*
+        version: link:../../shared-voice
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
@@ -765,6 +801,12 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  libs/shared-interaction:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../core
+
   libs/shared-media:
     dependencies:
       '@agent/core':
@@ -824,6 +866,15 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
 
+  libs/shared-perception:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../core
+      jimp:
+        specifier: ^1.6.1
+        version: 1.6.1(supports-color@7.2.0)
+
   libs/shared-ui:
     dependencies:
       '@agent/core':
@@ -846,6 +897,12 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  libs/shared-video:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../core
+
   libs/shared-vision:
     dependencies:
       '@agent/core':
@@ -854,6 +911,18 @@ importers:
       puppeteer:
         specifier: ^25.14.0
         version: 25.14.0(yauzl@3.4.0)
+
+  libs/shared-voice:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../core
+      '@agent/shared-interaction':
+        specifier: workspace:*
+        version: link:../shared-interaction
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
 
   presence/bridge/terminal:
     dependencies:
@@ -903,6 +972,9 @@ importers:
       '@agent/shared-ui':
         specifier: workspace:*
         version: link:../../../libs/shared-ui
+      '@agent/shared-vision':
+        specifier: workspace:*
+        version: link:../../../libs/shared-vision
       '@simplewebauthn/browser':
         specifier: ^13.3.0
         version: 13.3.0

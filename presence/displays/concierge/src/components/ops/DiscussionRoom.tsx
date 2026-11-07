@@ -1,6 +1,6 @@
 'use client';
 
-import { coerceLocale, pickByLocale } from '@agent/core/locale-normalize';
+import { coerceLocale, pickByLocale } from '@agent/core/foundation/locale-normalize';
 import * as React from 'react';
 import { useSearchParams } from 'next/navigation';
 import {

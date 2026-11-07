@@ -25,7 +25,7 @@ Use this template after a real external FDE or SI completes a customer deploymen
 ```bash
 pnpm stance:create <slug>
 pnpm stance:switch <slug>
-source active/shared/runtime/customer.env
+source active/shared/runtime/stance.env
 pnpm onboarding
 pnpm run doctor
 ```

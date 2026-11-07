@@ -191,8 +191,8 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 
 identity の保存先と、baseline-check の L3 が確認する場所は、アクティブな stance で決まります。**identity を保存する前に**決めてください。
 
-- 自分として使う: `KYBERION_CUSTOMER` を設定しません。保存先は `knowledge/personal/` です。
-- 顧客・会社として使う: `pnpm stance:switch <customer-slug>` で切り替えます（overlay がなければ `pnpm stance:create <customer-slug>`）。保存先は `customer/{slug}/` です。
+- 自分として使う: `KYBERION_STANCE` を設定しません。保存先は `knowledge/personal/` です。
+- 顧客・会社として使う: `pnpm stance:switch <customer-slug>` で切り替えます（overlay がなければ `pnpm stance:create <customer-slug>`）。保存先は `knowledge/personal/stances/{slug}/` です。
 
 ### Stage 7: 魂の注入 (Soul Infusion)
 
@@ -207,10 +207,10 @@ identity の保存先と、baseline-check の L3 が確認する場所は、ア�
 - **承認に使う operator の identity**: 端末は承認を local owner member（`user:owner`、`knowledge/personal/members/owner.json`）として記録し、onboarding の名前は表示用に別に残します。concierge か presence-studio を開くとこの member が作られます。端末だけで使う場合は `pnpm organization member ensure-owner`（冪等）を実行します。職務分離（`approval-policy.json` の `separation_of_duties.enabled`）を有効にするときに必要で、無いと端末からの承認依頼と承認は診断メッセージを出して止まります。
 - **やり直す場合**: `pnpm onboarding reset` で onboarding state と生成された identity / vision / agent の成果物を削除します。
 - **物理的変化**:
-  - `customer/{slug}/my-identity.json` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/my-identity.json` になります。
-  - `customer/{slug}/my-vision.md` が生成（または更新）されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/my-vision.md` になります。
-  - `customer/{slug}/onboarding/onboarding-state.json` と `onboarding-summary.md` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/onboarding/` 配下になります。
-  - アイデンティティ設定の最後に、エージェントが自己紹介を行い、主権者との間で Agent ID（A2A 通信や記録に使う公的な名前）を合意します。`customer/{slug}/agent-identity.json` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/agent-identity.json` になります。
+  - `knowledge/personal/stances/{slug}/my-identity.json` が生成されます。`KYBERION_STANCE` 未設定時は `knowledge/personal/my-identity.json` になります。
+  - `knowledge/personal/stances/{slug}/my-vision.md` が生成（または更新）されます。`KYBERION_STANCE` 未設定時は `knowledge/personal/my-vision.md` になります。
+  - `knowledge/personal/stances/{slug}/onboarding/onboarding-state.json` と `onboarding-summary.md` が生成されます。`KYBERION_STANCE` 未設定時は `knowledge/personal/onboarding/` 配下になります。
+  - アイデンティティ設定の最後に、エージェントが自己紹介を行い、主権者との間で Agent ID（A2A 通信や記録に使う公的な名前）を合意します。`knowledge/personal/stances/{slug}/agent-identity.json` が生成されます。`KYBERION_STANCE` 未設定時は `knowledge/personal/agent-identity.json` になります。
   - サービス接続の候補（`connections/*.json`）、tenant 候補、最初の tutorial plan（`onboarding/tutorial-plan.md`）が同じ profile 配下に生成されます。これらは候補であり、外部への副作用は起きません。
 
 ### Stage 8: baseline を all_clear にする
@@ -230,13 +230,13 @@ identity の保存先と、baseline-check の L3 が確認する場所は、ア�
 
 個人のみで使う場合、この Stage は不要です。tenant を扱う場合は、[標準フロー](../knowledge/product/governance/onboarding-flow.md) の Step 5〜8 を順に実行してください。ここでは、そこで結び付ける 3 つの別物を整理しておきます。
 
-| 何を指すか                             | 役割                                                           | 置き場                                          |
-| -------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------- |
-| **customer-slug**（stance / 運用主体） | 「いま自分はどの主体として振る舞っているか」— **実行時の設定** | `customer/{slug}/` + `KYBERION_CUSTOMER`        |
-| **tenant-slug**（テナント）            | 「いまどの機密境界の内側にいるか」— **データ境界**             | `knowledge/confidential/{tenant-slug}/`         |
-| **organization-id**（組織）            | 「そのテナントをどう運営しているか」— テナント配下の運用モデル | `active/organizations/{tier}/{tenant}/{org_id}` |
+| 何を指すか                             | 役割                                                           | 置き場                                                   |
+| -------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------- |
+| **customer-slug**（stance / 運用主体） | 「いま自分はどの主体として振る舞っているか」— **実行時の設定** | `knowledge/personal/stances/{slug}/` + `KYBERION_STANCE` |
+| **tenant-slug**（テナント）            | 「いまどの機密境界の内側にいるか」— **データ境界**             | `knowledge/confidential/{tenant-slug}/`                  |
+| **organization-id**（組織）            | 「そのテナントをどう運営しているか」— テナント配下の運用モデル | `active/organizations/{tier}/{tenant}/{org_id}`          |
 
-`customer-slug` と `tenant-slug` は同じ綴りになることが多いですが同一物ではありません（前者は設定、後者は境界）。包含順の正本は [entity-scope-hierarchy](../knowledge/product/architecture/entity-scope-hierarchy.md)、3 層の区別は [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md) を参照してください。テナント自身の顧客は `knowledge/confidential/{tenant-slug}/customers/` に置き、`customer/{slug}/` には置きません。
+`customer-slug` と `tenant-slug` は同じ綴りになることが多いですが同一物ではありません（前者は設定、後者は境界）。包含順の正本は [entity-scope-hierarchy](../knowledge/product/architecture/entity-scope-hierarchy.md)、3 層の区別は [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md) を参照してください。テナント自身の顧客は `knowledge/confidential/{tenant-slug}/customers/` に置き、`knowledge/personal/stances/{slug}/` には置きません。
 
 AI 会社として始める場合は、`pnpm onboarding company --vertical <vertical> --slug <company-slug> --name "<会社名>" --owner-id human:<owner> --goal "<最初の成果>" --tenant-slug <tenant-slug> --dry-run` で tenant 登録と context binding をまとめて確認できます。AI worker は作業を準備・実行できますが、契約、支払、外部公開、権限変更などの最終判断は `--owner-id` の人間が保持します。会社オンボーディングは activation を自動完了しません。
 

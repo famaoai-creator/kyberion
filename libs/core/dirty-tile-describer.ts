@@ -14,6 +14,7 @@ import {
 } from './media/image-description-bridge.js';
 import { assertVolatileId, pathResolver } from './path-resolver.js';
 import { redactScreenCaptureFile } from './virtual/screen-frame-redaction.js';
+import { tenantOfPath } from './path-tenant-attribution.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -252,10 +253,7 @@ async function requireSourceTenant(
   let sourceOwner: string | undefined;
   for (const candidate of sourcePaths) {
     const partition = classifyStorageFloorPath(candidate)?.partition;
-    const owner =
-      partition?.kind === 'tier'
-        ? partition.tenant
-        : (await import('./video/ingest/video-brief.js')).tenantOfPath(candidate);
+    const owner = partition?.kind === 'tier' ? partition.tenant : tenantOfPath(candidate);
     if (!owner) continue;
     if (sourceOwner && sourceOwner !== owner)
       throw new Error('[VISION_TIER_SCOPE] lexical and canonical source tenants differ');
@@ -291,10 +289,7 @@ async function requireScopedTileDirs(
         );
       const partition = classifyStorageFloorPath(candidate)?.partition;
       if (tenant) {
-        const owner =
-          partition?.kind === 'tier'
-            ? partition.tenant
-            : (await import('./video/ingest/video-brief.js')).tenantOfPath(candidate);
+        const owner = partition?.kind === 'tier' ? partition.tenant : tenantOfPath(candidate);
         if (owner !== tenant)
           throw new Error('[VISION_TIER_SCOPE] tile directory belongs to a different tenant');
       }

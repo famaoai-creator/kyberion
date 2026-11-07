@@ -66,6 +66,12 @@ export interface GeneratedArtifactStep {
 // every generator's dependency graph.
 export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
   {
+    id: 'store-roots',
+    script: 'scripts/generate_store_roots.ts',
+    tracked: ['libs/core/foundation/runtime-state-roots.ts'],
+    run: async (argv) => (await import('./generate_store_roots.js')).main(argv),
+  },
+  {
     id: 'op-registry',
     script: 'scripts/generate_op_registry.ts',
     tracked: [
@@ -86,7 +92,7 @@ export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
     id: 'vocabulary-types',
     script: 'scripts/generate_vocabulary_types.ts',
     tracked: [
-      'libs/core/locale-normalize.ts',
+      'libs/core/foundation/locale-normalize.ts',
       'libs/core/knowledge/vocabulary-keys.generated.ts',
       'libs/shared-ui/vanilla/kyberion-ui-vocabulary.js',
     ],
@@ -114,6 +120,15 @@ export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
     script: 'scripts/generate_capability_seams.ts',
     tracked: ['docs/developer/CAPABILITY_SEAMS.md'],
     run: async (argv) => (await import('./generate_capability_seams.js')).main(argv),
+  },
+  {
+    id: 'package-dependency-graph',
+    script: 'scripts/generate_package_dependency_graph.ts',
+    tracked: ['docs/developer/architecture/dependency-graph.mmd'],
+    run: async (argv) =>
+      (await import('./generate_package_dependency_graph.js')).runGeneratePackageDependencyGraph(
+        argv
+      ),
   },
   {
     id: 'subagent-definitions',

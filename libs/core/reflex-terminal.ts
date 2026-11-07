@@ -7,7 +7,7 @@ import * as path from 'node:path';
 import { createLogger } from './logger.js';
 import { ptyEngine } from './shell/pty-engine.js';
 import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
-import { stripAnsi } from './ansi-utils.js';
+import { stripAnsi } from './foundation/ansi-utils.js';
 import { pathResolver } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
 

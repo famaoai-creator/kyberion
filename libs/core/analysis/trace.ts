@@ -9,7 +9,7 @@ import { createHash, randomUUID } from 'crypto';
 import * as path from 'node:path';
 import { getRegisteredEnvText, isCiProcess, isVitestProcess } from '../foundation/env.js';
 import * as pathResolver from '../path-resolver.js';
-import { customerRoot, customerIsConfigured } from '../customer-resolver.js';
+import { stanceLogDir, stanceIsConfigured } from '../stance-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning/reasoning-egress-scope.js';
 import { currentTriggerCorrelation, type TriggerCorrelationScope } from '../trigger-correlation.js';
@@ -162,7 +162,7 @@ export class TraceContext {
       knowledgeRefs: [],
       children: [],
     };
-    const customer = getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || undefined;
+    const customer = getRegisteredEnvText('KYBERION_STANCE')?.trim() || undefined;
     const tenant = getRegisteredEnvText('KYBERION_TENANT')?.trim() || undefined;
     this.trace = {
       traceId: randomUUID(),
@@ -301,21 +301,21 @@ export class TraceContext {
 
 /**
  * Pure (no filesystem mutation) resolution of the directory traces persist
- * to: `customer/{slug}/logs/traces/` when KYBERION_CUSTOMER is active, else
+ * to: `active/shared/logs/stances/{slug}/traces/` when a stance is active, else
  * `active/shared/logs/traces/`. Shared by `traceLogDir()` (which additionally
  * creates the directory) and `persistTrace`'s vitest skip-write path (which
  * must compute the same path without touching disk).
  */
 function resolveTraceLogDirPath(): string {
-  const baseDir = customerIsConfigured()
-    ? path.join(customerRoot('logs/traces')!)
+  const baseDir = stanceIsConfigured()
+    ? stanceLogDir('traces')!
     : path.join(pathResolver.shared('logs/traces'));
   return assertSafeRepositoryPath(baseDir, { allowMissingLeaf: true });
 }
 
 /**
  * Resolve the directory where traces should be persisted as JSONL.
- * - When KYBERION_CUSTOMER is active: customer/{slug}/logs/traces/
+ * - When a stance is active: active/shared/logs/stances/{slug}/traces/
  * - Otherwise: active/shared/logs/traces/
  *
  * Creates the directory if it does not exist.

@@ -192,6 +192,8 @@ Work Visibility Scope、Binding Scope）はそのまま残る。このモデル�
 | P3  | 派生関係             | provenance taint を mission 単位から資産単位に広げ、既存の来歴（ingest asset ledger、memory provenance）を一つの派生関係の参照形式でつなぐ。退会時の削除と保持期間の満了は派生関係をたどる。                                                                                                                                                                                                | テナントの資産を消すと、その要約・蒸留結果・キャッシュ・委譲結果も消える fixture テスト。手書きの削除対象リストが不要になる                                             | proposed   |
 | P4  | 閲覧の開示           | `admitsTenant`（#1407）を管理者の種類（system / tenant / person）で判定する形に一般化し、すべての surface reader をそれに揃える。                                                                                                                                                                                                                                                           | system / 単一テナント / 個人の viewer で、ホーム・あなた待ち・グラフの件数が一致する契約テスト                                                                          | proposed   |
 
+ファイル I/O の門番（tier-guard）でこのモデルを使う土台は、[保存先カタログと許可証による権限判定](./STORE_CATALOG_GRANT_GUARD_DESIGN_2026-11-05.ja.md)（G0〜G4）で先に整える。
+
 各段階は独立した PR とし、P1 から始める。P1 はガバナンスの中核を変えるので、
 独立レビューを必須とする。
 

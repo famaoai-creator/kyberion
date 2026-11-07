@@ -1,0 +1,6 @@
+---
+category: Added
+---
+
+- **`pnpm scope inspect <path> --compare-identity`** — compares the read decision with the custody ceiling of the process's own resolved identity (its tenant binding and approved broker tenants; `assetReadCeilingFor` in `@agent/core/governance/asset-scope-inspection`), and reports whether the path lies within it. The ceiling never comes from a flag value and grants nothing; an identity bound to no tenant reports `identity_unbound`. This is step 1 of the store-catalog guard's `decide`, compared against tier-guard: across every tenant store, the guard allows a cross-tenant read outside the ceiling only on the three known unprotected partitions (`active/projects/personal`, `runtime/surface-management` personal and confidential).
+- **Read ceilings also carry the role's declared tiers** — `assetReadCeilingFor` takes the tier part from the authority role's `tier_access` (public always included). Ten roles whose path grants already read the personal tier now declare it (`chronos_localadmin`, `chronos_operator`, `chronos_tenant_runner`, `generation_scheduler`, `surface_runtime`, `dot_lifecycle_writer`, `knowledge_steward`, `ruthless_auditor`, `slack_bridge`, `software_developer`); `tier_access` is descriptive, so no access changes.

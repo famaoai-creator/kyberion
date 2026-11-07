@@ -18,15 +18,16 @@
  * so the WorkItem, the inbox entry and the notification carry ids only; the
  * customer's comment stays in the confidential case.
  */
-import { withExecutionContext } from '../authority.js';
+import { assertStoreGrantIssuanceAllowed, withExecutionContext } from '../authority.js';
+import { currentExecutionScope, runInExecutionScope } from '../foundation/execution-scope.js';
+import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
 import { logger } from '../core.js';
 import {
-  CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
-  customerDecisionMilestoneCapability,
+  CUSTOMER_DECISION_MILESTONE_GRANT_ISSUANCE_RIGHT,
+  withCustomerDecisionMilestoneCapability,
   type CustomerDecisionMilestoneAccess,
 } from '../foundation/customer-decision-milestone-capability.js';
 import { DELIVERABLE_INBOX_WRITER_ROLE } from '../foundation/deliverable-inbox-writer-capability.js';
-import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
 import { ledgerDir } from '../decision-ledger/ledger.js';
@@ -67,23 +68,34 @@ function diagnosticCode(error: unknown): string {
   return /\[([A-Z0-9_]+)\]/u.exec(message)?.[1] ?? 'error';
 }
 
-/** Run `fn` as the narrow milestone store role inside its exact case capability. */
+/**
+ * Run `fn` inside the exact milestone grant of the case (G2: the grant is the authority; no store
+ * role). Who may issue it is unchanged: the rule that bounded assuming the former shared core role
+ * (RA-02) applies to the issuance right `customer_decision_milestone_store`. The caller keeps its
+ * own role and persona, bound to the case's tenant (no organization), as the tenant-bound role
+ * assumption bound it; a caller bound to another tenant is refused.
+ */
 function asMilestoneStore<T>(
   decisionCase: MissionDecisionCase,
   access: CustomerDecisionMilestoneAccess,
   fn: () => T
 ): T {
+  const tenant = decisionCase.tenantSlug;
   const caseDir = pathResolver.toRepoRelative(ledgerDir(decisionCase.location));
-  return runInResourceAccessScope(
-    customerDecisionMilestoneCapability(decisionCase.tenantSlug, caseDir, access),
-    () =>
-      withExecutionContext(
-        CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
-        fn,
-        undefined,
-        decisionCase.tenantSlug
-      )
-  );
+  assertStoreGrantIssuanceAllowed(CUSTOMER_DECISION_MILESTONE_GRANT_ISSUANCE_RIGHT);
+  return withCustomerDecisionMilestoneCapability(tenant, caseDir, access, () => {
+    const active = resolvePolicyIdentityContext().tenantSlug;
+    if (active && active !== tenant)
+      throw new Error(
+        `[ROLE_TENANT_SCOPE_MISMATCH] customer decision milestone grant for tenant '${tenant}' used by a caller bound to '${active}'`
+      );
+    const {
+      tenantCleared: _cleared,
+      organizationId: _organization,
+      ...current
+    } = currentExecutionScope() ?? { tenantBound: false };
+    return runInExecutionScope({ ...current, tenantBound: true, tenantSlug: tenant }, fn);
+  });
 }
 
 export interface BoltMilestoneResult {

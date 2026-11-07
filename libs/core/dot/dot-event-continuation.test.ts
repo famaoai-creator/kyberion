@@ -1,42 +1,86 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import {
-  spawnManagedProcess,
-  stopManagedProcess,
-  type ManagedProcessHandle,
-} from '../managed-process.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeRmSync,
-  safeWriteFile,
-} from '../secure-io.js';
-import { readJson } from '../foundation/json.js';
-import { enableDotEventContinuation } from './dot-lifecycle.js';
+import * as path from 'node:path';
+import type { ManagedProcessHandle } from '../managed-process.js';
 import type { DotCharter } from './dot-charter.js';
-import {
-  evaluateDotEventTriggers,
-  ingestLocalEvent,
-  readDotInboundEvents,
-  type EventIntakePolicy,
-} from './dot-event-intake.js';
-import { inspectDotEventIntake } from './dot-event-intake-diagnostics.js';
-import {
-  claimEventContinuation,
-  eventContinuationPath,
-  readEventContinuation,
-  initialEventContinuation,
-  writeEventContinuation,
-  reconcileEventRunnerTerminal,
-  EVENT_CONTINUATION_PENDING,
-} from './dot-event-continuation.js';
+import type { EventIntakePolicy } from './dot-event-intake.js';
 import type { DotWakeTool } from './dot-extensions.js';
-import { DOT_WAKE_TOOLS } from './dot-extension-registry.js';
-import { recordDotWakeOutcome, runDotWake } from './dot-runtime.js';
+let spawnManagedProcess: typeof import('../managed-process.js').spawnManagedProcess;
+let stopManagedProcess: typeof import('../managed-process.js').stopManagedProcess;
+let safeAppendFileSync: typeof import('../secure-io.js').safeAppendFileSync;
+let safeExistsSync: typeof import('../secure-io.js').safeExistsSync;
+let safeMkdir: typeof import('../secure-io.js').safeMkdir;
+let safeReadFile: typeof import('../secure-io.js').safeReadFile;
+let safeRmSync: typeof import('../secure-io.js').safeRmSync;
+let safeWriteFile: typeof import('../secure-io.js').safeWriteFile;
+let readJson: typeof import('../foundation/json.js').readJson;
+let enableDotEventContinuation: typeof import('./dot-lifecycle.js').enableDotEventContinuation;
+let evaluateDotEventTriggers: typeof import('./dot-event-intake.js').evaluateDotEventTriggers;
+let ingestLocalEvent: typeof import('./dot-event-intake.js').ingestLocalEvent;
+let readDotInboundEvents: typeof import('./dot-event-intake.js').readDotInboundEvents;
+let inspectDotEventIntake: typeof import('./dot-event-intake-diagnostics.js').inspectDotEventIntake;
+let claimEventContinuation: typeof import('./dot-event-continuation.js').claimEventContinuation;
+let eventContinuationPath: typeof import('./dot-event-continuation.js').eventContinuationPath;
+let readEventContinuation: typeof import('./dot-event-continuation.js').readEventContinuation;
+let initialEventContinuation: typeof import('./dot-event-continuation.js').initialEventContinuation;
+let writeEventContinuation: typeof import('./dot-event-continuation.js').writeEventContinuation;
+let reconcileEventRunnerTerminal: typeof import('./dot-event-continuation.js').reconcileEventRunnerTerminal;
+let EVENT_CONTINUATION_PENDING: typeof import('./dot-event-continuation.js').EVENT_CONTINUATION_PENDING;
+let DOT_WAKE_TOOLS: typeof import('./dot-extension-registry.js').DOT_WAKE_TOOLS;
+let recordDotWakeOutcome: typeof import('./dot-runtime.js').recordDotWakeOutcome;
+let runDotWake: typeof import('./dot-runtime.js').runDotWake;
 
-const ROOT = `active/shared/tmp/dot-event-continuation-tests-${process.pid}-${randomUUID()}`;
+const sourceRoot = process.cwd();
+const fixtureRoot = path.join(sourceRoot, 'active/shared/tmp', `continuation-root-${randomUUID()}`);
+const ROOT = path.join(fixtureRoot, 'active/shared/tmp/events');
+const auditKey = Symbol.for('@kyberion/audit-chain');
+let sourceAudit: PropertyDescriptor | undefined;
+let sourceIo: typeof import('../secure-io.js');
+let sourceContext: typeof import('../authority.js').withExecutionContext;
+beforeAll(async () => {
+  const { seedFirstJobTestRoot } =
+    await import('../../../scripts/fixtures/first-job-approval-fixture.js');
+  sourceIo = await import('../secure-io.js');
+  ({ withExecutionContext: sourceContext } = await import('../authority.js'));
+  seedFirstJobTestRoot(sourceRoot, fixtureRoot);
+  sourceAudit = Object.getOwnPropertyDescriptor(globalThis, auditKey);
+  vi.stubEnv('KYBERION_ROOT', fixtureRoot);
+  vi.stubEnv('VITEST', '');
+  expect(Reflect.deleteProperty(globalThis, auditKey)).toBe(true);
+  vi.resetModules();
+  ({ spawnManagedProcess, stopManagedProcess } = await import('../managed-process.js'));
+  ({ safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } =
+    await import('../secure-io.js'));
+  ({ readJson } = await import('../foundation/json.js'));
+  ({ enableDotEventContinuation } = await import('./dot-lifecycle.js'));
+  ({ evaluateDotEventTriggers, ingestLocalEvent, readDotInboundEvents } =
+    await import('./dot-event-intake.js'));
+  ({ inspectDotEventIntake } = await import('./dot-event-intake-diagnostics.js'));
+  ({
+    claimEventContinuation,
+    eventContinuationPath,
+    readEventContinuation,
+    initialEventContinuation,
+    writeEventContinuation,
+    reconcileEventRunnerTerminal,
+    EVENT_CONTINUATION_PENDING,
+  } = await import('./dot-event-continuation.js'));
+  ({ DOT_WAKE_TOOLS } = await import('./dot-extension-registry.js'));
+  ({ recordDotWakeOutcome, runDotWake } = await import('./dot-runtime.js'));
+  const { pathResolver } = await import('../path-resolver.js');
+  expect(pathResolver.rootDir()).toBe(fixtureRoot);
+  expect(pathResolver.primaryCheckoutRootDir()).toBe(fixtureRoot);
+});
+afterAll(() => {
+  if (sourceAudit) Object.defineProperty(globalThis, auditKey, sourceAudit);
+  else Reflect.deleteProperty(globalThis, auditKey);
+  vi.unstubAllEnvs();
+  sourceContext('ecosystem_architect', () =>
+    sourceIo.safeRmSync(fixtureRoot, { recursive: true, force: true })
+  );
+  vi.resetModules();
+});
+
 const NOW = new Date('2026-10-12T12:00:00Z');
 const deps = { rootDir: ROOT, now: () => NOW };
 const policy: EventIntakePolicy = {
@@ -98,7 +142,13 @@ function child(
       ownerId: 'event-continuation-tests',
       ownerType: 'test',
       command: process.execPath,
-      args: ['--import', './scripts/ts-loader.mjs', '--input-type=module', '-e', code],
+      args: [
+        '--import',
+        path.join(sourceRoot, 'scripts/ts-loader.mjs'),
+        '--input-type=module',
+        '-e',
+        code,
+      ],
       spawnOptions: {
         cwd: process.cwd(),
         env: {
@@ -143,6 +193,12 @@ function child(
 }
 // Match the built package imports: one authority/lock singleton graph in each child.
 const childImports =
+  "import {pathResolver} from '@agent/core/path-resolver';" +
+  'if(pathResolver.rootDir()!==' +
+  JSON.stringify(fixtureRoot) +
+  '||pathResolver.primaryCheckoutRootDir()!==' +
+  JSON.stringify(fixtureRoot) +
+  " )throw new Error('Continuation child escaped its fixture root');" +
   "import {safeReadFile,safeAppendFileSync} from '@agent/core/secure-io';" +
   "import {withExecutionContextAsync} from '@agent/core/authority';" +
   "import {evaluateDotEventTriggers} from '@agent/core/dot/dot-event-intake';" +

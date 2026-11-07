@@ -6,7 +6,7 @@
  * they are resolved per request locale — never the process default — by
  * the transport (`resolvePadLocale(req)` in `server.ts`).
  */
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import { resolveLocale } from '@agent/core/locale';
 import type { VocabularyKey } from '@agent/core/t';
 import { padT, padTexts, type PadTranslator } from '../lib/pad-ui.js';

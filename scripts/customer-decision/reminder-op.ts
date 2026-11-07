@@ -6,8 +6,8 @@
  * process, the same way the customer room does: an explicit env without
  * SYSTEM_ROLE and without the ambient role / persona / sudo / mission keys,
  * bound to the tenant the run is bound to. The facade then assumes its own
- * narrow roles (decision_ledger, customer_decision_invite_store, the inbox's
- * shared writer) exactly as when an operator runs `customer-decision remind`,
+ * narrow roles (decision_ledger, the inbox's shared writer) and issues its own
+ * exact invite capability exactly as when an operator runs `customer-decision remind`,
  * so a pipeline runner under any SYSTEM_ROLE never reaches those roles and no
  * role assumption policy changes.
  *

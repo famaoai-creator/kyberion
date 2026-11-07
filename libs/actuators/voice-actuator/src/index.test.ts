@@ -411,7 +411,7 @@ vi.mock('@agent/core/virtual/virtual-audio-output-playback-bridge', () => ({
 vi.mock('@agent/core/virtual/virtual-device-inventory-bridge', () => ({
   createVirtualDeviceInventoryBridge: mocks.createVirtualDeviceInventoryBridge,
 }));
-vi.mock('@agent/core/voice/voice-path-policy', () => ({
+vi.mock('@agent/shared-voice/voice-path-policy', () => ({
   resolveVoicePath: vi.fn((value: string) => value),
 }));
 vi.mock('@agent/core/voice/voice-engine-registry', async () => {
@@ -459,20 +459,20 @@ vi.mock('@agent/core/voice/voice-profile-registry', () => ({
   materializeVoiceProfileSampleRefs: mocks.materializeVoiceProfileSampleRefs,
   writeVoiceProfileRegistry: mocks.writeVoiceProfileRegistry,
 }));
-vi.mock('@agent/core/voice/voice-runtime-policy', () => ({
+vi.mock('@agent/shared-voice/voice-runtime-policy', () => ({
   getVoiceRuntimePolicy: mocks.getVoiceRuntimePolicy,
 }));
-vi.mock('@agent/core/voice/voice-tts-config', () => ({
+vi.mock('@agent/shared-voice/voice-tts-config', () => ({
   getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
 }));
-vi.mock('@agent/core/voice/voice-sample-ingestion-policy', () => ({
+vi.mock('@agent/shared-voice/voice-sample-ingestion-policy', () => ({
   getVoiceSampleIngestionPolicy: mocks.getVoiceSampleIngestionPolicy,
   validateVoiceProfileRegistration: mocks.validateVoiceProfileRegistration,
 }));
-vi.mock('@agent/core/voice/voice-sample-collection', () => ({
+vi.mock('@agent/shared-voice/voice-sample-collection', () => ({
   collectVoiceSamples: mocks.collectVoiceSamples,
 }));
-vi.mock('@agent/core/voice/voice-sample-recorder', () => ({
+vi.mock('@agent/shared-voice/voice-sample-recorder', () => ({
   recordVoiceSample: mocks.recordVoiceSample,
 }));
 vi.mock('@agent/core/voice/voice-text-chunking', () => ({
@@ -481,13 +481,13 @@ vi.mock('@agent/core/voice/voice-text-chunking', () => ({
 vi.mock('@agent/core/tool/tool-runtime-registry', () => ({
   listToolRuntimeInventory: mocks.listToolRuntimeInventory,
 }));
-vi.mock('@agent/core/voice/voice-capability-bridge', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core/voice/voice-capability-bridge')>(
-    '@agent/core/voice/voice-capability-bridge'
-  );
+vi.mock('@agent/shared-voice/voice-capability-bridge', async () => {
+  const actual = await vi.importActual<
+    typeof import('@agent/shared-voice/voice-capability-bridge')
+  >('@agent/shared-voice/voice-capability-bridge');
   return actual;
 });
-vi.mock('@agent/core/voice/voice-generation-runtime', () => ({
+vi.mock('@agent/shared-voice/voice-generation-runtime', () => ({
   VoiceGenerationRuntime: class {
     private packet: any = null;
     private listeners = new Set<(packet: any) => void>();

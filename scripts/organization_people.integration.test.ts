@@ -187,7 +187,7 @@ describe('people management through real secure IO', () => {
     'uses the actual Concierge and governed browser with synthetic approvals',
     async () => {
       const io = await import('@agent/core/secure-io');
-      const authn = await import('@agent/core/authn-providers');
+      const authn = await import('@agent/core/authn/authn-providers');
       const approvals = await import('@agent/core/governance/approval-store');
       const external = await import('@agent/core/governance/external-operation');
       const browser = await import('../libs/actuators/browser-actuator/src/index.js');

@@ -2,7 +2,7 @@
  * (gh-cli by default, github-rest where gh is absent). No caller-supplied
  * check names or pass flags are accepted as CI authority. An explicit `run`
  * keeps driving a gh CLI built on that runner (tests, injected transports). */
-import { computeApprovalPayloadHash } from '../governance/approval-store.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
 import type { GhCallOptions } from './github.js';
 import type { VcsCommandRunner } from './git.js';
 import {

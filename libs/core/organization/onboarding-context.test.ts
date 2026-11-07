@@ -24,9 +24,11 @@ import {
 const rootDir = path.join(process.cwd(), 'active/shared/tmp/onboarding-context-test');
 
 function seedFixture(): void {
-  safeMkdir(path.join(rootDir, 'customer', 'acme-ai', 'onboarding'), { recursive: true });
+  safeMkdir(path.join(rootDir, 'knowledge', 'personal', 'stances', 'acme-ai', 'onboarding'), {
+    recursive: true,
+  });
   safeWriteFile(
-    path.join(rootDir, 'customer', 'acme-ai', 'organization-profile.json'),
+    path.join(rootDir, 'knowledge', 'confidential', 'acme-ai', 'organization-profile.json'),
     JSON.stringify({
       version: '1.0.0',
       organization_id: 'org-acme-ai',
@@ -45,7 +47,7 @@ function seedFixture(): void {
       assigned_role: 'owner',
       isolation_policy: { strict_isolation: true, allow_cross_distillation: false },
     },
-    { rootDir, env: { KYBERION_CUSTOMER: 'acme-ai' } }
+    { rootDir, env: { KYBERION_STANCE: 'acme-ai' } }
   );
 }
 
@@ -101,8 +103,24 @@ afterAll(() => {
 
 describe('onboarding context binding', () => {
   it('reads only regular existing files for onboarding snapshots', () => {
-    const filePath = path.join(rootDir, 'customer', 'acme-ai', 'onboarding', 'snapshot.json');
-    const directoryPath = path.join(rootDir, 'customer', 'acme-ai', 'onboarding', 'snapshot-dir');
+    const filePath = path.join(
+      rootDir,
+      'knowledge',
+      'personal',
+      'stances',
+      'acme-ai',
+      'onboarding',
+      'snapshot.json'
+    );
+    const directoryPath = path.join(
+      rootDir,
+      'knowledge',
+      'personal',
+      'stances',
+      'acme-ai',
+      'onboarding',
+      'snapshot-dir'
+    );
     safeWriteFile(filePath, '{"ok":true}', { mkdir: true });
     safeMkdir(directoryPath, { recursive: true });
 
@@ -178,7 +196,9 @@ describe('onboarding context binding', () => {
   });
 
   it('rejects an unregistered tenant before producing a binding', () => {
-    safeMkdir(path.join(rootDir, 'customer', 'acme-ai'), { recursive: true });
+    safeMkdir(path.join(rootDir, 'knowledge', 'personal', 'stances', 'acme-ai'), {
+      recursive: true,
+    });
     expect(() =>
       resolveOnboardingContext({
         customerSlug: 'acme-ai',
@@ -259,7 +279,7 @@ describe('onboarding context binding', () => {
         status: 'suspended',
         assigned_role: 'owner',
       },
-      { rootDir, env: { KYBERION_CUSTOMER: 'acme-ai' } }
+      { rootDir, env: { KYBERION_STANCE: 'acme-ai' } }
     );
 
     expect(() =>
@@ -295,14 +315,20 @@ describe('onboarding context binding', () => {
 
   it('fails closed when an onboarding binding is a directory instead of a record', () => {
     seedFixture();
-    safeMkdir(path.join(rootDir, 'customer/acme-ai/onboarding/organization-context.json'), {
-      recursive: true,
-    });
+    safeMkdir(
+      path.join(rootDir, 'knowledge/personal/stances/acme-ai/onboarding/organization-context.json'),
+      {
+        recursive: true,
+      }
+    );
 
     expect(() => loadOnboardingContextBinding('acme-ai', rootDir)).toThrow(/regular file/);
     expect(
       safeLstat(
-        path.join(rootDir, 'customer/acme-ai/onboarding/organization-context.json')
+        path.join(
+          rootDir,
+          'knowledge/personal/stances/acme-ai/onboarding/organization-context.json'
+        )
       ).isDirectory()
     ).toBe(true);
   });

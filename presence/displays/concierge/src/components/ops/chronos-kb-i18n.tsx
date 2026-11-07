@@ -2,7 +2,7 @@
 
 import { useMemo, type ReactNode } from 'react';
 import { KbI18nProvider } from '@agent/shared-ui';
-import { buildUiMessageBundle } from '@agent/core/locale-normalize';
+import { buildUiMessageBundle } from '@agent/core/foundation/locale-normalize';
 import vocabularyCatalog from '../../../../../../knowledge/product/orchestration/user-facing-vocabulary.json';
 import { useChronosLocale } from '../../lib/ops/hooks';
 

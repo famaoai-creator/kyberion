@@ -12,14 +12,14 @@ const identity = vi.hoisted(() => ({ displayName: 'Alice Example' }));
 // Separation of duties is switched through a customer overlay of the real
 // approval policy, the way an operator enables it.
 const sod = vi.hoisted(() => ({ overlayPath: null as string | null, file: '' }));
-vi.mock('@agent/core/customer-resolver', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/customer-resolver')>();
+vi.mock('@agent/core/stance-resolver', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/stance-resolver')>();
   return {
     ...actual,
-    customerRoot: (subPath = '', ...rest: unknown[]) =>
+    stanceRoot: (subPath = '', ...rest: unknown[]) =>
       subPath === 'policy/approval-policy.json' && sod.overlayPath
         ? sod.overlayPath
-        : (actual.customerRoot as (...args: unknown[]) => string | null)(subPath, ...rest),
+        : (actual.stanceRoot as (...args: unknown[]) => string | null)(subPath, ...rest),
   };
 });
 

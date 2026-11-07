@@ -11,7 +11,7 @@ import type { A2UIMessage } from '../a2ui.js';
 import type { AgentContextMode } from '../context-boundary.js';
 import type { AgentRoutingDecision } from '../intent/intent-contract.js';
 import type { IntentResolutionContract } from '../intent/intent-resolution-contract.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import type {
   ExecutionFeedbackInput,
   ExecutionFeedbackRecord,

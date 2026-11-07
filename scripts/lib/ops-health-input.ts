@@ -14,7 +14,7 @@ import {
   listOperatorExcludedSchedules,
   loadScheduleRegistry,
   type ScheduledPipeline,
-} from '@agent/core/pipeline-scheduler';
+} from '@agent/core/pipeline/pipeline-scheduler';
 import { readJanitorLastRunMs } from '@agent/core/storage-janitor';
 import { loadSurfaceManifest } from '@agent/core/surface/surface-runtime';
 import { inspectInstalledUnits } from '@agent/core/daemon/installed-units';

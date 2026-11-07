@@ -61,7 +61,7 @@ export const REVIEWED_INFEASIBLE_ASSUMPTIONS: Array<{
   {
     systemRoles: ['computer_surface', 'presence_studio'],
     role: 'chronos_token_registry_reader',
-    site: 'libs/core/authn-providers.ts#loadRegistrations',
+    site: 'libs/core/authn/authn-providers.ts#loadRegistrations',
     rationale:
       'TR-01: computer-surface/auth.ts and presence-studio/security.ts resolve viewers with `registrations: null`, so the registry-token provider never reads the Chronos token registry; pinned by libs/core/chronos-token-registry-reader.test.ts',
   },

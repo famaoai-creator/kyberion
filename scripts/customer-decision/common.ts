@@ -33,7 +33,7 @@ import { ScriptExitError } from '../lib/harness.js';
 /** Agendas, receipts, switches, brief input, ledger and customer actors (tenant-bound). */
 export const LEDGER_ROLE = DECISION_LEDGER_ROLES.write;
 /**
- * Deal notes under `customer/<tenant>/deals/` only: the narrow tenant-bound
+ * Deal notes under `knowledge/confidential/<tenant>/deals/` only: the narrow tenant-bound
  * deal-note writer, never mission_controller — `respond` is customer-triggered.
  */
 export const DEAL_NOTE_ROLE = 'customer_decision_deal_note_writer';

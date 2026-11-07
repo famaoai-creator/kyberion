@@ -203,9 +203,18 @@ beforeEach(() => {
   fixture.onPreflight = undefined;
   fixture.verificationCalls = 0;
   modify(() => {
-    safeMkdir(path.join(fixture.rootDir, 'customer', scope.customerSlug), { recursive: true });
+    safeMkdir(path.join(fixture.rootDir, 'knowledge', 'personal', 'stances', scope.customerSlug), {
+      recursive: true,
+    });
     safeWriteFile(
-      path.join(fixture.rootDir, 'customer', scope.customerSlug, 'organization-profile.json'),
+      path.join(
+        fixture.rootDir,
+        'knowledge',
+        'personal',
+        'stances',
+        scope.customerSlug,
+        'organization-profile.json'
+      ),
       JSON.stringify({
         version: '1.0.0',
         organization_id: scope.organizationId,
@@ -348,9 +357,18 @@ describe('exact human tenant activation approval', () => {
     };
     fixture.identityTenant = companyTenant;
     modify(() => {
-      safeMkdir(path.join(fixture.rootDir, 'customer', companyTenant), { recursive: true });
+      safeMkdir(path.join(fixture.rootDir, 'knowledge', 'personal', 'stances', companyTenant), {
+        recursive: true,
+      });
       writeJson(
-        path.join(fixture.rootDir, 'customer', companyTenant, 'organization-profile.json'),
+        path.join(
+          fixture.rootDir,
+          'knowledge',
+          'personal',
+          'stances',
+          companyTenant,
+          'organization-profile.json'
+        ),
         {
           version: '1.0.0',
           organization_id: companyTenant,
@@ -409,7 +427,14 @@ describe('exact human tenant activation approval', () => {
         results,
       });
       writeJson(
-        path.join(fixture.rootDir, 'customer', companyTenant, 'onboarding/web-company-setup.json'),
+        path.join(
+          fixture.rootDir,
+          'knowledge',
+          'personal',
+          'stances',
+          companyTenant,
+          'onboarding/web-company-setup.json'
+        ),
         {
           evidenceRef: path.relative(fixture.rootDir, file),
           probePassed: true,
@@ -420,7 +445,7 @@ describe('exact human tenant activation approval', () => {
     const originalReadTenant = tenantRegistry.readTenantProfile;
     const originalReadBinding = onboarding.loadOnboardingContextBinding;
     const realRoot = pathResolver.rootDir();
-    const companyRoot = path.join(realRoot, 'customer', companyTenant);
+    const companyRoot = path.join(realRoot, 'knowledge', 'personal', 'stances', companyTenant);
     const remap = (file: string) =>
       file === companyRoot || file.startsWith(companyRoot + path.sep)
         ? path.join(fixture.rootDir, path.relative(realRoot, file))
@@ -595,7 +620,9 @@ describe('exact human tenant activation approval', () => {
           modify(() => {
             const file = path.join(
               fixture.rootDir,
-              'customer',
+              'knowledge',
+              'personal',
+              'stances',
               scope.customerSlug,
               'onboarding/organization-context.json'
             );

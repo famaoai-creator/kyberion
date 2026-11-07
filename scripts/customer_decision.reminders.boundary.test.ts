@@ -157,7 +157,7 @@ beforeAll(async () => {
       status: 'active',
       assigned_role: 'owner',
     });
-    writeFixtureJson(`customer/${tenant}/connections/channel-bindings.json`, {
+    writeFixtureJson(`knowledge/confidential/${tenant}/connections/channel-bindings.json`, {
       bindings: [
         { surface: 'slack', channel_id: 'C-ACME', active: true },
         ...(tenant === MOVE ? [{ surface: 'telegram', channel_id: 'T-ACME', active: true }] : []),

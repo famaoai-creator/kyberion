@@ -1,5 +1,5 @@
 import { isSensitiveScreenText } from './frame-redaction.js';
-import type { OcrResult } from './ocr-types.js';
+import type { OcrResult } from './contracts/ocr-types.js';
 
 /**
  * Set-of-Marks fusion.

@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { TENANT_DEALS_DIR, TENANT_HOME_ROOT } from './organization/tenant-home.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { createHash } from 'node:crypto';
 import { writeJson } from './foundation/json.js';
@@ -23,6 +24,7 @@ import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import {
   advanceDealStage,
   appendDealNote,
+  asDealStore,
   buildQuoteFromPriceBook,
   getDeal,
   loadPriceBook,
@@ -60,7 +62,7 @@ function dealDocsDir(tenantSlug: string, dealId: string): string {
     throw new Error(`[DEAL_SCOPE] invalid deal id: ${dealId}`);
   }
   return assertSafeRepositoryPath(
-    pathResolver.rootResolve(path.join('customer', tenantSlug, 'deals', dealId)),
+    pathResolver.rootResolve(path.join(TENANT_HOME_ROOT, tenantSlug, TENANT_DEALS_DIR, dealId)),
     { allowMissingLeaf: true }
   );
 }
@@ -69,19 +71,18 @@ function dealDocumentPath(dir: string, fileName: string): string {
   return assertSafeRepositoryPath(path.join(dir, fileName), { allowMissingLeaf: true });
 }
 
-export function isRegularDealDocumentPath(filePath: string): boolean {
-  if (!safeExistsSync(filePath)) return false;
+export function isRegularDealDocumentPath(filePath: string, tenantSlug: string): boolean {
   try {
-    return safeLstat(filePath).isFile();
+    return asDealStore(tenantSlug, () => safeExistsSync(filePath) && safeLstat(filePath).isFile());
   } catch {
     return false;
   }
 }
 
-function nextVersion(dir: string, prefix: string): number {
-  if (!safeExistsSync(dir)) return 1;
+function nextVersion(tenantSlug: string, dir: string, prefix: string): number {
   try {
-    const versions = safeReaddir(dir)
+    const entries = asDealStore(tenantSlug, () => (safeExistsSync(dir) ? safeReaddir(dir) : []));
+    const versions = entries
       .map((entry) => entry.match(new RegExp(`^${prefix}-v(\\d+)\\.`)))
       .filter(Boolean)
       .map((match) => Number(match![1]));
@@ -131,6 +132,17 @@ function contractReviewCatalog(filePath: string) {
 }
 
 export function loadContractReviewAtPath(
+  filePath: string,
+  tenantSlug: string,
+  dealId: string,
+  version: number
+): ContractReviewRecord {
+  return asDealStore(tenantSlug, () =>
+    loadContractReviewAsStore(filePath, tenantSlug, dealId, version)
+  );
+}
+
+function loadContractReviewAsStore(
   filePath: string,
   tenantSlug: string,
   dealId: string,
@@ -194,11 +206,13 @@ export function generateQuoteForDeal(input: {
     // and the task kinds can come from customer text. The list stays in the
     // tenant's deal folder.
     const dir = dealDocsDir(input.tenantSlug, input.dealId);
-    safeMkdir(dir, { recursive: true });
-    writeJson(dealDocumentPath(dir, UNQUOTABLE_FILE), {
-      deal_id: deal.deal_id,
-      recorded_at: nowIso(),
-      unquotable: quote.unquotable,
+    asDealStore(input.tenantSlug, () => {
+      safeMkdir(dir, { recursive: true });
+      writeJson(dealDocumentPath(dir, UNQUOTABLE_FILE), {
+        deal_id: deal.deal_id,
+        recorded_at: nowIso(),
+        unquotable: quote.unquotable,
+      });
     });
     void notifyOperator('question', {
       title: `見積不能項目あり (${input.tenantSlug} / ${deal.deal_id})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
@@ -208,22 +222,24 @@ export function generateQuoteForDeal(input: {
     return { ok: false, unquotable: quote.unquotable };
   }
   const dir = dealDocsDir(input.tenantSlug, input.dealId);
-  safeMkdir(dir, { recursive: true });
-  const version = nextVersion(dir, 'quote');
+  const version = nextVersion(input.tenantSlug, dir, 'quote');
   const quoteRef = path.join(
-    'customer',
+    TENANT_HOME_ROOT,
     input.tenantSlug,
-    'deals',
+    TENANT_DEALS_DIR,
     input.dealId,
     `quote-v${version}.md`
   );
   const quoteJsonPath = dealDocumentPath(dir, `quote-v${version}.json`);
   const canonicalQuote = quoteResultCatalog(quoteJsonPath).validate(quote, quoteJsonPath);
-  safeWriteFile(quoteJsonPath, JSON.stringify(canonicalQuote, null, 2));
-  safeWriteFile(
-    dealDocumentPath(dir, `quote-v${version}.md`),
-    renderQuoteMarkdown(deal, quote, version)
-  );
+  asDealStore(input.tenantSlug, () => {
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(quoteJsonPath, JSON.stringify(canonicalQuote, null, 2));
+    safeWriteFile(
+      dealDocumentPath(dir, `quote-v${version}.md`),
+      renderQuoteMarkdown(deal, quote, version)
+    );
+  });
   const advanced = advanceDealStage({
     tenantSlug: input.tenantSlug,
     dealId: input.dealId,
@@ -287,16 +303,18 @@ export function draftContractForDeal(input: {
     .split('{{QUOTE_REF}}')
     .join(deal.quote_ref || '(未発行)');
   const dir = dealDocsDir(input.tenantSlug, input.dealId);
-  safeMkdir(dir, { recursive: true });
-  const version = nextVersion(dir, 'contract');
+  const version = nextVersion(input.tenantSlug, dir, 'contract');
   const contractRef = path.join(
-    'customer',
+    TENANT_HOME_ROOT,
     input.tenantSlug,
-    'deals',
+    TENANT_DEALS_DIR,
     input.dealId,
     `contract-v${version}.md`
   );
-  safeWriteFile(dealDocumentPath(dir, `contract-v${version}.md`), rendered);
+  asDealStore(input.tenantSlug, () => {
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(dealDocumentPath(dir, `contract-v${version}.md`), rendered);
+  });
   const advanced = advanceDealStage({
     tenantSlug: input.tenantSlug,
     dealId: input.dealId,
@@ -339,8 +357,10 @@ export function recordContractReview(input: {
     },
     filePath
   );
-  safeMkdir(dir, { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(record, null, 2));
+  asDealStore(input.tenantSlug, () => {
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(filePath, JSON.stringify(record, null, 2));
+  });
   return filePath;
 }
 
@@ -350,7 +370,7 @@ function contractReviewApproved(tenantSlug: string, dealId: string, version: num
     `contract-review-v${version}.json`
   );
   try {
-    if (!safeExistsSync(filePath)) return false;
+    if (!asDealStore(tenantSlug, () => safeExistsSync(filePath))) return false;
     const record = loadContractReviewAtPath(filePath, tenantSlug, dealId, version);
     return record.verdict === 'approve';
   } catch {
@@ -380,7 +400,7 @@ export async function sendDealDocumentToCustomer(input: {
     dealDocsDir(tenantSlug, input.dealId),
     `${input.kind}-v${input.version}.md`
   );
-  if (!isRegularDealDocumentPath(docPath)) {
+  if (!isRegularDealDocumentPath(docPath, tenantSlug)) {
     return {
       sent: false,
       status: 'blocked',
@@ -396,7 +416,7 @@ export async function sendDealDocumentToCustomer(input: {
     );
     return { sent: false, status: 'blocked', reason: 'contract_review_required' };
   }
-  const body = readTextFile(docPath);
+  const body = asDealStore(tenantSlug, () => readTextFile(docPath));
   const result = await sendToCustomer({
     binding: input.binding,
     title: `${input.kind === 'quote' ? 'お見積書' : '契約書ドラフト'} (${input.dealId} v${input.version})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable

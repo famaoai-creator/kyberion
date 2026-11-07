@@ -34,7 +34,7 @@ import {
   completeScheduledPipelineRun,
   listOperatorExcludedSchedules,
   listScheduledPipelines,
-} from '@agent/core/pipeline-scheduler';
+} from '@agent/core/pipeline/pipeline-scheduler';
 import {
   enqueueChronosDelivery,
   validateChronosDeliveryTarget,

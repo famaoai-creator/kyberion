@@ -141,7 +141,7 @@ describe('pipeline approval resume', () => {
               KYBERION_TIER: 'confidential',
               KYBERION_ORGANIZATION_ID: 'org-original',
               KYBERION_PROJECT_ID: 'project-original',
-              KYBERION_CUSTOMER: 'customer-original',
+              KYBERION_STANCE: 'customer-original',
               KYBERION_NHI_ACTOR: 'enforce',
               KYBERION_NHI_ID: 'nhi-original',
               KYBERION_AGENT_ID: 'agent-original',

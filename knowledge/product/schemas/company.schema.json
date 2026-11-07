@@ -8,8 +8,7 @@
     "tenant_slug",
     "name",
     "sovereign",
-    "customer_ref",
-    "identity_ref",
+    "company_ref",
     "organization_profile_ref",
     "vision_ref",
     "org_chart_ref",
@@ -33,10 +32,7 @@
     "sovereign": {
       "type": ["string", "null"]
     },
-    "customer_ref": {
-      "$ref": "#/$defs/componentRef"
-    },
-    "identity_ref": {
+    "company_ref": {
       "$ref": "#/$defs/componentRef"
     },
     "organization_profile_ref": {
@@ -85,7 +81,7 @@
         },
         "source_kind": {
           "type": "string",
-          "enum": ["customer", "tenant", "global"]
+          "enum": ["tenant", "global"]
         },
         "title": {
           "type": ["string", "null"]

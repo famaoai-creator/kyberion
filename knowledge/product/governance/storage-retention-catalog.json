@@ -39,7 +39,7 @@
       "ttl_days": 7,
       "action": "delete",
       "audit": true,
-      "note": "Kyberion -> Chrome extension pull mailbox (libs/core/browser/browser-bridge-mailbox.ts), one JSON per request under <tier>/<tenant|shared>/. Requests live at most 60 minutes and are swept to expired on the next poll; enqueue is audited on the audit chain, so the files are consumable request/response hand-offs. A 7d grace lets a caller read a late response; tenant offboarding purges the tenant partitions."
+      "note": "Kyberion -> Chrome extension pull mailbox (libs/shared-vision/src/browser-bridge-mailbox.ts), one JSON per request under <tier>/<tenant|shared>/. Requests live at most 60 minutes and are swept to expired on the next poll; enqueue is audited on the audit chain, so the files are consumable request/response hand-offs. A 7d grace lets a caller read a late response; tenant offboarding purges the tenant partitions."
     },
     {
       "path": "active/shared/runtime/customer-decision-invites",
@@ -678,10 +678,10 @@
       "note": "Single-file pointer to the operator's current mission focus (mission-system.ts / agent-dispatch.ts), rewritten in place."
     },
     {
-      "path": "active/shared/runtime/customer.env",
+      "path": "active/shared/runtime/stance.env",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Active customer overlay selector written by scripts/customer_switch.ts / company_onboarding.ts; rewritten in place."
+      "note": "Active customer overlay selector written by scripts/stance_switch.ts / company_onboarding.ts; rewritten in place."
     },
     {
       "path": "active/shared/runtime/scope.env",
@@ -831,6 +831,12 @@
       "ttl_days": 90,
       "action": "delete",
       "note": "MSN-STORE-BOUNDS-2: raw-union archives written by write-time store maintenance (append-only-store.ts writeTimeArchiveDir: <store dir>/compaction-archive/) for top-level runtime stores such as dot-feedback.jsonl and dot-token-usage.jsonl. Store writers cannot write active/archive/, so the archive sits next to the store, keeping its tier/tenant partition. Kept 90 days, like other observability evidence."
+    },
+    {
+      "path": "active/shared/runtime/audit-mirror",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "S2: per-tenant copy of the master audit chain (libs/core/governance/audit-chain.ts, TENANT_AUDIT_MIRROR_ROOT_PATH): confidential/<tenant>/audit-<date>.jsonl, appended as the tenant-bound audit_mirror_writer only (storage-layout TENANT_STORE_LEDGER_ROOTS); formerly customer/<tenant>/logs/audit/. No TTL of its own: a day file expires together with the master day file (storage-retention-expiry auditChainDayMirrors), and audit_mirror_reconcile rebuilds a drifted copy from the master. personal/confidential subtrees are tenant_scope protected prefixes; tenant offboarding removes a tenant's partition."
     },
     {
       "path": "active/shared/runtime/tenant-approvals",
@@ -1033,7 +1039,7 @@
       "artifact_class": "log",
       "ttl_days": 30,
       "action": "delete",
-      "note": "Realtime voice conversation sessions (libs/core/voice/realtime-voice-conversation.ts) — conversation log, same 30d as peer-conversations / a2a-conversations."
+      "note": "Realtime voice conversation sessions (libs/shared-voice/src/realtime-voice-conversation.ts) — conversation log, same 30d as peer-conversations / a2a-conversations."
     },
     {
       "path": "active/shared/runtime/security",
@@ -1053,7 +1059,7 @@
       "artifact_class": "cache",
       "action": "delete",
       "backup": "exclude",
-      "note": "Synthesized first-phrase audio cache (libs/core/voice/voice-first-phrase-cache.ts); self-evicting LRU (maxEntries, default 64), regenerable."
+      "note": "Synthesized first-phrase audio cache (libs/shared-voice/src/voice-first-phrase-cache.ts); self-evicting LRU (maxEntries, default 64), regenerable."
     },
     {
       "path": "active/shared/runtime/web-push",

@@ -118,7 +118,7 @@ import {
   footerElements,
   resolvePptxPalette,
   sectionHeaderElements,
-} from './media/native-pptx-engine/layout-primitives.js';
+} from '@agent/shared-media/native-pptx-engine/layout-primitives';
 
 const REAL_ROOT = process.cwd();
 const DEFAULTS_REL = 'knowledge/public/design-patterns/semantic-design-tokens.json';

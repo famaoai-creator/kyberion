@@ -12,11 +12,18 @@ const st = vi.hoisted(() => ({
   tenantRead: vi.fn(),
   tenantPath: vi.fn(),
 }));
-vi.mock('../authority.js', () => ({
-  withExecutionContextAsync: async (_role: string, fn: () => unknown) => fn(),
-  resolveRole: () => 'concierge',
-}));
-vi.mock('../foundation/resource-access-scope.js', () => ({
+vi.mock('../authority.js', async () => {
+  const { runInExecutionScope } = await import('../foundation/execution-scope.js');
+  return {
+    // The management grant binds to a real execution scope (G2).
+    withExecutionContextAsync: async (role: string, fn: () => unknown) =>
+      runInExecutionScope({ tenantBound: false, assumedRole: role }, fn),
+    assertStoreGrantIssuanceAllowed: () => undefined,
+    resolveRole: () => 'concierge',
+  };
+});
+vi.mock('../foundation/resource-access-scope.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../foundation/resource-access-scope.js')>()),
   runInResourceAccessScope: async (scope: unknown, fn: () => unknown) => {
     st.scope(scope);
     return fn();

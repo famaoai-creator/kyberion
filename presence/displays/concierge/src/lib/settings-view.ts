@@ -7,7 +7,7 @@
  *
  * Translation stays with the caller: the catalog only names vocabulary keys.
  */
-import { segmentKeywordTerms } from '@agent/core/locale-normalize';
+import { segmentKeywordTerms } from '@agent/core/foundation/locale-normalize';
 import type { FrontDeskMessageKey } from './i18n';
 import {
   SETUP_CHECKLIST_ANCHORS,
