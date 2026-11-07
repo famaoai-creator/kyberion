@@ -3,7 +3,7 @@ import { dotItemWorkBindingMismatch } from './dot-executor-reports.js';
 import { assertOperationBinding } from './dot-lifecycle.js';
 import { orderExecutorCharters, recordExecutorTurn } from './dot-executor-scheduling.js';
 import { hasFirstJobDiagnosticProvenance } from '../surface/first-job-approval-proof.js';
-import { loadApprovalRequest } from '../governance/approval-store.js';
+import { loadApprovalRequest } from '../governance/approval-store-reader.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
 import { assertBuiltinOnlyWorkerEventStream } from '../workforce/worker-event-stream.js';
 import {

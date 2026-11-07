@@ -14,10 +14,10 @@ import * as secureIo from '../secure-io.js';
 
 vi.mock('../foundation/json.js', () => ({
   readJson: <T>(filePath: string) => {
-    if (filePath.includes('procedures.schema.json')) {
-      return JSON.parse(
-        fs.readFileSync(path.resolve('knowledge/product/schemas/procedures.schema.json'), 'utf8')
-      ) as T;
+    // Catalog stubs must never replace governance schemas loaded by the
+    // reasoning backend's independently validated policy catalogs.
+    if (filePath.includes(`${path.sep}knowledge${path.sep}product${path.sep}schemas${path.sep}`)) {
+      return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
     }
     const value = JSON.parse(String(secureIo.safeReadFile(filePath, { encoding: 'utf8' }))) as T;
     const hasDangerousKey = (candidate: unknown): boolean => {

@@ -301,7 +301,8 @@ describe('operator home summary', () => {
       ...(scope ? { scope } : {}),
       ...extra,
     });
-    vi.doMock('../governance/approval-store.js', () => ({
+    // listApprovalRequests is defined in approval-store-reader, which the summary imports.
+    vi.doMock('../governance/approval-store-reader.js', () => ({
       listApprovalRequests: () => [
         approval('APR-TENANT', { tier: 'public', tenant_slug: 'tenant-a' }),
         approval('APR-TIER-ONLY', { tier: 'public' }),
@@ -373,6 +374,6 @@ describe('operator home summary', () => {
     });
     expect(tenant.activeMissions.map((mission) => mission.missionId)).toEqual(['MSN-TENANT']);
     expect(tenant.pendingApprovals.map((item) => item.id)).toEqual(['APR-TENANT']);
-    vi.doUnmock('../governance/approval-store.js');
+    vi.doUnmock('../governance/approval-store-reader.js');
   });
 });

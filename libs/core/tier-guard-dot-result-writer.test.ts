@@ -5,6 +5,7 @@ import * as paths from './path-resolver.js';
 import { resetRoleAssumptionPolicyCache, withExecutionContext } from './authority.js';
 import { validateReadPermission, validateWritePermission } from './tier-guard.js';
 import {
+  createSynchronousResourceGrantIssuer,
   currentResourceAccessScope,
   runInResourceAccessScope,
   type ResourceAccessScope,
@@ -13,6 +14,7 @@ import {
   withDotResultStoreCapability,
   isDotResultStoreCapability,
   type DotResultStoreBinding,
+  type DotResultStoreOperation,
 } from './foundation/dot-result-store-capability.js';
 import {
   safeMkdir,
@@ -48,10 +50,11 @@ const binding = (): DotResultStoreBinding => ({
   file,
 });
 const at = (value = file) => path.join(root, value);
-const writer = <T>(fn: () => T) =>
-  withExecutionContext('dot_result_writer', fn, undefined, tenant, 'org-a');
-const append = <T>(fn: () => T) =>
-  withDotResultStoreCapability(binding(), 'append_result', () => writer(fn));
+// G2: the grant alone authorizes DOT result I/O; there is no store role to assume.
+const writer = <T>(fn: () => T): T => fn();
+const append = <T>(fn: () => T) => withDotResultStoreCapability(binding(), 'append_result', fn);
+const assumeRemovedRole = () =>
+  withExecutionContext('dot_result_writer', () => undefined, undefined, tenant, 'org-a');
 beforeEach(() => {
   root = path.join(sourceRoot, 'active/shared/tmp/dot-result-cap-' + crypto.randomUUID());
   safeMkdir(path.join(root, 'knowledge/personal/tenants'), { recursive: true });
@@ -82,17 +85,73 @@ afterEach(() => {
 });
 
 describe('internal DOT result capability under actual registered policy', () => {
-  it('checks every cold and warm role assumption, including registered system-role metadata', () => {
+  it.each(['append_result', 'append_report_marker', 'read_state'] as const)(
+    'preserves the operation ceiling matrix for %s',
+    (domainOperation: DotResultStoreOperation) => {
+      const writing = domainOperation !== 'read_state';
+      withDotResultStoreCapability(binding(), domainOperation, () => {
+        const scope = currentResourceAccessScope();
+        const cases = [
+          { target: file, read: !writing, append: writing, mkdir: false, metadata: true },
+          {
+            target: path.posix.dirname(file),
+            read: false,
+            append: false,
+            mkdir: writing,
+            metadata: true,
+          },
+          { target: '', read: false, append: false, mkdir: false, metadata: true },
+          { target: file + '.other', read: false, append: false, mkdir: false, metadata: false },
+          { target: file + '/child', read: false, append: false, mkdir: false, metadata: false },
+          {
+            target: file.replace(tenant, 'other-tenant'),
+            read: false,
+            append: false,
+            mkdir: false,
+            metadata: false,
+          },
+        ];
+        for (const row of cases) {
+          for (const operation of ['read', 'append', 'mkdir', 'metadata'] as const)
+            expect(
+              isDotResultStoreCapability(scope, { rootDir: root, target: row.target, operation })
+            ).toBe(row[operation]);
+          expect(
+            isDotResultStoreCapability(scope, {
+              rootDir: root,
+              target: row.target,
+              operation: 'write',
+            })
+          ).toBe(false);
+          expect(
+            isDotResultStoreCapability(scope, {
+              rootDir: root,
+              target: row.target,
+              operation: 'delete' as 'metadata',
+            })
+          ).toBe(false);
+          expect(
+            isDotResultStoreCapability(scope, {
+              rootDir: sourceRoot,
+              target: row.target,
+              operation: 'metadata',
+            })
+          ).toBe(false);
+        }
+      });
+    }
+  );
+
+  it('no longer has a store role: the former role name grants nothing, and system processes cannot assume it', () => {
+    const asRemovedRole = <T>(fn: () => T) =>
+      withExecutionContext('dot_result_writer', fn, undefined, tenant, 'org-a');
+    expect(asRemovedRole(() => validateWritePermission(at(), 'append').allowed)).toBe(false);
     vi.stubEnv('SYSTEM_ROLE', 'operator_surface');
-    expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/);
-    append(() => expect(validateWritePermission(at(), 'append').allowed).toBe(true));
-    expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/);
+    expect(assumeRemovedRole).toThrow();
     withDotResultStoreCapability(binding(), 'append_result', () => {
-      expect(() =>
-        withExecutionContext('dot_result_writer', () => undefined, undefined, tenant, 'other-org')
-      ).toThrow();
+      expect(assumeRemovedRole).toThrow();
+      expect(validateWritePermission(at(), 'append').allowed).toBe(true);
     });
-    expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/);
   });
   it('absorbs rejected promises and hostile thenables while invalidating their capability', async () => {
     expect(() =>
@@ -146,21 +205,22 @@ describe('internal DOT result capability under actual registered policy', () => 
       })
     );
   });
-  it('requires role and active opaque capability together, even with ambient grants', () => {
-    expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/);
+  it('authorizes with the active grant alone; forged, counterfeit and other-tenant use fail closed', () => {
     expect(validateWritePermission(at(), 'append').allowed).toBe(false);
     withDotResultStoreCapability(binding(), 'append_result', () => {
-      expect(validateWritePermission(at(), 'append').allowed).toBe(false);
-      expect(() =>
-        withExecutionContext(
-          'dot_result_writer',
-          () => undefined,
-          undefined,
-          'other-tenant',
-          'org-a'
-        )
-      ).toThrow();
+      expect(validateWritePermission(at(), 'append').allowed).toBe(true);
     });
+    expect(validateWritePermission(at(), 'append').allowed).toBe(false);
+    // A caller bound to another tenant gains nothing from the grant.
+    withExecutionContext(
+      'infrastructure_sentinel',
+      () =>
+        withDotResultStoreCapability(binding(), 'append_result', () => {
+          expect(validateWritePermission(at(), 'append').allowed).toBe(false);
+        }),
+      undefined,
+      'other-tenant'
+    );
     const forged: ResourceAccessScope = {
       tenantSlug: tenant,
       organizationId: 'org-a',
@@ -172,7 +232,16 @@ describe('internal DOT result capability under actual registered policy', () => 
       opaqueStoreToken: {},
     };
     runInResourceAccessScope(forged, () =>
-      expect(() => writer(() => undefined)).toThrow(/CAPABILITY_REQUIRED/)
+      expect(validateWritePermission(at(), 'append').allowed).toBe(false)
+    );
+    const counterfeitIssuer = createSynchronousResourceGrantIssuer('DOT_RESULT_CAPABILITY');
+    const { opaqueStoreToken: _token, ...sameCeiling } = forged;
+    counterfeitIssuer.run(
+      Object.freeze({ binding: binding(), operation: 'append_result' }),
+      sameCeiling,
+      () => {
+        expect(validateWritePermission(at(), 'append').allowed).toBe(false);
+      }
     );
   });
   it('invalidates escaped scope, spread copies, exceptions and queued asynchronous callbacks', async () => {
@@ -186,6 +255,12 @@ describe('internal DOT result capability under actual registered policy', () => 
       expect(
         isDotResultStoreCapability(
           { ...escaped! },
+          { rootDir: root, target: file, operation: 'append' }
+        )
+      ).toBe(false);
+      expect(
+        isDotResultStoreCapability(
+          { ...escaped!, opaqueStoreToken: escaped!.opaqueStoreToken },
           { rootDir: root, target: file, operation: 'append' }
         )
       ).toBe(false);
@@ -213,7 +288,9 @@ describe('internal DOT result capability under actual registered policy', () => 
     expect(() =>
       withDotResultStoreCapability(binding(), 'append_result', () => Promise.resolve())
     ).toThrow(/ASYNC/);
-    expect(() => runInResourceAccessScope(escaped!, () => writer(() => undefined))).toThrow();
+    expect(
+      runInResourceAccessScope(escaped!, () => validateWritePermission(at(), 'append').allowed)
+    ).toBe(false);
   });
   it('cannot expand nested ceilings, root, scope, dot or operation arrays', () => {
     const outer: ResourceAccessScope = {

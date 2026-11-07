@@ -7,7 +7,7 @@ import {
   summarizeApprovalAuditTrail,
 } from '@agent/core/governance/approval-audit';
 import { resolveFinanceControllerDecision } from '@agent/core/finance-controller';
-import { activeCustomer } from '@agent/core/customer-resolver';
+import { activeStance } from '@agent/core/stance-resolver';
 import {
   assertSafeRepositoryPath,
   emitChannelSurfaceEvent,
@@ -798,7 +798,7 @@ export function collectOwnerSummaries(
 
 export function resolveChronosTenantSlug(): string | null {
   try {
-    return activeCustomer();
+    return activeStance();
   } catch {
     return null;
   }

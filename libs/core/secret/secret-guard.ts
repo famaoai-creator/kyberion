@@ -23,7 +23,7 @@ import {
   resolveSecretEncryptionMode,
 } from './secret-encryption.js';
 import { requireRiskyApproval } from '../risky-op-approval-port.js';
-import { RISKY_OPS } from '../risky-op-ids.js';
+import { RISKY_OPS } from '../contracts/risky-op-ids.js';
 import { readJson } from '../foundation/json.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonObjectValue } from '../foundation/safe-json.js';

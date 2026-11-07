@@ -2,10 +2,12 @@ import * as path from 'node:path';
 import { PARTITIONED_RUNTIME_STATE_ROOTS as FOUNDATION_STATE_ROOTS } from './foundation/runtime-state-roots.js';
 import { describe, expect, it } from 'vitest';
 import { rootDir } from './path-resolver.js';
+import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
 import { safeReadFile } from './secure-io.js';
 import {
   autonomyLearningCapability,
   isAutonomyLearningCapability,
+  withAutonomyLearningCapability,
 } from './foundation/autonomy-learning-capability.js';
 import {
   SYSTEM_PARTITION,
@@ -198,7 +200,7 @@ describe('durable partitioned runtime state', () => {
     ).toBeUndefined();
   });
 
-  it('registers protected state partitions with only the dedicated receipt grant and no shared exemptions', () => {
+  it('registers protected state partitions with no role grant on receipts and no shared exemptions', () => {
     const policy = JSON.parse(
       safeReadFile(path.join(rootDir(), 'knowledge/product/governance/security-policy.json'), {
         encoding: 'utf8',
@@ -227,14 +229,14 @@ describe('durable partitioned runtime state', () => {
       'active/shared/runtime/browser-bridge-mailbox/confidential/',
       'active/shared/runtime/seam-selection-defaults/personal/',
       'active/shared/runtime/seam-selection-defaults/confidential/',
-      'active/shared/runtime/provider-attestations/personal/',
-      'active/shared/runtime/provider-attestations/confidential/',
       'active/shared/runtime/delegation-idempotency/personal/',
       'active/shared/runtime/delegation-idempotency/confidential/',
       'active/shared/runtime/media-generation/cost-settlements/personal/',
       'active/shared/runtime/media-generation/cost-settlements/confidential/',
       'active/shared/runtime/health/api-verification/personal/',
       'active/shared/runtime/health/api-verification/confidential/',
+      'active/shared/runtime/provider-attestations/personal/',
+      'active/shared/runtime/provider-attestations/confidential/',
     ]);
     expect(
       partitionedRuntimeStateTierInPath(
@@ -258,30 +260,14 @@ describe('durable partitioned runtime state', () => {
     ).toBe(false);
     for (const field of ['default_allow', 'persona_permissions', 'authority_permissions'])
       expect(JSON.stringify(policy[field])).not.toContain('runtime/discussion-create-requests');
-    const receiptGrant = policy.authority_role_permissions.discussion_request_store;
-    expect(receiptGrant).toEqual({
-      allow_read: [
-        'active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/',
-      ],
-      allow_write: [
-        'active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/',
-      ],
-    });
-    for (const [role, grant] of Object.entries(policy.authority_role_permissions))
-      if (role !== 'discussion_request_store')
-        expect(JSON.stringify(grant)).not.toContain('runtime/discussion-create-requests');
-    // Invite records: only the tenant-bound invite store role, only its own tenant.
-    expect(policy.authority_role_permissions.customer_decision_invite_store).toEqual({
-      allow_read: [
-        'active/shared/runtime/customer-decision-invites/confidential/${KYBERION_TENANT}/',
-      ],
-      allow_write: [
-        'active/shared/runtime/customer-decision-invites/confidential/${KYBERION_TENANT}/',
-      ],
-    });
-    for (const [role, grant] of Object.entries(policy.authority_role_permissions))
-      if (role !== 'customer_decision_invite_store')
-        expect(JSON.stringify(grant)).not.toContain('runtime/customer-decision-invites');
+    // Discussion request receipts (G2): no role grants them; only the opaque request grant does.
+    expect(policy.authority_role_permissions.discussion_request_store).toBeUndefined();
+    for (const grant of Object.values(policy.authority_role_permissions))
+      expect(JSON.stringify(grant)).not.toContain('runtime/discussion-create-requests');
+    // Invite records (G2): no role grants them; only the exact invite capability does.
+    expect(policy.authority_role_permissions.customer_decision_invite_store).toBeUndefined();
+    for (const grant of Object.values(policy.authority_role_permissions))
+      expect(JSON.stringify(grant)).not.toContain('runtime/customer-decision-invites');
     for (const field of ['default_allow', 'persona_permissions', 'authority_permissions'])
       expect(JSON.stringify(policy[field])).not.toContain('runtime/customer-decision-invites');
     // Credential allocation administration and dispatch metadata access reuse
@@ -303,7 +289,6 @@ describe('durable partitioned runtime state', () => {
         expect(JSON.stringify(policy[field])).not.toContain(`runtime/${store}`);
       }
       for (const [role, grant] of Object.entries(policy.authority_role_permissions)) {
-        if (store === 'autonomy-learning' && role === 'autonomy_learning_store') continue;
         if (
           store === 'grants' &&
           ['credential_allocation_manager', 'credential_allocation_reader'].includes(role)
@@ -312,25 +297,9 @@ describe('durable partitioned runtime state', () => {
         expect(JSON.stringify(grant)).not.toContain(`runtime/${store}`);
       }
     }
-    // The learning mediator has exact tenant file/directory policy grants;
-    // its mandatory capability further limits directory grants to mkdir and
-    // rejects the virtual knowledge aliases as actual data destinations.
+    // G2: no role holds a learning grant; the private issuer's exact ceiling is the authority.
     const runtime = 'active/shared/runtime/autonomy-learning';
-    const tenantDirectory = runtime + '/confidential/${KYBERION_TENANT}';
-    const exactGrant = [
-      tenantDirectory,
-      tenantDirectory + '/autonomy-outcomes.jsonl',
-      'knowledge/confidential/${KYBERION_TENANT}/autonomy-outcomes.jsonl',
-      tenantDirectory + '/autonomy-action-overrides.json',
-      'knowledge/confidential/${KYBERION_TENANT}/autonomy-action-overrides.json',
-      runtime,
-      runtime + '/confidential',
-      'knowledge/confidential/${KYBERION_TENANT}',
-    ];
-    expect(policy.authority_role_permissions.autonomy_learning_store).toEqual({
-      allow_read: exactGrant,
-      allow_write: exactGrant,
-    });
+    expect(policy.authority_role_permissions.autonomy_learning_store).toBeUndefined();
     const capability = autonomyLearningCapability('tenant-a');
     const tenantRoot = runtime + '/confidential/tenant-a';
     expect(capability).toEqual({
@@ -358,15 +327,13 @@ describe('durable partitioned runtime state', () => {
         tenantRoot + '/compaction-archive/',
       ],
     });
-    expect(isAutonomyLearningCapability(capability)).toBe(true);
-    expect(isAutonomyLearningCapability({ ...capability, writeExact: [tenantRoot] })).toBe(false);
+    // G2: the ceiling is data; only the private issuer's live grant is the capability.
+    expect(isAutonomyLearningCapability(capability)).toBe(false);
     expect(
-      isAutonomyLearningCapability({
-        ...capability,
-        namePrefixExact: [...(capability.namePrefixExact ?? []), tenantRoot + '/'],
-      })
-    ).toBe(false);
-    expect(isAutonomyLearningCapability({ ...capability, tenantSlug: 'tenant-b' })).toBe(false);
+      withAutonomyLearningCapability('tenant-a', tenantRoot, () =>
+        isAutonomyLearningCapability(currentResourceAccessScope())
+      )
+    ).toBe(true);
   });
 });
 
@@ -412,23 +379,10 @@ describe('tenant approval partitions', () => {
       allow_write: [],
     });
     for (const [role, grant] of Object.entries(policy.authority_role_permissions))
-      if (
-        role !== 'tenant_approval_store' &&
-        role !== 'tenant_approval_partition_index_reader' &&
-        role !== 'personal_approval_store'
-      )
+      if (role !== 'tenant_approval_store' && role !== 'tenant_approval_partition_index_reader')
         expect(JSON.stringify(grant)).not.toContain('runtime/tenant-approvals');
-    expect(policy.authority_role_permissions.personal_approval_store).toEqual({
-      allow_read: [
-        'knowledge/product/',
-        'active/shared/runtime/tenant-approvals/personal/shared/',
-        'active/shared/runtime/vitest-approvals/',
-      ],
-      allow_write: [
-        'active/shared/runtime/tenant-approvals/personal/shared/',
-        'active/shared/runtime/vitest-approvals/',
-      ],
-    });
+    // G2: the personal owner partitions are reached through the owner window, not a role.
+    expect(policy.authority_role_permissions.personal_approval_store).toBeUndefined();
   });
 });
 

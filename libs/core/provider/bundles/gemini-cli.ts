@@ -2,7 +2,7 @@ import {
   cliProviderEnv,
   cliProviderEnvText,
   registerCliProviderBundle,
-} from '../../cli-provider-bundle.js';
+} from '../cli-provider-bundle.js';
 import { maybeWrapWithDispatcher } from '../../agent/agent-dispatch.js';
 import { buildGeminiCliBackendFromEnv } from '../gemini-cli-backend.js';
 import { GeminiCliIntentExtractor } from '../gemini-cli-intent-extractor.js';

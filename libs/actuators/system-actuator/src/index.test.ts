@@ -1229,8 +1229,8 @@ vi.mock('@agent/core/virtual/desktop-launch-adapter', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/virtual/desktop-launch-adapter')),
   resolveDesktopLaunchAdapter,
 }));
-vi.mock('@agent/core/logic-utils', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/logic-utils')),
+vi.mock('@agent/core/pipeline/logic-utils', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/pipeline/logic-utils')),
   resolveVars,
   evaluateCondition,
   getPathValue,
@@ -1243,8 +1243,8 @@ vi.mock('@agent/core/recovery-policy', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/recovery-policy')),
   createGovernedRetryOptionsBuilder: vi.fn(() => vi.fn(() => ({}))),
 }));
-vi.mock('@agent/core/execution-bounds', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/execution-bounds')),
+vi.mock('@agent/core/contracts/execution-bounds', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/contracts/execution-bounds')),
   withinLoopBounds,
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
@@ -1367,8 +1367,8 @@ vi.mock('@agent/core/platform', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/platform')),
   platform: { listRunningApps: vi.fn(async () => []) },
 }));
-vi.mock('@agent/core/voice/voice-synth', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@agent/core/voice/voice-synth')),
+vi.mock('@agent/shared-voice/voice-synth', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/shared-voice/voice-synth')),
   say: vi.fn(async () => undefined),
 }));
 vi.mock('@agent/core/macos-automation-bridge', async () => ({

@@ -47,6 +47,20 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
   };
 });
 
+// Keep fallback policy validation real while avoiding the sentinel filesystem root.
+vi.mock('../../../core/foundation/ajv.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../core/foundation/ajv.js')>();
+  const { default: schema } =
+    await import('../../../../knowledge/product/schemas/retry-policy.schema.json');
+  return {
+    ...actual,
+    compileSchema: (schemaPath: string) =>
+      schemaPath.endsWith('/retry-policy.schema.json')
+        ? actual.createAjv().compile(schema)
+        : actual.compileSchema(schemaPath),
+  };
+});
+
 vi.mock('@agent/core/async-utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/async-utils')>();
   return { ...actual, retry: mocks.retry };

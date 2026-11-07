@@ -1,0 +1,53 @@
+{
+  "name": "@agent/shared-interaction",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Modality-independent conversation control: turn-taking, backchannels, user rhythm, utterance intent and reply structure (Observe \u2192 Infer \u2192 Decide who acts). No I/O; voice, chat and meeting adapters drive it. Depends on @agent/core; core never imports it.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./backchannel-policy": {
+      "types": "./dist/backchannel-policy.d.ts",
+      "default": "./dist/backchannel-policy.js"
+    },
+    "./conversation-engine": {
+      "types": "./dist/conversation-engine.d.ts",
+      "default": "./dist/conversation-engine.js"
+    },
+    "./interaction-signals": {
+      "types": "./dist/interaction-signals.d.ts",
+      "default": "./dist/interaction-signals.js"
+    },
+    "./interaction-state": {
+      "types": "./dist/interaction-state.d.ts",
+      "default": "./dist/interaction-state.js"
+    },
+    "./language-pack": {
+      "types": "./dist/language-pack.d.ts",
+      "default": "./dist/language-pack.js"
+    },
+    "./reply-structure": {
+      "types": "./dist/reply-structure.d.ts",
+      "default": "./dist/reply-structure.js"
+    },
+    "./user-rhythm": {
+      "types": "./dist/user-rhythm.d.ts",
+      "default": "./dist/user-rhythm.js"
+    },
+    "./utterance-intent": {
+      "types": "./dist/utterance-intent.d.ts",
+      "default": "./dist/utterance-intent.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.json && node ../../scripts/write_core_dist_scope.mjs --run"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*"
+  }
+}

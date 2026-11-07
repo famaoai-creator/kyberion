@@ -25,7 +25,9 @@ describe('Developer tour contract', () => {
     expect(tour).toContain('pnpm test -- --suite meeting-dry-run');
     expect(tour).toContain('voice-consent.json');
     expect(tour).toContain('telegram-bridge');
-    expect(tour).toContain('customer/{slug}/` becomes the preferred overlay root');
+    expect(tour).toContain(
+      'knowledge/personal/stances/{slug}/` becomes the preferred overlay root'
+    );
     expect(tour).toContain('Legacy personal fallback');
     expect(tour).toContain('Legacy personal fallback when no customer overlay is active');
     expect(tour).toContain('EXTENSION_POINTS.md');
@@ -42,10 +44,13 @@ describe('Developer tour contract', () => {
     expect(ext).toContain('meeting-actuator');
     expect(ext).toContain('voice-consent.json');
     expect(ext).toContain('PLUGIN_AUTHORING.md');
-    expect(ext).toContain('Resolution order: customer overlay → legacy personal fallback.');
-    expect(ext).toContain('Editing `knowledge/personal/` when `KYBERION_CUSTOMER` is unset');
+    expect(ext).toContain('stance overlay → legacy personal fallback');
+    expect(ext).toContain('Stance selection grants no tenant access.');
+    expect(ext).toContain('tenant assets use their tenant-bound facades');
+    expect(ext).toContain('90');
+    expect(ext).toContain('Editing `knowledge/personal/` when `KYBERION_STANCE` is unset');
     expect(ext).toContain(
-      'Editing `knowledge/personal/connections/` when `KYBERION_CUSTOMER` is unset'
+      'Editing `knowledge/personal/connections/` when `KYBERION_STANCE` is unset'
     );
     expect(ext).toContain('Stable (v1+)');
     expect(ext).toContain('Internal');

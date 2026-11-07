@@ -5,7 +5,7 @@
  */
 import { logger } from '../core.js';
 import { loadStandardIntentCatalog, resolveIntentResolutionPacket } from './intent-resolution.js';
-import { segmentKeywordTerms } from '../locale-normalize.js';
+import { segmentKeywordTerms } from '../foundation/locale-normalize.js';
 
 /**
  * Whether a knowledge hint's topic or tags contain any intent keyword.

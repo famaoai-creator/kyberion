@@ -32,7 +32,7 @@ import { primaryLanguageSubtag, supportsSpeechLanguage } from '@agent/core/voice
 import type { AudioChunk } from '@agent/core/meeting/meeting-session-types';
 import type { PlaybackHandle, PlaybackResult } from '@agent/core/voice/audio-playback';
 import type { AudioDeviceDescriptor } from '@agent/core/voice/audio-route';
-import type { PerceptionScope } from '@agent/core/perception/observation';
+import type { PerceptionScope } from '@agent/shared-perception/observation';
 import {
   safeCopyFileSync,
   safeExistsSync,
@@ -95,7 +95,7 @@ export const defaultSpeakDeps: SpeakDeps = {
   runMedia: (tool, args) => defaultPerceptionDeps.runMedia(tool, args),
   async voiceDefaults(language) {
     const { getVoiceProfileRegistry } = await import('@agent/core/voice/voice-profile-registry');
-    const { getVoiceTtsLanguageConfig } = await import('@agent/core/voice/voice-tts-config');
+    const { getVoiceTtsLanguageConfig } = await import('@agent/shared-voice/voice-tts-config');
     const primary = language.split('-')[0]!;
     const registry = getVoiceProfileRegistry();
     const profiles = registry.profiles.filter((p) => p.status === 'active');

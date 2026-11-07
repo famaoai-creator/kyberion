@@ -159,7 +159,7 @@ describe('core library bundle', () => {
 
   // CO-01: getGoldenRule() must be tenant-aware. It delegates to resolveVision()
   // with no explicit tenantSlug, which is only correct because resolveVision()
-  // itself falls back to customerResolver.activeCustomer() (the KYBERION_CUSTOMER
+  // itself falls back to customerResolver.activeCustomer() (the KYBERION_STANCE
   // env var) when no tenantSlug is passed. That fallback wiring was previously
   // unverified by any test — this locks in the delegation contract.
   describe('fileUtils.getGoldenRule (CO-01 tenant awareness)', () => {

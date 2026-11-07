@@ -1,5 +1,5 @@
 import { listApprovalRequests } from './approval-store-reader.js';
-import { withLockSync } from '../lock-utils.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 
 /** One durable task-effect slot across human and charter authorization provenance. */
 export function withExecutionIdentityLock<T>(identity: string, action: () => T): T {

@@ -23,7 +23,7 @@ vi.mock('./approval-store-reader.js', () => ({
 vi.mock('./approval-apply-claim.js', () => ({ claimApprovalApply: mocks.claim }));
 vi.mock('./approval-separation-of-duties.js', () => ({ assertApprovalUsable: mocks.usable }));
 vi.mock('./approval-presentation.js', () => ({ computeApprovalPayloadHash: () => 'record-hash' }));
-vi.mock('../lock-utils.js', () => ({
+vi.mock('../foundation/lock-utils.js', () => ({
   withLockSync: (_name: string, action: () => unknown) => action(),
 }));
 vi.mock('./delegated-execution.js', () => ({

@@ -6,7 +6,7 @@ import {
   installAvailableSpeechToTextBridges,
   type TranscribeResult,
 } from '@agent/core/voice/speech-to-text-bridge';
-import { pcmToWav } from '@agent/core/pcm-wav';
+import { pcmToWav } from '@agent/core/foundation/pcm-wav';
 import { pathResolver } from '@agent/core/path-resolver';
 import type { MicCaptureOptions } from '@agent/core/mic-capture';
 import { ensureDir, safeUnlinkSync, safeWriteFile } from '@agent/core/secure-io';

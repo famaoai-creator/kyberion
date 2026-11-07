@@ -1,6 +1,12 @@
 import { logger } from '../core.js';
 import { validateFileSize } from '../secure-io.js';
-import { OcrRequest, OcrResult, OcrProvider, OcrDataEgress, OcrRoutingMode } from '../ocr-types.js';
+import {
+  OcrRequest,
+  OcrResult,
+  OcrProvider,
+  OcrDataEgress,
+  OcrRoutingMode,
+} from '../contracts/ocr-types.js';
 import { ProviderChainRouter } from '../provider-chain-router.js';
 import { type SeamProviderCandidate } from '../seam-provider-selection.js';
 import { withEgressPayloadContext } from '../egress-policy.js';

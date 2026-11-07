@@ -15,6 +15,6 @@ describe('service integration guide contract', () => {
     expect(doc).toContain('service-presets/{service-id}.json');
     expect(doc).toContain('pnpm kyberion secret introduce');
     expect(doc).toContain('pnpm service:preflight');
-    expect(doc).toContain('customer/{slug}/` overlay');
+    expect(doc).toContain('knowledge/personal/stances/{slug}/` overlay');
   });
 });

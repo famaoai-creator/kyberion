@@ -412,7 +412,7 @@ bound to one identity.
 ## 13. Turn-taking contract (2026-09-24)
 
 `startRealtimeVoiceLoop` composes the turn-taking parts in
-`libs/core/voice/voice-turn-cancellation.ts`, `two-stage-barge-in.ts`,
+`libs/shared-voice/src/voice-turn-cancellation.ts`, `two-stage-barge-in.ts`,
 `voice-eot-scorer.ts`, `voice-respond-gate.ts`, `voice-phrase-chunker.ts`,
 `voice-first-phrase-cache.ts`, and `voice-speculative-policy.ts`. The pure
 `VoiceTurnTakingMachine` / voice workbench replays the same decisions on a
@@ -501,7 +501,7 @@ language/personal-voice settings fingerprint, and the text.
 ## 14. Conversation Engine (2026-10-04)
 
 The turn-taking machine is a voice adapter over the generic Interaction
-Controller in `libs/core/interaction/` (`ConversationEngine`). The engine
+Controller in `libs/shared-interaction/src/` (`ConversationEngine`). The engine
 consumes modality-neutral events (`speech_onset`, `speech_offset`,
 `transcript_partial`, `transcript_final`, `output_started`, `output_ended`,
 `reaction_started`, `reaction_ended`, `tick`; legacy `vad_*`/`stt_*`/`tts_*`

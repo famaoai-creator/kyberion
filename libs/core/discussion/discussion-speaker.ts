@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { DiscussionProviderError, DiscussionProviderSession } from './discussion-provider.js';
 import { discussionRoleLabel, fillCopy, loadDiscussionCopy } from './discussion-copy.js';
-import { pickByLocale } from '../locale-normalize.js';
+import { pickByLocale } from '../foundation/locale-normalize.js';
 import type {
   DiscussionAgendaItem,
   DiscussionParticipant,

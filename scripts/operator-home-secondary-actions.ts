@@ -25,7 +25,7 @@ import { ScriptExitError } from './lib/harness.js';
 
 /**
  * Governed role for the operator's deal-document writes. They land under
- * customer/{tenant}/deals/ (and, for the handoff, the mission's intent and
+ * knowledge/confidential/{tenant}/deals/ (and, for the handoff, the mission's intent and
  * requirements drafts); security-policy.json grants customer/ writes to
  * mission_controller, the same role the deal-documents module tests use.
  */

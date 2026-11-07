@@ -65,7 +65,7 @@ const ENV_KEYS = [
   'KYBERION_SUDO',
   'MISSION_ID',
   'KYBERION_TENANT_SCOPE_REQUIRED',
-  'KYBERION_CUSTOMER',
+  'KYBERION_STANCE',
 ] as const;
 
 // Writable for the data-only persona (default_allow + finance allow_write).

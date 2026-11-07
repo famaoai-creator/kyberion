@@ -19,7 +19,6 @@ import { currentScopeEnvelope } from '../scope-envelope.js';
 import { classifyStorageFloorPath } from '../storage-layout.js';
 import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import {
-  TASK_SOURCE_WORKSPACE_ROLE,
   taskSourceWorkspaceIoActive,
   withTaskSourceWorkspaceIo,
 } from './task-source-workspace-io.js';
@@ -120,14 +119,7 @@ export function readTaskSourceFile(
       options.assertCurrent();
       assertTaskSourcePathGrant(binding, relative, options);
     },
-    () =>
-      withExecutionContext(
-        TASK_SOURCE_WORKSPACE_ROLE,
-        read,
-        undefined,
-        binding.scope.tenant_slug,
-        binding.scope.organization_id
-      )
+    read
   );
 }
 export function createTaskSourceEditTool(
@@ -184,24 +176,27 @@ export function createTaskSourceEditTool(
   const write =
     options.write ??
     ((file: string, content: string) => {
-      const action = () =>
-        withExecutionContext(
-          binding.scope.tier === 'public' ? 'ecosystem_architect' : TASK_SOURCE_WORKSPACE_ROLE,
-          () => {
-            if (binding.scope.tier === 'public') options.assertCurrent();
-            else if (!taskSourceWorkspaceIoActive())
-              throw new Error('[TASK_SOURCE_SCOPE_DENIED] Private source IO window expired');
-            const relative = path.relative(root, file).split(path.sep).join('/');
-            if (!allowed.includes(relative))
-              throw new Error('[TASK_SOURCE_DENIED] Exact write grant changed');
-            if (binding.scope.tier === 'public') assertPathGrant(relative);
-            safeWriteFile(file, content, { mkdir: true });
-          },
-          binding.scope.tier === 'public' ? 'ecosystem_architect' : undefined,
-          binding.scope.tenant_slug,
-          binding.scope.organization_id
+      const body = () => {
+        if (binding.scope.tier === 'public') options.assertCurrent();
+        else if (!taskSourceWorkspaceIoActive())
+          throw new Error('[TASK_SOURCE_SCOPE_DENIED] Private source IO window expired');
+        const relative = path.relative(root, file).split(path.sep).join('/');
+        if (!allowed.includes(relative))
+          throw new Error('[TASK_SOURCE_DENIED] Exact write grant changed');
+        if (binding.scope.tier === 'public') assertPathGrant(relative);
+        safeWriteFile(file, content, { mkdir: true });
+      };
+      if (binding.scope.tier === 'public')
+        return withCoordinationMutation(() =>
+          withExecutionContext(
+            'ecosystem_architect',
+            body,
+            'ecosystem_architect',
+            binding.scope.tenant_slug,
+            binding.scope.organization_id
+          )
         );
-      if (binding.scope.tier === 'public') return withCoordinationMutation(action);
+      // G2: the private window is the authority; the caller keeps its own role.
       return withTaskSourceWorkspaceIo(
         binding,
         root,
@@ -211,7 +206,7 @@ export function createTaskSourceEditTool(
           options.assertCurrent();
           assertPathGrant(path.relative(root, file).split(path.sep).join('/'));
         },
-        action
+        body
       );
     });
   return {

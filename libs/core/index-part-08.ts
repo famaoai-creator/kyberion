@@ -1,72 +1,6 @@
 /** Generated public API barrel part. Keep exports in source order. */
 
 export {
-  loadMediaStylePolicyCatalog,
-  resolveSignalToneRank,
-  resolveBorderKeySides,
-} from './media/media-style-policy.js';
-
-export {
-  loadMediaSignalEntryPolicyCatalog,
-  resolveMediaSignalEntryPolicy,
-} from './media/media-signal-entry-policy.js';
-
-export { loadTrackerSheetPolicyCatalog } from './tracker-sheet-policy.js';
-
-export {
-  loadMediaThemeRolePolicyCatalog,
-  resolveThemeColorRole,
-  resolveThemeHexRole,
-} from './media/media-theme-role-policy.js';
-
-export {
-  loadMediaDrawioEdgePolicyCatalog,
-  resolveDrawioEdgeLabelStyleParts,
-  resolveDrawioEdgeRoutingStyleParts,
-} from './media/media-drawio-edge-policy.js';
-
-export {
-  loadMediaDrawioBoundaryPolicyCatalog,
-  resolveDrawioBoundaryIconCandidates,
-  resolveDrawioBoundaryPaletteOverride,
-} from './media/media-drawio-boundary-policy.js';
-
-export {
-  loadMediaDrawioTierOrderCatalog,
-  resolveMediaDrawioTierRank,
-} from './media/media-drawio-tier-order.js';
-
-export {
-  loadMediaDrawioSortPolicyCatalog,
-  resolveMediaDrawioGroupRank,
-  resolveMediaDrawioTypeRank,
-} from './media/media-drawio-sort-policy.js';
-
-export {
-  loadMediaDrawioSecurityGroupOrderCatalog,
-  resolveMediaDrawioSecurityGroupRelationPrefix,
-} from './media/media-drawio-security-group-order.js';
-
-export {
-  loadDocumentInferencePolicyCatalog,
-  resolveDocumentProfileCandidates,
-  resolveDocumentProfileKeywords,
-  resolveDocumentTypeFromClues,
-} from './media/document-inference-policy.js';
-
-export {
-  loadDocumentContentsPolicyCatalog,
-  resolveDocumentContentsLabel,
-  resolveDocumentContentsSubtitle,
-} from './media/document-contents-policy.js';
-
-export {
-  loadDocumentOutlineLabelPolicyCatalog,
-  resolveReportSectionTitle,
-  resolveReportSummaryTitle,
-} from './media/document-outline-label-policy.js';
-
-export {
   loadPromotedReportTemplatePolicyCatalog,
   resolvePromotedReportAudience,
   resolvePromotedReportOutputFormat,
@@ -118,15 +52,6 @@ export {
 } from './production-evidence-summary-policy.js';
 
 export { loadChangelogPolicyCatalog, resolveChangelogPolicy } from './changelog-policy.js';
-
-export { resolveProposalSectionKeywords } from './media/media-semantic-map.js';
-
-export {
-  loadSpreadsheetStylePolicyCatalog,
-  resolveSpreadsheetStyleIndex,
-} from './spreadsheet-style-policy.js';
-
-export { isLegacyMediaOp, loadLegacyMediaOpsCatalog } from './legacy-media-ops.js';
 
 export { installEmbeddingBackendIfAvailable } from './embedding-bootstrap.js';
 

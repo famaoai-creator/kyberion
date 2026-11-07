@@ -2,7 +2,7 @@
 
 import { opsApiPath, opsPagePath } from '../../lib/ops/ops-api-path';
 import * as React from 'react';
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import type { DisplayText } from '@agent/core/surface/display-humanize';
 import {
   Badge,

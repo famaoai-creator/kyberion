@@ -9,7 +9,7 @@ import {
   distillPptxDesign,
   distillDocxDesign,
   docxToMarkdown,
-} from '@agent/core/media/media-contracts';
+} from '@agent/shared-media/media-contracts';
 import { distillExcelDesign } from '@agent/shared-media';
 
 /**

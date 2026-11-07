@@ -29,7 +29,7 @@ import { listOcrProviders, ocrImage } from '@agent/core/ocr-bridge';
 import {
   generateImage,
   listImageGenerationProviders,
-} from '@agent/core/media/image-generation-bridge';
+} from '@agent/shared-media/image-generation-bridge';
 import {
   createVirtualCameraBridge,
   listVirtualCameraCaptureBackends,
@@ -41,7 +41,7 @@ import {
 import {
   listBrowserAutomationRuntimeBridges,
   resolveBrowserAutomationRuntime,
-} from '@agent/core/browser/browser-automation-runtime-bridge';
+} from '@agent/shared-vision/browser-automation-runtime-bridge';
 
 type CheckResult = {
   seam: string;

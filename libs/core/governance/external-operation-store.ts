@@ -9,17 +9,13 @@ import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
 } from '../storage-layout.js';
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
-import { withExecutionContext } from '../authority.js';
 import {
   currentPrPublicationScope,
   withPrPublicationStoreAccess,
-  PR_PUBLICATION_STORE_ROLE,
   currentVcsPublicationOperation,
 } from './pr-publication-runtime.js';
-import {
-  currentInstalledPersonCharterRuntime,
-  withPersonExternalReservationAccess,
-} from './person-charter-runtime.js';
+import { currentInstalledPersonCharterRuntime } from './person-charter-runtime.js';
+import { withPersonReservationAccess } from './person-charter-store-access.js';
 
 export interface ExternalOperationReservation {
   tenantSlug?: string;
@@ -91,13 +87,9 @@ export function reserveExternalOperation(input: ExternalOperationReservation): v
         ? !input.tenantSlug
         : publication.tenant_slug === input.tenantSlug)
     )
-      withPrPublicationStoreAccess('reservation-write', [], [relative], () =>
-        withExecutionContext(PR_PUBLICATION_STORE_ROLE, write, 'worker', input.tenantSlug)
-      );
+      withPrPublicationStoreAccess('reservation-write', [], [relative], write);
     else if (!input.tenantSlug && currentInstalledPersonCharterRuntime())
-      withPersonExternalReservationAccess(relative, () =>
-        withExecutionContext('person_charter_store', write, 'worker')
-      );
+      withPersonReservationAccess(relative, write);
     else write();
   } catch (error) {
     if ((error as { code?: string }).code === 'EEXIST') {

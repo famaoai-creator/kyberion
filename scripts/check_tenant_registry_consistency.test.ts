@@ -20,7 +20,7 @@ import {
 } from './check_tenant_registry_consistency.js';
 
 const FIXTURE_PARENT = path.join(pathResolver.rootDir(), 'active', 'shared', 'tmp');
-const EMPTY_ENV = {} as NodeJS.ProcessEnv; // no KYBERION_CUSTOMER → personal tenants dir
+const EMPTY_ENV = {} as NodeJS.ProcessEnv; // no KYBERION_STANCE → personal tenants dir
 
 describe('check_tenant_registry_consistency (DA-01)', () => {
   let fixtureRoot = '';
@@ -64,11 +64,13 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
   }
 
   function seedCustomerDir(slug: string): void {
-    fs.mkdirSync(path.join(fixtureRoot, 'customer', slug), { recursive: true });
+    fs.mkdirSync(path.join(fixtureRoot, 'knowledge', 'personal', 'stances', slug), {
+      recursive: true,
+    });
   }
 
   function seedCustomerTenantProfile(customerSlug: string, tenantSlug: string): void {
-    const dir = path.join(fixtureRoot, 'customer', customerSlug, 'tenants');
+    const dir = path.join(fixtureRoot, 'knowledge', 'personal', 'stances', customerSlug, 'tenants');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
       path.join(dir, `${tenantSlug}.json`),
@@ -119,7 +121,7 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
 
   it('does not follow a symlinked customer stance directory', () => {
     seedProfile('acme-corp');
-    const customerBase = path.join(fixtureRoot, 'customer');
+    const customerBase = path.join(fixtureRoot, 'knowledge', 'personal', 'stances');
     const outside = path.join(fixtureRoot, 'outside-customer');
     fs.mkdirSync(path.join(outside, 'tenants'), { recursive: true });
     fs.writeFileSync(path.join(outside, 'tenants', 'ghost-co.json'), '{}');

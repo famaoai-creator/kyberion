@@ -14,7 +14,7 @@ import {
   ensureBuiltinOcrProviders,
   listOcrProviders,
 } from '@agent/core/ocr-bridge';
-import type { OcrProvider, OcrRequest, OcrRoutingMode } from '@agent/core/ocr-types';
+import type { OcrProvider, OcrRequest, OcrRoutingMode } from '@agent/core/contracts/ocr-types';
 import type {
   SeamCalibrationAdapter,
   SeamCalibrationTrialContext,

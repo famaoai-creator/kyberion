@@ -9,7 +9,7 @@
  */
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { generateNativePdf } from './media/native-pdf-engine/engine.js';
+import { generateNativePdf } from '@agent/shared-media/native-pdf-engine/engine';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExec,

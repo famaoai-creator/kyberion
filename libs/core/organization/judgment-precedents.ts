@@ -13,7 +13,7 @@ import {
   DECISION_STATES,
   type DecisionRecord,
 } from '../decision-ledger/model.js';
-import type { ScopeContext } from '../scope-context-validation.js';
+import type { ScopeContext } from '../foundation/scope-context-validation.js';
 import {
   decisionEvidenceRefSchema,
   judgmentScopeSchema,

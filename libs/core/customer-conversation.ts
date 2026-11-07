@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { t } from './t.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { TENANT_DEALS_DIR, TENANT_HOME_ROOT } from './organization/tenant-home.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { readTextFile, trimEndChars } from './foundation/text.js';
 import { readJsonIfPresent, writeJson } from './foundation/json.js';
@@ -9,7 +10,7 @@ import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { logger } from './core.js';
 import { resolveLocale } from './locale.js';
-import { normalizeLocale } from './locale-normalize.js';
+import { normalizeLocale } from './foundation/locale-normalize.js';
 import { matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
 import { getReasoningBackend } from './reasoning/reasoning-backend.js';
@@ -31,6 +32,7 @@ import { notifyOperator } from './surface/operator-notifications.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import {
   appendDealNote,
+  asDealStore,
   getActiveDealForChannel,
   getDeal,
   loadPriceBook,
@@ -405,7 +407,7 @@ export interface SendToCustomerInput {
   approvalSummary?: string;
   /**
    * Where the approver reads the message: a tenant-relative path of a durable
-   * copy of exactly `body` under `customer/<tenant>/` (today: a deal document,
+   * copy of exactly `body` under `knowledge/confidential/<tenant>/` (today: a deal document,
    * `deals/<deal>/<quote|contract>-v<n>.md`). The default summary names it in
    * `pnpm kyberion customer-channel outbound`. A source that does not hold
    * exactly the body is not named.
@@ -547,9 +549,9 @@ const OUTBOUND_CONTENT_SOURCE_PATTERN =
   /^deals\/[A-Za-z0-9][A-Za-z0-9_-]{2,127}\/(?:(?:quote|contract)-v[1-9][0-9]{0,5}\.md|quote-unquotable\.json)$/u;
 
 /**
- * The file of a tenant outbound content source (`customer/<tenant>/<source>`),
+ * The file of a tenant outbound content source (`knowledge/confidential/<tenant>/<source>`),
  * or null when the tenant slug or the source is not one an approver may read
- * (only a deal's quote / contract documents and its unquotable list; no other customer/ area).
+ * (only a deal's quote / contract documents and its unquotable list; nothing else in the tenant home).
  */
 export function resolveCustomerOutboundContentPath(
   tenantSlug: string,
@@ -559,11 +561,14 @@ export function resolveCustomerOutboundContentPath(
   if (!OUTBOUND_CONTENT_SOURCE_PATTERN.test(source) || source.includes('..')) return null;
   try {
     const filePath = assertSafeRepositoryPath(
-      path.join(pathResolver.rootDir(), 'customer', tenantSlug, source),
+      path.join(pathResolver.rootDir(), TENANT_HOME_ROOT, tenantSlug, source),
       { allowMissingLeaf: true }
     );
-    if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return null;
-    return filePath;
+    const regular = asDealStore(
+      tenantSlug,
+      () => safeExistsSync(filePath) && safeLstat(filePath).isFile()
+    );
+    return regular ? filePath : null;
   } catch {
     return null;
   }
@@ -582,7 +587,7 @@ export function readCustomerOutboundContent(input: {
 }): { text: string; sha256: string; matches: boolean | null } | null {
   const filePath = resolveCustomerOutboundContentPath(input.tenantSlug, input.source);
   if (!filePath) return null;
-  const text = readTextFile(filePath);
+  const text = asDealStore(input.tenantSlug, () => readTextFile(filePath));
   const sha256 = createHash('sha256').update(text, 'utf8').digest('hex');
   return {
     text,
@@ -636,7 +641,7 @@ interface EscalationRecord {
   reply?: string;
 }
 
-/** `customer/<tenant>/deals/<deal>/escalations/<sha256>.json` (tenant-side, not capped). */
+/** `knowledge/confidential/<tenant>/deals/<deal>/escalations/<sha256>.json` (tenant-side, not capped). */
 function escalationPath(tenantSlug: string, dealId: string, sha256: string): string | null {
   if (!isValidTenantSlug(tenantSlug) || !/^[A-Za-z0-9][A-Za-z0-9_-]{2,127}$/u.test(dealId)) {
     return null;
@@ -644,7 +649,14 @@ function escalationPath(tenantSlug: string, dealId: string, sha256: string): str
   if (!/^[a-f0-9]{64}$/u.test(sha256)) return null;
   return assertSafeRepositoryPath(
     pathResolver.rootResolve(
-      path.join('customer', tenantSlug, 'deals', dealId, 'escalations', `${sha256}.json`)
+      path.join(
+        TENANT_HOME_ROOT,
+        tenantSlug,
+        TENANT_DEALS_DIR,
+        dealId,
+        'escalations',
+        `${sha256}.json`
+      )
     ),
     { allowMissingLeaf: true }
   );
@@ -659,8 +671,10 @@ function recordEscalation(
   try {
     const filePath = escalationPath(tenantSlug, dealId, sha256);
     if (!filePath) return;
-    safeMkdir(path.dirname(filePath), { recursive: true });
-    writeJson(filePath, record);
+    asDealStore(tenantSlug, () => {
+      safeMkdir(path.dirname(filePath), { recursive: true });
+      writeJson(filePath, record);
+    });
   } catch (err) {
     // The notification still goes out; the reader falls back to the deal notes.
     logger.warn(
@@ -676,7 +690,9 @@ function readEscalation(
 ): EscalationRecord | null {
   try {
     const filePath = escalationPath(tenantSlug, dealId, sha256);
-    const record = filePath ? readJsonIfPresent<EscalationRecord>(filePath) : null;
+    const record = filePath
+      ? asDealStore(tenantSlug, () => readJsonIfPresent<EscalationRecord>(filePath))
+      : null;
     return record && typeof record.message === 'string' && typeof record.at === 'string'
       ? record
       : null;

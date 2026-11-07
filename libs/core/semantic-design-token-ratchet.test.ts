@@ -12,7 +12,7 @@ const GUARDED = [
   'libs/core/video/video-design-system.ts',
   'libs/actuators/media-actuator/src/media-layout-runtime.ts',
   'libs/actuators/media-actuator/src/html-deck-helpers.ts',
-  'libs/core/media/native-pptx-engine/layout-primitives.ts',
+  'libs/shared-media/src/native-pptx-engine/layout-primitives.ts',
   'libs/actuators/media-actuator/src/media-diagram-render-helpers.ts',
   'libs/actuators/media-actuator/src/media-report-docx-builder.ts',
 ];

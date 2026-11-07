@@ -49,14 +49,9 @@ import {
   safeReaddir,
   safeRmSync,
 } from '../secure-io.js';
-import { resolveRole, withExecutionContext } from '../authority.js';
-import { CUSTOMER_DECISION_MILESTONE_STORE_ROLE } from '../foundation/customer-decision-milestone-capability.js';
-import {
-  CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
-  customerDecisionConsumerCapability,
-  type CustomerDecisionConsumerSuperseded,
-} from '../foundation/customer-decision-consumer-capability.js';
-import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+import { customerDecisionMilestoneGrantActive } from '../foundation/customer-decision-milestone-capability.js';
+import { type CustomerDecisionConsumerSuperseded } from '../foundation/customer-decision-consumer-capability.js';
+import { withCustomerDecisionConsumerGrant } from './consumer-grant-access.js';
 
 /** The guard's relink rule, for the facade to check a re-ask before it writes anything. */
 export { taskProposalRelinkProblem } from '../foundation/customer-decision-consumer-capability.js';
@@ -261,8 +256,8 @@ export function writeAgenda(
   assertBelongs(location, validated, 'agenda');
   assertAgendaLinks(validated);
   const file = agendaPath(location, validated.agenda_id);
-  if (resolveRole() === CUSTOMER_DECISION_MILESTONE_STORE_ROLE) {
-    // The milestone role (a shared core role) may only append milestones to an
+  if (customerDecisionMilestoneGrantActive()) {
+    // Inside the milestone grant (G2: no role) only milestones may be appended to an
     // existing agenda: re-read it here and refuse any other change.
     const previous = readAgenda(location, validated.agenda_id);
     if (!previous || !isMilestoneOnlyChange(previous, validated))
@@ -691,8 +686,8 @@ export function supersededConsumedDecisionLock(
 }
 
 /**
- * Run `fn` as the narrow, content-checked consumer store role bound to the
- * case's tenant, inside the exact owner-bound capability for one consumer
+ * Run `fn` inside the exact owner-bound, content-checked consumer-lock grant (G2:
+ * the grant is the authority) bound to the case's tenant, for one consumer
  * lock (`access`: case-relative reads, the one lock written). The operator
  * facade writes a re-asked lock this way so the tier guard holds the write
  * to the relink rule (CD-09 human decision 2026-10-26); the mission side
@@ -705,10 +700,7 @@ export function asCustomerDecisionConsumerOwner<T>(
   fn: () => T
 ): T {
   const caseDir = pathResolver.toRepoRelative(ledgerDir(location));
-  return runInResourceAccessScope(
-    customerDecisionConsumerCapability(tenantSlug, caseDir, access),
-    () => withExecutionContext(CUSTOMER_DECISION_CONSUMER_STORE_ROLE, fn, undefined, tenantSlug)
-  );
+  return withCustomerDecisionConsumerGrant(tenantSlug, caseDir, access, fn);
 }
 
 function consumerPath(location: CustomerDecisionLocation, consumer: string): string {

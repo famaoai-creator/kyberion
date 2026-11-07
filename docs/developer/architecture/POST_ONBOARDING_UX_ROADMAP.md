@@ -32,7 +32,7 @@ Kyberion 導入直後のユーザー体験を、`pnpm onboarding` の完了で�
 
 ### 2. 接続レビュー画面を独立させる
 
-**狙い**: `customer/{slug}/connections/*.json` を「保存済み事実」ではなく「レビュー可能な候補」として扱う。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/connections/*.json` を使う。
+**狙い**: `knowledge/personal/stances/{slug}/connections/*.json` を「保存済み事実」ではなく「レビュー可能な候補」として扱う。`KYBERION_STANCE` 未設定時は `knowledge/personal/connections/*.json` を使う。
 
 レビューで扱う操作:
 

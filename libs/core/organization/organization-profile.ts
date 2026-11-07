@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import * as customerResolver from '../customer-resolver.js';
+import { activeTenantSlug, tenantHomePath } from './tenant-home.js';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
@@ -69,23 +69,20 @@ export function loadOrganizationProfileAtPath(filePath: string): OrganizationPro
   return loadOrganizationProfileCatalog(assertSafeRepositoryPath(filePath));
 }
 
-export function loadOrganizationProfile(rootDir?: string): OrganizationProfile | null {
-  const customerSlug = customerResolver.activeCustomer();
-  const rootScopedCustomerPath =
-    rootDir && customerSlug
-      ? assertSafeRepositoryPath(
-          path.join(rootDir, 'customer', customerSlug, 'organization-profile.json'),
-          { allowMissingLeaf: true, rootDir }
-        )
-      : null;
-  const activeCustomerPath = rootDir
-    ? null
-    : customerSlug
-      ? customerResolver.customerRoot('organization-profile.json')
-      : null;
+/**
+ * The organization profile of a tenant (`knowledge/confidential/{tenant}/organization-profile.json`,
+ * a company asset), else the product default. The tenant is `tenantSlug`, else the
+ * active tenant (`KYBERION_TENANT`); the stance never selects it.
+ */
+export function loadOrganizationProfile(
+  rootDir?: string,
+  tenantSlug: string | null = activeTenantSlug()
+): OrganizationProfile | null {
+  const tenantProfilePath = tenantSlug
+    ? tenantHomePath(tenantSlug, 'organization-profile.json', rootDir)
+    : null;
   const candidatePaths = [
-    rootScopedCustomerPath,
-    activeCustomerPath,
+    tenantProfilePath,
     rootDir
       ? assertSafeRepositoryPath(
           path.join(rootDir, 'knowledge', 'public', 'governance', 'organization-profile.json'),

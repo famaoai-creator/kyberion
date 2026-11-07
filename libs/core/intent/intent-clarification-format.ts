@@ -1,6 +1,6 @@
 import { isInjectionSuspected } from '../untrusted-content.js';
 import { resolveLocale } from '../locale.js';
-import { normalizeLocale } from '../locale-normalize.js';
+import { normalizeLocale } from '../foundation/locale-normalize.js';
 import { t } from '../t.js';
 import type { ClarificationFormatOptions } from './intent-contract-types.js';
 import type { OperatorInteractionPacket } from '../contracts/operator-interaction-packet.js';

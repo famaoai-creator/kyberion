@@ -3,7 +3,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { loadRecoveryPolicy as loadRecoveryPolicyFromManifest } from '@agent/core/recovery-policy';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import { waitForJob } from '@agent/core/job-lifecycle';
-import { VideoRenderRuntime } from '@agent/core/video/video-render-runtime';
+import { VideoRenderRuntime } from '@agent/shared-video/video-render-runtime';
 import { compileSchema } from '@agent/core/foundation';
 
 export const videoCompositionActionValidate = compileSchema(

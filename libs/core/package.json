@@ -1,6 +1,6 @@
 {
   "name": "@agent/core",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "imports": {
@@ -16,6 +16,18 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./contracts/asset-scope": {
+      "types": "./dist/contracts/asset-scope.d.ts",
+      "default": "./dist/contracts/asset-scope.js"
+    },
+    "./foundation/asset-address": {
+      "types": "./dist/foundation/asset-address.d.ts",
+      "default": "./dist/foundation/asset-address.js"
+    },
+    "./governance/asset-scope-inspection": {
+      "types": "./dist/governance/asset-scope-inspection.d.ts",
+      "default": "./dist/governance/asset-scope-inspection.js"
+    },
     "./pipeline/pipeline-reuse": {
       "types": "./dist/pipeline/pipeline-reuse.d.ts",
       "default": "./dist/pipeline/pipeline-reuse.js"
@@ -112,17 +124,9 @@
       "types": "./dist/actuator/index.d.ts",
       "default": "./dist/actuator/index.js"
     },
-    "./actuator-capability": {
-      "types": "./dist/actuator-capability.d.ts",
-      "default": "./dist/actuator-capability.js"
-    },
     "./actuator-dependency-bundles": {
       "types": "./dist/actuator/actuator-dependency-bundles.d.ts",
       "default": "./dist/actuator/actuator-dependency-bundles.js"
-    },
-    "./actuator-example-catalog": {
-      "types": "./dist/actuator-example-catalog.d.ts",
-      "default": "./dist/actuator-example-catalog.js"
     },
     "./actuator-forwarding-port": {
       "types": "./dist/actuator/actuator-forwarding-port.d.ts",
@@ -508,9 +512,9 @@
       "types": "./dist/analysis/trace-schema.d.ts",
       "default": "./dist/analysis/trace-schema.js"
     },
-    "./app-profiles": {
-      "types": "./dist/app-profiles.d.ts",
-      "default": "./dist/app-profiles.js"
+    "./app-profile-index-loader": {
+      "types": "./dist/app-profile-index-loader.d.ts",
+      "default": "./dist/app-profile-index-loader.js"
     },
     "./append-only-store": {
       "types": "./dist/append-only-store.d.ts",
@@ -588,10 +592,6 @@
       "types": "./dist/workforce/artifact-verification.d.ts",
       "default": "./dist/workforce/artifact-verification.js"
     },
-    "./artifacts": {
-      "types": "./dist/artifacts.d.ts",
-      "default": "./dist/artifacts.js"
-    },
     "./assistant-compiler-request": {
       "types": "./dist/assistant-compiler-request.d.ts",
       "default": "./dist/assistant-compiler-request.js"
@@ -628,9 +628,9 @@
       "types": "./dist/authn-principal-resolver.d.ts",
       "default": "./dist/authn-principal-resolver.js"
     },
-    "./authn-providers": {
-      "types": "./dist/authn-providers.d.ts",
-      "default": "./dist/authn-providers.js"
+    "./authn/authn-providers": {
+      "types": "./dist/authn/authn-providers.d.ts",
+      "default": "./dist/authn/authn-providers.js"
     },
     "./authn/installation-step-up": {
       "types": "./dist/authn/installation-step-up.d.ts",
@@ -744,69 +744,17 @@
       "types": "./dist/browser/index.d.ts",
       "default": "./dist/browser/index.js"
     },
-    "./browser-automation-runtime-bridge": {
-      "types": "./dist/browser/browser-automation-runtime-bridge.d.ts",
-      "default": "./dist/browser/browser-automation-runtime-bridge.js"
-    },
-    "./browser-conversation-session": {
-      "types": "./dist/browser/browser-conversation-session.d.ts",
-      "default": "./dist/browser/browser-conversation-session.js"
-    },
     "./browser-extension-bridge": {
       "types": "./dist/browser/browser-extension-bridge.d.ts",
       "default": "./dist/browser/browser-extension-bridge.js"
-    },
-    "./browser-judgment": {
-      "types": "./dist/browser/browser-judgment.d.ts",
-      "default": "./dist/browser/browser-judgment.js"
-    },
-    "./browser-onboarding": {
-      "types": "./dist/browser/browser-onboarding.d.ts",
-      "default": "./dist/browser/browser-onboarding.js"
-    },
-    "./browser-procedure-promotion": {
-      "types": "./dist/browser/browser-procedure-promotion.d.ts",
-      "default": "./dist/browser/browser-procedure-promotion.js"
     },
     "./browser-recording-compiler": {
       "types": "./dist/browser/browser-recording-compiler.d.ts",
       "default": "./dist/browser/browser-recording-compiler.js"
     },
-    "./browser/browser-bridge-mailbox": {
-      "types": "./dist/browser/browser-bridge-mailbox.d.ts",
-      "default": "./dist/browser/browser-bridge-mailbox.js"
-    },
-    "./browser/browser-automation-runtime-bridge": {
-      "types": "./dist/browser/browser-automation-runtime-bridge.d.ts",
-      "default": "./dist/browser/browser-automation-runtime-bridge.js"
-    },
-    "./browser/browser-conversation-session": {
-      "types": "./dist/browser/browser-conversation-session.d.ts",
-      "default": "./dist/browser/browser-conversation-session.js"
-    },
     "./browser/browser-extension-bridge": {
       "types": "./dist/browser/browser-extension-bridge.d.ts",
       "default": "./dist/browser/browser-extension-bridge.js"
-    },
-    "./browser/browser-golden-evidence": {
-      "types": "./dist/browser/browser-golden-evidence.d.ts",
-      "default": "./dist/browser/browser-golden-evidence.js"
-    },
-    "./browser/browser-judgment": {
-      "types": "./dist/browser/browser-judgment.d.ts",
-      "default": "./dist/browser/browser-judgment.js"
-    },
-    "./browser/browser-onboarding": {
-      "types": "./dist/browser/browser-onboarding.d.ts",
-      "default": "./dist/browser/browser-onboarding.js"
-    },
-    "./browser/browser-onboarding-state": {
-      "types": "./dist/browser/browser-onboarding-state.d.ts",
-      "default": "./dist/browser/browser-onboarding-state.js"
-    },
-    "./browser/browser-procedure-promotion": {
-      "types": "./dist/browser/browser-procedure-promotion.d.ts",
-      "default": "./dist/browser/browser-procedure-promotion.js"
     },
     "./browser/browser-recording-compiler": {
       "types": "./dist/browser/browser-recording-compiler.d.ts",
@@ -952,9 +900,9 @@
       "types": "./dist/compaction-copy-recovery.d.ts",
       "default": "./dist/compaction-copy-recovery.js"
     },
-    "./computer-interaction-outcome": {
-      "types": "./dist/computer-interaction-outcome.d.ts",
-      "default": "./dist/computer-interaction-outcome.js"
+    "./contracts/computer-interaction-outcome": {
+      "types": "./dist/contracts/computer-interaction-outcome.d.ts",
+      "default": "./dist/contracts/computer-interaction-outcome.js"
     },
     "./computer-surface": {
       "types": "./dist/virtual/computer-surface.d.ts",
@@ -1185,8 +1133,8 @@
       "default": "./dist/creative-design-resolver.js"
     },
     "./cron-utils": {
-      "types": "./dist/cron-utils.d.ts",
-      "default": "./dist/cron-utils.js"
+      "types": "./dist/pipeline/cron-utils.d.ts",
+      "default": "./dist/pipeline/cron-utils.js"
     },
     "./custody-owner": {
       "types": "./dist/custody-owner.d.ts",
@@ -1204,10 +1152,6 @@
       "types": "./dist/customer-conversation-modes.d.ts",
       "default": "./dist/customer-conversation-modes.js"
     },
-    "./customer-decision": {
-      "types": "./dist/customer-decision.d.ts",
-      "default": "./dist/customer-decision.js"
-    },
     "./customer-decision/operator-handoff": {
       "types": "./dist/customer-decision/operator-handoff.d.ts",
       "default": "./dist/customer-decision/operator-handoff.js"
@@ -1216,9 +1160,9 @@
       "types": "./dist/customer-outbound-templates.d.ts",
       "default": "./dist/customer-outbound-templates.js"
     },
-    "./customer-resolver": {
-      "types": "./dist/customer-resolver.d.ts",
-      "default": "./dist/customer-resolver.js"
+    "./stance-resolver": {
+      "types": "./dist/stance-resolver.d.ts",
+      "default": "./dist/stance-resolver.js"
     },
     "./daemon-heartbeat": {
       "types": "./dist/daemon-heartbeat.d.ts",
@@ -1271,10 +1215,6 @@
     "./decision-rights": {
       "types": "./dist/decision-rights.d.ts",
       "default": "./dist/decision-rights.js"
-    },
-    "./deck-theme-direction": {
-      "types": "./dist/deck-theme-direction.d.ts",
-      "default": "./dist/deck-theme-direction.js"
     },
     "./delegated-task-observability": {
       "types": "./dist/delegated-task-observability.d.ts",
@@ -1436,18 +1376,6 @@
       "types": "./dist/knowledge/distill-knowledge-injector.d.ts",
       "default": "./dist/knowledge/distill-knowledge-injector.js"
     },
-    "./document-contents-policy": {
-      "types": "./dist/media/document-contents-policy.d.ts",
-      "default": "./dist/media/document-contents-policy.js"
-    },
-    "./document-inference-policy": {
-      "types": "./dist/media/document-inference-policy.d.ts",
-      "default": "./dist/media/document-inference-policy.js"
-    },
-    "./document-outline-label-policy": {
-      "types": "./dist/media/document-outline-label-policy.d.ts",
-      "default": "./dist/media/document-outline-label-policy.js"
-    },
     "./document-reader": {
       "types": "./dist/media/document-reader.d.ts",
       "default": "./dist/media/document-reader.js"
@@ -1455,10 +1383,6 @@
     "./documentation-source-map": {
       "types": "./dist/documentation-source-map.d.ts",
       "default": "./dist/documentation-source-map.js"
-    },
-    "./docx-utils": {
-      "types": "./dist/docx-utils.d.ts",
-      "default": "./dist/docx-utils.js"
     },
     "./dot/dot-action-ledger": {
       "types": "./dist/dot/dot-action-ledger.d.ts",
@@ -1628,9 +1552,9 @@
       "types": "./dist/error-classifier-judgment.d.ts",
       "default": "./dist/error-classifier-judgment.js"
     },
-    "./evidence": {
-      "types": "./dist/evidence.d.ts",
-      "default": "./dist/evidence.js"
+    "./contracts/evidence": {
+      "types": "./dist/contracts/evidence.d.ts",
+      "default": "./dist/contracts/evidence.js"
     },
     "./event-scope": {
       "types": "./dist/event-scope.d.ts",
@@ -1648,9 +1572,9 @@
       "types": "./dist/event/memory-event-bus.d.ts",
       "default": "./dist/event/memory-event-bus.js"
     },
-    "./execution-bounds": {
-      "types": "./dist/execution-bounds.d.ts",
-      "default": "./dist/execution-bounds.js"
+    "./contracts/execution-bounds": {
+      "types": "./dist/contracts/execution-bounds.d.ts",
+      "default": "./dist/contracts/execution-bounds.js"
     },
     "./execution-feedback": {
       "types": "./dist/execution-feedback.d.ts",
@@ -1663,10 +1587,6 @@
     "./facet-registry": {
       "types": "./dist/facet-registry.d.ts",
       "default": "./dist/facet-registry.js"
-    },
-    "./feedback-loop": {
-      "types": "./dist/feedback-loop.d.ts",
-      "default": "./dist/feedback-loop.js"
     },
     "./finance-controller": {
       "types": "./dist/finance-controller.d.ts",
@@ -1912,6 +1832,10 @@
       "types": "./dist/governance/approval-presentation.d.ts",
       "default": "./dist/governance/approval-presentation.js"
     },
+    "./governance/approval-separation-of-duties": {
+      "types": "./dist/governance/approval-separation-of-duties.d.ts",
+      "default": "./dist/governance/approval-separation-of-duties.js"
+    },
     "./governance/approval-requester": {
       "types": "./dist/governance/approval-requester.d.ts",
       "default": "./dist/governance/approval-requester.js"
@@ -2112,9 +2036,9 @@
       "types": "./dist/history-search-index.d.ts",
       "default": "./dist/history-search-index.js"
     },
-    "./html-sanitize": {
-      "types": "./dist/html-sanitize.d.ts",
-      "default": "./dist/html-sanitize.js"
+    "./foundation/html-sanitize": {
+      "types": "./dist/foundation/html-sanitize.d.ts",
+      "default": "./dist/foundation/html-sanitize.js"
     },
     "./html-to-markdown": {
       "types": "./dist/html-to-markdown.d.ts",
@@ -2139,22 +2063,6 @@
     "./image-dhash": {
       "types": "./dist/media/image-dhash.d.ts",
       "default": "./dist/media/image-dhash.js"
-    },
-    "./image-generation-bridge": {
-      "types": "./dist/media/image-generation-bridge.d.ts",
-      "default": "./dist/media/image-generation-bridge.js"
-    },
-    "./image-generation-policy": {
-      "types": "./dist/media/image-generation-policy.d.ts",
-      "default": "./dist/media/image-generation-policy.js"
-    },
-    "./image-generation-types": {
-      "types": "./dist/media/image-generation-types.d.ts",
-      "default": "./dist/media/image-generation-types.js"
-    },
-    "./image-reference-consent": {
-      "types": "./dist/media/image-reference-consent.d.ts",
-      "default": "./dist/media/image-reference-consent.js"
     },
     "./imessage-bridge": {
       "types": "./dist/imessage-bridge.d.ts",
@@ -2267,10 +2175,6 @@
     "./intent-clarification-format": {
       "types": "./dist/intent/intent-clarification-format.d.ts",
       "default": "./dist/intent/intent-clarification-format.js"
-    },
-    "./intent-compiler": {
-      "types": "./dist/intent-compiler.d.ts",
-      "default": "./dist/intent-compiler.js"
     },
     "./intent-contract": {
       "types": "./dist/intent/intent-contract.d.ts",
@@ -2420,38 +2324,6 @@
       "types": "./dist/intent/intent-use-case-scenario.d.ts",
       "default": "./dist/intent/intent-use-case-scenario.js"
     },
-    "./interaction": {
-      "types": "./dist/interaction/index.d.ts",
-      "default": "./dist/interaction/index.js"
-    },
-    "./interaction/backchannel-policy": {
-      "types": "./dist/interaction/backchannel-policy.d.ts",
-      "default": "./dist/interaction/backchannel-policy.js"
-    },
-    "./interaction/conversation-engine": {
-      "types": "./dist/interaction/conversation-engine.d.ts",
-      "default": "./dist/interaction/conversation-engine.js"
-    },
-    "./interaction/interaction-signals": {
-      "types": "./dist/interaction/interaction-signals.d.ts",
-      "default": "./dist/interaction/interaction-signals.js"
-    },
-    "./interaction/interaction-state": {
-      "types": "./dist/interaction/interaction-state.d.ts",
-      "default": "./dist/interaction/interaction-state.js"
-    },
-    "./interaction/language-pack": {
-      "types": "./dist/interaction/language-pack.d.ts",
-      "default": "./dist/interaction/language-pack.js"
-    },
-    "./interaction/user-rhythm": {
-      "types": "./dist/interaction/user-rhythm.d.ts",
-      "default": "./dist/interaction/user-rhythm.js"
-    },
-    "./interaction/utterance-intent": {
-      "types": "./dist/interaction/utterance-intent.d.ts",
-      "default": "./dist/interaction/utterance-intent.js"
-    },
     "./invariants": {
       "types": "./dist/invariants.d.ts",
       "default": "./dist/invariants.js"
@@ -2468,9 +2340,9 @@
       "types": "./dist/jsonl-read.d.ts",
       "default": "./dist/jsonl-read.js"
     },
-    "./judge-route": {
-      "types": "./dist/judge-route.d.ts",
-      "default": "./dist/judge-route.js"
+    "./contracts/judge-route": {
+      "types": "./dist/contracts/judge-route.d.ts",
+      "default": "./dist/contracts/judge-route.js"
     },
     "./judgment-assist": {
       "types": "./dist/reasoning/judgment-assist.d.ts",
@@ -2503,14 +2375,6 @@
     "./knowledge": {
       "types": "./dist/knowledge/index.d.ts",
       "default": "./dist/knowledge/index.js"
-    },
-    "./knowledge-curation-report": {
-      "types": "./dist/knowledge-curation-report.d.ts",
-      "default": "./dist/knowledge-curation-report.js"
-    },
-    "./knowledge-feedback-loop": {
-      "types": "./dist/knowledge-feedback-loop.d.ts",
-      "default": "./dist/knowledge-feedback-loop.js"
     },
     "./knowledge-index": {
       "types": "./dist/knowledge-index.d.ts",
@@ -2712,10 +2576,6 @@
       "types": "./dist/laya-mlx-judgment-backend.d.ts",
       "default": "./dist/laya-mlx-judgment-backend.js"
     },
-    "./layout-primitives": {
-      "types": "./dist/media/native-pptx-engine/layout-primitives.d.ts",
-      "default": "./dist/media/native-pptx-engine/layout-primitives.js"
-    },
     "./lease/lease-backend": {
       "types": "./dist/lease/lease-backend.d.ts",
       "default": "./dist/lease/lease-backend.js"
@@ -2735,10 +2595,6 @@
     "./ledger": {
       "types": "./dist/ledger.d.ts",
       "default": "./dist/ledger.js"
-    },
-    "./legacy-media-ops": {
-      "types": "./dist/legacy-media-ops.d.ts",
-      "default": "./dist/legacy-media-ops.js"
     },
     "./lifecycle-hook-engine": {
       "types": "./dist/lifecycle-hook-engine.d.ts",
@@ -2764,21 +2620,13 @@
       "types": "./dist/locale.d.ts",
       "default": "./dist/locale.js"
     },
-    "./locale-normalize": {
-      "types": "./dist/locale-normalize.d.ts",
-      "default": "./dist/locale-normalize.js"
-    },
-    "./lock-utils": {
-      "types": "./dist/lock-utils.d.ts",
-      "default": "./dist/lock-utils.js"
+    "./foundation/locale-normalize": {
+      "types": "./dist/foundation/locale-normalize.d.ts",
+      "default": "./dist/foundation/locale-normalize.js"
     },
     "./logger": {
       "types": "./dist/logger.d.ts",
       "default": "./dist/logger.js"
-    },
-    "./logic-utils": {
-      "types": "./dist/logic-utils.d.ts",
-      "default": "./dist/logic-utils.js"
     },
     "./macos-automation-bridge": {
       "types": "./dist/macos-automation-bridge.d.ts",
@@ -2796,10 +2644,6 @@
       "types": "./dist/managed-process.d.ts",
       "default": "./dist/managed-process.js"
     },
-    "./mark-target-resolver": {
-      "types": "./dist/mark-target-resolver.d.ts",
-      "default": "./dist/mark-target-resolver.js"
-    },
     "./marketing-workload": {
       "types": "./dist/marketing-workload.d.ts",
       "default": "./dist/marketing-workload.js"
@@ -2816,77 +2660,9 @@
       "types": "./dist/media/index.d.ts",
       "default": "./dist/media/index.js"
     },
-    "./media-aws-icon-rules": {
-      "types": "./dist/media/media-aws-icon-rules.d.ts",
-      "default": "./dist/media/media-aws-icon-rules.js"
-    },
     "./media-backend-registry": {
       "types": "./dist/media/media-backend-registry.d.ts",
       "default": "./dist/media/media-backend-registry.js"
-    },
-    "./media-brief-lock": {
-      "types": "./dist/media/media-brief-lock.d.ts",
-      "default": "./dist/media/media-brief-lock.js"
-    },
-    "./media-contracts": {
-      "types": "./dist/media/media-contracts.d.ts",
-      "default": "./dist/media/media-contracts.js"
-    },
-    "./media-drawio-boundary-policy": {
-      "types": "./dist/media/media-drawio-boundary-policy.d.ts",
-      "default": "./dist/media/media-drawio-boundary-policy.js"
-    },
-    "./media-drawio-edge-policy": {
-      "types": "./dist/media/media-drawio-edge-policy.d.ts",
-      "default": "./dist/media/media-drawio-edge-policy.js"
-    },
-    "./media-drawio-policy": {
-      "types": "./dist/media/media-drawio-policy.d.ts",
-      "default": "./dist/media/media-drawio-policy.js"
-    },
-    "./media-drawio-security-group-order": {
-      "types": "./dist/media/media-drawio-security-group-order.d.ts",
-      "default": "./dist/media/media-drawio-security-group-order.js"
-    },
-    "./media-drawio-sort-policy": {
-      "types": "./dist/media/media-drawio-sort-policy.d.ts",
-      "default": "./dist/media/media-drawio-sort-policy.js"
-    },
-    "./media-drawio-tier-order": {
-      "types": "./dist/media/media-drawio-tier-order.d.ts",
-      "default": "./dist/media/media-drawio-tier-order.js"
-    },
-    "./media-semantic-map": {
-      "types": "./dist/media/media-semantic-map.d.ts",
-      "default": "./dist/media/media-semantic-map.js"
-    },
-    "./media-signal-entry-policy": {
-      "types": "./dist/media/media-signal-entry-policy.d.ts",
-      "default": "./dist/media/media-signal-entry-policy.js"
-    },
-    "./media-style-policy": {
-      "types": "./dist/media/media-style-policy.d.ts",
-      "default": "./dist/media/media-style-policy.js"
-    },
-    "./media-theme-role-policy": {
-      "types": "./dist/media/media-theme-role-policy.d.ts",
-      "default": "./dist/media/media-theme-role-policy.js"
-    },
-    "./media-tone-style-map": {
-      "types": "./dist/media/media-tone-style-map.d.ts",
-      "default": "./dist/media/media-tone-style-map.js"
-    },
-    "./media/document-contents-policy": {
-      "types": "./dist/media/document-contents-policy.d.ts",
-      "default": "./dist/media/document-contents-policy.js"
-    },
-    "./media/document-inference-policy": {
-      "types": "./dist/media/document-inference-policy.d.ts",
-      "default": "./dist/media/document-inference-policy.js"
-    },
-    "./media/document-outline-label-policy": {
-      "types": "./dist/media/document-outline-label-policy.d.ts",
-      "default": "./dist/media/document-outline-label-policy.js"
     },
     "./media/document-reader": {
       "types": "./dist/media/document-reader.d.ts",
@@ -2895,10 +2671,6 @@
     "./media/docx-utils": {
       "types": "./dist/media/docx-utils.d.ts",
       "default": "./dist/media/docx-utils.js"
-    },
-    "./media/font-stack": {
-      "types": "./dist/media/font-stack.d.ts",
-      "default": "./dist/media/font-stack.js"
     },
     "./media/image-description-bridge": {
       "types": "./dist/media/image-description-bridge.d.ts",
@@ -2912,129 +2684,17 @@
       "types": "./dist/media/image-dhash.d.ts",
       "default": "./dist/media/image-dhash.js"
     },
-    "./media/image-generation-bridge": {
-      "types": "./dist/media/image-generation-bridge.d.ts",
-      "default": "./dist/media/image-generation-bridge.js"
-    },
-    "./media/image-generation-policy": {
-      "types": "./dist/media/image-generation-policy.d.ts",
-      "default": "./dist/media/image-generation-policy.js"
-    },
-    "./media/image-generation-types": {
-      "types": "./dist/media/image-generation-types.d.ts",
-      "default": "./dist/media/image-generation-types.js"
-    },
-    "./media/image-reference-consent": {
-      "types": "./dist/media/image-reference-consent.d.ts",
-      "default": "./dist/media/image-reference-consent.js"
-    },
-    "./media/media-aws-icon-rules": {
-      "types": "./dist/media/media-aws-icon-rules.d.ts",
-      "default": "./dist/media/media-aws-icon-rules.js"
-    },
     "./media/media-backend-registry": {
       "types": "./dist/media/media-backend-registry.d.ts",
       "default": "./dist/media/media-backend-registry.js"
-    },
-    "./media/media-brief-lock": {
-      "types": "./dist/media/media-brief-lock.d.ts",
-      "default": "./dist/media/media-brief-lock.js"
-    },
-    "./media/media-contracts": {
-      "types": "./dist/media/media-contracts.d.ts",
-      "default": "./dist/media/media-contracts.js"
-    },
-    "./media/media-drawio-boundary-policy": {
-      "types": "./dist/media/media-drawio-boundary-policy.d.ts",
-      "default": "./dist/media/media-drawio-boundary-policy.js"
-    },
-    "./media/media-drawio-edge-policy": {
-      "types": "./dist/media/media-drawio-edge-policy.d.ts",
-      "default": "./dist/media/media-drawio-edge-policy.js"
-    },
-    "./media/media-drawio-policy": {
-      "types": "./dist/media/media-drawio-policy.d.ts",
-      "default": "./dist/media/media-drawio-policy.js"
-    },
-    "./media/media-drawio-security-group-order": {
-      "types": "./dist/media/media-drawio-security-group-order.d.ts",
-      "default": "./dist/media/media-drawio-security-group-order.js"
-    },
-    "./media/media-drawio-sort-policy": {
-      "types": "./dist/media/media-drawio-sort-policy.d.ts",
-      "default": "./dist/media/media-drawio-sort-policy.js"
-    },
-    "./media/media-drawio-tier-order": {
-      "types": "./dist/media/media-drawio-tier-order.d.ts",
-      "default": "./dist/media/media-drawio-tier-order.js"
-    },
-    "./media/media-semantic-map": {
-      "types": "./dist/media/media-semantic-map.d.ts",
-      "default": "./dist/media/media-semantic-map.js"
-    },
-    "./media/media-signal-entry-policy": {
-      "types": "./dist/media/media-signal-entry-policy.d.ts",
-      "default": "./dist/media/media-signal-entry-policy.js"
-    },
-    "./media/media-style-policy": {
-      "types": "./dist/media/media-style-policy.d.ts",
-      "default": "./dist/media/media-style-policy.js"
-    },
-    "./media/media-theme-role-policy": {
-      "types": "./dist/media/media-theme-role-policy.d.ts",
-      "default": "./dist/media/media-theme-role-policy.js"
-    },
-    "./media/media-tone-style-map": {
-      "types": "./dist/media/media-tone-style-map.d.ts",
-      "default": "./dist/media/media-tone-style-map.js"
-    },
-    "./media/music-generation-bridge": {
-      "types": "./dist/media/music-generation-bridge.d.ts",
-      "default": "./dist/media/music-generation-bridge.js"
-    },
-    "./media/music-generation-policy": {
-      "types": "./dist/media/music-generation-policy.d.ts",
-      "default": "./dist/media/music-generation-policy.js"
-    },
-    "./media/music-generation-types": {
-      "types": "./dist/media/music-generation-types.d.ts",
-      "default": "./dist/media/music-generation-types.js"
-    },
-    "./media/music-workflow-compiler": {
-      "types": "./dist/media/music-workflow-compiler.d.ts",
-      "default": "./dist/media/music-workflow-compiler.js"
-    },
-    "./media/video-generation/provider": {
-      "types": "./dist/media/video-generation/provider.d.ts",
-      "default": "./dist/media/video-generation/provider.js"
-    },
-    "./media/video-generation/provider-registry": {
-      "types": "./dist/media/video-generation/provider-registry.d.ts",
-      "default": "./dist/media/video-generation/provider-registry.js"
-    },
-    "./media/native-docx-engine/engine": {
-      "types": "./dist/media/native-docx-engine/engine.d.ts",
-      "default": "./dist/media/native-docx-engine/engine.js"
-    },
-    "./media/native-docx-engine/examples/roundtrip_docx": {
-      "types": "./dist/media/native-docx-engine/examples/roundtrip_docx.d.ts",
-      "default": "./dist/media/native-docx-engine/examples/roundtrip_docx.js"
     },
     "./media/native-op-mapping": {
       "types": "./dist/media/native-op-mapping.d.ts",
       "default": "./dist/media/native-op-mapping.js"
     },
-    "./media/native-pdf-engine/engine": {
-      "types": "./dist/media/native-pdf-engine/engine.d.ts",
-      "default": "./dist/media/native-pdf-engine/engine.js"
-    },
     "./media/native-pdf-engine/parser": {
       "types": "./dist/media/native-pdf-engine/parser.d.ts",
       "default": "./dist/media/native-pdf-engine/parser.js"
-    },
-    "./media/native-pdf-engine/primitives": {
-      "types": "./dist/media/native-pdf-engine/primitives.d.ts",
-      "default": "./dist/media/native-pdf-engine/primitives.js"
     },
     "./media/native-pptx-engine/builders": {
       "types": "./dist/media/native-pptx-engine/builders.d.ts",
@@ -3052,10 +2712,6 @@
       "types": "./dist/media/native-pptx-engine/engine.d.ts",
       "default": "./dist/media/native-pptx-engine/engine.js"
     },
-    "./media/native-pptx-engine/layout-primitives": {
-      "types": "./dist/media/native-pptx-engine/layout-primitives.d.ts",
-      "default": "./dist/media/native-pptx-engine/layout-primitives.js"
-    },
     "./media/native-pptx-engine/presentation": {
       "types": "./dist/media/native-pptx-engine/presentation.d.ts",
       "default": "./dist/media/native-pptx-engine/presentation.js"
@@ -3064,65 +2720,13 @@
       "types": "./dist/media/native-pptx-engine/rels.d.ts",
       "default": "./dist/media/native-pptx-engine/rels.js"
     },
-    "./media/native-pptx-engine/text-metrics": {
-      "types": "./dist/media/native-pptx-engine/text-metrics.d.ts",
-      "default": "./dist/media/native-pptx-engine/text-metrics.js"
-    },
     "./media/native-pptx-engine/theme": {
       "types": "./dist/media/native-pptx-engine/theme.d.ts",
       "default": "./dist/media/native-pptx-engine/theme.js"
     },
-    "./media/native-speech-listen-bridge": {
-      "types": "./dist/media/native-speech-listen-bridge.d.ts",
-      "default": "./dist/media/native-speech-listen-bridge.js"
-    },
     "./media/native-subagent-adopter": {
       "types": "./dist/media/native-subagent-adopter.d.ts",
       "default": "./dist/media/native-subagent-adopter.js"
-    },
-    "./media/native-tts": {
-      "types": "./dist/media/native-tts.d.ts",
-      "default": "./dist/media/native-tts.js"
-    },
-    "./media/native-xlsx-engine/comments": {
-      "types": "./dist/media/native-xlsx-engine/comments.d.ts",
-      "default": "./dist/media/native-xlsx-engine/comments.js"
-    },
-    "./media/native-xlsx-engine/content-types": {
-      "types": "./dist/media/native-xlsx-engine/content-types.d.ts",
-      "default": "./dist/media/native-xlsx-engine/content-types.js"
-    },
-    "./media/native-xlsx-engine/drawing": {
-      "types": "./dist/media/native-xlsx-engine/drawing.d.ts",
-      "default": "./dist/media/native-xlsx-engine/drawing.js"
-    },
-    "./media/native-xlsx-engine/engine": {
-      "types": "./dist/media/native-xlsx-engine/engine.d.ts",
-      "default": "./dist/media/native-xlsx-engine/engine.js"
-    },
-    "./media/native-xlsx-engine/rels": {
-      "types": "./dist/media/native-xlsx-engine/rels.d.ts",
-      "default": "./dist/media/native-xlsx-engine/rels.js"
-    },
-    "./media/native-xlsx-engine/shared-strings": {
-      "types": "./dist/media/native-xlsx-engine/shared-strings.d.ts",
-      "default": "./dist/media/native-xlsx-engine/shared-strings.js"
-    },
-    "./media/native-xlsx-engine/styles": {
-      "types": "./dist/media/native-xlsx-engine/styles.d.ts",
-      "default": "./dist/media/native-xlsx-engine/styles.js"
-    },
-    "./media/native-xlsx-engine/table": {
-      "types": "./dist/media/native-xlsx-engine/table.d.ts",
-      "default": "./dist/media/native-xlsx-engine/table.js"
-    },
-    "./media/native-xlsx-engine/workbook": {
-      "types": "./dist/media/native-xlsx-engine/workbook.d.ts",
-      "default": "./dist/media/native-xlsx-engine/workbook.js"
-    },
-    "./media/native-xlsx-engine/worksheet": {
-      "types": "./dist/media/native-xlsx-engine/worksheet.d.ts",
-      "default": "./dist/media/native-xlsx-engine/worksheet.js"
     },
     "./media/ooxml-core-props": {
       "types": "./dist/media/ooxml-core-props.d.ts",
@@ -3372,9 +2976,9 @@
       "types": "./dist/mesh/peer-runtime-recovery.d.ts",
       "default": "./dist/mesh/peer-runtime-recovery.js"
     },
-    "./message-format": {
-      "types": "./dist/message-format.d.ts",
-      "default": "./dist/message-format.js"
+    "./foundation/message-format": {
+      "types": "./dist/foundation/message-format.d.ts",
+      "default": "./dist/foundation/message-format.js"
     },
     "./metrics": {
       "types": "./dist/metrics.d.ts",
@@ -4092,10 +3696,6 @@
       "types": "./dist/mobile-profile-validators.d.ts",
       "default": "./dist/mobile-profile-validators.js"
     },
-    "./mobile-runtime-helpers": {
-      "types": "./dist/mobile-runtime-helpers.d.ts",
-      "default": "./dist/mobile-runtime-helpers.js"
-    },
     "./model-performance-index": {
       "types": "./dist/reasoning/model-performance-index.d.ts",
       "default": "./dist/reasoning/model-performance-index.js"
@@ -4116,22 +3716,6 @@
       "types": "./dist/reasoning/model-role-fitness-runner.d.ts",
       "default": "./dist/reasoning/model-role-fitness-runner.js"
     },
-    "./music-generation-bridge": {
-      "types": "./dist/media/music-generation-bridge.d.ts",
-      "default": "./dist/media/music-generation-bridge.js"
-    },
-    "./music-generation-policy": {
-      "types": "./dist/media/music-generation-policy.d.ts",
-      "default": "./dist/media/music-generation-policy.js"
-    },
-    "./music-generation-types": {
-      "types": "./dist/media/music-generation-types.d.ts",
-      "default": "./dist/media/music-generation-types.js"
-    },
-    "./music-workflow-compiler": {
-      "types": "./dist/media/music-workflow-compiler.d.ts",
-      "default": "./dist/media/music-workflow-compiler.js"
-    },
     "./narrated-video-brief-compiler": {
       "types": "./dist/video/narrated-video-brief-compiler.d.ts",
       "default": "./dist/video/narrated-video-brief-compiler.js"
@@ -4143,18 +3727,6 @@
     "./native-pptx-engine/design-cascade": {
       "types": "./dist/media/native-pptx-engine/design-cascade.d.ts",
       "default": "./dist/media/native-pptx-engine/design-cascade.js"
-    },
-    "./native-pptx-engine/text-metrics": {
-      "types": "./dist/media/native-pptx-engine/text-metrics.d.ts",
-      "default": "./dist/media/native-pptx-engine/text-metrics.js"
-    },
-    "./native-speech-listen-bridge": {
-      "types": "./dist/media/native-speech-listen-bridge.d.ts",
-      "default": "./dist/media/native-speech-listen-bridge.js"
-    },
-    "./native-tts": {
-      "types": "./dist/media/native-tts.d.ts",
-      "default": "./dist/media/native-tts.js"
     },
     "./nerve-bridge": {
       "types": "./dist/nerve-bridge.d.ts",
@@ -4168,9 +3740,9 @@
       "types": "./dist/next-action.d.ts",
       "default": "./dist/next-action.js"
     },
-    "./next-action-contract": {
-      "types": "./dist/next-action-contract.d.ts",
-      "default": "./dist/next-action-contract.js"
+    "./contracts/next-action-contract": {
+      "types": "./dist/contracts/next-action-contract.d.ts",
+      "default": "./dist/contracts/next-action-contract.js"
     },
     "./nhi-lifecycle-governance": {
       "types": "./dist/nhi-lifecycle-governance.d.ts",
@@ -4196,9 +3768,9 @@
       "types": "./dist/ocr-bridge.d.ts",
       "default": "./dist/ocr-bridge.js"
     },
-    "./ocr-types": {
-      "types": "./dist/ocr-types.d.ts",
-      "default": "./dist/ocr-types.js"
+    "./contracts/ocr-types": {
+      "types": "./dist/contracts/ocr-types.d.ts",
+      "default": "./dist/contracts/ocr-types.js"
     },
     "./onboarding-apply-input": {
       "types": "./dist/organization/onboarding-apply-input.d.ts",
@@ -4600,9 +4172,13 @@
       "types": "./dist/path-resolver.d.ts",
       "default": "./dist/path-resolver.js"
     },
-    "./pcm-wav": {
-      "types": "./dist/pcm-wav.d.ts",
-      "default": "./dist/pcm-wav.js"
+    "./path-tenant-attribution": {
+      "types": "./dist/path-tenant-attribution.d.ts",
+      "default": "./dist/path-tenant-attribution.js"
+    },
+    "./foundation/pcm-wav": {
+      "types": "./dist/foundation/pcm-wav.d.ts",
+      "default": "./dist/foundation/pcm-wav.js"
     },
     "./pdf-protocol": {
       "types": "./dist/contracts/pdf-protocol.d.ts",
@@ -4664,25 +4240,13 @@
       "types": "./dist/pipeline/pipeline-dry-run.d.ts",
       "default": "./dist/pipeline/pipeline-dry-run.js"
     },
-    "./pipeline-engine": {
-      "types": "./dist/pipeline-engine.d.ts",
-      "default": "./dist/pipeline-engine.js"
-    },
     "./pipeline-input-contract": {
       "types": "./dist/pipeline/pipeline-input-contract.d.ts",
       "default": "./dist/pipeline/pipeline-input-contract.js"
     },
-    "./pipeline-preview": {
-      "types": "./dist/pipeline-preview.d.ts",
-      "default": "./dist/pipeline-preview.js"
-    },
     "./pipeline-run-journal": {
       "types": "./dist/pipeline/pipeline-run-journal.d.ts",
       "default": "./dist/pipeline/pipeline-run-journal.js"
-    },
-    "./pipeline-scheduler": {
-      "types": "./dist/pipeline-scheduler.d.ts",
-      "default": "./dist/pipeline-scheduler.js"
     },
     "./pipeline/adf-engine": {
       "types": "./dist/pipeline/adf-engine.d.ts",
@@ -4904,10 +4468,6 @@
       "types": "./dist/plugin/skill-wrapper.d.ts",
       "default": "./dist/plugin/skill-wrapper.js"
     },
-    "./pptx-utils": {
-      "types": "./dist/pptx-utils.d.ts",
-      "default": "./dist/pptx-utils.js"
-    },
     "./presence-avatar": {
       "types": "./dist/presence-avatar.d.ts",
       "default": "./dist/presence-avatar.js"
@@ -5120,9 +4680,9 @@
       "types": "./dist/provider/provider-pins-store.d.ts",
       "default": "./dist/provider/provider-pins-store.js"
     },
-    "./provider-transport": {
-      "types": "./dist/provider-transport.d.ts",
-      "default": "./dist/provider-transport.js"
+    "./provider/provider-transport": {
+      "types": "./dist/provider/provider-transport.d.ts",
+      "default": "./dist/provider/provider-transport.js"
     },
     "./provider/agy-cli-backend": {
       "types": "./dist/provider/agy-cli-backend.d.ts",
@@ -5464,18 +5024,6 @@
       "types": "./dist/realtime-media-session.d.ts",
       "default": "./dist/realtime-media-session.js"
     },
-    "./realtime-voice-conversation": {
-      "types": "./dist/voice/realtime-voice-conversation.d.ts",
-      "default": "./dist/voice/realtime-voice-conversation.js"
-    },
-    "./realtime-voice-loop": {
-      "types": "./dist/voice/realtime-voice-loop.d.ts",
-      "default": "./dist/voice/realtime-voice-loop.js"
-    },
-    "./realtime-voice-preferences": {
-      "types": "./dist/voice/realtime-voice-preferences.d.ts",
-      "default": "./dist/voice/realtime-voice-preferences.js"
-    },
     "./engine-runtime-preferences": {
       "types": "./dist/voice/engine-runtime-preferences.d.ts",
       "default": "./dist/voice/engine-runtime-preferences.js"
@@ -5744,9 +5292,9 @@
       "types": "./dist/reflex-terminal.d.ts",
       "default": "./dist/reflex-terminal.js"
     },
-    "./rejection-reason": {
-      "types": "./dist/rejection-reason.d.ts",
-      "default": "./dist/rejection-reason.js"
+    "./contracts/rejection-reason": {
+      "types": "./dist/contracts/rejection-reason.d.ts",
+      "default": "./dist/contracts/rejection-reason.js"
     },
     "./relationship-graph-store": {
       "types": "./dist/relationship-graph-store.d.ts",
@@ -6280,9 +5828,9 @@
       "types": "./dist/share-grant-live-sessions.d.ts",
       "default": "./dist/share-grant-live-sessions.js"
     },
-    "./shared-business-types": {
-      "types": "./dist/shared-business-types.d.ts",
-      "default": "./dist/shared-business-types.js"
+    "./contracts/shared-business-types": {
+      "types": "./dist/contracts/shared-business-types.d.ts",
+      "default": "./dist/contracts/shared-business-types.js"
     },
     "./shell": {
       "types": "./dist/shell/index.d.ts",
@@ -6392,25 +5940,13 @@
       "types": "./dist/software-quality-operations.d.ts",
       "default": "./dist/software-quality-operations.js"
     },
-    "./som-overlay": {
-      "types": "./dist/som-overlay.d.ts",
-      "default": "./dist/som-overlay.js"
-    },
     "./source-analysis": {
       "types": "./dist/source-analysis.d.ts",
       "default": "./dist/source-analysis.js"
     },
-    "./sovereign-sentinel": {
-      "types": "./dist/sovereign-sentinel.d.ts",
-      "default": "./dist/sovereign-sentinel.js"
-    },
     "./speech-to-text-bridge": {
       "types": "./dist/voice/speech-to-text-bridge.d.ts",
       "default": "./dist/voice/speech-to-text-bridge.js"
-    },
-    "./spreadsheet-style-policy": {
-      "types": "./dist/spreadsheet-style-policy.d.ts",
-      "default": "./dist/spreadsheet-style-policy.js"
     },
     "./src/actuator-capability": {
       "types": "./dist/actuator/actuator-capability.d.ts",
@@ -6463,10 +5999,6 @@
     "./src/native-pptx-engine/design-cascade": {
       "types": "./dist/media/native-pptx-engine/design-cascade.d.ts",
       "default": "./dist/media/native-pptx-engine/design-cascade.js"
-    },
-    "./src/native-pptx-engine/text-metrics": {
-      "types": "./dist/media/native-pptx-engine/text-metrics.d.ts",
-      "default": "./dist/media/native-pptx-engine/text-metrics.js"
     },
     "./src/pipeline-engine": {
       "types": "./dist/pipeline/pipeline-engine.d.ts",
@@ -7100,17 +6632,13 @@
       "types": "./dist/accepted-pipeline-bindings.d.ts",
       "default": "./dist/accepted-pipeline-bindings.js"
     },
-    "./decision-ledger": {
-      "types": "./dist/decision-ledger.d.ts",
-      "default": "./dist/decision-ledger.js"
-    },
     "./ui-component-registry": {
       "types": "./dist/ui-component-registry.d.ts",
       "default": "./dist/ui-component-registry.js"
     },
-    "./text-escaping": {
-      "types": "./dist/text-escaping.d.ts",
-      "default": "./dist/text-escaping.js"
+    "./foundation/text-escaping": {
+      "types": "./dist/foundation/text-escaping.d.ts",
+      "default": "./dist/foundation/text-escaping.js"
     },
     "./tier-guard": {
       "types": "./dist/tier-guard.d.ts",
@@ -7184,17 +6712,9 @@
       "types": "./dist/tool/tool-runtime-registry.d.ts",
       "default": "./dist/tool/tool-runtime-registry.js"
     },
-    "./trace": {
-      "types": "./dist/trace.d.ts",
-      "default": "./dist/trace.js"
-    },
     "./trace-schema": {
       "types": "./dist/analysis/trace-schema.d.ts",
       "default": "./dist/analysis/trace-schema.js"
-    },
-    "./tracker-sheet-policy": {
-      "types": "./dist/tracker-sheet-policy.d.ts",
-      "default": "./dist/tracker-sheet-policy.js"
     },
     "./training-catalog": {
       "types": "./dist/training-catalog.d.ts",
@@ -7211,10 +6731,6 @@
     "./trust-requiring-resources": {
       "types": "./dist/trust-requiring-resources.d.ts",
       "default": "./dist/trust-requiring-resources.js"
-    },
-    "./tts-loopback-verifier": {
-      "types": "./dist/voice/tts-loopback-verifier.d.ts",
-      "default": "./dist/voice/tts-loopback-verifier.js"
     },
     "./types": {
       "types": "./dist/types.d.ts",
@@ -7276,10 +6792,6 @@
       "types": "./dist/voice/vad-registry.d.ts",
       "default": "./dist/voice/vad-registry.js"
     },
-    "./vad-turn-recorder": {
-      "types": "./dist/voice/vad-turn-recorder.d.ts",
-      "default": "./dist/voice/vad-turn-recorder.js"
-    },
     "./validate": {
       "types": "./dist/validate.d.ts",
       "default": "./dist/validate.js"
@@ -7320,21 +6832,9 @@
       "types": "./dist/video/index.d.ts",
       "default": "./dist/video/index.js"
     },
-    "./video-composition-compiler": {
-      "types": "./dist/video/video-composition-compiler.d.ts",
-      "default": "./dist/video/video-composition-compiler.js"
-    },
     "./video-composition-contract": {
       "types": "./dist/video/video-composition-contract.d.ts",
       "default": "./dist/video/video-composition-contract.js"
-    },
-    "./video-composition-lint": {
-      "types": "./dist/video/video-composition-lint.d.ts",
-      "default": "./dist/video/video-composition-lint.js"
-    },
-    "./video-composition-template-registry": {
-      "types": "./dist/video/video-composition-template-registry.d.ts",
-      "default": "./dist/video/video-composition-template-registry.js"
     },
     "./video-content-brief-contract": {
       "types": "./dist/video/video-content-brief-contract.d.ts",
@@ -7348,25 +6848,9 @@
       "types": "./dist/video/video-frame-bus.d.ts",
       "default": "./dist/video/video-frame-bus.js"
     },
-    "./video-ingest": {
-      "types": "./dist/video/ingest/index.d.ts",
-      "default": "./dist/video/ingest/index.js"
-    },
     "./video-motion-direction": {
       "types": "./dist/video/video-motion-direction.d.ts",
       "default": "./dist/video/video-motion-direction.js"
-    },
-    "./video-render-backend": {
-      "types": "./dist/video/video-render-backend.d.ts",
-      "default": "./dist/video/video-render-backend.js"
-    },
-    "./video-render-runtime": {
-      "types": "./dist/video/video-render-runtime.d.ts",
-      "default": "./dist/video/video-render-runtime.js"
-    },
-    "./video-render-runtime-policy": {
-      "types": "./dist/video/video-render-runtime-policy.d.ts",
-      "default": "./dist/video/video-render-runtime-policy.js"
     },
     "./video-scene-composition": {
       "types": "./dist/video/video-scene-composition.d.ts",
@@ -7376,34 +6860,6 @@
       "types": "./dist/video/video-visual-direction.d.ts",
       "default": "./dist/video/video-visual-direction.js"
     },
-    "./video/ingest": {
-      "types": "./dist/video/ingest/index.d.ts",
-      "default": "./dist/video/ingest/index.js"
-    },
-    "./video/ingest/index": {
-      "types": "./dist/video/ingest/index.d.ts",
-      "default": "./dist/video/ingest/index.js"
-    },
-    "./video/ingest/video-brief": {
-      "types": "./dist/video/ingest/video-brief.d.ts",
-      "default": "./dist/video/ingest/video-brief.js"
-    },
-    "./video/ingest/video-fetch": {
-      "types": "./dist/video/ingest/video-fetch.d.ts",
-      "default": "./dist/video/ingest/video-fetch.js"
-    },
-    "./video/ingest/video-ingest-types": {
-      "types": "./dist/video/ingest/video-ingest-types.d.ts",
-      "default": "./dist/video/ingest/video-ingest-types.js"
-    },
-    "./video/ingest/video-media": {
-      "types": "./dist/video/ingest/video-media.d.ts",
-      "default": "./dist/video/ingest/video-media.js"
-    },
-    "./video/ingest/vtt-parser": {
-      "types": "./dist/video/ingest/vtt-parser.d.ts",
-      "default": "./dist/video/ingest/vtt-parser.js"
-    },
     "./video/narrated-video-brief-compiler": {
       "types": "./dist/video/narrated-video-brief-compiler.d.ts",
       "default": "./dist/video/narrated-video-brief-compiler.js"
@@ -7412,29 +6868,9 @@
       "types": "./dist/video/narrated-video-preference-profile.d.ts",
       "default": "./dist/video/narrated-video-preference-profile.js"
     },
-    "./video/narrated-video-upload-package": {
-      "types": "./dist/video/narrated-video-upload-package.d.ts",
-      "default": "./dist/video/narrated-video-upload-package.js"
-    },
-    "./video/video-composition-compiler": {
-      "types": "./dist/video/video-composition-compiler.d.ts",
-      "default": "./dist/video/video-composition-compiler.js"
-    },
     "./video/video-composition-contract": {
       "types": "./dist/video/video-composition-contract.d.ts",
       "default": "./dist/video/video-composition-contract.js"
-    },
-    "./video/video-composition-lint": {
-      "types": "./dist/video/video-composition-lint.d.ts",
-      "default": "./dist/video/video-composition-lint.js"
-    },
-    "./video/video-composition-rendering": {
-      "types": "./dist/video/video-composition-rendering.d.ts",
-      "default": "./dist/video/video-composition-rendering.js"
-    },
-    "./video/video-composition-template-registry": {
-      "types": "./dist/video/video-composition-template-registry.d.ts",
-      "default": "./dist/video/video-composition-template-registry.js"
     },
     "./video/video-content-brief-contract": {
       "types": "./dist/video/video-content-brief-contract.d.ts",
@@ -7448,18 +6884,6 @@
       "types": "./dist/video/video-device-lease.d.ts",
       "default": "./dist/video/video-device-lease.js"
     },
-    "./video/video-filter": {
-      "types": "./dist/video/video-filter.d.ts",
-      "default": "./dist/video/video-filter.js"
-    },
-    "./video/video-filter-bootstrap": {
-      "types": "./dist/video/video-filter-bootstrap.d.ts",
-      "default": "./dist/video/video-filter-bootstrap.js"
-    },
-    "./video/obs-video-filter-provider": {
-      "types": "./dist/video/obs-video-filter-provider.d.ts",
-      "default": "./dist/video/obs-video-filter-provider.js"
-    },
     "./video/video-frame-archive": {
       "types": "./dist/video/video-frame-archive.d.ts",
       "default": "./dist/video/video-frame-archive.js"
@@ -7472,22 +6896,6 @@
       "types": "./dist/video/video-motion-direction.d.ts",
       "default": "./dist/video/video-motion-direction.js"
     },
-    "./video/video-narration-timeline": {
-      "types": "./dist/video/video-narration-timeline.d.ts",
-      "default": "./dist/video/video-narration-timeline.js"
-    },
-    "./video/video-render-backend": {
-      "types": "./dist/video/video-render-backend.d.ts",
-      "default": "./dist/video/video-render-backend.js"
-    },
-    "./video/video-render-runtime": {
-      "types": "./dist/video/video-render-runtime.d.ts",
-      "default": "./dist/video/video-render-runtime.js"
-    },
-    "./video/video-render-runtime-policy": {
-      "types": "./dist/video/video-render-runtime-policy.d.ts",
-      "default": "./dist/video/video-render-runtime-policy.js"
-    },
     "./video/video-route": {
       "types": "./dist/video/video-route.d.ts",
       "default": "./dist/video/video-route.js"
@@ -7495,10 +6903,6 @@
     "./video/video-scene-composition": {
       "types": "./dist/video/video-scene-composition.d.ts",
       "default": "./dist/video/video-scene-composition.js"
-    },
-    "./video/video-timeline-runtime": {
-      "types": "./dist/video/video-timeline-runtime.d.ts",
-      "default": "./dist/video/video-timeline-runtime.js"
     },
     "./video/video-visual-direction": {
       "types": "./dist/video/video-visual-direction.d.ts",
@@ -7660,10 +7064,6 @@
       "types": "./dist/visual-review-loop.d.ts",
       "default": "./dist/visual-review-loop.js"
     },
-    "./visual-workflow-compiler": {
-      "types": "./dist/visual-workflow-compiler.d.ts",
-      "default": "./dist/visual-workflow-compiler.js"
-    },
     "./vocabulary-catalog": {
       "types": "./dist/knowledge/vocabulary-catalog.d.ts",
       "default": "./dist/knowledge/vocabulary-catalog.js"
@@ -7684,10 +7084,6 @@
       "types": "./dist/voice/voice-bridge.d.ts",
       "default": "./dist/voice/voice-bridge.js"
     },
-    "./voice-capability-bridge": {
-      "types": "./dist/voice/voice-capability-bridge.d.ts",
-      "default": "./dist/voice/voice-capability-bridge.js"
-    },
     "./voice-consent": {
       "types": "./dist/voice/voice-consent.d.ts",
       "default": "./dist/voice/voice-consent.js"
@@ -7695,18 +7091,6 @@
     "./voice-engine-registry": {
       "types": "./dist/voice/voice-engine-registry.d.ts",
       "default": "./dist/voice/voice-engine-registry.js"
-    },
-    "./voice-generation-runtime": {
-      "types": "./dist/voice/voice-generation-runtime.d.ts",
-      "default": "./dist/voice/voice-generation-runtime.js"
-    },
-    "./voice-path-policy": {
-      "types": "./dist/voice/voice-path-policy.d.ts",
-      "default": "./dist/voice/voice-path-policy.js"
-    },
-    "./voice-profile-promotion": {
-      "types": "./dist/voice/voice-profile-promotion.d.ts",
-      "default": "./dist/voice/voice-profile-promotion.js"
     },
     "./voice-profile-registry": {
       "types": "./dist/voice/voice-profile-registry.d.ts",
@@ -7716,45 +7100,13 @@
       "types": "./dist/voice/voice-provider-adapters.d.ts",
       "default": "./dist/voice/voice-provider-adapters.js"
     },
-    "./voice-runtime-policy": {
-      "types": "./dist/voice/voice-runtime-policy.d.ts",
-      "default": "./dist/voice/voice-runtime-policy.js"
-    },
-    "./voice-sample-collection": {
-      "types": "./dist/voice/voice-sample-collection.d.ts",
-      "default": "./dist/voice/voice-sample-collection.js"
-    },
-    "./voice-sample-ingestion-policy": {
-      "types": "./dist/voice/voice-sample-ingestion-policy.d.ts",
-      "default": "./dist/voice/voice-sample-ingestion-policy.js"
-    },
-    "./voice-sample-recorder": {
-      "types": "./dist/voice/voice-sample-recorder.d.ts",
-      "default": "./dist/voice/voice-sample-recorder.js"
-    },
-    "./voice-selection-preferences": {
-      "types": "./dist/voice/voice-selection-preferences.d.ts",
-      "default": "./dist/voice/voice-selection-preferences.js"
-    },
     "./voice-stt": {
       "types": "./dist/voice/voice-stt.d.ts",
       "default": "./dist/voice/voice-stt.js"
     },
-    "./voice-synth": {
-      "types": "./dist/voice/voice-synth.d.ts",
-      "default": "./dist/voice/voice-synth.js"
-    },
     "./voice-text-chunking": {
       "types": "./dist/voice/voice-text-chunking.d.ts",
       "default": "./dist/voice/voice-text-chunking.js"
-    },
-    "./voice-transcript-alignment": {
-      "types": "./dist/voice/voice-transcript-alignment.d.ts",
-      "default": "./dist/voice/voice-transcript-alignment.js"
-    },
-    "./voice-tts-config": {
-      "types": "./dist/voice/voice-tts-config.d.ts",
-      "default": "./dist/voice/voice-tts-config.js"
     },
     "./voice/audio-bus": {
       "types": "./dist/voice/audio-bus.d.ts",
@@ -7788,22 +7140,6 @@
       "types": "./dist/voice/audio-tee.d.ts",
       "default": "./dist/voice/audio-tee.js"
     },
-    "./voice/audio-text-similarity": {
-      "types": "./dist/voice/audio-text-similarity.d.ts",
-      "default": "./dist/voice/audio-text-similarity.js"
-    },
-    "./voice/realtime-voice-conversation": {
-      "types": "./dist/voice/realtime-voice-conversation.d.ts",
-      "default": "./dist/voice/realtime-voice-conversation.js"
-    },
-    "./voice/realtime-voice-loop": {
-      "types": "./dist/voice/realtime-voice-loop.d.ts",
-      "default": "./dist/voice/realtime-voice-loop.js"
-    },
-    "./voice/realtime-voice-preferences": {
-      "types": "./dist/voice/realtime-voice-preferences.d.ts",
-      "default": "./dist/voice/realtime-voice-preferences.js"
-    },
     "./voice/engine-runtime-preferences": {
       "types": "./dist/voice/engine-runtime-preferences.d.ts",
       "default": "./dist/voice/engine-runtime-preferences.js"
@@ -7828,10 +7164,6 @@
       "types": "./dist/voice/streaming-tts-bridge.d.ts",
       "default": "./dist/voice/streaming-tts-bridge.js"
     },
-    "./voice/tts-loopback-verifier": {
-      "types": "./dist/voice/tts-loopback-verifier.d.ts",
-      "default": "./dist/voice/tts-loopback-verifier.js"
-    },
     "./voice/vad-bridge-protocol": {
       "types": "./dist/voice/vad-bridge-protocol.d.ts",
       "default": "./dist/voice/vad-bridge-protocol.js"
@@ -7839,10 +7171,6 @@
     "./voice/vad-registry": {
       "types": "./dist/voice/vad-registry.d.ts",
       "default": "./dist/voice/vad-registry.js"
-    },
-    "./voice/vad-turn-recorder": {
-      "types": "./dist/voice/vad-turn-recorder.d.ts",
-      "default": "./dist/voice/vad-turn-recorder.js"
     },
     "./voice/voice-activity-detector": {
       "types": "./dist/voice/voice-activity-detector.d.ts",
@@ -7852,10 +7180,6 @@
       "types": "./dist/voice/voice-bridge.d.ts",
       "default": "./dist/voice/voice-bridge.js"
     },
-    "./voice/voice-capability-bridge": {
-      "types": "./dist/voice/voice-capability-bridge.d.ts",
-      "default": "./dist/voice/voice-capability-bridge.js"
-    },
     "./voice/voice-consent": {
       "types": "./dist/voice/voice-consent.d.ts",
       "default": "./dist/voice/voice-consent.js"
@@ -7863,34 +7187,6 @@
     "./voice/voice-engine-registry": {
       "types": "./dist/voice/voice-engine-registry.d.ts",
       "default": "./dist/voice/voice-engine-registry.js"
-    },
-    "./voice/voice-eot-scorer": {
-      "types": "./dist/voice/voice-eot-scorer.d.ts",
-      "default": "./dist/voice/voice-eot-scorer.js"
-    },
-    "./voice/voice-first-phrase-cache": {
-      "types": "./dist/voice/voice-first-phrase-cache.d.ts",
-      "default": "./dist/voice/voice-first-phrase-cache.js"
-    },
-    "./voice/voice-generation-runtime": {
-      "types": "./dist/voice/voice-generation-runtime.d.ts",
-      "default": "./dist/voice/voice-generation-runtime.js"
-    },
-    "./voice/voice-hub-playback": {
-      "types": "./dist/voice/voice-hub-playback.d.ts",
-      "default": "./dist/voice/voice-hub-playback.js"
-    },
-    "./voice/voice-path-policy": {
-      "types": "./dist/voice/voice-path-policy.d.ts",
-      "default": "./dist/voice/voice-path-policy.js"
-    },
-    "./voice/voice-phrase-chunker": {
-      "types": "./dist/voice/voice-phrase-chunker.d.ts",
-      "default": "./dist/voice/voice-phrase-chunker.js"
-    },
-    "./voice/voice-profile-promotion": {
-      "types": "./dist/voice/voice-profile-promotion.d.ts",
-      "default": "./dist/voice/voice-profile-promotion.js"
     },
     "./voice/voice-profile-registry": {
       "types": "./dist/voice/voice-profile-registry.d.ts",
@@ -7904,65 +7200,17 @@
       "types": "./dist/voice/voice-respond-gate.d.ts",
       "default": "./dist/voice/voice-respond-gate.js"
     },
-    "./voice/voice-runtime-policy": {
-      "types": "./dist/voice/voice-runtime-policy.d.ts",
-      "default": "./dist/voice/voice-runtime-policy.js"
-    },
-    "./voice/voice-sample-collection": {
-      "types": "./dist/voice/voice-sample-collection.d.ts",
-      "default": "./dist/voice/voice-sample-collection.js"
-    },
-    "./voice/voice-sample-ingestion-policy": {
-      "types": "./dist/voice/voice-sample-ingestion-policy.d.ts",
-      "default": "./dist/voice/voice-sample-ingestion-policy.js"
-    },
-    "./voice/voice-sample-recorder": {
-      "types": "./dist/voice/voice-sample-recorder.d.ts",
-      "default": "./dist/voice/voice-sample-recorder.js"
-    },
-    "./voice/voice-selection-preferences": {
-      "types": "./dist/voice/voice-selection-preferences.d.ts",
-      "default": "./dist/voice/voice-selection-preferences.js"
-    },
-    "./voice/voice-speculative-policy": {
-      "types": "./dist/voice/voice-speculative-policy.d.ts",
-      "default": "./dist/voice/voice-speculative-policy.js"
-    },
     "./voice/voice-stt": {
       "types": "./dist/voice/voice-stt.d.ts",
       "default": "./dist/voice/voice-stt.js"
-    },
-    "./voice/voice-synth": {
-      "types": "./dist/voice/voice-synth.d.ts",
-      "default": "./dist/voice/voice-synth.js"
     },
     "./voice/voice-text-chunking": {
       "types": "./dist/voice/voice-text-chunking.d.ts",
       "default": "./dist/voice/voice-text-chunking.js"
     },
-    "./voice/voice-transcript-alignment": {
-      "types": "./dist/voice/voice-transcript-alignment.d.ts",
-      "default": "./dist/voice/voice-transcript-alignment.js"
-    },
-    "./voice/voice-tts-config": {
-      "types": "./dist/voice/voice-tts-config.d.ts",
-      "default": "./dist/voice/voice-tts-config.js"
-    },
-    "./voice/voice-turn-cancellation": {
-      "types": "./dist/voice/voice-turn-cancellation.d.ts",
-      "default": "./dist/voice/voice-turn-cancellation.js"
-    },
-    "./voice/voice-turn-taking": {
-      "types": "./dist/voice/voice-turn-taking.d.ts",
-      "default": "./dist/voice/voice-turn-taking.js"
-    },
     "./voice/voice-turn-taking-lexicon": {
       "types": "./dist/voice/voice-turn-taking-lexicon.d.ts",
       "default": "./dist/voice/voice-turn-taking-lexicon.js"
-    },
-    "./voice/voice-workbench": {
-      "types": "./dist/voice/voice-workbench.d.ts",
-      "default": "./dist/voice/voice-workbench.js"
     },
     "./volatile-knowledge": {
       "types": "./dist/volatile-knowledge.d.ts",
@@ -7976,9 +7224,9 @@
       "types": "./dist/search/web-search-runtime-bridge.d.ts",
       "default": "./dist/search/web-search-runtime-bridge.js"
     },
-    "./wire-error": {
-      "types": "./dist/wire-error.d.ts",
-      "default": "./dist/wire-error.js"
+    "./contracts/wire-error": {
+      "types": "./dist/contracts/wire-error.d.ts",
+      "default": "./dist/contracts/wire-error.js"
     },
     "./work-coordination": {
       "types": "./dist/workforce/work-coordination.d.ts",
@@ -8248,10 +7496,6 @@
       "types": "./dist/workforce/workspace-sweep.d.ts",
       "default": "./dist/workforce/workspace-sweep.js"
     },
-    "./xlsx-utils": {
-      "types": "./dist/xlsx-utils.d.ts",
-      "default": "./dist/xlsx-utils.js"
-    },
     "./organization/continuous-operations": {
       "types": "./dist/organization/continuous-operations.d.ts",
       "default": "./dist/organization/continuous-operations.js"
@@ -8388,10 +7632,6 @@
       "types": "./dist/foundation/json-state.d.ts",
       "default": "./dist/foundation/json-state.js"
     },
-    "./rate-limit": {
-      "types": "./dist/rate-limit.d.ts",
-      "default": "./dist/rate-limit.js"
-    },
     "./failure-tracker": {
       "types": "./dist/failure-tracker.d.ts",
       "default": "./dist/failure-tracker.js"
@@ -8415,34 +7655,6 @@
     "./shortcut-bridge": {
       "types": "./dist/shortcut-bridge.d.ts",
       "default": "./dist/shortcut-bridge.js"
-    },
-    "./perception/observation": {
-      "types": "./dist/perception/observation.d.ts",
-      "default": "./dist/perception/observation.js"
-    },
-    "./perception/visual-change": {
-      "types": "./dist/perception/visual-change.d.ts",
-      "default": "./dist/perception/visual-change.js"
-    },
-    "./perception/audio-analysis": {
-      "types": "./dist/perception/audio-analysis.d.ts",
-      "default": "./dist/perception/audio-analysis.js"
-    },
-    "./perception/tracking": {
-      "types": "./dist/perception/tracking.d.ts",
-      "default": "./dist/perception/tracking.js"
-    },
-    "./perception/semantic-index": {
-      "types": "./dist/perception/semantic-index.d.ts",
-      "default": "./dist/perception/semantic-index.js"
-    },
-    "./perception/image-dimensions": {
-      "types": "./dist/perception/image-dimensions.d.ts",
-      "default": "./dist/perception/image-dimensions.js"
-    },
-    "./voice/engine-runtime-preferences-operator": {
-      "types": "./dist/voice/engine-runtime-preferences-operator.d.ts",
-      "default": "./dist/voice/engine-runtime-preferences-operator.js"
     },
     "./information-assets/types": {
       "types": "./dist/information-assets/types.d.ts",
@@ -8487,6 +7699,74 @@
     "./provider-runtime-requirements": {
       "types": "./dist/provider-runtime-requirements.d.ts",
       "default": "./dist/provider-runtime-requirements.js"
+    },
+    "./media/docx-xml": {
+      "types": "./dist/media/docx-xml.d.ts",
+      "default": "./dist/media/docx-xml.js"
+    },
+    "./media/xlsx-xstring": {
+      "types": "./dist/media/xlsx-xstring.d.ts",
+      "default": "./dist/media/xlsx-xstring.js"
+    },
+    "./provider-chain-router": {
+      "types": "./dist/provider-chain-router.d.ts",
+      "default": "./dist/provider-chain-router.js"
+    },
+    "./provider-registry": {
+      "types": "./dist/provider-registry.d.ts",
+      "default": "./dist/provider-registry.js"
+    },
+    "./windows-native-image-generation-bridge": {
+      "types": "./dist/windows-native-image-generation-bridge.d.ts",
+      "default": "./dist/windows-native-image-generation-bridge.js"
+    },
+    "./barge-in-controller": {
+      "types": "./dist/barge-in-controller.d.ts",
+      "default": "./dist/barge-in-controller.js"
+    },
+    "./segmented-voice-playback": {
+      "types": "./dist/segmented-voice-playback.d.ts",
+      "default": "./dist/segmented-voice-playback.js"
+    },
+    "./voice/engine-runtime-preferences-access": {
+      "types": "./dist/voice/engine-runtime-preferences-access.d.ts",
+      "default": "./dist/voice/engine-runtime-preferences-access.js"
+    },
+    "./voice/engine-runtime-preferences-transaction": {
+      "types": "./dist/voice/engine-runtime-preferences-transaction.d.ts",
+      "default": "./dist/voice/engine-runtime-preferences-transaction.js"
+    },
+    "./governance/approval-store-reader": {
+      "types": "./dist/governance/approval-store-reader.d.ts",
+      "default": "./dist/governance/approval-store-reader.js"
+    },
+    "./intent/intent-phrase-lexicon": {
+      "types": "./dist/intent/intent-phrase-lexicon.d.ts",
+      "default": "./dist/intent/intent-phrase-lexicon.js"
+    },
+    "./knowledge/golden-scenario-verdict": {
+      "types": "./dist/knowledge/golden-scenario-verdict.d.ts",
+      "default": "./dist/knowledge/golden-scenario-verdict.js"
+    },
+    "./router-contract": {
+      "types": "./dist/router-contract.d.ts",
+      "default": "./dist/router-contract.js"
+    },
+    "./customer-decision": {
+      "types": "./dist/customer-decision/index.d.ts",
+      "default": "./dist/customer-decision/index.js"
+    },
+    "./decision-ledger": {
+      "types": "./dist/decision-ledger/index.d.ts",
+      "default": "./dist/decision-ledger/index.js"
+    },
+    "./foundation/rate-limit": {
+      "types": "./dist/foundation/rate-limit.d.ts",
+      "default": "./dist/foundation/rate-limit.js"
+    },
+    "./foundation/scope-context-validation": {
+      "types": "./dist/foundation/scope-context-validation.d.ts",
+      "default": "./dist/foundation/scope-context-validation.js"
     }
   },
   "dependencies": {

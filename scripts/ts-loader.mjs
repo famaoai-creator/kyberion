@@ -9,7 +9,7 @@
  * transpile cache, live in ./ts-loader-cache.mjs.
  */
 import { readFileSync, existsSync, realpathSync } from 'node:fs';
-import { dirname, extname, resolve as resolvePath } from 'node:path';
+import { dirname, extname, resolve as resolvePath, sep } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { registerHooks } from 'node:module';
 import {
@@ -47,36 +47,83 @@ function resolveCandidatePath(candidate) {
   return existsSync(candidate) ? pathToFileURL(candidate).href : null;
 }
 
+const CORE_ROOT = resolvePath(PROJECT_ROOT, 'libs/core');
+const CORE_DIST = resolvePath(CORE_ROOT, 'dist');
+
+/**
+ * One @agent/core per process: either its built dist or its source, never both.
+ * Two copies of the same module mean two copies of every module-private
+ * registry (opaque grants, seams, backends), so a grant issued by one copy is
+ * not honoured by the other. The choice is made once, by whichever comes first:
+ *   - the first `@agent/core` specifier: dist when libs/core/dist/index.js
+ *     exists, source otherwise;
+ *   - the first relative import of a libs/core TypeScript module (only the
+ *     bootstrap scripts allowlisted by scripts/check_core_single_instance.ts
+ *     do this): source.
+ * After that, a `@agent/core` subpath whose dist file is missing (a stale or
+ * partial build) is not quietly answered from source next to loaded dist
+ * modules; it fails like any unbuilt export, and a dist built while a source
+ * process runs (pnpm build) is not picked up by that process.
+ */
+let coreInstance = null;
+function latchCoreInstance(kind) {
+  if (coreInstance === null) coreInstance = kind;
+  return coreInstance;
+}
+
+function isCoreSourceModule(filePath) {
+  return (
+    filePath.startsWith(CORE_ROOT + sep) &&
+    !filePath.startsWith(CORE_DIST + sep) &&
+    TS_EXTENSIONS.has(extname(filePath))
+  );
+}
+
+let coreExportTargets = null;
+/** Source file behind an aliased export (e.g. `./a2a-bridge` -> `./dist/mesh/a2a-bridge.js`). */
+function coreExportSource(subpath) {
+  if (coreExportTargets === null) {
+    try {
+      const manifest = JSON.parse(readFileSync(resolvePath(CORE_ROOT, 'package.json'), 'utf8'));
+      coreExportTargets = manifest.exports ?? {};
+    } catch {
+      coreExportTargets = {};
+    }
+  }
+  const entry = coreExportTargets[subpath === 'index' ? '.' : './' + subpath];
+  const target = typeof entry === 'string' ? entry : (entry?.default ?? entry?.import);
+  if (typeof target !== 'string' || !target.startsWith('./dist/') || !target.endsWith('.js'))
+    return null;
+  const stem = resolvePath(CORE_ROOT, target.slice('./dist/'.length, -'.js'.length));
+  return resolveCandidatePath(stem + '.ts') ?? resolveCandidatePath(stem + '.mts');
+}
+
 function resolveWorkspacePackageToSource(specifier) {
-  let packageRoot;
   let subpath;
   if (specifier === '@agent/core') {
-    packageRoot = resolvePath(PROJECT_ROOT, 'libs/core');
     subpath = 'index';
   } else if (specifier.startsWith('@agent/core/')) {
-    packageRoot = resolvePath(PROJECT_ROOT, 'libs/core');
     subpath = specifier.slice('@agent/core/'.length);
   } else {
     return null;
   }
 
-  const distJs = resolvePath(packageRoot, 'dist', `${subpath}.js`);
-  const distIndex = resolvePath(packageRoot, 'dist', subpath, 'index.js');
-  if (existsSync(distJs) || existsSync(distIndex)) {
-    return null;
-  }
+  const instance = latchCoreInstance(
+    existsSync(resolvePath(CORE_DIST, 'index.js')) ? 'dist' : 'source'
+  );
+  if (instance === 'dist') return null;
 
   const candidates = [
-    resolvePath(packageRoot, `${subpath}.ts`),
-    resolvePath(packageRoot, subpath, 'index.ts'),
-    resolvePath(packageRoot, 'src', `${subpath}.ts`),
-    resolvePath(packageRoot, 'src', subpath, 'index.ts'),
+    resolvePath(CORE_ROOT, `${subpath}.ts`),
+    resolvePath(CORE_ROOT, subpath, 'index.ts'),
+    resolvePath(CORE_ROOT, 'src', `${subpath}.ts`),
+    resolvePath(CORE_ROOT, 'src', subpath, 'index.ts'),
   ];
   for (const candidate of candidates) {
     const resolved = resolveCandidatePath(candidate);
     if (resolved) return resolved;
   }
-  return null;
+  return coreExportSource(subpath);
 }
 
 /**
@@ -145,6 +192,7 @@ function resolveTsLike(specifier, context, nextResolve) {
   for (const candidate of candidates) {
     const resolved = resolveCandidatePath(candidate);
     if (resolved) {
+      if (isCoreSourceModule(candidate)) latchCoreInstance('source');
       const fast = resolveTsSourceDirectly(candidate);
       if (fast) return fast;
       // The CJS default resolver cannot handle file:// URL specifiers; when the

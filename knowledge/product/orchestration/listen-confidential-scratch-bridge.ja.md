@@ -1,7 +1,7 @@
 ---
 title: 'listen の confidential scratch — backend 読み取り権限の橋渡し設計ノート (R04 residual)'
 tags: [perception, listen, stt, tier-guard, role-assumption, design-note, r04]
-last_updated: 2026-10-31
+last_updated: 2026-11-06
 ---
 
 # listen の confidential scratch — backend 読み取り権限の橋渡し (R04 residual)
@@ -22,7 +22,7 @@ permission_denied 分類は正しい fail-closed であり、本書で扱った�
 
 1. `kyberion listen` → `runListenCommand` (`scripts/cli-listen.ts:187`) →
    `createPerceptionWorkDir('listen', absolute)` (`scripts/lib/perception.ts:236-246`)。
-2. `resolvePerceptionScope(sourceFile)` (`libs/core/perception/observation.ts:47-60`) は
+2. `resolvePerceptionScope(sourceFile)` (`libs/shared-perception/src/observation.ts:47-60`) は
    **active scope と入力推定 tier の高い方**を採る。永続 scope.env
    (`active/shared/runtime/scope.env`, tier=confidential / tenant=famao-ai —
    `scope-context.ts:76-115`) があると `active.tier=confidential` が勝ち、
@@ -86,7 +86,7 @@ permission_denied 分類は正しい fail-closed であり、本書で扱った�
 - **persona `worker`**: `persona_permissions.worker.allow_read` に tenant 展開
   対応の当該 prefix が明示登録されている。
 - **広い tmp grant を持つ role**: `infrastructure_sentinel` / `asset_promoter` /
-  `secret_introduce` / `dot_lifecycle_writer` / `pr_publication_store` /
+  `secret_introduce` / `dot_lifecycle_writer` /
   finance・sales・marketing・talent・line_manager 系 (`active/shared/tmp/`)。
 - **capability-bound な reader**: `memory_provenance_reader` は当該 prefix の
   allow_read を持つが、`requestResourceDenial` が role 名で capability を強制

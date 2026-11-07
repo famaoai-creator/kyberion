@@ -33,7 +33,7 @@ import { readTextFile } from '../foundation/text.js';
 import { safeReaddir, safeExistsSync, safeLstat } from '../secure-io.js';
 import type { ScopeContext } from '../scope-context.js';
 import { isValidTenantSlug } from '../entity-scope.js';
-import { segmentWords } from '../locale-normalize.js';
+import { segmentWords } from '../foundation/locale-normalize.js';
 import {
   getEmbeddingBackend,
   cosineSimilarity,

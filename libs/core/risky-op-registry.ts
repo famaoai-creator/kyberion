@@ -12,9 +12,9 @@
 
 import { requireApprovalForOp } from './risky-op-approval-implementation.js';
 import { registerRiskyApprovalHandler } from './risky-op-approval-port.js';
-import { RISKY_OPS, type RiskyOpId } from './risky-op-ids.js';
+import { RISKY_OPS, type RiskyOpId } from './contracts/risky-op-ids.js';
 
-export { RISKY_OPS, type RiskyOpId } from './risky-op-ids.js';
+export { RISKY_OPS, type RiskyOpId } from './contracts/risky-op-ids.js';
 
 export type { RequireApprovalParams } from './risky-op-approval-implementation.js';
 

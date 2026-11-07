@@ -279,25 +279,9 @@ describe('Package boundary contract', () => {
     expect(matches).toEqual([]);
   });
 
-  it('forbids runtime imports from libs/core via relative paths', () => {
-    const matches = findMatches(/\.\.\/(?:\.\.\/)?(?:\.\.\/)?libs\/core\//);
-    // Bootstrap/test exceptions run without a package build, when the
-    // @agent/core dist entry points do not exist yet (see
-    // check_esm_integrity ALLOWED_WORKSPACE_SOURCE_IMPORT_FILES).
-    const sourceImportExceptions = new Set([
-      'scripts/clean.ts',
-      'scripts/clean_entrypoint.ts',
-      'scripts/build_repository.ts',
-      'scripts/bindings.ts',
-      'scripts/check_install_script_allowlist.ts',
-      'scripts/check_lockfile_commit_gate.ts',
-      'scripts/check_pinned_deps.ts',
-      // The TypeScript loader itself: it runs before any TypeScript or dist exists and
-      // shares the private-host-cache trust rules (plain .mjs) with libs/core.
-      'scripts/ts-loader-cache.mjs',
-    ]);
-    expect(matches.filter((match) => !sourceImportExceptions.has(match))).toEqual([]);
-  });
+  // Runtime (non-test) relative imports of libs/core are owned by the
+  // core-single-instance gate (scripts/check_core_single_instance.ts), which
+  // resolves every import form, including `../../core/` from inside libs/.
 
   it('forbids test imports from @agent/core/src and @agent/core/dist', () => {
     const matches = findMatchesInRoots(TEST_ROOTS, /@agent\/core\/(?:src|dist)\//);

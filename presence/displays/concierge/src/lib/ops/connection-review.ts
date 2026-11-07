@@ -4,8 +4,8 @@ import {
   listGovernedArtifacts,
   readGovernedArtifactJson,
   writeGovernedArtifactJson,
-} from '@agent/core/artifacts';
-import type { GovernedArtifactRole } from '@agent/core/artifacts';
+} from '@agent/core/workforce/artifact-store';
+import type { GovernedArtifactRole } from '@agent/core/workforce/artifact-store';
 import { nowIso } from '@agent/core/foundation';
 import {
   listServiceBindingRecords,

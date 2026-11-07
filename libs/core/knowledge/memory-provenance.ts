@@ -1,11 +1,14 @@
 /** Content-bound memory lineage. Evidence eligibility never grants execution authority. */
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
-import { resolveRole, withExecutionContext } from '../authority.js';
-import { withLockSync } from '../lock-utils.js';
+import { assertStoreGrantIssuanceAllowed, resolveRole } from '../authority.js';
+import { currentExecutionScope, runInExecutionScope } from '../foundation/execution-scope.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { pathResolver } from '../path-resolver.js';
 import {
-  MEMORY_PROVENANCE_READER_ROLE,
+  MEMORY_PROVENANCE_GRANT_ISSUANCE_RIGHT,
   memoryProvenanceStatePath,
   withMemoryProvenanceReadCapability,
 } from './memory-provenance-capability.js';
@@ -95,6 +98,46 @@ function recordsAtPath(state: MemoryProvenanceState, file: string): MemoryProven
   return index.get(file) || [];
 }
 
+/**
+ * One exact lineage read inside the read grant, which is its authority (G2: no reader role). Who
+ * may issue it is unchanged: the rule that bounded assuming the former shared core role (RA-02)
+ * applies to the issuance right `memory_provenance_reader`, and the former assumption's binding
+ * checks still run first — a confidential read only for the caller's active tenant, a personal read
+ * only for the owner NHI. The caller keeps its own role and persona, bound to the scope's tenant
+ * (no organization) or unbound when the scope has none, as the role assumption bound it; a caller
+ * bound to another tenant is refused.
+ */
+function asLineageReader<T>(scope: MemoryScopeEnvelope, read: () => T): T {
+  assertStoreGrantIssuanceAllowed(MEMORY_PROVENANCE_GRANT_ISSUANCE_RIGHT);
+  const tenant = scope.tenant_slug;
+  const active = resolvePolicyIdentityContext().tenantSlug;
+  if (
+    (scope.tier === 'confidential' && (!active || active !== tenant)) ||
+    (scope.tier === 'personal' && getRegisteredEnvText('KYBERION_NHI_ID') !== scope.owner_nhi)
+  )
+    throw new Error(
+      '[MEMORY_PROVENANCE_READ_SCOPE] Exact current tenant/owner read capability required'
+    );
+  if (tenant && active && active !== tenant)
+    throw new Error(
+      `[ROLE_TENANT_SCOPE_MISMATCH] lineage read grant for tenant '${tenant}' used by a caller bound to '${active}'`
+    );
+  return withMemoryProvenanceReadCapability(scope, () => {
+    const {
+      tenantCleared: _cleared,
+      organizationId: _organization,
+      tenantSlug: _tenant,
+      ...current
+    } = currentExecutionScope() ?? { tenantBound: false };
+    return runInExecutionScope(
+      tenant
+        ? { ...current, tenantBound: true, tenantSlug: tenant }
+        : { ...current, tenantBound: false },
+      read
+    );
+  });
+}
+
 /** Same durable memory partition as the queue, deliberately outside mission/checkpoint files. */
 const statePath = (scope: MemoryScopeEnvelope) =>
   memoryProvenanceStatePath(assertMemoryScope(scope));
@@ -108,9 +151,7 @@ function load(scope: MemoryScopeEnvelope): MemoryProvenanceState {
     resolveRole() || ''
   )
     ? read()
-    : withMemoryProvenanceReadCapability(scope, () =>
-        withExecutionContext(MEMORY_PROVENANCE_READER_ROLE, read, undefined, scope.tenant_slug)
-      );
+    : asLineageReader(scope, read);
   if (raw === undefined) return { version: 1, records: {} };
   const value = parseSafeJsonInput(raw, 'memory provenance') as MemoryProvenanceState;
   if (value?.version !== 1 || !value.records || Array.isArray(value.records))

@@ -11,7 +11,7 @@ import {
   projectExecutionShapeToWorkflowShape,
   type ExecutionShape,
   type WorkflowExecutionShape,
-} from '../execution-shape.js';
+} from '../contracts/execution-shape.js';
 
 export interface MissionWorkflowSelectionInput {
   missionClass: MissionClass;

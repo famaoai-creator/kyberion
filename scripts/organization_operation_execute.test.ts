@@ -44,7 +44,7 @@ vi.mock('@agent/core/organization/organization-interventions', () => ({
   }),
 }));
 vi.mock('@agent/core/secure-io', () => ({ safeExistsSync: () => true }));
-vi.mock('@agent/core/lock-utils', () => ({
+vi.mock('@agent/core/foundation/lock-utils', () => ({
   withLock: (_id: string, fn: () => Promise<unknown>) => fn(),
 }));
 vi.mock('@agent/core/scope-context', () => ({

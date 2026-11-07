@@ -39,7 +39,7 @@ let cli: typeof import('./customer_channel.js');
 let io: typeof import('@agent/core/secure-io');
 
 const bindingsFile = (tenant: string) =>
-  path.join(ROOT, 'customer', tenant, 'connections', 'channel-bindings.json');
+  path.join(ROOT, 'knowledge', 'confidential', tenant, 'connections', 'channel-bindings.json');
 const readBindings = (tenant: string) =>
   JSON.parse(
     initialContext('ecosystem_architect', () =>
@@ -163,7 +163,7 @@ describe('customer-channel bind / unbind / list (D8, real paths)', () => {
     expect(created).toMatchObject({
       tenant_slug: TENANT,
       change: 'created',
-      file: `customer/${TENANT}/connections/channel-bindings.json`,
+      file: `knowledge/confidential/${TENANT}/connections/channel-bindings.json`,
     });
     expect(readBindings(TENANT).bindings).toEqual([
       {
@@ -269,19 +269,51 @@ describe('customer-channel bind / unbind / list (D8, real paths)', () => {
     expect(readTenantBindingIds(OTHER).includes('C-LOCK')).toBe(false);
   }, 30_000);
 
+  it.each(['{ malformed', JSON.stringify({ bindings: [{ surface: 'fax' }] })])(
+    'refuses a bind without changing existing target bytes when another active tenant has invalid bindings: %s',
+    (invalid) => {
+      ensureBound(TENANT, 'C-STRICT-TARGET');
+      ensureBound(OTHER, 'C-STRICT-OTHER');
+      const readBytes = (tenant: string) =>
+        initialContext('ecosystem_architect', () => io.safeReadFile(bindingsFile(tenant)));
+      const targetBefore = readBytes(TENANT);
+      const otherBefore = readBytes(OTHER);
+      try {
+        initialContext('onboarding', () => io.safeWriteFile(bindingsFile(OTHER), invalid));
+        expect(() =>
+          run(['bind', '--tenant', TENANT, '--surface', 'slack', '--channel', 'C-STRICT-NEW'])
+        ).toThrow(/CUSTOMER_BINDING_CONFLICT_CHECK/u);
+        expect(readBytes(TENANT)).toEqual(targetBefore);
+        expect(String(readBytes(OTHER))).toBe(invalid);
+      } finally {
+        initialContext('onboarding', () => {
+          io.safeWriteFile(bindingsFile(TENANT), targetBefore);
+          io.safeWriteFile(bindingsFile(OTHER), otherBefore);
+        });
+      }
+    }
+  );
+
   it('refuses to overwrite a bindings file that does not validate', () => {
-    initialContext('mission_controller', () =>
-      io.safeWriteFile(bindingsFile(OTHER), JSON.stringify({ bindings: [{ surface: 'fax' }] }))
+    const before = initialContext('ecosystem_architect', () =>
+      io.safeReadFile(bindingsFile(OTHER))
     );
-    expect(exitOf(['bind', '--tenant', OTHER, '--surface', 'slack', '--channel', 'C-2'])).toMatch(
-      /CUSTOMER_BINDING_FILE_INVALID/u
-    );
-    expect(readBindings(OTHER)).toEqual({ bindings: [{ surface: 'fax' }] });
+    try {
+      initialContext('onboarding', () =>
+        io.safeWriteFile(bindingsFile(OTHER), JSON.stringify({ bindings: [{ surface: 'fax' }] }))
+      );
+      expect(exitOf(['bind', '--tenant', OTHER, '--surface', 'slack', '--channel', 'C-2'])).toMatch(
+        /CUSTOMER_BINDING_FILE_INVALID/u
+      );
+      expect(readBindings(OTHER)).toEqual({ bindings: [{ surface: 'fax' }] });
+    } finally {
+      initialContext('onboarding', () => io.safeWriteFile(bindingsFile(OTHER), before));
+    }
   });
 });
 
 describe('customer_channel_binding_store on the real guard', () => {
-  it("writes only its bound tenant's channel-bindings.json, nothing else under customer/", async () => {
+  it("writes only its bound tenant's channel-bindings.json, nothing else in the tenant home", async () => {
     const authority = await import('@agent/core/authority');
     const role = 'customer_channel_binding_store';
     const asStore = (fn: () => unknown, tenant = TENANT) =>
@@ -293,11 +325,16 @@ describe('customer_channel_binding_store on the real guard', () => {
     const denied = /CUSTOMER_CHANNEL_BINDING_STORE_SCOPE/u;
     expect(() =>
       asStore(() =>
-        io.safeWriteFile(path.join(ROOT, 'customer', TENANT, 'connections', 'slack.json'), '{}')
+        io.safeWriteFile(
+          path.join(ROOT, 'knowledge', 'confidential', TENANT, 'connections', 'slack.json'),
+          '{}'
+        )
       )
     ).toThrow(denied);
     expect(() =>
-      asStore(() => io.safeWriteFile(path.join(ROOT, 'customer', TENANT, 'profile.json'), '{}'))
+      asStore(() =>
+        io.safeWriteFile(path.join(ROOT, 'knowledge', 'confidential', TENANT, 'profile.json'), '{}')
+      )
     ).toThrow(denied);
     expect(() =>
       asStore(() => io.safeWriteFile(path.join(ROOT, 'active/shared/runtime/x.json'), '{}'))
@@ -316,7 +353,7 @@ describe('customer_channel_binding_store on the real guard', () => {
 describe('customer outbound approvals carry ids only (B2, real gate)', () => {
   it('keeps the message out of the shared approval store and worker events, and the approval binds it', async () => {
     const core = await import('@agent/core/customer-channel-binding');
-    const { openDeal } = await import('@agent/core/deal-store');
+    const { asDealStore, openDeal } = await import('@agent/core/deal-store');
     const { sendDealDocumentToCustomer } = await import('@agent/core/deal-documents');
     const { listApprovalRequests, decideApprovalRequest } =
       await import('@agent/core/governance/approval-store');
@@ -336,9 +373,17 @@ describe('customer outbound approvals carry ids only (B2, real gate)', () => {
       undefined,
       TENANT
     );
-    const docPath = path.join(ROOT, 'customer', TENANT, 'deals', deal.deal_id, 'quote-v1.md');
+    const docPath = path.join(
+      ROOT,
+      'knowledge',
+      'confidential',
+      TENANT,
+      'deals',
+      deal.deal_id,
+      'quote-v1.md'
+    );
     const body = `# Quote\n\n${BODY_MARKER}\n`;
-    initialContext('mission_controller', () => io.safeWriteFile(docPath, body));
+    asDealStore(TENANT, () => io.safeWriteFile(docPath, body));
     const sha = createHash('sha256').update(body, 'utf8').digest('hex');
     const deliver = vi.fn(async () => undefined);
     const send = () =>
@@ -407,7 +452,7 @@ describe('customer outbound approvals carry ids only (B2, real gate)', () => {
     });
 
     // An edited document is other text: the approval does not cover it.
-    initialContext('mission_controller', () => io.safeWriteFile(docPath, `${body}PS\n`));
+    asDealStore(TENANT, () => io.safeWriteFile(docPath, `${body}PS\n`));
     const edited = await send();
     expect(edited.sent).toBe(false);
     expect(deliver).not.toHaveBeenCalled();
@@ -424,7 +469,7 @@ describe('customer outbound approvals carry ids only (B2, real gate)', () => {
     ).toMatchObject({ matches_approval: false });
 
     // The exact approved text goes out.
-    initialContext('mission_controller', () => io.safeWriteFile(docPath, body));
+    asDealStore(TENANT, () => io.safeWriteFile(docPath, body));
     const sent = await send();
     expect(sent).toMatchObject({ sent: true, status: 'sent' });
     expect(deliver).toHaveBeenCalledWith(body);
@@ -499,7 +544,8 @@ describe('customer escalations carry ids only (real notifyOperator / ops alert)'
       const walk = (dir: string): void => {
         for (const name of io.safeReaddir(dir)) {
           const file = path.join(dir, name);
-          if (file.startsWith(path.join(ROOT, 'customer', TENANT, 'deals'))) continue;
+          if (file.startsWith(path.join(ROOT, 'knowledge', 'confidential', TENANT, 'deals')))
+            continue;
           if (file.startsWith(path.join(ROOT, 'knowledge'))) continue;
           const stat = io.safeLstat(file);
           if (stat.isDirectory()) walk(file);

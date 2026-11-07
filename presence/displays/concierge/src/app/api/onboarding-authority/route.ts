@@ -9,7 +9,7 @@ import {
 } from '@agent/core/organization/onboarding-authority';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
 import { createLogger } from '@agent/core/logger';
-import { toWireError } from '@agent/core/wire-error';
+import { toWireError } from '@agent/core/contracts/wire-error';
 import { resolveConciergeViewer } from '../../../lib/viewer-context';
 import {
   asOnboardingOwner,

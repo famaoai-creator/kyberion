@@ -1,5 +1,5 @@
-import type { Observation } from '@agent/core/perception/observation';
-import { resolvePerceptionScope } from '@agent/core/perception/observation';
+import type { Observation } from '@agent/shared-perception/observation';
+import { resolvePerceptionScope } from '@agent/shared-perception/observation';
 import {
   PERCEPTION_OPTIONS_HELP,
   validatePerceptionOptions,
@@ -60,13 +60,13 @@ interface SeeArgs extends CommonArgs {
 }
 
 export interface SeeResult {
-  source?: import('@agent/core/perception/observation').PerceptionSource;
+  source?: import('@agent/shared-perception/observation').PerceptionSource;
   observations?: Observation[];
-  changes?: import('@agent/core/perception/visual-change').VisualChange;
-  tracking?: import('@agent/core/perception/tracking').TrackingResult;
+  changes?: import('@agent/shared-perception/visual-change').VisualChange;
+  tracking?: import('@agent/shared-perception/tracking').TrackingResult;
   animation_cues?: unknown[];
   index?: unknown;
-  search?: import('@agent/core/perception/semantic-index').SemanticSearchHit[];
+  search?: import('@agent/shared-perception/semantic-index').SemanticSearchHit[];
   file: string;
   bytes: number;
   width?: number;
@@ -165,7 +165,7 @@ export async function runSeeCommand(
     // withPerceptionMediaRole).
     const search =
       deps.enhancements?.search ??
-      (await import('@agent/core/perception/semantic-index')).searchMedia;
+      (await import('@agent/shared-perception/semantic-index')).searchMedia;
     const hits = await withPerceptionMediaRole(
       {
         tier: current.tier,
@@ -304,7 +304,7 @@ export async function runSeeCommand(
     );
   }
   if (options.track) {
-    const tracking = await import('@agent/core/perception/tracking');
+    const tracking = await import('@agent/shared-perception/tracking');
     result.tracking = await withPerceptionMediaRole(inputScope, () =>
       (deps.enhancements?.track ?? tracking.trackMedia)({
         path: absolute,
@@ -328,7 +328,7 @@ export async function runSeeCommand(
   if (options.index && source) {
     const index =
       deps.enhancements?.index ??
-      (await import('@agent/core/perception/semantic-index')).indexMedia;
+      (await import('@agent/shared-perception/semantic-index')).indexMedia;
     result.index = await withPerceptionMediaRole(inputScope, () =>
       index({
         indexId: options.index!,

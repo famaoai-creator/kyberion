@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { withExecutionContext } from './authority.js';
-import { advanceDealStage, openDeal } from './deal-store.js';
+import { advanceDealStage, asDealStore, openDeal } from './deal-store.js';
 import {
   draftContractForDeal,
   generateQuoteForDeal,
@@ -14,12 +14,10 @@ import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } fr
 
 const TENANT = 'deal-review-loader-test';
 const DEAL_ID = 'DEAL-REVIEW-001';
-const DEAL_ROOT = pathResolver.rootResolve(`customer/${TENANT}`);
+const DEAL_ROOT = pathResolver.rootResolve(`knowledge/confidential/${TENANT}`);
 
 afterEach(() => {
-  withExecutionContext('mission_controller', () =>
-    safeRmSync(DEAL_ROOT, { recursive: true, force: true })
-  );
+  withExecutionContext('onboarding', () => safeRmSync(DEAL_ROOT, { recursive: true, force: true }));
 });
 
 describe('deal document contract review loader', () => {
@@ -30,8 +28,8 @@ describe('deal document contract review loader', () => {
       safeWriteFile(filePath, '# quote\n', { mkdir: true });
       safeMkdir(directoryPath, { recursive: true });
 
-      expect(isRegularDealDocumentPath(filePath)).toBe(true);
-      expect(isRegularDealDocumentPath(directoryPath)).toBe(false);
+      expect(isRegularDealDocumentPath(filePath, TENANT)).toBe(true);
+      expect(isRegularDealDocumentPath(directoryPath, TENANT)).toBe(false);
     } finally {
       safeRmSync(filePath, { force: true });
       safeRmSync(directoryPath, { recursive: true, force: true });
@@ -59,9 +57,9 @@ describe('deal document contract review loader', () => {
 
   it('rejects a review record bound to another deal or version', () => {
     const filePath = pathResolver.rootResolve(
-      `customer/${TENANT}/deals/${DEAL_ID}/contract-review-v2.json`
+      `knowledge/confidential/${TENANT}/deals/${DEAL_ID}/contract-review-v2.json`
     );
-    withExecutionContext('mission_controller', () => {
+    asDealStore(TENANT, () => {
       safeMkdir(path.dirname(filePath), { recursive: true });
       safeWriteFile(
         filePath,
@@ -84,7 +82,7 @@ describe('deal document contract review loader', () => {
 
   it('rejects an invalid review before persisting it', () => {
     const filePath = pathResolver.rootResolve(
-      `customer/${TENANT}/deals/${DEAL_ID}/contract-review-v1.json`
+      `knowledge/confidential/${TENANT}/deals/${DEAL_ID}/contract-review-v1.json`
     );
     expect(() =>
       withExecutionContext('mission_controller', () =>
@@ -97,14 +95,14 @@ describe('deal document contract review loader', () => {
         })
       )
     ).toThrow(/Invalid catalog contract-review-record/);
-    expect(safeExistsSync(filePath)).toBe(false);
+    expect(asDealStore(TENANT, () => safeExistsSync(filePath))).toBe(false);
   });
 
   it('rejects a directory at the review record path', () => {
     const filePath = pathResolver.rootResolve(
-      `customer/${TENANT}/deals/${DEAL_ID}/contract-review-v1.json`
+      `knowledge/confidential/${TENANT}/deals/${DEAL_ID}/contract-review-v1.json`
     );
-    withExecutionContext('mission_controller', () => safeMkdir(filePath, { recursive: true }));
+    asDealStore(TENANT, () => safeMkdir(filePath, { recursive: true }));
 
     expect(() => loadContractReviewAtPath(filePath, TENANT, DEAL_ID, 1)).toThrow('regular file');
   });
@@ -179,9 +177,9 @@ describe('deal document contract review loader', () => {
 
     expect(result.ok).toBe(true);
     const quotePath = pathResolver.rootResolve(
-      `customer/${TENANT}/deals/${deal.deal_id}/quote-v1.json`
+      `knowledge/confidential/${TENANT}/deals/${deal.deal_id}/quote-v1.json`
     );
-    const stored = JSON.parse(String(safeReadFile(quotePath)));
+    const stored = JSON.parse(String(asDealStore(TENANT, () => safeReadFile(quotePath))));
     expect(stored.ok).toBe(true);
     expect(stored.currency).toBe('JPY');
     expect(stored.$schema).toBeUndefined();

@@ -14,7 +14,7 @@ vi.mock('../profile-root.js', () => ({
 
 import { resolveOperatorDisplayName, resolveOperatorLocale } from './operator-identity.js';
 import { _resetLocaleModuleStateForTests } from '../locale.js';
-import { SUPPORTED_LOCALES } from '../locale-normalize.js';
+import { SUPPORTED_LOCALES } from '../foundation/locale-normalize.js';
 
 const TEST_PROFILE_ROOT = pathResolver.sharedTmp('operator-identity-test');
 

@@ -67,7 +67,7 @@ function put(file: string, value: unknown): void {
   safeMkdir(path.dirname(target), { recursive: true });
   safeWriteFile(target, typeof value === 'string' ? value : JSON.stringify(value));
 }
-let browser: typeof import('@agent/core/authn-providers');
+let browser: typeof import('@agent/core/authn/authn-providers');
 let approvalsFacade: typeof import('@agent/core/surface/first-job-approval');
 let browserToken = '';
 let authority: typeof import('@agent/core/authority');
@@ -124,7 +124,7 @@ beforeAll(async () => {
   dispatch = await import('@agent/core/dot/dot-dispatch');
   execution = await import('@agent/core/surface/front-desk-execution');
   helper = await import('./onboarding_first_job_tenant_status.js');
-  browser = await import('@agent/core/authn-providers');
+  browser = await import('@agent/core/authn/authn-providers');
   approvalsFacade = await import('@agent/core/surface/first-job-approval');
 }, 60_000);
 beforeEach(() => {

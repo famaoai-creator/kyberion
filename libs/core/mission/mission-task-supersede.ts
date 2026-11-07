@@ -36,15 +36,17 @@ import {
 } from '../governance/approval-requester.js';
 import {
   assertApprovalUsable,
-  computeApprovalPayloadHash,
-  createApprovalRequest,
   evaluateApprovalUsability,
+} from '../governance/approval-separation-of-duties.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
+import { createApprovalRequest } from '../governance/approval-request-create.js';
+import {
   isApprovalRequestExpired,
   listApprovalRequests,
   loadApprovalRequest,
-  validateHumanFinalDecision,
-  type ApprovalRequestRecord,
-} from '../governance/approval-store.js';
+} from '../governance/approval-store-reader.js';
+import { validateHumanFinalDecision } from '../governance/approval-human-decision.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { hasAuthority, resolveIdentityContext } from '../authority.js';
 import { logger } from '../core.js';

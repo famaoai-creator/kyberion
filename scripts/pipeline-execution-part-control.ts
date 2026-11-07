@@ -29,7 +29,7 @@ import {
 } from '@agent/core/governance/external-operation';
 import { safeExistsSync, type SafeShell } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
-import { resolveVars } from '@agent/core/logic-utils';
+import { resolveVars } from '@agent/core/pipeline/logic-utils';
 import { capabilityEntry } from '@agent/core/path-resolver';
 import { buildWorkingPrinciplesLines } from '@agent/core/working-principles';
 import {

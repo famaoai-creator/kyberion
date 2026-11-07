@@ -36,8 +36,8 @@ const state = vi.hoisted(() => ({
   rotateKey: false,
   failReadback: false,
 }));
-vi.mock('../authn-providers.js', async (original) => {
-  const actual = await original<typeof import('../authn-providers.js')>();
+vi.mock('../authn/authn-providers.js', async (original) => {
+  const actual = await original<typeof import('../authn/authn-providers.js')>();
   return {
     ...actual,
     browserSessionKey: () => {
@@ -88,9 +88,11 @@ vi.mock('../dot/dot-dispatch.js', async (original) => ({
     return state.action;
   },
 }));
-vi.mock('../lock-utils.js', () => ({
-  withLockSync: (_key: string, fn: () => unknown) => {
-    state.locks++;
+vi.mock('../foundation/lock-utils.js', () => ({
+  withLockSync: (key: string, fn: () => unknown) => {
+    // The audit chain serialises its append-only log with this lock; only
+    // locks around diagnostic/decision state count as a mutation here.
+    if (!key.startsWith('audit-chain')) state.locks++;
     return fn();
   },
 }));
@@ -167,6 +169,14 @@ vi.mock('../governance/approval-store.js', async (original) => ({
     return structuredClone(state.record);
   },
 }));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('../governance/approval-store-reader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../governance/approval-store-reader.js')>()),
+  loadApprovalRequest: (_channel: string, id: string) =>
+    state.record?.id === id && !(state.failReadback && state.record.status !== 'pending')
+      ? structuredClone(state.record)
+      : null,
+}));
 
 vi.mock('../workforce/work-coordination.js', async (original) => ({
   ...(await original<typeof import('../workforce/work-coordination.js')>()),
@@ -220,7 +230,7 @@ vi.mock('./first-job-approval-proof.js', async (original) => ({
   ...(await original<typeof import('./first-job-approval-proof.js')>()),
   hasVerifiedFirstJobDecision: () => state.verifiedProof,
 }));
-import { mintBrowserSessionToken } from '../authn-providers.js';
+import { mintBrowserSessionToken } from '../authn/authn-providers.js';
 import { firstJobApprovalEffect } from './first-job-approval-proof.js';
 import { readFirstJobRecoveries, terminateFirstJobRequest } from './first-job-recovery.js';
 import { frontDeskExecutionProposal } from './front-desk-execution.js';

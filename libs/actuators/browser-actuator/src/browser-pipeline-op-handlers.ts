@@ -7,7 +7,7 @@
 import { logger } from '@agent/core/core';
 import { safeWriteFile, safeMkdir, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { getPathValue } from '@agent/core/logic-utils';
+import { getPathValue } from '@agent/core/pipeline/logic-utils';
 import { retry } from '@agent/core/async-utils';
 import { processUntrustedContent } from '@agent/core/untrusted-content';
 import { executeLlmDecideOp } from '@agent/core/semantic-decide';

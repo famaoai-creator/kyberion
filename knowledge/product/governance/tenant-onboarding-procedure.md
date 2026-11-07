@@ -15,10 +15,10 @@ authority: standard
 first-work の開始までを含む標準順序は [オンボーディング標準フロー](./onboarding-flow.md) を参照する。
 
 テナントの正本(背骨)は **テナントプロファイル**(`libs/core/organization/tenant-registry.ts` が読む
-`knowledge/personal/tenants/{slug}.json`)である。`customer/{customer}/tenants/{tenant}.json`
-は customer stance 側の任意の参照ファセットであり、`KYBERION_CUSTOMER` の切替で正本が
+`knowledge/personal/tenants/{slug}.json`)である。`knowledge/personal/stances/{stance}/tenants/{tenant}.json`
+は customer stance 側の任意の参照ファセットであり、`KYBERION_STANCE` の切替で正本が
 変わってはならない。他の系統
-(`knowledge/confidential/tenants/index.json`・`customer/{slug}/` ディレクトリ)は
+(`knowledge/confidential/tenants/index.json`・`knowledge/personal/stances/{slug}/` ディレクトリ)は
 任意の付随ファセットであり、**登録はプロファイル1系統だけ**行い、残りは突合スクリプトで検証する。
 
 ## 手順
@@ -47,7 +47,7 @@ first-work の開始までを含む標準順序は [オンボーディング標�
 
 3. **解決を確認する。**
    `resolveTenant(slug)`(`@agent/core`)が active プロファイル・`knowledge_root`・
-   customer overlay(`customer/{slug}/` が存在する場合)を一意に返せば完了。
+   customer overlay(`knowledge/personal/stances/{slug}/` が存在する場合)を一意に返せば完了。
    `suspended`/`archived` は tenant-bound write を fail-closed で拒否する。
 
 ## registry の保守(rename / delete)
@@ -78,7 +78,7 @@ pnpm tenant delete <slug> --apply --accept --purge-data
 
 ## やってはいけないこと
 
-- confidential index や `customer/{slug}/` への「登録だけ」でテナントを増やすこと
+- confidential index や `knowledge/personal/stances/{slug}/` への「登録だけ」でテナントを増やすこと
   (プロファイルなしの slug はドリフトとして CI が落とす)。
 - facade を経由しない profile JSON の直接編集。
 - 例外ファイルの理由なしエントリ。

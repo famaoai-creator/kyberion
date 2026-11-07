@@ -1,9 +1,9 @@
 import { resolveEastAsianFontFamily, resolveLatinFontFamily } from '../../design-fonts.js';
 import type { PptxElement, PptxStyle } from '../../contracts/pptx-protocol.js';
 import { clamp } from '../../foundation/text.js';
-import { stripTags } from '../../html-sanitize.js';
+import { stripTags } from '../../foundation/html-sanitize.js';
 import { findXmlElement, replaceXmlAttr, stripSelfClosingElements } from './xml-lite.js';
-import { decodeEntities, sanitizeXmlText } from '../../text-escaping.js';
+import { decodeEntities, sanitizeXmlText } from '../../foundation/text-escaping.js';
 
 function inToEmu(inches: number): number {
   return Math.round(inches * 914400);

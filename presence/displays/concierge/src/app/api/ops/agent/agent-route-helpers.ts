@@ -2,7 +2,7 @@ import { eventScopeMatches, type EventScope, type EventScopeInput } from '@agent
 import { withExecutionContext } from '@agent/core/authority';
 import { isRecord } from '@agent/core/foundation';
 import { t } from '@agent/core/t';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import type { MissionProposal } from '@agent/core/surface/channel-surface-types';
 import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract';
 import {

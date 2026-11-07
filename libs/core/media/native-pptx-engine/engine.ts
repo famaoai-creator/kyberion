@@ -7,7 +7,7 @@ import {
 import AdmZip from 'adm-zip';
 import * as path from 'path';
 import { safeExistsSync, safeReadFile, safeWriteFile } from '../../secure-io.js';
-import { decodeEntities, sanitizeXmlText } from '../../text-escaping.js';
+import { decodeEntities, sanitizeXmlText } from '../../foundation/text-escaping.js';
 import type { PptxDesignProtocol } from '../../contracts/pptx-protocol.js';
 import { generateContentTypes } from './content-types.js';
 import {

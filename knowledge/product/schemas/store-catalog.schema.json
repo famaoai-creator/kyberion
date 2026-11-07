@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "store-catalog.schema.json",
+  "title": "Store Catalog",
+  "description": "One declaration per governed store: where it lives, who holds custody of its records (information asset scope model: system / tenant / person), which tiers it may hold and which legacy store roles touch it today. G0 of the store-catalog guard design records current behaviour only; tier-guard does not read it yet. Stores whose custodian cannot be determined from their path are declared unscoped-legacy instead of guessed (scope model R-01).",
+  "type": "object",
+  "required": ["version", "stores"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "integer", "minimum": 1 },
+    "description": { "type": "string" },
+    "stores": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/store" }
+    }
+  },
+  "definitions": {
+    "store": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "custody", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" },
+        "path": {
+          "type": "string",
+          "description": "Repo-relative path template. Placeholders: <tier> (personal|confidential|public), <tenant> (tenant slug or the literal shared segment), <customer>, <slug> (stance slug), <id> (one record id).",
+          "pattern": "^[A-Za-z0-9_.<>/-]+$"
+        },
+        "custody": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "enum": ["system", "tenant", "person", "derived", "unscoped-legacy"] },
+            "ref": {
+              "type": "string",
+              "description": "Placeholder in path that names the custodian (tenant: <tenant>; person: installation-owner until per-person partitions exist)."
+            },
+            "shared_segment": {
+              "enum": ["system"],
+              "description": "Custody of the literal shared partition segment (records with no tenant)."
+            },
+            "note": { "type": "string" }
+          }
+        },
+        "tiers": {
+          "type": "array",
+          "items": { "enum": ["personal", "confidential", "public"] },
+          "uniqueItems": true
+        },
+        "status": {
+          "enum": ["active", "planned", "legacy-move"],
+          "description": "planned: the new home a migration (S1-S3) fills; legacy-move: today's location that a migration empties."
+        },
+        "moves_to": {
+          "type": "string",
+          "description": "Store id that replaces a legacy-move store."
+        },
+        "registration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["family", "key", "order", "retention_path"],
+          "description": "Build/CI binding to an existing runtime root and retention policy. Not an authority grant or executable custody migration.",
+          "properties": {
+            "family": { "enum": ["state", "ledger", "floor"] },
+            "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+            "order": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+            "retention_path": { "type": "string", "minLength": 1 },
+            "partition_shape": {
+              "enum": ["system_person"],
+              "description": "Placement-only mixed system/person state root with derived custody, a bare canonical path and no declared tier. Does not infer a custodian or grant access."
+            }
+          }
+        },
+        "legacy_roles": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "uniqueItems": true,
+          "description": "Store-scoped authority roles whose security-policy paths reach this store today (G2 replaces them with grants)."
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "runtime-state-roots",
+              "storage-floor",
+              "role-policy",
+              "stance-overlay",
+              "tenant-records",
+              "scope-model"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "note": { "type": "string" }
+      }
+    }
+  }
+}

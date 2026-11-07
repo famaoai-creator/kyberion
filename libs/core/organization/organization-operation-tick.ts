@@ -9,7 +9,7 @@
  */
 import { createHash } from 'node:crypto';
 import { nowIso } from '../foundation/time.js';
-import { withLock } from '../lock-utils.js';
+import { withLock } from '../foundation/lock-utils.js';
 import { createOrganizationIncident } from './organization-interventions.js';
 import {
   listOrganizationOperationRuns,

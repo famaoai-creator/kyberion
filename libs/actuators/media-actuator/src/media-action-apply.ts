@@ -19,7 +19,7 @@ import {
   generateNativeXlsx,
   patchPptxText,
   patchPptxParagraphs,
-} from '@agent/core/media/media-contracts';
+} from '@agent/shared-media/media-contracts';
 import {
   assertMediaProtocolLayoutReady,
   summarizeMediaPptxLayout,

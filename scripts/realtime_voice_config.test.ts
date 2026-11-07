@@ -7,7 +7,7 @@ import {
   getRealtimeVoiceConversationPreferencesPath,
   loadRealtimeVoiceConversationPreferences,
   saveRealtimeVoiceConversationPreferences,
-} from '@agent/core/voice/realtime-voice-preferences';
+} from '@agent/shared-voice/realtime-voice-preferences';
 import { main } from './realtime_voice_config.js';
 import { parseScriptFlags } from './lib/harness.js';
 

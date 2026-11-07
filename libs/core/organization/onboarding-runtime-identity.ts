@@ -10,7 +10,7 @@ import {
   captureRuntimeBindingReference,
   type RuntimeBindingReference,
 } from '../agent/agent-identity.js';
-import { parseNhiId } from '../nhi-id.js';
+import { parseNhiId } from '../contracts/nhi-id.js';
 import { resolvePersonaIdentity, personaIdentityBindingsSchema } from '../persona-identity.js';
 import { getPluginExecutionContext } from '../shell/sandbox-policy.js';
 import {

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Callout, EmptyState, PageHeader, statusLabel, useKbI18n } from '@agent/shared-ui';
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import type { DisplayText } from '@agent/core/surface/display-humanize';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import { useWorkspaceResource } from '../../lib/use-workspace-resource';
