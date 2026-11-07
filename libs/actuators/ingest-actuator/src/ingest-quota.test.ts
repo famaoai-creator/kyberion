@@ -8,8 +8,14 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import {
   checkIngestQuota,
   DEFAULT_INGEST_QUOTA_POLICY,
@@ -257,7 +263,9 @@ describe('checkIngestQuota — warn→block staging', () => {
 describe('shouldEnforceIngestQuota — spend-guard VITEST convention', () => {
   it('routes the opt-in flag through the governed accessor', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('libs/core/ingest-quota.ts'), { encoding: 'utf8' })
+      safeReadFile(pathResolver.rootResolve('libs/actuators/ingest-actuator/src/ingest-quota.ts'), {
+        encoding: 'utf8',
+      })
     );
     expect(source).not.toMatch(/env\.KYBERION_/u);
     expect(source).toContain('getRegisteredEnvText');

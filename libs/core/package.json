@@ -2040,14 +2040,6 @@
       "types": "./dist/ingest-asset-ledger.d.ts",
       "default": "./dist/ingest-asset-ledger.js"
     },
-    "./ingest-quota": {
-      "types": "./dist/ingest-quota.d.ts",
-      "default": "./dist/ingest-quota.js"
-    },
-    "./ingest-sync-cursors": {
-      "types": "./dist/ingest-sync-cursors.d.ts",
-      "default": "./dist/ingest-sync-cursors.js"
-    },
     "./ingest-tier-gate": {
       "types": "./dist/ingest-tier-gate.d.ts",
       "default": "./dist/ingest-tier-gate.js"
