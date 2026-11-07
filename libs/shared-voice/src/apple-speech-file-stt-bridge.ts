@@ -14,27 +14,27 @@
  */
 import * as path from 'node:path';
 
-import { logger } from './core.js';
-import { resolveLocale } from './locale.js';
-import { localeToBcp47 } from './foundation/locale-normalize.js';
-import { getRegisteredEnvText } from './foundation/env.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { isRecord } from './foundation/text.js';
-import { pathResolver } from './path-resolver.js';
+import { logger } from '@agent/core/core';
+import { resolveLocale } from '@agent/core/locale';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { isRecord } from '@agent/core/foundation/text';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
   safeExecResult,
   safeExistsSync,
   safeWriteFile,
-} from './secure-io.js';
+} from '@agent/core/secure-io';
 import {
   getSpeechToTextBridges,
   registerSpeechToTextBridge,
   type SpeechToTextBridge,
   type TranscribeInput,
   type TranscribeResult,
-} from './voice/speech-to-text-bridge.js';
-import { discoverLocalSttBackends } from './local-stt-discovery.js';
+} from '@agent/core/voice/speech-to-text-bridge';
+import { discoverLocalSttBackends } from '@agent/core/local-stt-discovery';
 
 export const APPLE_SPEECH_FILE_BRIDGE_NAME = 'apple-speech-file';
 

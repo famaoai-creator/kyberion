@@ -1061,6 +1061,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../../libs/core
+      '@agent/shared-voice':
+        specifier: workspace:*
+        version: link:../../../libs/shared-voice
       chokidar:
         specifier: ^5.0.0
         version: 5.0.0
