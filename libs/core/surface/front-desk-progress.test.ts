@@ -1,19 +1,26 @@
-// FD-05: `buildProgressPayload` / `buildProgressDetail` (presence-studio
-// "進み具合" page read models). Pure, no I/O — see `progress.ts` for the
-// documented artifact-record vs deliverable-inbox store gap this surface has.
+// FD-05: `buildProgressPayload` / `buildProgressDetail` — the shared
+// "依頼" / "進み具合" read models (Concierge 仕事 › 依頼, presence-studio 頼む).
+// Pure, no I/O — see the module doc for the documented artifact-record vs
+// deliverable-inbox store gap. Moved from presence-studio `progress.test.ts`.
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@agent/core/surface/surface-url', () => ({ resolveSurfaceBrowserUrl: vi.fn() }));
-import { resolveSurfaceBrowserUrl } from '@agent/core/surface/surface-url';
+vi.mock('./surface-url.js', () => ({ resolveSurfaceBrowserUrl: vi.fn() }));
+import { resolveSurfaceBrowserUrl } from './surface-url.js';
 import {
   resolveComputerSurfaceMirrorHref,
   buildProgressDetail,
   buildProgressPayload,
   estimateTaskSessionPercent,
+  buildTaskSessionProgressDetail,
+  deriveProgressArtifactTitle,
+  findMatchingInboxEntry,
+  progressRecordInScope,
+  progressRecordTenant,
+  progressTaskSessionInput,
   type ProgressArtifactInput,
   type ProgressHistoryEntryInput,
   type ProgressTaskSessionInput,
-} from './progress.js';
+} from './front-desk-progress.js';
 
 const NOW = new Date('2026-09-13T12:00:00.000Z');
 const MIRROR_HREF = 'http://127.0.0.1:3040/';
@@ -472,5 +479,93 @@ describe('delivery-wide artifact membership', () => {
       ['pdf', 'delivery', true],
       ['slides', 'delivery', true],
     ]);
+  });
+});
+
+describe('record mappers shared by Concierge and presence-studio', () => {
+  const session = {
+    session_id: 'TS-1',
+    correlation_id: 'req-1',
+    status: 'executing',
+    updated_at: '2026-09-13T11:00:00.000Z',
+    goal: { summary: 'Draft the plan', success_condition: 'Two options' },
+    control: { awaiting_user_input: true },
+    completion_next_action: { next_step: 'Review', gaps: ['Budget'] },
+    history: [{ ts: '2026-09-13T10:00:00.000Z', text: 'Started' }, { ts: 'x' }],
+  };
+
+  it('maps a task session to a list row and a detail', () => {
+    expect(progressTaskSessionInput(session)).toEqual({
+      id: 'TS-1',
+      correlation_id: 'req-1',
+      title: 'Draft the plan',
+      status: 'executing',
+      awaiting_user_input: true,
+      when: '2026-09-13T11:00:00.000Z',
+      history: [{ when: '2026-09-13T10:00:00.000Z', text: 'Started' }],
+    });
+    expect(buildTaskSessionProgressDetail(session, 'task_session')).toMatchObject({
+      kind: 'task_session',
+      task_state: 'awaiting_input',
+      requested: 'Draft the plan — Two options',
+      next: ['Review', 'Budget'],
+      log: [{ when: '2026-09-13T10:00:00.000Z', text: 'Started' }],
+    });
+    expect(buildTaskSessionProgressDetail(session, 'artifact')).not.toHaveProperty('task_state');
+    expect(progressTaskSessionInput({ session_id: 'TS-2', status: 'planning' }).title).toBe('TS-2');
+  });
+
+  it('never uses raw markdown as a title', () => {
+    expect(deriveProgressArtifactTitle({ path: 'a/b/report.md', kind: 'doc' })).toBe('report.md');
+    expect(
+      deriveProgressArtifactTitle({ preview_text: '# Weekly summary\nbody', kind: 'doc' })
+    ).toBe('Weekly summary');
+    expect(deriveProgressArtifactTitle({ preview_text: '# x', kind: 'doc' })).toBe('doc');
+  });
+
+  it('links an artifact to an inbox entry only by an exact shared path', () => {
+    const entries = [{ entry_id: 'E-1', artifact_paths: ['out/report.md'] }];
+    expect(findMatchingInboxEntry(entries, 'out/report.md')?.entry_id).toBe('E-1');
+    expect(findMatchingInboxEntry(entries, 'report.md')).toBeUndefined();
+    expect(findMatchingInboxEntry(entries, undefined)).toBeUndefined();
+  });
+});
+
+describe('progressRecordInScope', () => {
+  const all = { tenantSlugs: 'all', organizationIds: 'all', projectIds: 'all' } as const;
+  const alpha = { ...all, tenantSlugs: ['alpha'] };
+
+  it('reads the tenant directly or from a nested scope envelope', () => {
+    expect(progressRecordTenant({ tenant_slug: ' alpha ' })).toBe('alpha');
+    expect(progressRecordTenant({ project_context: { tenant_slug: 'beta' } })).toBe('beta');
+    expect(progressRecordTenant({ scope: { scope: { tenant_slug: 'gamma' } } })).toBe('gamma');
+    expect(progressRecordTenant({})).toBeUndefined();
+  });
+
+  it('denies another tenant and an unknown tenant for a scoped viewer', () => {
+    expect(progressRecordInScope(alpha, { tenant_slug: 'alpha' })).toBe(true);
+    expect(progressRecordInScope(alpha, { tenant_slug: 'beta' })).toBe(false);
+    expect(progressRecordInScope(alpha, {})).toBe(false);
+    expect(progressRecordInScope(all, {})).toBe(true);
+    // The system selection admits only company-less records.
+    const system = { ...all, tenantSlugs: [] as string[], includeUntenanted: true };
+    expect(progressRecordInScope(system, {})).toBe(true);
+    expect(progressRecordInScope(system, { tenant_slug: 'alpha' })).toBe(false);
+  });
+
+  it('requires canonical scope metadata for an explicit organization / project narrowing', () => {
+    const project = { ...alpha, organizationIds: ['org-a'], projectIds: ['project-a'] };
+    const scoped = (projectId: string) => ({
+      scope: {
+        scope_kind: 'project',
+        tier: 'confidential',
+        tenant_slug: 'alpha',
+        organization_id: 'org-a',
+        project_id: projectId,
+      },
+    });
+    expect(progressRecordInScope(project, scoped('project-a'))).toBe(true);
+    expect(progressRecordInScope(project, scoped('project-b'))).toBe(false);
+    expect(progressRecordInScope(project, { tenant_slug: 'alpha' })).toBe(false);
   });
 });
