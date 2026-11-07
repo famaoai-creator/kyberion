@@ -386,7 +386,7 @@ describe('generate_subagent_definitions', () => {
                 relative.split(path.sep).join('/')
               )
                 ? path.join(generatedFixtureRoot, relative)
-                : actual.pathResolver.rootResolve(...parts);
+                : actual.pathResolver.rootResolve(relative);
             },
           },
         };
