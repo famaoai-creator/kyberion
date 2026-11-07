@@ -3114,6 +3114,11 @@ Provider-definition generation tests must generate and tamper with all provider 
 inside a UUID scratch fixture. Read canonical templates and policy from the checkout;
 never require or rewrite the developer's ignored provider-state directories. Enforce
 generation parity and tamper detection with `generate_subagent_definitions.test.ts`.
+Keep independent real API variants as separate parameterized cases with the same persisted
+state assertions; do not combine several integration operations under one case budget or
+raise the timeout to hide fixture coupling. Freeze source and build outputs for final
+verification. A full-suite run used while repairing failures is discovery evidence; rerun
+the failed and affected suites against the frozen generation before claiming completion.
 
 ## Intake extension CI checks
 
