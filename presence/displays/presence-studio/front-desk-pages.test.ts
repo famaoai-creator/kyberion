@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { loadVocabularyCatalog } from '@agent/core/knowledge/vocabulary-catalog';
+import { readFrontDeskSurfaceUrls } from '@agent/core/front-desk-nav';
 import {
   FRONT_DESK_PAGE_PARTIALS,
   FRONT_DESK_TEMPLATE_FILE_REDIRECTS,
@@ -25,7 +26,6 @@ const SHELL_PAGES = [
   'home.html',
   'ask.html',
   'progress.html',
-  'help.html',
   'index.html',
   'first-job.html',
   'engine-config.html',
@@ -119,14 +119,7 @@ describe('renderFrontDeskPageTemplate', () => {
   });
 
   it('keeps presence-studio stylesheets on --kb-ui-* tokens (no raw hex / rgb colors, no teal)', () => {
-    const sheets = [
-      'design-system.css',
-      'home.css',
-      'ask.css',
-      'progress.css',
-      'help.css',
-      'work.css',
-    ];
+    const sheets = ['design-system.css', 'home.css', 'ask.css', 'progress.css', 'work.css'];
     for (const sheet of sheets) {
       const css = readStatic(sheet);
       expect(css, sheet).not.toMatch(/#[0-9a-f]{3,8}\b/i);
@@ -204,8 +197,10 @@ describe('raw template files are never served unrendered', () => {
   }
 
   it('covers every page template and maps it to its canonical route', () => {
+    // `/help.html` stays mapped after the page moved to Concierge, so an old
+    // bookmark still lands on 使い方 (via the /help redirect).
     expect(Object.keys(FRONT_DESK_TEMPLATE_FILE_REDIRECTS).sort()).toEqual(
-      PAGES.map((page) => `/${page}`).sort()
+      [...PAGES, 'help.html'].map((page) => `/${page}`).sort()
     );
     expect(frontDeskTemplateRedirect('/engine-config.html')).toBe('/engine-config');
     expect(frontDeskTemplateRedirect('/home.html')).toBe('/home');
@@ -213,6 +208,23 @@ describe('raw template files are never served unrendered', () => {
       '/progress?tenant=acme#x'
     );
     expect(frontDeskTemplateRedirect('/ui-gallery.html')).toBeNull();
+  });
+
+  it('hands /help and /help/<track> to Concierge, keeping the query', () => {
+    const { routes } = recordRoutes();
+    const concierge = readFrontDeskSurfaceUrls().concierge;
+    const top = fakeRes();
+    routes.get('/help')!({ originalUrl: '/help?tenant=acme', params: {} }, top);
+    expect(top.statusCode).toBe(302);
+    expect(top.location).toBe(concierge + '/help?tenant=acme');
+    const track = fakeRes();
+    routes.get('/help/:track')!(
+      { originalUrl: '/help/first%20steps', params: { track: 'first steps' } },
+      track
+    );
+    expect(track.statusCode).toBe(302);
+    expect(track.location).toBe(concierge + '/help/first%20steps');
+    expect(track.sent).toBeUndefined();
   });
 
   it('renders the settings editor in the requested locale with a disabled form and shared navigation', () => {
@@ -231,7 +243,6 @@ describe('raw template files are never served unrendered', () => {
       expect(html).toContain('aria-live="polite"');
       expect(html).toContain('href="/help"');
     }
-    expect(readStatic('help.html')).toContain('href="/engine-config"');
   });
 
   it('renders the live avatar with localized status and no raw placeholders', () => {

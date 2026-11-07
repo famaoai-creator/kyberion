@@ -335,11 +335,24 @@ describe('rail placement and destinations', () => {
   });
 
   it('still resolves Studio destinations that left the rail', () => {
-    for (const id of ['ask', 'first-job', 'help', 'progress', 'home-studio']) {
+    for (const id of ['ask', 'first-job', 'progress', 'home-studio']) {
       expect(
         resolveFrontDeskDestination(id, { currentSurface: 'concierge', role: 'owner' })?.surface,
         id
       ).toBe('presence-studio');
     }
+  });
+
+  it('resolves 使い方 on Concierge itself (moved in Kyberion server phase 2)', () => {
+    const help = resolveFrontDeskDestination('help', {
+      currentSurface: 'concierge',
+      role: 'viewer',
+    });
+    expect(help).toMatchObject({
+      surface: 'concierge',
+      href: '/help',
+      external: false,
+      allowed: true,
+    });
   });
 });

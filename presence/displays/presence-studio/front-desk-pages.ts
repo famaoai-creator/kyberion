@@ -852,6 +852,7 @@ export const FRONT_DESK_TEMPLATE_FILE_REDIRECTS: Readonly<Record<string, string>
   '/index.html': '/work',
   '/ask.html': '/ask',
   '/progress.html': '/progress',
+  // Retired page (now Concierge 使い方): old bookmarks follow /help's redirect.
   '/help.html': '/help',
   '/first-job.html': '/first-job',
   '/live-avatar.html': '/live-avatar',
@@ -960,16 +961,15 @@ export function registerFrontDeskAuxPages(app: express.Express, staticDir: strin
     sendFrontDeskPage(req, res, staticDir, 'progress.html');
   });
 
-  // FD-08: the dedicated "使い方を見る" page (旧 /learn), replacing the interim
-  // `/onboarding` redirect.
-  app.get('/help', (req, res) => {
-    sendFrontDeskPage(req, res, staticDir, 'help.html');
-  });
-
-  // HT-05: a single training track's page — same static file as `/help`;
-  // `static/help.js` reads the track id from `window.location.pathname` and
-  // renders the matching catalog track client-side (GET /api/training/catalog).
-  app.get('/help/:track', (req, res) => {
-    sendFrontDeskPage(req, res, staticDir, 'help.html');
-  });
+  // 使い方 (`/help`, `/help/<track>`) is served by Concierge (Kyberion server
+  // phase 2); the old addresses hand the person there, query string kept.
+  const toConciergeHelp = (pathname: string, req: express.Request, res: express.Response) => {
+    const queryIndex = req.originalUrl.indexOf('?');
+    const query = queryIndex === -1 ? '' : req.originalUrl.slice(queryIndex);
+    res.redirect(302, readFrontDeskSurfaceUrls().concierge + pathname + query);
+  };
+  app.get('/help', (req, res) => toConciergeHelp('/help', req, res));
+  app.get('/help/:track', (req, res) =>
+    toConciergeHelp(`/help/${encodeURIComponent(String(req.params.track))}`, req, res)
+  );
 }
