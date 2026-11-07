@@ -25,7 +25,7 @@ import { pathResolver } from './path-resolver.js';
 import { policyRelativePath } from './policy-relative-path.js';
 import { rawExistsSync, rawReadTextFile, rawRealpathSync } from './fs-primitives.js';
 import { resolveProjectScope, resolveProjectScopeId } from './foundation/project-scope-env.js';
-import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
+import { resolvePolicyIdentityContext } from './foundation/identity-context.js';
 import { createLogger, emitConsoleLine } from './logger.js';
 import type { AuditEntry } from './governance/audit-chain.js';
 import { isValidTenantSlug } from './entity-scope.js';
