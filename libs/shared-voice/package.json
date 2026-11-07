@@ -11,6 +11,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./apple-speech-file-stt-bridge": {
+      "types": "./dist/apple-speech-file-stt-bridge.d.ts",
+      "default": "./dist/apple-speech-file-stt-bridge.js"
+    },
     "./audio-text-similarity": {
       "types": "./dist/audio-text-similarity.d.ts",
       "default": "./dist/audio-text-similarity.js"

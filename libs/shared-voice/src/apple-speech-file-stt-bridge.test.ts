@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 const mocks = vi.hoisted(() => ({
   safeExecResult: vi.fn(() => ({ stdout: '{"ok":true,"text":"hello"}', stderr: '', status: 0 })),
@@ -8,8 +8,9 @@ const mocks = vi.hoisted(() => ({
   safeWriteFile: vi.fn(),
 }));
 
-vi.mock('./secure-io.js', async () => {
-  const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+vi.mock('@agent/core/secure-io', async () => {
+  const actual =
+    await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
   return {
     ...actual,
     safeExecResult: mocks.safeExecResult,
@@ -18,14 +19,17 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
-vi.mock('./local-stt-discovery.js', () => ({ discoverLocalSttBackends: () => [] }));
+vi.mock('@agent/core/local-stt-discovery', () => ({ discoverLocalSttBackends: () => [] }));
 
 describe('apple speech file stt bridge', () => {
   it('routes Apple Speech environment reads through the governed accessor', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('libs/core/apple-speech-file-stt-bridge.ts'), {
-        encoding: 'utf8',
-      })
+      safeReadFile(
+        pathResolver.rootResolve('libs/shared-voice/src/apple-speech-file-stt-bridge.ts'),
+        {
+          encoding: 'utf8',
+        }
+      )
     );
     expect(source).not.toMatch(/env\.KYBERION_/u);
     expect(source).toContain('getRegisteredEnvText');

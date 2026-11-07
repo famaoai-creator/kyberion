@@ -6,6 +6,7 @@ export * from './realtime-voice-preferences.js';
 export * from './segmented-voice-playback.js';
 export * from './ten-vad-bridge.js';
 export * from './silero-vad-bridge.js';
+export * from './apple-speech-file-stt-bridge.js';
 export * from './tts-loopback-verifier.js';
 export * from './two-stage-barge-in.js';
 export * from './vad-turn-recorder.js';

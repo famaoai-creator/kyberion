@@ -26,7 +26,7 @@ import {
   installAvailableSpeechToTextBridges,
 } from '@agent/core/voice/speech-to-text-bridge';
 import { installAppleSpeechToTextBridgeIfAvailable } from '@agent/core/apple-intelligence-bridge';
-import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/core/apple-speech-file-stt-bridge';
+import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/shared-voice/apple-speech-file-stt-bridge';
 import { logger } from '@agent/core/core';
 import {
   detectMacAudioListing,

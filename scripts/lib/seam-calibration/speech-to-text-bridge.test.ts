@@ -13,7 +13,7 @@ vi.mock('@agent/core/voice/speech-to-text-bridge', async (importOriginal) => {
 vi.mock('@agent/core/apple-intelligence-bridge', () => ({
   installAppleSpeechToTextBridgeIfAvailable: async () => false,
 }));
-vi.mock('@agent/core/apple-speech-file-stt-bridge', () => ({
+vi.mock('@agent/shared-voice/apple-speech-file-stt-bridge', () => ({
   installAppleSpeechFileToTextBridgeIfAvailable: () => false,
 }));
 
