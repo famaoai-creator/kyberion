@@ -50,8 +50,6 @@ export * from './foundation/pcm-wav.js';
 
 export * from './voice/audio-playback.js';
 
-export * from './segmented-voice-playback.js';
-
 export * from './streaming-voice-playback.js';
 
 export * from './voice/audio-tee.js';
@@ -105,21 +103,11 @@ export type { OnErrorConfig, RefParams } from './pipeline/pipeline-engine.js';
 
 export * from './surface/channel-surface.js';
 
-export * from './cowork-surface.js';
-export {
-  loadCoworkArtifactPacketAtPath,
-  validateCoworkArtifactPacket,
-} from './cowork-artifact-packet.js';
-
-export * from './cowork-knowledge-bridge.js';
-
 export {
   delegationChildrenRegistryPath,
   loadDelegationChildrenRegistryAtPath,
   writeDelegationChildrenRegistryAtPath,
 } from './mission/delegation-child-registry.js';
-
-export * from './cowork-health-check.js';
 
 export * from './surface/surface-runtime-router.js';
 

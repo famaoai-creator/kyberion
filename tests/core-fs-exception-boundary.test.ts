@@ -167,8 +167,6 @@ const allowedCoreFsImports = [
   // fs rather than the API under test / mock.
   'libs/core/agent/agent-collaboration-projection.test.ts',
   'libs/core/baseline-check-cache.test.ts',
-  'libs/core/cowork-health-check.test.ts',
-  'libs/core/cowork-knowledge-bridge.test.ts',
   'libs/core/knowledge/knowledge-scope-health-history.test.ts',
   'libs/core/reasoning/model-performance-index.test.ts',
   'libs/core/knowledge/procedure-self-repair.test.ts',

@@ -1088,38 +1088,6 @@
       "types": "./dist/cost-report.d.ts",
       "default": "./dist/cost-report.js"
     },
-    "./cowork-artifact-packet": {
-      "types": "./dist/cowork-artifact-packet.d.ts",
-      "default": "./dist/cowork-artifact-packet.js"
-    },
-    "./cowork-artifact-packet.js": {
-      "types": "./dist/cowork-artifact-packet.d.ts",
-      "default": "./dist/cowork-artifact-packet.js"
-    },
-    "./cowork-health-check": {
-      "types": "./dist/cowork-health-check.d.ts",
-      "default": "./dist/cowork-health-check.js"
-    },
-    "./cowork-health-check.js": {
-      "types": "./dist/cowork-health-check.d.ts",
-      "default": "./dist/cowork-health-check.js"
-    },
-    "./cowork-knowledge-bridge": {
-      "types": "./dist/cowork-knowledge-bridge.d.ts",
-      "default": "./dist/cowork-knowledge-bridge.js"
-    },
-    "./cowork-knowledge-bridge.js": {
-      "types": "./dist/cowork-knowledge-bridge.d.ts",
-      "default": "./dist/cowork-knowledge-bridge.js"
-    },
-    "./cowork-surface": {
-      "types": "./dist/cowork-surface.d.ts",
-      "default": "./dist/cowork-surface.js"
-    },
-    "./cowork-surface.js": {
-      "types": "./dist/cowork-surface.d.ts",
-      "default": "./dist/cowork-surface.js"
-    },
     "./creative-design-resolver": {
       "types": "./dist/creative-design-resolver.d.ts",
       "default": "./dist/creative-design-resolver.js"
@@ -2644,10 +2612,6 @@
       "types": "./dist/max-file-lines-config.d.ts",
       "default": "./dist/max-file-lines-config.js"
     },
-    "./mcp-request-context": {
-      "types": "./dist/mcp-request-context.d.ts",
-      "default": "./dist/mcp-request-context.js"
-    },
     "./media": {
       "types": "./dist/media/index.d.ts",
       "default": "./dist/media/index.js"
@@ -3735,6 +3699,10 @@
     "./contracts/next-action-contract": {
       "types": "./dist/contracts/next-action-contract.d.ts",
       "default": "./dist/contracts/next-action-contract.js"
+    },
+    "./contracts/nhi-id": {
+      "types": "./dist/contracts/nhi-id.d.ts",
+      "default": "./dist/contracts/nhi-id.js"
     },
     "./nhi-lifecycle-governance": {
       "types": "./dist/nhi-lifecycle-governance.d.ts",
@@ -7707,10 +7675,6 @@
     "./barge-in-controller": {
       "types": "./dist/barge-in-controller.d.ts",
       "default": "./dist/barge-in-controller.js"
-    },
-    "./segmented-voice-playback": {
-      "types": "./dist/segmented-voice-playback.d.ts",
-      "default": "./dist/segmented-voice-playback.js"
     },
     "./voice/engine-runtime-preferences-access": {
       "types": "./dist/voice/engine-runtime-preferences-access.d.ts",

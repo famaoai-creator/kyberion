@@ -1,7 +1,7 @@
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
-import type { IntentResolutionContract } from './intent/intent-resolution-contract.js';
+import { defineCatalog } from '@agent/core/foundation/governed-catalog';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract';
 
 export interface CoworkArtifactPacketArtifact {
   path?: string;

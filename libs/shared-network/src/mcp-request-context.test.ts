@@ -35,7 +35,7 @@ describe('MCP request context', () => {
 
   it('routes server binding reads through the governed environment accessor', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('libs/core/mcp-request-context.ts'), {
+      safeReadFile(pathResolver.rootResolve('libs/shared-network/src/mcp-request-context.ts'), {
         encoding: 'utf8',
       })
     );

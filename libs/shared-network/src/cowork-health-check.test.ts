@@ -12,18 +12,18 @@ const { mockSafeExistsSync, mockSafeReadFile } = vi.hoisted(() => ({
   mockSafeReadFile: vi.fn(),
 }));
 
-vi.mock('./secure-io.js', () => ({
+vi.mock('@agent/core/secure-io', () => ({
   assertSafeRepositoryPath: (filePath: string) => filePath,
   safeExistsSync: mockSafeExistsSync,
   safeReadFile: mockSafeReadFile,
   safeLstat: () => ({ isFile: () => true }),
 }));
 
-vi.mock('./foundation/json.js', () => ({
+vi.mock('@agent/core/foundation/json', () => ({
   readJson: (filePath: string) => JSON.parse(String(mockSafeReadFile(filePath))),
 }));
 
-vi.mock('./foundation/io.js', () => ({
+vi.mock('@agent/core/foundation/io', () => ({
   getFoundationIo: () => ({
     loadJson: <T>(filePath: string) => JSON.parse(String(mockSafeReadFile(filePath))) as T,
     loadJsonIfPresent: <T>(filePath: string) => {
@@ -39,7 +39,7 @@ vi.mock('./foundation/io.js', () => ({
   registerFoundationIo: vi.fn(),
 }));
 
-vi.mock('./path-resolver.js', () => ({
+vi.mock('@agent/core/path-resolver', () => ({
   pathResolver: {
     rootDir: () => '/repo',
     rootResolve: (p: string) => `/repo/${p}`,
