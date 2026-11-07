@@ -9,15 +9,15 @@ import {
   renderSomOverlay,
   type SomRedactFn,
 } from './som-overlay.js';
-import { pathResolver } from './path-resolver.js';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeExistsSync,
   safeReaddir,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
-} from './secure-io.js';
-import type { SomMark } from './set-of-marks.js';
+} from '@agent/core/secure-io';
+import type { SomMark } from '@agent/core/set-of-marks';
 
 const dir = pathResolver.sharedTmp(`som-overlay-tests/${process.pid}`);
 

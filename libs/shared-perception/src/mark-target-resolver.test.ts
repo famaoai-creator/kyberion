@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { Jimp } from 'jimp';
 import * as path from 'node:path';
-import { withExecutionContextAsync } from './authority.js';
+import { withExecutionContextAsync } from '@agent/core/authority';
 import {
   MARKS_TTL_MS,
   clearMarks,
@@ -13,10 +13,10 @@ import {
   resolveMarkTarget,
   saveMarks,
 } from './mark-target-resolver.js';
-import { dhashFile } from './media/image-dhash.js';
-import { missionDir, pathResolver } from './path-resolver.js';
-import { safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
-import type { SomMark } from './set-of-marks.js';
+import { dhashFile } from '@agent/core/media/image-dhash';
+import { missionDir, pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import type { SomMark } from '@agent/core/set-of-marks';
 
 const sessions: string[] = [];
 const files: string[] = [];

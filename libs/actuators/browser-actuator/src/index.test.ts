@@ -839,7 +839,7 @@ describe('browser-actuator v3 contract', () => {
   it('clicks a DOM-backed mark:<n> of the current snapshot through its @eN ref', async () => {
     exposePiiRules();
     const { handleAction } = await import('./index');
-    const { saveMarks } = await import('@agent/core/mark-target-resolver');
+    const { saveMarks } = await import('@agent/shared-perception/mark-target-resolver');
     const { Jimp } = await import('jimp');
     const flatPage = await new Jimp({
       data: Buffer.alloc(32 * 32 * 4, 128),
@@ -907,7 +907,7 @@ describe('browser-actuator v3 contract', () => {
   it('clicks a pixel-only mark:<n> at its CSS-pixel center and refuses unknown marks', async () => {
     exposePiiRules();
     const { handleAction } = await import('./index');
-    const { saveMarks } = await import('@agent/core/mark-target-resolver');
+    const { saveMarks } = await import('@agent/shared-perception/mark-target-resolver');
     saveMarks({
       session_id: 'vision-marks-point',
       image: { width: 1600, height: 1200 },

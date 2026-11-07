@@ -84,7 +84,7 @@ egress decision, so the verb owns exactly that and nothing else: by default only
 providers that keep the data on this machine and finish unattended are eligible;
 `--allow-cloud` adds cloud providers and `--allow-handoff` adds host-agent hand-off as
 a last resort (exit 100; the rerun collects the image only if the host saved it for
-that request — `libs/core/host-image-handoff.ts` — never a file that was already there). The gate is an explicit provider allowlist
+that request — `libs/shared-media/src/host-image-handoff.ts` — never a file that was already there). The gate is an explicit provider allowlist
 (`ImageGenerationRequest.allowedProviders`) that the router enforces on every selection
 path — `mode: 'local_only'` alone is not enough, because host bridges run locally but
 forward the request to the host agent's model. Reference images (`--ref`) follow PA-10:

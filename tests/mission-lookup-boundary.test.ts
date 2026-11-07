@@ -72,7 +72,7 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'libs/core/delegation-store-partition.ts': 'scope-derivation',
   'libs/core/history-search-index.ts': 'scope-derivation',
   'libs/core/injection-signal.ts': 'scope-derivation',
-  'libs/core/mark-target-resolver.ts': 'scope-derivation',
+  'libs/shared-perception/src/mark-target-resolver.ts': 'scope-derivation',
   'libs/core/mesh/a2a-conversation-store.ts': 'scope-derivation',
   'libs/core/mission/mission-read-model.ts': 'scope-derivation',
   'libs/core/mission/mission-team-plan-composer.ts': 'scope-derivation',

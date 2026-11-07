@@ -358,6 +358,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-perception':
+        specifier: workspace:*
+        version: link:../../shared-perception
       '@agent/shared-vision':
         specifier: workspace:*
         version: link:../../shared-vision
@@ -658,6 +661,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-perception':
+        specifier: workspace:*
+        version: link:../../shared-perception
       '@agent/shared-vision':
         specifier: workspace:*
         version: link:../../shared-vision
@@ -709,6 +715,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-perception':
+        specifier: workspace:*
+        version: link:../../shared-perception
       '@agent/shared-video':
         specifier: workspace:*
         version: link:../../shared-video
@@ -862,6 +871,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../core
+      jimp:
+        specifier: ^1.6.1
+        version: 1.6.1(supports-color@7.2.0)
 
   libs/shared-ui:
     dependencies:

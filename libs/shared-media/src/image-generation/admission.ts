@@ -10,7 +10,7 @@ import {
   imageProviderDataEgress,
   resolveReferenceImagePath,
 } from '../image-reference-consent.js';
-import { isHostImageHandoffOutput } from '@agent/core/host-image-handoff';
+import { isHostImageHandoffOutput } from '../host-image-handoff.js';
 import { runExternalOperation } from '@agent/core/governance/external-operation';
 import { wrapAdapterEffects } from '@agent/core/governance/adapter-effect-proxy';
 

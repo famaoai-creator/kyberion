@@ -2,8 +2,8 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { isHostImageHandoffOutput, recordHostImageHandoffRequest } from './host-image-handoff.js';
-import * as pathResolver from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import * as pathResolver from '@agent/core/path-resolver';
+import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 
 describe('host image hand-off bookkeeping', () => {
   let dir = '';

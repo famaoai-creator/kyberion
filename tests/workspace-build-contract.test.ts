@@ -26,7 +26,13 @@ function collectExportTargets(exportsField: any): string[] {
 
 describe('Workspace build contract', () => {
   it('keeps CI-built workspace package entrypoints aligned with built output files', () => {
-    const packageFiles = ['libs/core/package.json'];
+    const packageFiles = [
+      'libs/core/package.json',
+      'libs/shared-voice/package.json',
+      'libs/shared-mobile/package.json',
+      'libs/shared-media/package.json',
+      'libs/shared-perception/package.json',
+    ];
 
     const missing: string[] = [];
 
@@ -34,11 +40,9 @@ describe('Workspace build contract', () => {
       const absPkg = path.join(rootDir, relPkg);
       const pkgDir = path.dirname(absPkg);
       const pkg = JSON.parse(safeReadFile(absPkg, { encoding: 'utf8' }) as string);
-      const targets = [
-        pkg.main,
-        pkg.types,
-        ...collectExportTargets(pkg.exports),
-      ].filter((value: unknown): value is string => typeof value === 'string');
+      const targets = [pkg.main, pkg.types, ...collectExportTargets(pkg.exports)].filter(
+        (value: unknown): value is string => typeof value === 'string'
+      );
 
       for (const target of targets) {
         const resolved = path.resolve(pkgDir, target);
@@ -49,5 +53,144 @@ describe('Workspace build contract', () => {
     }
 
     expect(missing).toEqual([]);
+  });
+
+  it('keeps Set-of-Marks rendering in shared-perception with its vision consumer', () => {
+    const root = JSON.parse(
+      safeReadFile(path.join(rootDir, 'package.json'), { encoding: 'utf8' }) as string
+    );
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const perception = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-perception/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    const vision = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/actuators/vision-actuator/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./som-overlay']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/som-overlay.ts'))).toBe(false);
+    expect(perception.exports['./som-overlay']).toEqual({
+      types: './dist/som-overlay.d.ts',
+      default: './dist/som-overlay.js',
+    });
+    expect(perception.dependencies.jimp).toBe(root.dependencies.jimp);
+    expect(vision.dependencies['@agent/shared-perception']).toBe('workspace:*');
+    // Screen redaction, secure I/O, mark contracts, and image hashing stay
+    // shared in core; moving the renderer must not reverse that dependency.
+    for (const subpath of [
+      './virtual/screen-frame-redaction',
+      './secure-io',
+      './set-of-marks',
+      './media/image-dhash',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
+  it('keeps mark target resolution in shared-perception with its actuator consumers', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const perception = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-perception/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./mark-target-resolver']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/mark-target-resolver.ts'))).toBe(false);
+    expect(perception.exports['./mark-target-resolver']).toEqual({
+      types: './dist/mark-target-resolver.d.ts',
+      default: './dist/mark-target-resolver.js',
+    });
+    for (const actuator of ['browser', 'system', 'vision']) {
+      const manifest = JSON.parse(
+        safeReadFile(path.join(rootDir, `libs/actuators/${actuator}-actuator/package.json`), {
+          encoding: 'utf8',
+        }) as string
+      );
+      expect(manifest.dependencies['@agent/shared-perception']).toBe('workspace:*');
+    }
+    // Mission lookup, scoped I/O, mark contracts, and hashing retain their
+    // canonical core implementations and do not depend on shared-perception.
+    for (const subpath of [
+      './foundation/safe-json',
+      './foundation/json',
+      './path-resolver',
+      './secure-io',
+      './set-of-marks',
+      './media/image-dhash',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+    expect(core.dependencies?.['@agent/shared-perception']).toBeUndefined();
+  });
+
+  it('keeps host image hand-off bookkeeping with its shared-media consumers', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const media = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-media/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./host-image-handoff']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/host-image-handoff.ts'))).toBe(false);
+    expect(media.exports['./host-image-handoff']).toEqual({
+      types: './dist/host-image-handoff.d.ts',
+      default: './dist/host-image-handoff.js',
+    });
+    // Persistence, path resolution, and security remain in core. Only the
+    // image-specific bookkeeping module moves beside its consumers.
+    for (const subpath of ['./foundation/json', './path-resolver', './secure-io']) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
+  it('keeps mobile runtime helpers in shared-mobile without closing legacy deep imports', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const mobile = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-mobile/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./mobile-runtime-helpers']).toBeUndefined();
+    expect(core.exports['./mobile-profile-validators']).toBeDefined();
+    expect(core.exports['./types']).toBeDefined();
+    expect(core.exports['./secure-io']).toBeDefined();
+    expect(mobile.exports).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/mobile-runtime-helpers.ts'))).toBe(false);
+    for (const filename of ['mobile-runtime-helpers.js', 'mobile-runtime-helpers.d.ts']) {
+      expect(safeExistsSync(path.join(rootDir, 'libs/shared-mobile/dist', filename))).toBe(true);
+    }
+  });
+
+  it('keeps two-stage barge-in in shared-voice and the shared energy detector in core', () => {
+    const readPackage = (directory: string) =>
+      JSON.parse(
+        safeReadFile(path.join(rootDir, directory, 'package.json'), { encoding: 'utf8' }) as string
+      ) as { exports: Record<string, { types: string; default: string }> };
+    const core = readPackage('libs/core');
+    const voice = readPackage('libs/shared-voice');
+
+    expect(core.exports['./two-stage-barge-in']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/two-stage-barge-in.ts'))).toBe(false);
+    expect(voice.exports['./two-stage-barge-in']).toEqual({
+      types: './dist/two-stage-barge-in.d.ts',
+      default: './dist/two-stage-barge-in.js',
+    });
+    // Meeting and voice both use the energy detector, so it must not move
+    // into a package that would make core depend on shared-voice.
+    expect(core.exports['./barge-in-controller']).toEqual({
+      types: './dist/barge-in-controller.d.ts',
+      default: './dist/barge-in-controller.js',
+    });
   });
 });

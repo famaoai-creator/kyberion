@@ -1,9 +1,9 @@
 import path from 'node:path';
 import { Jimp } from 'jimp';
-import { dhashRegion } from './media/image-dhash.js';
-import { redactScreenCaptureFile } from './virtual/screen-frame-redaction.js';
-import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
-import { safeMarkLabel, type SomImageSize, type SomMark } from './set-of-marks.js';
+import { dhashRegion } from '@agent/core/media/image-dhash';
+import { redactScreenCaptureFile } from '@agent/core/virtual/screen-frame-redaction';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { safeMarkLabel, type SomImageSize, type SomMark } from '@agent/core/set-of-marks';
 
 /**
  * Set-of-Marks overlay: numbered boxes drawn on a redacted copy of the

@@ -2652,10 +2652,6 @@
       "types": "./dist/managed-process.d.ts",
       "default": "./dist/managed-process.js"
     },
-    "./mark-target-resolver": {
-      "types": "./dist/mark-target-resolver.d.ts",
-      "default": "./dist/mark-target-resolver.js"
-    },
     "./marketing-workload": {
       "types": "./dist/marketing-workload.d.ts",
       "default": "./dist/marketing-workload.js"
@@ -3707,10 +3703,6 @@
     "./mobile-profile-validators": {
       "types": "./dist/mobile-profile-validators.d.ts",
       "default": "./dist/mobile-profile-validators.js"
-    },
-    "./mobile-runtime-helpers": {
-      "types": "./dist/mobile-runtime-helpers.d.ts",
-      "default": "./dist/mobile-runtime-helpers.js"
     },
     "./model-performance-index": {
       "types": "./dist/reasoning/model-performance-index.d.ts",
@@ -5956,10 +5948,6 @@
       "types": "./dist/software-quality-operations.d.ts",
       "default": "./dist/software-quality-operations.js"
     },
-    "./som-overlay": {
-      "types": "./dist/som-overlay.d.ts",
-      "default": "./dist/som-overlay.js"
-    },
     "./source-analysis": {
       "types": "./dist/source-analysis.d.ts",
       "default": "./dist/source-analysis.js"
@@ -7732,10 +7720,6 @@
       "types": "./dist/provider-runtime-requirements.d.ts",
       "default": "./dist/provider-runtime-requirements.js"
     },
-    "./host-image-handoff": {
-      "types": "./dist/host-image-handoff.d.ts",
-      "default": "./dist/host-image-handoff.js"
-    },
     "./media/docx-xml": {
       "types": "./dist/media/docx-xml.d.ts",
       "default": "./dist/media/docx-xml.js"
@@ -7763,10 +7747,6 @@
     "./segmented-voice-playback": {
       "types": "./dist/segmented-voice-playback.d.ts",
       "default": "./dist/segmented-voice-playback.js"
-    },
-    "./two-stage-barge-in": {
-      "types": "./dist/two-stage-barge-in.d.ts",
-      "default": "./dist/two-stage-barge-in.js"
     },
     "./voice/engine-runtime-preferences-access": {
       "types": "./dist/voice/engine-runtime-preferences-access.d.ts",
