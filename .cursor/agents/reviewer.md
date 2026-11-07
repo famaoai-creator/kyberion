@@ -22,8 +22,8 @@ Check drift with: pnpm agents:generate -- --check
 Sources (SSoT):
   - knowledge/product/orchestration/team-roles/reviewer.json
   - knowledge/product/roles/ruthless_auditor/PROCEDURE.md
-  - libs/core/subagent-capability-profiles.ts (KD-05 capability tiers)
-  - libs/core/working-principles.ts (buildWorkingPrinciplesLines)
+  - libs/core/workforce/subagent-capability-profiles.ts (KD-05 capability tiers)
+  - libs/core/workforce/working-principles.ts (buildWorkingPrinciplesLines)
   - knowledge/product/governance/multi-provider-coexecution-contract.md (XP-04 read/write matrix)
   Generator: scripts/generate_subagent_definitions.ts
 -->
