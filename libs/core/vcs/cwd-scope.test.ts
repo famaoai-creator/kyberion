@@ -108,7 +108,7 @@ afterEach(() => {
 describe('typed VCS repository data scope', () => {
   it.each(['git-read', 'git-push', 'gh-read', 'gh-merge'])(
     'blocks public %s on private cwd before even an injected transport runs',
-    (operation) => {
+    async (operation) => {
       const run = vi.fn(() => ({ status: 0, stdout: '{}', stderr: '' }));
       const action = () =>
         operation === 'git-read'
@@ -118,9 +118,10 @@ describe('typed VCS repository data scope', () => {
             : operation === 'gh-read'
               ? ghPrView({ cwd: personal, ref: '1', fields: 'number' }, run)
               : ghPrMerge({ cwd: personal, ref: '1' }, run);
-      expect(() => withExecutionContext('mission_controller', action, 'sovereign')).toThrow(
-        'VCS_CWD_SCOPE_DENIED'
-      );
+      // gitPush is async: its scope check rejects instead of throwing.
+      await expect(
+        (async () => withExecutionContext('mission_controller', action, 'sovereign'))()
+      ).rejects.toThrow('VCS_CWD_SCOPE_DENIED');
       expect(run).not.toHaveBeenCalled();
     }
   );

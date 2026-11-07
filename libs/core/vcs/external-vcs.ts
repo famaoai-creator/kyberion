@@ -1,4 +1,7 @@
-import { runExternalOperationSync } from '../governance/external-operation.js';
+import {
+  runExternalOperation,
+  runExternalOperationSync,
+} from '../governance/external-operation.js';
 import { isDelegableExternalOperation } from '../governance/external-operation-target.js';
 import type { VcsCommandResult } from './git.js';
 
@@ -18,6 +21,26 @@ export function governVcsCommand(
       // VCS mutations registered in the delegation registry may consult an
       // exact repository grant. Push merges and sends resolve against the
       // charter's repository+branch targets.
+      delegable: isDelegableExternalOperation(operationId),
+    },
+    execute,
+    (result) =>
+      result.status === 0 && !result.error ? 'succeeded' : mutation ? 'unknown' : 'failed'
+  );
+}
+
+/** Async twin of {@link governVcsCommand}: same admission, delegation and outcome rules. */
+export function governVcsCommandAsync(
+  operationId: string,
+  effect: Record<string, unknown>,
+  execute: () => Promise<VcsCommandResult>,
+  mutation: boolean
+): Promise<VcsCommandResult> {
+  return runExternalOperation(
+    {
+      operationId,
+      effect,
+      requiresApproval: mutation,
       delegable: isDelegableExternalOperation(operationId),
     },
     execute,
