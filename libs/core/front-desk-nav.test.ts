@@ -335,12 +335,30 @@ describe('rail placement and destinations', () => {
   });
 
   it('still resolves Studio destinations that left the rail', () => {
-    for (const id of ['ask', 'first-job', 'progress', 'home-studio']) {
+    for (const id of ['ask', 'first-job', 'home-studio']) {
       expect(
         resolveFrontDeskDestination(id, { currentSurface: 'concierge', role: 'owner' })?.surface,
         id
       ).toBe('presence-studio');
     }
+  });
+
+  it('resolves 進み具合 to Concierge 仕事 › 依頼, keeping the query in the path', () => {
+    expect(
+      resolveFrontDeskDestination('progress', { currentSurface: 'concierge', role: 'viewer' })
+    ).toMatchObject({
+      surface: 'concierge',
+      href: '/work?tab=requests',
+      external: false,
+      allowed: true,
+      scope_query_style: 'camel',
+    });
+    expect(
+      resolveFrontDeskDestination('progress', {
+        currentSurface: 'presence-studio',
+        urls: { concierge: 'https://desk.example.test/' },
+      })
+    ).toMatchObject({ href: 'https://desk.example.test/work?tab=requests', external: true });
   });
 
   it('resolves 使い方 on Concierge itself (moved in Kyberion server phase 2)', () => {

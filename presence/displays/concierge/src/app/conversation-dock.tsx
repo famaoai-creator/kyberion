@@ -33,6 +33,7 @@ import {
   TENANT_CHANGED_EVENT,
   tenantFromChangeEvent,
 } from '../lib/tenant-context';
+import { REQUESTS_PATH, requestLinkHref } from '../lib/requests-view';
 import { frontDeskText, type ConciergeMessageKey, type FrontDeskMessageKey } from '../lib/i18n';
 import type {
   ConversationMessageResponse,
@@ -116,7 +117,7 @@ export function ConversationDock(props: { progressHref?: string } = {}) {
   );
 }
 
-function ConversationDockContent({ progressHref = '/progress' }: { progressHref?: string }) {
+function ConversationDockContent({ progressHref = REQUESTS_PATH }: { progressHref?: string }) {
   const { locale, t } = useConciergeI18n();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -809,7 +810,7 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
               {message.role === 'user' && /^[a-f0-9-]{36}-user$/.test(message.id) ? (
                 <GuardedAnchor
                   href={withSelectedTenant(
-                    progressHref + '?request=' + encodeURIComponent(message.id.slice(0, -5)),
+                    requestLinkHref(progressHref, message.id.slice(0, -5)),
                     tenant
                   )}
                 >
