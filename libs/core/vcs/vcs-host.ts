@@ -37,7 +37,11 @@
 
 import { createProviderRegistry } from '../provider/provider-registry.js';
 import type { SeamProviderMetadata } from '../seam.js';
-import { resolveSeamDefaultOrder } from '../provider/seam-provider-selection.js';
+import {
+  getSeamSelectionPolicy,
+  resolveSeamDefaultOrder,
+  savedSeamDefaultFor,
+} from '../provider/seam-provider-selection.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { assertVcsCwdScope } from './cwd-scope.js';
 import { vcsDefaultRunner, type VcsCommandRunner } from './vcs-backend.js';
@@ -334,6 +338,57 @@ export function resolveVcsHostProvider(
   throw new Error(
     `[VCS_HOST_UNAVAILABLE] no available VCS host provider (tried ${chain.join(', ') || 'none'}) — install and authenticate the GitHub CLI, or register GH_TOKEN for github-rest`
   );
+}
+
+export interface VcsHostSelectionCandidate {
+  id: string;
+  registered: boolean;
+  available: boolean;
+}
+
+export interface VcsHostSelection {
+  /** Provider the default chain would pick, or undefined when none is available. */
+  selected?: string;
+  /** Default chain in resolution order. */
+  chain: string[];
+  /** Where the head of the chain comes from (saved/env default layer, policy or builtin). */
+  source: string;
+  candidates: VcsHostSelectionCandidate[];
+}
+
+/**
+ * Explain the default-chain resolution without performing any forge call:
+ * the same chain and `isAvailable()` checks as {@link resolveVcsHostProvider}
+ * (gh-cli runs `gh --version` locally; github-rest only checks for a
+ * registered token). Never touches the network.
+ */
+export function inspectVcsHostSelection(
+  options: Pick<VcsHostCallOptions, 'cwd' | 'env'> = {}
+): VcsHostSelection {
+  const ctx = vcsHostCallContext(options);
+  const chain = resolveSeamDefaultOrder(VCS_HOST_SEAM, {
+    builtin: [GH_CLI_VCS_HOST_ID, GITHUB_REST_VCS_HOST_ID],
+  });
+  const saved = savedSeamDefaultFor(VCS_HOST_SEAM);
+  let source = 'builtin';
+  if (saved) source = saved.source;
+  else {
+    try {
+      if (getSeamSelectionPolicy(VCS_HOST_SEAM)) source = 'policy';
+    } catch {
+      /* policy directory unavailable: builtin order */
+    }
+  }
+  const candidates = chain.map((id) => {
+    const provider = vcsHostRegistry.get(id);
+    return {
+      id,
+      registered: Boolean(provider),
+      available: provider ? safeAvailable(provider, ctx) : false,
+    };
+  });
+  const selected = candidates.find((candidate) => candidate.available)?.id;
+  return { ...(selected ? { selected } : {}), chain, source, candidates };
 }
 
 function safeAvailable(provider: VcsHostProvider, ctx: VcsHostCallContext): boolean {

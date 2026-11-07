@@ -34,6 +34,7 @@ import {
   registerVcsHostProvider,
   resolveVcsHostProvider,
   vcsHostCallContext,
+  inspectVcsHostSelection,
   VcsHostError,
   type VcsHostCallContext,
   type VcsHostProvider,
@@ -729,5 +730,43 @@ describe('repository visibility verb', () => {
     const injected = vcsHostOptionsForRunner({ cwd: '/x' }, run);
     expect(injected.git).toBe(run);
     expect(injected.hostProvider?.id).toBe('gh-cli');
+  });
+});
+
+describe('vcs-host selection inspection (doctor)', () => {
+  let unregister: (() => void) | undefined;
+  afterEach(() => {
+    unregister?.();
+    vi.unstubAllEnvs();
+  });
+
+  it('explains an env default and checks availability without any forge call', () => {
+    const provider = createMemoryVcsHostProvider({ id: 'memory-doctor' });
+    const authStatus = vi.spyOn(provider, 'authStatus');
+    const repository = vi.spyOn(provider, 'repository');
+    unregister = registerVcsHostProvider(provider);
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'vcs-host=memory-doctor');
+    const selection = inspectVcsHostSelection();
+    expect(selection.chain[0]).toBe('memory-doctor');
+    expect(selection.source).toBe('env:KYBERION_SEAM_DEFAULTS');
+    expect(selection.selected).toBe('memory-doctor');
+    expect(selection.candidates[0]).toEqual({
+      id: 'memory-doctor',
+      registered: true,
+      available: true,
+    });
+    expect(authStatus).not.toHaveBeenCalled();
+    expect(repository).not.toHaveBeenCalled();
+  });
+
+  it('reports an unregistered default as unavailable instead of throwing', () => {
+    vi.stubEnv('KYBERION_SEAM_DEFAULTS', 'vcs-host=not-installed');
+    const selection = inspectVcsHostSelection();
+    expect(selection.candidates[0]).toEqual({
+      id: 'not-installed',
+      registered: false,
+      available: false,
+    });
+    expect(selection.selected).not.toBe('not-installed');
   });
 });
