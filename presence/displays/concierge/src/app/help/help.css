@@ -101,14 +101,21 @@
   overflow-wrap: anywhere;
 }
 
-.help-lesson__title {
+.help-lesson__head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--kb-ui-space-2);
+}
+
+.help-lesson__title {
   margin: 0;
   font-size: var(--kb-ui-font-size-md);
   overflow-wrap: anywhere;
+}
+
+.help-lesson [role='status']:focus {
+  outline: none;
 }
 
 .help-lesson__actions {

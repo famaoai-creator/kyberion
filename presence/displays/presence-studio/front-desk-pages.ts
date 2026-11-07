@@ -734,26 +734,6 @@ export const ASK_VOCABULARY_KEYS = [
   'front_desk:hearing_inventory_open',
 ] as const satisfies readonly VocabularyKey[];
 
-// HT-06: exactly the `front_desk` keys `static/help.js` renders for the
-// training block (`#training-content`) — the track/lesson catalog data
-// itself (titles, goals, checks) stays free-form catalog content from
-// `GET /api/training/catalog`; only this fixed UI chrome is vocabulary.
-// Mirrors `ASK_VOCABULARY_KEYS` above — see `GET /api/help-vocabulary` in
-// `front-desk-routes.ts`.
-export const HELP_VOCABULARY_KEYS = [
-  'front_desk:training_choose_track',
-  'front_desk:training_open',
-  'front_desk:training_back',
-  'front_desk:training_try',
-  'front_desk:training_done_prefix',
-  'front_desk:training_level_beginner',
-  'front_desk:training_level_intermediate',
-  'front_desk:training_level_advanced',
-  'front_desk:training_status_not_started',
-  'front_desk:training_status_in_progress',
-  'front_desk:training_status_complete',
-] as const satisfies readonly VocabularyKey[];
-
 // UI-05/UI-06 (SURFACE_UI_UNIFICATION_PLAN_2026-09-23 §3.1): front-desk pages
 // are served as small templates so their fixed chrome (page title, headings,
 // input placeholders, loading text) is already in the viewer's language at

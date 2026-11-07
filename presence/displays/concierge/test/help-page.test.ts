@@ -53,11 +53,15 @@ describe('使い方 page (/help) contract', () => {
 
   it('reads the catalog and only the viewer’s own progress, and marks a lesson through /api/training/me', () => {
     const page = read('src/app/help/help-page.tsx');
-    expect(page).toContain("fetch('/api/training/catalog'");
-    expect(page).toContain("fetch('/api/training/me'");
+    expect(page).toContain("read('/api/training/catalog')");
+    expect(page).toContain("read('/api/training/me')");
+    expect(page).toContain("fetch('/api/training/me', {");
     expect(page).toContain("method: 'POST'");
     expect(page).toContain("status: 'complete'");
     expect(page).toContain('frontDeskFetch as fetch');
     expect(page).not.toContain('member_id');
+    // Only this route's coded refusals are shown; never a server's error text.
+    expect(page).toContain('error_code');
+    expect(page).not.toMatch(/body\??\.error\b(?!_code)/u);
   });
 });

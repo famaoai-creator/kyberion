@@ -3,6 +3,7 @@ import {
   helpLessonsDone,
   helpTrackId,
   helpTryHref,
+  parseHelpAccess,
   parseHelpCatalog,
   parseHelpProgress,
   type HelpLesson,
@@ -76,6 +77,23 @@ describe('help view', () => {
       'http://studio.example/progress'
     );
     expect(helpTryHref(settings, links)).toBe('/settings');
+  });
+
+  it('never sends a viewer to a page their role cannot open', () => {
+    const [, decide, settings] = parseHelpCatalog(catalog)![0].lessons;
+    const viewer = parseHelpAccess({
+      ok: true,
+      items: [
+        { id: 'inbox', allowed: false },
+        { id: 'settings', allowed: false },
+      ],
+    });
+    expect(viewer).toEqual({ inbox: false, settings: false });
+    expect(helpTryHref(decide, links, viewer)).toBe('http://studio.example/progress');
+    expect(helpTryHref(settings, links, viewer)).toBeNull();
+    // An item missing from the nav is not allowed; an unreadable nav is "unknown" (allowed).
+    expect(parseHelpAccess({ ok: true, items: [] })).toEqual({ inbox: false, settings: false });
+    expect(parseHelpAccess(null)).toEqual({ inbox: true, settings: true });
   });
 
   it('counts completed lessons and reads the track segment', () => {
