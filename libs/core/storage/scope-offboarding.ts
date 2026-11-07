@@ -77,6 +77,8 @@ import type { MissionState } from '../mission/mission-types.js';
 import {
   collectDerivedAssetTargets,
   readUnchangedDerivedTarget,
+  retainCollectedLeftovers,
+  exportUnchangedDerivedTarget,
 } from './scope-offboarding-derived.js';
 
 // ---------------------------------------------------------------------------
@@ -1642,12 +1644,7 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
     for (const target of result.targets) {
       const absolute = pathResolver.rootResolve(target.path);
       if (target.kind === 'derived_asset') {
-        withLockSync(`asset-derivation-delete:${target.path}`, () => {
-          const bytes = readUnchangedDerivedTarget(target);
-          const destination = path.join(exportDirAbs, ...target.path.split('/'));
-          safeMkdir(path.dirname(destination), { recursive: true });
-          safeWriteFile(destination, bytes);
-        });
+        exportUnchangedDerivedTarget(target, exportDirAbs);
         continue;
       }
       if (!safeExistsSync(absolute)) {
@@ -1932,20 +1929,7 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       // The ledger that names derived_asset targets is itself soft-deleted
       // in the loop above, so a failed derived deletion is invisible to the
       // re-collected target scan — check the collected targets directly.
-      const stillPresent = result.targets
-        .filter((target) => !result.soft_deleted.includes(target.path))
-        .map((target) => target.path)
-        .filter((targetPath) => {
-          try {
-            return safeExistsSync(pathResolver.rootResolve(targetPath));
-          } catch {
-            return true;
-          }
-        });
-      if (stillPresent.length > 0) {
-        result.verification.leftovers.push(...stillPresent);
-        result.verification.clean = false;
-      }
+      retainCollectedLeftovers(result.targets, result.soft_deleted, result.verification);
       appendRetentionAudit({
         event: 'SCOPE_OFFBOARD_VERIFIED',
         scope_type: scopeType,
