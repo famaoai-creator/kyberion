@@ -18,7 +18,7 @@
  */
 
 import type { AudioChunk, AudioFormat } from '../meeting/meeting-session-types.js';
-import { BoundedAudioQueue, DEFAULT_AUDIO_BUFFER_POLICY } from '../bounded-audio-queue.js';
+import { BoundedAudioQueue, DEFAULT_AUDIO_BUFFER_POLICY } from './bounded-audio-queue.js';
 import type {
   AudioBufferPolicy,
   AudioDeviceDescriptor,

@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { humanActor } from '../actor.js';
+import { humanActor } from '../contracts/actor.js';
 import { withOperationInterface } from './operation-protection.js';
 import * as pathResolver from '../path-resolver.js';
 import { safeRmSync, safeWriteFile } from '../secure-io.js';
@@ -41,7 +41,7 @@ vi.mock('./approval-policy.js', () => ({
     mandatoryApproval: mocks.mandatory,
   }),
 }));
-vi.mock('../decision-rights.js', () => ({
+vi.mock('../organization/decision-rights.js', () => ({
   resolveDecisionRightsMatrix: () => ({}),
   evaluateDecisionRights: () =>
     mocks.escalates ? { requiresEscalation: true, escalationKind: 'role_mismatch' } : null,

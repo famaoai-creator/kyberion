@@ -55,8 +55,8 @@ status: archived
 
 ### 実装メモ — 2026-07-04
 
-- `libs/core/next-action.ts` に完了用の構造化 next-action を追加し、`scripts/refactor/mission-lifecycle.ts` の finish で `mission_completion_next_action` と `mission_completion_summary` を state.context に記録するようにした。
-- `libs/core/next-action.test.ts` で満足済み/未充足の両ケースを固定した。
+- `libs/core/surface/next-action.ts` に完了用の構造化 next-action を追加し、`scripts/refactor/mission-lifecycle.ts` の finish で `mission_completion_next_action` と `mission_completion_summary` を state.context に記録するようにした。
+- `libs/core/surface/next-action.test.ts` で満足済み/未充足の両ケースを固定した。
 
 ## 実装メモ
 

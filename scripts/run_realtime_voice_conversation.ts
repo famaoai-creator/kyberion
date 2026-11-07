@@ -48,7 +48,7 @@ import {
 } from '@agent/core/voice/streaming-stt-bridge';
 import { getStreamingTtsBridge } from '@agent/core/voice/streaming-tts-bridge';
 import { installAppleSpeechToTextBridgeIfAvailable } from '@agent/core/apple-intelligence-bridge';
-import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/core/apple-speech-file-stt-bridge';
+import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/shared-voice/apple-speech-file-stt-bridge';
 import {
   installManagedMlxWhisperStreamingSttBridgeIfAvailable,
   installShellStreamingSttBridgeFromEnv,
@@ -58,11 +58,14 @@ import {
   installReasoningBackends,
 } from '@agent/core/reasoning/reasoning-bootstrap';
 import { installShellStreamingTtsBridgeFromEnv } from '@agent/core/shell/shell-streaming-tts-bridge';
-import { installSileroVadBackend } from '@agent/core/silero-vad-bridge';
-import { installTenVadBackend } from '@agent/core/ten-vad-bridge';
+import { installSileroVadBackend } from '@agent/shared-voice/silero-vad-bridge';
+import { installTenVadBackend } from '@agent/shared-voice/ten-vad-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
 import { probeAudioPlayback } from '@agent/core/voice/audio-playback';
-import { playPcmAudioStream, probePcmAudioStreaming } from '@agent/core/streaming-voice-playback';
+import {
+  playPcmAudioStream,
+  probePcmAudioStreaming,
+} from '@agent/shared-voice/streaming-voice-playback';
 import { probeMicCapture, resolveMicDevice } from '@agent/core/mic-capture';
 import { resolveFfmpegBin } from '@agent/core/tool/tool-binary-resolvers';
 import { recordVadTurn, type VadTurnState } from '@agent/shared-voice/vad-turn-recorder';

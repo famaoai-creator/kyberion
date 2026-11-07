@@ -28,7 +28,7 @@ mission
 
 - When a hash chain records its algorithm per entry (chain_alg), link and hash checks alone do not make it tamper-evident: unkeyed sha256 entries can be recomputed by anyone. Rules learned in MSN-AUDIT-LEDGER-HARDENING-20261028:
 
-1. Verify the algorithm sequence with one shared tracker (libs/core/chain-integrity.ts createChainAlgTracker): an unkeyed entry after a keyed one is a downgrade (chain_downgrade), and a chain born keyed (tenant ledger partitions) may hold no unkeyed entry at all (unkeyed_entry).
+1. Verify the algorithm sequence with one shared tracker (libs/core/governance/chain-integrity.ts createChainAlgTracker): an unkeyed entry after a keyed one is a downgrade (chain_downgrade), and a chain born keyed (tenant ledger partitions) may hold no unkeyed entry at all (unkeyed_entry).
 2. Downgrade detection alone still accepts a chain rewritten unkeyed from genesis. The authoritative verifier (audit:verify, the daily audit-verify-daily pipeline) therefore requires keyed entries by default; accepting a legacy unkeyed prefix is an explicit opt-in (--allow-legacy-unkeyed). In-process liveness checks may stay lenient so legacy hosts do not fail lifecycle steps.
 3. A windowed verification (--since) must continue from the last readable entry before the window (its hash and keyed state); otherwise a rewritten window restarts from the real boundary hash and passes.
 4. A verifier must report unreadable lines and files as findings. A reader that drops a whole file on one bad line lets a forger hide keyed entries from the tracker.

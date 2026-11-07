@@ -42,7 +42,7 @@ pnpm organization participant assign --actor kyberion://agent/<org>/<slug> \
 ## 2. Capability control (what each role can do)
 
 - Team-role → KD-05 tier map lives in
-  `libs/core/subagent-capability-profiles.ts` (`TEAM_ROLE_CAPABILITY_PROFILE`)
+  `libs/core/workforce/subagent-capability-profiles.ts` (`TEAM_ROLE_CAPABILITY_PROFILE`)
   — reviewer/tester→explorer (read-only), implementer→implementer,
   coordination roles→planner (no tools). Unknown roles fall back to the
   read-only tier.

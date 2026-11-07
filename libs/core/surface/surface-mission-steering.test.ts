@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
-import { clearOwnerScopeCache } from '../owner-scope.js';
+import { clearOwnerScopeCache } from '../governance/owner-scope.js';
 import {
   clearWorkCoordinationNamespace,
   clearWorkCoordinationStore,
@@ -38,7 +38,7 @@ import { getMissionAgentInputQueue } from '../agent/agent-input-queue.js';
 import type { SurfaceConversationInput } from './channel-surface-types.js';
 import type { SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
 import type { MissionStatusView } from '../mission/mission-read-model.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 
 /**
  * SO-04 hermetic E2E tests. Hermetic like surface-steering-authority.test.ts:

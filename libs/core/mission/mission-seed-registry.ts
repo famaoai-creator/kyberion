@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { defineCatalog } from '../foundation/governed-catalog.js';
-import * as customerResolver from '../stance-resolver.js';
+import * as customerResolver from '../authn/stance-resolver.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   assertSafeRepositoryPath,

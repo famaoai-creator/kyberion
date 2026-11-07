@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { safeRmSync } from '../secure-io.js';
-import { humanActor } from '../actor.js';
+import { humanActor } from '../contracts/actor.js';
 import { useOnboardingAuthorityFixture } from '../../../tests/helpers/onboarding-authority-fixture.js';
 const f = useOnboardingAuthorityFixture();
 const person = { kind: 'person' } as const;

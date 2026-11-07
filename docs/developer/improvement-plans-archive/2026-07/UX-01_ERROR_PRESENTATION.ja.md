@@ -73,7 +73,7 @@ status: archived
 
 ## 実装メモ
 
-- 2026-07-04: `libs/core/error-classifier.ts` に `buildUserFacingError()` を追加し、`knowledge/product/orchestration/user-facing-vocabulary.json` へエラー語彙を追加した。Chronos の `FocusedOperatorView` / `MissionIntelligence` / `SovereignChat` は、内部例外を直接描画せず、ブラウザ安全な封筒表現に差し替えた。
+- 2026-07-04: `libs/core/analysis/error-classifier.ts` に `buildUserFacingError()` を追加し、`knowledge/product/orchestration/user-facing-vocabulary.json` へエラー語彙を追加した。Chronos の `FocusedOperatorView` / `MissionIntelligence` / `SovereignChat` は、内部例外を直接描画せず、ブラウザ安全な封筒表現に差し替えた。
 - 2026-07-04 (Task 3/4 完了): `libs/core/bridge-error-reply.ts` を新設(`buildBridgeErrorReplyText` / `buildBridgeEmptyReplyText` / `postBridgeError`(会話単位 1 分 1 回のレート制限内蔵)/ `chunkBridgeMessage`(コードフェンス境界を保つ分割))。語彙に `empty_reply_body` / `empty_reply_next_step` を追加。
   - **slack**: 会話ハンドラ catch でスレッドへ封筒テキスト投稿、`empty_reply` 時に定型文投稿。
   - **telegram**: 会話失敗時にチャットへ封筒テキスト送信(receipt は `ok:false, reason:'conversation_failed'`)、空返答時に定型文送信。

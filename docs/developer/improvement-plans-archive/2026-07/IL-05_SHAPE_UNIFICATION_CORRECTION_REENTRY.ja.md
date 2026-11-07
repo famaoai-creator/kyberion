@@ -71,7 +71,7 @@ status: archived
 ## 実装状況 (2026-07-13, 完了)
 
 - Task 1(shape 正準化): `intent-contract.ts` が `shape_disagreement` をトレース記録(実装済みを確認)。
-- Task 2(修正検知とバックトラック): `libs/core/correction-detection.ts` + slot-filling 割り込みは実装済みだったが、**直前に埋めたスロットでなく次の空きスロットを再質問**しており修正対象が失われていた。`requirements.filled_order` を導入し、修正発話で最後に埋めたスロットを missing 先頭へ差し戻し・値を破棄・再質問する真のバックトラックに修正(orchestrator fastpath テスト1本追加)。
+- Task 2(修正検知とバックトラック): `libs/core/intent/correction-detection.ts` + slot-filling 割り込みは実装済みだったが、**直前に埋めたスロットでなく次の空きスロットを再質問**しており修正対象が失われていた。`requirements.filled_order` を導入し、修正発話で最後に埋めたスロットを missing 先頭へ差し戻し・値を破棄・再質問する真のバックトラックに修正(orchestrator fastpath テスト1本追加)。
 - Task 3(pending intent 永続化): `pending-intent-store.ts` + テスト(実装済みを確認)。
 - Task 4(納品後修正の再オープン): `reopenTaskSession` + 相関ID一致の直近 completed 判定(`surface-runtime-orchestrator.ts` 実装済みを確認)。
 - 関連: LOOP_CLOSURE_PLAN LC-10/11 の ask-why・review-reentry は本計画の会話面を補完する。iMessage/Telegram ブリッジには承認決定フロー自体が存在しないため、ブリッジ ask-why の横展開対象は Slack のみ(実装済み)。

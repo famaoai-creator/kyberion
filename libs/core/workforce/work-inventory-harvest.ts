@@ -27,7 +27,7 @@ import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { readJsonLines } from '../foundation/json.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir, safeReadFile } from '../secure-io.js';
-import { loadAdhocRunLedgerAtPath, type AdhocRunTally } from '../promotion-candidates.js';
+import { loadAdhocRunLedgerAtPath, type AdhocRunTally } from '../pipeline/promotion-candidates.js';
 import {
   applyClassification,
   createWorkInventoryEntry,

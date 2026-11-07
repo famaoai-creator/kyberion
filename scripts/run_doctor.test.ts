@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
   createStandardYargs: vi.fn(),
   runAppPreflight: vi.fn(),
   formatAppPreflightReport: vi.fn(),
+  collectVcsHostDoctorLines: vi.fn(async (_options?: { probeAuth?: boolean }) => [
+    'VCS host: none available (fixture)',
+  ]),
 }));
 
 vi.mock('@agent/core', async (importOriginal) => {
@@ -54,6 +57,12 @@ vi.mock('@agent/core/apple-intelligence-bridge', () => ({
 
 vi.mock('@agent/core/virtual/desktop-observation-readiness', () => ({
   probeDesktopObservationReadiness: vi.fn(async () => []),
+}));
+
+// The vcs-host section has its own tests (lib/doctor-vcs-host.test.ts); do not
+// spawn `gh --version` from doctor formatting tests.
+vi.mock('./lib/doctor-vcs-host.js', () => ({
+  collectVcsHostDoctorLines: mocks.collectVcsHostDoctorLines,
 }));
 
 describe('run_doctor', () => {
@@ -197,6 +206,16 @@ describe('run_doctor', () => {
         (line) => line.includes('Apple Speech readiness:') && line.includes('"available":true')
       )
     ).toBe(true);
+  });
+
+  it('includes the vcs-host section without counting it as missing, probing auth only on --vcs-auth', async () => {
+    const { collectDoctorReport } = await import('./run_doctor.js');
+    const report = await collectDoctorReport({ runtime: 'app', platform: 'android' });
+    expect(report.vcsHostLines).toEqual(['VCS host: none available (fixture)']);
+    expect(report.totalMissing).toBe(0);
+    expect(mocks.collectVcsHostDoctorLines).toHaveBeenLastCalledWith({ probeAuth: false });
+    await collectDoctorReport({ runtime: 'app', platform: 'android', vcsAuth: true });
+    expect(mocks.collectVcsHostDoctorLines).toHaveBeenLastCalledWith({ probeAuth: true });
   });
 
   it('reports surface outbox and dead-letter state in the doctor report', async () => {

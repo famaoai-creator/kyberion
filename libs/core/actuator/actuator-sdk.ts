@@ -1,6 +1,6 @@
 import { buildUnknownActuatorOpError, type PipelineStepType } from './actuator-op-registry.js';
 import { createAjv } from '../foundation/ajv.js';
-import { createGovernedRetryOptionsBuilder } from '../recovery-policy.js';
+import { createGovernedRetryOptionsBuilder } from '../pipeline/recovery-policy.js';
 import type { RetryOptions } from '../pipeline/retry-utils.js';
 import { getRegisteredEnv } from '../foundation/env.js';
 import { isRecord } from '../foundation/primitives.js';

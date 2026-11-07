@@ -1234,7 +1234,7 @@ describe('a2a-bridge', () => {
       if (savedActorMode === undefined) delete process.env.KYBERION_NHI_ACTOR;
       else process.env.KYBERION_NHI_ACTOR = savedActorMode;
       const { setNhiActorAuditSinkForTests, clearNhiActorVerificationCache } =
-        await import('../nhi-actor-verification.js');
+        await import('../agent/nhi-actor-verification.js');
       setNhiActorAuditSinkForTests(null);
       clearNhiActorVerificationCache();
       const { resetAgentIdentityServiceForTests } = await import('../agent/agent-identity.js');
@@ -1350,7 +1350,7 @@ describe('a2a-bridge', () => {
       const { a2aBridge } = await import('./a2a-bridge.js');
       const { withExecutionContext } = await import('../authority.js');
       const identity = await import('../agent/agent-identity.js');
-      const verification = await import('../nhi-actor-verification.js');
+      const verification = await import('../agent/nhi-actor-verification.js');
 
       identity.resetAgentIdentityServiceForTests(
         `active/shared/tmp/ni02-bridge-tests-${process.pid}/agent-identities-${Date.now()}.jsonl`

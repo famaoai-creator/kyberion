@@ -11,7 +11,7 @@ import {
   runGeminiCliQuery,
 } from './gemini-cli-backend.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
-import { metrics } from '../metrics.js';
+import { metrics } from '../analysis/metrics.js';
 
 beforeEach(() => {
   vi.spyOn(metrics, 'record').mockImplementation(() => undefined as never);

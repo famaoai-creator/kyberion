@@ -13,15 +13,15 @@ import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
 import { logger } from '../core.js';
 import { validate, loadSchema } from '../validate.js';
 import { pathResolver } from '../path-resolver.js';
-import { tryRepairJson, repairJsonString } from '../json-repair.js';
+import { tryRepairJson, repairJsonString } from '../foundation/json-repair.js';
 import { parseDirtyJson } from './dirty-json.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
 import { validatePipelineAdf } from './pipeline-contract.js';
 import {
   completeDelegatedTaskTrace,
   startDelegatedTaskTrace,
-} from '../delegated-task-observability.js';
-import { createGapRecorder } from '../gap-phase.js';
+} from '../workforce/delegated-task-observability.js';
+import { createGapRecorder } from '../analysis/gap-phase.js';
 import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
 import { recordKnowledgeDelivery } from '../knowledge/knowledge-feedback-loop.js';
 import { readHintsByCategory } from '../knowledge/feedback-loop.js';
@@ -36,7 +36,7 @@ import { getWorkItem } from '../workforce/work-coordination.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { readTextFile, truncateNormalizedText } from '../foundation/text.js';
 import { assertProjectTrustApproval } from '../project/project-trust.js';
-import { isBuiltinPipelineResource } from '../trust-requiring-resources.js';
+import { isBuiltinPipelineResource } from '../governance/trust-requiring-resources.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord } from '../foundation/primitives.js';
 import type { ValidationResult } from '../types.js';

@@ -32,7 +32,7 @@ const input = JSON.parse(await new Promise(resolve => {
 const { pathResolver } = await import(input.coreUrl + 'path-resolver.js');
 const { resolvePromotionTargetRoot } = await import(input.coreUrl + 'knowledge/memory-promotion-git.js');
 const { withScopeEnvOnly, resolveScopeContext } = await import(input.coreUrl + 'scope-context.js');
-const { resolveActiveProfileRoot } = await import(input.coreUrl + 'profile-root.js');
+const { resolveActiveProfileRoot } = await import(input.coreUrl + 'authn/profile-root.js');
 const { safeExistsSync } = await import(input.coreUrl + 'secure-io.js');
 const path = await import('node:path');
 if (pathResolver.rootDir() !== input.root) throw new Error('Installation root mismatch');

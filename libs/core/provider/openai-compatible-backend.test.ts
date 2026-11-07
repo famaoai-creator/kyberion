@@ -237,7 +237,7 @@ describe('openai-compatible-backend', () => {
       toolsEnabled: true,
     });
     const { runWithDelegationExecutionTracker } =
-      await import('../delegation-execution-tracker.js');
+      await import('../workforce/delegation-execution-tracker.js');
     const metadata = await runWithDelegationExecutionTracker(async (tracker) => {
       await expect(backend.delegateTask('do it')).resolves.toBe('done');
       return tracker.metadata;

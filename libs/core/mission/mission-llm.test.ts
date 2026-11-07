@@ -5,7 +5,7 @@ import * as pathResolver from '../path-resolver.js';
 
 // checkProviderEgress raises an ops-alert on every denial; keep the shared
 // ops-alerts sink untouched by these tests.
-vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
+vi.mock('../daemon/ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 import {
   BUILTIN_FALLBACK,
   inspectLlmResolution,

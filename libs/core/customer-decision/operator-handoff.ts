@@ -21,10 +21,10 @@
  */
 import { createHash } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
-import { addInboxEntry, listInboxEntries } from '../deliverable-inbox.js';
+import { addInboxEntry, listInboxEntries } from '../task/deliverable-inbox.js';
 import { DELIVERABLE_INBOX_WRITER_ROLE } from '../foundation/deliverable-inbox-writer-capability.js';
 import { notifyOperatorWithReceiptSync } from '../surface/operator-notifications.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import type { AgendaReminderRecord } from './model.js';
 import {
   handoffInboxEntryId,

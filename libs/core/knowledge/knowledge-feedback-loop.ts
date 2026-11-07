@@ -51,7 +51,7 @@ import {
 } from './memory-promotion-queue.js';
 import type { TaskResultKnowledgeFeedback } from '../surface/channel-surface-types.js';
 import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
-import { physicalScopedPath } from '../physical-namespace.js';
+import { physicalScopedPath } from '../storage/physical-namespace.js';
 import {
   recordKnowledgeProblem,
   recordKnowledgeReuseObservation,

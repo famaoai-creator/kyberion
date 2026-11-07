@@ -15,19 +15,19 @@ export type {
 
 export { abortableAudioChunks } from './meeting/meeting-session-types.js';
 
-export * from './barge-in-controller.js';
+export * from './voice/barge-in-controller.js';
 
 export { StubAudioBus } from './voice/audio-bus.js';
 
 export type { AudioBus, AudioBusProbe } from './voice/audio-bus.js';
 
-export { BlackHoleAudioBus } from './blackhole-audio-bus.js';
+export { BlackHoleAudioBus } from './voice/blackhole-audio-bus.js';
 
-export type { BlackHoleBusOptions } from './blackhole-audio-bus.js';
+export type { BlackHoleBusOptions } from './voice/blackhole-audio-bus.js';
 
-export { PulseAudioBus } from './pulse-audio-bus.js';
+export { PulseAudioBus } from './voice/pulse-audio-bus.js';
 
-export type { PulseAudioBusOptions } from './pulse-audio-bus.js';
+export type { PulseAudioBusOptions } from './voice/pulse-audio-bus.js';
 
 export { resolveAudioBus } from './voice/audio-bus-resolver.js';
 
@@ -35,11 +35,11 @@ export type { AudioBusId } from './voice/audio-bus-resolver.js';
 
 export * from './voice/audio-route.js';
 
-export * from './bounded-audio-queue.js';
+export * from './voice/bounded-audio-queue.js';
 
-export * from './coreaudio-device-inventory.js';
+export * from './voice/coreaudio-device-inventory.js';
 
-export * from './coreaudio-output-bridge.js';
+export * from './voice/coreaudio-output-bridge.js';
 
 export * from './voice/audio-device-lease.js';
 
@@ -53,7 +53,7 @@ export type {
 } from './video/video-frame-bus.js';
 
 export * from './video/video-route.js';
-export * from './bounded-video-queue.js';
+export * from './video/bounded-video-queue.js';
 
 export * from './video/video-device-lease.js';
 
@@ -220,15 +220,6 @@ export type {
 } from './virtual/virtual-camera-injection-bridge.js';
 
 export {
-  V4L2_VIRTUAL_CAMERA_BRIDGE_ID,
-  V4L2_VIRTUAL_CAMERA_CAPABILITIES,
-  V4l2VirtualCameraOutputBridge,
-  installV4l2VirtualCameraOutputBridge,
-} from './v4l2-virtual-camera-output.js';
-
-export type { V4l2VirtualCameraOutputOptions } from './v4l2-virtual-camera-output.js';
-
-export {
   VIRTUAL_MEDIA_DEVICE_CONTROL_BRIDGE_ID,
   createVirtualMediaDeviceControlBridge,
 } from './virtual/virtual-media-device-control-bridge.js';
@@ -321,19 +312,6 @@ export {
 export * from './meeting/meeting-platform-registry.js';
 
 export {
-  installObsVirtualCameraOutputBridge,
-  OBS_VIRTUAL_CAMERA_BRIDGE_ID,
-  OBS_VIRTUAL_CAMERA_CAPABILITIES,
-  ObsVirtualCamera,
-  ObsVirtualCameraOutputBridge,
-} from './obs-virtual-camera-output.js';
-
-export type {
-  ObsVirtualCameraBridgeOptions,
-  ObsVirtualCameraOptions,
-} from './obs-virtual-camera-output.js';
-
-export {
   recordActionItem,
   updateActionItemStatus,
   appendReminder,
@@ -347,7 +325,7 @@ export {
   confirmActionItemBySpeaker,
   nextActionItemId,
   summarizeActionItemLifecycle,
-} from './action-item-store.js';
+} from './meeting/action-item-store.js';
 
 export type {
   ActionItem,
@@ -363,7 +341,7 @@ export type {
   ActionItemReviewState,
   ActionItemStatus,
   ActionItemLifecycleSummary,
-} from './action-item-store.js';
+} from './meeting/action-item-store.js';
 
 export type {
   DesignSpec,
@@ -373,7 +351,7 @@ export type {
   SaveTestPlanParams,
   TaskPlan,
   TestPlan,
-} from './sdlc-artifact-store.js';
+} from './mission/sdlc-artifact-store.js';
 
 export {
   signA2AContent,

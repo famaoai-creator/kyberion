@@ -1,14 +1,14 @@
-import { recognizeImageLocallyWithAppleVision } from '../../apple-intelligence-bridge.js';
+import { recognizeImageLocallyWithAppleVision } from '../../provider/apple-intelligence-bridge.js';
 import { isMacOS } from '../../platform-facts.js';
 import { pathResolver } from '../../path-resolver.js';
 import { assertSafeRepositoryPath, validateFileSize } from '../../secure-io.js';
-import { spawnManagedProcess } from '../../managed-process.js';
+import { spawnManagedProcess } from '../../tool/managed-process.js';
 import { parseSafeJsonObjectInput } from '../../foundation/safe-json.js';
 import { OcrRequest, OcrResult, OcrProvider } from '../../contracts/ocr-types.js';
 import {
   probeWindowsNativeImageRecognition,
   recognizeTextWithWindowsNativeApi,
-} from '../../windows-native-image-recognition-bridge.js';
+} from '../windows-native-image-recognition-bridge.js';
 import { resolveOcrImagePath, parseAppleVisionLines } from '../provider-support.js';
 
 export class WindowsNativeOcrProvider implements OcrProvider {
@@ -127,7 +127,9 @@ export class AppleVisionOcrProvider implements OcrProvider {
     // Retain the legacy Vision implementation for older hosts/toolchains and
     // helpers without the extended OCR contract; it remains on-device.
     validateFileSize(resolvedImagePath, 512);
-    const scriptPath = assertSafeRepositoryPath(pathResolver.resolve('libs/core/native-ocr.swift'));
+    const scriptPath = assertSafeRepositoryPath(
+      pathResolver.resolve('libs/core/ocr/native-ocr.swift')
+    );
 
     return new Promise((resolve, reject) => {
       const args = [scriptPath, resolvedImagePath];

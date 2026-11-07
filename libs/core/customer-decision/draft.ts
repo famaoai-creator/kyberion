@@ -24,7 +24,7 @@ import {
   reasoningEgressDenialNext,
   withReasoningPayloadScope,
 } from '../reasoning/reasoning-egress-scope.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import type { AgendaEntry, DecisionAgenda } from './model.js';
 
 const MAX_RATIONALE_CHARS = 500;

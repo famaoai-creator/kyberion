@@ -41,12 +41,12 @@ status: archived
 | #   | 実装                                                                               | 優先順位                                          | 既定     |
 | --- | ---------------------------------------------------------------------------------- | ------------------------------------------------- | -------- |
 | 1   | `resolveOperatorLocale()` `libs/core/surface/operator-identity.ts:30`              | `KYBERION_LOCALE` → identity の `language` → 引数 | **`ja`** |
-| 2   | `resolveVocabularyLocale()` `libs/core/ux-vocabulary.ts:97`                        | 引数のみ(呼び出し側が `process.env.LANG` を渡す)  | **`en`** |
+| 2   | `resolveVocabularyLocale()` `libs/core/localization/ux-vocabulary.ts:97`           | 引数のみ(呼び出し側が `process.env.LANG` を渡す)  | **`en`** |
 | 3   | `resolveLocale()` `scripts/cli.ts:171`                                             | `--locale` → `KYBERION_UI_LOCALE` → `LANG`        | **`en`** |
-| 4   | `resolveQuestionLocale()` `libs/core/question-resolver.ts:100`                     | `KYBERION_UI_LOCALE` → `LANG`                     | **`en`** |
+| 4   | `resolveQuestionLocale()` `libs/core/intent/question-resolver.ts:100`              | `KYBERION_UI_LOCALE` → `LANG`                     | **`en`** |
 | 5   | `normalizeChronosLocale()` + localStorage `chronos/src/lib/ux-vocabulary.ts:16,27` | 明示選択(localStorage)→ `navigator.language`      | catalog  |
 
-- **環境変数が3つ**: `KYBERION_LOCALE`(#1)/ `KYBERION_UI_LOCALE`(#3#4)/ `LANG`(#2#3#4)。加えて音声だけ別系統 `KYBERION_VOICE_LANGUAGE`(`libs/core/python-voice-bridge.ts:128`、既定 `ja`)。
+- **環境変数が3つ**: `KYBERION_LOCALE`(#1)/ `KYBERION_UI_LOCALE`(#3#4)/ `LANG`(#2#3#4)。加えて音声だけ別系統 `KYBERION_VOICE_LANGUAGE`(`libs/core/voice/python-voice-bridge.ts:128`、既定 `ja`)。
 - **既定が `ja` と `en` に割れている**ため、同一プロセス内でも経路によって出力言語が変わりうる。
 - `scripts/intent.ts:114,194,395` は `process.env.LANG` を直接読んで #2 に渡しており、**#1 の identity 設定を無視する**。
 
@@ -90,11 +90,11 @@ status: archived
 
 ### 2.6 LLM 生成応答の言語 — 3方式が並存
 
-| 方式                         | 実装                                                           |
-| ---------------------------- | -------------------------------------------------------------- |
-| 「ユーザーの言語で返す」指示 | `satellites/slack-bridge/src/index.ts:585`                     |
-| 日本語を文言ごと埋め込み     | `libs/core/customer-conversation.ts:127`(`確認して回答します`) |
-| 日本語固定のテンプレート応答 | `chronos/src/app/api/agent/route.ts:418,515,668,724,765,811`   |
+| 方式                         | 実装                                                                        |
+| ---------------------------- | --------------------------------------------------------------------------- |
+| 「ユーザーの言語で返す」指示 | `satellites/slack-bridge/src/index.ts:585`                                  |
+| 日本語を文言ごと埋め込み     | `libs/core/organization/customer-conversation.ts:127`(`確認して回答します`) |
+| 日本語固定のテンプレート応答 | `chronos/src/app/api/agent/route.ts:418,515,668,724,765,811`                |
 
 `structured-output-contracts.ts:109` に `user_language` フィールドが、`surface-runtime-orchestrator.ts:1923,2044` に `Derived language` の導出があるが、**生成側への注入が統一されていない**。
 
@@ -136,7 +136,7 @@ status: archived
 
 **タスク**
 
-1. `libs/core/locale.ts` を新設し、以下を単一実装として export する。
+1. `libs/core/localization/locale.ts` を新設し、以下を単一実装として export する。
    - `type SupportedLocale`(I18N-02 でカタログ由来に置換するまでは暫定 union)
    - `resolveLocale(ctx?: { explicit?; surfacePreference?; identityPath? }): SupportedLocale`
    - 優先順位を**1つに固定**: 明示指定(`--locale` / API 引数)→ 表面固有の永続設定(chronos localStorage)→ onboarding identity の `language` → `KYBERION_LOCALE` → OS/ブラウザ(`LANG` / `navigator.language`)→ カタログの `default_locale`
@@ -205,7 +205,7 @@ status: archived
 
 **対象範囲の正本**: 移行対象は推測ではなく **I18N-03 の baseline が正確に列挙している** — `knowledge/product/governance/i18n-baseline.json`(2026-07-26 時点で 100 ファイル / 1,056 件)。移行が進むたび `--update-baseline` で締め直すため、**baseline の残件数がそのまま I18N-04 の進捗**になる。
 
-**I18N-05 からの繰り越し(順3 chronos に含める)**: chronos の `'use client'` 群は `libs/core/format.ts` が module scope で secure-io を引くためブラウザバンドルに載せられず、解決済みロケールを `toLocaleString` に明示引数として渡す形に留めてある(環境依存という本質的な問題は解消済み)。**`locale-normalize.ts` と同型に `format.ts` の純粋 Intl 部分を import ゼロのモジュールへ分離**すれば共有 formatter に載る。chronos を触る順3 で同時に行うこと(単独で先行実装しても消費者がいない)。
+**I18N-05 からの繰り越し(順3 chronos に含める)**: chronos の `'use client'` 群は `libs/core/localization/format.ts` が module scope で secure-io を引くためブラウザバンドルに載せられず、解決済みロケールを `toLocaleString` に明示引数として渡す形に留めてある(環境依存という本質的な問題は解消済み)。**`locale-normalize.ts` と同型に `format.ts` の純粋 Intl 部分を import ゼロのモジュールへ分離**すれば共有 formatter に載る。chronos を触る順3 で同時に行うこと(単独で先行実装しても消費者がいない)。
 
 ---
 
@@ -215,7 +215,7 @@ status: archived
 
 **タスク**
 
-1. `libs/core/format.ts` に集約: `formatDateTime(value, { locale, timeZone, style })` / `formatNumber` / `formatCurrency` / `formatRelativeTime`。locale・timeZone は**必須引数**とし、暗黙の環境依存を型で禁止する。
+1. `libs/core/localization/format.ts` に集約: `formatDateTime(value, { locale, timeZone, style })` / `formatNumber` / `formatCurrency` / `formatRelativeTime`。locale・timeZone は**必須引数**とし、暗黙の環境依存を型で禁止する。
 2. timeZone の解決を `resolveLocale()` と同じ経路に載せる(identity → `KYBERION_TIMEZONE` → 既定 `Asia/Tokyo`)。テストでは固定注入する。
 3. 引数なし `toLocaleString()` 32箇所を置換(最大は `chronos/src/components/MissionIntelligence.tsx` の15箇所)。
 4. `'ja-JP'` 直書き 102箇所を置換。**成果物系を優先**: `native-pptx-engine/builders.ts`(7箇所)、`native-xlsx-engine/drawing.ts`(3箇所)は生成ドキュメントの書式に直結する。
@@ -231,8 +231,8 @@ status: archived
 
 **タスク**
 
-1. 「**生成文の言語 = 解決済み operator locale**」を単一のプロンプト断片(`libs/core/working-principles.ts` 経由の worker prompt 注入と同じ経路)として実装する。`slack-bridge:585` の方式を正本に採用。
-2. `libs/core/customer-conversation.ts:127` の日本語埋め込み(`確認して回答します`)を撤去し、**マーカーは言語非依存**(`ESCALATION_MARKER`)に、文言はロケール解決に委ねる。
+1. 「**生成文の言語 = 解決済み operator locale**」を単一のプロンプト断片(`libs/core/workforce/working-principles.ts` 経由の worker prompt 注入と同じ経路)として実装する。`slack-bridge:585` の方式を正本に採用。
+2. `libs/core/organization/customer-conversation.ts:127` の日本語埋め込み(`確認して回答します`)を撤去し、**マーカーは言語非依存**(`ESCALATION_MARKER`)に、文言はロケール解決に委ねる。
 3. `chronos/src/app/api/agent/route.ts` の日本語固定テンプレート応答6箇所(`:418,515,668,724,765,811`)を I18N-02 の `t()` へ移行(I18N-04 順3 と同一コミットで可)。
 4. `structured-output-contracts.ts:109` の `user_language` と `surface-runtime-orchestrator.ts:1923,2044` の `Derived language` 導出を `resolveLocale()` の結果と突合し、**乖離したら warn** を出す(ユーザーが英語で書いたのに identity が ja、等の検知)。
 5. 音声: STT/TTS の言語(`python-voice-bridge.ts:128`、`in-room-minutes-recorder.ts:139`、`speech-to-text-bridge.ts`)を同じ解決結果に接続する。

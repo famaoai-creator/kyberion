@@ -9,7 +9,7 @@ last_updated: 2026-11-01
 **Purpose**: capture _how_ a frontier model (Fable-class) actually works — the
 habits that make its output reliable — as mechanical rules that fast/small
 models can follow without frontier-level judgment. Runtime injection lives in
-`libs/core/working-principles.ts`; this document is the full version with
+`libs/core/workforce/working-principles.ts`; this document is the full version with
 rationale and anti-patterns.
 
 **Audience**: every worker agent (any model tier), prompt authors, and
@@ -261,7 +261,7 @@ produced, with a long comment justifying the workaround.
 ## How this is delivered to agents
 
 1. **Runtime injection** — `buildWorkingPrinciplesLines(teamRole)` from
-   `libs/core/working-principles.ts` is included in every worker prompt
+   `libs/core/workforce/working-principles.ts` is included in every worker prompt
    (mission task execution, work-item dispatch, independent review). Compact
    mode injects the top-6 core rules + role addendum.
 2. **This document** — the full rationale, read during onboarding and by

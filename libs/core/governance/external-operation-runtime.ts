@@ -8,7 +8,7 @@ import { charterInputForDecision } from './charter-call-site.js';
 import { currentExternalOperationOccurrence } from './external-operation-occurrence.js';
 import { writeScopedArtifact } from '../workforce/artifact-store.js';
 import { redactSensitiveValue } from '../network.js';
-import { agentActor } from '../actor.js';
+import { agentActor } from '../contracts/actor.js';
 import { inspectInstalledOnboardingRuntime } from '../organization/onboarding-runtime-identity.js';
 import { withInstalledPersonCharterRuntime } from './person-charter-runtime.js';
 export { withInstalledPersonCharterRuntime } from './person-charter-runtime.js';

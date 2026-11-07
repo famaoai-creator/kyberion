@@ -6,7 +6,7 @@
   "description": "Refreshes the public zero-LLM history index from public A2A, mission, channel, and non-mission trace sources.",
   "_refs": {
     "plan": "docs/developer/improvement-plans-2026-07/HERMES_AGENT_ADOPTION_PLAN_2026-07-18.ja.md",
-    "implementation": "libs/core/history-search-index.ts"
+    "implementation": "libs/core/search/history-search-index.ts"
   },
   "schedule": {
     "id": "history-search-refresh-quarter-hourly",

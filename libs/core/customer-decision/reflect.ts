@@ -11,7 +11,7 @@ import { defineCatalog, type GovernedCatalog } from '../foundation/governed-cata
 import { readJsonIfPresent, writeJson } from '../foundation/json.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeMkdir } from '../secure-io.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { agendaContentHash } from './hash.js';
 import {
   AGENDA_ID_PATTERN,
