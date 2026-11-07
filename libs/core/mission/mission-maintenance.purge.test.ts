@@ -92,6 +92,14 @@ describe('purgeMissions (AL-01)', () => {
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.MISSION_ROLE = 'mission_controller';
+    const governance = path.join(tmpRoot, 'knowledge/product/governance');
+    fs.mkdirSync(governance, { recursive: true });
+    for (const policy of ['security-policy.json', 'agent-policies.yaml']) {
+      fs.copyFileSync(
+        path.join(REPO_ROOT, 'knowledge/product/governance', policy),
+        path.join(governance, policy)
+      );
+    }
 
     // mission-state.ts compiles this schema at import time — seed the real one.
     fs.mkdirSync(path.join(tmpRoot, 'schemas'), { recursive: true });

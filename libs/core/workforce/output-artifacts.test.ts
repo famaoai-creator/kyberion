@@ -22,6 +22,10 @@ function seedPolicyFile(root: string): void {
   const target = path.join(root, 'knowledge', 'product', 'governance', 'agent-policies.yaml');
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(path.join(REPO_ROOT, 'knowledge/product/governance/agent-policies.yaml'), target);
+  fs.copyFileSync(
+    path.join(REPO_ROOT, 'knowledge/product/governance/security-policy.json'),
+    path.join(path.dirname(target), 'security-policy.json')
+  );
 }
 
 /** writeScopedArtifact validates index rows against the governed catalog schema. */

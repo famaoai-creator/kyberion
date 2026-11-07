@@ -254,32 +254,47 @@ describe('request-bound first-job status with real governed stores', { timeout: 
     expect(stderr).toEqual([]);
     expect(snapshot()).toEqual(before);
   });
-  it('rejects missing or forged attempts and contradictory same-item results before success', async () => {
+  // Each case exercises the real stores and the complete read-only oracle;
+  // independent cases avoid accumulating several full-root snapshots per test.
+  it.each([
+    'missing-attempt',
+    'forged-current-attempt',
+    'forged-run',
+    'foreign-project',
+    'invalid-version',
+    'foreign-dot',
+    'contradictory-turn',
+  ] as const)('rejects inconsistent successful work: %s', async (scenario) => {
     const fixture = await pending();
     decide(fixture);
     await api.tickFirstJob(tenant);
     const item = work.listWorkItems()[0];
     const itemFile = 'active/shared/runtime/work-coordination/items.jsonl';
     const savedItems = String(safeReadFile(path.join(root, itemFile)));
-    for (const patch of [
-      { attempts: [], current_attempt_id: undefined },
-      { current_attempt_id: 'forged-attempt' },
-      { attempts: [{ ...item.attempts![0], run_id: 'forged-attempt' }] },
-      { context: { ...item.context, project_id: 'foreign-project' } },
-      { version: -1 },
-    ]) {
+    const patches = {
+      'missing-attempt': { attempts: [], current_attempt_id: undefined },
+      'forged-current-attempt': { current_attempt_id: 'forged-attempt' },
+      'forged-run': { attempts: [{ ...item.attempts![0], run_id: 'forged-attempt' }] },
+      'foreign-project': { context: { ...item.context, project_id: 'foreign-project' } },
+      'invalid-version': { version: -1 },
+    };
+    if (scenario in patches) {
+      const patch = patches[scenario as keyof typeof patches];
       put(itemFile, savedItems + JSON.stringify({ ...item, ...patch }) + '\n');
       expect((await read()).status).toBe('uncertain');
+      return;
     }
-    put(itemFile, savedItems);
-    const charter = charters.findDotCharter(fixture.configured.dot_id)!.charter;
-    const { dotStatePath, DOT_WORK_RESULTS_FILE } = await import('@agent/core/dot/dot-state-paths');
-    const resultFile = dotStatePath(charter, DOT_WORK_RESULTS_FILE);
-    const savedResults = String(safeReadFile(path.join(root, resultFile)));
-    const row = results.readDotWorkResults(charter).at(-1)!;
-    put(resultFile, savedResults + JSON.stringify({ ...row, dot_id: 'foreign-dot' }) + '\n');
-    expect((await read()).status).toBe('uncertain');
-    put(resultFile, savedResults);
+    if (scenario === 'foreign-dot') {
+      const charter = charters.findDotCharter(fixture.configured.dot_id)!.charter;
+      const { dotStatePath, DOT_WORK_RESULTS_FILE } =
+        await import('@agent/core/dot/dot-state-paths');
+      const resultFile = dotStatePath(charter, DOT_WORK_RESULTS_FILE);
+      const savedResults = String(safeReadFile(path.join(root, resultFile)));
+      const row = results.readDotWorkResults(charter).at(-1)!;
+      put(resultFile, savedResults + JSON.stringify({ ...row, dot_id: 'foreign-dot' }) + '\n');
+      expect((await read()).status).toBe('uncertain');
+      return;
+    }
     const projected = store.readFrontDeskConversationRequestWork;
     vi.spyOn(store, 'readFrontDeskConversationRequestWork').mockImplementationOnce((...args) => {
       const value = projected(...args);
@@ -288,12 +303,21 @@ describe('request-bound first-job status with real governed stores', { timeout: 
     });
     expect((await read()).status).toBe('uncertain');
   });
-  it('reports queued/running only with exact current attempt and live lease ownership', async () => {
+  it.each([
+    ['queued', 'queued'],
+    ['live-owner', 'running'],
+    ['foreign-owner', 'uncertain'],
+    ['duplicate-live-lease', 'uncertain'],
+    ['expired-lease', 'uncertain'],
+  ] as const)('projects work with %s as %s', async (scenario, expected) => {
     const fixture = await pending();
     decide(fixture);
     vi.spyOn(executor, 'runDotExecutorStep').mockResolvedValueOnce([]);
     await api.tickFirstJob(tenant);
-    expect((await read()).status).toBe('queued');
+    if (scenario === 'queued') {
+      expect((await read()).status).toBe(expected);
+      return;
+    }
     const item = work.listWorkItems()[0];
     work.claimWorkItem({
       itemId: item.item_id,
@@ -302,17 +326,21 @@ describe('request-bound first-job status with real governed stores', { timeout: 
       purpose: 'status fixture',
       ttlMs: 60_000,
     });
-    expect((await read()).status).toBe('running');
     const leasesFile = 'active/shared/runtime/work-coordination/leases.jsonl';
     const saved = String(safeReadFile(path.join(root, leasesFile)));
     const lease = work.listActiveWorkLeases()[0];
-    put(leasesFile, saved + JSON.stringify({ ...lease, holder_peer_id: 'foreign-worker' }) + '\n');
-    expect((await read()).status).toBe('uncertain');
-    put(leasesFile, saved + JSON.stringify({ ...lease, lease_id: 'duplicate-live-lease' }) + '\n');
-    expect((await read()).status).toBe('uncertain');
-    put(leasesFile, saved);
-    vi.setSystemTime(new Date(Date.now() + 61_000));
-    expect((await read()).status).toBe('uncertain');
+    if (scenario === 'foreign-owner')
+      put(
+        leasesFile,
+        saved + JSON.stringify({ ...lease, holder_peer_id: 'foreign-worker' }) + '\n'
+      );
+    if (scenario === 'duplicate-live-lease')
+      put(
+        leasesFile,
+        saved + JSON.stringify({ ...lease, lease_id: 'duplicate-live-lease' }) + '\n'
+      );
+    if (scenario === 'expired-lease') vi.setSystemTime(new Date(Date.now() + 61_000));
+    expect((await read()).status).toBe(expected);
   });
   it('refuses opt-in role tracing before assumptions or trace-file creation', async () => {
     configure();

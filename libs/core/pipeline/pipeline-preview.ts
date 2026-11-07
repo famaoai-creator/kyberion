@@ -156,6 +156,40 @@ function countChildren(ps: PreviewStep): number {
   return total;
 }
 
+/**
+ * Scan nonempty template bodies without rescanning an unterminated suffix
+ * from every opening pair. A body may contain opening braces and newlines,
+ * but its first closing brace must be followed by another closing brace.
+ */
+function replacePreviewTemplates(
+  input: string,
+  replacer: (match: string, key: string) => string
+): string {
+  const chunks: string[] = [];
+  let cursor = 0;
+  let searchFrom = 0;
+  while (searchFrom < input.length) {
+    const start = input.indexOf('{{', searchFrom);
+    if (start < 0) break;
+    const close = input.indexOf('}', start + 2);
+    if (close < 0) break;
+    if (close === start + 2 || input[close + 1] !== '}') {
+      // No opening pair before this first closing brace can form a token.
+      searchFrom = close + 1;
+      continue;
+    }
+    const end = close + 2;
+    chunks.push(
+      input.slice(cursor, start),
+      replacer(input.slice(start, end), input.slice(start + 2, close))
+    );
+    cursor = end;
+    searchFrom = end;
+  }
+  chunks.push(input.slice(cursor));
+  return chunks.join('');
+}
+
 function previewStep(step: any, index: number, ctx: Record<string, any>): PreviewStep {
   const ps: PreviewStep = {
     index,
@@ -192,18 +226,18 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
 
   // Check for unresolved template variables
   const paramStr = JSON.stringify(step.params || {});
-  const unresolvedVars = paramStr.match(/\{\{([^}]+)\}\}/g) || [];
-  for (const v of unresolvedVars) {
+  replacePreviewTemplates(paramStr, (v) => {
     const varName = v.replace(/[{}]/g, '').trim().split('.')[0];
     if (!(varName in ctx)) {
       ps.warnings.push(`Unresolved variable: ${v}`);
     }
-  }
+    return v;
+  });
 
   // Resolve what we can
   try {
     ps.resolvedParams = parseSafeJsonInput(
-      paramStr.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
+      replacePreviewTemplates(paramStr, (_, key) => {
         const parts = key.trim().split('.');
         let val: any = ctx;
         for (const p of parts) val = val?.[p];
@@ -217,7 +251,7 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
 
   // Check ref paths
   if (step.op === 'ref' && step.params?.path) {
-    const refPathRaw = String(step.params.path).replace(/\{\{[^}]+\}\}/g, '_');
+    const refPathRaw = replacePreviewTemplates(String(step.params.path), () => '_');
     try {
       const refPath = pathResolver.rootResolve(refPathRaw);
       assertPipelinePreviewResourcePath(refPath);
