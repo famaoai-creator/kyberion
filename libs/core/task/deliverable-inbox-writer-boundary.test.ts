@@ -200,7 +200,7 @@ describe('deliverable_inbox_writer on the real tier guard', () => {
     // G3: the path rule is a security-policy `narrow` declaration, evaluated by
     // foundation/role-narrowing-denial.ts. Assert the declaration through the
     // generic evaluator on the policy fixture copied under ROOT.
-    const narrowing = await import('./foundation/role-narrowing-denial.js');
+    const narrowing = await import('../foundation/role-narrowing-denial.js');
     const policy = JSON.parse(
       String(
         initialContext('ecosystem_architect', () =>
