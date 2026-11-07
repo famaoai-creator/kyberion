@@ -1,4 +1,4 @@
-import { cliProviderEnv, registerCliProviderBundle } from '../../cli-provider-bundle.js';
+import { cliProviderEnv, registerCliProviderBundle } from '../cli-provider-bundle.js';
 import {
   buildClaudeCliOptionsFromEnv,
   buildShellClaudeCliBackendFromEnv,

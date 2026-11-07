@@ -64,7 +64,7 @@ status: active
 - **役割**: オンボーディング後の実行が、正しい customer overlay、tenant scope、organization operating model を使うようにする。
 - **アクション**: `pnpm onboarding:context bind --customer-slug <customer> --tenant-slug <tenant> --dry-run` で書き込み範囲を確認し、承認後に `--apply` する。
 - **UX**: `onboarding:context show --json` が返す `customer_slug`、`tenant_slug`、`organization_id`、tier、owner、first-work link を context card の入力として表示する。未解決または不一致の場合は実行を止める。各 surface のカード表示はこの stable JSON を投影し、表示文言を判定ロジックへ埋め込まない。
-- **成果物**: `customer/{slug}/onboarding/organization-context.json` と tenant-scoped organization state。
+- **成果物**: `knowledge/personal/stances/{slug}/onboarding/organization-context.json` と tenant-scoped organization state。
 
 binding は activation ではない。最初の仕事の apply 前に、[オンボーディング標準フロー](./onboarding-flow.md) の tenant activation gate（viewer scope、NHI、service readiness、isolation probe、人間の受け入れ）を通過させる。
 

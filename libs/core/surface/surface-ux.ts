@@ -19,7 +19,7 @@ import {
 } from './surface-coordination-store.js';
 import { listSurfaceProviderManifests } from './surface-provider-manifest.js';
 import { buildNextAction } from '../next-action.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import { t } from '../t.js';
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 

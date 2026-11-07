@@ -16,7 +16,7 @@ import {
   indexMedia,
   type SemanticEmbeddingProvider,
   type SemanticIndexOptions,
-} from '@agent/core/perception/semantic-index';
+} from '@agent/shared-perception/semantic-index';
 import {
   dropDuplicateFrames,
   parseFfprobeMetadata,

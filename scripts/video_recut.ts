@@ -3,7 +3,11 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { parseSafeJsonObjectInput } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeReadFile, safeRealpath } from '@agent/core/secure-io';
-import { parseVideoRecutRequest, prepareVideoRecut, renderVideoRecut } from '@agent/core/video';
+import {
+  parseVideoRecutRequest,
+  prepareVideoRecut,
+  renderVideoRecut,
+} from '@agent/shared-video/video-recut';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 /** Prepare existing footage and supplied VTT; rendering is an explicit opt-in. */

@@ -45,7 +45,7 @@ tenant_slug → organization_id → project_id → mission_id → task_id → se
 | Identity       | `AgentIdentity.affiliation.tenant_slug`                     | NHI の tenant affiliation と実行 request の tenant は一致させる                                |
 | Process        | runtime / surface の lifecycle manifest                     | process の owner・health・shutdown と、データの tenant scope を混同しない                      |
 | Viewer         | server-side `ViewerContext`                                 | client の tenant パラメータは認可にならず、許可集合を狭めるだけ                                |
-| Stance         | `customer/{slug}` / `KYBERION_CUSTOMER`                     | stance は acting-as overlay であり、containment chain の一部ではない                           |
+| Stance         | `knowledge/personal/stances/{slug}` / `KYBERION_STANCE`     | stance は acting-as overlay であり、containment chain の一部ではない                           |
 
 ## 3. 現在の実装調査
 
@@ -56,7 +56,7 @@ tenant_slug → organization_id → project_id → mission_id → task_id → se
 - `libs/core/scope-context.ts` が `tenant_slug`、organization / project / mission / task / session、tier、NHI、viewer principal を一つの context として検証できる。
 - `libs/core/event-scope.ts` が `system` から `session` までの scope kind、authority との lineage 一致、tenant viewer の fail-closed filter を提供している。
 - `knowledge/product/architecture/entity-scope-hierarchy.md` は storage、authorization、artifact、identity、event / ledger の containment chain を同じ順序で説明している。
-- `customer/{slug}` を tenant とみなさない方針、tier 名を tenant とみなさない検証、tenant registry の active 判定は整備されている。
+- `knowledge/personal/stances/{slug}` を tenant とみなさない方針、tier 名を tenant とみなさない検証、tenant registry の active 判定は整備されている。
 
 **不足していること**
 
@@ -531,7 +531,7 @@ egress、cross-tenant binding、global policy は高リスク変更として hum
 | surface / channel binding | Slack workspace、MCP grant、review port             | service owner + tenant owner             |
 | personal                  | user preference、voice、local review UI             | 本人。ただし external effect は別 gate   |
 
-`customer/{slug}` は stance の変更であり、tenant scope の変更とは別の change kind にする。
+`knowledge/personal/stances/{slug}` は stance の変更であり、tenant scope の変更とは別の change kind にする。
 tenant、organization、surface binding を一度に変更する onboarding でも、contained scope
 ごとの diff と probe を持つ一つの parent change に分解して、部分成功を曖昧にしない。
 

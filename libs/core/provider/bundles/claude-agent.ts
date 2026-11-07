@@ -2,7 +2,7 @@ import {
   cliProviderEnv,
   cliProviderEnvText,
   registerCliProviderBundle,
-} from '../../cli-provider-bundle.js';
+} from '../cli-provider-bundle.js';
 import { isInsideProviderHarness } from '../../agent-execution-context.js';
 import { maybeWrapWithDispatcher } from '../../agent/agent-dispatch.js';
 import { ClaudeAgentIntentExtractor } from '../claude-agent-intent-extractor.js';

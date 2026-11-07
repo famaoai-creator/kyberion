@@ -8,7 +8,10 @@ const issuers = new Set([
   'libs/core/foundation/dot-result-store-capability.ts',
   'libs/core/dot/dot-result-store.ts',
 ]);
-const predicates = new Set(['libs/core/authority.ts', 'libs/core/tier-guard.ts']);
+// G2: the grant alone authorizes DOT result I/O, so authority.ts and tier-guard.ts no longer
+// import it. G3: the module registers its authority rule with the store grant registry, so no
+// predicate consumer imports it (the tier-guard store-grant table is gone).
+const predicates = new Set<string>();
 const originImplementation = 'libs/core/dot/dot-result-origin.ts';
 const originValues = new Map([
   ['mintDotResultOutcomePermit', 'libs/core/dot/dot-executor.ts'],
@@ -284,12 +287,14 @@ describe('DOT result capability trusted import boundary', () => {
           'plugins/foreign.mjs',
         ])
           expect(violations(consumer, text).length, text).toBeGreaterThan(0);
-      expect(
-        violations(
-          'libs/core/authority.ts',
-          `import {isDotResultStoreCapability,DOT_RESULT_STORE_ROLE} from '${target}';`
-        )
-      ).toEqual([]);
+      for (const former of [
+        'libs/core/authority.ts',
+        'libs/core/tier-guard.ts',
+        'libs/core/tier-guard-store-grants.ts',
+      ])
+        expect(
+          violations(former, `import {isDotResultStoreCapability} from '${target}';`).length
+        ).toBeGreaterThan(0);
       expect(
         violations(
           'libs/core/dot/dot-result-store.ts',

@@ -11,7 +11,7 @@ import {
 import { resolveIdentityContext, withExecutionContextAsync } from '@agent/core/authority';
 import { nowIso } from '@agent/core/foundation/time';
 import { parseSafeJsonObjectInput } from '@agent/core/foundation/safe-json';
-import { TraceContext, finalizeAndPersist } from '@agent/core/trace';
+import { TraceContext, finalizeAndPersist } from '@agent/core/analysis/trace';
 import { logger } from '@agent/core/core';
 import { findMissionPath, missionEvidenceDir, pathResolver } from '@agent/core/path-resolver';
 import { pipelineBootstrapNeeds } from '@agent/core/reasoning/pipeline-bootstrap-needs';
@@ -209,7 +209,7 @@ async function recordPipelineFeedback(
   status: 'succeeded' | 'failed',
   trace: unknown
 ): Promise<void> {
-  const { runFeedbackLoop } = await import('@agent/core/feedback-loop');
+  const { runFeedbackLoop } = await import('@agent/core/knowledge/feedback-loop');
   runFeedbackLoop(pipelineId, status, trace as Parameters<typeof runFeedbackLoop>[2]);
 }
 
@@ -460,7 +460,7 @@ async function executePipelineFileOnce(
   const effectivePayloadScope: ReasoningPayloadScope = withPipelineTrainingUse(
     options.payloadScope || {
       tier: payloadTier,
-      tenant_slug: registeredEnv('KYBERION_CUSTOMER')?.trim() || undefined,
+      tenant_slug: registeredEnv('KYBERION_STANCE')?.trim() || undefined,
       purpose: `pipeline ${pipelineId}`,
     }
   );
@@ -1172,7 +1172,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
     const inferredScope: Record<string, unknown> = {
       tiers: ['public', autoContext.mission_tier],
     };
-    const customer = registeredEnv('KYBERION_CUSTOMER')?.trim();
+    const customer = registeredEnv('KYBERION_STANCE')?.trim();
     if (customer) inferredScope.customerId = customer;
     autoContext._knowledge_scope = inferredScope;
   }
@@ -1318,7 +1318,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
           ).withReasoningPayloadScope(
             {
               tier: payloadTier,
-              tenant_slug: registeredEnv('KYBERION_CUSTOMER')?.trim() || undefined,
+              tenant_slug: registeredEnv('KYBERION_STANCE')?.trim() || undefined,
               purpose: `pipeline ${pipelineId}`,
               training_use: pipelinePayloadTrainingUse(payloadTier),
             },

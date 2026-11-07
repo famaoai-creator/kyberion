@@ -67,11 +67,11 @@ import {
   listApprovalRequests,
   loadApprovalRequest,
 } from '@agent/core/governance/approval-store';
-import { formatWireError } from '@agent/core/wire-error';
+import { formatWireError } from '@agent/core/contracts/wire-error';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { buildKnowledgeIndex, queryKnowledge } from '@agent/core/knowledge-index';
-import { recordHumanKnowledgeFeedback } from '@agent/core/knowledge-feedback-loop';
+import { recordHumanKnowledgeFeedback } from '@agent/core/knowledge/knowledge-feedback-loop';
 import { executeServicePreset } from '@agent/core/service/service-engine';
 import { deliverToCowork, listCoworkOutbox } from '@agent/core/cowork-surface.js';
 import {

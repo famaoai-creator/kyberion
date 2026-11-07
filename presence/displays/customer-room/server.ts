@@ -20,7 +20,7 @@ import { getRegisteredEnvText } from '@agent/core/foundation';
 import { loadVocabularyCatalog } from '@agent/core/knowledge/vocabulary-catalog';
 import { pathResolver } from '@agent/core/path-resolver';
 import { installProcessGuards } from '@agent/core/process-guards';
-import { parseTrustedProxies, type TrustedProxies } from '@agent/core/rate-limit';
+import { parseTrustedProxies, type TrustedProxies } from '@agent/core/foundation/rate-limit';
 import { safeReadFile } from '@agent/core/secure-io';
 import { createFacadeSpawner } from './src/server/facade.js';
 import { buildBundles, renderCustomerRoomPage } from './src/server/page.js';

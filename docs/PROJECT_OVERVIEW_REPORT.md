@@ -144,7 +144,7 @@ agent / approval / artifact / blockchain / browser / calendar / code / daemon / 
 - **ADF パイプライン形式** — 宣言的・スキーマ検証済み・サブパイプライン合成可能、`on_error` リカバリ付き
 - **ミッション・ライフサイクル** — 各作業が独自 Git リポジトリ・状態・証跡を持つ
 - **3層知識隔離** — ファイル I/O 境界で強制
-- **顧客アグリゲーション** — `customer/{slug}/` オーバーレイで fork 不要のカスタマイズ
+- **顧客アグリゲーション** — `knowledge/personal/stances/{slug}/` オーバーレイで fork 不要のカスタマイズ
 - **Trace + 監査** — OTel 風の構造化トレースと追記専用監査チェーン
 
 ---

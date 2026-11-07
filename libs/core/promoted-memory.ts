@@ -16,7 +16,7 @@ export type {
   PromotedKnowledgeHintRecord,
   PromotedReportTemplateRecord,
 } from './promoted-memory-builder.js';
-import { withLockSync } from './lock-utils.js';
+import { withLockSync } from './foundation/lock-utils.js';
 import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';

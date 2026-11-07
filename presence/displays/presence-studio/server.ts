@@ -9,7 +9,7 @@ import * as presenceStudioData from './presence-studio-runtime-data.js';
 // `installReasoningBackends()` itself honors `KYBERION_REASONING_BACKEND=stub`.
 import { appendJsonLine, nowIso, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
-import { localeToBcp47, normalizeLocale } from '@agent/core/locale-normalize';
+import { localeToBcp47, normalizeLocale } from '@agent/core/foundation/locale-normalize';
 import { resolveLocale } from '@agent/core/locale';
 import {
   ensureOwnerMember,
@@ -25,7 +25,7 @@ import {
   createBrowserConversationSession,
   listBrowserConversationSessions,
   saveBrowserConversationSession,
-} from '@agent/core/browser/browser-conversation-session';
+} from '@agent/shared-vision/browser-conversation-session';
 import { listArtifactRecords } from '@agent/core/workforce/artifact-record';
 import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import { installReasoningBackendsForService } from '@agent/core/reasoning/reasoning-bootstrap';
@@ -49,7 +49,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import {
   getVoiceSelectionSnapshot,
   saveVoiceSelectionPreferences,
-} from '@agent/core/voice/voice-selection-preferences';
+} from '@agent/shared-voice/voice-selection-preferences';
 import { safeMkdir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { randomUUID } from 'node:crypto';
 import {

@@ -14,15 +14,17 @@
  */
 import {
   assertApprovalUsable,
-  computeApprovalPayloadHash,
-  createApprovalRequest,
   evaluateApprovalUsability,
-  isApprovalRequestExpired,
   isSeparationOfDutiesEnabled,
+} from '../governance/approval-separation-of-duties.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
+import { createApprovalRequest } from '../governance/approval-request-create.js';
+import {
+  isApprovalRequestExpired,
   listApprovalRequests,
   loadApprovalRequest,
-  type ApprovalRequestRecord,
-} from '../governance/approval-store.js';
+} from '../governance/approval-store-reader.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import { serviceRecordingContentHash, type ServiceRecording } from './service-recording.js';
 import { markApprovalConsumed } from '../governance/approval-revocation.js';
 import {

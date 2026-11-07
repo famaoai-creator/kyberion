@@ -4,12 +4,9 @@ import { resolveRole, withExecutionContext } from '../authority.js';
 import {
   currentPrPublicationScope,
   withPrPublicationStoreAccess,
-  PR_PUBLICATION_STORE_ROLE,
 } from './pr-publication-runtime.js';
-import {
-  currentInstalledPersonCharterRuntime,
-  withPersonCharterStoreAccess,
-} from './person-charter-runtime.js';
+import { currentInstalledPersonCharterRuntime } from './person-charter-runtime.js';
+import { withPersonCharterRegistryAccess } from './person-charter-store-access.js';
 /**
  * Accountability charter — persistence, acceptance and the consumption ledger.
  *
@@ -118,7 +115,7 @@ function scopedCharterIo<T>(
       'charter-ledger-write',
       files.map(relative),
       writes.map(relative),
-      () => withExecutionContext(PR_PUBLICATION_STORE_ROLE, action, 'worker', scope.tenant_slug)
+      action
     );
   }
   if (
@@ -129,20 +126,11 @@ function scopedCharterIo<T>(
       (scope.kind === 'organization' && publication.tenant_slug === scope.tenant_slug))
   ) {
     const relative = files.map((file) => pathResolver.storeRelativePath(file));
-    return withPrPublicationStoreAccess('charter-read', relative, [], () =>
-      withExecutionContext(
-        PR_PUBLICATION_STORE_ROLE,
-        action,
-        'worker',
-        scope.kind === 'organization' ? scope.tenant_slug : undefined
-      )
-    );
+    return withPrPublicationStoreAccess('charter-read', relative, [], action);
   }
   if (scope.kind === 'person' && currentInstalledPersonCharterRuntime()) {
     const relative = (file: string) => pathResolver.storeRelativePath(file);
-    return withPersonCharterStoreAccess(files.map(relative), writes.map(relative), () =>
-      withExecutionContext('person_charter_store', action, 'worker')
-    );
+    return withPersonCharterRegistryAccess(files.map(relative), writes.map(relative), action);
   }
   if (scope.kind !== 'organization' || !identity?.tenantSlug) return action();
   if (identity.tenantSlug !== scope.tenant_slug)

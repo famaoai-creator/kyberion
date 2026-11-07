@@ -98,8 +98,8 @@ vs. full `pnpm lint` which scans everything.
 export KYBERION_REASONING_BACKEND=stub
 
 # Override active customer
-export KYBERION_CUSTOMER=demo-customer
-# Customer-specific identity, connections, and onboarding artifacts resolve under customer/{slug}/ when set
+export KYBERION_STANCE=demo-customer
+# Customer-specific identity, connections, and onboarding artifacts resolve under knowledge/personal/stances/{slug}/ when set
 
 # Override the local ComfyUI export folder used by media generation examples
 export KYBERION_COMFY_OUTPUT_DIR=active/shared/tmp/comfy/output

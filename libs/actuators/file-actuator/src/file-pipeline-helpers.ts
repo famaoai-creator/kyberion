@@ -26,7 +26,7 @@ import {
   evaluateCondition,
   resolveWriteArtifactSpec,
   resolveRequiredStringParam,
-} from '@agent/core/logic-utils';
+} from '@agent/core/pipeline/logic-utils';
 import { validateOpInput } from '@agent/core/pipeline/op-input-contracts';
 import { processUntrustedContent } from '@agent/core/untrusted-content';
 import { skipAdfStep } from '@agent/core/pipeline/adf-engine';
@@ -38,7 +38,7 @@ import {
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
+} from '@agent/core/contracts/execution-bounds';
 import {
   createStandardYargs,
   currentProcessArgv,

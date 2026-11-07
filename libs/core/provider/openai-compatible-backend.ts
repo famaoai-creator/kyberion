@@ -59,7 +59,7 @@ import {
   computeCompletionTokenBudget,
   estimateRequestInputTokens,
   resolveConfiguredContextWindowTokens,
-} from '../completion-token-budget.js';
+} from './completion-token-budget.js';
 import {
   StablePrefixGuard,
   type StablePrefixSnapshot,

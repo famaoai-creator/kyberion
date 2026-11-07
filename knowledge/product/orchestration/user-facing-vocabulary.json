@@ -8821,9 +8821,9 @@
         "qps-ploc": "⟦Ůşėƒůŀ ƒïřşŧ-řůñ ƈőɱɱȧñḓş: ŀőřėɱ ïṗ⟧"
       },
       "cli_help_onboard": {
-        "en": "  pnpm onboarding       # customer/{slug}/ preferred when KYBERION_CUSTOMER is set",
-        "ja": "  pnpm onboarding       # KYBERION_CUSTOMER 設定時は customer/{slug}/ を優先",
-        "qps-ploc": "⟦  ṗñṗɱ őñƀőȧřḓïñɠ       # ƈůşŧőɱėř/{slug}/ ṗřėƒėřřėḓ ẇħėñ ĶẎɃĖŘÏŐÑ_ƇŮŞŦŐⱮĖŘ ïş şėŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+        "en": "  pnpm onboarding       # knowledge/personal/stances/{slug}/ preferred when KYBERION_STANCE is set",
+        "ja": "  pnpm onboarding       # KYBERION_STANCE 設定時は knowledge/personal/stances/{slug}/ を優先",
+        "qps-ploc": "⟦  ṗñṗɱ őñƀőȧřḓïñɠ       # ķñőẇŀėḓɠė/ṗėřşőñȧŀ/şŧȧñƈėş/{slug}/ ṗřėƒėřřėḓ ẇħėñ ĶẎɃĖŘÏŐÑ_ŞŦȦÑƇĖ ïş şėŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
       "cli_help_doctor": {
         "en": "  pnpm kyberion doctor [--scope env|service|voice|meeting|app|setup]  Check environment readiness",
@@ -9675,6 +9675,11 @@
         "ja": "現在のスコープを確認",
         "qps-ploc": "⟦Ïñşṗėƈŧ ŧħė ȧƈŧïṽė şƈőṗė ŀőřėɱ ï⟧"
       },
+      "cli_cmd_scope_inspect": {
+        "en": "Inspect asset scope and the current read policy",
+        "ja": "資産スコープと現在の読取ポリシーを確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ȧşşėŧ şƈőṗė ȧñḓ ŧħė ƈůřřėñŧ řėȧḓ ṗőŀïƈẏ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
       "cli_cmd_script_bindings": {
         "en": "Inspect the runtime seam catalog",
         "ja": "ランタイムのシームカタログを確認",
@@ -10410,22 +10415,22 @@
         "ja": "推論設定を表示・変更",
         "qps-ploc": "⟦Şħőẇ őř ƈħȧñɠė řėȧşőñïñɠ ƈőñƒïɠůřȧŧïőñ ŀőřėɱ ïṗşůɱ ⟧"
       },
-      "cli_cmd_script_customer_create": {
-        "en": "Create a stance overlay (customer/{slug}/)",
-        "ja": "スタンスのオーバーレイを作成 (customer/{slug}/)",
-        "qps-ploc": "⟦Ƈřėȧŧė ȧ şŧȧñƈė őṽėřŀȧẏ (ƈůşŧőɱėř/{slug}/) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      "cli_cmd_script_stance_create": {
+        "en": "Create a stance (knowledge/personal/stances/{slug}/)",
+        "ja": "スタンスを作成 (knowledge/personal/stances/{slug}/)",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ şŧȧñƈė (ķñőẇŀėḓɠė/ṗėřşőñȧŀ/şŧȧñƈėş/{slug}/) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
-      "cli_cmd_script_customer_list": {
+      "cli_cmd_script_stance_list": {
         "en": "List stance overlays",
         "ja": "スタンスのオーバーレイを一覧",
         "qps-ploc": "⟦Ŀïşŧ şŧȧñƈė őṽėřŀȧẏş ŀőřėɱ ⟧"
       },
-      "cli_cmd_script_customer_migrate_from_personal": {
+      "cli_cmd_script_stance_migrate_from_personal": {
         "en": "Migrate personal data into a stance overlay",
         "ja": "個人データをスタンスのオーバーレイへ移行",
         "qps-ploc": "⟦Ɱïɠřȧŧė ṗėřşőñȧŀ ḓȧŧȧ ïñŧő ȧ şŧȧñƈė őṽėřŀȧẏ ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
-      "cli_cmd_script_customer_switch": {
+      "cli_cmd_script_stance_switch": {
         "en": "Switch the active stance overlay",
         "ja": "有効なスタンスのオーバーレイを切り替え",
         "qps-ploc": "⟦Şẇïŧƈħ ŧħė ȧƈŧïṽė şŧȧñƈė őṽėřŀȧẏ ŀőřėɱ ïṗşů⟧"

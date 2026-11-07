@@ -3,7 +3,7 @@ import {
   assertScopeContext,
   normalizeScopeContext,
   type ScopeContext,
-} from '../scope-context-validation.js';
+} from '../foundation/scope-context-validation.js';
 export const MAX_COMPACTION_RETENTION_MS = 30 * 86_400_000;
 export const DEFAULT_COMPACTION_RETENTION_MS = 7 * 86_400_000;
 export const compactionSnapshotReceiptSchema = z

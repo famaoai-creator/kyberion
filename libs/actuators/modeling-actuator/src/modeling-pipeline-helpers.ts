@@ -15,10 +15,14 @@ import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
+} from '@agent/core/contracts/execution-bounds';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveMissionDir } from '@agent/core/owner-scope';
-import { evaluateCondition, getPathValue, resolveWriteArtifactSpec } from '@agent/core/logic-utils';
+import {
+  evaluateCondition,
+  getPathValue,
+  resolveWriteArtifactSpec,
+} from '@agent/core/pipeline/logic-utils';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 
 import { runGovernedShellScript } from '@agent/core/command-runner';

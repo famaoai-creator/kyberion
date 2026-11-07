@@ -1,7 +1,7 @@
 'use client';
 
 import { opsApiPath } from '../../lib/ops/ops-api-path';
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import {
   Shield,
   Building2,

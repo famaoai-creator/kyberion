@@ -44,7 +44,7 @@ import {
 import { withExecutionContext } from '../authority.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { agentIdentityMatchesTenant } from '../persona-identity.js';
-import { resolveClaimedNhiId } from '../nhi-id.js';
+import { resolveClaimedNhiId } from '../contracts/nhi-id.js';
 import type { CharterPathOptions } from '../governance/accountability-charter-registry.js';
 
 export const NHI_SESSION_ADMISSION_CHANNEL = 'nhi-session-admission';

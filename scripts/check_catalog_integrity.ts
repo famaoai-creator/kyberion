@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { extractPlaceholderNames } from '@agent/core/message-format';
+import { extractPlaceholderNames } from '@agent/core/foundation/message-format';
 import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index';
 import { resolveVocabularyEntry } from '@agent/core/knowledge/vocabulary-catalog';
 import { pathResolver } from '@agent/core/path-resolver';

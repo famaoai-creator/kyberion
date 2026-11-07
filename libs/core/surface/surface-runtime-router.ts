@@ -1,5 +1,5 @@
 import { classifyTaskSessionIntent } from '../task/task-session.js';
-import { detectTextLocale } from '../locale-normalize.js';
+import { detectTextLocale } from '../foundation/locale-normalize.js';
 import {
   resolveIntentResolutionPacket,
   type IntentResolutionPacket,

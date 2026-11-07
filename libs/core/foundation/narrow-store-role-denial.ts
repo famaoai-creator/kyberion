@@ -1,23 +1,10 @@
 import type { ResourceAccessOperation, ResourceAccessScope } from './resource-access-scope.js';
 import {
-  PERSONAL_APPROVAL_STORE_ROLE,
-  personalApprovalIoAllowed,
-} from './personal-approval-io-capability.js';
-import {
-  TASK_SOURCE_WORKSPACE_ROLE,
-  taskSourceWorkspaceIoAllowed,
-} from './task-source-workspace-capability.js';
-import {
   ARCHIVED_MISSION_STATE_READER_ROLE,
   isArchivedMissionStateCapability,
 } from './archived-mission-state-capability.js';
-import { CUSTOMER_DECISION_INVITE_STORE_ROLE } from './customer-decision-invite-capability.js';
-import { customerDecisionInviteWriteDenial } from './customer-decision-invite-write-content.js';
-import {
-  CONTENT_CHECKED_ROLES,
-  customerDecisionWriteContentDenial,
-  type WriteContent,
-} from './customer-decision-write-content.js';
+import type { WriteContent } from './customer-decision-record-content.js';
+import { storeGrantNarrowingDenial, storeGrantRule } from './store-grant-registry.js';
 import {
   CUSTOMER_CHANNEL_BINDING_STORE_ROLE,
   customerChannelBindingStorePathAllowed,
@@ -36,10 +23,12 @@ import {
  *     and may only append to the shared entries file;
  *   - `archived_mission_state_reader`: reads only under its exact capability;
  *   - `customer_channel_binding_store`: writes / mkdirs only the bindings file;
- *   - content-checked roles (consumer / milestone store): every write is
- *     checked against the record on disk;
- *   - `customer_decision_invite_store`: writes / mkdirs only for a registered
- *     active tenant, except a content-checked revoke of an existing record.
+ *   - content-checked stores: every write inside a live consumer-lock or
+ *     milestone grant (G2: no role) is checked against the record on disk;
+ *   - an active customer decision invite capability (G2: it replaced the
+ *     `customer_decision_invite_store` role, whatever role the caller holds):
+ *     writes / mkdirs only for a registered active tenant, except a
+ *     content-checked revoke of an existing record.
  * Returns the refusal reason, or null.
  */
 export function narrowStoreRoleDenial(input: {
@@ -54,22 +43,35 @@ export function narrowStoreRoleDenial(input: {
   const { role, relativePath } = input;
   // `shared` is the personal storage marker, never a tenant credential. An
   // unbound tenant-store reader must not reinterpret this owner namespace.
+  // G2: only the live personal approval owner window (no role) reaches an owner partition
+  // (G3: asked through the store grant registry; an unloaded window module admits nothing).
   if (
     /(?:^|\/)tenant-approvals\/personal\/shared\/owners(?:\/|$)/u.test(relativePath) &&
-    (role !== PERSONAL_APPROVAL_STORE_ROLE ||
-      !personalApprovalIoAllowed(relativePath, input.operation))
+    storeGrantRule('personal-approval')?.pathAllowed?.(relativePath, input.operation) !== true
   )
     return '[PERSONAL_APPROVAL_SCOPE_REQUIRED] Personal owner partition requires exact owner IO';
-  if (
-    role === PERSONAL_APPROVAL_STORE_ROLE &&
-    !personalApprovalIoAllowed(relativePath, input.operation)
-  )
-    return '[PERSONAL_APPROVAL_SCOPE_REQUIRED] Exact personal owner IO window required';
-  if (
-    role === TASK_SOURCE_WORKSPACE_ROLE &&
-    !taskSourceWorkspaceIoAllowed(relativePath, input.operation)
-  )
-    return '[TASK_SOURCE_SCOPE_DENIED] Exact live workspace IO capability required';
+  // G2/G3: the live store grants narrow every I/O made inside them (no role), in registry order:
+  // the personal approval window, the task source workspace window (its liveness check runs
+  // with the window suspended, so it is never narrowed), the invite capability's tenant/content
+  // check, and the content checks of every write inside a consumer-lock or milestone grant.
+  const grantDenial = storeGrantNarrowingDenial(
+    [
+      'personal-approval',
+      'task-source-workspace',
+      'customer-decision-invite',
+      'customer-decision-consumer',
+      'customer-decision-milestone',
+    ],
+    {
+      relativePath,
+      operation: input.operation,
+      candidates: () => [relativePath],
+      scope: input.scope,
+      content: input.content,
+      readRepoFile: input.readRepoFile,
+    }
+  );
+  if (grantDenial) return grantDenial;
   // Append must retain every pre-existing write/content restriction, never fall through
   // a metadata/read branch merely because the resource ceiling distinguishes the verb.
   const operation = input.operation === 'append' ? 'write' : input.operation;
@@ -100,7 +102,7 @@ export function narrowStoreRoleDenial(input: {
     role === CUSTOMER_CHANNEL_BINDING_STORE_ROLE &&
     !customerChannelBindingStorePathAllowed(relativePath, operation)
   )
-    return '[CUSTOMER_CHANNEL_BINDING_STORE_SCOPE] The binding store writes only customer/<tenant>/connections/channel-bindings.json';
+    return '[CUSTOMER_CHANNEL_BINDING_STORE_SCOPE] The binding store writes only knowledge/confidential/<tenant>/connections/channel-bindings.json';
   if (
     role === ARCHIVED_MISSION_STATE_READER_ROLE &&
     (operation === 'write' ||
@@ -108,23 +110,5 @@ export function narrowStoreRoleDenial(input: {
       !isArchivedMissionStateCapability(input.scope))
   )
     return '[RESOURCE_SCOPE_REQUIRED] Archived mission state reads require their exact read-only capability';
-  if (role === CUSTOMER_DECISION_INVITE_STORE_ROLE) {
-    const inviteDenial = customerDecisionInviteWriteDenial({
-      tenantSlug: input.scope?.tenantSlug,
-      relativePath,
-      operation,
-      content: input.content,
-      readRepoFile: input.readRepoFile,
-    });
-    if (inviteDenial) return inviteDenial;
-  }
-  if (operation === 'write' && CONTENT_CHECKED_ROLES.has(role))
-    return customerDecisionWriteContentDenial(
-      role,
-      relativePath,
-      input.content,
-      input.scope?.metadataExact?.[0],
-      input.readRepoFile
-    );
   return null;
 }

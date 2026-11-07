@@ -9,7 +9,7 @@ import {
   loadBrowserBridgeRequest,
   respondBrowserBridgeRequest,
   type BrowserBridgeRequest,
-} from '@agent/core/browser/browser-bridge-mailbox';
+} from '@agent/shared-vision/browser-bridge-mailbox';
 import { runBrowserBridgeCommand, type BrowserBridgeCliDeps } from './cli-browser-bridge.js';
 
 afterEach(() => {

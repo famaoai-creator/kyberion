@@ -1,4 +1,4 @@
-import type { OcrResult } from './ocr-types.js';
+import type { OcrResult } from './contracts/ocr-types.js';
 import { findPiiSpans } from './pii-scrubber.js';
 
 export interface RgbaFrame {

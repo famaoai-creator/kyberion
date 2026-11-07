@@ -17,7 +17,7 @@ import {
   listGovernedArtifacts,
   readGovernedArtifactJson,
   writeGovernedArtifactJson,
-} from '@agent/core/artifacts';
+} from '@agent/core/workforce/artifact-store';
 import {
   createApprovalRequest,
   decideApprovalRequest,

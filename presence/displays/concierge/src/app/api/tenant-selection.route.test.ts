@@ -59,7 +59,7 @@ vi.mock('@agent/core/front-desk-identity', () => ({
   },
 }));
 vi.mock('@agent/core/organization/member-registry', () => ({ ensureOwnerMember: () => {} }));
-vi.mock('@agent/core/browser/browser-onboarding', () => ({
+vi.mock('@agent/shared-vision/browser-onboarding', () => ({
   getBrowserOnboardingState: () => ({ onboarding: { status: 'complete' } }),
 }));
 vi.mock('../../lib/headless-projections', async (importOriginal) => ({

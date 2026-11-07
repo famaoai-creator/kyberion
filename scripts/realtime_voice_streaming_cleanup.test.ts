@@ -28,12 +28,12 @@ vi.mock('@agent/core/streaming-voice-playback', async (original) => ({
   ...(await original<typeof import('@agent/core/streaming-voice-playback')>()),
   probePcmAudioStreaming: probes.pcm,
 }));
-vi.mock('@agent/core/voice/realtime-voice-loop', async (original) => ({
-  ...(await original<typeof import('@agent/core/voice/realtime-voice-loop')>()),
+vi.mock('@agent/shared-voice/realtime-voice-loop', async (original) => ({
+  ...(await original<typeof import('@agent/shared-voice/realtime-voice-loop')>()),
   startRealtimeVoiceLoop: probes.startLoop,
 }));
-vi.mock('@agent/core/voice/realtime-voice-conversation', async (original) => ({
-  ...(await original<typeof import('@agent/core/voice/realtime-voice-conversation')>()),
+vi.mock('@agent/shared-voice/realtime-voice-conversation', async (original) => ({
+  ...(await original<typeof import('@agent/shared-voice/realtime-voice-conversation')>()),
   ensureRealtimeVoiceConversationSession: () => ({
     session_id: 'streaming-cleanup',
     profile_id: 'fixture',
@@ -41,8 +41,8 @@ vi.mock('@agent/core/voice/realtime-voice-conversation', async (original) => ({
     assistant_name: 'Agent',
   }),
 }));
-vi.mock('@agent/core/voice/realtime-voice-preferences', async (original) => ({
-  ...(await original<typeof import('@agent/core/voice/realtime-voice-preferences')>()),
+vi.mock('@agent/shared-voice/realtime-voice-preferences', async (original) => ({
+  ...(await original<typeof import('@agent/shared-voice/realtime-voice-preferences')>()),
   loadRealtimeVoiceConversationPreferences: () => null,
 }));
 vi.mock('@agent/core/silero-vad-bridge', () => ({ installSileroVadBackend: vi.fn() }));

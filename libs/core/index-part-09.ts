@@ -30,8 +30,6 @@ export * from './state-probe.js';
 
 export * from './graph-run-artifact.js';
 
-export * from './voice/realtime-voice-conversation.js';
-
 export * from './realtime-media-session.js';
 
 export * from './surface/surface-coordination-store.js';
@@ -48,9 +46,7 @@ export * from './mic-capture.js';
 
 export * from './in-room-minutes-recorder.js';
 
-export * from './pcm-wav.js';
-
-export * from './voice/vad-turn-recorder.js';
+export * from './foundation/pcm-wav.js';
 
 export * from './voice/audio-playback.js';
 
@@ -63,8 +59,6 @@ export * from './voice/audio-tee.js';
 export * from './voice/vad-registry.js';
 
 export * from './silero-vad-bridge.js';
-
-export * from './voice/realtime-voice-loop.js';
 
 export * from './actuator/actuator-serve-client.js';
 
@@ -159,15 +153,11 @@ export * from './media/native-subagent-adopter.js';
 export type * from './surface/channel-surface-types.js';
 export { isSurfaceAsyncChannel, SURFACE_ASYNC_CHANNELS } from './surface/channel-surface-types.js';
 
-export * from './browser/browser-conversation-session.js';
-
 export * from './mesh/peer-conversation.js';
 
 export * from './browser/browser-extension-bridge.js';
 
 export * from './video/narrated-video-preference-profile.js';
-
-export * from './video/narrated-video-upload-package.js';
 
 export * from './meeting/meeting-operations-profile.js';
 
@@ -189,7 +179,7 @@ export * from './surface/surface-query.js';
 
 export * from './surface/surface-ux-contract.js';
 
-export * from './next-action-contract.js';
+export * from './contracts/next-action-contract.js';
 
 export * from './task/task-session.js';
 
@@ -386,7 +376,7 @@ export type { UnhandledIntentEntry, IntentMissType } from './unhandled-intent-re
 
 // Shared Business Types
 
-export * from './shared-business-types.js';
+export * from './contracts/shared-business-types.js';
 
 export * from './types.js';
 // export * as visionJudge from './vision-judge.js';

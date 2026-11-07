@@ -8,18 +8,18 @@ import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 
 describe('organization-profile', () => {
-  const originalCustomer = process.env.KYBERION_CUSTOMER;
+  const originalCustomer = process.env.KYBERION_TENANT;
   const overlayRoot = pathResolver.sharedTmp('organization-profile-test-org');
-  const overlayPath = `${overlayRoot}/customer/test-org/organization-profile.json`;
+  const overlayPath = `${overlayRoot}/knowledge/confidential/test-org/organization-profile.json`;
   const demoRoot = pathResolver.sharedTmp('organization-profile-demo-org');
-  const demoOverlayPath = `${demoRoot}/customer/demo-org/organization-profile.json`;
+  const demoOverlayPath = `${demoRoot}/knowledge/confidential/demo-org/organization-profile.json`;
   const alternateRoot = pathResolver.sharedTmp('organization-profile-alt-root');
-  const alternateOverlayRoot = `${alternateRoot}/customer/test-org`;
+  const alternateOverlayRoot = `${alternateRoot}/knowledge/confidential/test-org`;
   const alternateOverlayPath = `${alternateOverlayRoot}/organization-profile.json`;
 
   afterEach(() => {
-    if (originalCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
-    else process.env.KYBERION_CUSTOMER = originalCustomer;
+    if (originalCustomer === undefined) delete process.env.KYBERION_TENANT;
+    else process.env.KYBERION_TENANT = originalCustomer;
 
     if (safeExistsSync(overlayRoot)) {
       safeRmSync(overlayRoot, { recursive: true, force: true });
@@ -33,7 +33,7 @@ describe('organization-profile', () => {
   });
 
   it('loads the organization overlay from the provided root before the public default', () => {
-    process.env.KYBERION_CUSTOMER = 'test-org';
+    process.env.KYBERION_TENANT = 'test-org';
     safeMkdir(overlayRoot, { recursive: true });
     safeWriteFile(
       overlayPath,
@@ -76,8 +76,8 @@ describe('organization-profile', () => {
     expect(profile?.llm?.default_profile).toBe('light');
   });
 
-  it('falls back to the public organization profile when no customer overlay exists', () => {
-    delete process.env.KYBERION_CUSTOMER;
+  it('falls back to the public organization profile when no tenant organization profile exists', () => {
+    delete process.env.KYBERION_TENANT;
 
     const profile = loadOrganizationProfile();
 
@@ -85,9 +85,9 @@ describe('organization-profile', () => {
     expect(profile?.mission_defaults?.default_team_template).toBe('default');
   });
 
-  it('loads the repository customer overlay when the active customer is set', () => {
-    process.env.KYBERION_CUSTOMER = 'demo-org';
-    safeMkdir(`${demoRoot}/customer/demo-org`, { recursive: true });
+  it('loads the repository tenant organization profile when the active customer is set', () => {
+    process.env.KYBERION_TENANT = 'demo-org';
+    safeMkdir(`${demoRoot}/knowledge/confidential/demo-org`, { recursive: true });
     safeWriteFile(
       demoOverlayPath,
       JSON.stringify(
@@ -137,8 +137,8 @@ describe('organization-profile', () => {
     expect(profile?.mission_defaults?.default_team_template).toBe('development');
   });
 
-  it('loads the customer overlay from a different root when provided', () => {
-    process.env.KYBERION_CUSTOMER = 'test-org';
+  it('loads the tenant organization profile from a different root when provided', () => {
+    process.env.KYBERION_TENANT = 'test-org';
     safeMkdir(alternateOverlayRoot, { recursive: true });
     safeWriteFile(
       alternateOverlayPath,
@@ -174,13 +174,13 @@ describe('organization-profile', () => {
   });
 
   it('does not fall back to the active repository when a root is explicitly provided', () => {
-    process.env.KYBERION_CUSTOMER = 'missing-from-fixture';
+    process.env.KYBERION_TENANT = 'missing-from-fixture';
 
     expect(loadOrganizationProfile(alternateRoot)).toBeNull();
   });
 
-  it('does not accept a schema-invalid customer overlay', () => {
-    process.env.KYBERION_CUSTOMER = 'test-org';
+  it('does not accept a schema-invalid tenant organization profile', () => {
+    process.env.KYBERION_TENANT = 'test-org';
     safeMkdir(alternateOverlayRoot, { recursive: true });
     safeWriteFile(
       alternateOverlayPath,

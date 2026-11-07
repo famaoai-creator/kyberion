@@ -16,7 +16,7 @@ import {
   localeUsesWordSpaces,
   pickByLocale,
   type SupportedLocale,
-} from './locale-normalize.js';
+} from './foundation/locale-normalize.js';
 import { assertScopeContext, type ScopeContext } from './scope-context.js';
 import { loadPersonalIdentityAtPath } from './personal-identity-state.js';
 import { withExecutionContext } from './authority.js';

@@ -17,7 +17,7 @@ vi.mock('../organization/member-registry.js', async (original) => ({
   listMemberIdsStrict: () => Object.keys(state.profiles).sort(),
   readMemberProfile: (id: string) => structuredClone(state.profiles[id] ?? null),
 }));
-vi.mock('../lock-utils.js', () => ({
+vi.mock('../foundation/lock-utils.js', () => ({
   withLockSync: (_key: string, fn: () => unknown) => {
     state.locks++;
     return fn();

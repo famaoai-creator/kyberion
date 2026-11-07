@@ -18,7 +18,7 @@
  * so providers can reuse the same contract instead of hand-rolling tags.
  */
 
-import { escapeHtml } from './text-escaping.js';
+import { escapeHtml } from './foundation/text-escaping.js';
 
 export interface FrameUntrustedInputParams {
   /** The raw, untrusted text to frame. Escaped before interpolation. */

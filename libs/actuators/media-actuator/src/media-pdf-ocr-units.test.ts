@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { OcrResult } from '@agent/core/ocr-types';
+import type { OcrResult } from '@agent/core/contracts/ocr-types';
 import { buildPdfPageOcrOverlayLinesFromResult } from './media-pdf-helpers.js';
 
 const page = { pageNumber: 1, width: 1000, height: 1000 };

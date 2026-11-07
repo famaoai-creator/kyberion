@@ -7,7 +7,7 @@ import {
   validateScopeContext,
   type ScopeContext,
   type ScopeContextInput,
-} from './scope-context-validation.js';
+} from './foundation/scope-context-validation.js';
 import { resolveScopeContext, resolveScopeResolution } from './scope-context.js';
 import { tryResolveOwnerScope, SHARED_TENANT, type OwnerRef } from './owner-scope.js';
 import type { ContextSecurityScope } from './context-security-scope.js';

@@ -1,6 +1,6 @@
 import { logger } from '../core.js';
 import { ocrImage } from '../ocr-bridge.js';
-import type { OcrRequest, OcrResult, OcrRoutingMode } from '../ocr-types.js';
+import type { OcrRequest, OcrResult, OcrRoutingMode } from '../contracts/ocr-types.js';
 import { OsAccessibilityDetector } from '../virtual/os-accessibility-detector.js';
 import { PixelRegionDetector } from '../pixel-region-detector.js';
 import {

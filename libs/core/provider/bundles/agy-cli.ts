@@ -2,7 +2,7 @@ import {
   cliProviderEnv,
   cliProviderEnvText,
   registerCliProviderBundle,
-} from '../../cli-provider-bundle.js';
+} from '../cli-provider-bundle.js';
 import { maybeWrapWithDispatcher } from '../../agent/agent-dispatch.js';
 import { buildAgyCliBackendFromEnv } from '../agy-cli-backend.js';
 import { AgyCliIntentExtractor } from '../agy-cli-intent-extractor.js';

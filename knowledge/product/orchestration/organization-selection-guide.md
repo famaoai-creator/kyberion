@@ -63,7 +63,7 @@ When a command resolves organization-scoped behavior, the order is:
 
 ```text
 CLI organization-id / org override
--> KYBERION_CUSTOMER environment context
+-> KYBERION_STANCE environment context
 -> knowledge/product/governance/organization-profile.json
 -> builtin fallback
 ```
@@ -315,7 +315,7 @@ The main files are:
 ## 7. Practical Advice
 
 - Use `--organization-id` when you want to evaluate a different organization profile without changing the environment permanently.
-- Use `KYBERION_CUSTOMER` when you want a durable organization context for a shell session.
+- Use `KYBERION_STANCE` when you want a durable organization context for a shell session.
 - Keep organization profiles declarative; keep execution logic in actuators and mission composition code.
 - Treat the JSON inventory/detail outputs as contracts, not ad-hoc debug dumps.
 

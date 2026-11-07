@@ -8,7 +8,7 @@
 import type express from 'express';
 import { nowIso } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
-import { normalizeLocale } from '@agent/core/locale-normalize';
+import { normalizeLocale } from '@agent/core/foundation/locale-normalize';
 import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
 import { withExecutionContext } from '@agent/core/authority';
 import {

@@ -52,7 +52,7 @@ vi.mock('../secure-io.js', async () => {
   return { ...actual, safeExec: mocks.safeExec };
 });
 
-vi.mock('../customer-resolver.js', () => ({
+vi.mock('../stance-resolver.js', () => ({
   resolveOverlay: mocks.resolveOverlay,
 }));
 
@@ -68,7 +68,7 @@ describe('DA-02 extraction connector presets (real catalog contract)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.KYBERION_ALLOW_UNSAFE_CLI = 'true';
-    delete process.env.KYBERION_CUSTOMER;
+    delete process.env.KYBERION_STANCE;
     delete process.env.KYBERION_SERVICE_ENDPOINTS_PATH;
     delete process.env.KYBERION_SERVICE_ENDPOINTS_DIR;
     delete process.env.KYBERION_SERVICE_PRESETS_DIR;

@@ -16,11 +16,11 @@ For development setup, see [`../QUICKSTART.md`](../QUICKSTART.md). This document
 
 Before installing on any environment:
 
-- [ ] Decide single-user vs. customer-overlay (FDE) mode. Customer-overlay = define `KYBERION_CUSTOMER` and prepare `customer/{slug}/`.
+- [ ] Decide single-user vs. customer-overlay (FDE) mode. Customer-overlay = define `KYBERION_STANCE` and prepare `knowledge/personal/stances/{slug}/`.
 - [ ] Decide reasoning backend: `claude-cli` (preferred when CLI is authenticated), `anthropic` (API key), `codex-cli`, `gemini-cli`, `agy-cli`, `copilot` (GitHub Copilot CLI via ACP), `openrouter` (OpenRouter API), `nemotron-api` (OpenAI-compatible endpoint), or `stub` (offline).
 - [ ] Decide voice tier: tier 0 (browser + native TTS, no install), tier 1 (cloud), tier 2 (local Style-Bert-VITS2).
 - [ ] Identify which actuators the use case needs (browser? voice? media? meeting?). Heavy ones (Playwright, Style-Bert-VITS2) only install if needed.
-- [ ] Identify secrets storage strategy: OS keychain (preferred), env vars, or `customer/{slug}/secrets.json` (dev only).
+- [ ] Identify secrets storage strategy: OS keychain (preferred), env vars, or `knowledge/personal/stances/{slug}/secrets.json` (dev only).
 
 ---
 
@@ -71,7 +71,7 @@ $EDITOR customer/customer-slug/identity.json
 $EDITOR customer/customer-slug/vision.md
 
 pnpm stance:switch customer-slug
-source active/shared/runtime/customer.env
+source active/shared/runtime/stance.env
 pnpm onboarding
 ```
 
@@ -242,7 +242,7 @@ sudo journalctl -u kyberion-chronos -f
 sudo systemctl status kyberion-daemon-watchdog.timer
 ```
 
-Edit `User`, `KYBERION_CUSTOMER`, `EnvironmentFile`, and the `pnpm` executable path
+Edit `User`, `KYBERION_STANCE`, `EnvironmentFile`, and the `pnpm` executable path
 before installing if the defaults do not match the target host. `%h/kyberion` resolves
 the selected service user's home directory. Repeat the same
 pattern for `mission:orchestrator` if needed.
@@ -353,11 +353,11 @@ See `docker-compose.yml` at the repo root.
 
 Mount these volumes if you want state to survive container restarts:
 
-| Container path            | Purpose                                |
-| ------------------------- | -------------------------------------- |
-| `/app/active`             | Mission state, traces, audit           |
-| `/app/customer`           | Customer overlay (FDE mode, preferred) |
-| `/app/knowledge/personal` | Identity fallback for single-user mode |
+| Container path            | Purpose                                            |
+| ------------------------- | -------------------------------------------------- |
+| `/app/active`             | Mission state, traces, audit                       |
+| `/app/knowledge/personal` | Identity and stances (`stances/{slug}/`, FDE mode) |
+| `/app/customer`           | Legacy tenant company files (until S2)             |
 
 ### 3.5 Production Docker (FDE)
 
@@ -368,10 +368,11 @@ docker run -d \
   --name kyberion \
   --restart unless-stopped \
   -p 3000:3000 \
-  -e KYBERION_CUSTOMER=customer-slug \
+  -e KYBERION_STANCE=customer-slug \
   -e KYBERION_REASONING_BACKEND=anthropic \
   --env-file /etc/kyberion/env \
   -v /var/lib/kyberion/active:/app/active \
+  -v /var/lib/kyberion/knowledge-personal:/app/knowledge/personal \
   -v /var/lib/kyberion/customer:/app/customer \
   ghcr.io/famaoai-creator/kyberion-playground:full
 ```
@@ -434,14 +435,14 @@ Mission state is forward-compatible by design (additive fields only). If a major
 
 ## 7. Troubleshooting
 
-| Symptom                                           | Likely cause                     | Action                                                                                                                                                           |
-| ------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm kyberion doctor` reports Playwright missing | browser-actuator dependency      | `pnpm env:bootstrap --manifest meeting-participation-runtime --apply --force`                                                                                    |
-| `pnpm onboarding` says "no reasoning backend"     | No CLI/API key configured        | Set `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` (or `KYBERION_OPENROUTER_KEY`), `KYBERION_NEMOTRON_URL`, `KYBERION_LOCAL_LLM_URL`, or run `claude` to authenticate |
-| Mission stuck in `active` after process crash     | Stale lock                       | Lock has PID-based stale detection; next command auto-recovers                                                                                                   |
-| `Trace persisted path` empty in pipeline output   | Persistence policy denied        | Check `KYBERION_PERSONA` and `MISSION_ROLE` env vars                                                                                                             |
-| Customer overlay not picked up                    | `KYBERION_CUSTOMER` not exported | `echo $KYBERION_CUSTOMER` — must show your slug                                                                                                                  |
-| Voice surface silent                              | OS TTS not installed             | Linux: `sudo apt-get install espeak`. macOS: built-in. Windows: built-in (SAPI)                                                                                  |
+| Symptom                                           | Likely cause                   | Action                                                                                                                                                           |
+| ------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm kyberion doctor` reports Playwright missing | browser-actuator dependency    | `pnpm env:bootstrap --manifest meeting-participation-runtime --apply --force`                                                                                    |
+| `pnpm onboarding` says "no reasoning backend"     | No CLI/API key configured      | Set `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` (or `KYBERION_OPENROUTER_KEY`), `KYBERION_NEMOTRON_URL`, `KYBERION_LOCAL_LLM_URL`, or run `claude` to authenticate |
+| Mission stuck in `active` after process crash     | Stale lock                     | Lock has PID-based stale detection; next command auto-recovers                                                                                                   |
+| `Trace persisted path` empty in pipeline output   | Persistence policy denied      | Check `KYBERION_PERSONA` and `MISSION_ROLE` env vars                                                                                                             |
+| Customer overlay not picked up                    | `KYBERION_STANCE` not exported | `echo $KYBERION_STANCE` — must show your slug                                                                                                                    |
+| Voice surface silent                              | OS TTS not installed           | Linux: `sudo apt-get install espeak`. macOS: built-in. Windows: built-in (SAPI)                                                                                  |
 
 ---
 

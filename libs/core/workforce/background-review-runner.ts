@@ -500,14 +500,14 @@ export async function runBackgroundReviewFork(
       input.missionId
         ? {
             tier: 'confidential',
-            tenant_slug: getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || undefined,
+            tenant_slug: getRegisteredEnvText('KYBERION_STANCE')?.trim() || undefined,
             purpose: 'background review snapshot',
             attachment_count: 0,
             training_use: 'no_training',
           }
         : {
             tier: 'personal',
-            tenant_slug: getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || undefined,
+            tenant_slug: getRegisteredEnvText('KYBERION_STANCE')?.trim() || undefined,
             purpose: 'background review snapshot',
             attachment_count: 0,
             training_use: 'local_only',

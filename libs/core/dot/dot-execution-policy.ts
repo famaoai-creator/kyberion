@@ -31,8 +31,10 @@ const fallback: DotExecutionPolicy = {
   },
   learning: {
     enabled: false,
-    l2_release_approvals: Number.MAX_SAFE_INTEGER,
-    l3_release_approvals: Number.MAX_SAFE_INTEGER,
+    // Disabled independently of thresholds; keep the conservative defaults
+    // inside the same schema bounds required of file-loaded policies.
+    l2_release_approvals: 1000000,
+    l3_release_approvals: 1000000,
     l3_decay_days: 36500,
     metrics_days: 30,
   },

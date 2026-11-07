@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { customerIsConfigured, customerRoot } from '@agent/core/customer-resolver';
+import { stanceIsConfigured, stanceLogDir } from '@agent/core/stance-resolver';
 import { nowIso, readJsonLines } from '@agent/core/foundation';
 import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
@@ -208,9 +208,9 @@ function readPersistedTraceRecords(
 
 export function resolveTraceFeedDirs(): string[] {
   const dirs: string[] = [];
-  if (customerIsConfigured()) {
-    const customerTraceDir = customerRoot('logs/traces');
-    if (customerTraceDir) dirs.push(customerTraceDir);
+  if (stanceIsConfigured()) {
+    const stanceTraceDir = stanceLogDir('traces');
+    if (stanceTraceDir) dirs.push(stanceTraceDir);
   }
 
   dirs.push(pathResolver.sharedLogsTraces());

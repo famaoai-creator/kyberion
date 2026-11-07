@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import type { EngineRuntimeOperatorPrincipal } from '@agent/core/voice/engine-runtime-preferences-operator';
+import type { EngineRuntimeOperatorPrincipal } from '@agent/shared-voice/engine-runtime-preferences-operator';
 import { requireConciergeMutationAccess } from './api-guard';
 import { isLoopbackAddress } from '../../server/local-peer.ts';
 import { isLoopbackPeer } from './loopback-peer';

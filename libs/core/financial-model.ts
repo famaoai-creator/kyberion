@@ -3,6 +3,7 @@ import { pathResolver } from './path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { TENANT_COMPANY_FILE, TENANT_HOME_ROOT } from './organization/tenant-home.js';
 
 export interface FinancialPeriod {
   period_id: string;
@@ -19,7 +20,7 @@ export interface FinancialPeriod {
 export interface FinancialModel {
   company_id: string;
   tenant_slug: string | null;
-  source_kind: 'customer' | 'confidential' | 'public' | 'derived';
+  source_kind: 'confidential' | 'public' | 'derived';
   source_path: string;
   periods: FinancialPeriod[];
 }
@@ -130,7 +131,7 @@ function loadLegacyCustomerFinancials(
   return {
     company_id: tenantSlug,
     tenant_slug: tenantSlug,
-    source_kind: 'customer',
+    source_kind: 'confidential',
     source_path: customerPath,
     periods: [toFinancialPeriod(legacy, 'prev_fy', 'Previous FY')],
   };
@@ -162,7 +163,6 @@ export function resolveFinancialModel(
   const companyId = resolvedTenantSlug || 'default';
   const candidates = resolvedTenantSlug
     ? [
-        path.join(baseDir, 'customer', resolvedTenantSlug, 'finance', 'financial-model.json'),
         path.join(
           baseDir,
           'knowledge',
@@ -185,11 +185,7 @@ export function resolveFinancialModel(
       company_id: companyId,
       tenant_slug: resolvedTenantSlug,
       source_path: candidate,
-      source_kind: candidate.includes('/customer/')
-        ? 'customer'
-        : candidate.includes('/confidential/')
-          ? 'confidential'
-          : 'public',
+      source_kind: candidate.includes('/confidential/') ? 'confidential' : 'public',
       periods: parsed.periods.map((period, index) =>
         toFinancialPeriod(
           period as unknown as Record<string, unknown>,
@@ -203,7 +199,7 @@ export function resolveFinancialModel(
   const legacy = resolvedTenantSlug
     ? loadLegacyCustomerFinancials(
         assertSafeRepositoryPath(
-          path.join(baseDir, 'customer', resolvedTenantSlug, 'customer.json'),
+          path.join(baseDir, TENANT_HOME_ROOT, resolvedTenantSlug, TENANT_COMPANY_FILE),
           { allowMissingLeaf: true, rootDir: baseDir }
         ),
         resolvedTenantSlug

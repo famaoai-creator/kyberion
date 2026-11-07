@@ -8,7 +8,7 @@ import {
   assertApprovalUsable,
   isSeparationOfDutiesEnabled,
 } from './approval-separation-of-duties.js';
-import { loadApprovalRequest } from './approval-store.js';
+import { loadApprovalRequest } from './approval-store-reader.js';
 
 /**
  * Held actions: the linked shared-store decision must still be usable (not

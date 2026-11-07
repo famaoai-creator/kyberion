@@ -1,6 +1,6 @@
 import { JSDOM } from 'jsdom';
 import ExcelJS from 'exceljs';
-import { DocumentArtifact } from '@agent/core/shared-business-types';
+import { DocumentArtifact } from '@agent/core/contracts/shared-business-types';
 
 export interface ExcelSheetDef {
   name: string;

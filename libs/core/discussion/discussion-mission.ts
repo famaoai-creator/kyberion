@@ -1,12 +1,10 @@
 import { withExecutionContext } from '../authority.js';
 import { parseEventScopeInput } from '../event-scope.js';
-import { assertScopeContext } from '../scope-context-validation.js';
+import { assertScopeContext } from '../foundation/scope-context-validation.js';
 import { approvalUsabilityRefusal } from '../governance/approval-linked-usability.js';
-import {
-  createApprovalRequest,
-  evaluateApprovalUsability,
-  loadApprovalRequest,
-} from '../governance/approval-store.js';
+import { createApprovalRequest } from '../governance/approval-request-create.js';
+import { evaluateApprovalUsability } from '../governance/approval-separation-of-duties.js';
+import { loadApprovalRequest } from '../governance/approval-store-reader.js';
 import { issueChronosMissionFromProposal } from '../surface/surface-mission-proposals.js';
 import { loadArtifactRecord, saveArtifactRecord } from '../workforce/artifact-record.js';
 import { getWorkItem, updateWorkItem } from '../workforce/work-coordination.js';

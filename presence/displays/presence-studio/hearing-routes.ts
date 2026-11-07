@@ -10,7 +10,7 @@ import type { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { nowIso } from '@agent/core/foundation';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import { normalizeLocale, type SupportedLocale } from '@agent/core/locale-normalize';
+import { normalizeLocale, type SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
 import { withExecutionContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';

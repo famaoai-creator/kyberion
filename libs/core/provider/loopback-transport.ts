@@ -18,7 +18,7 @@ import {
   type TransportErrorPayload,
   type TransportInvocation,
   type TransportResult,
-} from '../provider-transport.js';
+} from './provider-transport.js';
 
 type CallableProvider = Record<string, unknown>;
 

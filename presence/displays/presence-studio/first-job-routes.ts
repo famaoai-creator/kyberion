@@ -2,7 +2,7 @@ import {
   readFirstJobRecoveries,
   terminateFirstJobRequest,
 } from '@agent/core/surface/first-job-recovery';
-import { normalizeLocale } from '@agent/core/locale-normalize';
+import { normalizeLocale } from '@agent/core/foundation/locale-normalize';
 import { readFirstJobSetup } from '@agent/core/surface/first-job-setup';
 /** Local-only typed diagnostic intake; outer authentication and rate limits remain installed. */
 import type express from 'express';

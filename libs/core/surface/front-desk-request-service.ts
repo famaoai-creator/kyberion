@@ -1,4 +1,4 @@
-import type { SupportedLocale } from '../locale-normalize.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import type { FrontDeskConversationViewer } from './front-desk-conversation-persistence.js';
 import type { FrontDeskArtifactRevisionInput } from './front-desk-artifact-revision-contract.js';
 import {

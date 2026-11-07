@@ -3,8 +3,8 @@ import {
   buildSessionHandoffArtifact,
   ensureParentDir,
   resolveAppProfile,
-} from '@agent/core/mobile-runtime-helpers';
-import { decodeEntities } from '@agent/core/text-escaping';
+} from '@agent/shared-mobile';
+import { decodeEntities } from '@agent/core/foundation/text-escaping';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -16,7 +16,7 @@ import {
 import { logger } from '@agent/core/core';
 import { resolveAdbBin } from '@agent/core/tool/tool-binary-resolvers';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolvePipelineContextValues } from '@agent/core/logic-utils';
+import { resolvePipelineContextValues } from '@agent/core/pipeline/logic-utils';
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
 import { retry, sleep, getRetryDefaults } from '@agent/core/async-utils';
 import { defineCatalog, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
@@ -29,7 +29,7 @@ import {
   mirrorStateFilePath,
 } from '@agent/shared-mobile';
 import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
-import { DEFAULT_PIPELINE_TIMEOUT_MS } from '@agent/core/execution-bounds';
+import { DEFAULT_PIPELINE_TIMEOUT_MS } from '@agent/core/contracts/execution-bounds';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';

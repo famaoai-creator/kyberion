@@ -4,7 +4,7 @@ export {
   buildTrackNextWorkProposal,
   materializeTrackArtifactSkeleton,
 } from '@agent/core/sdlc-gate-readiness';
-export { createNextActionContract } from '@agent/core/next-action-contract';
+export { createNextActionContract } from '@agent/core/contracts/next-action-contract';
 export {
   computeApprovalPresentedDigest,
   decideApprovalRequest,
@@ -13,7 +13,7 @@ export {
   surfaceDecisionAuthMethod,
   surfaceDecisionBinding,
 } from '@agent/core/governance/approval-store';
-export { normalizeRejectionReasonCategory } from '@agent/core/rejection-reason';
+export { normalizeRejectionReasonCategory } from '@agent/core/contracts/rejection-reason';
 export {
   clearSurfaceOutboxMessage,
   enqueueSurfaceNotification,

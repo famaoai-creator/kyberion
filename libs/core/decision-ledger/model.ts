@@ -187,7 +187,7 @@ export interface DecisionCustomerActor {
   note?: string;
   /**
    * CD-11: the bound customer channel (a surface + channel_id of
-   * `customer/<tenant>/connections/channel-bindings.json`) reminders for this
+   * `knowledge/confidential/<tenant>/connections/channel-bindings.json`) reminders for this
    * actor are delivered to. Set through `customer-decision actor-add --channel`.
    */
   channel?: {

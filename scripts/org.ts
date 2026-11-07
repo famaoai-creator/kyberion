@@ -428,13 +428,6 @@ function securityPolicyCatalog(filePath: string): GovernedCatalog<SecurityPolicy
     id: 'security-policy',
     path: filePath,
     schema: SECURITY_POLICY_SCHEMA_PATH,
-    fallback: () => ({
-      version: '1.0.0',
-      default_allow: [],
-      tier_restrictions: {},
-      persona_permissions: {},
-      authority_role_permissions: {},
-    }),
   });
   securityPolicyCatalogs.set(filePath, catalog);
   return catalog;

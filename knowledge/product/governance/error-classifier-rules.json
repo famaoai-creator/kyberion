@@ -341,7 +341,7 @@
       "explanation": "The current persona is not authorized for this tenant scope.",
       "required_role": "mission_controller with tenant binding",
       "repair_steps": [
-        "Set KYBERION_CUSTOMER to the correct tenant slug.",
+        "Set KYBERION_TENANT to the correct tenant slug (KYBERION_STANCE selects the stance, not the tenant).",
         "Verify the tenant slug is registered in knowledge/confidential/{tenant}/.",
         "Ensure KYBERION_PERSONA is bound to this tenant in the mission state."
       ]

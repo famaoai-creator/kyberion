@@ -1,10 +1,7 @@
 /** Read-only commit-time revalidation. Admission never creates a standing grant. */
-import {
-  loadApprovalRequest,
-  evaluateApprovalUsability,
-  isApprovalRequestExpired,
-  computeApprovalPayloadHash,
-} from './approval-store.js';
+import { loadApprovalRequest, isApprovalRequestExpired } from './approval-store-reader.js';
+import { evaluateApprovalUsability } from './approval-separation-of-duties.js';
+import { computeApprovalPayloadHash } from './approval-presentation.js';
 import { findActiveCharter, loadCharterUsage } from './accountability-charter-registry.js';
 import type { ApprovalGateCharterInput } from './approval-gate-charter.js';
 import type { Charter } from './accountability-charter.js';

@@ -46,7 +46,7 @@ import {
 import chalk from 'chalk';
 import { summarizeBackupStatus } from './backup.js';
 import { readTextFile } from '@agent/core/foundation';
-import { activeCustomer } from '@agent/core/customer-resolver';
+import { activeStance } from '@agent/core/stance-resolver';
 import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import {
   parsePersonalSovereignIdentity,
@@ -77,7 +77,7 @@ export function readDashboardTextFile(filePath: string): string {
 function resolveDashboardTenantSlug(): string | null {
   const onboardingState = readDashboardOnboardingState();
   const onboardingTenant = onboardingState?.tenants?.entries?.[0]?.tenant_slug?.trim();
-  return onboardingTenant || activeCustomer() || null;
+  return onboardingTenant || activeStance() || null;
 }
 
 function getDashboardFocus(argv: string[] = []): DashboardFocus {
@@ -721,7 +721,7 @@ function drawOnboardingHome() {
   );
 
   const recommendedNextAction = !onboardingComplete
-    ? 'Run `pnpm onboarding` (customer/{slug}/ preferred when KYBERION_CUSTOMER is set) and resume the current phase.'
+    ? 'Run `pnpm onboarding` (knowledge/personal/stances/{slug}/ preferred when KYBERION_STANCE is set) and resume the current phase.'
     : blockedServices.length > 0
       ? `Review ${blockedServices.join(', ')} connection drafts.`
       : tenantEntries.length === 0

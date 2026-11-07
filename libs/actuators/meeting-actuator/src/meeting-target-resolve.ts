@@ -9,8 +9,8 @@
  */
 
 import { resolveMeetingPlatformByHost } from '@agent/core/meeting/meeting-platform-registry';
-import { stripTags } from '@agent/core/html-sanitize';
-import { decodeEntities } from '@agent/core/text-escaping';
+import { stripTags } from '@agent/core/foundation/html-sanitize';
+import { decodeEntities } from '@agent/core/foundation/text-escaping';
 
 export type JoinablePlatform = 'meet' | 'zoom' | 'teams';
 

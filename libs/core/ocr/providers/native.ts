@@ -4,7 +4,7 @@ import { pathResolver } from '../../path-resolver.js';
 import { assertSafeRepositoryPath, validateFileSize } from '../../secure-io.js';
 import { spawnManagedProcess } from '../../managed-process.js';
 import { parseSafeJsonObjectInput } from '../../foundation/safe-json.js';
-import { OcrRequest, OcrResult, OcrProvider } from '../../ocr-types.js';
+import { OcrRequest, OcrResult, OcrProvider } from '../../contracts/ocr-types.js';
 import {
   probeWindowsNativeImageRecognition,
   recognizeTextWithWindowsNativeApi,

@@ -30,7 +30,7 @@ import {
   createExecutionBoundsState,
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '../execution-bounds.js';
+} from '../contracts/execution-bounds.js';
 
 // Lazily created: actuator-sdk sits on every pipeline entry point's import
 // path, and ajv is only needed once a contract input validator is compiled.
