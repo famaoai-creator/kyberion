@@ -45,6 +45,10 @@
       "type": "string",
       "enum": ["read", "write", "mkdir", "metadata"]
     },
+    "resource_access_custody": {
+      "type": "string",
+      "enum": ["system", "tenant", "person"]
+    },
     "narrow_path_rule": {
       "type": "object",
       "additionalProperties": false,
@@ -98,6 +102,16 @@
               "type": "array",
               "items": { "type": "string", "minLength": 1 },
               "minItems": 1
+            },
+            "custody": {
+              "anyOf": [
+                { "$ref": "#/$defs/resource_access_custody" },
+                {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/resource_access_custody" },
+                  "minItems": 1
+                }
+              ]
             },
             "exact": {
               "type": "object",
