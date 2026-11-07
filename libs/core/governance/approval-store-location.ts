@@ -27,6 +27,8 @@ import * as path from 'node:path';
 import { resolveIdentityContext, withExecutionContext } from '../authority.js';
 import { appendJsonLine, readJsonLines, writeJson } from '../foundation/json.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
+import { currentExecutionScope } from '../foundation/execution-scope.js';
+import { withScopeEnvOnly } from '../foundation/scope-resolution-mode.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
 import {
@@ -289,7 +291,18 @@ function asPersonalApprovalStore<T>(
   writing: boolean,
   fn: () => T
 ): T {
-  return withPersonalApprovalIo(partition.owner_hash, logicalPath, writing, fn);
+  // G2 keeps the caller's role; its facade clears execution bindings inside
+  // the window. Refuse an explicit tenant before that unbound IO context opens.
+  const execution = currentExecutionScope();
+  if (execution?.tenantBound && execution.tenantSlug)
+    throw new Error(
+      '[PERSONAL_APPROVAL_SCOPE_REQUIRED] Explicit tenant binding cannot access an owner partition'
+    );
+  // Ignore only persisted operator scope while performing the exact owner IO.
+  // Registered environment tenant bindings still reach the normal tier guard.
+  return withPersonalApprovalIo(partition.owner_hash, logicalPath, writing, () =>
+    withScopeEnvOnly(fn)
+  );
 }
 
 // ---------------------------------------------------------------------------

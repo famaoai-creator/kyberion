@@ -8,6 +8,8 @@ import {
   applyOnboardingAuthority,
 } from '@agent/core/organization/onboarding-authority';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
+import { createLogger } from '@agent/core/logger';
+import { toWireError } from '@agent/core/contracts/wire-error';
 import { resolveConciergeViewer } from '../../../lib/viewer-context';
 import {
   asOnboardingOwner,
@@ -16,10 +18,50 @@ import {
 import { readRequestObject } from '../../../lib/request-input';
 import { requireConciergeInstallationAccess } from '../../../lib/installation-access';
 export const dynamic = 'force-dynamic';
+const logger = createLogger('concierge-onboarding-authority');
+/**
+ * Failures shown to the person, by allowlist: this domain's own refusals,
+ * the principal / installation codes, the route's own literals and the
+ * approval and charter refusals a person can cause (a repeated apply, a
+ * changed request). Anything else (role, policy or storage violations, raw
+ * fs errors) can carry internal detail such as absolute paths: it is logged
+ * server-side under a correlation id and answered with the generic wire
+ * error, never echoed to the browser.
+ */
+const ROUTE_REFUSALS = new Set([
+  'invalid scope query',
+  'invalid continuation fields',
+  'request_id required',
+  'reviewed digest required',
+  'unknown authority action',
+]);
+const DOMAIN_REFUSAL =
+  /^\[(?:ONBOARDING_AUTHORITY\] |POLICY_VIOLATION\] (?:Approval |A current approved |Final approval )|CHARTER_SCOPE_DENIED\] )/u;
+const CODE = /^[a-z][a-z0-9_]{2,80}$/u;
+const PATH_LIKE = /(?:^|[\s'"(=:])(?:\/|[A-Za-z]:\\|(?:active|knowledge|libs)\/)/u;
+function onboardingAuthorityFailureIsShown(message: string): boolean {
+  if (PATH_LIKE.test(message)) return false;
+  return ROUTE_REFUSALS.has(message) || CODE.test(message) || DOMAIN_REFUSAL.test(message);
+}
 const response = (value: unknown, status = 200) =>
   NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
 function failure(error: unknown) {
   const message = error instanceof Error ? error.message : 'onboarding_authority_unavailable';
+  if (!onboardingAuthorityFailureIsShown(message)) {
+    const safe = toWireError({ status: 500, message });
+    logger.warn(
+      `onboarding authority request failed — internal error | next: inspect the core failure | evidence: correlation_id=${safe.correlation_id} ${message}`
+    );
+    return response(
+      {
+        ok: false,
+        error: safe.message,
+        error_code: safe.code,
+        correlation_id: safe.correlation_id,
+      },
+      500
+    );
+  }
   if (message === 'authentication_required') return response({ ok: false, error: message }, 401);
   if (message === 'installation_owner_required' || message === 'installation_step_up_required')
     return response({ ok: false, error: message, error_code: message }, 403);
