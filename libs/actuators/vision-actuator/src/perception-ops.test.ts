@@ -21,8 +21,8 @@ vi.mock('@agent/shared-video/ingest', async (importOriginal) => ({
   buildVideoBrief: mocks.buildVideoBrief,
 }));
 
-vi.mock('@agent/core/dirty-tile-describer', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/dirty-tile-describer')>()),
+vi.mock('./dirty-tile-describer.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./dirty-tile-describer.js')>()),
   describeScreenDelta: mocks.describeScreenDelta,
 }));
 

@@ -194,12 +194,7 @@ export * from './report-contract.js';
 export * from './facet-registry.js';
 
 export * from './design-qa.js';
-
 export * from './apple-intelligence-bridge.js';
-
-export * from './apple-speech-file-stt-bridge.js';
-
-export * from './ten-vad-bridge.js';
 
 export * from './mission/mission-hygiene.js';
 
@@ -226,8 +221,6 @@ export * from './storage-layout.js';
 export * from './scratch-promotion.js';
 
 export * from './config-change.js';
-
-export * from './mcp-request-context.js';
 
 export * from './protocol-service-registry.js';
 

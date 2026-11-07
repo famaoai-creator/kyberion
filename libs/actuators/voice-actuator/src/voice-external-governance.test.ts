@@ -65,7 +65,7 @@ vi.mock('@agent/core/virtual/virtual-audio-input-recording-bridge', () => ({
     captureStream: processMocks.captureStream,
   }),
 }));
-vi.mock('@agent/core/obs-virtual-camera-output', () => ({
+vi.mock('@agent/shared-video/obs-virtual-camera-output', () => ({
   installObsVirtualCameraOutputBridge: vi.fn(() => {
     if (processMocks.cameras.has('obs-virtual-cam')) throw new Error('duplicate registration');
     processMocks.cameras.set('obs-virtual-cam', {
@@ -75,7 +75,7 @@ vi.mock('@agent/core/obs-virtual-camera-output', () => ({
     });
   }),
 }));
-vi.mock('@agent/core/v4l2-virtual-camera-output', () => ({
+vi.mock('@agent/shared-video/v4l2-virtual-camera-output', () => ({
   installV4l2VirtualCameraOutputBridge: vi.fn(() => {
     if (processMocks.cameras.has('v4l2-virtual-cam')) throw new Error('duplicate registration');
     processMocks.cameras.set('v4l2-virtual-cam', {
@@ -153,7 +153,7 @@ import {
 import { recordVoiceSample } from '@agent/shared-voice/voice-sample-recorder';
 import { outputToVirtualCamera } from './voice-media-output-helpers.js';
 import { safeExecShellScript } from '@agent/core/secure-io';
-import { installObsVirtualCameraOutputBridge } from '@agent/core/obs-virtual-camera-output';
+import { installObsVirtualCameraOutputBridge } from '@agent/shared-video/obs-virtual-camera-output';
 
 const trusted = <T>(body: () => T) =>
   withExternalOperationAuthority(
