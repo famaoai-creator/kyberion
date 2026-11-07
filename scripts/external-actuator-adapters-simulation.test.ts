@@ -150,9 +150,9 @@ describe('external adapters with real approval persistence simulation', () => {
     const request = await captureSimulationApproval(execute);
     expect(sent).toEqual([]);
     approveSimulationRequest(request);
-    execute();
+    await execute();
     expect(sent).toEqual([['push', '--', remote, `${sha}:refs/heads/feature`]]);
-    expect(execute).toThrow('EXTERNAL_EXECUTION_ALREADY_RESERVED');
+    await expect(execute()).rejects.toThrow('EXTERNAL_EXECUTION_ALREADY_RESERVED');
     expect(sent).toHaveLength(1);
     observations.push({
       operation: 'vcs:push',
@@ -189,7 +189,7 @@ describe('external adapters with real approval persistence simulation', () => {
     const request = await captureSimulationApproval(execute);
     approveSimulationRequest(request);
     sha = 'c'.repeat(40);
-    expect(execute).toThrow('effect_mismatch');
+    await expect(execute()).rejects.toThrow('effect_mismatch');
     expect(sent).not.toHaveBeenCalled();
     observations.push({
       operation: 'vcs:push',

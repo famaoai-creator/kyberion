@@ -826,7 +826,8 @@ export function ghPrCreate(
 
 /**
  * Verified repo visibility for delegation gating — never trust a claim.
- * Supported sync probe: `gitPush` and onboarding grant creation are sync.
+ * @deprecated Use `vcsHostRepositoryVisibility` (`@agent/core/vcs/vcs-host-verbs`). Kept for the
+ *   deprecated sync PR verbs and the parity tests; new callers are rejected by `check:vcs-host-boundary`.
  */
 export function ghRepositoryVisibility(
   params: GhCallOptions & { repository?: { host: string; slug: string } },

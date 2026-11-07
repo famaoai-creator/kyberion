@@ -40,7 +40,7 @@ describe('CLI identity provisioning with actual NHI and signed authority stores'
       f.root,
       'knowledge/personal/onboarding/development-combined-reviewed.json'
     );
-    const plan = onboarding.buildDelegationInput(new Date(), {
+    const plan = await onboarding.buildDelegationInput(new Date(), {
       remote: 'https://github.com/fixture/repo',
     });
     f.run(() => safeWriteFile(source, JSON.stringify(plan)));

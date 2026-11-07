@@ -66,7 +66,7 @@ export async function runStandardPrLifecycle(
     assertOk(gitCommit(cwd, params.commit_message, exec), 'git commit -m');
   }
   assertOk(
-    gitPush(cwd, { remote: 'origin', ref: params.branch_name, setUpstream: true }, exec),
+    await gitPush(cwd, { remote: 'origin', ref: params.branch_name, setUpstream: true }, exec),
     'git push'
   );
   const bodyFile = pathResolver.rootResolve(
