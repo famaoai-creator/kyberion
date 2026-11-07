@@ -127,6 +127,21 @@ describe('admitsTenant (row-level tenant admission)', () => {
 });
 
 describe('admitsCustody (P4 — custody-kind row admission)', () => {
+  it('validates both literal owner aliases before choosing custody', () => {
+    const viewer = { tenantSlugs: 'all' as const, principalId: 'alice' };
+    expect(admitsCustody(viewer, custodyOfScope({ nhi_id: 'alice' }))).toBe(true);
+    expect(admitsCustody(viewer, custodyOfScope({ owner_nhi: 'alice', nhi_id: 'alice' }))).toBe(
+      true
+    );
+    for (const scope of [
+      { owner_nhi: '', nhi_id: 'alice' },
+      { owner_nhi: 'alice', nhi_id: '' },
+      { owner_nhi: 'alice', nhi_id: 'bob' },
+      { nhi_id: ' alice ' },
+      { nhi_id: 12 },
+    ])
+      expect(admitsCustody(viewer, custodyOfScope(scope))).toBe(false);
+  });
   it('fails closed on malformed identities and declarations without widening legacy tenant absence', () => {
     const all = { tenantSlugs: 'all' as const, principalId: 'owner' };
     for (const scope of [
@@ -190,6 +205,13 @@ describe('admitsCustody (P4 — custody-kind row admission)', () => {
       ref: 'acme',
     });
     expect(custodyOfScope({ owner_nhi: 'human:x' })).toEqual({ kind: 'person', ref: 'human:x' });
+    // `nhi_id` is the governed (event-scope) person-binding field — one
+    // binding vocabulary with owner_nhi (approval-review-scope equivalence).
+    expect(custodyOfScope({ nhi_id: 'human:x' })).toEqual({ kind: 'person', ref: 'human:x' });
+    expect(custodyOfScope({ tenant_slug: 'acme', nhi_id: 'human:x' })).toEqual({
+      kind: 'tenant',
+      ref: 'acme',
+    });
     expect(custodyOfScope({})).toEqual({ kind: 'system' });
     expect(custodyOfScope(null)).toEqual({ kind: 'system' });
     expect(custodyOfScope(undefined)).toEqual({ kind: 'system' });

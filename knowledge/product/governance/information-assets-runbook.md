@@ -16,6 +16,8 @@ Viewer の person IDs と tenant allowlist は認証済み server context から
 
 reader で許可したレコードを queue card に変換するときも owner / audience を保持する。helper 単体だけでなく、実 reader の結果を queue builder に渡し、tenant を持つ本人の owner-only card と audience の共有 card が残り、他人や明示 tenant 選択では除外されることを確認する。
 
+governed record の `nhi_id` と memory record の `owner_nhi` は、開示時には同じ person binding の別名として扱う。両方あれば同じ非空の literal ID が必要であり、空白除去、先勝ち、role からの本人推測は行わない。本人が複数 tenant に属していても tenantless の本人レコードは表示できるが、関連 mission の tenant を後付けして他人へ開示してはならない。
+
 変更時は surface authorization / workspace graph / needs-you sources と Concierge の discussion・memory・distill scope テストを実行する。public-only viewer、permission がない viewer、本人、同じ tenant の他人、未知の principal、および明示 tenant 選択で owner/system レコードが除外されるケースを含める。
 
 ## 所在を登録する

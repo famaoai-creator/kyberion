@@ -87,7 +87,7 @@ export function needsYouKnowledgeFromCandidate(
       ? { organization_id: candidate.scope.organization_id }
       : {}),
     ...(candidate.scope?.project_id ? { project_id: candidate.scope.project_id } : {}),
-    ...(candidate.scope?.owner_nhi ? { owner_nhi: candidate.scope.owner_nhi } : {}),
+    ...personCustodyFields(candidate.scope),
     ...(candidate.scope?.allowed_audience
       ? { allowed_audience: candidate.scope.allowed_audience }
       : {}),
@@ -119,7 +119,8 @@ function knowledgeFor(viewer: SurfaceAuthorizationContext): NeedsYouKnowledgeInp
       const audienceMatch = audience.some((id) => ids.includes(id));
       if (audience.length && !audienceMatch) return false;
       if (scope?.owner_nhi && !ids.includes(scope.owner_nhi) && !audienceMatch) return false;
-      if (sourceTier === 'personal' && !scope?.owner_nhi && !audienceMatch) return false;
+      if (sourceTier === 'personal' && custodyOfScope(scope).kind !== 'person' && !audienceMatch)
+        return false;
       return true;
     })
     .map((candidate) => needsYouKnowledgeFromCandidate(candidate));

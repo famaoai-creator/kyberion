@@ -965,6 +965,41 @@ describe('asset-derivation (P3 contract)', () => {
     vi.stubEnv('MISSION_ROLE', 'mission_controller');
   });
 
+  it('never promotes a tenant-bound ambient caller to write personal lineage or producer receipts', () => {
+    const g = freshGraph();
+    const member = `fixture-member-${randomUUID().slice(0, 8)}`;
+    const source = `knowledge/personal/${member}/docs/source.md`;
+    const derived = `knowledge/personal/${member}/summaries/result.md`;
+    write(g.root, source, 'personal fixture source');
+    write(g.root, derived, 'personal fixture result');
+    const previousTenant = process.env.KYBERION_TENANT;
+    try {
+      vi.stubEnv('MISSION_ROLE', 'infrastructure_sentinel');
+      vi.stubEnv('KYBERION_TENANT', 'acme');
+      expect(() =>
+        recordDerivation({
+          derived: { path: derived, kind: 'summary' },
+          sources: [{ kind: 'path', path: source }],
+          options: g.opts,
+        })
+      ).toThrow(/DERIVATION_ISSUER_REQUIRED/);
+    } finally {
+      vi.stubEnv('MISSION_ROLE', 'mission_controller');
+      vi.stubEnv('KYBERION_TENANT', previousTenant);
+    }
+    for (const partition of ['system', `personal/${member}`])
+      expect(
+        safeExistsSync(
+          path.join(
+            g.root,
+            'active/shared/runtime/asset-derivations',
+            partition,
+            'derivations.jsonl'
+          )
+        )
+      ).toBe(false);
+  });
+
   it('lists derived paths for the custodian (janitor query surface)', () => {
     const root2 = path.join(
       pathResolver.rootDir(),

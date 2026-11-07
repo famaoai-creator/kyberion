@@ -43,8 +43,16 @@ export function workHomeRecordInScope(viewer: SurfaceViewerScope, value: unknown
     organizationId: 'organization_id',
     projectId: 'project_id',
     ownerNhi: 'owner_nhi',
+    nhiId: 'nhi_id',
   };
-  const fields = new Set(['tier', 'tenant_slug', 'organization_id', 'project_id', 'owner_nhi']);
+  const fields = new Set([
+    'tier',
+    'tenant_slug',
+    'organization_id',
+    'project_id',
+    'owner_nhi',
+    'nhi_id',
+  ]);
   function collect(input: unknown, depth: number): boolean {
     if (!input || typeof input !== 'object' || Array.isArray(input) || depth > 3) return false;
     const record = input as Record<string, unknown>;
@@ -79,11 +87,15 @@ export function workHomeRecordInScope(viewer: SurfaceViewerScope, value: unknown
   try {
     const normalized = normalizeEventScope(claims as EventScopeInput);
     return (
-      // `owner_nhi` is not an EventScope field — feed it to custody
-      // derivation so an owner-bound record admits to its owner only.
+      // `owner_nhi` is not an EventScope field (`nhi_id` is) — feed both
+      // to custody derivation so an owner-bound record admits to its owner only.
       admitsCustody(
         viewer,
-        custodyOfScope({ tenant_slug: normalized.tenant_slug, owner_nhi: claims.owner_nhi })
+        custodyOfScope({
+          tenant_slug: normalized.tenant_slug,
+          owner_nhi: claims.owner_nhi,
+          nhi_id: claims.nhi_id,
+        })
       ) &&
       (viewer.organizationIds === 'all' ||
         Boolean(
