@@ -193,9 +193,9 @@ its own implementation and evidence before being described as enforced.
 ## Existing sources of truth
 
 - NHI identity lifecycle and journal: `libs/core/agent/agent-identity.ts`,
-  `libs/core/nhi-lifecycle-governance.ts`, and `scripts/nhi.ts`.
-- Personal identity resolution: `libs/core/personal-identity-state.ts` and
-  `libs/core/personal-identity-reader.ts`.
+  `libs/core/agent/nhi-lifecycle-governance.ts`, and `scripts/nhi.ts`.
+- Personal identity resolution: `libs/core/authn/personal-identity-state.ts` and
+  `libs/core/authn/personal-identity-reader.ts`.
 - Tenant runtime admission: `libs/core/organization/nhi-session-admission.ts`
   and `libs/core/organization/onboarding-runtime-identity.ts`.
 - Organization responsibilities: `libs/core/organization/organization-participants.ts`

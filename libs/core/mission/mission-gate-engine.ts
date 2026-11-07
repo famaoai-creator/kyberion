@@ -11,7 +11,7 @@ import { readTextFile } from '../foundation/text.js';
 import {
   type StructuredOutputSchemaName,
   resolveStructuredOutputSchema,
-} from '../structured-output-contracts.js';
+} from '../contracts/structured-output-contracts.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -27,7 +27,7 @@ import {
   evaluateDeliverableQuality,
   inferDeliverableKind,
   qualityScoreFromReport,
-} from '../deliverable-quality.js';
+} from '../task/deliverable-quality.js';
 import {
   evaluateAcceptanceCriteria,
   evaluateDefinitionOfDone,
@@ -38,11 +38,11 @@ import {
   parseTestInventory,
   type SoftwareQualityContract,
   type SoftwareQualityReportSummary,
-} from '../software-quality.js';
+} from '../testing/software-quality.js';
 import {
   evaluateQualityEnforcement,
   type QualityEnforcementMode,
-} from '../software-quality-operations.js';
+} from '../testing/software-quality-operations.js';
 import { persistMissionAiDlcGateProjection } from './mission-aidlc-gate-projection.js';
 import { fingerprintMissionGateInputs } from './mission-gate-input-fingerprint.js';
 import { existingMissionPath } from './mission-gate-record-reader.js';

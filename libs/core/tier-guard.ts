@@ -118,7 +118,7 @@ type PolicyLoad = { status: 'loaded'; policy: any } | { status: 'missing' } | { 
 let corruptPolicyWarned = false;
 
 /**
- * A missing policy preserves bootstrap access outside protected durable state.
+ * A missing policy preserves role-less bootstrap access outside protected durable state.
  * A policy that exists but cannot be parsed must NOT silently disable tier
  * isolation — protected tiers fail closed until the file is repaired.
  */
@@ -535,7 +535,8 @@ function isScopedStructuralMkdir(
   relativePath: string,
   protectedPrefix: string,
   tenantSlug: string | undefined,
-  access: { kind: 'read' | 'write' | 'append' | 'mkdir'; role?: string }
+  access: { kind: 'read' | 'write' | 'append' | 'mkdir'; role?: string },
+  policy: unknown
 ): boolean {
   if (access.kind !== 'mkdir') return false;
   // G3: a live store grant may decide its own structural container (the PR publication grant:
@@ -564,10 +565,7 @@ function isScopedStructuralMkdir(
   // (authority_role_permissions.<role>.narrow.structural_mkdir).
   if (
     !sharedChecks &&
-    !(
-      access.role !== undefined &&
-      roleNarrowAllowsStructuralMkdir(requestResourceDenialPolicy(), access.role)
-    )
+    !(access.role !== undefined && roleNarrowAllowsStructuralMkdir(policy, access.role))
   )
     return false;
   const resource = currentResourceAccessScope();
@@ -679,7 +677,8 @@ function checkTenantScope(
   }
   const targetTenant = scoped.tenant;
   if (!targetTenant || !cfg.slugPattern.test(targetTenant) || !isValidTenantSlug(targetTenant)) {
-    if (isScopedStructuralMkdir(relativePath, scoped.prefix, tenantSlug, access)) return null;
+    if (isScopedStructuralMkdir(relativePath, scoped.prefix, tenantSlug, access, policy))
+      return null;
     // Pre-tenant migrations stored a mission directly under
     // active/missions/confidential/{MISSION_ID}/. Keep that layout usable
     // only for an unmistakable legacy mission directory. A non-slug mission
@@ -892,20 +891,10 @@ function recordGroupAccess(input: {
 
 export type { WriteContent };
 
-/**
- * The policy the narrow declarations live in, loaded for requestResourceDenial
- * (which runs before the callers' own loadPolicy). Missing or corrupt policy
- * carries no declarations, so role narrowing is simply absent there — the same
- * fail-open posture the rest of the unprotected surface already takes.
- */
-function requestResourceDenialPolicy(): unknown {
-  const loaded = loadPolicy();
-  return loaded.status === 'loaded' ? loaded.policy : undefined;
-}
-
 function requestResourceDenial(
   relativePath: string,
   operation: ResourceAccessOperation,
+  getPolicy: () => PolicyLoad,
   content?: WriteContent
 ): { allowed: false; reason: string } | null {
   const denial = resourceAccessDenial(relativePath, operation);
@@ -988,20 +977,26 @@ function requestResourceDenial(
   // G3: deny-only role narrowing is a security-policy declaration
   // (authority_role_permissions.<role>.narrow), evaluated by one generic rule —
   // per-role modules and role-name branches are gone from the gate. A missing or
-  // corrupt policy holds no declarations, so no narrowing is evaluated there;
-  // with no assumed role the policy is not even loaded.
-  const roleDenial = normalizedRole
-    ? roleNarrowingDenial({
-        policy: requestResourceDenialPolicy(),
-        role: normalizedRole,
-        relativePath,
-        operation,
-        scope: currentResourceAccessScope(),
-        content,
-        readRepoFile,
-      })
-    : null;
-  if (roleDenial) return { allowed: false, reason: roleDenial };
+  // corrupt policy must not remove an explicit role's deny-only constraints.
+  // With no assumed role the policy is not loaded by this stage.
+  if (normalizedRole) {
+    const narrowingPolicy = getPolicy();
+    if (narrowingPolicy.status !== 'loaded')
+      return {
+        allowed: false,
+        reason: `[ROLE_NARROWING_POLICY_UNAVAILABLE] security-policy.json is ${narrowingPolicy.status}; restore a valid policy before role '${normalizedRole}' performs resource I/O`,
+      };
+    const roleDenial = roleNarrowingDenial({
+      policy: narrowingPolicy.policy,
+      role: normalizedRole,
+      relativePath,
+      operation,
+      scope: currentResourceAccessScope(),
+      content,
+      readRepoFile,
+    });
+    if (roleDenial !== null) return { allowed: false, reason: roleDenial };
+  }
   return null;
 }
 
@@ -1016,12 +1011,18 @@ function decide(
   filePath: string,
   operation: ResourceAccessOperation,
   content?: WriteContent
-): { denied: { allowed: false; reason: string } } | { resolvedPath: string; relativePath: string } {
+):
+  | { denied: { allowed: false; reason: string } }
+  | { resolvedPath: string; relativePath: string; getPolicy: () => PolicyLoad } {
   const resolvedPath = path.resolve(filePath);
   const relativePath = normalizePath(policyRelativePath(resolvedPath));
-  const resourceDenial = requestResourceDenial(relativePath, operation, content);
+  // One lazy snapshot for narrowing and base/structural checks. Besides avoiding
+  // duplicate I/O, this cannot combine an allow from two different policy versions.
+  let policy: PolicyLoad | undefined;
+  const getPolicy = () => (policy ??= loadPolicy());
+  const resourceDenial = requestResourceDenial(relativePath, operation, getPolicy, content);
   if (resourceDenial) return { denied: resourceDenial };
-  return { resolvedPath, relativePath };
+  return { resolvedPath, relativePath, getPolicy };
 }
 
 export function validateWritePermission(
@@ -1053,7 +1054,7 @@ export function validateWritePermission(
   const identity = resolvePolicyIdentityContext();
   const { role: currentRole, authorities, tenantSlug, brokeredTenants, brokerApproval } = identity;
 
-  const loaded = loadPolicy();
+  const loaded = decided.getPolicy();
   if (loaded.status === 'missing') {
     return isProtectedRuntimeStatePath(relativePath)
       ? MISSING_RUNTIME_STATE_POLICY_DENIAL
@@ -1229,7 +1230,7 @@ export function inspectReadPermission(
     (/\/(?:personal|confidential)\//u.test(relativePath) ||
       isProtectedStorageFloorTier(partitionedRuntimeStateTierInPath(relativePath)))
   ) {
-    const loaded = loadPolicy();
+    const loaded = decided.getPolicy();
     if (loaded.status === 'missing' && isProtectedRuntimeStatePath(relativePath)) {
       return MISSING_RUNTIME_STATE_POLICY_DENIAL;
     }
@@ -1341,7 +1342,7 @@ export function inspectReadPermission(
     return { allowed: true };
   }
 
-  const loaded = loadPolicy();
+  const loaded = decided.getPolicy();
   if (loaded.status === 'missing') return { allowed: true };
   if (loaded.status === 'corrupt') return CORRUPT_POLICY_DENIAL;
   const policy = loaded.policy;

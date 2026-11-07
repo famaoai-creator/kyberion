@@ -35,7 +35,7 @@ import {
   PIPELINE_JOURNAL_GRANT_ISSUANCE_RIGHT,
   withPipelineJournalCapability,
 } from '../foundation/pipeline-journal-capability.js';
-import { missionTierScanDirs } from '../owner-scope.js';
+import { missionTierScanDirs } from '../governance/owner-scope.js';
 import {
   appendValidatedJournalEvent,
   EventSourcingKernel,

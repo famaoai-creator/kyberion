@@ -150,7 +150,7 @@ A dedicated network service, cross-tenant federation, automated peer scheduling,
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | Intent routing and execution shape             | knowledge/product/governance/work-policy.json and intent contracts                           |
 | Bounded provider delegation                    | Reasoning backends, libs/core/task/task-executor.ts, provider permission profiles            |
-| Same-checkout local collaboration              | libs/core/co-session.ts, scripts/co_session.ts                                               |
+| Same-checkout local collaboration              | libs/core/workforce/co-session.ts, scripts/co_session.ts                                     |
 | Kyberion-to-Kyberion transport                 | libs/core/mesh/peer-messaging.ts, scripts/peer_conversation_server.ts                        |
 | Same-tenant discovery and allowlisted routing  | Mesh Hub modules and [Mesh Hub v1 ADR](./decisions/2026-06-24-mesh-hub-v1-boundaries.md)     |
 | Durable task, ownership, and mission lifecycle | Work coordination and scripts/mission_controller.ts                                          |

@@ -14,7 +14,7 @@
  * are tenant-owned free text, so the surface renders `label_text` for them
  * and applies its vocabulary/i18n gate only to `label_source: 'vocabulary'`.
  */
-import type { ActorRef } from '../actor.js';
+import type { ActorRef } from '../contracts/actor.js';
 import {
   DECISIONS_SCENARIO_PREFIX,
   DECISION_SAFE_SEGMENT_PATTERN,

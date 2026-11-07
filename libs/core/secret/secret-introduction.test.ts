@@ -18,7 +18,7 @@ vi.mock('./secret-guard.js', () => ({
   storeConnectionDocument,
 }));
 
-vi.mock('../ledger.js', () => ({
+vi.mock('../governance/ledger.js', () => ({
   ledger: { record: vi.fn() },
 }));
 

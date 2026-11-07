@@ -3,10 +3,10 @@ import {
   type AutonomousOpsDecision,
   type AutonomousOpsGateResult,
 } from './autonomous-ops-gate.js';
-import { resolveLocale } from '../locale.js';
+import { resolveLocale } from '../localization/locale.js';
 import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import type { NotificationChannelTarget } from '../surface/operator-notifications.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 
 /**
  * The decision card — one screen that tells the

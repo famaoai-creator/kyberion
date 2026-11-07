@@ -6,7 +6,8 @@
  * Client supplied scope values must be narrowed before they reach this API.
  */
 
-import type { ResolvedPrincipal } from '../authn-principal-resolver.js';
+import type { ResolvedPrincipal } from '../authn/authn-principal-resolver.js';
+import { isValidTenantSlug } from '../foundation/scope.js';
 
 export type SurfaceAuthorizationRole = 'readonly' | 'localadmin';
 export type SurfaceAuthorizationEffect = 'read' | 'write';
@@ -113,7 +114,14 @@ function denied(
  * their person: disclosure can never admit "somebody's" data anonymously.
  */
 export type ViewerRecordCustody =
-  { kind: 'system' } | { kind: 'tenant'; ref: string } | { kind: 'person'; ref: string };
+  | { kind: 'system' }
+  | { kind: 'tenant'; ref: string }
+  | { kind: 'person'; ref: string }
+  | { kind: 'invalid' };
+
+function validPersonId(id: unknown): id is string {
+  return typeof id === 'string' && id.length > 0 && id.trim() === id && id !== '*';
+}
 
 /**
  * The server-resolved viewer scope fields custody admission reads. Readers
@@ -141,12 +149,12 @@ export function viewerPersonIds(
   }
 ): readonly string[] {
   const ids = [
-    ...(context.personIds ?? []),
+    ...(Array.isArray(context.personIds) ? context.personIds : []),
     context.memberId,
-    context.principal?.actor.id,
+    context.principal?.actor?.id,
     context.principalId,
   ];
-  return [...new Set(ids.filter((id): id is string => Boolean(id)))];
+  return [...new Set(ids.filter(validPersonId))];
 }
 
 /**
@@ -165,13 +173,19 @@ export function admitsCustody(
   context: ViewerCustodyContext,
   custody: ViewerRecordCustody
 ): boolean {
+  if (!custody || typeof custody !== 'object') return false;
   if (custody.kind === 'tenant') {
+    if (typeof custody.ref !== 'string' || !isValidTenantSlug(custody.ref)) return false;
     return context.tenantSlugs === 'all' || context.tenantSlugs.includes(custody.ref);
   }
   if (custody.kind === 'system') {
     return context.tenantSlugs === 'all' || context.includeUntenanted === true;
   }
-  return viewerPersonIds(context).includes(custody.ref);
+  return (
+    custody.kind === 'person' &&
+    validPersonId(custody.ref) &&
+    viewerPersonIds(context).includes(custody.ref)
+  );
 }
 
 /**
@@ -181,10 +195,22 @@ export function admitsCustody(
  * field keep their previous tenant/system behavior.
  */
 export function custodyOfScope(
-  scope: { tenant_slug?: string | null; owner_nhi?: string | null } | null | undefined
+  scope: { tenant_slug?: unknown; owner_nhi?: unknown } | null | undefined
 ): ViewerRecordCustody {
-  if (scope?.tenant_slug) return { kind: 'tenant', ref: scope.tenant_slug };
-  if (scope?.owner_nhi) return { kind: 'person', ref: scope.owner_nhi };
+  if (scope != null && (typeof scope !== 'object' || Array.isArray(scope)))
+    return { kind: 'invalid' };
+  // Preserve legacy null/empty tenant absence; declared malformed ownership
+  // never becomes installation-owned data through a truthiness fallback.
+  if (
+    scope?.tenant_slug != null &&
+    scope.tenant_slug !== '' &&
+    (typeof scope.tenant_slug !== 'string' || !isValidTenantSlug(scope.tenant_slug))
+  )
+    return { kind: 'invalid' };
+  if (scope?.owner_nhi != null && !validPersonId(scope.owner_nhi)) return { kind: 'invalid' };
+  if (typeof scope?.tenant_slug === 'string' && scope.tenant_slug)
+    return { kind: 'tenant', ref: scope.tenant_slug };
+  if (validPersonId(scope?.owner_nhi)) return { kind: 'person', ref: scope.owner_nhi };
   return { kind: 'system' };
 }
 
@@ -206,6 +232,11 @@ export function admitsScopeAudience(
     | null
     | undefined
 ): boolean {
+  if (
+    scope?.allowed_audience != null &&
+    (!Array.isArray(scope.allowed_audience) || !scope.allowed_audience.every(validPersonId))
+  )
+    return false;
   const custody = custodyOfScope(scope);
   if (admitsCustody(context, custody)) return true;
   if (custody.kind !== 'person') return false;

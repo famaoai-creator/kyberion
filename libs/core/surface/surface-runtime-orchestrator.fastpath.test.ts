@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 
 const mocks = vi.hoisted(() => {
   const safeExec = vi.fn();
@@ -77,16 +77,16 @@ vi.mock('../task/task-session.js', () => ({
   getActiveTaskSession: mocks.getActiveTaskSession,
 }));
 
-vi.mock('../capture-photo-task-session-executor.js', () => ({
+vi.mock('../task/capture-photo-task-session-executor.js', () => ({
   executeCapturePhotoTaskSession: mocks.executeCapturePhotoTaskSession,
 }));
 
-vi.mock('../execution-feedback.js', () => ({
+vi.mock('../knowledge/execution-feedback.js', () => ({
   recordExecutionFeedback: mocks.recordExecutionFeedback,
   parseExecutionFeedbackText: mocks.parseExecutionFeedbackText,
 }));
 
-vi.mock('../router-contract.js', () => ({
+vi.mock('../intent/router-contract.js', () => ({
   resolveSurfaceIntent: mocks.resolveSurfaceIntent,
   resolveDirectIntentCommand: () => null,
 }));

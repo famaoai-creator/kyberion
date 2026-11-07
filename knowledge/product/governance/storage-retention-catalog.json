@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/storage-retention-catalog.schema.json",
   "version": "1.11.0",
-  "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered. EV-06 extends coverage beyond active/shared/runtime/ to the append-only event stores (active/shared/observability/, active/shared/coordination/orchestration/events/, presence/bridge/runtime/): these sat outside every janitor scan root, so they were neither TTL-governed nor surfaced as uncovered. scanEventStores enforces their TTLs and listUncoveredEventStoreDirs reports undeclared event streams. WI-10 declares the work-inventory personal/member knowledge subtrees (knowledge/personal/work-inventory, knowledge/personal/members) as never-auto-delete evidence. WI-16 adds an entry-level status_rules vocabulary — a generic, declarative per-file status+age expiry rule nested under a directory entry — and uses it on knowledge/personal/members to expire stale pending_review and discarded work-inventory observation summaries by their own JSON status/date fields (see storage-janitor.ts's sweepStatusRules) without touching confirmed summaries, consents, or unrelated member records. G01/G02/G14 (ops-runtime-retention) declare the top-level ledgers and state files that sit directly in active/shared/runtime/ (dot-*.jsonl, mission_queue.jsonl, reasoning-failover-events.jsonl, …) and the remaining runtime subdirectories; listUncoveredRuntimeEntries now reports undeclared top-level files too (janitor report field uncoveredRuntimeFiles), and the runtime-store-retention check gate (scripts/check_runtime_store_retention.ts) fails when source references an active/shared/runtime/<name> store with no entry here. Top-level file entries carry no ttl_days: the janitor's mtime TTL walks directories and an append-only ledger's mtime never ages, so such files are either self-bounded (the note says how) or review_required.",
+  "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered. EV-06 extends coverage beyond active/shared/runtime/ to the append-only event stores (active/shared/observability/, active/shared/coordination/orchestration/events/, presence/bridge/runtime/): these sat outside every janitor scan root, so they were neither TTL-governed nor surfaced as uncovered. scanEventStores enforces their TTLs and listUncoveredEventStoreDirs reports undeclared event streams. WI-10 declares the work-inventory personal/member knowledge subtrees (knowledge/personal/work-inventory, knowledge/personal/members) as never-auto-delete evidence. WI-16 adds an entry-level status_rules vocabulary — a generic, declarative per-file status+age expiry rule nested under a directory entry — and uses it on knowledge/personal/members to expire stale pending_review and discarded work-inventory observation summaries by their own JSON status/date fields (see storage-janitor.ts's sweepStatusRules) without touching confirmed summaries, consents, or unrelated member records. G01/G02/G14 (ops-runtime-retention) declare the top-level ledgers and state files that sit directly in active/shared/runtime/ (dot-*.jsonl, mission_queue.jsonl, reasoning-failover-events.jsonl, …) and the remaining runtime subdirectories; listUncoveredRuntimeEntries now reports undeclared top-level files too (janitor report field uncoveredRuntimeFiles), and the runtime-store-retention check gate (scripts/check_runtime_store_retention.ts) fails when source references an active/shared/runtime/<name> store with no entry here. Top-level file entries carry no ttl_days: the janitor's mtime TTL walks directories and an append-only ledger's mtime never ages, so such files are either self-bounded (the note says how) or review_required.",
   "entries": [
     {
       "path": "active/personal/owners",
@@ -65,7 +65,7 @@
       "ttl_days": 1,
       "code_grace_days": 2,
       "action": "delete",
-      "note": "Formerly DEFAULT_TMP_TTL_MS (24h). Shared scratch floor — anything here is consumable by contract. Partitioned as tmp/system/<domain>/ or tmp/<tier>/<tenant|shared>/<domain>/ (libs/core/storage-layout.ts); unpartitioned subtrees are legacy call sites ratcheted by shared-tmp-allowlist.json. code_grace_days: an unpromoted job directory (tmp/<job>/, tmp/system/<domain>/<job>/, tmp/<tier>/<tenant|shared>/<domain>/<job>/) holding authored code or ADF keeps its files that many days beyond the TTL; the janitor warns with the exact pnpm scratch:promote command and lists it in active/shared/runtime/system/scratch-promotion-candidates.json (libs/core/scratch-promotion.ts)."
+      "note": "Formerly DEFAULT_TMP_TTL_MS (24h). Shared scratch floor — anything here is consumable by contract. Partitioned as tmp/system/<domain>/ or tmp/<tier>/<tenant|shared>/<domain>/ (libs/core/storage-layout.ts); unpartitioned subtrees are legacy call sites ratcheted by shared-tmp-allowlist.json. code_grace_days: an unpromoted job directory (tmp/<job>/, tmp/system/<domain>/<job>/, tmp/<tier>/<tenant|shared>/<domain>/<job>/) holding authored code or ADF keeps its files that many days beyond the TTL; the janitor warns with the exact pnpm scratch:promote command and lists it in active/shared/runtime/system/scratch-promotion-candidates.json (libs/core/storage/scratch-promotion.ts)."
     },
     {
       "path": "active/shared/runtime/system",
@@ -437,13 +437,13 @@
       "path": "active/shared/runtime/delegation-idempotency",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "R5 delegation idempotency reservations (libs/core/delegation-idempotency.ts): one JSON per idempotency key holding the payload hash and the terminal DelegationResult used for replay; a registered tier/tenant-partitioned runtime-state root (PARTITIONED_RUNTIME_STATE_ROOTS.delegation_idempotency): tenant reservations live under confidential/<tenant>/ (tier-guarded, removed by tenant offboarding), untenanted ones under system/. Deleting a terminal reservation re-enables execution for that key, so removal is a reviewed decision."
+      "note": "R5 delegation idempotency reservations (libs/core/workforce/delegation-idempotency.ts): one JSON per idempotency key holding the payload hash and the terminal DelegationResult used for replay; a registered tier/tenant-partitioned runtime-state root (PARTITIONED_RUNTIME_STATE_ROOTS.delegation_idempotency): tenant reservations live under confidential/<tenant>/ (tier-guarded, removed by tenant offboarding), untenanted ones under system/. Deleting a terminal reservation re-enables execution for that key, so removal is a reviewed decision."
     },
     {
       "path": "active/shared/runtime/delegation-records",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Delegated-task trace and resumable records (libs/core/delegated-task-observability.ts): a registered tier/tenant-partitioned runtime ledger root (PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations, store role delegation_record_store). system/ holds untenanted delegations; confidential/<tenant>/ holds tenant delegations (instruction, context and result text) — delegations.jsonl (append-only audit trace), records/<id>.json, records/child-inbox/<child>.jsonl and notifications.jsonl (the background-completion notification queue of libs/core/mission/delegation-notifications.ts: tenant instruction/result excerpts; claimed rows are kept as the delivered-once ledger). Tenant partitions are tenant_scope protected prefixes, read and written only as the tenant-bound delegation_record_store role; tenant offboarding exports and soft-deletes a tenant's partitions (target kind tenant_delegations). Records are the resume authority for continuable child sessions, so removal is a reviewed decision."
+      "note": "Delegated-task trace and resumable records (libs/core/workforce/delegated-task-observability.ts): a registered tier/tenant-partitioned runtime ledger root (PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations, store role delegation_record_store). system/ holds untenanted delegations; confidential/<tenant>/ holds tenant delegations (instruction, context and result text) — delegations.jsonl (append-only audit trace), records/<id>.json, records/child-inbox/<child>.jsonl and notifications.jsonl (the background-completion notification queue of libs/core/mission/delegation-notifications.ts: tenant instruction/result excerpts; claimed rows are kept as the delivered-once ledger). Tenant partitions are tenant_scope protected prefixes, read and written only as the tenant-bound delegation_record_store role; tenant offboarding exports and soft-deletes a tenant's partitions (target kind tenant_delegations). Records are the resume authority for continuable child sessions, so removal is a reviewed decision."
     },
     {
       "path": "active/shared/runtime/asset-derivations",
@@ -591,7 +591,7 @@
       "path": "active/shared/runtime/dot-wake-ledger.jsonl",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "G01: append-only resident-dot wake ledger (libs/core/dot/dot-runtime.ts). Load-bearing history: a delivered/rejected trigger key stays consumed forever, so truncating it would re-fire old inbox/watch/event wakes — never TTL-deleted. Hot-path reads (due-ness, wake circuit, per-skip dedupe) replay it incrementally via readJsonLinesCached (libs/core/jsonl-tail.ts). Self-bounding: compactDotWakeLedger() folds consumed (dot_id,trigger_key) pairs to the final consuming row while keeping live-key history intact; invoked opportunistically from recordDotWakeOutcome past 8 MiB."
+      "note": "G01: append-only resident-dot wake ledger (libs/core/dot/dot-runtime.ts). Load-bearing history: a delivered/rejected trigger key stays consumed forever, so truncating it would re-fire old inbox/watch/event wakes — never TTL-deleted. Hot-path reads (due-ness, wake circuit, per-skip dedupe) replay it incrementally via readJsonLinesCached (libs/core/storage/jsonl-tail.ts). Self-bounding: compactDotWakeLedger() folds consumed (dot_id,trigger_key) pairs to the final consuming row while keeping live-key history intact; invoked opportunistically from recordDotWakeOutcome past 8 MiB."
     },
     {
       "path": "active/shared/runtime/dot-token-usage.jsonl",
@@ -675,7 +675,7 @@
       "artifact_class": "evidence",
       "action": "review_required",
       "audit": true,
-      "note": "Dependency vulnerability ledger (libs/core/dependency-vulnerability-ledger.ts); security evidence trail. MSN-STORE-BOUNDS-2: full history is load-bearing (previous-state fold over every scan), so no retention; the reader streams with no size cap."
+      "note": "Dependency vulnerability ledger (libs/core/governance/dependency-vulnerability-ledger.ts); security evidence trail. MSN-STORE-BOUNDS-2: full history is load-bearing (previous-state fold over every scan), so no retention; the reader streams with no size cap."
     },
     {
       "path": "active/shared/runtime/current_mission_focus.json",
@@ -705,13 +705,13 @@
       "path": "active/shared/runtime/execution-feedback.json",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Execution feedback store (libs/core/execution-feedback.ts); self-bounded to the newest MAX_FEEDBACK_ENTRIES (500) entries on every write."
+      "note": "Execution feedback store (libs/core/knowledge/execution-feedback.ts); self-bounded to the newest MAX_FEEDBACK_ENTRIES (500) entries on every write."
     },
     {
       "path": "active/shared/runtime/external-service-registry.json",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Mutable runtime external-service registry (libs/core/external-service-registry.ts)."
+      "note": "Mutable runtime external-service registry (libs/core/service/external-service-registry.ts)."
     },
     {
       "path": "active/shared/runtime/intent-flow-cache.json",
@@ -762,7 +762,7 @@
       "artifact_class": "log",
       "ttl_days": 90,
       "action": "delete",
-      "note": "MSN-HARNESS-ADOPT R1: one JSON record per opt-in live backend scenario run (libs/core/backend-live-scenarios.ts recordBackendLiveScenarioRun, written by scripts/check_backend_live_scenarios.ts --live). Read by backend-capability-honesty.ts as session_continuity/abort evidence; stores answer excerpts of nonce prompts only, no task content. Stale measurements age out so honesty never rests on an old run."
+      "note": "MSN-HARNESS-ADOPT R1: one JSON record per opt-in live backend scenario run (libs/core/reasoning/backend-live-scenarios.ts recordBackendLiveScenarioRun, written by scripts/check_backend_live_scenarios.ts --live). Read by backend-capability-honesty.ts as session_continuity/abort evidence; stores answer excerpts of nonce prompts only, no task content. Stale measurements age out so honesty never rests on an old run."
     },
     {
       "path": "active/shared/runtime/tenant-rate-limit-state.json",
@@ -774,7 +774,7 @@
       "path": "active/shared/runtime/share-grant-live-sessions.json",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Live share-grant session registry (libs/core/share-grant-live-sessions.ts)."
+      "note": "Live share-grant session registry (libs/core/governance/share-grant-live-sessions.ts)."
     },
     {
       "path": "active/shared/runtime/service-receipts",
@@ -801,19 +801,19 @@
       "path": "active/shared/runtime/usage-ledger",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Tier/tenant-partitioned resource-usage ledgers (libs/core/metrics.ts RESOURCE_USAGE_LEDGER_ROOT): <tier>/<tenant|shared>/resource-usage.jsonl for usage whose scope carries a tenant or a personal/confidential tier; untenanted public usage stays in work/metrics/resource-usage.jsonl. Append-only cost/accounting evidence read by mission retrospectives, cost reports and generation-cost dedup, so no TTL deletion; personal/confidential subtrees are tenant_scope protected prefixes and follow the knowledge-tier persona read rules."
+      "note": "Tier/tenant-partitioned resource-usage ledgers (libs/core/analysis/metrics.ts RESOURCE_USAGE_LEDGER_ROOT): <tier>/<tenant|shared>/resource-usage.jsonl for usage whose scope carries a tenant or a personal/confidential tier; untenanted public usage stays in work/metrics/resource-usage.jsonl. Append-only cost/accounting evidence read by mission retrospectives, cost reports and generation-cost dedup, so no TTL deletion; personal/confidential subtrees are tenant_scope protected prefixes and follow the knowledge-tier persona read rules."
     },
     {
       "path": "active/shared/runtime/execution-metrics",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Tier/tenant-partitioned execution-metrics ledgers (libs/core/metrics.ts EXECUTION_METRICS_LEDGER_ROOT): <tier>/<tenant|shared>/execution-metrics.jsonl for MetricsCollector.record rows whose scope carries a tenant or a personal/confidential tier; untenanted public rows stay in work/metrics/execution-metrics.jsonl. Append-only latency/token/cost evidence read by cost reports, budget and spend guards, mission retrospectives and health regressions, so no TTL deletion; personal/confidential subtrees are tenant_scope protected prefixes and follow the knowledge-tier persona read rules; tenant offboarding exports and soft-deletes a tenant's partitions."
+      "note": "Tier/tenant-partitioned execution-metrics ledgers (libs/core/analysis/metrics.ts EXECUTION_METRICS_LEDGER_ROOT): <tier>/<tenant|shared>/execution-metrics.jsonl for MetricsCollector.record rows whose scope carries a tenant or a personal/confidential tier; untenanted public rows stay in work/metrics/execution-metrics.jsonl. Append-only latency/token/cost evidence read by cost reports, budget and spend guards, mission retrospectives and health regressions, so no TTL deletion; personal/confidential subtrees are tenant_scope protected prefixes and follow the knowledge-tier persona read rules; tenant offboarding exports and soft-deletes a tenant's partitions."
     },
     {
       "path": "active/shared/runtime/tenant-ledger",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "D9: hash-chained tenant partitions of the hybrid ledger (libs/core/ledger.ts TENANT_LEDGER_ROOT): <tier>/<tenant>/ledger.jsonl holds the metadata entries (MISSION_EVENT:*) of tenant missions and the detailed entries of tenant records without a mission ledger; the system ledger active/audit/system-ledger.jsonl keeps untenanted records only. Append-only audit evidence verified by pnpm audit:verify, so no TTL deletion and never rewritten; personal/confidential subtrees are tenant_scope protected prefixes, read and written as the tenant-bound tenant_ledger_store role; tenant offboarding exports and soft-deletes a tenant's partitions. MSN-STORE-BOUNDS-3: each <tier>/<tenant>/ledger.jsonl rotates itself into <tier>/<tenant>/ledger-YYYYMMDD-HHmmss[-n].jsonl under the tenant_ledger_store role (same chain-continuing design as active/audit/system-ledger.jsonl); verify, scoped reads and tenant backup/restore include the segments. The directory stays review_required: segments are tenant audit evidence, moved only by operator decision or the audited offboarding ceremony. Code never archives tenant segments, so a partition missing its oldest segments is always a verification finding (unproven_anchor) and tenant restore refuses it (BACKUP_RESTORE_LEDGER_INCOMPLETE). Mission evidence ledgers (<mission>/evidence/ledger.jsonl) do not rotate."
+      "note": "D9: hash-chained tenant partitions of the hybrid ledger (libs/core/governance/ledger.ts TENANT_LEDGER_ROOT): <tier>/<tenant>/ledger.jsonl holds the metadata entries (MISSION_EVENT:*) of tenant missions and the detailed entries of tenant records without a mission ledger; the system ledger active/audit/system-ledger.jsonl keeps untenanted records only. Append-only audit evidence verified by pnpm audit:verify, so no TTL deletion and never rewritten; personal/confidential subtrees are tenant_scope protected prefixes, read and written as the tenant-bound tenant_ledger_store role; tenant offboarding exports and soft-deletes a tenant's partitions. MSN-STORE-BOUNDS-3: each <tier>/<tenant>/ledger.jsonl rotates itself into <tier>/<tenant>/ledger-YYYYMMDD-HHmmss[-n].jsonl under the tenant_ledger_store role (same chain-continuing design as active/audit/system-ledger.jsonl); verify, scoped reads and tenant backup/restore include the segments. The directory stays review_required: segments are tenant audit evidence, moved only by operator decision or the audited offboarding ceremony. Code never archives tenant segments, so a partition missing its oldest segments is always a verification finding (unproven_anchor) and tenant restore refuses it (BACKUP_RESTORE_LEDGER_INCOMPLETE). Mission evidence ledgers (<mission>/evidence/ledger.jsonl) do not rotate."
     },
     {
       "path": "active/audit",
@@ -886,7 +886,7 @@
       "path": "active/shared/runtime/imessage-bridge",
       "artifact_class": "log",
       "action": "review_required",
-      "note": "iMessage bridge event log (libs/core/imessage-bridge.ts IMESSAGE_LOG_PATH). User conversation records — human retention decision."
+      "note": "iMessage bridge event log (libs/core/integrations/imessage-bridge.ts IMESSAGE_LOG_PATH). User conversation records — human retention decision."
     },
     {
       "path": "active/shared/runtime/imessage-bridge/events.jsonl",
@@ -919,7 +919,7 @@
       "path": "active/shared/runtime/cloudflare-os",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "G02: Cloudflare OS control-plane state (libs/core/cloudflare-os-control-plane.ts control-plane.json)."
+      "note": "G02: Cloudflare OS control-plane state (libs/core/governance/cloudflare-os-control-plane.ts control-plane.json)."
     },
     {
       "path": "active/shared/runtime/generated-pipelines",
@@ -971,13 +971,13 @@
       "path": "active/shared/runtime/seam-selection",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "G02: operator seam selection rules (libs/core/seam-selection-rules.ts rules.json) — operator judgment, never auto-deleted."
+      "note": "G02: operator seam selection rules (libs/core/provider/seam-selection-rules.ts rules.json) — operator judgment, never auto-deleted."
     },
     {
       "path": "active/shared/runtime/seam-selection-defaults",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Saved seam provider defaults per tenant / organization / project (libs/core/seam-selection-defaults.ts), tier/tenant partitioned — human judgment, never auto-deleted; offboarded with the tenant."
+      "note": "Saved seam provider defaults per tenant / organization / project (libs/core/provider/seam-selection-defaults.ts), tier/tenant partitioned — human judgment, never auto-deleted; offboarded with the tenant."
     },
     {
       "path": "active/shared/runtime/provider-attestations",
@@ -1038,7 +1038,7 @@
       "artifact_class": "evidence",
       "action": "review_required",
       "audit": true,
-      "note": "Software-quality defect event log (libs/core/software-quality-operations.ts qa/defect-events.jsonl)."
+      "note": "Software-quality defect event log (libs/core/testing/software-quality-operations.ts qa/defect-events.jsonl)."
     },
     {
       "path": "active/shared/runtime/realtime-voice-conversations",
@@ -1052,13 +1052,13 @@
       "artifact_class": "evidence",
       "action": "review_required",
       "audit": true,
-      "note": "Security-screen quarantine records (libs/core/security-screen.ts quarantineDir)."
+      "note": "Security-screen quarantine records (libs/core/governance/security-screen.ts quarantineDir)."
     },
     {
       "path": "active/shared/runtime/share-grants",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Share-grant graph state incl. its HMAC key (libs/core/share-grant-graph.ts) — deleting the key invalidates every grant."
+      "note": "Share-grant graph state incl. its HMAC key (libs/core/governance/share-grant-graph.ts) — deleting the key invalidates every grant."
     },
     {
       "path": "active/shared/runtime/voice-first-phrase-cache",

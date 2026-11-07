@@ -4,7 +4,7 @@ import { compileSchema } from '../foundation/ajv.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
-import { requiresProjectTrust } from '../trust-requiring-resources.js';
+import { requiresProjectTrust } from '../governance/trust-requiring-resources.js';
 import type { DesktopRecordingStep } from './desktop-recording.js';
 
 let validator: ValidateFunction | null = null;

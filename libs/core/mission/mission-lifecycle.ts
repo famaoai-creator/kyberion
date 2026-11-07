@@ -8,7 +8,7 @@ import {
   addInboxEntry,
   normalizeStoredInboxPaths,
   repointMissionInboxPaths,
-} from '../deliverable-inbox.js';
+} from '../task/deliverable-inbox.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
 import { runMissionRetrospective } from './mission-retrospective.js';
 import * as pathResolver from '../path-resolver.js';
@@ -17,15 +17,18 @@ import { getRegisteredEnvBool, getRegisteredEnvText } from '../foundation/env.js
 import { nowIso } from '../foundation/time.js';
 import { readTextFile } from '../foundation/text.js';
 import { createActuatorTrace, finalizeActuatorTrace } from '../actuator/actuator-trace.js';
-import { buildCompletionNextAction, type CompletionReconciliation } from '../next-action.js';
+import {
+  buildCompletionNextAction,
+  type CompletionReconciliation,
+} from '../surface/next-action.js';
 import {
   buildReviewGapText,
   listPendingReviewReentryRequests,
   markReviewReentryProcessed,
-} from '../review-reentry.js';
-import { ledger } from '../ledger.js';
+} from '../workforce/review-reentry.js';
+import { ledger } from '../governance/ledger.js';
 import { logger } from '../core.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { latestSnapshot } from '../intent/intent-snapshot-store.js';
 import {
   listMemoryPromotionCandidates,

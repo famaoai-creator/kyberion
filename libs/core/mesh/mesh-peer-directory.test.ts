@@ -11,8 +11,8 @@ import {
   safeWriteFile,
 } from '../index.js';
 import { readJsonLines } from '../foundation/json.js';
-import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
-import { STORAGE_RETENTION_AUDIT_FILENAME } from '../storage-retention-catalog.js';
+import { resetAppendOnlyStoreMaintenanceState } from '../storage/append-only-store.js';
+import { STORAGE_RETENTION_AUDIT_FILENAME } from '../storage/storage-retention-catalog.js';
 import { sharedLogsAudit, vitestLivePath } from '../path-resolver.js';
 import {
   advertiseMeshCapabilities,

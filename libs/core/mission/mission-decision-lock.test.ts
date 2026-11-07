@@ -4,7 +4,7 @@ import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { appendDecisions } from '../decision-ledger/ledger.js';
-import type { DealRecord } from '../deal-store.js';
+import type { DealRecord } from '../organization/deal-store.js';
 import type { DecisionAgenda } from '../customer-decision/model.js';
 import {
   customerDecisionPaths,

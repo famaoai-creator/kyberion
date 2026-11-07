@@ -17,8 +17,8 @@ vi.mock('../governance/approval-store-reader.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../governance/approval-store-reader.js')>()),
   listApprovalRequests: mocks.approvals,
 }));
-vi.mock('../deliverable-inbox.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../deliverable-inbox.js')>()),
+vi.mock('../task/deliverable-inbox.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../task/deliverable-inbox.js')>()),
   listInboxEntries: mocks.inbox,
 }));
 vi.mock('./surface-ux.js', async (importOriginal) => ({
@@ -65,6 +65,36 @@ beforeEach(() => {
 });
 
 describe('default needs-you reader (MCP)', () => {
+  it('admits owner and audience knowledge by authenticated identity, never all-tenant scope', () => {
+    mocks.approvals.mockReturnValue([]);
+    const candidate = {
+      candidate_id: 'owned',
+      source_type: 'mission',
+      source_ref: 'mission:owned',
+      proposed_memory_kind: 'heuristic',
+      summary: 'owned',
+      evidence_refs: [],
+      sensitivity_tier: 'public',
+      ratification_required: false,
+      status: 'queued',
+      queued_at: '2026-11-05T10:00:00Z',
+      scope: { tier: 'public', owner_nhi: 'owner' },
+    };
+    mocks.memory.mockReturnValue([candidate]);
+    expect(readNeedsYouSources({ ...viewer, principalId: 'owner' }).knowledge).toHaveLength(1);
+    expect(
+      readNeedsYouSources({ ...viewer, principalId: 'owner', organizationIds: ['org-a'] }).knowledge
+    ).toHaveLength(0);
+    expect(
+      readNeedsYouSources({ ...viewer, principalId: 'owner', projectIds: ['project-a'] }).knowledge
+    ).toHaveLength(0);
+    mocks.memory.mockReturnValue([
+      { ...candidate, scope: { ...candidate.scope, allowed_audience: ['peer'] } },
+    ]);
+    expect(readNeedsYouSources({ ...viewer, principalId: 'owner' }).knowledge).toHaveLength(0);
+    expect(readNeedsYouSources({ ...viewer, principalId: 'peer' }).knowledge).toHaveLength(1);
+    expect(readNeedsYouSources({ ...viewer, tenantSlugs: 'all' }).knowledge).toHaveLength(0);
+  });
   it('admits only approvals in the viewer tenant and tier, never personal ones', () => {
     mocks.approvals.mockReturnValue([
       record('mine', { tenant_slug: 'famao-ai', tier: 'confidential' }),

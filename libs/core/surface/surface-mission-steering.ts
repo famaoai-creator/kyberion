@@ -83,7 +83,7 @@ import type {
 } from './channel-surface-types.js';
 import type { SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
 import type { SupportedLocale } from '../foundation/locale-normalize.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { trimEndChars } from '../foundation/text.js';
 
 // ---------------------------------------------------------------------------

@@ -13,7 +13,7 @@ const state = vi.hoisted(() => ({
   writes: vi.fn(),
   network: vi.fn(),
 }));
-vi.mock('../profile-root.js', () => ({ resolveActiveProfileRoot: () => '/fixture/profile' }));
+vi.mock('../authn/profile-root.js', () => ({ resolveActiveProfileRoot: () => '/fixture/profile' }));
 vi.mock('../secure-io.js', async (original) => ({
   ...(await original<typeof import('../secure-io.js')>()),
   safeLstat: () => {

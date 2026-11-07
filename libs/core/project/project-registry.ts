@@ -1,4 +1,4 @@
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';

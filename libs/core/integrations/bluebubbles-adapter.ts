@@ -6,7 +6,7 @@ import {
   normalizeIMessageAttachments,
   normalizeIMessageTapback,
   type IMessageStimulus,
-} from '../imessage-utils.js';
+} from './imessage-utils.js';
 import { pathResolver } from '../path-resolver.js';
 import { nowIso } from '../foundation/time.js';
 import { getRegisteredEnvText } from '../foundation/env.js';

@@ -112,7 +112,7 @@ Kyberion にとっての含意は大きい: `os-automation.ts` は既に `getWin
 
 ### DR-01: desktop 破壊操作の承認分類(P0 / S)— **他のすべての前提**
 
-**内容**: `desktop:destructive_action` を `knowledge/product/governance/approval-policy.json` に追加し、`RISKY_OPS`(`libs/core/risky-op-registry.ts:19-28`)に op ID を登録する。対象は送信確定・削除・`app_quit`・`process_kill`・任意アプリへの `paste_text`+`press_key` 確定系。read-only(`takeScreenshot` / `detectFocusedInput` / `getWindowList` / `clipboardRead`)は非ゲートで高速のまま維持する。リスク分類の無い未知 desktop op は**安全側(承認要)に倒す**。
+**内容**: `desktop:destructive_action` を `knowledge/product/governance/approval-policy.json` に追加し、`RISKY_OPS`(`libs/core/governance/risky-op-registry.ts:19-28`)に op ID を登録する。対象は送信確定・削除・`app_quit`・`process_kill`・任意アプリへの `paste_text`+`press_key` 確定系。read-only(`takeScreenshot` / `detectFocusedInput` / `getWindowList` / `clipboardRead`)は非ゲートで高速のまま維持する。リスク分類の無い未知 desktop op は**安全側(承認要)に倒す**。
 
 **受入条件**:
 

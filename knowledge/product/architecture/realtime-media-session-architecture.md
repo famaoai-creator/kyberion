@@ -35,7 +35,7 @@ single user realtime model is not a multi-speaker diarization engine, and a
 voice profile is not an avatar identity.
 
 This document is the design contract for the reusable core implemented by
-`libs/core/realtime-media-session.ts`. Existing meeting participation,
+`libs/core/media/realtime-media-session.ts`. Existing meeting participation,
 realtime voice, meeting intelligence, and presence code remains compatible
 through adapters and projections.
 

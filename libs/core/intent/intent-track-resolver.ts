@@ -9,7 +9,7 @@ import {
 } from '../project/project-track-registry.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { sanitizeIntentPathSegment } from './intent-path-utils.js';
-import { loadIntentRoutingMap } from '../router-contract.js';
+import { loadIntentRoutingMap } from './router-contract.js';
 
 type JsonObject = Record<string, unknown>;
 

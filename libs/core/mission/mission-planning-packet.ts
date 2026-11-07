@@ -4,9 +4,9 @@ import type { MissionTeamPlan } from './mission-team-plan-composer.js';
 import {
   PlanningReviewVerdictSchema,
   renderStructuredOutputSchemaPrompt,
-} from '../structured-output-contracts.js';
+} from '../contracts/structured-output-contracts.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
-import { tryResolveOwnerScope } from '../owner-scope.js';
+import { tryResolveOwnerScope } from '../governance/owner-scope.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';

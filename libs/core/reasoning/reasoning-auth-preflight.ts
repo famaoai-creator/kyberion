@@ -1,5 +1,5 @@
 import { loadReasoningRoutePolicy, type ReasoningRoutePolicy } from './reasoning-route-resolver.js';
-import { probeExplicitReasoningBackend } from '../environment-capability-probes.js';
+import { probeExplicitReasoningBackend } from '../daemon/environment-capability-probes.js';
 import { nowIso } from '../foundation/time.js';
 import {
   getReasoningProviderDescriptor,

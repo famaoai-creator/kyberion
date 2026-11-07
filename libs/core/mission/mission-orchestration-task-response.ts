@@ -12,7 +12,7 @@ import {
   recordKnowledgeUsageFeedback,
   type DeliveredKnowledgeRef,
 } from '../knowledge/knowledge-feedback-loop.js';
-import type { ContextSecurityScope } from '../context-security-scope.js';
+import type { ContextSecurityScope } from '../governance/context-security-scope.js';
 import { redactCustomerDecisionsForPrompt } from '../task/task-result-contract.js';
 import type { PlannedNextTask, TaskResultBlock } from './mission-orchestration-worker-contracts.js';
 
@@ -69,7 +69,7 @@ export async function obtainTaskResultResponse(
     requiredCapabilities?: string[];
     prompt: string;
     contextPackId?: string;
-    securityScope?: import('../context-security-scope.js').ContextSecurityScope;
+    securityScope?: import('../governance/context-security-scope.js').ContextSecurityScope;
     /**
      * KP-04: what the first-round context pack already delivered (from
      * `buildTaskDispatchContext`), so a needs-driven retry retrieval can

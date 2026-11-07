@@ -67,23 +67,6 @@
                 {{t:front_desk:ask_startup_retry}}
               </button>
             </div>
-            <div
-              id="ask-correction-status"
-              class="kb-callout"
-              role="status"
-              aria-live="polite"
-              hidden
-            >
-              <p id="ask-correction-text">{{t:front_desk:ask_correction_failed}}</p>
-              <button
-                type="button"
-                id="ask-correction-retry"
-                class="kb-btn kb-btn--secondary"
-                hidden
-              >
-                {{t:front_desk:ask_correction_retry}}
-              </button>
-            </div>
             <p id="conversation-selection" class="kb-callout" role="status" hidden></p>
             <div id="conversation-status" class="kb-section" role="status" aria-live="polite"></div>
             <details id="conversation-legacy" class="hidden">
@@ -308,10 +291,9 @@
     <script src="/ask-read-recovery.js"></script>
     <script src="/ask-hearing-recovery.js"></script>
     <script src="/ask-hearing-completion.js"></script>
-    <script src="/ask-correction.js"></script>
     <script src="/ask-next-actions.js"></script>
     <script src="/ask.js"></script>
-    <!-- FD-00 / UI-05: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <!-- FD-00 / UI-05: shared front-desk rail (libs/core/surface/front-desk-nav.ts contract) -->
     <script type="module" src="/front-desk-rail.js"></script>
     <script type="module">
       if (window.FrontDeskRail) {

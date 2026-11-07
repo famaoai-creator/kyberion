@@ -63,7 +63,7 @@ export function resolveCustomerDecisionTenant(
   // model route resolves it).
   strictViewerTier(viewer, 'confidential');
   // A tenant's organization id is its slug: `resolveCompany` sets
-  // `company_id` to the tenant slug (libs/core/company.ts), so the whole
+  // `company_id` to the tenant slug (libs/core/organization/company.ts), so the whole
   // company aggregate is not loaded just to read it back.
   strictViewerScopeOrganizationIds(viewer, tenant);
   return { tenant };

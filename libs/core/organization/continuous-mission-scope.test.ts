@@ -11,8 +11,8 @@ import type { MissionState } from '../mission/mission-types.js';
 import { withContinuousMissionScope } from './continuous-mission-scope.js';
 
 vi.mock('../mission/mission-state.js', () => ({ loadState: vi.fn() }));
-vi.mock('../owner-scope.js', async (original) => ({
-  ...(await original<typeof import('../owner-scope.js')>()),
+vi.mock('../governance/owner-scope.js', async (original) => ({
+  ...(await original<typeof import('../governance/owner-scope.js')>()),
   tryResolveOwnerScope: () => undefined,
 }));
 const missionId = 'MSN-CONTINUOUS-SCOPE-FIXTURE';

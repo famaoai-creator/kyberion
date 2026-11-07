@@ -1002,7 +1002,7 @@
       "status": "active",
       "legacy_roles": ["customer_decision_deal_note_writer"],
       "sources": ["scope-model", "role-policy"],
-      "note": "S3 done: the tenant's customer records (deals, deal documents, requirements captures, escalations, deal log), read and written only as the tenant-bound deal store (libs/core/deal-store.ts asDealStore)."
+      "note": "S3 done: the tenant's customer records (deals, deal documents, requirements captures, escalations, deal log), read and written only as the tenant-bound deal store (libs/core/organization/deal-store.ts asDealStore)."
     },
     {
       "id": "tenant-knowledge",

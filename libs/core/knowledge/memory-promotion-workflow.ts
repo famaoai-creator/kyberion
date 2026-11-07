@@ -15,7 +15,7 @@ import {
   type KnowledgeHint,
   type KnowledgeScope,
 } from './knowledge-index.js';
-import { parseStructuredJson } from '../structured-reasoning.js';
+import { parseStructuredJson } from '../reasoning/structured-reasoning.js';
 import { z } from 'zod';
 import {
   loadMemoryPromotionCandidate,
@@ -42,14 +42,14 @@ import { normalizeMemoryFact } from './memory-notebook.js';
 import {
   savePromotedMemoryRecord,
   NotMeaningfulPromotionCandidateError,
-} from '../promoted-memory.js';
+} from './promoted-memory.js';
 import { logger } from '../core.js';
 import { reviewMemoryPromotionCandidate } from './memory-promotion-review.js';
 import { assertReusableLearningBinding } from './reusable-learning-binding.js';
 import { laneApprovesWithoutSteward } from './promotion-lanes.js';
 import { resolvePromotionTargetRoot } from './memory-promotion-git.js';
 import { assessMissionMemoryCandidate } from '../mission/mission-assessment.js';
-import { listInboxEntries } from '../deliverable-inbox.js';
+import { listInboxEntries } from '../task/deliverable-inbox.js';
 import { evaluateBackgroundReviewText } from '../workforce/background-review-policy.js';
 import {
   checkProviderEgress,

@@ -9,7 +9,7 @@
  * `iss`/`sub`, which is attacker-influenced text.
  */
 
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import type { VocabularyKey } from '../knowledge/vocabulary-keys.generated.js';
 
 export type SurfaceLoginLocale = 'en' | 'ja';

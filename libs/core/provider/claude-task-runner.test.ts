@@ -10,7 +10,7 @@ const { runBrowserAgentTask, runDocumentAgentTask, ShellClaudeCliBackend } = vi.
   return { runBrowserAgentTask, runDocumentAgentTask, ShellClaudeCliBackend };
 });
 
-vi.mock('../risky-op-registry.js', () => ({
+vi.mock('../governance/risky-op-registry.js', () => ({
   RISKY_OPS: {
     CLAUDE_BROWSER_INTERACTIVE: 'claude:browser_interactive',
     CLAUDE_DOCUMENT_GENERATION: 'claude:document_generation',
@@ -24,7 +24,7 @@ vi.mock('../shell/shell-claude-cli-backend.js', () => ({
   ShellClaudeCliBackend,
 }));
 
-import { requireApprovalForOp } from '../risky-op-registry.js';
+import { requireApprovalForOp } from '../governance/risky-op-registry.js';
 import {
   runApprovedClaudeBrowserTask,
   runApprovedClaudeDocumentTask,

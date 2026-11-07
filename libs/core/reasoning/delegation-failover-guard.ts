@@ -10,13 +10,13 @@
  *
  * Kept out of reasoning-backend.ts so the failover chain only calls into it.
  */
-import { runIdempotentDelegation } from '../delegation-idempotency.js';
+import { runIdempotentDelegation } from '../workforce/delegation-idempotency.js';
 import {
   DelegationExecutionStartedError,
   delegationExecutionStartedFromError,
   markErrorExecutionStarted,
   runWithDelegationExecutionTracker,
-} from '../delegation-result.js';
+} from '../workforce/delegation-result.js';
 import type { ReasoningFailureClass } from './reasoning-failure-taxonomy.js';
 
 /** The failover candidate an attempt runs on (named in the failure message). */

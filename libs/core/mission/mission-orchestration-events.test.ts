@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 
-vi.mock('../managed-process.js', () => ({
+vi.mock('../tool/managed-process.js', () => ({
   spawnManagedProcess: mocks.spawnManagedProcess,
 }));
 

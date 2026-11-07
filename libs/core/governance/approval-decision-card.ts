@@ -3,13 +3,13 @@ import { evaluateVetoWindow, type VetoWindowState } from './approval-veto-window
 import type { AutonomousOpsGateResult } from './autonomous-ops-gate.js';
 import type { DecisionCard, DecisionCardEvidence, InterventionLevel } from './decision-card.js';
 import type { NotificationChannelTarget } from '../surface/operator-notifications.js';
-import { resolveLocale } from '../locale.js';
+import { resolveLocale } from '../localization/locale.js';
 import {
   localeToBcp47,
   localeUsesWordSpaces,
   type SupportedLocale,
 } from '../foundation/locale-normalize.js';
-import { t, type VocabularyKey } from '../t.js';
+import { t, type VocabularyKey } from '../localization/t.js';
 import { neutralizeChannelMarkup } from '../surface/channel-adapter-registry.js';
 
 export type { InterventionLevel } from './decision-card.js';

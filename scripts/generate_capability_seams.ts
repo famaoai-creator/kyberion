@@ -24,8 +24,8 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     consumers: ['libs/core/intent/intent-resolution.ts'],
   },
   'question-profile-provider': {
-    declaration: 'libs/core/question-resolver.ts',
-    consumers: ['libs/core/question-resolver.ts'],
+    declaration: 'libs/core/intent/question-resolver.ts',
+    consumers: ['libs/core/intent/question-resolver.ts'],
   },
   'surface-task-reply-section': {
     declaration: 'libs/core/surface/surface-runtime-helpers.ts',
@@ -36,7 +36,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     consumers: ['libs/core/mesh/a2a-bridge.ts'],
   },
   'camera-output-bridge': {
-    declaration: 'libs/core/camera-output-bridge.ts',
+    declaration: 'libs/core/media/camera-output-bridge.ts',
     consumers: ['libs/actuators/voice-actuator/src/voice-media-output-helpers.ts'],
   },
   'video-filter-provider': {
@@ -97,7 +97,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     ],
   },
   'authn-principal-resolver': {
-    declaration: 'libs/core/authn-principal-resolver.ts',
+    declaration: 'libs/core/authn/authn-principal-resolver.ts',
     consumers: [
       'libs/core/surface/surface-authn.ts',
       'libs/core/surface/oidc-browser-login.ts',
@@ -105,11 +105,11 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     ],
   },
   'authz-policy-engine': {
-    declaration: 'libs/core/authz-policy-engine.ts',
+    declaration: 'libs/core/governance/authz-policy-engine.ts',
     consumers: [
-      'libs/core/authz-providers.ts',
+      'libs/core/governance/authz-providers.ts',
       'libs/core/surface/surface-authorization.ts',
-      'libs/core/agent-execution-context.ts',
+      'libs/core/agent/agent-execution-context.ts',
     ],
   },
   'ocr-provider': {
@@ -146,8 +146,8 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     ],
   },
   'risky-approval-override': {
-    declaration: 'libs/core/risky-op-approval-port.ts',
-    consumers: ['libs/core/risky-op-approval-port.ts'],
+    declaration: 'libs/core/governance/risky-op-approval-port.ts',
+    consumers: ['libs/core/governance/risky-op-approval-port.ts'],
   },
   'scenario-op-override': {
     declaration: 'libs/core/actuator/actuator-op-registry.ts',
@@ -181,7 +181,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     consumers: ['libs/actuators/deployment-actuator/src/deployment-actuator-helpers.ts'],
   },
   'embedding-backend': {
-    declaration: 'libs/core/embedding-backend.ts',
+    declaration: 'libs/core/reasoning/embedding-backend.ts',
     consumers: ['libs/core/knowledge/knowledge-index.ts'],
   },
   'knowledge-adapter': {
@@ -197,8 +197,8 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     consumers: ['libs/core/actuator/adapter-default-selection.ts', 'scripts/email-workflow.ts'],
   },
   'environment.capability-probe': {
-    declaration: 'libs/core/environment-capability.ts',
-    consumers: ['libs/core/environment-capability.ts'],
+    declaration: 'libs/core/daemon/environment-capability.ts',
+    consumers: ['libs/core/daemon/environment-capability.ts'],
   },
   'intent-extractor': {
     declaration: 'libs/core/intent/intent-extractor.ts',
@@ -213,7 +213,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
   },
   'meeting-join-driver': {
     declaration: 'libs/core/meeting/meeting-join-driver.ts',
-    consumers: ['libs/core/in-room-meeting-driver.ts'],
+    consumers: ['libs/core/meeting/in-room-meeting-driver.ts'],
   },
   'mission-worker-core-dispatcher': {
     declaration: 'libs/core/mission/mission-orchestration-worker-dispatch-port.ts',
@@ -228,8 +228,8 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     consumers: ['libs/core/reasoning/reasoning-bootstrap.ts'],
   },
   'risky-approval-handler': {
-    declaration: 'libs/core/risky-op-approval-port.ts',
-    consumers: ['libs/core/risky-op-registry.ts', 'libs/core/mesh/acp-mediator.ts'],
+    declaration: 'libs/core/governance/risky-op-approval-port.ts',
+    consumers: ['libs/core/governance/risky-op-registry.ts', 'libs/core/mesh/acp-mediator.ts'],
   },
   'secret-provider': {
     declaration: 'libs/core/secret/provider-registry.ts',
@@ -244,7 +244,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
   'lease-backend': {
     declaration: 'libs/core/lease/lease-backend.ts',
     consumers: [
-      'libs/core/writer-lease.ts',
+      'libs/core/lease/writer-lease.ts',
       'libs/core/lease/local-lease-backend.ts',
       'libs/core/lease/memory-lease-backend.ts',
       'libs/core/lease/kv-lease-backend.stub.ts',
@@ -255,7 +255,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     consumers: ['libs/core/event/local-event-bus.ts', 'libs/core/event/memory-event-bus.ts'],
   },
   'runtime-readiness-check': {
-    declaration: 'libs/core/runtime-readiness.ts',
+    declaration: 'libs/core/daemon/runtime-readiness.ts',
     consumers: ['presence/displays/concierge/src/app/api/readyz/route.ts'],
   },
   'trace-exporter': {
@@ -284,7 +284,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     consumers: ['libs/core/mission/mission-llm.ts'],
   },
   'super-nerve-executor': {
-    declaration: 'libs/core/super-nerve-execution-port.ts',
+    declaration: 'libs/core/pipeline/super-nerve-execution-port.ts',
     consumers: ['libs/actuators/orchestrator-actuator/src/super-nerve/index.ts'],
   },
   'surface-provider': {
@@ -321,12 +321,15 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
   },
   'voice.vad-backend': {
     declaration: 'libs/core/voice/vad-registry.ts',
-    consumers: ['libs/core/ten-vad-bridge.ts', 'libs/core/silero-vad-bridge.ts'],
+    consumers: [
+      'libs/shared-voice/src/ten-vad-bridge.ts',
+      'libs/shared-voice/src/silero-vad-bridge.ts',
+    ],
   },
   'build.readiness-inspector': {
-    declaration: 'libs/core/build-readiness.ts',
+    declaration: 'libs/core/harnessing/build-readiness.ts',
     consumers: [
-      'libs/core/environment-capability-probes.ts',
+      'libs/core/daemon/environment-capability-probes.ts',
       'scripts/baseline_build_readiness.ts',
     ],
   },

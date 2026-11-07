@@ -24,8 +24,8 @@ vi.mock('@agent/core/voice/audio-playback', async (original) => ({
   ...(await original<typeof import('@agent/core/voice/audio-playback')>()),
   probeAudioPlayback: probes.artifact,
 }));
-vi.mock('@agent/core/streaming-voice-playback', async (original) => ({
-  ...(await original<typeof import('@agent/core/streaming-voice-playback')>()),
+vi.mock('@agent/shared-voice/streaming-voice-playback', async (original) => ({
+  ...(await original<typeof import('@agent/shared-voice/streaming-voice-playback')>()),
   probePcmAudioStreaming: probes.pcm,
 }));
 vi.mock('@agent/shared-voice/realtime-voice-loop', async (original) => ({
@@ -45,8 +45,8 @@ vi.mock('@agent/shared-voice/realtime-voice-preferences', async (original) => ({
   ...(await original<typeof import('@agent/shared-voice/realtime-voice-preferences')>()),
   loadRealtimeVoiceConversationPreferences: () => null,
 }));
-vi.mock('@agent/core/silero-vad-bridge', () => ({ installSileroVadBackend: vi.fn() }));
-vi.mock('@agent/core/ten-vad-bridge', () => ({ installTenVadBackend: vi.fn() }));
+vi.mock('@agent/shared-voice/silero-vad-bridge', () => ({ installSileroVadBackend: vi.fn() }));
+vi.mock('@agent/shared-voice/ten-vad-bridge', () => ({ installTenVadBackend: vi.fn() }));
 vi.mock('@agent/core/vad-registry', async (original) => ({
   ...(await original<typeof import('@agent/core/vad-registry')>()),
   resolveVadBackend: () => ({ backend: { backend_id: 'fixture', create: vi.fn() } }),

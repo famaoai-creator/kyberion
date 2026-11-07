@@ -13,7 +13,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { ACTUATOR_SERVE_RESULT_PREFIX } from '../cli-utils.js';
+import { ACTUATOR_SERVE_RESULT_PREFIX } from '../harnessing/cli-utils.js';
 import { logger } from '../core.js';
 import { rootResolve } from '../path-resolver.js';
 import { buildSafeExecEnv } from '../secure-io.js';

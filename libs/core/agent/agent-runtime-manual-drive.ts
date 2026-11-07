@@ -18,7 +18,11 @@ import {
   type ApprovalGateParams,
   type ApprovalGateResult,
 } from '../governance/approval-gate.js';
-import { normalizeEventScope, type EventScope, type EventScopeInput } from '../event-scope.js';
+import {
+  normalizeEventScope,
+  type EventScope,
+  type EventScopeInput,
+} from '../event/event-scope.js';
 import { startManualDriverBridge } from './agent-runtime-manual-drive-bridge.js';
 
 export const MANUAL_DRIVE_ACTION_KINDS = [

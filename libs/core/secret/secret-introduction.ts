@@ -20,7 +20,7 @@ import {
 } from '../governance/approval-store.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
-import { ledger } from '../ledger.js';
+import { ledger } from '../governance/ledger.js';
 import { withLock } from '../foundation/lock-utils.js';
 import { evaluateAutonomousOpsAction } from '../governance/autonomous-ops-gate.js';
 import { buildDecisionCard } from '../governance/decision-card.js';
@@ -32,7 +32,7 @@ import {
 } from './secret-identity.js';
 import { fetchSecretSync, storeSecret } from './secret-bridge.js';
 import { getSecret, storeConnectionDocument } from './secret-guard.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 
 const DEFAULT_CHANNEL = 'terminal';
 const DEFAULT_STORAGE_CHANNEL = 'terminal';

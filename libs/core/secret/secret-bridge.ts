@@ -29,7 +29,7 @@ import {
   memoizedNativeSecretRead,
   invalidateNativeSecretRead,
 } from '../foundation/secret-resolution-session.js';
-import { ProviderChainRouter } from '../provider-chain-router.js';
+import { ProviderChainRouter } from '../provider/provider-chain-router.js';
 import {
   listSecretProviders,
   registerSecretProvider,

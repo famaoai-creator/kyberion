@@ -1,4 +1,4 @@
-import { createProviderRegistry } from '../provider-registry.js';
+import { createProviderRegistry } from '../provider/provider-registry.js';
 import type { SeamProviderMetadata } from '../seam.js';
 import type { OcrProvider } from '../contracts/ocr-types.js';
 export const OCR_PROVIDER_SEAM = 'ocr-provider';
