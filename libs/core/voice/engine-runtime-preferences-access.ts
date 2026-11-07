@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { readConfiguredActorIdentity } from '../identity-context-bridge.js';
+import { readConfiguredActorIdentity } from '../foundation/identity-context.js';
 import {
   resourceAccessDenial,
   type ResourceAccessOperation,

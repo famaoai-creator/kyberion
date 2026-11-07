@@ -26,7 +26,7 @@ export interface ConceptBaseline {
 // Canonical implementations contain these concepts by design. No consumer exemption.
 const CANONICAL: Partial<Record<ConceptMetric, readonly string[]>> = {
   // Process-configured actor identity is deliberately centralized at this boundary.
-  env_direct_read_budget: ['libs/core/identity-context-bridge.ts'],
+  env_direct_read_budget: ['libs/core/foundation/identity-context.ts'],
   runtime_path_literal_budget: ['libs/core/foundation/runtime-state-roots.ts'],
   rate_limiter_impl_budget: ['libs/core/foundation/rate-limit.ts', 'libs/core/failure-tracker.ts'],
   bespoke_cli_parser_budget: [
