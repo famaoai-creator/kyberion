@@ -458,6 +458,14 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
   `viewer.source === 'loopback'`. Test the signed-in owner, not only a
   synthetic loopback viewer. (MSN-SERVER-STUDIO-PROGRESS-20261107: the
   owner's personal 業務の自動化候補.)
+- **Deleting the old surface's tests can delete core coverage.** A surface's
+  route or client tests often exercise `libs/core` logic for real, while the
+  core package's own tests mock that module. Before deleting them, list each
+  case that reaches unmocked core code. Move those cases into a core test
+  (no HTTP), and port the client harness cases whose behaviour was ported.
+  For each case you drop, record why. Check the result by removing guard
+  conditions one at a time: a mutant that survives marks lost coverage.
+  (MSN-SERVER-STUDIO-FIRST-JOB-20261108: 初めての仕事.)
 
 ## 6. Process discipline for repo work
 
