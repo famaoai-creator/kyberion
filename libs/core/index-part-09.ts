@@ -56,8 +56,6 @@ export * from './voice/audio-tee.js';
 
 export * from './voice/vad-registry.js';
 
-export * from './silero-vad-bridge.js';
-
 export * from './actuator/actuator-serve-client.js';
 
 export * from './in-room-meeting-driver.js';

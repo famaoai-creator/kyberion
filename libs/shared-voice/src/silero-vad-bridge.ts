@@ -18,22 +18,22 @@
  * remembers the reason — callers can inspect `degradedReason`.
  */
 
-import { getRegisteredEnvText } from './foundation/env.js';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { buildSafeExecEnv } from './secure-io.js';
-import { rootResolve } from './path-resolver.js';
-import { safeExistsSync } from './secure-io.js';
-import { resolveManagedToolPythonBin } from './tool/tool-runtime-registry.js';
-import { registerVadBackend, type VadFactoryOptions } from './voice/vad-registry.js';
-import { parseVadBridgeLine } from './voice/vad-bridge-protocol.js';
+import { buildSafeExecEnv } from '@agent/core/secure-io';
+import { rootResolve } from '@agent/core/path-resolver';
+import { safeExistsSync } from '@agent/core/secure-io';
+import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
+import { registerVadBackend, type VadFactoryOptions } from '@agent/core/voice/vad-registry';
+import { parseVadBridgeLine } from '@agent/core/voice/vad-bridge-protocol';
 import {
   computeChunkDurationMs,
   EnergyVad,
   type VoiceActivityDetector,
   type VoiceActivityState,
-} from './voice/voice-activity-detector.js';
-import type { AudioChunk } from './meeting/meeting-session-types.js';
+} from '@agent/core/voice/voice-activity-detector';
+import type { AudioChunk } from '@agent/core/meeting/meeting-session-types';
 
 export interface SileroVadOptions {
   /** Python interpreter (default: KYBERION_SILERO_VAD_PYTHON → KYBERION_PYTHON_BIN → python3). */

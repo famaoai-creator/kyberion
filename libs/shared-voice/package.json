@@ -23,6 +23,10 @@
       "types": "./dist/gemini-live-client.d.ts",
       "default": "./dist/gemini-live-client.js"
     },
+    "./native-tts": {
+      "types": "./dist/native-tts.d.ts",
+      "default": "./dist/native-tts.js"
+    },
     "./realtime-voice-conversation": {
       "types": "./dist/realtime-voice-conversation.d.ts",
       "default": "./dist/realtime-voice-conversation.js"
@@ -38,6 +42,10 @@
     "./segmented-voice-playback": {
       "types": "./dist/segmented-voice-playback.d.ts",
       "default": "./dist/segmented-voice-playback.js"
+    },
+    "./silero-vad-bridge": {
+      "types": "./dist/silero-vad-bridge.d.ts",
+      "default": "./dist/silero-vad-bridge.js"
     },
     "./ten-vad-bridge": {
       "types": "./dist/ten-vad-bridge.d.ts",
@@ -138,10 +146,6 @@
     "./voice-workbench": {
       "types": "./dist/voice-workbench.d.ts",
       "default": "./dist/voice-workbench.js"
-    },
-    "./native-tts": {
-      "types": "./dist/native-tts.d.ts",
-      "default": "./dist/native-tts.js"
     }
   },
   "scripts": {
