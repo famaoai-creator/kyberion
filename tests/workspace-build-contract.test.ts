@@ -177,6 +177,7 @@ describe('Workspace build contract', () => {
       'spreadsheet-style-policy',
       'tracker-sheet-policy',
       'visual-workflow-compiler',
+      'windows-native-image-generation-bridge',
     ]) {
       expect(core.exports[`./${name}`]).toBeUndefined();
       expect(media.exports[`./${name}`]).toEqual({

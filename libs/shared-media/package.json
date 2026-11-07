@@ -343,6 +343,10 @@
     "./visual-workflow-compiler": {
       "types": "./dist/visual-workflow-compiler.d.ts",
       "default": "./dist/visual-workflow-compiler.js"
+    },
+    "./windows-native-image-generation-bridge": {
+      "types": "./dist/windows-native-image-generation-bridge.d.ts",
+      "default": "./dist/windows-native-image-generation-bridge.js"
     }
   }
 }

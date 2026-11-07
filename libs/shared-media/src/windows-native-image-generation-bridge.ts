@@ -1,5 +1,5 @@
-import { safeExecResult } from './secure-io.js';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { safeExecResult } from '@agent/core/secure-io';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 
 export interface WindowsNativeImageGenerationAvailability {
   available: boolean;
