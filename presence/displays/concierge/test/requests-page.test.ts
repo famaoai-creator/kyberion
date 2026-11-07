@@ -104,7 +104,7 @@ describe('仕事 › 依頼 (/work?tab=requests) contract', () => {
     expect(inventory).toContain('workInventoryPanelPath(params)');
     // A personal-scope save: the hand-off selects the personal view, where the
     // panel lists the local owner's own personal inventory.
-    const handoff = read('../presence-studio/work-inventory-routes.ts');
+    const handoff = read('../../../libs/core/surface/hearing-completion.ts');
     expect(handoff).toContain("url.searchParams.set('tenant', CONCIERGE_PERSONAL_SELECTION)");
     expect(hearing).toContain(
       'workInventoryHandoffHref(hearingScopedUrl(progressItem.href, viewer)'

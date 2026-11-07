@@ -7,7 +7,7 @@ import type {
   HearingDecisionIdentity,
   HearingDecisionOperation,
   HearingDecidedBy,
-} from './hearing.js';
+} from '@agent/core/surface/hearing';
 import { withExecutionContext as initialContext } from '@agent/core/authority';
 import { rootDir } from '@agent/core/path-resolver';
 import * as initialIO from '@agent/core/secure-io';
@@ -51,8 +51,8 @@ const ENV_KEYS = [
 ] as const;
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 let authority: typeof import('@agent/core/authority');
-let runtime: typeof import('./hearing-runtime.js');
-let hearing: typeof import('./hearing.js');
+let runtime: typeof import('@agent/core/surface/hearing-runtime');
+let hearing: typeof import('@agent/core/surface/hearing');
 let access: typeof import('./hearing-storage-access.js');
 
 beforeAll(async () => {
@@ -83,8 +83,8 @@ beforeAll(async () => {
   vi.resetModules();
   await import('@agent/core/secure-io');
   authority = await import('@agent/core/authority');
-  runtime = await import('./hearing-runtime.js');
-  hearing = await import('./hearing.js');
+  runtime = await import('@agent/core/surface/hearing-runtime');
+  hearing = await import('@agent/core/surface/hearing');
   access = await import('./hearing-storage-access.js');
   const resolver = await import('@agent/core/path-resolver');
   expect(resolver.rootDir()).toBe(ROOT);
@@ -298,6 +298,28 @@ describe('hearing storage facade under production Presence Studio identity', () 
       assertAmbient();
     }
   );
+
+  it('refuses with the surface 403 error the hearing routes map to a status', async () => {
+    const { PresenceStudioViewerError } = await import('./security.js');
+    const refusal = (fn: () => unknown) => {
+      try {
+        fn();
+      } catch (error) {
+        return error;
+      }
+      throw new Error('expected a refusal');
+    };
+    const seeded = seed();
+    const token = access.hearingStorageForViewer(viewer([TENANT], 'token'));
+    for (const error of [
+      refusal(() => token.reserve(seeded.record, 'mission', NOW)),
+      refusal(() => access.hearingStorageForViewer(viewer('all', 'token'))),
+    ]) {
+      expect(error).toBeInstanceOf(PresenceStudioViewerError);
+      expect((error as InstanceType<typeof PresenceStudioViewerError>).status).toBe(403);
+    }
+    assertAmbient();
+  });
 
   it.each(
     [['all'], ['unscoped'], [TENANT, OTHER], [''], ['../other'], ['shared'], ['INVALID']].map(
