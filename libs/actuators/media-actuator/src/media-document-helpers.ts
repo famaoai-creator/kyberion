@@ -20,8 +20,8 @@ import {
   resolveDocumentProfileKeywords as resolveDocumentProfileKeywordsPolicy,
 } from '@agent/shared-media/document-inference-policy';
 import { loadMediaSignalEntryPolicyCatalog } from '@agent/shared-media/media-signal-entry-policy';
-import { loadTrackerSheetPolicyCatalog } from '@agent/core/tracker-sheet-policy';
-import { isLegacyMediaOp } from '@agent/core/legacy-media-ops';
+import { loadTrackerSheetPolicyCatalog } from '@agent/shared-media/tracker-sheet-policy';
+import { isLegacyMediaOp } from '@agent/shared-media/legacy-media-ops';
 import { loadJsonValue } from './media-catalog-loaders.js';
 import type { CreativeDesignTypography } from '@agent/core/creative-design-resolver';
 import * as path from 'node:path';

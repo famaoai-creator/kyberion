@@ -1,5 +1,5 @@
-import { pathResolver } from './path-resolver.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { defineCatalog } from '@agent/core/foundation/governed-catalog';
 
 interface SpreadsheetStylePolicyCatalog {
   version: string;

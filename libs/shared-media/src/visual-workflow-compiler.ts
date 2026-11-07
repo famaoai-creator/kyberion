@@ -1,7 +1,10 @@
-import type { KyberionImageGenerationADF } from './contracts/image-generation-adf.js';
-import type { KyberionVideoGenerationADF } from './contracts/video-generation-adf.js';
-import { slugify } from './foundation/text.js';
-import { buildVideoDesignCssVars, resolveVideoModeDefaults } from './video/video-design-system.js';
+import type { KyberionImageGenerationADF } from '@agent/core/contracts/image-generation-adf';
+import type { KyberionVideoGenerationADF } from '@agent/core/contracts/video-generation-adf';
+import { slugify } from '@agent/core/foundation/text';
+import {
+  buildVideoDesignCssVars,
+  resolveVideoModeDefaults,
+} from '@agent/core/video/video-design-system';
 
 export function compileComfyUiImageRequest(
   request: {

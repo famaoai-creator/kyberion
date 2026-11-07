@@ -219,11 +219,6 @@ export {
   resolveServiceBinding,
 } from './service/service-binding.js';
 
-export {
-  compileImageGenerationADF,
-  compileVideoGenerationADF,
-} from './visual-workflow-compiler.js';
-
 export * as secretGuard from './secret/secret-guard.js';
 
 export {

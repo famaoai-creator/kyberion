@@ -6,7 +6,7 @@ import {
   ImageGenerationResult,
   ImageGenerationProvider,
 } from '../../image-generation-types.js';
-import { compileComfyUiImageRequest } from '@agent/core/visual-workflow-compiler';
+import { compileComfyUiImageRequest } from '../../visual-workflow-compiler.js';
 import { governImageProvider } from '../admission.js';
 import { getFallbackTargetPath } from '../provider-support.js';
 
