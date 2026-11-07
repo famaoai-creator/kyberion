@@ -4,7 +4,7 @@ import * as React from 'react';
 import './kyberion-ui-tokens.css';
 import './kyberion-ui.css';
 import './globals.css';
-import { readFrontDeskSurfaceUrls } from '@agent/core/front-desk-nav';
+import { readFrontDeskSurfaceUrls, resolveFrontDeskDestination } from '@agent/core/front-desk-nav';
 import { THEME_BOOTSTRAP_SCRIPT } from '../lib/concierge-theme';
 import { ConciergeShell } from './concierge-shell';
 import { ConciergeHeader } from './concierge-header';
@@ -26,7 +26,13 @@ export const metadata = {
 export const viewport = { themeColor: '#1d4ed8' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const frontDeskUrls = readFrontDeskSurfaceUrls();
+  // 進み具合 is 仕事 › 依頼 on Concierge itself; the shared destination
+  // catalog resolves it (`/work?tab=requests`), never a literal surface URL.
+  const progressHref =
+    resolveFrontDeskDestination('progress', {
+      currentSurface: 'concierge',
+      urls: readFrontDeskSurfaceUrls(),
+    })?.href ?? '/work?tab=requests';
 
   return (
     // `data-theme` (a pinned light/dark choice) and `lang` are set on the
@@ -47,7 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           nav={<FrontDeskRail />}
           overlays={
             <>
-              <ConversationDock progressHref={frontDeskUrls['presence-studio'] + '/progress'} />
+              <ConversationDock progressHref={progressHref} />
               <CommandPalette />
             </>
           }
