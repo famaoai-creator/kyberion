@@ -184,18 +184,119 @@ Work Visibility Scope、Binding Scope）はそのまま残る。このモデル�
 
 ## 移行計画
 
-| ID  | 段階                 | 内容                                                                                                                                                                                                                                                                                                                                                                                        | 受入条件                                                                                                                                                                | 状態       |
-| --- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| P0  | 用語                 | この文書と GLOSSARY への追記。挙動は変えない。                                                                                                                                                                                                                                                                                                                                              | GLOSSARY に「情報資産のスコープ（管理・開示・加工）」の項があり、Scope terms から参照される                                                                             | proposed   |
-| P1  | 処理者への開示の統一 | 管理者 `{ kind: 'system' \| 'tenant' \| 'person', ref }` を受け取る判定関数を一つにし、推論送信（`reasoning-egress-scope.ts`）と委譲（`provider-egress-gate.ts`）の両方から使う。インストール単位の証明を `system/` 区画に、個人単位の証明を `personal/` 区画に、テナントの証明と同じ形（承認つき、TTL 180 日）で置く。登録は既存の `pnpm onboarding llm attest` を管理者の種類で拡張する。 | 同じ入力に対して 2 つの入口の結論が一致する契約テスト。テナント無しの role draft が、インストール単位の証明があれば通り、無ければ証明の登録コマンドを案内して拒否される | proposed   |
-| P2  | 作成時の管理者       | 実行時ストアのテナント分割の登録ゲート（#1414）と `training_use` の型必須化（進行中の PR）を R-01 / R-04 の実装として位置づける。新しい記録型には管理者を必須フィールドとして持たせる。                                                                                                                                                                                                     | 登録されていないテナント分割ストアと管理者の無い新規記録が CI で拒否される                                                                                              | 一部進行中 |
-| P3  | 派生関係             | provenance taint を mission 単位から資産単位に広げ、既存の来歴（ingest asset ledger、memory provenance）を一つの派生関係の参照形式でつなぐ。退会時の削除と保持期間の満了は派生関係をたどる。                                                                                                                                                                                                | テナントの資産を消すと、その要約・蒸留結果・キャッシュ・委譲結果も消える fixture テスト。手書きの削除対象リストが不要になる                                             | proposed   |
-| P4  | 閲覧の開示           | `admitsTenant`（#1407）を管理者の種類（system / tenant / person）で判定する形に一般化し、すべての surface reader をそれに揃える。                                                                                                                                                                                                                                                           | system / 単一テナント / 個人の viewer で、ホーム・あなた待ち・グラフの件数が一致する契約テスト                                                                          | proposed   |
+| ID  | 段階                 | 内容                                                                                                                                                                                                                                                                                                                                                                                        | 受入条件                                                                                                                                                                | 状態                          |
+| --- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| P0  | 用語                 | この文書と GLOSSARY への追記。挙動は変えない。                                                                                                                                                                                                                                                                                                                                              | GLOSSARY に「情報資産のスコープ（管理・開示・加工）」の項があり、Scope terms から参照される                                                                             | proposed                      |
+| P1  | 処理者への開示の統一 | 管理者 `{ kind: 'system' \| 'tenant' \| 'person', ref }` を受け取る判定関数を一つにし、推論送信（`reasoning-egress-scope.ts`）と委譲（`provider-egress-gate.ts`）の両方から使う。インストール単位の証明を `system/` 区画に、個人単位の証明を `personal/` 区画に、テナントの証明と同じ形（承認つき、TTL 180 日）で置く。登録は既存の `pnpm onboarding llm attest` を管理者の種類で拡張する。 | 同じ入力に対して 2 つの入口の結論が一致する契約テスト。テナント無しの role draft が、インストール単位の証明があれば通り、無ければ証明の登録コマンドを案内して拒否される | proposed                      |
+| P2  | 作成時の管理者       | 実行時ストアのテナント分割の登録ゲート（#1414）と `training_use` の型必須化（進行中の PR）を R-01 / R-04 の実装として位置づける。新しい記録型には管理者を必須フィールドとして持たせる。                                                                                                                                                                                                     | 登録されていないテナント分割ストアと管理者の無い新規記録が CI で拒否される                                                                                              | 一部進行中                    |
+| P3  | 派生関係             | provenance taint を mission 単位から資産単位に広げ、既存の来歴（ingest asset ledger、memory provenance）を一つの派生関係の参照形式でつなぐ。退会時の削除と保持期間の満了は派生関係をたどる。                                                                                                                                                                                                | テナントの資産を消すと、その要約・蒸留結果・キャッシュ・委譲結果も消える fixture テスト。手書きの削除対象リストが不要になる                                             | 実施済み（下記「P3 の実施」） |
+| P4  | 閲覧の開示           | `admitsTenant`（#1407）を管理者の種類（system / tenant / person）で判定する形に一般化し、すべての surface reader をそれに揃える。                                                                                                                                                                                                                                                           | system / 単一テナント / 個人の viewer で、ホーム・あなた待ち・グラフの件数が一致する契約テスト                                                                          | proposed                      |
+
+**P3 の実施（MSN-SCOPE-P3-20261107）。**
+
+- `libs/core/information-assets/asset-derivation.ts` に派生関係を実装した。参照形式は一つ:
+  `asset:{tenant}:{id}@v{n}`（ingest 台帳の資産）と `path:{repo-relative}`
+  （任意の資産パス）。memory provenance の記録は `memoryProvenanceRefs`
+  で `path:` 参照に写像してつなぐ（内容ハッシュ・`external:` の origin
+  連鎖は provenance ストア側に残る — 実体のないパスは名乗らない）。
+- 資産単位の taint（`AssetTaint` = highestTier・tenants・prohibitExternal）は
+  参照解決で導出する — caller が taint を名乗れない（asset → 台帳の
+  target_path、path → アンカーされた区画レイアウトで tier/custody を分類）。
+  派生の taint は全源泉の最も厳しい合成（R-06）。`assertAssetShareAllowed`
+  は mission 単位 `assertProvenanceShareAllowed` の資産版。
+- 信頼モデル: 台帳は削除権限の信頼基点なので、内容は常に敵対的に扱う。
+  - custody は**アンカーされた区画レイアウト**（knowledge/・テナントツリー・
+    floor・登録済み runtime 区画 — 大文字小文字を畳み `tenantOfPath` 優先）で
+    推定する。部分文字列の `confidential/{slug}` は管理者にならない
+    （`tmp/job/confidential/acme/` は acme の区画ではない = custody
+    laundering 防止）。
+  - 記録パスは**派生可能なデータ区画**に限る（knowledge/・テナントツリー・
+    floor — コード・設定・`.git`・runtime state・台帳自身は不可）。
+    `recordDerivation`・削除・退会収集の 3 層で同じ天井を replay する。
+  - replay は**区画束縛 honoring**（`recordedLandingHonored`）で行う。
+    台帳行が名乗る custody は信用しない — `path:` ソースはアンカー
+    レイアウトから、`asset:` ソースは ingest 台帳の実在確認から custody
+    と taint を**再検証**し（`verifiedRecordSources`）、レコードは
+    「自分が置かれた区画の管理者 ∈ 検証済みソース管理集合」のときだけ
+    有効とみなす（`recordDerivation` が書く場所と同じ規則）。着地点は
+    その区画の管理者か system に限られ、tier は検証済みソースから
+    再計算した taint の床を超える必要がある — 他テナント・他 person の
+    custody を名乗る偽造行は、自分の区画の到達範囲を一歩も越えられない。
+    区画列挙自体もアンカー済み（`system/`・`confidential/{slug|common}`・
+    `personal/{member}` のみ — 不正な区画名・読めない区画は警告つきで
+    skip）。
+  - 台帳区画は `tenant_scope.protected_prefixes` と
+    `TIER_PARTITIONED_RUNTIME_ROOTS` に登録済み — 他テナント区画への
+    書き込みは tenant binding が閉じ、台帳の tier 分類も正しい。
+    `personal/{member}` はメンバー区画なのでテナント列挙からは除外する
+    （`tenantTiers` carve-out — slug==member-id のテナント退会が
+    メンバーの台帳を掃かない）。残余: system 区画の台帳は ambient
+    persona 権限で書けるため、system 区画内の偽造は public/非管理
+    データの削除に留まる — 専用 storeRole 化を強化案として後続に残す。
+- `recordDerivation` は派生物が最も厳しい源泉より低い tier の区画に置かれる
+  記録を refuse する（`[DERIVATION_TIER_VIOLATION]`、fail-closed）。
+  ソースは実在し（path 参照）、asset 参照は ingest 台帳の target_path が
+  参照テナントの木内かつ**派生可能なデータ区画**であることまで確かめる
+  （偽造 ingest 行が `libs/` などを差しても届かない）。
+- 派生台帳は**ソースの管理者区画**に append-only で置く
+  （`active/shared/runtime/asset-derivations/{confidential/{T}|system|personal/{ref}}/`
+  — 登録済み partitioned ledger root。複数管理者にまたがる源泉は各管理者の
+  台帳に全ソース列を書く — どの区画が残っても閉包が完結する）。
+- 削除は `deleteAssetWithDerivations` が台帳の遷移閉包（BFS・dedupe・サイクル
+  安全）をたどり、葉から順に消す。閉包のシードは `path:{normalized}` の
+  `derived.path` のみ（`derived.ref` は `path:` 形と不一致なら行ごと形状
+  不正として捨てる）— そして**死亡伝播も区画束縛 honoring を通るレコード
+  に限る**: 偽造行が「被害者のソースが死んだ」と標しても、その区画の
+  honoring を通らなければ deadRefs に乗らず、被害者自身の正当レコードを
+  使った削除ランダリングは起きない。**削除前に全候補を再検証**し、通常
+  ファイルだけを消す — malformed / 形状不正 / 権利外の行は警告付きで
+  skip し、監査は `derivation-deletions.jsonl` に deleted+skipped 両方で
+  残る（削除失敗・消失候補も skipped に記録）。
+- 退会: `collectScopeTargets` がテナントの派生台帳を読み（
+  `scope-offboarding-derived.ts`）、収集済みツリーの外にある派生物を
+  `derived_asset` 対象として拾う — 同じ区画束縛 replay を経るので、
+  他 custody に落ちる行を名乗る偽造は export への持ち出し自体を防ぐ。
+  対象は **runtime 区画ターゲットより前に** 並べ、台帳を名乗る区画が
+  派生物より先に消えないようにする。`verifyScopeOffboarded` は収集済み
+  対象 − soft-deleted の残存も直接数える（台帳が先に消えても失敗した
+  削除が見えなくならない）。保持期間側への接続口は
+  `listDerivedPathsForCustodian` / `listDerivedRecordsForCustodian`
+  （janitor 配線は後続段階）。
+- 受入 fixture テスト `libs/core/information-assets/asset-derivation.test.ts`（初期19件、レビュー修正で拡張）+
+  `scope-offboarding.test.ts`（退会収集・外部着地点拒否）:
+  資産→要約→蒸留（多段）・キャッシュ・委譲結果を記録し、資産削除で
+  全て消えることを確認。加えて低 tier 区画への記録拒否・malformed
+  ref/ソース・偽造 ingest 行（非派生区画の target_path）・custody
+  laundering・両スペリング閉包・サイクル・改竄行（他テナント・非派生
+  区画・形状不正・**検証済み foreign custody を名乗る偽造行** — 区画束縛
+  で拒否、退会収集でも export しない・**被害者のソースを「死んだ」と
+  標す偽造行による削除ランダリング** — deadRefs に乗らず被害者の
+  グラフは無事）の削除防御を網羅。
+- mission 単位の `provenance-taint.ts` は変えない — 資産単位は別の参照型として併置。
 
 ファイル I/O の門番（tier-guard）でこのモデルを使う土台は、[保存先カタログと許可証による権限判定](./STORE_CATALOG_GRANT_GUARD_DESIGN_2026-11-05.ja.md)（G0〜G4）で先に整える。
 
 各段階は独立した PR とし、P1 から始める。P1 はガバナンスの中核を変えるので、
 独立レビューを必須とする。
+
+### P3 レビューによる信頼境界の補強（2026-11-08）
+
+上記の区画束縛だけでは、正しい源泉と無関係な system ファイルを組み合わせた
+偽造を拒否できない。custodian 台帳は索引として扱い、登録済みの同じ
+asset-derivations ストアの system 区画に、信頼する producer が源泉と出力の
+パス・内容ハッシュを結んだ発行証跡を先に記録する。生の証跡へのアクセスは
+mission_controller・knowledge_steward・chronos_gateway に制限する。通常の退会
+確認は対象テナントの台帳に対する通常権限を先に確認し、共通の同期読取 grant
+で証跡を読み取る。grant は正規の証跡ファイルの読取だけに限定し、計画処理に
+移る前に失効する。呼出者には対象テナントの派生パスだけを返し、証跡の生データや
+別テナントの台帳は開示しない。要求自体の resource ceiling は拡張しない。
+索引の行だけでは削除を認可しない。既存の未証明行や壊れた追跡情報があれば、
+退会は正常完了とせず、確認と再発行を必要とする。
+
+退会対象は信頼する多段階の閉包で求める。古いパス単位の削除監査では、
+現在存在するファイルを除外しない。収集時の inode・metadata・内容を export と
+削除の直前に再照合し、不一致なら停止して追跡台帳を残す。協調ロックは任意の
+外部プロセスによる置換を原子的に防ぐものではない。
 
 ## 非目標
 
