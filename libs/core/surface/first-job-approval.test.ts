@@ -120,8 +120,6 @@ vi.mock('../governance/approval-store.js', async (original) => ({
 }));
 import { mintBrowserSessionToken } from '../authn/authn-providers.js';
 import * as authnProviders from '../authn/authn-providers.js';
-import type express from 'express';
-import { registerFirstJobRoutes } from '../../../presence/displays/presence-studio/first-job-routes.js';
 import {
   firstJobApprovalEffect,
   hasVerifiedFirstJobDecision,
@@ -441,145 +439,14 @@ describe('verified diagnostic decisions', () => {
   });
 });
 
-// Retained authored test additions, combined with their later recorded fixes.
-// This append fragment needs replayApprovalTestEdits(seed) and is not standalone.
-const handlers = new Map<string, express.RequestHandler>();
-registerFirstJobRoutes({
-  get: (path: string, fn: express.RequestHandler) => handlers.set('GET ' + path, fn),
-  post: (path: string, fn: express.RequestHandler) => handlers.set('POST ' + path, fn),
-} as unknown as express.Express);
-async function route(
-  method: 'GET' | 'POST',
-  options: {
-    body?: unknown;
-    headers?: Record<string, string | undefined>;
-    address?: string;
-    query?: Record<string, unknown>;
-  } = {}
-) {
-  const req = {
-    method,
-    body: options.body ?? {},
-    query: options.query ?? {},
-    params: { requestId: id },
-    headers: {
-      host: '127.0.0.1:3031',
-      origin: 'http://127.0.0.1:3031',
-      cookie: 'kyberion_session=' + token,
-      ...options.headers,
-    },
-    socket: { remoteAddress: options.address ?? '127.0.0.1' },
-  } as unknown as express.Request;
-  const res = {
-    code: 200,
-    body: {} as {
-      ok?: boolean;
-      error?: string;
-      retry_safe?: boolean;
-      auth?: { status: string };
-      approvals?: ReturnType<typeof read>['approvals'];
-      status?: string;
-    },
-    setHeader: () => res,
-    status: (code: number) => {
-      res.code = code;
-      return res;
-    },
-    json: (body: typeof res.body) => {
-      res.body = body;
-      return res;
-    },
-  };
-  await handlers.get(
-    method +
-      (method === 'GET'
-        ? ' /api/first-job/approvals'
-        : ' /api/first-job/approvals/:requestId/decision')
-  )!(req, res as unknown as express.Response, vi.fn());
-  return res;
-}
-describe('first-job approval HTTP integration', () => {
-  it('validates locale semantics at approval read boundaries rather than the wire contract', async () => {
-    expect((await route('GET', { query: { locale: 'en-US' } })).code).toBe(200);
-    expect((await route('GET', { query: { locale: 'zz' } })).code).toBe(400);
+// The HTTP boundary cases moved with the routes to Concierge
+// (presence/displays/concierge/src/app/api/first-job/route.test.ts).
+describe('first-job approval core boundary', () => {
+  it('validates locale semantics at the approval read boundary', () => {
     expect(() => readFirstJobApprovals(state.mapping!.viewer, token, { locale: 'zz' })).toThrow(
       'first_job_invalid_request'
     );
     expect(state.write).not.toHaveBeenCalled();
-  });
-  it('uses real fixture-session crypto for same-origin local approve and refuses replay', async () => {
-    const got = await route('GET');
-    expect(got.code).toBe(200);
-    expect(got.body.auth?.status).toBe('ready');
-    const body = {
-      decision: 'approved',
-      session_id: sessionId,
-      display_digest: got.body.approvals![0].display_digest,
-    };
-    expect((await route('POST', { body })).code).toBe(200);
-    expect((await route('POST', { body })).code).toBe(409);
-    expect(state.write).toHaveBeenCalledTimes(1);
-  });
-  it('shows missing auth without exposing pending approvals', async () => {
-    const result = await route('GET', { headers: { cookie: undefined } });
-    expect(result.body.auth?.status).toBe('authentication_required');
-    expect(result.body.approvals).toEqual([]);
-    expect(state.write).not.toHaveBeenCalled();
-  });
-  it.each([
-    { origin: undefined },
-    { origin: 'http://attacker.example' },
-    { origin: 'https://127.0.0.1:3031' },
-    { host: 'attacker.example', origin: 'http://attacker.example' },
-    { origin: 'null' },
-  ])('refuses hostile transport even with a valid session %#', async (headers) => {
-    const body = {
-      decision: 'approved',
-      session_id: sessionId,
-      display_digest: read().approvals[0].display_digest,
-    };
-    expect((await route('POST', { body, headers })).code).toBe(403);
-    expect(state.write).not.toHaveBeenCalled();
-  });
-  it('refuses remote socket even with same origin and a valid browser token', async () => {
-    expect((await route('GET', { address: '198.51.100.1' })).code).toBe(403);
-    expect(state.write).not.toHaveBeenCalled();
-  });
-  it.each(['authenticated', 'memberId', 'decidedBy', 'token', 'effect_binding', 'note'])(
-    'rejects injected authority field %s',
-    async (field) => {
-      const body = {
-        decision: 'approved',
-        session_id: sessionId,
-        display_digest: read().approvals[0].display_digest,
-        [field]: 'spoof',
-      };
-      expect((await route('POST', { body })).code).toBe(400);
-      expect(state.write).not.toHaveBeenCalled();
-    }
-  );
-  it('does not let an explicit forged bearer fall back to a valid cookie', async () => {
-    const body = {
-      decision: 'approved',
-      session_id: sessionId,
-      display_digest: read().approvals[0].display_digest,
-    };
-    expect(
-      (await route('POST', { body, headers: { authorization: 'Bearer kys1.forged.fake' } })).code
-    ).toBe(401);
-    expect(state.write).not.toHaveBeenCalled();
-  });
-  it('reports a failed post-write readback as uncertain and unsafe to retry', async () => {
-    const body = {
-      decision: 'approved',
-      session_id: sessionId,
-      display_digest: read().approvals[0].display_digest,
-    };
-    state.failReadback = true;
-    const result = await route('POST', { body });
-    expect(result.code).toBe(503);
-    expect(result.body).toMatchObject({ error: 'first_job_decision_uncertain', retry_safe: false });
-    expect(state.write).toHaveBeenCalledTimes(1);
   });
   it('sanitizes private-member parse failures at the reusable effect boundary', () => {
     state.memberError = true;

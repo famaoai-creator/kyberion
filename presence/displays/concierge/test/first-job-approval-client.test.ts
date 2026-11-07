@@ -1,52 +1,121 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { runInNewContext } from 'node:vm';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { act, createElement, useState, type ReactElement } from 'react';
+import type { Root } from 'react-dom/client';
 import { safeReadFile } from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
+import {
+  FakeElement,
+  fireEvent,
+  installFakeDom,
+} from '../../../../libs/shared-ui/vanilla/fake-dom.test-support';
 
+// 初めての仕事 approval view (FirstJobApprovalPanel + FirstJobApprovalSection),
+// ported from presence-studio first-job-approval-client.test.ts when the page
+// moved to Concierge (Kyberion server phase 2). The panel and its React
+// section render on their own into the shared fake DOM, driven by a context
+// exactly as the Studio harness drove `KyberionFirstJobApproval.check`.
 // Inert DOM/network fixtures only. This does not exercise a live sign-in or approve real work.
-class Element {
-  children: Element[] = [];
-  private ownText = '';
-  disabled = false;
-  hidden = false;
-  className = '';
-  type = '';
-  listeners: Record<string, () => void> = {};
-  constructor(
-    readonly tagName = 'div',
-    private onFocus?: (element: Element) => void
-  ) {}
-  focus() {
-    this.onFocus?.(this);
+const network = vi.hoisted(() => ({
+  handler: undefined as undefined | ((url: string, init?: RequestInit) => Promise<unknown>),
+}));
+vi.mock('../src/lib/front-desk-fetch', () => ({
+  frontDeskFetch: (url: string, init?: RequestInit) => network.handler!(url, init),
+}));
+
+const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const readSource = (relative: string) =>
+  String(safeReadFile(path.join(appDir, relative), { encoding: 'utf8' }));
+let dom: ReturnType<typeof installFakeDom>;
+let client: typeof import('react-dom/client');
+let panelModule: typeof import('../src/app/first-job/first-job-approval-panel');
+let sectionModule: typeof import('../src/app/first-job/first-job-approval-section');
+let mounted: Root | undefined;
+beforeAll(async () => {
+  dom = installFakeDom();
+  client = await import('react-dom/client');
+  panelModule = await import('../src/app/first-job/first-job-approval-panel');
+  sectionModule = await import('../src/app/first-job/first-job-approval-section');
+});
+afterAll(() => {
+  if (mounted) act(() => mounted!.unmount());
+  dom.restore();
+});
+
+function allBelow(element: FakeElement): FakeElement[] {
+  return element.children.flatMap((child) => [
+    child as FakeElement,
+    ...allBelow(child as FakeElement),
+  ]);
+}
+const wrapped = new WeakMap<FakeElement, Node>();
+const wrap = (element: FakeElement) => {
+  let node = wrapped.get(element);
+  if (!node) wrapped.set(element, (node = new Node(element)));
+  return node;
+};
+/** A rendered node, shaped like the Studio harness's element double. */
+class Node {
+  constructor(readonly element: FakeElement) {}
+  get tagName(): string {
+    return this.element.localName;
   }
   get textContent(): string {
-    return this.ownText + this.children.map((child) => child.textContent).join(' ');
+    return this.element.textContent;
   }
-  set textContent(value: string) {
-    this.ownText = value;
-    this.children = [];
+  get disabled(): boolean {
+    return (this.element as unknown as { disabled: boolean }).disabled;
   }
-  set innerHTML(_value: string) {
-    throw new Error('HTML injection is forbidden');
+  get hidden(): boolean {
+    return this.element.hasAttribute('hidden');
   }
-  appendChild(child: Element) {
-    this.children.push(child);
-    return child;
+  focus() {
+    this.element.focus();
   }
-  replaceChildren() {
-    this.children = [];
-    this.ownText = '';
-  }
-  addEventListener(name: string, handler: () => void) {
-    this.listeners[name] = handler;
+  descendants(): Node[] {
+    return allBelow(this.element).map(wrap);
   }
   fire() {
-    this.listeners.click?.();
-  }
-  descendants(): Element[] {
-    return this.children.flatMap((child) => [child, ...child.descendants()]);
+    act(() => {
+      fireEvent(this.element, 'click');
+    });
   }
 }
+/** A Studio element id; an absent element reads as hidden, empty and disabled. */
+class View {
+  constructor(private readonly find: () => FakeElement | null) {}
+  private get el(): FakeElement | null {
+    return this.find();
+  }
+  private control(): FakeElement | null {
+    const el = this.el;
+    if (!el || el.localName !== 'span') return el;
+    return el.querySelector('button') ?? el.querySelector('a') ?? el;
+  }
+  get hidden(): boolean {
+    const el = this.el;
+    return !el || el.hasAttribute('hidden');
+  }
+  get disabled(): boolean {
+    const control = this.control();
+    return !control || (control as unknown as { disabled?: boolean }).disabled === true;
+  }
+  get textContent(): string {
+    return this.el?.textContent ?? '';
+  }
+  descendants(): Node[] {
+    return (this.el ? allBelow(this.el) : []).map(wrap);
+  }
+  fire() {
+    const control = this.control();
+    if (!control || (control as unknown as { disabled?: boolean }).disabled) return;
+    act(() => {
+      fireEvent(control, 'click');
+    });
+  }
+}
+
 const session = 'concierge-' + 'a'.repeat(64);
 const approvalId = '11111111-1111-4111-8111-111111111111';
 const requestId = '22222222-2222-4222-8222-222222222222';
@@ -81,7 +150,9 @@ const response = (body: unknown, status = 200) => ({
   json: async () => body,
 });
 const flush = async () => {
-  for (let i = 0; i < 40; i++) await Promise.resolve();
+  await act(async () => {
+    for (let i = 0; i < 40; i++) await Promise.resolve();
+  });
 };
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -98,9 +169,7 @@ function harness(
     signal?: AbortSignal;
   } = {}
 ) {
-  const elements = new Map(
-    ['readiness', 'signin', 'refresh', 'error', 'status', 'items'].map((id) => [id, new Element()])
-  );
+  if (mounted) act(() => mounted!.unmount());
   const context = {
     signal: options.signal,
     snapshot: {
@@ -109,7 +178,6 @@ function harness(
       readiness: { ready: true, status: 'diagnostic_mapping_ready' },
       ...options.snapshot,
     },
-    vocab: new Proxy({} as Record<string, string>, { get: (_target, key) => String(key) }),
     locale: 'en',
     onChange: vi.fn(),
     onDecision: vi.fn(),
@@ -137,43 +205,72 @@ function harness(
       throw new Error('Unexpected request: ' + url);
     }
   );
-  const window = {
-    AbortController,
+  network.handler = (url, init) => fetch(url, init as Parameters<typeof fetch>[1]);
+  Object.assign(dom.window, {
     setTimeout: (handler: () => void, delay: number) => setTimeout(handler, delay),
     clearTimeout: (timer: ReturnType<typeof setTimeout>) => clearTimeout(timer),
-    KyberionFirstJobApproval: undefined as
-      undefined | { check: (context: unknown) => Promise<void>; invalidate: () => void },
-  };
-  const document = {
-    activeElement: null as Element | null,
-    getElementById: (id: string) => elements.get(id.replace('first-job-approval-', '')) ?? null,
-    createElement: (tag: string) =>
-      new Element(tag, (element) => {
-        document.activeElement = element;
-      }),
-  };
-  runInNewContext(
-    String(
-      safeReadFile('presence/displays/presence-studio/static/first-job-approval.js', {
-        encoding: 'utf8',
+  });
+  const host = { notify: () => undefined as void };
+  const panel = new panelModule.FirstJobApprovalPanel(() => host.notify());
+  const text = (key: string) => 'front_desk:first_job_' + key;
+  function Host(): ReactElement {
+    const [, setVersion] = useState(0);
+    host.notify = () => setVersion((value) => value + 1);
+    return createElement(
+      'div',
+      null,
+      createElement(
+        'ul',
+        null,
+        createElement(sectionModule.FirstJobApprovalReadiness, { panel, text })
+      ),
+      createElement(sectionModule.FirstJobApprovalSection, {
+        panel,
+        text,
+        locale: 'en',
+        act: (run: () => Promise<void> | void) => void run(),
       })
-    ),
-    { window, document, fetch, URLSearchParams, Date }
-  );
-  window.KyberionFirstJobApproval!.check(context);
-  const get = (id: string) => elements.get(id)!;
+    );
+  }
+  const container = dom.document.createElement('div');
+  dom.document.body.appendChild(container);
+  const root = client.createRoot(container as unknown as Element);
+  mounted = root;
+  act(() => root.render(createElement(Host)));
+  type Context = Parameters<typeof panel.check>[0];
+  const window = {
+    KyberionFirstJobApproval: {
+      check: (next: unknown) => panel.check(next as Context),
+      invalidate: () => act(() => panel.invalidate()),
+    },
+  };
+  void act(() => {
+    void panel.check(context as unknown as Context);
+  });
+  const get = (id: string) =>
+    new View(() => container.querySelector(`[data-fj="approval-${id}"]`) as FakeElement | null);
   return {
     context,
     fetch,
     window,
-    document,
+    document: {
+      get activeElement() {
+        const active = dom.document.activeElement;
+        return active ? wrap(active) : null;
+      },
+    },
     get,
     posts: () => fetch.mock.calls.filter(([, init]) => init?.method === 'POST'),
     buttons: () =>
       get('items')
         .descendants()
         .filter((node) => node.tagName === 'button'),
-    refresh: () => window.KyberionFirstJobApproval!.check(context),
+    refresh: () =>
+      act(async () => {
+        await panel.check(context as unknown as Context);
+      }),
+    /** Re-render without touching the panel (the page re-renders on any guide change). */
+    rerender: () => act(() => host.notify()),
   };
 }
 
@@ -390,6 +487,38 @@ describe('Dedicated diagnostic approval UI with inert fixtures', () => {
     }
   );
 
+  // Added in the Concierge port: the decision counterpart of Studio's
+  // "ignores an in-flight terminal response after invalidation" case.
+  it('ignores an in-flight decision response after invalidation and a new unauthenticated view', async () => {
+    const pending = deferred<ReturnType<typeof response>>();
+    let signedOut = false;
+    const h = harness({
+      get: () =>
+        response(
+          signedOut
+            ? view({
+                auth: { status: 'authentication_required' },
+                readiness: { ready: false, status: 'authentication_required' },
+                approvals: [],
+              })
+            : view()
+        ),
+      post: async () => pending.promise,
+    });
+    await flush();
+    h.buttons()[0].fire();
+    h.window.KyberionFirstJobApproval!.invalidate();
+    signedOut = true;
+    await h.refresh();
+    pending.resolve(response({ ok: true, approval_request_id: approvalId, status: 'approved' }));
+    await flush();
+    h.rerender();
+    expect(h.context.onDecision).not.toHaveBeenCalled();
+    expect(h.get('status').textContent).not.toContain('approval_recorded');
+    expect(h.get('readiness').textContent).toContain('approval_auth_needed');
+    expect(h.posts()).toHaveLength(1);
+  });
+
   it('clears the decision deadline after a timely confirmed response', async () => {
     const h = harness();
     await flush();
@@ -485,16 +614,11 @@ describe('Dedicated diagnostic approval UI with inert fixtures', () => {
   });
 
   it('uses only the existing fixed sign-in route and never copies a login URL from server data', () => {
-    const html = String(
-      safeReadFile('presence/displays/presence-studio/static/first-job.html', { encoding: 'utf8' })
-    );
-    const js = String(
-      safeReadFile('presence/displays/presence-studio/static/first-job-approval.js', {
-        encoding: 'utf8',
-      })
-    );
-    expect(html).toContain('href="/login?next=%2Ffirst-job"');
-    expect(js).not.toContain('login_href');
+    const html = readSource('src/app/first-job/first-job-approval-section.tsx');
+    const js = readSource('src/app/first-job/first-job-approval-panel.ts');
+    expect(html).toContain("const LOGIN_HREF = '/login?next=%2Ffirst-job'");
+    expect(html).toContain('href={LOGIN_HREF}');
+    expect(js + html).not.toContain('login_href');
     expect(js).not.toMatch(/document\.cookie|Authorization|localStorage/);
   });
 
@@ -506,11 +630,7 @@ describe('Dedicated diagnostic approval UI with inert fixtures', () => {
     expect(copy.en).toContain('Signing out does not by itself revoke a recorded approval.');
     expect(copy.ja).toContain('サインアウトするだけでは、記録済みの承認は取り消されません。');
     expect(copy.en).toContain('Session-key changes, revoked membership, or a changed request');
-    const script = String(
-      safeReadFile('presence/displays/presence-studio/static/first-job-approval.js', {
-        encoding: 'utf8',
-      })
-    );
+    const script = readSource('src/app/first-job/first-job-approval-section.tsx');
     expect(script).toContain("text('approval_validity')");
     expect(script).toContain("'approval_execution_deadline'");
   });

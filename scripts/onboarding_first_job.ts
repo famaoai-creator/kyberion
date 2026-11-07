@@ -157,7 +157,7 @@ export function planFirstJob(tenant: string) {
     draft,
     plan_digest: digest(state),
     pipeline_digest: pipelineDigest,
-    first_job_url: resolveSurfaceBrowserUrl('presence-studio') + '/first-job',
+    first_job_url: resolveSurfaceBrowserUrl('concierge') + '/first-job',
     effects: [
       'Create or resume only this owned public diagnostic tenant and draft.',
       'Activate the strict diagnostic charter and write the exact mapping last.',
