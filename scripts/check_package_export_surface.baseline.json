@@ -5,7 +5,7 @@
     "libs/kernel": 4,
     "libs/shared-interaction": 9,
     "libs/shared-media": 81,
-    "libs/shared-perception": 9,
+    "libs/shared-perception": 10,
     "libs/shared-ui": 3,
     "libs/shared-video": 21,
     "libs/shared-vision": 9,

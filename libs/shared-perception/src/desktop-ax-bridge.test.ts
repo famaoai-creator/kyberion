@@ -5,17 +5,17 @@ const existsSync = vi.fn(() => true);
 const mkdir = vi.fn();
 const resolveBin = vi.fn(() => '/managed/tool-runtimes/agent-desktop/bin/agent-desktop');
 
-vi.mock('./secure-io.js', () => ({
+vi.mock('@agent/core/secure-io', () => ({
   safeExecResult: (...args: unknown[]) => execResult(...args),
   safeExistsSync: (...args: unknown[]) => existsSync(...args),
   safeMkdir: (...args: unknown[]) => mkdir(...args),
 }));
 
-vi.mock('./tool/tool-binary-resolvers.js', () => ({
+vi.mock('@agent/core/tool/tool-binary-resolvers', () => ({
   resolveAgentDesktopBin: () => resolveBin(),
 }));
 
-vi.mock('./path-resolver.js', () => ({
+vi.mock('@agent/core/path-resolver', () => ({
   pathResolver: {
     rootResolve: (sub: string) => `/repo/${sub}`,
   },

@@ -20,7 +20,7 @@ const gcSessions = vi.fn(() => ({ ok: true, envelope: { ok: true } }));
 const createApproval = vi.fn(() => ({ id: 'approval-ax-1', status: 'pending' }));
 const loadApproval = vi.fn(() => ({ status: 'approved' }));
 
-vi.mock('@agent/core/desktop-ax-bridge', () => ({
+vi.mock('@agent/shared-perception/desktop-ax-bridge', () => ({
   agentDesktopAvailability: () => availability(),
   runAgentDesktopCommand: (...args: unknown[]) => runCommand(...args),
   endAgentDesktopSession: (...args: unknown[]) => endSession(...args),

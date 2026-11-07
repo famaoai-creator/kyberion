@@ -265,4 +265,38 @@ describe('Workspace build contract', () => {
       default: './dist/barge-in-controller.js',
     });
   });
+
+  it('keeps the desktop AX bridge in shared-perception with its system-actuator consumer', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const perception = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-perception/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./desktop-ax-bridge']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/desktop-ax-bridge.ts'))).toBe(false);
+    expect(perception.exports['./desktop-ax-bridge']).toEqual({
+      types: './dist/desktop-ax-bridge.d.ts',
+      default: './dist/desktop-ax-bridge.js',
+    });
+    const system = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/actuators/system-actuator/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(system.dependencies['@agent/shared-perception']).toBe('workspace:*');
+    // Path resolution, scoped I/O, and managed-tool resolution remain in
+    // core; moving the AX bridge must not reverse that dependency.
+    for (const subpath of [
+      './path-resolver',
+      './secure-io',
+      './foundation/runtime-state-roots',
+      './tool/tool-binary-resolvers',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+    expect(core.dependencies?.['@agent/shared-perception']).toBeUndefined();
+  });
 });
