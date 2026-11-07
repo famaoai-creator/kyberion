@@ -275,6 +275,97 @@ describe('check_catalog_integrity', () => {
   });
 
   describe('unused vocabulary references', () => {
+    const referenceUnused = (
+      catalog: Parameters<typeof findUnusedVocabularyKeys>[0],
+      haystack: string
+    ): string[] => {
+      const unused: string[] = [];
+      for (const [namespace, entries] of Object.entries(catalog.domains || {})) {
+        for (const key of Object.keys(entries || {})) {
+          if (
+            ![key, `${namespace}:${key}`].some(
+              (value) => haystack.includes(`'${value}'`) || haystack.includes(`"${value}"`)
+            )
+          ) {
+            unused.push(
+              `user-facing-vocabulary: ${namespace}.${key} is not referenced anywhere scanned`
+            );
+          }
+        }
+      }
+      return unused;
+    };
+
+    it('matches raw substring semantics for comments, overlapping quotes, escapes and unusual names', () => {
+      const catalog = {
+        domains: {
+          ns: Object.fromEntries(
+            ['plain', '', '語', 'a:b', 'line\nbreak', "a'b", 'a"b', 'absent'].map((key) => [
+              key,
+              { en: key },
+            ])
+          ),
+          "n's": { qualified: { en: 'qualified' } },
+          'n"s': { qualified: { en: 'qualified' } },
+        },
+      };
+      for (const haystack of [
+        '// \'plain\'\n/* "ns:語" */',
+        '\'\'plain\'\' ""語""',
+        "\\'plain\\' 'a:b'",
+        "'line\nbreak'",
+        ["first file ends with 'line", 'break\' then "語"'].join('\n'),
+        '\'a\'b\' "a"b" \'n\'s:qualified\' "n"s:qualified"',
+        '"a\'b" \'a"b\'',
+        "'unterminated " + 'x'.repeat(100_000) + "' 'plain'",
+        '',
+      ]) {
+        expect(findUnusedVocabularyKeys(catalog, haystack)).toEqual(
+          referenceUnused(catalog, haystack)
+        );
+      }
+    });
+
+    it('matches the original lookup on exhaustive short delimiter combinations', () => {
+      const catalog = {
+        domains: {
+          a: Object.fromEntries(
+            ['', 'a', ':', '語', "'", '"', '\\', '\n', "a'", '"a'].map((key) => [key, { en: key }])
+          ),
+          "'": { a: { en: 'a' } },
+          '"': { a: { en: 'a' } },
+        },
+      };
+      let inputs = [''];
+      for (let depth = 0; depth <= 4; depth += 1) {
+        for (const input of inputs) {
+          expect(findUnusedVocabularyKeys(catalog, input)).toEqual(referenceUnused(catalog, input));
+        }
+        inputs = inputs.flatMap((input) =>
+          ['a', "'", '"', '\\', '\n', ':', '語'].map((c) => input + c)
+        );
+      }
+    });
+
+    it('retains warning order for a large catalog beside a long irrelevant quoted span', () => {
+      const keys = Array.from({ length: 3000 }, (_, index) => `key_${index}`);
+      const catalog = {
+        domains: { ns: Object.fromEntries(keys.map((key) => [key, { en: key }])) },
+      };
+      const missing = keys.filter((_, index) => index % 13 === 0);
+      const haystack =
+        "'" +
+        'x'.repeat(200_000) +
+        "'\n" +
+        keys
+          .filter((_, index) => index % 13 !== 0)
+          .map((key) => `''ns:${key}''`)
+          .join('\n');
+      expect(findUnusedVocabularyKeys(catalog, haystack)).toEqual(
+        missing.map((key) => `user-facing-vocabulary: ns.${key} is not referenced anywhere scanned`)
+      );
+    });
+
     it('accepts namespaced catalogT references and surface registries', () => {
       const catalog = {
         domains: {

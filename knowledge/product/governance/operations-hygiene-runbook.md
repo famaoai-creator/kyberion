@@ -3159,6 +3159,23 @@ metadata-only digests: a deterministic OS vault lookup label is not a password v
 Preserve stored credential lookup compatibility and obtain explicit owner approval before
 changing an external security alert disposition.
 
+Verify fixture identities through the owning suite runner as well as direct Vitest:
+managed child execution filters inherited environment values, so a caller's role/persona
+is not a fixture contract. Bind and restore the intended owner inside the fixture itself.
+Script-boundary unit tests must exercise the real script wrapper and real malformed
+catalog input, while delegating unrelated whole-checkout scans to their real CI gate.
+When replacing child execution with an in-process test, regenerate the governance-import
+baseline even when the raw import is removed; compare set membership so canonical sorting
+cannot conceal a new allowance. Enforce with the governance script, scanner module,
+virtual-office and governance-import baseline tests.
+
+Profile slow catalog gates before increasing concurrency budgets or deadlines. Unused-key
+checks must not rescan the complete source text once per vocabulary key: index consecutive
+quote-delimited spans per invocation and preserve raw-text matching, delimiter-bearing
+fallbacks and warning order. Verify parity against the old matcher, including adjacent and
+escaped quotes, Unicode, cross-line spans and long unrelated text. The catalog integrity
+suite and the unchanged catalog gate deadline enforce this bounded lookup behavior.
+
 ## Intake extension CI checks
 
 When adding a service operation, validate the shipped discovery count and service-harness operation inventory together with the exact kind/risk/approval assertions. Registry-overlay fixtures must assert the shipped exact declarations as well as the mutation fallback. For boundary tests, partially mock shared path resolvers so new legitimate imports retain their real APIs; a minimal hand-built resolver can fail during module initialization before the tested gate runs. Run the impacted existing tests in addition to the extension fixtures. For single-use admission capabilities, compare private in-memory snapshots of request and configuration values. Do not send credential-bearing configuration into hash or HMAC APIs: keyed fast hashes still trigger password-hashing checks and are unnecessary when the capability's private WeakMap already supplies the trust boundary. Never log or persist these snapshots.
