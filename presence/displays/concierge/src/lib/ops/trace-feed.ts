@@ -14,6 +14,7 @@ import {
 import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core/ce-adoption';
 import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
+import { admitsCustody, custodyOfScope } from '@agent/core/surface/surface-authorization';
 import { isJsonRecord, optionalStringField } from './json-record';
 
 export interface TraceFeedSummary {
@@ -92,6 +93,8 @@ export interface TraceFeedOptions {
   query?: string;
   /** Source-side viewer tenant allowlist; unscoped legacy traces fail closed. */
   tenantSlugs?: string[] | 'all';
+  /** Server-resolved only (the system selection): also admit company-less traces. */
+  includeUntenanted?: boolean;
   /** Source-side viewer tier allowlist; unclassified traces fail closed. */
   tierAccess?: readonly OsKnowledgeTier[];
   organizationIds?: string[] | 'all';
@@ -297,7 +300,13 @@ function matchesTraceQuery(summary: TraceFeedSummary, query?: string): boolean {
 
 function matchesTraceFilters(summary: TraceFeedSummary, options: TraceFeedOptions): boolean {
   if (options.tenantSlugs !== undefined && options.tenantSlugs !== 'all') {
-    if (!summary.tenantSlug || !options.tenantSlugs.includes(summary.tenantSlug)) return false;
+    if (
+      !admitsCustody(
+        { tenantSlugs: options.tenantSlugs, includeUntenanted: options.includeUntenanted },
+        custodyOfScope({ tenant_slug: summary.tenantSlug })
+      )
+    )
+      return false;
   }
   if (options.tierAccess !== undefined) {
     if (!summary.tier || !options.tierAccess.includes(summary.tier)) return false;
@@ -459,7 +468,10 @@ export function collectTraceDetail(
           detail &&
           (options.tenantSlugs === undefined ||
             options.tenantSlugs === 'all' ||
-            (detail.tenantSlug && options.tenantSlugs.includes(detail.tenantSlug))) &&
+            admitsCustody(
+              { tenantSlugs: options.tenantSlugs, includeUntenanted: options.includeUntenanted },
+              custodyOfScope({ tenant_slug: detail.tenantSlug })
+            )) &&
           (options.tierAccess === undefined ||
             (detail.tier && options.tierAccess.includes(detail.tier))) &&
           (options.organizationIds === undefined ||

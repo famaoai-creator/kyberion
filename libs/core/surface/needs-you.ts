@@ -39,7 +39,11 @@
 import type { CeoApprovalItem, CeoExceptionItem, CeoOutcomeItem } from '../ceo-surface-summary.js';
 import { compareDecisionUrgency, groupByDecision } from './decision-brief.js';
 import type { DisplayText } from './display-humanize.js';
-import type { SurfaceAuthorizationContext } from './surface-authorization.js';
+import {
+  admitsCustody,
+  custodyOfScope,
+  type SurfaceAuthorizationContext,
+} from './surface-authorization.js';
 
 export const NEEDS_YOU_REASONS = [
   'approval',
@@ -124,6 +128,8 @@ export interface NeedsYouItem {
   tenant_slug?: string;
   organization_id?: string;
   project_id?: string;
+  /** Person custody marker carried from the source record. */
+  owner_nhi?: string;
   waiting_since?: string;
   deadline?: string;
   overdue: boolean;
@@ -159,8 +165,14 @@ export interface NeedsYouNarrowing {
 
 export type NeedsYouViewerScope = Pick<
   SurfaceAuthorizationContext,
-  'tenantSlugs' | 'organizationIds' | 'projectIds'
->;
+  | 'tenantSlugs'
+  | 'organizationIds'
+  | 'projectIds'
+  | 'includeUntenanted'
+  | 'memberId'
+  | 'principalId'
+  | 'principal'
+> & { personIds?: readonly string[] };
 
 function ms(value: string | undefined): number {
   const parsed = value ? Date.parse(value) : NaN;
@@ -204,6 +216,7 @@ function fromApproval(item: CeoApprovalItem, now: number): NeedsYouItem {
     ...(item.mission_id ? { mission_id: item.mission_id } : {}),
     ...(item.tenant_slug ? { tenant_slug: item.tenant_slug } : {}),
     ...(item.organization_id ? { organization_id: item.organization_id } : {}),
+    ...(item.owner_nhi ? { owner_nhi: item.owner_nhi } : {}),
     ...(item.requested_at ? { waiting_since: item.requested_at } : {}),
     ...(deadline ? { deadline } : {}),
     overdue: isOverdue(deadline, item.requested_at, now),
@@ -305,15 +318,15 @@ function within(allowed: readonly string[] | 'all', value: string | undefined): 
  * nothing, so the client can never widen the result.
  */
 export function narrowNeedsYouItem(
-  item: Pick<NeedsYouItem, 'tenant_slug' | 'organization_id' | 'project_id'>,
+  item: Pick<NeedsYouItem, 'tenant_slug' | 'organization_id' | 'project_id' | 'owner_nhi'>,
   viewer: NeedsYouViewerScope,
   narrowing: NeedsYouNarrowing = {}
 ): boolean {
-  if (!within(viewer.tenantSlugs, item.tenant_slug)) return false;
+  if (!admitsCustody(viewer, custodyOfScope(item))) return false;
   if (!within(viewer.organizationIds, item.organization_id)) return false;
   if (!within(viewer.projectIds, item.project_id)) return false;
   if (narrowing.tenant) {
-    if (!within(viewer.tenantSlugs, narrowing.tenant)) return false;
+    if (!admitsCustody(viewer, { kind: 'tenant', ref: narrowing.tenant })) return false;
     if (item.tenant_slug !== narrowing.tenant) return false;
   }
   if (narrowing.organization_id) {
