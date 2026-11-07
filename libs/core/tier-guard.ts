@@ -927,12 +927,17 @@ function requestResourceDenial(
   // G2: a live lineage read grant (no role) narrows every I/O made inside it.
   const lineageDenial = storeGrantNarrowingDenial(['memory-provenance'], grantInput);
   if (lineageDenial) return { allowed: false, reason: lineageDenial };
+  const derivationDenial = storeGrantNarrowingDenial(['asset-derivation'], grantInput);
+  if (derivationDenial) return { allowed: false, reason: derivationDenial };
   // Issuance receipts must remain outside tenant/worker mutable state, even
   // when a broad runtime default or an exact resource grant allows the path.
   const derivationReceipts = `${PARTITIONED_RUNTIME_LEDGER_ROOTS.asset_derivations}/system`;
   if (
     pathStartsWith(relativePath, derivationReceipts) &&
-    !['mission_controller', 'knowledge_steward', 'chronos_gateway'].includes(normalizedRole || '')
+    !['mission_controller', 'knowledge_steward', 'chronos_gateway'].includes(
+      normalizedRole || ''
+    ) &&
+    storeGrantRule('asset-derivation')?.pathAllowed?.(relativePath, operation) !== true
   )
     return {
       allowed: false,

@@ -333,8 +333,12 @@ Work Visibility Scope、Binding Scope）はそのまま残る。このモデル�
 上記の区画束縛だけでは、正しい源泉と無関係な system ファイルを組み合わせた
 偽造を拒否できない。custodian 台帳は索引として扱い、登録済みの同じ
 asset-derivations ストアの system 区画に、信頼する producer が源泉と出力の
-パス・内容ハッシュを結んだ発行証跡を先に記録する。この区画は read/metadata
-も含めて mission_controller・knowledge_steward・chronos_gateway に制限する。
+パス・内容ハッシュを結んだ発行証跡を先に記録する。生の証跡へのアクセスは
+mission_controller・knowledge_steward・chronos_gateway に制限する。通常の退会
+確認は対象テナントの台帳に対する通常権限を先に確認し、共通の同期読取 grant
+で証跡を読み取る。grant は正規の証跡ファイルの読取だけに限定し、計画処理に
+移る前に失効する。呼出者には対象テナントの派生パスだけを返し、証跡の生データや
+別テナントの台帳は開示しない。要求自体の resource ceiling は拡張しない。
 索引の行だけでは削除を認可しない。既存の未証明行や壊れた追跡情報があれば、
 退会は正常完了とせず、確認と再発行を必要とする。
 
