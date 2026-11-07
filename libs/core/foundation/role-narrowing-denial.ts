@@ -178,6 +178,7 @@ function exactScopeMatches(
     if (
       scope.organizationId ||
       scope.projectId ||
+      (scope.namePrefixExact?.length ?? 0) > 0 ||
       (scope.metadataExact?.length ?? 0) > 0 ||
       scope.readExact.length !== 1 ||
       scope.writeExact.length > 0 ||
