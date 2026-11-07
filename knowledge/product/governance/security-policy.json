@@ -1103,6 +1103,7 @@
         "deny": ["write", "mkdir"],
         "deny_reason": "[RESOURCE_SCOPE_REQUIRED] Archived mission state reads require their exact read-only capability",
         "require_scope": {
+          "custody": "tenant",
           "exact": {
             "read_only": true,
             "read_path_pattern": "^active/archive/missions/(personal|confidential)/([a-z][a-z0-9-]{1,30})/[A-Za-z0-9][A-Za-z0-9._-]{0,160}/mission-state\\.json$",
