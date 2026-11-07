@@ -529,6 +529,54 @@ describe('Workspace build contract', () => {
     }
   });
 
+  it('keeps the v4l2 virtual-camera output in shared-video with the OBS backend', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const video = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-video/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./v4l2-virtual-camera-output']).toBeUndefined();
+    for (const suffix of ['.ts', '.test.ts']) {
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/core/v4l2-virtual-camera-output${suffix}`))
+      ).toBe(false);
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/shared-video/src/v4l2-virtual-camera-output${suffix}`)
+        )
+      ).toBe(true);
+    }
+    for (const suffix of ['.js', '.d.ts', '.js.map', '.d.ts.map']) {
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/core/dist/v4l2-virtual-camera-output${suffix}`))
+      ).toBe(false);
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/shared-video/dist/v4l2-virtual-camera-output${suffix}`)
+        )
+      ).toBe(true);
+    }
+    expect(video.exports['./v4l2-virtual-camera-output']).toEqual({
+      types: './dist/v4l2-virtual-camera-output.d.ts',
+      default: './dist/v4l2-virtual-camera-output.js',
+    });
+    // The seam contract, the governed injection bridge the adapter wraps, the
+    // device lease, and exec/path plumbing stay in core; only the v4l2 adapter
+    // moved.
+    for (const subpath of [
+      './camera-output-bridge',
+      './virtual/virtual-camera-injection-bridge',
+      './secure-io',
+      './video/video-device-lease',
+      './video/video-route',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
   it('keeps the desktop AX bridge in shared-perception with its system-actuator consumer', () => {
     const core = JSON.parse(
       safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string

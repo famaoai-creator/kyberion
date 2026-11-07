@@ -29,7 +29,7 @@
     "libs/core/service/service-runtime-registry.ts",
     "libs/core/shell/pty-engine.ts",
     "libs/core/tool/tool-runtime-registry.ts",
-    "libs/core/v4l2-virtual-camera-output.ts",
+    "libs/shared-video/src/v4l2-virtual-camera-output.ts",
     "libs/core/virtual/desktop-event-feed.ts",
     "libs/core/virtual/desktop-launch-adapter.ts",
     "libs/core/virtual/desktop-observation-readiness.ts",

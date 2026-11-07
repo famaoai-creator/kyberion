@@ -47,6 +47,10 @@
       "types": "./dist/obs-virtual-camera-output.d.ts",
       "default": "./dist/obs-virtual-camera-output.js"
     },
+    "./v4l2-virtual-camera-output": {
+      "types": "./dist/v4l2-virtual-camera-output.d.ts",
+      "default": "./dist/v4l2-virtual-camera-output.js"
+    },
     "./video-composition-compiler": {
       "types": "./dist/video-composition-compiler.d.ts",
       "default": "./dist/video-composition-compiler.js"

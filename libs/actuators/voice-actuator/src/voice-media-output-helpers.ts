@@ -13,7 +13,7 @@ import {
 } from '@agent/core/tool/tool-binary-resolvers';
 import { resolveVoicePath } from '@agent/shared-voice/voice-path-policy';
 import { installObsVirtualCameraOutputBridge } from '@agent/shared-video/obs-virtual-camera-output';
-import { installV4l2VirtualCameraOutputBridge } from '@agent/core/v4l2-virtual-camera-output';
+import { installV4l2VirtualCameraOutputBridge } from '@agent/shared-video/v4l2-virtual-camera-output';
 import {
   resolveCameraOutputBridge,
   listCameraOutputBridges,

@@ -75,7 +75,7 @@ vi.mock('@agent/shared-video/obs-virtual-camera-output', () => ({
     });
   }),
 }));
-vi.mock('@agent/core/v4l2-virtual-camera-output', () => ({
+vi.mock('@agent/shared-video/v4l2-virtual-camera-output', () => ({
   installV4l2VirtualCameraOutputBridge: vi.fn(() => {
     if (processMocks.cameras.has('v4l2-virtual-cam')) throw new Error('duplicate registration');
     processMocks.cameras.set('v4l2-virtual-cam', {
