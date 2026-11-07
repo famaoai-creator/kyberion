@@ -180,13 +180,17 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
     const workspaceViewer = resolvedViewer.context as typeof resolvedViewer.context &
       Partial<ResolvedWorkspaceScope>;
     if (
-      !approvalMatchesWorkspace(approvalRecord, {
-        tenantSlugs: workspaceViewer.tenantSlugs,
-        organizationIds: workspaceViewer.organizationIds ?? 'all',
-        projectIds: workspaceViewer.projectIds ?? 'all',
-        tierAccess: workspaceViewer.tierAccess ?? ['public', 'confidential'],
-        selection: workspaceViewer.selection ?? { kind: 'tenant' },
-      })
+      !approvalMatchesWorkspace(
+        approvalRecord,
+        {
+          tenantSlugs: workspaceViewer.tenantSlugs,
+          organizationIds: workspaceViewer.organizationIds ?? 'all',
+          projectIds: workspaceViewer.projectIds ?? 'all',
+          tierAccess: workspaceViewer.tierAccess ?? ['public', 'confidential'],
+          selection: workspaceViewer.selection ?? { kind: 'tenant' },
+        },
+        resolvedViewer.context
+      )
     )
       return NextResponse.json({ error: 'Approval request not found' }, { status: 404 });
     if (
