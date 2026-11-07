@@ -57,7 +57,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('./apple-intelligence-bridge.js', () => ({
+vi.mock('./provider/apple-intelligence-bridge.js', () => ({
   recognizeImageLocallyWithAppleVision: mocks.appleVision,
 }));
 
@@ -861,7 +861,7 @@ describe('OCR egress capability routing', () => {
 
 describe('OCR input path boundary', () => {
   it('rejects an external image path before any provider reads or executes it', async () => {
-    const native = await import('./windows-native-image-recognition-bridge.js');
+    const native = await import('./ocr/windows-native-image-recognition-bridge.js');
     expect(() => native.recognizeTextWithWindowsNativeApi('/tmp/outside-ocr.png')).toThrow(
       '[RESOURCE_PATH_SCOPE]'
     );

@@ -3,12 +3,12 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { createLogger } from '../libs/core/logger.js';
-import { withCompilerOutputs } from '../libs/core/build-coordination.js';
+import { withCompilerOutputs } from '../libs/core/harnessing/build-coordination.js';
 import {
   BUILD_RECEIPT_SCHEMA_VERSION,
   publishBuildGenerationReceipt,
   type BuildGenerationReceipt,
-} from '../libs/core/build-generation.js';
+} from '../libs/core/harnessing/build-generation.js';
 import { readJsonIfPresent } from '../libs/core/foundation/json.js';
 import { nowIso } from '../libs/core/foundation/time.js';
 import { PfcController, type RecoveryAttempt } from '../libs/core/pfc/PfcController.js';

@@ -42,7 +42,30 @@
         "required": ["layer", "pattern"]
       }
     },
-    "default_layer": { "type": "string", "minLength": 1 }
+    "default_layer": { "type": "string", "minLength": 1 },
+    "core_placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root_modules", "domain_roles"],
+      "properties": {
+        "root_modules": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["responsibility", "reason"],
+            "properties": {
+              "responsibility": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "domain_roles": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
   },
   "required": [
     "version",
@@ -50,6 +73,7 @@
     "facade_patterns",
     "direction_exceptions",
     "patterns",
-    "default_layer"
+    "default_layer",
+    "core_placement"
   ]
 }

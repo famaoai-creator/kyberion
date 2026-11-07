@@ -28,7 +28,7 @@
  * both surfaces apply before mapping. Data-tier rules (personal, unknown) are
  * each caller's own (Concierge: `lib/progress-server.ts`).
  */
-import { eventScopeFromRecord } from '../event-scope.js';
+import { eventScopeFromRecord } from '../event/event-scope.js';
 import { admitsTenant } from './surface-authorization.js';
 import { resolveSurfaceBrowserUrl } from './surface-url.js';
 
@@ -56,7 +56,7 @@ export function estimateTaskSessionPercent(status: string): number | undefined {
 const TASK_SESSION_TERMINAL_STATUSES = new Set(['completed', 'failed', 'released']);
 
 /** Deliverable-inbox statuses that mean a verdict has already been recorded
- * (see `libs/core/deliverable-inbox.ts` `DeliverableInboxStatus`). */
+ * (see `libs/core/task/deliverable-inbox.ts` `DeliverableInboxStatus`). */
 const VERDICTED_INBOX_STATUSES = new Set(['accepted', 'rejected', 'changes_requested']);
 
 export const COMPUTER_SURFACE_MIRROR_FALLBACK_PORT = 3040;
@@ -492,7 +492,7 @@ export function progressRecordInScope(scope: ProgressViewerScope, value: unknown
 /**
  * Resolve the "手元の画面を見る" mirror link server-side from the surface
  * manifest (`computer-surface` id) — never a literal port in static files.
- * Best-effort like `readFrontDeskSurfacePorts` (`libs/core/front-desk-nav.ts`):
+ * Best-effort like `readFrontDeskSurfacePorts` (`libs/core/surface/front-desk-nav.ts`):
  * the manifest may be missing or unreadable in this execution context, so
  * this never throws and falls back to `COMPUTER_SURFACE_MIRROR_FALLBACK_PORT`.
  */

@@ -22,7 +22,7 @@ import {
   evaluateMissionPhaseExitGates,
   resolvePhaseGateMode,
 } from './mission-orchestration-phase-gates.js';
-import { summarizeHeuristics } from '../heuristic-feedback.js';
+import { summarizeHeuristics } from '../knowledge/heuristic-feedback.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
 import {
   loadMissionOrchestrationReplayPlan,

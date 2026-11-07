@@ -32,7 +32,7 @@ const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 const savedRoot = process.env.KYBERION_ROOT;
 
 let io: typeof import('./secure-io.js');
-let delegations: typeof import('./delegated-task-observability.js');
+let delegations: typeof import('./workforce/delegated-task-observability.js');
 let notifications: typeof import('./mission/delegation-notifications.js');
 let withExecutionContext = initialContext;
 
@@ -65,7 +65,7 @@ beforeAll(async () => {
   vi.resetModules();
   io = await import('./secure-io.js');
   ({ withExecutionContext } = await import('./authority.js'));
-  delegations = await import('./delegated-task-observability.js');
+  delegations = await import('./workforce/delegated-task-observability.js');
   notifications = await import('./mission/delegation-notifications.js');
   expect((await import('./path-resolver.js')).rootDir()).toBe(ROOT);
 }, 120_000);

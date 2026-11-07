@@ -50,8 +50,8 @@ import {
   structuredReasoningSpecs,
   STRUCTURED_REASONING_SYSTEM_PROMPT,
   type StructuredOpSpec,
-} from '../structured-reasoning.js';
-import { schemaHint } from '../structured-schema-hint.js';
+} from '../reasoning/structured-reasoning.js';
+import { schemaHint } from '../reasoning/structured-schema-hint.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -74,7 +74,7 @@ import type {
   DecomposedTaskPlan,
   ReasoningCallOptions,
 } from '../reasoning/reasoning-backend.js';
-import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
+import { runStartReportingDelegation } from '../workforce/delegation-execution-tracker.js';
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });

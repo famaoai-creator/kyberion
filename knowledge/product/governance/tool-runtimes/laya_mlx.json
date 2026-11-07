@@ -24,7 +24,7 @@
       "installed_backend": {
         "kind": "uv",
         "command": "uv",
-        "args": ["run", "python3", "libs/core/scripts/laya_mlx_bridge.py"],
+        "args": ["run", "python3", "libs/core/provider/scripts/laya_mlx_bridge.py"],
         "description": "Run the resident Laya judgment worker over NDJSON stdio."
       },
       "managed_env_subpath": "tool-runtimes/laya-mlx",

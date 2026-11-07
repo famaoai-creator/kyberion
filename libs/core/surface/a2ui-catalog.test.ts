@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readJson } from '../foundation/json.js';
 import { pathResolver } from '../path-resolver.js';
-import { validateA2UIMessage } from '../a2ui.js';
+import { validateA2UIMessage } from './a2ui.js';
 import {
   KB_STATUS_TONES,
   KB_STATUS_VALUES,
@@ -12,7 +12,7 @@ import {
   validateA2UIComponentProps,
   type KyberionBaseComponentType,
 } from './a2ui-catalog.js';
-import { listUxStatusValues } from '../ux-vocabulary.js';
+import { listUxStatusValues } from '../localization/ux-vocabulary.js';
 
 const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/a2ui-catalog-kyberion-base.schema.json'

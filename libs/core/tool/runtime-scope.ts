@@ -5,7 +5,7 @@ import {
   resolveEventScopeAgainstAuthority,
   type EventScope,
   type EventScopeInput,
-} from '../event-scope.js';
+} from '../event/event-scope.js';
 import { findMissionPath } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { loadProjectRecord } from '../project/project-registry.js';

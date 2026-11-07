@@ -25,10 +25,10 @@ import {
   type ApprovalRequestRecord,
 } from './approval-store.js';
 import { refuseHumanOnlyDecisionOnAgentPath } from './approval-human-decision.js';
-import { detectAgentExecutionContext } from '../agent-execution-context.js';
+import { detectAgentExecutionContext } from '../agent/agent-execution-context.js';
 import { auditChain } from './audit-chain.js';
 import { nowIso } from '../foundation/time.js';
-import type { EventScopeInput } from '../event-scope.js';
+import type { EventScopeInput } from '../event/event-scope.js';
 
 const COWORK_AGENT_ID = 'cowork-surface-agent';
 const GOVERNED_ROLE = 'sovereign_concierge' as const;

@@ -15,15 +15,19 @@ import { withResidentDotScope } from './resident-dot-scope.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
-import { isTenantPhysicalNamespacePath } from '../physical-namespace.js';
+import { isTenantPhysicalNamespacePath } from '../storage/physical-namespace.js';
 import { assertSafeRepositoryPath, safeMkdir, safeReadFile } from '../secure-io.js';
-import { evaluateStateProbe, type StateProbeDeps, type StateProbeResult } from '../state-probe.js';
+import {
+  evaluateStateProbe,
+  type StateProbeDeps,
+  type StateProbeResult,
+} from '../pipeline/state-probe.js';
 import {
   keyResultProgress,
   type KeyResultOrgMetric,
   type KeyResultSpec,
   type ObjectiveRef,
-} from '../key-result-spec.js';
+} from '../organization/key-result-spec.js';
 import {
   listOrganizationIncidents,
   listOrganizationDecisions,

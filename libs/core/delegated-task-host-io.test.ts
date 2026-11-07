@@ -6,7 +6,7 @@ import {
   createDelegationHandle,
   loadDelegatedTaskRecord,
   startDelegatedTaskTrace,
-} from './delegated-task-observability.js';
+} from './workforce/delegated-task-observability.js';
 import {
   buildRoleAwareReasoningBackend,
   getReasoningBackend,

@@ -1,5 +1,5 @@
-import { computeAuditEntryHash, GENESIS_HASH } from '../chain-integrity.js';
-import { humanActor } from '../actor.js';
+import { computeAuditEntryHash, GENESIS_HASH } from '../governance/chain-integrity.js';
+import { humanActor } from '../contracts/actor.js';
 import { readTextFile } from '../foundation/text.js';
 import { withExecutionContextAsync } from '../authority.js';
 import { runInExecutionScope } from '../foundation/execution-scope.js';

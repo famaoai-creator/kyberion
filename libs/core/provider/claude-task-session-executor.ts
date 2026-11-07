@@ -14,7 +14,7 @@ import {
   runApprovedClaudeDocumentTask,
   type ClaudeTaskRunnerContext,
 } from './claude-task-runner.js';
-import type { DraftRefineInput } from '../draft-refine.js';
+import type { DraftRefineInput } from '../reasoning/draft-refine.js';
 
 export type ClaudeTaskSessionKind = 'browser' | 'document';
 
@@ -46,7 +46,7 @@ export async function maybeRefineDocumentOutput(input: {
     // Lazy import: draft-refine pulls the reasoning-backend graph, which
     // consumers of this module (and their minimally-mocked tests) must not
     // pay for unless a refine actually runs.
-    const { draftRefine } = await import('../draft-refine.js');
+    const { draftRefine } = await import('../reasoning/draft-refine.js');
     const outcome = await draftRefine({
       kind: 'doc',
       content: input.output,

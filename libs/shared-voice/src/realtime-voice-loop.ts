@@ -46,7 +46,7 @@ import {
   streamVoicePlayback,
   streamTtsAudioPlayback,
   type StreamingVoicePlaybackController,
-} from '@agent/core/streaming-voice-playback';
+} from './streaming-voice-playback.js';
 import type { StreamingTextToSpeechBridge } from '@agent/core/voice/streaming-tts-bridge';
 import { VadTurnSegmenter, type VadTurnSegmenterOptions } from './vad-turn-recorder.js';
 import { computeChunkRms } from '@agent/core/voice/voice-activity-detector';

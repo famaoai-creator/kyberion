@@ -33,23 +33,23 @@ import {
   type webcrypto,
 } from 'node:crypto';
 
-import { agentActor, humanActor, parseActorRef, serviceActor } from '../actor.js';
-import { browserSessionKey } from '../authn-browser-session-key.js';
-export { browserSessionKey, BROWSER_SESSION_MIN_KEY_BYTES } from '../authn-browser-session-key.js';
+import { agentActor, humanActor, parseActorRef, serviceActor } from '../contracts/actor.js';
+import { browserSessionKey } from './authn-browser-session-key.js';
+export { browserSessionKey, BROWSER_SESSION_MIN_KEY_BYTES } from './authn-browser-session-key.js';
 import {
   CHRONOS_TOKEN_REGISTRY_READER_ROLE,
   findChronosTokenRegistration,
   matchesChronosToken,
   readChronosTokenRegistrations,
-} from '../chronos-access-registry.js';
-import type { OsKnowledgeTier } from '../cloudflare-os-control-plane.js';
+} from './chronos-access-registry.js';
+import type { OsKnowledgeTier } from '../governance/cloudflare-os-control-plane.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { getRegisteredEnvBool, isVitestProcess } from '../foundation/env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { readTextFile } from '../foundation/text.js';
 import { getAgentIdentity, deriveAgentNhiId } from '../agent/agent-identity.js';
 import { resolveAssumedRole, resolveExecutionPersona, withExecutionContext } from '../authority.js';
-import { frontDeskRoleAuthority } from '../front-desk-roles.js';
+import { frontDeskRoleAuthority } from '../surface/front-desk-roles.js';
 import { isValidMemberId } from '../organization/member-id-grammar.js';
 import {
   externalIdentityBindingDenied,
@@ -63,7 +63,7 @@ import {
   NhiActorPolicyError,
   enforceNhiActorPolicy,
   resolveNhiActorMode,
-} from '../nhi-actor-verification.js';
+} from '../agent/nhi-actor-verification.js';
 import { parseNhiId } from '../contracts/nhi-id.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { secretGuard } from '../secret/secret-guard.js';
@@ -80,7 +80,7 @@ import {
   type AuthnRequest,
   type AuthnResolveDeps,
   type ResolvedPrincipal,
-} from '../authn-principal-resolver.js';
+} from './authn-principal-resolver.js';
 
 // ---------------------------------------------------------------------------
 // shared helpers

@@ -36,7 +36,7 @@ import type { ReasoningBackendMode } from '../reasoning/reasoning-backend-policy
 import {
   getDefaultLifecycleHookEngine,
   type LifecycleHookRegistration,
-} from '../lifecycle-hook-engine.js';
+} from '../harnessing/lifecycle-hook-engine.js';
 import {
   registerOpGuard,
   registerOpPreflightListener,
@@ -49,7 +49,7 @@ import {
   PLUGIN_OFFICIAL_ONLY_SEAMS,
   PLUGIN_RESERVED_SEAMS,
 } from './plugin-permissions.js';
-import { listPluginFacetContributions, registerPluginFacet } from '../facet-registry.js';
+import { listPluginFacetContributions, registerPluginFacet } from './facet-registry.js';
 import type { PluginPermissionGrant } from './plugin-permissions.js';
 import {
   createPluginGrantBinding,

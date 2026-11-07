@@ -1,7 +1,7 @@
 import { safeExec, safeExecResult } from '../secure-io.js';
-import { activateApplication, toAppleScriptString } from '../apple-event-bridge.js';
+import { activateApplication, toAppleScriptString } from './apple-event-bridge.js';
 import { terminalBridge } from '../shell/terminal-bridge.js';
-import { powerShellStdinArgs, windowsPowerShellEnv } from '../windows-powershell.js';
+import { powerShellStdinArgs, windowsPowerShellEnv } from './windows-powershell.js';
 
 export interface KnownAppCapability {
   application: string;

@@ -1274,7 +1274,7 @@ export interface KbTalkingAvatarProps {
   fallback_initials?: string;
 }
 
-/** An `AnimationCue`-shaped object (`libs/core/realtime-media-session.ts`). */
+/** An `AnimationCue`-shaped object (`libs/core/media/realtime-media-session.ts`). */
 export interface KbAvatarCue {
   kind: string;
   payload: Record<string, number | string>;

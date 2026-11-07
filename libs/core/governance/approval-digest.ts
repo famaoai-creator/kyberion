@@ -11,10 +11,10 @@ import { approvalStoreRoots } from './approval-store-paths.js';
 import type { ApprovalRequestRecord } from './approval-store.js';
 import { readJsonLines } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
-import { resolveLocale } from '../locale.js';
+import { resolveLocale } from '../localization/locale.js';
 import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import { pathResolver } from '../path-resolver.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 
 /**
  * Autonomous-operation P1-8: the operator's twice-daily view of the decision

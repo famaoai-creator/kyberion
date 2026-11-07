@@ -34,7 +34,7 @@ scripts/kyberion_home.ts:312 の handleAskSubcommand は :323 で runSurfaceMess
 
 ### P1: surface handoff と mission task の契約不一致
 
-libs/core/surface/surface-runtime-orchestrator.ts:800 の forced delegation は context を指定しない。libs/core/surface/surface-runtime-conversation-data.ts:1368 の builder は、呼出側が context を渡した場合だけ payload に入れる。一方 libs/core/structured-output-contracts.ts:103、:104、:140 は mission_id、team_role と context を必須とする。libs/core/mesh/a2a-bridge.ts:382、:393 で実行前に拒否される。
+libs/core/surface/surface-runtime-orchestrator.ts:800 の forced delegation は context を指定しない。libs/core/surface/surface-runtime-conversation-data.ts:1368 の builder は、呼出側が context を渡した場合だけ payload に入れる。一方 libs/core/contracts/structured-output-contracts.ts:103、:104、:140 は mission_id、team_role と context を必須とする。libs/core/mesh/a2a-bridge.ts:382、:393 で実行前に拒否される。
 
 モデルが A2A を出す別経路でも、surface-runtime-orchestrator.ts:747 の processDelegations は text の補正だけを行う。欠落した trusted runtime context を解決しない。偽の mission_id を補って通す修正は採らない。bridge は mission_id の有無を runtime の所有区分にも使うため、監査上の誤帰属になる。
 

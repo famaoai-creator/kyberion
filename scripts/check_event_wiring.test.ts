@@ -60,7 +60,7 @@ describe('check_event_wiring', () => {
     it('呼び出し元の無い TriggerSource 値を検出する', () => {
       const violations = checkTriggerSourceWiring(
         sources({
-          'libs/core/trigger-runner.ts':
+          'libs/core/daemon/trigger-runner.ts':
             "export type TriggerSource = 'cron' | 'watch';\nexport function createTriggerRunner() {}\nexport function armTriggerWatch() {}",
           'scripts/some_daemon.ts': 'createTriggerRunner();',
         })
@@ -72,7 +72,7 @@ describe('check_event_wiring', () => {
     it('全値に呼び出し元があれば緑', () => {
       const violations = checkTriggerSourceWiring(
         sources({
-          'libs/core/trigger-runner.ts': "export type TriggerSource = 'cron' | 'watch';",
+          'libs/core/daemon/trigger-runner.ts': "export type TriggerSource = 'cron' | 'watch';",
           'scripts/a.ts': 'createTriggerRunner();',
           'libs/core/b.ts': 'armTriggerWatch(id, {});',
         })
@@ -83,8 +83,8 @@ describe('check_event_wiring', () => {
     it('テストファイルは呼び出し元として数えない', () => {
       const violations = checkTriggerSourceWiring(
         sources({
-          'libs/core/trigger-runner.ts': "export type TriggerSource = 'cron';",
-          'libs/core/trigger-runner.test.ts': 'createTriggerRunner();',
+          'libs/core/daemon/trigger-runner.ts': "export type TriggerSource = 'cron';",
+          'libs/core/daemon/trigger-runner.test.ts': 'createTriggerRunner();',
         })
       );
       expect(violations).toHaveLength(1);

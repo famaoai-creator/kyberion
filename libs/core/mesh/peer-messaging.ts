@@ -6,12 +6,12 @@ import { logger } from '../core.js';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
-import { streamJsonLinesAcrossCompaction } from '../jsonl-parked-read.js';
+import { streamJsonLinesAcrossCompaction } from '../storage/jsonl-parked-read.js';
 import {
   maintainStoreAfterAppend,
   type MaintainStoreOutcome,
   type StoreKey,
-} from '../append-only-store.js';
+} from '../storage/append-only-store.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
@@ -26,7 +26,7 @@ import {
   parseEventScopeInput,
   type EventScope,
   type EventScopeInput,
-} from '../event-scope.js';
+} from '../event/event-scope.js';
 import { toWireError } from '../contracts/wire-error.js';
 import {
   assertSafeRepositoryPath,

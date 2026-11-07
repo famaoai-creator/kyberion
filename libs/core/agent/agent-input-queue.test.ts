@@ -11,7 +11,7 @@ import {
   renderAgentInputQueueEntries,
   setAgentInputQueueStoreTuningForTests,
 } from './agent-input-queue.js';
-import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
+import { resetAppendOnlyStoreMaintenanceState } from '../storage/append-only-store.js';
 import {
   safeAppendFileSync,
   safeExistsSync,
@@ -21,7 +21,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
-import { clearOwnerScopeCache } from '../owner-scope.js';
+import { clearOwnerScopeCache } from '../governance/owner-scope.js';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 

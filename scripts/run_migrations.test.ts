@@ -176,7 +176,7 @@ export async function rollback(opts) { calls().push(['rollback', id, opts.dryRun
     expect(source).not.toContain('parseSafeJsonObjectValue');
 
     const stateSource = String(
-      safeReadFile(pathResolver.rootResolve('libs/core/migration-state.ts'), {
+      safeReadFile(pathResolver.rootResolve('libs/core/storage/migration-state.ts'), {
         encoding: 'utf8',
       })
     );

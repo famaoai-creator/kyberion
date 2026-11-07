@@ -42,7 +42,7 @@ This plan tracks catalog/index splits that should move from centralized JSON blo
   envelope (`version`, defaults) plus a single-element item array so it
   validates against the existing registry schema as-is (voice-profiles precedent).
   Shared-header consistency, duplicate detection, and id-sorted merge live in
-  `libs/core/registry-directory.ts`.
+  `libs/core/foundation/registry-directory.ts`.
 - New runtime loaders must read the canonical directory first.
 - Schema and governance checks must fail if directory and snapshot diverge.
 - Empty ledgers (gateway capabilities, external-service seed) use

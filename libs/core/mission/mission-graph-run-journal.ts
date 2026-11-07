@@ -9,10 +9,10 @@ import { nowIso } from '../foundation/time.js';
  * process stops between node completion and NEXT_TASKS persistence.
  */
 import { pathResolver } from '../path-resolver.js';
-import { resolveMissionDir } from '../owner-scope.js';
+import { resolveMissionDir } from '../governance/owner-scope.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
-import { withFencedWriterLeaseSync, writerLeaseResourceId } from '../writer-lease.js';
+import { withFencedWriterLeaseSync, writerLeaseResourceId } from '../lease/writer-lease.js';
 
 export const MISSION_GRAPH_RUN_JOURNAL_VERSION = 1;
 const JOURNAL_EVENT_SCHEMA_PATH = pathResolver.knowledge(

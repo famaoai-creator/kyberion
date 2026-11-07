@@ -28,14 +28,14 @@ import { listDotCharters, type LoadedDotCharter } from '../dot/dot-charter.js';
 import { readDotTokenUsageForDay } from '../dot/dot-token-usage.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { readJsonIfPresent } from '../foundation/json.js';
-import { generationQuotaCounterPath } from '../generation-quota.js';
+import { generationQuotaCounterPath } from '../finance/generation-quota.js';
 import {
   aggregateMetricsForEnforcement,
   projectEnforcementRow,
   type EnforcementRowView,
-} from '../metrics.js';
+} from '../analysis/metrics.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { sendOpsAlert } from '../ops-alert.js';
+import { sendOpsAlert } from '../daemon/ops-alert.js';
 import { pathResolver } from '../path-resolver.js';
 
 const logger = createLogger('org-budget-governor');

@@ -189,16 +189,16 @@
     "libs/core/agent/agent-runtime-supervisor.ts": {
       "json_state_write_budget": 2
     },
-    "libs/core/aidlc-phase-state.ts": {
+    "libs/core/mission/aidlc-phase-state.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/analysis/trace.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/apple-intelligence-bridge.ts": {
+    "libs/core/provider/apple-intelligence-bridge.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/assistant-compiler-request.ts": {
+    "libs/core/intent/assistant-compiler-request.ts": {
       "json_state_write_budget": 2
     },
     "libs/core/authn/passkey-credential-store.ts": {
@@ -207,7 +207,7 @@
     "libs/core/authority.ts": {
       "env_direct_read_budget": 5
     },
-    "libs/core/baseline-check-cache.ts": {
+    "libs/core/daemon/baseline-check-cache.ts": {
       "json_state_write_budget": 1
     },
     "libs/shared-interaction/src/bridge-error-reply.ts": {
@@ -231,33 +231,33 @@
     "libs/core/browser/chrome-extension-meeting-driver.ts": {
       "json_state_write_budget": 2
     },
-    "libs/core/capability-broker.ts": {
+    "libs/core/provider/capability-broker.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/cli-usage-metering.ts": {
+    "libs/core/provider/cli-usage-metering.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/cloudflare-os-control-plane.ts": {
+    "libs/core/governance/cloudflare-os-control-plane.ts": {
       "env_direct_read_budget": 1,
       "json_state_write_budget": 1
     },
-    "libs/core/cloudflare-os-journal-store.ts": {
+    "libs/core/governance/cloudflare-os-journal-store.ts": {
       "env_direct_read_budget": 1,
       "json_state_write_budget": 1
     },
-    "libs/core/cloudflare-os-journal.ts": {
+    "libs/core/governance/cloudflare-os-journal.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/cloudflare-os-shared.ts": {
+    "libs/core/governance/cloudflare-os-shared.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/co-session.ts": {
+    "libs/core/workforce/co-session.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/config-fallback-registry.ts": {
+    "libs/core/governance/config-fallback-registry.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/contextual-intent-memory.ts": {
+    "libs/core/intent/contextual-intent-memory.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/core.ts": {
@@ -271,31 +271,31 @@
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/customer-conversation-modes.ts": {
+    "libs/core/organization/customer-conversation-modes.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/daemon-heartbeat.ts": {
+    "libs/core/daemon/daemon-heartbeat.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/daemon/specs.ts": {
       "runtime_path_literal_budget": 3
     },
-    "libs/core/data-vault.ts": {
+    "libs/core/storage/data-vault.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/deal-documents.ts": {
+    "libs/core/organization/deal-documents.ts": {
       "json_state_write_budget": 2
     },
-    "libs/core/deal-store.ts": {
+    "libs/core/organization/deal-store.ts": {
       "json_state_write_budget": 2
     },
-    "libs/core/delegated-task-observability.ts": {
+    "libs/core/workforce/delegated-task-observability.ts": {
       "env_direct_read_budget": 2
     },
-    "libs/core/deliverable-inbox.ts": {
+    "libs/core/task/deliverable-inbox.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/dependency-vulnerability-ledger.ts": {
+    "libs/core/governance/dependency-vulnerability-ledger.ts": {
       "runtime_path_literal_budget": 1
     },
     "libs/actuators/vision-actuator/src/dirty-tile-describer.ts": {
@@ -339,19 +339,19 @@
     "libs/core/dot/dot-state-paths.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/egress-policy.ts": {
+    "libs/core/governance/egress-policy.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/environment-capability.ts": {
+    "libs/core/daemon/environment-capability.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/execution-feedback-candidates.ts": {
+    "libs/core/knowledge/execution-feedback-candidates.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/execution-feedback.ts": {
+    "libs/core/knowledge/execution-feedback.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/external-service-registry.ts": {
+    "libs/core/service/external-service-registry.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/foundation/execution-scope.ts": {
@@ -369,18 +369,18 @@
     "libs/core/foundation/project-scope-env.ts": {
       "env_direct_read_budget": 2
     },
-    "libs/core/front-desk-identity.ts": {
+    "libs/core/surface/front-desk-identity.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/generation-cost-settlement.ts": {
+    "libs/core/finance/generation-cost-settlement.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/generation-quota.ts": {
+    "libs/core/finance/generation-quota.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/generation-scheduler.ts": {
+    "libs/core/daemon/generation-scheduler.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 2
     },
@@ -413,7 +413,7 @@
     "libs/core/governance/policy-engine.ts": {
       "rate_limiter_impl_budget": 1
     },
-    "libs/core/graph-run-artifact.ts": {
+    "libs/core/pipeline/graph-run-artifact.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/harnessing/contrastive-session.ts": {
@@ -422,16 +422,16 @@
     "libs/core/harnessing/recursive-session.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/heuristic-feedback.ts": {
+    "libs/core/knowledge/heuristic-feedback.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/history-search-index.ts": {
+    "libs/core/search/history-search-index.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/i18n-coverage-history.ts": {
+    "libs/core/localization/i18n-coverage-history.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/i18n-hardcoding-baseline.ts": {
+    "libs/core/localization/i18n-hardcoding-baseline.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/identity-context-bridge.ts": {
@@ -445,7 +445,7 @@
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/injection-signal.ts": {
+    "libs/core/governance/injection-signal.ts": {
       "env_direct_read_budget": 2,
       "json_state_write_budget": 1
     },
@@ -515,13 +515,13 @@
     "libs/core/knowledge/procedure-self-repair.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/llm-selection-preferences.ts": {
+    "libs/core/reasoning/llm-selection-preferences.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/logger.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "libs/core/marketing-workload.ts": {
+    "libs/core/organization/marketing-workload.ts": {
       "exported_type_name_duplication_budget": 1
     },
     "libs/shared-media/src/image-generation/provider-support.ts": {
@@ -568,10 +568,10 @@
     "libs/core/mesh/peer-runtime-recovery.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/metrics.ts": {
+    "libs/core/analysis/metrics.ts": {
       "env_direct_read_budget": 2
     },
-    "libs/core/migration-state.ts": {
+    "libs/core/storage/migration-state.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/mission/delegation-child-registry.ts": {
@@ -644,16 +644,16 @@
     "libs/core/mission/mission-working-memory.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/nerve-bridge.ts": {
+    "libs/core/ingress/nerve-bridge.ts": {
       "env_direct_read_budget": 1
     },
     "libs/core/network.ts": {
       "env_direct_read_budget": 5
     },
-    "libs/core/oauth-session-store.ts": {
+    "libs/core/authn/oauth-session-store.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/operation-policy-gate.ts": {
+    "libs/core/governance/operation-policy-gate.ts": {
       "env_direct_read_budget": 1
     },
     "libs/core/organization/company-bootstrap.ts": {
@@ -715,10 +715,10 @@
     "libs/core/path-resolver.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/pending-intent-store.ts": {
+    "libs/core/intent/pending-intent-store.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/personal-identity-state.ts": {
+    "libs/core/authn/personal-identity-state.ts": {
       "json_state_write_budget": 2
     },
     "libs/core/pfc/PfcController.ts": {
@@ -744,13 +744,13 @@
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "libs/core/presence-avatar.ts": {
+    "libs/core/surface/presence-avatar.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/presentation-preference-registry.ts": {
+    "libs/core/design/presentation-preference-registry.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/process-logger.ts": {
+    "libs/core/daemon/process-logger.ts": {
       "env_direct_read_budget": 1
     },
     "libs/core/project/project-management.ts": {
@@ -773,10 +773,10 @@
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/promoted-memory.ts": {
+    "libs/core/knowledge/promoted-memory.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/promotion-candidates.ts": {
+    "libs/core/pipeline/promotion-candidates.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
@@ -833,19 +833,19 @@
     "libs/core/reasoning/reasoning-route-resolver.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/reconcile-ops.ts": {
+    "libs/core/daemon/reconcile-ops.ts": {
       "json_state_write_budget": 4
     },
-    "libs/core/reflex-terminal.ts": {
+    "libs/core/shell/reflex-terminal.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/relationship-graph-store.ts": {
+    "libs/core/organization/relationship-graph-store.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/report-ops.ts": {
+    "libs/core/daemon/report-ops.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/requirements-draft-store.ts": {
+    "libs/core/mission/requirements-draft-store.ts": {
       "json_state_write_budget": 1,
       "exported_type_name_duplication_budget": 1
     },
@@ -855,22 +855,22 @@
     "libs/core/scope-context.ts": {
       "json_state_write_budget": 2
     },
-    "libs/core/scope-offboarding.ts": {
+    "libs/core/storage/scope-offboarding.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 7
     },
-    "libs/core/sdlc-artifact-store.ts": {
+    "libs/core/mission/sdlc-artifact-store.ts": {
       "json_state_write_budget": 2,
       "exported_type_name_duplication_budget": 1
     },
-    "libs/core/seam-calibration.ts": {
+    "libs/core/provider/seam-calibration.ts": {
       "env_direct_read_budget": 1,
       "json_state_write_budget": 1
     },
-    "libs/core/seam-provider-selection.ts": {
+    "libs/core/provider/seam-provider-selection.ts": {
       "env_direct_read_budget": 3
     },
-    "libs/core/seam-selection-rules.ts": {
+    "libs/core/provider/seam-selection-rules.ts": {
       "env_direct_read_budget": 2,
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
@@ -888,11 +888,11 @@
     "libs/core/secure-io-path-guard.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/semantic-degradation-log.ts": {
+    "libs/core/reasoning/semantic-degradation-log.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/semantic-design-tokens.ts": {
+    "libs/core/design/semantic-design-tokens.ts": {
       "env_direct_read_budget": 1
     },
     "libs/core/service/service-binding-registry.ts": {
@@ -914,28 +914,28 @@
     "libs/core/service/service-runtime-registry.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/share-grant-live-sessions.ts": {
+    "libs/core/governance/share-grant-live-sessions.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/shell/terminal-bridge.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/soak-evidence-manifest.ts": {
+    "libs/core/testing/soak-evidence-manifest.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/soak-restart-state.ts": {
+    "libs/core/testing/soak-restart-state.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/spend-guard.ts": {
+    "libs/core/finance/spend-guard.ts": {
       "env_direct_read_budget": 3
     },
-    "libs/core/storage-janitor.ts": {
+    "libs/core/storage/storage-janitor.ts": {
       "json_state_write_budget": 5
     },
-    "libs/core/storage-retention-catalog.ts": {
+    "libs/core/storage/storage-retention-catalog.ts": {
       "runtime_path_literal_budget": 4
     },
-    "libs/core/storage-runtime-coverage.ts": {
+    "libs/core/storage/storage-runtime-coverage.ts": {
       "runtime_path_literal_budget": 2
     },
     "libs/core/surface/__tests__/parked-recovery-engine-worker.ts": {
@@ -996,24 +996,24 @@
     "libs/core/tool/tool-runtime-registry.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/training-catalog.ts": {
+    "libs/core/organization/training-catalog.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/trigger-runner.ts": {
+    "libs/core/daemon/trigger-runner.ts": {
       "env_direct_read_budget": 1,
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/trust-engine.ts": {
+    "libs/core/governance/trust-engine.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/unclassified-error-registry.ts": {
+    "libs/core/daemon/unclassified-error-registry.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/unhandled-intent-registry.ts": {
+    "libs/core/intent/unhandled-intent-registry.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/untrusted-content.ts": {
+    "libs/core/governance/untrusted-content.ts": {
       "env_direct_read_budget": 1,
       "json_state_write_budget": 1
     },
@@ -1068,7 +1068,7 @@
     "libs/shared-voice/src/voice-selection-preferences.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/volatile-knowledge.ts": {
+    "libs/core/knowledge/volatile-knowledge.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/workforce/agent-worktree.ts": {
@@ -1131,7 +1131,7 @@
     "libs/core/workforce/workspace-sweep.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/writer-lease.ts": {
+    "libs/core/lease/writer-lease.ts": {
       "json_state_write_budget": 2
     },
     "libs/shared-network/src/mcp-actuator-invoke.ts": {
@@ -1908,7 +1908,7 @@
     "libs/core/dot/dot-token-usage.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/ops-health-probe.ts": {
+    "libs/core/daemon/ops-health-probe.ts": {
       "runtime_path_literal_budget": 1
     }
   },
@@ -1919,9 +1919,9 @@
       "libs/actuators/terminal-actuator/src/terminal-actuator-helpers.ts"
     ],
     "GateResult": [
-      "libs/core/marketing-workload.ts",
-      "libs/core/requirements-draft-store.ts",
-      "libs/core/sdlc-artifact-store.ts"
+      "libs/core/organization/marketing-workload.ts",
+      "libs/core/mission/requirements-draft-store.ts",
+      "libs/core/mission/sdlc-artifact-store.ts"
     ],
     "MissionSummary": [
       "libs/core/mission/mission-read-model.ts",

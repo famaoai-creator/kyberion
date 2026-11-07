@@ -35,7 +35,7 @@ two weeks. Size caps on runtime stores turn growth into an outage, so:
 1. **Size never fails a read.** Choose the reader by what the caller needs, never by
    how big the file is today (see Reader contract).
 2. **The store owns its retention, at write time.** The writer calls
-   `maintainStoreAfterAppend(path, policy)` (`libs/core/append-only-store.ts`) right
+   `maintainStoreAfterAppend(path, policy)` (`libs/core/storage/append-only-store.ts`) right
    after appending. It is a cheap stat until the store crosses its threshold, then runs
    under the store lock, and re-runs only after the store doubles. The janitor uses the
    same implementation, but correctness never depends on the janitor running.
@@ -119,7 +119,7 @@ caller's identity. A writer that cannot write the retention audit log passes
 
 ## Reader contract
 
-Readers are in `libs/core/jsonl-read.ts`. None has a size cap, and each read stays on
+Readers are in `libs/core/storage/jsonl-read.ts`. None has a size cap, and each read stays on
 one open file (inode) even if the store is rotated or compacted mid-read.
 
 | need                | reader                                                |
@@ -135,7 +135,7 @@ one open file (inode) even if the store is rotated or compacted mid-read.
   (`fileEndsWithNewline`), or the new record merges into the broken one.
 - While another process compacts, the live file is briefly parked; readers that must
   not see an empty store read the parked copy (`jsonl-parked-read.ts`).
-- `JsonlTail` / `readJsonLinesCached` (`libs/core/jsonl-tail.ts`) read in chunks with
+- `JsonlTail` / `readJsonLinesCached` (`libs/core/storage/jsonl-tail.ts`) read in chunks with
   no size cap; a large backlog warns once and the cursor still advances. Use them for
   hot incremental replay, not as a substitute for a window reader.
 

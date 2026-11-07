@@ -6,7 +6,7 @@ last_updated: 2026-10-31
 
 # Build-Generation Receipt v1 設計レビュー (R12)
 
-- 対象: `libs/core/build-generation.ts` (schema v1)、発行側 `scripts/build_repository.ts` (commit `1134d1af4`)、読み側 `scripts/baseline_build_readiness.ts` / `libs/core/build-readiness.ts`
+- 対象: `libs/core/harnessing/build-generation.ts` (schema v1)、発行側 `scripts/build_repository.ts` (commit `1134d1af4`)、読み側 `scripts/baseline_build_readiness.ts` / `libs/core/harnessing/build-readiness.ts`
 - 基準: worktree `agent-cli-reliability`、base `bfefd82b5`、計画 `kyberion-reliability-plan.md` §3.3 / R12
 - 結論: **approve-with-conditions** (後述の条件 C1–C4。設計上の差し戻し事由はない)
 
@@ -74,7 +74,7 @@ last_updated: 2026-10-31
 
 ## 7. マージ時に reviewer が検証すること (条件)
 
-- **C1 (merge gate)**: `pnpm exec vitest run libs/core/build-generation.test.ts scripts/build_repository.provenance.test.ts scripts/check_stale_dist.test.ts libs/core/environment-capability-probes.test.ts scripts/run_doctor.probes.test.ts` が全 pass + `pnpm run ci` 相当 (validate+test) が worktree で完走すること。本レビュー時点では full `pnpm run ci` 未実行 (residual)。
+- **C1 (merge gate)**: `pnpm exec vitest run libs/core/harnessing/build-generation.test.ts scripts/build_repository.provenance.test.ts scripts/check_stale_dist.test.ts libs/core/daemon/environment-capability-probes.test.ts scripts/run_doctor.probes.test.ts` が全 pass + `pnpm run ci` 相当 (validate+test) が worktree で完走すること。本レビュー時点では full `pnpm run ci` 未実行 (residual)。
 - **C2 (no green-path 確認)**: 「receipt が存在する」だけで fresh と判定する consumer がないことを、将来の consumer 追加時も維持する。`BuildGenerationIdentity` は provenance ラベル専用とする。
 - **C3 (文書化)**: §3 の残る限界 (snapshot 非原子性・`<unreadable>` 同値・A→B→A 不可証明) を build-generation.ts のヘッダコメントまたは本ドキュメントへの参照として残す。
 - **C4 (schema 進化)**: v2 で field を追加する場合は `BUILD_RECEIPT_SCHEMA_VERSION` を上げ、v1 reader が v2 receipt を `legacy` として fail-closed に扱う現行挙動を contract test で固定する。

@@ -32,19 +32,19 @@ import {
   inferTaskSessionOutcomeContract,
   validateOutcomeContractAtCompletion,
   type OutcomeContract,
-} from '../outcome-contract.js';
-import { buildCompletionNextAction, type CompletionNextAction } from '../next-action.js';
+} from './outcome-contract.js';
+import { buildCompletionNextAction, type CompletionNextAction } from '../surface/next-action.js';
 import { recordIntentContractOutcome } from '../intent/intent-contract-learning.js';
 import { currentScope } from '../scope-context.js';
 import { reconcileCompletionStructurally } from '../intent/intent-reconciliation.js';
 import { matchesAnyTextRule, type TextMatchRule } from '../foundation/text-rule-matcher.js';
-import { buildFallbackExecutionBrief, type ExecutionBriefSeed } from '../execution-brief.js';
+import { buildFallbackExecutionBrief, type ExecutionBriefSeed } from '../intent/execution-brief.js';
 import {
   findServiceByTopic,
   topicToServiceId,
   extractProviderFromUtterance,
   resolveProviderUrl,
-} from '../external-service-registry.js';
+} from '../service/external-service-registry.js';
 import type { ActuatorExecutionBrief } from '../contracts/actuator-execution-brief.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 import {

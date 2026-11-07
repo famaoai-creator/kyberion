@@ -1,5 +1,5 @@
 import type { VideoFrame, VideoFormat } from '../meeting/meeting-session-types.js';
-import { BoundedVideoQueue, DEFAULT_VIDEO_BUFFER_POLICY } from '../bounded-video-queue.js';
+import { BoundedVideoQueue, DEFAULT_VIDEO_BUFFER_POLICY } from './bounded-video-queue.js';
 import {
   sameVideoFormat,
   type VideoBufferPolicy,

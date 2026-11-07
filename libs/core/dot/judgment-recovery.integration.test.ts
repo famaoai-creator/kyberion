@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { beforeAll, afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import type { DotCharter } from './dot-charter.js';
 import type { DotJudgmentPreEffectDeps } from './dot-judgment-pre-effect.js';
-import type { ManagedProcessHandle } from '../managed-process.js';
+import type { ManagedProcessHandle } from '../tool/managed-process.js';
 
 const sourceRoot = process.cwd();
 const root = path.join(sourceRoot, 'active/shared/tmp/judgment-recovery-' + randomUUID());
@@ -34,7 +34,7 @@ let pre: typeof import('./dot-judgment-pre-effect.js');
 let approvals: typeof import('../governance/approval-store.js');
 let state: typeof import('./dot-state-paths.js');
 let resultStore: typeof import('./dot-result-store.js');
-let managed: typeof import('../managed-process.js');
+let managed: typeof import('../tool/managed-process.js');
 const children: ManagedProcessHandle[] = [];
 let serial = 0;
 let resultFile = '';
@@ -125,7 +125,7 @@ beforeAll(async () => {
   approvals = await import('../governance/approval-store.js');
   state = await import('./dot-state-paths.js');
   resultStore = await import('./dot-result-store.js');
-  managed = await import('../managed-process.js');
+  managed = await import('../tool/managed-process.js');
   resultFile = path.join(
     root,
     state.dotStatePath(

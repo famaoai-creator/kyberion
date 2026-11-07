@@ -1,0 +1,1931 @@
+/**
+ * AL-04: scope-linked GC and scope offboarding.
+ *
+ * AL-01..03 connected retention to TTLs (catalog-driven janitor) and to the
+ * mission's own tree (finish/archive closure). What was still missing is the
+ * residue a mission leaves OUTSIDE its tree, and any verb at all for the two
+ * scopes above a mission:
+ *
+ *  - {@link gcMissionRuntimeResidue} — run at mission archive: reclaims the
+ *    `active/shared/runtime/` entries that belong to one mission (artifact
+ *    records, task sessions, that mission's volatile session directories).
+ *    The mission tree itself is already handled by AL-03's closure ceremony.
+ *  - {@link offboardScope} — the tenant/project offboarding verb: discover →
+ *    export → delete, with a MANDATORY human approval for the delete step
+ *    (same `approved_by` + `purpose` evidence shape tier-guard requires of
+ *    `cross_tenant_brokerage`), every step audited.
+ *
+ * Deletion discipline: everything here deletes through AL-04's soft-delete
+ * (`softDeleteToTrash` → `active/archive/.trash/<original-path>`), so an
+ * offboarding or residue GC is recoverable with `restoreFromTrash` until the
+ * janitor's trash sweep purges it. Nothing in this module hard-deletes.
+ *
+ * Contract: both entry points are IDEMPOTENT (a second run finds nothing
+ * left and reports a no-op) and NEVER THROW — they are lifecycle hooks, and
+ * a GC failure must never fail the archive/offboard decision that already
+ * succeeded. Failures surface as `status: 'error'` plus an audit record.
+ */
+
+import * as path from 'node:path';
+import { readJson, readJsonLines } from '../foundation/json.js';
+import * as pathResolver from '../path-resolver.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
+import { readTextFile } from '../foundation/text.js';
+import { streamTextLines } from './jsonl-read.js';
+import { nowIso } from '../foundation/time.js';
+import { logger } from '../core.js';
+import {
+  assertSafeRepositoryPath,
+  safeCopyFileSync,
+  safeExistsSync,
+  safeMkdir,
+  safeReaddir,
+  safeLstat,
+  safeStat,
+  safeWriteFile,
+} from '../secure-io.js';
+import { listArtifactOwnershipHistoryByQuery } from '../workforce/artifact-registry.js';
+import {
+  appendRetentionAudit,
+  repoRelativePosix,
+  softDeleteToTrash,
+  TRASH_REPO_SUBPATH,
+} from './storage-janitor.js';
+import { RETENTION_CATALOG_REPO_PATH } from './storage-retention-catalog.js';
+import {
+  PARTITIONED_RUNTIME_LEDGER_ROOTS,
+  PARTITIONED_RUNTIME_STATE_ROOTS,
+  metricsLedgerLockId,
+  metricsRowTenant,
+  tenantRuntimePartitionOf,
+  tenantRuntimePartitionPaths,
+  type TenantRuntimePartitionKey,
+} from '../storage-layout.js';
+import { isValidTenantSlug } from '../foundation/scope.js';
+import { withLockSync } from '../foundation/lock-utils.js';
+import { retireIdentitiesForScopeBestEffort } from '../agent/nhi-lifecycle-governance.js';
+import { revokeGrantsForTenantBestEffort } from '../task/task-scoped-grants.js';
+import { assertPhysicalScopeSegment, PHYSICAL_TENANT_NAMESPACE } from './physical-namespace.js';
+import {
+  DELEGATION_NOTIFICATIONS_LOCK,
+  LEGACY_DELEGATION_NOTIFICATIONS_PATH,
+  LEGACY_DELEGATION_RECORD_DIR,
+  LEGACY_DELEGATION_TRACE_PATH,
+} from '../foundation/runtime-state-roots.js';
+import { loadMissionStateAtPath } from '../mission/mission-state-reader.js';
+import type { MissionState } from '../mission/mission-types.js';
+
+// ---------------------------------------------------------------------------
+// Mission runtime residue
+// ---------------------------------------------------------------------------
+
+/**
+ * Where a mission's residue can live outside its own tree. Deliberately a
+ * CLOSED list of probes with an explicit match rule each — a heuristic sweep
+ * over `runtime/` would risk deleting another scope's state, so anything not
+ * listed here is left alone (and stays visible through the janitor's
+ * uncovered/review_required reporting).
+ *
+ * Not probed, on purpose: `runtime/work-coordination/` (work items are
+ * project-scoped and shared across missions), `runtime/audit/` and
+ * `runtime/state/` (audit + load-bearing state, `review_required` in the
+ * catalog).
+ */
+export type MissionResidueProbe = 'runtime_artifacts' | 'task_sessions' | 'session_volatile';
+
+export interface MissionResidueCandidate {
+  /** Repo-relative POSIX path. */
+  path: string;
+  probe: MissionResidueProbe;
+}
+
+export interface GcMissionRuntimeResidueResult {
+  status: 'gc' | 'noop' | 'error';
+  mission_id: string;
+  dry_run: boolean;
+  candidates: MissionResidueCandidate[];
+  /** Repo-relative paths moved to the trash this run. */
+  soft_deleted: string[];
+  error?: string;
+}
+
+function readJsonRecord(filePath: string): Record<string, unknown> | null {
+  try {
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safePath)) return null;
+    if (!safeStat(safePath).isFile()) return null;
+    return parseSafeJsonObjectValue(readJson<unknown>(safePath), `scope record ${filePath}`);
+  } catch {
+    return null;
+  }
+}
+
+function listDirEntries(dir: string): string[] {
+  let safeDir: string;
+  try {
+    safeDir = assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+  } catch {
+    return [];
+  }
+  if (!safeExistsSync(safeDir)) return [];
+  try {
+    return safeReaddir(safeDir);
+  } catch (error) {
+    // Only a directory that vanished is empty. A refused or changed listing
+    // is rethrown, so verification reports it instead of claiming clean.
+    const code = (error as { code?: unknown } | null)?.code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') return [];
+    throw error;
+  }
+}
+
+/** Mission ids are compared case-insensitively (`findMissionPath` upper-cases). */
+function sameMission(value: unknown, missionId: string): boolean {
+  return typeof value === 'string' && value.trim().toUpperCase() === missionId;
+}
+
+function safeOptionalRepositoryPath(filePath: string): string | undefined {
+  try {
+    return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  } catch {
+    return undefined;
+  }
+}
+
+function collectMissionResidue(missionId: string): MissionResidueCandidate[] {
+  const candidates: MissionResidueCandidate[] = [];
+
+  // 1. Artifact records (`runtime/artifacts/<artifact_id>.json`) carry an
+  //    optional `mission_id`. The artifact OWNERSHIP ledger is a separate,
+  //    append-only record and is never touched here.
+  const artifactsDir = pathResolver.shared('runtime/artifacts');
+  for (const name of listDirEntries(artifactsDir)) {
+    if (!name.endsWith('.json')) continue;
+    const filePath = path.join(artifactsDir, name);
+    const record = readJsonRecord(filePath);
+    if (record && sameMission(record.mission_id, missionId)) {
+      candidates.push({ path: repoRelativePosix(filePath), probe: 'runtime_artifacts' });
+    }
+  }
+
+  // 2. Task sessions (`runtime/task-sessions/<session_id>.json`) reference the
+  //    mission either at the top level or through their `artifact` block.
+  const taskSessionsDir = pathResolver.shared('runtime/task-sessions');
+  for (const name of listDirEntries(taskSessionsDir)) {
+    if (!name.endsWith('.json')) continue;
+    const filePath = path.join(taskSessionsDir, name);
+    const record = readJsonRecord(filePath);
+    if (!record) continue;
+    const artifact = record.artifact as Record<string, unknown> | undefined;
+    if (sameMission(record.mission_id, missionId) || sameMission(artifact?.mission_id, missionId)) {
+      candidates.push({ path: repoRelativePosix(filePath), probe: 'task_sessions' });
+    }
+  }
+
+  // 3. Volatile session directories (`runtime/session/<session-id>/`,
+  //    path-resolver `volatile('session', ref)`) named after the mission —
+  //    either exactly, or `<MISSION-ID>-<suffix>` for per-task sessions.
+  const sessionRoot = pathResolver.shared('runtime/session');
+  for (const name of listDirEntries(sessionRoot)) {
+    const upper = name.toUpperCase();
+    if (upper !== missionId && !upper.startsWith(`${missionId}-`)) continue;
+    const sessionPath = safeOptionalRepositoryPath(path.join(sessionRoot, name));
+    if (!sessionPath) continue;
+    candidates.push({
+      path: repoRelativePosix(sessionPath),
+      probe: 'session_volatile',
+    });
+  }
+
+  return candidates;
+}
+
+/**
+ * Reclaim one mission's `active/shared/runtime/` residue. Called from the
+ * mission archive verbs (`archiveMissionById`, `purgeMissions`) once the
+ * mission tree has been moved to the archive — at that point the runtime
+ * entries pointing into it are dangling by construction.
+ *
+ * Soft-deletes (recoverable) and audits every removal. Idempotent and never
+ * throws.
+ */
+export function gcMissionRuntimeResidue(input: {
+  missionId: string;
+  dryRun?: boolean;
+}): GcMissionRuntimeResidueResult {
+  const missionId = String(input.missionId || '')
+    .trim()
+    .toUpperCase();
+  const dryRun = input.dryRun ?? false;
+  const result: GcMissionRuntimeResidueResult = {
+    status: 'noop',
+    mission_id: missionId,
+    dry_run: dryRun,
+    candidates: [],
+    soft_deleted: [],
+  };
+  if (!missionId) {
+    result.status = 'error';
+    result.error = 'missionId is required';
+    return result;
+  }
+
+  try {
+    result.candidates = collectMissionResidue(missionId);
+    if (result.candidates.length === 0) return result;
+    result.status = 'gc';
+    if (dryRun) return result;
+
+    for (const candidate of result.candidates) {
+      const absolute = safeOptionalRepositoryPath(pathResolver.rootResolve(candidate.path));
+      if (!absolute) continue;
+      try {
+        if (!safeExistsSync(absolute)) continue;
+        softDeleteToTrash(absolute);
+        result.soft_deleted.push(candidate.path);
+        appendRetentionAudit({
+          event: 'MISSION_RESIDUE_SOFT_DELETE',
+          path: candidate.path,
+          trash_path: `${TRASH_REPO_SUBPATH}/${candidate.path}`,
+          mission_id: missionId,
+          probe: candidate.probe,
+          policy_ref: RETENTION_CATALOG_REPO_PATH,
+          reason: 'mission archived — scope-linked runtime residue GC (AL-04)',
+        });
+      } catch (err) {
+        logger.warn(
+          `[scope-offboarding] failed to reclaim ${candidate.path} for ${missionId}: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+      }
+    }
+    return result;
+  } catch (err) {
+    result.status = 'error';
+    result.error = err instanceof Error ? err.message : String(err);
+    logger.warn(`[scope-offboarding] mission residue GC failed for ${missionId}: ${result.error}`);
+    return result;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tenant / project offboarding
+// ---------------------------------------------------------------------------
+
+export type OffboardScopeType = 'tenant' | 'project';
+
+/**
+ * Human approval for the irreversible half of an offboarding. Same evidence
+ * shape tier-guard demands of `cross_tenant_brokerage`: WHO approved and WHY.
+ * Without it the verb refuses to delete (fail-closed) — a dry run and the
+ * export need no approval, only the removal does.
+ */
+export interface OffboardApproval {
+  approved_by: string;
+  purpose: string;
+  /** ISO-8601; stamped at execution time when the caller omits it. */
+  approved_at?: string;
+}
+
+export type OffboardTargetKind =
+  | 'project_tree'
+  | 'mission_tree'
+  /** Tenant-owned physical coordination namespace (surface queues/DLQ). */
+  | 'tenant_physical_namespace'
+  /** Project-owned physical namespace nested below a tenant namespace. */
+  | 'project_physical_namespace'
+  /** DA-08: the tenant's governed knowledge root incl. its `_ledger/` asset ledger (DA-05). */
+  | 'tenant_knowledge_tree'
+  /** DA-08: the tenant's incremental-sync cursor subtree (DA-03). */
+  | 'ingest_cursors_tree'
+  /** DA-08: one data-vault cache entry whose projectId equals the scope id. */
+  | 'data_vault_entry'
+  /** Tenant-scoped feedback, intent, audit, and collaboration runtime state. */
+  | 'tenant_learning_tree'
+  /** The tenant's partition of the resource-usage ledger (one per tier). */
+  | 'tenant_usage_ledger'
+  /** The tenant's partition of the execution-metrics ledger (one per tier). */
+  | 'tenant_execution_metrics'
+  /** The tenant's partition of the hybrid (audit) ledger (one per tier, D9). */
+  | 'tenant_ledger'
+  /** The tenant's approval store partition (requests, passkey challenges, event logs; one per tier). */
+  | 'tenant_approvals'
+  /** The tenant's customer decision invite records (CD-06; one partition per tier). */
+  | 'customer_decision_invites'
+  /** The tenant's delegation trace + record partition (delegated-task-observability.ts). */
+  | 'tenant_delegations'
+  /**
+   * A pre-partition delegation record (or child inbox) in the shared legacy
+   * directory attributed to the tenant (its `tenant_slug`, or its mission).
+   */
+  | 'delegation_legacy_record'
+  /**
+   * The tenant's partition of another registered runtime state root (pipeline
+   * library runs, autonomy learning, external operations, hearing, discussion
+   * create requests, standing grants; one partition per root and tier).
+   */
+  | 'tenant_runtime_state';
+
+export interface OffboardTarget {
+  /** Repo-relative POSIX path. */
+  path: string;
+  kind: OffboardTargetKind;
+}
+
+/** DA-08: dedup-registry line prune summary (tenant offboarding). */
+export interface OffboardDedupRegistryResult {
+  /** Lines identified as belonging to the tenant (ledger hashes / source ids / landing prefix). */
+  matched: number;
+  /** Lines actually removed (execute mode only; 0 on dry run). */
+  removed: number;
+  /** Repo-relative copy of the removed lines inside the export directory. */
+  export_file?: string;
+}
+
+/** DA-08: post-execute leftover check (受入条件: 痕跡が残らない). */
+export interface OffboardVerification {
+  clean: boolean;
+  /** Repo-relative paths (or annotated registry refs) still carrying scope traces. */
+  leftovers: string[];
+  /** Set when the leftover scan itself failed: the scope is not proven clean. */
+  error?: string;
+}
+
+export interface OffboardScopeResult {
+  status: 'dry_run' | 'offboarded' | 'approval_required' | 'not_found' | 'error';
+  scope_type: OffboardScopeType;
+  scope_id: string;
+  dry_run: boolean;
+  targets: OffboardTarget[];
+  /** Repo-relative export directory (execute mode only). */
+  export_path?: string;
+  /** Repo-relative paths moved to the trash (execute mode only). */
+  soft_deleted: string[];
+  /** NI-05: identities auto-retired because their scope closed (execute mode only). */
+  retired_identities?: number;
+  /** NI-04: live task grants revoked because the tenant closed. */
+  revoked_task_grants?: number;
+  /** DA-08: dedup-registry prune summary (tenant scope only). */
+  dedup_registry?: OffboardDedupRegistryResult;
+  /** Tenant rows pruned from the shared (pre-partition) resource-usage ledger. */
+  usage_ledger_legacy?: OffboardDedupRegistryResult;
+  /** Tenant rows pruned from the shared (pre-partition) execution-metrics ledger. */
+  execution_metrics_legacy?: OffboardDedupRegistryResult;
+  /** Tenant rows pruned from the shared (pre-partition) delegation trace and its segments. */
+  delegations_legacy?: OffboardDedupRegistryResult;
+  /** EG-10: registry-backed artifact ownership query for the offboarded scope. */
+  artifact_registry?: { matched: number; registry_path: string; records_retained: boolean };
+  /** DA-08: automatic post-execute leftover check (execute mode only). */
+  verification?: OffboardVerification;
+  reason?: string;
+}
+
+/** Where offboarding exports land, under the catalog's `active/shared/exports` tree. */
+export const OFFBOARDING_EXPORT_SUBDIR = 'offboarding';
+
+/**
+ * DA-08 ingest-system residue locations. Kept as literals (not imports from
+ * the ingest modules) so this lifecycle verb has no module-load coupling to
+ * the ingest stack; they mirror `ingest-quota.ts` / the ingest-actuator dedup
+ * registry / the DA-03 sync cursor store and the retention-catalog entries.
+ */
+export const INGEST_CURSORS_REPO_SUBPATH = 'active/shared/runtime/ingest-cursors';
+export const INGEST_DEDUP_REGISTRY_REPO_PATH =
+  'active/shared/runtime/ingest/content-hash-registry.jsonl';
+const INGEST_QUOTA_REPO_SUBPATH = 'active/shared/runtime/ingest/quota';
+/** metrics.ts RESOURCE_USAGE_LEDGER_ROOT (`<root>/<tier>/<tenant>/resource-usage.jsonl`). */
+export const USAGE_LEDGER_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.resource_usage;
+/**
+ * The repo-wide (system) resource-usage ledger. Rows written before the
+ * ledger was partitioned may still carry a tenant scope; offboarding prunes
+ * them line by line like the dedup registry.
+ */
+export const USAGE_LEDGER_LEGACY_REPO_PATH = 'work/metrics/resource-usage.jsonl';
+/** metrics.ts EXECUTION_METRICS_LEDGER_ROOT (`<root>/<tier>/<tenant>/execution-metrics.jsonl`). */
+export const EXECUTION_METRICS_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.execution_metrics;
+/** ledger.ts TENANT_LEDGER_ROOT (`<root>/<tier>/<tenant>/ledger.jsonl`, D9). */
+export const TENANT_LEDGER_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_ledger;
+/** approval-store-location.ts tenant partitions (`<root>/<tier>/<tenant>/<channel>/…`). */
+export const TENANT_APPROVALS_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals;
+/** customer-decision/invite.ts invite records (`<root>/<tier>/<tenant>/inv-<id>.json`). */
+export const CUSTOMER_DECISION_INVITES_REPO_SUBPATH =
+  PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites;
+/** The repo-wide (system) execution-metrics ledger; pre-partition rows are pruned like usage rows. */
+export const EXECUTION_METRICS_LEGACY_REPO_PATH = 'work/metrics/execution-metrics.jsonl';
+
+/**
+ * The partitioned metrics ledgers (metrics.ts) and their offboarding ceremony:
+ * the tenant's `<root>/<tier>/<tenant>/` partitions are exported + soft-deleted
+ * as targets; its pre-partition rows of the system file are exported, then
+ * removed by one atomic, approval-gated, audited rewrite.
+ */
+interface MetricsLedgerOffboarding {
+  result_key: 'usage_ledger_legacy' | 'execution_metrics_legacy';
+  partition_root: string;
+  target_kind: OffboardTargetKind;
+  legacy_path: string;
+  export_file: string;
+  audit_event: string;
+  row_label: string;
+}
+
+const METRICS_LEDGERS: readonly MetricsLedgerOffboarding[] = [
+  {
+    result_key: 'usage_ledger_legacy',
+    partition_root: USAGE_LEDGER_REPO_SUBPATH,
+    target_kind: 'tenant_usage_ledger',
+    legacy_path: USAGE_LEDGER_LEGACY_REPO_PATH,
+    export_file: 'usage-ledger-legacy-removed.jsonl',
+    audit_event: 'SCOPE_OFFBOARD_USAGE_LEDGER_PRUNE',
+    row_label: 'resource-usage',
+  },
+  {
+    result_key: 'execution_metrics_legacy',
+    partition_root: EXECUTION_METRICS_REPO_SUBPATH,
+    target_kind: 'tenant_execution_metrics',
+    legacy_path: EXECUTION_METRICS_LEGACY_REPO_PATH,
+    export_file: 'execution-metrics-legacy-removed.jsonl',
+    audit_event: 'SCOPE_OFFBOARD_EXECUTION_METRICS_PRUNE',
+    row_label: 'execution-metrics',
+  },
+];
+
+const SCOPE_TIERS = ['personal', 'confidential', 'public'] as const;
+
+/**
+ * Offboarding disposition of every tenant-partitioned runtime root. `null`
+ * leaves the partition in place. The `satisfies` clause makes a newly
+ * registered root fail to compile until its disposition is decided here.
+ */
+export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
+  // Resident-dot state: load-bearing append-only state; the retention catalog
+  // requires audited review before tenant offboarding deletes it. (Its
+  // pre-partition dot/tenants/<slug>/ copies are offboarded automatically via
+  // PHYSICAL_LEGACY_TENANT_STATE_ROOTS.)
+  dot: 'not_offboarded',
+  // Registered source workspaces are removed through their owning ledger,
+  // never by a tenant tree deletion that leaves live workspace records behind.
+  task_workspaces: 'not_offboarded',
+  resource_usage: 'tenant_usage_ledger',
+  execution_metrics: 'tenant_execution_metrics',
+  tenant_ledger: 'tenant_ledger',
+  tenant_approvals: 'tenant_approvals',
+  // A copy of the tenant's master audit entries; the master chain keeps them.
+  tenant_audit_mirror: 'tenant_runtime_state',
+  customer_decision_invites: 'customer_decision_invites',
+  pipeline_library_runs: 'tenant_runtime_state',
+  autonomy_learning: 'tenant_runtime_state',
+  external_operations: 'tenant_runtime_state',
+  // durable receipts: review-required, never auto-offboarded (see hearing-/discussion-request-storage-boundary tests)
+  hearing: 'not_offboarded',
+  // durable receipts: review-required, never auto-offboarded (see hearing-/discussion-request-storage-boundary tests)
+  discussion_create_requests: 'not_offboarded',
+  grants: 'tenant_runtime_state',
+  // Short-lived extension requests/responses (≤60 min lifetime): purge with the tenant.
+  browser_bridge_mailbox: 'tenant_runtime_state',
+  // Tenant/organization/project seam provider defaults: tenant configuration, purge with the tenant.
+  seam_selection_defaults: 'tenant_runtime_state',
+  // System / person custody provider attestations: never tenant-partitioned
+  // (tenant attestations live in the tenant profile), so nothing to offboard.
+  provider_attestations: 'not_offboarded',
+  // R5 idempotency reservations hold replayable tenant delegation output: purge with the tenant.
+  delegation_idempotency: 'tenant_runtime_state',
+  // Provider-reported tenant generation costs: exported, then removed with the tenant.
+  generation_cost_settlements: 'tenant_runtime_state',
+  // Reasoning API credential proofs (valid for 15 minutes): purge with the tenant.
+  api_verification: 'tenant_runtime_state',
+  // Delegation trace + records hold tenant instruction / context / result text:
+  // exported, then removed with the tenant (legacy shared copies: see
+  // computeLegacyDelegationTracePrunes / collectLegacyDelegationRecordTargets).
+  delegations: 'tenant_delegations',
+} as const satisfies Record<TenantRuntimePartitionKey, OffboardTargetKind | 'not_offboarded'>;
+
+/**
+ * Repo-relative knowledge root for a tenant slug. Deliberately the
+ * tenant-registry DEFAULT (`knowledge/confidential/{slug}`) rather than a
+ * `resolveTenant` call: offboarding must keep working for tenants whose
+ * profile is already gone/invalid, and importing tenant-registry would bind
+ * this module's load to schema files. Profiles that declare a custom
+ * `knowledge_root` are not resolved here (none exist today) — their tree
+ * would surface via the janitor's coverage reporting, not silently vanish.
+ */
+function tenantKnowledgeRootDefault(tenantSlug: string): string {
+  return `knowledge/confidential/${tenantSlug}`;
+}
+
+function missionStateScope(missionDir: string): {
+  tenantSlug?: string;
+  organizationId?: string;
+  projectId?: string;
+} {
+  const record = loadMissionStateAtPath(path.join(missionDir, 'mission-state.json')) as
+    | (MissionState & {
+        organization_profile?: { organization_id?: unknown };
+      })
+    | null;
+  if (!record) return {};
+  const organizationProfile = record.organization_profile;
+  return {
+    tenantSlug: record.tenant_slug,
+    organizationId:
+      record.organization_id ||
+      record.relationships?.organization?.organization_id ||
+      (typeof organizationProfile?.organization_id === 'string'
+        ? organizationProfile.organization_id
+        : undefined),
+    projectId: record.relationships?.project?.project_id,
+  };
+}
+
+function projectRecordScope(projectId: string): {
+  tenantSlug?: string;
+  organizationId?: string;
+} {
+  const record = readJsonRecord(
+    pathResolver.rootResolve(`active/shared/runtime/projects/${projectId}.json`)
+  );
+  return {
+    tenantSlug: typeof record?.tenant_slug === 'string' ? record.tenant_slug : undefined,
+    organizationId:
+      typeof record?.organization_id === 'string' ? record.organization_id : undefined,
+  };
+}
+
+function lineageMatches(
+  lineage: { tenantSlug?: string; organizationId?: string },
+  filter: PhysicalNamespaceFilter
+): boolean {
+  if (filter.tenantSlug && lineage.tenantSlug !== filter.tenantSlug) return false;
+  if (filter.organizationId && lineage.organizationId !== filter.organizationId) return false;
+  return true;
+}
+
+/**
+ * Resolve the lineage of a project workspace.
+ *
+ * New workspaces use `active/projects/{tier}/{tenant}/{project}`. The direct
+ * `active/projects/{tier}/{project}` form is legacy and can only be scoped by
+ * the project registry record; when that record is absent, a tenant/org
+ * filtered offboarding must leave the directory untouched.
+ */
+function projectWorkspaceLineage(
+  workspace: string,
+  projectId: string,
+  tierDir: string
+): { tenantSlug?: string; organizationId?: string } {
+  const segments = path.relative(tierDir, workspace).split(path.sep).filter(Boolean);
+  const recordScope = projectRecordScope(projectId);
+  const operationalState = readJsonRecord(path.join(workspace, 'state', 'project-state.json'));
+  const tenantSlug =
+    typeof operationalState?.tenant_slug === 'string'
+      ? operationalState.tenant_slug
+      : segments.length >= 2 && segments[0] !== 'shared'
+        ? segments[0]
+        : recordScope.tenantSlug;
+  const organizationId =
+    typeof operationalState?.organization_id === 'string'
+      ? operationalState.organization_id
+      : recordScope.organizationId;
+  if (segments.length < 2) return { tenantSlug, organizationId };
+  return {
+    tenantSlug,
+    organizationId,
+  };
+}
+
+function collectProjectWorkspaceTargets(
+  projectId: string,
+  filter: PhysicalNamespaceFilter
+): Array<{ target: OffboardTarget; lineage: { tenantSlug?: string; organizationId?: string } }> {
+  const candidates: Array<{
+    target: OffboardTarget;
+    lineage: { tenantSlug?: string; organizationId?: string };
+  }> = [];
+  for (const tier of SCOPE_TIERS) {
+    const tierDir = path.join(pathResolver.rootDir(), 'active', 'projects', tier);
+    for (const owner of listDirEntries(tierDir)) {
+      const ownerDir = safeOptionalRepositoryPath(path.join(tierDir, owner));
+      if (!ownerDir) continue;
+      try {
+        if (!safeStat(ownerDir).isDirectory()) continue;
+      } catch {
+        continue;
+      }
+
+      const candidate = safeOptionalRepositoryPath(
+        owner === projectId ? ownerDir : path.join(ownerDir, projectId)
+      );
+      if (!candidate || !safeExistsSync(candidate)) continue;
+      try {
+        if (!safeStat(candidate).isDirectory()) continue;
+      } catch {
+        continue;
+      }
+      const lineage = projectWorkspaceLineage(candidate, projectId, tierDir);
+      if (lineageMatches(lineage, filter)) {
+        candidates.push({
+          target: { path: repoRelativePosix(candidate), kind: 'project_tree' },
+          lineage,
+        });
+      }
+    }
+  }
+  return candidates;
+}
+
+/**
+ * Data-vault entry files (`active/shared/data-vault/*.json`) whose projectId
+ * equals the scope id. Vault records written before scoped ownership existed
+ * have no tenant/org lineage; project offboarding refuses to claim those
+ * records rather than deleting a potentially shared entry.
+ */
+function collectDataVaultEntryTargets(
+  scopeType: OffboardScopeType,
+  scopeId: string,
+  filter: PhysicalNamespaceFilter
+): OffboardTarget[] {
+  const targets: OffboardTarget[] = [];
+  const vaultDir = pathResolver.shared('data-vault');
+  for (const name of listDirEntries(vaultDir)) {
+    if (!name.endsWith('.json')) continue;
+    const filePath = path.join(vaultDir, name);
+    const record = readJsonRecord(filePath);
+    if (!record || record.projectId !== scopeId) continue;
+    if (scopeType === 'project' && (filter.tenantSlug || filter.organizationId)) {
+      const hasTenant = typeof record.tenant_slug === 'string';
+      const hasOrganization = typeof record.organization_id === 'string';
+      if (!hasTenant || !hasOrganization) {
+        throw new Error(
+          `[PROJECT_DATA_VAULT_AMBIGUOUS] data-vault entry '${name}' has no complete tenant/org lineage`
+        );
+      }
+      if (
+        record.tenant_slug !== filter.tenantSlug ||
+        record.organization_id !== filter.organizationId
+      ) {
+        continue;
+      }
+    }
+    targets.push({ path: repoRelativePosix(filePath), kind: 'data_vault_entry' });
+  }
+  return targets;
+}
+
+export const PHYSICAL_SCHEDULE_ROOT = 'active/shared/runtime/media-generation/schedules';
+export const PHYSICAL_CHANNEL_ROOT = 'active/shared/coordination/channels';
+export const PHYSICAL_PRESENCE_ROOT = 'active/shared/runtime/presence';
+/**
+ * Bases of the `physicalScopedPath` layout (`<base>/tenants/<slug>/…`) whose
+ * tenant subtree tenant offboarding removes as a learning tree. Each entry is
+ * the BASE: the removed directory is `<base>/tenants/<slug>`. (Registered
+ * roots use `<root>/<tier>/<tenant>/` and are covered by
+ * TENANT_RUNTIME_PARTITION_ROOTS instead.)
+ *
+ * - `active/shared/runtime` is the base of `RUNTIME_STATE_PATHS['memory.tenantRoot']`
+ *   (`active/shared/runtime/tenants/<slug>/memory/…`) and of the scoped
+ *   cowork-sync / distill-candidate / execution-feedback state.
+ */
+export const PHYSICAL_TENANT_LEARNING_ROOTS = [
+  'active/shared/runtime/feedback-loop',
+  'active/shared/runtime',
+  'active/shared/observability',
+  'active/shared/coordination',
+  // Public-tier diagnostic receipts of front-desk execution (surface/front-desk-execution.ts).
+  'active/shared/runtime/front-desk-execution',
+  // Concierge front-desk conversations (surface/front-desk-conversation-persistence.ts):
+  // nested one level below the channel surface, so the channel scan never sees them.
+  'active/shared/coordination/channels/concierge/conversations',
+] as const;
+/**
+ * Pre-migration `<base>/tenants/<slug>/` copies of stores that now live in a
+ * registered `<root>/<tier>/<tenant>/` partition. New writes never land here;
+ * tenant offboarding still removes what an older version left behind.
+ */
+export const PHYSICAL_LEGACY_TENANT_STATE_ROOTS = [
+  // dot-state-paths.ts: pre-partition tenant dot state (dot/tenants/<slug>/). Live
+  // tenants keep the operator-reviewed `pnpm kyberion dot migrate-state` path;
+  // an offboarded tenant's leftover copy is exported and soft-deleted (owner
+  // decision 2026-11-05). The partitioned dot state itself stays 'not_offboarded'.
+  PARTITIONED_RUNTIME_STATE_ROOTS.dot,
+  // generation-cost-settlement.ts: read fallback until the next write moves it.
+  PARTITIONED_RUNTIME_STATE_ROOTS.generation_cost_settlements,
+  // scripts/reasoning_credentials.ts: proofs expire after 15 minutes; no read fallback.
+  PARTITIONED_RUNTIME_STATE_ROOTS.api_verification,
+] as const;
+
+export interface PhysicalNamespaceFilter {
+  tenantSlug?: string;
+  organizationId?: string;
+}
+
+interface PhysicalNamespaceRoot {
+  path: string;
+  kind: 'schedule' | 'channel' | 'presence';
+}
+
+function physicalLineageMatches(
+  root: string,
+  directory: string,
+  filter: PhysicalNamespaceFilter
+): boolean {
+  const segments = path.relative(root, directory).split(path.sep).filter(Boolean);
+  const tenantIndex = segments.lastIndexOf('tenants');
+  const organizationIndex = segments.lastIndexOf('organizations');
+  if (filter.tenantSlug && segments[tenantIndex + 1] !== filter.tenantSlug) return false;
+  if (filter.organizationId && segments[organizationIndex + 1] !== filter.organizationId)
+    return false;
+  return true;
+}
+
+function physicalProjectLineageKey(repoPath: string): string {
+  const segments = repoPath.split('/').filter(Boolean);
+  const tenantIndex = segments.lastIndexOf('tenants');
+  const organizationIndex = segments.lastIndexOf('organizations');
+  return [segments[tenantIndex + 1] || 'system', segments[organizationIndex + 1] || 'shared'].join(
+    '/'
+  );
+}
+
+function collectDirectoriesWithLineage(
+  root: string,
+  directoryName: 'projects',
+  scopeId: string,
+  filter: PhysicalNamespaceFilter
+): string[] {
+  const matches: string[] = [];
+  const visit = (dir: string): void => {
+    const safeDir = safeOptionalRepositoryPath(dir);
+    if (!safeDir || !safeExistsSync(safeDir)) return;
+    for (const name of listDirEntries(safeDir)) {
+      const child = safeOptionalRepositoryPath(path.join(safeDir, name));
+      if (!child) continue;
+      try {
+        if (!safeStat(child).isDirectory()) continue;
+      } catch {
+        continue;
+      }
+      if (
+        path.basename(safeDir) === directoryName &&
+        name === scopeId &&
+        physicalLineageMatches(root, child, filter)
+      ) {
+        matches.push(child);
+        continue;
+      }
+      visit(child);
+    }
+  };
+  visit(root);
+  return matches;
+}
+
+function collectPhysicalNamespaceTargets(
+  scopeType: OffboardScopeType,
+  scopeId: string,
+  filter: PhysicalNamespaceFilter = {}
+): OffboardTarget[] {
+  const roots: PhysicalNamespaceRoot[] = [
+    { path: pathResolver.rootResolve(PHYSICAL_SCHEDULE_ROOT), kind: 'schedule' },
+    { path: pathResolver.rootResolve(PHYSICAL_CHANNEL_ROOT), kind: 'channel' },
+    { path: pathResolver.rootResolve(PHYSICAL_PRESENCE_ROOT), kind: 'presence' },
+  ];
+  if (scopeType === 'tenant') {
+    const targets: OffboardTarget[] = [];
+    for (const root of roots) {
+      if (root.kind === 'channel') {
+        for (const surface of listDirEntries(root.path)) {
+          const tenantRoot = safeOptionalRepositoryPath(
+            path.join(root.path, surface, 'tenants', scopeId)
+          );
+          if (tenantRoot && safeExistsSync(tenantRoot)) {
+            targets.push({
+              path: repoRelativePosix(tenantRoot),
+              kind: 'tenant_physical_namespace',
+            });
+          }
+        }
+        continue;
+      }
+      const tenantRoot = safeOptionalRepositoryPath(path.join(root.path, 'tenants', scopeId));
+      if (tenantRoot && safeExistsSync(tenantRoot)) {
+        targets.push({
+          path: repoRelativePosix(tenantRoot),
+          kind: 'tenant_physical_namespace',
+        });
+      }
+    }
+    for (const root of [...PHYSICAL_TENANT_LEARNING_ROOTS, ...PHYSICAL_LEGACY_TENANT_STATE_ROOTS]) {
+      const tenantRoot = safeOptionalRepositoryPath(
+        path.join(pathResolver.rootResolve(root), PHYSICAL_TENANT_NAMESPACE, scopeId)
+      );
+      if (tenantRoot && safeExistsSync(tenantRoot)) {
+        targets.push({ path: repoRelativePosix(tenantRoot), kind: 'tenant_learning_tree' });
+      }
+    }
+    return targets;
+  }
+
+  const targets = roots.flatMap((root) =>
+    collectDirectoriesWithLineage(root.path, 'projects', scopeId, filter).map((dir) => ({
+      path: repoRelativePosix(dir),
+      kind: 'project_physical_namespace' as const,
+    }))
+  );
+  const lineageCount = new Set(targets.map((target) => physicalProjectLineageKey(target.path)))
+    .size;
+  if (lineageCount > 1 && (!filter.tenantSlug || !filter.organizationId)) {
+    throw new Error(
+      `[PROJECT_PHYSICAL_NAMESPACE_AMBIGUOUS] project '${scopeId}' exists in multiple tenant namespaces; provide tenantSlug and organizationId`
+    );
+  }
+  return targets;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy (pre-partition) delegation store
+// ---------------------------------------------------------------------------
+
+/** Pre-partition shared delegation trace (live file; rotated segments sit beside it). */
+export const DELEGATION_LEGACY_TRACE_REPO_PATH = LEGACY_DELEGATION_TRACE_PATH;
+/** Pre-partition shared delegation records (`<id>.json`, `child-inbox/<child>.jsonl`). */
+export const DELEGATION_LEGACY_RECORD_REPO_DIR = LEGACY_DELEGATION_RECORD_DIR;
+/** Pre-partition shared background-delegation notification queue (tenant-mixed). */
+export const DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH = LEGACY_DELEGATION_NOTIFICATIONS_PATH;
+const DELEGATION_LEGACY_EXPORT_DIR = 'delegations-legacy-removed';
+
+/**
+ * Upper-cased ids of the tenant's missions: mission trees declaring the tenant
+ * (already among `targets`) plus the tenant-partitioned mission directories
+ * (`active/[archive/]missions/<tier>/<tenant>/<id>`). Legacy delegation rows
+ * carry no tenant, so their mission is the only attribution available.
+ */
+function tenantMissionIds(tenantSlug: string, targets: readonly OffboardTarget[]): Set<string> {
+  const ids = new Set<string>();
+  for (const target of targets) {
+    if (target.kind === 'mission_tree') ids.add(path.posix.basename(target.path).toUpperCase());
+  }
+  for (const base of [
+    ['active', 'missions'],
+    ['active', 'archive', 'missions'],
+  ]) {
+    for (const tier of SCOPE_TIERS) {
+      const dir = safeOptionalRepositoryPath(
+        path.join(pathResolver.rootDir(), ...base, tier, tenantSlug)
+      );
+      if (!dir) continue;
+      for (const name of listDirEntries(dir)) ids.add(name.toUpperCase());
+    }
+  }
+  return ids;
+}
+
+/**
+ * Does a legacy delegation row / record belong to the tenant (its stamp, else
+ * its mission, else its delegation being one of the tenant's — `delegation_id`
+ * of a record or notification, `trace_id` of a trace row)?
+ */
+function legacyDelegationBelongsTo(
+  row: Record<string, unknown>,
+  tenantSlug: string,
+  missionIds: ReadonlySet<string>,
+  delegationIds: ReadonlySet<string> = new Set()
+): boolean {
+  const stamped = typeof row.tenant_slug === 'string' ? row.tenant_slug.trim().toLowerCase() : '';
+  if (stamped) return stamped === tenantSlug;
+  if (typeof row.mission_id === 'string' && missionIds.has(row.mission_id.trim().toUpperCase())) {
+    return true;
+  }
+  const delegationId =
+    typeof row.delegation_id === 'string'
+      ? row.delegation_id
+      : typeof row.trace_id === 'string'
+        ? row.trace_id
+        : '';
+  return Boolean(delegationId) && delegationIds.has(delegationId.trim());
+}
+
+/**
+ * Ids of the tenant's delegations: the records in its delegation-store
+ * partitions plus the legacy shared records attributed to it. Legacy
+ * notification rows written after the record moved to its partition carry
+ * neither a tenant stamp nor (always) a mission; their delegation id is the
+ * remaining attribution.
+ */
+function tenantDelegationIds(tenantSlug: string, missionIds: ReadonlySet<string>): Set<string> {
+  const ids = new Set<string>();
+  for (const tier of SCOPE_TIERS) {
+    const dir = safeOptionalRepositoryPath(
+      path.join(
+        pathResolver.rootDir(),
+        PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations,
+        tier,
+        tenantSlug,
+        'records'
+      )
+    );
+    if (!dir) continue;
+    let names: string[] = [];
+    try {
+      names = listDirEntries(dir);
+    } catch (error) {
+      logger.warn(
+        `[OFFBOARD_DELEGATION_IDS_UNREADABLE] tenant delegation records could not be listed — legacy notification rows attributed only by delegation id stay in place | next: rerun the offboarding with the sovereign persona | evidence: ${repoRelativePosix(dir)}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    for (const name of names) {
+      if (name.endsWith('.json')) ids.add(name.slice(0, -'.json'.length));
+    }
+  }
+  for (const target of collectLegacyDelegationRecordTargets(tenantSlug, missionIds)) {
+    const name = path.posix.basename(target.path);
+    if (
+      path.posix.dirname(target.path) === DELEGATION_LEGACY_RECORD_REPO_DIR &&
+      name.endsWith('.json')
+    ) {
+      ids.add(name.slice(0, -'.json'.length));
+    }
+  }
+  return ids;
+}
+
+/**
+ * Repo-relative legacy delegation JSONL files: the trace (live file plus its
+ * rotated segments) and the shared notification queue.
+ */
+function legacyDelegationLineFiles(): string[] {
+  return [...legacyDelegationTraceFiles(), DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH];
+}
+
+/** Repo-relative legacy trace files: the live file plus its rotated segments. */
+function legacyDelegationTraceFiles(): string[] {
+  const live = DELEGATION_LEGACY_TRACE_REPO_PATH;
+  const dir = path.posix.dirname(live);
+  const stem = path.posix.basename(live, '.jsonl');
+  const segment = new RegExp(`^${stem}-\\d{8}-\\d{6}(?:-\\d+)?\\.jsonl$`, 'u');
+  const files = listDirEntries(pathResolver.rootResolve(dir))
+    .filter((name) => name === `${stem}.jsonl` || segment.test(name))
+    .sort()
+    .map((name) => `${dir}/${name}`);
+  return files;
+}
+
+interface LegacyDelegationTracePrune {
+  path: string;
+  prune: DedupRegistryPrune;
+}
+
+/** The tenant's rows of each legacy trace / notification file (corrupt lines are kept). */
+function computeLegacyDelegationTracePrunes(
+  tenantSlug: string,
+  missionIds: ReadonlySet<string>,
+  delegationIds: ReadonlySet<string> = new Set()
+): LegacyDelegationTracePrune[] {
+  const tenant = tenantSlug.trim().toLowerCase();
+  const prunes: LegacyDelegationTracePrune[] = [];
+  for (const repoPath of legacyDelegationLineFiles()) {
+    const abs = safeOptionalRepositoryPath(pathResolver.rootResolve(repoPath));
+    if (!abs || !safeExistsSync(abs) || !safeLstat(abs).isFile()) continue;
+    const prune: DedupRegistryPrune = { removedLines: [], keptLines: [] };
+    // Streamed (constant memory). A line over the scan limit is never yielded,
+    // so a rewrite would drop it: refuse the prune instead (fail closed).
+    const lines = streamTextLines(abs, {
+      onOversized: (oversized) => {
+        throw new Error(
+          `[OFFBOARD_DELEGATION_TRACE_OVERSIZED_LINE] ${repoPath} line ${oversized.lineNumber} exceeds the scan limit — refusing to rewrite it | next: inspect the line and prune it by hand | evidence: ${repoPath}`
+        );
+      },
+    });
+    for (const { text } of lines) {
+      const trimmed = text.trim();
+      if (!trimmed) continue;
+      let matches = false;
+      try {
+        matches = legacyDelegationBelongsTo(
+          parseSafeJsonObjectValue(
+            parseSafeJsonInput(trimmed, 'delegation trace JSONL entry'),
+            'delegation trace JSONL entry'
+          ),
+          tenant,
+          missionIds,
+          delegationIds
+        );
+      } catch {
+        /* corrupt line: keep it — the trace readers skip it anyway */
+      }
+      (matches ? prune.removedLines : prune.keptLines).push(trimmed);
+    }
+    if (prune.removedLines.length > 0) prunes.push({ path: repoPath, prune });
+  }
+  return prunes;
+}
+
+/** Legacy shared delegation records (and their child inboxes) attributed to the tenant. */
+function collectLegacyDelegationRecordTargets(
+  tenantSlug: string,
+  missionIds: ReadonlySet<string>
+): OffboardTarget[] {
+  const tenant = tenantSlug.trim().toLowerCase();
+  const dir = pathResolver.rootResolve(DELEGATION_LEGACY_RECORD_REPO_DIR);
+  const targets: OffboardTarget[] = [];
+  for (const name of listDirEntries(dir)) {
+    if (!name.endsWith('.json')) continue;
+    const filePath = safeOptionalRepositoryPath(path.join(dir, name));
+    if (!filePath) continue;
+    const record = readJsonRecord(filePath);
+    if (!record || !legacyDelegationBelongsTo(record, tenant, missionIds)) continue;
+    targets.push({ path: repoRelativePosix(filePath), kind: 'delegation_legacy_record' });
+    const child =
+      typeof record.child_session_id === 'string'
+        ? record.child_session_id.trim().replace(/[^a-zA-Z0-9._-]+/g, '-')
+        : '';
+    if (!child) continue;
+    const inbox = safeOptionalRepositoryPath(path.join(dir, 'child-inbox', `${child}.jsonl`));
+    if (inbox && safeExistsSync(inbox)) {
+      targets.push({ path: repoRelativePosix(inbox), kind: 'delegation_legacy_record' });
+    }
+  }
+  return targets;
+}
+
+/** Extra inputs for tenant leftovers whose attribution outlives the tenant's trees. */
+export interface ScopeTargetOptions {
+  /**
+   * Mission ids known to belong to the tenant before its trees were removed
+   * (the post-offboard verification passes the ids of the plan, so legacy
+   * delegation rows attributed only by mission are still recognised).
+   */
+  legacyMissionIds?: ReadonlySet<string>;
+  /**
+   * Delegation ids known to belong to the tenant before its partitions were
+   * removed (legacy notification rows attributed only by delegation).
+   */
+  legacyDelegationIds?: ReadonlySet<string>;
+}
+
+/**
+ * Everything that belongs to the scope: its project workspace tree(s), every
+ * mission declaring it, and — for a tenant (DA-08) — the tenant's governed
+ * knowledge root (incl. the DA-05 `_ledger/`), its ingest sync-cursor and
+ * quota-counter subtrees, plus data-vault entries keyed by the scope id.
+ * Data-vault entries use `VaultEntry.projectId` for both scope types — a
+ * tenant that cached vault data under a projectId different from its slug is
+ * NOT matched here (the projectId is the only scope key the vault carries).
+ */
+export function collectScopeTargets(
+  scopeType: OffboardScopeType,
+  scopeId: string,
+  filter: PhysicalNamespaceFilter = {},
+  options: ScopeTargetOptions = {}
+): OffboardTarget[] {
+  const targets: OffboardTarget[] = [];
+  const id = scopeId.trim();
+  if (!id) return targets;
+  assertPhysicalScopeSegment(id, `${scopeType} scopeId`);
+  if (filter.tenantSlug) assertPhysicalScopeSegment(filter.tenantSlug, 'tenantSlug');
+  if (filter.organizationId) assertPhysicalScopeSegment(filter.organizationId, 'organizationId');
+  if (scopeType === 'project' && Boolean(filter.tenantSlug) !== Boolean(filter.organizationId)) {
+    throw new Error(
+      '[PROJECT_SCOPE_LINEAGE_REQUIRED] project offboarding requires both tenantSlug and organizationId'
+    );
+  }
+
+  // Project workspace trees use `active/projects/<tier>/<tenant>/<id>`;
+  // tenant offboarding claims the tenant root, while project offboarding
+  // selects only the exact project directory after lineage matching.
+  if (scopeType === 'tenant') {
+    for (const tier of SCOPE_TIERS) {
+      const dir = safeOptionalRepositoryPath(
+        path.join(pathResolver.rootDir(), 'active', 'projects', tier, id)
+      );
+      if (dir && safeExistsSync(dir)) {
+        targets.push({ path: repoRelativePosix(dir), kind: 'project_tree' });
+      }
+    }
+  } else {
+    const workspaceCandidates = collectProjectWorkspaceTargets(id, filter);
+    const workspaceLineages = new Set(
+      workspaceCandidates.map(
+        ({ lineage }) => `${lineage.tenantSlug || 'shared'}/${lineage.organizationId || 'unknown'}`
+      )
+    );
+    if (workspaceLineages.size > 1 && (!filter.tenantSlug || !filter.organizationId)) {
+      throw new Error(
+        `[PROJECT_WORKSPACE_AMBIGUOUS] project '${id}' exists in multiple tenant namespaces; provide tenantSlug and organizationId`
+      );
+    }
+    targets.push(...workspaceCandidates.map(({ target }) => target));
+  }
+
+  // Mission trees declaring the scope in their state.
+  const missionsRoot = path.join(pathResolver.rootDir(), 'active', 'missions');
+  for (const tier of SCOPE_TIERS) {
+    const tierDir = path.join(missionsRoot, tier);
+    for (const name of listDirEntries(tierDir)) {
+      const missionDir = safeOptionalRepositoryPath(path.join(tierDir, name));
+      if (!missionDir) continue;
+      try {
+        if (!safeStat(missionDir).isDirectory()) continue;
+      } catch {
+        continue;
+      }
+      const scope = missionStateScope(missionDir);
+      const matches =
+        scopeType === 'tenant'
+          ? scope.tenantSlug === id
+          : scope.projectId === id && lineageMatches(scope, filter);
+      if (matches) targets.push({ path: repoRelativePosix(missionDir), kind: 'mission_tree' });
+    }
+  }
+
+  if (scopeType === 'project') {
+    const matchingMissionDirs = targets.filter((target) => target.kind === 'mission_tree');
+    if (!filter.tenantSlug && !filter.organizationId && matchingMissionDirs.length > 1) {
+      const lineages = new Set(
+        matchingMissionDirs.map((target) => {
+          const scope = missionStateScope(pathResolver.rootResolve(target.path));
+          return `${scope.tenantSlug || 'unknown'}/${scope.organizationId || 'unknown'}`;
+        })
+      );
+      if (lineages.size > 1) {
+        throw new Error(
+          `[PROJECT_MISSION_AMBIGUOUS] project '${id}' is referenced by multiple tenant namespaces; provide tenantSlug and organizationId`
+        );
+      }
+    }
+  }
+
+  // DA-08 tenant residue: governed knowledge (with the asset ledger inside),
+  // sync cursors, and quota counters.
+  if (scopeType === 'tenant') {
+    const knowledgeRoot = tenantKnowledgeRootDefault(id);
+    const knowledgePath = safeOptionalRepositoryPath(pathResolver.rootResolve(knowledgeRoot));
+    if (knowledgePath && safeExistsSync(knowledgePath)) {
+      targets.push({ path: knowledgeRoot, kind: 'tenant_knowledge_tree' });
+    }
+    for (const subtree of [
+      `${INGEST_CURSORS_REPO_SUBPATH}/${id}`,
+      `${INGEST_QUOTA_REPO_SUBPATH}/${id}`,
+      `knowledge/personal/tenants/${id}`,
+    ]) {
+      const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
+      if (subtreePath && safeExistsSync(subtreePath)) {
+        targets.push({ path: subtree, kind: 'ingest_cursors_tree' });
+      }
+    }
+    // Every tenant-partitioned runtime root (storage-layout registry): the
+    // tenant's `<root>/<tier>/<tenant>` partitions must not outlive the tenant;
+    // other tenants' partitions stay. Notes per root:
+    // - D9 hybrid ledger: rows written before D9 still hold tenant mission ids
+    //   in the hash-chained system ledger; that file is append-only, so
+    //   offboarding leaves those rows (not pruned).
+    // - Approval store: tenant records written before the partition existed may
+    //   still sit in the system approval tree until the hygiene migration moves
+    //   them (approval_store_hygiene --migrate-tenant-partitions); their
+    //   append-only event-log lines stay.
+    // - Metrics ledgers: pre-partition rows of the system file are pruned below
+    //   (METRICS_LEDGERS).
+    if (isValidTenantSlug(id)) {
+      // A partition this process cannot even probe is listed (fail loud: its
+      // removal then fails visibly) rather than silently skipped.
+      // Null-disposition roots are never probed, listed or counted as leftovers.
+      const offboarded = (subtree: string): boolean => {
+        const key = tenantRuntimePartitionOf(subtree)?.key;
+        return key !== undefined && TENANT_RUNTIME_PARTITION_TARGET_KINDS[key] !== 'not_offboarded';
+      };
+      const present = (subtree: string): boolean => {
+        if (!offboarded(subtree)) return false;
+        const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
+        if (!subtreePath) return false;
+        try {
+          return safeExistsSync(subtreePath);
+        } catch {
+          return true;
+        }
+      };
+      for (const partition of tenantRuntimePartitionPaths(id, present)) {
+        const kind = TENANT_RUNTIME_PARTITION_TARGET_KINDS[partition.key];
+        if (kind !== 'not_offboarded') targets.push({ path: partition.path, kind });
+      }
+      // Pre-partition delegation records in the shared legacy directory that
+      // belong to this tenant (stamped, or by mission) go with it.
+      const missionIds = new Set([
+        ...(options.legacyMissionIds ?? []),
+        ...tenantMissionIds(id, targets),
+      ]);
+      targets.push(...collectLegacyDelegationRecordTargets(id, missionIds));
+    }
+  }
+
+  // Physical runtime/channel records are outside the mission/project trees,
+  // so they must be explicitly included in the same export + soft-delete
+  // ceremony. Tenant targets include all nested organization/project paths;
+  // project targets select only the matching lineage directory.
+  targets.push(...collectPhysicalNamespaceTargets(scopeType, id, filter));
+
+  // DA-08 data-vault entries keyed by the scope id. Project entries require
+  // complete lineage when an explicit project scope is used; unscoped legacy
+  // entries are never silently assigned to a tenant/org.
+  targets.push(...collectDataVaultEntryTargets(scopeType, id, filter));
+
+  return targets;
+}
+
+// ---------------------------------------------------------------------------
+// DA-08: dedup-registry prune + post-offboard verification
+// ---------------------------------------------------------------------------
+
+interface LedgerAssetLine {
+  content_sha256?: string;
+  source_system?: string;
+  source_id?: string;
+}
+
+/** Parse a JSONL file leniently (corrupt lines skipped — same contract as the ingest readers). */
+function readJsonlLines(absPath: string): Array<Record<string, unknown>> {
+  const safePath = safeOptionalRepositoryPath(absPath);
+  if (!safePath || !safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return [];
+  return readJsonLines<unknown>(safePath, { onMalformed: 'skip' }).filter(
+    (value): value is Record<string, unknown> =>
+      value !== null && typeof value === 'object' && !Array.isArray(value)
+  );
+}
+
+interface DedupRegistryPrune {
+  /** Registry lines that belong to the tenant, verbatim (for the export copy). */
+  removedLines: string[];
+  /** Every other line, verbatim, in original order. */
+  keptLines: string[];
+}
+
+/**
+ * Which dedup-registry lines belong to this tenant? A line matches when its
+ * content hash or source identity appears in the tenant's asset ledger, or
+ * when its recorded landing path points into the tenant knowledge root. Must
+ * be computed BEFORE the knowledge tree (and with it the ledger) is deleted.
+ */
+function computeDedupRegistryPrune(tenantSlug: string): DedupRegistryPrune {
+  const result: DedupRegistryPrune = { removedLines: [], keptLines: [] };
+  const registryAbs = safeOptionalRepositoryPath(
+    pathResolver.rootResolve(INGEST_DEDUP_REGISTRY_REPO_PATH)
+  );
+  if (!registryAbs || !safeExistsSync(registryAbs) || !safeLstat(registryAbs).isFile()) {
+    return result;
+  }
+
+  const knowledgeRoot = tenantKnowledgeRootDefault(tenantSlug);
+  const ledgerLines = readJsonlLines(
+    pathResolver.rootResolve(`${knowledgeRoot}/_ledger/assets.jsonl`)
+  ) as LedgerAssetLine[];
+  const hashes = new Set<string>();
+  const sourcePairs = new Set<string>();
+  for (const line of ledgerLines) {
+    if (typeof line.content_sha256 === 'string') hashes.add(line.content_sha256);
+    if (typeof line.source_system === 'string' && typeof line.source_id === 'string') {
+      sourcePairs.add(`${line.source_system}::${line.source_id}`);
+    }
+  }
+
+  const raw = readTextFile(registryAbs);
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let matches = false;
+    try {
+      const record = parseSafeJsonInput(trimmed, 'dedup registry JSONL entry') as {
+        content_sha256?: string;
+        source_system?: string;
+        source_id?: string;
+        target_path?: string;
+      };
+      matches =
+        (typeof record.content_sha256 === 'string' && hashes.has(record.content_sha256)) ||
+        (typeof record.source_id === 'string' &&
+          sourcePairs.has(`${record.source_system ?? ''}::${record.source_id}`)) ||
+        (typeof record.target_path === 'string' &&
+          (record.target_path === knowledgeRoot ||
+            record.target_path.startsWith(`${knowledgeRoot}/`)));
+    } catch {
+      /* corrupt line: keep it — the registry readers skip it anyway */
+    }
+    (matches ? result.removedLines : result.keptLines).push(trimmed);
+  }
+  return result;
+}
+
+/**
+ * Which pre-partition rows of a shared metrics ledger belong to this tenant
+ * (by the row's own scope)? Corrupt lines are kept, as in the dedup registry
+ * prune.
+ */
+function computeLegacyLedgerPrune(
+  ledger: MetricsLedgerOffboarding,
+  tenantSlug: string
+): DedupRegistryPrune {
+  const result: DedupRegistryPrune = { removedLines: [], keptLines: [] };
+  const ledgerAbs = safeOptionalRepositoryPath(pathResolver.rootResolve(ledger.legacy_path));
+  if (!ledgerAbs || !safeExistsSync(ledgerAbs) || !safeLstat(ledgerAbs).isFile()) return result;
+  const tenant = tenantSlug.trim().toLowerCase();
+  for (const line of readTextFile(ledgerAbs).split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let matches = false;
+    try {
+      matches =
+        metricsRowTenant(parseSafeJsonInput(trimmed, `${ledger.row_label} JSONL entry`)) === tenant;
+    } catch {
+      /* corrupt line: keep it — the ledger readers skip it anyway */
+    }
+    (matches ? result.removedLines : result.keptLines).push(trimmed);
+  }
+  return result;
+}
+
+/**
+ * DA-08 acceptance check: does ANY trace of the scope remain (active/ trees,
+ * tenant knowledge + ledger, sync cursors, quota counters, data-vault
+ * entries, dedup-registry lines still pointing into the tenant knowledge
+ * root)? Run automatically after an execute; also callable standalone as the
+ * `--verify` half of the ceremony. Post-delete the ledger no longer exists,
+ * so registry leftovers are detected by landing-path prefix — the strongest
+ * signal still derivable without it.
+ */
+export function verifyScopeOffboarded(
+  scopeType: OffboardScopeType,
+  scopeId: string,
+  filter: PhysicalNamespaceFilter = {},
+  options: ScopeTargetOptions = {}
+): OffboardVerification {
+  const id = String(scopeId || '').trim();
+  let leftovers: string[];
+  try {
+    leftovers = collectScopeTargets(scopeType, id, filter, options).map((target) => target.path);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { clean: false, leftovers: [message], error: message };
+  }
+
+  if (scopeType === 'tenant' && id) {
+    const knowledgeRoot = tenantKnowledgeRootDefault(id);
+    const registryLeft = readJsonlLines(
+      pathResolver.rootResolve(INGEST_DEDUP_REGISTRY_REPO_PATH)
+    ).filter((record) => {
+      const targetPath = record.target_path;
+      return (
+        typeof targetPath === 'string' &&
+        (targetPath === knowledgeRoot || targetPath.startsWith(`${knowledgeRoot}/`))
+      );
+    }).length;
+    if (registryLeft > 0) {
+      leftovers.push(
+        `${INGEST_DEDUP_REGISTRY_REPO_PATH} (${registryLeft} line(s) referencing ${knowledgeRoot})`
+      );
+    }
+    for (const ledger of METRICS_LEDGERS) {
+      const rowsLeft = computeLegacyLedgerPrune(ledger, id).removedLines.length;
+      if (rowsLeft > 0) {
+        leftovers.push(`${ledger.legacy_path} (${rowsLeft} legacy row(s) of '${id}')`);
+      }
+    }
+    if (isValidTenantSlug(id)) {
+      const missionIds = new Set([
+        ...(options.legacyMissionIds ?? []),
+        ...tenantMissionIds(id, []),
+      ]);
+      const delegationIds = new Set([
+        ...(options.legacyDelegationIds ?? []),
+        ...tenantDelegationIds(id, missionIds),
+      ]);
+      for (const { path: tracePath, prune } of computeLegacyDelegationTracePrunes(
+        id,
+        missionIds,
+        delegationIds
+      )) {
+        leftovers.push(
+          `${tracePath} (${prune.removedLines.length} legacy delegation row(s) of '${id}')`
+        );
+      }
+    }
+  }
+
+  return { clean: leftovers.length === 0, leftovers };
+}
+
+/** Recursive copy through secure-io (no shell, cross-platform). */
+function copyTree(source: string, destination: string): void {
+  const safeSource = assertSafeRepositoryPath(source);
+  const safeDestination = assertSafeRepositoryPath(destination, { allowMissingLeaf: true });
+  const stat = safeStat(safeSource);
+  if (stat.isDirectory()) {
+    if (!safeExistsSync(safeDestination)) safeMkdir(safeDestination, { recursive: true });
+    for (const name of listDirEntries(safeSource)) {
+      copyTree(path.join(safeSource, name), path.join(safeDestination, name));
+    }
+    return;
+  }
+  const parent = path.dirname(safeDestination);
+  if (!safeExistsSync(parent)) safeMkdir(parent, { recursive: true });
+  safeCopyFileSync(safeSource, safeDestination);
+}
+
+export interface OffboardScopeInput {
+  scopeType: OffboardScopeType;
+  scopeId: string;
+  /** Optional tenant lineage for a project with a reused project ID. */
+  tenantSlug?: string;
+  /** Optional organization lineage for a project with a reused project ID. */
+  organizationId?: string;
+  /** `dry_run` (default) only reports; `execute` exports then deletes. */
+  mode?: 'dry_run' | 'execute';
+  approval?: OffboardApproval;
+  /** Clock override for deterministic export directory names in tests. */
+  nowIso?: string;
+}
+
+/**
+ * Tenant / project offboarding: **discover → export → delete**.
+ *
+ *  - `mode: 'dry_run'` (default) reports the targets and writes nothing —
+ *    always safe to run, never needs approval.
+ *  - `mode: 'execute'` requires a human {@link OffboardApproval}; without one
+ *    the verb returns `approval_required` and touches nothing (fail-closed).
+ *    With one it copies every target into
+ *    `active/shared/exports/offboarding/<scope>-<id>-<timestamp>/` (plus a
+ *    `manifest.json` recording the approval), then soft-deletes the originals.
+ *
+ * Idempotent (a second execute finds no targets → `not_found`) and never
+ * throws.
+ */
+export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
+  const scopeType = input.scopeType;
+  const scopeId = String(input.scopeId || '').trim();
+  const tenantSlug = input.tenantSlug?.trim() || undefined;
+  const organizationId = input.organizationId?.trim() || undefined;
+  const mode = input.mode ?? 'dry_run';
+  const result: OffboardScopeResult = {
+    status: mode === 'execute' ? 'offboarded' : 'dry_run',
+    scope_type: scopeType,
+    scope_id: scopeId,
+    dry_run: mode !== 'execute',
+    targets: [],
+    soft_deleted: [],
+  };
+  if (!scopeId) {
+    result.status = 'error';
+    result.reason = 'scopeId is required';
+    return result;
+  }
+
+  try {
+    const physicalFilter = { tenantSlug, organizationId };
+    result.targets = collectScopeTargets(scopeType, scopeId, physicalFilter);
+    // Ownership history, not only current owners: an artifact this scope
+    // owned before it was re-registered (e.g. promoted) still counts.
+    const ownedArtifacts = listArtifactOwnershipHistoryByQuery(
+      scopeType === 'tenant' ? { tenantSlug: scopeId } : { projectId: scopeId }
+    );
+    if (ownedArtifacts.length > 0) {
+      result.artifact_registry = {
+        matched: ownedArtifacts.length,
+        registry_path: repoRelativePosix(pathResolver.shared('runtime/artifacts/registry.jsonl')),
+        records_retained: true,
+      };
+    }
+    // DA-08: dedup-registry lines are pruned in place (line-level, not a
+    // tree), so they ride next to `targets`. Computed while the ledger still
+    // exists — this must precede any deletion.
+    const dedupPrune = scopeType === 'tenant' ? computeDedupRegistryPrune(scopeId) : null;
+    if (dedupPrune && dedupPrune.removedLines.length > 0) {
+      result.dedup_registry = { matched: dedupPrune.removedLines.length, removed: 0 };
+    }
+    const ledgerPrunes =
+      scopeType === 'tenant'
+        ? METRICS_LEDGERS.map((ledger) => ({
+            ledger,
+            prune: computeLegacyLedgerPrune(ledger, scopeId),
+          })).filter(({ prune }) => prune.removedLines.length > 0)
+        : [];
+    for (const { ledger, prune } of ledgerPrunes) {
+      result[ledger.result_key] = { matched: prune.removedLines.length, removed: 0 };
+    }
+    // Pre-partition delegation trace rows attributed to the tenant (stamped,
+    // or by one of its missions — computed while the mission trees exist).
+    const legacyMissionIds =
+      scopeType === 'tenant' && isValidTenantSlug(scopeId)
+        ? tenantMissionIds(scopeId, result.targets)
+        : new Set<string>();
+    // …and its delegation ids (partition records + attributed legacy records),
+    // which attribute legacy notification rows carrying neither stamp nor mission.
+    const legacyDelegationIds =
+      scopeType === 'tenant' && isValidTenantSlug(scopeId)
+        ? tenantDelegationIds(scopeId, legacyMissionIds)
+        : new Set<string>();
+    const delegationTracePrunes =
+      scopeType === 'tenant' && isValidTenantSlug(scopeId)
+        ? computeLegacyDelegationTracePrunes(scopeId, legacyMissionIds, legacyDelegationIds)
+        : [];
+    if (delegationTracePrunes.length > 0) {
+      result.delegations_legacy = {
+        matched: delegationTracePrunes.reduce(
+          (sum, { prune }) => sum + prune.removedLines.length,
+          0
+        ),
+        removed: 0,
+      };
+    }
+    if (
+      result.targets.length === 0 &&
+      !result.dedup_registry &&
+      ledgerPrunes.length === 0 &&
+      delegationTracePrunes.length === 0 &&
+      !result.artifact_registry
+    ) {
+      result.status = 'not_found';
+      result.reason = `no scope-owned trees or entries found for ${scopeType} '${scopeId}'`;
+      return result;
+    }
+
+    if (mode !== 'execute') {
+      appendRetentionAudit({
+        event: 'SCOPE_OFFBOARD_DRY_RUN',
+        scope_type: scopeType,
+        scope_id: scopeId,
+        ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+        ...(organizationId ? { organization_id: organizationId } : {}),
+        targets: result.targets.map((target) => target.path),
+        ...(result.dedup_registry ? { dedup_registry_matched: result.dedup_registry.matched } : {}),
+        ...(result.usage_ledger_legacy
+          ? { usage_ledger_legacy_matched: result.usage_ledger_legacy.matched }
+          : {}),
+        ...(result.execution_metrics_legacy
+          ? { execution_metrics_legacy_matched: result.execution_metrics_legacy.matched }
+          : {}),
+        ...(result.delegations_legacy
+          ? { delegations_legacy_matched: result.delegations_legacy.matched }
+          : {}),
+        ...(result.artifact_registry
+          ? { artifact_registry_matched: result.artifact_registry.matched }
+          : {}),
+        policy_ref: RETENTION_CATALOG_REPO_PATH,
+        reason: 'offboarding dry run (no writes)',
+      });
+      return result;
+    }
+
+    const approvedBy = input.approval?.approved_by?.trim();
+    const purpose = input.approval?.purpose?.trim();
+    if (!approvedBy || !purpose) {
+      result.status = 'approval_required';
+      result.reason =
+        'offboarding delete requires a human approval with approved_by and purpose ' +
+        '(dry_run needs none) — refusing to delete';
+      appendRetentionAudit({
+        event: 'SCOPE_OFFBOARD_DENIED',
+        scope_type: scopeType,
+        scope_id: scopeId,
+        ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+        ...(organizationId ? { organization_id: organizationId } : {}),
+        targets: result.targets.map((target) => target.path),
+        policy_ref: RETENTION_CATALOG_REPO_PATH,
+        reason: result.reason,
+      });
+      return result;
+    }
+
+    const currentIso = input.nowIso ?? nowIso();
+    const approvedAt = input.approval?.approved_at ?? currentIso;
+    const exportDirName = `${scopeType}-${scopeId}-${currentIso.replace(/[:.]/g, '-')}`;
+    const exportDirAbs = assertSafeRepositoryPath(
+      pathResolver.sharedExports(path.join(OFFBOARDING_EXPORT_SUBDIR, exportDirName)),
+      { allowMissingLeaf: true }
+    );
+    if (!safeExistsSync(exportDirAbs)) safeMkdir(exportDirAbs, { recursive: true });
+    result.export_path = repoRelativePosix(exportDirAbs);
+
+    // Export first: the deletion below is only reached once every target has
+    // a copy under the export directory.
+    for (const target of result.targets) {
+      copyTree(
+        assertSafeRepositoryPath(pathResolver.rootResolve(target.path)),
+        path.join(exportDirAbs, ...target.path.split('/'))
+      );
+    }
+    // DA-08: the tenant's dedup-registry lines are exported verbatim too —
+    // the prune below removes them from the shared registry, and the export
+    // is the recoverable copy (the registry file itself is shared across
+    // tenants, so it never goes to the trash wholesale).
+    const dedupExportFile = 'dedup-registry-removed.jsonl';
+    if (dedupPrune && dedupPrune.removedLines.length > 0) {
+      const dedupExportPath = assertSafeRepositoryPath(path.join(exportDirAbs, dedupExportFile), {
+        allowMissingLeaf: true,
+      });
+      safeWriteFile(dedupExportPath, `${dedupPrune.removedLines.join('\n')}\n`);
+      result.dedup_registry = {
+        matched: dedupPrune.removedLines.length,
+        removed: 0,
+        export_file: `${result.export_path}/${dedupExportFile}`,
+      };
+    }
+    // The tenant's pre-partition rows of the shared metrics ledgers are
+    // exported verbatim right before they are pruned, under the ledger lock
+    // (see below); the manifest names the export file now.
+    for (const { ledger, prune } of ledgerPrunes) {
+      result[ledger.result_key] = {
+        matched: prune.removedLines.length,
+        removed: 0,
+        export_file: `${result.export_path}/${ledger.export_file}`,
+      };
+    }
+    if (result.delegations_legacy) {
+      result.delegations_legacy.export_file = `${result.export_path}/${DELEGATION_LEGACY_EXPORT_DIR}`;
+    }
+    const manifestPath = assertSafeRepositoryPath(path.join(exportDirAbs, 'manifest.json'), {
+      allowMissingLeaf: true,
+    });
+    safeWriteFile(
+      manifestPath,
+      JSON.stringify(
+        {
+          scope_type: scopeType,
+          scope_id: scopeId,
+          ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+          ...(organizationId ? { organization_id: organizationId } : {}),
+          exported_at: currentIso,
+          approval: { approved_by: approvedBy, approved_at: approvedAt, purpose },
+          targets: result.targets,
+          ...(result.dedup_registry ? { dedup_registry: result.dedup_registry } : {}),
+          ...(result.usage_ledger_legacy
+            ? { usage_ledger_legacy: result.usage_ledger_legacy }
+            : {}),
+          ...(result.execution_metrics_legacy
+            ? { execution_metrics_legacy: result.execution_metrics_legacy }
+            : {}),
+          ...(result.delegations_legacy ? { delegations_legacy: result.delegations_legacy } : {}),
+          policy_ref: RETENTION_CATALOG_REPO_PATH,
+        },
+        null,
+        2
+      )
+    );
+    appendRetentionAudit({
+      event: 'SCOPE_OFFBOARD_EXPORTED',
+      scope_type: scopeType,
+      scope_id: scopeId,
+      ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+      ...(organizationId ? { organization_id: organizationId } : {}),
+      export_path: result.export_path,
+      targets: result.targets.map((target) => target.path),
+      approved_by: approvedBy,
+      approved_at: approvedAt,
+      purpose,
+      policy_ref: RETENTION_CATALOG_REPO_PATH,
+      reason: 'offboarding export completed',
+    });
+
+    // DA-08: prune the tenant's lines out of the shared dedup registry
+    // (exported above). Audited like every other purge in this ceremony.
+    if (dedupPrune && dedupPrune.removedLines.length > 0) {
+      const registryAbs = assertSafeRepositoryPath(
+        pathResolver.rootResolve(INGEST_DEDUP_REGISTRY_REPO_PATH),
+        { allowMissingLeaf: true }
+      );
+      safeWriteFile(
+        registryAbs,
+        dedupPrune.keptLines.length > 0 ? `${dedupPrune.keptLines.join('\n')}\n` : ''
+      );
+      if (result.dedup_registry) {
+        result.dedup_registry.removed = dedupPrune.removedLines.length;
+      }
+      appendRetentionAudit({
+        event: 'SCOPE_OFFBOARD_DEDUP_REGISTRY_PRUNE',
+        scope_type: scopeType,
+        scope_id: scopeId,
+        path: INGEST_DEDUP_REGISTRY_REPO_PATH,
+        removed_lines: dedupPrune.removedLines.length,
+        kept_lines: dedupPrune.keptLines.length,
+        export_path: result.export_path,
+        approved_by: approvedBy,
+        approved_at: approvedAt,
+        purpose,
+        policy_ref: RETENTION_CATALOG_REPO_PATH,
+        reason: 'offboarding removed the tenant’s dedup-registry lines after export (DA-08)',
+      });
+    }
+
+    // Same for the tenant's pre-partition rows of the shared metrics ledgers.
+    // These files are hot (every metrics append): under the lock every
+    // appender takes, the prune is recomputed from the file as it is NOW,
+    // exported, then applied by one atomic rewrite (secure-io writes through a
+    // temp file + rename), so rows appended since the plan survive. Audited
+    // like every other purge.
+    for (const { ledger } of ledgerPrunes) {
+      const ledgerAbs = assertSafeRepositoryPath(pathResolver.rootResolve(ledger.legacy_path), {
+        allowMissingLeaf: true,
+      });
+      const prune = withLockSync(metricsLedgerLockId(ledgerAbs), () => {
+        const current = computeLegacyLedgerPrune(ledger, scopeId);
+        const exportPath = assertSafeRepositoryPath(path.join(exportDirAbs, ledger.export_file), {
+          allowMissingLeaf: true,
+        });
+        safeWriteFile(exportPath, `${current.removedLines.join('\n')}\n`);
+        safeWriteFile(
+          ledgerAbs,
+          current.keptLines.length > 0 ? `${current.keptLines.join('\n')}\n` : ''
+        );
+        return current;
+      });
+      const summary = result[ledger.result_key];
+      if (summary) {
+        summary.matched = prune.removedLines.length;
+        summary.removed = prune.removedLines.length;
+      }
+      appendRetentionAudit({
+        event: ledger.audit_event,
+        scope_type: scopeType,
+        scope_id: scopeId,
+        path: ledger.legacy_path,
+        removed_lines: prune.removedLines.length,
+        kept_lines: prune.keptLines.length,
+        export_path: result.export_path,
+        approved_by: approvedBy,
+        approved_at: approvedAt,
+        purpose,
+        policy_ref: RETENTION_CATALOG_REPO_PATH,
+        reason: `offboarding removed the tenant’s legacy ${ledger.row_label} rows after export`,
+      });
+    }
+
+    // The tenant's rows of the pre-partition shared delegation trace (and its
+    // rotated segments) and of the shared notification queue: no writer
+    // appends there any more, but the prune still runs under the file's lock
+    // (the notification queue's own lock, which every claim holds), recomputes
+    // the rows from the file as it is now, exports them verbatim, then applies
+    // one atomic rewrite. Audited.
+    if (delegationTracePrunes.length > 0) {
+      let removed = 0;
+      for (const { path: tracePath } of delegationTracePrunes) {
+        const traceAbs = assertSafeRepositoryPath(pathResolver.rootResolve(tracePath), {
+          allowMissingLeaf: true,
+        });
+        const isNotificationQueue = tracePath === DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH;
+        const lockId = isNotificationQueue
+          ? DELEGATION_NOTIFICATIONS_LOCK
+          : metricsLedgerLockId(traceAbs);
+        const prune = withLockSync(lockId, () => {
+          const current = computeLegacyDelegationTracePrunes(
+            scopeId,
+            legacyMissionIds,
+            legacyDelegationIds
+          ).find((entry) => entry.path === tracePath)?.prune;
+          if (!current || current.removedLines.length === 0) return current;
+          const exportPath = assertSafeRepositoryPath(
+            path.join(exportDirAbs, DELEGATION_LEGACY_EXPORT_DIR, path.posix.basename(tracePath)),
+            { allowMissingLeaf: true }
+          );
+          safeMkdir(path.dirname(exportPath), { recursive: true });
+          safeWriteFile(exportPath, `${current.removedLines.join('\n')}\n`);
+          safeWriteFile(
+            traceAbs,
+            current.keptLines.length > 0 ? `${current.keptLines.join('\n')}\n` : ''
+          );
+          return current;
+        });
+        if (!prune || prune.removedLines.length === 0) continue;
+        removed += prune.removedLines.length;
+        appendRetentionAudit({
+          event: isNotificationQueue
+            ? 'SCOPE_OFFBOARD_DELEGATION_NOTIFICATION_PRUNE'
+            : 'SCOPE_OFFBOARD_DELEGATION_TRACE_PRUNE',
+          scope_type: scopeType,
+          scope_id: scopeId,
+          path: tracePath,
+          removed_lines: prune.removedLines.length,
+          kept_lines: prune.keptLines.length,
+          export_path: result.export_path,
+          approved_by: approvedBy,
+          approved_at: approvedAt,
+          purpose,
+          policy_ref: RETENTION_CATALOG_REPO_PATH,
+          reason: isNotificationQueue
+            ? 'offboarding removed the tenant’s rows from the pre-partition shared delegation notification queue after export'
+            : 'offboarding removed the tenant’s rows from the pre-partition shared delegation trace after export',
+        });
+      }
+      if (result.delegations_legacy) {
+        result.delegations_legacy.matched = Math.max(result.delegations_legacy.matched, removed);
+        result.delegations_legacy.removed = removed;
+      }
+    }
+
+    for (const target of result.targets) {
+      const absolute = assertSafeRepositoryPath(pathResolver.rootResolve(target.path));
+      try {
+        if (!safeExistsSync(absolute)) continue;
+        softDeleteToTrash(absolute);
+        result.soft_deleted.push(target.path);
+        appendRetentionAudit({
+          event: 'SCOPE_OFFBOARD_SOFT_DELETE',
+          scope_type: scopeType,
+          scope_id: scopeId,
+          path: target.path,
+          trash_path: `${TRASH_REPO_SUBPATH}/${target.path}`,
+          kind: target.kind,
+          export_path: result.export_path,
+          approved_by: approvedBy,
+          approved_at: approvedAt,
+          purpose,
+          policy_ref: RETENTION_CATALOG_REPO_PATH,
+          reason: 'offboarding delete after export (soft-delete, restorable)',
+        });
+      } catch (err) {
+        logger.warn(
+          `[scope-offboarding] failed to remove ${target.path}: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+      }
+    }
+
+    // NI-05: the scope is gone — so are the identities affiliated with it
+    // (OWASP NHI #1). Best-effort and idempotent, like the mission hooks.
+    const retiredIdentities = retireIdentitiesForScopeBestEffort({
+      scope: scopeType,
+      scopeId,
+      reason: `${scopeType} '${scopeId}' offboarded (approved by ${approvedBy})`,
+    });
+    result.retired_identities = retiredIdentities;
+    if (scopeType === 'tenant') {
+      result.revoked_task_grants = revokeGrantsForTenantBestEffort(
+        scopeId,
+        `${scopeType} '${scopeId}' offboarded (approved by ${approvedBy})`
+      );
+    }
+
+    // DA-08 acceptance: prove there is no trace left. Best-effort — a
+    // verification failure is reported, never thrown.
+    try {
+      result.verification = verifyScopeOffboarded(scopeType, scopeId, physicalFilter, {
+        legacyMissionIds,
+        legacyDelegationIds,
+      });
+      appendRetentionAudit({
+        event: 'SCOPE_OFFBOARD_VERIFIED',
+        scope_type: scopeType,
+        scope_id: scopeId,
+        ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+        ...(organizationId ? { organization_id: organizationId } : {}),
+        clean: result.verification.clean,
+        leftovers: result.verification.leftovers,
+        policy_ref: RETENTION_CATALOG_REPO_PATH,
+        reason: result.verification.clean
+          ? 'post-offboard verification found no scope traces'
+          : 'post-offboard verification found leftovers — operator attention required',
+      });
+      if (!result.verification.clean) {
+        logger.warn(
+          `[scope-offboarding] post-offboard verification for ${scopeType} '${scopeId}' found ` +
+            `leftovers: ${result.verification.leftovers.join(', ')}`
+        );
+      }
+      // A tenant runtime partition that survived is a failed offboarding, not
+      // a warning: its records (ledgers, grants, approvals) outlive the tenant.
+      const partitionLeftovers =
+        scopeType === 'tenant'
+          ? result.verification.leftovers.filter((leftover) => {
+              const partition = tenantRuntimePartitionOf(leftover);
+              return (
+                partition?.tenant === scopeId &&
+                TENANT_RUNTIME_PARTITION_TARGET_KINDS[partition.key] !== 'not_offboarded'
+              );
+            })
+          : [];
+      if (result.verification.error) {
+        result.status = 'error';
+        result.reason = `[OFFBOARD_VERIFICATION_FAILED] post-offboard verification could not run — the scope may still hold data | next: fix the cause and rerun the offboarding (idempotent) | evidence: ${result.verification.error}`;
+      } else if (partitionLeftovers.length > 0) {
+        result.status = 'error';
+        result.reason = `[OFFBOARD_PARTITION_LEFTOVER] tenant runtime partition(s) were not removed — the tenant's records outlive it | next: check this process's write grant on the partitions (tenant ledger, approval and delegation partitions need the sovereign persona), then rerun the offboarding | evidence: ${partitionLeftovers.join(', ')}`;
+      }
+    } catch (err) {
+      // An offboarding that cannot prove itself clean is not reported as done.
+      const message = err instanceof Error ? err.message : String(err);
+      result.status = 'error';
+      result.reason = `[OFFBOARD_VERIFICATION_FAILED] post-offboard verification could not run — the scope may still hold data | next: fix the cause and rerun the offboarding (idempotent) | evidence: ${message}`;
+      logger.warn(
+        `[scope-offboarding] post-offboard verification failed for ${scopeType} '${scopeId}': ${message}`
+      );
+    }
+
+    logger.info(
+      `[scope-offboarding] ${scopeType} '${scopeId}' offboarded: ${result.soft_deleted.length} tree(s) exported to ${result.export_path} and moved to the trash, ${retiredIdentities} identity(ies) retired`
+    );
+    return result;
+  } catch (err) {
+    result.status = 'error';
+    result.reason = err instanceof Error ? err.message : String(err);
+    logger.warn(
+      `[scope-offboarding] offboarding ${scopeType} '${scopeId}' failed: ${result.reason}`
+    );
+    return result;
+  }
+}

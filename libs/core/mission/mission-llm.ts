@@ -4,7 +4,7 @@
  */
 
 import { type ZodType } from 'zod';
-import * as customerResolver from '../stance-resolver.js';
+import * as customerResolver from '../authn/stance-resolver.js';
 import { logger } from '../core.js';
 import { formatDiagnostic } from '../logger.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -28,7 +28,7 @@ import {
   loadOrganizationProfile,
   type OrganizationProfile,
 } from '../organization/organization-profile.js';
-import { loadPersonalIdentityAtPath } from '../personal-identity-state.js';
+import { loadPersonalIdentityAtPath } from '../authn/personal-identity-state.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export interface LlmProfile {

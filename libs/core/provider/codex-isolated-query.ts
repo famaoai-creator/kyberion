@@ -28,7 +28,7 @@ import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { logger } from '../core.js';
-import { metrics } from '../metrics.js';
+import { metrics } from '../analysis/metrics.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { assertGovernedExec, safeWriteFile } from '../secure-io.js';
 import {

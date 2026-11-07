@@ -1,11 +1,11 @@
 import { logger } from '../core.js';
 import { safeExecResultAsync } from '../secure-io.js';
-import { safeMarkLabel, type SomBox, type SomCandidate } from '../set-of-marks.js';
+import { safeMarkLabel, type SomBox, type SomCandidate } from './set-of-marks.js';
 import type {
   UiElementDetectionRequest,
   UiElementDetector,
 } from '../surface/ui-element-detector.js';
-import { powerShellStdinArgs, windowsPowerShellEnv } from '../windows-powershell.js';
+import { powerShellStdinArgs, windowsPowerShellEnv } from './windows-powershell.js';
 
 /**
  * `os_accessibility` UI element detector: exact element rectangles of a native
@@ -666,7 +666,7 @@ export {
   POWERSHELL_STDIN_BOOTSTRAP,
   powerShellStdinArgs,
   windowsPowerShellEnv,
-} from '../windows-powershell.js';
+} from './windows-powershell.js';
 
 const defaultRunner: AccessibilityCommandRunner = (command, args, options) =>
   safeExecResultAsync(command, args, options);

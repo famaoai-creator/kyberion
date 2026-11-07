@@ -1,14 +1,14 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
-import type { FocusedInputState } from '../apple-event-bridge.js';
+import type { FocusedInputState } from './apple-event-bridge.js';
 import type { OsAutomationBridge } from './os-automation-bridge.js';
-import type { MacOSAutomationProbe } from '../macos-automation-bridge.js';
+import type { MacOSAutomationProbe } from './macos-automation-bridge.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
 import { redactSensitiveString } from '../network.js';
-import { scrubContent } from '../pii-scrubber.js';
+import { scrubContent } from '../governance/pii-scrubber.js';
 import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
 
 let desktopRecordingValidator: ValidateFunction | null = null;

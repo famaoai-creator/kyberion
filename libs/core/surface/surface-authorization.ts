@@ -6,7 +6,7 @@
  * Client supplied scope values must be narrowed before they reach this API.
  */
 
-import type { ResolvedPrincipal } from '../authn-principal-resolver.js';
+import type { ResolvedPrincipal } from '../authn/authn-principal-resolver.js';
 
 export type SurfaceAuthorizationRole = 'readonly' | 'localadmin';
 export type SurfaceAuthorizationEffect = 'read' | 'write';

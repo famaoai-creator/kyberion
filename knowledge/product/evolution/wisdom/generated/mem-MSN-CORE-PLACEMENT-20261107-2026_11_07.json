@@ -1,0 +1,22 @@
+{
+  "record_id": "mem-MSN-CORE-PLACEMENT-20261107-2026_11_07",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Core placement preserves public exports and validates physical paths",
+  "summary": "Classify core modules by responsibility while treating export compatibility, physical runtime paths and compiled graph freshness as separate checks.",
+  "candidate_id": "mem-MSN-CORE-PLACEMENT-20261107-2026_11_07",
+  "evidence_refs": [
+    "active/missions/public/MSN-CORE-PLACEMENT-20261107/evidence/complete-core-placement.md"
+  ],
+  "created_at": "2026-11-07T16:50:07.528Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "Read imports, consumers and initialization before moving a core module. Keep public export keys stable while remapping targets, move associated tests and native helpers, and register domain ownership plus justified root boundaries in core_placement. Audit embedded child imports, query-suffixed reevaluation and source/dist path construction separately. Clean-build before dependency or foundation-weight gates so obsolete emitted modules cannot distort the graph. Preserve cycle and weight budgets. Freeze source for final failed-and-affected regression reruns; a repair-time full-suite discovery run alone is not a final green claim."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-CORE-PLACEMENT-20261107/evidence/complete-core-placement.md"
+  ],
+  "source_branch": "refactor/core-placement-20261107",
+  "source_commit": "1d042d119ad3a1bfda01f6da0371998c022690f2"
+}

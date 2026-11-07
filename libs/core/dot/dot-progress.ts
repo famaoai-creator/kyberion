@@ -3,7 +3,7 @@
  */
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import { readJsonLinesCached } from '../jsonl-tail.js';
+import { readJsonLinesCached } from '../storage/jsonl-tail.js';
 import { pathResolver } from '../path-resolver.js';
 import type { DotCharter } from './dot-charter.js';
 import type { DotPromptSection, DotStatusSection } from './dot-extensions.js';

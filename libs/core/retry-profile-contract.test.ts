@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { safeReaddir, loadJson } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
-import { loadRetryPolicy } from './async-utils.js';
-import { loadRecoveryPolicy, buildGovernedRetryOptions } from './recovery-policy.js';
+import { loadRetryPolicy } from './pipeline/async-utils.js';
+import { loadRecoveryPolicy, buildGovernedRetryOptions } from './pipeline/recovery-policy.js';
 
 describe('canonical actuator retry profiles', () => {
   it('resolves every migrated manifest and retains explicit overrides', () => {
