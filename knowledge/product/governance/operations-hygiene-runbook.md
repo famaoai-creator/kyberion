@@ -1168,6 +1168,18 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
   `libs/core/mission/mission-tier-scan.test.ts`,
   `scripts/watch_tenant_drift.test.ts` (bound-partition probe),
   `libs/actuators/system-actuator/src/system-pipeline-path.test.ts` (bound `list_missions`).
+- **Owner-partition IO resolves scope from the env only.** A persisted `pnpm scope use <tenant>`
+  (`active/shared/runtime/scope.env`, read by `resolveProjectScope`) binds every process on the
+  checkout, including the Concierge server. IO into an owner partition that is not tenant data
+  (`tenant-approvals/personal/shared/owners/<hash>/`) must run under `withScopeEnvOnly`.
+  Otherwise tier-guard reads `shared` as an invalid tenant segment, and the read fails with
+  `tenant.scope_invalid_prefix`. That drops only the persisted file. An env or explicit tenant
+  binding still applies, so a tenant-bound process stays fenced. Never clear the tenant with
+  `withExecutionContext(…, '')` there, because that also unbinds env-bound processes.
+  Incident: 設定 › 自律度 failed for the personal owner on a checkout with a persisted tenant
+  (2026-11). Coverage: `libs/core/governance/approval-store-personal-partition.test.ts`.
+  A route that shows core failures to a person allowlists what it echoes; any other failure
+  can carry an absolute path (`onboarding-authority/route.ts`).
 - **Viewer scope projections never drop scope fields; tenant admission goes through
   `admitsTenant`.** A function that copies a server-resolved viewer into another shape
   (`toSurfaceAuthorizationContext`, an event `scopeFilter`, a store query) carries every scope
