@@ -27,7 +27,8 @@ importance: 8
 認可を分けた。`scope inspect` は明示したパスを診断し、上限を指定しない場合は
 `address_only` とする。これは住所の構造の診断であり、tenant の登録・存在や完全な
 I/O 許可の証明ではない。新判定で旧認可を置き換える G1 全体、保存先専用ロールを
-除去する G2、system/person の許可証拡張 G4 は未完了である。
+除去する G2 は実施済み。system/person の許可証拡張 G4 も要求ケイパビリティ天井に実施した
+（契約テストのみ — 実利用者への接続はスコープモデル P4）。
 
 公開 subpath は初期実装で3件追加した。credential 許可証の失効後にも残る権限を
 修正するため、secure-io の読み込み数は66から67へ増えた。これは pure proof module
@@ -1372,6 +1373,30 @@ policy engine）の分離として別の段階に置くか。これらを決め�
   門番の規則モジュール）、宣言の kind 5、入口の `decide` 1、新旧の食い違い 0
   （拒否の文言の詳細だけ変更: 汎用の前置きの中に従来の拒否マーカー
   `[DELIVERABLE_INBOX_WRITE_REFUSED]` などを保持。行数は max-file-lines 内）。
+
+**G4 の実施（管理者の拡張、MSN-SCOPE-G4-20261107）。**
+
+- 要求ケイパビリティ天井（`ResourceAccessScope`）に `custody` 判別を足した。
+  `system`・`tenant`・`person`（`ref` 省略可 — installation 全体の person 束縛。
+  `installation-owner` など member-id 形式を要求）。省略時は tenant に正規化されるため、
+  既存の呼び出し側は無改修のまま。凍結された scope は必ず正規化済みの custody を持ち、
+  非テナント custody は tenantSlug・organizationId・projectId を持てない
+  （違反は `[RESOURCE_SCOPE_INVALID]` で fail-closed）。
+- 入れ子の束縛は custody の等価を要求する（テナントの入れ替えだけでなく、
+  system/person への乗り換えも拒否する — tenantSlug 一致の一般化）。
+- 門番側の意味は変えない: テナント区画の構造 mkdir と narrow 宣言の
+  `require_scope.exact` のテナント捕捉グループは、非テナント custody で
+  自然に deny される（`scope.tenantSlug` が無いため）。`isArchivedMissionStateCapability`
+  は tenant custody を明示して指紋の意味を保った。
+- 宣言の拡張: `require_scope.custody`（kind または kind の配列）を narrow 宣言・
+  評価器・スキーマに追加 — P4 が system/person 束縛のロールを宣言できる最小の拡張。
+- 受入契約テスト `foundation/resource-access-custody-contract.test.ts`:
+  system/person custody の発行 → 天井内の許可・天井外の拒否・入れ子の custody
+  変更の拒否・発行経路（`createSynchronousResourceGrantIssuer`）の end-to-end・
+  非テナント custody でテナント区画 mkdir が拒否されること — すべて確認。
+  実利用者への接続は P4（閲覧の開示）で行う。
+- `knowledge/personal/` の人ごと分割は行わない（カタログの宣言どおり
+  `installation-owner` の person custody のまま。分割が要るかは別途判断する残置）。
 
 ## 既定で拒否であること
 

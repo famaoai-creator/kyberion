@@ -3120,6 +3120,22 @@ raise the timeout to hide fixture coupling. Freeze source and build outputs for 
 verification. A full-suite run used while repairing failures is discovery evidence; rerun
 the failed and affected suites against the frozen generation before claiming completion.
 
+## Deny-only policy and custody validation
+
+Validate narrowing declarations against the schema before evaluating them: reject unknown
+keys, empty reasons and malformed matchers rather than treating them as absent declarations.
+An explicitly selected role must refuse resource I/O when its policy is unavailable or
+corrupt. Preserve the documented role-less bootstrap behavior. Resolve one lazy policy
+snapshot per I/O decision so narrowing and base permissions cannot observe different policy
+generations. Structural mkdir checks must use that same snapshot.
+
+Custody fixtures must override the scope's actual fields, including forbidden tenant,
+organization and project fields on non-tenant custodians. Assert the specific malformed
+field diagnostic so an invalid custody wrapper cannot accidentally satisfy every case.
+Enforce these rules with `role-narrowing-denial.test.ts`,
+`tier-guard-policy-corruption.test.ts`, `resource-access-scope.test.ts`,
+`resource-access-custody-contract.test.ts` and `tier-guard-structural-mkdir.test.ts`.
+
 ## Intake extension CI checks
 
 When adding a service operation, validate the shipped discovery count and service-harness operation inventory together with the exact kind/risk/approval assertions. Registry-overlay fixtures must assert the shipped exact declarations as well as the mutation fallback. For boundary tests, partially mock shared path resolvers so new legitimate imports retain their real APIs; a minimal hand-built resolver can fail during module initialization before the tested gate runs. Run the impacted existing tests in addition to the extension fixtures. For single-use admission capabilities, compare private in-memory snapshots of request and configuration values. Do not send credential-bearing configuration into hash or HMAC APIs: keyed fast hashes still trigger password-hashing checks and are unnecessary when the capability's private WeakMap already supplies the trust boundary. Never log or persist these snapshots.
