@@ -19,7 +19,7 @@ import {
   type PrChecksResult,
   type PrListEntry,
 } from './github.js';
-import type { VcsCommandRunner } from './vcs-backend.js';
+import { vcsDefaultRunner, type VcsCommandRunner } from './vcs-backend.js';
 import { createGhCliVcsHostProvider } from './gh-cli-host-provider.js';
 import {
   parseVcsPrFields,
@@ -233,7 +233,9 @@ export function vcsHostOptionsForRunner(
     ...(options.env ? { env: options.env } : {}),
     ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
   };
-  if (!run || run === safeExecResult) return base;
+  // The ambient runners mean "no injected transport": use the seam chain
+  // (gh-cli, then github-rest), so a host without gh still works.
+  if (!run || run === safeExecResult || run === vcsDefaultRunner) return base;
   return { ...base, git: run, hostProvider: createGhCliVcsHostProvider({ run }) };
 }
 
@@ -363,6 +365,36 @@ async function visibilityOf(
     // which delegation treats as not-private.
     return 'unknown';
   }
+}
+
+/**
+ * Verified repository visibility for delegation and push-scope gating — never
+ * trust a claim. Same contract as the sync `ghRepositoryVisibility`: an
+ * absent, malformed or unverifiable repository is 'unknown' (not private).
+ */
+export async function vcsHostRepositoryVisibility(
+  params: VcsHostCallOptions & { repository?: { host: string; slug: string } }
+): Promise<VcsRepositoryVisibility> {
+  const target = params.repository;
+  if (!target || !/^[\w.-]+\/[\w.-]+$/u.test(target.slug)) return 'unknown';
+  let repo: VcsRepositoryRef;
+  try {
+    repo = assertRepositoryRef({
+      slug: target.slug,
+      host: target.host,
+      url: `https://${target.host}/${target.slug}`,
+    });
+  } catch {
+    return 'unknown';
+  }
+  const { repository: _repository, ...options } = params;
+  let bound: Bound;
+  try {
+    bound = bind(options);
+  } catch {
+    return 'unknown';
+  }
+  return visibilityOf(bound, repo);
 }
 
 const SHA = /^[a-f0-9]{40,64}$/i;
