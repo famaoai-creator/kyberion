@@ -11,9 +11,17 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./automation-blueprint-slack": {
+      "types": "./dist/automation-blueprint-slack.d.ts",
+      "default": "./dist/automation-blueprint-slack.js"
+    },
     "./backchannel-policy": {
       "types": "./dist/backchannel-policy.d.ts",
       "default": "./dist/backchannel-policy.js"
+    },
+    "./bridge-error-reply": {
+      "types": "./dist/bridge-error-reply.d.ts",
+      "default": "./dist/bridge-error-reply.js"
     },
     "./conversation-engine": {
       "types": "./dist/conversation-engine.d.ts",

@@ -9,7 +9,7 @@
  */
 import { ResourceTemplate, type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { resolveMcpRequestContext } from '@agent/core/mcp-request-context';
+import { resolveMcpRequestContext } from './mcp-request-context.js';
 import { resolveScopeResolution } from '@agent/core/scope-context';
 import { formatWireError } from '@agent/core/contracts/wire-error';
 import {
