@@ -123,7 +123,7 @@ export * from './integrations/slack-onboarding.js';
 
 export * from './agent/agent-activity-board.js';
 
-export * from './event-vocabulary.js';
+export * from './event/event-vocabulary.js';
 
 export * from './agent/agent-collaboration-events.js';
 
@@ -197,7 +197,7 @@ export * from './mission/mission-execution-surface.js';
 
 export * from './productivity-task-plan.js';
 
-export * from './presentation-preference-profile.js';
+export * from './design/presentation-preference-profile.js';
 
 export * from './project/project-registry.js';
 

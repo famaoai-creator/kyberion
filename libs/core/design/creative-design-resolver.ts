@@ -1,11 +1,11 @@
 import * as path from 'node:path';
-import { pathResolver } from './path-resolver.js';
+import { pathResolver } from '../path-resolver.js';
 import { loadBrandTokensAtPath, type BrandTokens } from './brand-tokens.js';
-import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
-import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
 import { DEFAULT_CHRONOS_WEB_THEME_PACK, type WebThemePack } from './web-design-system.js';
-import { deriveAccentPalette, type CeAccentPalette } from './ce-adoption.js';
-import { isValidTenantSlug } from './entity-scope.js';
+import { deriveAccentPalette, type CeAccentPalette } from '../ce-adoption.js';
+import { isValidTenantSlug } from '../entity-scope.js';
 import {
   buildFoundationModeVars,
   buildFoundationPrimitiveVars,
@@ -17,13 +17,13 @@ import {
 import {
   loadTenantDesignOverride,
   loadTenantDesignThemeOverlay,
-} from './organization/tenant-design-override.js';
+} from '../organization/tenant-design-override.js';
 import {
   SEMANTIC_ENGINE_COLOR_FORMAT,
   type SemanticColorFormat,
   type SemanticEngine,
 } from './semantic-design-token-fallbacks.js';
-import { createLogger } from './logger.js';
+import { createLogger } from '../logger.js';
 
 const designLogger = createLogger('creative-design-resolver');
 

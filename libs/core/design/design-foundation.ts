@@ -1,6 +1,6 @@
-import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
-import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { readJson } from '../foundation/json.js';
+import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
 
 /**
  * KDS v2 — the extended design foundation.

@@ -1,6 +1,6 @@
 import { t } from '../t.js';
 import { randomUUID } from 'node:crypto';
-import { resolveCollaborationKind } from '../event-vocabulary.js';
+import { resolveCollaborationKind } from '../event/event-vocabulary.js';
 import {
   normalizeEventScope,
   redactEventScopeForShared,

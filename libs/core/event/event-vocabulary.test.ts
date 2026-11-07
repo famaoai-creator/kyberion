@@ -9,8 +9,8 @@ import {
   PROCESS_WATCH_COLLABORATION_KIND,
   OPERATOR_EVENT_COLLABORATION_KIND,
 } from './event-vocabulary.js';
-import { WORKER_EVENT_TYPES } from './workforce/worker-event-stream.js';
-import { collaborationKindFromEventType } from './agent/agent-collaboration-events.js';
+import { WORKER_EVENT_TYPES } from '../workforce/worker-event-stream.js';
+import { collaborationKindFromEventType } from '../agent/agent-collaboration-events.js';
 
 /**
  * EV-07: the mapping used to be a chain of `String.includes` guesses, so it was

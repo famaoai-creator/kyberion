@@ -59,7 +59,7 @@ import {
 } from './dot-token-usage.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';
-import { recordDaemonHeartbeat } from '../daemon-heartbeat.js';
+import { recordDaemonHeartbeat } from '../daemon/daemon-heartbeat.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
 import { sendOpsAlert, type OpsAlertInput } from '../ops-alert.js';
 import type {

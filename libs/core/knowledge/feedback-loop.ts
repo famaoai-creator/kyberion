@@ -3,7 +3,7 @@ import {
   listSchedulerIncidents,
   schedulerIncidentLogForRoot,
   schedulerIncidentSweepKey,
-} from '../scheduler-incidents.js';
+} from '../daemon/scheduler-incidents.js';
 /**
  * Feedback Loop
  * Automatically connects execution results back into the knowledge and scheduling systems.
