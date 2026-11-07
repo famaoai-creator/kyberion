@@ -24,6 +24,7 @@ import type { MissionState } from '@agent/core/mission/mission-types';
 import { buildOrganizationManagementView } from '@agent/core/organization/organization-operating-model-management';
 import { humanizeSummary, stripIdPrefix } from '@agent/core/surface/display-humanize';
 import { WORKSPACE_GRAPH_READER_ROLE, viewerAdmitsNode } from '@agent/core/surface/workspace-graph';
+import { viewerPersonIds } from '@agent/core/surface/surface-authorization';
 import { krView, type KrDirection, type KrStatus } from '../components/ops/organization-outcome';
 import { collectDeliverableInbox, type DeliverableInboxItem } from './ops/deliverable-inbox';
 import {
@@ -527,6 +528,7 @@ export function collectHomeDashboard(
       limit: 50,
       tenantSlugs,
       ...(viewer.includeUntenanted ? { includeUntenanted: true } : {}),
+      personIds: viewerPersonIds(viewer),
       organizationIds,
       projectIds: focus.projectId ? [focus.projectId] : projectIds,
     })

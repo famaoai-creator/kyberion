@@ -1437,6 +1437,39 @@ secure-io の 40 以下は別の段階）。上の表は G0 の時点の見込�
 意図して挙動を変える箇所（内容検査の移動、`system` / `person` の許可証の追加）は、食い違いとして
 記録し、一件ずつ理由を残して受け入れる。
 
+**後続フォローアップ（MSN-SCOPE-FOLLOWUP-20261107、決めたこと）。**
+
+- **横断して読むロール 3 件は残す（P4 の判断）。** `workspace_graph_reader`、
+  `concierge_management_reader`、`peer_responder_reader` は「プロセスが複数テナントの保存先を
+  読める」という I/O 権限であり、P4 で揃えた custody admission はその内側で「viewer にどの行を
+  開示するか」を決める別の層。ロールを外すには保存先レベルの許可証化（流れの分解の段階）が要る。
+- **派生台帳に storeRole（P3 F9）。** `asset_derivations` を `TENANT_STORE_LEDGER_ROOTS` に登録し、
+  新ロール `asset_derivation_store` を発行した。`confidential/<tenant>` は custodian のテナント束縛、
+  メンバー区画 `personal/<ref>` と `system/` はロールのリテラル許可（メンバー ref はテナント slug
+  ではないため honoring が custodian 束縛を担う）。`tenantStoreLedgerPartitionOf` にルートごとの
+  `systemPartition` オプトインを追加し、ambient な runtime 書き込み権では台帳に追記できないように
+  した（`delegation-records/system/` など他ルートの `system/` セグメントは従来どおり）。
+- **janitor 配線は既に充足。** retention カタログの
+  `active/shared/runtime/asset-derivations`（`action: review_required`）が台帳を「報告するが自動削除
+  しない」状態にしている — 削除は派生関係グラフ（R-09）に従うため。`runtime-store-retention` ゲートが
+  エントリを強制する。
+- **P4 レビューの残件 4 件もこのミッションで閉じた**: `approval_decision` の owner チェック
+  （person custody の承認は owner のみが決定できる）、`approvalMatchesScope` の unscoped/'all'
+  早期許可への custody ゲート、deliverable-inbox の public 早期リターンを custody 評価の後ろへ、
+  presence-studio の `presenceStudioRecordInScope` に `owner_nhi` クレームと custody admission。
+- **2 回目のレビュー（ブロッキング 2 件）。**
+  - `nhi_id` も person 束縛として読む。governed 承認レコードの person 束縛は `nhi_id`
+    で書かれる（`approval-review-scope.ts` が `owner_nhi !== nhi_id` を同一語彙として突合）。
+    `custodyOfScope` が `owner_nhi` だけを読むと `{tier:'confidential', nhi_id}` の無テナント
+    レコードが system custody に落ちて全員に開示・全員が決定できる — 両フィールドを読み
+    `tenant_slug > owner_nhi/nhi_id > system` の順で決める。なお knowledge ドメインの
+    「`nhi_id` から personal 置き場を推論しない」契約は保存先推論の層の話であり、開示層では
+    `nhi_id` を person 束縛として扱う方が fail-closed で整合する。
+  - `asAssetDerivationStore` は `withExecutionContext(role, fn, undefined, '')` — 第 4 引数に
+    `undefined` を渡すと呼び出し側の ambient テナント束縛が残り、`personal/<member>` 追記が
+    tenant-bound プロセスから必ず `tenant.scope_violation` で弾かれる。`''`（tenantCleared）で
+    束縛を明示クリアする。tenant custody の書き込みだけは custodian slug を束縛する。
+
 ## スコープモデルとの対応
 
 | スコープモデル                       | この設計                                              |

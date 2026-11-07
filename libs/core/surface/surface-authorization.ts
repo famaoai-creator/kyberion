@@ -176,15 +176,26 @@ export function admitsCustody(
 
 /**
  * Derive the custody of a record scope: a tenant slug binds the record to
- * that tenant; absent a tenant, a person reference (`owner_nhi`) binds it to
- * that person; anything else is system custody. Records without a person
- * field keep their previous tenant/system behavior.
+ * that tenant; absent a tenant, a person reference binds it to that person;
+ * anything else is system custody. The person field is `owner_nhi` on
+ * memory-scope envelopes and `nhi_id` on governed (event-scope) records —
+ * approval-review-scope already treats the two as one binding
+ * (`owner.scope.owner_nhi !== approval.scope?.nhi_id`). Records without a
+ * person field keep their previous tenant/system behavior.
  */
 export function custodyOfScope(
-  scope: { tenant_slug?: string | null; owner_nhi?: string | null } | null | undefined
+  scope:
+    | {
+        tenant_slug?: string | null;
+        owner_nhi?: string | null;
+        nhi_id?: string | null;
+      }
+    | null
+    | undefined
 ): ViewerRecordCustody {
   if (scope?.tenant_slug) return { kind: 'tenant', ref: scope.tenant_slug };
-  if (scope?.owner_nhi) return { kind: 'person', ref: scope.owner_nhi };
+  const personRef = scope?.owner_nhi ?? scope?.nhi_id;
+  if (personRef) return { kind: 'person', ref: personRef };
   return { kind: 'system' };
 }
 
@@ -201,6 +212,7 @@ export function admitsScopeAudience(
     | {
         tenant_slug?: string | null;
         owner_nhi?: string | null;
+        nhi_id?: string | null;
         allowed_audience?: readonly string[] | null;
       }
     | null

@@ -30,6 +30,7 @@ import {
 } from './secure-io.js';
 import { logger } from './core.js';
 import { appendJsonLine } from './foundation/json.js';
+import { withExecutionContext } from './authority.js';
 import { streamJsonLines } from './jsonl-read.js';
 import { withLockSync } from './foundation/lock-utils.js';
 import { nowIso } from './foundation/time.js';
@@ -47,6 +48,31 @@ import {
 } from './foundation/runtime-state-roots.js';
 import { partitionedRuntimeTierInPath } from './storage-layout.js';
 import type { MemoryProvenanceRecord } from './knowledge/memory-provenance.js';
+
+/**
+ * Store role that owns every partition of the derivation lineage ledgers
+ * (`confidential/<tenant>`, member-keyed `personal/<ref>`, `system/` —
+ * TENANT_STORE_LEDGER_ROOTS.asset_derivations). Ledger writes run as it so an
+ * ambient runtime grant cannot append forged lineage; a tenant-custody write
+ * binds the custodian's tenant so `${KYBERION_TENANT}` grants resolve to that
+ * one partition, and person/system partitions admit the role's literal
+ * `personal/` / `system/` grants. The inter-process lock stays under the
+ * caller's role.
+ */
+const ASSET_DERIVATION_STORE_ROLE = 'asset_derivation_store';
+
+function asAssetDerivationStore<T>(custody: DerivationCustody, fn: () => T): T {
+  return withExecutionContext(
+    ASSET_DERIVATION_STORE_ROLE,
+    fn,
+    undefined,
+    // Member refs are not tenant slugs — for person and system custody the
+    // ambient tenant binding must be explicitly cleared ('' marks
+    // tenantCleared) or checkTenantScope would parse personal/<member> as a
+    // foreign-tenant path and deny the store role's literal grant.
+    custody.kind === 'tenant' ? custody.ref : ''
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Derivation references
@@ -744,8 +770,10 @@ export function recordDerivation(input: {
     };
     const file = ledgerPath(custody, options);
     withLockSync(`asset-derivation:${custodyPartition(custody)}`, () => {
-      safeMkdir(path.dirname(file), { recursive: true });
-      appendJsonLine(file, record);
+      asAssetDerivationStore(custody, () => {
+        safeMkdir(path.dirname(file), { recursive: true });
+        appendJsonLine(file, record);
+      });
     });
     records.push(record);
   }
@@ -1034,13 +1062,15 @@ export function deleteAssetWithDerivations(input: {
   if (deleted.length > 0 || skipped.length > 0) {
     const file = deletionsPath(resolved.custody, options);
     withLockSync(`asset-derivation:${custodyPartition(resolved.custody)}:deletions`, () => {
-      safeMkdir(path.dirname(file), { recursive: true });
-      appendJsonLine(file, {
-        source_ref: formatDerivationRef(input.ref),
-        source_path: normalizeRepoPath(sourcePath),
-        deleted_paths: deleted,
-        skipped_paths: skipped,
-        deleted_at: nowIso(),
+      asAssetDerivationStore(resolved.custody, () => {
+        safeMkdir(path.dirname(file), { recursive: true });
+        appendJsonLine(file, {
+          source_ref: formatDerivationRef(input.ref),
+          source_path: normalizeRepoPath(sourcePath),
+          deleted_paths: deleted,
+          skipped_paths: skipped,
+          deleted_at: nowIso(),
+        });
       });
     });
   }

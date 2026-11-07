@@ -714,6 +714,18 @@
       "allow_read": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"],
       "allow_write": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"]
     },
+    "asset_derivation_store": {
+      "allow_read": [
+        "active/shared/runtime/asset-derivations/confidential/${KYBERION_TENANT}/",
+        "active/shared/runtime/asset-derivations/personal/",
+        "active/shared/runtime/asset-derivations/system/"
+      ],
+      "allow_write": [
+        "active/shared/runtime/asset-derivations/confidential/${KYBERION_TENANT}/",
+        "active/shared/runtime/asset-derivations/personal/",
+        "active/shared/runtime/asset-derivations/system/"
+      ]
+    },
     "tenant_approval_store": {
       "allow_read": [
         "active/shared/runtime/tenant-approvals/personal/${KYBERION_TENANT}/",

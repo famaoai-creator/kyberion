@@ -48,7 +48,9 @@ export interface CeoApprovalItem {
   /** Whose decision this is. Lets a member of several organizations see which one is asking. */
   tenant_slug?: string;
   organization_id?: string;
-  /** Person custody marker: an owner-bound record admits to its owner only. */
+  /** Person custody marker: an owner-bound record admits to its owner only.
+   * Carries the record's `owner_nhi` or `nhi_id` (one binding — see
+   * custodyOfScope). */
   owner_nhi?: string;
   /** HA-06: digest of what this item shows; the decision sends it back. */
   presented_digest?: string;
@@ -211,6 +213,7 @@ export function notificationMatchesScope(
       custodyOfScope({
         tenant_slug: scopedRecord.tenant_slug ? String(scopedRecord.tenant_slug) : undefined,
         owner_nhi: scopedRecord.owner_nhi ? String(scopedRecord.owner_nhi) : undefined,
+        nhi_id: scopedRecord.nhi_id ? String(scopedRecord.nhi_id) : undefined,
       })
     )
   )
@@ -288,7 +291,9 @@ export function toCeoApprovalItem(
     organization_id: record.scope?.organization_id
       ? String(record.scope.organization_id)
       : undefined,
-    owner_nhi: record.scope?.owner_nhi ? String(record.scope.owner_nhi) : undefined,
+    owner_nhi:
+      (record.scope?.owner_nhi ? String(record.scope.owner_nhi) : undefined) ??
+      (record.scope?.nhi_id ? String(record.scope.nhi_id) : undefined),
     ...(record.id && record.title
       ? { presented_digest: computeApprovalPresentedDigest(approval) }
       : {}),

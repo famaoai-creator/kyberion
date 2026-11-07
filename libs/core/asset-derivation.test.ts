@@ -10,6 +10,8 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { withExecutionContext } from './authority.js';
+import { PARTITIONED_RUNTIME_LEDGER_ROOTS } from './foundation/runtime-state-roots.js';
 import { readJsonLines } from './foundation/json.js';
 import {
   combineAssetTaint,
@@ -218,6 +220,53 @@ describe('asset-derivation (P3 contract)', () => {
       })
     ).toThrow(/DERIVATION_INVALID/);
     safeRmSync(root4, { recursive: true, force: true });
+  });
+
+  it('writes a member-custody ledger from a tenant-bound caller (ambient binding cleared)', () => {
+    // Store-role enforcement only fires on the REAL ledger path — tmp fixtures
+    // never match the protected prefix. A tenant-bound ambient caller reaching
+    // `personal/<member>` would previously hit tenant.scope_violation because
+    // the member ref parses as a tenant segment; the store context must clear
+    // the ambient binding ('' = tenantCleared), not inherit it.
+    const member = `test-member-${randomUUID().slice(0, 8)}`;
+    const root = pathResolver.rootDir();
+    const sourcePath = `knowledge/personal/${member}/docs/x.md`;
+    const derivedPath = `knowledge/personal/${member}/summaries/x.md`;
+    const ledgerDir = path.join(
+      root,
+      PARTITIONED_RUNTIME_LEDGER_ROOTS.asset_derivations,
+      'personal',
+      member
+    );
+    try {
+      withExecutionContext('sovereign_concierge', () => {
+        write(root, sourcePath, 'x');
+        write(root, derivedPath, 's');
+      });
+      withExecutionContext(
+        'infrastructure_sentinel',
+        () =>
+          recordDerivation({
+            derived: { path: derivedPath, kind: 'summary' },
+            sources: [{ kind: 'path', path: sourcePath }],
+            options: { rootDir: root },
+          }),
+        undefined,
+        TENANT
+      );
+      const ledger = withExecutionContext('sovereign_concierge', () =>
+        readJsonLines<{ derived: { path: string } }>(path.join(ledgerDir, 'derivations.jsonl'))
+      );
+      expect(ledger.map((entry) => entry.derived.path)).toContain(derivedPath);
+    } finally {
+      withExecutionContext('sovereign_concierge', () => {
+        safeRmSync(path.join(root, 'knowledge/personal', member), {
+          recursive: true,
+          force: true,
+        });
+        safeRmSync(ledgerDir, { recursive: true, force: true });
+      });
+    }
   });
 
   it('records a fabricated-custody source under system, never the laundered tenant', () => {

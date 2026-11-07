@@ -630,7 +630,8 @@
         "order": 7,
         "retention_path": "active/shared/runtime/asset-derivations"
       },
-      "note": "P3 asset-derivation lineage ledger, keyed on the SOURCE custodian: derivations.jsonl records each artifact derived from the custodian's assets; derivation-deletions.jsonl audits propagated deletions. Non-tenant custodians use the separate system/ and personal/<ref> partitions (never enumerated as tenants). Deletion follows this graph (R-09), not hand-written target lists."
+      "note": "P3 asset-derivation lineage ledger, keyed on the SOURCE custodian: derivations.jsonl records each artifact derived from the custodian's assets; derivation-deletions.jsonl audits propagated deletions. Non-tenant custodians use the separate system/ and personal/<ref> partitions (never enumerated as tenants). Deletion follows this graph (R-09), not hand-written target lists.",
+      "legacy_roles": ["asset_derivation_store"]
     },
     {
       "id": "runtime.execution-metrics",
@@ -890,9 +891,9 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_writer"],
+      "legacy_roles": ["asset_derivation_store", "dot_lifecycle_writer"],
       "sources": ["role-policy"],
-      "note": "Whole runtime root granted to dot_lifecycle_writer; narrow it to the stores the DOT lifecycle writes (G2)."
+      "note": "Whole runtime root granted to dot_lifecycle_writer; narrow it to the stores the DOT lifecycle writes (G2). asset_derivation_store's literal grants reach only the asset-derivations/ personal/ and system/ partitions (its confidential/<tenant> writes are partition-bound to the custodian tenant)."
     },
     {
       "id": "shared.state",
