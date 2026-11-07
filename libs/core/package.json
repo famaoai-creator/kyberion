@@ -5416,10 +5416,6 @@
       "types": "./dist/resource-provenance.d.ts",
       "default": "./dist/resource-provenance.js"
     },
-    "./restricted-action-policy": {
-      "types": "./dist/restricted-action-policy.d.ts",
-      "default": "./dist/restricted-action-policy.js"
-    },
     "./review-reentry": {
       "types": "./dist/review-reentry.d.ts",
       "default": "./dist/review-reentry.js"

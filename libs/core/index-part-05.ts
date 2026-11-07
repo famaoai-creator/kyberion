@@ -283,10 +283,6 @@ export type {
   ResolvedKnowledgeSlice,
 } from './knowledge/knowledge-slices.js';
 
-export { loadRestrictedActionRules, matchRestrictedAction } from './restricted-action-policy.js';
-
-export type { RestrictedActionMatch, RestrictedActionRule } from './restricted-action-policy.js';
-
 export {
   assertCapabilityAllowed,
   checkCapabilityRestriction,

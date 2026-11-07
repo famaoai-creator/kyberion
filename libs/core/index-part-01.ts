@@ -194,7 +194,6 @@ export * from './report-contract.js';
 export * from './facet-registry.js';
 
 export * from './design-qa.js';
-
 export * from './apple-intelligence-bridge.js';
 
 export * from './mission/mission-hygiene.js';

@@ -524,6 +524,27 @@ describe('Workspace build contract', () => {
     }
   });
 
+  it('keeps the restricted-action policy inside the meeting actuator', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    expect(core.exports['./restricted-action-policy']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/restricted-action-policy.ts'))).toBe(false);
+    for (const suffix of ['.ts', '.test.ts']) {
+      expect(
+        safeExistsSync(
+          path.join(
+            rootDir,
+            `libs/actuators/meeting-actuator/src/restricted-action-policy${suffix}`
+          )
+        )
+      ).toBe(true);
+    }
+    // design-qa stays in core: the virtual-office palette test dog-foods it
+    // through the core barrel alongside the media actuator consumers.
+    expect(core.exports['./design-qa']).toBeDefined();
+  });
+
   it('keeps the ingest quota and sync cursors inside the ingest actuator', () => {
     const core = JSON.parse(
       safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
