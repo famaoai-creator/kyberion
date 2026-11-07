@@ -1,9 +1,9 @@
 import * as path from 'node:path';
-import { pathResolver } from './path-resolver.js';
-import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
-import { isValidTenantSlug } from './entity-scope.js';
-import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
-import { TENANT_COMPANY_FILE, TENANT_HOME_ROOT } from './organization/tenant-home.js';
+import { pathResolver } from '../path-resolver.js';
+import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
+import { isValidTenantSlug } from '../entity-scope.js';
+import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
+import { TENANT_COMPANY_FILE, TENANT_HOME_ROOT } from '../organization/tenant-home.js';
 
 export interface FinancialPeriod {
   period_id: string;

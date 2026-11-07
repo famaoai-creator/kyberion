@@ -3,9 +3,9 @@
  * Model pricing is data, not code: it lives in a knowledge-tier registry so
  * models can be added / repriced without a source change or redeploy.
  */
-import { defineCatalog } from './foundation/governed-catalog.js';
-import * as pathResolver from './path-resolver.js';
-import { safeExistsSync } from './secure-io.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import * as pathResolver from '../path-resolver.js';
+import { safeExistsSync } from '../secure-io.js';
 
 export interface CostRate {
   prompt: number;

@@ -1,12 +1,12 @@
 import type { ValidateFunction } from 'ajv';
-import { compileSchema } from './foundation/ajv.js';
-import { clamp } from './foundation/text.js';
-import { pathResolver } from './path-resolver.js';
+import { compileSchema } from '../foundation/ajv.js';
+import { clamp } from '../foundation/text.js';
+import { pathResolver } from '../path-resolver.js';
 import {
   resolveDefaultScheduleSource,
   type ScheduleSourceKind,
 } from './contextual-intent-memory.js';
-import { matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
+import { matchesIntentPhrase } from './intent-phrase-lexicon.js';
 
 const CONTEXTUAL_INTENT_FRAME_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/contextual-intent-frame.schema.json'

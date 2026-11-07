@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeReadFile } from '../secure-io.js';
 import {
   checkSpendGuard,
   loadSpendPolicy,
@@ -37,7 +37,7 @@ describe('sumSpend', () => {
 
 describe('spend policy loading', () => {
   it('uses the canonical policy without a duplicated fallback', () => {
-    const source = safeReadFile(pathResolver.rootResolve('libs/core/spend-guard.ts'), {
+    const source = safeReadFile(pathResolver.rootResolve('libs/core/finance/spend-guard.ts'), {
       encoding: 'utf8',
     }) as string;
     expect(source).not.toContain('DEFAULT_POLICY');

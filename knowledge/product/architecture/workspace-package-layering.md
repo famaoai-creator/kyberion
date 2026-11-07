@@ -119,6 +119,28 @@ This slice changes location and import/export targets only. Existing tests move
 with their implementation; registered source paths follow the files without
 increasing any authorization or dependency budget.
 
+### Finance and contextual intent
+
+`core/finance/` owns financial models and the cost, attribution and budget policy
+around resource use. It keeps actual, estimated, subscription-included and unknown
+cost distinct. Generation quota uses abstract generation units, not currency;
+moving it does not change the organization's report-only treatment of those units.
+The generic metrics collector and generation execution scheduler keep their existing
+responsibilities outside this domain.
+
+| Modules                                                                                                                                                                                                | Destination     | Responsibility                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `financial-model`, `finance-controller`, `finance-controller-cost-report`, `cost-report`, `spend-guard`, `generation-cost-settlement`, `generation-quota`, `usage-accounting`, `metrics-cost-registry` | `core/finance/` | Financial models, usage cost attribution, rate lookup, settlement and resource budget policy; preserve existing import keys and quota semantics. |
+| `contextual-intent-frame`, `contextual-intent-clarification-policy`, `contextual-intent-memory`, `pending-intent-store`, `unhandled-intent-registry`                                                   | `core/intent/`  | Contextual intent formation, clarification, scoped memory, pending confirmation and unhandled-intent observation.                                |
+
+The intent slice preserves schemas, storage roots, TTLs, correlation bindings,
+tenant isolation and denial behavior. Unhandled tenant speech must not enter shared
+scratch storage, and the module-local cooldown state remains a single instance.
+`requirements-draft-store` remains separate because it owns mission evidence and
+customer signoff, rather than pending conversational intent. All fourteen modules
+still have core consumers, so this is internal domain placement without a new
+shared package or public subpath.
+
 The playback extraction deliberately changes those two package import paths; core must
 not reexport shared-voice to preserve an old import. Internal core relocations preserve
 their existing package APIs by changing export targets instead of adding shim files.

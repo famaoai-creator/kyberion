@@ -24,14 +24,14 @@ import {
   RESOURCE_USAGE_LEDGER_ROOT,
   metrics,
 } from './metrics.js';
-import * as spendGuard from './spend-guard.js';
+import * as spendGuard from './finance/spend-guard.js';
 import { computeBudgetUsage } from './governance/org-budget-governor.js';
-import { buildCostReportFromHistory, formatCostReport } from './cost-report.js';
+import { buildCostReportFromHistory, formatCostReport } from './finance/cost-report.js';
 import { validateReadPermission } from './tier-guard.js';
 import { withExecutionContext } from './authority.js';
 import { logger as coreLogger } from './core.js';
 import { runDegradationWatch } from './health-degradation.js';
-import { resolveFinanceControllerDecision } from './finance-controller.js';
+import { resolveFinanceControllerDecision } from './finance/finance-controller.js';
 
 /**
  * R4 follow-up: cap enforcers count every tier of their scope whatever the

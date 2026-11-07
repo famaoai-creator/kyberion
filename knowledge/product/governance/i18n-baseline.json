@@ -69,7 +69,7 @@
   },
   "locale_tokens": {
     "intent_regex": {
-      "libs/core/contextual-intent-frame.ts": 1,
+      "libs/core/intent/contextual-intent-frame.ts": 1,
       "libs/core/intent/intent-resolution.ts": 1,
       "libs/core/media/protocol-to-markdown.ts": 1,
       "libs/core/surface/surface-mission-steering.ts": 3,
@@ -102,7 +102,7 @@
     "locale_literal": {
       "libs/core/apple-intelligence-bridge.ts": 2,
       "libs/shared-voice/src/apple-speech-file-stt-bridge.ts": 2,
-      "libs/core/contextual-intent-frame.ts": 4,
+      "libs/core/intent/contextual-intent-frame.ts": 4,
       "libs/core/deal-documents.ts": 1,
       "libs/core/media/native-pptx-engine/builders.ts": 3,
       "libs/core/media/native-pptx-engine/engine.ts": 1,

@@ -1,7 +1,7 @@
 import * as path from 'node:path';
-import { pathResolver } from './path-resolver.js';
+import { pathResolver } from '../path-resolver.js';
 import { resolveFinancialModel, type FinancialModel } from './financial-model.js';
-import { resolveOkrTracker, type OkrTracker } from './okr-tracker.js';
+import { resolveOkrTracker, type OkrTracker } from '../okr-tracker.js';
 import {
   financeControllerCostCoverage,
   loadFinanceControllerCostReportAtPath,

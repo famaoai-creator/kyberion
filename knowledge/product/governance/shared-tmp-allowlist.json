@@ -210,7 +210,7 @@
       "note": "inbox triage markdown is a report-class artifact"
     },
     {
-      "file": "libs/core/finance-controller.ts",
+      "file": "libs/core/finance/finance-controller.ts",
       "count": 1,
       "classification": "migrate-candidate",
       "note": "cost-report.json is a report-class artifact"
@@ -252,7 +252,7 @@
       "note": "AL-02: mission-unknown fallback only; mission-known offloads go to writeScopedArtifact(cache)"
     },
     {
-      "file": "libs/core/pending-intent-store.ts",
+      "file": "libs/core/intent/pending-intent-store.ts",
       "count": 3,
       "classification": "legit-tmp",
       "note": "pending intent handoff store (consumed on pickup)"

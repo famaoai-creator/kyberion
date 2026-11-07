@@ -7,7 +7,7 @@ import { resolveLocale, type SupportedLocale } from './locale.js';
 import {
   assessContextualClarification,
   type ContextualClarificationExecutionShape,
-} from './contextual-intent-clarification-policy.js';
+} from './intent/contextual-intent-clarification-policy.js';
 import { getMeetingBriefQuestions } from './meeting/meeting-operations-profile.js';
 import { notifyOperator } from './surface/operator-notifications.js';
 import { getNarratedVideoBriefQuestions } from './video/narrated-video-preference-profile.js';

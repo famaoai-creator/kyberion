@@ -5,7 +5,7 @@ import {
   runDegradationWatch,
   type LatencyRegression,
 } from './health-degradation.js';
-import type { FinanceControllerDecision } from './finance-controller.js';
+import type { FinanceControllerDecision } from './finance/finance-controller.js';
 
 const REGRESSION: LatencyRegression = {
   skill: 'pdf-render',

@@ -1,6 +1,6 @@
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { pathResolver } from '../path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 
 const FINANCE_CONTROLLER_COST_REPORT_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/finance-controller-cost-report.schema.json'

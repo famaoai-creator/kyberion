@@ -257,7 +257,7 @@
     "libs/core/config-fallback-registry.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/contextual-intent-memory.ts": {
+    "libs/core/intent/contextual-intent-memory.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/core.ts": {
@@ -372,11 +372,11 @@
     "libs/core/front-desk-identity.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/generation-cost-settlement.ts": {
+    "libs/core/finance/generation-cost-settlement.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/generation-quota.ts": {
+    "libs/core/finance/generation-quota.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
@@ -715,7 +715,7 @@
     "libs/core/path-resolver.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/pending-intent-store.ts": {
+    "libs/core/intent/pending-intent-store.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/personal-identity-state.ts": {
@@ -926,7 +926,7 @@
     "libs/core/soak-restart-state.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/spend-guard.ts": {
+    "libs/core/finance/spend-guard.ts": {
       "env_direct_read_budget": 3
     },
     "libs/core/storage-janitor.ts": {
@@ -1010,7 +1010,7 @@
     "libs/core/unclassified-error-registry.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/unhandled-intent-registry.ts": {
+    "libs/core/intent/unhandled-intent-registry.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/untrusted-content.ts": {

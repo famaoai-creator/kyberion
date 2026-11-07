@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getUsageAttribution } from '../usage-accounting.js';
+import { getUsageAttribution } from '../finance/usage-accounting.js';
 import { getReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
 import { getFoundationIo } from '../foundation/io.js';
 import * as secureIo from '../secure-io.js';

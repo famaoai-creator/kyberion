@@ -45,7 +45,7 @@ import {
   getProviderHealthDemotionTtlMs,
   reportProviderTemporarilyUnhealthy,
 } from '../provider/provider-health-registry.js';
-import { enforceSpendGuardForReasoning } from '../spend-guard.js';
+import { enforceSpendGuardForReasoning } from '../finance/spend-guard.js';
 import { metrics } from '../metrics.js';
 import { findMissionPath } from '../path-resolver.js';
 import { z } from 'zod';
