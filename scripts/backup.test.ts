@@ -1281,7 +1281,10 @@ describe('backup file selection', () => {
     safeSymlinkSync(`${root}/vault/keys.enc`, `${root}/active/keys-alias`, 'file');
     // Short path: a unix socket path is limited to ~104 bytes.
     server = createServer();
-    await new Promise<void>((resolve) => server!.listen(`${root}/active/s.sock`, resolve));
+    await new Promise<void>((resolve, reject) => {
+      server!.once('error', reject);
+      server!.listen(path.relative(process.cwd(), `${root}/active/s.sock`), resolve);
+    });
 
     const exclusions = resolveBackupExclusions({
       rootDir: root,

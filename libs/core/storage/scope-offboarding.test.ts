@@ -170,6 +170,8 @@ vi.mock('../foundation/io.js', () => ({
 }));
 
 vi.mock('../path-resolver.js', async () => {
+  const original =
+    await vi.importActual<typeof import('../path-resolver.js')>('../path-resolver.js');
   // This factory is hoisted: it cannot see the module-level helpers above
   // (TDZ) and module `var`s would be captured stale. Reach the SAME fixture
   // root via globalThis and lazily imported node modules only.
@@ -184,7 +186,9 @@ vi.mock('../path-resolver.js', async () => {
     return g.__kyberion_al04_root__;
   };
   const resolver = {
+    ...original.pathResolver,
     rootDir: () => factoryRoot(),
+    active: (sub = '') => nodePath.join(factoryRoot(), 'active', sub),
     rootResolve: (rel: string) =>
       nodePath.isAbsolute(rel)
         ? rel
@@ -206,7 +210,7 @@ vi.mock('../path-resolver.js', async () => {
   };
   // `pathResolver` (the namespace-style export) is what audit-chain — pulled
   // in transitively by NI-05's governance hook — reads at construction.
-  return { ...resolver, pathResolver: resolver };
+  return { ...original, ...resolver, pathResolver: resolver };
 });
 
 vi.mock('../core.js', () => ({
@@ -283,6 +287,10 @@ function auditEvents(): Array<Record<string, any>> {
 }
 
 beforeEach(() => {
+  vi.stubEnv('MISSION_ROLE', 'mission_controller');
+  vi.stubEnv('SYSTEM_ROLE', '');
+  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_TENANT', '');
   setRootDirState(undefined);
   const root = currentRoot();
   const schemaPath = path.join(root, 'knowledge/product/schemas/mission-state.schema.json');
@@ -294,6 +302,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   const root = rootDirState();
   if (root) fs.rmSync(root, { recursive: true, force: true });
 });

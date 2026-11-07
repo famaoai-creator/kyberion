@@ -1241,14 +1241,22 @@ export function listHonoredDerivedPathsForCustodian(
   if (!permission.allowed)
     throw new Error(`[DERIVATION_READ_SCOPE] own lineage index denied: ${permission.reason}`);
   const own = readLedger(bound, strict);
-  return withAssetDerivationReceiptSnapshot(
-    root,
-    bound,
-    own,
-    () => readLedger({ kind: 'system' }, strict),
-    () => listHonoredDerivedPathsInSnapshot(bound, strict),
-    canonical
-  );
+  try {
+    return withAssetDerivationReceiptSnapshot(
+      root,
+      bound,
+      own,
+      () => readLedger({ kind: 'system' }, strict),
+      () => listHonoredDerivedPathsInSnapshot(bound, strict),
+      canonical
+    );
+  } catch (error) {
+    const category =
+      error instanceof Error ? /^\[(DERIVATION_[A-Z_]+)\]/u.exec(error.message)?.[1] : undefined;
+    throw new Error(
+      `[DERIVATION_LINEAGE_UNAVAILABLE] Lineage could not be verified with the current scope.${category ? ` [${category}]` : ''}`
+    );
+  }
 }
 
 function listHonoredDerivedPathsInSnapshot(
