@@ -98,3 +98,20 @@ describe('segment classification', () => {
     expect(isNextStepLike('普通の文。', ja)).toBe(false);
   });
 });
+
+
+describe('reaction normalization boundaries', () => {
+  it('retains NFKC, case, Unicode whitespace and punctuation normalization', () => {
+    expect(isReactionLike('\u3000ＯＫＡＹ！？。、…\u00a0\t', en)).toBe(true);
+    expect(isReactionLike('okay\uFEFF', en)).toBe(true);
+    expect(isReactionLike(' okay) ', en)).toBe(false);
+    expect(isReactionLike('okay: ', en)).toBe(false);
+    expect(isReactionLike('okay\tthen', en)).toBe(false);
+  });
+
+  it('scans long trailing whitespace and punctuation without changing the marker', () => {
+    expect(isReactionLike('okay' + '\t'.repeat(100_000), en)).toBe(true);
+    expect(isReactionLike('okay' + '…\t'.repeat(50_000), en)).toBe(true);
+    expect(isReactionLike('okay' + '\t'.repeat(100_000) + 'x', en)).toBe(false);
+  });
+});

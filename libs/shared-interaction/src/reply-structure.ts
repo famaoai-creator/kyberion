@@ -24,11 +24,11 @@ const SENTENCE_TERMINATORS = /[。！？!?.\n…]+[」』”'"'"'）)\]]*/;
 
 /** Normalize for marker comparison — case/half-width-insensitive, punctuation-free. */
 function normalizeForMatch(text: string): string {
-  return text
-    .normalize('NFKC')
-    .toLowerCase()
-    .replace(/[。！？!?.,、…\s]+$/u, '')
-    .trim();
+  const normalized = text.normalize('NFKC').toLowerCase();
+  const trailing = /[。！？!?.,、…\s]/u;
+  let end = normalized.length;
+  while (end > 0 && trailing.test(normalized[end - 1]!)) end -= 1;
+  return normalized.slice(0, end).trim();
 }
 
 /** Split a reply into sentences, preserving trailing terminators. */
