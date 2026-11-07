@@ -141,6 +141,7 @@
   },
   "dependencies": {
     "@agent/core": "workspace:*",
-    "@agent/shared-interaction": "workspace:*"
+    "@agent/shared-interaction": "workspace:*",
+    "zod": "^4.6.7"
   }
 }

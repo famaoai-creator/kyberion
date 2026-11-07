@@ -8,11 +8,12 @@ import type { SetupChecklistState } from '../../../lib/setup-checklist-client';
 import { IdentityLinkSection } from '../../setup/identity-link-section';
 import { SsoSettingsForm } from '../../setup/sso-settings-form';
 import { CliSettingRow, SettingMeta, SettingsCommand } from './settings-ia-parts';
+import { EngineConfigPanel } from './EngineConfigPanel';
 
 /**
  * Settings IA cards that are new with MSN-SHELL-IA-20261105: the trial job,
  * company setup and projects entries, SSO, Studio engines, budget, and the
- * terminal-only settings (AUDIT §4-5). Render-only; the page owns data.
+ * terminal-only settings (AUDIT §4-5); the engine card edits in place. Render-only; the page owns data.
  */
 
 type Text = (key: FrontDeskMessageKey, params?: Record<string, string | number>) => string;
@@ -143,13 +144,7 @@ export function TenantCliCard({ locale }: { locale: ConciergeLocale }) {
   );
 }
 
-export function EngineConfigCard({
-  locale,
-  studioUrl,
-}: {
-  locale: ConciergeLocale;
-  studioUrl: string | null;
-}) {
+export function EngineConfigCard({ locale }: { locale: ConciergeLocale }) {
   const text = textFor(locale);
   return (
     <Card
@@ -161,15 +156,7 @@ export function EngineConfigCard({
         <SettingMeta locale={locale} effect={text('ia_settings_card_engine_effect')} />
         <p className="kb-text kb-text--caption">{text('ia_settings_card_engine_local')}</p>
       </div>
-      {studioUrl ? (
-        <div className="settings-row-actions settings-row-actions--start">
-          <Button
-            label={text('ia_settings_card_engine_action')}
-            variant="secondary"
-            href={studioUrl}
-          />
-        </div>
-      ) : null}
+      <EngineConfigPanel locale={locale} />
     </Card>
   );
 }
