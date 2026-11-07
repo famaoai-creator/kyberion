@@ -799,6 +799,9 @@ this contract; a faster Linux run alone is not evidence that macOS CI passed.
   before checking built ownership: incremental package builds can leave the old
   `.js`, `.d.ts` and source maps behind. Keep the workspace contract's negative
   assertions for retired outputs as well as its checks of the new targets.
+  Audit workflow inline probes too: use the published package subpath and current
+  API rather than a retired direct dist path. The workspace build contract pins
+  the Cross-OS stance probe so source moves cannot silently strand that lane.
 - Shared seam mechanisms must remain real in boundary tests. Use a partial mock
   with `createSeamCatalog()` to isolate registration state, rather than copying
   the seam API into a hand-written mock that omits new lifecycle helpers or

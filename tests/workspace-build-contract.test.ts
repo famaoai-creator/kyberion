@@ -4,6 +4,16 @@ import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 
 const rootDir = process.cwd();
 
+it('keeps cross-OS smoke on the published stance API after the customer rename', async () => {
+  const workflow = String(
+    safeReadFile(path.join(rootDir, '.github/workflows/cross-os.yml'), { encoding: 'utf8' })
+  );
+  expect(workflow).not.toMatch(/customer-resolver|activeCustomer/u);
+  expect(workflow).toContain('@agent/core/stance-resolver');
+  const { activeStance } = await import('@agent/core/stance-resolver');
+  expect(activeStance({ KYBERION_STANCE: 'smoke-test' })).toBe('smoke-test');
+});
+
 function collectExportTargets(exportsField: any): string[] {
   const targets: string[] = [];
   if (!exportsField || typeof exportsField !== 'object') return targets;
