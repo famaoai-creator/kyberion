@@ -186,8 +186,11 @@ provider ごとの認証確認は `vcsHostAuthStatus()` で取得できる。`pn
   allowlist 外での `'gh'` リテラルを第 1 引数に取る exec 呼び出し、`github.ts` 外の本番コードからの
   deprecated 同期 verb の参照。allowlist (`github.ts`、`gh-cli-host-provider.ts`、`gh copilot` の
   provider-discovery、`gh` の有無を見る actuator-capability) は、該当しなくなった項目を stale として報告する。
-- 同期のまま残す関数は 3 つ。`ghVersion`/`ghAuthStatus` は `gh_status` の CLI 診断、
-  `ghRepositoryVisibility` は同期の `gitPush` と onboarding grant 作成が使う可視性 probe である。
-  `gitPush` の async 化は呼び出し側が広いので本設計の範囲外とする。
+- 同期のまま残す関数は 2 つ。`ghVersion`/`ghAuthStatus` は `gh_status` の CLI 診断である。
+- 段階 5 の後続で `gitPush` を async にした。push 先の可視性は admission 時と送信直前の 2 回とも
+  `vcsHostRepositoryVisibility` (vcs-host seam) で確かめるので、gh の無い host でも `GH_TOKEN` があれば
+  private repository への push が通る。effect の `repository_visibility` は同期版と同じ値で、承認 hash は
+  変わらない。onboarding の grant 作成 (`buildDelegationInput`) も同じ verb に移し、
+  `ghRepositoryVisibility` を deprecate して gate の対象に加えた。
 - 変数に入れたコマンド名 (`safeExec(bin, …)`) は gate の対象外。リテラル以外の exec は
   role-assumption-reachability gate が unresolved site として別に数える。
