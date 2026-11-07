@@ -37,7 +37,7 @@
  * Loading takes seconds and inference takes milliseconds, so the Python
  * side (`scripts/laya_mlx_bridge.py`) is a long-lived NDJSON worker rather
  * than a `laya-mlx predict` invocation per judgment. Same shape as
- * `silero-vad-bridge.ts`. If the worker cannot start or dies, `judge()`
+ * `shared-voice/silero-vad-bridge.ts`. If the worker cannot start or dies, `judge()`
  * rejects and the seam degrades to the built-in rule provider — a judgment
  * provider must never be able to stop ordinary work.
  */

@@ -77,7 +77,7 @@ export const defaultPerceptionDeps: PerceptionDeps = {
         await import('@agent/core/apple-intelligence-bridge');
       if (!(await installAppleSpeechToTextBridgeIfAvailable().catch(() => false))) {
         const { installAppleSpeechFileToTextBridgeIfAvailable } =
-          await import('@agent/core/apple-speech-file-stt-bridge');
+          await import('@agent/shared-voice/apple-speech-file-stt-bridge');
         installAppleSpeechFileToTextBridgeIfAvailable();
       }
     }

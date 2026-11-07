@@ -48,7 +48,7 @@ import {
 import { pathResolver } from '@agent/core/path-resolver';
 import { discoveryOpsByActuator, loadMcpActuatorOpDiscovery } from './mcp-actuator-discovery.js';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
-import { assertMcpCallerRole, resolveMcpRequestContext } from '@agent/core/mcp-request-context';
+import { assertMcpCallerRole, resolveMcpRequestContext } from './mcp-request-context.js';
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import { normalizeEventScope } from '@agent/core/event-scope';
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
@@ -73,15 +73,15 @@ import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defa
 import { buildKnowledgeIndex, queryKnowledge } from '@agent/core/knowledge-index';
 import { recordHumanKnowledgeFeedback } from '@agent/core/knowledge/knowledge-feedback-loop';
 import { executeServicePreset } from '@agent/core/service/service-engine';
-import { deliverToCowork, listCoworkOutbox } from '@agent/core/cowork-surface.js';
+import { deliverToCowork, listCoworkOutbox } from './cowork-surface.js';
 import {
   listPendingApprovalsForCowork,
   decideApprovalFromCowork,
   recordAuditExportRequest,
 } from '@agent/core/governance/approval-cowork-adapter';
-import { runCoworkKnowledgeSync } from '@agent/core/cowork-knowledge-bridge.js';
+import { runCoworkKnowledgeSync } from './cowork-knowledge-bridge.js';
 import type { EventScope } from '@agent/core/event-scope';
-import type { McpRequestContext } from '@agent/core/mcp-request-context';
+import type { McpRequestContext } from './mcp-request-context.js';
 import { parseMcpTextPayload, parseSafeJsonObject } from './mcp-json.js';
 import { registerKyberionServiceCaptureTool } from './mcp-service-capture-tool.js';
 import { registerMcpFacadeDiscoverTools } from './mcp-facade-discover.js';

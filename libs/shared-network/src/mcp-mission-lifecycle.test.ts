@@ -4,7 +4,7 @@ import {
   MCP_MISSION_LIFECYCLE_OPERATIONS,
   type MissionLifecycleToolDeps,
 } from './mcp-mission-lifecycle.js';
-import type { McpRequestContext } from '@agent/core/mcp-request-context';
+import type { McpRequestContext } from './mcp-request-context.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as paths from '@agent/core/path-resolver';

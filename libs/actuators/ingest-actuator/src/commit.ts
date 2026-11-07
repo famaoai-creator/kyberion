@@ -44,11 +44,7 @@ import {
   type IngestAssetRecord,
 } from '@agent/core/ingest-asset-ledger';
 import { logger } from '@agent/core/core';
-import {
-  checkIngestQuota,
-  recordIngestUsage,
-  shouldEnforceIngestQuota,
-} from '@agent/core/ingest-quota';
+import { checkIngestQuota, recordIngestUsage, shouldEnforceIngestQuota } from './ingest-quota.js';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { scanForInjection, wrapUntrusted } from '@agent/core/untrusted-content';
@@ -57,7 +53,7 @@ import { updateMemoryPromotionCandidateStatus } from '@agent/core/knowledge/memo
 import { verifyStewardApproval } from '@agent/core/ingest-tier-gate';
 import { withExecutionContextAsync } from '@agent/core/authority';
 import type { IngestLedgerPathOptions } from '@agent/core/ingest-asset-ledger';
-import type { IngestQuotaCheck, IngestQuotaLevel } from '@agent/core/ingest-quota';
+import type { IngestQuotaCheck, IngestQuotaLevel } from './ingest-quota.js';
 import type { MemoryCandidate } from '@agent/core/knowledge/memory-promotion-queue';
 import type { PiiScrubApplication } from '@agent/core/pii-scrubber';
 import type { TierPromotionTargetRoot } from '@agent/core/ingest-tier-gate';
