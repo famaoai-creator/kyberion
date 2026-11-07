@@ -112,18 +112,47 @@ export function helpTrackId(segment: string | string[] | undefined): string | nu
   return value && value.length > 0 ? value : null;
 }
 
-/** "Try it" target for a lesson (studio mapping, except decide → あなた待ち). */
-export function helpTryHref(lesson: HelpLesson, links: HelpLinks): string {
+/** Which Concierge destinations this viewer may open (from `/api/front-desk/nav`). */
+export interface HelpAccess {
+  inbox: boolean;
+  settings: boolean;
+}
+
+/** Until the nav answers, assume access; the destination still enforces its own role. */
+export const HELP_ACCESS_UNKNOWN: HelpAccess = { inbox: true, settings: true };
+
+/** `{ ok: true, items: [{ id, allowed }] }` → access; anything else → unknown. */
+export function parseHelpAccess(value: unknown): HelpAccess {
+  const body = record(value);
+  const items: unknown = body?.items;
+  if (body?.ok !== true || !Array.isArray(items)) return HELP_ACCESS_UNKNOWN;
+  const allowed = (id: keyof HelpAccess) => {
+    const item = items.map(record).find((entry) => entry?.id === id);
+    return item ? item.allowed === true : false;
+  };
+  return { inbox: allowed('inbox'), settings: allowed('settings') };
+}
+
+/**
+ * "Try it" target for a lesson (studio mapping, except decide → 受信箱), or
+ * null when the viewer may not open any page that does it. A decide lesson
+ * for someone without 受信箱 falls back to 進み具合, which every role has.
+ */
+export function helpTryHref(
+  lesson: HelpLesson,
+  links: HelpLinks,
+  access: HelpAccess = HELP_ACCESS_UNKNOWN
+): string | null {
   switch (lesson.try.kind) {
     case 'ask':
       return `${links.ask}?prefill=${encodeURIComponent(lesson.try.prefill ?? '')}`;
     case 'decide':
-      // Decisions now wait in あなた待ち (Concierge), not on the progress page.
-      return links.inbox;
+      // Decisions now wait in 受信箱 (Concierge), not on the progress page.
+      return access.inbox ? links.inbox : links.progress;
     case 'progress':
       return links.progress;
     default:
-      return links.settings;
+      return access.settings ? links.settings : null;
   }
 }
 

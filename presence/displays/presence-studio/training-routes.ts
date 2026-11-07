@@ -6,10 +6,6 @@
 // §2.2/§2.3). `registerTrainingRoutes` is called once, after the same
 // `/api` + `/a2ui` guard and rate limiter every other API route runs behind.
 import type express from 'express';
-import { nowIso } from '@agent/core/foundation';
-import { t as catalogT } from '@agent/core/t';
-import { normalizeLocale } from '@agent/core/locale-normalize';
-import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
 import { withExecutionContext } from '@agent/core/authority';
 import {
   listMemberIds,
@@ -25,8 +21,6 @@ import {
   readTrainingProgress,
   summarizeTrainingProgress,
   upsertTrainingAssignment,
-  writeTrainingProgress,
-  type TrainingStatus,
 } from '@agent/core/training-catalog';
 import {
   PresenceStudioViewerError,
@@ -36,18 +30,6 @@ import {
   type PresenceStudioViewerContext,
 } from './security.js';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
-
-// HT-04/05 second pass: exactly the `front_desk` keys `static/help.js`'s
-// "mark this lesson done" button renders. `HELP_VOCABULARY_KEYS` in
-// `front-desk-pages.ts` is frozen for this wave (owned by the hearing/help
-// route split), so this wave's new copy is served through its own
-// `/api/training/vocabulary` mirroring `/api/help-vocabulary`'s shape
-// instead of extending that frozen list.
-export const TRAINING_VOCABULARY_KEYS = [
-  'front_desk:training_mark_done',
-  'front_desk:training_mark_done_recorded',
-  'front_desk:training_mark_done_failed',
-] as const;
 
 /** Same posture as `hearing-routes.ts`'s `resolveHearingDeciderRole`: a
  * resolved member's own per-tenant membership role wins over the viewer
@@ -78,68 +60,8 @@ export function registerTrainingRoutes(app: express.Express): void {
     }
   });
 
-  app.get('/api/training/progress', (req, res) => {
-    try {
-      const viewer = resolvePresenceStudioViewerContext(req);
-      const member = withExecutionContext('ecosystem_architect', () =>
-        resolveMemberByPrincipal({
-          principalId: viewer.principalId,
-          source: viewer.source,
-          registrationLabel: viewer.principal?.registrationLabel,
-          memberId: viewer.principal?.memberId,
-        })
-      );
-      if (!member) return res.status(404).json({ ok: false, error: 'Training member not found.' });
-      const progress = withExecutionContext('ecosystem_architect', () =>
-        readTrainingProgress(member.member_id)
-      );
-      res.setHeader('Cache-Control', 'no-store');
-      return res.json({ ok: true, progress });
-    } catch (error) {
-      const status = error instanceof PresenceStudioViewerError ? error.status : 500;
-      return res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
-    }
-  });
-
-  app.post('/api/training/progress', (req, res) => {
-    try {
-      const viewer = resolvePresenceStudioViewerContext(req);
-      requirePresenceStudioLocalAdmin(viewer);
-      const member = withExecutionContext('ecosystem_architect', () =>
-        resolveMemberByPrincipal({
-          principalId: viewer.principalId,
-          source: viewer.source,
-          registrationLabel: viewer.principal?.registrationLabel,
-          memberId: viewer.principal?.memberId,
-        })
-      );
-      if (!member) return res.status(404).json({ ok: false, error: 'Training member not found.' });
-      const lessonId = typeof req.body?.lesson_id === 'string' ? req.body.lesson_id.trim() : '';
-      const status = req.body?.status as TrainingStatus;
-      const lesson = loadTrainingCatalog()
-        .tracks.flatMap((track) => track.lessons)
-        .find((item) => item.id === lessonId);
-      if (!lesson || !['not_started', 'in_progress', 'complete'].includes(status)) {
-        return res.status(400).json({ ok: false, error: 'Invalid training progress.' });
-      }
-      const current = withExecutionContext('ecosystem_architect', () =>
-        readTrainingProgress(member.member_id)
-      );
-      const progress = withExecutionContext('ecosystem_architect', () =>
-        writeTrainingProgress({
-          ...current,
-          lessons: {
-            ...current.lessons,
-            [lessonId]: { status, ...(status === 'complete' ? { completed_at: nowIso() } : {}) },
-          },
-        })
-      );
-      return res.json({ ok: true, progress });
-    } catch (error) {
-      const status = error instanceof PresenceStudioViewerError ? error.status : 500;
-      return res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
-    }
-  });
+  // The viewer's own progress (GET/POST /api/training/progress) moved with
+  // 使い方 to Concierge `/api/training/me` (Kyberion server phase 2).
 
   app.get('/api/training/assignments', (req, res) => {
     try {
@@ -227,19 +149,5 @@ export function registerTrainingRoutes(app: express.Express): void {
       const status = error instanceof PresenceStudioViewerError ? error.status : 500;
       return res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
     }
-  });
-
-  // HT-04/05 second pass: exactly the keys `static/help.js`'s "mark done"
-  // button renders — mirrors `/api/help-vocabulary` in
-  // `front-desk-routes.ts` (same read-only, viewer-scoped, no
-  // client-supplied widening shape), scoped to this wave's new copy since
-  // `HELP_VOCABULARY_KEYS` is frozen.
-  app.get('/api/training/vocabulary', (req, res) => {
-    const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
-    const texts = Object.fromEntries(
-      TRAINING_VOCABULARY_KEYS.map((key) => [key, catalogT(key, undefined, locale)])
-    );
-    res.setHeader('Cache-Control', 'no-store');
-    res.json({ ok: true, locale, texts });
   });
 }

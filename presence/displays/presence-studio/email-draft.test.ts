@@ -16,14 +16,9 @@ describe('extractBodyMarkdownFromDraft', () => {
       'Kyberion',
     ].join('\n');
 
-    expect(extractBodyMarkdownFromDraft(draft)).toBe([
-      'Hi team,',
-      '',
-      'Here is the reply body.',
-      '',
-      'Best,',
-      'Kyberion',
-    ].join('\n'));
+    expect(extractBodyMarkdownFromDraft(draft)).toBe(
+      ['Hi team,', '', 'Here is the reply body.', '', 'Best,', 'Kyberion'].join('\n')
+    );
   });
 
   it('keeps plain markdown intact when there is no metadata envelope', () => {
