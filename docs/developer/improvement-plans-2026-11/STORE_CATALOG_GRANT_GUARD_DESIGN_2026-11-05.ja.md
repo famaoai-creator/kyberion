@@ -1486,6 +1486,40 @@ secure-io の 40 以下は別の段階）。上の表は G0 の時点の見込�
     tenant-bound プロセスから必ず `tenant.scope_violation` で弾かれる。`''`（tenantCleared）で
     束縛を明示クリアする。tenant custody の書き込みだけは custodian slug を束縛する。
 
+**流れの分解（MSN-SCOPE-FLOWDECOMP-20261107、決めたこと）。**
+
+- **`dot_lifecycle_writer` を分解した。** 旧ロールは `dots/`・`knowledge/confidential/<tenant>/dots/`・
+  `knowledge/personal/dots/<hash>/` の 3 custody の契約書と、`active/shared/runtime/` 全体を含む
+  実行時面を 1 つのロールで書いていた。`dot-lifecycle.ts` の各操作の内側で
+  `withExecutionContext` を呼ぶ形（旧 `CHARTER_WRITER_ROLE` 方式）はそのままに、ロールを 2 つに分けた:
+  - `dot_charter_store` — 契約書の読み書き（3 custody 全部）と、移行判定が要る検証の読み取り
+    （`tenants/<t>.json`・組織の運用状態・`runtime/projects/`）。confidential custody は契約書の
+    テナントを束縛し、personal / system custody は ambient 束縛を `''`（tenantCleared）で明示
+    クリアする。`narrow` 宣言で `dots/**/*.json` 系への書き込みだけに絞る。
+  - `dot_lifecycle_runtime_store` — ライフサイクルの監査台帳
+    （`active/shared/runtime/dot-lifecycle-audit.jsonl`）、起動 heartbeat
+    （`runtime/heartbeats/`）、event-continuation 状態（`runtime/dot/<…>/event-continuations/`・
+    `events.jsonl`）。`narrow` の `only.write`/`only.mkdir` がこの 3 系統（と fixture ルート
+    `active/shared/tmp/` 下の同型ミラー）以外の書き込みを `[DOT_LIFECYCLE_RUNTIME_SCOPE]` で
+    拒否する。
+  - inter-process のロック（`active/shared/runtime/locks/`）は worker の ambient ロール
+    `dot_lifecycle_worker` の既存 grant で取り、2 つの store ロールには持たせない — facade が
+    ロックを ambient で取得してから store ロールを引き受ける順序にした。
+  - 旧名は `RETIRED_STORE_ROLE_NAMES` 入り（引き受けは `[ROLE_ASSUMPTION_DENIED]` で拒否）。
+    `dot_lifecycle_worker` の `may_assume` は新しい 2 ロールに差し替え。
+- **`concierge_management_writer` はロールのまま残す（第 2 段階ブロッカー 3 件）。** ただし第 1 段階は
+  完了済み: `authority.ts` の引き受けゲートが、reader には「読み取りだけの tenant 許可証」、writer には
+  「tenant + organization が一致する許可証」を `[RESOURCE_SCOPE_REQUIRED]` で強制する。ロールを外すには
+  (1) `allow_read`/`allow_write` の宣言が担う tier-guard の祖先 mkdir・coverage 規則を許可証側の
+  宣言に移す、(2) `${KYBERION_ORGANIZATION_ID}` 展開が要る「引き受け中のロール」を許可証の
+  実行スコープで表す、(3) 下流が読む assumed role/persona（project-view・子プロセス/監査）を
+  許可証の属性に移す、の 3 件が要る。
+- **横断して読むロール 3 件は残す（P4 の判断を確認）。** 役割ごとの強制状態:
+  `concierge_management_reader` は許可証必須（第 1 段階済み）、`peer_responder_reader` は
+  `TENANT_BOUND_READER_ROLES` の tenant 束縛強制、`workspace_graph_reader` は意図的な
+  プロセス横断読みで P4 の viewer admission が行を絞る。保存先レベルの許可証化は P4 の開示層とは
+  別の段階の仕事。
+
 ## スコープモデルとの対応
 
 | スコープモデル                       | この設計                                              |

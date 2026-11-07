@@ -15,7 +15,12 @@ export interface ChainIntegrityIo {
   chmod(filePath: string, mode: number): void;
 }
 
+// The sink delivers the process adapter here; a caller's explicit
+// registration lives in its own slot so it always wins (an explicit test
+// fixture must beat the suite-wide vitest seam too — see requireLockIo's
+// resolution order in foundation/lock-utils.ts).
 let chainIo: ChainIntegrityIo | undefined;
+let explicitChainIo: ChainIntegrityIo | undefined;
 
 function testChainIntegrityIo(): ChainIntegrityIo | undefined {
   if (!isVitestProcess()) return undefined;
@@ -27,18 +32,17 @@ function testChainIntegrityIo(): ChainIntegrityIo | undefined {
 }
 
 export function registerChainIntegrityIo(io: ChainIntegrityIo): void {
-  chainIo = io;
+  explicitChainIo = io;
 }
 
 // Symmetric registration through the sink: secure-io publishes the guarded
 // adapter on this channel whether this module loads before or after it.
-// In vitest the only legitimate adapter is the suite's own fixture.
+// The process adapter always registers so real children spawned from a
+// suite — they inherit VITEST but carry no fixture — can still resolve the
+// chain key, while an explicit registration or the suite fixture wins at
+// call time (explicitChainIo ?? testChainIntegrityIo() ?? chainIo).
 registerAuditIoConsumer('chainIntegrityIo', (io) => {
-  if (isVitestProcess()) {
-    chainIo ??= testChainIntegrityIo();
-    return;
-  }
-  registerChainIntegrityIo(io as ChainIntegrityIo);
+  chainIo = io as ChainIntegrityIo;
 });
 
 export const GENESIS_HASH = '0'.repeat(64);
@@ -66,24 +70,24 @@ export function resolveAuditChainKey(options: { createIfMissing?: boolean } = {}
   if (fromEnv) return fromEnv;
 
   const keyPath = auditKeyPath();
-  chainIo ||= testChainIntegrityIo();
-  if (!chainIo) throw new Error('secure_chain_io_not_registered');
-  if (chainIo.exists(keyPath)) {
-    const existing = chainIo.read(keyPath).trim();
+  const io = explicitChainIo ?? testChainIntegrityIo() ?? chainIo;
+  if (!io) throw new Error('secure_chain_io_not_registered');
+  if (io.exists(keyPath)) {
+    const existing = io.read(keyPath).trim();
     return existing || null;
   }
   if (!options.createIfMissing) return null;
 
   const dir = path.dirname(keyPath);
-  if (!chainIo.exists(dir)) chainIo.mkdir(dir);
+  if (!io.exists(dir)) io.mkdir(dir);
   const generated = randomBytes(32).toString('hex');
   try {
-    chainIo.createExclusive(keyPath, `${generated}\n`);
+    io.createExclusive(keyPath, `${generated}\n`);
     // Restrict access to owner-only (read+write) — key must not be world-readable.
-    chainIo.chmod(keyPath, 0o600);
+    io.chmod(keyPath, 0o600);
   } catch {
-    if (chainIo.exists(keyPath)) {
-      const existing = chainIo.read(keyPath).trim();
+    if (io.exists(keyPath)) {
+      const existing = io.read(keyPath).trim();
       return existing || null;
     }
     throw new Error('failed_to_create_audit_chain_key');
