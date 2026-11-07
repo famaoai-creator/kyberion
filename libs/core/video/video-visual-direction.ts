@@ -4,7 +4,7 @@ import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import type { GovernedCatalog } from '../foundation/governed-catalog.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
-import { tryRepairJson } from '../json-repair.js';
+import { tryRepairJson } from '../foundation/json-repair.js';
 import {
   withReasoningPayloadScope,
   type ReasoningPayloadScope,

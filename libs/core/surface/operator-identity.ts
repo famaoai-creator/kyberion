@@ -1,8 +1,8 @@
 import * as path from 'node:path';
-import { resolveActiveProfileRoot } from '../profile-root.js';
+import { resolveActiveProfileRoot } from '../authn/profile-root.js';
 import { isRecord } from '../foundation/text.js';
-import { resolveLocale, type SupportedLocale } from '../locale.js';
-import { loadPersonalIdentityAtPath } from '../personal-identity-state.js';
+import { resolveLocale, type SupportedLocale } from '../localization/locale.js';
+import { loadPersonalIdentityAtPath } from '../authn/personal-identity-state.js';
 
 /**
  * UX-04 acceptance 5: approval decisions should carry the onboarding

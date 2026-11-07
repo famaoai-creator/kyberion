@@ -17,8 +17,8 @@ vi.mock('../governance/approval-store-reader.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../governance/approval-store-reader.js')>()),
   listApprovalRequests: mocks.approvals,
 }));
-vi.mock('../deliverable-inbox.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../deliverable-inbox.js')>()),
+vi.mock('../task/deliverable-inbox.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../task/deliverable-inbox.js')>()),
   listInboxEntries: mocks.inbox,
 }));
 vi.mock('./surface-ux.js', async (importOriginal) => ({

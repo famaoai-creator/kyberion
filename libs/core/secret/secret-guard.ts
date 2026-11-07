@@ -6,7 +6,7 @@ export {
 } from '../foundation/credential-binding.js';
 import * as secureIo from '../secure-io.js';
 import { operatorProbeSecretAccess } from '../service/operator-service-connection-admission.js';
-import { ledger } from '../ledger.js';
+import { ledger } from '../governance/ledger.js';
 import * as pathResolver from '../path-resolver.js';
 import * as path from 'node:path';
 import { createRequire } from 'node:module';
@@ -22,7 +22,7 @@ import {
   isEncryptedConnectionEnvelope,
   resolveSecretEncryptionMode,
 } from './secret-encryption.js';
-import { requireRiskyApproval } from '../risky-op-approval-port.js';
+import { requireRiskyApproval } from '../governance/risky-op-approval-port.js';
 import { RISKY_OPS } from '../contracts/risky-op-ids.js';
 import { readJson } from '../foundation/json.js';
 import { getRegisteredEnvText } from '../foundation/env.js';

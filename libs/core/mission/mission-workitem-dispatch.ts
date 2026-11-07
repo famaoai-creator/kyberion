@@ -3,7 +3,7 @@
  * Mission work item execution dispatch for registered tickets.
  */
 
-import { ledger } from '../ledger.js';
+import { ledger } from '../governance/ledger.js';
 import { logger } from '../core.js';
 import { ensureMissionTeamRuntimeViaSupervisor } from '../agent/agent-runtime-supervisor.js';
 import * as pathResolver from '../path-resolver.js';
@@ -20,7 +20,7 @@ import {
   updateWorkItem,
   type WorkItemStatus,
 } from '../workforce/work-coordination.js';
-import { formatCognitiveRouteDecision } from '../cognitive-routing.js';
+import { formatCognitiveRouteDecision } from '../provider/cognitive-routing.js';
 import { type TaskModelHint } from '../reasoning/reasoning-model-routing.js';
 import { findMissionPath } from '../path-resolver.js';
 import { deriveAgentNhiId } from '../agent/agent-identity.js';

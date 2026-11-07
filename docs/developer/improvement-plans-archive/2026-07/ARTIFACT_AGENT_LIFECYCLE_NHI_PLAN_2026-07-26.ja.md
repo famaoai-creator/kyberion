@@ -33,7 +33,7 @@ status: archived
 ### 1.1 保持: スコープはアクセス制御にあるが保持には無い
 
 - `libs/core/path-resolver.ts` はスコープ別配置を既に持つ(`volatile(scope, ref)` `:86-138` が session / mission / project / tenant / personal / global を別ディレクトリへ)。`libs/core/tier-guard.ts` は tenant / project / tier のアクセス制御を fail-closed で強制する(`checkTenantScope` `:302-387` 等)。**しかしどちらも「いつ消すか」を知らない。**
-- 保持機構は `libs/core/storage-janitor.ts` のみ: tmp 24h(`:14`)、logs 30d(`:15`)、`runtime/` は 43 サブディレクトリ中 **3 つだけ**名指しの TTL(`RUNTIME_RETENTION` `:25-29`)。`runtime/reports/`(108 件)・`runtime/artifacts/`(52 件)・`runtime/distill-candidates/`(~97 件)・`exports/`・mission ディレクトリ・`archive/` は**無保持**。
+- 保持機構は `libs/core/storage/storage-janitor.ts` のみ: tmp 24h(`:14`)、logs 30d(`:15`)、`runtime/` は 43 サブディレクトリ中 **3 つだけ**名指しの TTL(`RUNTIME_RETENTION` `:25-29`)。`runtime/reports/`(108 件)・`runtime/artifacts/`(52 件)・`runtime/distill-candidates/`(~97 件)・`exports/`・mission ディレクトリ・`archive/` は**無保持**。
 - TTL 値がコード内定数に散在し、governance 文書に保持ポリシーの正本が無い(KM-01/KM-04 は範囲が狭い)。
 
 ### 1.2 保持: 既存 GC が2箇所で実質死んでいる

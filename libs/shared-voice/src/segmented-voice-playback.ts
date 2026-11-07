@@ -18,7 +18,7 @@ import { splitVoiceTextIntoChunks } from '@agent/core/voice/voice-text-chunking'
 import {
   createPlaybackPauseGate,
   type PausablePlaybackHandle,
-} from '@agent/core/streaming-voice-playback';
+} from './streaming-voice-playback.js';
 
 /** Sentence-sized segments: small enough that the first chunk synthesizes fast. */
 export const DEFAULT_SPEECH_SEGMENT_CHARS = 160;

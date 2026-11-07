@@ -17,11 +17,11 @@ vi.mock('../governance/external-operation.js', () => ({
 }));
 import * as fs from 'node:fs';
 import * as secureIo from '../secure-io.js';
-import { discoverLocalSttBackends } from '../local-stt-discovery.js';
+import { discoverLocalSttBackends } from './local-stt-discovery.js';
 import * as path from 'node:path';
 
-vi.mock('../local-stt-discovery.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../local-stt-discovery.js')>()),
+vi.mock('./local-stt-discovery.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./local-stt-discovery.js')>()),
   discoverLocalSttBackends: vi.fn(() => []),
 }));
 

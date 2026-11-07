@@ -35,7 +35,7 @@ import {
   AuthnError,
   resolveAuthnPrincipal,
   type AuthnResolveDeps,
-} from '../authn-principal-resolver.js';
+} from '../authn/authn-principal-resolver.js';
 import {
   browserSessionKey,
   mintBrowserSessionToken,

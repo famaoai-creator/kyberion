@@ -1,6 +1,6 @@
 import { resolveRole, withExecutionContext } from '../authority.js';
 import { nowIso } from '../foundation/time.js';
-import { enforceNhiActorPolicy } from '../nhi-actor-verification.js';
+import { enforceNhiActorPolicy } from '../agent/nhi-actor-verification.js';
 import { WorkCoordinationError, assertWorkClaimsAllowed } from './work-coordination-error.js';
 import { workEffectOwnership } from './work-effect-ownership.js';
 import type { LedgerEntry } from '../governance/accountability-charter-registry.js';

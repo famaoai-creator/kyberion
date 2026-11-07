@@ -3,7 +3,7 @@ import {
   getUsageAttribution,
   withUsageAttribution,
   type UsageAttribution,
-} from '../usage-accounting.js';
+} from '../finance/usage-accounting.js';
 import { judgmentCanonicalHash } from '../organization/judgment-precedents.js';
 import { rereadOwnDotCharter, type DotCharter, type LoadedDotCharter } from './dot-charter.js';
 import type { DotProposal } from './dot-proposals.js';

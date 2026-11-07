@@ -36,15 +36,15 @@
       "reason": "Public subpath @agent/core/secret-guard, listed in docs/PACKAGING_CONTRACT.md (\"Contracts and policy helpers\") and libs/core/package.json exports: registers the risky-op approval handler before re-exporting secret-guard. In-repo callers import @agent/core/secret/secret-guard directly; this entry serves package-name consumers."
     },
     {
-      "id": "libs/core/store-contract.ts",
-      "reason": "QM-10 test harness: exerciseJsonRecordStoreContract is the reusable JSON-store contract that libs/core/store-contract.test.ts runs against the approval store and the surface outbox store. Tests are its intended consumers."
+      "id": "libs/core/testing/store-contract.ts",
+      "reason": "QM-10 test harness: exerciseJsonRecordStoreContract is the reusable JSON-store contract that libs/core/testing/store-contract.test.ts runs against the approval store and the surface outbox store. Tests are its intended consumers."
     },
     {
       "id": "libs/core/task/task-executor.ts",
       "reason": "Deprecated facade by design: returns an explicit routing error to legacy callers; declared seam consumer in scripts/generate_capability_seams.ts and asserted by the wisdom contract-boundary test (ORPHAN_DECISIONS OW-02: keep)."
     },
     {
-      "id": "libs/core/test-governance-payload.ts",
+      "id": "libs/core/testing/test-governance-payload.ts",
       "reason": "Test helper (withoutSchemaMetadata) shared by the governance contract tests; tests are its only intended consumers (ORPHAN_DECISIONS OW-02: keep)."
     },
     {
@@ -52,7 +52,7 @@
       "reason": "Loader for knowledge/product/governance/tool-actuator-routing-policy.json, reserved for the ACP mediator tool routing being built on another branch (ORPHAN_DECISIONS OW-02: keep by instruction); retire with the policy file if that work lands without it."
     },
     {
-      "id": "libs/core/windows-local-assist-bridge.ts",
+      "id": "libs/core/provider/windows-local-assist-bridge.ts",
       "reason": "Windows (Foundry Local) counterpart of apple-intelligence-bridge, unit-tested. Its natural call site is the doctor local-capability section next to probeAppleIntelligence in scripts/run_doctor.ts, which is owned by another branch; wire it there (opt-in probe, silent off Windows) when that branch lands."
     },
     {

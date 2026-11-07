@@ -9,7 +9,7 @@ vi.mock('../governance/audit-chain.js', () => ({
 }));
 
 const { OsAccessibilityDetector } = await import('../virtual/os-accessibility-detector.js');
-const { PixelRegionDetector } = await import('../pixel-region-detector.js');
+const { PixelRegionDetector } = await import('../virtual/pixel-region-detector.js');
 const {
   BrowserDomDetector,
   OcrTextDetector,
@@ -19,7 +19,7 @@ const {
   registerUiElementDetector,
   resetUiElementDetectors,
 } = await import('./ui-element-detector.js');
-const { getSeamSelectionPolicy } = await import('../seam-provider-selection.js');
+const { getSeamSelectionPolicy } = await import('../provider/seam-provider-selection.js');
 
 const IMAGE = { width: 1000, height: 500 };
 const DOM = [{ ref: '@e1', name: 'Go', bbox: { x: 10, y: 10, width: 40, height: 20 } }];

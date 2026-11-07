@@ -1,5 +1,5 @@
 import type { A2AMessage } from '../mesh/a2a-bridge.js';
-import type { A2UIComponent, A2UIMessage } from '../a2ui.js';
+import type { A2UIComponent, A2UIMessage } from './a2ui.js';
 import { isKyberionBaseComponentType, validateA2UIComponentProps } from './a2ui-catalog.js';
 import type {
   MissionProposal,
@@ -7,7 +7,7 @@ import type {
   SlackApprovalRequestDraft,
   SurfaceConversationResult,
 } from './channel-surface-types.js';
-import { extractPlanningPacketBlocks } from '../planning-packet-contract.js';
+import { extractPlanningPacketBlocks } from './planning-packet-contract.js';
 import { extractTaskResultBlocks } from '../task/task-result-contract.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord } from '../foundation/text.js';

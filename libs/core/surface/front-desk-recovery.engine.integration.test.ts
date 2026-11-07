@@ -6,7 +6,7 @@ import {
   spawnManagedProcess,
   stopManagedProcess,
   type ManagedProcessHandle,
-} from '../managed-process.js';
+} from '../tool/managed-process.js';
 import {
   seedFirstJobTestRoot,
   FIRST_JOB_TEST_SESSION_KEY,

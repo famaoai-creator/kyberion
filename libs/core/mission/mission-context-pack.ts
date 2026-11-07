@@ -10,7 +10,7 @@ import {
   type ArtifactOwnershipRecord,
 } from '../workforce/artifact-registry.js';
 import { findMissionPath, pathResolver } from '../path-resolver.js';
-import { tryResolveOwnerScope } from '../owner-scope.js';
+import { tryResolveOwnerScope } from '../governance/owner-scope.js';
 import {
   loadProjectOperationalState,
   projectOperationalStatePath,
@@ -41,8 +41,11 @@ import { renderSkillResourceIndex } from '../plugin/skill-resource-loader.js';
 import { formatKnowledgeVerificationLabel } from '../knowledge/knowledge-verification.js';
 import { loadProjectRecord } from '../project/project-registry.js';
 import { withExecutionContext } from '../authority.js';
-import { compileScopedContextPack, type ContextSecurityScope } from '../context-security-scope.js';
-import { resolveFacets, type ResolvedFacets } from '../facet-registry.js';
+import {
+  compileScopedContextPack,
+  type ContextSecurityScope,
+} from '../governance/context-security-scope.js';
+import { resolveFacets, type ResolvedFacets } from '../plugin/facet-registry.js';
 import {
   loadSkillResourceDescriptor,
   type SkillResourceDescriptor,

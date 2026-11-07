@@ -28,9 +28,9 @@
  * not this shared surface.
  */
 
-import { createProviderRegistry } from '../provider-registry.js';
+import { createProviderRegistry } from '../provider/provider-registry.js';
 import type { SeamProviderMetadata } from '../seam.js';
-import { resolveSeamDefaultOrder } from '../seam-provider-selection.js';
+import { resolveSeamDefaultOrder } from '../provider/seam-provider-selection.js';
 import type { SafeExecOptions } from '../secure-io.js';
 
 export const VCS_BACKEND_SEAM = 'vcs-backend';

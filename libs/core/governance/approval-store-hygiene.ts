@@ -37,7 +37,11 @@ import { withApprovalRecordLock } from './approval-apply-claim.js';
 import { withApprovalPasskeyChallengeLock } from './approval-passkey-challenge.js';
 import { auditChain } from './audit-chain.js';
 import { isTenantActivationActive } from '../organization/tenant-activation.js';
-import { appendRetentionAudit, softDeleteToTrash, TRASH_REPO_SUBPATH } from '../storage-janitor.js';
+import {
+  appendRetentionAudit,
+  softDeleteToTrash,
+  TRASH_REPO_SUBPATH,
+} from '../storage/storage-janitor.js';
 import { validateWritePermission } from '../tier-guard.js';
 
 /**

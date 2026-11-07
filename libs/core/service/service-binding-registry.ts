@@ -11,7 +11,7 @@ import {
   resolveTenantAlias,
   validateContextSecurityScope,
   type ContextSecurityScope,
-} from '../context-security-scope.js';
+} from '../governance/context-security-scope.js';
 import { loadProjectRecord } from '../project/project-registry.js';
 import { resolveTenant } from '../organization/tenant-registry.js';
 import { findMissionPath } from '../path-resolver.js';

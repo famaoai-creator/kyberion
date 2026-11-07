@@ -22,7 +22,7 @@ import { ClaudeAgentReasoningBackend } from './claude-agent-reasoning-backend.js
 import {
   delegationExecutionStartedFromError,
   markDelegationExecutionStarted,
-} from '../delegation-execution-tracker.js';
+} from '../workforce/delegation-execution-tracker.js';
 
 describe('ClaudeAgentReasoningBackend', () => {
   it('keeps advisory delegation text-only even when native agent tools are enabled', async () => {

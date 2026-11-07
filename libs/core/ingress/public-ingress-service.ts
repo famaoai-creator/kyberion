@@ -20,7 +20,7 @@ import { readJsonIfPresent, writeJson } from '../foundation/json.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { isRecord } from '../foundation/primitives.js';
 import { pathResolver } from '../path-resolver.js';
-import { requireApprovalForOp, RISKY_OPS } from '../risky-op-registry.js';
+import { requireApprovalForOp, RISKY_OPS } from '../governance/risky-op-registry.js';
 import { loadSurfaceManifest, type SurfaceRuntimeDefinition } from '../surface/surface-runtime.js';
 import {
   IngressError,

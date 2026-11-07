@@ -4,7 +4,7 @@ import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import { resolveRole } from '../authority.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import { resolveScopeContext } from '../scope-context.js';
-import { resolveMissionDir } from '../owner-scope.js';
+import { resolveMissionDir } from '../governance/owner-scope.js';
 import { loadState } from './mission-state.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { writeMissionNextTasks } from './mission-lifecycle-completion.js';

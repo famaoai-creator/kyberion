@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ActuatorServeClient, normalizeActuatorServeResponse } from './actuator-serve-client.js';
-import { ACTUATOR_SERVE_RESULT_PREFIX } from '../cli-utils.js';
+import { ACTUATOR_SERVE_RESULT_PREFIX } from '../harnessing/cli-utils.js';
 
 /**
  * Fake serve-mode actuator: echoes each request back framed with the

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { evaluateDegradation } from '../health-degradation.js';
+import { evaluateDegradation } from '../daemon/health-degradation.js';
 import {
   evaluateRuntimeHealthTrends,
   loadRuntimeHealthSamples,
@@ -13,7 +13,7 @@ import {
 import {
   resetAppendOnlyStoreMaintenanceState,
   setAppendOnlyStoreTestHooks,
-} from '../append-only-store.js';
+} from '../storage/append-only-store.js';
 import {
   safeAppendFileSync,
   safeMkdir,

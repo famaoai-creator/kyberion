@@ -2,7 +2,7 @@ import * as http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../session-git-index.js', () => ({ prepareSessionGitIndex: vi.fn(() => null) }));
+vi.mock('../vcs/session-git-index.js', () => ({ prepareSessionGitIndex: vi.fn(() => null) }));
 
 import { logger } from '../core.js';
 import {

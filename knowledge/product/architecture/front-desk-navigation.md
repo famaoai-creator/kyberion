@@ -7,7 +7,7 @@ role_affinity: [ecosystem_architect]
 
 # Existing front-desk navigation
 
-The shared catalog in [front-desk-nav.ts](../../../libs/core/front-desk-nav.ts) has no fixed item-count limit. Presence Studio and Concierge render the same groups, icons and localized labels. Concierge command search reads the same server-resolved, role-filtered catalog and adds the existing settings section shortcuts.
+The shared catalog in [front-desk-nav.ts](../../../libs/core/surface/front-desk-nav.ts) has no fixed item-count limit. Presence Studio and Concierge render the same groups, icons and localized labels. Concierge command search reads the same server-resolved, role-filtered catalog and adds the existing settings section shortcuts.
 
 ## Destination inventory
 

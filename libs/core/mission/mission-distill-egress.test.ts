@@ -58,7 +58,7 @@ vi.mock('./mission-llm.js', async (importOriginal) => {
       }),
   };
 });
-vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
+vi.mock('../daemon/ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 vi.mock('../knowledge/memory-promotion-queue.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../knowledge/memory-promotion-queue.js')>()),
   enqueueMemoryPromotionCandidate: vi.fn(),
@@ -68,8 +68,8 @@ vi.mock('../path-resolver.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../path-resolver.js')>();
   return { ...actual, findMissionPath: vi.fn(() => hoisted.missionPath) };
 });
-vi.mock('../ledger.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../ledger.js')>();
+vi.mock('../governance/ledger.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../governance/ledger.js')>();
   return { ...actual, ledger: { ...actual.ledger, record: vi.fn() } };
 });
 

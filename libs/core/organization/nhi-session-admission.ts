@@ -43,7 +43,7 @@ import {
 } from '../agent/agent-identity.js';
 import { withExecutionContext } from '../authority.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { agentIdentityMatchesTenant } from '../persona-identity.js';
+import { agentIdentityMatchesTenant } from '../authn/persona-identity.js';
 import { resolveClaimedNhiId } from '../contracts/nhi-id.js';
 import type { CharterPathOptions } from '../governance/accountability-charter-registry.js';
 

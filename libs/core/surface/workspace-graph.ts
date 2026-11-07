@@ -23,7 +23,7 @@ import { loadOrganizationOperationalState } from '../organization/organization-o
 import { listTenantProfileSlugs, readTenantProfile } from '../organization/tenant-registry.js';
 import { listMemberIds, readMemberProfile } from '../organization/member-registry.js';
 import { findMissionPath, pathResolver } from '../path-resolver.js';
-import { missionPathOrNull } from '../mission-lookup.js';
+import { missionPathOrNull } from '../mission/mission-lookup.js';
 import { readJson } from '../foundation/json.js';
 import { listProjectRecords } from '../project/project-registry.js';
 import { safeExistsSync, safeReaddir } from '../secure-io.js';

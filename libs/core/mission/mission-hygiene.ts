@@ -1,17 +1,17 @@
 import * as path from 'node:path';
 import { logger } from '../core.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { pathResolver } from '../path-resolver.js';
 import { loadStateAtPath } from './mission-state.js';
 import type { MissionState } from './mission-types.js';
 import { nowIso } from '../foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '../secure-io.js';
-import { missionTierScanDirs } from '../owner-scope.js';
+import { missionTierScanDirs } from '../governance/owner-scope.js';
 import {
   loadMissionNextTaskRecordsAtPath,
   type MissionNextTaskRecord,
 } from './mission-next-task-reader.js';
-import { sendOpsAlert } from '../ops-alert.js';
+import { sendOpsAlert } from '../daemon/ops-alert.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
 import { loadOrganizationProfile } from '../organization/organization-profile.js';
 import {

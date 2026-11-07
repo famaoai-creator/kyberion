@@ -13,11 +13,11 @@
 import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
+vi.mock('../daemon/ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 
 import { withExecutionContext } from '../authority.js';
-import type { CustodyOwner } from '../custody-owner.js';
-import { _resetEgressPolicyCacheForTests } from '../egress-policy.js';
+import type { CustodyOwner } from '../contracts/custody-owner.js';
+import { _resetEgressPolicyCacheForTests } from '../governance/egress-policy.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   _setReasoningTenantRegistryRootForTests,

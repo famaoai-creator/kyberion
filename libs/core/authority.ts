@@ -11,7 +11,7 @@ import * as path from 'node:path';
 import { rawExistsSync, rawLstatSync, rawReaddir, rawReadTextFile } from './fs-primitives.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import * as pathResolver from './path-resolver.js';
-import { missionPathOrNull } from './mission-lookup.js';
+import { missionPathOrNull } from './mission/mission-lookup.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { resolveProjectScope } from './foundation/project-scope-env.js';
 /** A set-but-invalid bound tenant (see foundation/project-scope-env): callers fail closed on it. */

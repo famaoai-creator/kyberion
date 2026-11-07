@@ -27,7 +27,7 @@ import {
   parseSlackApprovalAction,
   parseSlackAskWhyAction,
 } from '../integrations/slack-approval-ui.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 
 const RUN_ID = `${process.pid}-${Date.now()}`;
 const FIXTURE_CHANNEL = `test-${RUN_ID}`.slice(0, 63);

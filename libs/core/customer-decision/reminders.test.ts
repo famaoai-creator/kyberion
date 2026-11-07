@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DecisionRecord } from '../decision-ledger/model.js';
-import { renderCustomerRoutineTemplate } from '../customer-outbound-templates.js';
+import { renderCustomerRoutineTemplate } from '../organization/customer-outbound-templates.js';
 import { resolveAgendaEffective } from './effective.js';
 import { agendaContentHash } from './hash.js';
 import type { CustomerDecisionInvite } from './invite.js';

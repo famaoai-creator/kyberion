@@ -68,7 +68,7 @@ status: archived
 1. `scripts/meeting_preflight.ts` を新設し、`package.json` に `"meeting:preflight": "node --import ./scripts/ts-loader.mjs scripts/meeting_preflight.ts"` を追加。
 2. 検査項目(各項目 `{ id, status: pass|fail|warn, detail, fix }` で出力。1つでも fail なら exit 1):
    - `doctor.meeting`: 既存 `collectDoctorReport({ runtime: 'meeting' })`(`scripts/run_doctor.ts`)を呼び must 欠落を fail に。
-   - `playwright.browser`: 既存 probe(`libs/core/environment-capability-probes.ts` の `playwright.chromium-browser`)を流用。fix=`pnpm exec playwright install chromium`。
+   - `playwright.browser`: 既存 probe(`libs/core/daemon/environment-capability-probes.ts` の `playwright.chromium-browser`)を流用。fix=`pnpm exec playwright install chromium`。
    - `blackhole.device`: `safeExecResult('system_profiler', ['SPAudioDataType'])` の出力に `BlackHole` が含まれるか。fix=`brew install blackhole-2ch`。darwin 以外は warn(スキップ)。
    - `mlx.audio.runtime`: `active/shared/runtime/tool-runtimes/mlx-audio/bin/python` の存在(`meeting-bridge.py:63-64` と同じパス)。fix は tool-runtime セットアップコマンドを `listToolRuntimeInventory()` から引く。
    - `voice.profile`: voice profile ストア(`voice_learning_bridge.py` が書く profiles ディレクトリ。実パスは `libs/actuators/voice-actuator/scripts/voice_learning_bridge.py` を読んで確認)に 1 件以上あるか。fix=`Task 2 の voice-onboarding を実行`。

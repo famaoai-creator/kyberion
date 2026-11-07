@@ -17,11 +17,11 @@ import {
 import {
   saveExecutionFeedbackCandidate,
   executionFeedbackScopeRoot,
-} from '../execution-feedback-candidates.js';
+} from './execution-feedback-candidates.js';
 import {
   queueExecutionFeedbackLearning,
   inspectExecutionFeedbackLearning,
-} from '../execution-feedback-learning.js';
+} from './execution-feedback-learning.js';
 import {
   loadMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
@@ -46,7 +46,7 @@ import {
   inspectScopedLearningPublication,
   verifyScopedLearningPublication,
 } from './scoped-learning-publication.js';
-import { savePromotedMemoryRecord, buildPromotedMemoryMarkdown } from '../promoted-memory.js';
+import { savePromotedMemoryRecord, buildPromotedMemoryMarkdown } from './promoted-memory.js';
 import {
   registerReasoningBackend,
   resetReasoningBackend,

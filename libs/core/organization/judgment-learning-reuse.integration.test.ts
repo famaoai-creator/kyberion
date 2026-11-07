@@ -45,8 +45,8 @@ let coordination: typeof import('../workforce/work-coordination.js'),
 let identity: typeof import('../workforce/work-coordination-identity.js'),
   json: typeof import('../foundation/json.js');
 let artifacts: typeof import('../workforce/artifact-store.js'),
-  feedback: typeof import('../execution-feedback-candidates.js'),
-  learning: typeof import('../execution-feedback-learning.js');
+  feedback: typeof import('../knowledge/execution-feedback-candidates.js'),
+  learning: typeof import('../knowledge/execution-feedback-learning.js');
 let distill: typeof import('../knowledge/distill-candidate-registry.js'),
   queue: typeof import('../knowledge/memory-promotion-queue.js');
 let workflow: typeof import('../knowledge/scoped-learning-workflow.js'),
@@ -122,8 +122,8 @@ beforeAll(async () => {
   identity = await import('../workforce/work-coordination-identity.js');
   json = await import('../foundation/json.js');
   artifacts = await import('../workforce/artifact-store.js');
-  feedback = await import('../execution-feedback-candidates.js');
-  learning = await import('../execution-feedback-learning.js');
+  feedback = await import('../knowledge/execution-feedback-candidates.js');
+  learning = await import('../knowledge/execution-feedback-learning.js');
   distill = await import('../knowledge/distill-candidate-registry.js');
   queue = await import('../knowledge/memory-promotion-queue.js');
   workflow = await import('../knowledge/scoped-learning-workflow.js');
@@ -625,7 +625,7 @@ async function fixture() {
           }),
           'actual same-byte publication retrieval'
         ).toMatchObject({ governed: true, publication: proof });
-        const compiler = await import('../context-security-scope.js');
+        const compiler = await import('../governance/context-security-scope.js');
         const fragment = hints.knowledgeHintFragment(
           {
             path: proof.markdown_path,

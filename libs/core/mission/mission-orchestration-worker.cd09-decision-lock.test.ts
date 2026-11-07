@@ -70,7 +70,7 @@ vi.mock('./mission-team-plan-composer.js', () => ({
   buildMissionTeamView: mocks.buildMissionTeamView,
 }));
 
-vi.mock('../ledger.js', () => ({
+vi.mock('../governance/ledger.js', () => ({
   ledger: { record: mocks.record },
 }));
 
@@ -136,8 +136,8 @@ vi.mock('../surface/operator-notifications.js', async (importOriginal) => ({
 
 // The escalation's inbox entry and owner notification are observed, never
 // written to the shared runtime stores.
-vi.mock('../deliverable-inbox.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../deliverable-inbox.js')>()),
+vi.mock('../task/deliverable-inbox.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../task/deliverable-inbox.js')>()),
   addInboxEntry: (...args: unknown[]) => mocks.addInboxEntry(...args),
 }));
 

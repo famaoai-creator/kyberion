@@ -14,7 +14,7 @@ import {
   loadArtifactReviewReceipt,
   receiptToArtifactReviewDecision,
 } from '../workforce/artifact-review.js';
-import { evaluateDeliverableQuality, inferDeliverableKind } from '../deliverable-quality.js';
+import { evaluateDeliverableQuality, inferDeliverableKind } from '../task/deliverable-quality.js';
 import * as pathResolver from '../path-resolver.js';
 import { findMissionPath } from '../path-resolver.js';
 import { logger } from '../core.js';
@@ -31,16 +31,16 @@ import {
   sha256,
   loadMarketingCompletionEvidenceAtPath,
   validateMarketingCompletionEvidence,
-} from '../marketing-workload.js';
+} from '../organization/marketing-workload.js';
 import { listArtifactOwnershipRecordsForMission } from '../workforce/artifact-registry.js';
 import { loadArtifactRecord } from '../workforce/artifact-record.js';
-import { trustEngine } from '../trust-engine.js';
-import { validateOutcomeContractAtCompletion } from '../outcome-contract.js';
+import { trustEngine } from '../governance/trust-engine.js';
+import { validateOutcomeContractAtCompletion } from '../task/outcome-contract.js';
 import { evaluateArtifactBundleGate } from './mission-review-gates.js';
 import { loadLatestArtifactBundleForMission } from '../workforce/artifact-bundle.js';
 import { readTextFile } from '../foundation/text.js';
 import { loadState } from './mission-state.js';
-import { loadPersistedTrustLedger } from '../trust-engine.js';
+import { loadPersistedTrustLedger } from '../governance/trust-engine.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 
 const SECURITY_POLICY_QUALITY_CATALOG = defineCatalog<{
