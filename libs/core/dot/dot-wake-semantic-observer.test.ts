@@ -10,7 +10,7 @@ const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 const root = path.join(sourceRoot, 'active/shared/tmp', `vitest-wake-shadow-${randomUUID()}`);
 let io: typeof import('../secure-io.js');
 let runtime: typeof import('./dot-runtime.js');
-let accounting: typeof import('../usage-accounting.js');
+let accounting: typeof import('../finance/usage-accounting.js');
 let latency: typeof import('../organization/judgment-latency-fixture.js');
 let precedents: typeof import('../organization/judgment-precedents.js');
 let validation: typeof import('../organization/judgment-validation.js');
@@ -283,7 +283,7 @@ beforeAll(async () => {
     organization_id: 'synthetic-org',
   } as Parameters<typeof saveProjectRecord>[0]);
   runtime = await import('./dot-runtime.js');
-  accounting = await import('../usage-accounting.js');
+  accounting = await import('../finance/usage-accounting.js');
   latency = await import('../organization/judgment-latency-fixture.js');
   precedents = await import('../organization/judgment-precedents.js');
   validation = await import('../organization/judgment-validation.js');

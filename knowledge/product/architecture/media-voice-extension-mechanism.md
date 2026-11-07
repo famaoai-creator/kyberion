@@ -78,7 +78,7 @@ policy (`knowledge/product/governance/seam-provider-selection/*.json`).
 
 ## God-file decomposition map (2026-11-03)
 
-- Done: `libs/core/metrics.ts` → `libs/core/metrics-cost-registry.ts`
+- Done: `libs/core/metrics.ts` → `libs/core/finance/metrics-cost-registry.ts`
   (model-cost registry: types, catalog load/cache, rate resolution).
   `metrics.ts` re-exports the public surface, so existing imports are
   unchanged.

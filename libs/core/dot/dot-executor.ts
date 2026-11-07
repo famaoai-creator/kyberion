@@ -67,7 +67,7 @@ import {
 import type { FrontDeskArtifactVerification } from './dot-state-paths.js';
 import { withExecutionContextAsync } from '../authority.js';
 import { createLogger } from '../logger.js';
-import { withUsageAttribution } from '../usage-accounting.js';
+import { withUsageAttribution } from '../finance/usage-accounting.js';
 import {
   claimWorkItem,
   getWorkItem,

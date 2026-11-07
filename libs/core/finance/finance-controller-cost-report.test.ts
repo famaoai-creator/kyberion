@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '../secure-io.js';
 import {
   financeControllerCostCoverage,
   loadFinanceControllerCostReportAtPath,

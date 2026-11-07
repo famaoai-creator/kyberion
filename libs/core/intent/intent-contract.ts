@@ -1,7 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import { logger } from '../core.js';
-import { assessContextualClarification } from '../contextual-intent-clarification-policy.js';
-import { buildContextualIntentFrame } from '../contextual-intent-frame.js';
+import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
+import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { pathResolver } from '../path-resolver.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';

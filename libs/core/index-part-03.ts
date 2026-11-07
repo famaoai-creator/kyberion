@@ -149,11 +149,11 @@ export * from './execution-feedback.js';
 export * from './intent/intent-contract-learning.js';
 export * from './intent/conversation-signals.js';
 
-export * from './contextual-intent-frame.js';
+export * from './intent/contextual-intent-frame.js';
 
-export * from './contextual-intent-clarification-policy.js';
+export * from './intent/contextual-intent-clarification-policy.js';
 
-export * from './contextual-intent-memory.js';
+export * from './intent/contextual-intent-memory.js';
 
 export * from './execution-brief.js';
 

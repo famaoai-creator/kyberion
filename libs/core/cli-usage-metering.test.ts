@@ -9,7 +9,7 @@ import {
   recordCliUsage,
   recordEstimatedCliUsage,
 } from './cli-usage-metering.js';
-import { withUsageAttribution } from './usage-accounting.js';
+import { withUsageAttribution } from './finance/usage-accounting.js';
 import { runWithDelegationExecutionTracker } from './delegation-execution-tracker.js';
 
 afterEach(() => {

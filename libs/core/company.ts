@@ -3,7 +3,7 @@ import type { OrganizationProfile } from './organization/organization-profile.js
 import { resolveVision, type ResolvedVision } from './vision-resolver.js';
 import { resolveOrganizationOrgChart, type OrganizationOrgChart } from './org-chart.js';
 import { resolveDecisionRightsMatrix, type DecisionRightsMatrix } from './decision-rights.js';
-import { resolveFinancialModel, type FinancialModel } from './financial-model.js';
+import { resolveFinancialModel, type FinancialModel } from './finance/financial-model.js';
 import { resolveOkrTracker, type OkrTracker } from './okr-tracker.js';
 import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';

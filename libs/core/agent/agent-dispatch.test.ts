@@ -25,7 +25,7 @@ import {
 import { registerOpPreflightListener, resetOpPreflight } from '../pipeline/op-preflight.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
-import { withUsageAttribution } from '../usage-accounting.js';
+import { withUsageAttribution } from '../finance/usage-accounting.js';
 import * as delegationObservability from '../delegated-task-observability.js';
 
 const a2aRoute = vi.hoisted(() =>

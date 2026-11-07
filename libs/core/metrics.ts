@@ -20,7 +20,7 @@ import {
   type UsageCause,
   type UsageCostAccounting,
   type UsageCostStatus,
-} from './usage-accounting.js';
+} from './finance/usage-accounting.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { clamp } from './foundation/text.js';
@@ -44,7 +44,7 @@ import {
   resolveCostRateModelKey,
   resolveCostRatesFromRegistry,
   type ModelCostRegistry,
-} from './metrics-cost-registry.js';
+} from './finance/metrics-cost-registry.js';
 
 export {
   loadModelCostRegistry,
@@ -52,13 +52,13 @@ export {
   resolveCostRates,
   resolveCostRatesFromRegistry,
   _resetModelCostRegistryCacheForTests,
-} from './metrics-cost-registry.js';
+} from './finance/metrics-cost-registry.js';
 export type {
   CostRate,
   CostTier,
   ModelCostEntry,
   ModelCostRegistry,
-} from './metrics-cost-registry.js';
+} from './finance/metrics-cost-registry.js';
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { withExecutionContext } from './authority.js';
 import { withLockSync } from './foundation/lock-utils.js';

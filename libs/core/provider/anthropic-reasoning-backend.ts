@@ -16,7 +16,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { automaticReasoningRedispatchAllowed } from '../reasoning/reasoning-dispatch-scope.js';
 import { normalizeEventScope } from '../event-scope.js';
-import { getUsageAttribution } from '../usage-accounting.js';
+import { getUsageAttribution } from '../finance/usage-accounting.js';
 import { llmSemaphore } from '../semaphore.js';
 import { metrics } from '../metrics.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';

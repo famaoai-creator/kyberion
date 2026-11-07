@@ -13,7 +13,7 @@
  */
 
 import { readInstalledReasoningMode } from '../reasoning/installed-reasoning-mode.js';
-import { loadSpendPolicy, resolveSpendPolicyForTenant } from '../spend-guard.js';
+import { loadSpendPolicy, resolveSpendPolicyForTenant } from '../finance/spend-guard.js';
 import { loadNotificationPreferences } from './operator-notifications.js';
 import { findActiveCharter } from '../governance/accountability-charter-registry.js';
 import type { WorkspaceGraph } from './workspace-graph.js';

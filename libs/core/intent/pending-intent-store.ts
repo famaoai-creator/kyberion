@@ -1,7 +1,7 @@
 import * as path from 'node:path';
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { nowIso } from './foundation/time.js';
-import { pathResolver } from './path-resolver.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { nowIso } from '../foundation/time.js';
+import { pathResolver } from '../path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -10,8 +10,8 @@ import {
   safeReaddir,
   safeRmSync,
   safeWriteFile,
-} from './secure-io.js';
-import type { OperatorInteractionPacket } from './contracts/operator-interaction-packet.js';
+} from '../secure-io.js';
+import type { OperatorInteractionPacket } from '../contracts/operator-interaction-packet.js';
 
 export interface PendingIntentRecord {
   kind: 'pending-intent';

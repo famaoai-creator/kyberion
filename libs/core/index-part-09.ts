@@ -288,7 +288,7 @@ export * from './ingest-tier-gate.js';
 
 export * from './generation-scheduler.js';
 
-export * from './generation-quota.js';
+export * from './finance/generation-quota.js';
 
 export * from './pipeline/pipeline-scheduler.js';
 
@@ -333,9 +333,9 @@ export {
   listUnhandledIntents,
   markIntentsReconciled,
   pruneReconciledIntents,
-} from './unhandled-intent-registry.js';
+} from './intent/unhandled-intent-registry.js';
 
-export type { UnhandledIntentEntry, IntentMissType } from './unhandled-intent-registry.js';
+export type { UnhandledIntentEntry, IntentMissType } from './intent/unhandled-intent-registry.js';
 
 // Shared Business Types
 
