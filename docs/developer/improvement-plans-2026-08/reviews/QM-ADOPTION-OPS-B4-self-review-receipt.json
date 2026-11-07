@@ -29,7 +29,7 @@
       "severity": "suggestion",
       "category": "concurrency",
       "description": "Overlapping measures on one GapRecorder each record wall clock, so totalMs can exceed elapsed under concurrency; both current call sites are sequential.",
-      "location": "libs/core/gap-phase.ts"
+      "location": "libs/core/analysis/gap-phase.ts"
     }
   ],
   "acceptance_criteria": ["must_fix 指摘が解消済み"],

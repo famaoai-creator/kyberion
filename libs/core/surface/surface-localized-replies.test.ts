@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { parseExecutionFeedbackText } from '../execution-feedback.js';
-import { t } from '../t.js';
+import { parseExecutionFeedbackText } from '../knowledge/execution-feedback.js';
+import { t } from '../localization/t.js';
 import { buildKnowledgeQueryReply } from './surface-runtime-helpers.js';
 import { buildExecutionFeedbackPrompt } from './surface-runtime-conversation-data.js';
 import {

@@ -67,11 +67,11 @@ vi.mock('./mission-team-index.js', () => ({
     ),
 }));
 vi.mock('../organization/organization-profile.js', () => ({ loadOrganizationProfile: () => null }));
-vi.mock('../org-chart.js', () => ({
+vi.mock('../organization/org-chart.js', () => ({
   resolveOrganizationOrgChart: () => null,
   summarizeOrganizationOrgChart: () => undefined,
 }));
-vi.mock('../participant-context-resolver.js', () => ({
+vi.mock('../reasoning/participant-context-resolver.js', () => ({
   resolveParticipantContext: (input: { security_scope: unknown }) => ({
     participant: { security_scope: input.security_scope },
     selection_reason_codes: [],

@@ -5,7 +5,7 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeLstat, safeReadFile } from '../secure-io.js';
-import type { DeliverableKind } from '../deliverable-quality.js';
+import type { DeliverableKind } from '../task/deliverable-quality.js';
 
 export type ArtifactReviewVerdict = 'approved' | 'changes_requested' | 'rejected';
 

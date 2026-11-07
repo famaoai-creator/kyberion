@@ -9,7 +9,7 @@ import { getAllFiles } from '@agent/core/fs-utils';
  * A keyed `delegateTask` failure whose start state is unknown counts as
  * started: no retry, no failover, a terminal replay. Every ReasoningBackend
  * implementation must therefore wrap its `delegateTask` body in
- * `runStartReportingDelegation` (libs/core/delegation-execution-tracker.ts)
+ * `runStartReportingDelegation` (libs/core/workforce/delegation-execution-tracker.ts)
  * and mark the start at each dispatch point — or be a documented exception
  * in `tests/fixtures/delegation-start-reporting-allowlist.json` (decorators
  * that forward to a reporting backend, side-effect-free doubles).

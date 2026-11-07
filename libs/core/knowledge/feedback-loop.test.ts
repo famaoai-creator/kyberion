@@ -2,7 +2,7 @@ import {
   acknowledgeSchedulerIncident,
   listSchedulerIncidents,
   schedulerIncidentLogForRoot,
-} from '../scheduler-incidents.js';
+} from '../daemon/scheduler-incidents.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';

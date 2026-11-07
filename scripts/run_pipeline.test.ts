@@ -1,5 +1,21 @@
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+
+// Verify pipeline wiring without scanning unrelated checkout runtime data.
+// Real janitor scans are covered by storage-janitor's isolated fixtures.
+const janitorMock = vi.hoisted(() =>
+  vi.fn(() => ({
+    dryRun: true,
+    expiredTmp: 0,
+    deletedTmp: 0,
+    errors: [],
+  }))
+);
+vi.mock('@agent/core/storage-janitor', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/storage-janitor')>()),
+  runJanitor: janitorMock,
+}));
+
 import { TraceContext } from '@agent/core';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -748,6 +764,7 @@ describe('run_pipeline compatibility', () => {
   }, 30000);
 
   it('runs storage janitor through the core op in dry-run mode', async () => {
+    janitorMock.mockClear();
     const result = await runSteps([
       {
         op: 'core:run_janitor',
@@ -761,6 +778,7 @@ describe('run_pipeline compatibility', () => {
 
     expect(result.status).toBe('succeeded');
     expect(result.results).toEqual([{ op: 'core:run_janitor', status: 'success' }]);
+    expect(janitorMock).toHaveBeenCalledExactlyOnceWith({ dryRun: true });
     expect(result.context.janitor_report).toMatchObject({
       dryRun: true,
       expiredTmp: expect.any(Number),

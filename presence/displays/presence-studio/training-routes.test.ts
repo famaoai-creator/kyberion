@@ -3,7 +3,7 @@
 // established pattern this file follows: register the real
 // `registerTrainingRoutes` onto a tiny fake `express.Express` that records
 // handlers by `METHOD path`, then exercise route behavior directly.
-// `libs/core/training-catalog.ts` persists progress/assignments under real
+// `libs/core/organization/training-catalog.ts` persists progress/assignments under real
 // `knowledge/personal/members/` and `knowledge/confidential/` paths (no
 // fixture-rootDir seam), so this file uses dedicated fictitious member/tenant
 // ids and removes them in `afterEach`.

@@ -69,7 +69,7 @@ export type DelegationCapabilityTier = 'implementer' | 'explorer' | 'planner';
 /**
  * Privilege ordering of the KD-05 capability tiers — higher number = MORE
  * privilege. Encoded from the actual profile registry
- * (libs/core/subagent-capability-profiles.ts, `SUBAGENT_CAPABILITY_PROFILES`):
+ * (libs/core/workforce/subagent-capability-profiles.ts, `SUBAGENT_CAPABILITY_PROFILES`):
  *
  * - `implementer`: `allowedOps: '*'` — full read/write/exec ("Full
  *   read/write/exec tier"). Most privileged.

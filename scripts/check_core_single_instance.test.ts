@@ -70,12 +70,24 @@ describe('core single-instance gate', () => {
     ]);
   });
 
+  it('allows manifest metadata without allowing core implementations from the same importer', () => {
+    const metadata = `import corePackage from './libs/core/package.json' with { type: 'json' };`;
+    expect(coreRelativeImports('vitest.config.mts', metadata)).toEqual([]);
+    expect(
+      coreRelativeImports('vitest.config.mts', `${metadata}\nimport './libs/core/secure-io.js';`)
+    ).toEqual(['./libs/core/secure-io.js']);
+    expect(
+      coreRelativeImports('scripts/foreign.ts', `import '../libs/core/foundation/policy.json';`)
+    ).toEqual(['../libs/core/foundation/policy.json']);
+  });
+
   it('scans production sources only and keeps the repository clean', () => {
     const files = productionSourceFiles();
     expect(files).toContain('scripts/build_repository.ts');
     expect(files.some((file) => file.startsWith('libs/core/'))).toBe(false);
     expect(files.some((file) => /\.(?:test|spec)\.[^/]+$/.test(file))).toBe(false);
     expect(files.some((file) => file.startsWith('tests/'))).toBe(false);
+    expect(files.some((file) => file.startsWith('work/'))).toBe(false);
     for (const reason of CORE_SOURCE_IMPORT_EXCEPTIONS.values()) expect(reason).not.toBe('');
     expect(checkCoreSingleInstance(files)).toEqual([]);
   }, 60_000);

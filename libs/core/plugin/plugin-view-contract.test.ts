@@ -38,7 +38,7 @@ vi.mock('../governance/approval-store.js', async (importOriginal) => {
 });
 import { pathResolver } from '../path-resolver.js';
 import { withExecutionContext } from '../authority.js';
-import type { A2UIMessage } from '../a2ui.js';
+import type { A2UIMessage } from '../surface/a2ui.js';
 import { findPluginManifestFor } from './plugin-grant-runtime.js';
 import { auditChain, type AuditEntry } from '../governance/audit-chain.js';
 import {

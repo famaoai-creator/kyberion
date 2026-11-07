@@ -1,5 +1,5 @@
 import { appendJsonLine } from '../foundation/json.js';
-import { resolveLocale } from '../locale.js';
+import { resolveLocale } from '../localization/locale.js';
 import { localeToBcp47 } from '../foundation/locale-normalize.js';
 /* eslint-disable no-restricted-imports */
 /**
@@ -32,7 +32,7 @@ import { nowIso } from '../foundation/time.js';
 import { createLogger } from '../logger.js';
 import { ocrImage } from '../ocr-bridge.js';
 import { pathResolver } from '../path-resolver.js';
-import { scrubContent } from '../pii-scrubber.js';
+import { scrubContent } from '../governance/pii-scrubber.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import type { MeetingJoinDriver } from '../meeting/meeting-join-driver.js';
 import { registerMeetingJoinDriver } from '../meeting/meeting-join-driver.js';

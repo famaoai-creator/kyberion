@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { knowledgeTextSha256 } from '../knowledge/knowledge-delivery-snapshot.js';
 import { resolveScopedLearningRetrieval } from '../knowledge/scoped-learning-retrieval.js';
-import { compileScopedContextPack } from '../context-security-scope.js';
+import { compileScopedContextPack } from '../governance/context-security-scope.js';
 import {
   findRelevantDistilledKnowledge,
   type DistilledKnowledgeEntry,

@@ -1,0 +1,225 @@
+import { describe, expect, it } from 'vitest';
+import {
+  buildCostReport,
+  effectiveCostUsd,
+  executionMetricsReadFor,
+  formatCostReport,
+  type CostLedgerEntry,
+} from './cost-report.js';
+import { normalizeEventScope } from '../event/event-scope.js';
+
+const D1 = '2026-07-10T10:00:00.000Z';
+const D2 = '2026-07-11T10:00:00.000Z';
+
+function entry(overrides: Partial<CostLedgerEntry>): CostLedgerEntry {
+  return { timestamp: D2, model: 'claude-fable-5', ...overrides };
+}
+
+describe('effectiveCostUsd (source priority, Task 2.2)', () => {
+  it('prefers the SDK real total over the token-derived figure', () => {
+    expect(effectiveCostUsd({ sdk_cost_usd: 0.5, cost_usd: 0.3 })).toBe(0.5);
+    expect(effectiveCostUsd({ cost_usd: 0.3 })).toBe(0.3);
+    expect(effectiveCostUsd({})).toBe(0);
+    expect(effectiveCostUsd({ sdk_cost_usd: Number.NaN, cost_usd: 0.2 })).toBe(0.2);
+  });
+});
+
+describe('buildCostReport', () => {
+  it('counts zero provider reports, included runs, and unknown prices without calling them free', () => {
+    const report = buildCostReport([
+      entry({ sdk_cost_usd: 0, cost_usd: 99 }),
+      entry({ reported_cost_usd: 2, cost_usd: 99 }),
+      entry({
+        billing_mode: 'subscription_included',
+        reference_cost_usd: 4,
+        cost_status: 'included',
+      }),
+      entry({ cost_status: 'unknown', billing_mode: 'unknown', reference_cost_usd: 3 }),
+      entry({ cost_status: 'unknown', usage: { prompt_tokens: 10 } }),
+    ]);
+    expect(report).toMatchObject({
+      total_usd: 2,
+      calls: 5,
+      actual_cost_calls: 2,
+      included_calls: 1,
+      unknown_cost_calls: 2,
+      cost_complete: false,
+      reference_usd: 7,
+      reference_cost_calls: 2,
+    });
+    expect(report.by_model[0]).toMatchObject({
+      calls: 5,
+      included_calls: 1,
+      unknown_cost_calls: 2,
+      cost_complete: false,
+      reference_cost_calls: 2,
+    });
+  });
+
+  it('keeps unavailable reference estimates distinct from a known zero reference', () => {
+    const unavailable = buildCostReport([
+      entry({ cost_status: 'included', billing_mode: 'subscription_included' }),
+    ]);
+    const zero = buildCostReport([
+      entry({
+        cost_status: 'included',
+        billing_mode: 'subscription_included',
+        reference_cost_usd: 0,
+      }),
+    ]);
+    expect(unavailable).toMatchObject({
+      total_usd: 0,
+      included_calls: 1,
+      reference_usd: 0,
+      reference_cost_calls: 0,
+      cost_complete: true,
+    });
+    expect(zero.reference_cost_calls).toBe(1);
+  });
+
+  it('labels each unknown or included bucket without presenting it as a free priced call', () => {
+    const lines = formatCostReport(
+      buildCostReport([
+        entry({ mission_id: 'MSN-UNKNOWN', model: 'unpriced', cost_status: 'unknown' }),
+        entry({
+          mission_id: 'MSN-INCLUDED',
+          model: 'subscription',
+          cost_status: 'included',
+          billing_mode: 'subscription_included',
+        }),
+      ])
+    ).join('\n');
+    expect(lines).toContain('MSN-UNKNOWN: known subtotal $0.0000; 1 unknown');
+    expect(lines).toContain('unpriced: known subtotal $0.0000; 1 unknown');
+    expect(lines).toContain('MSN-INCLUDED: included');
+    expect(lines).not.toContain('MSN-INCLUDED: $0.0000');
+  });
+  const entries: CostLedgerEntry[] = [
+    entry({
+      mission_id: 'MSN-A',
+      cost_usd: 0.2,
+      cause: 'assistant',
+      usage: { prompt_tokens: 100, completion_tokens: 50 },
+    }),
+    entry({ mission_id: 'MSN-A', sdk_cost_usd: 0.6, cost_usd: 0.1, cause: 'judge' }),
+    entry({ mission_id: 'MSN-B', model: 'gemini-3.5-flash', cost_usd: 0.05, estimated: true }),
+    entry({ timestamp: D1, cost_usd: 0.4 }),
+    entry({ cost_usd: 0 }), // zero cost — excluded
+    entry({ timestamp: 'garbage', cost_usd: 9 }), // unparsable timestamp — excluded
+  ];
+
+  it('aggregates by mission, model, and day with source priority applied', () => {
+    const report = buildCostReport(entries);
+    expect(report.total_usd).toBeCloseTo(1.25, 5);
+    expect(report.estimated_usd).toBeCloseTo(0.05, 5);
+    expect(report.calls).toBe(4);
+
+    const missionA = report.by_mission.find((b) => b.key === 'MSN-A');
+    expect(missionA?.cost_usd).toBeCloseTo(0.8, 5); // 0.2 + 0.6 (sdk wins over 0.1)
+    expect(missionA?.prompt_tokens).toBe(100);
+
+    const noMission = report.by_mission.find((b) => b.key === '(no mission)');
+    expect(noMission?.cost_usd).toBeCloseTo(0.4, 5);
+    expect(report.by_cause.find((b) => b.key === 'judge')?.cost_usd).toBeCloseTo(0.6, 5);
+
+    expect(report.by_day.map((b) => b.key)).toEqual(['2026-07-10', '2026-07-11']);
+  });
+
+  it('applies the since window', () => {
+    const report = buildCostReport(entries, { since: '2026-07-11T00:00:00.000Z' });
+    expect(report.total_usd).toBeCloseTo(0.85, 5);
+    expect(report.by_day.map((b) => b.key)).toEqual(['2026-07-11']);
+  });
+
+  it('formats a readable summary with the estimated share', () => {
+    const lines = formatCostReport(buildCostReport(entries));
+    expect(lines[0]).toContain('$1.2500');
+    expect(lines[0]).toContain('estimated');
+    expect(lines.join('\n')).toContain('MSN-A');
+  });
+
+  it('separates actual, estimated, and committed resource usage by owner dimensions', () => {
+    const report = buildCostReport([
+      entry({
+        type: 'resource_usage',
+        resource_kind: 'api',
+        actor_id: 'agent:ops',
+        mission_id: 'MSN-R',
+        customer_id: 'ACME',
+        cost_center: 'sales',
+        cost_usd: 2,
+        status: 'actual',
+      }),
+      entry({
+        type: 'resource_usage',
+        resource_kind: 'saas',
+        actor_id: 'service:crm',
+        mission_id: 'MSN-R',
+        customer_id: 'ACME',
+        cost_center: 'sales',
+        cost_usd: 5,
+        status: 'committed',
+      }),
+      entry({
+        type: 'resource_usage',
+        resource_kind: 'compute',
+        actor_id: 'agent:ops',
+        customer_id: 'ACME',
+        cost_usd: 1,
+        status: 'estimated',
+      }),
+    ]);
+
+    expect(report.total_usd).toBe(8);
+    expect(report.actual_usd).toBe(2);
+    expect(report.estimated_usd).toBe(1);
+    expect(report.committed_usd).toBe(5);
+    expect(report.resource_usage_entries).toBe(3);
+    expect(report.resource_usage_cost_usd).toBe(8);
+    expect(report.by_actor.find((bucket) => bucket.key === 'agent:ops')?.cost_usd).toBe(3);
+    expect(report.by_customer[0]?.key).toBe('ACME');
+    expect(report.by_cost_center[0]?.key).toBe('sales');
+  });
+
+  it('filters cost and resource usage reports by canonical tenant scope', () => {
+    const tenantA = normalizeEventScope({ tier: 'confidential', tenant_slug: 'client-a' });
+    const tenantB = normalizeEventScope({ tier: 'confidential', tenant_slug: 'client-b' });
+    const report = buildCostReport(
+      [
+        entry({ cost_usd: 2, scope: tenantA }),
+        entry({ cost_usd: 3, scope: tenantB }),
+        entry({ type: 'resource_usage', cost_usd: 4, scope: tenantA }),
+        entry({ cost_usd: 9 }),
+      ],
+      { scopeFilter: { tenant_slug: 'client-a' } }
+    );
+
+    expect(report.total_usd).toBe(6);
+    expect(report.calls).toBe(2);
+    expect(report.resource_usage_entries).toBe(1);
+    expect(report.by_tenant.map((bucket) => bucket.key)).toEqual(['client-a']);
+  });
+
+  it('keeps unscoped legacy records out of entity-scoped reports', () => {
+    const report = buildCostReport([entry({ cost_usd: 2 })], {
+      scopeFilter: { tenant_slug: 'client-a' },
+    });
+    expect(report.total_usd).toBe(0);
+    expect(report.calls).toBe(0);
+  });
+});
+
+describe('executionMetricsReadFor (partitioned execution-metrics ledger)', () => {
+  it("reads a tenant report's partitions plus the system one, else the operator aggregate", () => {
+    expect(executionMetricsReadFor({ tenant_slug: 'client-a' })).toEqual({
+      tenants: ['client-a'],
+      includeSystem: true,
+    });
+    expect(executionMetricsReadFor({ tenant_slugs: ['client-a', 'client-b'] })).toEqual({
+      tenants: ['client-a', 'client-b'],
+      includeSystem: true,
+    });
+    expect(executionMetricsReadFor({ tenant_slugs: 'all' })).toEqual({ all: true });
+    expect(executionMetricsReadFor()).toEqual({ all: true });
+  });
+});

@@ -43,7 +43,7 @@ import {
 import {
   RETENTION_CATALOG_REPO_PATH,
   type RetentionArtifactClass,
-} from '../storage-retention-catalog.js';
+} from '../storage/storage-retention-catalog.js';
 import {
   ensureRegularScopedArtifactIndex,
   SCOPED_ARTIFACT_INDEX_FILENAME,
@@ -52,7 +52,7 @@ import {
   scopedTaskArtifactDirName,
   type ScopedArtifactIndexEntry,
 } from '../workforce/artifact-store.js';
-import { retireIdentitiesForScopeBestEffort } from '../nhi-lifecycle-governance.js';
+import { retireIdentitiesForScopeBestEffort } from '../agent/nhi-lifecycle-governance.js';
 
 /** Artifact classes deleted at closure time. Everything else is kept. */
 export const MISSION_CLOSURE_DELETE_CLASSES: readonly RetentionArtifactClass[] = Object.freeze([

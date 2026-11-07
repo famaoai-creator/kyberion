@@ -66,7 +66,7 @@ vi.mock('../core.js', () => ({
   logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));
 const opsAlert = vi.hoisted(() => vi.fn());
-vi.mock('../ops-alert.js', () => ({ sendOpsAlert: opsAlert }));
+vi.mock('../daemon/ops-alert.js', () => ({ sendOpsAlert: opsAlert }));
 const notify = vi.hoisted(() => vi.fn().mockResolvedValue(true));
 vi.mock('../surface/operator-notifications.js', () => ({ notifyOperator: notify }));
 const enqueueLearning = vi.hoisted(() => vi.fn());

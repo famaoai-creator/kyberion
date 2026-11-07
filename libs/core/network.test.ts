@@ -1,7 +1,10 @@
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { _resetEgressPolicyCacheForTests, withEgressPayloadContext } from './egress-policy.js';
+import {
+  _resetEgressPolicyCacheForTests,
+  withEgressPayloadContext,
+} from './governance/egress-policy.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 

@@ -314,7 +314,7 @@ registerCapabilityProbe('voice-actuator', async () => {
 registerCapabilityProbe('vision-actuator', async () => {
   const { platform } = await import('../platform.js');
   const { probeWindowsNativeImageRecognition } =
-    await import('../windows-native-image-recognition-bridge.js');
+    await import('../ocr/windows-native-image-recognition-bridge.js');
   const capabilities = await platform.getCapabilities();
   const available = capabilities.hasScreenCapture;
   const nativeRecognition = probeWindowsNativeImageRecognition();

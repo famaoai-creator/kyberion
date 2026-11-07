@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { compileSchema } from '../foundation/ajv.js';
 import { pathResolver } from '../path-resolver.js';
-import type { SourceAnalysisIr } from '../source-analysis.js';
+import type { SourceAnalysisIr } from '../analysis/source-analysis.js';
 
 const VERIFICATION_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/agentic-source-review-verification.schema.json'

@@ -4,7 +4,7 @@ import { nowIso } from '../foundation/time.js';
 import * as path from 'node:path';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import * as pathResolver from '../path-resolver.js';
-import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../governance/owner-scope.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import {
   deriveAgentNhiId,
@@ -45,7 +45,7 @@ import {
   resolveEventScopeAgainstAuthority,
   type EventScope,
   type EventScopeInput,
-} from '../event-scope.js';
+} from '../event/event-scope.js';
 
 export interface TeamBlueprintRole {
   team_role: string;
@@ -100,7 +100,7 @@ export interface MissionStaffingAssignment {
   organization_role_id?: string;
   perspective_ids?: string[];
   reasoning_route_id?: string;
-  security_scope?: import('../context-security-scope.js').ContextSecurityScope;
+  security_scope?: import('../governance/context-security-scope.js').ContextSecurityScope;
   selection_reason_codes?: string[];
   /** Delegation contract carried over from the team plan so staffing records are self-describing for audits. */
   delegation_contract?: MissionTeamAssignment['delegation_contract'];

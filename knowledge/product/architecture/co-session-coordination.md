@@ -159,7 +159,7 @@ participant_id は `<provider>-<session_id>`（hook payload の `session_id`）�
 
 ## 8. 実装マップ
 
-- Core: `libs/core/co-session.ts`（lease 直列化は `foundation/lock-utils.ts` の `withLockSync`）
+- Core: `libs/core/workforce/co-session.ts`（lease 直列化は `foundation/lock-utils.ts` の `withLockSync`）
 - Hook bridge core: `libs/core/provider/co-session-hook.ts`
 - Hook entries: `scripts/claude_code_hook.ts`（Claude: 同 `libs/core/provider/claude-code-hook.ts`）、`scripts/gemini_cli_hook.ts`（Gemini）、`scripts/codex_cli_hook.ts`（Codex）
 - 配線: `.claude/settings.json`（tracked・直接配線）、`pnpm generate:provider-hooks` → `.gemini/settings.json` / `.codex/hooks.json`（gitignore・生成物）

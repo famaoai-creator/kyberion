@@ -4,7 +4,7 @@ import { Jimp } from 'jimp';
 const { ocrImage, redactFrame } = vi.hoisted(() => ({ ocrImage: vi.fn(), redactFrame: vi.fn() }));
 
 vi.mock('../ocr-bridge.js', () => ({ ocrImage }));
-vi.mock('../frame-redaction.js', () => ({ redactFrame }));
+vi.mock('./frame-redaction.js', () => ({ redactFrame }));
 
 import {
   createRedactedImageCopy,

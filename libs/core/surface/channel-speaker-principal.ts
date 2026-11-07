@@ -1,4 +1,4 @@
-import { frontDeskRoleAuthority } from '../front-desk-roles.js';
+import { frontDeskRoleAuthority } from './front-desk-roles.js';
 import {
   externalIdentityBindingDenied,
   findMemberByExternalIdentity,

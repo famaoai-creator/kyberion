@@ -8,7 +8,7 @@ const janitor = vi.hoisted(() => ({
   appendRetentionAudit: vi.fn(),
   TRASH_REPO_SUBPATH: 'active/archive/.trash',
 }));
-vi.mock('../storage-janitor.js', () => janitor);
+vi.mock('../storage/storage-janitor.js', () => janitor);
 
 const trashAccess = vi.hoisted(() => ({
   check: vi.fn((): { allowed: boolean; reason?: string } => ({ allowed: true })),

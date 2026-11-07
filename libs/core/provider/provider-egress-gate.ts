@@ -43,7 +43,7 @@ import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { detectTier, TIERS } from '../tier-guard.js';
 import type { TierLevel } from '../types.js';
-import { sendOpsAlert } from '../ops-alert.js';
+import { sendOpsAlert } from '../daemon/ops-alert.js';
 import { createLogger } from '../logger.js';
 import { resolveTenant } from '../organization/tenant-registry.js';
 import { resolveIdentityContext, withExecutionContext } from '../authority.js';
@@ -54,7 +54,7 @@ import {
   custodyOwnerLabel,
   deriveCustodyOwner,
   type CustodyOwner,
-} from '../custody-owner.js';
+} from '../contracts/custody-owner.js';
 import {
   personCustodyConsentGap,
   readCustodyProviderAttestationEntry,

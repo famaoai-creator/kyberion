@@ -1,5 +1,5 @@
 import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
-import { type EventScopeInput } from '../event-scope.js';
+import { type EventScopeInput } from '../event/event-scope.js';
 import { assertScopeContext } from '../foundation/scope-context-validation.js';
 import { dotStatePath } from './dot-state-paths.js';
 /**
@@ -24,7 +24,7 @@ import {
   streamJsonLines,
   streamTextLines,
   type JsonlRawLine,
-} from '../jsonl-read.js';
+} from '../storage/jsonl-read.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';

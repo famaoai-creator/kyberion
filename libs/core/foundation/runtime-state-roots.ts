@@ -57,7 +57,7 @@ export const STORAGE_FLOOR_ROOTS = {
 
 /**
  * D9: root of the hash-chained tenant partitions of the hybrid ledger
- * (libs/core/ledger.ts). An append-only ledger root, registered in
+ * (libs/core/governance/ledger.ts). An append-only ledger root, registered in
  * storage-layout.ts PARTITIONED_RUNTIME_LEDGER_ROOTS — not a state root.
  */
 export const TENANT_LEDGER_ROOT_PATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_ledger;
@@ -82,7 +82,7 @@ export const TENANT_AUDIT_MIRROR_ROOT_PATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.te
 
 /**
  * Root of the delegated-task trace and record store
- * (`libs/core/delegated-task-observability.ts`):
+ * (`libs/core/workforce/delegated-task-observability.ts`):
  * `<root>/system/{delegations.jsonl,records/,notifications.jsonl}` for
  * untenanted delegations and
  * `<root>/confidential/<tenant>/{delegations.jsonl,records/,notifications.jsonl}`

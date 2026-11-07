@@ -3,7 +3,7 @@ import { withExecutionContext } from '../authority.js';
 import { loadMissionNextTaskObjectsAtPath } from '../mission/mission-next-task-reader.js';
 import { writeMissionNextTasks } from '../mission/mission-lifecycle-completion.js';
 import { pathResolver } from '../path-resolver.js';
-import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../governance/owner-scope.js';
 import { listWorkItems, type WorkItem, type WorkItemStatus } from './work-coordination.js';
 import { buildWorkGraph, type WorkGraph } from './work-graph.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from '../secure-io.js';

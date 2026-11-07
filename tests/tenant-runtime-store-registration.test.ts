@@ -111,7 +111,7 @@ function scanCallSites(): CallSite[] {
     .filter((relPath) => /\.(ts|tsx|mts)$/u.test(relPath))
     .filter((relPath) => !/\.(test|spec)\.tsx?$/u.test(relPath) && !relPath.endsWith('.d.ts'))
     .filter((relPath) => !/(^|\/)(node_modules|dist|\.next|__tests__)\//u.test(relPath))
-    .filter((relPath) => relPath !== 'libs/core/physical-namespace.ts');
+    .filter((relPath) => relPath !== 'libs/core/storage/physical-namespace.ts');
   const sites: CallSite[] = [];
   for (const file of files) {
     const source = read(path.join(rootDir, file));
@@ -156,7 +156,7 @@ describe('tenant-partitioned runtime store registration', () => {
         'tenant-runtime-store — these stores keep per-tenant data at <base>/tenants/<slug>/ under active/shared/runtime/,',
         'which tier-guard, backup and tenant offboarding cannot see (a contract ending leaves the data behind)',
         '| next: store it in a registered PARTITIONED_RUNTIME_STATE_ROOTS root via partitionedScopedPath (<root>/<tier>/<tenant>/),',
-        'or add the base to PHYSICAL_TENANT_LEARNING_ROOTS / PHYSICAL_LEGACY_TENANT_STATE_ROOTS in libs/core/scope-offboarding.ts;',
+        'or add the base to PHYSICAL_TENANT_LEARNING_ROOTS / PHYSICAL_LEGACY_TENANT_STATE_ROOTS in libs/core/storage/scope-offboarding.ts;',
         'only a deliberate exception goes in tests/fixtures/tenant-runtime-store-allowlist.json "bases" with a reason',
       ].join(' ')
     ).toEqual([]);

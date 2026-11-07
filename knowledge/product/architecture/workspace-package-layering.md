@@ -5,7 +5,7 @@ tags:
   [architecture, packages, layering, dependency-direction, shared, interaction, voice, perception]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-11-05
+last_updated: 2026-11-08
 kind: architecture
 scope: repository
 authority: reference
@@ -29,7 +29,128 @@ libs/shared-*  (video, media, voice, vision, interaction, network, ui, ...)
 @agent/core  ──▶  @agent/kernel
 ```
 
-## Rules
+## Package responsibilities and classification
+
+A package is a build and dependency boundary. A directory inside core is an ownership
+and module-layer boundary, not a separate workspace package. In particular,
+`libs/core/foundation` and `libs/core/contracts` belong to `@agent/core`; there is no
+`libs/foundation` workspace package. Do not create one merely to reduce the core file count.
+
+| Boundary                               | Owns                                                                                                              | Does not own                                                                               |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `@agent/kernel`                        | Storage backend contracts and append-only entry-ledger mechanics without a core dependency                        | Tenant policy, identity, approval or application workflow                                  |
+| `@agent/core`                          | Governed control plane: authority, secure I/O, scope, lifecycle, registries and bridges reused by core subsystems | Capability-specific runtimes that core does not call                                       |
+| `core/foundation`                      | Low-level primitives and the minimal enforcement machinery required by governed I/O                               | Business rules, provider orchestration or capability workflows                             |
+| `core/contracts`                       | Shared types, identifiers, vocabulary and wire contracts                                                          | Registry loading, execution or mutable domain state                                        |
+| Core domain directories                | A named subsystem's policies, state and services, such as mission, organization, voice or provider                | Unrelated utilities grouped only by having few imports                                     |
+| Core orchestration layer               | Coordination across subsystem services and execution lifecycles                                                   | New low-level primitives or another copy of subsystem state                                |
+| `libs/shared-*`                        | Reusable capability runtimes consumed by actuators, scripts and surfaces                                          | Implementations still needed by core; shared does not mean a miscellaneous utility package |
+| `libs/actuators/*`                     | Validated operation entry points, operation-specific authorization and runtime adaptation                         | A second implementation of reusable domain logic                                           |
+| `scripts/`, `presence/`, `satellites/` | CLI, HTTP/UI and runtime composition entry points                                                                 | Canonical domain rules duplicated per entry point                                          |
+
+The module layers describe allowed dependencies, not necessarily directories:
+an orchestration file may live beside its domain files, but remains classified by
+`module-layer-boundaries.json`. Foundation is not entirely I/O-free: `secure-io`
+and its explicitly reviewed bootstrap dependencies already form the enforcement boundary.
+Pure helpers must not acquire those dependencies just because both are low-level.
+
+### Placement procedure
+
+1. Identify the responsibility from behavior and state ownership, then inspect runtime
+   and type importers across the repository. A filename or zero imports is insufficient.
+2. Separate generic primitives, shared contract vocabulary, domain policy and orchestration.
+   Keep a dependency-free business rule in its domain.
+3. If core still calls the implementation, place it under the appropriate core subsystem.
+   Extract a capability runtime into `shared-*` only after its incoming core dependency
+   closure is removed; never introduce a core-to-shared import to make a move compile.
+4. Check sibling consumers before moving a shared registry into one capability package.
+   Cross-capability ownership remains in core unless a separate lower boundary is justified.
+5. Move one coherent slice with its tests, update all importers and facade exports, and
+   decide public subpath compatibility explicitly. Do not leave single-module reexport shims.
+6. Verify affected tests and the core/package builds. Use `module-boundaries`,
+   `package-export-surface`, `foundation-weight` and `package-dependency-graph` for the
+   boundaries they actually enforce; none proves semantic ownership by itself.
+
+### First classification slice (2026-11-07)
+
+| Module                | Classification and destination                     | Reason                                                                                                                                                                                                        |
+| --------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bounded-audio-queue` | Voice domain, `core/voice/` (moved with its tests) | Depends on audio-route and meeting audio contracts; core audio buses and the shell TTS bridge use it. Keep the existing root export; no new public subpath.                                                   |
+| `business-calendar`   | Temporal domain, `core/temporal/`                  | Japanese holiday and bank-day rules serve organization, meeting and temporal-context. The existing `@agent/core/business-calendar` subpath remains stable while its export target follows the implementation. |
+
+### Continued classification (2026-11-07)
+
+| Modules                                                                                                                                                         | Destination         | Responsibility and compatibility                                                                                                                                                                         |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `provider-chain-router`, `provider-registry`, `provider-runtime-requirements`                                                                                   | `core/provider/`    | Provider registration, routing and runtime prerequisites used by core; retain existing public subpath keys.                                                                                              |
+| `llm-selection-preferences`, `llm-selection-state`, `backend-capability-profile`, `backend-capability-honesty`, `backend-conformance`, `backend-live-scenarios` | `core/reasoning/`   | Reasoning selection state, declared capabilities and observed conformance; retain existing public subpath keys and measurement protections.                                                              |
+| `barge-in-controller`, `pulse-audio-bus`, `blackhole-audio-bus`, `coreaudio-device-inventory`, `coreaudio-output-bridge`                                        | `core/voice/`       | Device and audio-route primitives used by core meeting/audio services; retain existing public subpath keys. Native Swift helper paths remain unchanged.                                                  |
+| `business-calendar`, `temporal-context`                                                                                                                         | `core/temporal/`    | Business-day, timezone and working-hours interpretation shared by meeting and organization; domain policy rather than foundation. Preserve the calendar subpath and temporal-context root export.        |
+| `segmented-voice-playback`, `streaming-voice-playback`                                                                                                          | `shared-voice/src/` | Speech synthesis/playback orchestration with no incoming core implementation dependency. Move the closure and its tests, remove core reexports/subpaths, and migrate consumers to `@agent/shared-voice`. |
+
+PR #1436 is integrated with these boundaries: script-only BlackHole routing state lives
+in `scripts/lib`, while the Cowork/MCP leaves, device-specific sensing providers and
+single-consumer actuator policies live beside their owners. Both playback modules stay
+in shared-voice; the preserved core subpath targets and manifest-derived Vitest aliases
+remain in effect. Historical PR measurements are rechecked on the combined checkout.
+
+The subsequent core-domain slice places `bounded-video-queue` in `video/`, `html-to-markdown`
+in `media/`, `ranking-signals` in `knowledge/`, and `bridge-typing` / `bridge-poll-loop`
+in `integrations/`. Their behavior and existing public import keys remain unchanged.
+
+### Cross-format design and operational leaves
+
+`core/design/` owns the shared design language: brand and semantic tokens, themes,
+fonts, presentation preferences and slide patterns, format projections, creative
+design resolution and cross-surface QA. It supplies common design decisions to web,
+video and document consumers. `core/media/` retains document reading and format
+processing; generation runtimes remain in `shared-media` and `shared-video`.
+These are domain policies, not dependency-free foundation utilities. Core consumers
+still use this family, so it remains inside core with existing public import keys.
+
+| Modules                                                                                                                                                                                                                                                                                                     | Destination      | Responsibility                                                                                                                 |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `presentation-preference-profile`, `presentation-preference-registry`, `presentation-slide-pattern`, `design-fonts`, `design-foundation-ui`, `design-foundation`, `brand-tokens`, `web-design-system`, `semantic-design-tokens`, `semantic-design-token-fallbacks`, `creative-design-resolver`, `design-qa` | `core/design/`   | Shared cross-format design policy, adaptation and QA; keep the separate presentation preference contract in `core/contracts/`. |
+| `daemon-heartbeat`, `scheduler-alert-markers`, `scheduler-incidents`                                                                                                                                                                                                                                        | `core/daemon/`   | Service liveness, alert deduplication and scheduler incident state; preserve all existing storage roots and public APIs.       |
+| `event-vocabulary`                                                                                                                                                                                                                                                                                          | `core/event/`    | Mapping domain event names to the common collaboration vocabulary.                                                             |
+| `opencode-cli-reasoning-backend`                                                                                                                                                                                                                                                                            | `core/provider/` | OpenCode CLI transport adapter; retain root export and existing child-process boundary permissions.                            |
+
+This slice changes location and import/export targets only. Existing tests move
+with their implementation; registered source paths follow the files without
+increasing any authorization or dependency budget.
+
+### Finance and contextual intent
+
+`core/finance/` owns financial models and the cost, attribution and budget policy
+around resource use. It keeps actual, estimated, subscription-included and unknown
+cost distinct. Generation quota uses abstract generation units, not currency;
+moving it does not change the organization's report-only treatment of those units.
+The generic metrics collector and generation execution scheduler keep their existing
+responsibilities outside this domain.
+
+| Modules                                                                                                                                                                                                | Destination     | Responsibility                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `financial-model`, `finance-controller`, `finance-controller-cost-report`, `cost-report`, `spend-guard`, `generation-cost-settlement`, `generation-quota`, `usage-accounting`, `metrics-cost-registry` | `core/finance/` | Financial models, usage cost attribution, rate lookup, settlement and resource budget policy; preserve existing import keys and quota semantics. |
+| `contextual-intent-frame`, `contextual-intent-clarification-policy`, `contextual-intent-memory`, `pending-intent-store`, `unhandled-intent-registry`                                                   | `core/intent/`  | Contextual intent formation, clarification, scoped memory, pending confirmation and unhandled-intent observation.                                |
+
+The intent slice preserves schemas, storage roots, TTLs, correlation bindings,
+tenant isolation and denial behavior. Unhandled tenant speech must not enter shared
+scratch storage, and the module-local cooldown state remains a single instance.
+`requirements-draft-store` remains separate because it owns mission evidence and
+customer signoff, rather than pending conversational intent. All fourteen modules
+still have core consumers, so this is internal domain placement without a new
+shared package or public subpath.
+
+The playback extraction deliberately changes those two package import paths; core must
+not reexport shared-voice to preserve an old import. Internal core relocations preserve
+their existing package APIs by changing export targets instead of adding shim files.
+Moved boundary allowlist entries keep their existing budgets and permissions.
+
+These slices establish the placement procedure. They do not classify all remaining
+flat core modules or turn the internal foundation directory into a package. Seam selection,
+platform bootstrap, authority and secure-I/O foundations need separate dependency reviews.
+
+## Enforced dependency rules
 
 - `@agent/core` never imports `@agent/shared-*` (lint: `no-restricted-imports` on `libs/core/**`).
 - A module moves out of core only when no core module (outside its own directory) imports it.
@@ -39,7 +160,8 @@ libs/shared-*  (video, media, voice, vision, interaction, network, ui, ...)
 - Foundation stays light: the gate `foundation-weight` (baseline
   `scripts/check_foundation_weight.baseline.json`) counts, on `libs/core/dist`, how many core
   modules `secure-io`, `path-resolver`, `logger` and every `foundation/**` / `contracts/**`
-  module load at runtime. Most of `secure-io`'s 67 are the guard's own machinery (audit chain,
+  module load at runtime. The 2026-11-07 measurement is 53 modules for `secure-io`;
+  most are the guard's own machinery (audit chain,
   policy engine, identity, tenant partitions, vault, sandbox); a new domain rule must not add to it.
 - Reviewed security repair exception (2026-11-06, `MSN-CREDENTIAL-LIFETIME-20261106`):
   the existing credential-material role now checks its private live issuer on every I/O,
@@ -59,7 +181,7 @@ libs/shared-*  (video, media, voice, vision, interaction, network, ui, ...)
 Core itself is layered `foundation → contracts → domain → orchestration`
 (`knowledge/product/governance/module-layer-boundaries.json`, gate `module-boundaries`).
 
-- `libs/core/foundation/` holds dependency-free utilities (text escaping, HTML sanitising,
+- `libs/core/foundation/` holds low-level utilities (text escaping, HTML sanitising,
   locale vocabulary, message formatting, PCM/WAV, origin matching, ...). A foundation module
   imports nothing above foundation.
 - `libs/core/contracts/` holds shared vocabularies, ids and contract types (OCR types, NHI ids,
@@ -68,8 +190,8 @@ Core itself is layered `foundation → contracts → domain → orchestration`
 - A flat `libs/core/<name>.ts` that imports no other core module is a candidate for one of the
   two. Move it only when its content is generic (utility) or a shared vocabulary (contract);
   a dependency-free module with domain meaning (mission lookup, working principles, ...) stays
-  with its domain. The public subpath follows the file (`@agent/core/foundation/<name>`,
-  `@agent/core/contracts/<name>`).
+  with its domain. New public subpaths follow the file (`@agent/core/foundation/<name>`,
+  `@agent/core/contracts/<name>`); relocating an existing module preserves its public key.
 
 - A flat module that implements one core subsystem moves into that subsystem's directory
   (`authn-providers` → `authn/`; `cli-provider-bundle`, `provider-transport`,
@@ -80,16 +202,43 @@ Core itself is layered `foundation → contracts → domain → orchestration`
   `voice/voice-profile-registry`) stays in core: moving it into one shared package would make
   its sibling packages depend on each other.
 
+## Exhaustive core ownership
+
+Every production module in `libs/core` has an owner in
+`knowledge/product/governance/module-layer-boundaries.json` (`core_placement`).
+`domain_roles` defines each subsystem's responsibility; `root_modules` records the
+responsibility and retention reason for each bootstrap boundary or deliberate public facade.
+The `module-boundaries` gate rejects unclassified root implementations, undeclared
+subsystems, and stale ownership entries. Tests and native Swift/Python helpers follow
+their implementation. Build metadata and existing bootstrap declaration inputs remain
+at the package root; declarations are not runtime ownership exceptions.
+
+Keep security, scope, storage, platform and initialization boundaries at the root only
+when their recorded retention reason applies. Domain implementations belong in their
+subsystem even when they have no dependencies. A move preserves existing public export
+keys and changes their source target; it does not introduce a compatibility shim.
+Resolve package imports from those export targets when checking the dependency graph,
+and never treat a same-named directory as the target of a facade import.
+
+Foundation provides generic mechanisms; contracts define shared vocabulary; domain
+modules own subsystem behavior; orchestration composes those behaviors. Directory ownership
+and dependency layer are separate: moving a module must preserve its existing layer and
+must not increase cycle or foundation-weight allowances.
+
 ## Placement guide
 
-| Package              | Holds                                                                                               | Stays in core instead                                                |
-| -------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `shared-video`       | ingest, composition compile/render, filters, recut                                                  | video contracts, design system, frame bus/route/lease/archive        |
-| `shared-media`       | document generation engines, image/music/video generation, layout and drawio policies               | document reader, docx/xlsx/pptx utils, pdf parser, image description |
-| `shared-voice`       | realtime voice conversation loops, voice generation runtime, samples, selection, turn-taking        | audio bus/route, STT/TTS bridges, VAD, voice-engine registries       |
-| `shared-vision`      | browser automation bridge, extension mailbox, browser conversation, onboarding, procedure promotion | extension bridge, recording compiler, Chrome meeting driver          |
-| `shared-perception`  | observation scoping, audio analysis, visual change, tracking, semantic index (+ Python helpers)     | STT/VAD/OCR/image-description bridges it calls                       |
-| `shared-interaction` | modality-independent conversation control                                                           | —                                                                    |
+| Package              | Holds                                                                                               | Stays in core instead                                                              |
+| -------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `shared-video`       | ingest, composition compile/render, filters, recut                                                  | video contracts, design system, frame bus/route/lease/archive                      |
+| `shared-media`       | document generation engines, image/music/video generation, layout and drawio policies               | document reader, docx/xlsx/pptx utils, pdf parser, image description               |
+| `shared-voice`       | realtime voice conversation loops, voice generation runtime, samples, selection, turn-taking        | audio bus/route, shared STT/TTS contracts and bridges, VAD/voice-engine registries |
+| `shared-vision`      | browser automation bridge, extension mailbox, browser conversation, onboarding, procedure promotion | extension bridge, recording compiler, Chrome meeting driver                        |
+| `shared-perception`  | observation scoping, audio analysis, visual change, tracking, semantic index (+ Python helpers)     | STT/VAD/OCR/image-description bridges it calls                                     |
+| `shared-interaction` | modality-independent conversation control                                                           | —                                                                                  |
+| `shared-network`     | MCP client/server runtime, HTTP transport, Cowork runtime and MCP request context                   | authority, governed network I/O and core service registries                        |
+| `shared-ui`          | React and vanilla renderers for the shared A2UI/component catalog                                   | viewer authorization and domain decisions                                          |
+| `shared-mobile`      | device-independent frame sources, input injection and live-mirror runtime                           | platform facts and governed OS actions                                             |
+| `shared-nerve`       | reflex-engine runtime composition                                                                   | core sensing bridges, authority and lifecycle ownership                            |
 
 ## Listen, think, speak: layer by role, not by sense
 

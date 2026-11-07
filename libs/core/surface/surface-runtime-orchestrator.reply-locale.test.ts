@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   localeSeenByFork: [] as Array<string | undefined>,
 }));
 
-vi.mock('../execution-feedback.js', () => ({
+vi.mock('../knowledge/execution-feedback.js', () => ({
   recordExecutionFeedback: mocks.recordExecutionFeedback,
   parseExecutionFeedbackText: mocks.parseExecutionFeedbackText,
 }));
@@ -42,7 +42,7 @@ describe('surface runtime orchestrator — turn-scoped reply locale', () => {
       feedback_id: 'FB-1',
       recorded_at: '2026-10-01T00:00:00.000Z',
     }));
-    const { getReplyLocale } = await import('../locale.js');
+    const { getReplyLocale } = await import('../localization/locale.js');
     mocks.triggerBackgroundReviewFork.mockImplementation(() => {
       mocks.localeSeenByFork.push(getReplyLocale());
       return { review_due: false };
@@ -56,7 +56,7 @@ describe('surface runtime orchestrator — turn-scoped reply locale', () => {
 
   it('answers in the user language without leaking the locale into the caller', async () => {
     const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
-    const { getReplyLocale } = await import('../locale.js');
+    const { getReplyLocale } = await import('../localization/locale.js');
     expect(getReplyLocale()).toBeUndefined();
 
     const result = await runSurfaceConversation({
@@ -73,7 +73,7 @@ describe('surface runtime orchestrator — turn-scoped reply locale', () => {
   it('enters the reply locale before the HA-01 fork and ends it with the turn', async () => {
     mocks.parseExecutionFeedbackText.mockReturnValue(FEEDBACK);
     const { runSurfaceMessageConversation } = await import('./surface-runtime-orchestrator.js');
-    const { getReplyLocale } = await import('../locale.js');
+    const { getReplyLocale } = await import('../localization/locale.js');
 
     const result = await runSurfaceMessageConversation({
       surface: 'slack',

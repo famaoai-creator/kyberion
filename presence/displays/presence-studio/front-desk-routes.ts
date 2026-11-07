@@ -149,7 +149,7 @@ export function registerFrontDeskRoutes(app: express.Express): void {
   });
 
   // FD-00 / FD-01: the shared front-desk rail reads its menu + labels from
-  // here so presence-studio and concierge never drift (libs/core/front-desk-nav.ts
+  // here so presence-studio and concierge never drift (libs/core/surface/front-desk-nav.ts
   // is the shared existing-feature catalog).
   app.get('/api/front-desk/nav', async (req, res) => {
     try {

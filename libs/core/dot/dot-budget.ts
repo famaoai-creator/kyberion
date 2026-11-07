@@ -25,7 +25,7 @@ import {
   type OrgBudgetEvaluation,
   type OrgBudgetScope,
 } from '../governance/org-budget-governor.js';
-import type { sendOpsAlert } from '../ops-alert.js';
+import type { sendOpsAlert } from '../daemon/ops-alert.js';
 import type { DotCharter } from './dot-charter.js';
 import type { DotDigestSection, DotFloorContributor, DotStatusSection } from './dot-extensions.js';
 

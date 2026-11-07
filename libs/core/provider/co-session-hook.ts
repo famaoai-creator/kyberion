@@ -27,7 +27,7 @@ import {
   listCoSessionPresence,
   normalizeCoSessionPath,
   takeUnseenCoSessionHandoffs,
-} from '../co-session.js';
+} from '../workforce/co-session.js';
 
 const logger = createLogger('co-session-hook');
 

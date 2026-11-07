@@ -59,7 +59,7 @@ vi.mock('../workforce/work-coordination.js', () => ({
   getWorkItem: (id: string) => (id === 'WI-bound' ? mocks.item : undefined),
   listActiveWorkLeases: () => mocks.leases,
 }));
-vi.mock('../actor-context.js', () => ({ currentActor: () => mocks.actor }));
+vi.mock('../authn/actor-context.js', () => ({ currentActor: () => mocks.actor }));
 
 const scope = {
   tier: 'confidential' as const,
