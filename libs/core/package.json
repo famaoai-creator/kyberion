@@ -712,10 +712,6 @@
       "types": "./dist/blackhole-audio-bus.d.ts",
       "default": "./dist/blackhole-audio-bus.js"
     },
-    "./blackhole-routing-guard": {
-      "types": "./dist/blackhole-routing-guard.d.ts",
-      "default": "./dist/blackhole-routing-guard.js"
-    },
     "./bluebubbles-adapter": {
       "types": "./dist/integrations/bluebubbles-adapter.d.ts",
       "default": "./dist/integrations/bluebubbles-adapter.js"

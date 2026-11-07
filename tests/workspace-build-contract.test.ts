@@ -482,6 +482,15 @@ describe('Workspace build contract', () => {
     }
   });
 
+  it('keeps the BlackHole routing guard beside its pipeline-execution consumers', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    expect(core.exports['./blackhole-routing-guard']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/blackhole-routing-guard.ts'))).toBe(false);
+    expect(safeExistsSync(path.join(rootDir, 'scripts/lib/blackhole-routing-guard.ts'))).toBe(true);
+  });
+
   it('keeps the Apple speech file STT bridge in shared-voice with the VAD backends', () => {
     const core = JSON.parse(
       safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
