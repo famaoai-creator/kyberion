@@ -7712,10 +7712,6 @@
       "types": "./dist/provider-registry.d.ts",
       "default": "./dist/provider-registry.js"
     },
-    "./windows-native-image-generation-bridge": {
-      "types": "./dist/windows-native-image-generation-bridge.d.ts",
-      "default": "./dist/windows-native-image-generation-bridge.js"
-    },
     "./barge-in-controller": {
       "types": "./dist/barge-in-controller.d.ts",
       "default": "./dist/barge-in-controller.js"

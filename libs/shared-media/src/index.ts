@@ -96,3 +96,5 @@ export {
 } from './spreadsheet-style-policy.js';
 
 export { loadTrackerSheetPolicyCatalog } from './tracker-sheet-policy.js';
+
+export * from './windows-native-image-generation-bridge.js';

@@ -245,8 +245,6 @@ export * from './platform-command-adapters.js';
 
 export * from './virtual/desktop-launch-adapter.js';
 
-export * from './windows-native-image-generation-bridge.js';
-
 export * from './virtual/os-automation-bridge.js';
 
 export * from './macos-automation-bridge.js';
