@@ -34,7 +34,7 @@ The diagnostic identifies the affected resource and guard; inspectLockRecovery r
 
 Scoped execution admits at most eight turns in one live supervisor, with same-conversation overlap denied. Shutdown waits for pending boot and requires an acknowledged stopped result before capacity is released. Failed cleanup retains its slot. The cap survives surface restarts while that daemon remains alive; it is not a crash-proof global OS-process budget. Existing idle cleanup applies. Operators must reconcile orphaned runtime state after daemon crashes rather than assuming a new process proves old work stopped.
 
-Progress verdicts persist principal/scope/item uncertainty in browser session storage before POST. Old reads cannot clear newer uncertainty; only a later read containing the exact terminal entry can reconcile it. Storage restoration errors keep actions disabled and preserve unverified data. This is a client safeguard: the inherited deliverable-inbox backend is not an exactly-once mutation service.
+Progress verdicts are no longer recorded on the progress page: 進み具合 moved to Concierge 仕事 › 依頼 (`/work?tab=requests`), which links delivered items to 受信箱, where deliverable decisions are made. The inherited deliverable-inbox backend is not an exactly-once mutation service.
 
 ## Startup and deployment
 
@@ -44,8 +44,8 @@ Follow QUICKSTART's managed reconcile, status, and setup-report sequence. Enable
 
 - Startup/readiness: scripts/setup_report.test.ts, managed_startup.test.ts, setup_source_maintenance.test.ts
 - History and replay: front-desk-conversation-store.test.ts, conversation-routes.test.ts, Concierge route.history.test.ts
-- Browser interrupted/repeated flows: ask-client.test.ts, conversation-response-input.test.ts, progress-client.test.ts
-- Scope and result fidelity: progress-scope-routes.test.ts, progress.test.ts, home.test.ts
+- Browser interrupted/repeated flows: ask-client.test.ts, conversation-response-input.test.ts
+- Scope and result fidelity: progress-scope-routes.test.ts, libs/core/surface/front-desk-progress.test.ts, Concierge api/progress route tests, home.test.ts
 - Scoped runtime and cleanup: surface-conversation-runtime-context.test.ts, agent-lifecycle.surface-context.test.ts, surface-runtime-orchestrator.conversation-context.test.ts, surface-runtime-conversation-data.context-binding.test.ts
 - Lock publication/reclamation: lock-utils-contention.test.ts
 
