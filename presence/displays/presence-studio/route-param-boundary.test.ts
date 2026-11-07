@@ -8,10 +8,10 @@ function readRepoFile(relativePath: string): string {
 describe('Presence Studio route parameter boundary', () => {
   it('uses the strict route parameter reader for every dynamic route parameter', () => {
     const serverSource = readRepoFile('presence/displays/presence-studio/server.ts');
-    // FD-05 progress/:id and outcomes/:id/verdict moved into
-    // `front-desk-routes.ts` (registered from `server.ts`) purely to keep
-    // `server.ts` under the `max-file-lines` gate — the strict-reader
-    // requirement now spans these files.
+    // Front-desk routes live in `front-desk-routes.ts` (registered from
+    // `server.ts`) purely to keep `server.ts` under the `max-file-lines`
+    // gate — the strict-reader requirement spans these files. (FD-05's
+    // progress/:id and outcomes/:id/verdict left with the 進み具合 page.)
     const frontDeskRoutesSource = readRepoFile(
       'presence/displays/presence-studio/front-desk-routes.ts'
     );
@@ -21,7 +21,7 @@ describe('Presence Studio route parameter boundary', () => {
     const combined = `${serverSource}\n${frontDeskRoutesSource}\n${approvalInboxRoutesSource}`;
 
     expect(combined).not.toMatch(/String\(req\.params\.[^)]+\|\| ''\)\.trim\(\)/u);
-    expect(combined.match(/readPresenceStudioStringParam\(req\.params\.[^)]+\)/gu)).toHaveLength(8);
+    expect(combined.match(/readPresenceStudioStringParam\(req\.params\.[^)]+\)/gu)).toHaveLength(6);
     expect(serverSource.match(/readPresenceStudioStringParam\(req\.query\.path\)/gu)).toHaveLength(
       2
     );
