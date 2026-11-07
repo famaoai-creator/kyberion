@@ -515,7 +515,7 @@
     "libs/core/knowledge/procedure-self-repair.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/llm-selection-preferences.ts": {
+    "libs/core/reasoning/llm-selection-preferences.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/logger.ts": {

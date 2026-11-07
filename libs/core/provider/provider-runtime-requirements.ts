@@ -10,10 +10,10 @@
  * `unmet: ['managed_runtime:mlx_whisper']` exclusion with a setup hint).
  */
 
-import { hostArch, hostNodePlatform, isAppleSilicon } from './platform-facts.js';
-import { locateManagedToolPythonBin } from './tool/tool-runtime-registry.js';
-import { isExternalToolBinResolvable } from './tool/tool-binary-resolvers.js';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { hostArch, hostNodePlatform, isAppleSilicon } from '../platform-facts.js';
+import { locateManagedToolPythonBin } from '../tool/tool-runtime-registry.js';
+import { isExternalToolBinResolvable } from '../tool/tool-binary-resolvers.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 
 export interface ProviderRuntimeRequirement {
   /** Host platforms the provider can run on (NodeJS.Platform names). */

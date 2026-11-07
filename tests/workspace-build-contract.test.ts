@@ -244,7 +244,7 @@ describe('Workspace build contract', () => {
     }
   });
 
-  it('keeps two-stage barge-in in shared-voice and the shared energy detector in core', () => {
+  it('keeps voice playback and turn-taking runtimes in shared-voice and shared audio primitives in core', () => {
     const readPackage = (directory: string) =>
       JSON.parse(
         safeReadFile(path.join(rootDir, directory, 'package.json'), { encoding: 'utf8' }) as string
@@ -258,11 +258,19 @@ describe('Workspace build contract', () => {
       types: './dist/two-stage-barge-in.d.ts',
       default: './dist/two-stage-barge-in.js',
     });
+    for (const name of ['segmented-voice-playback', 'streaming-voice-playback']) {
+      expect(core.exports[`./${name}`]).toBeUndefined();
+      expect(safeExistsSync(path.join(rootDir, 'libs/core', `${name}.ts`))).toBe(false);
+      expect(voice.exports[`./${name}`]).toEqual({
+        types: `./dist/${name}.d.ts`,
+        default: `./dist/${name}.js`,
+      });
+    }
     // Meeting and voice both use the energy detector, so it must not move
     // into a package that would make core depend on shared-voice.
     expect(core.exports['./barge-in-controller']).toEqual({
-      types: './dist/barge-in-controller.d.ts',
-      default: './dist/barge-in-controller.js',
+      types: './dist/voice/barge-in-controller.d.ts',
+      default: './dist/voice/barge-in-controller.js',
     });
   });
 });

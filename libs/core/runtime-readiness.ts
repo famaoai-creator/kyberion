@@ -20,7 +20,7 @@
  * {@link toPublicReadinessReport}.
  */
 
-import { createProviderRegistry } from './provider-registry.js';
+import { createProviderRegistry } from './provider/provider-registry.js';
 import type { SeamProviderMetadata } from './seam.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeLstat } from './secure-io.js';

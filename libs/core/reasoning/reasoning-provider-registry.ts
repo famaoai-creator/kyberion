@@ -27,7 +27,7 @@ import type {
   BackendUtilityFit,
   ThinkingLevel,
   ThinkingLevelMap,
-} from '../backend-capability-profile.js';
+} from './backend-capability-profile.js';
 import { pathResolver } from '../path-resolver.js';
 import { loadRegistryDirectory, type RegistryDirectoryOptions } from '../registry-directory.js';
 import { assertModuleInvariant } from '../invariants.js';

@@ -21,7 +21,7 @@ import {
   unmetRuntimeRequirements,
   type ProviderRuntimeRequirement,
   type RuntimeRequirementContext,
-} from '../provider-runtime-requirements.js';
+} from '../provider/provider-runtime-requirements.js';
 import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 import {
   listSeamSelectionPurposes,

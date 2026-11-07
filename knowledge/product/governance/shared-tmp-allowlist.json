@@ -162,7 +162,7 @@
       "note": "request/result IPC handoff files, plus a path-scope guard (assertAssistantCompilerResultPath) that resolves the same results root to bound a caller-supplied output path"
     },
     {
-      "file": "libs/core/backend-conformance.ts",
+      "file": "libs/core/reasoning/backend-conformance.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "provider sandbox probe scratch dir; disposable per-probe"

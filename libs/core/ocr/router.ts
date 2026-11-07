@@ -7,7 +7,7 @@ import {
   OcrDataEgress,
   OcrRoutingMode,
 } from '../contracts/ocr-types.js';
-import { ProviderChainRouter } from '../provider-chain-router.js';
+import { ProviderChainRouter } from '../provider/provider-chain-router.js';
 import { type SeamProviderCandidate } from '../seam-provider-selection.js';
 import { withEgressPayloadContext } from '../egress-policy.js';
 import { providerDataPolicy, resolveOcrImagePath } from './provider-support.js';

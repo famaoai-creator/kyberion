@@ -28,7 +28,7 @@ import {
   reasoningProviderModelEnvKeys,
 } from './reasoning-provider-registry.js';
 import { readPinFile } from '../provider/provider-pins-store.js';
-import { loadLlmSelectionPreferences } from '../llm-selection-state.js';
+import { loadLlmSelectionPreferences } from './llm-selection-state.js';
 import {
   BACKEND_CAPABILITY_PROFILES,
   backendRouteCapabilities,
@@ -39,7 +39,7 @@ import {
   type BackendRouteCapability,
   type ConstrainedSampling,
   type ThinkingLevel,
-} from '../backend-capability-profile.js';
+} from './backend-capability-profile.js';
 
 const POLICY_PATH = pathResolver.knowledge('product/governance/reasoning-route-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/reasoning-route-policy.schema.json');

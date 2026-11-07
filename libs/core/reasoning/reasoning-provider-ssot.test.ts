@@ -28,9 +28,9 @@ import {
   backendCapabilityProfile,
   backendCapabilityProfileForIdentifier,
   isLocalOnlyReasoningBackend,
-} from '../backend-capability-profile.js';
+} from './backend-capability-profile.js';
 import { probeExplicitReasoningBackend } from '../environment-capability-probes.js';
-import { runBackendConformance, runBackendSandboxConformance } from '../backend-conformance.js';
+import { runBackendConformance, runBackendSandboxConformance } from './backend-conformance.js';
 import { reasoningBackendEndpoint } from './reasoning-egress-scope.js';
 import { providerIdForReasoningIdentifier } from '../provider/provider-egress-gate.js';
 import { isCliDiscoveryMode } from './cli-mode-presence.js';

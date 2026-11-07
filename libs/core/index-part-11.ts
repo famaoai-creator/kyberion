@@ -6,7 +6,7 @@ export {
   type BackendConformanceReport,
   type BackendConformanceResult,
   type ConformanceEvidenceStatus,
-} from './backend-conformance.js';
+} from './reasoning/backend-conformance.js';
 
 // QM-09: gap-phase latency attribution for LLM delegations.
 

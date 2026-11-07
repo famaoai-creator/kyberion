@@ -326,7 +326,7 @@ export type {
 
 export * from './reasoning/reasoning-route-resolver.js';
 
-export * from './llm-selection-preferences.js';
+export * from './reasoning/llm-selection-preferences.js';
 
 export * from './reasoning/reasoning-route-doctor.js';
 export * from './reasoning/reasoning-provider-readiness.js';

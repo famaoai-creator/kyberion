@@ -1,6 +1,6 @@
 import type { TierLevel } from './types.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { isLocalOnlyReasoningBackend } from './backend-capability-profile.js';
+import { isLocalOnlyReasoningBackend } from './reasoning/backend-capability-profile.js';
 
 import { KNOWLEDGE_TIER_RANK as TIER_SENSITIVITY } from './foundation/knowledge-tier.js';
 

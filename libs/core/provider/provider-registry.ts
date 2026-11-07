@@ -15,7 +15,7 @@ import {
   type Seam,
   type SeamCatalog,
   type SeamProviderMetadata,
-} from './seam.js';
+} from '../seam.js';
 
 export interface ProviderRegistryOptions<T> {
   /** Named seam key, e.g. 'ocr-provider'. */

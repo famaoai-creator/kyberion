@@ -65,7 +65,7 @@ import {
   type StablePrefixSnapshot,
 } from '../reasoning/prompt-cache-discipline.js';
 import type { ReasoningToolName, SamplingParams } from '../reasoning/reasoning-route-resolver.js';
-import type { ConstrainedSampling } from '../backend-capability-profile.js';
+import type { ConstrainedSampling } from '../reasoning/backend-capability-profile.js';
 import {
   markDelegationExecutionStarted,
   reportDelegationResultMetadata,

@@ -23,8 +23,8 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { logger } from '../core.js';
 import { buildSafeExecEnv } from '../secure-io.js';
-import { BoundedAudioQueue, DEFAULT_AUDIO_BUFFER_POLICY } from '../bounded-audio-queue.js';
-import { runtimeSetupHint } from '../provider-runtime-requirements.js';
+import { BoundedAudioQueue, DEFAULT_AUDIO_BUFFER_POLICY } from '../voice/bounded-audio-queue.js';
+import { runtimeSetupHint } from '../provider/provider-runtime-requirements.js';
 import {
   listStreamingTtsBridgeIds,
   registerStreamingTtsBridge,

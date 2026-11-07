@@ -11,14 +11,11 @@ import {
 } from './backend-live-scenarios.js';
 import { buildBackendCapabilityHonestyReport } from './backend-capability-honesty.js';
 import { BACKEND_CAPABILITY_PROFILES } from './backend-capability-profile.js';
-import { stubReasoningBackend } from './reasoning/reasoning-backend.js';
-import type {
-  ReasoningBackend,
-  ReasoningCallOptions,
-} from './reasoning/reasoning-backend-contracts.js';
-import { createDelegationHandle } from './delegated-task-observability.js';
-import { DelegationAbortedError } from './mission/delegation-concurrency.js';
-import { bindReasoningRequestTimeout } from './reasoning/reasoning-fixed-binding.js';
+import { stubReasoningBackend } from './reasoning-backend.js';
+import type { ReasoningBackend, ReasoningCallOptions } from './reasoning-backend-contracts.js';
+import { createDelegationHandle } from '../delegated-task-observability.js';
+import { DelegationAbortedError } from '../mission/delegation-concurrency.js';
+import { bindReasoningRequestTimeout } from './reasoning-fixed-binding.js';
 
 const NONCE = 'n0nce';
 const RECALL = /first message/u;

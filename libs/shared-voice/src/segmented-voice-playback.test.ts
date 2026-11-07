@@ -11,7 +11,7 @@ vi.mock('node:child_process', async (importOriginal) => {
 });
 
 import { speakSegmented } from './segmented-voice-playback.js';
-import type { PlaybackHandle, PlaybackResult } from './voice/audio-playback.js';
+import type { PlaybackHandle, PlaybackResult } from '@agent/core/voice/audio-playback';
 
 interface FakeChild extends EventEmitter {
   stdout: null;

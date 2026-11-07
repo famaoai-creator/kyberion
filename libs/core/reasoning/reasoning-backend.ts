@@ -64,7 +64,7 @@ import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js'
 import { AdvisoryPolicyViolation } from '../ce-adoption.js';
 import { assertDistillationTextEgress } from '../frame-redaction.js';
 import { appendPromptVisibilityRecord } from './prompt-visibility-ledger.js';
-import { resolveConstrainedSampling } from '../backend-capability-profile.js';
+import { resolveConstrainedSampling } from './backend-capability-profile.js';
 import {
   appendDeferredToolAnnouncement,
   planDeferredToolLoading,

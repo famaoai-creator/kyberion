@@ -13,7 +13,7 @@
  * touching call sites that already resolve through this seam.
  */
 
-import { createProviderRegistry } from '../provider-registry.js';
+import { createProviderRegistry } from '../provider/provider-registry.js';
 import type { SeamProviderMetadata } from '../seam.js';
 import { resolveSeamDefaultOrder } from '../seam-provider-selection.js';
 

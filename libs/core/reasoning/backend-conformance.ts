@@ -11,24 +11,24 @@
  */
 
 import path from 'node:path';
-import { safeExec, safeExecResult, safeExistsSync, safeMkdir, safeRmSync } from './secure-io.js';
+import { safeExec, safeExecResult, safeExistsSync, safeMkdir, safeRmSync } from '../secure-io.js';
 import {
   backendCapabilityProfile,
   type BackendCapabilityProfile,
 } from './backend-capability-profile.js';
-import { requireSandboxEnforcement, resolveSandboxPolicy } from './shell/sandbox-policy.js';
+import { requireSandboxEnforcement, resolveSandboxPolicy } from '../shell/sandbox-policy.js';
 import {
   PROVIDER_IDS,
   resolveProviderPermissionArgs,
-} from './provider/provider-permission-profiles.js';
+} from '../provider/provider-permission-profiles.js';
 import {
   listCliReasoningProviderDescriptors,
   type ReasoningProviderCli,
-} from './reasoning/reasoning-provider-registry.js';
-import { getRegisteredEnvText } from './foundation/env.js';
-import { nowIso } from './foundation/time.js';
-import * as pathResolver from './path-resolver.js';
-import type { ReasoningBackendMode } from './reasoning/reasoning-backend-policy.js';
+} from './reasoning-provider-registry.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { nowIso } from '../foundation/time.js';
+import * as pathResolver from '../path-resolver.js';
+import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 
 /**
  * RS-01: every CLI provider, its binary, probe args, bin-override env key and
