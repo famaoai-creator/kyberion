@@ -908,10 +908,6 @@
       "types": "./dist/virtual/computer-surface.d.ts",
       "default": "./dist/virtual/computer-surface.js"
     },
-    "./desktop-ax-bridge": {
-      "types": "./dist/desktop-ax-bridge.d.ts",
-      "default": "./dist/desktop-ax-bridge.js"
-    },
     "./config-change": {
       "types": "./dist/config-change.d.ts",
       "default": "./dist/config-change.js"
@@ -7763,6 +7759,10 @@
     "./foundation/rate-limit": {
       "types": "./dist/foundation/rate-limit.d.ts",
       "default": "./dist/foundation/rate-limit.js"
+    },
+    "./foundation/runtime-state-roots": {
+      "types": "./dist/foundation/runtime-state-roots.d.ts",
+      "default": "./dist/foundation/runtime-state-roots.js"
     },
     "./foundation/scope-context-validation": {
       "types": "./dist/foundation/scope-context-validation.d.ts",

@@ -1,7 +1,7 @@
-import { runtimeStatePath } from './foundation/runtime-state-roots.js';
-import { pathResolver } from './path-resolver.js';
-import { safeChmodSync, safeExecResult, safeExistsSync, safeMkdir } from './secure-io.js';
-import { resolveAgentDesktopBin } from './tool/tool-binary-resolvers.js';
+import { runtimeStatePath } from '@agent/core/foundation/runtime-state-roots';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeChmodSync, safeExecResult, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
+import { resolveAgentDesktopBin } from '@agent/core/tool/tool-binary-resolvers';
 
 /**
  * Governed bridge to the optional `agent-desktop` managed tool runtime.
