@@ -1,5 +1,10 @@
 import type { DiscussionScope } from '@agent/core/discussion/discussion-types';
 import {
+  admitsCustody,
+  custodyOfScope,
+  viewerPersonIds,
+} from '@agent/core/surface/surface-authorization';
+import {
   strictViewerScopeOrganizationIds,
   strictViewerScopeProjectIds,
   strictViewerScopeTenantSlugs,
@@ -18,7 +23,18 @@ export function isDiscussionVisibleToViewer(
   requestedTenant?: string
 ): boolean {
   const tenants = strictViewerScopeTenantSlugs(viewer, requestedTenant);
-  if (tenants !== 'all' && (!scope.tenant_slug || !tenants.includes(scope.tenant_slug))) {
+  if (
+    // `admitsCustody` decides for 'all' too: tenant/system custody admits, but
+    // person custody stays identity-bound even for an all-tenant viewer.
+    !admitsCustody(
+      {
+        tenantSlugs: tenants,
+        includeUntenanted: viewer.includeUntenanted,
+        personIds: viewerPersonIds(viewer),
+      },
+      custodyOfScope(scope)
+    )
+  ) {
     return false;
   }
   const organizations = strictViewerScopeOrganizationIds(viewer);

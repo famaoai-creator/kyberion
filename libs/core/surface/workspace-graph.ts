@@ -37,7 +37,7 @@ import { decisionReasonText } from './decision-reason-text.js';
 import { readableMissionName } from './display-humanize.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
 import {
-  admitsTenant,
+  admitsCustody,
   authorizeSurfaceOperation,
   type SurfaceAuthorizationContext,
 } from './surface-authorization.js';
@@ -589,10 +589,12 @@ const GRAPH_READ_POLICY = {
 };
 
 /**
- * Row-level admission. A node with no tenant is system data: only a viewer
- * scoped to every tenant, or the server-resolved system selection
- * (`includeUntenanted`), sees it — unless it is public tier. Tenant admission
- * goes through `admitsTenant`, the one rule every viewer-scoped reader shares.
+ * Row-level admission by custody kind. A node with no tenant is system
+ * data: only a viewer scoped to every tenant, or the server-resolved system
+ * selection (`includeUntenanted`), sees it — unless it is public tier. A
+ * member node is visible through shared tenancy OR to the member themself
+ * (person custody: the node id is the member id). Admission goes through
+ * `admitsCustody`, the one rule every viewer-scoped reader shares.
  */
 export function viewerAdmitsNode(viewer: SurfaceAuthorizationContext, node: GraphNode): boolean {
   if (node.kind === 'actor' && node.facts?.actor_type === 'member') {
@@ -600,9 +602,13 @@ export function viewerAdmitsNode(viewer: SurfaceAuthorizationContext, node: Grap
       .split(',')
       .filter(Boolean);
     if (viewer.tenantSlugs === 'all') return true;
-    return memberTenants.some((tenant) => admitsTenant(viewer, tenant));
+    return (
+      memberTenants.some((tenant) => admitsCustody(viewer, { kind: 'tenant', ref: tenant })) ||
+      admitsCustody(viewer, { kind: 'person', ref: node.id })
+    );
   }
-  if (!node.tenantSlug && node.tier !== 'public' && !admitsTenant(viewer, undefined)) return false;
+  if (!node.tenantSlug && node.tier !== 'public' && !admitsCustody(viewer, { kind: 'system' }))
+    return false;
   return authorizeSurfaceOperation({
     context: viewer,
     operation: GRAPH_READ_POLICY,

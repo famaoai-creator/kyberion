@@ -14,6 +14,7 @@ import {
   type OperatorHomeSummary,
 } from './surface/operator-home-summary.js';
 import { listSurfaceNotificationsAcrossChannels } from './surface/surface-ux.js';
+import { admitsCustody, custodyOfScope } from './surface/surface-authorization.js';
 import { t, type VocabularyKey } from './t.js';
 import { nowIso } from './foundation/time.js';
 import { computeApprovalPresentedDigest } from './governance/approval-presentation.js';
@@ -47,6 +48,8 @@ export interface CeoApprovalItem {
   /** Whose decision this is. Lets a member of several organizations see which one is asking. */
   tenant_slug?: string;
   organization_id?: string;
+  /** Person custody marker: an owner-bound record admits to its owner only. */
+  owner_nhi?: string;
   /** HA-06: digest of what this item shows; the decision sends it back. */
   presented_digest?: string;
   /** HA-07: the weakest decider proof a human-only request accepts (A3 = passkey). */
@@ -195,11 +198,21 @@ export function notificationMatchesScope(
     !scope.tiers.includes(scopedRecord.tier as 'personal' | 'confidential' | 'public')
   )
     return false;
-  const notificationTenant = String(scopedRecord.tenant_slug || '');
+  // Custody admission is the shared rule every viewer-scoped reader follows:
+  // tenant rows admit by tenant scope, untenanted rows need the system
+  // selection, person-bound rows admit to their owner only.
   if (
-    Array.isArray(scope?.tenantSlugs) &&
-    !scope.tenantSlugs.includes(notificationTenant) &&
-    !(scope.includeUntenanted && !notificationTenant)
+    !admitsCustody(
+      {
+        tenantSlugs: scope?.tenantSlugs ?? 'all',
+        includeUntenanted: scope?.includeUntenanted,
+        personIds: scope?.personIds,
+      },
+      custodyOfScope({
+        tenant_slug: scopedRecord.tenant_slug ? String(scopedRecord.tenant_slug) : undefined,
+        owner_nhi: scopedRecord.owner_nhi ? String(scopedRecord.owner_nhi) : undefined,
+      })
+    )
   )
     return false;
   if (
@@ -275,6 +288,7 @@ export function toCeoApprovalItem(
     organization_id: record.scope?.organization_id
       ? String(record.scope.organization_id)
       : undefined,
+    owner_nhi: record.scope?.owner_nhi ? String(record.scope.owner_nhi) : undefined,
     ...(record.id && record.title
       ? { presented_digest: computeApprovalPresentedDigest(approval) }
       : {}),

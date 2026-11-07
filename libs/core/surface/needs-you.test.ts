@@ -313,7 +313,17 @@ describe('needs-you scope narrowing', () => {
       organizationIds: 'all',
       projectIds: 'all',
     } as const;
-    expect(ids(buildNeedsYouQueue(data, { viewer, now: NOW }))).toEqual(['famao', 'personal']);
+    // Custody admission (P4): an untenanted item is system custody — it needs
+    // the server-resolved system selection, not just any tenant viewer.
+    expect(ids(buildNeedsYouQueue(data, { viewer, now: NOW }))).toEqual(['famao']);
+    expect(
+      ids(
+        buildNeedsYouQueue(data, {
+          viewer: { ...viewer, includeUntenanted: true },
+          now: NOW,
+        })
+      )
+    ).toEqual(['famao', 'personal']);
   });
 
   it('a client tenant narrows but never widens', () => {

@@ -2,6 +2,11 @@ import { scopedLearningApprovalVisibleToViewer } from './scoped-learning-approva
 import type { ViewerContext } from './ops-viewer';
 import { loadProjectRecord } from '@agent/core/project/project-registry';
 import {
+  admitsCustody,
+  custodyOfScope,
+  viewerPersonIds,
+} from '@agent/core/surface/surface-authorization';
+import {
   workspaceScopeMatchesResource,
   type ResolvedWorkspaceScope,
   type WorkspaceSelection,
@@ -74,6 +79,8 @@ export interface MissionHistoryQuery {
   projectIds?: string[] | 'all';
   kind?: string;
   missionId?: string;
+  /** Server-resolved only (the system selection): also admit company-less records. */
+  includeUntenanted?: boolean;
   limit?: number;
 }
 
@@ -203,6 +210,8 @@ export interface ApprovalQueueQuery {
   missionId?: string;
   tenant?: string;
   tenantSlugs?: string[] | 'all';
+  /** Server-resolved only (the system selection): also admit company-less records. */
+  includeUntenanted?: boolean;
   channel?: string;
   limit?: number;
 }
@@ -425,7 +434,13 @@ export function projectMissionHistoryItems(
       }
       if (query.tenantSlugs && query.tenantSlugs !== 'all') {
         const tenantValue = item.tenantSlug || item.tenantId;
-        if (!tenantValue || !query.tenantSlugs.includes(tenantValue)) return false;
+        if (
+          !admitsCustody(
+            { tenantSlugs: query.tenantSlugs, includeUntenanted: query.includeUntenanted },
+            custodyOfScope({ tenant_slug: tenantValue })
+          )
+        )
+          return false;
       }
       if (
         kindFilter &&
@@ -734,9 +749,20 @@ export function buildApprovalQueueItems(query: ApprovalQueueQuery = {}): Approva
           `${resolvedTenant || ''} ${record.requestedByContext?.actorId || ''} ${record.requestedByContext?.surface || ''} ${record.track_id || ''} ${record.track_name || ''}`.toLowerCase();
         if (!tenantValue.includes(tenantFilter)) return false;
       }
-      if (query.tenantSlugs && query.tenantSlugs !== 'all') {
-        if (!resolvedTenant || !query.tenantSlugs.includes(resolvedTenant)) return false;
-      }
+      // Custody admission is unconditional — a caller that forgets the scope
+      // resolves to 'all', which still never admits person custody.
+      const approvalScope = record.scope as { owner_nhi?: string } | undefined;
+      if (
+        !admitsCustody(
+          {
+            tenantSlugs: query.tenantSlugs ?? 'all',
+            includeUntenanted: query.includeUntenanted,
+            personIds: query.viewer ? viewerPersonIds(query.viewer) : [],
+          },
+          custodyOfScope({ tenant_slug: resolvedTenant, owner_nhi: approvalScope?.owner_nhi })
+        )
+      )
+        return false;
       if (
         channelFilter &&
         !`${record.channel} ${record.storageChannel}`.toLowerCase().includes(channelFilter)

@@ -190,7 +190,7 @@ Work Visibility Scope、Binding Scope）はそのまま残る。このモデル�
 | P1  | 処理者への開示の統一 | 管理者 `{ kind: 'system' \| 'tenant' \| 'person', ref }` を受け取る判定関数を一つにし、推論送信（`reasoning-egress-scope.ts`）と委譲（`provider-egress-gate.ts`）の両方から使う。インストール単位の証明を `system/` 区画に、個人単位の証明を `personal/` 区画に、テナントの証明と同じ形（承認つき、TTL 180 日）で置く。登録は既存の `pnpm onboarding llm attest` を管理者の種類で拡張する。 | 同じ入力に対して 2 つの入口の結論が一致する契約テスト。テナント無しの role draft が、インストール単位の証明があれば通り、無ければ証明の登録コマンドを案内して拒否される | proposed                      |
 | P2  | 作成時の管理者       | 実行時ストアのテナント分割の登録ゲート（#1414）と `training_use` の型必須化（進行中の PR）を R-01 / R-04 の実装として位置づける。新しい記録型には管理者を必須フィールドとして持たせる。                                                                                                                                                                                                     | 登録されていないテナント分割ストアと管理者の無い新規記録が CI で拒否される                                                                                              | 一部進行中                    |
 | P3  | 派生関係             | provenance taint を mission 単位から資産単位に広げ、既存の来歴（ingest asset ledger、memory provenance）を一つの派生関係の参照形式でつなぐ。退会時の削除と保持期間の満了は派生関係をたどる。                                                                                                                                                                                                | テナントの資産を消すと、その要約・蒸留結果・キャッシュ・委譲結果も消える fixture テスト。手書きの削除対象リストが不要になる                                             | 実施済み（下記「P3 の実施」） |
-| P4  | 閲覧の開示           | `admitsTenant`（#1407）を管理者の種類（system / tenant / person）で判定する形に一般化し、すべての surface reader をそれに揃える。                                                                                                                                                                                                                                                           | system / 単一テナント / 個人の viewer で、ホーム・あなた待ち・グラフの件数が一致する契約テスト                                                                          | proposed                      |
+| P4  | 閲覧の開示           | `admitsTenant`（#1407）を管理者の種類（system / tenant / person）で判定する形に一般化し、すべての surface reader をそれに揃える。                                                                                                                                                                                                                                                           | system / 単一テナント / 個人の viewer で、ホーム・あなた待ち・グラフの件数が一致する契約テスト                                                                          | 実施済み（下記「P4 の実施」） |
 
 **P3 の実施（MSN-SCOPE-P3-20261107）。**
 
@@ -273,6 +273,55 @@ Work Visibility Scope、Binding Scope）はそのまま残る。このモデル�
   標す偽造行による削除ランダリング** — deadRefs に乗らず被害者の
   グラフは無事）の削除防御を網羅。
 - mission 単位の `provenance-taint.ts` は変えない — 資産単位は別の参照型として併置。
+
+**P4 の実施（MSN-SCOPE-P4-20261107）。**
+
+- `libs/core/surface/surface-authorization.ts` に行 admission を custody kind
+  で判定する `admitsCustody(viewer, custody)` を追加した。`ViewerRecordCustody`
+  は `{ kind: 'system' } | { kind: 'tenant', ref } | { kind: 'person', ref }`
+  （P3 の `DerivationCustody` と同じ語彙、ただし person の ref は必須 —
+  「誰か」のデータを名指し無しに開示できない）。
+  - `tenant` — `tenantSlugs === 'all'` または列挙メンバーシップ（従来どおり）。
+  - `system` — 従来の「untenanted」が意味していたものそのもの:`'all'` または
+    サーバー解決の `includeUntenanted`。
+  - `person` — identity-bound で scope-bound ではない:`viewerPersonIds`
+    （`personIds` / `memberId` / `principal.actor.id` / `principalId`、いずれも
+    サーバー解決フィールド）との完全一致のみ。`'all'` でも他人の
+    person custody は開示しない。
+- `custodyOfScope(scope)` がレコードの custody を導く:`tenant_slug` → tenant、
+  無ければ `owner_nhi` → person、それ以外 → system。person フィールドを
+  持たないレコードは従来どおりの扱いで、データ移行は不要。
+  `admitsTenant` は薄いラッパとして残し、全入力で従来と同じ結果を返す。
+- すべての surface reader を同じ述語に揃えた（手書きの
+  `tenantSlugs.includes()` を排除）:
+  `needs-you-sources`・`workspace-graph`（member actor は共有テナンシー
+  または本人の自己可視）・`needs-you` の narrow 再検査（untenanted を
+  無条件に通していた分岐を system custody に統一）・`operator-home-summary`
+  （`tenantScopeAllows` → `scopeAdmitsCustody`、person は `personIds` +
+  owner 認証済み snapshot の `includePersonalApprovals` 経路の二本立て、
+  owner_nhi を名指す行には identity チェックを多層防御として追加）・
+  `ceo-surface-summary.notificationMatchesScope`・ops の
+  `knowledge-scope` / `distill-candidate-scope` / `discussion-access` /
+  `trace-log-access` / `trace-feed` / `su-surface-data` /
+  `workspace-overview` / `deliverable-preview` ルート・presence-studio の
+  `work-home-source`。`includeUntenanted` を伝播しなかった ops の
+  スコープ射影（ops headless ホーム、trace/su クエリ）も配線済み。
+- `CeoApprovalItem` / `NeedsYouItem` に `owner_nhi` を通し、narrow 再検査で
+  custody が落ちないようにした。personal tier の行は引き続き tier 天井で
+  マスクされ、承認の personal 区画は `withConciergePersonalApprovals` の
+  インストール済みオーナー立証の内側にある — custody はその先の行可視を
+  決める層であり、立証経路を置き換えない。
+- 契約テスト `tests/viewer-custody-admission-contract.test.ts`:
+  system / 単一テナント / 個人 / `'all'` の viewer について、ホーム
+  （`readConciergeHome`・`collectHomeDashboard`）・あなた待ち
+  （shell・MCP 両 reader）・グラフ（`viewerAdmitsNode`）の admission が
+  一致することを検証する。他人の person 行は `'all'` でも開示しない。
+- 横断読み 3 ロール（`workspace_graph_reader`・`concierge_management_reader`・
+  `peer_responder_reader`、G3 で棚上げ）は「Viewer Scope（D2）と同じ問い」
+  として答えが出た:読み手は custody 種別つきの視聴者として表せ、
+  `peer_responder_reader` はテナント束縛なので「そのテナントの視聴者」に、
+  グラフ／管理 reader は system selection（`includeUntenanted`）を持つ
+  視聴者に写る。ロール自体の廃止は引き続き先送りとする。
 
 ファイル I/O の門番（tier-guard）でこのモデルを使う土台は、[保存先カタログと許可証による権限判定](./STORE_CATALOG_GRANT_GUARD_DESIGN_2026-11-05.ja.md)（G0〜G4）で先に整える。
 

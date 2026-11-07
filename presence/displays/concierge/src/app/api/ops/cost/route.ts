@@ -33,9 +33,11 @@ export function GET(req: NextRequest) {
       const missionIds =
         tenantSlugs === 'all'
           ? undefined
-          : buildMissionHistoryItems({ tenantSlugs, limit: 10000 }).map(
-              (mission) => mission.missionId
-            );
+          : buildMissionHistoryItems({
+              tenantSlugs,
+              includeUntenanted: resolvedViewer.context.includeUntenanted,
+              limit: 10000,
+            }).map((mission) => mission.missionId);
       return collectCostSummary({
         missionId: readChronosOptionalStringParam(url.searchParams.get('missionId')),
         missionIds,
