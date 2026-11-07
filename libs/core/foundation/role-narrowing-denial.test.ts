@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { safeReadFile } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import type { ResourceAccessScope } from './resource-access-scope.js';
+import { isArchivedMissionStateCapability } from './archived-mission-state-capability.js';
 import {
   narrowDeclarationValid,
   roleNarrowAllowsStructuralMkdir,
@@ -270,6 +271,18 @@ describe('customer_channel_binding_store narrowing declaration', () => {
 });
 
 describe('archived_mission_state_reader narrowing declaration', () => {
+  it('rejects a name-prefix ceiling added to an otherwise exact archive capability', () => {
+    expect(isArchivedMissionStateCapability(archivedScope)).toBe(true);
+    const scope = {
+      ...archivedScope,
+      namePrefixExact: ['active/archive/missions/confidential/acme-corp/MSN-B/'],
+    };
+    expect(isArchivedMissionStateCapability(scope)).toBe(false);
+    for (const operation of ['read', 'metadata'] as const)
+      expect(
+        deny({ role: 'archived_mission_state_reader', relativePath: ARCHIVED, operation, scope })
+      ).toContain('RESOURCE_SCOPE_REQUIRED');
+  });
   it('never writes, appends or creates directories', () => {
     for (const operation of ['write', 'append', 'mkdir'] as const)
       expect(
