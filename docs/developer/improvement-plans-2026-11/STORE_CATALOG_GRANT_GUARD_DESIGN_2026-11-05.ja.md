@@ -2,7 +2,7 @@
 title: 保存先カタログと許可証による権限判定（tier-guard の再設計）
 kind: design
 status: planned
-last_updated: 2026-11-06
+last_updated: 2026-11-08
 tags: [design, tier-guard, secure-io, scope, custody, grant, storage, governance]
 importance: 8
 ---
@@ -27,7 +27,8 @@ importance: 8
 認可を分けた。`scope inspect` は明示したパスを診断し、上限を指定しない場合は
 `address_only` とする。これは住所の構造の診断であり、tenant の登録・存在や完全な
 I/O 許可の証明ではない。新判定で旧認可を置き換える G1 全体、保存先専用ロールを
-除去する G2、system/person の許可証拡張 G4 は未完了である。
+除去する G2 は実施済み。system/person の許可証拡張 G4 も要求ケイパビリティ天井に実施した
+（契約テストのみ — 実利用者への接続はスコープモデル P4）。
 
 公開 subpath は初期実装で3件追加した。credential 許可証の失効後にも残る権限を
 修正するため、secure-io の読み込み数は66から67へ増えた。これは pure proof module
@@ -1216,9 +1217,9 @@ security-policy のパスの一覧だけで効いている（門番のコード�
 | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
 | (a)  | 許可証の登録簿（`foundation/store-grant-registry.ts`）。各 capability モジュールが読み込まれたときに自分の判定（認可・絞り込み・内容検査・構造上の mkdir）を登録し、tier-guard は登録簿だけに尋ねる | 実施（下）               |
 | (b)  | カタログに `grant_required` / `issuer` / `content_check` / `shape` を宣言し、カタログのゲートが登録簿の id と発行者の登録を突き合わせる                                                             | 未実施                   |
-| (c)  | Concierge の Web 管理の 3 つの規則（祖先のメタデータ、祖先の mkdir、網羅の読み取り）をカタログの宣言にし、2 つのロールを外す                                                                        | 未実施（考え直す条件 1） |
-| (d)  | パスだけのロール 3 件と、門番に分岐の無い 24 件を許可証かカタログの形にする                                                                                                                         | 未実施（考え直す条件 1） |
-| (e)  | tier-guard の各入口を `decide(主体, 住所, 操作, 内容)` に通す                                                                                                                                       | 未実施                   |
+| (c)  | Concierge の Web 管理の 3 つの規則（祖先のメタデータ、祖先の mkdir、網羅の読み取り）をカタログの宣言にし、2 つのロールを外す                                                                        | 実施（G3 第 2 段階）     |
+| (d)  | パスだけのロール 3 件と、門番に分岐の無い 24 件を許可証かカタログの形にする                                                                                                                         | 実施（G3 第 2 段階）     |
+| (e)  | tier-guard の各入口を `decide(主体, 住所, 操作, 内容)` に通す                                                                                                                                       | 実施（G3 第 2 段階）     |
 | (f)  | secure-io の import を削る                                                                                                                                                                          | 未実施（考え直す条件 2） |
 
 **第 1 段階 (a): 許可証の登録簿。**
@@ -1249,7 +1250,8 @@ security-policy のパスの一覧だけで効いている（門番のコード�
   Concierge のロール名の確かめ、の順で尋ねる。パスの候補（realpath を含む）は、尋ねる絞り込みが
   あるときだけ計算する。構造上の mkdir は、PR の公開の許可証が自分で決め、次に許可証の認可、最後に
   招待の許可証（共通の確かめへ進む）か Concierge の writer のロール名、の順のまま。
-- 網羅の読み取りの規則（`information-asset-coverage-capability.ts`）は、Concierge の許可証の種類を
+- 網羅の読み取りの規則（当時 `information-asset-coverage-capability.ts`、G3 第 2 段階で
+  `information-asset-coverage-access.ts` に改名）は、Concierge の許可証の種類を
   登録簿に尋ねる。
 
 **比較（第 1 段階）。** G2 の比較の道具（`recordMatrix`）で、自律の学習記録、パイプラインの実行記録、
@@ -1344,6 +1346,58 @@ policy engine）の分離として別の段階に置くか。これらを決め�
 3 件（下の B）、(e) は入口の `decide`（下の D）に読み替える。(b)（カタログの `grant_required` などの宣言）と
 (f)（secure-io の import を削る）は今回は行わない（(f) は上の別の段階）。
 
+**G3 第 2 段階（(c)(d)(e) の実施、MSN-SCOPE-G3-20261107）。**
+
+- 拒否だけのロールと Concierge の規則は、security-policy.json の
+  `authority_role_permissions.<role>.narrow` 宣言になった。宣言の kind は 5 つ
+  （`deny`、`only`（exact/prefix/pattern）、`content_check`（append-only JSONL）、
+  `require_scope`（必須フィールドと読み取り専用の上限の指紋）、`structural_mkdir`）。
+  `foundation/role-narrowing-denial.ts` の 1 つの汎用規則が評価し、壊れた宣言は
+  `[ROLE_NARROWING_INVALID]` で fail-closed に拒否する。宣言の型は
+  `schemas/security-policy.schema.json` にも登録した。
+- ロールごとの門番モジュール `foundation/narrow-store-role-denial.ts` と、tier-guard の
+  Concierge のロール名の分岐 2 件・構造上 mkdir の writer 例外 1 件は外した。個人の承認の
+  所有者の区画と 5 つの保存先の絞り込みは、従来どおりの順序で requestResourceDenial 内の
+  登録簿経由に戻した。2 つの capability モジュールは発行の権利と呼び出し元の定数だけに
+  縮めた（`deliverable-inbox-writer-capability.ts`、`customer-channel-binding-store-capability.ts`）。
+- 網羅の読み取りの規則は実行 scope の束縛を要るため宣言化すると実質コードになる
+  （考え直す条件を適用） — 門番の規則モジュールとして残し、capability ではないことを
+  名前に表すため `information-asset-coverage-access.ts` に改めた（中身は一語一句同じ）。
+- 入口の `decide`：5 つの入口（read / metadata は `inspectReadPermission`、
+  write / append / mkdir は `validateWritePermission`）はすべて 1 つの内部 `decide`
+  （policy 相対パスへの解決 → 共有の資源門番 `requestResourceDenial`）を通る。
+  判定の種類ごとの残りの検査は従来どおり入口ごとに残る。
+- 再計測（この数え方で）: 保存先のロール名分岐 1（退役名の一覧）、門番の規則がある
+  保存先専用ロール 0、tier-guard の capability import 1（記憶の由来のパスの判定のみ。
+  `information-asset-coverage-access.ts` と `engine-runtime-preferences-access.ts` は
+  門番の規則モジュール）、宣言の kind 5、入口の `decide` 1、新旧の食い違い 0
+  （拒否の文言の詳細だけ変更: 汎用の前置きの中に従来の拒否マーカー
+  `[DELIVERABLE_INBOX_WRITE_REFUSED]` などを保持。行数は max-file-lines 内）。
+
+**G4 の実施（管理者の拡張、MSN-SCOPE-G4-20261107）。**
+
+- 要求ケイパビリティ天井（`ResourceAccessScope`）に `custody` 判別を足した。
+  `system`・`tenant`・`person`（`ref` 省略可 — installation 全体の person 束縛。
+  `installation-owner` など member-id 形式を要求）。省略時は tenant に正規化されるため、
+  既存の呼び出し側は無改修のまま。凍結された scope は必ず正規化済みの custody を持ち、
+  非テナント custody は tenantSlug・organizationId・projectId を持てない
+  （違反は `[RESOURCE_SCOPE_INVALID]` で fail-closed）。
+- 入れ子の束縛は custody の等価を要求する（テナントの入れ替えだけでなく、
+  system/person への乗り換えも拒否する — tenantSlug 一致の一般化）。
+- 門番側の意味は変えない: テナント区画の構造 mkdir と narrow 宣言の
+  `require_scope.exact` のテナント捕捉グループは、非テナント custody で
+  自然に deny される（`scope.tenantSlug` が無いため）。`isArchivedMissionStateCapability`
+  は tenant custody を明示して指紋の意味を保った。
+- 宣言の拡張: `require_scope.custody`（kind または kind の配列）を narrow 宣言・
+  評価器・スキーマに追加 — P4 が system/person 束縛のロールを宣言できる最小の拡張。
+- 受入契約テスト `foundation/resource-access-custody-contract.test.ts`:
+  system/person custody の発行 → 天井内の許可・天井外の拒否・入れ子の custody
+  変更の拒否・発行経路（`createSynchronousResourceGrantIssuer`）の end-to-end・
+  非テナント custody でテナント区画 mkdir が拒否されること — すべて確認。
+  実利用者への接続は P4（閲覧の開示）で行う。
+- `knowledge/personal/` の人ごと分割は行わない（カタログの宣言どおり
+  `installation-owner` の person custody のまま。分割が要るかは別途判断する残置）。
+
 ## 既定で拒否であること
 
 | 状況                                                 | 結果                                                                |
@@ -1394,6 +1448,13 @@ secure-io の 40 以下は別の段階）。上の表は G0 の時点の見込�
 | R-01 作成時の管理者                  | カタログの `custody` 宣言、G0 の突合ゲート            |
 | R-05 判定関数の共有                  | `decide` 一つ                                         |
 | R-09 派生をたどる削除                | カタログの `derived_from` と `retention`（P3 で使う） |
+
+## 統合時の安全性補強（2026-11-08）
+
+- narrow 宣言は schema と同じく、各階層の未知キー、空の拒否理由・パス・matcher・content ID を拒否する。不正な policy / role コンテナーを「宣言なし」と扱わない。
+- 明示された役割の I/O は policy 欠落・破損時に `[ROLE_NARROWING_POLICY_UNAVAILABLE]` で拒否する。役割なし bootstrap は従来の残余判定を維持する。
+- 1 回の I/O の narrow・基本権限・structural mkdir は、遅延読込みした同じ policy snapshot を使う。異なる版の許可条件を組み合わせない。
+- 回帰検証は `role-narrowing-denial.test.ts`、`tier-guard-policy-corruption.test.ts`、`resource-access-scope.test.ts` で、正常な宣言と不正入力・policy 変更／欠落の双方を確認する。
 
 ## 非目標
 

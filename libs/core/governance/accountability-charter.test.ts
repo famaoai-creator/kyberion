@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agentActor, humanActor } from '../actor.js';
+import { agentActor, humanActor } from '../contracts/actor.js';
 import {
   envelopeExceeds,
   evaluateAgainstCharter,

@@ -17,7 +17,7 @@ vi.mock('../mission/mission-team-orchestrator.js', () => ({
   ensureMissionTeamRuntime: mocks.ensureMissionTeamRuntime,
 }));
 
-vi.mock('../managed-process.js', () => ({
+vi.mock('../tool/managed-process.js', () => ({
   spawnManagedProcess: mocks.spawnManagedProcess,
 }));
 

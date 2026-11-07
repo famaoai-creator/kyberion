@@ -22,7 +22,7 @@ import {
 } from '../project/project-mission-ledger.js';
 import { readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
-import { normalizeEventScope } from '../event-scope.js';
+import { normalizeEventScope } from '../event/event-scope.js';
 
 export function resolveProjectLedgerPath(projectPath: string): string {
   const resolved = pathResolver.rootResolve(projectPath);

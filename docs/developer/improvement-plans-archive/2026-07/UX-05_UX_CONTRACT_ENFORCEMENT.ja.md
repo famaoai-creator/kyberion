@@ -29,7 +29,7 @@ status: archived
 
 ### Task 1: 表示語彙マッピングの一元化 — `claude-sonnet-4`
 
-1. `libs/core/ux-vocabulary.ts`(または既存の適所)に `renderStatus(domain: 'readiness'|'connection'|'provider'|'mission', value: string, locale): string` を実装し、語彙カタログの `readiness_*` 等を読む。未知値は「そのまま出す + logger.warn」でフェイルソフト。
+1. `libs/core/localization/ux-vocabulary.ts`(または既存の適所)に `renderStatus(domain: 'readiness'|'connection'|'provider'|'mission', value: string, locale): string` を実装し、語彙カタログの `readiness_*` 等を読む。未知値は「そのまま出す + logger.warn」でフェイルソフト。
 2. `question-resolver.ts:234` の発行値と `readiness_*` キーの対応表を作り、`cli.ts:807-809`・`sovereign_dashboard.ts:170-176,251-265`・`mission_controller.ts:557-567,1071` を `renderStatus` 経由に置換する。
 3. カタログに不足している状態語(provider/mission 系)を en/ja で追加し、`check:catalogs` を通す。
 
@@ -58,7 +58,7 @@ status: archived
 
 ## 実装メモ
 
-- `libs/core/ux-vocabulary.ts` を追加し、`renderStatus()` で readiness / mission などの表示語彙を `user-facing-vocabulary.json` から引くようにした。
+- `libs/core/localization/ux-vocabulary.ts` を追加し、`renderStatus()` で readiness / mission などの表示語彙を `user-facing-vocabulary.json` から引くようにした。
 - `scripts/cli.ts` の operator packet と `scripts/mission_controller.ts` の mission status 表示を共有レンダラ経由に寄せた。
 - `repairSurfaceUxContractText()` を追加し、`runSurfaceMessageConversation` は違反時に配信前修復を試みるようにした。
 - 2026-07-13: connection/provider/mission/runtime の不足語彙を補完し、sovereign dashboard の代表状態表示を `renderStatus()` 経由へ統一した。

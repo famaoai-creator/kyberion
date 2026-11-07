@@ -4,7 +4,10 @@ import { pathResolver } from '../path-resolver.js';
 import { loadPipelineAdfAtPath, type PipelineAdfStep } from './pipeline-contract.js';
 import { assertProjectTrustApproval } from '../project/project-trust.js';
 import { safeLstat } from '../secure-io.js';
-import { isBuiltinPipelineResource, requiresProjectTrust } from '../trust-requiring-resources.js';
+import {
+  isBuiltinPipelineResource,
+  requiresProjectTrust,
+} from '../governance/trust-requiring-resources.js';
 
 const MAX_REF_DEPTH = 10;
 

@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as pathResolver from '../path-resolver.js';
-import { humanActor } from '../actor.js';
+import { humanActor } from '../contracts/actor.js';
 import { safeRmSync } from '../secure-io.js';
 import {
   isInformationBoundActionClass,

@@ -54,7 +54,7 @@ package.json・パイプライン定義・スキーマの間で参照切れが�
 
 1. A の各エントリについて `grep -rn "<script名>" docs/ knowledge/ pipelines/ scripts/ libs/ --include='*.md' --include='*.json' --include='*.ts'` で参照を確認する。
    - **参照ゼロ** → package.json からエントリ削除。
-   - **ドキュメントから参照あり** → エントリは削除した上で、参照しているドキュメントの該当記述を更新(削除理由を一行残す)。復活が必要そうな機能(例: janitor は `libs/core/storage-janitor.ts` が現存)は、削除の代わりに正しい実装への付け替えを検討し、判断を PR 説明に記載する。
+   - **ドキュメントから参照あり** → エントリは削除した上で、参照しているドキュメントの該当記述を更新(削除理由を一行残す)。復活が必要そうな機能(例: janitor は `libs/core/storage/storage-janitor.ts` が現存)は、削除の代わりに正しい実装への付け替えを検討し、判断を PR 説明に記載する。
 2. B の 4 エントリは、テンプレートを `pipelines/` へ昇格させるのではなく、`--input knowledge/product/pipeline-templates/<name>.json` へパスを修正する(テンプレートが実行可能形式であることを `pnpm pipeline --input ...` のドライ実行で確認)。実行不能なら script エントリごと削除して報告。
 3. D の 3 つの未参照 `.yml` は `retired/pipelines/` へ移動(ディレクトリが無ければ作成し README を1行置く)。`high-fidelity-logic.yml` は同名 JSON テンプレートとの内容差分を確認し、重複なら同様に retire。
 

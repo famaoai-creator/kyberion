@@ -72,7 +72,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/apple-intelligence-bridge.ts (createAppleSpeechToTextBridge: on-device SpeechAnalyzer, macOS 26+)"
+            "libs/core/provider/apple-intelligence-bridge.ts (createAppleSpeechToTextBridge: on-device SpeechAnalyzer, macOS 26+)"
           ]
         },
         "apple-speech-file": {

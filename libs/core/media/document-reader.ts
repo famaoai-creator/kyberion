@@ -38,7 +38,7 @@ import {
   rasterizePdfPages,
   rasterizeVectorImage,
   VECTOR_IMAGE_EXTENSIONS,
-} from '../visual-raster.js';
+} from './visual-raster.js';
 import { extractPptxSlides, type ExtractedSlide } from './native-pptx-engine/engine.js';
 import { distillPdfDesign, selectPdfOcrImages } from './pdf-utils.js';
 import { distillDocxDesign } from './docx-utils.js';
@@ -52,7 +52,7 @@ import {
 import type { PdfDesignProtocol, PdfPage } from '../contracts/pdf-protocol.js';
 import { dropBrokenTextElements, pageNeedsRender, renderPdfPages } from './pdf-page-raster.js';
 import { loadPdfParseConstructor } from './pdf-parse-runtime.js';
-import { extractHtmlTitle, htmlToMarkdown } from '../html-to-markdown.js';
+import { extractHtmlTitle, htmlToMarkdown } from './html-to-markdown.js';
 import { extractOoxmlCoreTitle, OOXML_PLACEHOLDER_TITLES } from './ooxml-core-props.js';
 
 export type OfficeDocumentFormat = 'pdf' | 'pptx' | 'docx' | 'xlsx';

@@ -1,5 +1,5 @@
 /** Request selection narrows an authenticated viewer; registry records bind its parents. */
-import type { OsKnowledgeTier } from '../cloudflare-os-control-plane.js';
+import type { OsKnowledgeTier } from '../governance/cloudflare-os-control-plane.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { withExecutionContext } from '../authority.js';
 import { safeReaddir } from '../secure-io.js';

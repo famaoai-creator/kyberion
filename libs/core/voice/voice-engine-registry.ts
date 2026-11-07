@@ -8,7 +8,7 @@ import {
   resolveSeamProviderDecision,
   type SeamProviderCandidate,
   type SeamProviderDecision,
-} from '../seam-provider-selection.js';
+} from '../provider/seam-provider-selection.js';
 import { resolveVoiceTtsAdapter } from './voice-provider-adapters.js';
 
 export type VoiceEngineStatus = 'active' | 'shadow' | 'disabled';

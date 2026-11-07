@@ -35,8 +35,11 @@ import {
   autonomyLearningCapability,
   withAutonomyLearningCapability,
 } from './autonomy-learning-capability.js';
-import { narrowStoreRoleDenial } from './narrow-store-role-denial.js';
-import { DELIVERABLE_INBOX_ENTRIES_PATH } from './deliverable-inbox-writer-capability.js';
+import { roleNarrowingDenial } from './role-narrowing-denial.js';
+import {
+  DELIVERABLE_INBOX_ENTRIES_PATH,
+  DELIVERABLE_INBOX_WRITER_ROLE,
+} from './deliverable-inbox-writer-capability.js';
 
 vi.mock('../governance/audit-chain.js', () => ({
   auditChain: { record: vi.fn() },
@@ -180,9 +183,15 @@ describe('request resource ceiling', () => {
   });
 
   it('retains content-checked legacy write refusals for the actual append verb', () => {
+    const policy = JSON.parse(
+      safeReadFile(path.join(ROOT, 'knowledge/product/governance/security-policy.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
     expect(
-      narrowStoreRoleDenial({
-        role: 'deliverable_inbox_writer',
+      roleNarrowingDenial({
+        policy,
+        role: DELIVERABLE_INBOX_WRITER_ROLE,
         relativePath: DELIVERABLE_INBOX_ENTRIES_PATH,
         operation: 'append',
         scope: undefined,

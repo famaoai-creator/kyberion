@@ -28,7 +28,7 @@ import { safeExistsSync } from '../secure-io.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { resolveManagedToolPythonBin } from '../tool/tool-runtime-registry.js';
-import { runtimeSetupHint } from '../provider-runtime-requirements.js';
+import { runtimeSetupHint } from '../provider/provider-runtime-requirements.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import {
   listStreamingSttBridges,

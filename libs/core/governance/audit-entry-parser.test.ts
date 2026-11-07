@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { normalizePersistedAuditEntry } from './audit-chain.js';
-import { computeAuditEntryHash } from '../chain-integrity.js';
-import { agentActor, humanActor } from '../actor.js';
+import { computeAuditEntryHash } from './chain-integrity.js';
+import { agentActor, humanActor } from '../contracts/actor.js';
 
 const validEntry = {
   id: 'AUD-1',

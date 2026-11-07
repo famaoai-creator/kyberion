@@ -23,7 +23,7 @@ import {
   spawnManagedProcess,
   stopManagedProcess,
   touchManagedProcess,
-} from '../managed-process.js';
+} from '../tool/managed-process.js';
 import { resolveCodexBinary } from '../provider/codex-cli-query.js';
 import { loadAgentInstructionResource } from './agent-instruction-loader.js';
 import { resolveSandboxPolicy, toCodexSandboxPolicy } from '../shell/sandbox-policy.js';

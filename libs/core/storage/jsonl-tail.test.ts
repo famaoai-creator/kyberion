@@ -1,0 +1,344 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { pathResolver, sharedTmp } from '../path-resolver.js';
+import * as secureIo from '../secure-io.js';
+import { readJsonLines } from '../foundation/json.js';
+
+// Capture the jsonl-tail logger's warn lines; secure-io stays REAL.
+const tailWarnings = vi.hoisted(() => [] as string[]);
+vi.mock('../logger.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../logger.js')>();
+  return {
+    ...actual,
+    createLogger: (name: string) => {
+      const real = actual.createLogger(name);
+      if (name !== 'jsonl-tail') return real;
+      return { ...real, warn: (message: string) => tailWarnings.push(String(message)) };
+    },
+  };
+});
+import { getFoundationIo } from '../foundation/io.js';
+import {
+  createJsonlTail,
+  detectRotation,
+  readJsonLinesCached,
+  resetJsonLinesCache,
+  splitCompleteLines,
+  EMPTY_JSONL_CURSOR,
+} from './jsonl-tail.js';
+
+/**
+ * EV-04/EV-08: these cover the defect the previous size-delta tailer had —
+ * once the file was rotated or truncated the recorded offset permanently
+ * exceeded the real size, `size > lastSize` never held again, and every later
+ * append was lost silently.
+ */
+describe('jsonl-tail', () => {
+  let dir: string;
+  let file: string;
+
+  beforeEach(() => {
+    // secure-io refuses paths outside the repo root, and the repo's temp
+    // invariant is active/shared/tmp/ — not the OS temp dir.
+    dir = sharedTmp(`jsonl-tail-${randomUUID().slice(0, 8)}`);
+    fs.mkdirSync(dir, { recursive: true });
+    file = path.join(dir, 'stream.jsonl');
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  const append = (...records: unknown[]): void => {
+    fs.appendFileSync(file, records.map((r) => `${JSON.stringify(r)}\n`).join(''));
+  };
+
+  it('新規レコードのみを返し、二度目の read では何も返さない', () => {
+    append({ n: 1 }, { n: 2 });
+    const tail = createJsonlTail<{ n: number }>(file);
+
+    expect(tail.read().records).toEqual([{ n: 1 }, { n: 2 }]);
+    expect(tail.read().records).toEqual([]);
+
+    append({ n: 3 });
+    expect(tail.read().records).toEqual([{ n: 3 }]);
+  });
+
+  it('切り詰め後の追記を読み落とさない（回帰: size 差分方式の恒久停止）', () => {
+    append({ n: 1 }, { n: 2 });
+    const tail = createJsonlTail<{ n: number }>(file);
+    expect(tail.read().records).toHaveLength(2);
+
+    // Truncate to a single, shorter record: the old implementation recorded an
+    // offset past the new size and never delivered again.
+    fs.writeFileSync(file, `${JSON.stringify({ n: 9 })}\n`);
+
+    const batch = tail.read();
+    expect(batch.rotated).toBe(true);
+    expect(batch.records).toEqual([{ n: 9 }]);
+
+    append({ n: 10 });
+    expect(tail.read().records).toEqual([{ n: 10 }]);
+  });
+
+  it('ファイル置換（別 inode）を検知して先頭から読み直す', () => {
+    append({ n: 1 });
+    const tail = createJsonlTail<{ n: number }>(file);
+    tail.read();
+
+    fs.rmSync(file);
+    append({ n: 2 }, { n: 3 });
+
+    const batch = tail.read();
+    expect(batch.rotated).toBe(true);
+    expect(batch.records).toEqual([{ n: 2 }, { n: 3 }]);
+  });
+
+  it('未完結行は消費せず、改行が届いてから1件として返す', () => {
+    const tail = createJsonlTail<{ n: number }>(file);
+    fs.writeFileSync(file, '{"n":1}\n{"n":2');
+
+    // The partial second record must not be parsed-and-discarded.
+    expect(tail.read().records).toEqual([{ n: 1 }]);
+
+    fs.appendFileSync(file, '}\n');
+    expect(tail.read().records).toEqual([{ n: 2 }]);
+  });
+
+  it('壊れた行は飛ばして残りを配信し、件数を報告する', () => {
+    fs.writeFileSync(file, '{"n":1}\nnot json\n{"n":2}\n');
+    const batch = createJsonlTail<{ n: number }>(file).read();
+
+    expect(batch.records).toEqual([{ n: 1 }, { n: 2 }]);
+    expect(batch.malformed).toBe(1);
+  });
+
+  it('dangerous key を含む行は malformed として配送しない', () => {
+    fs.writeFileSync(file, '{"n":1}\n{"nested":{"constructor":{}}}\n{"n":2}\n');
+
+    const batch = createJsonlTail<{ n: number }>(file).read();
+
+    expect(batch.records).toEqual([{ n: 1 }, { n: 2 }]);
+    expect(batch.malformed).toBe(1);
+  });
+
+  it('parser hook は JSON の値を配送前に検証・投影する', () => {
+    fs.writeFileSync(file, '{"n":1}\n[]\n{"n":"bad"}\n');
+    const tail = createJsonlTail<{ n: number }>(file, {
+      parse: (value) => {
+        if (
+          value === null ||
+          typeof value !== 'object' ||
+          Array.isArray(value) ||
+          typeof (value as { n?: unknown }).n !== 'number'
+        ) {
+          throw new Error('invalid record');
+        }
+        return value as { n: number };
+      },
+    });
+
+    const batch = tail.read();
+    expect(batch.records).toEqual([{ n: 1 }]);
+    expect(batch.malformed).toBe(2);
+  });
+
+  it('マルチバイト文字を含む行でもオフセットがずれない', () => {
+    // Byte length differs from character length; a char-based offset would
+    // desynchronise here and corrupt every subsequent read.
+    append({ msg: '緊急アラート：システム障害' }, { msg: '復旧しました' });
+    const tail = createJsonlTail<{ msg: string }>(file);
+    expect(tail.read().records).toHaveLength(2);
+
+    append({ msg: '追加' });
+    expect(tail.read().records).toEqual([{ msg: '追加' }]);
+  });
+
+  it('seekToEnd は既存レコードを飛ばす', () => {
+    append({ n: 1 }, { n: 2 });
+    const tail = createJsonlTail<{ n: number }>(file);
+    tail.seekToEnd();
+
+    expect(tail.read().records).toEqual([]);
+    append({ n: 3 });
+    expect(tail.read().records).toEqual([{ n: 3 }]);
+  });
+
+  it('存在しないファイルは空を返し、出現後に読み始める', () => {
+    const tail = createJsonlTail<{ n: number }>(file);
+    expect(tail.read().records).toEqual([]);
+
+    append({ n: 1 });
+    expect(tail.read().records).toEqual([{ n: 1 }]);
+  });
+
+  it('リポジトリ外のファイルを tail しない', () => {
+    const outside = path.join(pathResolver.rootDir(), '..', 'jsonl-tail-outside.jsonl');
+    expect(() => createJsonlTail(outside)).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  describe('MSN-STORE-BOUNDS-2: a large backlog never stalls the tail', () => {
+    beforeEach(() => {
+      tailWarnings.length = 0;
+    });
+
+    it('reads a backlog above the threshold chunk by chunk, advances, and warns once', () => {
+      const big = 'x'.repeat(300);
+      append(...Array.from({ length: 200 }, (_, n) => ({ n, big })));
+      const size = fs.statSync(file).size;
+      // threshold ≈ 1KB, far below the ~62KB backlog; chunks split lines
+      const tail = createJsonlTail<{ n: number }>(file, { maxSizeMB: 0.001, chunkBytes: 97 });
+      const batch = tail.read();
+      expect(batch.records.map((r) => r.n)).toEqual(Array.from({ length: 200 }, (_, n) => n));
+      expect(batch.cursor.offset).toBe(size);
+      expect(tailWarnings.filter((w) => w.includes('large unread backlog'))).toHaveLength(1);
+      expect(tailWarnings[0]).toMatch(/ — .* \| .* \| offset=0 size=/);
+
+      append(...Array.from({ length: 200 }, (_, n) => ({ n: 200 + n, big })));
+      expect(tail.read().records).toHaveLength(200);
+      // warned once per tail, not every pass
+      expect(tailWarnings.filter((w) => w.includes('large unread backlog'))).toHaveLength(1);
+    });
+
+    it('keeps a torn tail unconsumed across chunk boundaries and multi-byte characters', () => {
+      const msg = 'あいうえお🙂'.repeat(5);
+      append({ msg, n: 1 }, { msg, n: 2 });
+      fs.appendFileSync(file, `{"msg":"${msg}","n":`);
+      const tail = createJsonlTail<{ msg: string; n: number }>(file, { chunkBytes: 7 });
+      const first = tail.read();
+      expect(first.records).toEqual([
+        { msg, n: 1 },
+        { msg, n: 2 },
+      ]);
+      expect(first.malformed).toBe(0);
+      fs.appendFileSync(file, '3}\r\n');
+      expect(tail.read().records).toEqual([{ msg, n: 3 }]);
+      expect(tail.cursor().offset).toBe(fs.statSync(file).size);
+    });
+
+    it('readJsonLinesCached replays a ledger above its warn threshold instead of throwing', () => {
+      const big = 'y'.repeat(500);
+      append(...Array.from({ length: 100 }, (_, n) => ({ n, big })));
+      fs.appendFileSync(file, '{"n":100,"big":"torn');
+      const rows = readJsonLinesCached<{ n: number }>(file, { maxSizeMB: 0.001, chunkBytes: 333 });
+      expect(rows.map((r) => r.n)).toEqual(Array.from({ length: 100 }, (_, n) => n));
+      expect(tailWarnings.some((w) => w.includes('large unread backlog'))).toBe(true);
+      resetJsonLinesCache();
+    });
+  });
+
+  describe('detectRotation', () => {
+    it('未読カーソルではローテーション扱いしない', () => {
+      expect(detectRotation(EMPTY_JSONL_CURSOR, { size: 100, fingerprint: 'abc', inode: 1 })).toBe(
+        false
+      );
+    });
+
+    it('サイズ後退・inode 変化・指紋変化のいずれでも検知する', () => {
+      const cursor = { offset: 100, fingerprint: 'abc', inode: 1 };
+      expect(detectRotation(cursor, { size: 50, fingerprint: 'abc', inode: 1 })).toBe(true);
+      expect(detectRotation(cursor, { size: 200, fingerprint: 'abc', inode: 2 })).toBe(true);
+      expect(detectRotation(cursor, { size: 200, fingerprint: 'zzz', inode: 1 })).toBe(true);
+      expect(detectRotation(cursor, { size: 200, fingerprint: 'abc', inode: 1 })).toBe(false);
+    });
+
+    it('inode が取得できない環境（0）では inode 比較を根拠にしない', () => {
+      const cursor = { offset: 100, fingerprint: 'abc', inode: 0 };
+      expect(detectRotation(cursor, { size: 200, fingerprint: 'abc', inode: 0 })).toBe(false);
+    });
+  });
+
+  describe('splitCompleteLines', () => {
+    it('改行までを消費し、末尾の断片は残す', () => {
+      expect(splitCompleteLines('a\nb\nc')).toEqual({ lines: ['a', 'b'], consumedChars: 4 });
+    });
+
+    it('改行が無ければ何も消費しない', () => {
+      expect(splitCompleteLines('partial')).toEqual({ lines: [], consumedChars: 0 });
+    });
+  });
+  describe('readJsonLinesCached (G01 bounded ledger replay)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+      resetJsonLinesCache();
+    });
+
+    /** Bytes read through range reads during `fn`; any whole-file read fails the test. */
+    const rangeBytesDuring = (fn: () => void): number => {
+      const range = vi.spyOn(secureIo, 'safeReadFileRange');
+      const whole = vi.spyOn(secureIo, 'safeReadFile');
+      const foundationRead = vi.spyOn(getFoundationIo(), 'readFile');
+      fn();
+      const total = range.mock.calls.reduce((sum, [, , length]) => sum + Number(length), 0);
+      expect(whole).not.toHaveBeenCalled();
+      expect(foundationRead).not.toHaveBeenCalled();
+      vi.restoreAllMocks();
+      return total;
+    };
+
+    it('returns exactly what readJsonLines(skip) returns, incl. malformed and unterminated lines', () => {
+      fs.writeFileSync(file, '{"n":1}\nnot-json\n\n{"n":2}\r\n{"n":3}');
+      const expected = readJsonLines(file, { onMalformed: 'skip' });
+      expect(readJsonLinesCached(file)).toEqual(expected);
+      expect(expected).toEqual([{ n: 1 }, { n: 2 }, { n: 3 }]);
+      // the unterminated record is completed by the next append, never doubled
+      fs.appendFileSync(file, '\n{"n":4}\n');
+      expect(readJsonLinesCached(file)).toEqual(readJsonLines(file, { onMalformed: 'skip' }));
+    });
+
+    it('returns frozen rows so a mutating caller cannot corrupt later reads', () => {
+      append({ n: 1, nested: { v: 1 } });
+      const first = readJsonLinesCached<{ n: number; nested: { v: number } }>(file);
+      expect(Object.isFrozen(first[0])).toBe(true);
+      expect(() => {
+        (first[0] as { n: number }).n = 99;
+      }).toThrow(TypeError);
+      expect(readJsonLinesCached<{ n: number }>(file)[0].n).toBe(1);
+    });
+
+    it('parses only the appended bytes on later calls, and nothing when the file is unchanged', () => {
+      const big = 'x'.repeat(200);
+      append(...Array.from({ length: 500 }, (_, n) => ({ n, big })));
+      const fullSize = fs.statSync(file).size;
+      expect(readJsonLinesCached(file)).toHaveLength(500);
+
+      expect(rangeBytesDuring(() => readJsonLinesCached(file))).toBe(0);
+
+      append({ n: 500, big });
+      let rows: unknown[] = [];
+      const bytes = rangeBytesDuring(() => {
+        rows = readJsonLinesCached(file);
+      });
+      expect(rows).toHaveLength(501);
+      expect(rows.at(-1)).toEqual({ n: 500, big });
+      // fingerprint prefix + consumed-tail check + the one new row — not the history
+      expect(bytes).toBeLessThan(fullSize / 10);
+    });
+
+    it('replays from scratch after an in-place rewrite that keeps the size and head bytes', () => {
+      append({ id: 'a', v: 1 }, { id: 'b', v: 1 });
+      expect(readJsonLinesCached(file)).toEqual([
+        { id: 'a', v: 1 },
+        { id: 'b', v: 1 },
+      ]);
+      fs.writeFileSync(
+        file,
+        `${JSON.stringify({ id: 'a', v: 1 })}\n${JSON.stringify({ id: 'b', v: 2 })}\n`
+      );
+      append({ id: 'c', v: 1 });
+      expect(readJsonLinesCached(file)).toEqual(readJsonLines(file, { onMalformed: 'skip' }));
+    });
+
+    it('returns [] for a missing file and starts over after it is truncated', () => {
+      expect(readJsonLinesCached(file)).toEqual([]);
+      append({ n: 1 }, { n: 2 });
+      expect(readJsonLinesCached(file)).toHaveLength(2);
+      fs.writeFileSync(file, '');
+      expect(readJsonLinesCached(file)).toEqual([]);
+      append({ n: 9 });
+      expect(readJsonLinesCached(file)).toEqual([{ n: 9 }]);
+    });
+  });
+});

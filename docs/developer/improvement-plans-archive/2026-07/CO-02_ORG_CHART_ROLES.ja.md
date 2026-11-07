@@ -28,7 +28,7 @@ status: archived
 ### Task 1: 組織図スキーマとデータ化 — `claude-sonnet-4`
 
 1. `schemas/org-chart.schema.json`: `{ positions: [{ role_id, reports_to, held_by (agent_id|human), responsibility_scope, authority_role_ref }], domains }`。既存 `personalities/roles.json` の5ドメイン + `sbinbs/org-chart-2604.json` の実例を参考に。
-2. `libs/core/org-chart.ts`: 組織図を読み、mission チーム編成(mission-team-composer)の**既定出発点**として提供する。実行時は既存どおり mission ごとに derive(組織図は上書き可能な既定、固定でない)。
+2. `libs/core/organization/org-chart.ts`: 組織図を読み、mission チーム編成(mission-team-composer)の**既定出発点**として提供する。実行時は既存どおり mission ごとに derive(組織図は上書き可能な既定、固定でない)。
 3. テスト: 組織図の読み込み、mission チーム derive の出発点として機能。
 
 ### Task 2: カスタムロール作成フロー — `claude-sonnet-4`
@@ -55,7 +55,7 @@ status: archived
 
 ## 実装メモ
 
-- 2026-07-05: `libs/core/org-chart.ts` を追加し、`knowledge/product/personalities/roles.json` と `team-role-index.json` を既定出発点として派生組織図を生成できるようにした。
+- 2026-07-05: `libs/core/organization/org-chart.ts` を追加し、`knowledge/product/personalities/roles.json` と `team-role-index.json` を既定出発点として派生組織図を生成できるようにした。
 - 2026-07-05: `libs/core/mission/mission-team-plan-composer.ts` に `organization_chart` の概要を載せ、mission plan が組織図の既定編成を参照できるようにした。
 - 2026-07-05: `pnpm org role create` を追加し、`authority-roles/*.json` / `team-roles/*.json` / `role-authority-map.json` / `security-policy.json` / `roles/{id}/PROCEDURE.md` / `mission.md` を一括生成・更新できるようにした。
 - 2026-07-05: `security-policy.json` と `role-authority-map.json` に finance_controller / strategic_sales / marketing_growth / talent_culture / line_manager の限定 authority_role を追加し、`validateWritePermission` が business role の act を認める最小経路を実装した。
@@ -73,9 +73,9 @@ status: archived
 
 STATUS.ja.md の「残: カスタムロール作成フロー精査」を実コード・実テストで再突合。CO-01(getGoldenRule)と異なり、今回は**全4タスクとも実装・テストの両方が既に揃っていた**(真の陳腐化、追加実装は不要):
 
-- Task 1(組織図データ化): `knowledge/product/schemas/org-chart.schema.json` 実在、`libs/core/org-chart.ts` が既定編成を提供。
+- Task 1(組織図データ化): `knowledge/product/schemas/org-chart.schema.json` 実在、`libs/core/organization/org-chart.ts` が既定編成を提供。
 - Task 2(カスタムロール作成フロー): `scripts/org.ts`(`pnpm org role create` / `pnpm org role promote`)+ `scripts/org.test.ts`(2テスト: 作成時の authority/team/policy/role doc 整合、既存 role の act 昇格)を確認・実行し緑。
 - Task 3(ビジネスロールの act 化): `tests/governance-policy.test.ts` が `finance_controller` を財務ドメイン配下の書き込みは許可・無関係な procedure ファイルへの書き込みは拒否、と scope 限定を固定していることを確認(「advise だけでなく限定的に act」の受入条件と一致)。
-- Task 4(Company への紐付け): `libs/core/company.ts` の `org_chart_ref` + `libs/core/company.test.ts` の該当アサーションで紐付けとテスト済みを確認。
+- Task 4(Company への紐付け): `libs/core/organization/company.ts` の `org_chart_ref` + `libs/core/organization/company.test.ts` の該当アサーションで紐付けとテスト済みを確認。
 
-検証: `scripts/org.test.ts` + `libs/core/company.test.ts` + `tests/company-vertical-templates-contract.test.ts` + `tests/governance-policy.test.ts` 計26テスト緑(既存テストの再実行、コード変更なし)。
+検証: `scripts/org.test.ts` + `libs/core/organization/company.test.ts` + `tests/company-vertical-templates-contract.test.ts` + `tests/governance-policy.test.ts` 計26テスト緑(既存テストの再実行、コード変更なし)。

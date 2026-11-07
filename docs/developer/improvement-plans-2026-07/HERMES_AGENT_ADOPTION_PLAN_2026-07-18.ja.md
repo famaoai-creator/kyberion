@@ -117,7 +117,7 @@ Hermes の gateway は最大サブシステム(`gateway/platforms/` 35k LOC + pl
 - **検索 op**: 引数から 3 モード推定(DISCOVERY: FTS query → lineage 重複排除 → snippet + 前後窓 / SCROLL: 特定セッションの窓移動 / BROWSE: 直近一覧)。**cron/scheduled 実行由来のセッションは除外でなく降格**(BM25 占拠対策)、subagent 内部セッションは非表示。
 - **堅牢性**: FTS 破損の self-healing(health probe → rebuild)。索引は tier 規約に従い mission/personal データの tier 境界を跨いだ検索結果を返さない(tier フィルタ必須)。
 
-**2026-07-18 実装済み**: `libs/core/history-search-index.ts` に基盤を実装し、明示的に `tier=public` と provenance を持つ A2A conversation・public mission journal・Telegram/Discord thread history・mission 非結合 trace をローカルソースから収集可能にした。tier 不明の runtime レコードは public index から除外する。wisdom actuator の public 固定 `history_search` capture op、`pnpm history:search` CLI、`pipelines/history-search-refresh.json` の Chronos 15分ごと refresh から利用できる。さらに confidential/personal は mission ID と明示 tier/provenance を要求する mission-scoped collector、ミッションごとに分離した SQLite 索引、`MISSION_ID`/`KYBERION_SUDO` 認可付き CLI entrypoint を追加した。A2A・mission journal・channel・trace の収集元を同一ミッションに限定し、private 索引が public 索引へ混入しないことを関連テストと実ミッション CLI で検証した。
+**2026-07-18 実装済み**: `libs/core/search/history-search-index.ts` に基盤を実装し、明示的に `tier=public` と provenance を持つ A2A conversation・public mission journal・Telegram/Discord thread history・mission 非結合 trace をローカルソースから収集可能にした。tier 不明の runtime レコードは public index から除外する。wisdom actuator の public 固定 `history_search` capture op、`pnpm history:search` CLI、`pipelines/history-search-refresh.json` の Chronos 15分ごと refresh から利用できる。さらに confidential/personal は mission ID と明示 tier/provenance を要求する mission-scoped collector、ミッションごとに分離した SQLite 索引、`MISSION_ID`/`KYBERION_SUDO` 認可付き CLI entrypoint を追加した。A2A・mission journal・channel・trace の収集元を同一ミッションに限定し、private 索引が public 索引へ混入しないことを関連テストと実ミッション CLI で検証した。
 
 **受入条件**:
 

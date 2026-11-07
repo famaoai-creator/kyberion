@@ -8,8 +8,8 @@ import {
   parseMissionTaskEventIdentity,
   type MissionTaskEventIdentity,
 } from './mission-task-events.js';
-import { ledger } from '../ledger.js';
-import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
+import { ledger } from '../governance/ledger.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../governance/owner-scope.js';
 import { readJsonLines } from '../foundation/json.js';
 import { readTextFile } from '../foundation/text.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
@@ -18,7 +18,7 @@ import {
   writeProvisionedJsonFrom,
   writeProvisionedText,
 } from './mission-orchestration-journal.js';
-import { validatePlanningPacket } from '../planning-packet-contract.js';
+import { validatePlanningPacket } from '../surface/planning-packet-contract.js';
 import { readProcessTemplateSeededTasks } from './mission-planning-packet.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { importExternalWorkItem, listWorkItems } from '../workforce/work-coordination.js';

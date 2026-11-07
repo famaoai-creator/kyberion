@@ -11,7 +11,7 @@ import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { withExecutionContext } from '../authority.js';
 
 const mocks = vi.hoisted(() => ({ sendOpsAlert: vi.fn() }));
-vi.mock('../ops-alert.js', () => ({ sendOpsAlert: mocks.sendOpsAlert }));
+vi.mock('../daemon/ops-alert.js', () => ({ sendOpsAlert: mocks.sendOpsAlert }));
 
 import {
   assertProviderEgress,

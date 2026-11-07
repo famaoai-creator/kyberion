@@ -13,7 +13,7 @@
  * stable identifiers (not prose) so the facade and the surface can map them
  * to vocabulary.
  */
-import { assertHumanActor } from '../actor.js';
+import { assertHumanActor } from '../contracts/actor.js';
 import {
   CUSTOMER_ACTOR_ID_PATTERN,
   decidedByActorRef,

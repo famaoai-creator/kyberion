@@ -109,6 +109,68 @@ describe('pipeline-preview', () => {
       expect(result.warnings.some((w) => w.includes('target_url'))).toBe(true);
     });
 
+    it('preserves nonempty token matching and resolves adjacent, dotted and whitespace tokens', () => {
+      const message =
+        '{{ name }}|{{nested.count}}{{nested.enabled}}|{{missing}}|{{}}|{{broken}tail}}|{{suffix}}';
+      const result = previewPipeline(
+        { steps: [{ op: 'log', params: { message } }] },
+        { name: 'Ada', nested: { count: 0, enabled: false }, suffix: '!' }
+      );
+
+      expect(result.steps[0].resolvedParams.message).toBe(
+        'Ada|0false|{{missing}}|{{}}|{{broken}tail}}|!'
+      );
+      expect(result.warnings).toEqual(['Unresolved variable: {{missing}}']);
+    });
+
+    it('retains the original params when a resolved value cannot be parsed as JSON', () => {
+      const params = { message: '{{name}}' };
+      const result = previewPipeline(
+        { steps: [{ op: 'log', params }] },
+        { name: 'unescaped "quote' }
+      );
+
+      expect(result.steps[0].resolvedParams).toEqual(params);
+      expect(result.warnings).toEqual([]);
+    });
+
+    it.each(['{{{{|', '{{{{'])(
+      'handles a long unterminated %s suffix in params and ref paths',
+      (opening) => {
+        const payload = opening.repeat(20_000);
+        const result = previewPipeline({
+          steps: [{ op: 'ref', params: { path: payload, message: payload } }],
+        });
+
+        expect(result.steps[0].resolvedParams).toEqual({ path: payload, message: payload });
+        expect(result.steps[0].children).toBeUndefined();
+        expect(result.warnings).toEqual([`ref path not readable: ${payload}`]);
+      }
+    );
+
+    it.each([
+      { token: '{{ name }}', filename: 'ref-_.json' },
+      { token: '{{\nname\n}}', filename: 'ref-_.json' },
+      { token: '{{{{name}}', filename: 'ref-_.json' },
+      { token: '{{}}', filename: 'ref-{{}}.json' },
+      { token: '{{broken}tail}}', filename: 'ref-{{broken}tail}}.json' },
+    ])('preserves ref-path matching for $token', ({ token, filename }) => {
+      const target = fixture(filename);
+      fs.writeFileSync(
+        target,
+        JSON.stringify({ steps: [{ op: 'log', params: { message: 'child' } }] })
+      );
+      try {
+        const result = previewPipeline({
+          steps: [{ op: 'ref', params: { path: fixture(`ref-${token}.json`) } }],
+        });
+        expect(result.steps[0].children).toHaveLength(1);
+        expect(result.steps[0].children?.[0].op).toBe('log');
+      } finally {
+        fs.unlinkSync(target);
+      }
+    });
+
     it('expands ref sub-pipelines into children', () => {
       // Create a temp sub-pipeline file
       const subPipeline = {

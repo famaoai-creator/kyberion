@@ -1,6 +1,6 @@
 import { logger } from '../core.js';
-import { trustEngine } from '../trust-engine.js';
-import type { EventScope } from '../event-scope.js';
+import { trustEngine } from '../governance/trust-engine.js';
+import type { EventScope } from '../event/event-scope.js';
 
 /**
  * Agent Registry v1.1

@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { withLock } from '../foundation/lock-utils.js';
 import { parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { pathResolver, findMissionPath } from '../path-resolver.js';
-import { missionPathOrNull } from '../mission-lookup.js';
+import { missionPathOrNull } from './mission-lookup.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import { resolveScopeContext } from '../scope-context.js';
 import { ExternalOperationApprovalRequired } from '../governance/external-operation.js';

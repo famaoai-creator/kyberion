@@ -90,7 +90,7 @@ If richer support is needed later, SDEF-based discovery can extend them without 
 
 The shared `OsAutomationPlatformAdapter` exposes the same logical pointer and
 observation API on macOS and Windows. macOS uses a small native Swift helper
-(`libs/core/macos-native-automation.swift`) through the governed synchronous
+(`libs/core/virtual/macos-native-automation.swift`) through the governed synchronous
 `macos-native-automation.ts` boundary:
 
 - CGEvent performs move, left/right/multiple click, directional scroll and drag.

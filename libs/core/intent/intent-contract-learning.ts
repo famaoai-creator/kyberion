@@ -10,7 +10,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import type { ScopeContext } from '../scope-context.js';
-import { physicalScopedPath } from '../physical-namespace.js';
+import { physicalScopedPath } from '../storage/physical-namespace.js';
 
 const MEMORY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/intent-contract-memory.schema.json'

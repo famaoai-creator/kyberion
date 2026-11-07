@@ -49,7 +49,7 @@ import {
 } from './knowledge-curation-tenant-ingest.js';
 import { listTenantProfileSlugs } from '../organization/tenant-registry.js';
 import type { ScopeContext } from '../scope-context.js';
-import { physicalScopedPath } from '../physical-namespace.js';
+import { physicalScopedPath } from '../storage/physical-namespace.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,

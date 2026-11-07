@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
-import { normalizeEventScope } from '../event-scope.js';
+import { normalizeEventScope } from '../event/event-scope.js';
 const fixture = vi.hoisted(() => ({ approval: null as ApprovalRequestRecord | null }));
 vi.mock('../governance/approval-store-reader.js', () => ({
   loadApprovalRequest: () => fixture.approval,

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
-import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../governance/owner-scope.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';

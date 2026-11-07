@@ -11,7 +11,7 @@ vi.mock('../foundation/authorization-registry.js', async (original) => {
   };
 });
 import { assertInformationAssetCatalogAuthorization } from './access.js';
-import { informationAssetCoverageReadAllowed } from '../foundation/information-asset-coverage-capability.js';
+import { informationAssetCoverageReadAllowed } from '../foundation/information-asset-coverage-access.js';
 import { withExecutionContext } from '../authority.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { withConciergeManagementAccess } from '../surface/concierge-management-access.js';

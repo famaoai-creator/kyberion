@@ -35,7 +35,7 @@ import { parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { readJson } from '../foundation/json.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeLstat, safeReadFile } from '../secure-io.js';
-import { validateA2UIMessage, type A2UIComponent, type A2UIMessage } from '../a2ui.js';
+import { validateA2UIMessage, type A2UIComponent, type A2UIMessage } from '../surface/a2ui.js';
 import { A2UI_BASE_CATALOG_ID, type KyberionBaseComponentType } from '../surface/a2ui-catalog.js';
 import { resolveVocabularyEntry } from '../knowledge/vocabulary-catalog.js';
 import { isPathContainedIn } from './plugin-source-trust.js';

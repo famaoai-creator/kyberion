@@ -15,7 +15,7 @@ import {
   _resetProviderEgressPolicyCacheForTests,
   evaluateProviderEgress,
 } from '../provider/provider-egress-gate.js';
-import { _resetEgressPolicyCacheForTests } from '../egress-policy.js';
+import { _resetEgressPolicyCacheForTests } from '../governance/egress-policy.js';
 import {
   ReasoningEgressDeniedError,
   assertReasoningEgressAllowed,

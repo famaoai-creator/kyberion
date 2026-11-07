@@ -53,7 +53,7 @@ import {
   type PeerReplyJob,
 } from './peer-auto-reply.js';
 import { peerRuntimeLogicalPath, setPeerLedgerStoreTuningForTests } from './peer-messaging.js';
-import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
+import { resetAppendOnlyStoreMaintenanceState } from '../storage/append-only-store.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
 import { CodexIsolatedQueryError } from '../provider/codex-isolated-query.js';
 import { ClaudeAgentQueryError } from '../provider/claude-agent-query.js';

@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   assertSafeRepositoryPath: vi.fn((value: string) => value),
 }));
 
-vi.mock('../managed-process.js', () => ({
+vi.mock('../tool/managed-process.js', () => ({
   spawnManagedProcess: mocks.spawnManagedProcess,
 }));
 vi.mock('./pipeline-run-journal.js', () => ({
@@ -29,7 +29,7 @@ vi.mock('../secure-io.js', () => ({
   safeLstat: mocks.lstat,
   safeReaddir: mocks.readdir,
 }));
-vi.mock('../owner-scope.js', () => ({
+vi.mock('../governance/owner-scope.js', () => ({
   missionTierScanDirs: vi.fn((root: string) => [root]),
 }));
 

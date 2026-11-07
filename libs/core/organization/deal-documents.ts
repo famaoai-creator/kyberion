@@ -1,0 +1,517 @@
+import * as path from 'node:path';
+import { pathResolver } from '../path-resolver.js';
+import { TENANT_DEALS_DIR, TENANT_HOME_ROOT } from './tenant-home.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { createHash } from 'node:crypto';
+import { writeJson } from '../foundation/json.js';
+import { readTextFile } from '../foundation/text.js';
+import { nowIso } from '../foundation/time.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeReaddir,
+  safeWriteFile,
+} from '../secure-io.js';
+import { logger } from '../core.js';
+import { notifyOperator } from '../surface/operator-notifications.js';
+import { writeIntentGoalHandoff } from '../intent/intent-handoff.js';
+import { readDealRequirementsCapture } from './customer-conversation-modes.js';
+import { saveRequirementsDraft } from '../mission/requirements-draft-store.js';
+import { isValidTenantSlug } from '../entity-scope.js';
+import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
+import {
+  advanceDealStage,
+  appendDealNote,
+  asDealStore,
+  buildQuoteFromPriceBook,
+  getDeal,
+  loadPriceBook,
+  type DealRecord,
+  type QuoteLineRequest,
+  type QuoteResult,
+} from './deal-store.js';
+import { sendToCustomer, type SendToCustomerResult } from './customer-conversation.js';
+import { formatNumber } from '../localization/format.js';
+
+/**
+ * E2E-06 Tasks 5/6: deal documents (quote / contract) and the SDLC handoff.
+ *
+ * Rules that must never be weakened:
+ *  - quote math is buildQuoteFromPriceBook only (LLMs never do arithmetic);
+ *    unknown work is unquotable → operator.
+ *  - contracts CANNOT be sent until a contract-review record with an
+ *    approve verdict exists for that exact version (defense layer 3).
+ *  - every outbound send goes through sendToCustomer (approval gate).
+ */
+
+/** The latest unquotable list of a deal (tenant-side; the operator notification has a count). */
+const UNQUOTABLE_FILE = 'quote-unquotable.json';
+
+/** The tenant-scoped command that shows one deal document to the operator. */
+function dealDocumentReadCommand(tenantSlug: string, dealId: string, fileName: string): string {
+  return `pnpm kyberion customer-channel outbound --tenant ${tenantSlug} --source deals/${dealId}/${fileName}`;
+}
+
+function dealDocsDir(tenantSlug: string, dealId: string): string {
+  if (!isValidTenantSlug(tenantSlug)) {
+    throw new Error(`[DEAL_SCOPE] invalid tenant slug: ${tenantSlug}`);
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{2,127}$/.test(dealId)) {
+    throw new Error(`[DEAL_SCOPE] invalid deal id: ${dealId}`);
+  }
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve(path.join(TENANT_HOME_ROOT, tenantSlug, TENANT_DEALS_DIR, dealId)),
+    { allowMissingLeaf: true }
+  );
+}
+
+function dealDocumentPath(dir: string, fileName: string): string {
+  return assertSafeRepositoryPath(path.join(dir, fileName), { allowMissingLeaf: true });
+}
+
+export function isRegularDealDocumentPath(filePath: string, tenantSlug: string): boolean {
+  try {
+    return asDealStore(tenantSlug, () => safeExistsSync(filePath) && safeLstat(filePath).isFile());
+  } catch {
+    return false;
+  }
+}
+
+function nextVersion(tenantSlug: string, dir: string, prefix: string): number {
+  try {
+    const entries = asDealStore(tenantSlug, () => (safeExistsSync(dir) ? safeReaddir(dir) : []));
+    const versions = entries
+      .map((entry) => entry.match(new RegExp(`^${prefix}-v(\\d+)\\.`)))
+      .filter(Boolean)
+      .map((match) => Number(match![1]));
+    return versions.length > 0 ? Math.max(...versions) + 1 : 1;
+  } catch {
+    return 1;
+  }
+}
+
+// I18N-05: this template's prose is Japanese-only today (see the literal
+// headings below); 'ja-JP' here just makes that existing assumption
+// explicit for the number formatting instead of relying on an
+// argument-less (environment-dependent) Number#toLocaleString().
+// TODO(I18N-04): thread a resolved customer/tenant locale once this
+// template itself is localized.
+const QUOTE_DOCUMENT_LOCALE = 'ja-JP';
+const QUOTE_RESULT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/quote-result.schema.json');
+
+function quoteResultCatalog(filePath: string) {
+  return defineCatalog<QuoteResult>({
+    id: 'quote-result',
+    path: filePath,
+    schema: QUOTE_RESULT_SCHEMA_PATH,
+  });
+}
+
+export interface ContractReviewRecord {
+  kind: 'contract-review-record';
+  deal_id: string;
+  version: number;
+  verdict: 'approve' | 'reject';
+  reviewer: string;
+  notes: string;
+  reviewed_at: string;
+}
+
+const CONTRACT_REVIEW_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/contract-review-record.schema.json'
+);
+
+function contractReviewCatalog(filePath: string) {
+  return defineCatalog<ContractReviewRecord>({
+    id: 'contract-review-record',
+    path: filePath,
+    schema: CONTRACT_REVIEW_SCHEMA_PATH,
+  });
+}
+
+export function loadContractReviewAtPath(
+  filePath: string,
+  tenantSlug: string,
+  dealId: string,
+  version: number
+): ContractReviewRecord {
+  return asDealStore(tenantSlug, () =>
+    loadContractReviewAsStore(filePath, tenantSlug, dealId, version)
+  );
+}
+
+function loadContractReviewAsStore(
+  filePath: string,
+  tenantSlug: string,
+  dealId: string,
+  version: number
+): ContractReviewRecord {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`contract review record must be a regular file: ${filePath}`);
+  }
+  const record = contractReviewCatalog(safeFilePath).load();
+  if (record.deal_id !== dealId || record.version !== version || tenantSlug.trim() === '') {
+    throw new Error(
+      `contract review record binding mismatch for ${tenantSlug}/${dealId} v${version}`
+    );
+  }
+  return record;
+}
+
+function renderQuoteMarkdown(deal: DealRecord, quote: QuoteResult, version: number): string {
+  return [
+    `# お見積書 (${deal.deal_id} v${version})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
+    '',
+    `- 宛先: ${deal.channel.surface}:${deal.channel.channel_id}`,
+    `- 通貨: ${quote.currency}`,
+    '',
+    '| 項目 | 作業種別 | 時間 | 単価 | 金額 |',
+    '|---|---|---:|---:|---:|',
+    ...quote.lines.map(
+      (line) =>
+        `| ${line.description} | ${line.task_kind} | ${line.hours}h | ${formatNumber(line.unit_price, { locale: QUOTE_DOCUMENT_LOCALE })} | ${formatNumber(line.amount, { locale: QUOTE_DOCUMENT_LOCALE })} |`
+    ),
+    '',
+    `**合計: ${formatNumber(quote.total, { locale: QUOTE_DOCUMENT_LOCALE })} ${quote.currency}(税別)**`,
+    '',
+    '> 金額は price book の決定論ルールで算出されています。', // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
+  ].join('\n');
+}
+
+export interface GenerateQuoteResult {
+  ok: boolean;
+  version?: number;
+  quote_ref?: string;
+  quote?: QuoteResult;
+  deal?: DealRecord;
+  unquotable?: QuoteResult['unquotable'];
+}
+
+export function generateQuoteForDeal(input: {
+  tenantSlug: string;
+  dealId: string;
+  requests: QuoteLineRequest[];
+}): GenerateQuoteResult {
+  const deal = getDeal(input.tenantSlug, input.dealId);
+  if (!deal) throw new Error(`deal_not_found:${input.dealId}`);
+  const priceBook = loadPriceBook(input.tenantSlug);
+  if (!priceBook) throw new Error('price_book_missing');
+  const quote = buildQuoteFromPriceBook(input.requests, priceBook);
+  if (!quote.ok) {
+    // Unknown work never gets an invented price — it goes to the operator.
+    // Ids and a count only: operator notifications are not tenant-partitioned
+    // and the task kinds can come from customer text. The list stays in the
+    // tenant's deal folder.
+    const dir = dealDocsDir(input.tenantSlug, input.dealId);
+    asDealStore(input.tenantSlug, () => {
+      safeMkdir(dir, { recursive: true });
+      writeJson(dealDocumentPath(dir, UNQUOTABLE_FILE), {
+        deal_id: deal.deal_id,
+        recorded_at: nowIso(),
+        unquotable: quote.unquotable,
+      });
+    });
+    void notifyOperator('question', {
+      title: `見積不能項目あり (${input.tenantSlug} / ${deal.deal_id})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
+      body: `見積不能項目 ${quote.unquotable.length} 件。内容はここには写しません。確認: ${dealDocumentReadCommand(input.tenantSlug, deal.deal_id, UNQUOTABLE_FILE)}`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
+      correlation_id: `${deal.deal_id}:unquotable`,
+    });
+    return { ok: false, unquotable: quote.unquotable };
+  }
+  const dir = dealDocsDir(input.tenantSlug, input.dealId);
+  const version = nextVersion(input.tenantSlug, dir, 'quote');
+  const quoteRef = path.join(
+    TENANT_HOME_ROOT,
+    input.tenantSlug,
+    TENANT_DEALS_DIR,
+    input.dealId,
+    `quote-v${version}.md`
+  );
+  const quoteJsonPath = dealDocumentPath(dir, `quote-v${version}.json`);
+  const canonicalQuote = quoteResultCatalog(quoteJsonPath).validate(quote, quoteJsonPath);
+  asDealStore(input.tenantSlug, () => {
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(quoteJsonPath, JSON.stringify(canonicalQuote, null, 2));
+    safeWriteFile(
+      dealDocumentPath(dir, `quote-v${version}.md`),
+      renderQuoteMarkdown(deal, quote, version)
+    );
+  });
+  const advanced = advanceDealStage({
+    tenantSlug: input.tenantSlug,
+    dealId: input.dealId,
+    stage: 'quote',
+    evidence: quoteRef,
+    refs: { quote_ref: quoteRef },
+  });
+  void notifyOperator('approval_required', {
+    title: `見積書ドラフト完成 (${deal.deal_id} v${version})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
+    // The total is tenant pricing: the shared notification names the document only.
+    body: `見積書 v${version} ができました（金額はここには写しません）。確認: ${dealDocumentReadCommand(input.tenantSlug, deal.deal_id, `quote-v${version}.md`)}。送付には承認が必要です。`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
+    link_hint: quoteRef,
+    correlation_id: `${deal.deal_id}:quote-v${version}`,
+  });
+  return { ok: true, version, quote_ref: quoteRef, quote, deal: advanced };
+}
+
+const DEFAULT_CONTRACT_TEMPLATE = 'product/sales/contract-templates/basic-service-agreement.md';
+
+export function draftContractForDeal(input: {
+  tenantSlug: string;
+  dealId: string;
+  templatePath?: string;
+}): { version: number; contract_ref: string; deal: DealRecord } {
+  const deal = getDeal(input.tenantSlug, input.dealId);
+  if (!deal) throw new Error(`deal_not_found:${input.dealId}`);
+  if (!deal.agreed?.scope?.length || !deal.agreed.amount) {
+    throw new Error('contract_requires_agreement: record agreed scope and amount first');
+  }
+  const knowledgeRoot = assertSafeRepositoryPath(pathResolver.knowledge());
+  const templateFile = assertSafeRepositoryPath(
+    pathResolver.knowledge(input.templatePath || DEFAULT_CONTRACT_TEMPLATE)
+  );
+  if (templateFile !== knowledgeRoot && !templateFile.startsWith(`${knowledgeRoot}${path.sep}`)) {
+    throw new Error(
+      `[RESOURCE_PATH_SCOPE] contract template is outside knowledge: ${templateFile}`
+    );
+  }
+  if (!safeExistsSync(templateFile)) throw new Error(`contract_template_missing:${templateFile}`);
+  if (!safeLstat(templateFile).isFile()) {
+    throw new Error(`contract_template_must_be_a_regular_file:${templateFile}`);
+  }
+  const template = readTextFile(templateFile);
+  const rendered = template
+    .split('{{DATE}}')
+    .join(nowIso().slice(0, 10))
+    .split('{{CUSTOMER_NAME}}')
+    .join('(担当者名)')
+    .split('{{CUSTOMER_ORG}}')
+    .join('(発注者名)')
+    .split('{{SCOPE}}')
+    .join(deal.agreed.scope.map((entry) => `- ${entry}`).join('\n'))
+    .split('{{AMOUNT}}')
+    .join(formatNumber(deal.agreed.amount.value, { locale: QUOTE_DOCUMENT_LOCALE }))
+    .split('{{CURRENCY}}')
+    .join(deal.agreed.amount.currency)
+    .split('{{DUE_DATE}}')
+    .join(deal.agreed.due_date || '(個別契約で定める)') // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
+    .split('{{SUCCESS_CONDITION}}')
+    .join(deal.agreed.success_condition || '(検収条件を個別契約で定める)') // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
+    .split('{{QUOTE_REF}}')
+    .join(deal.quote_ref || '(未発行)');
+  const dir = dealDocsDir(input.tenantSlug, input.dealId);
+  const version = nextVersion(input.tenantSlug, dir, 'contract');
+  const contractRef = path.join(
+    TENANT_HOME_ROOT,
+    input.tenantSlug,
+    TENANT_DEALS_DIR,
+    input.dealId,
+    `contract-v${version}.md`
+  );
+  asDealStore(input.tenantSlug, () => {
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(dealDocumentPath(dir, `contract-v${version}.md`), rendered);
+  });
+  const advanced = advanceDealStage({
+    tenantSlug: input.tenantSlug,
+    dealId: input.dealId,
+    stage: 'contract',
+    evidence: contractRef,
+    refs: { contract_ref: contractRef },
+  });
+  void notifyOperator('approval_required', {
+    title: `契約書ドラフト完成 (${deal.deal_id} v${version})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
+    body: 'contract-review パイプラインのレビュー記録(approve)が無い限り送付できません。', // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
+    link_hint: contractRef,
+    correlation_id: `${deal.deal_id}:contract-v${version}`,
+  });
+  return { version, contract_ref: contractRef, deal: advanced };
+}
+
+/**
+ * Defense layer 3: the review record. Written by the operator (or the
+ * contract-review pipeline's closing step) after multi-perspective review.
+ */
+export function recordContractReview(input: {
+  tenantSlug: string;
+  dealId: string;
+  version: number;
+  verdict: 'approve' | 'reject';
+  reviewer: string;
+  notes?: string;
+}): string {
+  const dir = dealDocsDir(input.tenantSlug, input.dealId);
+  const filePath = dealDocumentPath(dir, `contract-review-v${input.version}.json`);
+  const record = contractReviewCatalog(filePath).validate(
+    {
+      kind: 'contract-review-record',
+      deal_id: input.dealId,
+      version: input.version,
+      verdict: input.verdict,
+      reviewer: input.reviewer,
+      notes: input.notes || '',
+      reviewed_at: nowIso(),
+    },
+    filePath
+  );
+  asDealStore(input.tenantSlug, () => {
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(filePath, JSON.stringify(record, null, 2));
+  });
+  return filePath;
+}
+
+function contractReviewApproved(tenantSlug: string, dealId: string, version: number): boolean {
+  const filePath = dealDocumentPath(
+    dealDocsDir(tenantSlug, dealId),
+    `contract-review-v${version}.json`
+  );
+  try {
+    if (!asDealStore(tenantSlug, () => safeExistsSync(filePath))) return false;
+    const record = loadContractReviewAtPath(filePath, tenantSlug, dealId, version);
+    return record.verdict === 'approve';
+  } catch {
+    return false;
+  }
+}
+
+export type SendDealDocumentResult =
+  SendToCustomerResult | { sent: false; status: 'blocked'; reason: string };
+
+/**
+ * The only path for sending quote/contract documents. Contracts additionally
+ * require an approved contract-review record for the exact version.
+ */
+export async function sendDealDocumentToCustomer(input: {
+  binding: ResolvedCustomerBinding;
+  dealId: string;
+  kind: 'quote' | 'contract';
+  version: number;
+  hasHuman?: boolean;
+  hasUI?: boolean;
+  nonInteractive?: boolean;
+  deliver: (text: string) => Promise<unknown>;
+}): Promise<SendDealDocumentResult> {
+  const tenantSlug = input.binding.tenantSlug;
+  const docPath = dealDocumentPath(
+    dealDocsDir(tenantSlug, input.dealId),
+    `${input.kind}-v${input.version}.md`
+  );
+  if (!isRegularDealDocumentPath(docPath, tenantSlug)) {
+    return {
+      sent: false,
+      status: 'blocked',
+      reason: `document_missing:${input.kind}-v${input.version}`,
+    };
+  }
+  if (
+    input.kind === 'contract' &&
+    !contractReviewApproved(tenantSlug, input.dealId, input.version)
+  ) {
+    logger.warn(
+      `[deal-documents] contract send blocked for ${input.dealId} v${input.version}: no approved review record`
+    );
+    return { sent: false, status: 'blocked', reason: 'contract_review_required' };
+  }
+  const body = asDealStore(tenantSlug, () => readTextFile(docPath));
+  const result = await sendToCustomer({
+    binding: input.binding,
+    title: `${input.kind === 'quote' ? 'お見積書' : '契約書ドラフト'} (${input.dealId} v${input.version})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
+    body,
+    // The approver reads the document in the tenant's deal folder; the shared
+    // approval store gets ids only (sendToCustomer).
+    contentSource: `deals/${input.dealId}/${input.kind}-v${input.version}.md`,
+    // Per channel: the same document to another channel is a new approval
+    // (the approval binds the channel), not a permanent effect mismatch. The
+    // channel id (maybe an email address) goes in as a hash.
+    correlationId: `${input.dealId}:${input.kind}-v${input.version}:${input.binding.binding.surface}:${createHash('sha256').update(input.binding.binding.channel_id, 'utf8').digest('hex').slice(0, 16)}`,
+    ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),
+    ...(input.hasUI !== undefined ? { hasUI: input.hasUI } : {}),
+    ...(input.nonInteractive !== undefined ? { nonInteractive: input.nonInteractive } : {}),
+    deliver: input.deliver,
+  });
+  if (result.sent) {
+    appendDealNote({
+      tenantSlug,
+      dealId: input.dealId,
+      role: 'kyberion',
+      text: `${input.kind}-v${input.version} を送付しました (sent_at: ${nowIso()})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
+    });
+  }
+  return result;
+}
+
+/**
+ * E2E-06 Task 6: won → SDLC. The customer's words become the mission goal
+ * via the IL-01 intent handoff; sdlc-cycle.json is the next pipeline to run
+ * with this mission.
+ */
+export function handoffWonDealToSdlc(input: {
+  tenantSlug: string;
+  dealId: string;
+  missionId: string;
+}): {
+  handoff_path: string;
+  sdlc_pipeline: string;
+  deal: DealRecord;
+  requirements_draft_version?: string;
+} {
+  const deal = getDeal(input.tenantSlug, input.dealId);
+  if (!deal) throw new Error(`deal_not_found:${input.dealId}`);
+  if (!deal.agreed?.scope?.length) {
+    throw new Error('sdlc_handoff_requires_agreement');
+  }
+  const handoffPath = writeIntentGoalHandoff(input.missionId, {
+    source_text: deal.summary,
+    correlation_id: deal.deal_id,
+    goal: {
+      summary: deal.agreed.scope.join(' / '),
+      ...(deal.agreed.success_condition
+        ? { success_condition: deal.agreed.success_condition }
+        : {}),
+    },
+  });
+  const advanced = advanceDealStage({
+    tenantSlug: input.tenantSlug,
+    dealId: input.dealId,
+    stage: 'won',
+    evidence: handoffPath,
+    missionId: input.missionId,
+  });
+
+  // Promote the hearing's structured requirements into the mission's draft:
+  // without this, everything the discovery phase captured (via conversation
+  // turns or audio ingestion) dies at the deal boundary and the SDLC mission
+  // starts from just the one-line scope.
+  let requirementsDraftVersion: string | undefined;
+  const capture = readDealRequirementsCapture(input.tenantSlug, input.dealId);
+  if (capture) {
+    try {
+      const draft = saveRequirementsDraft({
+        missionId: input.missionId,
+        projectName: deal.summary.slice(0, 80),
+        extracted: capture.requirements,
+        elicitationSource: {
+          type: 'chat_log',
+          refs: [`deal:${deal.deal_id}`],
+        },
+        generatedBy: 'deal-requirements-capture',
+      });
+      requirementsDraftVersion = draft.version;
+    } catch (err) {
+      logger.warn(
+        `[deal-documents] requirements promotion failed for ${deal.deal_id}: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  return {
+    handoff_path: handoffPath,
+    sdlc_pipeline: 'pipelines/sdlc-cycle.json',
+    deal: advanced,
+    ...(requirementsDraftVersion ? { requirements_draft_version: requirementsDraftVersion } : {}),
+  };
+}

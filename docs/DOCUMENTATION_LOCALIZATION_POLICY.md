@@ -65,12 +65,12 @@ visible from its qualified `namespace:key` form. `required_locales` on the catal
 locales every key must define — adding a locale is a data edit to that array plus
 `pnpm generate:vocabulary-types`, never a hand-edited type union.
 
-The single type-safe entry point is `t(key, params?, locale?)` (`libs/core/t.ts`). `key` is a
+The single type-safe entry point is `t(key, params?, locale?)` (`libs/core/localization/t.ts`). `key` is a
 generated union (`libs/core/knowledge/vocabulary-keys.generated.ts`), so referencing a key the catalog does
 not define is a compile-time error, not a runtime "renders the key itself" surprise. `params`
 render through an intentionally small ICU MessageFormat subset (`libs/core/foundation/message-format.ts`):
 simple `{name}` interpolation and `{count, plural, one {...} other {...}}` — nothing more (no
-gender/ordinal/date sub-formats; those stay in `libs/core/format.ts`'s locale/timeZone-aware
+gender/ordinal/date sub-formats; those stay in `libs/core/localization/format.ts`'s locale/timeZone-aware
 formatters, not in the catalog). A locale left untranslated for a given key falls back to
 `default_locale` and logs one `[t]`-prefixed warning per call rather than failing silently or
 rendering blank text.

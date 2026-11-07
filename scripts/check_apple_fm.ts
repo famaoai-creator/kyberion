@@ -2,7 +2,7 @@
 /**
  * `pnpm check:apple-fm` — is on-device Apple Intelligence usable here, and
  * does a real round trip work? Read-only demo of the local assist layer
- * (libs/core/apple-intelligence-bridge.ts).
+ * (libs/core/provider/apple-intelligence-bridge.ts).
  */
 import {
   classifyLocallyWithAppleFm,

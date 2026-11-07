@@ -23,7 +23,7 @@ import { withPersonCharterRegistryAccess } from './person-charter-store-access.j
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import * as pathResolver from '../path-resolver.js';
-import { assertHumanActor, type ActorRef } from '../actor.js';
+import { assertHumanActor, type ActorRef } from '../contracts/actor.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
 import { listTenantProfileSlugs } from '../organization/tenant-registry.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';

@@ -21,14 +21,14 @@ import {
   unmetRuntimeRequirements,
   type ProviderRuntimeRequirement,
   type RuntimeRequirementContext,
-} from '../provider-runtime-requirements.js';
+} from '../provider/provider-runtime-requirements.js';
 import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 import {
   listSeamSelectionPurposes,
   resolveSeamProviderDecision,
   resolveSeamSelectionEntry,
   type SeamProviderDecision,
-} from '../seam-provider-selection.js';
+} from '../provider/seam-provider-selection.js';
 
 /** What a streaming TTS bridge can do; used only for governed selection. */
 export interface StreamingTtsCapabilities {

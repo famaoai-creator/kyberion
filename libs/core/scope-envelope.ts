@@ -9,8 +9,8 @@ import {
   type ScopeContextInput,
 } from './foundation/scope-context-validation.js';
 import { resolveScopeContext, resolveScopeResolution } from './scope-context.js';
-import { tryResolveOwnerScope, SHARED_TENANT, type OwnerRef } from './owner-scope.js';
-import type { ContextSecurityScope } from './context-security-scope.js';
+import { tryResolveOwnerScope, SHARED_TENANT, type OwnerRef } from './governance/owner-scope.js';
+import type { ContextSecurityScope } from './governance/context-security-scope.js';
 
 /**
  * SC-01: the two-layer scope envelope the runtime mints at dispatch

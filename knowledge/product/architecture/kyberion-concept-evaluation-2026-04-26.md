@@ -212,7 +212,7 @@ interface IntentResolutionContract {
 
 実装候補:
 
-- 新規: `libs/core/outcome-contract.ts`
+- 新規: `libs/core/task/outcome-contract.ts`
 - 新規: `schemas/outcome-contract.schema.json`
 - 更新: `libs/core/task/task-session.ts`
 - 更新: `scripts/mission_controller.ts`
@@ -239,7 +239,7 @@ interface OutcomeContract {
 
 実装状況:
 
-- `libs/core/outcome-contract.ts` と `libs/core/outcome-contract.test.ts` で固定済み。
+- `libs/core/task/outcome-contract.ts` と `libs/core/task/outcome-contract.test.ts` で固定済み。
 - `schemas/outcome-contract.schema.json` と契約ゲートに接続済み。
 
 ### P1-2. Artifact Ownership Registry を導入する
@@ -340,7 +340,7 @@ interface ArtifactRecord {
 - 新規: `libs/core/knowledge/memory-promotion-queue.ts`
 - 新規: `schemas/memory-candidate.schema.json`
 - 保存先: `active/shared/memory/promotion-queue.jsonl`
-- 更新: `libs/core/heuristic-feedback.ts`
+- 更新: `libs/core/knowledge/heuristic-feedback.ts`
 
 最小フィールド:
 

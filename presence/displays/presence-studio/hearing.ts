@@ -36,7 +36,7 @@ export interface HearingScenario {
 }
 
 /** WI-08: pure `{id, requirements}` shape derived from a
- * `hearing-scenarios.json` catalog entry (`libs/core/hearing-scenario-catalog.ts`)
+ * `hearing-scenarios.json` catalog entry (`libs/core/surface/hearing-scenario-catalog.ts`)
  * — the catalog is the single source of truth for the requirement set,
  * `createHearingRecord`/`applyHearingTurn` only need this thin projection.
  * A phase-structured entry carries its `phases` and each item's `phase_id`. */
@@ -100,7 +100,7 @@ export interface HearingRequirement {
 }
 
 /** FD-10 (plan §2.5 principle 4): decisions are human-only, recorded through
- * `libs/core/actor.ts`'s `humanActor` shape plus the deciding member's
+ * `libs/core/contracts/actor.ts`'s `humanActor` shape plus the deciding member's
  * front-desk role — never the synthetic loopback/token principal id. */
 export interface HearingDecidedBy {
   kind: 'human';

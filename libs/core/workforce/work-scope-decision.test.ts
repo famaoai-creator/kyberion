@@ -6,7 +6,7 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { compileSchemaFromPath } from '../schema-loader.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
-import { withoutSchemaMetadata } from '../test-governance-payload.js';
+import { withoutSchemaMetadata } from '../testing/test-governance-payload.js';
 import {
   loadWorkScopePolicy,
   resolveWorkScopeDecision,

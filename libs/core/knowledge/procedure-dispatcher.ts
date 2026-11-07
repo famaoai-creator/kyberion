@@ -10,7 +10,7 @@ import {
 } from './golden-scenario-verdict.js';
 import type { ScopeContext } from '../scope-context.js';
 import { logger } from '../core.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { enforceApprovalGate } from '../governance/approval-gate.js';
@@ -40,7 +40,7 @@ import {
   type ServiceStepResult,
 } from '../service/service-procedure-executor.js';
 import { type ProcedureEntry } from './procedure-types.js';
-import { RISKY_OPS } from '../risky-op-registry.js';
+import { RISKY_OPS } from '../governance/risky-op-registry.js';
 import { osAutomationBridge, type OsAutomationBridge } from '../virtual/os-automation-bridge.js';
 import {
   computeDesktopRecordingHash,

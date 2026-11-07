@@ -18,7 +18,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
-import { evaluateContextFragment } from '../context-security-scope.js';
+import { evaluateContextFragment } from '../governance/context-security-scope.js';
 import {
   commonKnowledgeGrantTenant,
   knowledgeHintFragment,
@@ -49,7 +49,7 @@ vi.mock('../knowledge/distill-knowledge-injector.js', () => ({
 
 // XP-03: checkProviderEgress emits an ops-alert on denial; mock the sink so
 // this suite never writes to the shared ops-alerts store.
-vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
+vi.mock('../daemon/ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 
 // ─── DA-07 acceptance tests ──────────────────────────────────────────────────
 //

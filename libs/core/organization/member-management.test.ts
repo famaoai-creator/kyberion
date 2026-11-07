@@ -39,7 +39,7 @@ vi.mock('../project/project-lifecycle-guards.js', () => ({
     if (s.worker) throw new Error('workers cannot mutate');
   },
 }));
-vi.mock('../chronos-access-registry.js', () => ({
+vi.mock('../authn/chronos-access-registry.js', () => ({
   issueChronosAccessToken: () => ({
     token: 'one-time-token',
     registration: { label: 'alice-token' },

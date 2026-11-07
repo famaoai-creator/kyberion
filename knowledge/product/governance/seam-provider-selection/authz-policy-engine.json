@@ -57,7 +57,10 @@
             "deny_everything": "declared",
             "permit_everything": "declared"
           },
-          "evidence": ["libs/core/organization/member-registry.ts", "libs/core/front-desk-roles.ts"]
+          "evidence": [
+            "libs/core/organization/member-registry.ts",
+            "libs/core/surface/front-desk-roles.ts"
+          ]
         },
         "policy-file": {
           "traits": {

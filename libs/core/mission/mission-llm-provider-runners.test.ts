@@ -18,11 +18,11 @@ vi.mock('node:child_process', async (importOriginal) => {
   return { ...actual, spawn: mocks.spawnMock };
 });
 // Denials raise ops alerts; keep the shared sink untouched.
-vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
+vi.mock('../daemon/ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 // Usage metering and the wall-clock child registry persist runtime records;
 // this suite must not write them.
-vi.mock('../cli-usage-metering.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../cli-usage-metering.js')>()),
+vi.mock('../provider/cli-usage-metering.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../provider/cli-usage-metering.js')>()),
   recordEstimatedCliUsage: vi.fn(),
   recordCliUsage: vi.fn(),
 }));
@@ -36,7 +36,7 @@ vi.mock('./delegation-concurrency.js', () => ({
 }));
 
 import { llmShellScratchCwd, type LlmProfile, runStructuredLlmProfile } from './mission-llm.js';
-import { recordCliUsage } from '../cli-usage-metering.js';
+import { recordCliUsage } from '../provider/cli-usage-metering.js';
 
 type FakeChild = EventEmitter & {
   pid?: number;

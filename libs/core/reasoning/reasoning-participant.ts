@@ -4,7 +4,7 @@ import {
   type CompiledContextPack,
   type ContextSecurityScope,
   type GovernedContextFragment,
-} from '../context-security-scope.js';
+} from '../governance/context-security-scope.js';
 
 export interface ReasoningParticipant {
   participant_id: string;

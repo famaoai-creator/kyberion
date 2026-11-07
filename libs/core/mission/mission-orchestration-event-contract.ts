@@ -1,4 +1,4 @@
-import type { EventScope } from '../event-scope.js';
+import type { EventScope } from '../event/event-scope.js';
 
 export type MissionOrchestrationEventType =
   | 'mission_issue_requested'

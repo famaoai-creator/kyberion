@@ -2,16 +2,10 @@ import { needsFixedReasoningGuard, pickRoleBackend } from './reasoning-fixed-bin
 /**
  * Reasoning Backend Contract — where LLM reasoning actually runs.
  *
- * Implements the contract layer of CONCEPT_INTEGRATION_BACKLOG P2-1.
- * Per the CLI harness coordination model, Kyberion owns the contract
- * (what to produce) but delegates the *reasoning* to an external provider
- * runtime or, in limited cases, an in-process LLM client. This module exposes
- * a small abstract surface so call sites (decision-ops, compilers, workflows)
- * never embed a specific reasoning implementation.
- *
- * Default backend is `stub` — deterministic, offline, returns structured
- * placeholders and logs a warning. Real backends (e.g. a host-CLI
- * adapter) are registered via `registerReasoningBackend`.
+ * Kyberion owns the output contract and delegates reasoning to a registered
+ * provider, keeping callers independent of provider implementations.
+ * The default `stub` returns deterministic offline placeholders; register real
+ * adapters with `registerReasoningBackend`.
  */
 
 import { automaticReasoningRedispatchAllowed } from './reasoning-dispatch-scope.js';
@@ -22,21 +16,24 @@ import {
   createSeamLifecycle,
   type SeamProviderMetadata,
 } from '../seam.js';
-import { assertOperationPolicy, currentDelegationDepth } from '../operation-policy-gate.js';
+import {
+  assertOperationPolicy,
+  currentDelegationDepth,
+} from '../governance/operation-policy-gate.js';
 import type {
   A2ATaskContract,
   PlanningPacket,
   TaskResultBlock,
 } from '../surface/channel-surface-types.js';
 import { slugify } from '../foundation/text.js';
-import { frameUntrustedInput } from '../untrusted-input-framing.js';
-import { createGapRecorder, type GapPhaseSample } from '../gap-phase.js';
-import { parseStructuredJson } from '../structured-reasoning.js';
+import { frameUntrustedInput } from '../governance/untrusted-input-framing.js';
+import { createGapRecorder, type GapPhaseSample } from '../analysis/gap-phase.js';
+import { parseStructuredJson } from './structured-reasoning.js';
 import {
   resolveStructuredOutputSchema,
   type ProcedureRankingResult,
   type StructuredOutputSchemaRef,
-} from '../structured-output-contracts.js';
+} from '../contracts/structured-output-contracts.js';
 import {
   healthyInstances,
   isInstanceDemoted,
@@ -45,8 +42,8 @@ import {
   getProviderHealthDemotionTtlMs,
   reportProviderTemporarilyUnhealthy,
 } from '../provider/provider-health-registry.js';
-import { enforceSpendGuardForReasoning } from '../spend-guard.js';
-import { metrics } from '../metrics.js';
+import { enforceSpendGuardForReasoning } from '../finance/spend-guard.js';
+import { metrics } from '../analysis/metrics.js';
 import { findMissionPath } from '../path-resolver.js';
 import { z } from 'zod';
 import {
@@ -55,16 +52,23 @@ import {
 } from './reasoning-egress-scope.js';
 import { classifyReasoningFailure, reasoningFailureMessage } from './reasoning-failure-taxonomy.js';
 import { appendReasoningFailoverEvent, markReasoningFailover } from './reasoning-failover.js';
-import { resolveReasoningProviderDescriptor } from './reasoning-provider-registry.js';
+import {
+  candidateLabel,
+  normalizeProviderName,
+  resolveReasoningProviderDescriptor,
+} from './reasoning-provider-registry.js';
 // Existing reasoning/delegation cycle is tracked by check:module-boundaries baseline.
 // eslint-disable-next-line import/no-cycle -- baseline until the delegation seam is split
-import { createDelegationHandle, type DelegationHandle } from '../delegated-task-observability.js';
+import {
+  createDelegationHandle,
+  type DelegationHandle,
+} from '../workforce/delegated-task-observability.js';
 import * as dg from './delegation-failover-guard.js';
 import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js';
-import { AdvisoryPolicyViolation } from '../ce-adoption.js';
-import { assertDistillationTextEgress } from '../frame-redaction.js';
+import { AdvisoryPolicyViolation } from '../harnessing/ce-adoption.js';
+import { assertDistillationTextEgress } from '../virtual/frame-redaction.js';
 import { appendPromptVisibilityRecord } from './prompt-visibility-ledger.js';
-import { resolveConstrainedSampling } from '../backend-capability-profile.js';
+import { resolveConstrainedSampling } from './backend-capability-profile.js';
 import {
   appendDeferredToolAnnouncement,
   planDeferredToolLoading,
@@ -132,17 +136,6 @@ import {
 } from './reasoning-live-capabilities.js';
 export * from './reasoning-live-capabilities.js';
 import { assertAdvisoryBackendPermission } from '../provider/provider-permission-profiles.js';
-
-function normalizeProviderName(value?: string): string | null {
-  const provider = String(value || '')
-    .trim()
-    .toLowerCase();
-  return provider || null;
-}
-
-function candidateLabel(candidate: ReasoningBackendCandidate): string {
-  return candidate.label || candidate.backend.name || candidate.provider || 'unknown';
-}
 
 /**
  * Exact model ids belong to the provider that resolved the primary route.

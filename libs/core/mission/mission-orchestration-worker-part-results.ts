@@ -5,9 +5,9 @@ import {
 } from '../customer-decision/task-decision-values.js';
 import { type DelegationChain } from './delegation-chain.js';
 import { type PlanningPacket } from '../surface/channel-surface.js';
-import { draftRefine } from '../draft-refine.js';
+import { draftRefine } from '../reasoning/draft-refine.js';
 import { logger } from '../core.js';
-import { sendOpsAlert } from '../ops-alert.js';
+import { sendOpsAlert } from '../daemon/ops-alert.js';
 import { missionEvidenceDir } from '../path-resolver.js';
 import { type DeliveredKnowledgeRef } from '../knowledge/knowledge-feedback-loop.js';
 import { TraceContext, persistTrace } from '../analysis/trace.js';
@@ -68,7 +68,10 @@ export {
   resolvePhaseGateMode,
 } from './mission-orchestration-phase-gates.js';
 import { getLastServedReasoningMode } from '../reasoning/reasoning-backend.js';
-import { BEST_OF_PROVIDERS_LIVE_ENV_VAR, runBestOfProviders } from '../best-of-providers.js';
+import {
+  BEST_OF_PROVIDERS_LIVE_ENV_VAR,
+  runBestOfProviders,
+} from '../provider/best-of-providers.js';
 import type { TierLevel } from '../types.js';
 import { type MissionGraphRunJournalHandle } from './mission-graph-run-journal.js';
 import { providerIdForReasoningIdentifier } from '../provider/provider-egress-gate.js';
@@ -317,7 +320,7 @@ export interface BestOfProvidersJudgeOutcome {
 
 /** Most sensitive tier the judge prompt may carry; no scope reads as confidential. */
 function judgeDataTier(
-  scope?: import('../context-security-scope.js').ContextSecurityScope
+  scope?: import('../governance/context-security-scope.js').ContextSecurityScope
 ): TierLevel {
   const tiers = scope?.read_tiers || [];
   if (tiers.includes('personal') || scope?.write_tier === 'personal') return 'personal';
@@ -334,7 +337,7 @@ function judgeDataTier(
 export async function obtainBestOfProvidersJudgeVerdict(input: {
   judgePrompt: string;
   taskId: string;
-  securityScope?: import('../context-security-scope.js').ContextSecurityScope;
+  securityScope?: import('../governance/context-security-scope.js').ContextSecurityScope;
   run?: typeof runBestOfProviders;
 }): Promise<BestOfProvidersJudgeOutcome | null> {
   if (input.securityScope?.external_egress === 'deny') return null;
@@ -378,7 +381,7 @@ export async function obtainBestOfTaskResultResponse(input: {
   taskModelHint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
   prompt: string;
   contextPackId?: string;
-  securityScope?: import('../context-security-scope.js').ContextSecurityScope;
+  securityScope?: import('../governance/context-security-scope.js').ContextSecurityScope;
   deliveredKnowledgeRefs?: DeliveredKnowledgeRef[];
   /** NI-03: forwarded verbatim to each candidate's obtainTaskResultResponse. */
   delegationChain?: DelegationChain;

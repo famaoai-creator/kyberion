@@ -9,8 +9,8 @@
   ],
   "blocking_gaps": [],
   "scope": [
-    "libs/core/trigger-runner.ts",
-    "libs/core/managed-process.ts",
+    "libs/core/daemon/trigger-runner.ts",
+    "libs/core/tool/managed-process.ts",
     "scripts/chronos_daemon.ts",
     "libs/core/src/pipeline-scheduler.ts"
   ]

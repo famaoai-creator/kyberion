@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { readTextFile } from '../foundation/text.js';
 import { safeExistsSync, safeLstat } from '../secure-io.js';
-import type { ResourceProvenance } from '../resource-provenance.js';
+import type { ResourceProvenance } from '../contracts/resource-provenance.js';
 
 export interface AgentInstructionResource {
   path: string;

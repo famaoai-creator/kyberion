@@ -34,8 +34,8 @@ vi.mock('../path-resolver.js', async (importOriginal) => {
     pathResolver: { ...actual.pathResolver, findArchivedMissionDir: archiveLookup },
   };
 });
-vi.mock('../ledger.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../ledger.js')>();
+vi.mock('../governance/ledger.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../governance/ledger.js')>();
   return {
     ...actual,
     ledger: {

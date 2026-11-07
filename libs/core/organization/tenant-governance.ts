@@ -42,7 +42,7 @@ import {
 } from '../governance/external-operation-target.js';
 import type { CharterScope } from '../governance/accountability-charter.js';
 import { resolveIdentityContext } from '../authority.js';
-import { currentActor } from '../actor-context.js';
+import { currentActor } from '../authn/actor-context.js';
 import { pathResolver } from '../path-resolver.js';
 import { isReservedScopeName, isValidTenantSlug } from '../entity-scope.js';
 import {

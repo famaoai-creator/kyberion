@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Daily ops-health probe: detects store overgrowth, alert dominance, and uncovered runtime stores; records findings to ops-findings.jsonl and files deduplicated WorkItems (autonomous improvement loop stage 1+2).",
   "_refs": {
-    "implementation": "libs/core/ops-health-probe.ts"
+    "implementation": "libs/core/daemon/ops-health-probe.ts"
   },
   "context": {
     "file_work_items": true

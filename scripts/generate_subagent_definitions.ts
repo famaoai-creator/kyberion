@@ -11,13 +11,13 @@
  *     description, compatible_authority_roles)
  *   - knowledge/product/roles/<authority-role>/PROCEDURE.md (condensed into
  *     the generated body when present)
- *   - libs/core/subagent-capability-profiles.ts (KD-05 capability tiers —
+ *   - libs/core/workforce/subagent-capability-profiles.ts (KD-05 capability tiers —
  *     the SSoT for both the team-role -> tier mapping
  *     (`resolveCapabilityProfileForTeamRole`) and the tier -> CLI `tools:`
  *     frontmatter projection (`SUBAGENT_PROFILE_CLI_TOOLS`), barrel-exported
  *     from `@agent/core`. `PROFILE_SPECS` below only adds the
  *     script-local framing lookup keyed by the same profile names.)
- *   - libs/core/working-principles.ts (buildWorkingPrinciplesLines)
+ *   - libs/core/workforce/working-principles.ts (buildWorkingPrinciplesLines)
  *
  * Generated files are ceremony-owned artifacts, never hand-edited (each file
  * carries its own "DO NOT EDIT BY HAND" header). `--check` regenerates
@@ -78,14 +78,14 @@ interface ProfileSpec {
   readonly tools: readonly string[];
   /**
    * `SUBAGENT_CAPABILITY_PROFILES[].systemPromptPrefix` from
-   * libs/core/subagent-capability-profiles.ts — the KD-05 capability-framing
+   * libs/core/workforce/subagent-capability-profiles.ts — the KD-05 capability-framing
    * sentence every generated definition must carry.
    */
   readonly framing: string;
 }
 
 // KD-05 profile -> { CLI tools:, framing } projection, derived from the SSoT
-// registry (libs/core/subagent-capability-profiles.ts) instead of a
+// registry (libs/core/workforce/subagent-capability-profiles.ts) instead of a
 // hand-mirrored table. Adding/renaming a tier there flows through here
 // automatically.
 export const PROFILE_SPECS: Readonly<Record<SubagentProfileName, ProfileSpec>> = Object.fromEntries(
@@ -102,7 +102,7 @@ export const DEFAULT_PROFILE: SubagentProfileName =
   DEFAULT_TEAM_ROLE_CAPABILITY_PROFILE as SubagentProfileName;
 
 // XP-04 §"The read/write matrix" projection, re-exported from the shared
-// framing SSoT (libs/core/subagent-prompt-framing.ts) so this committed
+// framing SSoT (libs/core/workforce/subagent-prompt-framing.ts) so this committed
 // generation ceremony and the runtime `--agents` projection (CN-02,
 // libs/core/provider/claude-native-subagent.ts) quote the same text.
 export const SHARED_DIRECTORY_RULES_LINES: readonly string[] =
@@ -113,7 +113,7 @@ export const SHARED_DIRECTORY_RULES_LINES: readonly string[] =
 // tester), explorer (reviewer, devils_advocate, researcher), planner
 // (planner) — so each tier's projection stays under drift check. Add a role
 // here to bring it under drift check; resolveCapabilityProfileForTeamRole
-// (libs/core/subagent-capability-profiles.ts) controls which tier it gets.
+// (libs/core/workforce/subagent-capability-profiles.ts) controls which tier it gets.
 export const GENERATED_ROLES: readonly string[] = [
   'implementer',
   'tester',
@@ -208,8 +208,8 @@ export function buildAgentDefinitionSource(role: string, provider = 'claude'): s
   if (authorityRole) {
     lines.push(`  - knowledge/product/roles/${authorityRole}/PROCEDURE.md`);
   }
-  lines.push('  - libs/core/subagent-capability-profiles.ts (KD-05 capability tiers)');
-  lines.push('  - libs/core/working-principles.ts (buildWorkingPrinciplesLines)');
+  lines.push('  - libs/core/workforce/subagent-capability-profiles.ts (KD-05 capability tiers)');
+  lines.push('  - libs/core/workforce/working-principles.ts (buildWorkingPrinciplesLines)');
   lines.push(
     '  - knowledge/product/governance/multi-provider-coexecution-contract.md (XP-04 read/write matrix)'
   );

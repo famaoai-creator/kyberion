@@ -11,11 +11,11 @@ import { resolveSelectionHints } from '../agent/agent-manifest.js';
 import { resolveTeamRoleSelectionHints } from './team-role-selection.js';
 import { resolveModelProvider } from '../reasoning/reasoning-model-routing.js';
 import { loadProviderConfig } from '../provider/provider-config.js';
-import type { ContextSecurityScope } from '../context-security-scope.js';
+import type { ContextSecurityScope } from '../governance/context-security-scope.js';
 import { resolveWorkforceLoad, type WorkforceLoadIndex } from '../workforce/workforce-load.js';
 import { workerLoadPenalty } from '../workforce/worker-assignment-policy.js';
 import { providerCanProjectProfile } from '../provider/provider-permission-profiles.js';
-import { resolveCapabilityProfileForTeamRole } from '../subagent-capability-profiles.js';
+import { resolveCapabilityProfileForTeamRole } from '../workforce/subagent-capability-profiles.js';
 import { canProvideGovernedTaskTools } from '../agent/agent-exec-adapter-bridge.js';
 
 export interface AuthorityRoleRecord {

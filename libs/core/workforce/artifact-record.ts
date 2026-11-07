@@ -21,7 +21,7 @@ import {
   evaluateDeliverableQuality,
   inferDeliverableKind,
   qualityScoreFromReport,
-} from '../deliverable-quality.js';
+} from '../task/deliverable-quality.js';
 
 export interface ArtifactRecord {
   artifact_id: string;

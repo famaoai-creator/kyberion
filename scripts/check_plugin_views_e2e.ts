@@ -306,7 +306,7 @@ export function registryTokenIssueScript(coreDistDir: string, tenantSlug: string
     JSON.stringify(pathToFileURL(path.join(coreDistDir, name)).href);
   return [
     `const { withExecutionContext } = await import(${moduleUrl('authority.js')});`,
-    `const { issueChronosAccessToken } = await import(${moduleUrl('chronos-access-registry.js')});`,
+    `const { issueChronosAccessToken } = await import(${moduleUrl('authn/chronos-access-registry.js')});`,
     `const issued = withExecutionContext('sovereign_concierge', () =>`,
     `  issueChronosAccessToken({ role: 'readonly', tenantSlugs: [${JSON.stringify(tenantSlug)}] })`,
     `);`,

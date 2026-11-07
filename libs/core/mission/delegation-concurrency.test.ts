@@ -98,7 +98,7 @@ import {
 import {
   sweepDelegationChildren,
   type DelegationChildRecord as JanitorDelegationChildRecord,
-} from '../storage-janitor.js';
+} from '../storage/storage-janitor.js';
 
 function makeDeferred<T = void>() {
   let resolve!: (v: T) => void;

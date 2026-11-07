@@ -22,7 +22,7 @@ import { pathResolver } from '../path-resolver.js';
 import {
   probeMacOSNativeAutomation,
   type MacOSNativeAutomationAvailability,
-} from '../macos-native-automation.js';
+} from '../virtual/macos-native-automation.js';
 import { evaluateMissionVoiceConsent } from '../voice/voice-consent.js';
 import { getGrantCapabilityPolicy } from './grant-capability-policy.js';
 import {

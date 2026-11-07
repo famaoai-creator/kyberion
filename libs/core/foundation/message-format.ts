@@ -8,7 +8,7 @@
  *  - simple interpolation: `{name}`
  *  - plural: `{count, plural, one {...} other {...}}` (only the `one` and
  *    `other` categories; no gender, ordinals, select, or date/number
- *    skeletons — those go through `libs/core/format.ts` and are passed in as
+ *    skeletons — those go through `libs/core/localization/format.ts` and are passed in as
  *    an already-formatted `{...}` argument).
  *
  * Keep this file free of third-party deps and of secure-io; it is a pure

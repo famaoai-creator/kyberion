@@ -24,7 +24,7 @@ import {
   resolveSeamProviderDecision,
   resolveSeamSelectionEntry,
   type SeamProviderDecision,
-} from '../seam-provider-selection.js';
+} from '../provider/seam-provider-selection.js';
 
 export const VAD_BACKEND_SEAM = 'voice.vad-backend';
 

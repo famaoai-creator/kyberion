@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { Jimp } from 'jimp';
 import { ocrImage } from '../ocr-bridge.js';
-import { redactFrame } from '../frame-redaction.js';
+import { redactFrame } from './frame-redaction.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeLstat, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import type { VideoFrame } from '../meeting/meeting-session-types.js';

@@ -23,10 +23,10 @@
 | Concern                           | Module                                                                                             |
 | --------------------------------- | -------------------------------------------------------------------------------------------------- |
 | Identity records + journal        | `libs/core/agent/agent-identity.ts` (`active/shared/coordination/identity/agent-identities.jsonl`) |
-| Actor verification (warn→enforce) | `libs/core/nhi-actor-verification.ts` (`KYBERION_NHI_ACTOR`)                                       |
+| Actor verification (warn→enforce) | `libs/core/agent/nhi-actor-verification.ts` (`KYBERION_NHI_ACTOR`)                                 |
 | Delegation chains + attenuation   | `libs/core/mission/delegation-chain.ts`                                                            |
 | Task-scoped grants                | `libs/core/task/task-scoped-grants.ts` (`active/shared/coordination/identity/task-grants.jsonl`)   |
-| Offboarding, orphans, inventory   | `libs/core/nhi-lifecycle-governance.ts`                                                            |
+| Offboarding, orphans, inventory   | `libs/core/agent/nhi-lifecycle-governance.ts`                                                      |
 
 ## If interop is ever required
 

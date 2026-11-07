@@ -18,7 +18,7 @@ import { defineCatalog, type GovernedCatalog } from '../foundation/governed-cata
 import { pathResolver } from '../path-resolver.js';
 import { resolveSharedObservabilityDir } from '../analysis/observability-gate.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
-import { currentTriggerDeliveryId } from '../trigger-correlation.js';
+import { currentTriggerDeliveryId } from '../event/trigger-correlation.js';
 import { redactCollaborationMetadata } from '../agent/agent-collaboration-events.js';
 
 export const WORKER_EVENT_TYPES = [

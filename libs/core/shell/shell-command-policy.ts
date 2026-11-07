@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
-import { isInjectionSuspected } from '../untrusted-content.js';
+import { isInjectionSuspected } from '../governance/untrusted-content.js';
 import { findSensitivePathInText } from '../sensitive-path-policy.js';
 import {
   allowableCommands,

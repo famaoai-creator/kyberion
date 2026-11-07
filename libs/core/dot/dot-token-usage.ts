@@ -14,8 +14,8 @@ import {
   maintainStoreAfterAppend,
   type AppendOnlyStorePolicy,
   type MaintainStoreOutcome,
-} from '../append-only-store.js';
-import { readJsonLinesSince } from '../jsonl-read.js';
+} from '../storage/append-only-store.js';
+import { readJsonLinesSince } from '../storage/jsonl-read.js';
 
 export const DOT_TOKEN_USAGE_PATH = 'active/shared/runtime/dot-token-usage.jsonl';
 

@@ -10,7 +10,10 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { isRecord, trimEndChars } from '../foundation/text.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { safeReadFile, safeStat, validateUrl } from '../secure-io.js';
-import { runStructuredReasoningOp, structuredReasoningSpecs } from '../structured-reasoning.js';
+import {
+  runStructuredReasoningOp,
+  structuredReasoningSpecs,
+} from '../reasoning/structured-reasoning.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning/reasoning-egress-scope.js';
 import { validateReasoningImageAttachmentPaths } from '../reasoning/reasoning-backend.js';
 import type { SamplingParams } from '../reasoning/reasoning-route-resolver.js';
@@ -39,7 +42,7 @@ import type {
   SynthesizedPersona,
   CritiqueResult,
 } from '../reasoning/reasoning-backend.js';
-import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
+import { runStartReportingDelegation } from '../workforce/delegation-execution-tracker.js';
 
 export const GEMINI_API_DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 /** Default Gemini API model: provider-config.json runtime_defaults['gemini-default'] (RS-02). */

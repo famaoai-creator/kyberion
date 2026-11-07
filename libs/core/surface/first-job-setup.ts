@@ -2,7 +2,7 @@
 import * as path from 'node:path';
 import { withExecutionContext } from '../authority.js';
 import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
-import { resolveActiveProfileRoot } from '../profile-root.js';
+import { resolveActiveProfileRoot } from '../authn/profile-root.js';
 import { verifyBrowserSessionToken } from '../authn/authn-providers.js';
 import {
   findMemberByExternalIdentity,

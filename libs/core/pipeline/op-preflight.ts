@@ -6,7 +6,7 @@
  * tighten the decision; no later registration can re-allow a denied call.
  */
 
-import { assertModuleInvariant } from '../invariants.js';
+import { assertModuleInvariant } from '../foundation/invariants.js';
 import { findPluginGrantDenial } from '../shell/sandbox-policy.js';
 import { createLogger } from '../logger.js';
 
