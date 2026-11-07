@@ -1,57 +1,160 @@
-import { describe, it, expect, vi } from 'vitest';
-import { runInNewContext } from 'node:vm';
+import { afterAll, beforeAll, describe, it, expect, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { act, createElement } from 'react';
+import type { Root } from 'react-dom/client';
 import { safeReadFile } from '@agent/core/secure-io';
+import {
+  FakeElement,
+  fireEvent,
+  installFakeDom,
+} from '../../../../libs/shared-ui/vanilla/fake-dom.test-support';
 
+// 初めての仕事 guide (src/app/first-job/), ported from presence-studio
+// first-job-client.test.ts when the page moved to Concierge (Kyberion server
+// phase 2). The real React page renders into the shared fake DOM; the Studio
+// cases address its controls by their Studio element ids (`data-fj`), so the
+// case bodies are carried over as they were. Vocabulary renders as its key
+// (`front_desk:first_job_*`), as the Studio harness's vocabulary proxy did.
 // Focused DOM doubles, not a visual or running-server browser test.
-class Element {
-  value = '';
-  private ownText = '';
-  children: Element[] = [];
-  disabled = false;
-  hidden = false;
-  className = '';
-  type = '';
-  attributes: Record<string, string> = {};
-  listeners: Record<string, () => void> = {};
-  constructor(
-    readonly tagName = 'div',
-    private onFocus?: (element: Element) => void
-  ) {}
-  focus() {
-    this.onFocus?.(this);
+const network = vi.hoisted(() => ({
+  handler: undefined as undefined | ((url: string, init?: RequestInit) => Promise<unknown>),
+}));
+vi.mock('../src/lib/front-desk-fetch', () => ({
+  frontDeskFetch: (url: string, init?: RequestInit) => network.handler!(url, init),
+}));
+vi.mock('../src/lib/i18n', async (original) => ({
+  ...(await original<typeof import('../src/lib/i18n')>()),
+  frontDeskText: (key: string) => 'front_desk:' + key,
+}));
+vi.mock('../src/lib/use-concierge-i18n', () => ({
+  useConciergeI18n: () => ({ locale: 'en' }),
+}));
+
+const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const readSource = (relative: string) =>
+  String(safeReadFile(path.join(appDir, relative), { encoding: 'utf8' }));
+let dom: ReturnType<typeof installFakeDom>;
+let client: typeof import('react-dom/client');
+let FirstJobPage: typeof import('../src/app/first-job/page').default;
+let mounted: Root | undefined;
+beforeAll(async () => {
+  dom = installFakeDom();
+  vi.stubGlobal('requestAnimationFrame', (callback: (time: number) => void) => {
+    callback(0);
+    return 0;
+  });
+  client = await import('react-dom/client');
+  FirstJobPage = (await import('../src/app/first-job/page')).default;
+});
+afterAll(() => {
+  if (mounted) act(() => mounted!.unmount());
+  dom.restore();
+  vi.unstubAllGlobals();
+});
+
+function allBelow(element: FakeElement): FakeElement[] {
+  return element.children.flatMap((child) => [
+    child as FakeElement,
+    ...allBelow(child as FakeElement),
+  ]);
+}
+
+/** A rendered node, shaped like the Studio harness's element double. */
+class Node {
+  constructor(readonly element: FakeElement) {}
+  get tagName(): string {
+    return this.element.localName;
   }
   get textContent(): string {
-    return this.ownText + this.children.map((child) => child.textContent).join(' ');
+    return this.element.textContent;
   }
-  set textContent(value: string) {
-    this.ownText = value;
-    this.children = [];
+  get disabled(): boolean {
+    return (this.element as unknown as { disabled: boolean }).disabled;
   }
-  set innerHTML(_value: string) {
-    throw new Error('Untrusted HTML is forbidden');
+  get hidden(): boolean {
+    return this.element.hasAttribute('hidden');
   }
-  setAttribute(name: string, value: string) {
-    this.attributes[name] = value;
+  get value(): string {
+    return (this.element as unknown as { value: string }).value;
   }
-  appendChild(child: Element) {
-    this.children.push(child);
-    return child;
+  get attributes(): Record<string, string> {
+    return Object.fromEntries(
+      this.element.getAttributeNames().map((name) => [name, this.element.getAttribute(name)!])
+    );
   }
-  replaceChildren() {
-    this.children = [];
-    this.ownText = '';
+  get children(): Node[] {
+    return this.element.children.map((child) => new Node(child as FakeElement));
   }
-  addEventListener(name: string, handler: () => void) {
-    this.listeners[name] = handler;
+  descendants(): Node[] {
+    return allBelow(this.element).map((child) => new Node(child));
   }
   fire(event = 'click') {
-    this.listeners[event]?.();
-  }
-  descendants(): Element[] {
-    return this.children.flatMap((child) => [child, ...child.descendants()]);
+    act(() => {
+      fireEvent(this.element, event);
+    });
   }
 }
+
+/**
+ * A Studio element id. Conditionally rendered controls are absent rather than
+ * hidden; an absent control reads as hidden and disabled, and firing it does
+ * nothing (the Studio listeners re-checked the same state before acting).
+ */
+class View {
+  constructor(private readonly find: () => FakeElement | null) {}
+  private get el(): FakeElement | null {
+    return this.find();
+  }
+  /** The actual control inside a `data-fj` wrapper (button, link or select). */
+  private control(): FakeElement | null {
+    const el = this.el;
+    if (!el) return null;
+    if (el.localName !== 'span') return el;
+    return el.querySelector('button') ?? el.querySelector('a') ?? el;
+  }
+  get hidden(): boolean {
+    const el = this.el;
+    return !el || el.hasAttribute('hidden');
+  }
+  get disabled(): boolean {
+    const control = this.control();
+    if (!control) return true;
+    // An `<a>` shared-ui button renders as a link only while enabled.
+    return (control as unknown as { disabled?: boolean }).disabled === true;
+  }
+  get textContent(): string {
+    return this.el?.textContent ?? '';
+  }
+  get value(): string {
+    return (this.control() as unknown as { value?: string } | null)?.value ?? '';
+  }
+  set value(value: string) {
+    const control = this.control();
+    if (control) (control as unknown as { value: string }).value = value;
+  }
+  get attributes(): Record<string, string> {
+    const el = this.control();
+    return el
+      ? Object.fromEntries(el.getAttributeNames().map((name) => [name, el.getAttribute(name)!]))
+      : {};
+  }
+  get children(): Node[] {
+    return (this.el?.children ?? []).map((child) => new Node(child as FakeElement));
+  }
+  descendants(): Node[] {
+    return (this.el ? allBelow(this.el) : []).map((child) => new Node(child));
+  }
+  fire(event?: string) {
+    const control = this.control();
+    if (!control || (control as unknown as { disabled?: boolean }).disabled) return;
+    act(() => {
+      fireEvent(control, event ?? (control.localName === 'select' ? 'change' : 'click'));
+    });
+  }
+}
+
 const session = 'concierge-' + 'a'.repeat(64);
 const first = '11111111-1111-4111-8111-111111111111';
 const second = '22222222-2222-4222-8222-222222222222';
@@ -63,7 +166,9 @@ const reply = (body: unknown, status = 200) => ({
   json: async () => body,
 });
 const flush = async () => {
-  for (let i = 0; i < 60; i++) await Promise.resolve();
+  await act(async () => {
+    for (let i = 0; i < 60; i++) await Promise.resolve();
+  });
 };
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -92,6 +197,43 @@ const artifact = (overrides: Record<string, unknown> = {}) => ({
   verifiedAt: 1234567890000,
   ...overrides,
 });
+const ELEMENTS = [
+  ...['readiness', 'signin', 'refresh', 'error', 'status', 'items'].map(
+    (name) => 'approval-' + name
+  ),
+  'setup-signin',
+  ...[
+    'profile',
+    'oidc',
+    'browser_user',
+    'approval_scope',
+    'baseline',
+    'reasoning',
+    'advancement',
+  ].map((name) => 'setup-' + name),
+  'readiness',
+  'scope',
+  'advance',
+  'setup',
+  'next',
+  'start',
+  'restart',
+  'restart-note',
+  'refresh',
+  'retry',
+  'approval',
+  'status',
+  'error',
+  'history',
+  'last-checked',
+  'refresh-mode',
+  'refresh-error',
+  'body-retry',
+  'compare-status',
+  ...['body', 'left', 'right'].flatMap((slot) =>
+    ['select', 'metadata', 'status', 'content'].map((part) => slot + '-' + part)
+  ),
+];
 function harness(
   options: {
     storage?: Map<string, string>;
@@ -103,69 +245,22 @@ function harness(
     approvalGet?: () => ReturnType<typeof reply> | Promise<ReturnType<typeof reply>>;
     approvalPost?: (body: Record<string, unknown>) => Promise<ReturnType<typeof reply>>;
     heldRequests?: Array<{ request_id: string; status: string; recovery: string }>;
-    ready?: Promise<void>;
     hidden?: boolean;
     get?: () => ReturnType<typeof reply> | Promise<ReturnType<typeof reply>>;
     approvals?: () => ReturnType<typeof reply> | Promise<ReturnType<typeof reply>>;
     body?: (query: URLSearchParams) => ReturnType<typeof reply> | Promise<ReturnType<typeof reply>>;
     post?: (body: Record<string, unknown>, url?: string) => Promise<ReturnType<typeof reply>>;
-    vocabularyFails?: boolean;
   } = {}
 ) {
-  const elements = new Map(
-    [
-      ...['readiness', 'signin', 'refresh', 'error', 'status', 'items'].map(
-        (name) => 'approval-' + name
-      ),
-      'setup-signin',
-      ...[
-        'profile',
-        'oidc',
-        'browser_user',
-        'approval_scope',
-        'baseline',
-        'reasoning',
-        'advancement',
-      ].map((name) => 'setup-' + name),
-      'readiness',
-      'scope',
-      'advance',
-      'setup',
-      'next',
-      'start',
-      'restart',
-      'restart-note',
-      'refresh',
-      'retry',
-      'approval',
-      ...['readiness', 'signin', 'refresh', 'error', 'status', 'items'].map(
-        (id) => 'approval-' + id
-      ),
-      'status',
-      'error',
-      'history',
-      'last-checked',
-      'refresh-mode',
-      'refresh-error',
-      'body-retry',
-      'compare-status',
-      ...['body', 'left', 'right'].flatMap((slot) =>
-        ['select', 'metadata', 'status', 'content'].map((part) => slot + '-' + part)
-      ),
-    ].map((id) => [id, new Element()])
-  );
-  elements.get('error')!.textContent = 'Server-rendered load failure';
+  // A new harness is a reload: the previous page goes away first.
+  if (mounted) act(() => mounted!.unmount());
   const storage = options.storage ?? new Map<string, string>();
   const timers = new Map<number, { at: number; handler: () => void }>();
-  const documentListeners: Record<string, () => void> = {};
-  const windowListeners: Record<string, () => void> = {};
   let now = 0;
   let timerId = 0;
-  const window = {
+  const window = dom.window as Record<string, unknown>;
+  Object.assign(window, {
     AbortController,
-    addEventListener: (event: string, handler: () => void) => {
-      windowListeners[event] = handler;
-    },
     setTimeout(handler: () => void, delay: number) {
       const id = ++timerId;
       timers.set(id, { at: now + delay, handler });
@@ -189,29 +284,21 @@ function harness(
         storage.set(key, value);
       },
     },
-    KyberionFirstJobApproval: {
-      check: async (context: {
-        onChange: (status: {
-          ready: boolean;
-          busy: boolean;
-          recoveryRequests?: Array<Record<string, unknown>>;
-          setupInvalidated?: boolean;
-          setupScopeInvalidated?: boolean;
-          heldRequests?: Array<{ request_id: string; status: string; recovery: string }>;
-        }) => void;
-      }) =>
-        context.onChange({
-          ready: options.approvalReady !== false,
-          busy: false,
-          recoveryRequests: options.recoveryRequests,
-          heldRequests: options.heldRequests,
-        }),
-      invalidate: vi.fn(),
-    },
-    KyberionPrefs: { locale: () => 'en' },
-    FrontDeskRail: { ready: options.ready ?? Promise.resolve() },
-    KyberionFirstJob: undefined as undefined | { mount: () => void },
-  };
+  });
+  // Without a scripted approval reader, the approval view answers like the
+  // Studio harness's stub: ready (or not), with any held / recovery rows.
+  const stubApprovals = () =>
+    reply({
+      ok: true,
+      auth: { status: 'ready' },
+      readiness:
+        options.approvalReady === false
+          ? { ready: false, status: 'not_ready' }
+          : { ready: true, status: 'ready' },
+      approvals: [],
+      held_requests: options.heldRequests ?? [],
+      recovery_requests: options.recoveryRequests ?? [],
+    });
   const fetch = vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
     if (url.startsWith('/api/first-job/approvals')) {
       if (init?.method === 'POST')
@@ -224,23 +311,20 @@ function harness(
         ? options.approvalGet()
         : options.approvals
           ? options.approvals()
-          : reply({
-              ok: true,
-              auth: { status: 'ready' },
-              readiness: { ready: true, status: 'ready' },
-              approvals: [],
-              held_requests: [],
-            });
+          : options.realApproval
+            ? reply({
+                ok: true,
+                auth: { status: 'ready' },
+                readiness: { ready: true, status: 'ready' },
+                approvals: [],
+                held_requests: [],
+              })
+            : stubApprovals();
     }
     if (init?.method === 'POST')
       return options.post
         ? options.post(JSON.parse(init.body!), url)
         : reply(snapshot({ historySaved: true }));
-    if (url.startsWith('/api/ui-vocabulary')) {
-      if (options.vocabularyFails) throw new Error('offline');
-      const texts = new Proxy({}, { get: (_target, key) => String(key) });
-      return reply({ ok: true, texts });
-    }
     if (url.startsWith('/api/first-job/artifact?')) {
       const query = new URLSearchParams(url.split('?')[1]);
       return options.body
@@ -259,37 +343,17 @@ function harness(
     if (url.startsWith('/api/first-job?')) return options.get ? options.get() : reply(snapshot());
     throw new Error('Unexpected fetch ' + url);
   });
-  const document = {
-    activeElement: null as Element | null,
-    hidden: options.hidden === true,
-    visibilityState: options.hidden ? 'hidden' : 'visible',
-    addEventListener: (event: string, handler: () => void) => {
-      documentListeners[event] = handler;
-    },
-    documentElement: { getAttribute: () => 'en' },
-    getElementById: (id: string) => elements.get(id.replace('first-job-', '')) ?? null,
-    createElement: (tag: string) =>
-      new Element(tag, (element) => {
-        document.activeElement = element;
-      }),
-  };
-  if (options.approvals || options.realApproval)
-    runInNewContext(
-      String(
-        safeReadFile('presence/displays/presence-studio/static/first-job-approval.js', {
-          encoding: 'utf8',
-        })
-      ),
-      { window, document, fetch, URLSearchParams }
-    );
-  runInNewContext(
-    String(
-      safeReadFile('presence/displays/presence-studio/static/first-job.js', { encoding: 'utf8' })
-    ),
-    { window, document, fetch, URLSearchParams }
-  );
-  window.KyberionFirstJob!.mount();
-  const get = (id: string) => elements.get(id)!;
+  network.handler = (url, init) => fetch(url, init as { method?: string; body?: string });
+  const document = dom.document as unknown as { hidden: boolean; visibilityState: string };
+  document.hidden = options.hidden === true;
+  document.visibilityState = options.hidden ? 'hidden' : 'visible';
+  const container = dom.document.createElement('div');
+  dom.document.body.appendChild(container);
+  const root = client.createRoot(container as unknown as Element);
+  mounted = root;
+  act(() => root.render(createElement(FirstJobPage)));
+  const get = (id: string) =>
+    new View(() => container.querySelector(`[data-fj="${id}"]`) as FakeElement | null);
   const commands = () =>
     get('history')
       .descendants()
@@ -308,7 +372,7 @@ function harness(
       if (!next) break;
       now = next[1].at;
       timers.delete(next[0]);
-      next[1].handler();
+      act(() => next[1].handler());
       await flush();
     }
     now = end;
@@ -316,9 +380,14 @@ function harness(
   const visibility = (hidden: boolean) => {
     document.hidden = hidden;
     document.visibilityState = hidden ? 'hidden' : 'visible';
-    documentListeners.visibilitychange?.();
+    act(() => {
+      fireEvent(dom.document, 'visibilitychange');
+    });
   };
-  const page = (event: string) => windowListeners[event]?.();
+  const page = (event: string) =>
+    act(() => {
+      fireEvent(dom.windowEvents, event);
+    });
   return {
     get,
     window,
@@ -332,17 +401,17 @@ function harness(
     visibility,
     page,
     timers,
+    container,
   };
 }
 
 describe('First-job bounded browser flow (DOM doubles)', () => {
-  it('waits for navigation readiness, reads only on load and ignores query commands and scope', async () => {
-    const ready = deferred<void>();
-    const h = harness({ ready: ready.promise });
+  // Concierge has no rail-readiness wait (the Studio page waited for its rail
+  // script); the guide reads once after mount.
+  it('reads only on load and ignores query commands and scope', async () => {
+    const h = harness();
     await flush();
-    expect(h.fetch).not.toHaveBeenCalled();
-    ready.resolve();
-    await flush();
+    expect(h.fetch.mock.calls[0][0]).toMatch(/^\/api\/first-job\?/);
     expect(h.posts()).toHaveLength(0);
     expect(h.fetch.mock.calls.map(([url]) => url).join(' ')).not.toMatch(
       /tenant|attacker|action=start|text=/
@@ -678,14 +747,9 @@ describe('First-job bounded browser flow (DOM doubles)', () => {
     expect(h.get('history').textContent).not.toContain('first_job_status_work_completed');
   });
 
-  it('keeps localized server-rendered failure copy when vocabulary fails', async () => {
-    const h = harness({ vocabularyFails: true });
-    await flush();
-    expect(h.get('error').hidden).toBe(false);
-    expect(h.get('status').textContent).toBe('Server-rendered load failure');
-    expect(h.get('start').disabled).toBe(true);
-    expect(h.posts()).toHaveLength(0);
-  });
+  // Dropped: "keeps localized server-rendered failure copy when vocabulary
+  // fails". Concierge bundles the vocabulary; there is no runtime vocabulary
+  // read that could fail.
 
   it('disables mutation after an authentication or history failure', async () => {
     const h = harness({ get: () => reply({ ok: false }, 401) });
@@ -816,13 +880,9 @@ describe('First-job bounded browser flow (DOM doubles)', () => {
     expect(h.get('start').disabled).toBe(true);
     expect(h.get('history').children).toHaveLength(1);
     expect(h.get('history').textContent).toContain(first);
-    const html = String(
-      safeReadFile('presence/displays/presence-studio/static/first-job.html', { encoding: 'utf8' })
-    );
-    const script = String(
-      safeReadFile('presence/displays/presence-studio/static/first-job.js', { encoding: 'utf8' })
-    );
-    expect(html).not.toContain('first-job-new-request');
+    const page = readSource('src/app/first-job/page.tsx');
+    const script = readSource('src/app/first-job/first-job-controller.ts');
+    expect(page).not.toContain('first-job-new-request');
     expect(script).not.toMatch(/canRecover|new-request/);
   });
 });
@@ -868,7 +928,8 @@ describe('Verified receipt bodies and immutable comparison (DOM doubles)', () =>
       const query = new URLSearchParams(url.split('?')[1]);
       expect([...query.keys()].sort()).toEqual(['request_id', 'revision', 'session_id', 'sha256']);
       expect(query.get('session_id')).toBe(session);
-      expect(init).toMatchObject({ credentials: 'same-origin', cache: 'no-store' });
+      // frontDeskFetch itself pins same-origin credentials and mode.
+      expect(init).toMatchObject({ cache: 'no-store' });
     }
     expect(h.get('body-content').textContent).toBe(newer);
     expect(h.get('left-content').textContent).toBe(older);
@@ -1508,14 +1569,29 @@ describe('Progress and receipt freshness consistency', () => {
 describe('Approval read coordination remains bounded', () => {
   it('bounds an inherited hanging approval read and retains held state through interim callbacks', async () => {
     const pending = deferred<void>();
+    let approvalReads = -1;
+    const held = [
+      { request_id: first, status: 'approval_verification_failed', recovery: 'operator_recovery' },
+    ];
     const h = harness({
-      heldRequests: [
-        {
-          request_id: first,
-          status: 'approval_verification_failed',
-          recovery: 'operator_recovery',
-        },
-      ],
+      approvals: () =>
+        approvalReads++ < 0
+          ? reply({
+              ok: true,
+              auth: { status: 'ready' },
+              readiness: { ready: true, status: 'ready' },
+              approvals: [],
+              held_requests: held,
+            })
+          : pending.promise.then(() =>
+              reply({
+                ok: true,
+                auth: { status: 'ready' },
+                readiness: { ready: true, status: 'ready' },
+                approvals: [],
+                held_requests: held,
+              })
+            ),
       get: () =>
         reply(
           snapshot({
@@ -1532,11 +1608,8 @@ describe('Approval read coordination remains bounded', () => {
         ),
     });
     await flush();
-    h.window.KyberionFirstJobApproval.check = async (context) => {
-      context.onChange({ ready: false, busy: false });
-      await pending.promise;
-      context.onChange({ ready: true, busy: false });
-    };
+    // The next approval read hangs (Studio swapped in a hanging reader).
+    approvalReads = 0;
     h.get('refresh').fire();
     await flush();
     await h.advance(15000);
@@ -2234,11 +2307,21 @@ describe('Truthful first-job setup guidance (DOM doubles)', () => {
     expect(h.get('start').disabled).toBe(true);
   });
   it('clears a previously verified user when the independent approval read loses access', async () => {
-    const h = harness({ get: () => reply(snapshot({ setup: setup() })) });
+    // The second approval read fails (Studio: onChange with setupInvalidated).
+    let approvalReads = 0;
+    const h = harness({
+      get: () => reply(snapshot({ setup: setup() })),
+      approvals: () =>
+        ++approvalReads === 1
+          ? reply({
+              ok: true,
+              auth: { status: 'ready' },
+              readiness: { ready: true, status: 'ready' },
+              approvals: [],
+            })
+          : reply({ ok: false }, 503),
+    });
     await flush();
-    h.window.KyberionFirstJobApproval.check = async (context) => {
-      context.onChange({ ready: false, busy: false, setupInvalidated: true });
-    };
     h.get('refresh').fire();
     await flush();
     expect(h.get('setup-profile').textContent).toContain('profile_present');
@@ -3245,12 +3328,13 @@ describe('Exact read-only operator handoff (DOM doubles)', () => {
     }
   );
 
-  it('has no tenant-wide tick or placeholder request command in initial HTML or client source', () => {
-    for (const path of [
-      'presence/displays/presence-studio/static/first-job.html',
-      'presence/displays/presence-studio/static/first-job.js',
+  it('has no tenant-wide tick or placeholder request command in the page or client source', () => {
+    for (const file of [
+      'src/app/first-job/page.tsx',
+      'src/app/first-job/first-job-controller.ts',
+      'src/app/first-job/first-job-approval-panel.ts',
     ]) {
-      const source = String(safeReadFile(path, { encoding: 'utf8' }));
+      const source = readSource(file);
       expect(source).not.toContain('--tick');
       expect(source).not.toContain('id="first-job-tick"');
     }
