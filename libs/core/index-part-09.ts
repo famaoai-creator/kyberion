@@ -266,10 +266,6 @@ export * from './organization/tenant-knowledge-retrieval.js';
 
 export * from './ingest-asset-ledger.js';
 
-export * from './ingest-quota.js';
-
-export * from './ingest-sync-cursors.js';
-
 export * from './pii-scrubber.js';
 
 export * from './frame-redaction.js';

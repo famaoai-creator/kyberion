@@ -24,19 +24,19 @@
  */
 
 import * as path from 'node:path';
-import { logger } from './core.js';
-import { isValidTenantSlug } from './entity-scope.js';
-import * as pathResolver from './path-resolver.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { nowIso } from './foundation/time.js';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { logger } from '@agent/core/core';
+import { isValidTenantSlug } from '@agent/core/entity-scope';
+import * as pathResolver from '@agent/core/path-resolver';
+import { defineCatalog } from '@agent/core/foundation/governed-catalog';
+import { nowIso } from '@agent/core/foundation/time';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
   safeWriteFile,
-} from './secure-io.js';
+} from '@agent/core/secure-io';
 
 /** Governance policy file (same directory + override shape as spend-policy.json). */
 export const INGEST_QUOTA_POLICY_REPO_PATH =

@@ -21,11 +21,11 @@
  */
 
 import * as path from 'node:path';
-import * as pathResolver from './path-resolver.js';
-import { isValidTenantSlug } from './entity-scope.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { isRecord, readTextFile } from './foundation/text.js';
-import { nowIso } from './foundation/time.js';
+import * as pathResolver from '@agent/core/path-resolver';
+import { isValidTenantSlug } from '@agent/core/entity-scope';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { isRecord, readTextFile } from '@agent/core/foundation/text';
+import { nowIso } from '@agent/core/foundation/time';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -33,7 +33,7 @@ import {
   safeLstat,
   safeUnlink,
   safeWriteFile,
-} from './secure-io.js';
+} from '@agent/core/secure-io';
 
 /** Default repo-relative base directory for cursor state files. */
 export const DEFAULT_INGEST_CURSORS_DIR = 'active/shared/runtime/ingest-cursors';

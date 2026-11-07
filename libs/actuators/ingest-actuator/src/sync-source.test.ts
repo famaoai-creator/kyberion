@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import { readSyncCursor } from '@agent/core/ingest-sync-cursors';
+import { readSyncCursor } from './ingest-sync-cursors.js';
 import { safeMkdir, safeRmSync } from '@agent/core/secure-io';
 import {
   extractConfluenceCursor,

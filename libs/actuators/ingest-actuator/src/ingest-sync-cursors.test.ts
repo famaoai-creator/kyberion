@@ -5,7 +5,8 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { pathResolver, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './index.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   advanceSyncCursor,
   readSyncCursor,

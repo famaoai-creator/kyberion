@@ -437,11 +437,11 @@
     "libs/core/identity-context-bridge.ts": {
       "env_direct_read_budget": 2
     },
-    "libs/core/ingest-quota.ts": {
+    "libs/actuators/ingest-actuator/src/ingest-quota.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/ingest-sync-cursors.ts": {
+    "libs/actuators/ingest-actuator/src/ingest-sync-cursors.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
