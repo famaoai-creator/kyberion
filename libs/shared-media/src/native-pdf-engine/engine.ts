@@ -8,7 +8,7 @@
  *   - AcroForms / Interactive Fields (§12.7)
  *   - Optional Content Groups / Layers (§8.11)
  *   - Linearization / Web-Optimized PDF (Annex F)
- *   - AES-256 Encryption (ISO/TS 32003:2023, §7.6)
+ *   - Encryption requests are refused until an audited security handler is available
  *   - PDF MAC Integrity (ISO/TS 32004:2024)
  *   - Hash Algorithm Extensions SHA256/384/512 (ISO/TS 32001:2022)
  *   - Digital Signatures ByteRange placeholder (ISO/TS 32002:2022)
@@ -48,7 +48,6 @@ import type {
   PdfFormField,
   PdfAcroForm,
   PdfLayer,
-  PdfEncryptOptions,
   PdfSignatureOptions,
   PdfDocumentPart,
 } from '@agent/core/contracts/pdf-protocol';
@@ -739,93 +738,6 @@ function buildLinearizationDict(
   return `<< /Linearized 1.0 /L ${fileLength} /H [0 0] /O ${firstPageObjId} /E 0 /N ${pageCount} /T 0 >>`;
 }
 
-// ─── P3: AES-256 Encryption (ISO/TS 32003, §7.6) ────────────
-
-/**
- * Derive encryption key using PDF 2.0 standard security handler (R=7, V=5).
- * Uses PBKDF2 with SHA256 per ISO 32000-2 §7.6.4.3.4.
- */
-function deriveEncryptionKey(password: string, salt: Buffer, uValue?: Buffer): Buffer {
-  const pwBuf = Buffer.from(password, 'utf8').subarray(0, 127);
-  const input = Buffer.concat([pwBuf, salt, uValue ?? Buffer.alloc(0)]);
-  // The ISO 32000-2 §7.6.4.3.4 R=7 handler mandates SHA-256 — not a storage choice.
-  return crypto.createHash('sha256').update(input).digest();
-}
-
-/**
- * Build PDF /Encrypt dictionary for AES-256 with standard security handler (V=5, R=7).
- * Returns an /Encrypt dict string and a 32-byte encryption key.
- */
-function buildEncryptDict(encOpts: PdfEncryptOptions): {
-  dictStr: string;
-  key: Buffer;
-  encryptId: string;
-} {
-  const ownerPw = encOpts.ownerPassword || 'owner';
-  const userPw = encOpts.userPassword || '';
-  const perms = encOpts.permissions ?? 0xfffffffc;
-
-  // Generate random salts and key (32 bytes = 256 bits)
-  const eSalt = crypto.randomBytes(8);
-  const vSalt = crypto.randomBytes(8);
-  const encKey = crypto.randomBytes(32);
-
-  // U hash: SHA256(userPw + vSalt) — spec-mandated, see deriveEncryptionKey note
-  const uHash = crypto
-    .createHash('sha256')
-    .update(Buffer.from(userPw, 'utf8'))
-    .update(vSalt)
-    .digest();
-  // UK (user key enc with AES256): AES256CBC(encKey, key=SHA256(userPw + eSalt))
-  const uEncKey = deriveEncryptionKey(userPw, eSalt);
-  const uCipher = crypto.createCipheriv('aes-256-cbc', uEncKey, Buffer.alloc(16));
-  const uKeyEncrypted = Buffer.concat([uCipher.update(encKey), uCipher.final()]);
-
-  // U = hash + eSalt + vSalt (48 bytes), UE = encrypted key (32 bytes)
-  const U = Buffer.concat([uHash, eSalt, vSalt]).toString('hex').toUpperCase();
-  const UE = uKeyEncrypted.subarray(0, 32).toString('hex').toUpperCase();
-
-  // O hash: SHA256(ownerPw + vSalt + U-value) — spec-mandated
-  const oHash = crypto
-    .createHash('sha256')
-    .update(Buffer.from(ownerPw, 'utf8'))
-    .update(vSalt)
-    .update(uHash)
-    .digest();
-  const oEncKey = deriveEncryptionKey(ownerPw, eSalt, uHash);
-  const oCipher = crypto.createCipheriv('aes-256-cbc', oEncKey, Buffer.alloc(16));
-  const oKeyEncrypted = Buffer.concat([oCipher.update(encKey), oCipher.final()]);
-
-  const O = Buffer.concat([oHash, eSalt, vSalt]).toString('hex').toUpperCase();
-  const OE = oKeyEncrypted.subarray(0, 32).toString('hex').toUpperCase();
-
-  // Perms: AES256CBC-encrypted (16 bytes)
-  const permsBuf = Buffer.alloc(16);
-  permsBuf.writeUInt32LE(perms >>> 0, 0); // Use unsigned int32LE for PDF permissions bitfield
-  permsBuf[4] = 0xff;
-  permsBuf[5] = 0xff;
-  permsBuf[6] = 0xff;
-  permsBuf[7] = 0xff;
-  permsBuf.write('adb', 8, 'ascii');
-  permsBuf[11] = 1; // EncryptMetadata = true
-  crypto.randomBytes(4).copy(permsBuf, 12);
-
-  const pCipher = crypto.createCipheriv('aes-256-ecb', encKey, null);
-  const Perms = Buffer.concat([pCipher.update(permsBuf), pCipher.final()])
-    .toString('hex')
-    .toUpperCase();
-
-  const encryptId = crypto.randomBytes(16).toString('hex').toUpperCase();
-
-  const dictStr =
-    `<< /Filter /Standard /V 5 /R 7 /Length 256 /P ${perms} ` +
-    `/CF << /StdCF << /AuthEvent /DocOpen /CFM /AESV3 /Length 32 >> >> ` +
-    `/StmF /StdCF /StrF /StdCF /EFF /StdCF ` +
-    `/U <${U}> /UE <${UE}> /O <${O}> /OE <${OE}> /Perms <${Perms}> >>`;
-
-  return { dictStr, key: encKey, encryptId };
-}
-
 // ─── P3: PDF MAC (ISO/TS 32004:2024) ─────────────────────────
 
 /**
@@ -950,6 +862,13 @@ export async function generateNativePdf(
   outputPath: string,
   options?: PdfRenderOptions
 ): Promise<void> {
+  // The former dictionary-only path never encrypted document strings/streams.
+  // Refuse either entry point before any I/O rather than emit plaintext that
+  // callers could mistake for a password-protected artifact.
+  if (options?.encrypt !== undefined || protocol.renderOptions?.encrypt !== undefined)
+    throw new Error(
+      '[PDF_ENCRYPTION_UNSUPPORTED] Native PDF encryption is unavailable; no output was written'
+    );
   // ── Validation ──────────────────────────────────────────
   const hasBody = protocol.source?.body?.trim();
   const hasPages = protocol.content?.pages?.length;
@@ -1313,13 +1232,6 @@ export async function generateNativePdf(
 
   // ── Write reserved non-stream objects ────────────────
 
-  // ── P3-4: AES-256 Encryption (must go in catalog) ───
-  let encryptId: number | undefined;
-  if (opts.encrypt?.ownerPassword) {
-    const { dictStr, key: _key } = buildEncryptDict(opts.encrypt);
-    encryptId = writer.addObj(dictStr);
-  }
-
   // Catalog
   const catalogParts = ['/Type /Catalog', `/Pages ${pagesRootId} 0 R`];
   if (metadataId !== undefined) catalogParts.push(`/Metadata ${metadataId} 0 R`);
@@ -1350,7 +1262,6 @@ export async function generateNativePdf(
     }
   }
   if (dpartRootId !== undefined) catalogParts.push(`/DPartRoot ${dpartRootId} 0 R`);
-  if (encryptId !== undefined) catalogParts.push(`/Encrypt ${encryptId} 0 R`);
   writeReserved(catalogId, `<<\n${catalogParts.map((p) => `  ${p}`).join('\n')}\n>>`);
 
   // Info (with PDF MAC token appended as comment if mac options provided)
