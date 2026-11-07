@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveConciergeInstallationAccess } from '../../../../lib/installation-access';
 import { resolveConciergeSelectedViewer } from '../../../../lib/selected-tenant';
 import { readWorkInventoryPanel } from '../../../../lib/work-inventory-panel';
 
@@ -14,9 +15,14 @@ export const dynamic = 'force-dynamic';
 export function GET(req: NextRequest) {
   const resolved = resolveConciergeSelectedViewer(req);
   if (resolved.response) return resolved.response;
+  const personalView = resolved.selection.mode === 'personal';
   return NextResponse.json(
     readWorkInventoryPanel(resolved.context, {
-      personalView: resolved.selection.mode === 'personal',
+      personalView,
+      // Only asked for the personal view: the installation owner (attested
+      // loopback peer + bound owner principal) sees their own inventory.
+      installationOwner:
+        personalView && resolveConciergeInstallationAccess(resolved.viewer, 'read', req).allowed,
     }),
     {
       headers: { 'Cache-Control': 'private, no-store' },
