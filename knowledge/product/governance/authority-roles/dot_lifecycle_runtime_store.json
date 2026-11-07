@@ -1,0 +1,9 @@
+{
+  "role": "dot_lifecycle_runtime_store",
+  "description": "Store role of the dot lifecycle runtime surfaces (libs/core/dot/dot-lifecycle.ts): the lifecycle audit ledger (active/shared/runtime/dot-lifecycle-audit.jsonl, append-only), activation heartbeats (active/shared/runtime/heartbeats/) and dot event-continuation state (active/shared/runtime/dot/.../event-continuations/ + events.jsonl). Assumed inside the lifecycle facade for these writes only — charter documents go through dot_charter_store and inter-process locks stay under the dot_lifecycle_worker ambient role. The narrow.only declaration restricts writes to exactly those artifacts and their mkdir ancestors. Tenant-confidential event-continuation partitions bind the charter's tenant; personal and system partitions run with the ambient tenant explicitly cleared.",
+  "default_persona": "worker",
+  "write_scopes": ["active/shared/runtime/"],
+  "scope_classes": ["audit", "operations_runtime"],
+  "allowed_actuators": [],
+  "tier_access": ["confidential", "personal", "public"]
+}

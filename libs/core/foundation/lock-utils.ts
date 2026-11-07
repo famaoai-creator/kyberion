@@ -40,7 +40,11 @@ export interface LockIo {
   sameFile?(a: string, b: string): boolean;
 }
 
+// The sink delivers the process adapter into `lockIo`; a caller's explicit
+// registration lives in `explicitLockIo` so it always wins — a test that
+// registers its own adapter must beat the suite-wide vitest seam too.
 let lockIo: LockIo | undefined;
+let explicitLockIo: LockIo | undefined;
 
 function testLockIo(): LockIo | undefined {
   if (!isVitestProcess()) return undefined;
@@ -53,27 +57,23 @@ function testLockIo(): LockIo | undefined {
 
 /** Registers the lock IO; returns the previous registration so tests can restore it. */
 export function registerLockIo(io: LockIo | undefined): LockIo | undefined {
-  const previous = lockIo;
-  lockIo = io;
+  const previous = explicitLockIo;
+  explicitLockIo = io;
   return previous;
 }
 
 // Symmetric registration through the sink: secure-io publishes the guarded
 // adapter on this channel whether this module loads before or after it.
-// In vitest the only legitimate adapter is the suite's own fixture — a
-// process-provided one would write locks into the real repo tree.
+// The process adapter always registers so real children spawned from a
+// suite — they inherit VITEST but carry no fixture — can still take locks.
 registerAuditIoConsumer('lockIo', (io) => {
-  if (isVitestProcess()) {
-    lockIo ??= testLockIo();
-    return;
-  }
-  registerLockIo(io as LockIo);
+  lockIo = io as LockIo;
 });
 
 function requireLockIo(): LockIo {
-  lockIo ||= testLockIo();
-  if (!lockIo) throw new Error('secure_lock_io_not_registered');
-  return lockIo;
+  const io = explicitLockIo ?? testLockIo() ?? lockIo;
+  if (!io) throw new Error('secure_lock_io_not_registered');
+  return io;
 }
 
 /**

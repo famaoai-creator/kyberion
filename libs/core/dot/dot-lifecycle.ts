@@ -60,13 +60,52 @@ import {
 export const DOT_LIFECYCLE_AUDIT_PATH = runtimeStatePath('dot.lifecycleAudit').logicalPath;
 
 /**
- * Charter files live at repo-root `dots/`; writes are made under a dedicated
- * lifecycle role (same pattern as mesh/peer-messaging store writers). The
- * writer role is deliberately NOT one a dot may bind: a runtime role holding
- * `dots/` write scope could rewrite the contract it runs under, and content
- * edits to an already-active charter bypass the activation gate.
+ * Charter files live at repo-root `dots/`; writes are made under dedicated
+ * store roles (same pattern as mesh/peer-messaging store writers and
+ * asAssetDerivationStore): `dot_charter_store` owns the charter documents in
+ * all three custodies, `dot_lifecycle_runtime_store` owns the lifecycle audit
+ * ledger, activation heartbeats and dot event-continuation state, and the
+ * inter-process locks stay under the caller's ambient role
+ * (dot_lifecycle_worker's `active/shared/runtime/locks/` grant).
+ * The store roles are deliberately NOT ones a dot may bind: a runtime role
+ * holding `dots/` write scope could rewrite the contract it runs under, and
+ * content edits to an already-active charter bypass the activation gate.
  */
-const CHARTER_WRITER_ROLE = 'dot_lifecycle_writer';
+const DOT_CHARTER_STORE_ROLE = 'dot_charter_store';
+const DOT_LIFECYCLE_RUNTIME_STORE_ROLE = 'dot_lifecycle_runtime_store';
+
+/**
+ * Member refs and system partitions are not tenant slugs: for non-tenant
+ * custody the ambient tenant binding is explicitly cleared ('' marks
+ * tenantCleared) so checkTenantScope does not parse `personal/` or system
+ * partitions as foreign-tenant paths.
+ */
+function lifecycleCustodyBinding(tenantSlug: string | undefined): string {
+  return tenantSlug ?? '';
+}
+
+function asDotCharterStore<T>(
+  tenantSlug: string | undefined,
+  fn: () => T,
+  organizationId?: string
+): T {
+  return withExecutionContext(
+    DOT_CHARTER_STORE_ROLE,
+    fn,
+    undefined,
+    lifecycleCustodyBinding(tenantSlug),
+    organizationId
+  );
+}
+
+function asDotLifecycleRuntimeStore<T>(tenantSlug: string | undefined, fn: () => T): T {
+  return withExecutionContext(
+    DOT_LIFECYCLE_RUNTIME_STORE_ROLE,
+    fn,
+    undefined,
+    lifecycleCustodyBinding(tenantSlug)
+  );
+}
 
 const TERMINAL_STATUSES: readonly DotCharterStatus[] = ['retired'];
 const TRANSITIONS: Record<DotCharterStatus, readonly DotCharterStatus[]> = {
@@ -263,23 +302,25 @@ export function createDraftDotCharter(
       throw new Error('[DOT_CREATE_EXISTS] dot identity or destination already exists');
     return charter;
   }
-  return withExecutionContext(
-    CHARTER_WRITER_ROLE,
-    () =>
-      withLockSync('dot-charter-create:' + filePath, () => {
-        if (findDotCharter(charter.dot_id, deps.rootDir) || safeExistsSync(filePath))
-          throw new Error('[DOT_CREATE_EXISTS] dot identity or destination already exists');
+  return withLockSync('dot-charter-create:' + filePath, () => {
+    if (findDotCharter(charter.dot_id, deps.rootDir) || safeExistsSync(filePath))
+      throw new Error('[DOT_CREATE_EXISTS] dot identity or destination already exists');
+    asDotCharterStore(
+      charter.scope.tenant_slug,
+      () => {
         safeMkdir(path.dirname(filePath), { recursive: true });
         safeWriteFile(filePath, JSON.stringify(charter, null, 2) + '\n', { createOnly: true });
-        auditTransition(
-          { event: 'dot_draft_created', dot_id: charter.dot_id, to: 'draft', path: filePath },
-          deps
-        );
-        return charter;
-      }),
-    undefined,
-    charter.scope.tenant_slug
-  );
+      },
+      charter.scope.organization_id
+    );
+    asDotLifecycleRuntimeStore(charter.scope.tenant_slug, () =>
+      auditTransition(
+        { event: 'dot_draft_created', dot_id: charter.dot_id, to: 'draft', path: filePath },
+        deps
+      )
+    );
+    return charter;
+  });
 }
 
 /**
@@ -300,11 +341,10 @@ function transitionDotCharterStatusUnlocked(
   // Tenant charters live under knowledge/confidential/<slug>/: read and write
   // them inside that tenant's context (tier-guard denies the path otherwise).
   const tenantSlug = source.tenant_slug;
-  const rawText = withExecutionContext(
-    CHARTER_WRITER_ROLE,
+  const rawText = asDotCharterStore(
+    tenantSlug,
     () => safeReadFile(filePath, { encoding: 'utf8' }) as string,
-    undefined,
-    tenantSlug
+    source.charter.scope.organization_id
   );
   const parsed = parseSafeJsonObjectInput(rawText, `dot charter ${filePath}`);
   const current = validateDotCharter(parsed, filePath);
@@ -329,43 +369,50 @@ function transitionDotCharterStatusUnlocked(
     );
   }
   if (target === 'active') {
-    const all = listDotCharters(deps.rootDir, { errors: [] }).map((entry) => entry.charter);
-    assertActivationReady(current, deps, all);
+    const all = asDotCharterStore(
+      tenantSlug,
+      () => listDotCharters(deps.rootDir, { errors: [] }).map((entry) => entry.charter),
+      current.scope.organization_id
+    );
+    asDotCharterStore(
+      tenantSlug,
+      () => assertActivationReady(current, deps, all),
+      current.scope.organization_id
+    );
   }
 
   const next = { ...parsed, status: target };
   const validated = validateDotCharter(next, filePath);
-  withExecutionContext(
-    CHARTER_WRITER_ROLE,
-    () => {
-      safeWriteFile(filePath, `${JSON.stringify(next, null, 2)}\n`, { encoding: 'utf8' });
-      auditTransition(
-        {
-          event: 'dot_status_transition',
-          dot_id: dotId,
-          from: current.status,
-          to: target,
-          path: filePath,
-        },
-        deps
-      );
-      // Activation seeds a heartbeat so the watchdog sees 'starting', not
-      // 'missing', until the first real wake lands.
-      if (target === 'active') {
-        recordDaemonHeartbeat(
-          validated.runtime.heartbeat_id,
-          { status: 'starting', details: { dot_id: dotId, event: 'activated' } },
-          deps.rootDir
-            ? {
-                rootDir: path.join(deps.rootDir, 'active/shared/runtime/heartbeats'),
-              }
-            : {}
-        );
-      }
-    },
-    undefined,
-    tenantSlug
+  asDotCharterStore(
+    tenantSlug,
+    () => safeWriteFile(filePath, `${JSON.stringify(next, null, 2)}\n`, { encoding: 'utf8' }),
+    current.scope.organization_id
   );
+  asDotLifecycleRuntimeStore(tenantSlug, () => {
+    auditTransition(
+      {
+        event: 'dot_status_transition',
+        dot_id: dotId,
+        from: current.status,
+        to: target,
+        path: filePath,
+      },
+      deps
+    );
+    // Activation seeds a heartbeat so the watchdog sees 'starting', not
+    // 'missing', until the first real wake lands.
+    if (target === 'active') {
+      recordDaemonHeartbeat(
+        validated.runtime.heartbeat_id,
+        { status: 'starting', details: { dot_id: dotId, event: 'activated' } },
+        deps.rootDir
+          ? {
+              rootDir: path.join(deps.rootDir, 'active/shared/runtime/heartbeats'),
+            }
+          : {}
+      );
+    }
+  });
   return validated;
 }
 
@@ -403,15 +450,8 @@ export function transitionDotCharterStatus(
 ): DotCharter {
   const source = findDotCharter(dotId, deps.rootDir);
   if (!source) throw new Error('[DOT_NOT_FOUND] no charter for ' + dotId);
-  return withExecutionContext(
-    CHARTER_WRITER_ROLE,
-    () =>
-      withLockSync('dot-charter-edit:' + path.resolve(source.path), () =>
-        transitionDotCharterStatusUnlocked(dotId, target, deps)
-      ),
-    undefined,
-    source.tenant_slug,
-    source.charter.scope.organization_id
+  return withLockSync('dot-charter-edit:' + path.resolve(source.path), () =>
+    transitionDotCharterStatusUnlocked(dotId, target, deps)
   );
 }
 
@@ -425,10 +465,10 @@ export function configureDotDelegationCapacity(
     throw new Error('[DOT_CAPACITY_INVALID] limit must be an integer from 1 to 256');
   const source = findDotCharter(dotId, deps.rootDir);
   if (!source) throw new Error('[DOT_NOT_FOUND] no charter for ' + dotId);
-  return withExecutionContext(
-    CHARTER_WRITER_ROLE,
-    () =>
-      withLockSync('dot-charter-edit:' + path.resolve(source.path), () => {
+  return withLockSync('dot-charter-edit:' + path.resolve(source.path), () =>
+    asDotCharterStore(
+      source.tenant_slug,
+      () => {
         const parsed = parseSafeJsonObjectInput(
           String(safeReadFile(source.path, { encoding: 'utf8' })),
           'dot capacity charter'
@@ -454,15 +494,17 @@ export function configureDotDelegationCapacity(
         const charter = validateDotCharter(next, source.path);
         if (!deps.dryRun) {
           writeJson(source.path, next);
-          auditTransition(
-            {
-              dot_id: dotId,
-              action: 'configure_delegation_capacity',
-              previous: current.authority.max_concurrent_delegations ?? 'inherit',
-              next: limit ?? 'inherit',
-              path: source.path,
-            },
-            deps
+          asDotLifecycleRuntimeStore(source.tenant_slug, () =>
+            auditTransition(
+              {
+                dot_id: dotId,
+                action: 'configure_delegation_capacity',
+                previous: current.authority.max_concurrent_delegations ?? 'inherit',
+                next: limit ?? 'inherit',
+                path: source.path,
+              },
+              deps
+            )
           );
         }
         return {
@@ -470,10 +512,9 @@ export function configureDotDelegationCapacity(
           effective_limit: resolveDotDelegationLimit(limit),
           applied: !deps.dryRun,
         };
-      }),
-    undefined,
-    source.tenant_slug,
-    source.charter.scope.organization_id
+      },
+      source.charter.scope.organization_id
+    )
   );
 }
 
@@ -489,63 +530,81 @@ export function enableDotEventContinuation(
     throw new Error('Stop supervisors and charter editors; then confirm quiescence explicitly.');
   const source = findDotCharter(dotId, deps.rootDir);
   if (!source) throw new Error('[DOT_NOT_FOUND] no charter for ' + dotId);
-  return withExecutionContext(
-    CHARTER_WRITER_ROLE,
-    () =>
-      withLockSync('dot-charter-edit:' + path.resolve(source.path), () => {
-        const raw = String(safeReadFile(source.path, { encoding: 'utf8' }));
-        const parsed = parseSafeJsonObjectInput(raw, 'event continuation charter');
-        const current = validateDotCharter(parsed, source.path);
-        if (current.status !== 'draft' && current.status !== 'paused')
-          throw new Error('Event continuation adoption requires a draft or paused charter.');
-        if (current.attention.event_delivery || eventContinuationExists(current, deps))
-          throw new Error(
-            'Continuation evidence already exists; inspect it, never initialize again.'
-          );
-        if (!current.attention.triggers.some((t) => t.kind === 'event'))
-          throw new Error('Event continuation requires an event trigger.');
-        return withEventContinuationLock(current, deps, () =>
-          withLockSync(eventIntakeLockId(eventContinuationLedger(current, deps.rootDir)), () => {
-            const file = eventContinuationLedger(current, deps.rootDir);
-            try {
-              safeLstat(file);
-            } catch (error) {
-              if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error;
-              safeWriteFile(file, '', { createOnly: true });
-            }
-            const activation_id = randomUUID();
-            const next = {
-              ...parsed,
-              attention: {
-                ...current.attention,
-                event_delivery: { mode: 'durable' as const, activation_id },
-              },
-            };
-            const validated = validateDotCharter(next, source.path);
-            const state = initialEventContinuation(current, activation_id, deps);
-            if (safeReadFile(source.path, { encoding: 'utf8' }) !== raw)
-              throw new Error('Charter changed during adoption; stop all editors before retrying.');
-            // Snapshot first: a crash before the declaration creates a visible hold.
-            writeEventContinuation(current, state, deps, true);
-            if (safeReadFile(source.path, { encoding: 'utf8' }) !== raw)
-              throw new Error('Charter changed after snapshot; operator recovery required.');
-            safeWriteFile(source.path, JSON.stringify(next, null, 2) + '\n');
-            auditTransition(
-              {
-                event: 'dot_event_continuation_adopted',
-                dot_id: dotId,
-                path: source.path,
-                activation_id,
-                floor: state.source.floor,
-              },
-              deps
-            );
-            return validated;
-          })
+  const tenantSlug = source.tenant_slug;
+  const orgId = source.charter.scope.organization_id;
+  return withLockSync('dot-charter-edit:' + path.resolve(source.path), () => {
+    const raw = asDotCharterStore(
+      tenantSlug,
+      () => String(safeReadFile(source.path, { encoding: 'utf8' })),
+      orgId
+    );
+    const parsed = parseSafeJsonObjectInput(raw, 'event continuation charter');
+    const current = validateDotCharter(parsed, source.path);
+    if (current.status !== 'draft' && current.status !== 'paused')
+      throw new Error('Event continuation adoption requires a draft or paused charter.');
+    if (
+      current.attention.event_delivery ||
+      asDotLifecycleRuntimeStore(tenantSlug, () => eventContinuationExists(current, deps))
+    )
+      throw new Error('Continuation evidence already exists; inspect it, never initialize again.');
+    if (!current.attention.triggers.some((t) => t.kind === 'event'))
+      throw new Error('Event continuation requires an event trigger.');
+    return withEventContinuationLock(current, deps, () =>
+      withLockSync(eventIntakeLockId(eventContinuationLedger(current, deps.rootDir)), () => {
+        asDotLifecycleRuntimeStore(tenantSlug, () => {
+          const file = eventContinuationLedger(current, deps.rootDir);
+          try {
+            safeLstat(file);
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error;
+            safeWriteFile(file, '', { createOnly: true });
+          }
+        });
+        const activation_id = randomUUID();
+        const next = {
+          ...parsed,
+          attention: {
+            ...current.attention,
+            event_delivery: { mode: 'durable' as const, activation_id },
+          },
+        };
+        const validated = validateDotCharter(next, source.path);
+        const state = asDotLifecycleRuntimeStore(tenantSlug, () =>
+          initialEventContinuation(current, activation_id, deps)
         );
-      }),
-    undefined,
-    source.tenant_slug,
-    source.charter.scope.organization_id
-  );
+        const readCharter = () =>
+          asDotCharterStore(
+            tenantSlug,
+            () => safeReadFile(source.path, { encoding: 'utf8' }),
+            orgId
+          );
+        if (readCharter() !== raw)
+          throw new Error('Charter changed during adoption; stop all editors before retrying.');
+        // Snapshot first: a crash before the declaration creates a visible hold.
+        asDotLifecycleRuntimeStore(tenantSlug, () =>
+          writeEventContinuation(current, state, deps, true)
+        );
+        if (readCharter() !== raw)
+          throw new Error('Charter changed after snapshot; operator recovery required.');
+        asDotCharterStore(
+          tenantSlug,
+          () => safeWriteFile(source.path, JSON.stringify(next, null, 2) + '\n'),
+          orgId
+        );
+        asDotLifecycleRuntimeStore(tenantSlug, () =>
+          auditTransition(
+            {
+              event: 'dot_event_continuation_adopted',
+              dot_id: dotId,
+              path: source.path,
+              activation_id,
+              floor: state.source.floor,
+            },
+            deps
+          )
+        );
+        return validated;
+      })
+    );
+  });
 }

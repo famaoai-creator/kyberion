@@ -203,9 +203,6 @@
         "active/audit/"
       ]
     },
-    "dot_lifecycle_writer": {
-      "allow": ["dots/", "active/shared/runtime/", "active/shared/tmp/"]
-    },
     "organization_operator": {
       "allow": [
         "active/organizations/confidential/${KYBERION_TENANT}/",
@@ -226,6 +223,20 @@
     },
     "customer_channel_binding_store": {
       "allow": ["knowledge/confidential/${KYBERION_TENANT}/connections/"]
+    },
+    "dot_charter_store": {
+      "allow": [
+        "dots/",
+        "knowledge/personal/dots/",
+        "knowledge/confidential/${KYBERION_TENANT}/dots/",
+        "active/shared/tmp/"
+      ]
+    },
+    "dot_lifecycle_runtime_store": {
+      "allow": ["active/shared/runtime/", "active/shared/tmp/"]
+    },
+    "dot_lifecycle_worker": {
+      "allow": ["active/shared/runtime/locks/"]
     }
   }
 }
