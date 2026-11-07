@@ -22,7 +22,7 @@ const {
   mockDeliverToCowork,
 } = vi.hoisted(() => ({
   mockSafeExistsSync: vi.fn(),
-  mockSafeLstat: vi.fn(() => ({ isFile: () => true })),
+  mockSafeLstat: vi.fn((_filePath: string) => ({ isFile: () => true as boolean })),
   mockSafeReadFile: vi.fn(),
   mockSafeReaddir: vi.fn(),
   mockSafeWriteFile: vi.fn(),
@@ -34,7 +34,7 @@ const {
   mockDeliverToCowork: vi.fn().mockReturnValue('COWORK-TEST-001'),
 }));
 
-vi.mock('./secure-io.js', () => ({
+vi.mock('@agent/core/secure-io', () => ({
   assertSafeRepositoryPath: mockAssertSafeRepositoryPath,
   safeExistsSync: mockSafeExistsSync,
   safeLstat: mockSafeLstat,
@@ -70,7 +70,7 @@ vi.mock('./secure-io.js', () => ({
   },
 }));
 
-vi.mock('./path-resolver.js', () => ({
+vi.mock('@agent/core/path-resolver', () => ({
   pathResolver: {
     rootDir: () => '/repo',
     rootResolve: (p: string) => `/repo/${p}`,
@@ -81,7 +81,7 @@ vi.mock('./path-resolver.js', () => ({
   },
 }));
 
-vi.mock('./knowledge/memory-promotion-queue.js', () => ({
+vi.mock('@agent/core/knowledge/memory-promotion-queue', () => ({
   createMemoryPromotionCandidate: mockCreateCandidate,
   enqueueMemoryPromotionCandidate: mockEnqueueCandidate,
   listMemoryPromotionCandidates: mockListCandidates,
@@ -91,7 +91,7 @@ vi.mock('./cowork-surface.js', () => ({
   deliverToCowork: mockDeliverToCowork,
 }));
 
-import { registerFoundationIo } from './foundation/io.js';
+import { registerFoundationIo } from '@agent/core/foundation/io';
 
 registerFoundationIo({
   loadJson: <T>(filePath: string): T => {

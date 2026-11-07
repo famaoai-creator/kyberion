@@ -23,8 +23,8 @@
 
 import { createHash } from 'node:crypto';
 import * as nodePath from 'node:path';
-import { pathResolver } from './path-resolver.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { defineCatalog } from '@agent/core/foundation/governed-catalog';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -32,19 +32,19 @@ import {
   safeReaddir,
   safeWriteFile,
   safeMkdir,
-} from './secure-io.js';
-import { nowIso } from './foundation/time.js';
-import { readTextFile } from './foundation/text.js';
+} from '@agent/core/secure-io';
+import { nowIso } from '@agent/core/foundation/time';
+import { readTextFile } from '@agent/core/foundation/text';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
   listMemoryPromotionCandidates,
   type MemoryCandidateTier,
   type MemoryCandidateKind,
-} from './knowledge/memory-promotion-queue.js';
-import type { MemoryScopeEnvelope } from './knowledge/memory-scope.js';
-import { scopeContextKey, type ScopeContext } from './scope-context.js';
-import { physicalScopedPath } from './physical-namespace.js';
+} from '@agent/core/knowledge/memory-promotion-queue';
+import type { MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
+import { scopeContextKey, type ScopeContext } from '@agent/core/scope-context';
+import { physicalScopedPath } from '@agent/core/physical-namespace';
 import { deliverToCowork } from './cowork-surface.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────

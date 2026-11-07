@@ -225,8 +225,6 @@ export * from './scratch-promotion.js';
 
 export * from './config-change.js';
 
-export * from './mcp-request-context.js';
-
 export * from './protocol-service-registry.js';
 
 export * from './protocol-service-lifecycle.js';

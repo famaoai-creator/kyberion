@@ -1,6 +1,6 @@
-import { normalizeEventScope, type EventScope } from './event-scope.js';
-import { getRegisteredEnvText } from './foundation/env.js';
-import { resolveClaimedNhiId } from './contracts/nhi-id.js';
+import { normalizeEventScope, type EventScope } from '@agent/core/event-scope';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { resolveClaimedNhiId } from '@agent/core/contracts/nhi-id';
 
 export type McpCallerRole = 'operator' | 'agent' | 'cowork' | 'service' | 'unknown';
 
