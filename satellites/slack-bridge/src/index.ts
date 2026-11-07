@@ -121,7 +121,7 @@ import {
   buildAutomationSlackModal,
   extractAutomationSlackFormValues,
   parseAutomationSlackModalMetadata,
-} from '@agent/core/automation-blueprint-slack';
+} from '@agent/shared-interaction/automation-blueprint-slack';
 import {
   findAutomationBlueprint,
   parseAutomationSlashRequest,

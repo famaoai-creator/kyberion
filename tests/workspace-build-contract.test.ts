@@ -482,6 +482,48 @@ describe('Workspace build contract', () => {
     }
   });
 
+  it('keeps the Slack blueprint formatter, intake vectors, and the tile describer beside their consumers', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const interaction = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-interaction/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    for (const name of ['automation-blueprint-slack', 'intake-vectors', 'dirty-tile-describer']) {
+      expect(core.exports[`./${name}`]).toBeUndefined();
+      expect(safeExistsSync(path.join(rootDir, `libs/core/${name}.ts`))).toBe(false);
+    }
+    expect(interaction.exports['./automation-blueprint-slack']).toEqual({
+      types: './dist/automation-blueprint-slack.d.ts',
+      default: './dist/automation-blueprint-slack.js',
+    });
+    for (const suffix of ['.ts', '.test.ts']) {
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/shared-interaction/src/automation-blueprint-slack${suffix}`)
+        )
+      ).toBe(true);
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/actuators/vision-actuator/src/dirty-tile-describer${suffix}`)
+        )
+      ).toBe(true);
+    }
+    expect(safeExistsSync(path.join(rootDir, 'scripts/lib/intake-vectors.ts'))).toBe(true);
+    // The blueprint contract, project-scope env, vision describe bridge, and
+    // governed catalog stay published from core; only the leaf adapters moved.
+    for (const subpath of [
+      './automation-blueprint',
+      './foundation/project-scope-env',
+      './media/image-description-bridge',
+      './foundation/governed-catalog',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
   it('keeps the ingest quota and sync cursors inside the ingest actuator', () => {
     const core = JSON.parse(
       safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string

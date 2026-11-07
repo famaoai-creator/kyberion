@@ -298,7 +298,7 @@
     "libs/core/dependency-vulnerability-ledger.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/dirty-tile-describer.ts": {
+    "libs/actuators/vision-actuator/src/dirty-tile-describer.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/discussion/discussion-readiness.ts": {

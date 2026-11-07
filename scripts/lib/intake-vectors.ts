@@ -6,8 +6,8 @@
  * that only a host-level gate (SUDO / operator action) may trigger.
  */
 
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { pathResolver } from './path-resolver.js';
+import { defineCatalog } from '@agent/core/foundation/governed-catalog';
+import { pathResolver } from '@agent/core/path-resolver';
 
 const INTAKE_VECTORS_POLICY_PATH = 'knowledge/product/governance/intake-vectors.json';
 const INTAKE_VECTORS_SCHEMA_PATH = 'knowledge/product/schemas/intake-vectors.schema.json';

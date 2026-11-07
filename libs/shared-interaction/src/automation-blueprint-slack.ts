@@ -1,6 +1,6 @@
-import { t } from './t.js';
-import type { AutomationBlueprint, AutomationFormSchema } from './automation-blueprint.js';
-import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { t } from '@agent/core/t';
+import type { AutomationBlueprint, AutomationFormSchema } from '@agent/core/automation-blueprint';
+import { parseSafeJsonObjectInput } from '@agent/core/foundation/safe-json';
 
 export interface AutomationSlackModalMetadata {
   blueprint_id: string;

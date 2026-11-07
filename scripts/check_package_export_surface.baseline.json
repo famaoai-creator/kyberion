@@ -1,9 +1,9 @@
 {
   "version": 1,
   "packages": {
-    "libs/core": 1919,
+    "libs/core": 1917,
     "libs/kernel": 4,
-    "libs/shared-interaction": 10,
+    "libs/shared-interaction": 11,
     "libs/shared-media": 82,
     "libs/shared-network": 6,
     "libs/shared-perception": 10,
