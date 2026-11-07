@@ -62,7 +62,7 @@ const run = (tenant = 'acme') =>
     'approval_decision'
   );
 // Exercise all-scope and finite-scope viewers through the same decision path.
-const runAsAll = (overrides: Record<string, unknown> = {}) =>
+const runAsAll = (overrides: Record<string, unknown> = {}, tenant?: string) =>
   INTELLIGENCE_ACTION_HANDLERS.approval_decision(
     {
       action: 'approval_decision',
@@ -71,6 +71,7 @@ const runAsAll = (overrides: Record<string, unknown> = {}) =>
       channel: 'terminal',
       decision: 'approved',
       presentedDigest: 'shown-digest',
+      ...(tenant ? { tenant } : {}),
     },
     {
       context: {
@@ -188,6 +189,11 @@ describe('scoped learning shared decision boundary', () => {
     expect((await runAsAll({ principalId: 'human:alice', tenantSlugs: ['acme'] })).status).toBe(
       200
     );
+    mocks.decide.mockClear();
+    expect(
+      (await runAsAll({ principalId: 'human:alice', tenantSlugs: ['acme'] }, 'acme')).status
+    ).toBe(403);
+    expect(mocks.decide).not.toHaveBeenCalled();
     for (const scope of [
       { owner_nhi: '', nhi_id: 'human:alice' },
       { owner_nhi: 'human:alice', nhi_id: 'human:bob' },

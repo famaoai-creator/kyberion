@@ -3205,6 +3205,11 @@ bind a checkout-relative address and reject listener errors directly, so path-le
 sandbox IPC failures are not disguised as test timeouts. Verify under the existing CI
 settings; do not relax production grants or deadlines to accommodate a fixture.
 
+CLI dry-run fixtures that expect `not_found` must also declare the legitimate controller
+identity: checking an absent lineage index still requires ordinary read authority. Run the
+entire CLI suite with the scripts CI runner's empty role/persona defaults, and include a
+roleless negative case. Never skip permission checks because a path does not exist.
+
 ## Audit bootstrap and identity resolver lifecycle
 
 Reducing a low-level dependency closure must preserve the audited operation's original
