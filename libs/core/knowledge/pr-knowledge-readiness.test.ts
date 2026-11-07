@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as pathResolver from '../path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import {
+  safeCopyFileSync,
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+  safeWriteFile,
+} from '../secure-io.js';
 import {
   checkPrKnowledgeReadiness,
   evaluatePrKnowledgeReadiness,
@@ -902,6 +908,14 @@ describe.skipIf(!CORE_DIST_BUILT)(
     beforeEach(() => {
       root = pathResolver.sharedTmp(`vitest-kl03-cross-root/${randomUUID()}`);
       safeMkdir(path.join(root, 'knowledge'), { recursive: true });
+      const governance = path.join(root, 'knowledge/product/governance');
+      safeMkdir(governance, { recursive: true });
+      for (const policy of ['security-policy.json', 'agent-policies.yaml']) {
+        safeCopyFileSync(
+          pathResolver.rootResolve(`knowledge/product/governance/${policy}`),
+          path.join(governance, policy)
+        );
+      }
       safeMkdir(path.join(root, 'active/shared/runtime/memory'), { recursive: true });
       safeWriteFile(path.join(root, 'package.json'), '{"name":"kl03-fixture","private":true}\n');
       safeWriteFile(path.join(root, 'AGENTS.md'), '# fixture\n');

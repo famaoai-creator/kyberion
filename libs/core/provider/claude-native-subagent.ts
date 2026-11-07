@@ -33,16 +33,16 @@
 import {
   getSubagentCapabilityProfile,
   type SubagentCapabilityProfile,
-} from '../subagent-capability-profiles.js';
+} from '../workforce/subagent-capability-profiles.js';
 import {
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
-import { buildWorkingPrinciplesLines } from '../working-principles.js';
+import { buildWorkingPrinciplesLines } from '../workforce/working-principles.js';
 import {
   SUBAGENT_SECURE_IO_CONSTRAINT,
   SUBAGENT_SHARED_DIRECTORY_RULES_LINES,
-} from '../subagent-prompt-framing.js';
+} from '../workforce/subagent-prompt-framing.js';
 
 /** Built-in tool name the parent session is allowed to use (`--tools`). */
 export const CLAUDE_PARENT_SESSION_TOOLS: readonly string[] = ['Task'];

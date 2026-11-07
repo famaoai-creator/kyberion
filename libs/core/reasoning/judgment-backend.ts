@@ -51,7 +51,7 @@ import { checkProviderEgress, type ProviderEgressLabel } from '../provider/provi
 import { pathResolver } from '../path-resolver.js';
 import { readJsonIfPresent } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
-import { savedSeamDefaultFor } from '../seam-provider-selection.js';
+import { savedSeamDefaultFor } from '../provider/seam-provider-selection.js';
 import type { TierLevel } from '../types.js';
 
 const logger = createLogger('judgment-backend');

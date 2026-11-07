@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 
 // IP-08 Task 2 finding (c): a corrupt security-policy.json used to fall
@@ -9,6 +9,8 @@ import * as path from 'node:path';
 const state = {
   policyExists: true,
   policyText: '{ this is not json',
+  policySequence: undefined as string[] | undefined,
+  policyReads: 0,
 };
 
 vi.mock('./fs-primitives.js', () => ({
@@ -17,7 +19,12 @@ vi.mock('./fs-primitives.js', () => ({
     return false;
   },
   rawReadTextFile: (p: string) => {
-    if (p.includes('security-policy.json')) return state.policyText;
+    if (p.includes('security-policy.json')) {
+      const index = state.policyReads++;
+      return (
+        state.policySequence?.[Math.min(index, state.policySequence.length - 1)] ?? state.policyText
+      );
+    }
     throw new Error(`unexpected read: ${p}`);
   },
 }));
@@ -36,13 +43,90 @@ vi.mock('./authority.js', () => ({
 
 import { validateReadPermission, validateWritePermission } from './tier-guard.js';
 import { pathResolver } from './path-resolver.js';
+import { runInResourceAccessScope } from './foundation/resource-access-scope.js';
 
 const ROOT = pathResolver.rootDir();
 
 describe('tier-guard policy corruption fail-closed (IP-08)', () => {
   beforeEach(() => {
+    vi.stubEnv('SYSTEM_ROLE', undefined);
+    vi.stubEnv('MISSION_ROLE', undefined);
     state.policyExists = true;
     state.policyText = '{ this is not json';
+    state.policySequence = undefined;
+    state.policyReads = 0;
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('does not combine narrowing and base allows from different policy versions', () => {
+    const target = 'active/shared/tmp/policy-snapshot.txt';
+    const role = 'snapshot_role';
+    const first = JSON.stringify({
+      default_allow: false,
+      authority_role_permissions: {
+        [role]: { write: [], narrow: { only: { write: [{ path: target }] } } },
+      },
+    });
+    const second = JSON.stringify({
+      default_allow: true,
+      authority_role_permissions: {
+        [role]: { write: [target], narrow: { only: { write: [{ path: target + '.other' }] } } },
+      },
+    });
+    vi.stubEnv('SYSTEM_ROLE', role);
+    for (const policy of [first, second]) {
+      state.policyText = policy;
+      expect(validateWritePermission(path.join(ROOT, target)).allowed).toBe(false);
+    }
+    state.policyReads = 0;
+    state.policySequence = [first, second];
+    expect(validateWritePermission(path.join(ROOT, target)).allowed).toBe(false);
+    expect(state.policyReads).toBe(1);
+  });
+
+  it.each([
+    'deliverable_inbox_writer',
+    'customer_channel_binding_store',
+    'archived_mission_state_reader',
+    'concierge_management_reader',
+    'concierge_management_writer',
+  ])('does not erase %s restrictions when policy is unavailable', (role) => {
+    const target = 'active/shared/inbox/entries.jsonl';
+    const foreign = 'active/shared/inbox/another.jsonl';
+    vi.stubEnv('SYSTEM_ROLE', role);
+    for (const policyExists of [false, true]) {
+      state.policyExists = policyExists;
+      state.policyText = '{ this is not json';
+      for (const scoped of [false, true]) {
+        const probe = () => {
+          for (const relative of [target, foreign]) {
+            const file = path.join(ROOT, relative);
+            for (const operation of ['write', 'append', 'mkdir'] as const) {
+              const decision = validateWritePermission(file, operation, '{"id":"replacement"}\n');
+              expect(decision.allowed).toBe(false);
+              expect(decision.reason).toContain('ROLE_NARROWING_POLICY_UNAVAILABLE');
+            }
+            for (const operation of ['read', 'metadata'] as const) {
+              const decision = validateReadPermission(file, operation);
+              expect(decision.allowed).toBe(false);
+              expect(decision.reason).toContain('ROLE_NARROWING_POLICY_UNAVAILABLE');
+            }
+          }
+        };
+        if (scoped)
+          runInResourceAccessScope(
+            {
+              tenantSlug: 'acme-corp',
+              readExact: [target, foreign],
+              writeExact: [target, foreign],
+              mkdirExact: [target, foreign],
+              allowProductKnowledgeRead: false,
+            },
+            probe
+          );
+        else probe();
+      }
+    }
   });
 
   it('denies protected-tier writes when the policy file is corrupt', () => {

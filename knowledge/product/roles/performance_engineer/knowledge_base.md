@@ -22,9 +22,9 @@ last_updated: 2026-10-08
 
 ## 2. 性能監視・計測ツール
 
-- **Capability Metrics**: `libs/core/metrics.ts` により自動収集。システム行は `work/metrics/execution-metrics.jsonl`、テナント／personal・confidential 行は `active/shared/runtime/execution-metrics/<tier>/<tenant|shared>/` に記録（全体集計は `metrics.loadHistory({ read: { all: true } })`）。
+- **Capability Metrics**: `libs/core/analysis/metrics.ts` により自動収集。システム行は `work/metrics/execution-metrics.jsonl`、テナント／personal・confidential 行は `active/shared/runtime/execution-metrics/<tier>/<tenant|shared>/` に記録（全体集計は `metrics.loadHistory({ read: { all: true } })`）。
 - **System Benchmark**: `pnpm exec tsx scripts/benchmark_memory.ts` / `scripts/benchmark_learning_efficiency.ts` でベンチマークを実行。
-- **Resource Profiler**: `libs/core/metrics.ts` と `pnpm dashboard` を使用して、詳細なボトルネック分析を実施。
+- **Resource Profiler**: `libs/core/analysis/metrics.ts` と `pnpm dashboard` を使用して、詳細なボトルネック分析を実施。
 
 ## 3. 最適化の定石 (Optimization Patterns)
 

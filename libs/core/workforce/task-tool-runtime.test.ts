@@ -7,7 +7,7 @@ import {
 } from './task-tool-runtime.js';
 import type { WorkItem, WorkLease } from './work-coordination-types.js';
 import { WorkerEventStream } from './worker-event-stream.js';
-import { DynamicInjectionRegistry } from '../dynamic-injection.js';
+import { DynamicInjectionRegistry } from '../reasoning/dynamic-injection.js';
 import type { GenerateWithToolsResult } from '../reasoning/reasoning-backend.js';
 
 const scope = {

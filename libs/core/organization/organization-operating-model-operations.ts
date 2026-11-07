@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { nowIso } from '../foundation/time.js';
 import { safeExistsSync } from '../secure-io.js';
-import type { KeyResultSpec } from '../key-result-spec.js';
+import type { KeyResultSpec } from './key-result-spec.js';
 
 import {
   validatorFor,

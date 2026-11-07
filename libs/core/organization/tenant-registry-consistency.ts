@@ -29,7 +29,7 @@
  * All output is codepoint-sorted (never localeCompare) for cross-platform
  * reproducibility.
  */
-import { STANCES_DIR } from '../stance-resolver.js';
+import { STANCES_DIR } from '../authn/stance-resolver.js';
 import * as path from 'node:path';
 import { listTenantProfileSlugs, readTenantProfile, resolveTenant } from './tenant-registry.js';
 import { loadTenantDesignOverrideIndex } from './tenant-design-resolver.js';

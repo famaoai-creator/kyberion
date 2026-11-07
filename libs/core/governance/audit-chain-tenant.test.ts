@@ -424,7 +424,7 @@ describe('audit-chain — tenant mirror', () => {
 
   /** A sha256 entry continuing `previous` — what anyone can compute without the chain key. */
   async function forgeUnkeyed(previous: Record<string, any>, id: string, previousHash: string) {
-    const { computeAuditEntryHash } = await import('../chain-integrity.js');
+    const { computeAuditEntryHash } = await import('./chain-integrity.js');
     const { chain_key_id: _keyId, ...rest } = previous;
     const forged = {
       ...rest,

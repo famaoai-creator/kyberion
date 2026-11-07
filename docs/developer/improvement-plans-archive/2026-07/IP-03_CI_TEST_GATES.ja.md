@@ -70,8 +70,8 @@ status: archived
 
 以下の実 sleep / ポーリング依存テストを、fake timers(`vi.useFakeTimers`)またはイベント待ち(完了 Promise の公開)に置き換える。挙動仕様を変えないこと。
 
-- `libs/core/data-vault.test.ts:96,159,233,241`(5ms sleep)
-- `libs/core/semaphore.test.ts:15`(5ms)
+- `libs/core/storage/data-vault.test.ts:96,159,233,241`(5ms sleep)
+- `libs/core/foundation/semaphore.test.ts:15`(5ms)
 - `libs/core/core.test.ts:129`(25ms)
 - `libs/core/tier-guard-tenant.test.ts:35`(25ms ポーリング)
 - `libs/core/video/video-render-runtime.test.ts:78`、`libs/core/voice/voice-generation-runtime.test.ts:117-123`

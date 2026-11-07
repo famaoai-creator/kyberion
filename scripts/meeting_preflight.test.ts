@@ -135,8 +135,8 @@ describe('meeting_preflight', () => {
       (candidate: string) =>
         candidate.includes('/active/shared/runtime/voice-profiles') ||
         candidate.includes('/active/shared/runtime/voice-profiles/alpha/metadata.json') ||
-        candidate.includes('/libs/core/coreaudio-output-bridge.swift') ||
-        candidate.includes('/libs/core/coreaudio-device-inventory.swift')
+        candidate.includes('/libs/core/voice/coreaudio-output-bridge.swift') ||
+        candidate.includes('/libs/core/voice/coreaudio-device-inventory.swift')
     );
     mocks.safeReaddir.mockReturnValue(['alpha', 'README.md']);
     mocks.locateManagedToolPythonBin.mockImplementation((toolId: string) =>

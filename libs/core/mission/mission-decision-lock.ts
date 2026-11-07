@@ -28,7 +28,7 @@
  */
 import { withExecutionContext } from '../authority.js';
 import { logger } from '../core.js';
-import { listDeals, type DealRecord } from '../deal-store.js';
+import { listDeals, type DealRecord } from '../organization/deal-store.js';
 import {
   customerDecisionsRootDir,
   runInCustomerDecisionConsumerSweep,
@@ -78,7 +78,7 @@ import {
 import { isValidTenantSlug } from '../foundation/scope.js';
 import { nowIso } from '../foundation/time.js';
 import { safeExistsSync } from '../secure-io.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { WorkCoordinationError } from '../workforce/work-coordination-error.js';
 import {
   createWorkItemIfAbsent,
@@ -92,7 +92,7 @@ import {
   loadState,
 } from './mission-state.js';
 import { readMissionStateAtPath } from './mission-state-reader.js';
-import { boundTenant } from '../owner-scope.js';
+import { boundTenant } from '../governance/owner-scope.js';
 import {
   isTaskVerifiablySuperseded,
   missionTaskSupersedeProof,

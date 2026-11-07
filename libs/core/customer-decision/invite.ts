@@ -22,7 +22,7 @@
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
-import { isActiveCustomerTenant } from '../customer-channel-binding.js';
+import { isActiveCustomerTenant } from '../organization/customer-channel-binding.js';
 import { customerDecisionInviteCapability } from '../foundation/customer-decision-invite-capability.js';
 import { currentExecutionScope, runInExecutionScope } from '../foundation/execution-scope.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';

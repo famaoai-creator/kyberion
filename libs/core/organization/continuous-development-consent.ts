@@ -7,7 +7,7 @@ import { dotStatePath } from '../dot/dot-state-paths.js';
 import type { DotCharter } from '../dot/dot-charter.js';
 import type { MissionDevelopmentSpec } from '../mission/mission-development-continuation.js';
 import type { ContinuousWorkOwnerScope } from './continuous-work-owner-state.js';
-import type { EventScopeInput } from '../event-scope.js';
+import type { EventScopeInput } from '../event/event-scope.js';
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 
 export function continuousDevelopmentConsentSummary(

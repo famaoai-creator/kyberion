@@ -41,11 +41,11 @@ import {
   resolveOrganizationOrgChart,
   summarizeOrganizationOrgChart,
   type OrganizationOrgChartSummary,
-} from '../org-chart.js';
+} from '../organization/org-chart.js';
 import {
   resolveParticipantContext,
   type ParticipantRisk,
-} from '../participant-context-resolver.js';
+} from '../reasoning/participant-context-resolver.js';
 import { discoverProviders, type ProviderInfo } from '../provider/provider-discovery.js';
 import { isObsoleteAgentRuntimeProvider } from '../provider/provider-config.js';
 import type { ScopeContext } from '../scope-context.js';

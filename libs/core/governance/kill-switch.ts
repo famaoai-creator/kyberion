@@ -1,5 +1,5 @@
 import { createLogger } from '../logger.js';
-import { loadTrustPolicy, trustEngine, type TrustPolicyAnomalyDetection } from '../trust-engine.js';
+import { loadTrustPolicy, trustEngine, type TrustPolicyAnomalyDetection } from './trust-engine.js';
 import { auditChain } from './audit-chain.js';
 import { registerGovernanceActionSink } from './governance-action-recorder.js';
 import { registerKillSwitchTerminationRegistrar } from '../mission/delegation-concurrency.js';

@@ -82,7 +82,7 @@ status: partial
 
 ### 2.2 エージェント経路の遮断
 
-- 共通ヘルパ `detectAgentExecutionContext()` を新設する(`libs/core/agent-execution-context.ts`)。
+- 共通ヘルパ `detectAgentExecutionContext()` を新設する(`libs/core/agent/agent-execution-context.ts`)。
   - 判定材料: `CLAUDECODE`、`CODEX_*`、`TERM_PROGRAM=codex`、agy / gemini / grok のマーカー、agent-token / agent-context の principal、`KYBERION_AGENT_*`。
   - 既存のばらばらな判定(claude-agent.ts、image-generation-bridge.ts)も、このヘルパに寄せる。
 - 以下の経路は、human_only 決定を `[APPROVAL_HUMAN_PROOF_REQUIRED]` で拒否する。

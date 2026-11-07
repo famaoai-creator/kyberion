@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { processUntrustedContent } from '../untrusted-content.js';
+import { processUntrustedContent } from '../governance/untrusted-content.js';
 import { nowIso } from '../foundation/time.js';
 export {
   emitChannelSurfaceEvent,

@@ -31,16 +31,16 @@ import {
 } from '../secure-io.js';
 import { withLock } from '../foundation/lock-utils.js';
 import { holdsMissionMutationLock } from './mission-mutation-snapshot.js';
-import { withFencedWriterLease, writerLeaseResourceId } from '../writer-lease.js';
-import { resolveActiveProfileRoot } from '../profile-root.js';
+import { withFencedWriterLease, writerLeaseResourceId } from '../lease/writer-lease.js';
+import { resolveActiveProfileRoot } from '../authn/profile-root.js';
 import { hasAuthority } from '../authority.js';
 import { type MissionState, type MissionRelationships, ACTIVE_TIERS } from './mission-types.js';
 import { loadMissionManagementConfig } from './mission-management-config.js';
 // Registers the owner-scope mission locator behind findMissionPath, so every
 // state lookup here resolves an existing mission from its own record.
-import '../owner-scope.js';
-import { boundTenant, missionTierScanDirs } from '../owner-scope.js';
-import { readOrNullOnMissionRefusal } from '../mission-lookup.js';
+import '../governance/owner-scope.js';
+import { boundTenant, missionTierScanDirs } from '../governance/owner-scope.js';
+import { readOrNullOnMissionRefusal } from './mission-lookup.js';
 import { loadMissionStateAtPath, writeMissionStateAtPath } from './mission-state-reader.js';
 let missionStateValidate: ReturnType<typeof compileSchema> | undefined;
 const MISSION_FOCUS_SCHEMA_PATH = pathResolver.knowledge(

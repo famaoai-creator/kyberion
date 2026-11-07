@@ -17,7 +17,7 @@ vi.mock('../governance/audit-chain.js', () => ({
 }));
 // SA-05 Task 3.3: require_approval routes through the approval gate; keep
 // unit tests hermetic — the pending path (allowed: false) is the default.
-vi.mock('../risky-op-registry.js', () => ({
+vi.mock('../governance/risky-op-registry.js', () => ({
   requireApprovalForOp: vi.fn(() => ({
     allowed: false,
     message: 'operator approval required',

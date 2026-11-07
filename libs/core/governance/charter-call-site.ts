@@ -14,7 +14,7 @@
  * it run unattended.
  */
 
-import { agentActor } from '../actor.js';
+import { agentActor } from '../contracts/actor.js';
 import { buildNhiId, NHI_SLUG_PATTERN } from '../contracts/nhi-id.js';
 import {
   parseInformationFlowFacts,

@@ -10,7 +10,7 @@ import {
   getSurfaceCoordinationRole,
   _resetSurfaceCoordinationRoleMapCacheForTests,
 } from './surface-coordination-role-map.js';
-import { withoutSchemaMetadata } from '../test-governance-payload.js';
+import { withoutSchemaMetadata } from '../testing/test-governance-payload.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 

@@ -13,12 +13,12 @@ import {
   buildFailedDelegationResult,
   markDelegationExecutionStarted,
   runStartReportingDelegation,
-} from '../delegation-result.js';
+} from '../workforce/delegation-result.js';
 import {
   deriveDelegationIdempotencyKey,
   loadDelegationReservation,
   resetDelegationIdempotencyForTests,
-} from '../delegation-idempotency.js';
+} from '../workforce/delegation-idempotency.js';
 
 const SCOPE = {
   tier: 'public' as const,

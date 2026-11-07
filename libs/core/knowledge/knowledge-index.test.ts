@@ -74,8 +74,8 @@ import {
   _chunkMarkdownBody,
   type KnowledgeHint,
 } from './knowledge-index.js';
-import { registerEmbeddingBackend } from '../embedding-backend.js';
-import * as rankingSignals from '../ranking-signals.js';
+import { registerEmbeddingBackend } from '../reasoning/embedding-backend.js';
+import * as rankingSignals from './ranking-signals.js';
 
 const TEST_ROOT = '/tmp/test-knowledge-base';
 const OUTSIDE_ROOT = '/tmp/test-knowledge-outside';

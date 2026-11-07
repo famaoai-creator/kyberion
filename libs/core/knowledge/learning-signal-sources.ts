@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir } from '../secure-io.js';
-import { readJsonLinesSince } from '../jsonl-read.js';
+import { readJsonLinesSince } from '../storage/jsonl-read.js';
 import { listConversationSignals } from '../intent/conversation-signals.js';
 import { loadApprovalRequest } from '../governance/approval-store-reader.js';
 import {
@@ -13,8 +13,8 @@ import {
 } from '../governance/approval-store-location.js';
 import { readWorkerEventStreamJsonl } from '../workforce/worker-event-stream.js';
 import { reasoningFailoverEventsPath } from '../reasoning/reasoning-failover.js';
-import { metrics, type ResourceUsageRecord } from '../metrics.js';
-import { parseDefectTransitionEvent } from '../software-quality-operations.js';
+import { metrics, type ResourceUsageRecord } from '../analysis/metrics.js';
+import { parseDefectTransitionEvent } from '../testing/software-quality-operations.js';
 import {
   evaluateRuntimeHealthTrends,
   loadRuntimeHealthSamples,
@@ -29,10 +29,10 @@ import {
   readDiscussionEvents,
   readDiscussionRoom,
 } from '../discussion/discussion-store.js';
-import { listQuarantineRecords } from '../security-screen.js';
+import { listQuarantineRecords } from '../governance/security-screen.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { listTaskSessions } from '../task/task-session.js';
-import { systemDelegationTracePaths } from '../delegated-task-observability.js';
+import { systemDelegationTracePaths } from '../workforce/delegated-task-observability.js';
 import {
   closedToken,
   daysInWindow,

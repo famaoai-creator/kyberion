@@ -22,7 +22,7 @@ import type { JudgmentModelInput } from './judgment-contract.js';
 const DATASET_SHA256 = 'dc5f49eb703405d6e458b90f1c980c3ba6a36fdc83290465c495a563f412c95b';
 const RUBRIC_SHA256 = 'ba542bf586010d005203bf191b00fd982bd5ea6cbb45d1278e13c8d13f5c29d7';
 const PROMPT_IMPLEMENTATION_SHA256 =
-  '5acb9f214dae6d7599c9f28d44baecc3739ff3fc343a42c5a5e5c8ea034bb257';
+  'a2c80fa20b582ec5cb937f1c36f37b953afdc85b7b2ea23e6bc4a95a3adf4512';
 const negativeScenarios = [
   'unknown_operation',
   'missing_observation',

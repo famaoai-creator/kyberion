@@ -1,7 +1,7 @@
 /**
  * The governed writer of `knowledge/confidential/<tenant>/connections/channel-bindings.json`
  * (D8, `pnpm kyberion customer-channel bind|unbind`). The reader is
- * libs/core/customer-channel-binding.ts; this module is the only writer.
+ * libs/core/organization/customer-channel-binding.ts; this module is the only writer.
  */
 import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';

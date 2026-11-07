@@ -10,7 +10,7 @@ import {
   withExecutionContext,
   resetRoleAssumptionPolicyCache,
 } from '../authority.js';
-import type { ResolvedPrincipal } from '../authn-principal-resolver.js';
+import type { ResolvedPrincipal } from '../authn/authn-principal-resolver.js';
 import type { SurfaceManagementAuthorization } from '../surface/surface-management-contract.js';
 import { safeExistsSync, safeMkdir, safeRmSync } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';

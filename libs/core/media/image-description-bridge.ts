@@ -1,9 +1,9 @@
 import path from 'node:path';
-import { appleFmPromptWithImage, gateAppleLane } from '../apple-intelligence-bridge.js';
+import { appleFmPromptWithImage, gateAppleLane } from '../provider/apple-intelligence-bridge.js';
 import {
   probeWindowsNativeImageRecognition,
   describeImageWithWindowsNativeApi,
-} from '../windows-native-image-recognition-bridge.js';
+} from '../ocr/windows-native-image-recognition-bridge.js';
 import {
   ImageDescriptionProvider,
   ImageDescriptionRequest,

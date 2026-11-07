@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('./stance-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./stance-resolver.js')>();
+vi.mock('./authn/stance-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./authn/stance-resolver.js')>();
   const { customerRootWithSodOverlay } =
     await import('./governance/__tests__/sod-overlay-state.js');
   return { ...actual, stanceRoot: customerRootWithSodOverlay(actual.stanceRoot) };
@@ -14,9 +14,12 @@ import {
 import { pathResolver } from './path-resolver.js';
 import { safeAppendFileSync, safeMkdir, safeRmSync } from './secure-io.js';
 import { auditChain } from './governance/audit-chain.js';
-import { CloudflareOsControlPlane } from './cloudflare-os-control-plane.js';
-import { CloudflareOsReadOnlySurface, CloudflareOsSurface } from './cloudflare-os-surface.js';
-import { setControlPlaneRuntimeRootForTests } from './cloudflare-os-journal.js';
+import { CloudflareOsControlPlane } from './governance/cloudflare-os-control-plane.js';
+import {
+  CloudflareOsReadOnlySurface,
+  CloudflareOsSurface,
+} from './governance/cloudflare-os-surface.js';
+import { setControlPlaneRuntimeRootForTests } from './governance/cloudflare-os-journal.js';
 import {
   cancelApprovalRequest,
   decideApprovalRequest,

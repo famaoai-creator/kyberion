@@ -60,7 +60,7 @@ operator inspection.
 
 ## References
 
-- `libs/core/action-item-store.ts` — fields, eligibility predicate, list/clear helpers
+- `libs/core/meeting/action-item-store.ts` — fields, eligibility predicate, list/clear helpers
 - `libs/actuators/wisdom-actuator/src/decision-ops.ts` — `extract_action_items`,
   `execute_self_action_items` (approval gate), `track_pending_action_items`
   (CC), `audit_speaker_fairness`

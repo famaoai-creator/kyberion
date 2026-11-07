@@ -8,10 +8,10 @@ import {
   loadRegistryDirectory,
   resolveRegistryDirectory,
   type RegistryDirectoryOptions,
-} from '../registry-directory.js';
+} from '../foundation/registry-directory.js';
 import { probeToolRuntime } from '../tool/tool-runtime-registry.js';
 import { probeServiceRuntime } from '../service/service-runtime-registry.js';
-import { probeAppleImageGeneration } from '../apple-intelligence-bridge.js';
+import { probeAppleImageGeneration } from '../provider/apple-intelligence-bridge.js';
 import { getAdapterDefault } from '../actuator/adapter-default-preferences.js';
 import {
   getVoiceEngineRegistry,

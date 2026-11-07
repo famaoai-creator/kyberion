@@ -27,13 +27,13 @@ L4 人間フィードバック 却下 → ask-why 1問(5カテゴリ) → イベ
 
 ## L1: 実行成功→再利用昇格
 
-| 何             | どこ                                                                                     | 挙動                                                                                                                                                                                                                                                                                                     |
-| -------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| preflight      | `scripts/refactor/adf-input.ts` `readValidatedWorkflowAdf`                               | schema(`validatePipelineAdf`)+ guardrails。error は throw                                                                                                                                                                                                                                                |
-| 実行時修復     | `scripts/run_pipeline.ts` `runStepWithRepair` → `libs/core/autonomous-repair.ts`         | 1修復+1再試行の有界ループ。**決定論修復が先**(`tryRepairJson`、パース不能な機械的破損はトークンゼロで修復)、意味的破損のみ LLM サブエージェントへ。permission/auth/config/env は fail-closed で ops エスカレーション                                                                                     |
-| 修復の学習     | 同上(LC-03)                                                                              | 検証済み修復の成功時に `repair:<category>:<op>` hint を persist、次回同クラス修復プロンプトに直近3件を注入                                                                                                                                                                                               |
-| **昇格**       | `scripts/pipeline_promote.ts` = **`pnpm pipeline:promote --input <adf> --run <run-id>`** | preflight → LLM 1問(placeholder 化・semantic step フラグ。stub では verbatim)→ `promotion` キーに出自 → 再 preflight → `pipelines/<slug>.json` + README カタログ行。`--run` は同一バイト列の成功したエンジン実行 journal が必須（`--draft` は無力な提案のみ）。`--dry-run` / `--no-llm` / `--force` あり |
-| 昇格サジェスト | `run_pipeline` 成功時                                                                    | 入力が `pipelines/` 外なら「昇格しますか」1行を表示                                                                                                                                                                                                                                                      |
+| 何             | どこ                                                                                      | 挙動                                                                                                                                                                                                                                                                                                     |
+| -------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| preflight      | `scripts/refactor/adf-input.ts` `readValidatedWorkflowAdf`                                | schema(`validatePipelineAdf`)+ guardrails。error は throw                                                                                                                                                                                                                                                |
+| 実行時修復     | `scripts/run_pipeline.ts` `runStepWithRepair` → `libs/core/pipeline/autonomous-repair.ts` | 1修復+1再試行の有界ループ。**決定論修復が先**(`tryRepairJson`、パース不能な機械的破損はトークンゼロで修復)、意味的破損のみ LLM サブエージェントへ。permission/auth/config/env は fail-closed で ops エスカレーション                                                                                     |
+| 修復の学習     | 同上(LC-03)                                                                               | 検証済み修復の成功時に `repair:<category>:<op>` hint を persist、次回同クラス修復プロンプトに直近3件を注入                                                                                                                                                                                               |
+| **昇格**       | `scripts/pipeline_promote.ts` = **`pnpm pipeline:promote --input <adf> --run <run-id>`**  | preflight → LLM 1問(placeholder 化・semantic step フラグ。stub では verbatim)→ `promotion` キーに出自 → 再 preflight → `pipelines/<slug>.json` + README カタログ行。`--run` は同一バイト列の成功したエンジン実行 journal が必須（`--draft` は無力な提案のみ）。`--dry-run` / `--no-llm` / `--force` あり |
+| 昇格サジェスト | `run_pipeline` 成功時                                                                     | 入力が `pipelines/` 外なら「昇格しますか」1行を表示                                                                                                                                                                                                                                                      |
 
 **ドクトリン**: まず成功まで持っていく(一回きりならそこで終わり)。再実行の見込み・同型反復が見えたら昇格する。未成功の ADF を先に凍結しない。
 
@@ -41,9 +41,9 @@ L4 人間フィードバック 却下 → ask-why 1問(5カテゴリ) → イベ
 
 - **正本**: [`knowledge/product/governance/llm-invocation-rubric.md`](../governance/llm-invocation-rubric.md) — 6段ラダーと判定質問。pipeline/タスク設計時はこれを先に読む。
 - **lint**: `libs/core/pipeline/adf-guardrails.ts` — `llm-decide-without-distill` / `llm-decide-without-fallback`(warn)。蒸留なし・fallback 宣言なしの `llm_decide` を preflight で警告。
-- **プリミティブ**: `libs/core/semantic-decide.ts` `decideFromObservation`(選択>生成、options 外は拒否→null)、`delegateStructured<T>`(schema 強制+retry)、`delegateBestOf`(N案+judge)— すべて `libs/core/reasoning/reasoning-backend.ts`。
-- **蒸留→判断の全面展開**(AR-07 完了): `llm_decide` は全5 actuator で利用可能。op 本体は共通ヘルパ `executeLlmDecideOp`(semantic-decide.ts)。蒸留段: browser `distill_dom` / android `summarize_ui_tree` / system `distill_output` / network `distill_response`(後2者は `libs/core/observation-distill.ts` — head/tail/error行・JSON shape・HTML title+links)/ terminal は observation 明示必須。
-- ワーカーへの周知: `libs/core/working-principles.ts` の strategist 追補にラダー参照が入る(全 worker prompt に注入)。
+- **プリミティブ**: `libs/core/reasoning/semantic-decide.ts` `decideFromObservation`(選択>生成、options 外は拒否→null)、`delegateStructured<T>`(schema 強制+retry)、`delegateBestOf`(N案+judge)— すべて `libs/core/reasoning/reasoning-backend.ts`。
+- **蒸留→判断の全面展開**(AR-07 完了): `llm_decide` は全5 actuator で利用可能。op 本体は共通ヘルパ `executeLlmDecideOp`(semantic-decide.ts)。蒸留段: browser `distill_dom` / android `summarize_ui_tree` / system `distill_output` / network `distill_response`(後2者は `libs/core/reasoning/observation-distill.ts` — head/tail/error行・JSON shape・HTML title+links)/ terminal は observation 明示必須。
+- ワーカーへの周知: `libs/core/workforce/working-principles.ts` の strategist 追補にラダー参照が入る(全 worker prompt に注入)。
 
 ## L3: 縮退防止(stub へのサイレント縮退の遮断)
 
@@ -63,7 +63,7 @@ L4 人間フィードバック 却下 → ask-why 1問(5カテゴリ) → イベ
   → ask-why 1問(スキップ可): 内容が誤り/方向が違う/品質不足/スコープ過不足/その他
       UI: chronos 成果物レビュー + chronos 承認キュー
   → note + reason_category が承認イベント JSONL / review entry に永続化
-  → [再実行] 再突入キュー(libs/core/review-reentry.ts)に enqueue
+  → [再実行] 再突入キュー(libs/core/workforce/review-reentry.ts)に enqueue
       → mission finish が pending 要求を completion reconciliation の gaps に合流
       → IL-04 goal loop が implementer+reviewer の rework タスクを自動生成
         (task brief に verdict + カテゴリ別ガイダンス + レビュアーコメント)
@@ -91,5 +91,5 @@ L4 人間フィードバック 却下 → ask-why 1問(5カテゴリ) → イベ
 1. **完了判定を触るなら** `reconcileCompletionStructurally` が単一の関所(task-session close と mission finish の両方が通る)。ここに条件を足せば全 shape に効く。
 2. **却下理由の消費者を増やすなら** イベント JSONL(`active/shared/observability/channels/<ch>/approvals.jsonl`)と review-reentry レコード(`active/shared/coordination/review-reentry/<MISSION>/`)を読む。nested workflow record は読まない(死蔵の旧経路)。
 3. **hints の読み書き**は `persistHints` / `readHintsByCategory`(`libs/core/knowledge/feedback-loop.ts`)。カテゴリ = ファイル名。topic で dedup される。100件でローテーション。
-4. **テストの定石**: governed artifact を触るテストは secure-io をモックし、**論理パスを KYBERION_ROOT 起点で解決する**こと(`libs/core/review-reentry.test.ts` 冒頭のコメント参照。素通しの fs モックだと実リポジトリに書いてしまう)。
-5. **フォローアップ接続も実装済み**(2026-07-13 後続): (a) ワーカー brief に直近の却下教訓を注入(`buildRejectionLessonLines`)、(b) `llm_decide` 縮退の週次集計が operator packet に載る(`libs/core/semantic-degradation-log.ts` → orchestrator status report)、(c) アドホック ADF の成功3回で昇格候補として run_pipeline と operator packet に提示(`libs/core/promotion-candidates.ts`)、(d) Slack 承認却下の ask-why ボタン(`slack_approval_askwhy` action → `annotateApprovalRejectionReason` で決定後の理由をイベントストリームに追記)。真の残りは iMessage/Telegram ブリッジへの同型展開と、会話文中の修正意図検知(IL-05)のみ。
+4. **テストの定石**: governed artifact を触るテストは secure-io をモックし、**論理パスを KYBERION_ROOT 起点で解決する**こと(`libs/core/workforce/review-reentry.test.ts` 冒頭のコメント参照。素通しの fs モックだと実リポジトリに書いてしまう)。
+5. **フォローアップ接続も実装済み**(2026-07-13 後続): (a) ワーカー brief に直近の却下教訓を注入(`buildRejectionLessonLines`)、(b) `llm_decide` 縮退の週次集計が operator packet に載る(`libs/core/reasoning/semantic-degradation-log.ts` → orchestrator status report)、(c) アドホック ADF の成功3回で昇格候補として run_pipeline と operator packet に提示(`libs/core/pipeline/promotion-candidates.ts`)、(d) Slack 承認却下の ask-why ボタン(`slack_approval_askwhy` action → `annotateApprovalRejectionReason` で決定後の理由をイベントストリームに追記)。真の残りは iMessage/Telegram ブリッジへの同型展開と、会話文中の修正意図検知(IL-05)のみ。

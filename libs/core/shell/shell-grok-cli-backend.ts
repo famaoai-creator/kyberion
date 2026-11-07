@@ -51,12 +51,12 @@ import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { GrokAdapter, type AgentAskOptions, type AgentResponse } from '../agent/agent-adapter.js';
 import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js';
 import type { ReasoningCallOptions } from '../reasoning/reasoning-backend.js';
-import { getSubagentCapabilityProfile } from '../subagent-capability-profiles.js';
+import { getSubagentCapabilityProfile } from '../workforce/subagent-capability-profiles.js';
 import {
   STRUCTURED_REASONING_SYSTEM_PROMPT,
   structuredReasoningSpecs,
   type StructuredOpSpec,
-} from '../structured-reasoning.js';
+} from '../reasoning/structured-reasoning.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -79,7 +79,7 @@ import type {
   DecomposedTaskPlan,
   ReasoningTextStream,
 } from '../reasoning/reasoning-backend.js';
-import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
+import { runStartReportingDelegation } from '../workforce/delegation-execution-tracker.js';
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });

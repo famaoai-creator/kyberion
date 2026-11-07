@@ -1,0 +1,139 @@
+import { describe, expect, it } from 'vitest';
+import { loadIntentRoutingMap, resolveSurfaceIntent } from './router-contract.js';
+import { classifySurfaceQueryIntent } from '../surface/surface-query.js';
+import { classifyBrowserConversationCommand } from '@agent/shared-vision/browser-conversation-session';
+
+describe('router-contract', () => {
+  it('routes direct replies through the shared intent resolver', () => {
+    const knowledge = resolveSurfaceIntent('ナレッジで planner を調べて');
+    const live = resolveSurfaceIntent('今日の天気を教えて');
+    expect(['knowledge-query', 'query-knowledge']).toContain(knowledge.intentId);
+    expect(knowledge.routeFamily).toBe('direct_reply');
+    expect(knowledge.queryType).toBe('knowledge_search');
+    expect(live.intentId).toBe('live-query');
+    expect(live.routeFamily).toBe('direct_reply');
+    expect(live.queryType).toBe('weather');
+    expect(classifySurfaceQueryIntent('今日の天気を教えて')).toBe('weather');
+  });
+
+  it('uses a supplied packet without resolving the utterance again', () => {
+    const resolved = resolveSurfaceIntent('unrelated text', {
+      packet: {
+        kind: 'intent_resolution_packet',
+        utterance: 'unrelated text',
+        selected_intent_id: 'live-query',
+        selected_confidence: 0.9,
+        selected_resolution: { shape: 'direct_reply' },
+        candidates: [],
+      },
+    });
+
+    expect(resolved.intentId).toBe('live-query');
+    expect(resolved.routeFamily).toBe('direct_reply');
+  });
+
+  it('applies the viewer tier while selecting a surface route', () => {
+    const publicOnly = resolveSurfaceIntent('personal memo をまとめて', {
+      tier: 'public',
+      tenantId: 'tenant-a',
+    });
+    expect(publicOnly.intentId).not.toBe('generate-report');
+  });
+
+  it('routes browser intents through the shared resolver before command shaping', () => {
+    const openSite = resolveSurfaceIntent('日経新聞を開いて');
+    const browserStep = resolveSurfaceIntent('左下の承認ボタンを押して');
+    expect(openSite.intentId).toBe('open-site');
+    expect(openSite.routeFamily).toBe('browser_session');
+    expect(openSite.browserCommandKind).toBe('open_site');
+    expect(browserStep.intentId).toBe('browser-step');
+    expect(browserStep.routeFamily).toBe('browser_session');
+    expect(browserStep.browserCommandKind).toBe('browser_step');
+    expect(classifyBrowserConversationCommand('日経新聞を開いて')?.action).toBe('navigate');
+    expect(classifyBrowserConversationCommand('左下の承認ボタンを押して')?.action).toBe('click');
+  });
+
+  it('routes field-fill requests to the browser conversation path', () => {
+    const fill = resolveSurfaceIntent('メール欄にtest@example.comを入力して');
+    expect(fill.intentId).toBe('browser-step');
+    expect(fill.routeFamily).toBe('browser_session');
+    expect(fill.browserCommandKind).toBe('browser_step');
+  });
+
+  it('emits pipeline and mission routing hints for governed process intents', () => {
+    const baseline = resolveSurfaceIntent('Kyberionのベースライン状態を確認して');
+    const createMission = resolveSurfaceIntent('ミッションを作成して');
+    const inventory = resolveSurfaceIntent('ミッション一覧を教えて');
+    expect(baseline.intentId).toBe('check-kyberion-baseline');
+    expect(baseline.shape).toBe('pipeline');
+    expect(baseline.pipelineId).toBe('baseline-check');
+    expect(createMission.intentId).toBe('create-mission');
+    expect(createMission.shape).toBe('mission');
+    expect(createMission.missionAction).toBe('create');
+    expect(inventory.intentId).toBe('inspect-mission-inventory');
+    expect(inventory.shape).toBe('task_session');
+    expect(inventory.routeFamily).toBe('pipeline');
+    expect(inventory.pipelineId).toBe('inspect-mission-inventory');
+
+    const codeChange = resolveSurfaceIntent('implement this change');
+    expect(codeChange.intentId).toBe('feature-expansion-delivery');
+    expect(codeChange.routeFamily).toBe('mission');
+    expect(codeChange.missionAction).toBe('create');
+  });
+
+  it('exposes track routing from the same governed map used by surface routing', () => {
+    const routing = loadIntentRoutingMap();
+    expect(routing.track_intent_policy_map?.['request-feature-development']).toEqual({
+      track_type: 'delivery',
+      default_lifecycle: 'default-sdlc',
+      min_confidence_to_autostart: 0.75,
+    });
+  });
+
+  it('maps extended mission-process intents to direct mission actions', () => {
+    const classify = resolveSurfaceIntent('classify-mission');
+    const workflow = resolveSurfaceIntent('select-mission-workflow');
+    const review = resolveSurfaceIntent('review-worker-output');
+    const handoff = resolveSurfaceIntent('handoff-mission');
+    const inspectState = resolveSurfaceIntent('inspect-mission-state');
+
+    expect(classify.intentId).toBe('classify-mission');
+    expect(classify.missionAction).toBe('classify');
+    expect(workflow.intentId).toBe('select-mission-workflow');
+    expect(workflow.missionAction).toBe('workflow');
+    expect(review.intentId).toBe('review-worker-output');
+    expect(review.missionAction).toBe('review_output');
+    expect(handoff.intentId).toBe('handoff-mission');
+    expect(handoff.missionAction).toBe('handoff');
+    expect(inspectState.intentId).toBe('inspect-mission-state');
+    expect(inspectState.missionAction).toBe('inspect_state');
+  });
+
+  it('routes contract and text review intents to different pipelines', () => {
+    const contract = resolveSurfaceIntent('この契約書をレビューして');
+    const text = resolveSurfaceIntent('この文章をレビューして');
+
+    expect(contract.intentId).toBe('contract-review');
+    expect(contract.routeFamily).toBe('pipeline');
+    expect(contract.pipelineId).toBe('knowledge/product/pipeline-templates/contract-review');
+
+    expect(text.intentId).toBe('review-text');
+    expect(text.routeFamily).toBe('pipeline');
+    expect(text.pipelineId).toBe('knowledge/product/pipeline-templates/review-text');
+  });
+
+  it('maps environment readiness intents to governed pipeline hints', () => {
+    const verify = resolveSurfaceIntent('verify-environment-readiness');
+    const inspect = resolveSurfaceIntent('inspect-environment-readiness');
+    const supervisor = resolveSurfaceIntent('inspect-runtime-supervisor');
+    const audit = resolveSurfaceIntent('verify-audit-chain');
+    expect(verify.intentId).toBe('verify-environment-readiness');
+    expect(verify.pipelineId).toBe('baseline-check');
+    expect(inspect.intentId).toBe('inspect-environment-readiness');
+    expect(inspect.pipelineId).toBe('baseline-check');
+    expect(supervisor.intentId).toBe('inspect-runtime-supervisor');
+    expect(supervisor.pipelineId).toBe('system-diagnostics');
+    expect(audit.intentId).toBe('verify-audit-chain');
+    expect(audit.pipelineId).toBe('system-diagnostics');
+  });
+});

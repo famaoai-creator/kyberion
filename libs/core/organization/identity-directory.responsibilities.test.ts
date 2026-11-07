@@ -22,7 +22,7 @@ vi.mock('../agent/agent-identity.js', () => ({
   ],
   getAgentIdentity: () => null,
 }));
-vi.mock('../nhi-lifecycle-governance.js', () => ({ listOrphanNhiIdentities: () => [] }));
+vi.mock('../agent/nhi-lifecycle-governance.js', () => ({ listOrphanNhiIdentities: () => [] }));
 vi.mock('./organization-participants.js', () => ({
   readOrganizationResponsibilityForActor: (
     scope: { organizationId: string; tenantSlug: string },

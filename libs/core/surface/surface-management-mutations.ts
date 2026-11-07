@@ -21,7 +21,7 @@ export {
 /** Trusted HTTP mediator for four bounded, owner-authorized management commands. */
 import * as path from 'node:path';
 import { withExecutionContextAsync, resolveRole } from '../authority.js';
-import { humanActor } from '../actor.js';
+import { humanActor } from '../contracts/actor.js';
 import { acquireLock, releaseLock } from '../foundation/lock-utils.js';
 import { withConciergeManagementAccessAsync } from './concierge-management-access.js';
 import { readJsonIfPresent, writeJson } from '../foundation/json.js';

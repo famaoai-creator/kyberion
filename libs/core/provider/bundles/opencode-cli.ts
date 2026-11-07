@@ -1,6 +1,6 @@
 import { cliProviderEnv, registerCliProviderBundle } from '../cli-provider-bundle.js';
 import { maybeWrapWithDispatcher } from '../../agent/agent-dispatch.js';
-import { buildOpencodeCliBackendFromEnv } from '../../opencode-cli-reasoning-backend.js';
+import { buildOpencodeCliBackendFromEnv } from '../opencode-cli-reasoning-backend.js';
 
 registerCliProviderBundle('opencode-cli', (options) => {
   const env = cliProviderEnv(options);

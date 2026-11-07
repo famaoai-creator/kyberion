@@ -3,7 +3,7 @@ import {
   loadModelCostRegistry,
   _resetModelCostRegistryCacheForTests,
   resolveCostRates,
-} from '../metrics.js';
+} from './metrics.js';
 
 describe('model-cost registry — data-driven (not source-hardcoded)', () => {
   beforeEach(() => _resetModelCostRegistryCacheForTests());

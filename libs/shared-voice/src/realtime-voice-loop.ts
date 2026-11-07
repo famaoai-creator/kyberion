@@ -41,15 +41,12 @@ import { startMicCapture, type MicCaptureOptions } from '@agent/core/mic-capture
 import { pcmToWav } from '@agent/core/foundation/pcm-wav';
 import { playAudioFile, type PlaybackHandle } from '@agent/core/voice/audio-playback';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
-import {
-  speakSegmented,
-  type SegmentedSpeechController,
-} from '@agent/core/segmented-voice-playback';
+import { speakSegmented, type SegmentedSpeechController } from './segmented-voice-playback.js';
 import {
   streamVoicePlayback,
   streamTtsAudioPlayback,
   type StreamingVoicePlaybackController,
-} from '@agent/core/streaming-voice-playback';
+} from './streaming-voice-playback.js';
 import type { StreamingTextToSpeechBridge } from '@agent/core/voice/streaming-tts-bridge';
 import { VadTurnSegmenter, type VadTurnSegmenterOptions } from './vad-turn-recorder.js';
 import { computeChunkRms } from '@agent/core/voice/voice-activity-detector';
