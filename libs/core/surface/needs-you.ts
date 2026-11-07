@@ -41,7 +41,8 @@ import { compareDecisionUrgency, groupByDecision } from './decision-brief.js';
 import type { DisplayText } from './display-humanize.js';
 import {
   admitsCustody,
-  custodyOfScope,
+  admitsScopeAudience,
+  viewerPersonIds,
   type SurfaceAuthorizationContext,
 } from './surface-authorization.js';
 
@@ -77,6 +78,8 @@ const AGENT_REQUESTER_KEYS = new Set([
 ]);
 
 export interface NeedsYouKnowledgeInput {
+  owner_nhi?: string;
+  allowed_audience?: readonly string[];
   id: string;
   candidateKey?: string;
   learningReviewUrl?: string;
@@ -104,8 +107,8 @@ export interface NeedsYouClarificationInput {
   waiting_since?: string;
 }
 
-export type NeedsYouOutcomeInput = CeoOutcomeItem;
-export type NeedsYouFailureInput = CeoExceptionItem & { tenant_slug?: string };
+export type NeedsYouOutcomeInput = CeoOutcomeItem & { owner_nhi?: string };
+export type NeedsYouFailureInput = CeoExceptionItem & { tenant_slug?: string; owner_nhi?: string };
 
 /** What the readers return, already admitted for the viewer. */
 export interface NeedsYouSourceData {
@@ -130,6 +133,7 @@ export interface NeedsYouItem {
   project_id?: string;
   /** Person custody marker carried from the source record. */
   owner_nhi?: string;
+  allowed_audience?: readonly string[];
   waiting_since?: string;
   deadline?: string;
   overdue: boolean;
@@ -238,6 +242,7 @@ function fromOutcome(item: NeedsYouOutcomeInput, now: number): NeedsYouItem {
     requester: decision ? { label: { key: 'ia_inbox_requester_customer' }, agent: false } : AGENT,
     ...(item.mission_id ? { mission_id: item.mission_id } : {}),
     ...(item.tenant_slug ? { tenant_slug: item.tenant_slug } : {}),
+    ...(item.owner_nhi ? { owner_nhi: item.owner_nhi } : {}),
     ...(item.updated_at ? { waiting_since: item.updated_at } : {}),
     overdue: isOverdue(undefined, item.updated_at, now),
     // A hand-off is closed by the operator once dealt with (`/api/outcomes/[id]`
@@ -263,6 +268,8 @@ function fromKnowledge(item: NeedsYouKnowledgeInput, now: number): NeedsYouItem 
     title: { key: 'ia_inbox_knowledge_title' },
     requester: AGENT,
     ...(item.tenant_slug ? { tenant_slug: item.tenant_slug } : {}),
+    ...(item.owner_nhi ? { owner_nhi: item.owner_nhi } : {}),
+    ...(item.allowed_audience ? { allowed_audience: item.allowed_audience } : {}),
     ...(item.organization_id ? { organization_id: item.organization_id } : {}),
     ...(item.project_id ? { project_id: item.project_id } : {}),
     ...(item.queued_at ? { waiting_since: item.queued_at } : {}),
@@ -298,6 +305,7 @@ function fromFailure(item: NeedsYouFailureInput, now: number): NeedsYouItem {
     title: text(item.title, 'ia_inbox_failure_title'),
     requester: AGENT,
     ...(item.tenant_slug ? { tenant_slug: item.tenant_slug } : {}),
+    ...(item.owner_nhi ? { owner_nhi: item.owner_nhi } : {}),
     ...(item.created_at ? { waiting_since: item.created_at } : {}),
     overdue: isOverdue(undefined, item.created_at, now),
     actions: ['later'],
@@ -318,11 +326,19 @@ function within(allowed: readonly string[] | 'all', value: string | undefined): 
  * nothing, so the client can never widen the result.
  */
 export function narrowNeedsYouItem(
-  item: Pick<NeedsYouItem, 'tenant_slug' | 'organization_id' | 'project_id' | 'owner_nhi'>,
+  item: Pick<
+    NeedsYouItem,
+    'tenant_slug' | 'organization_id' | 'project_id' | 'owner_nhi' | 'allowed_audience'
+  >,
   viewer: NeedsYouViewerScope,
   narrowing: NeedsYouNarrowing = {}
 ): boolean {
-  if (!admitsCustody(viewer, custodyOfScope(item))) return false;
+  if (!admitsScopeAudience(viewer, item)) return false;
+  if (
+    item.allowed_audience?.length &&
+    !item.allowed_audience.some((id) => viewerPersonIds(viewer).includes(id))
+  )
+    return false;
   if (!within(viewer.organizationIds, item.organization_id)) return false;
   if (!within(viewer.projectIds, item.project_id)) return false;
   if (narrowing.tenant) {

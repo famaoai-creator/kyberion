@@ -416,7 +416,8 @@ function inheritedRecordSources(
     try {
       const ref = parseDerivationRef(source);
       sourcePath = normalizeRepoPath(
-        ref.kind === 'path' ? ref.path : sourcePathOfAsset(ref, options)
+        record.proof?.sources.find((proof) => proof.ref === source)?.path ??
+          (ref.kind === 'path' ? ref.path : sourcePathOfAsset(ref, options))
       );
     } catch {
       continue;

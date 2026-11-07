@@ -32,6 +32,7 @@ vi.mock('../knowledge/memory-promotion-queue.js', async (importOriginal) => ({
 vi.mock('../mission/mission-hygiene.js', () => ({ collectMissionHygieneReport: mocks.hygiene }));
 
 import { readNeedsYouFailures, readNeedsYouSources } from './needs-you-sources.js';
+import { buildNeedsYouQueue } from './needs-you.js';
 
 function record(id: string, scope: Record<string, string> | undefined) {
   return {
@@ -65,6 +66,68 @@ beforeEach(() => {
 });
 
 describe('default needs-you reader (MCP)', () => {
+  it('preserves owner and audience through the actual source-to-queue assembly', () => {
+    mocks.approvals.mockReturnValue([]);
+    const base = {
+      source_type: 'mission',
+      source_ref: 'mission:owner',
+      proposed_memory_kind: 'heuristic',
+      summary: 'owned',
+      evidence_refs: [],
+      sensitivity_tier: 'confidential',
+      ratification_required: false,
+      status: 'queued',
+      queued_at: '2026-11-05T10:00:00Z',
+    };
+    mocks.memory.mockReturnValue([
+      { ...base, candidate_id: 'own', scope: { tier: 'public', owner_nhi: 'owner' } },
+      { ...base, candidate_id: 'other', scope: { tier: 'public', owner_nhi: 'other' } },
+      {
+        ...base,
+        candidate_id: 'shared',
+        scope: {
+          tier: 'public',
+          owner_nhi: 'other',
+          allowed_audience: ['peer'],
+        },
+      },
+    ]);
+    mocks.inbox.mockReturnValue([
+      {
+        entry_id: 'owned-outcome',
+        title: 'Outcome',
+        summary: '',
+        artifact_paths: [],
+        status: 'unread',
+        updated_at: '2026-11-05T10:00:00Z',
+        owner_nhi: 'owner',
+      },
+    ]);
+    mocks.notifications.mockReturnValue([
+      {
+        id: 'owned-failure',
+        status: 'failed',
+        surface: 'presence',
+        title: 'Failure',
+        created_at: '2026-11-05T10:00:00Z',
+        scope: { tier: 'confidential', owner_nhi: 'owner' },
+      },
+    ]);
+    const owner = { ...viewer, principalId: 'owner', includeUntenanted: false };
+    const data = readNeedsYouSources(owner);
+    const queue = buildNeedsYouQueue(data, { viewer: owner });
+    expect(queue.map((item) => item.reason).sort()).toEqual(['failure', 'knowledge', 'review']);
+    expect(queue.every((item) => item.owner_nhi === 'owner')).toBe(true);
+    expect(buildNeedsYouQueue(data, { viewer: owner, narrowing: { tenant: 'famao-ai' } })).toEqual(
+      []
+    );
+    const peer = { ...owner, principalId: 'peer' };
+    const shared = buildNeedsYouQueue(readNeedsYouSources(peer), { viewer: peer });
+    expect(shared).toHaveLength(1);
+    expect(shared[0]?.knowledge?.id).toBe('shared');
+    const stranger = { ...owner, principalId: 'stranger', tenantSlugs: 'all' as const };
+    expect(buildNeedsYouQueue(readNeedsYouSources(stranger), { viewer: stranger })).toEqual([]);
+  });
   it('admits owner and audience knowledge by authenticated identity, never all-tenant scope', () => {
     mocks.approvals.mockReturnValue([]);
     const candidate = {
