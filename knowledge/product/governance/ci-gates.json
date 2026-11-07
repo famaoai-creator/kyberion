@@ -280,6 +280,14 @@
       "rationale": "Checks capability seam adoption at the AST boundary."
     },
     {
+      "id": "vcs-host-boundary",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_vcs_host_boundary.ts"],
+      "owner": "architecture",
+      "rationale": "Keeps forge access on the vcs-host seam: production code may not exec the gh CLI outside the allowlisted provider/diagnostic files, nor reference the deprecated sync gh verbs of libs/core/vcs/github.ts (VCS host API seam design, stage 5)."
+    },
+    {
       "id": "role-assumption-reachability",
       "scope": "pr",
       "executable": "node",
