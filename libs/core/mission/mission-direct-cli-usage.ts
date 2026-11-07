@@ -1,5 +1,5 @@
 import { logger } from '../core.js';
-import { metrics, type MetricsCollector, type ResourceUsageRecord } from '../metrics.js';
+import { metrics, type MetricsCollector, type ResourceUsageRecord } from '../analysis/metrics.js';
 import { PROVIDER_IDS } from '../provider/provider-permission-profiles.js';
 
 /**

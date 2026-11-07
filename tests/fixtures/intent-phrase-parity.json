@@ -122,7 +122,7 @@
     },
     "approval.request_creation": {
       "old_regex": "/(承認を依頼|承認を申請|承認依頼|稟議.*依頼|request approval|approval request)/i",
-      "sites": ["libs/core/execution-brief.ts:124"],
+      "sites": ["libs/core/intent/execution-brief.ts:124"],
       "match": [
         "承認を依頼",
         "ねえ 承認を依頼 して",
@@ -166,7 +166,7 @@
     },
     "approval.request_resolution": {
       "old_regex": "/(稟議|決裁|承認して|承認し|承認待ち|approve|approved?|通して|処理して)/i",
-      "sites": ["libs/core/execution-brief.ts:130"],
+      "sites": ["libs/core/intent/execution-brief.ts:130"],
       "match": [
         "稟議",
         "ねえ 稟議 して",
@@ -335,7 +335,7 @@
     },
     "approval.system_binding_hint": {
       "old_regex": "/ringi|approval|workflow|稟議/i",
-      "sites": ["libs/core/execution-brief.ts:143"],
+      "sites": ["libs/core/intent/execution-brief.ts:143"],
       "match": [
         "稟議",
         "ねえ 稟議 して",
@@ -379,7 +379,7 @@
     },
     "approval.system_name": {
       "old_regex": "/(kintone|サイボウズ|cybozu|garoon|desknet's|workflow|稟議システム|intra-mart|SAP|oracle|freee|ジョブカン|salesforce|notion)/i",
-      "sites": ["libs/core/execution-brief.ts:149"],
+      "sites": ["libs/core/intent/execution-brief.ts:149"],
       "match": [
         "サイボウズ",
         "ねえ サイボウズ して",
@@ -1926,7 +1926,10 @@
     },
     "coordination.meeting_request": {
       "old_regex": "/会議|ミーティング|打ち合わせ|Teams|Zoom|Meet|meeting|call|facilitate|進行|議事録|アクションアイテム|代理参加/i",
-      "sites": ["libs/core/execution-brief.ts:80", "libs/core/guided-coordination-brief.ts:86"],
+      "sites": [
+        "libs/core/intent/execution-brief.ts:80",
+        "libs/core/intent/guided-coordination-brief.ts:86"
+      ],
       "match": [
         "会議",
         "ねえ 会議 して",
@@ -1970,7 +1973,7 @@
     },
     "coordination.schedule_request": {
       "old_regex": "/スケジュール|予定|日程|リスケ|resched|reschedule|calendar|カレンダー|調整|変更|空き時間|availability/i",
-      "sites": ["libs/core/execution-brief.ts:86", "libs/core/task/task-session.ts:635"],
+      "sites": ["libs/core/intent/execution-brief.ts:86", "libs/core/task/task-session.ts:635"],
       "match": [
         "スケジュール",
         "ねえ スケジュール して",
@@ -2213,7 +2216,7 @@
     },
     "execution_brief.agenda_change_cue": {
       "old_regex": "/(調整|変更|リスケ|ずら|移動|修正|update|change|resched|reschedule|入れ替え|前倒し|後ろ|見直し|再調整|詰め直し|整え|進め方|facilitate|preparation|準備)/i",
-      "sites": ["libs/core/execution-brief.ts:99"],
+      "sites": ["libs/core/intent/execution-brief.ts:99"],
       "match": [
         "調整",
         "ねえ 調整 して",
@@ -2257,7 +2260,7 @@
     },
     "execution_brief.agenda_read_cue": {
       "old_regex": "/(教えて|見せて|確認|見る|空き|agenda|available|availability|今週|来週|今日|明日)/i",
-      "sites": ["libs/core/execution-brief.ts:96"],
+      "sites": ["libs/core/intent/execution-brief.ts:96"],
       "match": [
         "教えて",
         "ねえ 教えて して",
@@ -2301,31 +2304,31 @@
     },
     "execution_feedback.outcome_dissatisfied": {
       "old_regex": "/不満|dissatisfied/i",
-      "sites": ["libs/core/execution-feedback.ts"],
+      "sites": ["libs/core/knowledge/execution-feedback.ts"],
       "match": ["不満", "dissatisfied"],
       "no_match": ["満足", "satisfied"]
     },
     "execution_feedback.outcome_partially_satisfied": {
       "old_regex": "/一部違う|partially_satisfied/i",
-      "sites": ["libs/core/execution-feedback.ts"],
+      "sites": ["libs/core/knowledge/execution-feedback.ts"],
       "match": ["一部違う", "partially_satisfied"],
       "no_match": ["不満", "satisfied"]
     },
     "execution_feedback.outcome_satisfied": {
       "old_regex": "/満足|satisfied/i",
-      "sites": ["libs/core/execution-feedback.ts"],
+      "sites": ["libs/core/knowledge/execution-feedback.ts"],
       "match": ["満足", "satisfied"],
       "no_match": ["不満", "hello"]
     },
     "execution_feedback.prefix": {
       "old_regex": "/^評価/",
-      "sites": ["libs/core/execution-feedback.ts"],
+      "sites": ["libs/core/knowledge/execution-feedback.ts"],
       "match": ["評価", "feedback", "FEEDBACK", "評価 use-case-x"],
       "no_match": ["来週の予定教えて"]
     },
     "guided_coordination.booking": {
       "old_regex": "/予約|booking|reservation|purchase|order|appointment|apply/i",
-      "sites": ["libs/core/guided-coordination-brief.ts:96"],
+      "sites": ["libs/core/intent/guided-coordination-brief.ts:96"],
       "match": [
         "予約",
         "ねえ 予約 して",
@@ -2369,7 +2372,7 @@
     },
     "guided_coordination.decision_support": {
       "old_regex": "/比較|compare|strategy|優先順位|priorit/i",
-      "sites": ["libs/core/guided-coordination-brief.ts:108"],
+      "sites": ["libs/core/intent/guided-coordination-brief.ts:108"],
       "match": [
         "比較",
         "ねえ 比較 して",
@@ -2409,7 +2412,7 @@
     },
     "guided_coordination.narrated_video": {
       "old_regex": "/動画|video|movie|ナレーション|narrated/i",
-      "sites": ["libs/core/guided-coordination-brief.ts:95"],
+      "sites": ["libs/core/intent/guided-coordination-brief.ts:95"],
       "match": [
         "動画",
         "ねえ 動画 して",
@@ -2451,7 +2454,7 @@
     },
     "guided_coordination.onboarding": {
       "old_regex": "/オンボーディング|onboarding|初回設定|初期設定|setup/i",
-      "sites": ["libs/core/guided-coordination-brief.ts:105"],
+      "sites": ["libs/core/intent/guided-coordination-brief.ts:105"],
       "match": [
         "オンボーディング",
         "ねえ オンボーディング して",
@@ -2489,7 +2492,7 @@
     },
     "guided_coordination.presentation": {
       "old_regex": "/パワーポイント|powerpoint|ppt|スライド|deck|briefing pack|presentation|提案書/i",
-      "sites": ["libs/core/guided-coordination-brief.ts:92"],
+      "sites": ["libs/core/intent/guided-coordination-brief.ts:92"],
       "match": [
         "パワーポイント",
         "ねえ パワーポイント して",
@@ -2533,7 +2536,7 @@
     },
     "guided_coordination.proposal": {
       "old_regex": "/proposal|提案|ストーリー|storyline|稟議|decision support|意思決定/i",
-      "sites": ["libs/core/guided-coordination-brief.ts:106"],
+      "sites": ["libs/core/intent/guided-coordination-brief.ts:106"],
       "match": [
         "提案",
         "ねえ 提案 して",
@@ -2577,7 +2580,7 @@
     },
     "guided_coordination.schedule": {
       "old_regex": "/スケジュール|予定|日程|リスケ|resched|reschedule|calendar|調整|変更|空き時間|availability/i",
-      "sites": ["libs/core/guided-coordination-brief.ts:99"],
+      "sites": ["libs/core/intent/guided-coordination-brief.ts:99"],
       "match": [
         "スケジュール",
         "ねえ スケジュール して",
@@ -2621,7 +2624,7 @@
     },
     "guided_coordination.service_operation": {
       "old_regex": "/service|運用|operation|diagnos|inspec/i",
-      "sites": ["libs/core/guided-coordination-brief.ts:109"],
+      "sites": ["libs/core/intent/guided-coordination-brief.ts:109"],
       "match": [
         "運用",
         "ねえ 運用 して",
@@ -2665,7 +2668,7 @@
     },
     "guided_coordination.travel": {
       "old_regex": "/旅行|travel|trip|tour|宿泊|hotel|flight/i",
-      "sites": ["libs/core/guided-coordination-brief.ts:97"],
+      "sites": ["libs/core/intent/guided-coordination-brief.ts:97"],
       "match": [
         "旅行",
         "ねえ 旅行 して",
@@ -3695,7 +3698,7 @@
     },
     "project.bootstrap_request": {
       "old_regex": "/Webサービス|webサービス|新しいプロジェクト|新規プロジェクト|プロジェクト.*(作って|立ち上げ|始め)|新規事業|build a service|create a service/i",
-      "sites": ["libs/core/execution-brief.ts:118"],
+      "sites": ["libs/core/intent/execution-brief.ts:118"],
       "match": [
         "Webサービス",
         "WEBサービス",
@@ -3766,7 +3769,7 @@
     "schedule.agenda_topic": {
       "old_regex": "/(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|カレンダー|agenda|availability|calendar)/i",
       "sites": [
-        "libs/core/execution-brief.ts:93",
+        "libs/core/intent/execution-brief.ts:93",
         "libs/core/intent/contextual-intent-frame.ts:103",
         "libs/core/intent/intent-resolution.ts:475"
       ],
@@ -4204,7 +4207,7 @@
     },
     "egress.customer_routine_greeting": {
       "old_regex": "new contract: exact customer greeting allowlist",
-      "sites": ["libs/core/customer-conversation.ts"],
+      "sites": ["libs/core/organization/customer-conversation.ts"],
       "match": ["こんにちは", "こんばんは", "Good morning"],
       "no_match": ["Hi, we reviewed the quote", "hello there", "ありがとうございます"]
     },

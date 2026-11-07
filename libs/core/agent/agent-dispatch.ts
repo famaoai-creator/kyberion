@@ -22,7 +22,7 @@ import {
   getSubagentCapabilityProfile,
   listSubagentCapabilityProfileNames,
   type SubagentCapabilityProfile,
-} from '../subagent-capability-profiles.js';
+} from '../workforce/subagent-capability-profiles.js';
 import {
   advanceToolCallRepeatGovernor,
   createToolCallRepeatGovernorState,
@@ -46,7 +46,10 @@ import type {
   ToolDefinition,
   GenerateWithToolsResult,
 } from '../reasoning/reasoning-backend.js';
-import { createDelegationHandle, type DelegationHandle } from '../delegated-task-observability.js';
+import {
+  createDelegationHandle,
+  type DelegationHandle,
+} from '../workforce/delegated-task-observability.js';
 import { runOpPreflight } from '../pipeline/op-preflight.js';
 import { ensureDefaultOpPreflight } from '../pipeline/op-preflight-defaults.js';
 import { recordGovernanceAction } from '../governance/governance-action-recorder.js';

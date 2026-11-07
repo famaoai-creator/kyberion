@@ -78,11 +78,11 @@ policy (`knowledge/product/governance/seam-provider-selection/*.json`).
 
 ## God-file decomposition map (2026-11-03)
 
-- Done: `libs/core/metrics.ts` → `libs/core/finance/metrics-cost-registry.ts`
+- Done: `libs/core/analysis/metrics.ts` → `libs/core/finance/metrics-cost-registry.ts`
   (model-cost registry: types, catalog load/cache, rate resolution).
   `metrics.ts` re-exports the public surface, so existing imports are
   unchanged.
-- `libs/core/storage-janitor.ts`: the event-store / append-only sweep
+- `libs/core/storage/storage-janitor.ts`: the event-store / append-only sweep
   section (`scanEventStores`, `scanStorageFloors`, `sweepStatusRules`,
   `sweepSupervisorEventFiles`, `sweepAppendOnlyStores`, ~600 lines) is the
   next extraction target as `storage-janitor-event-stores.ts`; it needs the

@@ -37,7 +37,7 @@
 
 import { createProviderRegistry } from '../provider/provider-registry.js';
 import type { SeamProviderMetadata } from '../seam.js';
-import { resolveSeamDefaultOrder } from '../seam-provider-selection.js';
+import { resolveSeamDefaultOrder } from '../provider/seam-provider-selection.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { assertVcsCwdScope } from './cwd-scope.js';
 import { vcsDefaultRunner, type VcsCommandRunner } from './vcs-backend.js';

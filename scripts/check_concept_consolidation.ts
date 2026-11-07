@@ -28,11 +28,14 @@ const CANONICAL: Partial<Record<ConceptMetric, readonly string[]>> = {
   // Process-configured actor identity is deliberately centralized at this boundary.
   env_direct_read_budget: ['libs/core/identity-context-bridge.ts'],
   runtime_path_literal_budget: ['libs/core/foundation/runtime-state-roots.ts'],
-  rate_limiter_impl_budget: ['libs/core/foundation/rate-limit.ts', 'libs/core/failure-tracker.ts'],
+  rate_limiter_impl_budget: [
+    'libs/core/foundation/rate-limit.ts',
+    'libs/core/foundation/failure-tracker.ts',
+  ],
   bespoke_cli_parser_budget: [
-    'libs/core/cli-guard.ts',
-    'libs/core/command-harness.ts',
-    'libs/core/check-harness.ts',
+    'libs/core/harnessing/cli-guard.ts',
+    'libs/core/harnessing/command-harness.ts',
+    'libs/core/harnessing/check-harness.ts',
   ],
 };
 const CONTEXT_ENV = new Set(['KYBERION_TENANT', 'KYBERION_PERSONA', 'MISSION_ROLE', 'MISSION_ID']);

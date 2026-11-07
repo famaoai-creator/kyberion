@@ -116,13 +116,13 @@ const webpush = vi.hoisted(() => ({
 vi.mock('./web-push.js', () => webpush);
 
 const imessage = vi.hoisted(() => vi.fn());
-vi.mock('../imessage-bridge.js', () => ({ sendIMessage: imessage }));
+vi.mock('../integrations/imessage-bridge.js', () => ({ sendIMessage: imessage }));
 
 const inbox = vi.hoisted(() => ({
   addInboxEntry: vi.fn(),
   listInboxEntries: vi.fn(() => [] as Array<{ entry_id: string }>),
 }));
-vi.mock('../deliverable-inbox.js', () => inbox);
+vi.mock('../task/deliverable-inbox.js', () => inbox);
 
 describe('operator notifications (E2E-04 Task 2)', () => {
   beforeEach(() => {

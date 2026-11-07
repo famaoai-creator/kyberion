@@ -3,7 +3,7 @@
  * (`scratch:promote --tenant`, `pipeline:promote --tenant`). A tenant
  * promotion lands a durable asset under knowledge/confidential/<slug>/, so it
  * gets the same DA-05 ledger line an ingest commit gets
- * (`<tenant knowledge root>/_ledger/assets.jsonl`, libs/core/ingest-asset-ledger.ts).
+ * (`<tenant knowledge root>/_ledger/assets.jsonl`, libs/core/information-assets/ingest-asset-ledger.ts).
  * Public promotions never call this module.
  *
  * Call plan + append inside the caller's tenant-bound `asset_promoter`

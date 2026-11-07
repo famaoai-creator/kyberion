@@ -4,7 +4,7 @@ import { safeLstat } from '../secure-io.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { loadPipelineAdfAtPath } from './pipeline-contract.js';
 import { pathResolver } from '../path-resolver.js';
-import { deriveExecutionGraph, type GraphEdge } from '../graph-scheduler.js';
+import { deriveExecutionGraph, type GraphEdge } from './graph-scheduler.js';
 
 // ---------------------------------------------------------------------------
 // Types

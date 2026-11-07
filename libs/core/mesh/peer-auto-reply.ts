@@ -30,7 +30,7 @@ import { createLogger } from '../logger.js';
 import { withExecutionContextAsync } from '../authority.js';
 import { isRecord } from '../foundation/text.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
-import { frameUntrustedInput } from '../untrusted-input-framing.js';
+import { frameUntrustedInput } from '../governance/untrusted-input-framing.js';
 import { withReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
 import {
   isIsolatedToolAttemptError,

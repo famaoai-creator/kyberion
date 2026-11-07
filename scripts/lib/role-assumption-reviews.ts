@@ -63,7 +63,7 @@ export const REVIEWED_INFEASIBLE_ASSUMPTIONS: Array<{
     role: 'chronos_token_registry_reader',
     site: 'libs/core/authn/authn-providers.ts#loadRegistrations',
     rationale:
-      'TR-01: computer-surface/auth.ts and presence-studio/security.ts resolve viewers with `registrations: null`, so the registry-token provider never reads the Chronos token registry; pinned by libs/core/chronos-token-registry-reader.test.ts',
+      'TR-01: computer-surface/auth.ts and presence-studio/security.ts resolve viewers with `registrations: null`, so the registry-token provider never reads the Chronos token registry; pinned by libs/core/testing/chronos-token-registry-reader.test.ts',
   },
 ];
 
@@ -86,7 +86,7 @@ export const REVIEWED_CHILD_PROCESSES: Record<string, ReviewedChildProcess> = {
     rationale:
       'starts `node dist/libs/actuators/<id>/src/index.js` for the ids of a caller-supplied service manifest with process.env: any actuator entry',
   },
-  'libs/core/apple-intelligence-bridge.ts#defaultRunner': {
+  'libs/core/provider/apple-intelligence-bridge.ts#defaultRunner': {
     targets: [],
     rationale: `Apple Foundation Models helper; ${EXTERNAL_BINARY}`,
   },
@@ -102,11 +102,11 @@ export const REVIEWED_CHILD_PROCESSES: Record<string, ReviewedChildProcess> = {
     targets: [],
     rationale: `camera capture tools (imagesnap / ffmpeg / sips / cp); ${EXTERNAL_BINARY}`,
   },
-  'libs/core/windows-os-automation.ts#runWindowsPointerActions': {
+  'libs/core/virtual/windows-os-automation.ts#runWindowsPointerActions': {
     targets: [],
     rationale: `Windows pointer script via the powershell.exe stdin bootstrap with an env built only from Windows system variables (windowsPowerShellEnv) plus KYBERION_WIN_POINTER; ${EXTERNAL_BINARY}`,
   },
-  'libs/core/windows-os-automation.ts#runWindowsAppScript': {
+  'libs/core/virtual/windows-os-automation.ts#runWindowsAppScript': {
     targets: [],
     rationale: `Windows app launch / window action scripts via the powershell.exe stdin bootstrap with an env built only from Windows system variables (windowsPowerShellEnv) plus the request JSON; ${EXTERNAL_BINARY}`,
   },

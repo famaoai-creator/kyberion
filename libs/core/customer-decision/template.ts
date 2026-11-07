@@ -6,7 +6,7 @@
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
-import { t, type VocabularyKey } from '../t.js';
+import { t, type VocabularyKey } from '../localization/t.js';
 import type { AgendaEntryKind, AgendaOptionImpact, DecisionAgenda } from './model.js';
 import { AGENDA_ID_PATTERN } from './model.js';
 

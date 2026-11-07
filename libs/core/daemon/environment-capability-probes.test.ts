@@ -1,0 +1,389 @@
+import * as path from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  installCoreEnvironmentProbes,
+  isRegularAuditChainPath,
+  nodeVersionSatisfiesFloor,
+  parseNodeEnginesRange,
+  parseEnginesNodeFloor,
+  playwrightBrowsersDir,
+  probeExplicitReasoningBackend,
+  probeRepoBuild,
+  requiredPlaywrightChromiumDirs,
+} from './environment-capability-probes.js';
+import {
+  registerBuildReadinessInspector,
+  resetBuildReadinessInspector,
+  type BuildReadinessInspection,
+} from '../harnessing/build-readiness.js';
+import { probeManifest, type EnvironmentManifest } from './environment-capability.js';
+import * as pathResolver from '../path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+
+describe('audit-chain resource loader', () => {
+  const fixtureRoot = pathResolver.sharedTmp('environment-audit-chain-loader-test');
+
+  afterEach(() => {
+    safeRmSync(fixtureRoot, { recursive: true, force: true });
+  });
+
+  it('accepts only an existing regular audit-chain file', () => {
+    const filePath = path.join(fixtureRoot, 'audit-chain.jsonl');
+    const directoryPath = path.join(fixtureRoot, 'audit-chain-directory.jsonl');
+    safeWriteFile(filePath, '{"id":"audit-1"}\n', { mkdir: true });
+    safeMkdir(directoryPath, { recursive: true });
+
+    expect(isRegularAuditChainPath(filePath)).toBe(true);
+    expect(isRegularAuditChainPath(directoryPath)).toBe(false);
+    expect(isRegularAuditChainPath(path.join(fixtureRoot, 'missing.jsonl'))).toBe(false);
+  });
+});
+
+describe('parseEnginesNodeFloor', () => {
+  it('parses a >= range', () => {
+    expect(parseEnginesNodeFloor('>=24.0.0')).toEqual([24, 0, 0]);
+    expect(parseEnginesNodeFloor('>= 22.11')).toEqual([22, 11, 0]);
+    expect(parseEnginesNodeFloor('>=v20')).toEqual([20, 0, 0]);
+  });
+
+  it('parses a caret range', () => {
+    expect(parseEnginesNodeFloor('^24.1.0')).toEqual([24, 1, 0]);
+  });
+
+  it('returns null when no floor is declared', () => {
+    expect(parseEnginesNodeFloor('*')).toBeNull();
+    expect(parseEnginesNodeFloor('')).toBeNull();
+  });
+});
+
+describe('parseNodeEnginesRange', () => {
+  it('reads only a non-empty string node engine range from object roots', () => {
+    expect(parseNodeEnginesRange({ engines: { node: '>=24.0.0' } })).toBe('>=24.0.0');
+    expect(parseNodeEnginesRange({ engines: { node: '  ' } })).toBeNull();
+  });
+
+  it.each([null, [], 'invalid', { engines: [] }, { engines: { node: 24 } }])(
+    'fails closed for malformed package shapes: %p',
+    (value) => {
+      expect(parseNodeEnginesRange(value)).toBeNull();
+    }
+  );
+});
+
+describe('nodeVersionSatisfiesFloor', () => {
+  it('accepts versions at or above the floor', () => {
+    expect(nodeVersionSatisfiesFloor('v24.0.0', [24, 0, 0])).toBe(true);
+    expect(nodeVersionSatisfiesFloor('24.5.1', [24, 0, 0])).toBe(true);
+    expect(nodeVersionSatisfiesFloor('v25.0.0', [24, 0, 0])).toBe(true);
+    expect(nodeVersionSatisfiesFloor('v24.1.0', [24, 1, 0])).toBe(true);
+  });
+
+  it('rejects versions below the floor', () => {
+    expect(nodeVersionSatisfiesFloor('v22.14.0', [24, 0, 0])).toBe(false);
+    expect(nodeVersionSatisfiesFloor('v23.9.9', [24, 0, 0])).toBe(false);
+    expect(nodeVersionSatisfiesFloor('v24.0.9', [24, 1, 0])).toBe(false);
+  });
+});
+
+describe('node-version.floor probe (wired via kyberion-toolchain style manifest)', () => {
+  it('is satisfied on the current runtime (repo engines must accept the CI/dev Node)', async () => {
+    installCoreEnvironmentProbes();
+    const manifest: EnvironmentManifest = {
+      manifest_id: 'unit-test-node-floor',
+      version: 'test',
+      capabilities: [
+        {
+          capability_id: 'node-runtime',
+          kind: 'binary',
+          description: 'node floor',
+          required_for: ['demo'],
+          probe: { kind: 'probe', probe_id: 'node-version.floor' },
+        },
+      ],
+    };
+    const statuses = await probeManifest(manifest);
+    expect(statuses).toHaveLength(1);
+    // The suite itself runs on a Node that pnpm engines already accepted,
+    // so the floor probe must agree with pnpm's gate.
+    expect(statuses[0]?.satisfied).toBe(true);
+  });
+});
+
+describe('playwrightBrowsersDir', () => {
+  afterEach(() => {
+    delete process.env.PLAYWRIGHT_BROWSERS_PATH;
+  });
+
+  it('honors PLAYWRIGHT_BROWSERS_PATH override', () => {
+    expect(playwrightBrowsersDir({ PLAYWRIGHT_BROWSERS_PATH: '/custom/browsers' })).toBe(
+      '/custom/browsers'
+    );
+  });
+
+  it('maps the special value 0 to node_modules', () => {
+    expect(playwrightBrowsersDir({ PLAYWRIGHT_BROWSERS_PATH: '0' })).toBe(
+      pathResolver.rootResolve('node_modules/playwright-core/.local-browsers')
+    );
+  });
+
+  it('falls back to the platform cache dir', () => {
+    const dir = playwrightBrowsersDir({});
+    expect(path.basename(dir)).toBe('ms-playwright');
+    expect(path.isAbsolute(dir)).toBe(true);
+  });
+
+  it('names the browser directories the installed playwright-core launches', () => {
+    const dirs = requiredPlaywrightChromiumDirs();
+    expect(dirs).not.toBeNull();
+    expect(dirs).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^chromium-\d+$/),
+        expect.stringMatching(/^chromium_headless_shell-\d+$/),
+      ])
+    );
+  });
+});
+
+describe('probeExplicitReasoningBackend (LC-04d: explicit selection is probed specifically)', () => {
+  const binaryYes = () => true;
+  const binaryNo = () => false;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('treats explicit stub as not-real with an actionable reason', async () => {
+    const result = await probeExplicitReasoningBackend('stub', {});
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('stub');
+    expect(result.reason).toContain('reasoning:setup');
+  });
+
+  it('anthropic requires ANTHROPIC_API_KEY', async () => {
+    await expect(
+      probeExplicitReasoningBackend(
+        'anthropic',
+        { ANTHROPIC_API_KEY: 'k' },
+        { anthropicProbe: async () => ({ available: true }) }
+      )
+    ).resolves.toEqual({ available: true });
+    const missing = await probeExplicitReasoningBackend('anthropic', {});
+    expect(missing.available).toBe(false);
+    expect(missing.reason).toContain('ANTHROPIC_API_KEY');
+  });
+
+  it('probes the shell runtime for explicit claude-cli even when an API key is present', async () => {
+    const result = await probeExplicitReasoningBackend(
+      'claude-cli',
+      { CLAUDE_API_KEY: 'not-a-shell-health-signal' },
+      { claudeProbe: () => ({ available: false, reason: 'placeholder CLI' }) }
+    );
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('placeholder CLI');
+  });
+
+  it('does not treat an empty Claude API key as an available agent backend', async () => {
+    const result = await probeExplicitReasoningBackend(
+      'claude-agent',
+      { ANTHROPIC_API_KEY: '   ', CLAUDE_API_KEY: '   ' },
+      { claudeProbe: () => ({ available: false, reason: 'not authenticated' }) }
+    );
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('not authenticated');
+  });
+
+  it('treats a registered Anthropic API key as an available Claude Agent backend', async () => {
+    const result = await probeExplicitReasoningBackend(
+      'claude-agent',
+      { ANTHROPIC_API_KEY: 'anthropic-test-key' },
+      { claudeProbe: () => ({ available: false, reason: 'Claude CLI is not installed' }) }
+    );
+    expect(result).toEqual({ available: true });
+  });
+
+  it('probes the grok CLI for grok-cli and normalizes the grok alias', async () => {
+    const calls: Array<[string, readonly string[]]> = [];
+    const recordingProbe = (command: string, args: readonly string[]) => {
+      calls.push([command, args]);
+      return true;
+    };
+    await expect(
+      probeExplicitReasoningBackend('grok-cli', {}, { binaryProbe: recordingProbe })
+    ).resolves.toEqual({ available: true });
+    await expect(
+      probeExplicitReasoningBackend('grok', {}, { binaryProbe: recordingProbe })
+    ).resolves.toEqual({ available: true });
+    expect(calls).toEqual([
+      ['grok', ['--version']],
+      ['grok', ['--version']],
+    ]);
+
+    const down = await probeExplicitReasoningBackend('grok-cli', {}, { binaryProbe: binaryNo });
+    expect(down.available).toBe(false);
+    expect(down.reason).toContain('grok');
+  });
+
+  it('probes grok-api from an xAI key and normalizes the xai alias', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(
+        async () => new Response(JSON.stringify({ data: [{ id: 'grok-4.7' }] }), { status: 200 })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      probeExplicitReasoningBackend('grok-api', { XAI_API_KEY: 'xai-test-key' })
+    ).resolves.toEqual({ available: true });
+    await expect(
+      probeExplicitReasoningBackend('xai', { KYBERION_GROK_API_KEY: 'kyb-xai-key' })
+    ).resolves.toEqual({ available: true });
+
+    const down = await probeExplicitReasoningBackend('grok-api', {});
+    expect(down.available).toBe(false);
+    expect(down.reason).toMatch(/XAI_API_KEY/);
+  });
+
+  it('does not fall back to a different working backend when the selected one is down', async () => {
+    // codex selected but broken; the injected claude probe would succeed —
+    // the result must still be unavailable for the *selected* backend.
+    const result = await probeExplicitReasoningBackend(
+      'codex-cli',
+      {},
+      { binaryProbe: binaryNo, claudeProbe: () => ({ available: true }) }
+    );
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('codex');
+  });
+
+  it('probes copilot through gh', async () => {
+    const calls: Array<[string, readonly string[]]> = [];
+    await probeExplicitReasoningBackend(
+      'copilot',
+      {},
+      {
+        binaryProbe: (command, args) => {
+          calls.push([command, args]);
+          return true;
+        },
+      }
+    );
+    expect(calls).toEqual([['gh', ['copilot', '--', '--help']]]);
+  });
+
+  it('rejects unknown backend modes with a catalog pointer', async () => {
+    const result = await probeExplicitReasoningBackend(
+      'bogus-backend',
+      {},
+      { binaryProbe: binaryYes }
+    );
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('reasoning-backend-policy.json');
+  });
+});
+
+describe('repo-build.receipt probe', () => {
+  const installInspector = (inspection: Partial<BuildReadinessInspection>) =>
+    registerBuildReadinessInspector(async () => ({
+      deferred: false,
+      entrypointPresent: true,
+      importViolations: [],
+      staleFindings: [],
+      scanFailures: [],
+      ...inspection,
+    }));
+
+  afterEach(() => {
+    resetBuildReadinessInspector();
+  });
+
+  it('reports fresh compiler outputs as available', async () => {
+    installInspector({});
+    expect(await probeRepoBuild()).toEqual({ available: true });
+  });
+
+  it('names the stale target and the rebuild fix', async () => {
+    installInspector({
+      staleFindings: [
+        {
+          target: 'libs/core',
+          code: 'source_changed_since_build',
+          sourceFile: 'libs/core/new.ts',
+        },
+      ],
+    });
+    const result = await probeRepoBuild();
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('repo-build stale');
+    expect(result.reason).toContain('libs/core');
+    expect(result.reason).toContain('pnpm build');
+  });
+
+  it('distinguishes missing outputs from stale ones', async () => {
+    installInspector({ entrypointPresent: false });
+    const result = await probeRepoBuild();
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('repo-build missing');
+  });
+
+  it('defers as building — an observation, never a repair', async () => {
+    installInspector({ deferred: true, entrypointPresent: false });
+    const result = await probeRepoBuild();
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('repo-build building');
+  });
+
+  it('reports inputs that moved during the scan as changed_during_scan', async () => {
+    installInspector({ inputFingerprintBefore: 'a', inputFingerprintAfter: 'b' });
+    const result = await probeRepoBuild();
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('changed_during_scan');
+  });
+
+  it('stops on unknown instead of degrading to green', async () => {
+    installInspector({
+      scanFailures: [{ target: 'libs/core', code: 'scan_failed', detail: 'permission denied' }],
+    });
+    const result = await probeRepoBuild();
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('repo-build unknown');
+  });
+
+  it('stays unknown when no inspector is installed', async () => {
+    const result = await probeRepoBuild();
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('unknown');
+    expect(result.reason).toContain('inspector');
+  });
+});
+
+describe('playwright.chromium-browser probe', () => {
+  afterEach(() => {
+    delete process.env.PLAYWRIGHT_BROWSERS_PATH;
+  });
+
+  it('reports an actionable install command when the cache dir is absent', async () => {
+    installCoreEnvironmentProbes();
+    process.env.PLAYWRIGHT_BROWSERS_PATH = pathResolver.rootResolve(
+      'active/shared/tmp/onb02-nonexistent-playwright-cache'
+    );
+    const manifest: EnvironmentManifest = {
+      manifest_id: 'unit-test-playwright',
+      version: 'test',
+      capabilities: [
+        {
+          capability_id: 'playwright-chromium',
+          kind: 'binary',
+          description: 'playwright browsers',
+          required_for: ['browser-first-win'],
+          optional: true,
+          probe: { kind: 'probe', probe_id: 'playwright.chromium-browser' },
+        },
+      ],
+    };
+    const statuses = await probeManifest(manifest);
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]?.satisfied).toBe(false);
+    expect(statuses[0]?.reason).toContain('pnpm env:bootstrap');
+  });
+});

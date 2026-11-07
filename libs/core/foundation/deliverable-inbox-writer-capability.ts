@@ -4,7 +4,7 @@ import { RUNTIME_LOCK_ROOT_PATH } from './runtime-state-roots.js';
 
 /**
  * Narrow writer role of the deliverable inbox (`active/shared/inbox/`,
- * libs/core/deliverable-inbox.ts `addInboxEntry`). libs/core assumes it to add
+ * libs/core/task/deliverable-inbox.ts `addInboxEntry`). libs/core assumes it to add
  * an operator task to the inbox on behalf of a caller that has no inbox grant
  * (a customer-triggered respond in the customer room's facade, the reminder
  * sweep of a tenant pipeline): the CD-10 bolt rejection

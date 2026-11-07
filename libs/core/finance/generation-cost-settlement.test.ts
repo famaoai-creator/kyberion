@@ -1,9 +1,9 @@
 import * as path from 'node:path';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { MetricsCollector } from '../metrics.js';
+import { MetricsCollector } from '../analysis/metrics.js';
 import { pathResolver } from '../path-resolver.js';
-import { physicalScopedPath } from '../physical-namespace.js';
-import { normalizeEventScope } from '../event-scope.js';
+import { physicalScopedPath } from '../storage/physical-namespace.js';
+import { normalizeEventScope } from '../event/event-scope.js';
 import { tenantRuntimePartitionOf } from '../storage-layout.js';
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {

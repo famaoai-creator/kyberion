@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { parseEventScopeInput } from '../event-scope.js';
+import { parseEventScopeInput } from '../event/event-scope.js';
 import { assertScopeContext } from '../foundation/scope-context-validation.js';
 
 import { pathResolver } from '../path-resolver.js';
@@ -28,7 +28,7 @@ import {
 } from '../workforce/artifact-store.js';
 import type { AgentRoutingDecision } from '../intent/intent-contract.js';
 import { nowIso } from '../foundation/time.js';
-import { resolveLocale, type SupportedLocale } from '../locale.js';
+import { resolveLocale, type SupportedLocale } from '../localization/locale.js';
 
 import { getSurfaceCoordinationRole } from './surface-coordination-role-map.js';
 import {
@@ -43,7 +43,7 @@ import type {
   SlackMissionProposalState,
   SurfaceMissionProposalState,
 } from './channel-surface-types.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 
 const SURFACE_MISSION_PROPOSAL_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/surface-mission-proposal-state.schema.json'

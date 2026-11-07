@@ -15,7 +15,7 @@ const logger = createLogger('concierge-me');
  * FD-01c: `GET /api/me` — the concierge half of the shared front-desk
  * identity contract (plan §2.4). Combines the server-resolved viewer scope
  * with tenant profiles and the onboarding flag into `FrontDeskMe`
- * (`libs/core/front-desk-identity.ts`), which both surfaces render
+ * (`libs/core/surface/front-desk-identity.ts`), which both surfaces render
  * identically. Personal tier stays masked here exactly as it already is for
  * every other Concierge route — `resolveConciergeViewer` never grants it.
  *

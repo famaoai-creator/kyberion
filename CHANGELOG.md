@@ -398,7 +398,7 @@ migrate` tags legacy taxonomy-default bindings.
 - **Contract semver enforcement** (`scripts/check_contract_semver.ts`) detects breaking changes to actuator surfaces without a version bump. Initial baseline of 26 actuators recorded.
 - **Trace persistence** (`persistTrace`, `finalizeAndPersist`, `traceLogDir`) — actuator traces now write to `active/shared/logs/traces/` (or `customer/{slug}/logs/traces/` when active). Browser-actuator and mission_controller checkpoint integrated.
 - **Mission lifecycle hardening** (`resumeMission` TOCTOU fix + 60s RESUME idempotency window).
-- **Error classifier** (`libs/core/error-classifier.ts`) — maps unstructured errors to a small set of categories with remediation hints.
+- **Error classifier** (`libs/core/analysis/error-classifier.ts`) — maps unstructured errors to a small set of categories with remediation hints.
 - **License audit** (`scripts/license_audit.ts`) — scans 3rd-party deps and writes `docs/legal/third-party-licenses.json`.
 - **Cross-OS CI matrix** (`.github/workflows/cross-os.yml`) — Ubuntu + macOS + Docker.
 - **Golden output check** (`scripts/check_golden_output.ts`) — semantic regression detection for stable pipelines.

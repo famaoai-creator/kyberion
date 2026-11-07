@@ -62,7 +62,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
-import { withFencedWriterLeaseSync, writerLeaseResourceId } from '../writer-lease.js';
+import { withFencedWriterLeaseSync, writerLeaseResourceId } from '../lease/writer-lease.js';
 import {
   demoteActiveOnResume,
   GOAL_CANCEL_SYSTEM_REMINDER,

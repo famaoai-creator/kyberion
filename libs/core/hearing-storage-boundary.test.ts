@@ -45,7 +45,7 @@ const ROOT = path.join(SOURCE_ROOT, 'active/shared/tmp/hearing-boundary-' + proc
 let withExecutionContext = initialContext;
 let { safeReadFile, safeRmSync, safeWriteFile, safeSymlinkSync, safeLinkExclusiveSync } = initialIO;
 let guard: typeof import('./tier-guard.js');
-let retention: typeof import('./storage-retention-catalog.js');
+let retention: typeof import('./storage/storage-retention-catalog.js');
 const savedRoot = process.env.KYBERION_ROOT;
 
 // A fresh root preserves the real logical tier paths. The ordinary Vitest
@@ -77,7 +77,7 @@ beforeAll(async () => {
     await import('./secure-io.js'));
   ({ withExecutionContext } = await import('./authority.js'));
   guard = await import('./tier-guard.js');
-  retention = await import('./storage-retention-catalog.js');
+  retention = await import('./storage/storage-retention-catalog.js');
   expect((await import('./path-resolver.js')).rootDir()).toBe(ROOT);
 }, 30_000);
 
@@ -307,7 +307,7 @@ describe('durable hearing storage uses real secureIO tier and tenant boundaries'
   });
 
   it('keeps durable hearing receipts out of automatic tenant offboarding targets', async () => {
-    const { collectScopeTargets } = await import('./scope-offboarding.js');
+    const { collectScopeTargets } = await import('./storage/scope-offboarding.js');
     privileged(() => {
       const targets = collectScopeTargets('tenant', TENANT);
       expect(

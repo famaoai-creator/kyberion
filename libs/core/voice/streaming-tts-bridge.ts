@@ -28,7 +28,7 @@ import {
   resolveSeamProviderDecision,
   resolveSeamSelectionEntry,
   type SeamProviderDecision,
-} from '../seam-provider-selection.js';
+} from '../provider/seam-provider-selection.js';
 
 /** What a streaming TTS bridge can do; used only for governed selection. */
 export interface StreamingTtsCapabilities {

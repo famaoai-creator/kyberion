@@ -1,4 +1,4 @@
-import { appendOpsAlertLogRecord } from '../ops-alert-log.js';
+import { appendOpsAlertLogRecord } from './ops-alert-log.js';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';

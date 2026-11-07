@@ -29,7 +29,7 @@
  * code declarations only — missing data resolves to the fail-safe default.
  */
 import { pathResolver } from '../path-resolver.js';
-import * as customerResolver from '../stance-resolver.js';
+import * as customerResolver from '../authn/stance-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { createLogger } from '../logger.js';

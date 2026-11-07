@@ -144,7 +144,7 @@ export * from './intent/intent-contract.js';
 
 export * from './intent/intent-use-case-scenario.js';
 
-export * from './execution-feedback.js';
+export * from './knowledge/execution-feedback.js';
 
 export * from './intent/intent-contract-learning.js';
 export * from './intent/conversation-signals.js';
@@ -155,19 +155,19 @@ export * from './intent/contextual-intent-clarification-policy.js';
 
 export * from './intent/contextual-intent-memory.js';
 
-export * from './execution-brief.js';
+export * from './intent/execution-brief.js';
 
 export * from './tool/tool-actuator-routing.js';
 
 export * from './mission/delegation-request.js';
 
-export * from './assistant-compiler-request.js';
+export * from './intent/assistant-compiler-request.js';
 
 export * from './intent/intent-contract.js';
 
 export * from './mission/delegation-request.js';
 
-export * from './assistant-compiler-request.js';
+export * from './intent/assistant-compiler-request.js';
 
 // Governance & Security (Shield Layer)
 
@@ -192,9 +192,9 @@ export {
   withExecutionContextAsync,
 } from './authority.js';
 
-export * as transformer from './transformer.js';
+export * as transformer from './pipeline/transformer.js';
 
-export { transform, getValueByPath } from './transformer.js';
+export { transform, getValueByPath } from './pipeline/transformer.js';
 
 export * as serviceEngine from './service/service-engine.js';
 
@@ -233,7 +233,7 @@ export * from './shell/shell-command-policy.js';
 
 export * from './sensitive-path-policy.js';
 
-export * from './output-artifacts.js';
+export * from './workforce/output-artifacts.js';
 
 export * from './workforce/worker-context-compaction.js';
 
@@ -241,27 +241,27 @@ export * from './provider/completion-token-budget.js';
 
 export * from './workforce/worker-event-stream.js';
 
-export * from './ce-adoption.js';
+export * from './harnessing/ce-adoption.js';
 
-export * from './lifecycle-hook-engine.js';
+export * from './harnessing/lifecycle-hook-engine.js';
 
-export * from './external-hook-bridge.js';
+export * from './harnessing/external-hook-bridge.js';
 
-export * from './external-hook-discovery.js';
+export * from './harnessing/external-hook-discovery.js';
 
 export * from './agent/agent-input-queue.js';
 
-export * from './writer-lease.js';
+export * from './lease/writer-lease.js';
 
-export * from './invariants.js';
+export * from './foundation/invariants.js';
 
 export * from './plugin/plugin-contributions.js';
 
-export * from './dynamic-injection.js';
+export * from './reasoning/dynamic-injection.js';
 
 export * from './reasoning/prompt-cache-discipline.js';
 
-export * from './context-rewind.js';
+export * from './workforce/context-rewind.js';
 
 export * from './workforce/worker-goal.js';
 
@@ -279,22 +279,22 @@ export * from './mission/orchestrator-session.js';
 
 export * from './agent/agent-identity.js';
 
-export * from './nhi-lifecycle-governance.js';
+export * from './agent/nhi-lifecycle-governance.js';
 
-export * from './storage-retention-catalog.js';
+export * from './storage/storage-retention-catalog.js';
 
 // MSN-STORE-BOUNDS-20261101: size-independent JSONL readers + shared store maintenance.
-export * from './jsonl-read.js';
+export * from './storage/jsonl-read.js';
 
-export * from './append-only-store.js';
+export * from './storage/append-only-store.js';
 
 export * from './surface/surface-steering-authority.js';
 
 export * from './pipeline/adf-guardrails.js';
 
-export * from './reconcile-ops.js';
+export * from './daemon/reconcile-ops.js';
 
-export * from './report-ops.js';
+export * from './daemon/report-ops.js';
 
 export * from './contracts/execution-bounds.js';
 
@@ -304,7 +304,7 @@ export * from './mesh/mesh-message-broker.js';
 
 export * from './mesh/mesh-delivery-driver.js';
 
-export * from './egress-policy.js';
+export * from './governance/egress-policy.js';
 
 export * from './governance/governance-status.js';
 

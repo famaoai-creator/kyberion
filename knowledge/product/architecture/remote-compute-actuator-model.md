@@ -18,7 +18,7 @@ Establish an execution seam and an actuator (`compute-actuator`) in Kyberion to 
 Kyberion separates **governed intent/contracts** from the **underlying physical execution runtime**.
 
 - **Actuator Layer (`compute-actuator`)**: Declarative contract boundary exposing canonical ops (`submit_job`, `poll_status`, `collect_artifact`, `cancel_job`).
-- **Seam Provider Layer (`compute-execution-provider`)**: Governed provider boundary conforming to `libs/core/seam-provider-selection.ts`.
+- **Seam Provider Layer (`compute-execution-provider`)**: Governed provider boundary conforming to `libs/core/provider/seam-provider-selection.ts`.
   - `local`: Direct host execution (CPU / local Apple Silicon MPS / CUDA).
   - `colab`: Ephemeral headless or Drive-bridged execution on Google Colab GPU/TPU runtimes.
   - `modal` / `runpod` (future): Serverless container compute providers.

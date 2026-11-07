@@ -35,7 +35,7 @@ import { readJsonIfPresent, writeJson } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import { physicalScopedPath } from '../physical-namespace.js';
+import { physicalScopedPath } from '../storage/physical-namespace.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,

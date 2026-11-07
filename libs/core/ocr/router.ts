@@ -8,8 +8,8 @@ import {
   OcrRoutingMode,
 } from '../contracts/ocr-types.js';
 import { ProviderChainRouter } from '../provider/provider-chain-router.js';
-import { type SeamProviderCandidate } from '../seam-provider-selection.js';
-import { withEgressPayloadContext } from '../egress-policy.js';
+import { type SeamProviderCandidate } from '../provider/seam-provider-selection.js';
+import { withEgressPayloadContext } from '../governance/egress-policy.js';
 import { providerDataPolicy, resolveOcrImagePath } from './provider-support.js';
 import { OCR_PROVIDER_SEAM } from './provider-registry.js';
 

@@ -8,7 +8,7 @@ import {
   loadPendingIntent,
   savePendingIntent,
 } from './pending-intent-store.js';
-import { isCorrectionUtterance } from '../correction-detection.js';
+import { isCorrectionUtterance } from './correction-detection.js';
 
 function cleanupPendingIntentStore() {
   const dir = pathResolver.sharedTmp('pending-intents');

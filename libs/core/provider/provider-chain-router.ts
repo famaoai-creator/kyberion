@@ -29,7 +29,7 @@ import {
   resolveSeamSelectionEntry,
   type ResolveSeamProviderOptions,
   type SeamProviderCandidate,
-} from '../seam-provider-selection.js';
+} from './seam-provider-selection.js';
 
 export interface ProviderChainSpec<TProvider, TRequest> {
   /** Named seam the chain selects from, e.g. 'ocr-provider'. */

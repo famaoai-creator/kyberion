@@ -162,7 +162,7 @@ DoR 合格 → 実装/試験設計 → AC をテスト項目で検証 → DoD �
 
 - 契約: `software-quality-contract` / `test-inventory` / `test-execution-record` / `defect-record` / `software-quality-report` schema。
 - 観点: `software-test-viewpoints.json` に10カテゴリを正準化し、専用schemaで検証。
-- 評価: `libs/core/software-quality.ts` が品質契約、DoR、AC、DoD、must-have/AC/risk traceabilityをfail-closedで判定。
+- 評価: `libs/core/testing/software-quality.ts` が品質契約、DoR、AC、DoD、must-have/AC/risk traceabilityをfail-closedで判定。
 - 統合: `mission-gate-engine` に `quality_contract_valid` / `dor_satisfied` / `acceptance_criteria_verified` / `dod_satisfied` / `test_traceability` を追加。
 - 報告: failed/error結果からdefect candidateを生成し、証跡不足をpassにせず、最終判断を常にhuman pendingで開始する品質報告generatorを追加。
 - 実行: `pnpm quality:report -- --contract ... --inventory ... --execution ... --output ...` と `pipelines/fragments/software-qa-lifecycle.json` を追加。

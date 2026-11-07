@@ -1,5 +1,5 @@
 import type { AgentProvider } from './agent-registry.js';
-import type { AgentContextMode } from '../context-boundary.js';
+import type { AgentContextMode } from '../contracts/context-boundary.js';
 import {
   askAgentRuntime,
   ensureAgentRuntime,
@@ -9,12 +9,12 @@ import {
 import {
   validateContextSecurityScope,
   type ContextSecurityScope,
-} from '../context-security-scope.js';
-import type { EventScopeInput } from '../event-scope.js';
+} from '../governance/context-security-scope.js';
+import type { EventScopeInput } from '../event/event-scope.js';
 import { nowIso } from '../foundation/time.js';
 import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 import { getWorkItem, listActiveWorkLeases } from '../workforce/work-coordination.js';
-import { resolveDelegationCapabilityProfile } from '../subagent-capability-profiles.js';
+import { resolveDelegationCapabilityProfile } from '../workforce/subagent-capability-profiles.js';
 
 export interface AgentTaskEnvelope {
   /** Optional canonical WorkItem; lease/profile authority is always re-derived server-side. */

@@ -315,7 +315,7 @@ the tenant boundary explicit.
 Sending confidential or personal material to an external model needs a
 statement that the provider does not train on it (`training_use: none`).
 Whose statement applies is decided by the material's **custody owner**
-(`libs/core/custody-owner.ts`), not by its tier:
+(`libs/core/contracts/custody-owner.ts`), not by its tier:
 
 | Custody  | Derived when                      | Attestation lives in                                                       | Recorded with                                                                |
 | -------- | --------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
@@ -409,7 +409,7 @@ Ledger/event handling follows the same split:
 - **projection plane**: read models are derived and rebuildable. They never
   become a second source of truth and never authorize a cross-tenant query.
 
-The implementation seam is `libs/core/event-scope.ts`; `audit-chain`,
+The implementation seam is `libs/core/event/event-scope.ts`; `audit-chain`,
 `ledger`, mission task/orchestration events, and the collaboration projection
 use it. Flat fields remain during migration so old JSONL can be replayed, but
 new writers must emit `scope`.

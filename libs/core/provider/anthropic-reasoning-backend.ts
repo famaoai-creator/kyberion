@@ -15,10 +15,10 @@ import { z } from 'zod';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { automaticReasoningRedispatchAllowed } from '../reasoning/reasoning-dispatch-scope.js';
-import { normalizeEventScope } from '../event-scope.js';
+import { normalizeEventScope } from '../event/event-scope.js';
 import { getUsageAttribution } from '../finance/usage-accounting.js';
-import { llmSemaphore } from '../semaphore.js';
-import { metrics } from '../metrics.js';
+import { llmSemaphore } from '../foundation/semaphore.js';
+import { metrics } from '../analysis/metrics.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import {
   DEFAULT_COMPLETION_FLOOR_TOKENS,
@@ -67,7 +67,7 @@ import {
 import {
   reportDelegationResultMetadata,
   runStartReportingDelegation,
-} from '../delegation-execution-tracker.js';
+} from '../workforce/delegation-execution-tracker.js';
 
 const DEFAULT_MODEL = resolveRuntimeModelId('anthropic-default');
 const DEFAULT_MAX_TOKENS = 16000;

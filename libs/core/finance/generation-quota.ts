@@ -1,7 +1,11 @@
 import * as path from 'node:path';
 import * as pathResolver from '../path-resolver.js';
 import { isValidTenantSlug } from '../entity-scope.js';
-import { normalizeEventScope, type EventScope, type EventScopeInput } from '../event-scope.js';
+import {
+  normalizeEventScope,
+  type EventScope,
+  type EventScopeInput,
+} from '../event/event-scope.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import {

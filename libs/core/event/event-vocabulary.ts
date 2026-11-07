@@ -30,7 +30,7 @@ import type { CollaborationKind } from '../agent/agent-collaboration-events.js';
 import type { WorkerEventType } from '../workforce/worker-event-stream.js';
 import type { MissionOrchestrationEventType } from '../mission/mission-orchestration-events.js';
 import type { MissionTaskEventType } from '../mission/mission-task-events.js';
-import type { ManagedProcessWatchEventKind } from '../managed-process.js';
+import type { ManagedProcessWatchEventKind } from '../tool/managed-process.js';
 import type { OperatorEvent } from '../surface/operator-notifications.js';
 
 /**

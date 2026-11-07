@@ -7,8 +7,8 @@ import { assertProjectLifecycleOwner } from '../project/project-lifecycle-guards
 import { isValidTenantSlug } from '../entity-scope.js';
 import { sameScimIssuer } from './scim-token-registry.js';
 import { trimTrailingSlashes } from '../surface/surface-session-cookie.js';
-import { issueChronosAccessToken } from '../chronos-access-registry.js';
-import { frontDeskRoleAuthority } from '../front-desk-roles.js';
+import { issueChronosAccessToken } from '../authn/chronos-access-registry.js';
+import { frontDeskRoleAuthority } from '../surface/front-desk-roles.js';
 import {
   isValidMemberId,
   memberProfileDir,

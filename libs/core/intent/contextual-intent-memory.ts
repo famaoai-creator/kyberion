@@ -9,7 +9,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import type { ScopeContext } from '../scope-context.js';
-import { physicalScopedPath } from '../physical-namespace.js';
+import { physicalScopedPath } from '../storage/physical-namespace.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 

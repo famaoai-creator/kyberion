@@ -1,7 +1,7 @@
 /** Pure identity checks. These hand-authored records are not proof of a real human decision. */
 import { describe, expect, it, vi } from 'vitest';
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
-import { normalizeEventScope } from '../event-scope.js';
+import { normalizeEventScope } from '../event/event-scope.js';
 import { judgmentCanonicalHash } from '../organization/judgment-precedents.js';
 import { judgmentEvidenceParent } from '../organization/judgment-evidence.js';
 import { createJudgmentLatencyFixture } from '../organization/judgment-latency-fixture.js';

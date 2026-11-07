@@ -2,7 +2,7 @@
  * AI company onboarding: materialize a vertical, bind human accountability,
  * create the initial AI workforce, and leave one reviewed first-work plan.
  */
-import { isStanceEntry, stanceDirForSlug } from '../stance-resolver.js';
+import { isStanceEntry, stanceDirForSlug } from '../authn/stance-resolver.js';
 import { tenantHomeDir } from './tenant-home.js';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';

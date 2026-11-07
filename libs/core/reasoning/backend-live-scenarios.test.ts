@@ -13,7 +13,7 @@ import { buildBackendCapabilityHonestyReport } from './backend-capability-honest
 import { BACKEND_CAPABILITY_PROFILES } from './backend-capability-profile.js';
 import { stubReasoningBackend } from './reasoning-backend.js';
 import type { ReasoningBackend, ReasoningCallOptions } from './reasoning-backend-contracts.js';
-import { createDelegationHandle } from '../delegated-task-observability.js';
+import { createDelegationHandle } from '../workforce/delegated-task-observability.js';
 import { DelegationAbortedError } from '../mission/delegation-concurrency.js';
 import { bindReasoningRequestTimeout } from './reasoning-fixed-binding.js';
 

@@ -141,7 +141,7 @@ last_updated: 2026-04-20
 
 #### P2-3. Relationship-graph を presence / voice actuator に結線 ✅ store 完了（2026-04-20）
 
-- `libs/core/relationship-graph-store.ts`：`recordInteraction`（信頼アクチュエータが rolling history に追記）、`suggestFieldUpdate`（trust_level 等は pending_suggestions に queue、直接変更しない）、read helper 群。path-traversal 拒否、20-entry ロールキャップ、neutral trust=3 で auto-create。
+- `libs/core/organization/relationship-graph-store.ts`：`recordInteraction`（信頼アクチュエータが rolling history に追記）、`suggestFieldUpdate`（trust_level 等は pending_suggestions に queue、直接変更しない）、read helper 群。path-traversal 拒否、20-entry ロールキャップ、neutral trust=3 で auto-create。
 - 各アクチュエータが interaction ごとに `recordInteraction` を呼ぶ結線は presence / voice actuator 側の follow-up。
 
 #### P2-4. heuristic-entry の tier 変更 ✅ 完了（2026-04-20）
@@ -151,13 +151,13 @@ last_updated: 2026-04-20
 
 #### P2-5. Heuristic feedback loop の実装 ✅ 完了（2026-04-20）
 
-- `libs/core/heuristic-feedback.ts`：`validateHeuristic`（成果 → validity_score を算出）、`scoreValidity`（success/partial/failure + optional metric_score）、`summarizeHeuristics`（retrospective 用レポート）。冪等再評価可。
+- `libs/core/knowledge/heuristic-feedback.ts`：`validateHeuristic`（成果 → validity_score を算出）、`scoreValidity`（success/partial/failure + optional metric_score）、`summarizeHeuristics`（retrospective 用レポート）。冪等再評価可。
 - 12 テスト通過。retrospective ミッションフェーズから `summarizeHeuristics` を呼ぶ結線は follow-up。
 
 #### P2-6. approval-gate を risky ops と結線 ✅ 完了（2026-04-20）
 
 - `approval-policy.json` を 1.1.0 に更新、`secret:grant_access` / `auth:grant_authority` / `config:update`（governance|policy|review_gate scope）/ `vault:write` ルールを追加。
-- `libs/core/risky-op-registry.ts`：`RISKY_OPS` 定数と `requireApprovalForOp` ディスパッチャ。call-site は correlation / intent id の boilerplate なくゲート可能。
+- `libs/core/governance/risky-op-registry.ts`：`RISKY_OPS` 定数と `requireApprovalForOp` ディスパッチャ。call-site は correlation / intent id の boilerplate なくゲート可能。
 - 既存 risky 呼び出し（例：`secret-guard.grantAccess`）を本 registry に移植するのは follow-up。
 
 ### P3 — 文書整合と吸収 ✅ 全完了（2026-04-20）

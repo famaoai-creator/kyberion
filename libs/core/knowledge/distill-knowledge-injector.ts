@@ -39,7 +39,7 @@ import {
   cosineSimilarity,
   reciprocalRankFusion,
   type EmbeddingBackend,
-} from '../embedding-backend.js';
+} from '../reasoning/embedding-backend.js';
 
 const CURRENT_DISTILL_DIR = 'knowledge/product/evolution';
 const LEGACY_DISTILL_DIRS = ['knowledge/product/incidents', 'knowledge/product/evolution'];

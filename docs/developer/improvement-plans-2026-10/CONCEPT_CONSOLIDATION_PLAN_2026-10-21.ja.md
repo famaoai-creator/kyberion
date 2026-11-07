@@ -73,16 +73,16 @@ B に該当するのは次の 5 つ。いずれも SX / SC / PG のどこにも�
 | -------------------- | ------------------------------------------------------- | ---------------------------------- |
 | `ScopeContext`       | `libs/core/scope-context-validation.ts:4`               | role, persona, sudo, actor         |
 | `IdentityContext`    | `libs/core/types.ts:257`                                | org, project, task, session, actor |
-| `ResolvedPrincipal`  | `libs/core/authn-principal-resolver.ts:96`              | mission, task, session             |
+| `ResolvedPrincipal`  | `libs/core/authn/authn-principal-resolver.ts:96`        | mission, task, session             |
 | `ExecutionScope`     | `libs/core/foundation/execution-scope.ts:39`            | ほぼ全部                           |
-| `OwnerScope`         | `libs/core/owner-scope.ts:44`                           | role, persona, mission             |
+| `OwnerScope`         | `libs/core/governance/owner-scope.ts:44`                | role, persona, mission             |
 | `SurfaceViewerScope` | `libs/core/surface/surface-viewer-scope-contract.ts:13` | 実行主体                           |
 
 どれも全体を持たないため、呼び出し側が必要な項目だけ env から拾う。
 
 - `libs/core/tier-guard.ts:959-962` — `assumedRole || SYSTEM_ROLE || MISSION_ROLE` で `authority.resolveRole` を再実装
 - `libs/core/spend-guard.ts:96` — `tenantId ?? getRegisteredEnvText('KYBERION_TENANT')`
-- `libs/core/metrics.ts:770` — `input.mission_id || getRegisteredEnvText('MISSION_ID')`
+- `libs/core/analysis/metrics.ts:770` — `input.mission_id || getRegisteredEnvText('MISSION_ID')`
 - `libs/core/organization/tenant-governance.ts:144` — `agentId: input.actor || KYBERION_PERSONA || 'operator'`
 
 文法も分岐している。`owner-scope.ts:116` だけ `'default'` を許容、`spend-guard.ts:207` は validate せず lowercase のみ、mission id は 5 種の正規表現、sudo は `'1'` と `'true'` の 2 流儀(`history-search-index.ts:736`)。
@@ -221,7 +221,7 @@ B に該当するのは次の 5 つ。いずれも SX / SC / PG のどこにも�
 
 **実装**:
 
-- `defineCheck({ id, collect(ctx): Finding[], render(findings) })` を `libs/core/check-harness.ts` に置く
+- `defineCheck({ id, collect(ctx): Finding[], render(findings) })` を `libs/core/harnessing/check-harness.ts` に置く
 - 契約を固定する: findings > 0 なら exit 1、`--json` は `{ ok, id, findings: [{ code, message, path?, line? }] }`、成功は `[check:<id>] OK`
 - `ci-gates.json`(SX-07)の `id` と 1:1 対応させ、manifest に無い check は CI で走らないことを明示する
 - `--fail` 依存(`check_deprecated_wisdom_ops.ts:84`)を廃止し、常に findings で判定する

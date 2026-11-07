@@ -76,7 +76,8 @@ describe('check_catalog_integrity', () => {
         findUnreferencedGovernanceCatalogs({
           catalogs: [{ fileName: 'decision-rights.json', documentationOnly: false }],
           sourceFiles: {
-            'libs/core/decision-rights.ts': "path.join(baseDir, 'decision-rights.json')",
+            'libs/core/organization/decision-rights.ts':
+              "path.join(baseDir, 'decision-rights.json')",
           },
         })
       ).toEqual([]);

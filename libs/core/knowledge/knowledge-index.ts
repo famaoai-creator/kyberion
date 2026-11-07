@@ -1,4 +1,4 @@
-import { STANCES_DIR } from '../stance-resolver.js';
+import { STANCES_DIR } from '../authn/stance-resolver.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -20,7 +20,7 @@ import {
   getEmbeddingBackend,
   cosineSimilarity,
   reciprocalRankFusion,
-} from '../embedding-backend.js';
+} from '../reasoning/embedding-backend.js';
 import {
   knowledgeMetadataScore,
   loadKnowledgeRankingWeights,
@@ -38,7 +38,7 @@ import {
   loadKnowledgeIndexUsageAtPath,
   writeKnowledgeIndexUsageAtPath,
 } from './knowledge-index-usage.js';
-import { physicalScopedPath } from '../physical-namespace.js';
+import { physicalScopedPath } from '../storage/physical-namespace.js';
 import type { ScopeContext } from '../scope-context.js';
 import { currentScope } from '../scope-context.js';
 import { segmentWords } from '../foundation/locale-normalize.js';

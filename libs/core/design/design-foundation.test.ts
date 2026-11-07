@@ -13,7 +13,7 @@ import {
   type CompositionSpec,
 } from './design-foundation.js';
 import { resolveCreativeDesign } from './creative-design-resolver.js';
-import { buildCampaignPlan, type CampaignBrief } from '../campaign-suite.js';
+import { buildCampaignPlan, type CampaignBrief } from '../media/campaign-suite.js';
 
 const foundation = loadDesignFoundation();
 

@@ -5,31 +5,31 @@ import { getAllFiles } from '@agent/core/fs-utils';
 
 const rootDir = process.cwd();
 const allowedCoreFsImports = [
-  'libs/core/action-item-store.test.ts',
+  'libs/core/meeting/action-item-store.test.ts',
   'libs/core/governance/approval-rejection-reason.test.ts',
   'libs/core/governance/approval-session-runtime.test.ts',
   'libs/core/reasoning/reasoning-backend.failover-events.test.ts',
   'libs/core/reasoning/reasoning-degradation.test.ts',
   'libs/core/reasoning/reasoning-failover.test.ts',
-  'libs/core/reconcile-ops.test.ts',
-  'libs/core/review-reentry.test.ts',
+  'libs/core/daemon/reconcile-ops.test.ts',
+  'libs/core/workforce/review-reentry.test.ts',
   'libs/core/governance/audit-chain-store-bounds.test.ts',
   'libs/core/governance/audit-chain-tenant.test.ts',
   // Manifest gate: validates plugin manifests' authorizations blocks against the schema.
   'libs/core/governance/authorization-overlay.test.ts',
   // Mock-loader fixtures that read tmp-dir JSON outside the project root (secure-io denies it).
   'libs/core/governance/policy-engine.test.ts',
-  'libs/core/recovery-policy.test.ts',
+  'libs/core/pipeline/recovery-policy.test.ts',
   'libs/core/browser/browser-extension-bridge.test.ts',
   'libs/core/browser/chrome-extension-meeting-driver.test.ts',
   // TR-01: hermetic KYBERION_ROOT with a personal-tier registry fixture.
-  'libs/core/chronos-token-registry-reader.test.ts',
-  'libs/core/cli-subagent-team.e2e.test.ts',
-  'libs/core/data-vault.test.ts',
+  'libs/core/testing/chronos-token-registry-reader.test.ts',
+  'libs/core/agent/cli-subagent-team.e2e.test.ts',
+  'libs/core/storage/data-vault.test.ts',
   'libs/core/design/creative-design-resolver.test.ts',
   'libs/core/design/semantic-design-tokens.test.ts',
   'libs/core/mission/delegation-concurrency.test.ts',
-  'libs/core/deliverable-inbox.test.ts',
+  'libs/core/task/deliverable-inbox.test.ts',
   'libs/core/knowledge/distill-knowledge-injector.test.ts',
   'libs/core/surface/operator-home-summary.test.ts',
   'libs/core/surface/operator-notifications.test.ts',
@@ -40,7 +40,7 @@ const allowedCoreFsImports = [
   'libs/core/mission/mission-hygiene.test.ts',
   'libs/core/mission/mission-lifecycle-service.test.ts',
   'libs/core/pipeline/pipeline-scheduler.test.ts',
-  'libs/core/environment-capability.test.ts',
+  'libs/core/daemon/environment-capability.test.ts',
   // Source-scanning gate: enumerates admission call sites across libs/core+scripts.
   'libs/core/foundation/authorization-registry.test.ts',
   'libs/core/fs-primitives.ts',
@@ -49,24 +49,24 @@ const allowedCoreFsImports = [
   // every persona by design; owner/mode-checked raw fs on those directories only.
   'libs/core/private-host-cache.mjs',
   // Plants and inspects that private cache to prove a planted entry is never run.
-  'libs/core/local-stt-discovery.cache.test.ts',
-  'libs/core/heuristic-feedback.test.ts',
+  'libs/core/voice/local-stt-discovery.cache.test.ts',
+  'libs/core/knowledge/heuristic-feedback.test.ts',
   'libs/core/intent/intent-handoff.test.ts',
-  'libs/core/jsonl-tail.test.ts',
-  'libs/core/ledger.test.ts',
+  'libs/core/storage/jsonl-tail.test.ts',
+  'libs/core/governance/ledger.test.ts',
   'libs/core/meeting/meeting-participation-coordinator.test.ts',
-  'libs/core/metrics.test.ts',
+  'libs/core/analysis/metrics.test.ts',
   'libs/core/mission/mission-evidence-doc.test.ts',
   // AL-02 hermetic scoped-artifact tests: raw fs to seed/inspect a temp KYBERION_ROOT.
   'libs/core/workforce/artifact-store.test.ts',
   // Hermetic mission→project promotion / org digest artifact tests (temp KYBERION_ROOT).
   'libs/core/mission/mission-artifact-promotion.test.ts',
   // Hermetic owner-scope resolution tests (temp KYBERION_ROOT).
-  'libs/core/owner-scope.test.ts',
+  'libs/core/governance/owner-scope.test.ts',
   'libs/core/mission/mission-seal.test.ts',
   // D9: hermetic temp KYBERION_ROOT; raw fs seeds and inspects the fixture ledgers.
   'libs/core/mission/mission-ledger-tenant-scope.test.ts',
-  'libs/core/output-artifacts.test.ts',
+  'libs/core/workforce/output-artifacts.test.ts',
   // Linked-worktree fixture: builds synthetic .git/commondir entries so the
   // authority-store primary-root remap can be exercised hermetically.
   'libs/core/path-resolver-authority-store.test.ts',
@@ -77,20 +77,20 @@ const allowedCoreFsImports = [
   // AL-04 / NI-05 hermetic tests: raw fs to seed/inspect a temp repo root
   // (scope trees, trash, identity ledger) — secure-io is the module under
   // test's own seam, so the fixtures must bypass it.
-  'libs/core/scope-offboarding.test.ts',
-  'libs/core/nhi-lifecycle-governance.test.ts',
+  'libs/core/storage/scope-offboarding.test.ts',
+  'libs/core/agent/nhi-lifecycle-governance.test.ts',
   // Vision attachment tests plant a real PNG fixture under active/shared/tmp/
   // so the governed path/signature validators run against real disk bytes;
   // raw fs is the honest fixture seam for those test files.
   'libs/core/provider/opencode-cli-reasoning-backend.test.ts',
   'libs/core/mission/mission-phase-exit-gates.test.ts',
-  'libs/core/process-logger.test.ts',
-  'libs/core/promoted-memory.test.ts',
-  'libs/core/python-voice-bridge.test.ts',
-  'libs/core/relationship-graph-store.test.ts',
+  'libs/core/daemon/process-logger.test.ts',
+  'libs/core/knowledge/promoted-memory.test.ts',
+  'libs/core/voice/python-voice-bridge.test.ts',
+  'libs/core/organization/relationship-graph-store.test.ts',
   'libs/core/repository-path-boundary.mjs',
-  'libs/core/requirements-draft-store.test.ts',
-  'libs/core/sdlc-artifact-store.test.ts',
+  'libs/core/mission/requirements-draft-store.test.ts',
+  'libs/core/mission/sdlc-artifact-store.test.ts',
   // Fixture setup needs raw fs to create symlinks and verify 0600/0700 modes.
   'libs/core/secret/secret-bridge.test.ts',
   'libs/core/secure-io.branch.test.ts',
@@ -122,14 +122,14 @@ const allowedCoreFsImports = [
   // Catalog fixture injection falls back to the committed file for this readiness test.
   'libs/core/service/service-connection-readiness.test.ts',
   // SB-01: hermetic KYBERION_ROOT with a stimuli journal fixture.
-  'libs/core/stimuli-journal-rotation-role.test.ts',
-  'libs/core/storage-janitor.test.ts',
+  'libs/core/event/stimuli-journal-rotation-role.test.ts',
+  'libs/core/storage/storage-janitor.test.ts',
   // AL-01 catalog loader test: raw fs for temp catalog fixtures.
-  'libs/core/storage-retention-catalog.test.ts',
+  'libs/core/storage/storage-retention-catalog.test.ts',
   'libs/core/organization/tenant-registry.test.ts',
   'libs/core/tier-guard-tenant.test.ts',
-  'libs/core/trust-engine.test.ts',
-  'libs/core/validators.test.ts',
+  'libs/core/governance/trust-engine.test.ts',
+  'libs/core/foundation/validators.test.ts',
   'libs/core/workforce/worker-event-stream.test.ts',
   // Symlink/directory boundary probe fixtures: raw fs (mkdir/symlink/unlink/rm) to
   // construct a path that secure-io must reject as a traversal or type mismatch —
@@ -141,8 +141,8 @@ const allowedCoreFsImports = [
   'libs/core/workforce/artifact-review.test.ts',
   'libs/core/workforce/background-review-patch.test.ts',
   'libs/core/browser/browser-extension-bridge.observation-boundary.test.ts',
-  'libs/core/customer-channel-binding.test.ts',
-  'libs/core/history-search-index.test.ts',
+  'libs/core/organization/customer-channel-binding.test.ts',
+  'libs/core/search/history-search-index.test.ts',
   'libs/core/intent/intent-reconciliation.test.ts',
   'libs/core/intent/intent-track-resolver.test.ts',
   'libs/core/mission/mission-context-pack.test.ts',
@@ -166,11 +166,11 @@ const allowedCoreFsImports = [
   // fixture setup and real-schema reads inside the mock factory must use raw
   // fs rather than the API under test / mock.
   'libs/core/agent/agent-collaboration-projection.test.ts',
-  'libs/core/baseline-check-cache.test.ts',
+  'libs/core/daemon/baseline-check-cache.test.ts',
   'libs/core/knowledge/knowledge-scope-health-history.test.ts',
   'libs/core/reasoning/model-performance-index.test.ts',
   'libs/core/knowledge/procedure-self-repair.test.ts',
-  'libs/core/promotion-candidates.test.ts',
+  'libs/core/pipeline/promotion-candidates.test.ts',
   'libs/core/provider/provider-discovery.test.ts',
   'libs/core/provider/provider-egress-gate.test.ts',
   // Not an in-process fs import: `dist/.session-build-head` lands under

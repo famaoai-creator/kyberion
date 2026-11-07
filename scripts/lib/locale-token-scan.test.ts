@@ -44,7 +44,9 @@ describe('scanFileForLocaleTokens', () => {
         scan("export const x = 'ja-JP';", 'libs/core/foundation/locale-normalize.ts').counts
           .locale_literal
       ).toBe(0);
-      expect(scan("if (locale === 'ja') {}", 'libs/core/locale.ts').counts.locale_compare).toBe(0);
+      expect(
+        scan("if (locale === 'ja') {}", 'libs/core/localization/locale.ts').counts.locale_compare
+      ).toBe(0);
     });
 
     it('does not flag a tag passed straight to a formatting API (machine-stable output)', () => {

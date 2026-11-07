@@ -7,7 +7,7 @@ import {
   loadRegistryDirectory,
   resolveRegistryDirectory,
   type RegistryDirectoryOptions,
-} from '../registry-directory.js';
+} from '../foundation/registry-directory.js';
 import {
   assertSafeRepositoryPath,
   safeExecResult,

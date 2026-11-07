@@ -22,7 +22,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { logger } from '../core.js';
 import { buildSafeExecEnv, safeExec } from '../secure-io.js';
 import { resolveFfmpegBin } from '../tool/tool-binary-resolvers.js';
-import { registerEnvironmentCapabilityProbe } from '../environment-capability.js';
+import { registerEnvironmentCapabilityProbe } from '../daemon/environment-capability.js';
 import type { AudioBus, AudioBusProbe } from './audio-bus.js';
 import type { AudioChunk, AudioFormat } from '../meeting/meeting-session-types.js';
 import { BoundedAudioQueue, DEFAULT_AUDIO_BUFFER_POLICY } from './bounded-audio-queue.js';

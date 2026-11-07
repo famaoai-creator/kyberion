@@ -89,7 +89,7 @@ export function nextChronosLocale(locale: SupportedLocale): SupportedLocale {
 }
 
 /**
- * I18N-01: the browser-safe subset of `libs/core/locale.ts`'s
+ * I18N-01: the browser-safe subset of `libs/core/localization/locale.ts`'s
  * `resolveLocale` precedence chain — steps 2 (surface preference, here the
  * localStorage-persisted header-toggle choice), 5 (`navigator.language`),
  * and 6 (catalog `default_locale`). Steps 1 (explicit arg), 3 (onboarding

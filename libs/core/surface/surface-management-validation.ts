@@ -1,5 +1,5 @@
 /** Domain validation for the bounded management command contract. */
-import { humanActor } from '../actor.js';
+import { humanActor } from '../contracts/actor.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { assertOrganizationId } from '../organization/organization-operating-model-persistence.js';
 import { assertManagedProjectId } from '../project/project-management.js';

@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { getAllFiles } from '../fs-utils.js';
+import { getAllFiles } from '../storage/fs-utils.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
 

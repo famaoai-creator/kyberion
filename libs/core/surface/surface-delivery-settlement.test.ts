@@ -14,7 +14,7 @@ vi.mock('./surface-coordination-store.js', () => ({
   markSurfaceDeadTarget: mocks.markSurfaceDeadTarget,
   updateSurfaceOutboxMessage: mocks.updateSurfaceOutboxMessage,
 }));
-vi.mock('../ops-alert.js', () => ({ sendOpsAlert: mocks.sendOpsAlert }));
+vi.mock('../daemon/ops-alert.js', () => ({ sendOpsAlert: mocks.sendOpsAlert }));
 
 import {
   assertSurfaceOutboxDeliveryAuthorized,

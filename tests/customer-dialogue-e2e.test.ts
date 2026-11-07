@@ -82,7 +82,7 @@ vi.mock('../libs/core/reasoning/reasoning-backend.js', () => ({
 }));
 
 const opsAlerts = vi.hoisted(() => vi.fn());
-vi.mock('../libs/core/ops-alert.js', () => ({ sendOpsAlert: opsAlerts }));
+vi.mock('../libs/core/daemon/ops-alert.js', () => ({ sendOpsAlert: opsAlerts }));
 
 const gate = vi.hoisted(() => vi.fn());
 vi.mock('../libs/core/governance/approval-gate.js', () => ({ enforceApprovalGate: gate }));
@@ -103,10 +103,10 @@ const SLUG = 'e2e06-fixture-tenant';
 const CHANNEL = 'C_E2E06_FIXTURE';
 
 let tmpRoot: string;
-let core: typeof import('../libs/core/customer-conversation.js') &
-  typeof import('../libs/core/customer-channel-binding.js') &
-  typeof import('../libs/core/deal-store.js') &
-  typeof import('../libs/core/deal-documents.js');
+let core: typeof import('../libs/core/organization/customer-conversation.js') &
+  typeof import('../libs/core/organization/customer-channel-binding.js') &
+  typeof import('../libs/core/organization/deal-store.js') &
+  typeof import('../libs/core/organization/deal-documents.js');
 
 describe('customer dialogue (E2E-06)', () => {
   beforeAll(async () => {
@@ -345,10 +345,10 @@ describe('customer dialogue (E2E-06)', () => {
       '# 契約書 {{DATE}}\n範囲:\n{{SCOPE}}\n金額: {{AMOUNT}} {{CURRENCY}}\n検収: {{SUCCESS_CONDITION}}\n見積: {{QUOTE_REF}}\n'
     );
 
-    const conversation = await import('../libs/core/customer-conversation.js');
-    const bindingMod = await import('../libs/core/customer-channel-binding.js');
-    const dealMod = await import('../libs/core/deal-store.js');
-    const docsMod = await import('../libs/core/deal-documents.js');
+    const conversation = await import('../libs/core/organization/customer-conversation.js');
+    const bindingMod = await import('../libs/core/organization/customer-channel-binding.js');
+    const dealMod = await import('../libs/core/organization/deal-store.js');
+    const docsMod = await import('../libs/core/organization/deal-documents.js');
     core = { ...conversation, ...bindingMod, ...dealMod, ...docsMod } as typeof core;
   });
 
@@ -711,7 +711,7 @@ describe('customer dialogue (E2E-06)', () => {
     });
 
     // the discovery hearing captured structured requirements on the deal
-    const modes = await import('../libs/core/customer-conversation-modes.js');
+    const modes = await import('../libs/core/organization/customer-conversation-modes.js');
     modes.saveDealRequirementsCapture({
       tenantSlug: SLUG,
       dealId: deal.deal_id,
@@ -737,7 +737,7 @@ describe('customer dialogue (E2E-06)', () => {
 
     // hearing requirements survive the deal boundary into the mission draft
     expect(handoff.requirements_draft_version).toBe('v1');
-    const draftStore = await import('../libs/core/requirements-draft-store.js');
+    const draftStore = await import('../libs/core/mission/requirements-draft-store.js');
     const draft = draftStore.readRequirementsDraft('MSN-DEAL-1');
     expect(draft?.functional_requirements[0]?.id).toBe('FR-SEARCH-1');
     expect(draft?.elicitation_source?.refs).toContain(`deal:${deal.deal_id}`);
@@ -783,7 +783,7 @@ describe('customer dialogue (E2E-06)', () => {
   });
 
   it('discovery stage switches to requirements-hearing mode and captures a structured draft', async () => {
-    const modes = await import('../libs/core/customer-conversation-modes.js');
+    const modes = await import('../libs/core/organization/customer-conversation-modes.js');
     backendPrompt.mockResolvedValue('承知しました。まず成功条件を伺えますか?');
     backendExtractRequirements.mockResolvedValue({
       functional_requirements: [
@@ -860,7 +860,7 @@ describe('customer dialogue (E2E-06)', () => {
   });
 
   it('ingests a call recording into the deal requirements draft via the STT bridge', async () => {
-    const modes = await import('../libs/core/customer-conversation-modes.js');
+    const modes = await import('../libs/core/organization/customer-conversation-modes.js');
     const stt = await import('../libs/core/voice/speech-to-text-bridge.js');
     stt.registerSpeechToTextBridge({
       name: 'test-stt',

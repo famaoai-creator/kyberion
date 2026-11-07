@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { agentActor } from '../actor.js';
+import { agentActor } from '../contracts/actor.js';
 import type { Charter, CharterAction, CharterDecision } from './accountability-charter.js';
 
 vi.mock('./approval-policy.js', () => ({ resolveApprovalPolicy: vi.fn() }));

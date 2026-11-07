@@ -28,7 +28,7 @@ export type { ExternalOperationGrant } from './external-operation-target.js';
  * `accountability-charter-registry.ts`.
  */
 
-import { parseActorRef, type ActorRef } from '../actor.js';
+import { parseActorRef, type ActorRef } from '../contracts/actor.js';
 
 // ---------------------------------------------------------------------------
 // Model

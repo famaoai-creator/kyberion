@@ -461,7 +461,7 @@ describe('mission retrospective loop', () => {
       expect(mod.collectMissionExecutionStats(MISSION).usage_unrecorded).toBe(false);
 
       completeTasks();
-      const { MetricsCollector } = await import('../metrics.js');
+      const { MetricsCollector } = await import('../analysis/metrics.js');
       const { recordDirectCliTaskUsage } = await import('./mission-direct-cli-usage.js');
       const [entry] = recordDirectCliTaskUsage({
         missionId: MISSION,
@@ -497,7 +497,7 @@ describe('mission retrospective loop', () => {
         statePath,
         JSON.stringify({ ...state, tier: 'confidential', tenant_slug: 'tenant-a' })
       );
-      const { MetricsCollector } = await import('../metrics.js');
+      const { MetricsCollector } = await import('../analysis/metrics.js');
       const { recordDirectCliTaskUsage } = await import('./mission-direct-cli-usage.js');
       for (const [taskId, tenant] of [
         ['T-1', 'tenant-a'],
@@ -544,7 +544,7 @@ describe('mission retrospective loop', () => {
         statePath,
         JSON.stringify({ ...state, tier: 'confidential', tenant_slug: 'tenant-a' })
       );
-      const { MetricsCollector } = await import('../metrics.js');
+      const { MetricsCollector } = await import('../analysis/metrics.js');
       const collector = new MetricsCollector();
       const call = (tokens: number, scope?: { tier: 'confidential'; tenant_slug: string }) =>
         collector.record('anthropic-sdk', 1, 'success', {

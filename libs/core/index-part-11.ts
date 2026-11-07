@@ -10,9 +10,14 @@ export {
 
 // QM-09: gap-phase latency attribution for LLM delegations.
 
-export type { BaseGapPhase, GapPhaseSample, GapRecorder } from './gap-phase.js';
+export type { BaseGapPhase, GapPhaseSample, GapRecorder } from './analysis/gap-phase.js';
 
-export { GAP_PHASES, isKnownGapPhase, createGapRecorder, sanitizeGapSamples } from './gap-phase.js';
+export {
+  GAP_PHASES,
+  isKnownGapPhase,
+  createGapRecorder,
+  sanitizeGapSamples,
+} from './analysis/gap-phase.js';
 
 // QM-03: memory notebook line grammar — the single source of truth for
 // bullet-notebook memory (`- (YYYY-MM-DD) fact`), fold, and consolidation.
@@ -52,7 +57,7 @@ export {
   exerciseJsonRecordStoreContract,
   type JsonRecordStoreContractAdapter,
   type JsonRecordStoreContractResult,
-} from './store-contract.js';
+} from './testing/store-contract.js';
 
 // Software QA lifecycle (QA-01)
 
@@ -69,21 +74,21 @@ export type {
   TestExecutionRecord,
   DefectCandidate,
   SoftwareQualityReportSummary,
-} from './software-quality.js';
+} from './testing/software-quality.js';
 
-export * from './software-quality-operations.js';
+export * from './testing/software-quality-operations.js';
 
-export * from './software-quality-report-reader.js';
+export * from './testing/software-quality-report-reader.js';
 
-export * from './source-analysis.js';
+export * from './analysis/source-analysis.js';
 
 export * from './agent/agentic-source-review.js';
 
 export * from './agent/agentic-source-review-verification.js';
 
-export * from './windows-local-assist-bridge.js';
+export * from './provider/windows-local-assist-bridge.js';
 
-export * from './windows-native-image-recognition-bridge.js';
+export * from './ocr/windows-native-image-recognition-bridge.js';
 
 export * from './media/image-description-types.js';
 
@@ -101,7 +106,7 @@ export {
   parseTestExecutionRecord,
   createDefectCandidates,
   buildSoftwareQualityReport,
-} from './software-quality.js';
+} from './testing/software-quality.js';
 
 export * from './mission/delegation-notifications.js';
 
@@ -156,7 +161,7 @@ export * from './dot/dot-proposals.js';
 export * from './dot/dot-dispatch.js';
 export * from './dot/dot-feedback.js';
 export * from './dot/dot-state-paths.js';
-export * from './key-result-spec.js';
+export * from './organization/key-result-spec.js';
 export * from './dot/dot-extensions.js';
 export * from './dot/dot-extension-registry.js';
 export * from './dot/dot-extension-bootstrap.js';
@@ -175,7 +180,7 @@ export * from './ingress/public-ingress-contract.js';
 export * from './ingress/public-ingress-seam.js';
 export * from './ingress/public-ingress-provider-registry.js';
 export * from './ingress/public-ingress-service.js';
-export * from './agent-execution-context.js';
+export * from './agent/agent-execution-context.js';
 
 // Learning-signal adapter: one path from runtime logs into the improvement loop.
 export { builtinLearningSignalSources } from './knowledge/learning-signal-sources.js';
@@ -201,9 +206,9 @@ export {
   type OpsHealthFinding,
   type OpsHealthInput,
   type OpsHealthReport,
-} from './ops-health.js';
+} from './daemon/ops-health.js';
 export {
   readBackupDrillReceipt,
   writeBackupDrillReceipt,
   recordDaemonStart,
-} from './ops-health-state.js';
+} from './daemon/ops-health-state.js';

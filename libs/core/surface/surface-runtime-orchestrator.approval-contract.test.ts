@@ -38,7 +38,7 @@ vi.mock('../intent/intent-contract.js', () => ({
   isSimpleGreetingText: () => false,
 }));
 
-vi.mock('../router-contract.js', () => ({
+vi.mock('../intent/router-contract.js', () => ({
   resolveSurfaceIntent: mocks.resolveSurfaceIntent,
   resolveDirectIntentCommand: () => null,
 }));
@@ -56,9 +56,9 @@ vi.mock('./surface-runtime-router.js', async () => {
   };
 });
 
-vi.mock('../execution-feedback.js', async () => {
-  const actual = await vi.importActual<typeof import('../execution-feedback.js')>(
-    '../execution-feedback.js'
+vi.mock('../knowledge/execution-feedback.js', async () => {
+  const actual = await vi.importActual<typeof import('../knowledge/execution-feedback.js')>(
+    '../knowledge/execution-feedback.js'
   );
   return {
     ...actual,

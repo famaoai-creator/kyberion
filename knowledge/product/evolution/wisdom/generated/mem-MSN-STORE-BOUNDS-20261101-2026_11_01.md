@@ -30,9 +30,9 @@ mission
 
 Rules (these supersede the earlier "writes stop at a hard cap below the read window" rule):
 
-- A runtime store's size must never make a read or an append fail. Choose the reader by purpose with libs/core/jsonl-read.ts: last record = readLastJsonLine, recent window = readJsonLinesBackward / readJsonLinesSince to a time cutoff, full history = streamJsonLines (constant memory). Size caps belong only on untrusted input (attachments, uploads).
+- A runtime store's size must never make a read or an append fail. Choose the reader by purpose with libs/core/storage/jsonl-read.ts: last record = readLastJsonLine, recent window = readJsonLinesBackward / readJsonLinesSince to a time cutoff, full history = streamJsonLines (constant memory). Size caps belong only on untrusted input (attachments, uploads).
 - A chunked reader must be pinned to one inode for the whole scan (secure-io openSafeRangeReader); per-chunk path reads tear or truncate when inline rotation/compaction renames the file.
-- Retention is owned by the store and runs at write time through libs/core/append-only-store.ts (rotate / compactStoreByKey / retainWindow / maintainStoreAfterAppend, which never throws and backs off by doubling, including after failures). The janitor uses the same code.
+- Retention is owned by the store and runs at write time through libs/core/storage/append-only-store.ts (rotate / compactStoreByKey / retainWindow / maintainStoreAfterAppend, which never throws and backs off by doubling, including after failures). The janitor uses the same code.
 - Removing a cap changes who else acts on the store: a catalog `rotate` entry plus the janitor's 8MiB default would have rotated the uncapped trigger journal and dropped its dedupe window. A store whose correctness depends on history is marked `self_managed: true` in storage-retention-catalog.json — the janitor only expires its segments.
 - Rotation of a history-bearing store moves only the dropped records to the segment (segment + live = old content), frees a size-proportional amount, records backoff in finally, and cleans orphaned temps under the lock — never re-copy the whole store on every attempt.
 - Compaction passes must index exact byte lengths per pass and copy late bytes verbatim; keep staging copies only when data is not otherwise intact; fall back when hard links are unsupported.

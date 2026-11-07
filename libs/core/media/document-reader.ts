@@ -38,7 +38,7 @@ import {
   rasterizePdfPages,
   rasterizeVectorImage,
   VECTOR_IMAGE_EXTENSIONS,
-} from '../visual-raster.js';
+} from './visual-raster.js';
 import { extractPptxSlides, type ExtractedSlide } from './native-pptx-engine/engine.js';
 import { distillPdfDesign, selectPdfOcrImages } from './pdf-utils.js';
 import { distillDocxDesign } from './docx-utils.js';

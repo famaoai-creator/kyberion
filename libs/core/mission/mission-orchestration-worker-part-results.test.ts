@@ -4,7 +4,7 @@ import {
   obtainBestOfProvidersJudgeVerdict,
   parseBestOfJudgeVerdict,
 } from './mission-orchestration-worker-part-results.js';
-import { runBestOfProviders, type BestOfProviderBackend } from '../best-of-providers.js';
+import { runBestOfProviders, type BestOfProviderBackend } from '../provider/best-of-providers.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeRmSync } from '../secure-io.js';
 

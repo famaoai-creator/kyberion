@@ -48,7 +48,7 @@ const ACTUATOR = path.join(ROOT, 'dist/libs/actuators/terminal-actuator/src/inde
 const TS_LOADER = path.join(ROOT, 'scripts/ts-loader.mjs');
 const SELF = path.join(ROOT, 'scripts/terminal_session_cli.ts');
 
-// Must equal ACTUATOR_SERVE_RESULT_PREFIX in libs/core/cli-utils.ts; the
+// Must equal ACTUATOR_SERVE_RESULT_PREFIX in libs/core/harnessing/cli-utils.ts; the
 // constant is duplicated here so the framing stays stable for the daemon's
 // raw stdout reader, and scripts/terminal_session_cli.test.ts asserts the
 // two stay in sync.

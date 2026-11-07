@@ -27,7 +27,7 @@ let precedents: typeof import('../organization/judgment-precedents.js');
 let evidence: typeof import('../organization/judgment-evidence.js');
 let proposals: typeof import('./dot-proposals.js');
 let feedback: typeof import('./dot-feedback.js');
-let events: typeof import('../event-scope.js');
+let events: typeof import('../event/event-scope.js');
 let foundation: typeof import('../foundation/io.js');
 let serial = 0;
 let policyVersion: string;
@@ -98,7 +98,7 @@ beforeAll(async () => {
   evidence = await import('../organization/judgment-evidence.js');
   proposals = await import('./dot-proposals.js');
   feedback = await import('./dot-feedback.js');
-  events = await import('../event-scope.js');
+  events = await import('../event/event-scope.js');
   foundation = await import('../foundation/io.js');
 });
 afterEach(() => {

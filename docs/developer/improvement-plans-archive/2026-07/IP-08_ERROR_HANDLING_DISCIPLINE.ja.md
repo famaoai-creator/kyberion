@@ -75,7 +75,7 @@ status: archived
 ## 実装状況 追記 (2026-07-12)
 
 - **再突合**: Task 1 は概ね解消済みを確認 — secure-io の fail-open は SA-05 で fail-closed 化(本 IP の「警告して通す」を超える処置)、run_baseline_check は parse 失敗警告 + `config_degraded` フラグ実装済み、run_super_pipeline の main catch も実装メモどおり処置済み。voice-hub の浮遊 Promise(Task 6.1)も全 `.then` チェーンに `.catch` 付与済みを確認。
-- **Task 6.2 完了(今回)**: `libs/core/process-guards.ts` を新設(`installProcessGuards(name)` — unhandledRejection / uncaughtException を記録、プロセスは落とさない・冪等)。**9つの長寿命プロセス**へ配線: voice-hub / slack・discord・imessage・telegram の4ブリッジ / terminal-bridge / presence-studio / nexus-daemon / agent-runtime-supervisor daemon。テスト2本。
+- **Task 6.2 完了(今回)**: `libs/core/daemon/process-guards.ts` を新設(`installProcessGuards(name)` — unhandledRejection / uncaughtException を記録、プロセスは落とさない・冪等)。**9つの長寿命プロセス**へ配線: voice-hub / slack・discord・imessage・telegram の4ブリッジ / terminal-bridge / presence-studio / nexus-daemon / agent-runtime-supervisor daemon。テスト2本。
 - 残: 空 catch 137 箇所の triage 台帳(Task 2/3)と console→logger 移行(Task 4)、process.exit 除去(Task 5)— いずれも機械的横展開のため別スライス。
 
 ## 空 catch triage 台帳(2026-07-12, Task 2 成果物)
@@ -85,7 +85,7 @@ status: archived
 
 - 分類は文脈キーワードによる一次判定。(c) 13箇所は 2026-07-12 に全件実地レビュー済み — 実バグは tier-guard の破損ポリシー fail-open 1件のみ(#519 で fail-closed 化)、残りは fail-closed / best-effort を確認。
 - 処置の横展開: **分類 (b) 49箇所は 2026-07-12 に全件 logger.warn 付与済み**(制御フロー不変、握りつぶし内容の可視化のみ)。残るは (a) への理由コメント付与(任意)。
-- (c) の代表例: `libs/core/secret/secret-guard.ts`(5箇所)、`libs/core/tier-guard.ts`(3箇所)、`libs/core/trust-engine.ts`。これらは「ガード失敗を握りつぶして許可側に倒れていないか」の観点で個別レビューする。
+- (c) の代表例: `libs/core/secret/secret-guard.ts`(5箇所)、`libs/core/tier-guard.ts`(3箇所)、`libs/core/governance/trust-engine.ts`。これらは「ガード失敗を握りつぶして許可側に倒れていないか」の観点で個別レビューする。
 
 | ファイル                                                            | 行   | 分類 | 処置                                                                                       |
 | ------------------------------------------------------------------- | ---- | ---- | ------------------------------------------------------------------------------------------ |
@@ -116,15 +116,15 @@ status: archived
 | `libs/core/integrations/email-workflow.ts`                          | 161  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
 | `libs/core/integrations/email-workflow.ts`                          | 171  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
 | `libs/core/integrations/email-workflow.ts`                          | 628  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
-| `libs/core/fs-utils.ts`                                             | 38   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
-| `libs/core/fs-utils.ts`                                             | 75   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
-| `libs/core/metrics.ts`                                              | 527  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
-| `libs/core/nerve-bridge.ts`                                         | 63   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
-| `libs/core/nerve-bridge.ts`                                         | 96   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/storage/fs-utils.ts`                                     | 38   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/storage/fs-utils.ts`                                     | 75   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/analysis/metrics.ts`                                     | 527  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/ingress/nerve-bridge.ts`                                 | 63   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/ingress/nerve-bridge.ts`                                 | 96   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
 | `libs/core/network.ts`                                              | 26   | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
-| `libs/core/oauth-session-store.ts`                                  | 51   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
-| `libs/core/oauth-session-store.ts`                                  | 96   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
-| `libs/core/oauth-session-store.ts`                                  | 99   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/authn/oauth-session-store.ts`                            | 51   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/authn/oauth-session-store.ts`                            | 96   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/authn/oauth-session-store.ts`                            | 99   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
 | `libs/core/mesh/peer-conversation.test.ts`                          | 25   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
 | `libs/core/mesh/peer-messaging.test.ts`                             | 37   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
 | `libs/core/secret/secret-guard.ts`                                  | 74   | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
@@ -136,7 +136,7 @@ status: archived
 | `libs/core/secure-io.ts`                                            | 262  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
 | `libs/core/secure-io.ts`                                            | 445  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
 | `libs/core/secure-io.ts`                                            | 448  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
-| `libs/core/sensory-memory.ts`                                       | 30   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/event/sensory-memory.ts`                                 | 30   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
 | `libs/core/service/service-engine-execution.ts`                     | 63   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
 | `libs/core/service/service-engine-execution.ts`                     | 101  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
 | `libs/core/service/service-engine-helpers.ts`                       | 38   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
@@ -149,12 +149,12 @@ status: archived
 | `libs/core/tier-guard.ts`                                           | 45   | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
 | `libs/core/tier-guard.ts`                                           | 531  | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
 | `libs/core/tier-guard.ts`                                           | 547  | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
-| `libs/core/trust-engine.ts`                                         | 231  | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
-| `libs/core/trust-engine.ts`                                         | 252  | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
-| `libs/core/unclassified-error-registry.ts`                          | 104  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/governance/trust-engine.ts`                              | 231  | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
+| `libs/core/governance/trust-engine.ts`                              | 252  | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
+| `libs/core/daemon/unclassified-error-registry.ts`                   | 104  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
 | `libs/core/unhandled-intent-registry.ts`                            | 135  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
-| `libs/core/untrusted-content.test.ts`                               | 30   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
-| `libs/core/untrusted-content.test.ts`                               | 51   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/governance/untrusted-content.test.ts`                    | 30   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/governance/untrusted-content.test.ts`                    | 51   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
 | `libs/shared-network/src/mcp-client-engine.ts`                      | 68   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
 | `presence/bridge/nexus-daemon.ts`                                   | 200  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
 | `presence/bridge/terminal/server.ts`                                | 196  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
@@ -193,7 +193,7 @@ libs/ の console.\* 95箇所(計画時115から他改修で減少)のうち、*
 | `libs/core/core.ts`(logger 実装内 2)                                                                                                 | 2    | logger 自体の出口(console.error/log がログの実体)                  |
 | `libs/core/doctor_core.ts`                                                                                                           | 22   | doctor 系の対話出力(計画で除外可と明記)                            |
 | `libs/core/plugin/skill-wrapper.ts`                                                                                                  | 9    | スキル実行結果の CLI 出力(stdout が結果面)                         |
-| `libs/core/cli-utils.ts`                                                                                                             | 5    | CLI ハーネス(printResult の stdout / ユーザー向け stderr)          |
+| `libs/core/harnessing/cli-utils.ts`                                                                                                  | 5    | CLI ハーネス(printResult の stdout / ユーザー向け stderr)          |
 | `libs/core/test-utils.ts`                                                                                                            | 4    | ミニテストハーネスの結果出力                                       |
 | `libs/shared-vision/src/vision-judge.ts`                                                                                             | 6    | readline 対話 UI(tie-break プロンプト)                             |
 | `libs/core/video/video-composition-compiler.ts`                                                                                      | 4    | ブラウザ/iframe 実行文脈に埋め込まれるコード断片(node logger 不在) |

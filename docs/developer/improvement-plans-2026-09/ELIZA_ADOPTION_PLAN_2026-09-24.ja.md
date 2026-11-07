@@ -86,7 +86,7 @@ env: `KYBERION_VOICE_BARGE_IN_MODE`(off|legacy|two_stage)、`KYBERION_VOICE_SPEC
 
 - op 受付の観測点: `libs/core/pipeline/op-preflight.ts` の listener / guard(呼び出し元 `adf-engine.ts:398`、`pipeline-execution-part-control.ts:472`)。
 - op dispatch: `pipeline-execution-part-control.ts:665` `resolveActuatorOperation` → `pipeline-execution-part-bootstrap.ts:605` `loadActuatorDispatch`。
-- 承認: `libs/core/risky-op-approval-port.ts` の sole seam `risky-approval-handler`。
+- 承認: `libs/core/governance/risky-op-approval-port.ts` の sole seam `risky-approval-handler`。
 - reasoning: `registerReasoningBackend`。stub-taint(LC-07)あり。
 - 時計の注入点は無い(`foundation/time.ts` の `nowIso` のみ)。secure-io に書き込み observer は無い。
 

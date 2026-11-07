@@ -47,9 +47,9 @@ import {
   type ReasoningBackend,
   type ReasoningCallOptions,
 } from '../reasoning/reasoning-backend.js';
-import { parseStructuredJson } from '../structured-reasoning.js';
+import { parseStructuredJson } from '../reasoning/structured-reasoning.js';
 import { logger } from '../core.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
 import { recordKnowledgeDelivery } from '../knowledge/knowledge-feedback-loop.js';
 import {

@@ -5,7 +5,7 @@ import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 
 const profileRoot = vi.hoisted(() => ({ value: '' }));
 
-vi.mock('../profile-root.js', () => ({
+vi.mock('../authn/profile-root.js', () => ({
   resolveActiveProfileRoot: () => profileRoot.value,
 }));
 

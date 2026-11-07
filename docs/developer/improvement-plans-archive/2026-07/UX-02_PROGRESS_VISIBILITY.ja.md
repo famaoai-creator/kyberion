@@ -67,7 +67,7 @@ OPERATOR_UX_GUIDE は「何が起きているかを見せる」ことを核の�
 
 ## 実装メモ
 
-- 2026-07-04: `libs/core/ux-vocabulary.ts` に progress 状態を追加し、`surface-interaction-model.ts` の既定進捗通知を vocabulary 経由に切り替えた。`locale` を `SurfaceSpaceContext` に持たせることで、`ja` では `処理中 / 完了 / 失敗` が出ることを `surface-interaction-model.test.ts` で固定した。
+- 2026-07-04: `libs/core/localization/ux-vocabulary.ts` に progress 状態を追加し、`surface-interaction-model.ts` の既定進捗通知を vocabulary 経由に切り替えた。`locale` を `SurfaceSpaceContext` に持たせることで、`ja` では `処理中 / 完了 / 失敗` が出ることを `surface-interaction-model.test.ts` で固定した。
 - 2026-07-11: pipeline 完了ログが `results.length + 1` により `[step 2/1]` となる回帰を修正。開始時の step number を完了ログまで固定し、logger capture test と baseline-check 実走で検証する。
 - 2026-07-11: chronos `SovereignChat` に AbortController によるキャンセルと経過時間ベースのフェーズ表示(送信中→思考中→長時間経過)を追加。文言は `user-facing-vocabulary.json` の `chronos_chat_cancel` / `chronos_chat_phase_*` キー経由で ja/en を解決する。
 

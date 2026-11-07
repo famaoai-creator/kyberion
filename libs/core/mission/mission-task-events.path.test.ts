@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const resolveMissionDir = vi.hoisted(() => vi.fn());
 
-vi.mock('../owner-scope.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../owner-scope.js')>()),
+vi.mock('../governance/owner-scope.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../governance/owner-scope.js')>()),
   resolveMissionDir,
 }));
 

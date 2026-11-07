@@ -19,7 +19,7 @@ import {
   resolveCapabilityBundleForIntent,
   summarizeRelevantCapabilityBundlesForIntentIds,
   summarizeRelevantCapabilityBundlesForIntentIdsCompact,
-} from '../capability-bundle-registry.js';
+} from '../plugin/capability-bundle-registry.js';
 import {
   resolveExecutionProfileForIntent,
   summarizeRelevantExecutionProfilesForIntentIds,
@@ -59,8 +59,8 @@ import {
   buildFallbackExecutionBrief,
   normalizeExecutionBrief,
   type ExecutionBriefSeed,
-} from '../execution-brief.js';
-import { resolveQuestionInteractionPacket } from '../question-resolver.js';
+} from './execution-brief.js';
+import { resolveQuestionInteractionPacket } from './question-resolver.js';
 import {
   normalizeExecutionShape,
   projectExecutionShapeToWorkflowShape,

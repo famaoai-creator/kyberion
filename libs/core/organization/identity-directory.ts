@@ -5,7 +5,7 @@ import {
   type AgentIdentityRecord,
 } from '../agent/agent-identity.js';
 import { listMemberIds, readMemberProfile, type MemberProfile } from './member-registry.js';
-import { listOrphanNhiIdentities } from '../nhi-lifecycle-governance.js';
+import { listOrphanNhiIdentities } from '../agent/nhi-lifecycle-governance.js';
 import {
   readOrganizationResponsibilityForActor,
   type OrganizationParticipantRecord,

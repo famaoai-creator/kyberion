@@ -138,7 +138,7 @@ describe('mission ledger scope (D9)', () => {
   });
 
   it('creates the audit chain key as the tenant ledger store role (first write is a tenant record)', async () => {
-    const ledger = await import('../ledger.js');
+    const ledger = await import('../governance/ledger.js');
     const keyFile = path.join(tmpRoot, 'active/shared/runtime/audit/chain-key');
     expect(fs.existsSync(keyFile)).toBe(false);
     const hash = ledger.record('KEY_FIRST', {
@@ -159,7 +159,7 @@ describe('mission ledger scope (D9)', () => {
     const { createMission, startMission } = await import('./mission-creation.js');
     const { finishMission } = await import('./mission-lifecycle.js');
     const { transitionStatus } = await import('./mission-status.js');
-    const ledger = await import('../ledger.js');
+    const ledger = await import('../governance/ledger.js');
     const pathResolver = await import('../path-resolver.js');
     expect(pathResolver.rootDir()).toBe(tmpRoot);
 
@@ -276,7 +276,7 @@ describe('mission ledger scope (D9)', () => {
   }, 120_000);
 
   it('a process bound to another tenant may neither verify nor read the partition', async () => {
-    const ledger = await import('../ledger.js');
+    const ledger = await import('../governance/ledger.js');
     const { withExecutionContext } = await import('../authority.js');
     const bound = withExecutionContext(
       'mission_controller',
@@ -329,7 +329,7 @@ describe('mission ledger scope (D9)', () => {
   });
 
   it('a tenant binding mismatch never throws and never half-writes into another scope', async () => {
-    const ledger = await import('../ledger.js');
+    const ledger = await import('../governance/ledger.js');
     const pathResolver = await import('../path-resolver.js');
     const { withExecutionContext } = await import('../authority.js');
     const publicDir = pathResolver.findMissionPath(PUBLIC_MISSION) as string;
@@ -363,7 +363,7 @@ describe('mission ledger scope (D9)', () => {
   });
 
   it("the mission's location wins over a disagreeing state (tenant or tier)", async () => {
-    const ledger = await import('../ledger.js');
+    const ledger = await import('../governance/ledger.js');
     const tenantFile = ledger.tenantLedgerPath('confidential', TENANT);
     const seed = (id: string, state: Record<string, unknown>) => {
       const dir = path.join(tmpRoot, 'active/missions/confidential', TENANT, id);
@@ -395,7 +395,7 @@ describe('mission ledger scope (D9)', () => {
 
   it('a public-tier tenant mission is stored under a protected tier, keeping its public scope', async () => {
     const { createMission } = await import('./mission-creation.js');
-    const ledger = await import('../ledger.js');
+    const ledger = await import('../governance/ledger.js');
     const id = `MSN-LEDGER-PUBTEN-${suffix}`;
     await createMission({ id, tier: 'public', tenantSlug: TENANT, rootDir: tmpRoot });
 
@@ -454,7 +454,7 @@ describe('mission ledger scope (D9)', () => {
   }, 60_000);
 
   it('routes an archived tenant mission to its tenant; an unknown id stays a system record', async () => {
-    const ledger = await import('../ledger.js');
+    const ledger = await import('../governance/ledger.js');
     ledger.record('LATE_EVENT', { mission_id: TENANT_MISSION, note: 'after archive' });
     const late = readLines(ledger.tenantLedgerPath('confidential', TENANT)).find(
       (line) => line.type === 'LATE_EVENT'
@@ -502,7 +502,7 @@ describe('mission ledger scope (D9)', () => {
   });
 
   it('refuses to fork a chain whose tail cannot be parsed', async () => {
-    const ledger = await import('../ledger.js');
+    const ledger = await import('../governance/ledger.js');
     const file = ledger.tenantLedgerPath('confidential', 'ledger-keyfirst');
     const original = fs.readFileSync(file, 'utf8');
     try {
@@ -516,7 +516,7 @@ describe('mission ledger scope (D9)', () => {
   });
 
   it('detects tampering in a tenant partition', async () => {
-    const ledger = await import('../ledger.js');
+    const ledger = await import('../governance/ledger.js');
     const file = ledger.tenantLedgerPath('confidential', TENANT);
     const original = fs.readFileSync(file, 'utf8');
     try {

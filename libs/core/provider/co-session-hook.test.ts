@@ -22,7 +22,7 @@ import {
   createCoSessionHandoff,
   setCoSessionNamespace,
   startCoSession,
-} from '../co-session.js';
+} from '../workforce/co-session.js';
 import {
   coSessionHookDrain,
   coSessionHookEnd,
@@ -144,21 +144,21 @@ describe('coSessionHookLeaseGate', () => {
     acquireCoSessionLease({
       session_id: 'cos-hook-4',
       provider: 'claude',
-      path: 'libs/core/co-session.ts',
+      path: 'libs/core/workforce/co-session.ts',
       participant_id: 'claude-owner',
     });
 
     const denied = coSessionHookLeaseGate({
       provider: 'gemini',
       session_key: 'other',
-      file_path: 'libs/core/co-session.ts',
+      file_path: 'libs/core/workforce/co-session.ts',
     });
     expect(denied.decision).toBe('deny');
     expect(denied.reason).toContain('claude-owner');
 
     const own = coSessionHookLeaseGate({
       provider: 'claude',
-      file_path: 'libs/core/co-session.ts',
+      file_path: 'libs/core/workforce/co-session.ts',
       participant_id: 'claude-owner',
     });
     expect(own.decision).toBe('allow');
@@ -173,7 +173,8 @@ describe('coSessionHookLeaseGate', () => {
 
   it('fails open when no session exists', () => {
     expect(
-      coSessionHookLeaseGate({ provider: 'claude', file_path: 'libs/core/co-session.ts' }).decision
+      coSessionHookLeaseGate({ provider: 'claude', file_path: 'libs/core/workforce/co-session.ts' })
+        .decision
     ).toBe('allow');
   });
 });
@@ -184,7 +185,7 @@ describe('coSessionHookEnd', () => {
     acquireCoSessionLease({
       session_id: 'cos-hook-5',
       provider: 'gemini',
-      path: 'libs/core/co-session.ts',
+      path: 'libs/core/workforce/co-session.ts',
       participant_id: 'gemini-s9',
     });
     const ended = coSessionHookEnd({
@@ -196,7 +197,7 @@ describe('coSessionHookEnd', () => {
       coSessionHookLeaseGate({
         provider: 'claude',
         session_key: 'anyone',
-        file_path: 'libs/core/co-session.ts',
+        file_path: 'libs/core/workforce/co-session.ts',
       }).decision
     ).toBe('allow');
   });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
-import { normalizeEventScope } from '../event-scope.js';
+import { normalizeEventScope } from '../event/event-scope.js';
 import {
   checkGenerationQuota,
   generationQuotaCounterPath,

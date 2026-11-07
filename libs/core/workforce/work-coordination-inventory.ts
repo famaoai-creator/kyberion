@@ -1,5 +1,8 @@
 /** Read-only WorkItem inventory validation and unchanged latest-record folding. */
-import { parkedCompactionCopies, streamJsonLinesAcrossCompaction } from '../jsonl-parked-read.js';
+import {
+  parkedCompactionCopies,
+  streamJsonLinesAcrossCompaction,
+} from '../storage/jsonl-parked-read.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { validateWorkItem } from './work-coordination-identity.js';
 import type { WorkItem } from './work-coordination-types.js';

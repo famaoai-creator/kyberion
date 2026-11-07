@@ -2,7 +2,7 @@ import * as net from 'node:net';
 import { parseSafeJsonInput } from '../foundation/json.js';
 import { isRecord } from '../foundation/text.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { spawnManagedProcess } from '../managed-process.js';
+import { spawnManagedProcess } from '../tool/managed-process.js';
 import { pathResolver, rootDir } from '../path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -20,9 +20,9 @@ import {
   parseEventScopeFromRecord,
   type EventScope,
   type EventScopeInput,
-} from '../event-scope.js';
+} from '../event/event-scope.js';
 import { createLogger } from '../logger.js';
-import { resolveLocalIpcAddress } from '../local-ipc.js';
+import { resolveLocalIpcAddress } from '../tool/local-ipc.js';
 import { AgentRuntimeApprovalPendingError } from './agent-prompt-approval-port.js';
 const logger = createLogger('agent-runtime-supervisor-client');
 

@@ -32,7 +32,7 @@
 import {
   agentExecutionContextEnvNames,
   detectAgentExecutionContext,
-} from '../agent-execution-context.js';
+} from '../agent/agent-execution-context.js';
 import { resolveMemberByPrincipal } from '../organization/member-registry.js';
 import { resolveOperatorDisplayName } from '../surface/operator-identity.js';
 import { resolveSeparationOfDutiesPolicy } from './approval-policy.js';

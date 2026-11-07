@@ -88,15 +88,15 @@ import {
   resetVoiceBridge,
 } from '../voice/voice-bridge.js';
 import { installAvailableSpeechToTextBridges } from '../voice/speech-to-text-bridge.js';
-import { installAppleSpeechToTextBridgeIfAvailable } from '../apple-intelligence-bridge.js';
+import { installAppleSpeechToTextBridgeIfAvailable } from '../provider/apple-intelligence-bridge.js';
 import {
   installShellDeploymentAdapterFromConfigIfAvailable,
   installShellDeploymentAdapterIfAvailable,
 } from '../actuator/deployment-adapter.js';
 import { installAuditForwarderIfAvailable } from '../governance/audit-forwarder.js';
 import { installSecretResolverIfAvailable } from '../secret/secret-resolver.js';
-import { installPythonVoiceBridgeIfAvailable } from '../python-voice-bridge.js';
-import { installEmbeddingBackendIfAvailable } from '../embedding-bootstrap.js';
+import { installPythonVoiceBridgeIfAvailable } from '../voice/python-voice-bridge.js';
+import { installEmbeddingBackendIfAvailable } from './embedding-bootstrap.js';
 import { discoverProviders } from '../provider/provider-discovery.js';
 import { cliModeAbsentFromDiscovery, isCliDiscoveryMode } from './cli-mode-presence.js';
 import { discoverReasoningEndpoints } from './reasoning-endpoint-discovery.js';
@@ -104,7 +104,7 @@ import {
   loadProviderCapabilityRegistry,
   peekProviderCapabilityRegistry,
 } from '../provider/provider-capability-registry.js';
-import { resolveProviderDecision } from '../capability-broker.js';
+import { resolveProviderDecision } from '../provider/capability-broker.js';
 import { auditChain } from '../governance/audit-chain.js';
 import {
   loadReasoningBackendPolicy,

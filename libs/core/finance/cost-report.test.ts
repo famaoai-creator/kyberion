@@ -6,7 +6,7 @@ import {
   formatCostReport,
   type CostLedgerEntry,
 } from './cost-report.js';
-import { normalizeEventScope } from '../event-scope.js';
+import { normalizeEventScope } from '../event/event-scope.js';
 
 const D1 = '2026-07-10T10:00:00.000Z';
 const D2 = '2026-07-11T10:00:00.000Z';

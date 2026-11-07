@@ -1,5 +1,5 @@
 /** Bounded diagnostic read model. This module never dispatches or invokes a model. */
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { isFirstJobDiagnosticMapping } from './first-job-admission.js';
 import { normalizeLocale, type SupportedLocale } from '../foundation/locale-normalize.js';
 import { narrowSurfaceViewerScope, type SurfaceViewerScope } from './surface-mutation-guard.js';

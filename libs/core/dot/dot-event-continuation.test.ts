@@ -1,12 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import type { ManagedProcessHandle } from '../managed-process.js';
+import type { ManagedProcessHandle } from '../tool/managed-process.js';
 import type { DotCharter } from './dot-charter.js';
 import type { EventIntakePolicy } from './dot-event-intake.js';
 import type { DotWakeTool } from './dot-extensions.js';
-let spawnManagedProcess: typeof import('../managed-process.js').spawnManagedProcess;
-let stopManagedProcess: typeof import('../managed-process.js').stopManagedProcess;
+let spawnManagedProcess: typeof import('../tool/managed-process.js').spawnManagedProcess;
+let stopManagedProcess: typeof import('../tool/managed-process.js').stopManagedProcess;
 let safeAppendFileSync: typeof import('../secure-io.js').safeAppendFileSync;
 let safeExistsSync: typeof import('../secure-io.js').safeExistsSync;
 let safeMkdir: typeof import('../secure-io.js').safeMkdir;
@@ -48,7 +48,7 @@ beforeAll(async () => {
   vi.stubEnv('VITEST', '');
   expect(Reflect.deleteProperty(globalThis, auditKey)).toBe(true);
   vi.resetModules();
-  ({ spawnManagedProcess, stopManagedProcess } = await import('../managed-process.js'));
+  ({ spawnManagedProcess, stopManagedProcess } = await import('../tool/managed-process.js'));
   ({ safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } =
     await import('../secure-io.js'));
   ({ readJson } = await import('../foundation/json.js'));

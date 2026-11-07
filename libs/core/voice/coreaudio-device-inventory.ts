@@ -134,7 +134,7 @@ export class CoreAudioDeviceInventoryBridge {
     if (process.platform !== 'darwin' && !this.options.command_runner) return [];
     const command = this.options.swift_bin ?? 'swift';
     const script =
-      this.options.script_path ?? rootResolve('libs/core/coreaudio-device-inventory.swift');
+      this.options.script_path ?? rootResolve('libs/core/voice/coreaudio-device-inventory.swift');
     const result = this.options.command_runner
       ? this.options.command_runner(command, [script])
       : safeExecResult(command, [script], { timeoutMs: 20_000, maxOutputMB: 4 });

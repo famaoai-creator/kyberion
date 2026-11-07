@@ -18,7 +18,7 @@ The WS items bound that shared state and the disk that per-session copies use.
 
 ## WS-01 — Private git index per write-capable session
 
-`libs/core/session-git-index.ts` — `prepareSessionGitIndex({ cwd, sessionId })`.
+`libs/core/vcs/session-git-index.ts` — `prepareSessionGitIndex({ cwd, sessionId })`.
 
 - Resolves the checkout with `git rev-parse --is-inside-work-tree`,
   `--show-toplevel` and `--git-path index` (the last one makes linked
