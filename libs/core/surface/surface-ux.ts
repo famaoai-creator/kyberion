@@ -9,7 +9,7 @@ import {
   loadSurfaceState,
   type SurfaceRuntimeDefinition,
 } from './surface-runtime.js';
-import { renderVocabularyText } from '../ux-vocabulary.js';
+import { renderVocabularyText } from '../localization/ux-vocabulary.js';
 import { getServicePresetPolicy } from '../service/service-preset-policy.js';
 import { getServicePresetRecord } from '../service/service-preset-registry.js';
 import { getServiceEndpointRecord } from '../service/service-endpoint-registry.js';
@@ -18,9 +18,9 @@ import {
   listSurfaceNotifications,
 } from './surface-coordination-store.js';
 import { listSurfaceProviderManifests } from './surface-provider-manifest.js';
-import { buildNextAction } from '../next-action.js';
+import { buildNextAction } from './next-action.js';
 import type { SupportedLocale } from '../foundation/locale-normalize.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 
 export interface SurfaceDirectoryRow {

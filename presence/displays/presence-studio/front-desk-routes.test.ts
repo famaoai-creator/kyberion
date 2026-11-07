@@ -13,7 +13,7 @@
 //   2. reads `server.ts` / `security.ts` / `presence-studio-runtime-data.ts`
 //      as text to prove the routes are wired to those same functions.
 // Tenant profiles are fixture-backed via the `TenantRegistryPathOptions`
-// seam (same pattern as `libs/core/front-desk-identity.test.ts` /
+// seam (same pattern as `libs/core/surface/front-desk-identity.test.ts` /
 // `tenant-registry.test.ts`) — no real `knowledge/` file is touched.
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -773,7 +773,7 @@ describe('FD-08 removed presence-studio dashboard panels', () => {
     // Kept because a test (os-control-plane-route.test.ts) requires the
     // canonical standard-intent catalog loader be wired here.
     expect(serverSource).toContain("presenceStudioData.app.get('/api/standard-intents'");
-    // Kept because libs/core/control-plane-client.ts and
+    // Kept because libs/core/surface/control-plane-client.ts and
     // scripts/control_plane_cli.ts still call these on this surface.
     expect(serverSource).toContain("presenceStudioData.app.get('/api/projects'");
     expect(serverSource).toContain("presenceStudioData.app.get('/api/project-tracks'");
@@ -809,7 +809,7 @@ describe('HT-06 i18n gate: hearing canvas + training help vocabulary', () => {
     }
     // WI-08: the `web_app_build` requirement set (ids + `label_key`s) moved
     // out of this literal source file into the governed
-    // `hearing-scenarios.json` catalog (`libs/core/hearing-scenario-catalog.ts`)
+    // `hearing-scenarios.json` catalog (`libs/core/surface/hearing-scenario-catalog.ts`)
     // — `WEB_APP_HEARING_SCENARIO` is now a thin constant derived from it, so
     // the i18n-key assertion moves to the catalog data + the derivation call.
     expect(hearingTs).toContain("hearingScenarioFromCatalog('web_app_build')");

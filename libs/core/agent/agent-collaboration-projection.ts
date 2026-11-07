@@ -10,7 +10,7 @@ import {
   safeReaddir,
   safeReadFileTail,
 } from '../secure-io.js';
-import { splitCompleteLines } from '../jsonl-tail.js';
+import { splitCompleteLines } from '../storage/jsonl-tail.js';
 import {
   collaborationKindFromEventType,
   createAgentCollaborationEvent,
@@ -24,9 +24,9 @@ import {
   listPeerConversationTenants,
   readPeerConversationEdges,
 } from '../mesh/peer-conversation.js';
-import { eventScopeMatches, type EventScopeFilter } from '../event-scope.js';
-import { resolveScopeForRecord } from '../scope-migration.js';
-import type { GraphRunArtifact } from '../graph-run-artifact.js';
+import { eventScopeMatches, type EventScopeFilter } from '../event/event-scope.js';
+import { resolveScopeForRecord } from '../governance/scope-migration.js';
+import type { GraphRunArtifact } from '../pipeline/graph-run-artifact.js';
 
 type JsonRecord = Record<string, unknown>;
 

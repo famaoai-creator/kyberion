@@ -698,7 +698,7 @@ describe('mission-orchestration-journal', () => {
   it('fails closed when an explicit tenant contradicts the mission or the mission is unknown', async () => {
     const { appendMissionOrchestrationJournalEntry, loadMissionOrchestrationJournal } =
       await import('./mission-orchestration-journal.js');
-    const { normalizeEventScope } = await import('../event-scope.js');
+    const { normalizeEventScope } = await import('../event/event-scope.js');
     const missionId = `MSN-JOURNAL-CONTRA-${process.pid}`;
     seedMission(missionId, 'confidential', 'acme');
     const append = (id: string, tenantSlug: string) =>

@@ -10,7 +10,7 @@ Stable scope:
 
 - `libs/actuators/orchestrator-actuator/src/super-nerve/resolver.ts`
 - `knowledge/product/governance/standard-intents.json`
-- `libs/core/contextual-intent-frame.ts`
+- `libs/core/intent/contextual-intent-frame.ts`
 - `libs/core/intent/conversation-signals.ts` (replaced `libs/core/contextual-intent-learning.ts`, retired 2026-10-05 — see `retired/README.md`)
 
 Contract terms:

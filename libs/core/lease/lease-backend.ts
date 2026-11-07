@@ -26,9 +26,9 @@
  * contract, not an implementation detail.
  */
 
-import { createProviderRegistry } from '../provider-registry.js';
+import { createProviderRegistry } from '../provider/provider-registry.js';
 import type { SeamProviderMetadata } from '../seam.js';
-import { resolveSeamDefaultOrder } from '../seam-provider-selection.js';
+import { resolveSeamDefaultOrder } from '../provider/seam-provider-selection.js';
 
 export const LEASE_BACKEND_SEAM = 'lease-backend';
 /** Builtin default provider id; also the governed `default_provider`. */

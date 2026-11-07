@@ -24,7 +24,7 @@ import { assertOperatorNativeCredentialOwner } from '../agent/native-credential-
  */
 
 import { spawn } from 'node:child_process';
-import { cliOptionValue } from '../cli-guard.js';
+import { cliOptionValue } from '../harnessing/cli-guard.js';
 import { memoizedCliSpawnSync } from '../provider/provider-discovery.js';
 import * as readline from 'node:readline';
 import {
@@ -56,7 +56,11 @@ import {
   redactProviderOutputValue,
   withRedactedProviderOutput,
 } from '../provider/provider-output-redaction.js';
-import { cliOutputFormat, parseClaudeCliUsage, recordCliUsage } from '../cli-usage-metering.js';
+import {
+  cliOutputFormat,
+  parseClaudeCliUsage,
+  recordCliUsage,
+} from '../provider/cli-usage-metering.js';
 import { isClaudeCliAuthenticated } from '../provider/claude-cli-auth-status.js';
 import {
   CLAUDE_CLI_PLACEHOLDER_SIGNATURE,
@@ -73,7 +77,7 @@ export {
 import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js';
 import { ClaudeCliSessionAdapter } from '../provider/claude-cli-session-adapter.js';
 import { buildClaudeNativeDelegationPrompt } from '../provider/claude-native-subagent.js';
-import { getSubagentCapabilityProfile } from '../subagent-capability-profiles.js';
+import { getSubagentCapabilityProfile } from '../workforce/subagent-capability-profiles.js';
 import type { AgentAskOptions, AgentResponse } from '../agent/agent-adapter.js';
 import type {
   ReasoningBackend,
@@ -105,7 +109,7 @@ import {
   parsePromptedToolResponse,
   renderPromptedToolProtocol,
 } from '../reasoning/prompted-tool-protocol.js';
-import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
+import { runStartReportingDelegation } from '../workforce/delegation-execution-tracker.js';
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });

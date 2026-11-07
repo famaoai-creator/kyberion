@@ -1,7 +1,7 @@
 import { appendJsonLine } from '../foundation/json.js';
-import { jsonlFileSize, streamJsonLines } from '../jsonl-read.js';
-import { maintainStoreAfterAppend } from '../append-only-store.js';
-import { parkedCompactionCopies } from '../jsonl-parked-read.js';
+import { jsonlFileSize, streamJsonLines } from '../storage/jsonl-read.js';
+import { maintainStoreAfterAppend } from '../storage/append-only-store.js';
+import { parkedCompactionCopies } from '../storage/jsonl-parked-read.js';
 import { logger } from '../core.js';
 import { nowIso } from '../foundation/time.js';
 /**
@@ -18,7 +18,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
-import { resolveMissionDir } from '../owner-scope.js';
+import { resolveMissionDir } from '../governance/owner-scope.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
 import { escapeXml } from '../foundation/text-escaping.js';
 import { withLock } from '../foundation/lock-utils.js';

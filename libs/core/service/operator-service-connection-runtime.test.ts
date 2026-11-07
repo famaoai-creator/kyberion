@@ -31,10 +31,10 @@ vi.mock('../network.js', async () => ({
   ...(await vi.importActual<typeof import('../network.js')>('../network.js')),
   secureFetch: fixture.secureFetch,
 }));
-vi.mock('../ledger.js', () => ({ ledger: { record: vi.fn() } }));
-vi.mock('../unclassified-error-registry.js', async () => ({
-  ...(await vi.importActual<typeof import('../unclassified-error-registry.js')>(
-    '../unclassified-error-registry.js'
+vi.mock('../governance/ledger.js', () => ({ ledger: { record: vi.fn() } }));
+vi.mock('../daemon/unclassified-error-registry.js', async () => ({
+  ...(await vi.importActual<typeof import('../daemon/unclassified-error-registry.js')>(
+    '../daemon/unclassified-error-registry.js'
   )),
   recordUnclassifiedError: fixture.recordUnclassified,
 }));

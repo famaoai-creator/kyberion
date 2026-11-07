@@ -3,7 +3,7 @@
 // Kyberion's Node runtime shells out to this tiny Swift CLI to reach the
 // on-device Apple Intelligence language model (FoundationModels framework,
 // macOS 26+) and the macOS 27 Apple Intelligence developer surfaces.
-// Design contract with libs/core/apple-intelligence-bridge.ts:
+// Design contract with libs/core/provider/apple-intelligence-bridge.ts:
 //
 //   afm availability
 //     → single-line JSON {"available":true} | {"available":false,"reason":"..."}

@@ -245,7 +245,7 @@ describe('Workspace build contract', () => {
     }
   });
 
-  it('keeps two-stage barge-in in shared-voice and the shared energy detector in core', () => {
+  it('keeps voice playback and turn-taking runtimes in shared-voice and shared audio primitives in core', () => {
     const readPackage = (directory: string) =>
       JSON.parse(
         safeReadFile(path.join(rootDir, directory, 'package.json'), { encoding: 'utf8' }) as string
@@ -259,11 +259,19 @@ describe('Workspace build contract', () => {
       types: './dist/two-stage-barge-in.d.ts',
       default: './dist/two-stage-barge-in.js',
     });
+    for (const name of ['segmented-voice-playback', 'streaming-voice-playback']) {
+      expect(core.exports[`./${name}`]).toBeUndefined();
+      expect(safeExistsSync(path.join(rootDir, 'libs/core', `${name}.ts`))).toBe(false);
+      expect(voice.exports[`./${name}`]).toEqual({
+        types: `./dist/${name}.d.ts`,
+        default: `./dist/${name}.js`,
+      });
+    }
     // Meeting and voice both use the energy detector, so it must not move
     // into a package that would make core depend on shared-voice.
     expect(core.exports['./barge-in-controller']).toEqual({
-      types: './dist/barge-in-controller.d.ts',
-      default: './dist/barge-in-controller.js',
+      types: './dist/voice/barge-in-controller.d.ts',
+      default: './dist/voice/barge-in-controller.js',
     });
   });
 
@@ -349,13 +357,14 @@ describe('Workspace build contract', () => {
       types: './dist/segmented-voice-playback.d.ts',
       default: './dist/segmented-voice-playback.js',
     });
-    // Playback, text chunking, and the streaming gate stay in core; only the
-    // segmenter moved beside its sole consumer.
-    for (const subpath of [
-      './voice/audio-playback',
-      './voice/voice-text-chunking',
-      './streaming-voice-playback',
-    ]) {
+    // The device player and text chunking stay in core; both playback
+    // orchestration modes live beside their realtime loop consumer.
+    expect(core.exports['./streaming-voice-playback']).toBeUndefined();
+    expect(voice.exports['./streaming-voice-playback']).toEqual({
+      types: './dist/streaming-voice-playback.d.ts',
+      default: './dist/streaming-voice-playback.js',
+    });
+    for (const subpath of ['./voice/audio-playback', './voice/voice-text-chunking']) {
       expect(core.exports[subpath]).toBeDefined();
     }
   });

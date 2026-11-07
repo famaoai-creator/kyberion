@@ -34,7 +34,7 @@ How to iterate fast on Kyberion locally. Phase C'-7 of `docs/PRODUCTIZATION_ROAD
 ### Run a single test
 
 ```bash
-pnpm vitest run libs/core/error-classifier.test.ts
+pnpm vitest run libs/core/analysis/error-classifier.test.ts
 ```
 
 ### Run tests for a directory

@@ -92,7 +92,7 @@ status: archived
 - manifest に対象 op が無い場合は既存互換のため通す。
 - 検証:
   - `pnpm run typecheck`
-  - `pnpm exec vitest run scripts/run_pipeline.test.ts libs/core/actuator/actuator-capability.test.ts libs/core/error-classifier.test.ts`
+  - `pnpm exec vitest run scripts/run_pipeline.test.ts libs/core/actuator/actuator-capability.test.ts libs/core/analysis/error-classifier.test.ts`
   - `pnpm --filter '@agent/core' build`
   - `pnpm run build:repo`
   - `pnpm pipeline --input pipelines/storage-janitor.json --context '{"dry_run":true}'`

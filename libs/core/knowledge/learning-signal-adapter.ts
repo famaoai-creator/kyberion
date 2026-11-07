@@ -7,7 +7,7 @@ import { safeExistsSync, safeMkdir, safeReaddir, safeStat } from '../secure-io.j
 import { readJsonIfPresent, readJsonLines, writeJson } from '../foundation/json.js';
 import { resolveIdentityContext } from '../authority.js';
 import { storagePartitionSegments, type StoragePartition } from '../storage-layout.js';
-import { enqueueOperationalLearningSignal } from '../operational-learning.js';
+import { enqueueOperationalLearningSignal } from './operational-learning.js';
 import { persistHints } from './feedback-loop.js';
 import type { KnowledgeHint } from './knowledge-index.js';
 

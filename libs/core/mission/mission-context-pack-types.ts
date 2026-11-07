@@ -5,8 +5,11 @@ import type {
   CondenserBudget,
   ContextCondenser,
 } from './mission-context-condenser.js';
-import type { ContextFragmentRejection, ContextSecurityScope } from '../context-security-scope.js';
-import type { FacetRequest } from '../facet-registry.js';
+import type {
+  ContextFragmentRejection,
+  ContextSecurityScope,
+} from '../governance/context-security-scope.js';
+import type { FacetRequest } from '../plugin/facet-registry.js';
 import type { MissionTeamAssignment } from './mission-team-plan-composer.js';
 import type { ProjectOperationalState } from '../project/project-operational-state-registry.js';
 import type { ProjectTrackRecord } from '../project/project-track-registry.js';

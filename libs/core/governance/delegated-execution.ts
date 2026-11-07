@@ -2,7 +2,7 @@ import { assertNoHumanClaim, withExecutionIdentityLock } from './execution-claim
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { currentOperationInterface, operationInterfaceResolver } from './operation-protection.js';
 import { createHash, createHmac } from 'node:crypto';
-import { resolveAuditChainKey } from '../chain-integrity.js';
+import { resolveAuditChainKey } from './chain-integrity.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 import { currentScopeEnvelope, runtimeScopeIdentity } from '../scope-envelope.js';
@@ -12,7 +12,10 @@ import { getServicePresetRecord } from '../service/service-preset-registry.js';
 import { loadConnectionWithFallback } from '../service/service-engine-helpers.js';
 import { resolveServiceBinding } from '../service/service-binding.js';
 import { listServiceBindingRecords } from '../service/service-binding-registry.js';
-import { evaluateDecisionRights, resolveDecisionRightsMatrix } from '../decision-rights.js';
+import {
+  evaluateDecisionRights,
+  resolveDecisionRightsMatrix,
+} from '../organization/decision-rights.js';
 import { charterInputForDecision } from './charter-call-site.js';
 import { findCharterDecision } from './charter-decision-vocabulary.js';
 import { isCharterEligiblePolicy } from './approval-gate-charter.js';

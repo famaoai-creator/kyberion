@@ -22,7 +22,7 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveScopeContext } from '@agent/core/scope-context';
-import { streamTtsAudioPlayback } from '@agent/core/streaming-voice-playback';
+import { streamTtsAudioPlayback } from '@agent/shared-voice/streaming-voice-playback';
 import { ShellStreamingTextToSpeechBridge } from '@agent/core/shell/shell-streaming-tts-bridge';
 import { getVoiceEngineRegistry } from '@agent/core/voice/voice-engine-registry';
 import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';

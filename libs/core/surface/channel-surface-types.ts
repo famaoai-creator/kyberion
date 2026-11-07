@@ -7,8 +7,8 @@
 import type { ApprovalRequestDraft, ApprovalRequestRecord } from '../governance/approval-store.js';
 import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 import type { A2AMessage } from '../mesh/a2a-bridge.js';
-import type { A2UIMessage } from '../a2ui.js';
-import type { AgentContextMode } from '../context-boundary.js';
+import type { A2UIMessage } from './a2ui.js';
+import type { AgentContextMode } from '../contracts/context-boundary.js';
 import type { AgentRoutingDecision } from '../intent/intent-contract.js';
 import type { IntentResolutionContract } from '../intent/intent-resolution-contract.js';
 import type { SupportedLocale } from '../foundation/locale-normalize.js';
@@ -16,8 +16,8 @@ import type {
   ExecutionFeedbackInput,
   ExecutionFeedbackRecord,
   ExecutionFeedbackRequest,
-} from '../execution-feedback.js';
-import type { EventScope, EventScopeInput } from '../event-scope.js';
+} from '../knowledge/execution-feedback.js';
+import type { EventScope, EventScopeInput } from '../event/event-scope.js';
 import type {
   MissionTeamRoleSelection,
   MissionTeamSelectionResolution,

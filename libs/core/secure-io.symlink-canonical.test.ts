@@ -39,7 +39,7 @@ import {
   setProcFdLookupDisabledForTesting,
   setProcFdRootForTesting,
 } from './secure-io-path-guard.js';
-import { getAllFiles } from './fs-utils.js';
+import { getAllFiles } from './storage/fs-utils.js';
 
 // Denials emit best-effort audit events; keep them off the real audit chain.
 vi.mock('./governance/audit-chain.js', () => ({

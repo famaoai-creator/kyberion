@@ -2,7 +2,7 @@ import { dotStatePath } from './dot-state-paths.js';
 /** Durable digest admission, bounded catch-up and safe notification retry. */
 import * as path from 'node:path';
 import { appendJsonLine } from '../foundation/json.js';
-import { streamJsonLines } from '../jsonl-read.js';
+import { streamJsonLines } from '../storage/jsonl-read.js';
 import { safeMkdir } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import { matchesCron } from '../pipeline/cron-utils.js';

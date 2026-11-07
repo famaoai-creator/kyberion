@@ -7,11 +7,11 @@ import { matchesAnyTextRule, type TextMatchRule } from '../foundation/text-rule-
 import {
   resolveCapabilityBundleForIntent,
   resolveCapabilityBundlesForUtterance,
-} from '../capability-bundle-registry.js';
+} from '../plugin/capability-bundle-registry.js';
 import {
   buildContextualIntentFrame,
   type ContextualIntentFrame,
-} from '../contextual-intent-frame.js';
+} from './contextual-intent-frame.js';
 import { sanitizeIntentPathSegment } from './intent-path-utils.js';
 import { segmentWords } from '../foundation/locale-normalize.js';
 import {

@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import { normalizeEventScope, type EventScope } from '../event-scope.js';
+import { normalizeEventScope, type EventScope } from '../event/event-scope.js';
 import { resolveRole, withExecutionContext } from '../authority.js';
 import { safeReadFileSnapshot, safeRealpath } from '../secure-io.js';
 import { getWorkItem, listActiveWorkLeases } from '../workforce/work-coordination.js';

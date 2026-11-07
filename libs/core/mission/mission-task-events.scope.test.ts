@@ -5,7 +5,7 @@ import {
   redactMissionTaskEventForShared,
 } from './mission-task-events.js';
 import { redactCollaborationMetadata } from '../agent/agent-collaboration-events.js';
-import { normalizeEventScope } from '../event-scope.js';
+import { normalizeEventScope } from '../event/event-scope.js';
 
 describe('mission task event scope lineage', () => {
   it('parses only task-event identity rows and rejects unrelated mission data', () => {

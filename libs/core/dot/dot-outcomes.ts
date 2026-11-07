@@ -25,7 +25,7 @@ import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir } from '../secure-io.js';
 import { getWorkItem } from '../workforce/work-coordination.js';
-import type { KeyResultSpec } from '../key-result-spec.js';
+import type { KeyResultSpec } from '../organization/key-result-spec.js';
 import type { DotCharter } from './dot-charter.js';
 import type {
   DotDigestSection,
@@ -341,7 +341,7 @@ async function measureKrReadings(
 }
 
 async function defaultRecordRegression(c: DotCharter, row: DotOutcomeRow): Promise<void> {
-  const { recordExecutionFeedback } = await import('../execution-feedback.js');
+  const { recordExecutionFeedback } = await import('../knowledge/execution-feedback.js');
   const tenant = Boolean(c.scope.tenant_slug);
   const subject = row.ref.kr_id ?? row.ref.signal ?? 'unknown';
   // Tenant dots: ids and numbers only; no prose into the global store.

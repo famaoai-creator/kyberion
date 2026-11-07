@@ -5,8 +5,8 @@ import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { safeMkdir, safeRmSync } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
-import { resolveLocalIpcAddress } from '../local-ipc.js';
-import { spawnManagedProcess, stopManagedProcess } from '../managed-process.js';
+import { resolveLocalIpcAddress } from '../tool/local-ipc.js';
+import { spawnManagedProcess, stopManagedProcess } from '../tool/managed-process.js';
 
 describe('headless supervisor request settlement', () => {
   it.each(['invalid-result', 'closed-refresh', 'closed-ask', 'delayed-success'] as const)(

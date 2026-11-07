@@ -20,7 +20,7 @@ status: archived
 
 ### 症状
 
-`libs/core/history-search-index.test.ts` 5 件と `libs/actuators/wisdom-actuator/src/index.test.ts` 1 件が
+`libs/core/search/history-search-index.test.ts` 5 件と `libs/actuators/wisdom-actuator/src/index.test.ts` 1 件が
 `history search sqlite failed: Parse error near line 2: unsafe use of virtual table "history_fts"` で失敗。
 
 ### 原因

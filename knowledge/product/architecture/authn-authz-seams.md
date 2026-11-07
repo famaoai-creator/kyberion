@@ -30,8 +30,8 @@ operation and resource. Both are additive — existing surface authentication
 (`resolveSurfaceViewerScope`, `surface-authorization.ts`) still runs and the
 seams project onto it rather than replacing it.
 
-Code: `libs/core/authn-principal-resolver.ts` + `authn-providers.ts`,
-`libs/core/authz-policy-engine.ts` + `authz-providers.ts`. Package subpaths:
+Code: `libs/core/authn/authn-principal-resolver.ts` + `authn-providers.ts`,
+`libs/core/governance/authz-policy-engine.ts` + `authz-providers.ts`. Package subpaths:
 `@agent/core/authn-principal-resolver`, `@agent/core/authn-providers`,
 `@agent/core/authz-policy-engine`, `@agent/core/authz-providers`. Policies:
 `knowledge/product/governance/seam-provider-selection/{authn-principal-resolver,authz-policy-engine}.json`.
@@ -51,9 +51,9 @@ import '@agent/core/authn-providers'; // self-registers the built-in set
 const { principal, decision, attempts } = resolveAuthnPrincipal(
   {
     credential: { type: 'bearer', token: authorizationHeader.slice(7) },
-    loopback: isProvenLoopback(req),          // adapter-owned proof, never client-supplied
-    loopbackRole: 'readonly',                  // optional narrowing of the loopback grant
-    serverTenant: tenantFromServerConfig,      // binding for unregistered remote credentials
+    loopback: isProvenLoopback(req), // adapter-owned proof, never client-supplied
+    loopbackRole: 'readonly', // optional narrowing of the loopback grant
+    serverTenant: tenantFromServerConfig, // binding for unregistered remote credentials
   },
   { purpose: 'remote_human', context: { surface: 'concierge' } }
 );
@@ -73,15 +73,15 @@ const scope = toSurfaceViewerScope(principal); // existing SurfaceViewerScope co
 
 ### Built-in authn providers
 
-| Provider          | Judges                                             | Produces                                   | Knobs                                                                                          |
-| ----------------- | -------------------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| `loopback-local`  | `request.loopback === true`                        | local operator (`localadmin`/`readonly`)   | `request.loopbackRole`                                                                          |
-| `env-token`       | bearer == `KYBERION_API_TOKEN`/`KYBERION_LOCALADMIN_TOKEN` | service principal                    | `request.serverTenant` required for unregistered remote use                                    |
-| `registry-token`  | bearer hashed in `chronos-access.json`             | `user:<member>` / service w/ stored scope  | `deps.registrations` injection; registry is source of truth                                    |
-| `agent-context`   | in-process `request.executionContext`              | `kyberion://agent/<org>/<slug>` (NI-02)    | ambient `KYBERION_PERSONA`/`MISSION_ROLE` never authenticate a wire request                    |
-| `agent-token`     | `kya1.` HMAC workload token                        | agent actor bound to NI-01 ledger entry    | `KYBERION_AGENT_TOKEN_SECRET` (secret-guard `kyberion-agent-token` fallback); `issueAgentToken`  |
-| `oidc-jwt`        | JWT verified against JWKS                          | federated `user:`/`service:` principal     | `KYBERION_OIDC_ISSUER` (required), `_AUDIENCE`, `_JWKS`/`_JWKS_PATH`/`deps.jwks`, `_ALLOW_HS256` |
-| `stub`            | `credential.type === 'none'` only                  | synthetic principal                        | `KYBERION_AUTHN_STUB_PRINCIPAL`; never claims a presented credential                            |
+| Provider         | Judges                                                     | Produces                                  | Knobs                                                                                            |
+| ---------------- | ---------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `loopback-local` | `request.loopback === true`                                | local operator (`localadmin`/`readonly`)  | `request.loopbackRole`                                                                           |
+| `env-token`      | bearer == `KYBERION_API_TOKEN`/`KYBERION_LOCALADMIN_TOKEN` | service principal                         | `request.serverTenant` required for unregistered remote use                                      |
+| `registry-token` | bearer hashed in `chronos-access.json`                     | `user:<member>` / service w/ stored scope | `deps.registrations` injection; registry is source of truth                                      |
+| `agent-context`  | in-process `request.executionContext`                      | `kyberion://agent/<org>/<slug>` (NI-02)   | ambient `KYBERION_PERSONA`/`MISSION_ROLE` never authenticate a wire request                      |
+| `agent-token`    | `kya1.` HMAC workload token                                | agent actor bound to NI-01 ledger entry   | `KYBERION_AGENT_TOKEN_SECRET` (secret-guard `kyberion-agent-token` fallback); `issueAgentToken`  |
+| `oidc-jwt`       | JWT verified against JWKS                                  | federated `user:`/`service:` principal    | `KYBERION_OIDC_ISSUER` (required), `_AUDIENCE`, `_JWKS`/`_JWKS_PATH`/`deps.jwks`, `_ALLOW_HS256` |
+| `stub`           | `credential.type === 'none'` only                          | synthetic principal                       | `KYBERION_AUTHN_STUB_PRINCIPAL`; never claims a presented credential                             |
 
 `oidc-jwt` is synchronous and **never fetches**: a surface that owns egress
 must fetch the remote JWKS and pass it as `deps.jwks`.
@@ -110,13 +110,13 @@ Every verdict — including denies — is recorded to the audit chain.
 
 ### Built-in authz providers
 
-| Provider            | Semantics                                                                            |
-| ------------------- | ------------------------------------------------------------------------------------ |
-| `role-scope`        | Existing `surface-authorization.ts` role + tenant/org/project/tier containment       |
-| `member-membership` | Member-registry profiles; `owner`/`approver`/`viewer` → permissions; inactive/missing members deny |
+| Provider            | Semantics                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------ |
+| `role-scope`        | Existing `surface-authorization.ts` role + tenant/org/project/tier containment                         |
+| `member-membership` | Member-registry profiles; `owner`/`approver`/`viewer` → permissions; inactive/missing members deny     |
 | `policy-file`       | Declarative rules (`KYBERION_AUTHZ_POLICY_PATH` or `deps.policyPath`); deny rules win, no match denies |
-| `allow-all`         | **Vitest only** — ineligible outside the test runner (no production fail-open)       |
-| `deny-all`          | Lockdown / fail-closed floor                                                         |
+| `allow-all`         | **Vitest only** — ineligible outside the test runner (no production fail-open)                         |
+| `deny-all`          | Lockdown / fail-closed floor                                                                           |
 
 Declarative policies follow `knowledge/product/schemas/authz-policy.schema.json`
 (`rules[]` matching `principals` / `principal_kinds` / `operations` / `effects`
@@ -135,7 +135,7 @@ Declarative policies follow `knowledge/product/schemas/authz-policy.schema.json`
 - Tests: `setAuthnAuditSinkForTests` / `setAuthzAuditSinkForTests`,
   `deps.env` / `deps.jwks` / `deps.now` / `deps.policyPath` /
   `deps.memberRegistry` keep suites hermetic (see
-  `libs/core/authn-principal-resolver.test.ts`).
+  `libs/core/authn/authn-principal-resolver.test.ts`).
 
 ## Surface wiring contract (when binding to HTTP)
 

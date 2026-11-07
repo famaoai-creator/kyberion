@@ -232,7 +232,7 @@ LLM token費用だけでなく、次を共通 `resource_usage` として記録�
 **担当**: `claude-sonnet-4`  
 **対象**:
 
-- `libs/core/ceo-surface-summary.ts`
+- `libs/core/surface/ceo-surface-summary.ts`
 - `libs/core/surface/operator-home-summary.ts`
 - concierge / Chronos / `pnpm kyberion`
 - SU-01〜04、E2E-04

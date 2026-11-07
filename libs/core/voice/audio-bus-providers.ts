@@ -3,9 +3,9 @@
  */
 
 import { StubAudioBus } from './audio-bus.js';
-import { BlackHoleAudioBus } from '../blackhole-audio-bus.js';
+import { BlackHoleAudioBus } from './blackhole-audio-bus.js';
 import { getRegisteredEnv } from '../foundation/env.js';
-import { PulseAudioBus } from '../pulse-audio-bus.js';
+import { PulseAudioBus } from './pulse-audio-bus.js';
 import { registerAudioBusBridge, type AudioBusCreateOptions } from './audio-bus-bridge.js';
 
 function kyberionEnv(name: string): string | undefined {

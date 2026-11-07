@@ -1,0 +1,126 @@
+import { t } from '../localization/t.js';
+import { deriveReplyLocale, getReplyLocale } from '../localization/locale.js';
+import { pathResolver } from '../path-resolver.js';
+import { nowIso } from '../foundation/time.js';
+import { assertSafeRepositoryPath } from '../secure-io.js';
+import { recordTaskSessionHistory, updateTaskSession, type TaskSession } from './task-session.js';
+import { createVirtualCameraBridge } from '../virtual/virtual-camera-bridge.js';
+import { createVirtualDeviceInventoryBridge } from '../virtual/virtual-device-inventory-bridge.js';
+
+export interface ExecuteCapturePhotoTaskSessionParams {
+  session: TaskSession;
+  queryText: string;
+}
+
+export interface ExecuteCapturePhotoTaskSessionResult {
+  output: string;
+  outputPath: string;
+  session: TaskSession;
+}
+
+function buildOutputPath(sessionId: string): string {
+  const normalized = String(sessionId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error('[CAPTURE_PHOTO_SESSION_ID] session id must be a single path segment');
+  }
+  return assertSafeRepositoryPath(pathResolver.sharedTmp(`capture-photo/${normalized}.jpg`), {
+    allowMissingLeaf: true,
+  });
+}
+
+function resolveCameraPreference(session: TaskSession): string | undefined {
+  const payload = session.payload || {};
+  const candidates = [
+    payload.camera_device_preference,
+    payload.device_preference,
+    payload.camera_name,
+    payload.camera,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+  }
+  return undefined;
+}
+
+function resolveCameraIntent(
+  session: TaskSession
+): 'record' | 'share' | 'reference' | 'ocr_source' {
+  const payloadIntent = session.payload?.camera_intent;
+  return payloadIntent === 'share' ||
+    payloadIntent === 'reference' ||
+    payloadIntent === 'ocr_source'
+    ? payloadIntent
+    : 'record';
+}
+
+export async function executeCapturePhotoTaskSession(
+  params: ExecuteCapturePhotoTaskSessionParams
+): Promise<ExecuteCapturePhotoTaskSessionResult> {
+  const devicePreference = resolveCameraPreference(params.session);
+  const inventoryBridge = createVirtualDeviceInventoryBridge();
+  const cameraBridge = createVirtualCameraBridge({
+    inventory_bridge: inventoryBridge,
+    device_preference: devicePreference,
+  });
+
+  const probe = await cameraBridge.probe();
+  if (!probe.available) {
+    throw new Error(
+      `[capture-photo-task-session] camera bridge unavailable: ${probe.reason || 'unknown reason'}`
+    );
+  }
+
+  const outputPath = buildOutputPath(params.session.session_id);
+  const capture = await cameraBridge.capturePhoto({
+    save_path: outputPath,
+    camera_intent: resolveCameraIntent(params.session),
+    subject_hint: params.session.goal.summary || params.queryText,
+    device_preference: devicePreference || probe.selected_camera,
+  });
+
+  // Reply in the language the user asked in (IT-02), else the turn/operator locale.
+  const locale =
+    deriveReplyLocale({ text: params.queryText }) ??
+    deriveReplyLocale({ text: params.session.goal.summary }) ??
+    getReplyLocale();
+  const summaryParts = [
+    t('surface:photo_captured', undefined, locale),
+    capture.selected_camera
+      ? t('surface:photo_camera_used', { camera: capture.selected_camera }, locale)
+      : '',
+    t('surface:photo_saved_to', { path: outputPath }, locale),
+  ].filter(Boolean);
+
+  const updated = updateTaskSession(params.session.session_id, {
+    status: 'completed',
+    artifact: {
+      kind: 'image',
+      output_path: outputPath,
+      preview_text: summaryParts.join(' '),
+      storage_class: 'tmp',
+      backend: capture.backend,
+      selected_camera: capture.selected_camera,
+      camera_intent: capture.camera_intent,
+    },
+  });
+
+  if (updated) {
+    const timestamp = nowIso();
+    recordTaskSessionHistory(updated.session_id, {
+      ts: timestamp,
+      type: 'execution',
+      text: `Camera capture executed through ${capture.backend}.`,
+    });
+    recordTaskSessionHistory(updated.session_id, {
+      ts: timestamp,
+      type: 'artifact',
+      text: `Captured image stored at ${outputPath}.`,
+    });
+  }
+
+  return {
+    output: summaryParts.join('\n'),
+    outputPath,
+    session: updated || params.session,
+  };
+}

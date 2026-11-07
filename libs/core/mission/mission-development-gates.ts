@@ -5,7 +5,7 @@ import { readJson } from '../foundation/json.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import { resolveScopeContext } from '../scope-context.js';
 import { findMissionPath } from '../path-resolver.js';
-import { missionPathOrNull } from '../mission-lookup.js';
+import { missionPathOrNull } from './mission-lookup.js';
 import { parseContinuousWorkPlan } from '../organization/continuous-work-plan.js';
 import { loadState } from './mission-state.js';
 import { assertMissionOwnerPath } from './mission-git.js';
