@@ -61,7 +61,7 @@ tenant_slug → organization_id → project_id → mission_id → task_id → se
 | `contextual-intent-{memory,learning}.ts` / `intent-contract-learning.ts` | なし                                                             | —                                                                                                                                                               | `knowledge/personal/*.json`・`active/shared/runtime/intent-contract-memory.json` 単一(グローバル 500 件 cap で他テナントの学習を追い出す) | ❌ 学習した `default_approval_scope` がテナントを跨ぐ    |
 | `HINTS.md`(`promoted-memory.ts:73-90`)                                   | なし                                                             | —                                                                                                                                                               | `knowledge/product/governance/HINTS.md` 単一 50 節                                                                                        | ❌                                                       |
 | `libs/core/knowledge/memory-scope.ts`                                    | full chain                                                       | tier→audience→owner→chain 全段比較(`:56-110`)                                                                                                                   | —                                                                                                                                         | ✅ **参照実装**                                          |
-| `libs/core/context-security-scope.ts`                                    | full chain + purpose                                             | `compileScopedContextPack` に typed rejection(`TENANT/ORGANIZATION/PROJECT/MISSION_SCOPE_MISMATCH`)                                                             | —                                                                                                                                         | ✅ 契約は存在するが **pack builder が消費していない**    |
+| `libs/core/governance/context-security-scope.ts`                         | full chain + purpose                                             | `compileScopedContextPack` に typed rejection(`TENANT/ORGANIZATION/PROJECT/MISSION_SCOPE_MISMATCH`)                                                             | —                                                                                                                                         | ✅ 契約は存在するが **pack builder が消費していない**    |
 
 frontmatter 側: repo 全体で `scope:` 39 件(値は `repository`/`global` のみ)、`tenant`/`organization_id` を持つ
 frontmatter は 0 件。ranking 語彙に chain を表す語彙が存在しない。
@@ -77,7 +77,7 @@ frontmatter は 0 件。ranking 語彙に chain を表す語彙が存在しな�
 - `libs/core/creative-design-resolver.ts:135-141` — tenant 層のみ(org/project 層なし)。docx/xlsx engine は `resolveCreativeDesign` 未配線。`web-design-system.ts:245` は `tenant_slug:'kyberion'` ハードコード。
 - `libs/core/plugin/skill-plugin-loader.ts:78-80` — `.kyberion-plugins.json` を cwd から読む flat list。`restricted-skills.json` は TS 消費者 0。
 - `libs/core/organization/tenant-rate-limiter.ts` — tenant 対応で実装済みだが消費者 0(実稼働は `policy-engine`= agentId、`api-guard`= IP)。
-- `libs/core/locale.ts:117-165` — 解決順に tenant/org 段がない。`mission-templates.json` / `mission-team-templates.json` は tenant overlay なし。
+- `libs/core/localization/locale.ts:117-165` — 解決順に tenant/org 段がない。`mission-templates.json` / `mission-team-templates.json` は tenant overlay なし。
 
 ## 設計判断
 

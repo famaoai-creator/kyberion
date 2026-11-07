@@ -44,9 +44,9 @@ import {
   safeReadFile,
 } from '../secure-io.js';
 import { appendJsonLine, readJsonIfPresent, writeJson } from '../foundation/json.js';
-import { readJsonLinesCached } from '../jsonl-tail.js';
-import { readJsonLinesCachedAcrossCompaction } from '../jsonl-parked-read.js';
-import { streamJsonLines } from '../jsonl-read.js';
+import { readJsonLinesCached } from '../storage/jsonl-tail.js';
+import { readJsonLinesCachedAcrossCompaction } from '../storage/jsonl-parked-read.js';
+import { streamJsonLines } from '../storage/jsonl-read.js';
 import {
   compactDotWakeLedgerAt,
   type DotWakeLedgerCompactionResult,
@@ -59,9 +59,9 @@ import {
 } from './dot-token-usage.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';
-import { recordDaemonHeartbeat } from '../daemon-heartbeat.js';
+import { recordDaemonHeartbeat } from '../daemon/daemon-heartbeat.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
-import { sendOpsAlert, type OpsAlertInput } from '../ops-alert.js';
+import { sendOpsAlert, type OpsAlertInput } from '../daemon/ops-alert.js';
 import type {
   ReasoningBackend,
   ToolCall,
@@ -78,9 +78,9 @@ import {
   type DotTrigger,
   type LoadedDotCharter,
 } from './dot-charter.js';
-import { evaluateStateProbe, probeSpecId, type StateProbeDeps } from '../state-probe.js';
+import { evaluateStateProbe, probeSpecId, type StateProbeDeps } from '../pipeline/state-probe.js';
 import { createLogger } from '../logger.js';
-import { getUsageAttribution } from '../usage-accounting.js';
+import { getUsageAttribution } from '../finance/usage-accounting.js';
 import { estimateWakeTokensFromText, withDotWakeUsage } from './dot-wake-usage.js';
 import {
   withDotWakeSemanticObserver,

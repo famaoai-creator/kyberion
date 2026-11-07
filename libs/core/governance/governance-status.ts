@@ -1,6 +1,6 @@
 import { loadApprovalPolicy } from './approval-policy.js';
 import { listApprovalRequests } from './approval-store-reader.js';
-import { loadAllowedEgressDomains, loadEgressPolicy } from '../egress-policy.js';
+import { loadAllowedEgressDomains, loadEgressPolicy } from './egress-policy.js';
 import { killSwitch } from './kill-switch.js';
 import { policyEngine } from './policy-engine.js';
 import { loadShellCommandPolicy } from '../shell/shell-command-policy.js';

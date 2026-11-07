@@ -1,4 +1,4 @@
-import { getSubagentCapabilityProfile } from '../subagent-capability-profiles.js';
+import { getSubagentCapabilityProfile } from '../workforce/subagent-capability-profiles.js';
 import { resolveTaskProviderEnvironment } from '../foundation/credential-binding.js';
 import { credentialExecutionIdentity } from '../foundation/credential-binding.js';
 import {

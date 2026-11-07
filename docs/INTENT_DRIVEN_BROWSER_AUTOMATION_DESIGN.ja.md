@@ -34,20 +34,20 @@ tags: [browser-bridge, intent-loop, capability, pipeline, approval, multi-agent]
 
 を滑らかに繋ぐのが目的。`feature/cowork-integration-phase0` 時点での充足状況：
 
-| 能力                                                        | 状態                            | 主な実体                                                                                                                |
-| ----------------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| DOM意味込みの実演レコーダー                                 | ✅ 完成                         | `tools/adf-replay-extension/content.js`, `background.js`, `sidepanel.js`                                                |
-| 録画→draft pipeline コンパイル                              | 🟡 半分                         | `compileBrowserRecordingToPipeline()` @ `libs/core/browser/browser-extension-bridge.ts:490`                             |
-| 承認 / lease / receipt / トラスト境界                       | ✅ 完成                         | `scripts/browser_bridge_host.ts`, `libs/core/risky-op-registry.ts`, `knowledge/product/governance/approval-policy.json` |
-| 秘密入力の非記録（redaction）                               | ✅ 完成                         | `content.js`（password/OTP/token/WebAuthn を記録しない）                                                                |
-| **① 手順レジストリ＆意図解決**                              | ❌ 欠落                         | —                                                                                                                       |
-| **③' ref→堅牢セレクタ自動解決 / Golden Scenario / dry-run** | ❌ 欠落                         | —                                                                                                                       |
-| **④ 自己修復・差分学習**                                    | ❌ 欠落（停止はするが直さない） | —                                                                                                                       |
-| **⑤ MFA中継ゲート**                                         | ❌ 欠落（秘密の非記録のみ）     | —                                                                                                                       |
+| 能力                                                        | 状態                            | 主な実体                                                                                                                           |
+| ----------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| DOM意味込みの実演レコーダー                                 | ✅ 完成                         | `tools/adf-replay-extension/content.js`, `background.js`, `sidepanel.js`                                                           |
+| 録画→draft pipeline コンパイル                              | 🟡 半分                         | `compileBrowserRecordingToPipeline()` @ `libs/core/browser/browser-extension-bridge.ts:490`                                        |
+| 承認 / lease / receipt / トラスト境界                       | ✅ 完成                         | `scripts/browser_bridge_host.ts`, `libs/core/governance/risky-op-registry.ts`, `knowledge/product/governance/approval-policy.json` |
+| 秘密入力の非記録（redaction）                               | ✅ 完成                         | `content.js`（password/OTP/token/WebAuthn を記録しない）                                                                           |
+| **① 手順レジストリ＆意図解決**                              | ❌ 欠落                         | —                                                                                                                                  |
+| **③' ref→堅牢セレクタ自動解決 / Golden Scenario / dry-run** | ❌ 欠落                         | —                                                                                                                                  |
+| **④ 自己修復・差分学習**                                    | ❌ 欠落（停止はするが直さない） | —                                                                                                                                  |
+| **⑤ MFA中継ゲート**                                         | ❌ 欠落（秘密の非記録のみ）     | —                                                                                                                                  |
 
 **重要な事実（設計判断の前提）**
 
-- `libs/core/capability-broker.ts` の Capability Broker は **LLMプロバイダ選択専用**。照合は完全一致キーのみで**曖昧/意味マッチは持たない**。→ 手順の意図解決をここに同居させてはいけない。**同じ知識駆動パターンを踏襲した別レジストリ**を作り、曖昧マッチは reasoning backend に委譲する。
+- `libs/core/provider/capability-broker.ts` の Capability Broker は **LLMプロバイダ選択専用**。照合は完全一致キーのみで**曖昧/意味マッチは持たない**。→ 手順の意図解決をここに同居させてはいけない。**同じ知識駆動パターンを踏襲した別レジストリ**を作り、曖昧マッチは reasoning backend に委譲する。
 - `knowledge/product/governance/actuator-op-registry.json` の `browser` ドメインに既に2つの実行基盤がある：`extension_session`（ライブタブ実行）と Playwright 系 `click/fill/...`。→ パターンBの実行基盤はこの**両者を用途で振り分ける**。
 - pipeline は draft（`_draft:true`, `_review_required`, `version:"0.1.0-draft"`）と promoted（`pipelines/*.json`）で区別される。
 

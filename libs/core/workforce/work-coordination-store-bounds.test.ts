@@ -13,7 +13,7 @@ import {
 } from '../secure-io.js';
 import { validateWritePermission } from '../tier-guard.js';
 import { WORK_COORDINATION_ROOT_PATH } from '../foundation/runtime-state-roots.js';
-import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
+import { resetAppendOnlyStoreMaintenanceState } from '../storage/append-only-store.js';
 import {
   claimWorkItem,
   createWorkItemIfAbsent,

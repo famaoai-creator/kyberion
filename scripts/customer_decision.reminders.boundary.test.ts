@@ -82,16 +82,16 @@ const DIST_FILES = [
   'dist/scripts/customer_decision.js',
   'dist/scripts/customer-decision/reminders.js',
   'libs/core/dist/customer-decision/reminders.js',
-  'libs/core/dist/customer-conversation.js',
-  'libs/core/dist/customer-outbound-templates.js',
-  'libs/core/dist/customer-channel-binding.js',
+  'libs/core/dist/organization/customer-conversation.js',
+  'libs/core/dist/organization/customer-outbound-templates.js',
+  'libs/core/dist/organization/customer-channel-binding.js',
 ];
 const SOURCE_DIRS = ['scripts/customer-decision', 'libs/core/customer-decision'];
 const SOURCE_FILES = [
   'scripts/customer_decision.ts',
-  'libs/core/customer-conversation.ts',
-  'libs/core/customer-outbound-templates.ts',
-  'libs/core/customer-channel-binding.ts',
+  'libs/core/organization/customer-conversation.ts',
+  'libs/core/organization/customer-outbound-templates.ts',
+  'libs/core/organization/customer-channel-binding.ts',
 ];
 function staleDistReason(): string | null {
   const mtime = (relative: string) => {

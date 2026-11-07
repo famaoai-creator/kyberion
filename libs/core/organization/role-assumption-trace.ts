@@ -111,7 +111,7 @@ export function resolveRoleAssumptionTracePath(raw: string | undefined): string 
 }
 
 const AUTHORITY_FRAME =
-  /[\\/]libs[\\/]core[\\/](?:dist[\\/])?(?:authority|role-assumption-trace|foundation[\\/]execution-scope)\.[cm]?[jt]s\b/;
+  /[\\/]libs[\\/]core[\\/](?:dist[\\/])?(?:authority|organization[\\/]role-assumption-trace|foundation[\\/]execution-scope)\.[cm]?[jt]s\b/;
 
 /** Functions of the assumption path itself, recognised by name when bundled (Next.js chunks). */
 const AUTHORITY_FUNCTIONS = new Set([

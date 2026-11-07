@@ -11,7 +11,7 @@ import {
   getIntentPhraseMatcher,
 } from '../intent/intent-phrase-lexicon.js';
 import { detectTextLocale, type SupportedLocale } from '../foundation/locale-normalize.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import type { IntentResolutionContract } from '../intent/intent-resolution-contract-parser.js';
 
 export const CONVERSATION_TASK_MAX_TASKS = 64;

@@ -18,7 +18,7 @@ import {
   setWorkCoordinationNamespace,
 } from '../workforce/work-coordination.js';
 import { WorkerEventStream } from '../workforce/worker-event-stream.js';
-import { DynamicInjectionRegistry } from '../dynamic-injection.js';
+import { DynamicInjectionRegistry } from '../reasoning/dynamic-injection.js';
 import { writeMissionStateAtPath } from './mission-state-reader.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import type { MissionState } from './mission-types.js';

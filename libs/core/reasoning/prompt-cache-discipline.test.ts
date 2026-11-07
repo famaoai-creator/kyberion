@@ -15,7 +15,7 @@ import {
 import {
   mergeAdjacentSameRoleMessages,
   renderInjectionsAsSystemReminders,
-} from '../dynamic-injection.js';
+} from './dynamic-injection.js';
 
 describe('computeStablePrefixFingerprint', () => {
   it('is independent of object key order (canonical JSON)', () => {

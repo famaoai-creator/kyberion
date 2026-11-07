@@ -15,8 +15,8 @@ import {
   safeMkdir,
   safeReaddir,
 } from '../secure-io.js';
-import { streamTextLines } from '../jsonl-read.js';
-import { resolveSeamDefaultOrder } from '../seam-provider-selection.js';
+import { streamTextLines } from './jsonl-read.js';
+import { resolveSeamDefaultOrder } from '../provider/seam-provider-selection.js';
 import {
   LOCAL_STORAGE_BACKEND_ID,
   STORAGE_BACKEND_SEAM,

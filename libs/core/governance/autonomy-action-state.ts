@@ -38,7 +38,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { appendJsonLine, readJsonIfPresent } from '../foundation/json.js';
-import { readJsonLinesSince, streamJsonLines } from '../jsonl-read.js';
+import { readJsonLinesSince, streamJsonLines } from '../storage/jsonl-read.js';
 import {
   appendOnlyStoreLockId,
   appendOnlyStoreMaintenanceDue,
@@ -46,12 +46,12 @@ import {
   maintainStoreAfterAppend,
   type AppendOnlyStorePolicy,
   type MaintainStoreOutcome,
-} from '../append-only-store.js';
+} from '../storage/append-only-store.js';
 import { createLogger } from '../logger.js';
 import { storagePartitionSegments, PARTITIONED_RUNTIME_STATE_ROOTS } from '../storage-layout.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { loadAutonomyLearningPolicy } from './autonomy-learning-policy.js';
-import { appendRetentionAudit } from '../storage-retention-expiry.js';
+import { appendRetentionAudit } from '../storage/storage-retention-expiry.js';
 import type { AutonomousOpsDecision } from './autonomous-ops-gate.js';
 import { assertStoreGrantIssuanceAllowed } from '../authority.js';
 import {

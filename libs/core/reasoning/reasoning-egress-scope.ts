@@ -1,12 +1,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createLogger } from '../logger.js';
-import { evaluateEgressPolicy } from '../egress-policy.js';
+import { evaluateEgressPolicy } from '../governance/egress-policy.js';
 import {
   findActiveCharter,
   loadCharterUsage,
 } from '../governance/accountability-charter-registry.js';
 import { evaluateInformationFlow } from '../governance/accountability-charter.js';
-import { isLocalOnlyReasoningBackend } from '../backend-capability-profile.js';
+import { isLocalOnlyReasoningBackend } from './backend-capability-profile.js';
 import { assertSandboxNetworkAllowed } from '../shell/sandbox-policy.js';
 import {
   isLocalReasoningEndpoint,
@@ -25,7 +25,7 @@ import {
   custodyOwnerLabel,
   deriveCustodyOwner,
   type CustodyOwner,
-} from '../custody-owner.js';
+} from '../contracts/custody-owner.js';
 
 /**
  * Tier context for reasoning-backend sends.

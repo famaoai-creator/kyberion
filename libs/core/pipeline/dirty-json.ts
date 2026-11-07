@@ -2,7 +2,7 @@
  * dirty-json — bounded, deterministic repair of LLM-emitted broken JSON.
  *
  * Port of Agent Zero's `helpers/dirty_json.py` tolerant parsing to the
- * candidate-pipeline style of `libs/core/json-repair.ts`. Where `tryRepairJson`
+ * candidate-pipeline style of `libs/core/foundation/json-repair.ts`. Where `tryRepairJson`
  * stays conservative (it returns null rather than guessing), this module is
  * the more permissive LAST-RESORT stage for LLM output that is *almost* JSON:
  * trailing commas, single-quoted strings, unquoted keys/values, `//` and

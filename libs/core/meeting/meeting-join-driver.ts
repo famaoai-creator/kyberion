@@ -21,7 +21,7 @@ import { abortableAudioChunks } from './meeting-session-types.js';
 import { nowIso } from '../foundation/time.js';
 import type { AudioBus } from '../voice/audio-bus.js';
 import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
-import { resolveSeamDefaultProvider } from '../seam-provider-selection.js';
+import { resolveSeamDefaultProvider } from '../provider/seam-provider-selection.js';
 import {
   findMeetingPlatform,
   matchMeetingPlatformHost,

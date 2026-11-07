@@ -6,23 +6,23 @@ import * as path from 'node:path';
 import {
   verificationFreshness,
   type VerificationFreshness,
-} from '../verification-source-snapshot.js';
-import { MetricsCollector, metricsWithheldNotice } from '../metrics.js';
-import { resolveUsageCost } from '../cost-report.js';
-import { hasUsageCostEvidence } from '../usage-accounting.js';
+} from '../testing/verification-source-snapshot.js';
+import { MetricsCollector, metricsWithheldNotice } from '../analysis/metrics.js';
+import { resolveUsageCost } from '../finance/cost-report.js';
+import { hasUsageCostEvidence } from '../finance/usage-accounting.js';
 import { listApprovalRequests } from '../governance/approval-store-reader.js';
 import { listArtifactRecords } from '../workforce/artifact-record.js';
-import { buildNextAction, type NextAction } from '../next-action.js';
-import { listInboxEntries, type DeliverableInboxEntry } from '../deliverable-inbox.js';
+import { buildNextAction, type NextAction } from './next-action.js';
+import { listInboxEntries, type DeliverableInboxEntry } from '../task/deliverable-inbox.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from '../secure-io.js';
 import { loadMissionStateAtPath } from '../mission/mission-state-reader.js';
-import { loadSoftwareQualityReportAtPath } from '../software-quality-report-reader.js';
+import { loadSoftwareQualityReportAtPath } from '../testing/software-quality-report-reader.js';
 import { loadMissionStaffingAssignments } from '../mission/mission-team-binding.js';
-import { buildNhiLedgerReport } from '../nhi-lifecycle-governance.js';
+import { buildNhiLedgerReport } from '../agent/nhi-lifecycle-governance.js';
 import { loadMissionManagementConfig } from '../mission/mission-management-config.js';
 import { nowIso } from '../foundation/time.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 
 export interface OperatorHomeMissionItem {
   missionId: string;

@@ -24,8 +24,8 @@ import {
   renderIntentOutcomeLabel,
   type IntentResolutionContract,
 } from '../intent/intent-resolution-contract.js';
-import { resolveLocale, type SupportedLocale } from '../locale.js';
-import { t, type VocabularyKey } from '../t.js';
+import { resolveLocale, type SupportedLocale } from '../localization/locale.js';
+import { t, type VocabularyKey } from '../localization/t.js';
 import {
   AUTONOMY_APPROVAL_CHANNEL,
   renderDecisionCardExplanation,

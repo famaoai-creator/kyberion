@@ -4,7 +4,7 @@ import {
   type ObsSourceFilter,
   type ObsSourceFilterRequest,
   type ObsVirtualCameraOptions,
-} from '@agent/core/obs-virtual-camera-output';
+} from './obs-virtual-camera-output.js';
 import { getSecret } from '@agent/core/secret/secret-guard';
 import { resolveAuditChainKey } from '@agent/core/chain-integrity';
 import {

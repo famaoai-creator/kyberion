@@ -26,7 +26,7 @@ import {
 import { isOperationsHalted } from './operations-halt.js';
 import { getAutonomousOpsPolicy, type AutonomousOpsGateResult } from './autonomous-ops-gate.js';
 import { buildDecisionCard, type DecisionCardEvidence } from './decision-card.js';
-import { normalizeEventScope, type EventScopeInput } from '../event-scope.js';
+import { normalizeEventScope, type EventScopeInput } from '../event/event-scope.js';
 import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import {
   loadNotificationPreferences,

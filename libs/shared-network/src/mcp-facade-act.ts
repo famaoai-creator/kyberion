@@ -9,7 +9,7 @@
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { resolveMcpRequestContext } from '@agent/core/mcp-request-context';
+import { resolveMcpRequestContext } from './mcp-request-context.js';
 import { formatWireError } from '@agent/core/contracts/wire-error';
 import { invokeAllowlistedActuator, readActuatorInvokeAllowlist } from './mcp-actuator-invoke.js';
 import type { EnsureMcpApproval, RegisterGovernedTool, ToolCatalog } from './mcp-server-engine.js';

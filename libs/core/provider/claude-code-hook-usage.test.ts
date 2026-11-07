@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const recordMock = vi.fn();
-vi.mock('../metrics.js', () => ({ metrics: { record: (...a: any[]) => recordMock(...a) } }));
+vi.mock('../analysis/metrics.js', () => ({
+  metrics: { record: (...a: any[]) => recordMock(...a) },
+}));
 vi.mock('../governance/audit-chain.js', () => ({
   auditChain: { record: vi.fn(() => ({ id: 'x' })) },
 }));

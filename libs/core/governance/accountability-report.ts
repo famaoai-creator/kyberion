@@ -5,7 +5,7 @@
  * ledger, so it is deterministic and testable; delivery lives in the caller.
  */
 
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import {
   loadCharterObservationPolicy,
   type CharterObservationPolicy,

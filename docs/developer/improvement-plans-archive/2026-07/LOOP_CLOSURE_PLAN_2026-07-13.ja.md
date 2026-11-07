@@ -37,7 +37,7 @@ status: archived
 ⑥ 昇格: 成功ランの実行記録から pipelines/*.json へ昇格(LC-02)
 ```
 
-現状の裏付け: preflight は `scripts/refactor/adf-input.ts:46-60`(`validatePipelineAdf` → `validatePipelineGuardrails`、error は throw)。runtime 修復は `scripts/run_pipeline.ts:893-978`(`runStepWithRepair`、`attempt < 2` の有界ループ)+ `libs/core/autonomous-repair.ts:51-127`(LLM サブエージェント修復、permission/auth/config/env は fail-closed で ops エスカレーション)。修復結果は**元ファイルへの in-place 上書き**で永続化される。
+現状の裏付け: preflight は `scripts/refactor/adf-input.ts:46-60`(`validatePipelineAdf` → `validatePipelineGuardrails`、error は throw)。runtime 修復は `scripts/run_pipeline.ts:893-978`(`runStepWithRepair`、`attempt < 2` の有界ループ)+ `libs/core/pipeline/autonomous-repair.ts:51-127`(LLM サブエージェント修復、permission/auth/config/env は fail-closed で ops エスカレーション)。修復結果は**元ファイルへの in-place 上書き**で永続化される。
 
 ### LC-01: 決定論修復の復権(修復カスケードの「決定論→LLM」順序化) — P1 / S
 
@@ -67,7 +67,7 @@ status: archived
 
 ### 2.1 確立済みの型(再掲・正本参照)
 
-- **蒸留→一点判断**: 決定論 op で観測を蒸留(`distill_dom`、上限 12,000 字)してから `llm_decide` で一点だけ判断。選択肢があるなら**選択>生成**(options 外は拒否、単一選択肢は LLM 呼び出しなし)— `libs/core/semantic-decide.ts:33-86`(AR-07)。
+- **蒸留→一点判断**: 決定論 op で観測を蒸留(`distill_dom`、上限 12,000 字)してから `llm_decide` で一点だけ判断。選択肢があるなら**選択>生成**(options 外は拒否、単一選択肢は LLM 呼び出しなし)— `libs/core/reasoning/semantic-decide.ts:33-86`(AR-07)。
 - **schema 強制委譲**: `delegateStructured<T>`(retry-on-mismatch、既定2回)— HN-02 **DONE**。
 - **モデル/エフォート・ルーティング**: タスク単位 tier 解決 — MO-05 **DONE**。
 - **品質最大化**: high リスク実装タスクは best-of-2 + judge、文書 deliverable は draft→refine — MO-07 **稼働中(opt-out)**。
@@ -164,7 +164,7 @@ android/terminal への `llm_decide` 展開、蒸留ヘルパの system/network 
 
 ## 4.10 実装状況 追記(2026-07-13, Wave 2〜3 の一部完了)
 
-- **LC-11 実装済み**: `libs/core/review-reentry.ts`(governed 再突入キュー: enqueue / listPending / markProcessed + `buildReviewGapText`)。chronos の deliverable-review route が非 accept verdict でキュー投入(best-effort)。**mission finish は pending 再突入要求を completion reconciliation の gaps に合流**させ、既存 IL-04 goal loop が implementer+reviewer の rework task(`goal-gap-r<n>`)を生成・要求を processed 化(上限 `KYBERION_GOAL_LOOP_MAX_ROUNDS` 共用・超過は operator エスカレーション)。完了済みミッションは **`mission_controller review-reenter <ID>`**(round カウンタ共用、オペレータ明示実行のため上限なし)。テスト: review-reentry 4本 + mission_controller 特性化49本 + scripts/refactor 91本 + tsc 緑。
+- **LC-11 実装済み**: `libs/core/workforce/review-reentry.ts`(governed 再突入キュー: enqueue / listPending / markProcessed + `buildReviewGapText`)。chronos の deliverable-review route が非 accept verdict でキュー投入(best-effort)。**mission finish は pending 再突入要求を completion reconciliation の gaps に合流**させ、既存 IL-04 goal loop が implementer+reviewer の rework task(`goal-gap-r<n>`)を生成・要求を processed 化(上限 `KYBERION_GOAL_LOOP_MAX_ROUNDS` 共用・超過は operator エスカレーション)。完了済みミッションは **`mission_controller review-reenter <ID>`**(round カウンタ共用、オペレータ明示実行のため上限なし)。テスト: review-reentry 4本 + mission_controller 特性化49本 + scripts/refactor 91本 + tsc 緑。
 - **LC-01 実装済み**: `attemptAutonomousRepair` の前段に決定論カスケード(`tryRepairJson` + 修復後 validate)。パース不能な機械的破損は **LLM 呼び出しゼロ**で修復、パース可能な意味的破損のみ LLM へ。テスト2本追加(既存4本と共に緑)。
 - **LC-12 実装済み(v1)**: 再突入要求の enqueue 時に `human-rejection:<category>` の KnowledgeHint を persist(runtime hints → knowledge index 自動取り込み経由で次回同型作業の検索に乗る)+ KM-03 promotion queue へ memory candidate 投入(confidential tier、統治付き)。**残(v2)**: ワーカー brief への同型却下履歴の明示注入(現状は knowledge 検索経由)。
 - **未着手**: LC-02(pipeline:promote — 本計画の中核、次スライス推奨)、LC-05(rubric + lint)、LC-06(poor→redo)、LC-09(llm_decide 可観測化)、LC-03、LC-04(AR-07 残の追跡)、LC-10 残(CLI/会話ブリッジの ask-why)。

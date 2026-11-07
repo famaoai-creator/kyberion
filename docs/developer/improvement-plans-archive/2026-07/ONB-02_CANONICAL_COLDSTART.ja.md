@@ -59,10 +59,10 @@ status: archived
 
 - **受入 1(単一正本)**: `docs/INITIALIZATION.md` を正本と明記(冒頭に正本宣言を追加)。README の Quick Start と QUICKSTART §1 を「要約 + 正本リンク」に統一し、QUICKSTART の `onboard → reconcile` の順序矛盾を正本の `reconcile → onboard` に修正。AGENTS.md §3 の `install → build → surfaces:reconcile → onboard` は正本と整合済み。
 - **受入 2(Node 統一 + floor 検証)**: engines `>=24.0.0` を正とし、`.nvmrc` を `24` に、`docs/INITIALIZATION.md`・`docs/QUICKSTART.md`・`README.md`・`kyberion-toolchain.json`・`kyberion-runtime-baseline.json`・`error-classifier-rules.json`・`scripts/dependency_resolver.ts`(floor 22→24。依存 id `node22` は bundles/個人 overlay から参照される安定キーのため据え置き)・`Dockerfile`(`node:20-slim`→`node:24-slim`)を 24 に統一。CI workflows は既に 24。
-- **受入 3(preflight での floor 検出)**: `libs/core/environment-capability-probes.ts` に `node-version.floor` probe を新設。root `package.json` の `engines.node` を読み、`process.versions.node` を実バージョン比較(`>=` floor)。不足時は `nvm install 24 && nvm use 24` を日英併記で案内して失敗する。`kyberion-toolchain` / `kyberion-runtime-baseline` の `node-runtime` capability をこの probe に切替(従来はバイナリ存在確認のみで素通り)。Node 22 をシミュレートして exit 1 + 案内文言を確認済み。
+- **受入 3(preflight での floor 検出)**: `libs/core/daemon/environment-capability-probes.ts` に `node-version.floor` probe を新設。root `package.json` の `engines.node` を読み、`process.versions.node` を実バージョン比較(`>=` floor)。不足時は `nvm install 24 && nvm use 24` を日英併記で案内して失敗する。`kyberion-toolchain` / `kyberion-runtime-baseline` の `node-runtime` capability をこの probe に切替(従来はバイナリ存在確認のみで素通り)。Node 22 をシミュレートして exit 1 + 案内文言を確認済み。
 - **受入 4(Playwright)**: `playwright.chromium-browser` probe を新設(`PLAYWRIGHT_BROWSERS_PATH` / OS 別 `ms-playwright` キャッシュディレクトリの存在確認)。`kyberion-toolchain` に `playwright-chromium` capability を **optional** で追加し、未導入時は `pnpm prereq:check` が**非致命の警告**で `pnpm exec playwright install chromium` を案内(exit 0 のまま。実測確認済み)。`scripts/bootstrap_environment.ts` は optional capability を exit code に数えないよう修正。postinstall での自動ダウンロードは行わない(計画どおり既定は案内)。INITIALIZATION/QUICKSTART/README の手順に導入コマンドを明記。
 - **受入 5(allowBuilds)**: 先行コミット(`a6ae51a6`)で解決済み(ts-loader CJS 修正も同コミット)。
-- **テスト**: `libs/core/environment-capability-probes.test.ts` を新設(floor パース/比較、probe の充足・不足、Playwright ディレクトリ解決、案内文言)。既存 `environment-capability.test.ts`・`environment-doctor.test.ts` と合わせて 35 件パス。
+- **テスト**: `libs/core/daemon/environment-capability-probes.test.ts` を新設(floor パース/比較、probe の充足・不足、Playwright ディレクトリ解決、案内文言)。既存 `environment-capability.test.ts`・`environment-doctor.test.ts` と合わせて 35 件パス。
 
 **未了(スコープ外として明示)**:
 

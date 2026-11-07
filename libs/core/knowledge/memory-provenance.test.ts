@@ -16,9 +16,9 @@ import {
   memoryProvenanceStatePath,
   MEMORY_PROVENANCE_GRANT_ISSUANCE_RIGHT,
 } from './memory-provenance-capability.js';
-import { savePromotedMemoryRecord } from '../promoted-memory.js';
+import { savePromotedMemoryRecord } from './promoted-memory.js';
 import { createDistillCandidateRecord } from './distill-candidate-registry.js';
-import { registerEmbeddingBackend, resetEmbeddingBackend } from '../embedding-backend.js';
+import { registerEmbeddingBackend, resetEmbeddingBackend } from '../reasoning/embedding-backend.js';
 
 const cleanup = new Set<string>();
 afterEach(() =>

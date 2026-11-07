@@ -13,7 +13,7 @@ import {
 import { listSurfaceProviderManifests } from './surface-provider-manifest.js';
 import { resolveChannelMessageShape } from './channel-adapter-registry.js';
 import type { SurfaceDelegationReceiver } from './surface-provider-policy.js';
-import type { SurfaceIntentResolution } from '../router-contract.js';
+import type { SurfaceIntentResolution } from '../intent/router-contract.js';
 export type { SurfaceDelegationReceiver } from './surface-provider-policy.js';
 
 import type {

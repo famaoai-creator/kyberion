@@ -16,7 +16,7 @@ vi.mock('../secret/secret-guard.js', () => ({
     },
   },
 }));
-vi.mock('../chronos-access-registry.js', () => ({
+vi.mock('../authn/chronos-access-registry.js', () => ({
   issueChronosAccessToken: (input: Record<string, unknown>) => {
     issued.push(input);
     return { token: `raw-token-${issued.length}`, registration: { label: input.label } };

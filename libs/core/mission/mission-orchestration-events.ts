@@ -5,15 +5,15 @@ import * as path from 'node:path';
 import { pathResolver, rootDir } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '../secure-io.js';
 import { resolveSharedObservabilityDir } from '../analysis/observability-gate.js';
-import { spawnManagedProcess } from '../managed-process.js';
+import { spawnManagedProcess } from '../tool/managed-process.js';
 import { appendMissionOrchestrationJournalEntry } from './mission-orchestration-journal.js';
-import { resolveMissionDir } from '../owner-scope.js';
+import { resolveMissionDir } from '../governance/owner-scope.js';
 import { getDefaultWorkerEventStream } from '../workforce/worker-event-stream.js';
 import {
   redactEventScopeForShared,
   type EventScope,
   type EventScopeInput,
-} from '../event-scope.js';
+} from '../event/event-scope.js';
 import { redactCollaborationMetadata } from '../agent/agent-collaboration-events.js';
 import {
   resolveMissionOrchestrationScope,

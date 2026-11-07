@@ -1,0 +1,88 @@
+import { describe, expect, it, vi } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
+
+const mocks = vi.hoisted(() => ({
+  safeExecResult: vi.fn(() => ({ stdout: '{"ok":true,"text":"hello"}', stderr: '', status: 0 })),
+  safeExistsSync: vi.fn(() => true),
+  safeWriteFile: vi.fn(),
+}));
+
+vi.mock('@agent/core/secure-io', async () => {
+  const actual =
+    await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+  return {
+    ...actual,
+    safeExecResult: mocks.safeExecResult,
+    safeExistsSync: mocks.safeExistsSync,
+    safeWriteFile: mocks.safeWriteFile,
+  };
+});
+
+vi.mock('@agent/core/local-stt-discovery', () => ({ discoverLocalSttBackends: () => [] }));
+
+describe('apple speech file stt bridge', () => {
+  it('routes Apple Speech environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(
+        pathResolver.rootResolve('libs/shared-voice/src/apple-speech-file-stt-bridge.ts'),
+        {
+          encoding: 'utf8',
+        }
+      )
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
+  it('normalizes the native JSON envelope and rejects malformed shapes', async () => {
+    const { normalizeAppleSpeechFilePayload } = await import('./apple-speech-file-stt-bridge.js');
+
+    expect(normalizeAppleSpeechFilePayload([])).toBeUndefined();
+    expect(normalizeAppleSpeechFilePayload({ ok: 'true', text: 'hello' })).toBeUndefined();
+    expect(normalizeAppleSpeechFilePayload({ ok: true, text: 42 })).toBeUndefined();
+    expect(normalizeAppleSpeechFilePayload({ ok: false, error: 'no_speech_result' })).toEqual({
+      ok: false,
+      error: 'no_speech_result',
+    });
+  });
+
+  it('skips malformed stdout records before accepting a valid result', async () => {
+    mocks.safeExecResult.mockReturnValueOnce({
+      stdout: 'loader noise\n[]\n{"ok":true,"text":"hello","locale":"en-US"}\n',
+      stderr: '',
+      status: 0,
+    });
+    const { transcribeAudioFileWithAppleSpeech } =
+      await import('./apple-speech-file-stt-bridge.js');
+
+    expect(transcribeAudioFileWithAppleSpeech('AGENTS.md', { locale: 'en' })).toEqual({
+      text: 'hello',
+      locale: 'en-US',
+    });
+  });
+
+  it('rejects an audio input outside the repository', async () => {
+    mocks.safeExecResult.mockClear();
+    const { transcribeAudioFileWithAppleSpeech } =
+      await import('./apple-speech-file-stt-bridge.js');
+
+    expect(() => transcribeAudioFileWithAppleSpeech('/tmp/outside-call.wav')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+    expect(mocks.safeExecResult).not.toHaveBeenCalled();
+  });
+
+  it('keeps the declared local_only capability in the transcription result', async () => {
+    const { createAppleSpeechFileToTextBridge } = await import('./apple-speech-file-stt-bridge.js');
+    const bridge = createAppleSpeechFileToTextBridge();
+    const result = await bridge.transcribe({ audioPath: 'AGENTS.md', language: 'en' });
+    expect(bridge.capabilities?.local_only).toBe(true);
+    expect(result.capabilities).toEqual({
+      timestamps: false,
+      granularity: 'none',
+      local_only: true,
+    });
+    expect(mocks.safeWriteFile).toHaveBeenCalled();
+  });
+});

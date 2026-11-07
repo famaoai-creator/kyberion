@@ -9,7 +9,7 @@
  * `dot/tenants/<slug>/` copy (scope-offboarding PHYSICAL_LEGACY_TENANT_STATE_ROOTS).
  */
 
-import { assertPhysicalScopeSegment, physicalScopedPath } from '../physical-namespace.js';
+import { assertPhysicalScopeSegment, physicalScopedPath } from '../storage/physical-namespace.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
@@ -24,7 +24,7 @@ import {
 } from '../secure-io.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { writeJson } from '../foundation/json.js';
-import { readJsonLinesCached } from '../jsonl-tail.js';
+import { readJsonLinesCached } from '../storage/jsonl-tail.js';
 import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
 import { assertScopeContext } from '../foundation/scope-context-validation.js';
 import { storagePartitionSegments } from '../storage-layout.js';

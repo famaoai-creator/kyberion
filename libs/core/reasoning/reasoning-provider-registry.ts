@@ -27,10 +27,13 @@ import type {
   BackendUtilityFit,
   ThinkingLevel,
   ThinkingLevelMap,
-} from '../backend-capability-profile.js';
+} from './backend-capability-profile.js';
 import { pathResolver } from '../path-resolver.js';
-import { loadRegistryDirectory, type RegistryDirectoryOptions } from '../registry-directory.js';
-import { assertModuleInvariant } from '../invariants.js';
+import {
+  loadRegistryDirectory,
+  type RegistryDirectoryOptions,
+} from '../foundation/registry-directory.js';
+import { assertModuleInvariant } from '../foundation/invariants.js';
 import { isRecord } from '../foundation/text.js';
 import { resolveSecretIdentity } from '../secret/secret-identity.js';
 import { getSecretForIdentity } from '../secret/secret-guard.js';
@@ -39,6 +42,19 @@ import { isCredentialBindingRequired } from '../foundation/credential-binding.js
 import { createLogger } from '../logger.js';
 
 const logger = createLogger('reasoning-provider-registry');
+
+/** Normalize provider identities before route/vendor comparisons. */
+export function normalizeProviderName(value?: string): string | null {
+  const provider = String(value || '')
+    .trim()
+    .toLowerCase();
+  return provider || null;
+}
+
+/** Stable display identity for provider candidates and failover diagnostics. */
+export function candidateLabel(candidate: ReasoningBackendCandidate): string {
+  return candidate.label || candidate.backend.name || candidate.provider || 'unknown';
+}
 
 export interface ReasoningProviderCapabilities {
   reasoning: boolean;

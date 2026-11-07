@@ -1,0 +1,289 @@
+import * as path from 'node:path';
+import { resolveLocale } from '../localization/locale.js';
+import { localeToBcp47 } from '../foundation/locale-normalize.js';
+import { pathResolver } from '../path-resolver.js';
+import { TENANT_DEALS_DIR, TENANT_HOME_ROOT } from './tenant-home.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { nowIso } from '../foundation/time.js';
+import { readTextFile } from '../foundation/text.js';
+import { isValidTenantSlug } from '../entity-scope.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from '../secure-io.js';
+import { logger } from '../core.js';
+import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
+import { asDealStore, type DealRecord, type DealStage } from './deal-store.js';
+import type { ExtractedRequirements } from '../reasoning/reasoning-backend.js';
+import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
+import { getSpeechToTextBridge } from '../voice/speech-to-text-bridge.js';
+
+/**
+ * Customer conversation modes — the direct-to-customer paths (sales,
+ * customer support, upstream requirements elicitation) share one grounded
+ * handler (`runCustomerConversation`) but need different conversational
+ * *jobs*. The mode decides what the avatar is trying to accomplish in each
+ * turn; the disclosure policy is shared and absolute regardless of mode.
+ *
+ * Mode resolution: explicit binding override > deal stage mapping.
+ *  - inquiry/qualified/quote/contract → sales (advance the deal)
+ *  - discovery                        → requirements_hearing (elicit + record)
+ *  - won/delivering/delivered/invoiced → support (keep the customer unblocked)
+ */
+
+export type CustomerConversationMode = 'sales' | 'support' | 'requirements_hearing';
+
+const STAGE_TO_MODE: Readonly<Record<DealStage, CustomerConversationMode>> = {
+  inquiry: 'sales',
+  qualified: 'sales',
+  discovery: 'requirements_hearing',
+  quote: 'sales',
+  contract: 'sales',
+  won: 'support',
+  delivering: 'support',
+  delivered: 'support',
+  invoiced: 'support',
+  lost: 'sales',
+};
+
+export function resolveConversationMode(
+  binding: ResolvedCustomerBinding,
+  deal: Pick<DealRecord, 'stage'>
+): CustomerConversationMode {
+  const override = (binding.binding as { mode?: string }).mode;
+  if (override === 'sales' || override === 'support' || override === 'requirements_hearing') {
+    return override;
+  }
+  return STAGE_TO_MODE[deal.stage] || 'sales';
+}
+
+/**
+ * Conversation principles — the customer-facing analog of
+ * working-principles.ts: mechanical rules that keep any model tier
+ * professional and convergent. Shared across all modes.
+ */
+export const CUSTOMER_CONVERSATION_PRINCIPLES: readonly string[] = [
+  'Restate the customer ask in one sentence before answering, so misunderstandings surface immediately.',
+  'Every reply ends with exactly one concrete next step (a question to answer, a date to confirm, or an action you will take).',
+  'Ask at most ONE question per reply — the single most blocking one.',
+  'Never leave a customer question unaddressed: answer it from the grounding, or say you will confirm and escalate it.',
+  'Match the customer language and formality; keep replies under 10 sentences.',
+] as const;
+
+const MODE_PROMPT_LINES: Readonly<Record<CustomerConversationMode, readonly string[]>> = {
+  sales: [
+    'MODE: sales — your job this turn is to advance the deal one stage.',
+    '- Qualify in this order: need → decision process → timeline → budget. Fill the earliest gap first.',
+    '- Propose only solutions present in the SOLUTION CATALOG; map the customer need to a catalog item by name.',
+    '- Quote prices only when they are literally in the PRICE BOOK; otherwise escalate for a quote.',
+    '- If the customer signals readiness (asks about price, contract, start date), state the concrete next step toward quote/contract.',
+  ],
+  requirements_hearing: [
+    'MODE: requirements hearing — your job this turn is to make the requirements picture more complete.',
+    '- Coverage checklist, in priority order: goal/success criteria → users & scenarios → functional needs → non-functional needs (performance, security, availability) → constraints (budget, timeline, tech) → out-of-scope.',
+    '- Look at OPEN QUESTIONS in the deal context; ask the single most blocking one. If none are recorded, ask about the earliest uncovered checklist area.',
+    '- After the customer answers, confirm your understanding by restating what you captured in one or two bullet points.',
+    '- Never design solutions in this mode; capture what and why, not how.',
+  ],
+  support: [
+    'MODE: customer support — your job this turn is to unblock the customer.',
+    '- First identify: which deliverable/feature, what did they expect, what happened instead, since when.',
+    '- Ask for reproduction steps when the report is about broken behavior and steps are missing.',
+    '- If the KNOWN ISSUES notes cover it, give the documented workaround verbatim.',
+    '- Outages, data loss, or security concerns: apologize once, say the team is on it, and escalate immediately — do not troubleshoot inline.',
+  ],
+};
+
+export function buildModePromptLines(mode: CustomerConversationMode): string[] {
+  return [
+    ...MODE_PROMPT_LINES[mode],
+    '',
+    'CONVERSATION PRINCIPLES (all modes):',
+    ...CUSTOMER_CONVERSATION_PRINCIPLES.map((rule) => `- ${rule}`),
+  ];
+}
+
+/**
+ * Support grounding: tenant known-issues notes, so support-mode replies can
+ * cite documented workarounds instead of improvising.
+ */
+export function loadSupportGrounding(tenantSlug: string): { knownIssues: string; found: boolean } {
+  if (!isValidTenantSlug(tenantSlug)) {
+    throw new Error(`[CUSTOMER_SCOPE] invalid tenant slug: ${tenantSlug}`);
+  }
+  const candidates = [
+    assertSafeRepositoryPath(
+      pathResolver.knowledge(path.join('confidential', tenantSlug, 'support', 'known-issues.md')),
+      { allowMissingLeaf: true }
+    ),
+    assertSafeRepositoryPath(pathResolver.knowledge('product/sales/known-issues.md'), {
+      allowMissingLeaf: true,
+    }),
+  ];
+  for (const candidate of candidates) {
+    try {
+      if (safeExistsSync(candidate)) {
+        if (!safeLstat(candidate).isFile()) {
+          throw new Error(
+            '[CUSTOMER_GROUNDING] known-issues resource must be a regular file: ' + candidate
+          );
+        }
+        return {
+          knownIssues: readTextFile(candidate).slice(0, 4000),
+          found: true,
+        };
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('[CUSTOMER_GROUNDING]')) {
+        throw error;
+      }
+      // unreadable grounding is the same as missing grounding
+    }
+  }
+  return { knownIssues: '', found: false };
+}
+
+// ----- Requirements capture (requirements_hearing mode) -----
+
+export interface DealRequirementsCapture {
+  deal_id: string;
+  tenant_slug: string;
+  updated_at: string;
+  turns_captured: number;
+  requirements: ExtractedRequirements;
+}
+
+const DEAL_REQUIREMENTS_CAPTURE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/deal-requirements-capture.schema.json'
+);
+
+function dealRequirementsPath(tenantSlug: string, dealId: string): string {
+  if (!isValidTenantSlug(tenantSlug)) {
+    throw new Error(`[DEAL_SCOPE] invalid tenant slug: ${tenantSlug}`);
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{2,127}$/.test(dealId)) {
+    throw new Error(`[DEAL_SCOPE] invalid deal id: ${dealId}`);
+  }
+  // Lives in the deal's document directory (knowledge/confidential/<tenant>/deals/<id>/,
+  // same convention as deal-documents) — NOT as a sibling of DEAL-*.json,
+  // which listDeals() would misread as a deal record.
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve(
+      path.join(TENANT_HOME_ROOT, tenantSlug, TENANT_DEALS_DIR, dealId, 'requirements.json')
+    ),
+    { allowMissingLeaf: true }
+  );
+}
+
+function dealRequirementsCaptureCatalog(filePath: string) {
+  return defineCatalog<DealRequirementsCapture>({
+    id: 'deal-requirements-capture',
+    path: filePath,
+    schema: DEAL_REQUIREMENTS_CAPTURE_SCHEMA_PATH,
+  });
+}
+
+export function readDealRequirementsCapture(
+  tenantSlug: string,
+  dealId: string
+): DealRequirementsCapture | null {
+  const filePath = dealRequirementsPath(tenantSlug, dealId);
+  try {
+    return asDealStore(tenantSlug, () => {
+      if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return null;
+      return dealRequirementsCaptureCatalog(filePath).load();
+    });
+  } catch (err) {
+    logger.warn(
+      `[customer-conversation-modes] unreadable requirements capture ${filePath}: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return null;
+  }
+}
+
+export function saveDealRequirementsCapture(input: {
+  tenantSlug: string;
+  dealId: string;
+  requirements: ExtractedRequirements;
+}): DealRequirementsCapture {
+  const previous = readDealRequirementsCapture(input.tenantSlug, input.dealId);
+  const capture: DealRequirementsCapture = {
+    deal_id: input.dealId,
+    tenant_slug: input.tenantSlug,
+    updated_at: nowIso(),
+    turns_captured: (previous?.turns_captured || 0) + 1,
+    requirements: input.requirements,
+  };
+  const filePath = dealRequirementsPath(input.tenantSlug, input.dealId);
+  const validated = dealRequirementsCaptureCatalog(filePath).validate(capture, filePath);
+  asDealStore(input.tenantSlug, () => {
+    safeMkdir(path.dirname(filePath), { recursive: true });
+    safeWriteFile(filePath, JSON.stringify(validated, null, 2));
+  });
+  return validated;
+}
+
+/**
+ * Audio-first elicitation: transcribe a customer call recording on-device
+ * (SpeechToTextBridge — zero-config Apple STT on supported Macs) and fold
+ * the transcript into the deal's structured requirements draft. The path
+ * for 「打ち合わせ録音を渡すだけで要件ドラフトが育つ」.
+ */
+export async function ingestAudioIntoDealRequirements(input: {
+  tenantSlug: string;
+  dealId: string;
+  audioPath: string;
+  language?: string;
+  projectName?: string;
+}): Promise<{ transcript_path?: string; capture: DealRequirementsCapture } | null> {
+  const backend = getReasoningBackend();
+  if (backend.name === 'stub') {
+    logger.warn('[deal-requirements] stub reasoning backend — audio ingestion skipped');
+    return null;
+  }
+  const stt = getSpeechToTextBridge();
+  let transcript;
+  try {
+    transcript = await stt.transcribe({
+      audioPath: input.audioPath,
+      language: input.language || localeToBcp47(resolveLocale()),
+    });
+  } catch (err) {
+    logger.warn(
+      `[deal-requirements] transcription failed for ${input.audioPath}: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return null;
+  }
+  const previous = readDealRequirementsCapture(input.tenantSlug, input.dealId);
+  const requirements = await backend.extractRequirements({
+    sourceText: transcript.text,
+    projectName: input.projectName,
+    priorDraft: previous?.requirements,
+    language: input.language || 'ja',
+  });
+  const capture = saveDealRequirementsCapture({
+    tenantSlug: input.tenantSlug,
+    dealId: input.dealId,
+    requirements,
+  });
+  return {
+    ...(transcript.written_to ? { transcript_path: transcript.written_to } : {}),
+    capture,
+  };
+}
+
+/** Compact open-question list for the hearing prompt (top blockers first). */
+export function summarizeOpenQuestionsForPrompt(
+  capture: DealRequirementsCapture | null,
+  limit = 5
+): string {
+  const questions = (capture?.requirements.open_questions || [])
+    .filter((question) => (question.status || 'open') === 'open')
+    .sort((a, b) => Number(Boolean(b.blocking)) - Number(Boolean(a.blocking)))
+    .slice(0, limit)
+    .map((question) => `- ${question.blocking ? '[blocking] ' : ''}${question.question}`);
+  return questions.length > 0 ? questions.join('\n') : '- (none recorded yet)';
+}

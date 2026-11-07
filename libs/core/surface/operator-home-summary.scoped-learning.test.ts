@@ -31,7 +31,7 @@ vi.mock('../governance/approval-store-reader.js', async (importOriginal) => ({
   },
 }));
 // Unrelated stores are intentionally absent. No fixtures or raw filesystem IO.
-vi.mock('../metrics.js', () => ({
+vi.mock('../analysis/metrics.js', () => ({
   MetricsCollector: class {
     loadHistory() {
       return [];
@@ -40,7 +40,7 @@ vi.mock('../metrics.js', () => ({
   metricsWithheldNotice: () => undefined,
 }));
 vi.mock('../workforce/artifact-record.js', () => ({ listArtifactRecords: () => [] }));
-vi.mock('../deliverable-inbox.js', () => ({ listInboxEntries: () => [] }));
+vi.mock('../task/deliverable-inbox.js', () => ({ listInboxEntries: () => [] }));
 vi.mock('../mission/mission-management-config.js', () => ({
   loadMissionManagementConfig: () => ({ directories: {} }),
 }));
@@ -48,14 +48,14 @@ vi.mock('../mission/mission-state-reader.js', () => ({ loadMissionStateAtPath: (
 vi.mock('../mission/mission-team-binding.js', () => ({
   loadMissionStaffingAssignments: () => null,
 }));
-vi.mock('../software-quality-report-reader.js', () => ({
+vi.mock('../testing/software-quality-report-reader.js', () => ({
   loadSoftwareQualityReportAtPath: () => null,
 }));
-vi.mock('../nhi-lifecycle-governance.js', () => ({
+vi.mock('../agent/nhi-lifecycle-governance.js', () => ({
   buildNhiLedgerReport: () => ({ total: 0, orphans: [], by_status: {} }),
 }));
-vi.mock('../next-action.js', () => ({ buildNextAction: (input: unknown) => input }));
-vi.mock('../t.js', () => ({ t: (key: string) => key }));
+vi.mock('./next-action.js', () => ({ buildNextAction: (input: unknown) => input }));
+vi.mock('../localization/t.js', () => ({ t: (key: string) => key }));
 vi.mock('../secure-io.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../secure-io.js')>()),
   safeExistsSync: () => false,

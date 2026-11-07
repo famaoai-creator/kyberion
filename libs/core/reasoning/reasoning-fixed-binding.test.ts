@@ -28,7 +28,7 @@ vi.mock('./reasoning-egress-scope.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./reasoning-egress-scope.js')>()),
   assertReasoningEgressAllowed: vi.fn(),
 }));
-vi.mock('../metrics.js', () => ({ metrics: { record: vi.fn() } }));
+vi.mock('../analysis/metrics.js', () => ({ metrics: { record: vi.fn() } }));
 
 import { resolveReasoningRoute } from './reasoning-route-resolver.js';
 import { installReasoningBackends, resetReasoningBootstrap } from './reasoning-bootstrap.js';

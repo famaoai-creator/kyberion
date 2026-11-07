@@ -19,11 +19,11 @@ import {
   type OpPreflightCall,
   type OpPreflightListenerResult,
 } from './op-preflight.js';
-import { checkSpendGuard } from '../spend-guard.js';
+import { checkSpendGuard } from '../finance/spend-guard.js';
 import {
   validateContextSecurityScope,
   type ContextSecurityScope,
-} from '../context-security-scope.js';
+} from '../governance/context-security-scope.js';
 import {
   currentScopeEnvelope,
   envelopeNarrowRequestErrors,

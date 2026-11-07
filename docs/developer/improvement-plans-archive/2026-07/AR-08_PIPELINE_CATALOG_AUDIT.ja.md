@@ -14,7 +14,7 @@ status: archived
 
 - **静的監査ツール**: schema(`validatePipelineAdf`)+ guardrails(`validatePipelineGuardrails`)+ op 実在チェックを全 77 pipeline に適用するスクリプトを一時作成し実行(恒久化はしていない — 下記「残作業」参照)。
 - **実行監査**: 55/77 pipeline を実際に `pnpm pipeline --input ...` で実行し、静的検証だけでは見えない実行時バグを多数発見。
-- **修正済み・実行で検証済み**: 16 pipeline JSON + 共有エンジン2箇所(`scripts/run_pipeline.ts`, `libs/core/autonomous-repair.ts`)+ `libs/actuators/process-actuator/src/index.ts`。
+- **修正済み・実行で検証済み**: 16 pipeline JSON + 共有エンジン2箇所(`scripts/run_pipeline.ts`, `libs/core/pipeline/autonomous-repair.ts`)+ `libs/actuators/process-actuator/src/index.ts`。
 - **見つけたが未修正(要判断)**: 4件(下記「未解決の発見」)。
 
 ## 背景と課題
@@ -33,7 +33,7 @@ pipeline カタログには 77 件の JSON があるが、監査開始時点で�
 
 1. **`libs/actuators/process-actuator/src/index.ts`**: schema を静的 ESM JSON import(`import processActionSchema from '....schema.json'`)で読み込んでいたため、Node 24 の厳格な ESM ルールでモジュール読込時に即エラー。**`process:*` op を使う pipeline は全て機能しない状態だった**。`safeReadFile` + `JSON.parse` に置換し、`main()` 内の遅延読込に変更(修正: `libs/actuators/process-actuator/src/index.ts:1-17`)。
 2. **`scripts/run_pipeline.ts` の `runStepWithRepair`**: 自動修復リトライ時に「修復後のステップ定義」を `refreshedPipeline.steps.find(s => s.id === step.id || s.op === step.op)` で再検索していたが、**トップレベルの steps 配列しか見ておらず、`core:if`/`core:foreach` にネストしたステップを見つけられない**。さらに `op` 一致でのフォールバック検索が、たまたま同じ op を持つ無関係な別ステップを誤って選んでしまう実害を `system-upgrade-check.json` の実行で確認(nested な `system:shell` ステップの修復が、無関係な先行 `system:shell` ステップにすり替わった)。`id` のみで再帰探索する `findStepByIdRecursive` を追加し、`op` フォールバックを廃止(修正: `scripts/run_pipeline.ts`)。
-3. **`libs/core/autonomous-repair.ts` の `attemptAutonomousRepair`**: 修復サブエージェントが「セキュリティ境界の正当な拒否なので変更なし・人間にエスカレーション」と明言して**実際に何も変更しなかった**場合でも、`validate()`(schema/guardrails の再検証)が通れば無条件で `true`(修復成功)を返していた。`system-upgrade-check.json` の実行で実際に発生: personal→confidential のティア越境を伴う mission 作成をサブエージェントが正しく拒否したにも関わらず、呼び出し元は「修復成功」とログし、パイプライン全体を ✅ 成功として報告した(実際には mission は作成されておらず、セキュリティ境界自体は破られていない)。修復前後で対象ファイルの実体を diff し、**変更がなければ無条件で false を返す**ように修正(修正: `libs/core/autonomous-repair.ts`)。回帰テストを両ファイルに追加。
+3. **`libs/core/pipeline/autonomous-repair.ts` の `attemptAutonomousRepair`**: 修復サブエージェントが「セキュリティ境界の正当な拒否なので変更なし・人間にエスカレーション」と明言して**実際に何も変更しなかった**場合でも、`validate()`(schema/guardrails の再検証)が通れば無条件で `true`(修復成功)を返していた。`system-upgrade-check.json` の実行で実際に発生: personal→confidential のティア越境を伴う mission 作成をサブエージェントが正しく拒否したにも関わらず、呼び出し元は「修復成功」とログし、パイプライン全体を ✅ 成功として報告した(実際には mission は作成されておらず、セキュリティ境界自体は破られていない)。修復前後で対象ファイルの実体を diff し、**変更がなければ無条件で false を返す**ように修正(修正: `libs/core/pipeline/autonomous-repair.ts`)。回帰テストを両ファイルに追加。
 
 ### B. pipeline JSON 個別の不具合
 
@@ -88,4 +88,4 @@ pipeline カタログには 77 件の JSON があるが、監査開始時点で�
 
 ## 関連コミット/変更ファイル
 
-`knowledge/product/governance/security-policy.json`(承認済み権限付与)、`libs/actuators/process-actuator/src/index.ts`、`libs/core/autonomous-repair.ts`(+ test)、`scripts/run_pipeline.ts`(+ test)、`pipelines/{audit-verify-daily,aws-operations-simulation,ceo-strategic-report,chaos-actuator-down,contract-review,executive-narrative-bridge,fragments/intra-login,knowledge-sync,license-injection-inner,license-injection-outer,marketing-content,orchestration-jobs,promote-procedure,system-upgrade-execute,ui-voice-browser-smoke,voice-hello}.json`
+`knowledge/product/governance/security-policy.json`(承認済み権限付与)、`libs/actuators/process-actuator/src/index.ts`、`libs/core/pipeline/autonomous-repair.ts`(+ test)、`scripts/run_pipeline.ts`(+ test)、`pipelines/{audit-verify-daily,aws-operations-simulation,ceo-strategic-report,chaos-actuator-down,contract-review,executive-narrative-bridge,fragments/intra-login,knowledge-sync,license-injection-inner,license-injection-outer,marketing-content,orchestration-jobs,promote-procedure,system-upgrade-execute,ui-voice-browser-smoke,voice-hello}.json`

@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { humanActor } from '../actor.js';
+import { humanActor } from '../contracts/actor.js';
 import * as pathResolver from '../path-resolver.js';
 import { safeRmSync } from '../secure-io.js';
 import { acceptCharter, readCharterLedger } from '../governance/accountability-charter-registry.js';
@@ -76,7 +76,7 @@ vi.mock('../governance/approval-policy.js', async (original) => ({
   ...(await original<typeof import('../governance/approval-policy.js')>()),
   resolveApprovalPolicy: () => ({ requiresApproval: false, missingRequirements: [] }),
 }));
-vi.mock('../decision-rights.js', () => ({
+vi.mock('../organization/decision-rights.js', () => ({
   resolveDecisionRightsMatrix: () => ({}),
   evaluateDecisionRights: () => null,
 }));

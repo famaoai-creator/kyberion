@@ -2,7 +2,7 @@
  * mission executor; this host never interprets caller pass flags as authority. */
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { missionPathOrNull } from '../mission-lookup.js';
+import { missionPathOrNull } from '../mission/mission-lookup.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { readTextFile } from '../foundation/text.js';
 import { assertSafeRepositoryPath } from '../secure-io.js';

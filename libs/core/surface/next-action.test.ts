@@ -1,0 +1,93 @@
+import { describe, expect, it } from 'vitest';
+
+import { classifyError } from '../analysis/error-classifier.js';
+import {
+  buildCompletionNextAction,
+  buildNextActionFromError,
+  formatCompletionNextAction,
+} from './next-action.js';
+import { t } from '../localization/t.js';
+
+describe('next-action remediation commands', () => {
+  it('suggests the setup report for missing secrets', () => {
+    const action = buildNextActionFromError(classifyError('secret missing from keychain'));
+
+    expect(action).toMatchObject({
+      next_action_type: 'inspect_artifact',
+      suggested_command: 'pnpm kyberion setup report --persona first-time-user',
+    });
+  });
+
+  it('suggests the governed approval queue command', () => {
+    const action = buildNextActionFromError(classifyError('approval required to proceed'));
+
+    expect(action).toMatchObject({
+      next_action_type: 'run_command',
+      suggested_command: 'pnpm kyberion approvals',
+    });
+  });
+});
+
+describe('next-action completion path', () => {
+  it('builds a structured completion summary for satisfied goals', () => {
+    const action = buildCompletionNextAction({
+      goal: {
+        summary: 'Deliver the mission closeout note',
+        success_condition: 'The closeout note is saved',
+      },
+      reconciliation: {
+        satisfied: true,
+        delivered: ['evidence/closeout.md'],
+        gaps: [],
+        confidence: 0.93,
+        evidence_refs: ['evidence/closeout.md'],
+      },
+    });
+
+    expect(action).toMatchObject({
+      title: t('next_action:completion_confirmed'),
+      request: 'The closeout note is saved',
+      satisfied: true,
+      confidence: 0.93,
+      delivered: ['evidence/closeout.md'],
+      gaps: [],
+      evidence_refs: ['evidence/closeout.md'],
+    });
+    expect(action.next_step).toBe(t('next_action:completion_next_step_proceed'));
+
+    const lines = formatCompletionNextAction(action);
+    expect(lines).toEqual(
+      expect.arrayContaining([
+        `Completion: ${t('next_action:completion_confirmed')}`,
+        'Goal: The closeout note is saved',
+        'Satisfied: yes',
+        'Confidence: 0.93',
+        'Delivered: evidence/closeout.md',
+        'Evidence: evidence/closeout.md',
+      ])
+    );
+  });
+
+  it('surfaces gaps when the goal is not yet satisfied', () => {
+    const action = buildCompletionNextAction({
+      goal: {
+        summary: 'Deliver the mission closeout note',
+        success_condition: 'The closeout note is saved',
+      },
+      reconciliation: {
+        satisfied: false,
+        delivered: [],
+        gaps: ['No mission evidence refs were collected.'],
+        confidence: 0.35,
+      },
+    });
+
+    expect(action).toMatchObject({
+      title: t('next_action:completion_followup'),
+      satisfied: false,
+      confidence: 0.35,
+      gaps: ['No mission evidence refs were collected.'],
+    });
+    expect(action.next_step).toBe(t('next_action:completion_next_step_resolve'));
+  });
+});

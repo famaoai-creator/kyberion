@@ -34,7 +34,7 @@ vi.mock('../workforce/worker-event-stream.js', () => ({
 vi.mock('../reasoning/reasoning-failover.js', () => ({
   reasoningFailoverEventsPath: () => mocks.failoverPath.value,
 }));
-vi.mock('../metrics.js', () => ({
+vi.mock('../analysis/metrics.js', () => ({
   metrics: { loadHistory: mocks.history, loadResourceUsageHistory: mocks.usage },
 }));
 vi.mock('../tool/runtime-health-history.js', async (importOriginal) => ({
@@ -51,7 +51,7 @@ vi.mock('../discussion/discussion-store.js', () => ({
   readDiscussionEvents: mocks.roomEvents,
   readDiscussionRoom: mocks.room,
 }));
-vi.mock('../security-screen.js', () => ({ listQuarantineRecords: mocks.quarantine }));
+vi.mock('../governance/security-screen.js', () => ({ listQuarantineRecords: mocks.quarantine }));
 vi.mock('../task/task-session.js', () => ({ listTaskSessions: mocks.sessions }));
 
 import { pathResolver } from '../path-resolver.js';

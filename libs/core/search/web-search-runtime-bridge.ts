@@ -14,8 +14,8 @@ import {
   resolveSeamAutoProvider,
   type SeamProviderMetadata,
 } from '../seam.js';
-import { resolveSeamDefaultProvider } from '../seam-provider-selection.js';
-import { savedSeamDefaultFor } from '../seam-provider-selection.js';
+import { resolveSeamDefaultProvider } from '../provider/seam-provider-selection.js';
+import { savedSeamDefaultFor } from '../provider/seam-provider-selection.js';
 
 export interface WebSearchHit {
   title: string;
