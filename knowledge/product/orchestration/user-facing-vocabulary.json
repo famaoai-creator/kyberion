@@ -34702,6 +34702,61 @@
         "en": "{count} items need you",
         "ja": "あなた待ち {count} 件",
         "qps-ploc": "⟦{count} ïŧėɱş ñėėḓ ẏőů ŀőřėɱ ï⟧"
+      },
+      "training_member_not_found": {
+        "en": "Training progress is kept for registered members. Sign in as a member to record lessons.",
+        "ja": "研修の記録はメンバーごとに残します。メンバーとしてサインインすると記録できます。",
+        "qps-ploc": "⟦Ŧřȧïñïñɠ ṗřőɠřėşş ïş ķėṗŧ ƒőř řėɠïşŧėřėḓ ɱėɱƀėřş. Şïɠñ ïñ ȧş ȧ ɱėɱƀėř ŧő řėƈőřḓ ŀėşşőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "training_mark_done_local_only": {
+        "en": "Lessons can be marked done from this computer's own session.",
+        "ja": "「できた」の記録は、このコンピューターの本人のセッションからだけできます。",
+        "qps-ploc": "⟦Ŀėşşőñş ƈȧñ ƀė ɱȧřķėḓ ḓőñė ƒřőɱ ŧħïş ƈőɱṗůŧėř'ş őẇñ şėşşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "training_progress_invalid": {
+        "en": "That lesson could not be found. Reload the page and try again.",
+        "ja": "そのレッスンが見つかりませんでした。ページを再読み込みしてからお試しください。",
+        "qps-ploc": "⟦Ŧħȧŧ ŀėşşőñ ƈőůŀḓ ñőŧ ƀė ƒőůñḓ. Řėŀőȧḓ ŧħė ṗȧɠė ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "help_training_title": {
+        "en": "Training",
+        "ja": "トレーニング",
+        "qps-ploc": "⟦Ŧřȧïñïñɠ ŀőř⟧"
+      },
+      "help_training_lead": {
+        "en": "Short lessons, each with one thing to try for real.",
+        "ja": "一つずつ実際に試しながら覚える、短いレッスンです。",
+        "qps-ploc": "⟦Şħőřŧ ŀėşşőñş, ėȧƈħ ẇïŧħ őñė ŧħïñɠ ŧő ŧřẏ ƒőř řėȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "help_training_unavailable": {
+        "en": "Training could not be loaded. Reload the page to try again.",
+        "ja": "トレーニングを読み込めませんでした。ページを再読み込みしてください。",
+        "qps-ploc": "⟦Ŧřȧïñïñɠ ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. Řėŀőȧḓ ŧħė ṗȧɠė ŧő ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "help_track_not_found": {
+        "en": "That track is not in the catalog.",
+        "ja": "そのトラックは見つかりませんでした。",
+        "qps-ploc": "⟦Ŧħȧŧ ŧřȧƈķ ïş ñőŧ ïñ ŧħė ƈȧŧȧŀőɠ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "help_lessons_done": {
+        "en": "{done} of {total} done",
+        "ja": "{total} 件中 {done} 件できた",
+        "qps-ploc": "⟦{done} őƒ {total} ḓőñė ŀőřėɱ ï⟧"
+      },
+      "help_where_title": {
+        "en": "Where things are",
+        "ja": "どこで何をするか",
+        "qps-ploc": "⟦Ẇħėřė ŧħïñɠş ȧřė ŀőřėɱ⟧"
+      },
+      "help_engine_title": {
+        "en": "Agent and autonomy",
+        "ja": "エージェントと自律度",
+        "qps-ploc": "⟦Ȧɠėñŧ ȧñḓ ȧůŧőñőɱẏ ŀőřėɱ⟧"
+      },
+      "help_engine_sub": {
+        "en": "Engine, model and how far it may act alone",
+        "ja": "エンジン・モデルと、任せる範囲",
+        "qps-ploc": "⟦Ėñɠïñė, ɱőḓėŀ ȧñḓ ħőẇ ƒȧř ïŧ ɱȧẏ ȧƈŧ ȧŀőñė ŀőřėɱ ïṗşůɱ ḓő⟧"
       }
     },
     "operator": {

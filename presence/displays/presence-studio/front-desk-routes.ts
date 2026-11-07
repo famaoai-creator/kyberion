@@ -306,7 +306,9 @@ export function registerFrontDeskRoutes(app: express.Express): void {
         items,
         help: {
           label: catalogT(FRONT_DESK_HELP_LINK.label_key as VocabularyKey, undefined, locale),
-          href: FRONT_DESK_HELP_LINK.path,
+          // 使い方 is served by Concierge (Kyberion server phase 2).
+          href:
+            readFrontDeskSurfaceUrls()[FRONT_DESK_HELP_LINK.surface] + FRONT_DESK_HELP_LINK.path,
         },
         brand_tagline: catalogT('front_desk:brand_tagline', undefined, locale),
         aria_label: catalogT('front_desk:nav_aria_label', undefined, locale),

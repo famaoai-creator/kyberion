@@ -1,0 +1,118 @@
+/*
+ * 使い方 (/help, /help/<track>): track cards and lessons. Cards, buttons and
+ * badges are kyberion-base classes; tokens are --kb-ui-* only.
+ */
+.help-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-6);
+}
+
+.help-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-3);
+  min-width: 0;
+}
+
+.help-heading {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-lg);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.help-meta {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.help-back {
+  align-self: flex-start;
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.help-tracks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: var(--kb-ui-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.help-track {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  height: 100%;
+  padding: var(--kb-ui-space-5);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-lg);
+  box-shadow: var(--kb-ui-shadow-sm);
+  color: var(--kb-ui-text);
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.help-track:hover,
+.help-track:focus-visible {
+  border-color: var(--kb-ui-accent);
+}
+
+.help-track__title {
+  font-size: var(--kb-ui-font-size-md);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.help-track__open {
+  margin-top: auto;
+  font-size: var(--kb-ui-font-size-sm);
+  font-weight: 600;
+  color: var(--kb-ui-accent-text);
+}
+
+.help-lessons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.help-lesson {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  padding: var(--kb-ui-space-5);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-lg);
+  min-width: 0;
+}
+
+.help-lesson p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.help-lesson__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  margin: 0;
+  font-size: var(--kb-ui-font-size-md);
+  overflow-wrap: anywhere;
+}
+
+.help-lesson__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kb-ui-space-2);
+}
