@@ -35,13 +35,9 @@ describeStoreGrantBoundary(
       ],
       [
         'libs/core/tier-guard.ts',
-        ['storeGrantAuthorizes', 'storeGrantNarrowingDenial', 'storeGrantRules'],
+        ['storeGrantAuthorizes', 'storeGrantNarrowingDenial', 'storeGrantRule', 'storeGrantRules'],
       ],
-      [
-        'libs/core/foundation/narrow-store-role-denial.ts',
-        ['storeGrantNarrowingDenial', 'storeGrantRule'],
-      ],
-      ['libs/core/foundation/information-asset-coverage-capability.ts', ['storeGrantRule']],
+      ['libs/core/foundation/information-asset-coverage-access.ts', ['storeGrantRule']],
     ]),
   },
   { formerConsumers: ['libs/core/authority.ts'] }

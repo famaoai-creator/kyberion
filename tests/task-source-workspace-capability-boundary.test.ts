@@ -152,10 +152,11 @@ describe('Task source workspace window trusted import boundary', () => {
           `import {taskSourceWorkspaceGrantAllows} from '${target}';`
         ).length
       ).toBeGreaterThan(0);
-      // G3: tier-guard asks the store grant registry, which the grant module registers into.
+      // G3: tier-guard asks the store grant registry, which the grant module registers into;
+      // the generic role-narrowing evaluator stays store-agnostic too.
       expect(
         violations(
-          'libs/core/foundation/narrow-store-role-denial.ts',
+          'libs/core/foundation/role-narrowing-denial.ts',
           `import {taskSourceWorkspaceIoDenial} from '${target}';`
         ).length
       ).toBeGreaterThan(0);
