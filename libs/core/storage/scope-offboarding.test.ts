@@ -102,6 +102,12 @@ vi.mock('../secure-io.js', async () => {
     safeRmSync: (p: string, opts: any) => actual.rmSync(p, opts),
     safeExistsSync: (p: string) => actual.existsSync(p),
     safeReadFile: (p: string, opts: any) => actual.readFileSync(p, opts),
+    MAX_SNAPSHOT_READ_BYTES: 64 * 1024 * 1024,
+    safeReadFileSnapshot: (p: string, maxBytes: number) => {
+      const bytes = actual.readFileSync(p);
+      if (bytes.length > maxBytes) throw new Error('snapshot byte limit');
+      return bytes;
+    },
     loadJson: (p: string) => JSON.parse(actual.readFileSync(p, 'utf8')),
     safeMkdir: (p: string, opts: any) => actual.mkdirSync(p, opts),
     safeWriteFile: (p: string, data: string) => {
@@ -221,6 +227,8 @@ import {
 import { TENANT_RUNTIME_PARTITION_ROOTS } from '../storage-layout.js';
 import { restoreFromTrash, TRASH_REPO_SUBPATH } from './storage-janitor.js';
 import { STORAGE_RETENTION_AUDIT_FILENAME } from './storage-retention-catalog.js';
+import { withExecutionContext } from '../authority.js';
+import { recordDerivation } from '../information-assets/asset-derivation.js';
 
 const MISSION_ID = 'MIS-AL04-TEST';
 
@@ -1127,7 +1135,6 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     const outOfTree = `active/shared/cache/confidential/${TENANT}/spec.index`;
     const inTree = `${KNOWLEDGE_ROOT}/reports/summary.md`;
     const alreadyDeleted = `active/shared/cache/confidential/${TENANT}/old.index`;
-    const taint = { highestTier: 'confidential', tenants: [TENANT], prohibitExternal: true };
     const at = '2026-11-08T00:00:00.000Z';
     // The claimed `asset:` source must resolve in the tenant's ingest ledger —
     // partition-bounded honoring refuses records whose sources don't verify.
@@ -1141,26 +1148,6 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     ]);
     fs.mkdirSync(abs(`${KNOWLEDGE_ROOT}/reports`), { recursive: true });
     fs.writeFileSync(abs(`${KNOWLEDGE_ROOT}/reports/q1.md`), '# Q1');
-    writeJsonl(`${ledgerDir}/derivations.jsonl`, [
-      {
-        derived: { ref: `path:${outOfTree}`, path: outOfTree, kind: 'cache' },
-        sources: [`asset:${TENANT}:ing-aaaa@v1`],
-        taint,
-        recorded_at: at,
-      },
-      {
-        derived: { ref: `path:${inTree}`, path: inTree, kind: 'summary' },
-        sources: [`asset:${TENANT}:ing-aaaa@v1`],
-        taint,
-        recorded_at: at,
-      },
-      {
-        derived: { ref: `path:${alreadyDeleted}`, path: alreadyDeleted, kind: 'cache' },
-        sources: [`asset:${TENANT}:ing-aaaa@v1`],
-        taint,
-        recorded_at: at,
-      },
-    ]);
     writeJsonl(`${ledgerDir}/derivation-deletions.jsonl`, [
       {
         source_ref: `asset:${TENANT}:ing-aaaa@v1`,
@@ -1172,6 +1159,14 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     fs.writeFileSync(abs(inTree), 's');
     fs.mkdirSync(path.dirname(abs(outOfTree)), { recursive: true });
     fs.writeFileSync(abs(outOfTree), 'idx');
+    withExecutionContext('mission_controller', () => {
+      for (const derived of [outOfTree, inTree])
+        recordDerivation({
+          derived: { path: derived, kind: 'cache' },
+          sources: [{ kind: 'asset', tenant: TENANT, assetId: 'ing-aaaa', version: 1 }],
+          options: { rootDir: currentRoot() },
+        });
+    });
 
     const targets = collectScopeTargets('tenant', TENANT);
     // Out-of-tree derived path is reached through the ledger, not a hand list.
@@ -1185,6 +1180,92 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     expect(paths).not.toContain(inTree);
     expect(paths).not.toContain(alreadyDeleted);
   });
+
+  function seedDerivedChain(): { source: string; middle: string; leaf: string; ledger: string } {
+    const source = `${KNOWLEDGE_ROOT}/docs/origin.md`;
+    const middle = `active/shared/cache/confidential/${TENANT}/middle.txt`;
+    const leaf = `active/shared/artifacts/confidential/${TENANT}/leaf.txt`;
+    for (const file of [source, middle, leaf]) {
+      fs.mkdirSync(path.dirname(abs(file)), { recursive: true });
+      fs.writeFileSync(abs(file), file);
+    }
+    withExecutionContext('mission_controller', () => {
+      for (const [input, output] of [
+        [source, middle],
+        [middle, leaf],
+      ])
+        recordDerivation({
+          derived: { path: output!, kind: 'cache' },
+          sources: [{ kind: 'path', path: input! }],
+          options: { rootDir: currentRoot() },
+        });
+    });
+    return {
+      source,
+      middle,
+      leaf,
+      ledger: `active/shared/runtime/asset-derivations/confidential/${TENANT}`,
+    };
+  }
+
+  it('offboards a trusted transitive chain despite a stale path tombstone', () => {
+    const { middle, leaf, ledger } = seedDerivedChain();
+    writeJsonl(`${ledger}/derivation-deletions.jsonl`, [{ deleted_paths: [middle] }]);
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+    });
+    expect(result.status).toBe('offboarded');
+    expect(result.verification?.clean).toBe(true);
+    for (const file of [middle, leaf]) {
+      expect(result.soft_deleted).toContain(file);
+      expect(fs.existsSync(abs(file))).toBe(false);
+      expect(fs.existsSync(abs(`${result.export_path}/${file}`))).toBe(true);
+    }
+  });
+
+  it.each(['directory', 'replacement', 'modified'] as const)(
+    'refuses a derived %s swapped after export and preserves its lineage ledger',
+    (swap) => {
+      const { middle, ledger } = seedDerivedChain();
+      const original = fs.readFileSync(abs(middle), 'utf8');
+      const hooks = globalThis as { __kyberion_offboard_write_hook__?: (target: string) => void };
+      hooks.__kyberion_offboard_write_hook__ = (target) => {
+        if (path.basename(target) !== 'manifest.json') return;
+        delete hooks.__kyberion_offboard_write_hook__;
+        if (swap === 'modified') fs.writeFileSync(abs(middle), 'changed generation');
+        else {
+          fs.renameSync(abs(middle), `${abs(middle)}.original`);
+          if (swap === 'directory') {
+            fs.mkdirSync(abs(middle));
+            fs.writeFileSync(path.join(abs(middle), 'keep.txt'), 'unrelated child');
+          } else fs.writeFileSync(abs(middle), original);
+        }
+      };
+      try {
+        const result = offboardScope({
+          scopeType: 'tenant',
+          scopeId: TENANT,
+          mode: 'execute',
+          approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+        });
+        expect(result.status).toBe('error');
+        expect(result.soft_deleted).not.toContain(middle);
+        expect(result.verification?.clean).not.toBe(true);
+        expect(fs.existsSync(abs(middle))).toBe(true);
+        expect(fs.existsSync(abs(`${ledger}/derivations.jsonl`))).toBe(true);
+        expect(fs.readFileSync(abs(`${result.export_path}/${middle}`), 'utf8')).toBe(original);
+        if (swap === 'directory')
+          expect(fs.readFileSync(path.join(abs(middle), 'keep.txt'), 'utf8')).toBe(
+            'unrelated child'
+          );
+      } finally {
+        delete hooks.__kyberion_offboard_write_hook__;
+      }
+    }
+  );
 
   it('refuses a ledger line landing outside the offboarding tenant (no export exfil)', () => {
     const ledgerDir = `active/shared/runtime/asset-derivations/confidential/${TENANT}`;
@@ -1215,8 +1296,7 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     fs.mkdirSync(abs(`${KNOWLEDGE_ROOT}/docs`), { recursive: true });
     fs.writeFileSync(abs(`${KNOWLEDGE_ROOT}/docs/a.md`), 'a');
 
-    const targets = collectScopeTargets('tenant', TENANT);
-    expect(targets.map((t) => t.path)).not.toContain(victimPath);
+    expect(() => collectScopeTargets('tenant', TENANT)).toThrow();
     const result = offboardScope({
       scopeType: 'tenant',
       scopeId: TENANT,
@@ -1225,6 +1305,7 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
       nowIso: '2026-10-08T01:02:03.000Z',
     });
     expect(fs.existsSync(abs(victimPath))).toBe(true);
+    expect(result.status).toBe('error');
     expect(fs.existsSync(abs(`${result.export_path}/${victimPath}`))).toBe(false);
   });
 

@@ -21,6 +21,7 @@ import {
   parseDerivationRef,
   recordDerivation,
   listHonoredDerivedPathsForCustodian,
+  verifiedRecordSources,
   tenantFromRepoPath,
   type DerivationRef,
 } from './asset-derivation.js';
@@ -813,6 +814,44 @@ describe('asset-derivation (P3 contract)', () => {
       deleteAssetWithDerivations({ ref: { kind: 'path', path: g.source }, options: g.opts })
     ).toThrow(/DERIVATION_SOURCE_CHANGED/);
   });
+
+  it.each(['retargeted', 'removed'] as const)(
+    'retains multihop provenance and upstream verification after an ingest alias is %s',
+    (mode) => {
+      const g = freshGraph();
+      g.issue(g.intermediate, [{ kind: 'path', path: g.source }]);
+      writeIngestLedger(g.root, 'acme', g.intermediate, 'ing-upstream');
+      const [record] = g.issue(g.final, [
+        { kind: 'asset', tenant: 'acme', assetId: 'ing-upstream', version: 1 },
+      ]);
+      if (mode === 'removed') {
+        safeRmSync(path.join(g.root, 'knowledge/confidential/acme/_ledger/assets.jsonl'));
+      } else {
+        const replacement = 'knowledge/confidential/acme/docs/alias-replacement.md';
+        write(g.root, replacement, 'unrelated replacement');
+        writeIngestLedger(g.root, 'acme', replacement, 'ing-upstream');
+      }
+      const replay = { ...g.opts, strictLineage: true };
+      expect(
+        verifiedRecordSources(record, replay).some(
+          (source) =>
+            source.custody.kind === 'tenant' &&
+            source.custody.ref === 'acme' &&
+            source.taint.tenants.includes('acme') &&
+            source.taint.highestTier === 'confidential'
+        )
+      ).toBe(true);
+      // The saved alias must still traverse its original intermediate's
+      // provenance; consulting the mutable index would miss this corruption.
+      write(g.root, g.source, 'changed upstream original');
+      expect(() => verifiedRecordSources(record, replay)).toThrow(/DERIVATION_SOURCE_CHANGED/);
+      const next = 'active/shared/cache/confidential/shared/third-hop.md';
+      write(g.root, next);
+      expect(() => g.issue(next, [{ kind: 'path', path: g.final }])).toThrow(
+        /DERIVATION_SOURCE_CHANGED/
+      );
+    }
+  );
 
   it('selects the matching protected receipt among multiple output generations', () => {
     const g = freshGraph();

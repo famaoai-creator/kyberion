@@ -194,7 +194,7 @@ Work Visibility Scope、Binding Scope）はそのまま残る。このモデル�
 
 **P3 の実施（MSN-SCOPE-P3-20261107）。**
 
-- `libs/core/asset-derivation.ts` に派生関係を実装した。参照形式は一つ:
+- `libs/core/information-assets/asset-derivation.ts` に派生関係を実装した。参照形式は一つ:
   `asset:{tenant}:{id}@v{n}`（ingest 台帳の資産）と `path:{repo-relative}`
   （任意の資産パス）。memory provenance の記録は `memoryProvenanceRefs`
   で `path:` 参照に写像してつなぐ（内容ハッシュ・`external:` の origin
@@ -262,7 +262,7 @@ Work Visibility Scope、Binding Scope）はそのまま残る。このモデル�
   削除が見えなくならない）。保持期間側への接続口は
   `listDerivedPathsForCustodian` / `listDerivedRecordsForCustodian`
   （janitor 配線は後続段階）。
-- 受入 fixture テスト `libs/core/asset-derivation.test.ts`（19件）+
+- 受入 fixture テスト `libs/core/information-assets/asset-derivation.test.ts`（初期19件、レビュー修正で拡張）+
   `scope-offboarding.test.ts`（退会収集・外部着地点拒否）:
   資産→要約→蒸留（多段）・キャッシュ・委譲結果を記録し、資産削除で
   全て消えることを確認。加えて低 tier 区画への記録拒否・malformed
@@ -327,6 +327,21 @@ Work Visibility Scope、Binding Scope）はそのまま残る。このモデル�
 
 各段階は独立した PR とし、P1 から始める。P1 はガバナンスの中核を変えるので、
 独立レビューを必須とする。
+
+### P3 レビューによる信頼境界の補強（2026-11-08）
+
+上記の区画束縛だけでは、正しい源泉と無関係な system ファイルを組み合わせた
+偽造を拒否できない。custodian 台帳は索引として扱い、登録済みの同じ
+asset-derivations ストアの system 区画に、信頼する producer が源泉と出力の
+パス・内容ハッシュを結んだ発行証跡を先に記録する。この区画は read/metadata
+も含めて mission_controller・knowledge_steward・chronos_gateway に制限する。
+索引の行だけでは削除を認可しない。既存の未証明行や壊れた追跡情報があれば、
+退会は正常完了とせず、確認と再発行を必要とする。
+
+退会対象は信頼する多段階の閉包で求める。古いパス単位の削除監査では、
+現在存在するファイルを除外しない。収集時の inode・metadata・内容を export と
+削除の直前に再照合し、不一致なら停止して追跡台帳を残す。協調ロックは任意の
+外部プロセスによる置換を原子的に防ぐものではない。
 
 ## 非目標
 

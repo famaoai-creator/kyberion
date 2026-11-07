@@ -36,7 +36,10 @@ import {
   isPersistentInstructionPath,
 } from './foundation/persistent-instruction-effect.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
-import { PARTITIONED_RUNTIME_STATE_ROOTS } from './foundation/runtime-state-roots.js';
+import {
+  PARTITIONED_RUNTIME_STATE_ROOTS,
+  PARTITIONED_RUNTIME_LEDGER_ROOTS,
+} from './foundation/runtime-state-roots.js';
 // The policy gate is intentionally part of secure-io bootstrap; policy-engine
 // also validates policy-file paths through secure-io, so this known cycle must
 // remain explicit rather than being hidden by a second I/O implementation.
@@ -822,6 +825,17 @@ export function safeCopyFileSync(srcPath: string, destPath: string): void {
  * the source of permission; there is no role-name exception.
  */
 function assertRuntimeStateAggregateAccess(resolved: string, canonical: string): void {
+  const receipts = path.join(
+    pathResolver.rootDir(),
+    PARTITIONED_RUNTIME_LEDGER_ROOTS.asset_derivations,
+    'system'
+  );
+  // Guard ancestors as well as the receipt directory itself; an aggregate
+  // rename/removal must not bypass the protected producer issuance boundary.
+  if (isInside(resolved, receipts) !== undefined || isInside(canonical, receipts) !== undefined) {
+    const decision = validateWritePermission(receipts);
+    if (!decision.allowed) throw new Error(decision.reason);
+  }
   for (const relativeRoot of Object.values(PARTITIONED_RUNTIME_STATE_ROOTS)) {
     const root = path.join(pathResolver.rootDir(), relativeRoot);
     if (isInside(resolved, root) === undefined && isInside(canonical, root) === undefined) continue;
