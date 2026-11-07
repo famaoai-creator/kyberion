@@ -12,7 +12,7 @@
 
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { assertIntakeVectorEnabled } from '@agent/core/intake-vectors';
+import { assertIntakeVectorEnabled } from './lib/intake-vectors.js';
 import {
   listVaultMounts,
   mountToVault,

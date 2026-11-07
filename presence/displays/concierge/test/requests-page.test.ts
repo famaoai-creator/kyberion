@@ -109,8 +109,11 @@ describe('仕事 › 依頼 (/work?tab=requests) contract', () => {
     expect(hearing).toContain(
       'workInventoryHandoffHref(hearingScopedUrl(progressItem.href, viewer)'
     );
-    expect(read('src/app/api/work-inventory/candidates/route.ts')).toContain(
-      "personalView: resolved.selection.mode === 'personal'"
+    const candidates = read('src/app/api/work-inventory/candidates/route.ts');
+    expect(candidates).toContain("const personalView = resolved.selection.mode === 'personal'");
+    // The owner is the installation owner, never the credential source.
+    expect(candidates).toContain(
+      "resolveConciergeInstallationAccess(resolved.viewer, 'read', req)"
     );
     expect(inventory).toContain("t('ia_work_requests_inventory_choose_company')");
   });

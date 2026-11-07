@@ -220,15 +220,6 @@ export type {
 } from './virtual/virtual-camera-injection-bridge.js';
 
 export {
-  V4L2_VIRTUAL_CAMERA_BRIDGE_ID,
-  V4L2_VIRTUAL_CAMERA_CAPABILITIES,
-  V4l2VirtualCameraOutputBridge,
-  installV4l2VirtualCameraOutputBridge,
-} from './v4l2-virtual-camera-output.js';
-
-export type { V4l2VirtualCameraOutputOptions } from './v4l2-virtual-camera-output.js';
-
-export {
   VIRTUAL_MEDIA_DEVICE_CONTROL_BRIDGE_ID,
   createVirtualMediaDeviceControlBridge,
 } from './virtual/virtual-media-device-control-bridge.js';
@@ -319,19 +310,6 @@ export {
 } from './meeting/meeting-join-driver.js';
 
 export * from './meeting/meeting-platform-registry.js';
-
-export {
-  installObsVirtualCameraOutputBridge,
-  OBS_VIRTUAL_CAMERA_BRIDGE_ID,
-  OBS_VIRTUAL_CAMERA_CAPABILITIES,
-  ObsVirtualCamera,
-  ObsVirtualCameraOutputBridge,
-} from './obs-virtual-camera-output.js';
-
-export type {
-  ObsVirtualCameraBridgeOptions,
-  ObsVirtualCameraOptions,
-} from './obs-virtual-camera-output.js';
 
 export {
   recordActionItem,

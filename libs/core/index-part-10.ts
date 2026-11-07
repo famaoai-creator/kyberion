@@ -52,15 +52,6 @@ export { Semaphore, llmSemaphore } from './semaphore.js';
 
 // Prompt constraints (Paper2Any pattern — reusable output constraint fragments)
 
-// BlackHole routing guard (SIGINT safety — restores system mic on Ctrl+C)
-
-export {
-  markRouterActive,
-  markRouterInactive,
-  isRouterActive,
-  resetRouterSync,
-} from './blackhole-routing-guard.js';
-
 // ---------------------------------------------------------------------------
 // Intent-driven automation (P0-P4) — procedure catalog, compiler, dispatcher,
 // and self-repair.  All browser-execution types are in browser-extension-bridge

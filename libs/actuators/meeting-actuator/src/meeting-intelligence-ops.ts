@@ -21,7 +21,7 @@ import { delegateBestOf, getReasoningBackend } from '@agent/core/reasoning/reaso
 import { getVoiceBridge } from '@agent/core/voice/voice-bridge';
 import { loadMeetingFacilitatorPolicy } from '@agent/core/meeting/meeting-facilitator-policy';
 import { logger } from '@agent/core/core';
-import { matchRestrictedAction } from '@agent/core/restricted-action-policy';
+import { matchRestrictedAction } from './restricted-action-policy.js';
 import { listMissionSummaries } from '@agent/core/mission/mission-read-model';
 import {
   assertSafeRepositoryPath,
