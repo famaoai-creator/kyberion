@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { guardOpsRequest, requireOpsAccess } from '../../../../lib/ops/ops-request-guard';
 import { collectDeliverableInbox } from '../../../../lib/ops/deliverable-inbox';
+import { viewerPersonIds } from '@agent/core/surface/surface-authorization';
 import {
   resolveOpsViewerForRequest,
   strictViewerTier,
@@ -25,14 +26,13 @@ export async function GET(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
 
   let tenantSlugs: string[] | 'all';
+  let requestedTenant: string | undefined;
   let organizationIds: string[] | 'all';
   let projectIds: string[] | 'all';
   let tier: 'personal' | 'confidential' | 'public' | '';
   try {
-    tenantSlugs = strictViewerScopeTenantSlugs(
-      resolvedViewer.context,
-      readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
-    );
+    requestedTenant = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'));
+    tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
     organizationIds = strictViewerScopeOrganizationIds(
       resolvedViewer.context,
       readChronosOptionalStringParam(req.nextUrl.searchParams.get('organization_id'))
@@ -61,6 +61,9 @@ export async function GET(req: NextRequest) {
       tierAccess: resolvedViewer.context.tierAccess ?? ['public', 'confidential'],
       limit: Number.isFinite(limit) ? limit : 50,
       tenantSlugs,
+      requestedTenant,
+      includeUntenanted: resolvedViewer.context.includeUntenanted === true,
+      personIds: viewerPersonIds(resolvedViewer.context),
       organizationIds,
       projectIds,
     })

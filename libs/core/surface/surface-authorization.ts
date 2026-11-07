@@ -190,12 +190,15 @@ export function admitsCustody(
 
 /**
  * Derive the custody of a record scope: a tenant slug binds the record to
- * that tenant; absent a tenant, a person reference (`owner_nhi`) binds it to
- * that person; anything else is system custody. Records without a person
- * field keep their previous tenant/system behavior.
+ * that tenant; absent a tenant, a person reference binds it to that person;
+ * anything else is system custody. The person field is `owner_nhi` on
+ * memory-scope envelopes and `nhi_id` on governed (event-scope) records —
+ * approval-review-scope already treats the two as one binding
+ * (`owner.scope.owner_nhi !== approval.scope?.nhi_id`). Records without a
+ * person field keep their previous tenant/system behavior.
  */
 export function custodyOfScope(
-  scope: { tenant_slug?: unknown; owner_nhi?: unknown } | null | undefined
+  scope: { tenant_slug?: unknown; owner_nhi?: unknown; nhi_id?: unknown } | null | undefined
 ): ViewerRecordCustody {
   if (scope != null && (typeof scope !== 'object' || Array.isArray(scope)))
     return { kind: 'invalid' };
@@ -208,9 +211,13 @@ export function custodyOfScope(
   )
     return { kind: 'invalid' };
   if (scope?.owner_nhi != null && !validPersonId(scope.owner_nhi)) return { kind: 'invalid' };
+  if (scope?.nhi_id != null && !validPersonId(scope.nhi_id)) return { kind: 'invalid' };
+  if (scope?.owner_nhi != null && scope?.nhi_id != null && scope.owner_nhi !== scope.nhi_id)
+    return { kind: 'invalid' };
   if (typeof scope?.tenant_slug === 'string' && scope.tenant_slug)
     return { kind: 'tenant', ref: scope.tenant_slug };
   if (validPersonId(scope?.owner_nhi)) return { kind: 'person', ref: scope.owner_nhi };
+  if (validPersonId(scope?.nhi_id)) return { kind: 'person', ref: scope.nhi_id };
   return { kind: 'system' };
 }
 
@@ -227,6 +234,7 @@ export function admitsScopeAudience(
     | {
         tenant_slug?: string | null;
         owner_nhi?: string | null;
+        nhi_id?: string | null;
         allowed_audience?: readonly string[] | null;
       }
     | null

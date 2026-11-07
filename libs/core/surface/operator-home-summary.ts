@@ -681,8 +681,17 @@ export function collectOperatorHomeSummary(
         input.scope
       );
     }
-    if (!input.scope || !isScoped) return true;
     const scope = approval.scope;
+    const custody = custodyOfScope(scope);
+    // An unscoped or all-'all' filter still cannot admit another person's
+    // records — person custody is identity-bound, not scope-bound.
+    if (!input.scope || !isScoped)
+      return (
+        custody.kind === 'system' ||
+        custody.kind === 'tenant' ||
+        (custody.kind === 'person' &&
+          viewerPersonIds({ personIds: input.scope?.personIds }).includes(custody.ref))
+      );
     const missionId =
       scope?.mission_id || approval.requestedByContext?.missionId || approval.steering?.missionId;
     const tenantSlug = scope?.tenant_slug;
@@ -693,7 +702,6 @@ export function collectOperatorHomeSummary(
     const tier = scope?.tier;
     const organizationId = scope?.organization_id;
     const projectId = scope?.project_id;
-    const custody = custodyOfScope(scope);
     // A person-bound scope must reach the custody check even when it carries
     // none of the scope axes — the fallthroughs below would otherwise leak it
     // to the mission's tenant or the system selection.

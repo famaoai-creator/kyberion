@@ -333,7 +333,9 @@ export function toSurfaceAuthorizationContext(
  * `toSurfaceAuthorizationContext` above — a member-registry-aware `approver`
  * role has no server-side counterpart yet (FD-07).
  */
-export function toFrontDeskViewerScope(viewer: PresenceStudioViewerContext): SurfaceViewerScope {
+export function toFrontDeskViewerScope(
+  viewer: PresenceStudioViewerContext
+): SurfaceViewerScope & { principal?: ResolvedPrincipal } {
   return {
     role: viewer.source === 'loopback' ? 'localadmin' : 'readonly',
     tenantSlugs: viewer.tenantSlugs,
@@ -345,6 +347,7 @@ export function toFrontDeskViewerScope(viewer: PresenceStudioViewerContext): Sur
         : ['confidential', 'public'],
     source: viewer.source,
     principalId: viewer.principalId,
+    ...(viewer.principal ? { principal: viewer.principal } : {}),
     ...(viewer.principal?.memberId ? { memberId: viewer.principal.memberId } : {}),
   };
 }
@@ -383,7 +386,40 @@ export function presenceStudioRecordInScope(
   viewer: PresenceStudioViewerContext,
   value: unknown
 ): boolean {
-  return progressRecordInScope(toFrontDeskViewerScope(viewer), value);
+  const allowed = toFrontDeskViewerScope(viewer);
+  // Tier is an independent ceiling on the server adapter, not a custody
+  // property. Legacy records with no classification retain confidential.
+  let tier: 'personal' | 'confidential' | 'public' | undefined;
+  const seen = new WeakSet<object>();
+  const collectTier = (input: unknown, depth: number): boolean => {
+    if (!input || typeof input !== 'object' || Array.isArray(input) || depth > 3 || seen.has(input))
+      return false;
+    seen.add(input);
+    const record = input as Record<string, unknown>;
+    if (record.tier !== undefined) {
+      if (record.tier !== 'personal' && record.tier !== 'confidential' && record.tier !== 'public')
+        return false;
+      if (tier !== undefined && tier !== record.tier) return false;
+      tier = record.tier;
+    }
+    for (const key of [
+      'scope',
+      'scope_context',
+      'project',
+      'project_context',
+      'requestedByContext',
+      'context',
+      'metadata',
+    ]) {
+      if (record[key] != null && !collectTier(record[key], depth + 1)) return false;
+    }
+    return true;
+  };
+  return (
+    collectTier(value, 0) &&
+    allowed.tierAccess.includes(tier ?? 'confidential') &&
+    progressRecordInScope(allowed, value)
+  );
 }
 
 export function narrowPresenceStudioScope(

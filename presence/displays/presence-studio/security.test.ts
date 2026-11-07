@@ -8,6 +8,7 @@ import {
   presenceStudioVoiceStopSchema,
   requirePresenceStudioLocalAdmin,
   resolvePresenceStudioViewerContext,
+  presenceStudioRecordInScope,
 } from './security.js';
 
 function request(remoteAddress: string, authorization?: string) {
@@ -18,6 +19,41 @@ function request(remoteAddress: string, authorization?: string) {
 }
 
 describe('Presence Studio OS viewer scope', () => {
+  it('uses the shared exact person admission for a tenant-bound owner', () => {
+    const owner = { principalId: 'alice', tenantSlugs: ['acme'], source: 'token' as const };
+    expect(presenceStudioRecordInScope(owner, { scope: { nhi_id: 'alice' } })).toBe(true);
+    expect(presenceStudioRecordInScope(owner, { scope: { nhi_id: 'bob' } })).toBe(false);
+    expect(presenceStudioRecordInScope({ ...owner, tenantSlugs: 'all' }, { nhi_id: '' })).toBe(
+      false
+    );
+    expect(presenceStudioRecordInScope(owner, { owner_nhi: 'alice', nhi_id: 'bob' })).toBe(false);
+  });
+  it('keeps the server tier ceiling independent of exact owner custody', () => {
+    const remote = { principalId: 'alice', tenantSlugs: ['acme'], source: 'token' as const };
+    const local = { ...remote, source: 'loopback' as const };
+    for (const record of [
+      { nhi_id: 'alice', tier: 'personal' },
+      { scope: { nhi_id: 'alice', tier: 'personal' } },
+      { nhi_id: 'alice', metadata: { tier: 'personal' } },
+    ]) {
+      expect(presenceStudioRecordInScope(remote, record)).toBe(false);
+      expect(presenceStudioRecordInScope(local, record)).toBe(true);
+    }
+    expect(presenceStudioRecordInScope(remote, { nhi_id: 'alice' })).toBe(true);
+    for (const record of [
+      { nhi_id: 'alice', tier: 'public', scope: { tier: 'personal' } },
+      { nhi_id: 'alice', metadata: { tier: 123 } },
+      { nhi_id: 'alice', scope_context: { tier: 'unknown' } },
+    ])
+      expect(presenceStudioRecordInScope(local, record)).toBe(false);
+    expect(presenceStudioRecordInScope(local, { nhi_id: 'bob', tier: 'personal' })).toBe(false);
+    expect(
+      presenceStudioRecordInScope(
+        { ...local, organizationIds: ['org-a'] },
+        { nhi_id: 'alice', tier: 'personal', organization_id: 'org-b' }
+      )
+    ).toBe(false);
+  });
   afterEach(() => {
     vi.unstubAllEnvs();
   });
