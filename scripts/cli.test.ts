@@ -441,6 +441,11 @@ describe('Kyberion CLI helpers', () => {
   });
 
   it('reports not_found (exit 0, no writes) for a scope with no active trees', async () => {
+    vi.stubEnv('MISSION_ROLE', 'mission_controller');
+    vi.stubEnv('KYBERION_PERSONA', 'worker');
+    vi.stubEnv('SYSTEM_ROLE', '');
+    vi.stubEnv('KYBERION_TENANT', '');
+    vi.stubEnv('KYBERION_SUDO', '');
     const output: string[] = [];
     const previousExitCode = process.exitCode;
 
@@ -451,6 +456,23 @@ describe('Kyberion CLI helpers', () => {
     expect(output.join('\n')).toContain('"status": "not_found"');
     expect(output.join('\n')).toContain('"soft_deleted": []');
     expect(process.exitCode ?? 0).toBe(previousExitCode ?? 0);
+  });
+
+  it('denies a roleless offboarding query even when the lineage index is absent', async () => {
+    vi.stubEnv('MISSION_ROLE', '');
+    vi.stubEnv('KYBERION_PERSONA', '');
+    vi.stubEnv('SYSTEM_ROLE', '');
+    vi.stubEnv('KYBERION_TENANT', '');
+    vi.stubEnv('KYBERION_SUDO', '');
+    const output: string[] = [];
+    await expect(
+      main(['offboard', 'tenant', 'kyberion-cli-test-absent-tenant', '--json'], (value) =>
+        output.push(String(value))
+      )
+    ).rejects.toThrow();
+    expect(output.join('\n')).toContain('"status": "error"');
+    expect(output.join('\n')).toContain('DERIVATION_READ_SCOPE');
+    expect(output.join('\n')).toContain('"soft_deleted": []');
   });
 
   it('includes the offboarding command in detailed help output', async () => {

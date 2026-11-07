@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ViewerContext } from './ops-viewer';
 import {
   computeApprovalPresentedDigest,
   type ApprovalRequestRecord,
@@ -51,6 +52,50 @@ const base: ApprovalRequestRecord = {
 function tenantScope(tenant: string): ApprovalRequestRecord['scope'] {
   return { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant };
 }
+
+it('admits an exact person owner without weakening the other workspace ceilings', () => {
+  const owner: ViewerContext = {
+    role: 'localadmin',
+    source: 'token',
+    principalId: 'human:alice',
+    tenantSlugs: ['acme'],
+    organizationIds: 'all',
+    projectIds: 'all',
+    tierAccess: ['public', 'confidential'],
+  };
+  const workspace = {
+    selection: { kind: 'tenant' as const },
+    tenantSlugs: ['acme'],
+    organizationIds: 'all' as const,
+    projectIds: 'all' as const,
+    tierAccess: ['public' as const, 'confidential' as const],
+  };
+  const owned: ApprovalRequestRecord = {
+    ...base,
+    requestedByContext: undefined,
+    scope: { scope_kind: 'system', tier: 'confidential', nhi_id: 'human:alice' },
+  };
+  expect(approvalMatchesWorkspace(owned, workspace, owner)).toBe(true);
+  expect(approvalMatchesWorkspace(owned, workspace, { ...owner, principalId: 'human:bob' })).toBe(
+    false
+  );
+  expect(approvalMatchesWorkspace(owned, { ...workspace, tierAccess: ['public'] }, owner)).toBe(
+    false
+  );
+  expect(approvalMatchesWorkspace(owned, { ...workspace, organizationIds: ['org-a'] }, owner)).toBe(
+    false
+  );
+  expect(approvalMatchesWorkspace(owned, { ...workspace, projectIds: ['proj-a'] }, owner)).toBe(
+    false
+  );
+  expect(
+    approvalMatchesWorkspace(
+      owned,
+      { ...workspace, selection: { kind: 'tenant', tenant_slug: 'acme' } },
+      owner
+    )
+  ).toBe(false);
+});
 
 function withRequesterTenant(
   record: ApprovalRequestRecord,
