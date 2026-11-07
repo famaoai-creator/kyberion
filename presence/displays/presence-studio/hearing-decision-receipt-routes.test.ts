@@ -23,8 +23,12 @@ import {
   hearingRevision,
   type HearingDecisionOperation,
   type HearingRecord,
-} from './hearing.js';
-import { loadHearingRecord, saveHearingRecord, updateHearingRecord } from './hearing-runtime.js';
+} from '@agent/core/surface/hearing';
+import {
+  loadHearingRecord,
+  saveHearingRecord,
+  updateHearingRecord,
+} from '@agent/core/surface/hearing-runtime';
 import { registerHearingRoutes } from './hearing-routes.js';
 import * as security from './security.js';
 import { harness, response as clientResponse, flush } from './ask-client-test-harness.js';

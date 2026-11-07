@@ -69,4 +69,4 @@ secure-io はリポジトリ外を読めないので、`--impl` は `active/shar
 ## 投影キャンバス(SD-05)
 
 台帳ヒアリング(`scenario=decisions-<case>-<actor>`)のキャンバスはモデル生成ではなく、台帳・観測・突合結果からの決定論的な投影
-(`libs/core/decision-ledger/projection.ts` → presence-studio `hearing-ledger-canvas.ts`)。デザインは `resolveCreativeDesign` のトークンのみ。
+(`libs/core/decision-ledger/projection.ts` → `libs/core/surface/hearing-ledger-canvas.ts`)。デザインは `resolveCreativeDesign` のトークンのみ。

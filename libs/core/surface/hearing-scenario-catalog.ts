@@ -5,16 +5,15 @@
  * Mirrors `libs/core/organization/training-catalog.ts`'s `defineCatalog` pattern. Each
  * entry names the requirement set a hearing session walks through, which
  * canvas renderer owns the read-only preview (`web_app_preview`, the
- * existing model-drawn/template canvas in
- * `presence/displays/presence-studio/hearing-canvas.ts` +
+ * existing model-drawn/template canvas in `hearing-canvas.ts` +
  * `hearing-runtime.ts`'s `renderHearingCanvas`; `work_inventory_table`, the
- * deterministic table canvas in
- * `presence/displays/presence-studio/hearing-work-inventory.ts`), and which
- * governed hand-off the decided record confirms into
- * (`mission` via `hearing-mission-routes.ts`, `work_inventory` via the
- * `POST /api/hearing/:session/inventory` route in `hearing-routes.ts`).
+ * deterministic table canvas in `hearing-work-inventory.ts`, all next to
+ * this file), and which governed hand-off the decided record confirms into
+ * (`mission` via presence-studio's `hearing-mission-routes.ts`,
+ * `work_inventory` via the `POST /api/hearing/:session/inventory` route in
+ * its `hearing-routes.ts`).
  *
- * `presence/displays/presence-studio/hearing.ts`'s `WEB_APP_HEARING_SCENARIO`
+ * `hearing.ts`'s `WEB_APP_HEARING_SCENARIO`
  * is a thin derived constant read from this catalog's `web_app_build`
  * entry — the catalog is the single source of truth for that requirement
  * set, not a duplicate literal.
@@ -36,7 +35,7 @@ export type HearingScenarioHandoffKind = 'mission' | 'work_inventory';
 export interface HearingScenarioCatalogRequirement {
   id: string;
   /** A `front_desk:*` vocabulary key, never raw display text — see
-   * `presence/displays/presence-studio/hearing.ts`'s
+   * `hearing.ts`'s
    * `HearingScenarioRequirement.label_key` doc for the i18n-gate reason. */
   label_key: string;
   aliases?: string[];

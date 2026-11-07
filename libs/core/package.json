@@ -6296,6 +6296,10 @@
       "types": "./dist/surface/approval-publication-preview.d.ts",
       "default": "./dist/surface/approval-publication-preview.js"
     },
+    "./surface/ask-view": {
+      "types": "./dist/surface/ask-view.d.ts",
+      "default": "./dist/surface/ask-view.js"
+    },
     "./surface/browser-human-request": {
       "types": "./dist/surface/browser-human-request.d.ts",
       "default": "./dist/surface/browser-human-request.js"
@@ -6419,6 +6423,50 @@
     "./surface/front-desk-request-service": {
       "types": "./dist/surface/front-desk-request-service.d.ts",
       "default": "./dist/surface/front-desk-request-service.js"
+    },
+    "./surface/hearing": {
+      "types": "./dist/surface/hearing.d.ts",
+      "default": "./dist/surface/hearing.js"
+    },
+    "./surface/hearing-a2ui": {
+      "types": "./dist/surface/hearing-a2ui.d.ts",
+      "default": "./dist/surface/hearing-a2ui.js"
+    },
+    "./surface/hearing-canvas": {
+      "types": "./dist/surface/hearing-canvas.d.ts",
+      "default": "./dist/surface/hearing-canvas.js"
+    },
+    "./surface/hearing-completion": {
+      "types": "./dist/surface/hearing-completion.d.ts",
+      "default": "./dist/surface/hearing-completion.js"
+    },
+    "./surface/hearing-handoff-snapshot": {
+      "types": "./dist/surface/hearing-handoff-snapshot.d.ts",
+      "default": "./dist/surface/hearing-handoff-snapshot.js"
+    },
+    "./surface/hearing-ledger-canvas": {
+      "types": "./dist/surface/hearing-ledger-canvas.d.ts",
+      "default": "./dist/surface/hearing-ledger-canvas.js"
+    },
+    "./surface/hearing-mission": {
+      "types": "./dist/surface/hearing-mission.d.ts",
+      "default": "./dist/surface/hearing-mission.js"
+    },
+    "./surface/hearing-runtime": {
+      "types": "./dist/surface/hearing-runtime.d.ts",
+      "default": "./dist/surface/hearing-runtime.js"
+    },
+    "./surface/hearing-scope": {
+      "types": "./dist/surface/hearing-scope.d.ts",
+      "default": "./dist/surface/hearing-scope.js"
+    },
+    "./surface/hearing-storage-access": {
+      "types": "./dist/surface/hearing-storage-access.d.ts",
+      "default": "./dist/surface/hearing-storage-access.js"
+    },
+    "./surface/hearing-work-inventory": {
+      "types": "./dist/surface/hearing-work-inventory.d.ts",
+      "default": "./dist/surface/hearing-work-inventory.js"
     },
     "./surface/human-request-runtime-config": {
       "types": "./dist/surface/human-request-runtime-config.d.ts",
