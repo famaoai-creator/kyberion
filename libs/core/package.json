@@ -524,10 +524,6 @@
       "types": "./dist/apple-intelligence-bridge.d.ts",
       "default": "./dist/apple-intelligence-bridge.js"
     },
-    "./apple-speech-file-stt-bridge": {
-      "types": "./dist/apple-speech-file-stt-bridge.d.ts",
-      "default": "./dist/apple-speech-file-stt-bridge.js"
-    },
     "./approval-audit": {
       "types": "./dist/governance/approval-audit.d.ts",
       "default": "./dist/governance/approval-audit.js"

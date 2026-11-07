@@ -48,7 +48,7 @@ import {
 } from '@agent/core/voice/streaming-stt-bridge';
 import { getStreamingTtsBridge } from '@agent/core/voice/streaming-tts-bridge';
 import { installAppleSpeechToTextBridgeIfAvailable } from '@agent/core/apple-intelligence-bridge';
-import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/core/apple-speech-file-stt-bridge';
+import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/shared-voice/apple-speech-file-stt-bridge';
 import {
   installManagedMlxWhisperStreamingSttBridgeIfAvailable,
   installShellStreamingSttBridgeFromEnv,

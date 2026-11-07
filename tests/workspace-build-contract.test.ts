@@ -482,6 +482,54 @@ describe('Workspace build contract', () => {
     }
   });
 
+  it('keeps the Apple speech file STT bridge in shared-voice with the VAD backends', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const voice = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-voice/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./apple-speech-file-stt-bridge']).toBeUndefined();
+    for (const suffix of ['.ts', '.test.ts']) {
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/core/apple-speech-file-stt-bridge${suffix}`))
+      ).toBe(false);
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/shared-voice/src/apple-speech-file-stt-bridge${suffix}`)
+        )
+      ).toBe(true);
+    }
+    for (const suffix of ['.js', '.d.ts', '.js.map', '.d.ts.map']) {
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/core/dist/apple-speech-file-stt-bridge${suffix}`))
+      ).toBe(false);
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/shared-voice/dist/apple-speech-file-stt-bridge${suffix}`)
+        )
+      ).toBe(true);
+    }
+    expect(voice.exports['./apple-speech-file-stt-bridge']).toEqual({
+      types: './dist/apple-speech-file-stt-bridge.d.ts',
+      default: './dist/apple-speech-file-stt-bridge.js',
+    });
+    // The STT seam contract, local backend discovery, locale/env plumbing,
+    // and secure exec stay in core; only the Apple Speech backend moved.
+    for (const subpath of [
+      './voice/speech-to-text-bridge',
+      './local-stt-discovery',
+      './locale',
+      './foundation/env',
+      './secure-io',
+      './path-resolver',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
   it('keeps the OBS virtual-camera output in shared-video with its filter provider', () => {
     const core = JSON.parse(
       safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
