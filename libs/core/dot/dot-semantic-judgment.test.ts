@@ -291,6 +291,10 @@ describe('contract-only dot semantic observer (no production reservation/provide
       path.join(sourceRoot, 'knowledge/product/governance/agent-policies.yaml'),
       path.join(fixtureRoot, 'knowledge/product/governance/agent-policies.yaml')
     );
+    copy(
+      path.join(sourceRoot, 'knowledge/product/governance/security-policy.json'),
+      path.join(fixtureRoot, 'knowledge/product/governance/security-policy.json')
+    );
     bootstrapIo.safeWriteFile(path.join(fixtureRoot, 'package.json'), '{}');
     vi.stubEnv('KYBERION_ROOT', fixtureRoot);
     vi.stubEnv('MISSION_ROLE', 'mission_controller');

@@ -46,6 +46,7 @@ describe('virtual office surface', () => {
     // (schemas are already covered wholesale by the knowledge/product/schemas
     // copy above).
     const REQUIRED_GOVERNED_CATALOGS = [
+      'product/governance/security-policy.json',
       'product/governance/provider-config.json',
       'product/governance/tasktype-artifact-map.json',
       'public/common/project_standards.json',

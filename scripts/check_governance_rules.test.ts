@@ -1,24 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeUnlinkSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   discoverGovernanceRuleChecks,
   findDeterministicCatalogViolations,
+  runCheckGovernanceRules,
 } from './check_governance_rules.js';
 
 const GOVERNANCE_DIR = pathResolver.rootResolve('knowledge/product/governance');
 const TEST_FILE = path.join(GOVERNANCE_DIR, 'test-governance-deterministic.json');
-
-function runGovernanceCheck(): { status: number | null; stderr: string } {
-  const result = spawnSync(
-    process.execPath,
-    ['--import', './scripts/ts-loader.mjs', 'scripts/check_governance_rules.ts'],
-    { cwd: pathResolver.rootDir(), encoding: 'utf8' }
-  );
-  return { status: result.status, stderr: result.stderr || '' };
-}
 
 describe('check_governance_rules', () => {
   let savedPersona: string | undefined;
@@ -56,13 +47,21 @@ describe('check_governance_rules', () => {
     );
   });
 
-  it('reports violations through the shared script failure boundary', () => {
+  it('reports violations through the shared script failure boundary', async () => {
     safeWriteFile(TEST_FILE, JSON.stringify({ version: '1.0.0' }));
 
-    const result = runGovernanceCheck();
-
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain('[check:governance-rules] violations detected:');
-    expect(result.stderr).toContain('test-governance-deterministic.json');
+    const previousExitCode = process.exitCode;
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      process.exitCode = undefined;
+      await runCheckGovernanceRules([]);
+      expect(process.exitCode).toBe(1);
+      const output = stderr.mock.calls.map((args) => args.join(' ')).join('\n');
+      expect(output).toContain('[check:governance-rules] violations detected:');
+      expect(output).toContain('test-governance-deterministic.json');
+    } finally {
+      stderr.mockRestore();
+      process.exitCode = previousExitCode;
+    }
   });
 });

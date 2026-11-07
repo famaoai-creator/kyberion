@@ -11,6 +11,7 @@ import { roleNarrowingDenial } from './role-narrowing-denial.js';
 import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
+import { withExecutionContext } from '../authority.js';
 
 vi.mock('../governance/audit-chain.js', () => ({
   auditChain: { record: vi.fn() },
@@ -116,7 +117,11 @@ describe('G4 custody on the request ceiling', () => {
           // not disclosure, so the persona gate still denies personal-tier
           // reads for a bare process (P4 wires the viewer path).
           expect(resourceAccessDenial(PERSON_CHARTER, 'read')).toBeNull();
-          const personal = validateReadPermission(abs(PERSON_CHARTER));
+          const personal = withExecutionContext(
+            'worker',
+            () => validateReadPermission(abs(PERSON_CHARTER)),
+            'worker'
+          );
           expect(personal.allowed).toBe(false);
           expect(personal.reason).not.toContain('RESOURCE_SCOPE');
           expect(validateWritePermission(abs(exact)).allowed).toBe(true);
