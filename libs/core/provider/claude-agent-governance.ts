@@ -175,7 +175,7 @@ export function createKyberionCanUseTool(options: KyberionCanUseToolOptions = {}
         // SA-05 Task 3.3: the approval gate is the single decision source —
         // a pending request is created for the operator; retry passes once
         // it is approved. Until then the call stays denied (fail-closed).
-        const { requireApprovalForOp } = await import('../risky-op-registry.js');
+        const { requireApprovalForOp } = await import('../governance/risky-op-registry.js');
         const approval = requireApprovalForOp({
           opId: 'subagent:bash',
           agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'sub-agent',

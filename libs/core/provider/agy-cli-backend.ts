@@ -18,7 +18,7 @@ import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js'
 import {
   markDelegationExecutionStarted,
   runStartReportingDelegation,
-} from '../delegation-execution-tracker.js';
+} from '../workforce/delegation-execution-tracker.js';
 import {
   buildDelegationSpawnEnv,
   newDelegationSessionId,
@@ -67,7 +67,7 @@ import {
   getSubagentCapabilityProfile,
   resolveCapabilityProfileForTeamRole,
   type SubagentCapabilityProfile,
-} from '../subagent-capability-profiles.js';
+} from '../workforce/subagent-capability-profiles.js';
 import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
 
 export interface AgyHarnessSession {

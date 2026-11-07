@@ -50,7 +50,7 @@ import {
   clearCoSessionNamespace,
   clearCoSessionStore,
   setCoSessionNamespace,
-} from '../co-session.js';
+} from '../workforce/co-session.js';
 import {
   buildPostCompactionContext,
   buildSessionEndContext,

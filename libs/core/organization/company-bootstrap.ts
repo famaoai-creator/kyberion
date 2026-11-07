@@ -24,7 +24,7 @@ import {
 } from '../secure-io.js';
 import { readTextFile } from '../foundation/index.js';
 import { loadOrganizationProfileAtPath } from './organization-profile.js';
-import { isStanceEntry, stanceDirForSlug } from '../stance-resolver.js';
+import { isStanceEntry, stanceDirForSlug } from '../authn/stance-resolver.js';
 import { tenantHomeDir } from './tenant-home.js';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;

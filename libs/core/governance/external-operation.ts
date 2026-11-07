@@ -3,7 +3,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { currentScopeEnvelope } from '../scope-envelope.js';
-import { normalizeEventScope, type EventScopeInput } from '../event-scope.js';
+import { normalizeEventScope, type EventScopeInput } from '../event/event-scope.js';
 import { enforceApprovalGate, type ApprovalGateResult } from './approval-gate.js';
 import type { ApprovalGateCharterInput } from './approval-gate-charter.js';
 import { computeApprovalPayloadHash } from './approval-presentation.js';

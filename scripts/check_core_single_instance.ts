@@ -15,6 +15,8 @@
  * Type-only imports are erased and never load a module. Tests are out of scope:
  * vitest aliases @agent/core to source, so a test process has one instance, and
  * its white-box imports are governed by tests/package-boundary-contract.test.ts.
+ * The exact package.json manifest is metadata: importing its export map does
+ * not load any core implementation or duplicate a module-private registry.
  *
  * Exceptions are exact files with a reason; an entry that no longer imports
  * libs/core relatively fails the gate so the list cannot go stale.
@@ -133,15 +135,19 @@ export function runtimeSpecifiers(relative: string, text: string): string[] {
 export function coreRelativeImports(relative: string, text: string): string[] {
   if (relative === CORE_DIR || relative.startsWith(CORE_DIR + '/')) return [];
   if (!CANDIDATE.test(text)) return [];
-  return runtimeSpecifiers(relative, text).filter((specifier) =>
-    intoCore(resolveSpecifier(relative, specifier))
-  );
+  return runtimeSpecifiers(relative, text).filter((specifier) => {
+    const target = resolveSpecifier(relative, specifier);
+    return intoCore(target) && target !== `${CORE_DIR}/package.json`;
+  });
 }
 
 function walk(relativeDir: string, files: string[]): void {
   for (const entry of safeReaddir(path.join(ROOT, relativeDir))) {
     if (entry.startsWith('.') || SKIP_DIRS.has(entry)) continue;
     const relative = relativeDir ? `${relativeDir}/${entry}` : entry;
+    // Legacy root-level runtime metrics are redirected to each Vitest fixture.
+    // They are not production source; retain any nested code directory named work.
+    if (relative === 'work') continue;
     if (relative === CORE_DIR) continue;
     const stat = safeLstat(path.join(ROOT, relative));
     if (stat.isSymbolicLink()) continue;

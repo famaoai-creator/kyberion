@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { runWithReplyLocale } from '../locale.js';
+import { runWithReplyLocale } from '../localization/locale.js';
 import type {
   FrontDeskExecutionMapping,
   FrontDeskExecutionProjection,

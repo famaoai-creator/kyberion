@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import * as writerLease from '../writer-lease.js';
+import * as writerLease from '../lease/writer-lease.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeAppendFileSync, safeExistsSync, safeMkdir, safeRmSync } from '../secure-io.js';
 import { withExecutionContext } from '../authority.js';

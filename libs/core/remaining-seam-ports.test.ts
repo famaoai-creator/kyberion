@@ -5,7 +5,7 @@ import { coreSeamCatalog } from './seam.js';
 import {
   executeRegisteredSuperPipeline,
   registerSuperNerveExecutor,
-} from './super-nerve-execution-port.js';
+} from './pipeline/super-nerve-execution-port.js';
 import {
   listDemotedProviders,
   registerHealthyInstancesResolver,

@@ -1,6 +1,6 @@
 import { appendJsonLine, parseSafeJsonInput, readJsonLines } from '../foundation/json.js';
 import * as path from 'node:path';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { randomUUID } from 'node:crypto';
 import { pathResolver, findMissionPath } from '../path-resolver.js';
 import {
@@ -14,15 +14,18 @@ import {
 import { logger } from '../core.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
-import { deriveMissionOutcome, validateMissionHeuristics } from '../heuristic-feedback.js';
+import {
+  deriveMissionOutcome,
+  validateMissionHeuristics,
+} from '../knowledge/heuristic-feedback.js';
 import { recordAgentRoleOutcomes } from '../agent/agent-performance-index.js';
 import { recordModelRoleOutcomes } from '../reasoning/model-performance-index.js';
-import { MetricsCollector } from '../metrics.js';
+import { MetricsCollector } from '../analysis/metrics.js';
 import {
   resolveUsageCostAccounting,
   hasUsageCostEvidence,
   type ResolvedUsageCostAccounting,
-} from '../usage-accounting.js';
+} from '../finance/usage-accounting.js';
 import { isRecord } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';

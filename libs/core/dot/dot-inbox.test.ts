@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
-import { streamJsonLines } from '../jsonl-read.js';
+import { streamJsonLines } from '../storage/jsonl-read.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   appendDotInboxEntry as appendScopedDotInboxEntry,

@@ -2,7 +2,7 @@ import type { MissionTeamAssignment } from './mission-team-plan-composer.js';
 import { sanitizeIdSegment } from '../foundation/text.js';
 import { agentRegistry } from '../agent/agent-registry.js';
 import { deriveAgentNhiId } from '../agent/agent-identity.js';
-import { tryResolveOwnerScope } from '../owner-scope.js';
+import { tryResolveOwnerScope } from '../governance/owner-scope.js';
 import {
   appendDelegationLink,
   buildDelegationLink,
@@ -11,7 +11,7 @@ import {
   type DelegationCapabilityTier,
   type DelegationChain,
 } from './delegation-chain.js';
-import { resolveCapabilityProfileForTeamRole } from '../subagent-capability-profiles.js';
+import { resolveCapabilityProfileForTeamRole } from '../workforce/subagent-capability-profiles.js';
 import {
   claimWorkItem,
   importExternalWorkItem,
@@ -21,13 +21,13 @@ import {
 } from '../workforce/work-coordination.js';
 import { logger } from '../core.js';
 import { dispatchThroughMissionWorkerCore } from './mission-orchestration-worker-dispatch-port.js';
-import { canonicalizeTeamRole } from '../working-principles.js';
+import { canonicalizeTeamRole } from '../workforce/working-principles.js';
 import {
   getMissionDynamicInjectionRegistry,
   getMissionScopedDynamicInjectionRegistry,
   type DynamicInjectionRegistry,
   type ScopedDynamicInjectionRegistry,
-} from '../dynamic-injection.js';
+} from '../reasoning/dynamic-injection.js';
 import {
   runGoalDrivenLoop,
   type GoalPreStepHook,
@@ -48,20 +48,20 @@ import {
 import { provisionTaskKnowledge } from '../task/task-knowledge-provisioning.js';
 import { type DeliveredKnowledgeRef } from '../knowledge/knowledge-feedback-loop.js';
 import { TraceContext, persistTrace } from '../analysis/trace.js';
-import { createGapRecorder, sanitizeGapSamples, type GapRecorder } from '../gap-phase.js';
+import { createGapRecorder, sanitizeGapSamples, type GapRecorder } from '../analysis/gap-phase.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import { safeExistsSync } from '../secure-io.js';
 import { loadMissionStateForInference } from './mission-state-reader.js';
 import { findMissionPath } from '../path-resolver.js';
-import { missionPathOrNull } from '../mission-lookup.js';
+import { missionPathOrNull } from './mission-lookup.js';
 import { loadMissionStateSnapshot } from './mission-orchestration-phase-gates.js';
 import { unchangedAiDlcContractFailure } from './mission-aidlc-gate-projection.js';
 import {
   createApprovalBackedManualDriveGate,
   type ManualDriveApprovalGate,
 } from '../agent/agent-runtime-manual-drive.js';
-import type { ContextSecurityScope } from '../context-security-scope.js';
-import type { EventScopeInput } from '../event-scope.js';
+import type { ContextSecurityScope } from '../governance/context-security-scope.js';
+import type { EventScopeInput } from '../event/event-scope.js';
 export { resolveMissionPlanningPacket } from './mission-orchestration-planning.js';
 
 export {
@@ -69,7 +69,10 @@ export {
   loadMissionPhaseGateDefinitions,
   resolvePhaseGateMode,
 } from './mission-orchestration-phase-gates.js';
-import { fireLifecycleHooks, getDefaultLifecycleHookEngine } from '../lifecycle-hook-engine.js';
+import {
+  fireLifecycleHooks,
+  getDefaultLifecycleHookEngine,
+} from '../harnessing/lifecycle-hook-engine.js';
 import {
   getMissionAgentInputQueue,
   renderAgentInputQueueEntries,
@@ -191,7 +194,7 @@ export interface GoalDrivenWorkItemSeams {
   injectionRegistry?: DynamicInjectionRegistry;
   /** DH-09: optional task/session-scoped injection registry. */
   scopedInjectionRegistry?: ScopedDynamicInjectionRegistry;
-  injectionScope?: import('../scoped-registry.js').ScopedRegistryScope;
+  injectionScope?: import('../governance/scoped-registry.js').ScopedRegistryScope;
   journal?: WorkerStateJournal;
   /** Escalate a blocked goal to the mission owner (defaults to `recordMissionContextTask`). */
   reportBlockerToMission?: (state: GoalRuntimeState) => void;
@@ -528,7 +531,7 @@ export async function provisionGoalDrivenTaskKnowledge(input: {
   systemPrompt?: string;
   missionContextPackPath?: string;
   contextPackId?: string;
-  securityScope?: import('../context-security-scope.js').ContextSecurityScope;
+  securityScope?: import('../governance/context-security-scope.js').ContextSecurityScope;
   /** KP-05: knowledge actually delivered to this goal-driven dispatch, if any. */
   deliveredKnowledgeRefs: DeliveredKnowledgeRef[];
 }> {

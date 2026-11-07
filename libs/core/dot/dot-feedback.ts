@@ -22,13 +22,13 @@ import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir } from '../secure-io.js';
 import { appendJsonLine } from '../foundation/json.js';
-import { readJsonLinesSince, streamJsonLines } from '../jsonl-read.js';
+import { readJsonLinesSince, streamJsonLines } from '../storage/jsonl-read.js';
 import {
   writeTimeArchiveDir,
   maintainStoreAfterAppend,
   type AppendOnlyStorePolicy,
-} from '../append-only-store.js';
-import { evaluateStateProbe, type StateProbeDeps } from '../state-probe.js';
+} from '../storage/append-only-store.js';
+import { evaluateStateProbe, type StateProbeDeps } from '../pipeline/state-probe.js';
 import { VETO_WINDOW_DECIDER } from '../governance/approval-veto-window.js';
 import type { DotCharter } from './dot-charter.js';
 import type { DotDecisionLevel } from './dot-proposals.js';
@@ -176,7 +176,7 @@ export function readDotFeedback(dotId: string, deps: DotFeedbackDeps = {}): DotF
 
 async function recordRejectionForDistill(entry: DotFeedbackEntry): Promise<void> {
   const { recordExecutionFeedback, materializeExecutionFeedbackCandidate } =
-    await import('../execution-feedback.js');
+    await import('../knowledge/execution-feedback.js');
   const feedback = recordExecutionFeedback({
     scenario_id: `dot:${entry.dot_id}`,
     intent_id: entry.action_id,

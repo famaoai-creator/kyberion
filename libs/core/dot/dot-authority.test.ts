@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import { safeRmSync } from '../secure-io.js';
-import { humanActor } from '../actor.js';
+import { humanActor } from '../contracts/actor.js';
 import { acceptCharter, retireCharter } from '../governance/accountability-charter-registry.js';
 import { assertDotAccountabilityCharter } from './dot-authority.js';
 import type { DotCharter } from './dot-charter.js';

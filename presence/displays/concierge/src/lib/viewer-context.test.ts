@@ -243,6 +243,8 @@ describe('concierge viewer-context tier masking', () => {
       source: 'loopback' as const,
     };
     expect(toSurfaceAuthorizationContext(viewer).includeUntenanted).toBeUndefined();
+    expect(toSurfaceAuthorizationContext(viewer).permissions).toBeUndefined();
+    expect(toSurfaceAuthorizationContext({ ...viewer, permissions: [] }).permissions).toEqual([]);
     expect(
       toSurfaceAuthorizationContext({ ...viewer, includeUntenanted: true }).includeUntenanted
     ).toBe(true);

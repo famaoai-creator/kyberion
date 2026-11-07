@@ -12,7 +12,7 @@ import {
   toCodexSandboxPolicy,
   withSandboxPolicy,
 } from './sandbox-policy.js';
-import { evaluateEgressPolicy } from '../egress-policy.js';
+import { evaluateEgressPolicy } from '../governance/egress-policy.js';
 import { validatePipelineGuardrails } from '../pipeline/adf-guardrails.js';
 import { validateUrl } from '../secure-io.js';
 import { executeAdfSteps } from '../pipeline/adf-engine.js';

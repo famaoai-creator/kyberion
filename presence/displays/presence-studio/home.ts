@@ -20,6 +20,11 @@
  *   else in the system.
  */
 
+import { estimateTaskSessionPercent } from '@agent/core/surface/front-desk-progress';
+
+/** The shared phase estimate (also used by 依頼 / 進み具合). */
+export { estimateTaskSessionPercent };
+
 export type HomeDecideKind = 'approval' | 'exception' | 'stalled' | 'memory';
 export type HomeProgressKind = 'in_progress' | 'delivered';
 
@@ -102,24 +107,6 @@ const DECIDE_KIND_WEIGHT: Record<HomeDecideKind, number> = {
 
 /** Task sessions in these statuses are done, not "in progress". */
 const TASK_SESSION_TERMINAL_STATUSES = new Set(['completed', 'failed', 'released']);
-
-/**
- * Coarse, documented estimate only — task sessions carry no numeric progress
- * field anywhere in the system. Statuses not listed here (e.g. `blocked`,
- * `paused`) render without a progress bar rather than guess a number.
- */
-const TASK_SESSION_STATUS_PERCENT: Record<string, number> = {
-  awaiting_instruction: 5,
-  collecting_requirements: 15,
-  planning: 30,
-  awaiting_confirmation: 45,
-  executing: 65,
-  verifying: 85,
-};
-
-export function estimateTaskSessionPercent(status: string): number | undefined {
-  return TASK_SESSION_STATUS_PERCENT[status];
-}
 
 function toTimeMs(when: string | undefined, fallbackMs: number): number {
   if (!when) return fallbackMs;

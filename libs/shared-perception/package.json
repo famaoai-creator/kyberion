@@ -15,6 +15,10 @@
       "types": "./dist/audio-analysis.d.ts",
       "default": "./dist/audio-analysis.js"
     },
+    "./desktop-ax-bridge": {
+      "types": "./dist/desktop-ax-bridge.d.ts",
+      "default": "./dist/desktop-ax-bridge.js"
+    },
     "./image-dimensions": {
       "types": "./dist/image-dimensions.d.ts",
       "default": "./dist/image-dimensions.js"

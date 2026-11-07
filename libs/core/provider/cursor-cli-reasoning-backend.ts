@@ -47,11 +47,11 @@ import {
   structuredReasoningSpecs,
   STRUCTURED_REASONING_SYSTEM_PROMPT,
   type StructuredOpSpec,
-} from '../structured-reasoning.js';
-import { schemaHint } from '../structured-schema-hint.js';
+} from '../reasoning/structured-reasoning.js';
+import { schemaHint } from '../reasoning/structured-schema-hint.js';
 import type { AgentAskOptions, AgentResponse } from '../agent/agent-adapter.js';
 import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js';
-import { getSubagentCapabilityProfile } from '../subagent-capability-profiles.js';
+import { getSubagentCapabilityProfile } from '../workforce/subagent-capability-profiles.js';
 import { CursorCliSessionAdapter } from './cursor-cli-session-adapter.js';
 import type {
   ReasoningBackend,
@@ -76,7 +76,7 @@ import type {
   ReasoningCallOptions,
   ReasoningTextStream,
 } from '../reasoning/reasoning-backend.js';
-import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
+import { runStartReportingDelegation } from '../workforce/delegation-execution-tracker.js';
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });

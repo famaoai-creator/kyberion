@@ -474,96 +474,8 @@ export const HOME_VOCABULARY_KEYS = [
   'presence_studio:home_metric_decide',
 ] as const satisfies readonly VocabularyKey[];
 
-// FD-05: exactly the `front_desk` keys `static/progress.js` renders. Mirrors
-// `HOME_VOCABULARY_KEYS` above — see `GET /api/progress-vocabulary` in
-// `front-desk-routes.ts`.
-export const PROGRESS_VOCABULARY_KEYS = [
-  'front_desk:progress_open_work',
-  'front_desk:progress_recorded_subtitle',
-  'front_desk:progress_task_state_collecting_requirements',
-  'front_desk:progress_task_state_awaiting_input',
-  'front_desk:progress_task_state_awaiting_confirmation',
-  'front_desk:progress_task_state_planning',
-  'front_desk:progress_task_state_executing',
-  'front_desk:progress_task_state_verifying',
-  'front_desk:progress_task_state_paused',
-  'front_desk:progress_task_state_blocked',
-  'front_desk:progress_task_state_completed',
-  'front_desk:progress_task_state_failed',
-  'front_desk:progress_task_state_released',
-  'front_desk:progress_task_state_unknown',
-  'front_desk:progress_task_recorded_state',
-  'front_desk:progress_task_latest_update',
-  'front_desk:progress_task_next_input',
-  'front_desk:progress_task_next_confirmation',
-  'front_desk:progress_task_next_refresh',
-  'front_desk:progress_task_next_inspect',
-  'front_desk:progress_task_next_result',
-  'front_desk:progress_leave_title',
-  'front_desk:progress_leave_draft',
-  'front_desk:progress_leave_pending',
-  'front_desk:progress_leave_uncertain',
-  'front_desk:progress_leave_stay',
-  'front_desk:progress_leave_stay_page',
-  'front_desk:progress_leave_discard',
-  'front_desk:progress_leave_anyway',
-  'front_desk:progress_leave_unavailable',
-  'front_desk:progress_delivery_verdict_scope',
-  'front_desk:progress_correction_unavailable',
-  'front_desk:progress_correction_draft_note',
-  'front_desk:progress_correction_save',
-  'front_desk:progress_correction_discard',
-  'front_desk:progress_correction_recorded',
-  'front_desk:progress_correction_prepare',
-  'front_desk:progress_loading',
-  'front_desk:progress_refreshing',
-  'front_desk:progress_detail_loading',
-  'front_desk:progress_detail_failed',
-  'front_desk:progress_detail_ready',
-  'front_desk:progress_detail_retry',
-  'front_desk:progress_scope_required',
-  'front_desk:progress_storage_required',
-  'front_desk:progress_phase_estimate',
-  'front_desk:progress_history',
-  'front_desk:progress_status_released',
-  'front_desk:progress_recovery',
-  'front_desk:progress_load_failed',
-  'front_desk:progress_action_failed',
-  'front_desk:progress_request_pending',
-  'front_desk:progress_item_unavailable',
-  'front_desk:progress_refresh',
-  'ui:status_completed',
-  'ui:status_failed',
-  'concierge:home.status.accepted',
-  'concierge:home.status.rejected',
-  'concierge:home.status.changes_requested',
-  'front_desk:progress_filter_active',
-  'front_desk:progress_filter_delivered',
-  'front_desk:progress_filter_done',
-  'front_desk:progress_delivered_title',
-  'front_desk:progress_delivered_waiting',
-  'front_desk:progress_empty_active',
-  'front_desk:progress_empty_delivered',
-  'front_desk:progress_select_hint',
-  'front_desk:progress_detail_requested',
-  'front_desk:progress_detail_now',
-  'front_desk:progress_detail_next',
-  'front_desk:progress_detail_log',
-  'front_desk:progress_action_note',
-  'front_desk:progress_open_mirror',
-  // The prefilled "ask about this item" text (word order is per locale).
-  'front_desk:progress_ask_about',
-  'front_desk:action_open',
-  'front_desk:action_receive',
-  'front_desk:action_revise',
-  'front_desk:count_items',
-  // UI-06: row status pill labels.
-  'front_desk:tag_in_progress',
-  'front_desk:tag_delivered',
-] as const satisfies readonly VocabularyKey[];
-
 // FD-03: exactly the keys `static/ask.js` renders. Mirrors
-// `HOME_VOCABULARY_KEYS` / `PROGRESS_VOCABULARY_KEYS` above — see
+// `HOME_VOCABULARY_KEYS` above — see
 // `GET /api/ask-vocabulary` in `front-desk-routes.ts`. Mixes the `front_desk`
 // domain with the shared `tui` authority/outcome labels (same mix
 // `PRESENCE_STUDIO_VOCABULARY_KEYS` above already uses for `index.html`'s own
@@ -595,15 +507,6 @@ export const ASK_VOCABULARY_KEYS = [
   'front_desk:ask_pending_review',
   'front_desk:ask_keyboard_hint',
   'front_desk:ask_draft_too_long',
-  'front_desk:ask_correction_loading',
-  'front_desk:ask_correction_failed',
-  'front_desk:ask_correction_retry',
-  'front_desk:ask_correction_prepared',
-  'front_desk:ask_correction_draft_intro',
-  'front_desk:ask_correction_entry',
-  'front_desk:ask_correction_artifact',
-  'front_desk:ask_correction_title',
-  'front_desk:ask_correction_note',
   'front_desk:work_home_resume_readonly',
   'front_desk:work_home_request_unavailable',
   'front_desk:conversation_access_required',
@@ -831,6 +734,7 @@ export const FRONT_DESK_TEMPLATE_FILE_REDIRECTS: Readonly<Record<string, string>
   '/home.html': '/home',
   '/index.html': '/work',
   '/ask.html': '/ask',
+  // Retired page (now Concierge 仕事 › 依頼): old bookmarks follow /progress's redirect.
   '/progress.html': '/progress',
   // Retired page (now Concierge 使い方): old bookmarks follow /help's redirect.
   '/help.html': '/help',
@@ -911,6 +815,14 @@ export function registerFrontDeskHomeWorkPages(app: express.Express, staticDir: 
   });
 }
 
+/** Concierge 仕事 › 依頼 with an old `/progress` query kept (its own `tab` wins). */
+export function conciergeRequestsPath(query: string): string {
+  const params = new URLSearchParams(query);
+  params.delete('tab');
+  const rest = params.toString();
+  return '/work?tab=requests' + (rest ? '&' + rest : '');
+}
+
 // FD-06/03/05/08: the remaining front-desk page routes, registered after
 // `express.static` (a literal `/onboarding`, `/ask`, `/progress`, or `/help`
 // path only matches a static file named exactly that, with no extension, so
@@ -935,10 +847,17 @@ export function registerFrontDeskAuxPages(app: express.Express, staticDir: strin
     sendFrontDeskPage(req, res, staticDir, 'ask.html');
   });
 
-  // FD-05: the dedicated "進み具合" page, replacing the interim `/work`
-  // redirect.
+  // 進み具合 is served by Concierge as 仕事 › 依頼 (`/work?tab=requests`,
+  // Kyberion server phase 2). The old address hands the person there with its
+  // query kept (`request`, `tenant`, …); the fragment (`#<id>`) follows the
+  // redirect in the browser.
   app.get('/progress', (req, res) => {
-    sendFrontDeskPage(req, res, staticDir, 'progress.html');
+    const queryIndex = req.originalUrl.indexOf('?');
+    res.redirect(
+      302,
+      readFrontDeskSurfaceUrls().concierge +
+        conciergeRequestsPath(queryIndex === -1 ? '' : req.originalUrl.slice(queryIndex + 1))
+    );
   });
 
   // 使い方 (`/help`, `/help/<track>`) is served by Concierge (Kyberion server

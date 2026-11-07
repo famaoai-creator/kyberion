@@ -475,7 +475,7 @@ async function recordDistillFeedback(
   input: DotMemoryDistillFeedback
 ): Promise<{ candidate_id?: string }> {
   const { recordExecutionFeedback, materializeExecutionFeedbackCandidate } =
-    await import('../execution-feedback.js');
+    await import('../knowledge/execution-feedback.js');
   const feedback = recordExecutionFeedback({
     scenario_id: `dot-memory:${input.dot_id}`,
     intent_id: input.key,

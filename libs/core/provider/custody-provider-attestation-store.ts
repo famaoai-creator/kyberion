@@ -43,7 +43,7 @@
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { resolveIdentityContext } from '../authority.js';
-import { custodyOwnerLabel, type CustodyOwner } from '../custody-owner.js';
+import { custodyOwnerLabel, type CustodyOwner } from '../contracts/custody-owner.js';
 import { readJsonIfPresent, writeJson } from '../foundation/json.js';
 import { normalizeApprovalPrincipalId } from '../governance/approval-principal-id.js';
 import type { ApprovalConsent } from '../governance/approval-separation-of-duties.js';

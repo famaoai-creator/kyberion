@@ -32,7 +32,7 @@ Scratch checkout used for this map: `active/shared/tmp/pstack-review/cursor-plug
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Bug fix playbook                         | [engineering-bug-fix-playbook](./engineering-bug-fix-playbook.md)                                                                                 |
 | Feature playbook                         | [engineering-feature-playbook](./engineering-feature-playbook.md)                                                                                 |
-| Attack the Premise / Sequence / Subtract | [working-philosophy](../governance/working-philosophy.md) §11–13 + `libs/core/working-principles.ts`                                              |
+| Attack the Premise / Sequence / Subtract | [working-philosophy](../governance/working-philosophy.md) §11–13 + `libs/core/workforce/working-principles.ts`                                    |
 | `create-verification-skill`              | [create-verification-skill-playbook](./create-verification-skill-playbook.md) + `plugins/kyberion-agent-plugin/skills/create-verification-skill/` |
 
 ## Landed — MSN-PSTACK-EXT-20261101

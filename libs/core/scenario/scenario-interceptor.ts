@@ -44,7 +44,7 @@ import {
 import {
   overrideRiskyApprovalHandler,
   type RiskyApprovalResult,
-} from '../risky-op-approval-port.js';
+} from '../governance/risky-op-approval-port.js';
 import type {
   ScenarioApprovalDecision,
   ScenarioDefinition,

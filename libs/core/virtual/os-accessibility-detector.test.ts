@@ -22,7 +22,7 @@ import {
   type AccessibilityCommandRunner,
   type AccessibilityElement,
 } from './os-accessibility-detector.js';
-import { fuseSetOfMarks } from '../set-of-marks.js';
+import { fuseSetOfMarks } from './set-of-marks.js';
 
 const IMAGE = { width: 2000, height: 1200 };
 

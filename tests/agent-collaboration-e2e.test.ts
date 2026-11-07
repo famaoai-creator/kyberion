@@ -64,7 +64,7 @@ vi.mock('../libs/core/mission/mission-team-plan-composer.js', () => ({
   resolveMissionTeamReceiver: mocks.resolveMissionTeamReceiver,
 }));
 
-vi.mock('../libs/core/ledger.js', () => ({
+vi.mock('../libs/core/governance/ledger.js', () => ({
   ledger: {
     record: mocks.record,
   },

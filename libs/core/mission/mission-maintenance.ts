@@ -1,4 +1,4 @@
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 /**
  * libs/core/mission/mission-maintenance.ts
@@ -22,7 +22,7 @@ import {
   safeStat,
   safeWriteFile,
 } from '../secure-io.js';
-import { sendOpsAlert } from '../ops-alert.js';
+import { sendOpsAlert } from '../daemon/ops-alert.js';
 import { withLock } from '../foundation/lock-utils.js';
 import {
   withTaskEvidenceFence,
@@ -72,8 +72,8 @@ import {
   tryAutoCompleteTaskFromEvidence,
   writeMissionNextTasks,
 } from './mission-lifecycle.js';
-import { gcMissionRuntimeResidue } from '../scope-offboarding.js';
-import { retireIdentitiesForScopeBestEffort } from '../nhi-lifecycle-governance.js';
+import { gcMissionRuntimeResidue } from '../storage/scope-offboarding.js';
+import { retireIdentitiesForScopeBestEffort } from '../agent/nhi-lifecycle-governance.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { generateMissionWorkReconciliationScaffold } from './mission-work-reconciliation.js';
 import { recordDirectCliTaskUsage } from './mission-direct-cli-usage.js';
@@ -91,7 +91,7 @@ import {
   validateHumanFinalDecision,
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
-import { hasAuthority, resolveIdentityContext } from '../governance.js';
+import { hasAuthority, resolveIdentityContext } from '../authority.js';
 import {
   MISSION_SCOPE_APPROVAL_CHANNEL,
   scopeApproveApprovalPayload,

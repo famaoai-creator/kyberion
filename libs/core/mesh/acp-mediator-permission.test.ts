@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RequestPermissionRequest } from '@agentclientprotocol/sdk';
 
 const requireRiskyApproval = vi.fn();
-vi.mock('../risky-op-approval-port.js', () => ({
+vi.mock('../governance/risky-op-approval-port.js', () => ({
   requireRiskyApproval: (...args: unknown[]) => requireRiskyApproval(...args),
 }));
 vi.mock('../agent/agent-manifest.js', async (importOriginal) => ({

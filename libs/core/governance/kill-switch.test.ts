@@ -36,7 +36,7 @@ vi.mock('../agent/agent-runtime-supervisor-client.js', () => ({
   shutdownAgentRuntimeViaDaemon: mocks.shutdownAgentRuntimeViaDaemon,
 }));
 
-vi.mock('../trust-engine.js', () => ({
+vi.mock('./trust-engine.js', () => ({
   trustEngine: {
     getScore: mocks.getScore,
     detectRegimeShift: mocks.detectRegimeShift,

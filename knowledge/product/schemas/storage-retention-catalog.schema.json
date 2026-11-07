@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Storage Retention Catalog",
-  "description": "Single source of truth for storage retention (AL-01). Each entry declares, for one repo-relative directory, what class of artifact lives there, how long it is retained (ttl_days), and what happens on expiry (action). Consumed by libs/core/storage-retention-catalog.ts, which falls back to built-in defaults mirroring the pre-catalog constants when this file is missing or invalid — the janitor never dies because of a bad catalog. Entries without ttl_days are note-only declarations (e.g. self-expiring stores); directories with no entry at all are never deleted and, under active/shared/runtime/, are surfaced by the janitor report as uncovered.",
+  "description": "Single source of truth for storage retention (AL-01). Each entry declares, for one repo-relative directory, what class of artifact lives there, how long it is retained (ttl_days), and what happens on expiry (action). Consumed by libs/core/storage/storage-retention-catalog.ts, which falls back to built-in defaults mirroring the pre-catalog constants when this file is missing or invalid — the janitor never dies because of a bad catalog. Entries without ttl_days are note-only declarations (e.g. self-expiring stores); directories with no entry at all are never deleted and, under active/shared/runtime/, are surfaced by the janitor report as uncovered.",
   "type": "object",
   "required": ["version", "entries"],
   "additionalProperties": false,

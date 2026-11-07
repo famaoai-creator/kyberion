@@ -17,7 +17,7 @@ import {
   stubReasoningBackend,
 } from '../reasoning/reasoning-backend.js';
 import type { ReasoningBackend } from '../reasoning/reasoning-backend-contracts.js';
-import { requireRiskyApproval } from '../risky-op-approval-port.js';
+import { requireRiskyApproval } from '../governance/risky-op-approval-port.js';
 import { parseScenarioDefinition, type ScenarioDefinition } from './scenario-definition.js';
 import {
   installScenarioInterceptor,

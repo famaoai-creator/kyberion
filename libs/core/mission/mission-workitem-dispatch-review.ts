@@ -17,7 +17,7 @@ import type { A2AMessage } from '../mesh/a2a-bridge.js';
 import { extractFencedBlock } from '../foundation/text.js';
 import { getA2ARoute } from '../mesh/a2a-route-port.js';
 import type { AgentExecutionPort } from '../agent/agent-execution-port.js';
-import type { AgentContextMode } from '../context-boundary.js';
+import type { AgentContextMode } from '../contracts/context-boundary.js';
 import {
   buildArtifactReviewReceipt,
   hashArtifactForReview,
@@ -29,7 +29,7 @@ import { classifyReasoningFailure } from '../reasoning/reasoning-failure-taxonom
 import {
   delegateCoordinatedAgentTask,
   type CoordinatedAgentExecutionReceipt,
-} from '../coordinated-agent-execution-port.js';
+} from '../agent/coordinated-agent-execution-port.js';
 import { loadAgentProfileIndex } from './mission-team-index.js';
 import * as pathResolver from '../path-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -50,7 +50,7 @@ import {
   type WorkItemSource,
   type WorkItemStatus,
 } from '../workforce/work-coordination.js';
-import { type CognitiveRouteDecision } from '../cognitive-routing.js';
+import { type CognitiveRouteDecision } from '../provider/cognitive-routing.js';
 import {
   renderMissionContextPack,
   resolveMissionContextPack,
@@ -65,13 +65,16 @@ import { routeTaskWithJudgment } from '../task/task-routing-judgment.js';
 import { ensureJudgmentBackendsRegistered } from '../reasoning/judgment-provider-bootstrap.js';
 import { type TaskResultBlock } from '../surface/channel-surface-types.js';
 import { type OperatorInteractionPacket } from '../contracts/operator-interaction-packet.js';
-import { buildWorkingPrinciplesLines, canonicalizeTeamRole } from '../working-principles.js';
-import { resolveDelegationCapabilityProfile } from '../subagent-capability-profiles.js';
+import {
+  buildWorkingPrinciplesLines,
+  canonicalizeTeamRole,
+} from '../workforce/working-principles.js';
+import { resolveDelegationCapabilityProfile } from '../workforce/subagent-capability-profiles.js';
 import { assertProviderCanProjectProfile } from '../provider/provider-permission-profiles.js';
 import type { MissionState } from './mission-types.js';
-import type { ContextSecurityScope } from '../context-security-scope.js';
+import type { ContextSecurityScope } from '../governance/context-security-scope.js';
 import { checkProviderEgress } from '../provider/provider-egress-gate.js';
-import { evaluateEgressPolicy } from '../egress-policy.js';
+import { evaluateEgressPolicy } from '../governance/egress-policy.js';
 import { reasoningBackendEndpoint } from '../reasoning/reasoning-egress-scope.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';

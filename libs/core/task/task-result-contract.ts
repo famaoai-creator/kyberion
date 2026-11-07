@@ -2,7 +2,7 @@ import {
   TaskCustomerDecisionRequestSchema,
   TaskResultSchema,
   formatZodIssues,
-} from '../structured-output-contracts.js';
+} from '../contracts/structured-output-contracts.js';
 import type { TaskResultBlock } from '../surface/channel-surface-types.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { replaceFencedBlocks } from '../foundation/text.js';

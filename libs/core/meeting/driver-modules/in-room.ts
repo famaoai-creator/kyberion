@@ -1,1 +1,1 @@
-export { installInRoomMeetingParticipationDriver as installMeetingParticipationDriver } from '../../in-room-meeting-driver.js';
+export { installInRoomMeetingParticipationDriver as installMeetingParticipationDriver } from '../in-room-meeting-driver.js';

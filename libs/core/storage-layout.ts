@@ -196,12 +196,12 @@ export function protectedStorageFloorPrefixes(): string[] {
 
 /**
  * Tier/tenant-partitioned runtime ledgers (state purpose, runtime-storage-layout):
- * `<root>/<tier>/<tenant|shared>/<file>.jsonl`, written by `libs/core/metrics.ts`.
+ * `<root>/<tier>/<tenant|shared>/<file>.jsonl`, written by `libs/core/analysis/metrics.ts`.
  * Their personal/confidential subtrees are tenant_scope protected prefixes in
  * security-policy.json; tier-guard gives reads of them the tenant check plus the
  * persona read rules of `knowledge/<tier>/`, and tenant offboarding purges them.
  *
- * Hash-chained tenant partitions of the hybrid ledger (`libs/core/ledger.ts`):
+ * Hash-chained tenant partitions of the hybrid ledger (`libs/core/governance/ledger.ts`):
  * `<personal|confidential>/<tenant>/ledger.jsonl`, written and verified as `tenant_ledger_store`.
  * Tenant records and tenant mission metadata never reach the system ledger.
  *

@@ -5,7 +5,7 @@
  */
 
 import type { SkillOutput } from '../types.js';
-import { metrics } from '../metrics.js';
+import { metrics } from '../analysis/metrics.js';
 import { fileUtils } from '../core.js';
 import { nowIso } from '../foundation/time.js';
 import { safeWriteFile } from '../secure-io.js';

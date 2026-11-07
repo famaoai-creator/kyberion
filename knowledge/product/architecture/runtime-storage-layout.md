@@ -98,7 +98,7 @@ costs the next process the work again.
 | Cache                                                       | Writer                                                          | Content and key                                                                                                                                                                                                                                                                      | Retention / off switch                                                                             |
 | ----------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | `node_modules/.cache/kyberion-ts-loader/` (not a floor)     | `scripts/ts-loader-cache.mjs` (used by `scripts/ts-loader.mjs`) | One transpiled module per file, `<2 hex>/<sha256>.transpiled` (not a code extension, so repository scanners skip it); key = the cache module's own text + TypeScript version + absolute path + source. Sources under `active/`, `knowledge/`, `customer/`, `vault/` are never cached | Pruned by the loader (written > 30 days ago, at most daily); `KYBERION_TS_LOADER_CACHE=0`          |
-| `node_modules/.cache/kyberion-stt-discovery/` (not a floor) | `libs/core/local-stt-discovery.ts`                              | `candidates.json`: (backend, source, binary, version) per detected local STT backend; key = platform + PATH + registry content + managed runtimes' bin lstat and site-packages mtimes                                                                                                | 10 minutes in-file (`KYBERION_STT_DISCOVERY_CACHE_TTL_MS`, `0` = off); managed installers clear it |
+| `node_modules/.cache/kyberion-stt-discovery/` (not a floor) | `libs/core/voice/local-stt-discovery.ts`                        | `candidates.json`: (backend, source, binary, version) per detected local STT backend; key = platform + PATH + registry content + managed runtimes' bin lstat and site-packages mtimes                                                                                                | 10 minutes in-file (`KYBERION_STT_DISCOVERY_CACHE_TTL_MS`, `0` = off); managed installers clear it |
 
 **Trust-model exception: neither cache is on a floor.** The transpile cache's
 entries are executed as code by whoever runs the loader (operator,
@@ -138,7 +138,7 @@ caches.
 
 A write that belongs to an owner — a mission, task, project or organization —
 is placed by the **owner's own record**, never by the caller's guess
-(`libs/core/owner-scope.ts`):
+(`libs/core/governance/owner-scope.ts`):
 
 | Owner        | Source of tier / tenant / organization                                                               |
 | ------------ | ---------------------------------------------------------------------------------------------------- |
@@ -220,7 +220,7 @@ covers `active/shared/runtime/dot`. See
 
 ### Metrics ledgers (resource usage, execution metrics)
 
-Both ledgers of the shared `MetricsCollector` (`libs/core/metrics.ts`) place
+Both ledgers of the shared `MetricsCollector` (`libs/core/analysis/metrics.ts`) place
 each row by the row's own `scope`; callers do not choose the file. Usage
 accounting (`recordResourceUsage`) and execution metrics (`record`: latency,
 tokens, cost per component call) share one mechanism:
@@ -333,7 +333,7 @@ tokens, cost per component call) share one mechanism:
 
 ### Hybrid audit ledger (system ledger, tenant ledgers)
 
-`ledger.record(type, data)` (`libs/core/ledger.ts`) writes a hash-chained
+`ledger.record(type, data)` (`libs/core/governance/ledger.ts`) writes a hash-chained
 entry. Unlike the metrics ledgers, a record with a `mission_id` takes its
 scope from **its mission's location** (`active/missions/<tier>/<tenant|shared>/<id>`,
 or its archive dir) — the path tier-guard enforces — filling what the record
@@ -438,7 +438,7 @@ the record is stored follows its scope
 ### Delegation trace and records
 
 The delegated-task trace and the resumable delegation records
-(`libs/core/delegated-task-observability.ts`) carry tenant instruction,
+(`libs/core/workforce/delegated-task-observability.ts`) carry tenant instruction,
 context and result text, so they live in the registered ledger root
 `active/shared/runtime/delegation-records/` (`PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations`):
 
@@ -630,7 +630,7 @@ the same generator, without a whole-file merge driver for the mixed source file.
 ## References
 
 - `libs/core/storage-layout.ts` — floor resolver and classifier
-- `libs/core/owner-scope.ts` — owner-derived scope (`resolveOwnerScope`, `resolveMissionDir`)
+- `libs/core/governance/owner-scope.ts` — owner-derived scope (`resolveOwnerScope`, `resolveMissionDir`)
 - `libs/core/workforce/artifact-store.ts` — `writeScopedArtifact`
 - `knowledge/product/governance/storage-retention-catalog.json` — TTLs
 - `knowledge/product/governance/security-policy.json` — `tenant_scope`

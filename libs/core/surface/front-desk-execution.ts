@@ -13,7 +13,7 @@ import { validateReadPermission, validateWritePermission } from '../tier-guard.j
 import { withFrontDeskDispatchLock } from './front-desk-dispatch-lock.js';
 import { safeReadFile, safeExistsSync, safeLstat } from '../secure-io.js';
 import { writeScopedArtifact } from '../workforce/artifact-store.js';
-import { physicalScopedPath } from '../physical-namespace.js';
+import { physicalScopedPath } from '../storage/physical-namespace.js';
 import { resolveWorkScopeDecision } from '../workforce/work-scope-decision.js';
 import { getWorkItem, type WorkItem } from '../workforce/work-coordination.js';
 import {

@@ -133,7 +133,7 @@ describe('operator home summary', () => {
   });
 
   it('summarizes approval, inbox, mission, and next-action state', async () => {
-    const { addInboxEntry } = await import('../deliverable-inbox.js');
+    const { addInboxEntry } = await import('../task/deliverable-inbox.js');
     const { collectOperatorHomeSummary } = await import('./operator-home-summary.js');
 
     fs.mkdirSync(path.join(tmpRoot, 'active/missions/public/MSN-1'), { recursive: true });
@@ -210,7 +210,7 @@ describe('operator home summary', () => {
   });
 
   it('preserves CLI cost uncertainty and subscription reference amounts without confirming the remaining budget', async () => {
-    const { MetricsCollector } = await import('../metrics.js');
+    const { MetricsCollector } = await import('../analysis/metrics.js');
     const spy = vi.spyOn(MetricsCollector.prototype, 'loadHistory').mockReturnValue([
       {
         timestamp: '2026-10-28T00:00:00Z',

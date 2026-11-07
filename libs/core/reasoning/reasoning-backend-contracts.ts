@@ -4,11 +4,11 @@ import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
 import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js';
-import type { DelegationHandle } from '../delegated-task-observability.js';
+import type { DelegationHandle } from '../workforce/delegated-task-observability.js';
 import type {
   BackendCapabilityProfile,
   ConstrainedSampling,
-} from '../backend-capability-profile.js';
+} from './backend-capability-profile.js';
 
 export type PersonaLabel = string;
 
@@ -386,7 +386,7 @@ export interface ReasoningCallOptions {
   /** Cancellation propagated by delegateTaskHandle to killable providers. */
   signal?: AbortSignal;
   /** Whether this call starts a fresh task context or continues the current one. */
-  context_mode?: import('../context-boundary.js').AgentContextMode;
+  context_mode?: import('../contracts/context-boundary.js').AgentContextMode;
   /** DH-12: persist a child session that can be cold-resumed once. */
   continuable?: boolean;
   /** CE-11: this call is advice-only and must never produce a tool call. */

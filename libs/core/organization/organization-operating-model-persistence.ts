@@ -4,7 +4,7 @@ import {
   isDocumentProjectRequest,
   resolveIntentResolutionPacket,
 } from '../intent/intent-resolution.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { pathResolver } from '../path-resolver.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { auditChain } from '../governance/audit-chain.js';

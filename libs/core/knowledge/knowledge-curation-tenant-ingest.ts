@@ -30,7 +30,7 @@ import {
   COMMON_TENANT_SLUG,
   listAssets,
   type IngestLedgerPathOptions,
-} from '../ingest-asset-ledger.js';
+} from '../information-assets/ingest-asset-ledger.js';
 import { listTenantProfileSlugs } from '../organization/tenant-registry.js';
 import type { CurationSloConfig } from './knowledge-curation-report.js';
 

@@ -278,7 +278,7 @@ The ordered record of who acted on whose behalf across a delegation (NI-03, `lib
 
 ### ActorContext
 
-The attribution projection carried through a call: actor reference, `ScopeContext`, and the effective authority (`role`, `persona`, `authorities`, `sudo`) (`libs/core/actor-context.ts`). Its `provenance` is `claim` (the dispatch claim holder) or `explicit`; it is never authentication proof or an authorization grant.
+The attribution projection carried through a call: actor reference, `ScopeContext`, and the effective authority (`role`, `persona`, `authorities`, `sudo`) (`libs/core/authn/actor-context.ts`). Its `provenance` is `claim` (the dispatch claim holder) or `explicit`; it is never authentication proof or an authorization grant.
 
 ### Task-scoped grant
 
@@ -286,7 +286,7 @@ A short-lived, audience-bound authority issued to one NHI for one task (NI-04, `
 
 ### NHI offboarding
 
-Retiring the identities that belonged to a scope when that scope closes (NI-05, `libs/core/nhi-lifecycle-governance.ts`): mission finish/archive retires the mission's identities, tenant/project offboarding retires theirs. The inverse check — a non-retired identity whose scope no longer exists — is an _orphan NHI_, surfaced by baseline-check (layer L9 → `needs_attention`) and in the operator packet's NHI ledger. OWASP ranks improper offboarding as the #1 non-human identity risk, which is why this is a lifecycle hook rather than a periodic cleanup.
+Retiring the identities that belonged to a scope when that scope closes (NI-05, `libs/core/agent/nhi-lifecycle-governance.ts`): mission finish/archive retires the mission's identities, tenant/project offboarding retires theirs. The inverse check — a non-retired identity whose scope no longer exists — is an _orphan NHI_, surfaced by baseline-check (layer L9 → `needs_attention`) and in the operator packet's NHI ledger. OWASP ranks improper offboarding as the #1 non-human identity risk, which is why this is a lifecycle hook rather than a periodic cleanup.
 
 ## Surfaces and channels
 
@@ -340,7 +340,7 @@ One canonical term per layer; the aliases are names you will meet in code, docs,
 
 ### Front Desk
 
-**(first-win)** The shared menu rail rendered by both Concierge and Presence Studio, built from `libs/core/front-desk-nav.ts`: five core human verbs — ホーム (home), 頼む (ask), 決める (decide), 進み具合 (progress), 設定 (settings) — plus role-gated destinations grouped as 仕事 / 資料・学習 / 管理 (missions, work items, deliverables, knowledge, discussion, organization, operations, diagnostics, …; some hosted on Chronos). One implementation, two hosting surfaces, so a person sees one menu.
+**(first-win)** The shared menu rail rendered by both Concierge and Presence Studio, built from `libs/core/surface/front-desk-nav.ts`: five core human verbs — ホーム (home), 頼む (ask), 決める (decide), 進み具合 (progress), 設定 (settings) — plus role-gated destinations grouped as 仕事 / 資料・学習 / 管理 (missions, work items, deliverables, knowledge, discussion, organization, operations, diagnostics, …; some hosted on Chronos). One implementation, two hosting surfaces, so a person sees one menu.
 
 ### Stance (vs tenant customer)
 
@@ -518,7 +518,7 @@ The internal set of specialists Kyberion assigns to a request, such as a browser
 
 Two distinct, non-interchangeable role concepts that are easy to conflate (the other two role words, Persona and Authority Role, are in [Role terms](#role-terms)):
 
-- **Team Role** (`teamRole`): the per-task execution role assigned by `mission-team-plan-composer.ts` from a mission's team template (`knowledge/product/orchestration/mission-team-templates.json`, e.g. `owner`/`planner`/`implementer`/`reviewer`/`tester`/`experience_designer`). It selects the working-principles addendum (`libs/core/working-principles.ts`) and gates artifact-review behavior in `mission-orchestration-worker.ts`. Team-template role names are not always the canonical addendum key (e.g. `tester` canonicalizes to `qa`, `experience_designer` to `designer`) — any code branching on team-role identity must compare `canonicalizeTeamRole(teamRole)`, never the raw string, or aliased roles silently miss the behavior their canonical role is supposed to get.
+- **Team Role** (`teamRole`): the per-task execution role assigned by `mission-team-plan-composer.ts` from a mission's team template (`knowledge/product/orchestration/mission-team-templates.json`, e.g. `owner`/`planner`/`implementer`/`reviewer`/`tester`/`experience_designer`). It selects the working-principles addendum (`libs/core/workforce/working-principles.ts`) and gates artifact-review behavior in `mission-orchestration-worker.ts`. Team-template role names are not always the canonical addendum key (e.g. `tester` canonicalizes to `qa`, `experience_designer` to `designer`) — any code branching on team-role identity must compare `canonicalizeTeamRole(teamRole)`, never the raw string, or aliased roles silently miss the behavior their canonical role is supposed to get.
 - **Org Role** (historically "Assigned Persona"; selected with `--persona`): the one org-chart role assigned to a whole mission at activation (e.g. `product_manager`, `qa_lead`, `solution_architect` — the role directories under `knowledge/product/roles/{persona}/`). `syncRoleProcedure` mirrors that persona's `PROCEDURE.md` into the mission directory once at activation; it is then injected into the first task prompt as a one-shot dynamic injection (see `buildRolePersonaProcedureInjectionProvider` in `mission-orchestration-worker.ts`). A mission started without an explicit `--persona` defaults to `worker`, which has no corresponding role directory — no procedure gets injected in that case.
 
 ### Evidence
@@ -663,7 +663,7 @@ HMAC-signed peer-to-peer messaging between tenant instances. Peers are registere
 
 ### Stance (Customer Overlay)
 
-The `knowledge/personal/stances/{slug}/` overlay selected by `KYBERION_STANCE`, layering one identity / connections / policy / voice set over `knowledge/personal/` without forking (`libs/core/stance-resolver.ts`). It answers "which hat am I wearing right now" — an FDE engagement is one such stance, and holding roles at several independent legal entities is another. A stance is runtime configuration, not a scope: it does not appear in the entity scope hierarchy. Stances used to live in the top-level `customer/` directory (selected by the now-deprecated `KYBERION_CUSTOMER`). → [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md)
+The `knowledge/personal/stances/{slug}/` overlay selected by `KYBERION_STANCE`, layering one identity / connections / policy / voice set over `knowledge/personal/` without forking (`libs/core/authn/stance-resolver.ts`). It answers "which hat am I wearing right now" — an FDE engagement is one such stance, and holding roles at several independent legal entities is another. A stance is runtime configuration, not a scope: it does not appear in the entity scope hierarchy. Stances used to live in the top-level `customer/` directory (selected by the now-deprecated `KYBERION_CUSTOMER`). → [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md)
 
 ### Tenant's Customers
 
@@ -671,7 +671,7 @@ The end customers a tenant delivers to, stored inside that tenant's own boundary
 
 ### History Search
 
-Zero-LLM full-text search over conversation, mission, and trace history on SQLite FTS5 (unicode61 + CJK trigram), tier-isolated with an explicit provenance gate before anything is indexed publicly (`libs/core/history-search-index.ts`, `pnpm history:search`).
+Zero-LLM full-text search over conversation, mission, and trace history on SQLite FTS5 (unicode61 + CJK trigram), tier-isolated with an explicit provenance gate before anything is indexed publicly (`libs/core/search/history-search-index.ts`, `pnpm history:search`).
 
 ## Governance and storage terms
 

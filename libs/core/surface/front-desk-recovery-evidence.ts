@@ -4,7 +4,7 @@ import { stateFile, workResultLock } from '../dot/dot-executor-reports.js';
 import { readJsonLines } from '../foundation/json.js';
 import { projectDotResultRecords, dotResultScopeSchema } from '../dot/dot-result-records.js';
 import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
-import { physicalScopedPath } from '../physical-namespace.js';
+import { physicalScopedPath } from '../storage/physical-namespace.js';
 import type { DotCharter } from '../dot/dot-charter.js';
 import type { DotActionRecord } from '../dot/dot-dispatch.js';
 import {

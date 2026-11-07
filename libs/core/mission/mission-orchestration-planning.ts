@@ -4,7 +4,7 @@ import { logger } from '../core.js';
 import { emitChannelSurfaceEvent } from '../surface/surface-artifact-store.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
 import { rootDir } from '../path-resolver.js';
-import { resolveMissionDir } from '../owner-scope.js';
+import { resolveMissionDir } from '../governance/owner-scope.js';
 import { nowIso } from '../foundation/time.js';
 import { reportProviderTemporarilyUnhealthy } from '../provider/provider-health-registry.js';
 import { agentRegistry } from '../agent/agent-registry.js';
@@ -21,7 +21,7 @@ import {
   parsePlanningReviewVerdict,
   type PlanningReviewVerdict,
 } from './mission-planning-packet.js';
-import { extractPlanningPacketBlocks } from '../planning-packet-contract.js';
+import { extractPlanningPacketBlocks } from '../surface/planning-packet-contract.js';
 import { evaluateMissionGate } from './mission-gate-engine.js';
 import { loadMissionGateRecordAtPath } from './mission-orchestration-phase-gates.js';
 import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';

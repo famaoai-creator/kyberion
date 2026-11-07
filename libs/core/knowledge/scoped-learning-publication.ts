@@ -9,7 +9,7 @@ import {
   buildPromotedMemoryRecord,
   buildPromotedMemoryMarkdown,
   type PromotedMemoryRecord,
-} from '../promoted-memory-builder.js';
+} from './promoted-memory-builder.js';
 import { normalizeMemoryFact } from './memory-notebook.js';
 import type { MemoryCandidate } from './memory-promotion-queue.js';
 import { assertScopedLearningApproval } from './scoped-learning-approval-verification.js';

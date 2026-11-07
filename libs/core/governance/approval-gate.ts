@@ -12,8 +12,11 @@ import {
 } from './approval-assurance.js';
 import { nowIso } from '../foundation/time.js';
 import { summarizeApprovalGate } from './approval-gate-summary.js';
-import { evaluateDecisionRights, resolveDecisionRightsMatrix } from '../decision-rights.js';
-import { resolveGoldenRulePriorityOrder, resolveVision } from '../vision-resolver.js';
+import {
+  evaluateDecisionRights,
+  resolveDecisionRightsMatrix,
+} from '../organization/decision-rights.js';
+import { resolveGoldenRulePriorityOrder, resolveVision } from '../organization/vision-resolver.js';
 import {
   createApprovalRequest,
   computeApprovalPayloadHash,
@@ -36,7 +39,7 @@ import { auditChain } from './audit-chain.js';
 import type { TraceContext } from '../analysis/trace.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
-import type { EventScopeInput } from '../event-scope.js';
+import type { EventScopeInput } from '../event/event-scope.js';
 import {
   isCharterEligiblePolicy,
   runCharterGate,

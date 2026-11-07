@@ -8,7 +8,7 @@ last_updated: 2026-11-05
 # Contract Design Principles — Absence, Failure, and Backend Opacity
 
 **Purpose**: three rules for any result shape Kyberion hands to a caller — a
-report contract (`libs/core/report-contract.ts`), a task result, a CLI
+report contract (`libs/core/task/report-contract.ts`), a task result, a CLI
 `--json` envelope, a delegated-work reply. They are written in the same
 rule → why → anti-pattern form as
 [working-philosophy](./working-philosophy.md) so reviewers can apply them
@@ -63,7 +63,7 @@ field that is a string from one backend and an array from another.
 
 ## Where this applies
 
-- Report phase contracts — `libs/core/report-contract.ts`.
+- Report phase contracts — `libs/core/task/report-contract.ts`.
 - Organization drafting envelopes — `libs/core/organization/role-intent-draft.ts`
   (`status: drafted | failed`, `failure.class`, unknown values omitted).
 - Any new `--json` CLI output or delegated-work result shape.

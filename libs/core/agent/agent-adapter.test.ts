@@ -43,9 +43,10 @@ vi.mock('../secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('../secure-io.js')>('../secure-io.js');
   return { ...actual, safeExecResult: codexMocks.safeExecResult };
 });
-vi.mock('../managed-process.js', async () => {
-  const actual =
-    await vi.importActual<typeof import('../managed-process.js')>('../managed-process.js');
+vi.mock('../tool/managed-process.js', async () => {
+  const actual = await vi.importActual<typeof import('../tool/managed-process.js')>(
+    '../tool/managed-process.js'
+  );
   return {
     ...actual,
     spawnManagedProcess: codexMocks.spawnManagedProcess,

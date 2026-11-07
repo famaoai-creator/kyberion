@@ -79,7 +79,7 @@
             "privacy": "declared"
           },
           "evidence": [
-            "libs/core/pixel-region-detector.ts (PixelRegionDetector: deterministic on-machine edge/connected-component regions of any screenshot; finds unlabelled icons and buttons OCR misses, but boxes are unlabelled guesses that can include text blocks and decorations)"
+            "libs/core/virtual/pixel-region-detector.ts (PixelRegionDetector: deterministic on-machine edge/connected-component regions of any screenshot; finds unlabelled icons and buttons OCR misses, but boxes are unlabelled guesses that can include text blocks and decorations)"
           ]
         }
       },

@@ -1,0 +1,677 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+import * as path from 'node:path';
+import { pathResolver } from '../path-resolver.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { loadServiceEndpointsCatalog } from '../service/service-endpoint-registry.js';
+import type { ProvenanceTaint } from './cloudflare-os-control-plane.js';
+import { isValidTenantSlug } from '../entity-scope.js';
+import { getActiveSandboxPolicy, isSandboxNetworkHostAllowed } from '../shell/sandbox-policy.js';
+import { assertSafeRepositoryPath } from '../secure-io.js';
+import {
+  _resetProviderEndpointDomainsForTests,
+  providerEndpointDomains,
+} from '../provider/provider-endpoint-domains.js';
+
+export type EgressPolicyMode = 'warn' | 'enforce';
+
+export interface EgressPolicyFile {
+  version?: string;
+  mode?: EgressPolicyMode;
+  manual_allowed_domains?: string[];
+  blocked_domains?: string[];
+  /**
+   * SA-04 Task 2: per-tenant destinations approved for confidential/personal
+   * material. Keyed by tenant slug; `*` applies to every tenant. Empty by
+   * default — tenant data has nowhere approved to go until someone says so.
+   */
+  tenant_allowed_domains?: Record<string, string[]>;
+  /**
+   * Providers approved for a tenant's confidential/personal material, keyed
+   * like `tenant_allowed_domains`. The hosts come from each provider's
+   * `endpoint_domains` in provider-egress-policy.json, so approving "agy"
+   * does not mean knowing that agy talks to generativelanguage.googleapis.com.
+   * Separate from `tenant_allowed_domains` because that table is also the
+   * customer-message link floor, and approving a model API for egress must
+   * not restrict which links a customer can be sent.
+   */
+  tenant_allowed_providers?: Record<string, string[]>;
+  /**
+   * QM-11: operator policy for LINKS SHARED IN MESSAGES — deliberately
+   * separate from the network-egress allowlist above (mentioning a URL to a
+   * customer must not require widening actual network egress). Absent =
+   * the operator imposes no link restriction.
+   */
+  link_allowed_domains?: string[];
+}
+
+export interface EgressPolicyDecision {
+  verdict: 'allow' | 'warn' | 'deny';
+  hostname: string;
+  reason: string;
+  matchedDomain?: string;
+  mode: EgressPolicyMode;
+  /** Tier the decision was made for, when the caller declared one. */
+  tier?: 'public' | 'confidential' | 'personal';
+}
+
+const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/egress-policy.json');
+const SECURITY_POLICY_PATH = pathResolver.knowledge('product/governance/security-policy.json');
+const SECURITY_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/security-policy.schema.json'
+);
+
+let cachedPolicyPath: string | null = null;
+let cachedPolicy: EgressPolicyFile | null = null;
+let cachedAllowedDomains: string[] | null = null;
+const egressContextStorage = new AsyncLocalStorage<EgressPayloadContext>();
+
+import { KNOWLEDGE_TIER_RANK as EGRESS_TIER_ORDER } from '../foundation/knowledge-tier.js';
+
+const policyCatalog = defineCatalog<EgressPolicyFile>({
+  id: 'egress-policy',
+  path: () => getEgressPolicyPath(),
+  schema: pathResolver.knowledge('product/schemas/egress-policy.schema.json'),
+});
+
+/**
+ * Tenant egress overlay: an operator-owned egress policy file inside the BOUND
+ * tenant's confidential root (knowledge/confidential/{tenant}/...), named by
+ * KYBERION_TENANT_EGRESS_POLICY_PATH. Only that tenant's
+ * `tenant_allowed_providers` / `tenant_allowed_domains` entries are merged
+ * (union) onto the governed policy — an overlay can approve destinations for
+ * its own tenant's material and nothing else: it cannot change mode, blocked
+ * domains, the general allowlist, or any other tenant's entries. Unbound
+ * processes (no KYBERION_TENANT) never read an overlay. Set per process by
+ * the chronos tenant runner, so tenant approvals stay out of the public tier.
+ */
+let tenantOverlayRootForTests: string | null = null;
+
+/** Test seam: resolve overlay tenant roots under a fixture root instead of the repository root. */
+export function _setTenantEgressOverlayRootForTests(root: string | null): void {
+  tenantOverlayRootForTests = root;
+}
+
+function getTenantEgressOverlayPath(): { path: string; tenant: string } | null {
+  const configured = getRegisteredEnvText('KYBERION_TENANT_EGRESS_POLICY_PATH')?.trim();
+  const tenant = getRegisteredEnvText('KYBERION_TENANT')?.trim();
+  if (!configured || !tenant || !isValidTenantSlug(tenant)) return null;
+  const root = tenantOverlayRootForTests ?? pathResolver.rootDir();
+  const absolute = path.resolve(root, configured);
+  const relative = path.relative(root, absolute).replaceAll('\\', '/');
+  if (!relative.startsWith(`knowledge/confidential/${tenant}/`) || !relative.endsWith('.json')) {
+    throw new Error(
+      `[EGRESS_OVERLAY_SCOPE] tenant egress overlay must be a JSON file inside knowledge/confidential/${tenant}/: ${relative}`
+    );
+  }
+  return { path: assertSafeRepositoryPath(absolute), tenant };
+}
+
+const tenantOverlayCatalog = defineCatalog<EgressPolicyFile>({
+  id: 'tenant-egress-policy-overlay',
+  path: () => getTenantEgressOverlayPath()?.path ?? DEFAULT_POLICY_PATH,
+  schema: pathResolver.knowledge('product/schemas/egress-policy.schema.json'),
+});
+
+function mergeTenantEntries(
+  base: Record<string, string[]>,
+  overlay: Record<string, string[]> | undefined,
+  tenant: string
+): Record<string, string[]> {
+  const extra = Array.isArray(overlay?.[tenant]) ? overlay![tenant] : [];
+  if (extra.length === 0) return base;
+  return { ...base, [tenant]: [...new Set([...(base[tenant] ?? []), ...extra])] };
+}
+
+function getEgressPolicyPath(): string {
+  const configured =
+    getRegisteredEnvText('KYBERION_EGRESS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
+}
+
+const securityPolicyCatalog = defineCatalog<{
+  network_guardrails?: { allowed_domains?: string[] };
+}>({
+  id: 'security-policy-egress-view',
+  path: SECURITY_POLICY_PATH,
+  schema: SECURITY_POLICY_SCHEMA_PATH,
+});
+
+export function _resetEgressPolicyCacheForTests(): void {
+  cachedPolicyPath = null;
+  cachedPolicy = null;
+  cachedAllowedDomains = null;
+  policyCatalog.reset();
+  tenantOverlayCatalog.reset();
+  securityPolicyCatalog.reset();
+  _resetProviderEndpointDomainsForTests();
+}
+
+/**
+ * Backward-compatible cache reset for callers that used the public helper
+ * before the test-only naming was introduced.
+ */
+export function resetEgressPolicyCache(): void {
+  _resetEgressPolicyCacheForTests();
+}
+
+// ---------------------------------------------------------------------------
+// QM-11: audience egress floor (ported from qm's audience-floor).
+// A shared conversation's egress is NOT the room's own setting: a host is
+// reachable only if EVERY participant's policy allows it (allow-intersection)
+// and NO participant denies it (deny-union). ~matches qm src/resolution/
+// audience-floor.ts semantics; participants here are policy holders such as
+// the tenant and the operator, not a per-user identity system (roadmap
+// non-goal).
+// ---------------------------------------------------------------------------
+
+export interface EgressParticipantPolicy {
+  participant: string;
+  allowed_domains: string[];
+  blocked_domains?: string[];
+}
+
+export interface AudienceEgressFloor {
+  participants: string[];
+  /** Intersection of every participant's normalized allow set. */
+  allowed_domains: string[];
+  /** Union of every participant's normalized deny set. */
+  blocked_domains: string[];
+}
+
+export function normalizeEgressHost(host: string): string {
+  return String(host || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\*\./, '')
+    .replace(/\.$/, '');
+}
+
+export function composeAudienceFloor(policies: EgressParticipantPolicy[]): AudienceEgressFloor {
+  const participants = policies.map((policy) => policy.participant);
+  const blocked = new Set<string>();
+  for (const policy of policies) {
+    for (const host of policy.blocked_domains ?? []) {
+      const normalized = normalizeEgressHost(host);
+      if (normalized) blocked.add(normalized);
+    }
+  }
+  // A participant whose allow set contains '*' imposes no restriction of its
+  // own — it joins the audience without narrowing the intersection. If every
+  // participant is unrestricted, the floor allows all (denials still apply).
+  let allowed: Set<string> | null = null;
+  let sawUnrestricted = false;
+  for (const policy of policies) {
+    const own = new Set(
+      policy.allowed_domains.map(normalizeEgressHost).filter((host) => host.length > 0)
+    );
+    if (own.has('*')) {
+      sawUnrestricted = true;
+      continue;
+    }
+    if (allowed === null) {
+      allowed = own;
+    } else {
+      allowed = new Set([...allowed].filter((host) => own.has(host)));
+    }
+  }
+  if (allowed === null && sawUnrestricted) allowed = new Set(['*']);
+  return {
+    participants,
+    allowed_domains: [...(allowed ?? new Set<string>())].sort(),
+    blocked_domains: [...blocked].sort(),
+  };
+}
+
+function hostCoveredBy(hostname: string, domain: string): boolean {
+  if (domain === '*') return true;
+  return hostname === domain || hostname.endsWith(`.${domain}`);
+}
+
+export interface AudienceEgressDecision {
+  verdict: 'allow' | 'deny';
+  hostname: string;
+  reason: string;
+}
+
+/** Deny wins over allow; an empty audience permits nothing. */
+export function evaluateAudienceEgress(
+  hostname: string,
+  floor: AudienceEgressFloor
+): AudienceEgressDecision {
+  const host = normalizeEgressHost(hostname);
+  if (!host) {
+    return { verdict: 'deny', hostname: host, reason: 'empty hostname' };
+  }
+  const blockedBy = floor.blocked_domains.find((domain) => hostCoveredBy(host, domain));
+  if (blockedBy) {
+    return {
+      verdict: 'deny',
+      hostname: host,
+      reason: `denied by a participant policy (${blockedBy}) — one participant's denial denies everyone`,
+    };
+  }
+  const allowedBy = floor.allowed_domains.find((domain) => hostCoveredBy(host, domain));
+  if (allowedBy) {
+    return {
+      verdict: 'allow',
+      hostname: host,
+      reason: `allowed by every participant (${allowedBy})`,
+    };
+  }
+  return {
+    verdict: 'deny',
+    hostname: host,
+    reason: 'not in the audience floor — a host is reachable only when every participant allows it',
+  };
+}
+
+export function loadEgressPolicy(): EgressPolicyFile {
+  const policyPath = getEgressPolicyPath();
+  const overlayRef = getTenantEgressOverlayPath();
+  const cacheKey = overlayRef ? `${policyPath}+${overlayRef.path}` : policyPath;
+  if (cachedPolicy && cachedPolicyPath === cacheKey) return cachedPolicy;
+  const parsed = policyCatalog.load();
+  const modeOverride = getRegisteredEnvText('KYBERION_EGRESS_POLICY')?.trim();
+  const policy: EgressPolicyFile = {
+    version: parsed.version || '1',
+    mode:
+      modeOverride === 'enforce'
+        ? 'enforce'
+        : modeOverride === 'warn'
+          ? 'warn'
+          : parsed.mode === 'enforce'
+            ? 'enforce'
+            : 'warn',
+    manual_allowed_domains: Array.isArray(parsed.manual_allowed_domains)
+      ? parsed.manual_allowed_domains
+      : [],
+    blocked_domains: Array.isArray(parsed.blocked_domains) ? parsed.blocked_domains : [],
+    tenant_allowed_domains:
+      parsed.tenant_allowed_domains && typeof parsed.tenant_allowed_domains === 'object'
+        ? parsed.tenant_allowed_domains
+        : {},
+    tenant_allowed_providers:
+      parsed.tenant_allowed_providers && typeof parsed.tenant_allowed_providers === 'object'
+        ? parsed.tenant_allowed_providers
+        : {},
+    ...(Array.isArray(parsed.link_allowed_domains)
+      ? { link_allowed_domains: parsed.link_allowed_domains }
+      : {}),
+  };
+  if (overlayRef) {
+    const overlay = tenantOverlayCatalog.load();
+    const foreign = [
+      ...Object.keys(overlay.tenant_allowed_providers ?? {}),
+      ...Object.keys(overlay.tenant_allowed_domains ?? {}),
+    ].filter((key) => key !== overlayRef.tenant);
+    if (foreign.length > 0) {
+      throw new Error(
+        `[EGRESS_OVERLAY_SCOPE] tenant egress overlay for '${overlayRef.tenant}' may only list its own tenant (found: ${[...new Set(foreign)].join(', ')})`
+      );
+    }
+    policy.tenant_allowed_providers = mergeTenantEntries(
+      policy.tenant_allowed_providers ?? {},
+      overlay.tenant_allowed_providers,
+      overlayRef.tenant
+    );
+    policy.tenant_allowed_domains = mergeTenantEntries(
+      policy.tenant_allowed_domains ?? {},
+      overlay.tenant_allowed_domains,
+      overlayRef.tenant
+    );
+  }
+  // Cache only a fully merged policy: a rejected overlay must never leave a
+  // base-only policy cached under the overlay key.
+  cachedPolicyPath = cacheKey;
+  cachedPolicy = policy;
+  return cachedPolicy;
+}
+
+export function loadAllowedEgressDomains(): string[] {
+  if (cachedAllowedDomains) return cachedAllowedDomains;
+
+  const domains = new Set<string>();
+  const addDomain = (value: string | undefined | null) => {
+    const normalized = normalizeDomain(value);
+    if (normalized) domains.add(normalized);
+  };
+
+  try {
+    const securityPolicy = securityPolicyCatalog.load();
+    for (const domain of securityPolicy.network_guardrails?.allowed_domains ?? []) {
+      addDomain(domain);
+    }
+  } catch {
+    /* fall through */
+  }
+
+  try {
+    const catalog = loadServiceEndpointsCatalog();
+    for (const record of Object.values(catalog.services || {})) {
+      for (const domain of extractDomainsFromEndpointRecord(record.base_url)) {
+        addDomain(domain);
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+
+  const policy = loadEgressPolicy();
+  for (const domain of policy.manual_allowed_domains ?? []) {
+    addDomain(domain);
+  }
+
+  cachedAllowedDomains = Array.from(domains).sort();
+  return cachedAllowedDomains;
+}
+
+/**
+ * SA-04 Task 2: what tier of material this request carries, and for whom.
+ *
+ * Supplied by callers that knowingly move tenant data outward. Absent it the
+ * evaluation behaves exactly as before, so existing callers are unaffected.
+ */
+export interface EgressPayloadContext {
+  /** Most sensitive tier represented in the payload. */
+  tier?: 'public' | 'confidential' | 'personal';
+  /** Tenant the material belongs to, when tier is above public. */
+  tenant_slug?: string;
+  /** Short description of what is being sent, for the audit trail. */
+  purpose?: string;
+  /** Observation-derived taint; when present it is stricter than tier alone. */
+  provenance?: ProvenanceTaint;
+}
+
+/**
+ * Carry a trusted egress context through SDK/preset calls that eventually use
+ * secureFetch. An explicit secureFetch context still wins for fields it sets,
+ * while the ambient provenance is retained when the caller only adds a tier.
+ */
+export function withEgressPayloadContext<T>(context: EgressPayloadContext, fn: () => T): T {
+  return egressContextStorage.run(context, fn);
+}
+
+export function getEgressPayloadContext(): EgressPayloadContext | undefined {
+  return egressContextStorage.getStore();
+}
+
+export function resolveEgressPayloadContext(
+  explicit?: EgressPayloadContext
+): EgressPayloadContext | undefined {
+  const ambient = getEgressPayloadContext();
+  if (!ambient) return explicit;
+  if (!explicit) return ambient;
+  if (ambient.tenant_slug && explicit.tenant_slug && ambient.tenant_slug !== explicit.tenant_slug) {
+    throw new Error(
+      `[TENANT_SCOPE_CONFLICT] ambient tenant '${ambient.tenant_slug}' conflicts with explicit tenant '${explicit.tenant_slug}'`
+    );
+  }
+  const ambientTier = ambient.tier;
+  const explicitTier = explicit.tier;
+  const tier =
+    ambientTier && explicitTier
+      ? EGRESS_TIER_ORDER[ambientTier] >= EGRESS_TIER_ORDER[explicitTier]
+        ? ambientTier
+        : explicitTier
+      : ambientTier || explicitTier;
+  return {
+    ...ambient,
+    ...explicit,
+    ...(tier ? { tier } : {}),
+    ...(explicit.tenant_slug === undefined ? { tenant_slug: ambient.tenant_slug } : {}),
+    ...(explicit.purpose === undefined ? { purpose: ambient.purpose } : {}),
+    provenance: mergeEgressProvenance(ambient.provenance, explicit.provenance),
+  };
+}
+
+function mergeEgressProvenance(
+  ambient: ProvenanceTaint | undefined,
+  explicit: ProvenanceTaint | undefined
+): ProvenanceTaint | undefined {
+  if (!ambient) return explicit;
+  if (!explicit) return ambient;
+  const tenants =
+    ambient.tenants.length > 0 && explicit.tenants.length > 0
+      ? ambient.tenants.filter((tenant) => explicit.tenants.includes(tenant))
+      : ambient.tenants.length > 0
+        ? ambient.tenants
+        : explicit.tenants;
+  return {
+    missionId: ambient.missionId,
+    highestTier:
+      EGRESS_TIER_ORDER[ambient.highestTier] >= EGRESS_TIER_ORDER[explicit.highestTier]
+        ? ambient.highestTier
+        : explicit.highestTier,
+    tenants: tenants.length > 0 ? tenants : ['__provenance_scope_conflict__'],
+    prohibitExternal: ambient.prohibitExternal || explicit.prohibitExternal,
+    observationIds: Array.from(new Set([...ambient.observationIds, ...explicit.observationIds])),
+  };
+}
+
+export function evaluateEgressPolicy(
+  url: string,
+  context?: EgressPayloadContext
+): EgressPolicyDecision {
+  const policy = loadEgressPolicy();
+  const hostname = safeHostname(url);
+  if (!hostname) {
+    return {
+      verdict: 'deny',
+      hostname: '',
+      reason: 'Missing or invalid URL for egress policy.',
+      mode: policy.mode || 'warn',
+    };
+  }
+
+  const sandbox = getActiveSandboxPolicy();
+  if (sandbox && !sandbox.networkAccess) {
+    return {
+      verdict: 'deny',
+      hostname,
+      reason: `[SANDBOX_NETWORK_DENIED] ${sandbox.provider ?? 'unknown'} sandbox denies network access.`,
+      mode: policy.mode || 'warn',
+      tier: context?.tier,
+    };
+  }
+  if (sandbox && !isSandboxNetworkHostAllowed(hostname)) {
+    return {
+      verdict: 'deny',
+      hostname,
+      reason: `[SANDBOX_NETWORK_DENIED] ${hostname} is outside the ${sandbox.provider ?? 'unknown'} sandbox network allowlist.`,
+      mode: policy.mode || 'warn',
+      tier: context?.tier,
+    };
+  }
+
+  if (context?.tenant_slug && !isValidTenantSlug(context.tenant_slug)) {
+    return {
+      verdict: 'deny',
+      hostname,
+      reason: `[TENANT_SCOPE_INVALID] '${context.tenant_slug}' is not a valid tenant slug.`,
+      mode: policy.mode || 'warn',
+      tier: context.tier,
+    };
+  }
+
+  const blocked = new Set(
+    (policy.blocked_domains ?? [])
+      .map((domain) => normalizeDomain(domain))
+      .filter(Boolean) as string[]
+  );
+  if ([...blocked].some((domain) => matchesDomain(hostname, domain))) {
+    const matchedDomain = [...blocked].find((domain) => matchesDomain(hostname, domain));
+    return {
+      verdict: 'deny',
+      hostname,
+      matchedDomain,
+      reason: `Egress to blocked domain is denied: ${matchedDomain || hostname}`,
+      mode: policy.mode || 'warn',
+    };
+  }
+
+  // Confidential and personal material is denied unless the destination is
+  // explicitly allowed for that tenant. This gate is intentionally independent
+  // of `policy.mode`: the warn mode exists so an unlisted *public* host does
+  // not break a workflow, and letting it also soften tenant data leaving the
+  // box would defeat the point of having tiers at all.
+  const tier = context?.tier;
+  const provenance = context?.provenance;
+  if (provenance) {
+    const provenanceRank = EGRESS_TIER_ORDER;
+    const requestedTier = tier || provenance.highestTier;
+    const wrongTenant = Boolean(
+      provenance.tenants.length > 0 &&
+      (!context?.tenant_slug || !provenance.tenants.includes(context.tenant_slug))
+    );
+    if (
+      provenance.prohibitExternal ||
+      wrongTenant ||
+      provenanceRank[requestedTier] < provenanceRank[provenance.highestTier]
+    ) {
+      return {
+        verdict: 'deny',
+        hostname,
+        reason: `[PROVENANCE_EGRESS_DENIED] ${provenance.prohibitExternal ? 'non-public provenance cannot leave the governed context' : wrongTenant ? 'target tenant is outside provenance scope' : 'payload tier is broader than provenance taint'}`,
+        mode: policy.mode || 'warn',
+        tier: requestedTier,
+      };
+    }
+  }
+  if (tier === 'confidential' || tier === 'personal') {
+    const tenantDomains = loadTenantEgressDomains(policy, context?.tenant_slug);
+    const matched = tenantDomains.find((domain) => matchesDomain(hostname, domain));
+    if (!matched) {
+      return {
+        verdict: 'deny',
+        hostname,
+        reason: `[TIER_EGRESS_DENIED] ${tier} material${
+          context?.tenant_slug ? ` for tenant ${context.tenant_slug}` : ''
+        } may not be sent to ${hostname}. Add the host to that tenant's allowed egress domains if this is intended.`,
+        mode: policy.mode || 'warn',
+        tier,
+      };
+    }
+    return {
+      verdict: 'allow',
+      hostname,
+      matchedDomain: matched,
+      reason: `Egress of ${tier} material allowed to tenant-approved host ${matched}`,
+      mode: policy.mode || 'warn',
+      tier,
+    };
+  }
+
+  const allowedDomains = loadAllowedEgressDomains();
+  const matchedDomain = allowedDomains.find((domain) => matchesDomain(hostname, domain));
+  if (matchedDomain) {
+    return {
+      verdict: 'allow',
+      hostname,
+      matchedDomain,
+      reason: `Egress allowed for ${matchedDomain}`,
+      mode: policy.mode || 'warn',
+    };
+  }
+
+  return {
+    verdict: policy.mode === 'enforce' ? 'deny' : 'warn',
+    hostname,
+    reason: `Egress host is not allowlisted: ${hostname}. Add it to egress-policy.json or security-policy.json.`,
+    mode: policy.mode || 'warn',
+  };
+}
+
+export type EgressAudience = 'public' | 'confidential' | 'personal' | 'external';
+
+/**
+ * Classify where a payload is actually going, from policy rather than from any
+ * claim the caller makes about it: a host approved for the tenant's
+ * confidential/personal material is a `personal` audience, an allowlisted host
+ * is `public`, and everything else (unlisted, blocked, sandbox-denied,
+ * unparsable) is `external`. Accepts a URL or a bare host.
+ */
+export function classifyEgressDestination(
+  destination: string,
+  tenantSlug?: string
+): { hostname: string; audience: EgressAudience } {
+  const raw = String(destination || '').trim();
+  const url = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+  const hostname = safeHostname(url);
+  if (!hostname) return { hostname: '', audience: 'external' };
+  if (
+    tenantSlug &&
+    evaluateEgressPolicy(url, { tier: 'confidential', tenant_slug: tenantSlug }).verdict === 'allow'
+  ) {
+    return { hostname, audience: 'personal' };
+  }
+  return {
+    hostname,
+    audience: evaluateEgressPolicy(url).verdict === 'allow' ? 'public' : 'external',
+  };
+}
+
+/**
+ * Destinations approved for a tenant's confidential material.
+ *
+ * Deliberately does NOT fall back to the general allowlist: a host being fine
+ * for public traffic says nothing about whether a tenant's confidential deck
+ * may be sent there.
+ */
+function loadTenantEgressDomains(policy: EgressPolicyFile, tenantSlug?: string): string[] {
+  const domains = new Set<string>();
+  const add = (domain: string | undefined | null) => {
+    const normalized = normalizeDomain(domain);
+    if (normalized) domains.add(normalized);
+  };
+  const entriesFor = (table: Record<string, string[]> | undefined): string[] => {
+    const rows = [...(table?.['*'] ?? [])];
+    if (tenantSlug && isValidTenantSlug(tenantSlug) && table) {
+      if (Object.prototype.hasOwnProperty.call(table, tenantSlug)) {
+        rows.push(...(table[tenantSlug] ?? []));
+      }
+    }
+    return rows;
+  };
+  for (const domain of entriesFor(policy.tenant_allowed_domains)) add(domain);
+  for (const provider of entriesFor(policy.tenant_allowed_providers)) {
+    for (const domain of providerEndpointDomains(provider)) add(domain);
+  }
+  return Array.from(domains);
+}
+
+function safeHostname(url: string): string {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+function normalizeDomain(domain: string | undefined | null): string {
+  return String(domain || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\.+/, '');
+}
+
+function matchesDomain(hostname: string, domain: string): boolean {
+  return hostname === domain || hostname.endsWith(`.${domain}`);
+}
+
+function extractDomainsFromEndpointRecord(baseUrl?: string): string[] {
+  if (!baseUrl || typeof baseUrl !== 'string') return [];
+  const rewritten = baseUrl.replace(/\{\{[^}]+\}\}/g, 'placeholder');
+  try {
+    const hostname = new URL(rewritten).hostname.toLowerCase();
+    const parts = hostname.split('.').filter(Boolean);
+    const domains = new Set<string>();
+    if (parts.length >= 2) {
+      domains.add(parts.slice(-2).join('.'));
+    }
+    domains.add(hostname);
+    return Array.from(domains);
+  } catch {
+    return [];
+  }
+}

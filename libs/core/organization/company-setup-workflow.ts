@@ -1,14 +1,14 @@
 /** Bounded, transport-independent setup for an already authenticated tenant owner. */
-import { STANCES_DIR } from '../stance-resolver.js';
+import { STANCES_DIR } from '../authn/stance-resolver.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { withExecutionContextAsync } from '../authority.js';
-import type { ResolvedPrincipal } from '../authn-principal-resolver.js';
+import type { ResolvedPrincipal } from '../authn/authn-principal-resolver.js';
 import { pathResolver } from '../path-resolver.js';
 import { readJsonIfPresent, writeJson } from '../foundation/json.js';
 import { withLock } from '../foundation/lock-utils.js';
 import { safeMkdir } from '../secure-io.js';
-import { humanActor } from '../actor.js';
+import { humanActor } from '../contracts/actor.js';
 import {
   SurfaceManagementError,
   verifySurfaceManagementAuthorization,

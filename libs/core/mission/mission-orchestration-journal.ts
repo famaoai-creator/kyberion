@@ -24,13 +24,17 @@ import {
   normalizeEventScope,
   type EventScope,
   type EventScopeInput,
-} from '../event-scope.js';
+} from '../event/event-scope.js';
 import {
   withFencedWriterLeaseSync,
   withWriterLeaseSnapshotSync,
   writerLeaseResourceId,
-} from '../writer-lease.js';
-import { resolveMissionDir, tryResolveOwnerScope, type OwnerScopeHint } from '../owner-scope.js';
+} from '../lease/writer-lease.js';
+import {
+  resolveMissionDir,
+  tryResolveOwnerScope,
+  type OwnerScopeHint,
+} from '../governance/owner-scope.js';
 import { createLogger, formatDiagnostic } from '../logger.js';
 import { validateMissionBlueprint } from './mission-blueprint-validation.js';
 

@@ -4,7 +4,7 @@ import {
   createSeamLifecycle,
   type SeamProviderMetadata,
 } from '../seam.js';
-import { resolveSeamDefaultProvider } from '../seam-provider-selection.js';
+import { resolveSeamDefaultProvider } from '../provider/seam-provider-selection.js';
 import type { KnowledgeContext } from './knowledge-context.js';
 
 export interface KnowledgeRecord {

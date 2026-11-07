@@ -40,7 +40,7 @@ import {
 } from '../secure-io.js';
 import { storagePartitionSegments } from '../storage-layout.js';
 import { validateWritePermission } from '../tier-guard.js';
-import type { EventScope, EventScopeInput } from '../event-scope.js';
+import type { EventScope, EventScopeInput } from '../event/event-scope.js';
 import {
   ensureRegularGovernedArtifactFile,
   readGovernedArtifactJson,

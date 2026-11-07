@@ -1,14 +1,18 @@
 /** A task's model-visible tools, independent of CLI/API transport. */
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import { normalizeEventScope, type EventScope, type EventScopeInput } from '../event-scope.js';
+import {
+  normalizeEventScope,
+  type EventScope,
+  type EventScopeInput,
+} from '../event/event-scope.js';
 import { getWorkItem, listActiveWorkLeases } from './work-coordination.js';
 import { coordinationNamespace } from './work-coordination-ledger.js';
 import type { WorkItem, WorkLease } from './work-coordination-types.js';
 import {
   getSubagentCapabilityProfile,
   resolveDelegationCapabilityProfile,
-} from '../subagent-capability-profiles.js';
+} from './subagent-capability-profiles.js';
 import { pathResolver, findMissionPath } from '../path-resolver.js';
 import {
   safeReadFileSnapshot,

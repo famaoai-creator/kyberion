@@ -1,12 +1,20 @@
 ---
 title: 情報資産の所在登録・取得・完了確認の運用
 tags: [information-assets, runbook, intake, collectors, organization]
-last_updated: 2026-11-02
+last_updated: 2026-11-08
 ---
 
 # 情報資産の所在登録・取得・完了確認の運用
 
 この手順は既存の tenant、active organization、必要なら active project、組織所有の service binding が設定済みであることを前提にする。情報資産機能は binding や外部権限を自動作成しない。構造と境界は [architecture](../architecture/information-assets.md) を参照する。
+
+## Viewer への開示を変更するとき
+
+Viewer の person IDs と tenant allowlist は認証済み server context からだけ取得する。request の tenant / organization / project は表示の絞り込みに使い、person identity や権限の追加に使わない。custody の admission が通っても tier と operation permission の検証を省略しない。明示された所有者や audience が不正なら system scope に読み替えず拒否する。
+
+本人への表示と同じ tenant の他メンバーへの表示は区別する。他メンバーの graph node を許可した場合も、viewer の範囲外の tenant 所属・役割は返さない。owner / audience の制約は shell と MCP の両 reader で検証する。
+
+変更時は surface authorization / workspace graph / needs-you sources と Concierge の discussion・memory・distill scope テストを実行する。public-only viewer、permission がない viewer、本人、同じ tenant の他人、未知の principal、および明示 tenant 選択で owner/system レコードが除外されるケースを含める。
 
 ## 所在を登録する
 

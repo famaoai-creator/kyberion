@@ -3,12 +3,12 @@ import {
   writePersonalAgentIdentityAtPath,
   readPersonalAgentIdentityStrictAtPath,
   personalAgentIdentityRevision,
-} from '../personal-identity-state.js';
+} from '../authn/personal-identity-state.js';
 import { pathResolver } from '../path-resolver.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -18,7 +18,7 @@ import {
 } from '../secure-io.js';
 import { withExecutionContext } from '../authority.js';
 import { writeGovernedArtifactJson } from '../workforce/artifact-store.js';
-import * as customerResolver from '../stance-resolver.js';
+import * as customerResolver from '../authn/stance-resolver.js';
 
 import type {
   OnboardingField,

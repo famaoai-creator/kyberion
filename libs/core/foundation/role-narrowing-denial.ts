@@ -86,12 +86,16 @@ const VALID_OPERATIONS: ReadonlySet<string> = new Set([
   'metadata',
 ]);
 
-function roleRulesRecord(policy: unknown, role: string): Record<string, unknown> | undefined {
-  if (!isRecord(policy)) return undefined;
+function roleRulesRecord(
+  policy: unknown,
+  role: string
+): Record<string, unknown> | undefined | null {
+  if (!isRecord(policy)) return null;
   const permissions = policy.authority_role_permissions;
-  if (!isRecord(permissions)) return undefined;
+  if (!isRecord(permissions)) return null;
+  if (!Object.hasOwn(permissions, role)) return undefined;
   const roleRules = permissions[role];
-  return isRecord(roleRules) ? roleRules : undefined;
+  return isRecord(roleRules) ? roleRules : null;
 }
 
 /** The role's `narrow` declaration, or undefined when absent/not an object. */
@@ -174,6 +178,7 @@ function exactScopeMatches(
     if (
       scope.organizationId ||
       scope.projectId ||
+      (scope.namePrefixExact?.length ?? 0) > 0 ||
       (scope.metadataExact?.length ?? 0) > 0 ||
       scope.readExact.length !== 1 ||
       scope.writeExact.length > 0 ||
@@ -204,6 +209,14 @@ function exactScopeMatches(
   return true;
 }
 
+function onlyKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  return Object.keys(value).every((key) => keys.includes(key));
+}
+
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+
 /** Narrow declaration validation — a malformed declaration fails closed.
  * Mirrors `$defs.narrow_declaration` in security-policy.schema.json: an
  * 'append' key is always invalid (append is evaluated as `write`, so a
@@ -213,10 +226,22 @@ function exactScopeMatches(
  * falling through open.
  */
 export function narrowDeclarationValid(narrow: unknown): boolean {
-  if (!isRecord(narrow)) return false;
   if (
-    (narrow.deny_reason !== undefined && typeof narrow.deny_reason !== 'string') ||
-    (narrow.only_reason !== undefined && typeof narrow.only_reason !== 'string') ||
+    !isRecord(narrow) ||
+    !onlyKeys(narrow, [
+      'deny',
+      'deny_reason',
+      'only',
+      'only_reason',
+      'content_check',
+      'require_scope',
+      'structural_mkdir',
+    ])
+  )
+    return false;
+  if (
+    (narrow.deny_reason !== undefined && !nonEmptyString(narrow.deny_reason)) ||
+    (narrow.only_reason !== undefined && !nonEmptyString(narrow.only_reason)) ||
     (narrow.structural_mkdir !== undefined && typeof narrow.structural_mkdir !== 'boolean')
   )
     return false;
@@ -236,11 +261,11 @@ export function narrowDeclarationValid(narrow: unknown): boolean {
       if (!VALID_OPERATIONS.has(op) || op === 'append' || !Array.isArray(rules)) return false;
       if (rules.length === 0) return false;
       for (const rule of rules) {
-        if (!isRecord(rule)) return false;
+        if (!isRecord(rule) || !onlyKeys(rule, ['path', 'prefix', 'pattern'])) return false;
         if (rule.pattern === undefined && rule.path === undefined && rule.prefix === undefined)
           return false;
         for (const key of ['path', 'prefix', 'pattern'] as const)
-          if (rule[key] !== undefined && typeof rule[key] !== 'string') return false;
+          if (rule[key] !== undefined && !nonEmptyString(rule[key])) return false;
         if (rule.pattern !== undefined) {
           try {
             new RegExp(String(rule.pattern), 'u');
@@ -254,18 +279,26 @@ export function narrowDeclarationValid(narrow: unknown): boolean {
   if (narrow.content_check !== undefined) {
     if (!Array.isArray(narrow.content_check) || narrow.content_check.length === 0) return false;
     for (const check of narrow.content_check) {
-      if (!isRecord(check) || check.kind !== 'append_only_jsonl') return false;
-      if (typeof check.path !== 'string' || typeof check.id_field !== 'string') return false;
-      if (check.refusal_prefix !== undefined && typeof check.refusal_prefix !== 'string')
+      if (
+        !isRecord(check) ||
+        !onlyKeys(check, ['path', 'kind', 'id_field', 'refusal_prefix']) ||
+        check.kind !== 'append_only_jsonl'
+      )
         return false;
+      if (!nonEmptyString(check.path) || !nonEmptyString(check.id_field)) return false;
+      if (check.refusal_prefix !== undefined && !nonEmptyString(check.refusal_prefix)) return false;
     }
   }
   if (narrow.require_scope !== undefined) {
-    if (!isRecord(narrow.require_scope)) return false;
+    if (
+      !isRecord(narrow.require_scope) ||
+      !onlyKeys(narrow.require_scope, ['fields', 'exact', 'reason', 'custody'])
+    )
+      return false;
     const scope = narrow.require_scope;
     if (scope.fields !== undefined) {
       if (!Array.isArray(scope.fields) || scope.fields.length === 0) return false;
-      if (scope.fields.some((field) => typeof field !== 'string')) return false;
+      if (scope.fields.some((field) => !nonEmptyString(field))) return false;
     }
     if (scope.custody !== undefined) {
       const kinds = Array.isArray(scope.custody) ? scope.custody : [scope.custody];
@@ -277,10 +310,19 @@ export function narrowDeclarationValid(narrow: unknown): boolean {
       )
         return false;
     }
-    if (scope.reason !== undefined && typeof scope.reason !== 'string') return false;
+    if (scope.reason !== undefined && !nonEmptyString(scope.reason)) return false;
     const exact = scope.exact;
     if (exact !== undefined) {
-      if (!isRecord(exact)) return false;
+      if (
+        !isRecord(exact) ||
+        !onlyKeys(exact, [
+          'read_only',
+          'read_path_pattern',
+          'read_path_tenant_group',
+          'allow_product_knowledge_read',
+        ])
+      )
+        return false;
       if (
         (exact.read_only !== undefined && typeof exact.read_only !== 'boolean') ||
         (exact.allow_product_knowledge_read !== undefined &&
@@ -296,7 +338,7 @@ export function narrowDeclarationValid(narrow: unknown): boolean {
           return false;
       }
       if (exact.read_path_pattern !== undefined) {
-        if (typeof exact.read_path_pattern !== 'string') return false;
+        if (!nonEmptyString(exact.read_path_pattern)) return false;
         try {
           new RegExp(exact.read_path_pattern, 'u');
         } catch {
@@ -326,7 +368,10 @@ export function roleNarrowingDenial(input: {
 }): string | null {
   const { role, relativePath } = input;
   if (!role) return null;
-  const rawNarrow = roleRulesRecord(input.policy, role)?.narrow;
+  const roleRules = roleRulesRecord(input.policy, role);
+  if (roleRules === null)
+    return `[ROLE_NARROWING_INVALID] role '${role}' has a malformed authority_role_permissions policy record`;
+  const rawNarrow = roleRules?.narrow;
   if (rawNarrow === undefined) return null;
   if (!narrowDeclarationValid(rawNarrow))
     return `[ROLE_NARROWING_INVALID] role '${role}' has a malformed narrow declaration (security-policy.json authority_role_permissions.${role}.narrow)`;

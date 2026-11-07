@@ -10,7 +10,7 @@ import {
   spawnManagedProcess,
   stopManagedProcess,
   type ManagedProcessHandle,
-} from '../managed-process.js';
+} from '../tool/managed-process.js';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withExecutionContext } from '../authority.js';

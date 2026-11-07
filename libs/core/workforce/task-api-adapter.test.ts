@@ -8,7 +8,7 @@ import type {
   ReasoningCallOptions,
 } from '../reasoning/reasoning-backend.js';
 import { WorkerEventStream } from './worker-event-stream.js';
-import { DynamicInjectionRegistry } from '../dynamic-injection.js';
+import { DynamicInjectionRegistry } from '../reasoning/dynamic-injection.js';
 
 function runtime(): TaskToolRuntime {
   return {

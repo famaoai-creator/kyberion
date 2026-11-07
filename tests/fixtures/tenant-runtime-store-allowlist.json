@@ -1,5 +1,5 @@
 {
-  "description": "Tenant-partitioned runtime stores: physicalScopedPath (<base>/tenants/<slug>/...) call sites under active/shared/runtime/ that the gate cannot attribute to an offboarding PHYSICAL_* base in libs/core/scope-offboarding.ts. 'unresolved' entries name a base expression the static scan cannot evaluate (say what it resolves to and why it is covered); 'bases' entries name a resolved runtime base that is deliberately not offboarded. Gate: tests/tenant-runtime-store-registration.test.ts.",
+  "description": "Tenant-partitioned runtime stores: physicalScopedPath (<base>/tenants/<slug>/...) call sites under active/shared/runtime/ that the gate cannot attribute to an offboarding PHYSICAL_* base in libs/core/storage/scope-offboarding.ts. 'unresolved' entries name a base expression the static scan cannot evaluate (say what it resolves to and why it is covered); 'bases' entries name a resolved runtime base that is deliberately not offboarded. Gate: tests/tenant-runtime-store-registration.test.ts.",
   "unresolved": [
     {
       "file": "libs/core/knowledge/knowledge-index.ts",
@@ -22,7 +22,7 @@
       "reason": "dirname of active/shared/runtime/intent-contract-memory.json = active/shared/runtime (covered: <runtime>/tenants/<slug>) unless KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH overrides it."
     },
     {
-      "file": "libs/core/contextual-intent-memory.ts",
+      "file": "libs/core/intent/contextual-intent-memory.ts",
       "expression": "path.dirname(base)",
       "reason": "dirname of knowledge/personal/contextual-intent-memory.json: a knowledge-tier path, not active/shared/runtime (tier-guarded as knowledge/personal)."
     },

@@ -9,7 +9,7 @@
  * (`seam-provider-selection/secret-provider.json` `default_chains`).
  */
 
-import { createProviderRegistry } from '../provider-registry.js';
+import { createProviderRegistry } from '../provider/provider-registry.js';
 import type { SecretProvider } from './secret-types.js';
 import type { SeamProviderMetadata } from '../seam.js';
 

@@ -23,9 +23,9 @@ import {
   matchesChronosToken,
   type ChronosAccessRole,
   type ChronosTokenRegistration,
-} from '../chronos-access-registry.js';
+} from '../authn/chronos-access-registry.js';
 import { isValidTenantSlug } from '../entity-scope.js';
-import type { OsKnowledgeTier } from '../cloudflare-os-control-plane.js';
+import type { OsKnowledgeTier } from '../governance/cloudflare-os-control-plane.js';
 import { isScimProvisioningTokenFormat } from '../organization/scim-protocol.js';
 
 export interface SurfaceMutationRequest {

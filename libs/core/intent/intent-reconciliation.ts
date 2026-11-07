@@ -9,7 +9,7 @@ import {
   buildCompletionNextAction,
   type CompletionGoal,
   type CompletionReconciliation,
-} from '../next-action.js';
+} from '../surface/next-action.js';
 
 export interface IntentReconciliationInput {
   goal: CompletionGoal;

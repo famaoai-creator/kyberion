@@ -43,7 +43,7 @@ Kyberion エコシステムへ参加するメンバーが、それぞれの役�
 **目標**: 知的財産の保護、機密情報の漏洩防止、およびセキュアなコード品質を維持する。
 
 - **Step 1: 監査基盤**
-  - `libs/core/pii-scrubber.ts` とインジェスト時の PII ゲートによるドキュメントスキャン
+  - `libs/core/governance/pii-scrubber.ts` とインジェスト時の PII ゲートによるドキュメントスキャン
   - `code-actuator` と `secret-actuator` を使った governed security review の運用
 - **Step 2: 知財管理**
   - `pnpm license:audit` による依存ライブラリのライセンスチェック

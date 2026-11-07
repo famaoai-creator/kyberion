@@ -10,6 +10,7 @@ import {
 import type { MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
 import { admitsScopeAudience, viewerPersonIds } from '@agent/core/surface/surface-authorization';
 import {
+  viewerCanReadTier,
   defaultTierAccess,
   strictViewerScopeOrganizationIds,
   strictViewerScopeProjectIds,
@@ -56,6 +57,8 @@ export function distillCandidateVisibleToViewer(
   const organizations = strictViewerScopeOrganizationIds(viewer);
   const projects = strictViewerScopeProjectIds(viewer);
   const scope = candidate.scope ?? legacyScope(candidate);
+  if (!viewerCanReadTier(viewer, scope.tier)) return false;
+  if (requestedTenant && scope.tenant_slug !== requestedTenant) return false;
   const tiers = viewer.tierAccess ?? defaultTierAccess(viewer.role);
   if (scope.tier === 'personal' || !tiers.includes(scope.tier)) return false;
   if (candidate.tier && candidate.tier !== scope.tier) return false;

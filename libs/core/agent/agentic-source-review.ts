@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
-import type { SourceAnalysisIr } from '../source-analysis.js';
+import type { SourceAnalysisIr } from '../analysis/source-analysis.js';
 import type { ReasoningParticipant } from '../reasoning/reasoning-participant.js';
 import type { TierLevel } from '../types.js';
 import {

@@ -1094,7 +1094,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
   // Without this, a user pressing Ctrl+C during a meeting join pipeline would
   // leave their system microphone locked to BlackHole.
   const cleanupAndExit = (code: number) => {
-    void import('@agent/core/blackhole-routing-guard')
+    void import('./lib/blackhole-routing-guard.js')
       .then(({ resetRouterSync }) => {
         resetRouterSync();
         exitProcess(code);

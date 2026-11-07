@@ -1,6 +1,6 @@
 /** Existing dot wake metering and egress context, independent of the runtime driver. */
 import { estimateTokens } from '../foundation/text.js';
-import { withUsageAttribution } from '../usage-accounting.js';
+import { withUsageAttribution } from '../finance/usage-accounting.js';
 import { withReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
 import { withoutAutomaticReasoningRedispatch } from '../reasoning/reasoning-dispatch-scope.js';
 import type { DotCharter } from './dot-charter.js';

@@ -124,6 +124,49 @@ export function inferDeliverableTier(
   return normalizeDeliverableTier(pathTier);
 }
 
+/**
+ * Paths in artifact records mix absolute and repo-relative; the UI, the asset
+ * route and the tier rule all speak repo-relative with forward slashes.
+ */
+export function normalizeArtifactRecordPath(recordPath: string | undefined): string | undefined {
+  if (!recordPath) return undefined;
+  const root = pathResolver.rootDir().replace(/\\/g, '/').replace(/\/$/, '');
+  const normalized = recordPath.replace(/\\/g, '/');
+  return normalized.startsWith(`${root}/`) ? normalized.slice(root.length + 1) : normalized;
+}
+
+/**
+ * The governing tier of one artifact record (mission state, then metadata,
+ * then path — `inferDeliverableTier`). `undefined` means unknown, which every
+ * viewer-facing reader denies. Shared by the 成果物 list and 仕事 › 依頼.
+ */
+export function resolveArtifactRecordTier(record: ArtifactRecord): OsKnowledgeTier | undefined {
+  return inferDeliverableTier(
+    record,
+    normalizeArtifactRecordPath(record.path),
+    readMissionContext(record.mission_id).tier
+  );
+}
+
+/**
+ * The governing tier of one deliverable-inbox entry: its mission's tier, else
+ * the tier its delivered paths sit under. `undefined` when neither says.
+ */
+export function resolveInboxEntryTier(
+  entry: Pick<DeliverableInboxEntry, 'mission_id' | 'artifact_paths'>
+): OsKnowledgeTier | undefined {
+  const missionTier = readMissionContext(entry.mission_id).tier;
+  if (missionTier) return missionTier;
+  for (const artifactPath of entry.artifact_paths) {
+    const tier = normalizeArtifactRecordPath(artifactPath)?.match(
+      /(?:^|\/)(personal|confidential|public)(?:\/|$)/
+    )?.[1];
+    const normalized = normalizeDeliverableTier(tier);
+    if (normalized) return normalized;
+  }
+  return undefined;
+}
+
 /** Tier filtering used by the request-boundary projection. Unknown is denied. */
 export function deliverableVisibleToTierAccess(
   item: DeliverableInboxItem,
@@ -207,14 +250,8 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
       const recordPath = resolveArtifactRecordPath(record.artifact_id);
       const safeRecordPath = resolveSafeExistingFile(recordPath);
       const stats = safeRecordPath ? safeLstat(safeRecordPath) : null;
-      // Paths in artifact records mix absolute and repo-relative; the UI and
-      // the asset route both speak repo-relative.
       const root = pathResolver.rootDir().replace(/\\/g, '/').replace(/\/$/, '');
-      const normalizedPath = record.path
-        ? record.path.replace(/\\/g, '/').startsWith(`${root}/`)
-          ? record.path.replace(/\\/g, '/').slice(root.length + 1)
-          : record.path.replace(/\\/g, '/')
-        : undefined;
+      const normalizedPath = normalizeArtifactRecordPath(record.path);
       // The DELIVERABLE file itself (not the record json): tmp sweeps and
       // mission archival routinely delete these — surface it honestly.
       const targetMissing = normalizedPath
