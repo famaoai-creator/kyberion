@@ -10,14 +10,15 @@
  * (one release) so operators who still export them get a warning instead of
  * an unknown-variable failure. Remove the entry by hand once that window ends.
  *
- * Also generates `docs/developer/env.example` and
- * `docs/developer/CONFIGURATION.md` from the registry so the configuration
- * surface has a single source of truth. (The example lives under docs/
- * because the policy engine deliberately refuses writes to root dotfiles;
- * copy it to `.env` locally.)
+ * Also generates `docs/developer/env.example`,
+ * `docs/developer/CONFIGURATION.md`, and the types-only
+ * `libs/core/foundation/config.generated.ts` facade map from the registry so
+ * the configuration surface has a single source of truth. (The example lives
+ * under docs/ because the policy engine deliberately refuses writes to root
+ * dotfiles; copy it to `.env` locally.)
  *
  * Usage:
- *   pnpm generate:env-registry          — rewrite the three artifacts
+ *   pnpm generate:env-registry          — rewrite the four artifacts
  *   pnpm run check -- --scope pr --only env-registry
  *                                      — fail if any artifact drifted (PR gate)
  *   KYBERION_ENV_REGISTRY_STRICT_DOCS=1 pnpm run check -- --scope pr --only env-registry
@@ -166,6 +167,9 @@ export function validateEnvRegistryQuality(registry: EnvRegistryFile): string[] 
 const REGISTRY_PATH = pathResolver.knowledge('product/governance/env-registry.json');
 const ENV_EXAMPLE_PATH = pathResolver.rootResolve('docs/developer/env.example');
 const CONFIGURATION_DOC_PATH = pathResolver.rootResolve('docs/developer/CONFIGURATION.md');
+const FOUNDATION_CONFIG_TYPES_PATH = pathResolver.rootResolve(
+  'libs/core/foundation/config.generated.ts'
+);
 
 const SCAN_ROOTS = ['libs', 'scripts', 'satellites', 'presence', 'pipelines', 'tests'];
 const SCAN_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.py']);
@@ -177,6 +181,8 @@ const EXCLUDED_PATH_SEGMENTS = [
   '/vault/',
   '/tests/',
 ];
+/** Generated from the registry — must not feed discovery or unused names never drop. */
+const EXCLUDED_BASENAMES = new Set(['config.generated.ts']);
 const ENV_DISCOVERY_RE = /KYBERION_[A-Z0-9_]+/g;
 
 export function readEnvRegistryTextFile(filePath: string): string {
@@ -255,6 +261,7 @@ export function discoverEnvNames(rootDir: string): string[] {
       const normalized = `/${filePath.split(path.sep).join('/')}/`;
       if (EXCLUDED_PATH_SEGMENTS.some((segment) => normalized.includes(segment))) continue;
       if (!SCAN_EXTENSIONS.has(path.extname(filePath))) continue;
+      if (EXCLUDED_BASENAMES.has(path.basename(filePath))) continue;
       if (
         filePath.endsWith('.d.ts') ||
         /(?:\.test|\.spec)\.[^.]+$/.test(filePath) ||
@@ -381,6 +388,39 @@ function renderEnvExample(registry: EnvRegistryFile): string {
   return `${lines.join('\n').trimEnd()}\n`;
 }
 
+function registeredEnvTsType(entry: EnvRegistryEntry): 'string' | 'number' | 'boolean' {
+  if (entry.type === 'boolean') return 'boolean';
+  if (entry.type === 'number') return 'number';
+  return 'string';
+}
+
+/** Types-only map consumed by `libs/core/foundation/config.ts`. */
+export function renderFoundationConfigTypes(registry: EnvRegistryFile): string {
+  const entries = [...registry.entries].sort((left, right) => left.name.localeCompare(right.name));
+  const union =
+    entries.length === 0 ? 'never' : entries.map((entry) => `  | '${entry.name}'`).join('\n');
+  const valueMap =
+    entries.length === 0
+      ? 'Record<string, never>'
+      : `{\n${entries
+          .map((entry) => `  '${entry.name}': ${registeredEnvTsType(entry)};`)
+          .join('\n')}\n}`;
+  return [
+    '/**',
+    ' * Generated from `knowledge/product/governance/env-registry.json` by',
+    ' * `pnpm generate:env-registry` — do not edit by hand.',
+    ' *',
+    ' * Types only: the runtime facade lives in `config.ts` and still resolves',
+    ' * values through `foundation/env` + the secure-io registry reader.',
+    ' */',
+    '',
+    `export type RegisteredEnvName =\n${union};`,
+    '',
+    `export type RegisteredEnvValueByName = ${valueMap};`,
+    '',
+  ].join('\n');
+}
+
 function renderConfigurationDoc(registry: EnvRegistryFile): string {
   const categories: EnvCategory[] = ['secret', 'path', 'flag', 'tuning', 'provider', 'runtime'];
   const lines: string[] = [
@@ -391,10 +431,10 @@ function renderConfigurationDoc(registry: EnvRegistryFile): string {
     '',
     '## What belongs where',
     '',
-    '- **Environment variables**: secrets, environment-specific endpoints/paths, and feature flags. Validated at startup by `libs/core/harnessing/env-validator.ts` (warn by default; missing required values are errors).',
+    '- **Environment variables**: secrets, environment-specific endpoints/paths, and feature flags. Validated at startup by `libs/core/harnessing/env-validator.ts` (warn by default; missing required values are errors). Feature code should read them through `@agent/core/foundation/config` (`config.get` / `config.text` / `config.bool`), which is typed from this registry.',
     '- **Registry fields**: `required: true` is reserved for an unconditional startup prerequisite and must also be `documented: true`; conditional capability prerequisites stay in the environment manifests. `documented: false` is an honest discovery state, not a runtime failure.',
     '- **Secrets**: may be documented by name and purpose, but their values never belong in this registry and they cannot be marked required here. Secret requirements are enforced by the selected capability or command.',
-    '- **Config files (`knowledge/product/**`)**: policy thresholds (SA plans), model IDs (IP-13), catalogs and vocabularies. These need review, diffing, and schema validation — not per-host overrides.',
+    '- **Config files (`knowledge/product/**`)**: policy thresholds (SA plans), model IDs (IP-13), catalogs and vocabularies. These need review, diffing, and schema validation — not per-host overrides. They stay domain-owned catalogs, not this env facade.',
     '',
     'Copy [`env.example`](./env.example) to `.env` at the repo root for local overrides (the example is generated here because root dotfiles are write-protected by the policy engine).',
     '',
@@ -419,13 +459,17 @@ function renderConfigurationDoc(registry: EnvRegistryFile): string {
 
 async function formatWithPrettier(content: string, filePath: string): Promise<string> {
   const config = (await resolvePrettierConfig(filePath)) ?? {};
-  const parser = filePath.endsWith('.json') ? 'json' : 'markdown';
+  const parser = filePath.endsWith('.json')
+    ? 'json'
+    : filePath.endsWith('.ts')
+      ? 'typescript'
+      : 'markdown';
   return prettierFormat(content, { ...config, parser });
 }
 
 export const main = defineGenerator({
   id: 'env-registry',
-  outputs: [REGISTRY_PATH, ENV_EXAMPLE_PATH, CONFIGURATION_DOC_PATH],
+  outputs: [REGISTRY_PATH, ENV_EXAMPLE_PATH, CONFIGURATION_DOC_PATH, FOUNDATION_CONFIG_TYPES_PATH],
   async render(context) {
     const strictDocumentation =
       getRegisteredEnv<boolean>('KYBERION_ENV_REGISTRY_STRICT_DOCS', { defaultValue: false }) ===
@@ -456,6 +500,13 @@ export const main = defineGenerator({
       {
         path: CONFIGURATION_DOC_PATH,
         content: await formatWithPrettier(renderConfigurationDoc(built), CONFIGURATION_DOC_PATH),
+      },
+      {
+        path: FOUNDATION_CONFIG_TYPES_PATH,
+        content: await formatWithPrettier(
+          renderFoundationConfigTypes(built),
+          FOUNDATION_CONFIG_TYPES_PATH
+        ),
       },
     ];
   },
