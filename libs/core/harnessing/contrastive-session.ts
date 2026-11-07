@@ -13,7 +13,7 @@
 
 import * as path from 'node:path';
 import { assertSafeRepositoryPath, safeLstat, safeMkdir, safeWriteFile } from '../secure-io.js';
-import { ledger } from '../ledger.js';
+import { ledger } from '../governance/ledger.js';
 import { nowIso } from '../foundation/time.js';
 import {
   manifestsEqual,

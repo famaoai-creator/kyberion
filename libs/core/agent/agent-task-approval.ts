@@ -1,6 +1,6 @@
 /** Durable native-provider approvals. A pending request survives redispatch. */
 import { createHash } from 'node:crypto';
-import type { EventScopeInput } from '../event-scope.js';
+import type { EventScopeInput } from '../event/event-scope.js';
 import {
   AgentRuntimeApprovalPendingError,
   getAgentPromptApprovalPort,

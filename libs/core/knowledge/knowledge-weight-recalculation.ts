@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import { clamp, readTextFile } from '../foundation/text.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
-import { physicalScopedPath } from '../physical-namespace.js';
+import { physicalScopedPath } from '../storage/physical-namespace.js';
 import { auditChain } from '../governance/audit-chain.js';
 import {
   assertSafeRepositoryPath,

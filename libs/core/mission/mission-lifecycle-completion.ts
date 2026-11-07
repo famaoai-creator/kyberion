@@ -6,7 +6,7 @@
 import { guardSupersedeState } from './mission-next-tasks-supersede-guard.js';
 import * as path from 'node:path';
 import { createActuatorTrace } from '../actuator/actuator-trace.js';
-import * as customerResolver from '../stance-resolver.js';
+import * as customerResolver from '../authn/stance-resolver.js';
 import * as pathResolver from '../path-resolver.js';
 import { findMissionPath } from '../path-resolver.js';
 import { logger } from '../core.js';
@@ -26,7 +26,7 @@ import {
   loadVolatileSidecarAtPath,
   saveVolatileSidecarAtPath,
   volatileSidecarPath,
-} from '../volatile-knowledge.js';
+} from '../knowledge/volatile-knowledge.js';
 import {
   evaluateArtifactReviews,
   hashArtifactForReview,

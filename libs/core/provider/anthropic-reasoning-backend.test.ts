@@ -8,7 +8,7 @@ import {
 } from './anthropic-reasoning-backend.js';
 import { applyCacheBreakpointToSystemBlocks } from '../reasoning/prompt-cache-discipline.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
-import { metrics, MetricsCollector } from '../metrics.js';
+import { metrics, MetricsCollector } from '../analysis/metrics.js';
 import { getUsageAttribution, withUsageAttribution } from '../finance/usage-accounting.js';
 import { evaluateBudgetThrottle } from '../governance/org-budget-governor.js';
 import type { LoadedDotCharter } from '../dot/dot-charter.js';
@@ -17,7 +17,7 @@ import { withTaskCredentialBinding } from '../foundation/credential-binding.js';
 import {
   delegationExecutionStartedFromError,
   runWithDelegationExecutionTracker,
-} from '../delegation-execution-tracker.js';
+} from '../workforce/delegation-execution-tracker.js';
 
 describe('AnthropicReasoningBackend', () => {
   afterEach(() => {
@@ -404,7 +404,7 @@ it('emits Anthropic native deferred-tool definitions and returns tool references
 // KD-08 acceptance criterion 2 (opt-in, hits the real Anthropic API): cache_read
 // tokens must accrue from the second call onward when the same stable prefix
 // (system + tools, unchanged bytes) is resent. Gated on ANTHROPIC_API_KEY like
-// other real-backend suites in this repo (see libs/core/visual-raster.test.ts
+// other real-backend suites in this repo (see libs/core/media/visual-raster.test.ts
 // for the same describe.skipIf convention against a different capability).
 // ---------------------------------------------------------------------------
 describe.skipIf(!process.env.ANTHROPIC_API_KEY)(

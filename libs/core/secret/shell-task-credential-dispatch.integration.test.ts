@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CoordinatedAgentExecutionPort } from '../coordinated-agent-execution-port.js';
-import { currentActor } from '../actor-context.js';
+import { CoordinatedAgentExecutionPort } from '../agent/coordinated-agent-execution-port.js';
+import { currentActor } from '../authn/actor-context.js';
 import {
   createWorkItem,
   getWorkItem,

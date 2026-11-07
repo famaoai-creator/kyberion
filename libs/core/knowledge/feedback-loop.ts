@@ -10,8 +10,8 @@ import {
  * Implements the closed-loop between Phase 4 (Execution) and Phase 5 (Review/Distillation).
  */
 import { logger } from '../core.js';
-import { createFailureTracker } from '../failure-tracker.js';
-import { loadRuntimeControlPolicy } from '../runtime-control-policy.js';
+import { createFailureTracker } from '../foundation/failure-tracker.js';
+import { loadRuntimeControlPolicy } from '../governance/runtime-control-policy.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import {
@@ -32,8 +32,8 @@ import type {
   PipelineScheduleRegistry,
   PipelineSchedulerOptions,
 } from '../pipeline/pipeline-scheduler.js';
-import { sendOpsAlert } from '../ops-alert.js';
-import type { OpsAlertInput, OpsAlertOptions, OpsAlertReceipt } from '../ops-alert.js';
+import { sendOpsAlert } from '../daemon/ops-alert.js';
+import type { OpsAlertInput, OpsAlertOptions, OpsAlertReceipt } from '../daemon/ops-alert.js';
 
 const FEEDBACK_HINTS_DIR = pathResolver.shared('runtime/feedback-loop/hints');
 const FEEDBACK_HINTS_SCHEMA_PATH = pathResolver.knowledge(

@@ -38,8 +38,8 @@ const parity = JSON.parse(
 const MIGRATED_SOURCES = [
   'libs/shared-vision/src/browser-conversation-session.ts',
   'libs/core/intent/contextual-intent-frame.ts',
-  'libs/core/execution-brief.ts',
-  'libs/core/guided-coordination-brief.ts',
+  'libs/core/intent/execution-brief.ts',
+  'libs/core/intent/guided-coordination-brief.ts',
   'libs/core/intent/intent-contract.ts',
   'libs/core/intent/intent-resolution.ts',
   'libs/core/knowledge/procedure-self-repair.ts',

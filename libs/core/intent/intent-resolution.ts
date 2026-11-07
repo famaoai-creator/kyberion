@@ -7,7 +7,7 @@ import { matchesAnyTextRule, type TextMatchRule } from '../foundation/text-rule-
 import {
   resolveCapabilityBundleForIntent,
   resolveCapabilityBundlesForUtterance,
-} from '../capability-bundle-registry.js';
+} from '../plugin/capability-bundle-registry.js';
 import {
   buildContextualIntentFrame,
   type ContextualIntentFrame,

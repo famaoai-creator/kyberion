@@ -41,7 +41,7 @@ import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import {
   enqueueOperationalLearningSignal,
   type OperationalLearningSignal,
-} from '../operational-learning.js';
+} from '../knowledge/operational-learning.js';
 import {
   classifyWorkStep,
   listWorkInventoryEntries,

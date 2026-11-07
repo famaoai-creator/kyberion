@@ -104,7 +104,7 @@ import {
   getFrontDeskExecutionMapping,
   type FrontDeskExecutionBinding,
 } from '../surface/front-desk-execution-contract.js';
-import type { EventScopeInput } from '../event-scope.js';
+import type { EventScopeInput } from '../event/event-scope.js';
 import type { CreateWorkItemInput, WorkItem } from '../workforce/work-coordination-types.js';
 import {
   notifyOperatorSync,

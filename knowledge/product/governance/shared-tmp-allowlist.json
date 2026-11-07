@@ -6,7 +6,7 @@
   "plan": "docs/developer/improvement-plans-2026-07/ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26.ja.md",
   "entries": [
     {
-      "file": "libs/core/python-voice-bridge.ts",
+      "file": "libs/core/voice/python-voice-bridge.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "Consumable TTS audio for the optional Python bridge. Canonical checkout resolution preserves the existing voice-out default; explicit output overrides remain supported. Durable voice deliverables require separate scoped publication."
@@ -156,7 +156,7 @@
       "note": "CLI working directory"
     },
     {
-      "file": "libs/core/assistant-compiler-request.ts",
+      "file": "libs/core/intent/assistant-compiler-request.ts",
       "count": 3,
       "classification": "legit-tmp",
       "note": "request/result IPC handoff files, plus a path-scope guard (assertAssistantCompilerResultPath) that resolves the same results root to bound a caller-supplied output path"
@@ -174,7 +174,7 @@
       "note": "temp screenshots/prompt files for browser sessions; call sites consolidated into a single browserConversationTempPath() helper"
     },
     {
-      "file": "libs/core/capture-photo-task-session-executor.ts",
+      "file": "libs/core/task/capture-photo-task-session-executor.ts",
       "count": 1,
       "classification": "migrate-candidate",
       "note": "captured photo is a session-scoped artifact"
@@ -216,7 +216,7 @@
       "note": "cost-report.json is a report-class artifact"
     },
     {
-      "file": "libs/core/injection-signal.ts",
+      "file": "libs/core/governance/injection-signal.ts",
       "count": 1,
       "classification": "migrate-candidate",
       "note": "injection-suspicion quarantine record; evidence-class artifact (call site moved here from untrusted-content.ts)"
@@ -240,13 +240,13 @@
       "note": "AL-02: only intermediates (tarball, sym key, anchor input) remain in tmp; .enc/.key.enc now land in <missionDir>/seal -> archive"
     },
     {
-      "file": "libs/core/oauth-session-store.ts",
+      "file": "libs/core/authn/oauth-session-store.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "short-lived pending OAuth flow state"
     },
     {
-      "file": "libs/core/output-artifacts.ts",
+      "file": "libs/core/workforce/output-artifacts.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "AL-02: mission-unknown fallback only; mission-known offloads go to writeScopedArtifact(cache)"
@@ -276,7 +276,7 @@
       "note": "desktop procedure screenshot raw and redacted outputs; session-scoped artifacts"
     },
     {
-      "file": "libs/core/programmatic-tool-calling.ts",
+      "file": "libs/core/tool/programmatic-tool-calling.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "IPC socket dir"
@@ -300,7 +300,7 @@
       "note": "screen-frame OCR/redaction intermediate; frame-scoped artifact"
     },
     {
-      "file": "libs/core/seam-calibration.ts",
+      "file": "libs/core/provider/seam-calibration.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "mission-less calibration probe output; mission-bound runs use mission evidence"
@@ -318,7 +318,7 @@
       "note": "extracted image cache (per-document hash dir)"
     },
     {
-      "file": "libs/core/storage-janitor.ts",
+      "file": "libs/core/storage/storage-janitor.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "the janitor scanning its own tmp floor"
@@ -360,7 +360,7 @@
       "note": "replay clip intermediates"
     },
     {
-      "file": "libs/core/visual-raster.ts",
+      "file": "libs/core/media/visual-raster.ts",
       "count": 1,
       "classification": "migrate-candidate",
       "note": "visual-review raster fallback; review artifact"

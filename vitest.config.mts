@@ -189,8 +189,8 @@ export default defineConfig({
         'libs/core/governance/policy-engine.ts',
         'libs/core/provider/provider-discovery.ts',
         'libs/core/shell/pty-engine.ts',
-        'libs/core/reflex-terminal.ts',
-        'libs/core/sensor-engine.ts',
+        'libs/core/shell/reflex-terminal.ts',
+        'libs/core/event/sensor-engine.ts',
         'libs/core/shell/terminal-bridge.ts',
         'libs/shared-voice/src/voice-synth.ts',
         // Large script refactors are covered indirectly through command/build paths.

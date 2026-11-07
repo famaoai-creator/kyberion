@@ -53,7 +53,7 @@ import {
   legacyDelegationTenant,
   listDelegationTenantPartitions,
   normalizeDelegationTenant,
-} from '../delegation-store-partition.js';
+} from '../workforce/delegation-store-partition.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,

@@ -1,5 +1,5 @@
 /** Exact approval identity for synthetic judgments. No origin proof, new policy or authority. */
-import { normalizeEventScope } from '../event-scope.js';
+import { normalizeEventScope } from '../event/event-scope.js';
 import { judgmentCanonicalHash } from '../organization/judgment-precedents.js';
 import {
   loadApprovalRequest,

@@ -51,8 +51,8 @@ vi.mock('../path-resolver.js', async (importOriginal) => {
 });
 
 // Owner-derived mission lookup must see the same per-process fixture id.
-vi.mock('../owner-scope.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../owner-scope.js')>();
+vi.mock('../governance/owner-scope.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../governance/owner-scope.js')>();
   const rewrite = (value: string) => value.replaceAll('MSN-FOLLOWUP', FOLLOWUP_MISSION_ID);
   return {
     ...actual,
@@ -126,7 +126,7 @@ vi.mock('./mission-team-plan-composer.js', () => ({
   buildMissionTeamView: mocks.buildMissionTeamView,
 }));
 
-vi.mock('../ledger.js', () => ({
+vi.mock('../governance/ledger.js', () => ({
   ledger: {
     record: mocks.record,
   },

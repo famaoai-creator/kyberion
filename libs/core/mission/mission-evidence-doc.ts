@@ -18,7 +18,7 @@ import { nowIso } from '../foundation/time.js';
 import * as path from 'node:path';
 import { logger } from '../core.js';
 import * as pathResolver from '../path-resolver.js';
-import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../governance/owner-scope.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
 import { auditChain } from '../governance/audit-chain.js';

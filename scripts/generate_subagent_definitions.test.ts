@@ -1,10 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import {
   SUBAGENT_CAPABILITY_PROFILES,
   SUBAGENT_PROFILE_CLI_TOOLS,
   pathResolver,
   safeReadFile,
+  safeRmSync,
   safeWriteFile,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
@@ -32,36 +34,31 @@ import {
   PROFILE_SPECS,
   SHARED_DIRECTORY_RULES_LINES,
   buildAgentDefinitionSource,
-  buildGeneratedAgyFiles,
-  buildGeneratedCursorFiles,
-  buildGeneratedCodexFiles,
-  buildGeneratedDevinFiles,
-  buildGeneratedFiles,
   condenseProcedure,
   isCodexProjectionGeneratable,
-  main,
   readSubagentDefinitionsTextFile,
   resolveProfile,
 } from './generate_subagent_definitions.js';
 
+let generatedFixtureRoot: string;
 function agentPath(role: string): string {
-  return path.join(pathResolver.rootResolve('.claude/agents'), `${role}.md`);
+  return path.join(generatedFixtureRoot, '.claude/agents', `${role}.md`);
 }
 
 function agyAgentPath(role: string): string {
-  return path.join(pathResolver.rootResolve('.agents/agents'), agyAgentName(role), 'agent.md');
+  return path.join(generatedFixtureRoot, '.agents/agents', agyAgentName(role), 'agent.md');
 }
 
 function devinAgentPath(role: string): string {
-  return path.join(pathResolver.rootResolve('.devin/agents'), `${role}.md`);
+  return path.join(generatedFixtureRoot, '.devin/agents', `${role}.md`);
 }
 
 function cursorAgentPath(role: string): string {
-  return path.join(pathResolver.rootResolve('.cursor/agents'), `${role}.md`);
+  return path.join(generatedFixtureRoot, '.cursor/agents', `${role}.md`);
 }
 
 function codexAgentPath(role: string): string {
-  return path.join(pathResolver.rootResolve('.codex/agents'), `${role}.toml`);
+  return path.join(generatedFixtureRoot, '.codex/agents', `${role}.toml`);
 }
 
 describe('generate_subagent_definitions', () => {
@@ -358,7 +355,7 @@ describe('generate_subagent_definitions', () => {
   it('Wave-3 drift prevention: PROFILE_SPECS is derived from the SSoT registry, not a hand-mirrored copy', () => {
     // Reference equality (not just deep-equal) proves PROFILE_SPECS.tools is
     // literally the SSoT's array, so a future edit to
-    // libs/core/subagent-capability-profiles.ts's cliTools cannot silently
+    // libs/core/workforce/subagent-capability-profiles.ts's cliTools cannot silently
     // diverge from what this generator emits — there is no second array to
     // forget to update.
     for (const profile of SUBAGENT_CAPABILITY_PROFILES) {
@@ -369,7 +366,48 @@ describe('generate_subagent_definitions', () => {
     }
   });
 
-  describe('--check against the committed .claude/agents files', () => {
+  describe('--check against generated fixture files', () => {
+    let fixtureGenerator: typeof import('./generate_subagent_definitions.js');
+    const originalExitCode = process.exitCode;
+    // Keep canonical product inputs, but redirect every provider output before
+    // importing the generator (its output paths are captured at module load).
+    beforeAll(async () => {
+      generatedFixtureRoot = pathResolver.sharedTmp(`system/subagent-definitions-${randomUUID()}`);
+      vi.resetModules();
+      vi.doMock('@agent/core/path-resolver', async (importOriginal) => {
+        const actual = await importOriginal<typeof import('@agent/core/path-resolver')>();
+        return {
+          ...actual,
+          pathResolver: {
+            ...actual.pathResolver,
+            rootResolve: (...parts: string[]) => {
+              const relative = path.join(...parts);
+              return /^\.(?:claude|agents|devin|cursor|codex)\/agents(?:\/|$)/.test(
+                relative.split(path.sep).join('/')
+              )
+                ? path.join(generatedFixtureRoot, relative)
+                : actual.pathResolver.rootResolve(...parts);
+            },
+          },
+        };
+      });
+      fixtureGenerator = await import('./generate_subagent_definitions.js');
+      process.exitCode = undefined;
+      await fixtureGenerator.main([]);
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    afterAll(() => {
+      withExecutionContext('generate_subagent_definitions', () => {
+        safeRmSync(generatedFixtureRoot, { recursive: true, force: true });
+      });
+      vi.doUnmock('@agent/core/path-resolver');
+      vi.resetModules();
+      process.exitCode = originalExitCode;
+    });
+
+    const main: typeof import('./generate_subagent_definitions.js').main = (...args) =>
+      fixtureGenerator.main(...args);
     const originals = new Map<string, string>();
 
     afterEach(() => {
@@ -381,12 +419,12 @@ describe('generate_subagent_definitions', () => {
       originals.clear();
     });
 
-    it('passes when the committed files match the generator output', async () => {
-      const built = await buildGeneratedFiles();
-      const agyBuilt = await buildGeneratedAgyFiles();
-      const devinBuilt = await buildGeneratedDevinFiles();
-      const cursorBuilt = await buildGeneratedCursorFiles();
-      const codexBuilt = await buildGeneratedCodexFiles();
+    it('passes when the fixture files match the generator output', async () => {
+      const built = await fixtureGenerator.buildGeneratedFiles();
+      const agyBuilt = await fixtureGenerator.buildGeneratedAgyFiles();
+      const devinBuilt = await fixtureGenerator.buildGeneratedDevinFiles();
+      const cursorBuilt = await fixtureGenerator.buildGeneratedCursorFiles();
+      const codexBuilt = await fixtureGenerator.buildGeneratedCodexFiles();
       for (const role of GENERATED_ROLES) {
         const onDisk = String(safeReadFile(agentPath(role), { encoding: 'utf8' }) || '');
         expect(onDisk).toBe(built.get(role));

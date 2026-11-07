@@ -23,7 +23,7 @@ import {
   resolveSeamProviderDecision,
   resolveSeamSelectionEntry,
   type SeamProviderDecision,
-} from '../seam-provider-selection.js';
+} from '../provider/seam-provider-selection.js';
 import {
   unmetRuntimeRequirements,
   type ProviderRuntimeRequirement,

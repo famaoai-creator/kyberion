@@ -36,11 +36,8 @@ import {
   safeReadFile,
 } from '../secure-io.js';
 import { rootResolve } from '../path-resolver.js';
-import { resolveLocale } from '../locale.js';
-import {
-  discoverLocalSttBackends,
-  selectPreferredLocalSttBackend,
-} from '../local-stt-discovery.js';
+import { resolveLocale } from '../localization/locale.js';
+import { discoverLocalSttBackends, selectPreferredLocalSttBackend } from './local-stt-discovery.js';
 import { isExternalToolBinResolvable, resolveSpeechCppBin } from '../tool/tool-binary-resolvers.js';
 import {
   unmetRuntimeRequirements,
@@ -59,8 +56,8 @@ import {
   listSeamSelectionPurposes,
   resolveSeamProviderDecision,
   type SeamProviderDecision,
-} from '../seam-provider-selection.js';
-import { savedSeamDefaultFor } from '../seam-provider-selection.js';
+} from '../provider/seam-provider-selection.js';
+import { savedSeamDefaultFor } from '../provider/seam-provider-selection.js';
 import { runExternalOperation } from '../governance/external-operation.js';
 import {
   primaryLanguageSubtag,

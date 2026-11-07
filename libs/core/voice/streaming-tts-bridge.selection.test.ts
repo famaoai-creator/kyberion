@@ -23,7 +23,7 @@ vi.mock('../provider/provider-pins-store.js', () => ({
 
 const { pathResolver } = await import('../path-resolver.js');
 const { safeRmSync } = await import('../secure-io.js');
-const { setSeamSelectionRule } = await import('../seam-selection-rules.js');
+const { setSeamSelectionRule } = await import('../provider/seam-selection-rules.js');
 const { installShellStreamingTtsBridge, ShellStreamingTextToSpeechBridge } =
   await import('../shell/shell-streaming-tts-bridge.js');
 const {

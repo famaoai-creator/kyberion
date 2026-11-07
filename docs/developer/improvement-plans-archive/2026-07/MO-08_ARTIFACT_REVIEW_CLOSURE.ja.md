@@ -92,7 +92,7 @@ Mission の実装を `dispatch-workitems` 外で完了して `reconcile-work` �
 
 ## 7. 検証結果
 
-- `pnpm vitest run libs/core/workforce/artifact-review.test.ts libs/core/mission/mission-review-gates.test.ts libs/core/mission/mission-team-composer.test.ts libs/core/mission/mission-orchestration-worker.test.ts libs/core/marketing-workload.test.ts scripts/marketing_review_aggregate.test.ts scripts/refactor/mission-governance.test.ts scripts/refactor/mission-lifecycle.test.ts scripts/refactor/mission-work-reconciliation.test.ts scripts/refactor/mission-ticket-dispatch.test.ts scripts/refactor/mission-workitem-dispatch.test.ts`: 11 files / 120 tests passed
+- `pnpm vitest run libs/core/workforce/artifact-review.test.ts libs/core/mission/mission-review-gates.test.ts libs/core/mission/mission-team-composer.test.ts libs/core/mission/mission-orchestration-worker.test.ts libs/core/organization/marketing-workload.test.ts scripts/marketing_review_aggregate.test.ts scripts/refactor/mission-governance.test.ts scripts/refactor/mission-lifecycle.test.ts scripts/refactor/mission-work-reconciliation.test.ts scripts/refactor/mission-ticket-dispatch.test.ts scripts/refactor/mission-workitem-dispatch.test.ts`: 11 files / 120 tests passed
 - `pnpm validate`: exit 0。build、typecheck、catalog、governance、schema、semver、type-ratchet、tier hygiene を含む全ゲートを完走
 - `pnpm test`: 1 file / 2 tests passed
 - `pnpm test:unit`: 527 files / 3,323 tests passed / 11 skipped / 0 failed

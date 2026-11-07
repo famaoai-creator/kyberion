@@ -2,7 +2,7 @@
  * Type declarations for `lipsync.js` (PA-09 lip-sync engine; plain JS +
  * JSDoc, no build step). Shared by `avatar.js` and the React renderer
  * (`src/avatar/*`). Cues follow the `AnimationCue` shape of
- * `libs/core/realtime-media-session.ts`; kept loose (no `@agent/core` types).
+ * `libs/core/media/realtime-media-session.ts`; kept loose (no `@agent/core` types).
  */
 
 export interface KbLipsyncCue {

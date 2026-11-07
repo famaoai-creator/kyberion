@@ -9,7 +9,7 @@ import {
   delegateCoordinatedAgentTask,
   type CoordinatedAgentExecutionReceipt,
   type CoordinatedAgentTaskEnvelope,
-} from '../coordinated-agent-execution-port.js';
+} from '../agent/coordinated-agent-execution-port.js';
 
 /** Adapts the legacy text delegateTask contract to the typed execution port. */
 export class ReasoningBackendExecutionAdapter implements AgentExecutionPort {

@@ -29,7 +29,11 @@ import type {
   ManualDriveExecutionResult,
   ManualDriveExecutionStatus,
 } from './agent-runtime-manual-drive.js';
-import { normalizeEventScope, type EventScope, type EventScopeInput } from '../event-scope.js';
+import {
+  normalizeEventScope,
+  type EventScope,
+  type EventScopeInput,
+} from '../event/event-scope.js';
 
 const BRIDGE_ROOT = pathResolver.shared('coordination/agent-runtime/manual-drive');
 const DEFAULT_POLL_INTERVAL_MS = 100;

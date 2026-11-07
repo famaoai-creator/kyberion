@@ -3,7 +3,7 @@ import {
   spawnManagedProcess,
   stopManagedProcess,
   type ManagedProcessHandle,
-} from '../managed-process.js';
+} from '../tool/managed-process.js';
 import { rootResolve } from '../path-resolver.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord } from '../foundation/text.js';
@@ -92,7 +92,7 @@ export class CoreAudioOutputBridge implements AudioOutputPort {
     }
     const swift = this.options.swift_bin ?? 'swift';
     const script =
-      this.options.script_path ?? rootResolve('libs/core/coreaudio-output-bridge.swift');
+      this.options.script_path ?? rootResolve('libs/core/voice/coreaudio-output-bridge.swift');
     const deviceArg = device.uid.startsWith('label:')
       ? ['--label', device.display_name]
       : ['--uid', device.uid];

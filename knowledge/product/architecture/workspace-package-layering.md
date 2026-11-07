@@ -5,7 +5,7 @@ tags:
   [architecture, packages, layering, dependency-direction, shared, interaction, voice, perception]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-11-07
+last_updated: 2026-11-08
 kind: architecture
 scope: repository
 authority: reference
@@ -190,8 +190,8 @@ Core itself is layered `foundation → contracts → domain → orchestration`
 - A flat `libs/core/<name>.ts` that imports no other core module is a candidate for one of the
   two. Move it only when its content is generic (utility) or a shared vocabulary (contract);
   a dependency-free module with domain meaning (mission lookup, working principles, ...) stays
-  with its domain. The public subpath follows the file (`@agent/core/foundation/<name>`,
-  `@agent/core/contracts/<name>`).
+  with its domain. New public subpaths follow the file (`@agent/core/foundation/<name>`,
+  `@agent/core/contracts/<name>`); relocating an existing module preserves its public key.
 
 - A flat module that implements one core subsystem moves into that subsystem's directory
   (`authn-providers` → `authn/`; `cli-provider-bundle`, `provider-transport`,
@@ -201,6 +201,29 @@ Core itself is layered `foundation → contracts → domain → orchestration`
 - A registry shared by several `shared-*` packages and actuators (for example
   `voice/voice-profile-registry`) stays in core: moving it into one shared package would make
   its sibling packages depend on each other.
+
+## Exhaustive core ownership
+
+Every production module in `libs/core` has an owner in
+`knowledge/product/governance/module-layer-boundaries.json` (`core_placement`).
+`domain_roles` defines each subsystem's responsibility; `root_modules` records the
+responsibility and retention reason for each bootstrap boundary or deliberate public facade.
+The `module-boundaries` gate rejects unclassified root implementations, undeclared
+subsystems, and stale ownership entries. Tests and native Swift/Python helpers follow
+their implementation. Build metadata and existing bootstrap declaration inputs remain
+at the package root; declarations are not runtime ownership exceptions.
+
+Keep security, scope, storage, platform and initialization boundaries at the root only
+when their recorded retention reason applies. Domain implementations belong in their
+subsystem even when they have no dependencies. A move preserves existing public export
+keys and changes their source target; it does not introduce a compatibility shim.
+Resolve package imports from those export targets when checking the dependency graph,
+and never treat a same-named directory as the target of a facade import.
+
+Foundation provides generic mechanisms; contracts define shared vocabulary; domain
+modules own subsystem behavior; orchestration composes those behaviors. Directory ownership
+and dependency layer are separate: moving a module must preserve its existing layer and
+must not increase cycle or foundation-weight allowances.
 
 ## Placement guide
 

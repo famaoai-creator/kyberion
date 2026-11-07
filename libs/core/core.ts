@@ -6,7 +6,7 @@ import * as v8 from 'node:v8';
 import * as readline from 'node:readline';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { resolveVision } from './vision-resolver.js';
+import { resolveVision } from './organization/vision-resolver.js';
 import { safeLstat } from './secure-io.js';
 import {
   rawExistsSync,
@@ -24,7 +24,7 @@ import {
   recordLogLine,
   resolveLogThreshold,
 } from './logger.js';
-import { installProcessLogFileSink } from './process-logger.js';
+import { installProcessLogFileSink } from './daemon/process-logger.js';
 
 installProcessLogFileSink();
 

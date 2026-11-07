@@ -308,7 +308,7 @@ function ensureBuiltinVirtualCameraCaptureBackends(): void {
       capture(input) {
         const bin = input.swift_bin ?? 'swift';
         const script = assertSafeRepositoryPath(
-          pathResolver.rootResolve('libs/core/virtual-camera-capture.swift')
+          pathResolver.rootResolve('libs/core/virtual/virtual-camera-capture.swift')
         );
         const tempCapture = assertSafeRepositoryPath(
           path.join(

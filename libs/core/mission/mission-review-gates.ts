@@ -10,7 +10,7 @@ import type {
 } from './mission-classification.js';
 import type { ArtifactBundle } from '../workforce/artifact-bundle.js';
 import { checkArtifactBundleFulfillment } from '../workforce/artifact-bundle.js';
-import { evaluateDeliverableQuality, type DeliverableKind } from '../deliverable-quality.js';
+import { evaluateDeliverableQuality, type DeliverableKind } from '../task/deliverable-quality.js';
 import { evaluateIntentDriftGate } from '../intent/intent-snapshot-store.js';
 import { missionCanonicalIntent } from './mission-intent-delta.js';
 

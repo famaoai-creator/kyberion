@@ -1,6 +1,10 @@
 /** PI-01: stable usage-cause vocabulary and accounting helpers. */
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { normalizeEventScope, type EventScope, type EventScopeInput } from '../event-scope.js';
+import {
+  normalizeEventScope,
+  type EventScope,
+  type EventScopeInput,
+} from '../event/event-scope.js';
 
 /** Cost certainty is independent of execution/commitment lifecycle status. */
 export type UsageCostStatus = 'actual' | 'estimated' | 'included' | 'unknown';

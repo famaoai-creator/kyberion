@@ -23,7 +23,7 @@
  */
 
 import { createProviderRegistry, type ProviderRegistry } from './provider-registry.js';
-import { resolveSeamDefaultOrder } from '../seam-provider-selection.js';
+import { resolveSeamDefaultOrder } from './seam-provider-selection.js';
 import type { SeamProviderMetadata } from '../seam.js';
 
 export const PROVIDER_TRANSPORT_SEAM = 'provider-transport';

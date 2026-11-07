@@ -100,7 +100,7 @@ pi は Node/Bun/Deno/ブラウザで動く「最小コア + 攻撃的に拡張�
 
 **kyberion の現状**: plugin gate(KD-06)は install 時 provenance。実行時に「project/tenant ローカル resource のどれが承認を要するか」の列挙がなく、`restricted-skills.json` は **TS 消費者 0**(KS 監査)。承認 gate の非対話時挙動は gate ごと。
 
-**実装**: (1) `libs/core/trust-requiring-resources.ts` に kyberion 版集合(`.kyberion-plugins.json`, project/tenant `pipelines/`, `roles/PROCEDURE.md` overlay, facet overlay, `AGENTS.override.md`, skill dirs)を定数化し、loader は pre-trust set 以外を trust 解決後にのみ読む。(2) `restricted-skills.json` を `skill-plugin-loader`/`skill-wrapper` が消費(tenant_overrides と合成、narrow only)。(3) 承認 gate 共通の `hasHuman()` を導入し、非対話 mission では**拒否**(silent allow を禁止)。受入: restricted skill が worker から呼べない、非対話で human 承認が必要な op が拒否され receipt に理由が残る。
+**実装**: (1) `libs/core/governance/trust-requiring-resources.ts` に kyberion 版集合(`.kyberion-plugins.json`, project/tenant `pipelines/`, `roles/PROCEDURE.md` overlay, facet overlay, `AGENTS.override.md`, skill dirs)を定数化し、loader は pre-trust set 以外を trust 解決後にのみ読む。(2) `restricted-skills.json` を `skill-plugin-loader`/`skill-wrapper` が消費(tenant_overrides と合成、narrow only)。(3) 承認 gate 共通の `hasHuman()` を導入し、非対話 mission では**拒否**(silent allow を禁止)。受入: restricted skill が worker から呼べない、非対話で human 承認が必要な op が拒否され receipt に理由が残る。
 
 ### PI-04: worker 圧縮の hybrid 推定・更新型要約・自己完結 checkpoint(P1 / M)
 
@@ -952,7 +952,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 
 ## 7. 検証コマンド(実装時)
 
-- PI-01: `pnpm vitest run libs/core/spend-guard.test.ts libs/core/metrics.test.ts libs/core/cost-report.test.ts` + tier 境界 fixture
+- PI-01: `pnpm vitest run libs/core/spend-guard.test.ts libs/core/analysis/metrics.test.ts libs/core/cost-report.test.ts` + tier 境界 fixture
 - PI-02: `pnpm check -- --scope pr --only wire-error-boundary`(manifest gate)+ MCP/Chronos route tests
 - PI-03: `pnpm vitest run libs/core/plugin/skill-plugin-loader.test.ts libs/core/governance/approval-gate.test.ts`
 - PI-04: `pnpm vitest run libs/core/workforce/worker-context-compaction.test.ts`(5 連続圧縮 golden・overflow 1 回)

@@ -14,17 +14,17 @@ export * from './governance/governance-action-recorder.js';
 
 export * from './plugin/skill-wrapper.js';
 
-export * from './metrics.js';
+export * from './analysis/metrics.js';
 
 export * from './finance/generation-cost-settlement.js';
 
 export * from './contracts/wire-error.js';
 
-export * from './trust-requiring-resources.js';
+export * from './governance/trust-requiring-resources.js';
 
 export * from './project/project-trust.js';
 
-export * from './resource-provenance.js';
+export * from './contracts/resource-provenance.js';
 
 export * from './plugin/skill-resource-loader.js';
 
@@ -32,7 +32,7 @@ export * from './agent/agent-instruction-loader.js';
 
 export * from './reasoning/prompt-visibility-ledger.js';
 
-export * from './scoped-registry.js';
+export * from './governance/scoped-registry.js';
 
 export * from './finance/usage-accounting.js';
 
@@ -95,9 +95,9 @@ export * from './reasoning/model-registry-directory.js';
 
 export * from './reasoning/model-registry-contract.js';
 
-export * from './chronos-access-registry.js';
+export * from './authn/chronos-access-registry.js';
 
-export * from './context-boundary.js';
+export * from './contracts/context-boundary.js';
 
 export * from './scope-context.js';
 
@@ -105,7 +105,7 @@ export * from './knowledge/knowledge-scope.js';
 
 export type { VolatileScope, VolatileCadence } from './path-resolver.js';
 
-export * as customerResolver from './stance-resolver.js';
+export * as customerResolver from './authn/stance-resolver.js';
 
 // Error Classification (Phase A-7)
 
@@ -114,13 +114,13 @@ export {
   buildUserFacingError,
   formatClassification,
   getRuleIds as getErrorClassifierRuleIds,
-} from './error-classifier.js';
+} from './analysis/error-classifier.js';
 
 export type {
   ErrorCategory,
   ErrorClassification,
   UserFacingErrorEnvelope,
-} from './error-classifier.js';
+} from './analysis/error-classifier.js';
 
 // Native OS TTS (Phase A-5, voice tier 0)
 
@@ -157,98 +157,98 @@ export * from './design/creative-design-resolver.js';
 
 export * from './design/brand-tokens.js';
 
-export * from './golden-output.js';
+export * from './harnessing/golden-output.js';
 
-export * from './documentation-source-map.js';
+export * from './harnessing/documentation-source-map.js';
 
-export * from './campaign-suite.js';
+export * from './media/campaign-suite.js';
 
-export * from './config-mission.js';
+export * from './mission/config-mission.js';
 
-export * from './marketing-workload.js';
+export * from './organization/marketing-workload.js';
 
 export * from './workforce/artifact-review.js';
 
-export * from './customer-channel-binding.js';
+export * from './organization/customer-channel-binding.js';
 
-export * from './deal-store.js';
+export * from './organization/deal-store.js';
 
-export * from './customer-conversation.js';
+export * from './organization/customer-conversation.js';
 
-export * from './customer-conversation-modes.js';
+export * from './organization/customer-conversation-modes.js';
 
 export * from './surface/operator-notifications.js';
 
-export * from './deal-documents.js';
+export * from './organization/deal-documents.js';
 
 export * from './mission/mission-retrospective.js';
 
 export * from './reasoning/model-performance-index.js';
 
-export * from './working-principles.js';
+export * from './workforce/working-principles.js';
 
 export * from './reasoning/reasoning-runtime-instructions.js';
 
-export * from './report-contract.js';
+export * from './task/report-contract.js';
 
-export * from './facet-registry.js';
+export * from './plugin/facet-registry.js';
 
 export * from './design/design-qa.js';
-export * from './apple-intelligence-bridge.js';
+export * from './provider/apple-intelligence-bridge.js';
 
 export * from './mission/mission-hygiene.js';
 
-export * from './operational-learning.js';
+export * from './knowledge/operational-learning.js';
 
 export * from './mission/mission-work-reconciliation.js';
 
-export * from './context-security-scope.js';
+export * from './governance/context-security-scope.js';
 
 export * from './scope-context.js';
 
 export * from './scope-envelope.js';
 
-export * from './event-scope.js';
+export * from './event/event-scope.js';
 
 export * from './tool/runtime-scope.js';
 
-export * from './scope-migration.js';
+export * from './governance/scope-migration.js';
 
-export * from './physical-namespace.js';
+export * from './storage/physical-namespace.js';
 
 export * from './storage-layout.js';
 
-export * from './scratch-promotion.js';
+export * from './storage/scratch-promotion.js';
 
-export * from './config-change.js';
+export * from './governance/config-change.js';
 
-export * from './protocol-service-registry.js';
+export * from './service/protocol-service-registry.js';
 
-export * from './protocol-service-lifecycle.js';
+export * from './service/protocol-service-lifecycle.js';
 
 export * from './knowledge/memory-scope.js';
 
 export * from './reasoning/reasoning-participant.js';
 
-export * from './participant-context-resolver.js';
+export * from './reasoning/participant-context-resolver.js';
 
 // Utils
 
-export * from './fs-utils.js';
+export * from './storage/fs-utils.js';
 
-export * from './cli-utils.js';
+export * from './harnessing/cli-utils.js';
 
-export * from './async-utils.js';
+export * from './pipeline/async-utils.js';
 
-export * from './recovery-policy.js';
+export * from './pipeline/recovery-policy.js';
 
-export * from './command-runner.js';
+export * from './harnessing/command-runner.js';
 
-export * from './job-lifecycle.js';
+export * from './tool/job-lifecycle.js';
 
-export * from './camera-output-bridge.js';
+export * from './media/camera-output-bridge.js';
 
-export * from './ledger.js';
+export * from './governance/ledger.js';
 
 export * from './foundation/text-escaping.js';
 
@@ -258,13 +258,13 @@ export * from './foundation/lock-utils.js';
 
 export * from './pipeline/retry-utils.js';
 
-export * from './validators.js';
+export * from './foundation/validators.js';
 
-export * from './mobile-profile-validators.js';
+export * from './integrations/mobile-profile-validators.js';
 
 export * from './schema-loader.js';
 
-export * from './question-resolver.js';
+export * from './intent/question-resolver.js';
 
 export * from './pipeline/op-input-contracts.js';
 
@@ -282,15 +282,15 @@ export * from './surface/channel-adapter-registry.js';
 export * from './actuator/actuator-sdk.js';
 export * from './actuator/actuator-op-discovery.js';
 export * from './pipeline/pipeline-input-contract.js';
-export * from './super-nerve-execution-port.js';
+export * from './pipeline/super-nerve-execution-port.js';
 
 export * from './tool/tool-call-scheduler.js';
 
-export * from './autonomous-repair.js';
+export * from './pipeline/autonomous-repair.js';
 
 export * from './pipeline/adf-repair-agent.js';
 
-export * from './operation-policy-gate.js';
+export * from './governance/operation-policy-gate.js';
 
 export * from './video/video-visual-direction.js';
 
@@ -300,25 +300,25 @@ export * from './video/video-scene-composition.js';
 
 export * from './reasoning/reasoning-egress-scope.js';
 
-export * from './visual-raster.js';
+export * from './media/visual-raster.js';
 
-export * from './visual-review.js';
+export * from './media/visual-review.js';
 
-export * from './visual-review-loop.js';
+export * from './media/visual-review-loop.js';
 
 export * from './workforce/artifact-verification.js';
-export * from './training-catalog.js';
-export * from './hearing-scenario-catalog.js';
+export * from './organization/training-catalog.js';
+export * from './surface/hearing-scenario-catalog.js';
 
-export * from './semantic-decide.js';
+export * from './reasoning/semantic-decide.js';
 
-export * from './observation-distill.js';
+export * from './reasoning/observation-distill.js';
 
 export * from './knowledge/ranking-signals.js';
 
 export * from './knowledge/knowledge-weight-recalculation.js';
 
-export * from './operation-policy-gate.js';
+export * from './governance/operation-policy-gate.js';
 
 export * from './knowledge/ranking-signals.js';
 
@@ -327,16 +327,16 @@ export * from './tool/runtime-health-history.js';
 export * from './integrations/bridge-typing.js';
 export * from './integrations/bridge-poll-loop.js';
 
-export * from './draft-refine.js';
+export * from './reasoning/draft-refine.js';
 
 export * from './provider/gemini-embedding-backend.js';
 
-export * from './process-guards.js';
+export * from './daemon/process-guards.js';
 
-export * from './process-guards.js';
+export * from './daemon/process-guards.js';
 
-export * from './guided-coordination-brief.js';
-export * from './coordination-actuator-routing.js';
+export * from './intent/guided-coordination-brief.js';
+export * from './actuator/coordination-actuator-routing.js';
 
 export * from './integrations/email-workflow.js';
 
@@ -354,25 +354,25 @@ export * from './design/presentation-slide-pattern.js';
 
 export * from './design/web-design-system.js';
 
-export * from './managed-process.js';
+export * from './tool/managed-process.js';
 
-export * from './trigger-correlation.js';
+export * from './event/trigger-correlation.js';
 
-export * from './trigger-runner.js';
+export * from './daemon/trigger-runner.js';
 
-export * from './jsonl-tail.js';
+export * from './storage/jsonl-tail.js';
 
 export * from './meeting/meeting-environment-policy.js';
 
 export * from './meeting/meeting-participation-runtime-plan.js';
 
-export * from './deliverable-quality.js';
+export * from './task/deliverable-quality.js';
 
-export * from './deliverable-inbox.js';
+export * from './task/deliverable-inbox.js';
 
-export { resolveInputBindings, classifyInputId, isPathInput } from './input-binding.js';
+export { resolveInputBindings, classifyInputId, isPathInput } from './contracts/input-binding.js';
 
-export type { InputBinding, InputBindingType } from './input-binding.js';
+export type { InputBinding, InputBindingType } from './contracts/input-binding.js';
 
 export * from './governance/autonomous-ops-gate.js';
 
@@ -394,10 +394,10 @@ export {
   buildCompletionNextAction,
   formatCompletionNextAction,
   formatNextAction,
-} from './next-action.js';
+} from './surface/next-action.js';
 
 export { buildCompletionSummary, reconcileCompletion } from './intent/intent-reconciliation.js';
 
-export * from './build-coordination.js';
-export * from './build-readiness.js';
-export * from './build-generation.js';
+export * from './harnessing/build-coordination.js';
+export * from './harnessing/build-readiness.js';
+export * from './harnessing/build-generation.js';

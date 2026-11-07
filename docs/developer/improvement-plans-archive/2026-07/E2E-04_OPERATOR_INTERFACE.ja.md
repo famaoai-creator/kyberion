@@ -120,7 +120,7 @@ Kyberion からの用事(質問・承認・完了・アラート): 設定した1
 
 ### Task 3: 成果物 inbox(SU-03 の最小形)— `gpt-5.4-mini`
 
-1. `libs/core/deliverable-inbox.ts` を新設:
+1. `libs/core/task/deliverable-inbox.ts` を新設:
    - 実体: `active/shared/inbox/entries.jsonl`(`{ entry_id, mission_id, title, artifact_paths[], summary, created_at, status: 'unread'|'read'|'accepted', tenant_slug? }`)
    - API: `addInboxEntry` / `listInboxEntries(filter)` / `markInboxEntry(entry_id, status)`
 2. 配線: mission finish フック(E2E-01 Task 5 と同じ場所。既に delivery pack を作る分岐がある場合はその直後)で、outcome_contract の expected/実成果物パスから `addInboxEntry` → `notifyOperator('deliverable_ready', …)`。
