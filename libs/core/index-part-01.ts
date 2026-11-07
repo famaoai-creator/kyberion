@@ -153,9 +153,9 @@ export { resolveTenantDesign } from './organization/tenant-design-resolver.js';
 
 export * from './surface/channel-registry.js';
 
-export * from './creative-design-resolver.js';
+export * from './design/creative-design-resolver.js';
 
-export * from './brand-tokens.js';
+export * from './design/brand-tokens.js';
 
 export * from './golden-output.js';
 
@@ -193,7 +193,7 @@ export * from './report-contract.js';
 
 export * from './facet-registry.js';
 
-export * from './design-qa.js';
+export * from './design/design-qa.js';
 export * from './apple-intelligence-bridge.js';
 
 export * from './mission/mission-hygiene.js';
@@ -350,9 +350,9 @@ export * from './mission/mission-process-task-expansion.js';
 
 export * from './mesh/handoff-packet.js';
 
-export * from './presentation-slide-pattern.js';
+export * from './design/presentation-slide-pattern.js';
 
-export * from './web-design-system.js';
+export * from './design/web-design-system.js';
 
 export * from './managed-process.js';
 

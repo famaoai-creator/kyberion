@@ -6,8 +6,8 @@ import * as os from 'node:os';
 const rootDirRef = vi.hoisted(() => ({ value: process.cwd() }));
 let rootDir = rootDirRef.value;
 
-vi.mock('./path-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./path-resolver.js')>();
+vi.mock('../path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../path-resolver.js')>();
   return {
     ...actual,
     pathResolver: {
@@ -24,8 +24,8 @@ vi.mock('./path-resolver.js', async (importOriginal) => {
 
 const designWarnings = vi.hoisted(() => [] as string[]);
 
-vi.mock('./logger.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./logger.js')>();
+vi.mock('../logger.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../logger.js')>();
   return {
     ...actual,
     createLogger: (...args: Parameters<typeof actual.createLogger>) => {
@@ -40,10 +40,10 @@ vi.mock('./logger.js', async (importOriginal) => {
   };
 });
 
-vi.mock('./secure-io.js', async () => {
+vi.mock('../secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
   const foundation =
-    await vi.importActual<typeof import('./foundation/io.js')>('./foundation/io.js');
+    await vi.importActual<typeof import('../foundation/io.js')>('../foundation/io.js');
   const assertSafeRepositoryPath = (
     filePath: string,
     options: { allowMissingLeaf?: boolean; rootDir?: string } = {}
@@ -111,7 +111,7 @@ import {
 } from './semantic-design-tokens.js';
 import { SEMANTIC_TOKEN_FALLBACKS } from './semantic-design-token-fallbacks.js';
 import { readTenantSemanticTokens } from './creative-design-resolver.js';
-import { buildVideoDesignCssVars, resolveVideoModeDefaults } from './video/video-design-system.js';
+import { buildVideoDesignCssVars, resolveVideoModeDefaults } from '../video/video-design-system.js';
 import {
   PPTX_PALETTE,
   createPptxLayoutKit,

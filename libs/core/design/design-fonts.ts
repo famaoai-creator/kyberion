@@ -1,8 +1,8 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadBrandTokensAtPath, type BrandTokens } from './brand-tokens.js';
-import { pathResolver } from './path-resolver.js';
-import { safeExistsSync } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeExistsSync } from '../secure-io.js';
 
 type FontFamilyPair = {
   latin: string;

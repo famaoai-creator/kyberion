@@ -17,37 +17,37 @@
  */
 
 import { spawn } from 'node:child_process';
-import { memoizedCliSpawnSync } from './provider/provider-discovery.js';
-import { logger } from './core.js';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { memoizedCliSpawnSync } from './provider-discovery.js';
+import { logger } from '../core.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import {
   buildDelegationSpawnEnv,
   newDelegationSessionId,
   spawnWithDelegationEnv,
-} from './provider/provider-spawn-env.js';
-import { withRedactedProviderOutput } from './provider/provider-output-redaction.js';
-import { resolveProviderCliCommand } from './provider/provider-managed-env.js';
+} from './provider-spawn-env.js';
+import { withRedactedProviderOutput } from './provider-output-redaction.js';
+import { resolveProviderCliCommand } from './provider-managed-env.js';
 import {
   buildProviderChildEnv,
   resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
-} from './provider/provider-permission-profiles.js';
-import { assertReasoningEgressAllowed } from './reasoning/reasoning-egress-scope.js';
+} from './provider-permission-profiles.js';
+import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
 import {
   delegationChildHandleFromChildProcess,
   withWallClockBudget,
   DelegationWallClockExceededError,
-} from './mission/delegation-concurrency.js';
-import * as pathResolver from './path-resolver.js';
-import { safeReadFile, safeStat } from './secure-io.js';
+} from '../mission/delegation-concurrency.js';
+import * as pathResolver from '../path-resolver.js';
+import { safeReadFile, safeStat } from '../secure-io.js';
 import {
   runStructuredReasoningOp,
   structuredReasoningSpecs,
   STRUCTURED_REASONING_SYSTEM_PROMPT,
   type StructuredOpSpec,
-} from './structured-reasoning.js';
-import { schemaHint } from './structured-schema-hint.js';
+} from '../structured-reasoning.js';
+import { schemaHint } from '../structured-schema-hint.js';
 import type {
   ReasoningBackend,
   ReasoningImageAttachment,
@@ -70,14 +70,14 @@ import type {
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
   ReasoningCallOptions,
-} from './reasoning/reasoning-backend.js';
+} from '../reasoning/reasoning-backend.js';
 import {
   MAX_REASONING_IMAGES,
   MAX_REASONING_IMAGE_BYTES,
   MAX_REASONING_IMAGE_BYTES_TOTAL,
   validateReasoningImageAttachmentPaths,
-} from './reasoning/reasoning-backend.js';
-import { runStartReportingDelegation } from './delegation-execution-tracker.js';
+} from '../reasoning/reasoning-backend.js';
+import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });

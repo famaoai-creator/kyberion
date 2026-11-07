@@ -117,7 +117,7 @@ export * from './governance/approval-audit.js';
 
 export * from './org-chart.js';
 
-export * from './daemon-heartbeat.js';
+export * from './daemon/daemon-heartbeat.js';
 
 export * from './soak-restart-state.js';
 

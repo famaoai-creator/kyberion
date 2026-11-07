@@ -1,10 +1,10 @@
-import { appendOpsAlertLogRecord } from './ops-alert-log.js';
+import { appendOpsAlertLogRecord } from '../ops-alert-log.js';
 import { afterAll, describe, expect, it, vi } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 const state = vi.hoisted(() => ({ scope: { tier: 'confidential', tenant_slug: 'fixture-a' } }));
-vi.mock('./scope-context.js', async (original) => ({
-  ...(await original<typeof import('./scope-context.js')>()),
+vi.mock('../scope-context.js', async (original) => ({
+  ...(await original<typeof import('../scope-context.js')>()),
   currentScope: () => state.scope,
 }));
 import {

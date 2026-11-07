@@ -3,15 +3,15 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeReadFile } from '../secure-io.js';
 import {
   buildOpencodeCliBackendFromEnv,
   OpencodeCliReasoningBackend,
   parseOpencodeRunJson,
   probeOpencodeCliAvailability,
 } from './opencode-cli-reasoning-backend.js';
-import { resolveSandboxPolicy, withSandboxPolicy } from './shell/sandbox-policy.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
 
 const { spawnMock, withWallClockBudgetMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock('node:child_process', async (importOriginal) => {
   return { ...actual, spawn: spawnMock };
 });
 
-vi.mock('./mission/delegation-concurrency.js', () => ({
+vi.mock('../mission/delegation-concurrency.js', () => ({
   delegationChildHandleFromChildProcess: (child: MockChildProcess) => ({
     pid: child.pid,
     kill: (signal: NodeJS.Signals) => child.kill(signal),
@@ -76,9 +76,12 @@ function textEvent(text: string): unknown {
 describe('opencode-cli-reasoning-backend', () => {
   it('routes OpenCode CLI environment reads through the governed accessor', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('libs/core/opencode-cli-reasoning-backend.ts'), {
-        encoding: 'utf8',
-      })
+      safeReadFile(
+        pathResolver.rootResolve('libs/core/provider/opencode-cli-reasoning-backend.ts'),
+        {
+          encoding: 'utf8',
+        }
+      )
     );
     expect(source).not.toMatch(/env\.KYBERION_/u);
     expect(source).toContain('getRegisteredEnvText');

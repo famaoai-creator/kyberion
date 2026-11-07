@@ -1,6 +1,6 @@
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { getRegisteredEnvText } from './foundation/env.js';
-import { pathResolver } from './path-resolver.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { pathResolver } from '../path-resolver.js';
 import { readTenantSemanticTokens } from './creative-design-resolver.js';
 import {
   SEMANTIC_TOKEN_FALLBACKS,

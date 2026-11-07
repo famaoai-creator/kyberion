@@ -13,8 +13,8 @@ const fixture = vi.hoisted(() => {
   return { base, rootDir: base };
 });
 
-vi.mock('./path-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./path-resolver.js')>();
+vi.mock('../path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../path-resolver.js')>();
   return {
     ...actual,
     pathResolver: {
@@ -35,10 +35,10 @@ vi.mock('./path-resolver.js', async (importOriginal) => {
   };
 });
 
-vi.mock('./secure-io.js', async () => {
+vi.mock('../secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
   const foundation =
-    await vi.importActual<typeof import('./foundation/io.js')>('./foundation/io.js');
+    await vi.importActual<typeof import('../foundation/io.js')>('../foundation/io.js');
   const assertSafeRepositoryPath = (
     filePath: string,
     options: { allowMissingLeaf?: boolean; rootDir?: string } = {}

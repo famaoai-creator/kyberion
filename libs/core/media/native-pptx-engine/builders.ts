@@ -1,4 +1,4 @@
-import { resolveEastAsianFontFamily, resolveLatinFontFamily } from '../../design-fonts.js';
+import { resolveEastAsianFontFamily, resolveLatinFontFamily } from '../../design/design-fonts.js';
 import type { PptxElement, PptxStyle } from '../../contracts/pptx-protocol.js';
 import { clamp } from '../../foundation/text.js';
 import { stripTags } from '../../foundation/html-sanitize.js';

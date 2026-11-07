@@ -1,9 +1,9 @@
 /** Governed durable deduplication markers for scheduler operational alerts. */
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { withOperationalAlertStore } from './foundation/operational-store-policy.js';
-import { writeJson } from './foundation/json.js';
-import { knowledge, shared } from './path-resolver.js';
-import { safeExistsSync, safeLstat } from './secure-io.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { withOperationalAlertStore } from '../foundation/operational-store-policy.js';
+import { writeJson } from '../foundation/json.js';
+import { knowledge, shared } from '../path-resolver.js';
+import { safeExistsSync, safeLstat } from '../secure-io.js';
 
 export type SchedulerOpsAlertDays = Record<string, string>;
 const MARKER_PATH = 'runtime/state/scheduler-ops-alert-days.json';

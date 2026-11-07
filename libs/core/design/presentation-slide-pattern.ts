@@ -1,7 +1,7 @@
-import { pathResolver } from './path-resolver.js';
+import { pathResolver } from '../path-resolver.js';
 import type { PresentationDeckPurpose } from './presentation-preference-profile.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
 
 export interface SlidePatternSlot {
   slot_id: string;

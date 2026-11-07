@@ -1,5 +1,8 @@
-import { resolveCreativeDesign, type ResolvedCreativeDesign } from './creative-design-resolver.js';
-import { webThemePackToCssVars, type WebThemePack } from './web-design-system.js';
+import {
+  resolveCreativeDesign,
+  type ResolvedCreativeDesign,
+} from './design/creative-design-resolver.js';
+import { webThemePackToCssVars, type WebThemePack } from './design/web-design-system.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { slugify } from './foundation/text.js';
 import { escapeHtml } from './foundation/text-escaping.js';

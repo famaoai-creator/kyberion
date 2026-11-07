@@ -274,7 +274,7 @@
     "libs/core/customer-conversation-modes.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/daemon-heartbeat.ts": {
+    "libs/core/daemon/daemon-heartbeat.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/daemon/specs.ts": {
@@ -747,7 +747,7 @@
     "libs/core/presence-avatar.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/presentation-preference-registry.ts": {
+    "libs/core/design/presentation-preference-registry.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/process-logger.ts": {
@@ -892,7 +892,7 @@
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "libs/core/semantic-design-tokens.ts": {
+    "libs/core/design/semantic-design-tokens.ts": {
       "env_direct_read_budget": 1
     },
     "libs/core/service/service-binding-registry.ts": {

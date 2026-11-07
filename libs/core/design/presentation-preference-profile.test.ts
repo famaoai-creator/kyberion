@@ -4,7 +4,7 @@ import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { safeReadFile } from '@agent/core/secure-io';
 import { describe, expect, it, vi } from 'vitest';
-import { logger } from './core.js';
+import { logger } from '../core.js';
 import {
   getPresentationBriefQuestions,
   getPresentationSlidePatternSelectionPolicy,

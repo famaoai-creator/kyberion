@@ -1,5 +1,5 @@
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { pathResolver } from './path-resolver.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { pathResolver } from '../path-resolver.js';
 
 export interface BrandTokenColors {
   [key: string]: string | undefined;

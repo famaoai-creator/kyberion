@@ -51,7 +51,7 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/provider/cursor-cli-reasoning-backend.ts',
   'libs/core/provider/cursor-cli-session-adapter.ts',
   'libs/core/provider/devin-cli-reasoning-backend.ts',
-  'libs/core/opencode-cli-reasoning-backend.ts',
+  'libs/core/provider/opencode-cli-reasoning-backend.ts',
   'libs/shared-voice/src/silero-vad-bridge.ts',
   'libs/core/shell/shell-streaming-stt-bridge.ts',
   'libs/core/shell/shell-streaming-tts-bridge.ts',

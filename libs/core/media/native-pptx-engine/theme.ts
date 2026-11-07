@@ -1,4 +1,4 @@
-import { resolveEastAsianFontFamily, resolveLatinFontFamily } from '../../design-fonts.js';
+import { resolveEastAsianFontFamily, resolveLatinFontFamily } from '../../design/design-fonts.js';
 
 export function generateTheme(colors: { [key: string]: string } = {}): string {
   const fontStack = typeof colors['__fontStack'] === 'string' ? colors['__fontStack'] : undefined;

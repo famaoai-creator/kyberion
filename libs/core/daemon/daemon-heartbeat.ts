@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { defineCatalog } from './foundation/governed-catalog.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -7,8 +7,8 @@ import {
   safeReaddir,
   safeLstat,
   safeWriteFile,
-} from './secure-io.js';
-import * as pathResolver from './path-resolver.js';
+} from '../secure-io.js';
+import * as pathResolver from '../path-resolver.js';
 
 export interface DaemonHeartbeat {
   daemon_id: string;

@@ -94,9 +94,30 @@ single-consumer actuator policies live beside their owners. Both playback module
 in shared-voice; the preserved core subpath targets and manifest-derived Vitest aliases
 remain in effect. Historical PR measurements are rechecked on the combined checkout.
 
-The next core-domain slice places `bounded-video-queue` in `video/`, `html-to-markdown`
+The subsequent core-domain slice places `bounded-video-queue` in `video/`, `html-to-markdown`
 in `media/`, `ranking-signals` in `knowledge/`, and `bridge-typing` / `bridge-poll-loop`
 in `integrations/`. Their behavior and existing public import keys remain unchanged.
+
+### Cross-format design and operational leaves
+
+`core/design/` owns the shared design language: brand and semantic tokens, themes,
+fonts, presentation preferences and slide patterns, format projections, creative
+design resolution and cross-surface QA. It supplies common design decisions to web,
+video and document consumers. `core/media/` retains document reading and format
+processing; generation runtimes remain in `shared-media` and `shared-video`.
+These are domain policies, not dependency-free foundation utilities. Core consumers
+still use this family, so it remains inside core with existing public import keys.
+
+| Modules                                                                                                                                                                                                                                                                                                     | Destination      | Responsibility                                                                                                                 |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `presentation-preference-profile`, `presentation-preference-registry`, `presentation-slide-pattern`, `design-fonts`, `design-foundation-ui`, `design-foundation`, `brand-tokens`, `web-design-system`, `semantic-design-tokens`, `semantic-design-token-fallbacks`, `creative-design-resolver`, `design-qa` | `core/design/`   | Shared cross-format design policy, adaptation and QA; keep the separate presentation preference contract in `core/contracts/`. |
+| `daemon-heartbeat`, `scheduler-alert-markers`, `scheduler-incidents`                                                                                                                                                                                                                                        | `core/daemon/`   | Service liveness, alert deduplication and scheduler incident state; preserve all existing storage roots and public APIs.       |
+| `event-vocabulary`                                                                                                                                                                                                                                                                                          | `core/event/`    | Mapping domain event names to the common collaboration vocabulary.                                                             |
+| `opencode-cli-reasoning-backend`                                                                                                                                                                                                                                                                            | `core/provider/` | OpenCode CLI transport adapter; retain root export and existing child-process boundary permissions.                            |
+
+This slice changes location and import/export targets only. Existing tests move
+with their implementation; registered source paths follow the files without
+increasing any authorization or dependency budget.
 
 The playback extraction deliberately changes those two package import paths; core must
 not reexport shared-voice to preserve an old import. Internal core relocations preserve

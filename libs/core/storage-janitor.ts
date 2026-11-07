@@ -19,7 +19,7 @@ export {
   readSchedulerOpsAlertDays,
   writeSchedulerOpsAlertDay,
   type SchedulerOpsAlertDays,
-} from './scheduler-alert-markers.js';
+} from './daemon/scheduler-alert-markers.js';
 import * as nodePath from 'node:path';
 import { knowledge, sharedTmp, shared, rootDir } from './path-resolver.js';
 import {
