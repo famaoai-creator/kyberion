@@ -866,6 +866,15 @@ function assertRuntimeStateAggregateAccess(resolved: string, canonical: string):
   if (isInside(resolved, receipts) !== undefined || isInside(canonical, receipts) !== undefined) {
     const decision = validateWritePermission(receipts);
     if (!decision.allowed) throw new Error(decision.reason);
+    // Producer authority over system receipts does not authorize a tenant-bound
+    // producer to mutate every tenant's index through their public ancestor.
+    const tenantContainer = path.join(path.dirname(receipts), 'confidential');
+    const read = validateReadPermission(tenantContainer);
+    const write = validateWritePermission(tenantContainer);
+    if (!read.allowed || !write.allowed)
+      throw new Error(
+        '[SECURITY] derivation.aggregate_denied — tenant index container requires read/write authority'
+      );
   }
 }
 

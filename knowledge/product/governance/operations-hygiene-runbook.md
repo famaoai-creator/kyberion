@@ -3197,6 +3197,14 @@ Raw receipt reads remain producer-only. Test the ordinary operator identity with
 unrelated receipt present, a foreign-tenant denial, raw-read denial and grant revocation;
 mocked offboarding I/O alone cannot establish this entrypoint's usability or isolation.
 
+Governed-store fixtures must declare their controller role and persona explicitly. Resetting
+a whole runtime ancestor also covers protected receipt state; keep the operation's actual
+actor unchanged when elevating only fixture teardown. Preserve canonical exports in partial
+path-resolver mocks and rebase mutable roots. Unix socket fixtures in deep checkouts should
+bind a checkout-relative address and reject listener errors directly, so path-length or
+sandbox IPC failures are not disguised as test timeouts. Verify under the existing CI
+settings; do not relax production grants or deadlines to accommodate a fixture.
+
 ## Intake extension CI checks
 
 When adding a service operation, validate the shipped discovery count and service-harness operation inventory together with the exact kind/risk/approval assertions. Registry-overlay fixtures must assert the shipped exact declarations as well as the mutation fallback. For boundary tests, partially mock shared path resolvers so new legitimate imports retain their real APIs; a minimal hand-built resolver can fail during module initialization before the tested gate runs. Run the impacted existing tests in addition to the extension fixtures. For single-use admission capabilities, compare private in-memory snapshots of request and configuration values. Do not send credential-bearing configuration into hash or HMAC APIs: keyed fast hashes still trigger password-hashing checks and are unnecessary when the capability's private WeakMap already supplies the trust boundary. Never log or persist these snapshots.
