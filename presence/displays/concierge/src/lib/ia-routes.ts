@@ -11,11 +11,11 @@
  * Detail pages `/w/<kind>/<id>` stay where they are.
  */
 
-export type IaWorkTab = 'missions' | 'items';
+export type IaWorkTab = 'missions' | 'items' | 'requests';
 export type IaOrgTab = 'overview' | 'projects' | 'people';
 export type IaLibraryTab = 'deliverables' | 'knowledge' | 'ingest';
 
-export const IA_WORK_TABS: readonly IaWorkTab[] = ['missions', 'items'];
+export const IA_WORK_TABS: readonly IaWorkTab[] = ['missions', 'items', 'requests'];
 export const IA_ORG_TABS: readonly IaOrgTab[] = ['overview', 'projects', 'people'];
 export const IA_LIBRARY_TABS: readonly IaLibraryTab[] = ['deliverables', 'knowledge', 'ingest'];
 

@@ -27,5 +27,10 @@ describe('shell scope', () => {
     expect(destinationTabHref('/work', current, 'items', 'missions')).toBe(
       '/work?tenant=acme&tab=items'
     );
+    // The opened request belongs to 依頼 only.
+    const opened = new URLSearchParams('tenant=acme&tab=requests&request=req-1');
+    expect(destinationTabHref('/work', opened, 'items', 'missions')).toBe(
+      '/work?tenant=acme&tab=items'
+    );
   });
 });

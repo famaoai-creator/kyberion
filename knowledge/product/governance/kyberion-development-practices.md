@@ -1,6 +1,6 @@
 ---
 title: 'Kyberion Development Practices — Hard-Won Rules for Changing This Repo'
-last_updated: 2026-11-07
+last_updated: 2026-11-08
 ---
 
 # Kyberion Development Practices — Hard-Won Rules for Changing This Repo
@@ -454,6 +454,16 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
   the shared mutation guard, and return an `error_code` the page maps to its
   own copy. Otherwise the person sees the guard's internal English text.
   (MSN-SERVER-STUDIO-HELP-20261107: 使い方 mark-done.)
+- **"The local owner" is not the credential source on Concierge.**
+  Studio treats every credential-free loopback request as localadmin. On
+  Concierge a credential-free loopback viewer exists only during bootstrap or
+  with the anonymous-loopback escape hatch. Once an owner is bound, the
+  browser sends its session, so the viewer's `source` is `token`. Decide "the
+  owner of this machine" with `resolveConciergeInstallationAccess` (attested
+  loopback peer plus the bound owner's principal), never with
+  `viewer.source === 'loopback'`. Test the signed-in owner, not only a
+  synthetic loopback viewer. (MSN-SERVER-STUDIO-PROGRESS-20261107: the
+  owner's personal 業務の自動化候補.)
 
 ## 6. Process discipline for repo work
 

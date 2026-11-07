@@ -367,19 +367,31 @@ export function withConciergeViewerContext<T>(viewer: ConciergeViewerContext, fn
   );
 }
 
-export function conciergeErrorResponse(error: unknown, statusOverride?: number): NextResponse {
+/** The wire body `conciergeErrorResponse` sends (so a caller can log its correlation id). */
+export function conciergeErrorBody(
+  error: unknown,
+  statusOverride?: number
+): {
+  status: number;
+  body: { ok: false; error: string; error_code: string; correlation_id: string };
+} {
   const status = statusOverride || (error instanceof ConciergeViewerError ? error.status : 500);
   const safe = toWireError({
     status,
     message: error instanceof Error ? error.message : String(error),
   });
-  return NextResponse.json(
-    {
+  return {
+    status,
+    body: {
       ok: false,
       error: safe.message,
       error_code: safe.code,
       correlation_id: safe.correlation_id,
     },
-    { status }
-  );
+  };
+}
+
+export function conciergeErrorResponse(error: unknown, statusOverride?: number): NextResponse {
+  const { status, body } = conciergeErrorBody(error, statusOverride);
+  return NextResponse.json(body, { status });
 }
