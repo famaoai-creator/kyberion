@@ -149,7 +149,7 @@
         "kind": "system"
       },
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_writer"],
+      "legacy_roles": ["dot_charter_store"],
       "sources": ["role-policy"],
       "note": "Resident-agent charters shipped with the repository."
     },
@@ -220,7 +220,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_writer"],
+      "legacy_roles": ["dot_charter_store", "dot_lifecycle_runtime_store"],
       "sources": ["storage-floor", "role-policy"],
       "note": "Floors also hold a system/ partition (custody system).",
       "registration": {
@@ -413,7 +413,7 @@
       "legacy_roles": [
         "concierge_management_reader",
         "concierge_management_writer",
-        "dot_lifecycle_writer",
+        "dot_charter_store",
         "operational_learning_writer",
         "workspace_graph_reader"
       ],
@@ -451,7 +451,7 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_writer"],
+      "legacy_roles": ["dot_charter_store"],
       "sources": ["role-policy"]
     },
     {
@@ -518,7 +518,7 @@
       "legacy_roles": [
         "concierge_management_reader",
         "concierge_management_writer",
-        "dot_lifecycle_writer",
+        "dot_charter_store",
         "first_job_tenant_status_reader",
         "peer_catalog_reader",
         "peer_responder_reader",
@@ -891,9 +891,13 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["asset_derivation_store", "dot_lifecycle_writer"],
+      "legacy_roles": [
+        "asset_derivation_store",
+        "dot_charter_store",
+        "dot_lifecycle_runtime_store"
+      ],
       "sources": ["role-policy"],
-      "note": "Whole runtime root granted to dot_lifecycle_writer; narrow it to the stores the DOT lifecycle writes (G2). asset_derivation_store's literal grants reach only the asset-derivations/ personal/ and system/ partitions (its confidential/<tenant> writes are partition-bound to the custodian tenant)."
+      "note": "Runtime root granted to dot_lifecycle_runtime_store for the DOT lifecycle runtime artifacts (lifecycle audit ledger, heartbeats, event-continuation state) — narrowed by an only.write/only.mkdir declaration (MSN-SCOPE-FLOWDECOMP-20261107); the former dot_lifecycle_writer was decomposed into dot_charter_store + dot_lifecycle_runtime_store. asset_derivation_store's literal grants reach only the asset-derivations/ personal/ and system/ partitions (its confidential/<tenant> writes are partition-bound to the custodian tenant)."
     },
     {
       "id": "shared.state",
@@ -1083,7 +1087,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_writer"],
+      "legacy_roles": ["dot_charter_store"],
       "sources": ["role-policy"]
     },
     {

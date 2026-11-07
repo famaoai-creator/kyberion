@@ -258,7 +258,11 @@ export interface AuditChainIo {
   ): string;
 }
 
+// `auditIo` holds the sink-delivered process adapter; a caller's explicit
+// registration lives in `explicitAuditIo` so it always wins — a suite that
+// registers its own boundary must beat the suite-wide vitest seam too.
 let auditIo: AuditChainIo | undefined;
+let explicitAuditIo: AuditChainIo | undefined;
 
 /** Range-read options for tail / stream scans (tests inject a small chunk size). */
 let auditScanOptions: JsonlScanOptions = {};
@@ -494,6 +498,11 @@ function testAuditChainIo(): AuditChainIo | undefined {
     }
   ).__kyberionVitestIo?.auditIo;
 }
+
+/** An explicit registration wins, then the suite fixture, then the process adapter. */
+function auditIoNow(): AuditChainIo | undefined {
+  return explicitAuditIo ?? testAuditChainIo() ?? auditIo;
+}
 let auditChainInstance: AuditChainImpl | undefined;
 
 /**
@@ -502,12 +511,12 @@ let auditChainInstance: AuditChainImpl | undefined;
  * still the installed one), so a suite that swaps in a fixture can undo it.
  */
 export function registerAuditChainIo(io: AuditChainIo): () => void {
-  const previous = auditIo;
-  auditIo = io;
+  const previous = explicitAuditIo;
+  explicitAuditIo = io;
   auditChainInstance?.initializeFromDisk();
   return () => {
-    if (auditIo !== io) return;
-    auditIo = previous;
+    if (explicitAuditIo !== io) return;
+    explicitAuditIo = previous;
     if (previous) auditChainInstance?.initializeFromDisk();
   };
 }
@@ -524,9 +533,10 @@ function safeAuditPath(
   filePath: string,
   options: { allowMissingLeaf?: boolean } = {}
 ): string | null {
-  if (!auditIo) return null;
+  const io = auditIoNow();
+  if (!io) return null;
   try {
-    return auditIo.assertSafePath(filePath, options);
+    return io.assertSafePath(filePath, options);
   } catch {
     return null;
   }
@@ -543,7 +553,6 @@ class AuditChainImpl {
   private static readonly AUDIT_FILE_RE = /^audit-(\d{4}-\d{2}-\d{2})\.jsonl$/;
 
   constructor() {
-    auditIo ||= testAuditChainIo();
     // Under Vitest this resolves into the vitest-live sandbox (path-resolver),
     // so test events never land in the operator's real audit evidence.
     // (Suites that partially mock path-resolver lack vitestLivePath; they
@@ -902,7 +911,7 @@ class AuditChainImpl {
    */
   verifyTenantMirrors(): { ok: boolean; findings: string[] } {
     const findings: string[] = [];
-    if (!auditIo) return { ok: false, findings: ['audit_io_not_registered'] };
+    if (!auditIoNow()) return { ok: false, findings: ['audit_io_not_registered'] };
     const masterEntries = this.loadAll();
     const masterByTenant = new Map<string, AuditEntry[]>();
 
@@ -918,7 +927,7 @@ class AuditChainImpl {
     const mirrorRoot = tenantMirrorRoot(pathResolver.rootDir());
     const safeMirrorRoot = safeAuditPath(mirrorRoot, { allowMissingLeaf: true });
     if (!safeMirrorRoot) return { ok: false, findings: ['tenant_mirror_path_unsafe:root'] };
-    if (!auditIo.exists(safeMirrorRoot)) return { ok: true, findings };
+    if (!auditIoNow()!.exists(safeMirrorRoot)) return { ok: true, findings };
 
     // Tenant identity comes from the chained master entries, not from arbitrary
     // directory names under the mirror root.
@@ -930,9 +939,9 @@ class AuditChainImpl {
         findings.push(`tenant_mirror_path_unsafe:${slug}`);
         continue;
       }
-      if (!auditIo.exists(safeMirrorDir)) continue;
+      if (!auditIoNow()!.exists(safeMirrorDir)) continue;
 
-      const mirrorFiles = auditIo
+      const mirrorFiles = auditIoNow()!
         .readdir(safeMirrorDir)
         .filter((fileName) => AuditChainImpl.AUDIT_FILE_RE.test(fileName))
         .sort((left, right) => left.localeCompare(right));
@@ -1018,12 +1027,12 @@ class AuditChainImpl {
   private seedFromDisk(): void {
     this.seedFault = undefined;
     this.seedDenied = undefined;
-    if (!auditIo) return;
+    if (!auditIoNow()) return;
     // Disk is the only source of truth for the cursor: with no readable
     // record the next entry starts the chain, never from a stale in-memory hash.
     this.lastHash = GENESIS_HASH;
     this.entryCount = 0;
-    const io = auditIo;
+    const io = auditIoNow()!;
     let files: string[];
     try {
       files = this.listAuditFiles();
@@ -1075,10 +1084,10 @@ class AuditChainImpl {
   }
 
   private listAuditFiles(): string[] {
-    if (!auditIo || !auditIo.exists(this.auditDir)) return [];
+    if (!auditIoNow()?.exists(this.auditDir)) return [];
     let fileNames: string[];
     try {
-      fileNames = auditIo.readdir(this.auditDir);
+      fileNames = auditIoNow()!.readdir(this.auditDir);
     } catch (err) {
       // The directory can vanish between the exists check and the readdir
       // (janitor sweeps, tests mocking existsSync). A missing dir simply
@@ -1121,12 +1130,12 @@ class AuditChainImpl {
   } {
     const entries: AuditEntry[] = [];
     const invalidLines: number[] = [];
-    if (!auditIo || !auditIo.exists(filePath)) return { entries, invalidLines };
+    if (!auditIoNow()?.exists(filePath)) return { entries, invalidLines };
     // Forward stream in fixed chunks: no whole-file size cap, so a large day
     // is verified rather than reported unreadable.
     try {
       for (const { text, lineNumber } of streamTextLines(filePath, {
-        ...auditScan(auditIo),
+        ...auditScan(auditIoNow()!),
         onOversized: (line) => invalidLines.push(line.lineNumber),
       })) {
         if (!text.trim()) continue;
@@ -1152,15 +1161,15 @@ class AuditChainImpl {
   }
 
   private appendToFile(entry: AuditEntry): void {
-    if (!auditIo) {
+    if (!auditIoNow()) {
       logger.error('[AUDIT_CHAIN] Secure audit I/O is not registered; refusing to persist');
       return;
     }
     try {
-      if (!auditIo.exists(this.auditDir)) {
-        auditIo.mkdir(this.auditDir);
+      if (!auditIoNow()!.exists(this.auditDir)) {
+        auditIoNow()!.mkdir(this.auditDir);
       }
-      appendRecordLine(auditIo, this.getFilePath(entry.timestamp), entry);
+      appendRecordLine(auditIoNow()!, this.getFilePath(entry.timestamp), entry);
     } catch (err: any) {
       logger.error(`[AUDIT_CHAIN] Failed to persist: ${err.message}`);
     }
@@ -1171,7 +1180,7 @@ class AuditChainImpl {
     // appear anywhere else (EG-14), and only audit_mirror_writer may write it.
     if (entry.tenantSlug && isValidTenantSlug(entry.tenantSlug)) {
       const tenantSlug = entry.tenantSlug;
-      const io = auditIo;
+      const io = auditIoNow()!;
       try {
         // G17: the mirror is the chain's own store, written under its
         // tenant-bound store-writer role, never under the caller's identity.
@@ -1262,9 +1271,9 @@ function resolveCurrentTenantSlug(): string | undefined {
     path.join(pathResolver.rootDir(), 'active/missions/public', missionId, 'mission-state.json'),
   ];
   for (const candidate of candidates) {
-    if (!auditIo || !auditIo.exists(candidate)) continue;
+    if (!auditIoNow()?.exists(candidate)) continue;
     try {
-      const state = auditIo.loadJson<{ tenant_slug?: string }>(candidate);
+      const state = auditIoNow()!.loadJson<{ tenant_slug?: string }>(candidate);
       const slug = (state.tenant_slug || '').trim();
       if (slug && isValidTenantSlug(slug)) return slug;
     } catch {
@@ -1285,10 +1294,12 @@ export const auditChain: AuditChainImpl = auditChainInstance;
 // secure-io never imports the audit pipeline statically. Registration order
 // is irrelevant: the sink connects whichever side arrives second.
 registerAuditIoConsumer('auditChainIo', (io) => {
-  if (isVitestProcess()) {
-    auditIo ??= testAuditChainIo();
-    return;
-  }
-  registerAuditChainIo(io as AuditChainIo);
+  // The process adapter always registers — an explicit registration or the
+  // suite fixture still wins at call time (auditIoNow checks
+  // explicitAuditIo, then testAuditChainIo()) — so real children spawned
+  // from a suite, which inherit VITEST but carry no fixture, can still
+  // persist.
+  auditIo = io as AuditChainIo;
+  auditChainInstance?.initializeFromDisk();
 });
 registerDeferrableAuditRecorder((record) => auditChain.recordDeferrable(record));

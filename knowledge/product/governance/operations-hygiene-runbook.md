@@ -2584,7 +2584,7 @@ When adopting `defineCheck`, remove obsolete caller flags such as `--fail` from 
 
 Keep the declared data tier separate from the tenant ownership boundary. Confidential drafts remain under `knowledge/confidential/<tenant>/dots/`; verified public organization/project drafts use `dots/`. Tenant-only public diagnostic drafts must pass `assertFrontDeskDiagnosticDotCharter` and registered-tenant resolution before creation: an arbitrary public label does not grant the diagnostic capability. Never repair a first-job setup failure by changing its public-only input protocol to confidential or relaxing its no-downgrade checks.
 
-Runtime operation-binding validation is read-only: use the existing tenant-bound `workspace_tenant_registry_reader`, not `dot_lifecycle_writer`. Regression checks are `libs/core/dot/dot-lifecycle.test.ts`, the real-store `scripts/onboarding_first_job*.test.ts` suites, and `libs/core/surface/front-desk-recovery.engine.integration.test.ts`. Recovery fixtures must create their actual synthetic tenant via the governed facade before creating a tenant-owned charter.
+Runtime operation-binding validation is read-only: use the existing tenant-bound `workspace_tenant_registry_reader`, not the dot lifecycle store roles (`dot_charter_store` / `dot_lifecycle_runtime_store`; formerly `dot_lifecycle_writer`). Regression checks are `libs/core/dot/dot-lifecycle.test.ts`, the real-store `scripts/onboarding_first_job*.test.ts` suites, and `libs/core/surface/front-desk-recovery.engine.integration.test.ts`. Recovery fixtures must create their actual synthetic tenant via the governed facade before creating a tenant-owned charter.
 
 ## People management: exact store grants
 

@@ -214,18 +214,25 @@
       "allowed_actuators": ["file-actuator", "artifact-actuator"],
       "tier_access": ["public", "confidential"]
     },
-    "dot_lifecycle_writer": {
-      "description": "Writes dot charters (dots/) and the lifecycle audit ledger during governed status transitions (kyberion dot activate/pause/retire). Deliberately separate from any role a dot may bind at runtime, so an active dot can never rewrite the contract it runs under.",
+    "dot_charter_store": {
+      "description": "Store role of dot charter documents (libs/core/dot/dot-lifecycle.ts): dots/ at repo root, knowledge/confidential/<tenant>/dots/ and knowledge/personal/dots/<owner-hash>/ — all three custodies. The lifecycle facade assumes it (withExecutionContext) at each charter read/write inside the dot_lifecycle_worker process, binding the charter's tenant for confidential custody and explicitly clearing the ambient tenant ('' tenantCleared) for personal and system custody. Its read scopes additionally carry the validation reads that ran under the former dot_lifecycle_writer (tenants/<t>.json, organization operational state, runtime projects). Deliberately not a role a dot may bind at runtime, so an active dot can never rewrite the contract it runs under. The lifecycle audit ledger, activation heartbeats, event-continuation state and inter-process locks live under other roles (dot_lifecycle_runtime_store / the worker's ambient locks grant).",
       "default_persona": "worker",
       "write_scopes": [
         "dots/",
-        "knowledge/confidential/${KYBERION_TENANT}/dots/",
-        "active/shared/runtime/",
-        "active/shared/tmp/"
+        "knowledge/personal/dots/",
+        "knowledge/confidential/${KYBERION_TENANT}/dots/"
       ],
       "scope_classes": ["operations_runtime"],
       "allowed_actuators": [],
       "tier_access": ["public", "confidential", "personal"]
+    },
+    "dot_lifecycle_runtime_store": {
+      "description": "Store role of the dot lifecycle runtime surfaces (libs/core/dot/dot-lifecycle.ts): the lifecycle audit ledger (active/shared/runtime/dot-lifecycle-audit.jsonl, append-only), activation heartbeats (active/shared/runtime/heartbeats/) and dot event-continuation state (active/shared/runtime/dot/.../event-continuations/ + events.jsonl). Assumed inside the lifecycle facade for these writes only — charter documents go through dot_charter_store and inter-process locks stay under the dot_lifecycle_worker ambient role. The narrow.only declaration restricts writes to exactly those artifacts and their mkdir ancestors. Tenant-confidential event-continuation partitions bind the charter's tenant; personal and system partitions run with the ambient tenant explicitly cleared.",
+      "default_persona": "worker",
+      "write_scopes": ["active/shared/runtime/"],
+      "scope_classes": ["audit", "operations_runtime"],
+      "allowed_actuators": [],
+      "tier_access": ["confidential", "personal", "public"]
     },
     "ecosystem_architect": {
       "description": "Core architecture and repo evolution authority.",

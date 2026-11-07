@@ -1,7 +1,10 @@
 import { governedWorkerEnv } from '../server-child-env';
 /**
- * D3 (MSN-KYBERION-SERVER-20261104): the Kyberion server never assumes
- * `dot_lifecycle_writer`. `/api/ops/workspace/autonomy` plans the change
+ * D3 (MSN-KYBERION-SERVER-20261104): the Kyberion server never assumes the
+ * dot lifecycle store roles (`dot_charter_store` /
+ * `dot_lifecycle_runtime_store`; the former `dot_lifecycle_writer` was
+ * decomposed in MSN-SCOPE-FLOWDECOMP-20261107).
+ * `/api/ops/workspace/autonomy` plans the change
  * read-only (`planWorkspaceAutonomyControl`: operator role, workplace
  * ownership, viewer visibility, status, admission hash) and dispatches the
  * write to the governed worker `scripts/dot_lifecycle_worker.ts`, launched as a
