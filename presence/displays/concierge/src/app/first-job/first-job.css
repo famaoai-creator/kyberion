@@ -1,0 +1,126 @@
+/*
+ * 初めての仕事 (/first-job), moved from presence-studio home.css
+ * (.first-job-*, .home-work-*). Buttons, sections, callouts and inputs are
+ * kyberion-base classes; tokens are --kb-ui-* only. Long identifiers and
+ * digests wrap, so nothing overflows a 390 px viewport.
+ */
+.first-job-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-6);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.first-job-block {
+  min-width: 0;
+}
+
+.first-job-block p,
+.first-job-block li {
+  overflow-wrap: anywhere;
+}
+
+.first-job-subheading {
+  margin: var(--kb-ui-space-3) 0 var(--kb-ui-space-2);
+  font-size: var(--kb-ui-font-size-md);
+  font-weight: 600;
+}
+
+.first-job-list {
+  margin: 0;
+  padding-inline-start: var(--kb-ui-space-5);
+}
+
+.first-job-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  margin-block: var(--kb-ui-space-4);
+}
+
+.first-job-live {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+}
+
+.first-job-live:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+}
+
+.first-job-meta {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+}
+
+.first-job-code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.first-job-card {
+  margin-block: var(--kb-ui-space-3);
+  padding: var(--kb-ui-space-4);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  background: var(--kb-ui-surface);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.first-job-card__title {
+  margin: 0 0 var(--kb-ui-space-2);
+  font-size: var(--kb-ui-font-size-md);
+  font-weight: 600;
+}
+
+.first-job-field {
+  margin: var(--kb-ui-space-1) 0;
+}
+
+.first-job-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--kb-ui-space-4);
+}
+
+.first-job-receipt-pane {
+  min-width: 0;
+}
+
+.first-job-receipt-pane select {
+  width: 100%;
+  max-width: 100%;
+}
+
+.first-job-receipt-metadata {
+  overflow-wrap: anywhere;
+}
+
+.first-job-receipt-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: auto;
+  max-width: 100%;
+  max-height: 32rem;
+  padding: var(--kb-ui-space-3);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  background: var(--kb-ui-surface-sunken);
+  color: var(--kb-ui-text);
+}
+
+@media (max-width: 48rem) {
+  .first-job-comparison {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.first-job-control {
+  display: inline-flex;
+}
