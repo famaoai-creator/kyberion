@@ -251,7 +251,6 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = React.useState<SettingsSectionId>('start');
   const [searchQuery, setSearchQuery] = React.useState('');
   const checklist = useSetupChecklist();
-  const [studioUrl, setStudioUrl] = React.useState<string | null>(null);
   const voiceStreamRef = React.useRef<MediaStream | null>(null);
   const voiceRecorderRef = React.useRef<MediaRecorder | null>(null);
   const voiceChunksRef = React.useRef<Blob[]>([]);
@@ -565,8 +564,6 @@ export default function SettingsPage() {
       const chronos = parseChronosLink(links);
       if (!response.ok || !chronos) throw new Error('Invalid links response');
       setChronosUrl(chronos);
-      const studio = (links as { studio_engine_config_url?: unknown }).studio_engine_config_url;
-      if (typeof studio === 'string' && /^https?:\/\//.test(studio)) setStudioUrl(studio);
     } catch {
       // 詳細設定 keeps the rest of its content usable without the link.
     }
@@ -1356,7 +1353,7 @@ export default function SettingsPage() {
           />
         );
       case 'settings-engine':
-        return <EngineConfigCard locale={locale} studioUrl={studioUrl} />;
+        return <EngineConfigCard locale={locale} />;
       case 'setup-notifications':
         return (
           <NotificationsSection

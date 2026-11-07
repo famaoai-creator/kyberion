@@ -1,4 +1,5 @@
 import { isValidTenantSlug } from '@agent/core/entity-scope';
+import { voiceSelectionRequestSchema } from '@agent/shared-voice/voice-selection-preferences';
 import type { Request, RequestHandler } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
@@ -642,15 +643,8 @@ export const presenceStudioVoiceNativeListenSchema = z
   })
   .strict();
 
-export const presenceStudioVoiceSelectionSchema = z
-  .object({
-    tts_engine_id: z.string().trim().min(1).max(120).optional(),
-    stt_backend: z.string().trim().min(1).max(64).optional(),
-  })
-  .strict()
-  .refine((value) => value.tts_engine_id !== undefined || value.stt_backend !== undefined, {
-    message: 'tts_engine_id or stt_backend is required',
-  });
+/** Shared with the server's `POST /api/voice/selection` (one body contract). */
+export const presenceStudioVoiceSelectionSchema = voiceSelectionRequestSchema;
 
 export const presenceStudioEmailDraftSchema = z
   .object({

@@ -34379,29 +34379,24 @@
         "qps-ploc": "⟦ħőẇ ŧħė şėƈřėŧȧřẏ ŀőőķş ȧñḓ şőůñḓş ẇħėñ ïŧ şṗėȧķş ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       },
       "ia_settings_card_engine": {
-        "en": "Media engines (Presence Studio)",
-        "ja": "メディアエンジン(Presence Studio)",
-        "qps-ploc": "⟦Ɱėḓïȧ ėñɠïñėş (Ṗřėşėñƈė Şŧůḓïő) ŀőřėɱ ïṗşů⟧"
+        "en": "Media engines",
+        "ja": "メディアエンジン",
+        "qps-ploc": "⟦Ɱėḓïȧ ėñɠïñėş ŀőřė⟧"
       },
       "ia_settings_card_engine_desc": {
-        "en": "Speech, transcription and video tools, and how agents run, are set in Presence Studio on the Kyberion computer.",
-        "ja": "音声合成・文字起こし・動画の道具と、エージェントの実行方式は、Kyberion を動かしている PC の Presence Studio で設定します。",
-        "qps-ploc": "⟦Şṗėėƈħ, ŧřȧñşƈřïṗŧïőñ ȧñḓ ṽïḓėő ŧőőŀş, ȧñḓ ħőẇ ȧɠėñŧş řůñ, ȧřė şėŧ ïñ Ṗřėşėñƈė Şŧůḓïő őñ ŧħė Ķẏƀėřïőñ ƈőɱṗůŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+        "en": "Speech, transcription and video tools, and how agents run, on the Kyberion computer. Empty fields use the defaults; environment variables take precedence.",
+        "ja": "音声合成・文字起こし・動画の道具と、エージェントの実行方式です。Kyberion を動かしている PC で使われます。空欄は既定値、環境変数の指定が優先されます。",
+        "qps-ploc": "⟦Şṗėėƈħ, ŧřȧñşƈřïṗŧïőñ ȧñḓ ṽïḓėő ŧőőŀş, ȧñḓ ħőẇ ȧɠėñŧş řůñ, őñ ŧħė Ķẏƀėřïőñ ƈőɱṗůŧėř. Ėɱṗŧẏ ƒïėŀḓş ůşė ŧħė ḓėƒȧůŀŧş; ėñṽïřőñɱėñŧ ṽȧřïȧƀŀėş ŧȧķė ṗřėƈėḓėñƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőř⟧"
       },
       "ia_settings_card_engine_effect": {
         "en": "voice and media features use the chosen local tools",
         "ja": "声やメディアの機能が、選んだ道具を使います",
         "qps-ploc": "⟦ṽőïƈė ȧñḓ ɱėḓïȧ ƒėȧŧůřėş ůşė ŧħė ƈħőşėñ ŀőƈȧŀ ŧőőŀş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
-      "ia_settings_card_engine_action": {
-        "en": "Open engine settings",
-        "ja": "エンジン設定を開く",
-        "qps-ploc": "⟦Őṗėñ ėñɠïñė şėŧŧïñɠş ŀőřėɱ ⟧"
-      },
       "ia_settings_card_engine_local": {
-        "en": "Opens only on the Kyberion computer.",
-        "ja": "Kyberion を動かしている PC でのみ開けます。",
-        "qps-ploc": "⟦Őṗėñş őñŀẏ őñ ŧħė Ķẏƀėřïőñ ƈőɱṗůŧėř. ŀőřėɱ ïṗşůɱ ⟧"
+        "en": "Shown and saved only on the Kyberion computer itself.",
+        "ja": "Kyberion を動かしている PC で開いたときだけ表示・保存できます。",
+        "qps-ploc": "⟦Şħőẇñ ȧñḓ şȧṽėḓ őñŀẏ őñ ŧħė Ķẏƀėřïőñ ƈőɱṗůŧėř ïŧşėŀƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       },
       "ia_settings_agentpanel_default_link": {
         "en": "The default engine and model for all work is set in Settings › Agents & autonomy. This choice applies to this one agent only.",
