@@ -59,7 +59,7 @@ import {
 } from '@agent/core/reasoning/reasoning-bootstrap';
 import { installShellStreamingTtsBridgeFromEnv } from '@agent/core/shell/shell-streaming-tts-bridge';
 import { installSileroVadBackend } from '@agent/core/silero-vad-bridge';
-import { installTenVadBackend } from '@agent/core/ten-vad-bridge';
+import { installTenVadBackend } from '@agent/shared-voice/ten-vad-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
 import { probeAudioPlayback } from '@agent/core/voice/audio-playback';
 import { playPcmAudioStream, probePcmAudioStreaming } from '@agent/core/streaming-voice-playback';

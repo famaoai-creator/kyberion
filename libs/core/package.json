@@ -6572,10 +6572,6 @@
       "types": "./dist/organization/team-decision-support-metrics.d.ts",
       "default": "./dist/organization/team-decision-support-metrics.js"
     },
-    "./ten-vad-bridge": {
-      "types": "./dist/ten-vad-bridge.d.ts",
-      "default": "./dist/ten-vad-bridge.js"
-    },
     "./tenant-activation": {
       "types": "./dist/organization/tenant-activation.d.ts",
       "default": "./dist/organization/tenant-activation.js"

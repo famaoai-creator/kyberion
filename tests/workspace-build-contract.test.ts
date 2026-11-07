@@ -267,6 +267,33 @@ describe('Workspace build contract', () => {
     });
   });
 
+  it('keeps the TEN VAD bridge in shared-voice beside the other VAD installers', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const voice = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-voice/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./ten-vad-bridge']).toBeUndefined();
+    expect(safeExistsSync(path.join(rootDir, 'libs/core/ten-vad-bridge.ts'))).toBe(false);
+    expect(voice.exports['./ten-vad-bridge']).toEqual({
+      types: './dist/ten-vad-bridge.d.ts',
+      default: './dist/ten-vad-bridge.js',
+    });
+    // The VAD registry, bridge protocol, and detector contract stay in core;
+    // only the optional TEN backend installer moved.
+    for (const subpath of [
+      './voice/vad-registry',
+      './voice/vad-bridge-protocol',
+      './voice/voice-activity-detector',
+      './meeting/meeting-session-types',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
   it('keeps the desktop AX bridge in shared-perception with its system-actuator consumer', () => {
     const core = JSON.parse(
       safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string

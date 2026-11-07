@@ -199,8 +199,6 @@ export * from './apple-intelligence-bridge.js';
 
 export * from './apple-speech-file-stt-bridge.js';
 
-export * from './ten-vad-bridge.js';
-
 export * from './mission/mission-hygiene.js';
 
 export * from './operational-learning.js';
