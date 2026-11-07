@@ -14,7 +14,7 @@ const SOURCE_ROOT = rootDir();
 const ROOT = path.join(SOURCE_ROOT, 'active/shared/tmp/tenant-approval-boundary-' + process.pid);
 let withExecutionContext = initialContext;
 let { safeExistsSync, safeReadFile, safeReaddir, safeRmSync, safeWriteFile } = initialIO;
-let retention: typeof import('../storage-retention-catalog.js');
+let retention: typeof import('../storage/storage-retention-catalog.js');
 let guard: typeof import('../tier-guard.js');
 let store: typeof import('./approval-store.js');
 const savedRoot = process.env.KYBERION_ROOT;
@@ -83,7 +83,7 @@ beforeAll(async () => {
   ({ safeExistsSync, safeReadFile, safeReaddir, safeRmSync, safeWriteFile } =
     await import('../secure-io.js'));
   ({ withExecutionContext } = await import('../authority.js'));
-  retention = await import('../storage-retention-catalog.js');
+  retention = await import('../storage/storage-retention-catalog.js');
   guard = await import('../tier-guard.js');
   store = await import('./approval-store.js');
   expect((await import('../path-resolver.js')).rootDir()).toBe(ROOT);

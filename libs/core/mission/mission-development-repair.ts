@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver, findMissionPath } from '../path-resolver.js';
-import { missionPathOrNull } from '../mission-lookup.js';
+import { missionPathOrNull } from './mission-lookup.js';
 import { readTextFile } from '../foundation/text.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import type { WorkItem } from '../workforce/work-coordination.js';

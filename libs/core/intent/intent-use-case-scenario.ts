@@ -14,7 +14,7 @@ import {
   buildExecutionFeedbackHints,
   summarizeExecutionFeedback,
   type ExecutionFeedbackSummary,
-} from '../execution-feedback.js';
+} from '../knowledge/execution-feedback.js';
 
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/intent-use-case-scenario.schema.json');
 

@@ -1,24 +1,21 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import type express from 'express';
+// GET /api/progress stays in Studio for the 頼む page's recent-requests list;
+// the item detail and the verdict mutation left with the 進み具合 page
+// (Concierge 仕事 › 依頼, scoped by its own route tests).
 const f = vi.hoisted(() => ({
-  accept: vi.fn(),
-  mark: vi.fn(),
   entryTenant: 'alpha-team',
   taskStatus: 'executing',
   awaitingInput: false,
   artifactTenant: 'alpha-team',
   artifactTask: undefined as string | undefined,
-  findTask: vi.fn(),
   entryScope: undefined as undefined | Record<string, unknown>,
 }));
 vi.mock('./conversation-routes.js', () => ({ registerConversationRoutes: () => {} }));
 vi.mock('./presence-studio-runtime-data.js', () => ({
   isAllowedArtifactDownloadPath: () => true,
-  findTaskSession: (id: string) => f.findTask(id),
   resolveSafeExistingFile: (path: string) => path,
-  safeParsePresenceStudioRequestBody: (body: unknown) => body,
   presenceStudioWireError: () => ({ ok: false, error: 'scope denied' }),
-  presenceStudioAuditLine: () => 'audit fixture',
 }));
 vi.mock('@agent/core/authority', () => ({
   withExecutionContext: (_role: string, fn: () => unknown) => fn(),
@@ -60,8 +57,6 @@ vi.mock('@agent/core/deliverable-inbox', () => ({
       status: 'read',
     },
   ],
-  acceptInboxEntryWithHumanReceipt: f.accept,
-  markInboxEntry: f.mark,
 }));
 import { registerFrontDeskRoutes } from './front-desk-routes.js';
 const handlers = new Map<string, express.RequestHandler>();
@@ -69,25 +64,16 @@ registerFrontDeskRoutes({
   get: (p: string, h: express.RequestHandler) => handlers.set('GET ' + p, h),
   post: (p: string, h: express.RequestHandler) => handlers.set('POST ' + p, h),
 } as unknown as express.Express);
-function call(
-  method = 'GET',
-  body: unknown = {},
-  tenant = 'alpha-team',
-  selection: Record<string, string> = {},
-  detail = false,
-  detailId = 'artifact-1',
-  remoteToken?: string
-) {
+function call(tenant = 'alpha-team', selection: Record<string, string> = {}, remoteToken?: string) {
   const req = {
-    body,
     query: { tenant, ...selection },
-    params: { id: detail ? detailId : 'entry-1' },
+    params: {},
     headers: remoteToken
       ? { host: '127.0.0.1:3031', authorization: `Bearer ${remoteToken}` }
       : { host: '127.0.0.1:3031' },
     socket: { remoteAddress: remoteToken ? '198.51.100.24' : '127.0.0.1' },
-    path: method === 'GET' ? '/api/progress' : '/api/outcomes/entry-1/verdict',
-    method,
+    path: '/api/progress',
+    method: 'GET',
   } as unknown as express.Request;
   const res = {
     statusCode: 200,
@@ -104,13 +90,7 @@ function call(
       return this;
     },
   };
-  handlers.get(
-    method === 'GET'
-      ? detail
-        ? 'GET /api/progress/:id'
-        : 'GET /api/progress'
-      : 'POST /api/outcomes/:id/verdict'
-  )!(req, res as unknown as express.Response, vi.fn());
+  handlers.get('GET /api/progress')!(req, res as unknown as express.Response, vi.fn());
   return res;
 }
 beforeEach(() => {
@@ -120,10 +100,7 @@ beforeEach(() => {
   f.awaitingInput = false;
   f.artifactTenant = 'alpha-team';
   f.artifactTask = undefined;
-  f.findTask.mockReset().mockReturnValue(null);
   f.entryScope = undefined;
-  f.accept.mockReset().mockReturnValue({ entry_id: 'entry-1', status: 'accepted' });
-  f.mark.mockReset();
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('progress viewer scope HTTP integration', () => {
@@ -137,187 +114,42 @@ describe('progress viewer scope HTTP integration', () => {
       ])
     );
   });
-  it('accepts a matching scope marker and rejects an obsolete marker before mutation', () => {
-    const id = call().body.viewer_scope_id;
-    expect(call('POST', { status: 'accepted', viewer_scope_id: 'f'.repeat(64) }).statusCode).toBe(
-      409
-    );
-    expect(f.accept).not.toHaveBeenCalled();
-    expect(call('POST', { status: 'accepted', viewer_scope_id: id }).statusCode).toBe(200);
-    expect(f.accept).toHaveBeenCalledTimes(1);
-  });
-  it('denies an entry outside the selected tenant even for a loopback administrator', () => {
+  it('lists an artifact only with its in-scope inbox status', () => {
+    expect(call().body.delivered).toEqual([
+      expect.objectContaining({ id: 'artifact-1', status: 'read', entry_id: 'entry-1' }),
+    ]);
     f.entryTenant = 'beta-team';
-    expect(call('POST', { status: 'accepted' }).statusCode).toBe(403);
-    expect(f.accept).not.toHaveBeenCalled();
+    expect(call().body.delivered).toEqual([
+      expect.objectContaining({ id: 'artifact-1', status: 'delivered', can_verdict: false }),
+    ]);
+    f.artifactTenant = 'beta-team';
+    expect(call().body.delivered).toEqual([]);
   });
   it('never widens a token viewer bound to the server tenant', () => {
     vi.stubEnv('PRESENCE_STUDIO_TOKEN', 'studio-token');
-    expect(call('GET', {}, 'alpha-team', {}, false, 'artifact-1', 'studio-token').statusCode).toBe(
-      200
-    );
-    expect(call('GET', {}, 'beta-team', {}, false, 'artifact-1', 'studio-token').statusCode).toBe(
-      403
-    );
+    expect(call('alpha-team', {}, 'studio-token').statusCode).toBe(200);
+    expect(call('beta-team', {}, 'studio-token').statusCode).toBe(403);
   });
   it('changes the marker when the loopback owner switches tenant (FD-01)', () => {
     const alpha = call().body.viewer_scope_id;
-    const beta = call('GET', {}, 'beta-team').body.viewer_scope_id;
+    const beta = call('beta-team').body.viewer_scope_id;
     expect(alpha).not.toBe(beta);
-    expect(
-      call('POST', { status: 'accepted', viewer_scope_id: alpha }, 'beta-team').statusCode
-    ).toBe(409);
-    expect(f.accept).not.toHaveBeenCalled();
   });
 });
 
 it('hides unknown org/project metadata and changes scope receipt on explicit narrowing', () => {
   const tenant = call();
-  const project = call('GET', {}, 'alpha-team', {
-    organizationId: 'org-a',
-    projectId: 'project-a',
-  });
+  const project = call('alpha-team', { organizationId: 'org-a', projectId: 'project-a' });
   expect(project.statusCode).toBe(200);
   expect(project.body.active).toEqual([]);
   expect(project.body.viewer_scope_id).not.toBe(tenant.body.viewer_scope_id);
-  expect(
-    call('POST', { status: 'accepted' }, 'alpha-team', {
-      organizationId: 'org-a',
-      projectId: 'project-a',
-    }).statusCode
-  ).toBe(403);
-  expect(f.accept).not.toHaveBeenCalled();
-});
-it('allows only matching canonical project verdict metadata and rejects conflicts', () => {
-  const selection = { organizationId: 'org-a', projectId: 'project-a' };
-  f.entryScope = {
-    scope_kind: 'project',
-    tier: 'confidential',
-    tenant_slug: 'alpha-team',
-    organization_id: 'org-a',
-    project_id: 'project-a',
-  };
-  expect(call('POST', { status: 'accepted' }, 'alpha-team', selection).statusCode).toBe(200);
-  f.accept.mockClear();
-  f.entryScope.project_id = 'project-b';
-  expect(call('POST', { status: 'accepted' }, 'alpha-team', selection).statusCode).toBe(403);
-  expect(f.accept).not.toHaveBeenCalled();
 });
 
-it('does not expose an out-of-scope inbox verdict through artifact detail', () => {
-  f.entryTenant = 'beta-team';
-  const result = call('GET', {}, 'alpha-team', {}, true);
-  expect(result.statusCode).toBe(200);
-  expect(JSON.stringify(result.body)).not.toContain('read');
-});
-it('checks artifact scope before following its in-scope task association', () => {
-  f.artifactTenant = 'beta-team';
-  f.artifactTask = 'task-1';
-  f.findTask.mockImplementation((id: string) =>
-    id === 'task-1'
-      ? {
-          session_id: 'task-1',
-          status: 'running',
-          goal: { summary: 'private association' },
-          tenant_slug: 'alpha-team',
-        }
-      : null
-  );
-  const result = call('GET', {}, 'alpha-team', {}, true);
-  expect(result.statusCode).toBe(404);
-  expect(f.findTask).not.toHaveBeenCalledWith('task-1');
-});
-
-describe('explicit progress target HTTP boundaries', () => {
-  const selected = { organizationId: 'org-a', projectId: 'project-a' };
-  const exact = 'task/日本語 %2F';
-  const session = (tenant = 'alpha-team', project = 'project-a') => ({
-    session_id: exact,
-    goal: { summary: 'Scoped task detail' },
-    status: 'running',
-    scope: {
-      scope_kind: 'project',
-      tier: 'confidential',
-      tenant_slug: tenant,
-      organization_id: 'org-a',
-      project_id: project,
-    },
-  });
-  it('resolves only the exact decoded route identifier within the matching project', () => {
-    f.findTask.mockImplementation((id: string) => (id === exact ? session() : null));
-    const allowed = call('GET', {}, 'alpha-team', selected, true, exact);
-    expect(allowed.statusCode).toBe(200);
-    expect(allowed.body.item).toMatchObject({ requested: 'Scoped task detail' });
-    expect(f.findTask).toHaveBeenCalledWith(exact);
-    expect(
-      call('GET', {}, 'alpha-team', selected, true, encodeURIComponent(exact)).statusCode
-    ).toBe(404);
-    expect(f.accept).not.toHaveBeenCalled();
-    expect(f.mark).not.toHaveBeenCalled();
-  });
-  it.each(['unknown', 'tenant', 'project', 'organization'])(
-    'keeps %s targets unavailable without unrelated fallback',
-    (reason) => {
-      f.findTask.mockImplementation((id: string) => {
-        if (id !== exact || reason === 'unknown') return null;
-        const value = session(
-          reason === 'tenant' ? 'beta-team' : 'alpha-team',
-          reason === 'project' ? 'project-b' : 'project-a'
-        );
-        if (reason === 'organization') value.scope.organization_id = 'org-b';
-        return value;
-      });
-      const denied = call('GET', {}, 'alpha-team', selected, true, exact);
-      expect(denied.statusCode).toBe(404);
-      expect(denied.body.item).toBeUndefined();
-      expect(JSON.stringify(denied.body)).not.toContain('Scoped task detail');
-      expect(call().body.active).toEqual(
-        expect.arrayContaining([expect.objectContaining({ id: 'task-1' })])
-      );
-      expect(f.accept).not.toHaveBeenCalled();
-      expect(f.mark).not.toHaveBeenCalled();
-    }
-  );
-});
-
-it('propagates explicit task input wait to list and fresh direct detail', () => {
+it('propagates explicit task input wait to the list', () => {
   f.awaitingInput = true;
   expect(call().body.active).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ id: 'task-1', task_state: 'awaiting_input' }),
     ])
   );
-  f.findTask.mockImplementation((id) =>
-    id === 'task-1'
-      ? {
-          session_id: 'task-1',
-          goal: { summary: 'Task' },
-          status: 'paused',
-          control: { awaiting_user_input: false },
-          project_context: { tenant_slug: 'alpha-team' },
-        }
-      : null
-  );
-  const res = call('GET', {}, 'alpha-team', {}, true, 'task-1');
-  expect(res.body.item).toEqual(
-    expect.objectContaining({ kind: 'task_session', status: 'paused', task_state: 'paused' })
-  );
-});
-it('keeps linked-artifact details out of task-state presentation', () => {
-  f.artifactTask = 'source-task';
-  f.findTask.mockImplementation((id) =>
-    id === 'source-task'
-      ? {
-          session_id: 'source-task',
-          goal: { summary: 'Source task' },
-          status: 'executing',
-          control: { awaiting_user_input: true },
-          project_context: { tenant_slug: 'alpha-team' },
-        }
-      : null
-  );
-  const res = call('GET', {}, 'alpha-team', {}, true);
-  expect(res.statusCode).toBe(200);
-  expect(res.body.item).toEqual(expect.objectContaining({ kind: 'artifact' }));
-  expect(res.body.item).not.toHaveProperty('task_state');
 });

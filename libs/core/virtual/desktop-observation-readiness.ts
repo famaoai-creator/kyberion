@@ -2,7 +2,7 @@ import {
   assessDesktopObservationReadiness,
   type DesktopObservationReadiness,
 } from './desktop-recording.js';
-import { macosAutomationBridge } from '../macos-automation-bridge.js';
+import { macosAutomationBridge } from './macos-automation-bridge.js';
 import { osAutomationBridge } from './os-automation-bridge.js';
 import { createScreenCaptureBridge } from './screen-capture-bridge.js';
 

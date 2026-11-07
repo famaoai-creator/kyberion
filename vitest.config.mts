@@ -2,8 +2,29 @@ import { defineConfig } from 'vitest/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import corePackage from './libs/core/package.json' with { type: 'json' };
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
+
+// Public core subpaths can remain stable when their implementation moves.
+// Mirror those export targets before the source-directory fallback so tests
+// exercise the same API mapping as the compiled workspace packages.
+const relocatedCoreAliases = Object.entries(
+  corePackage.exports as Record<string, { types?: string }>
+).flatMap(([subpath, target]) => {
+  if (!subpath.startsWith('./') || !target.types?.startsWith('./dist/')) return [];
+  if (!target.types.endsWith('.d.ts')) return [];
+  const name = subpath.slice(2);
+  const source = target.types.slice('./dist/'.length).replace(/\.d\.ts$/u, '');
+  if (source === name || source === `${name}/index`) return [];
+  const publicPath = `@agent/core/${name}`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return [
+    {
+      find: new RegExp(`^${publicPath}$`),
+      replacement: path.join(rootDir, 'libs/core', `${source}.ts`),
+    },
+  ];
+});
 
 // Per-run nonce for the Vitest approval store (tests/vitest-run-id.ts). Set
 // while the config loads, in the main process before the worker pool is forked,
@@ -168,8 +189,8 @@ export default defineConfig({
         'libs/core/governance/policy-engine.ts',
         'libs/core/provider/provider-discovery.ts',
         'libs/core/shell/pty-engine.ts',
-        'libs/core/reflex-terminal.ts',
-        'libs/core/sensor-engine.ts',
+        'libs/core/shell/reflex-terminal.ts',
+        'libs/core/event/sensor-engine.ts',
         'libs/core/shell/terminal-bridge.ts',
         'libs/shared-voice/src/voice-synth.ts',
         // Large script refactors are covered indirectly through command/build paths.
@@ -195,6 +216,7 @@ export default defineConfig({
     testTimeout: process.env.CI ? 30000 : 10000,
     hookTimeout: process.env.CI ? 30000 : 10000,
     alias: [
+      ...relocatedCoreAliases,
       { find: /^@agent\/core\/(.*)$/, replacement: path.resolve(rootDir, './libs/core/$1') },
       { find: '@agent/core', replacement: path.resolve(rootDir, './libs/core/index.ts') },
       {
@@ -253,6 +275,10 @@ export default defineConfig({
       {
         find: /^@agent\/shared-ui$/,
         replacement: path.resolve(rootDir, './libs/shared-ui/src/index.ts'),
+      },
+      {
+        find: /^@agent\/shared-network\/(.*)$/,
+        replacement: path.resolve(rootDir, './libs/shared-network/src/$1'),
       },
       {
         find: '@agent/shared-network',

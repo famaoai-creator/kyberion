@@ -5,7 +5,7 @@ import {
   inferArtifactReviewKind,
 } from '../workforce/artifact-review.js';
 import { pathResolver } from '../path-resolver.js';
-import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../governance/owner-scope.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import { resolveArtifactReviewerProfile } from './mission-review-gates.js';
 import { missionClassOf, missionRiskProfileOf } from './mission-orchestration-phase-gates.js';

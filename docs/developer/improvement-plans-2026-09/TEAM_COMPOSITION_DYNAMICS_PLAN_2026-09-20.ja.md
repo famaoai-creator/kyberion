@@ -265,7 +265,7 @@ team role は `required_capabilities` を、agent profile は `capabilities` を
 - **6 個の capability がどの agent にも宣言されていない**(`curation`, `memory_management`, `privacy`, `product`, `quality`, `tracking`)
 - うち `tester` は `executed-verification` 義務が必須にする役割 = 出荷変更のたびに要求されるのに、能力を満たす候補がいなかった
 
-`libs/core/staffing-coverage.ts` がこれをデータ化し、CI gate `staffing-capability-coverage`(`ci-gates.json` に登録)が**システムが実際に要求する役割についてのみ失敗**する: ①義務が要求しうる役割に完全充足候補が無い、②テンプレートが required 宣言する役割に候補が 0、③ハード職務分離ペアがプール上そもそも独立になり得ない。残りの薄い役割は表に出し続ける(閉じるにはエージェント追加か宣言取り下げが必要で、これは運用判断であり、ここで能力を捏造すべきではない)。
+`libs/core/workforce/staffing-coverage.ts` がこれをデータ化し、CI gate `staffing-capability-coverage`(`ci-gates.json` に登録)が**システムが実際に要求する役割についてのみ失敗**する: ①義務が要求しうる役割に完全充足候補が無い、②テンプレートが required 宣言する役割に候補が 0、③ハード職務分離ペアがプール上そもそも独立になり得ない。残りの薄い役割は表に出し続ける(閉じるにはエージェント追加か宣言取り下げが必要で、これは運用判断であり、ここで能力を捏造すべきではない)。
 
 **TC-10 — 閉じられるギャップだけ閉じる**
 

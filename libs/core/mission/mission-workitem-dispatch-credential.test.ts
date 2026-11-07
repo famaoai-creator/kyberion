@@ -27,8 +27,8 @@ vi.mock('../agent/agent-dispatch.js', async (importOriginal) => ({
     }
   },
 }));
-vi.mock('../coordinated-agent-execution-port.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../coordinated-agent-execution-port.js')>()),
+vi.mock('../agent/coordinated-agent-execution-port.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../agent/coordinated-agent-execution-port.js')>()),
   delegateCoordinatedCliSubagentTask: async (
     _request: unknown,
     execute: () => Promise<unknown>

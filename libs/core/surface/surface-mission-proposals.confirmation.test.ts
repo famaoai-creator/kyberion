@@ -9,7 +9,7 @@ import {
   isSlackMissionRejection,
   loadMissionProposalStateAtPath,
 } from './surface-mission-proposals.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 
 const testRoot = pathResolver.sharedTmp('surface-mission-proposal-state-test');
 

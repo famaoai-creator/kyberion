@@ -15914,9 +15914,9 @@
         "qps-ploc": "⟦Ŧřẏ ŀőȧḓïñɠ ȧɠȧïñ ŀőřėɱ⟧"
       },
       "dock.history.pending": {
-        "en": "Some saved requests have no recorded reply yet. Check their progress before sending them again.",
-        "ja": "返信がまだ記録されていない依頼があります。再送する前に進み具合をご確認ください。",
-        "qps-ploc": "⟦Şőɱė şȧṽėḓ řėɋůėşŧş ħȧṽė ñő řėƈőřḓėḓ řėṗŀẏ ẏėŧ. Ƈħėƈķ ŧħėïř ṗřőɠřėşş ƀėƒőřė şėñḓïñɠ ŧħėɱ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+        "en": "Some saved requests have no recorded reply yet. Check them in Requests before sending them again.",
+        "ja": "返信がまだ記録されていない依頼があります。再送する前に「依頼」でご確認ください。",
+        "qps-ploc": "⟦Şőɱė şȧṽėḓ řėɋůėşŧş ħȧṽė ñő řėƈőřḓėḓ řėṗŀẏ ẏėŧ. Ƈħėƈķ ŧħėɱ ïñ Řėɋůėşŧş ƀėƒőřė şėñḓïñɠ ŧħėɱ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
       "dock.history.unsaved": {
         "en": "Some replies could not be saved, or used a voice-only path. They may not appear when you return. Do not repeat completed work just to save its reply.",
@@ -20782,6 +20782,91 @@
         "en": "Work items",
         "ja": "作業",
         "qps-ploc": "⟦Ẇőřķ ïŧėɱş ŀőř⟧"
+      },
+      "ia_shell_work_tab_requests": {
+        "en": "Requests",
+        "ja": "依頼",
+        "qps-ploc": "⟦Řėɋůėşŧş ŀőř⟧"
+      },
+      "ia_work_requests_list_label": {
+        "en": "Your requests",
+        "ja": "あなたの依頼",
+        "qps-ploc": "⟦Ẏőůř řėɋůėşŧş ŀőřė⟧"
+      },
+      "ia_work_requests_empty_done": {
+        "en": "No finished requests are recorded.",
+        "ja": "終わった依頼の記録はありません。",
+        "qps-ploc": "⟦Ñő ƒïñïşħėḓ řėɋůėşŧş ȧřė řėƈőřḓėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_work_requests_updated": {
+        "en": "Updated {when}",
+        "ja": "更新 {when}",
+        "qps-ploc": "⟦Ůṗḓȧŧėḓ {when} ŀőřė⟧"
+      },
+      "ia_work_requests_percent": {
+        "en": "About {percent}% (phase estimate, not a measurement)",
+        "ja": "約 {percent}%（段階に基づく目安で、実測ではありません）",
+        "qps-ploc": "⟦Ȧƀőůŧ {percent}% (ṗħȧşė ėşŧïɱȧŧė, ñőŧ ȧ ɱėȧşůřėɱėñŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_work_requests_inbox_status": {
+        "en": "In Inbox: {status}",
+        "ja": "受信箱での状態: {status}",
+        "qps-ploc": "⟦Ïñ Ïñƀőẋ: {status} ŀőřėɱ⟧"
+      },
+      "ia_work_requests_inbox_decide": {
+        "en": "Decide in Inbox",
+        "ja": "受信箱で判断する",
+        "qps-ploc": "⟦Ḓėƈïḓė ïñ Ïñƀőẋ ŀőřė⟧"
+      },
+      "ia_work_requests_kind_line": {
+        "en": "Kind: {kind}",
+        "ja": "種類: {kind}",
+        "qps-ploc": "⟦Ķïñḓ: {kind} ŀőř⟧"
+      },
+      "ia_work_requests_kind_report": {
+        "en": "Report",
+        "ja": "レポート",
+        "qps-ploc": "⟦Řėṗőřŧ ŀőř⟧"
+      },
+      "ia_work_requests_kind_deck": {
+        "en": "Slides",
+        "ja": "スライド",
+        "qps-ploc": "⟦Şŀïḓėş ŀőř⟧"
+      },
+      "ia_work_requests_kind_document": {
+        "en": "Document",
+        "ja": "文書",
+        "qps-ploc": "⟦Ḓőƈůɱėñŧ ŀőř⟧"
+      },
+      "ia_work_requests_kind_data": {
+        "en": "Data",
+        "ja": "データ",
+        "qps-ploc": "⟦Ḓȧŧȧ ŀőř⟧"
+      },
+      "ia_work_requests_kind_image": {
+        "en": "Image",
+        "ja": "画像",
+        "qps-ploc": "⟦Ïɱȧɠė ŀőř⟧"
+      },
+      "ia_work_requests_kind_media": {
+        "en": "Audio or video",
+        "ja": "音声・動画",
+        "qps-ploc": "⟦Ȧůḓïő őř ṽïḓėő ŀőřė⟧"
+      },
+      "ia_work_requests_kind_other": {
+        "en": "Deliverable",
+        "ja": "成果物",
+        "qps-ploc": "⟦Ḓėŀïṽėřȧƀŀė ŀőř⟧"
+      },
+      "ia_work_requests_inventory_choose_company": {
+        "en": "Choose a company in the header to see its automation candidates.",
+        "ja": "ヘッダーで会社を選ぶと、その会社の自動化候補が表示されます。",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ƈőɱṗȧñẏ ïñ ŧħė ħėȧḓėř ŧő şėė ïŧş ȧůŧőɱȧŧïőñ ƈȧñḓïḓȧŧėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ia_work_requests_inbox_not_linked": {
+        "en": "No Inbox item is linked to this delivery yet.",
+        "ja": "この成果に紐づく受信箱の項目はまだありません。",
+        "qps-ploc": "⟦Ñő Ïñƀőẋ ïŧėɱ ïş ŀïñķėḓ ŧő ŧħïş ḓėŀïṽėřẏ ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       },
       "ia_shell_mission_board_label": {
         "en": "Missions by state",
@@ -29154,9 +29239,9 @@
         "qps-ploc": "⟦Őṗėñ ƈőñṽėřşȧŧïőñ ŀőřėɱ⟧"
       },
       "work_home_link_progress": {
-        "en": "Open progress",
-        "ja": "進み具合を開く",
-        "qps-ploc": "⟦Őṗėñ ṗřőɠřėşş ŀőřė⟧"
+        "en": "Open requests",
+        "ja": "依頼を開く",
+        "qps-ploc": "⟦Őṗėñ řėɋůėşŧş ŀőřė⟧"
       },
       "work_home_link_artifact": {
         "en": "Open result",
@@ -29304,9 +29389,9 @@
         "qps-ploc": "⟦Őṗėñ ŧħė řėɋůėşŧ ŧő ƈħėƈķ ẇħȧŧ ėẋėƈůŧïőñ ïş ȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       },
       "work_home_next_follow_progress": {
-        "en": "Open progress for the latest recorded context.",
-        "ja": "進み具合を開いて最新の記録を確認できます。",
-        "qps-ploc": "⟦Őṗėñ ṗřőɠřėşş ƒőř ŧħė ŀȧŧėşŧ řėƈőřḓėḓ ƈőñŧėẋŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+        "en": "Open requests for the latest recorded context.",
+        "ja": "依頼を開いて最新の記録を確認できます。",
+        "qps-ploc": "⟦Őṗėñ řėɋůėşŧş ƒőř ŧħė ŀȧŧėşŧ řėƈőřḓėḓ ƈőñŧėẋŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       },
       "work_home_next_verify_result": {
         "en": "Check the result before treating this as complete.",
@@ -29399,9 +29484,9 @@
         "qps-ploc": "⟦Ẇħȧŧ ïş ẇȧïŧïñɠ őñ ẏőů ŀőřėɱ ï⟧"
       },
       "nav_progress": {
-        "en": "Progress",
-        "ja": "進み具合",
-        "qps-ploc": "⟦Ṗřőɠřėşş ŀőř⟧"
+        "en": "Requests",
+        "ja": "依頼",
+        "qps-ploc": "⟦Řėɋůėşŧş ŀőř⟧"
       },
       "nav_progress_sub": {
         "en": "In progress and delivered",
@@ -29609,9 +29694,9 @@
         "qps-ploc": "⟦Ṗřőɠřėşş ŀőř⟧"
       },
       "home_progress_more": {
-        "en": "See all in Progress",
-        "ja": "「進み具合」ですべて見る",
-        "qps-ploc": "⟦Şėė ȧŀŀ ïñ Ṗřőɠřėşş ŀőřėɱ ⟧"
+        "en": "See all in Requests",
+        "ja": "「依頼」ですべて見る",
+        "qps-ploc": "⟦Şėė ȧŀŀ ïñ Řėɋůėşŧş ŀőřėɱ ⟧"
       },
       "home_progress_empty": {
         "en": "Nothing in progress.",
@@ -29808,11 +29893,6 @@
         "ja": "未完了の仕事 {count}",
         "qps-ploc": "⟦Őṗėñ ẇőřķ {count} ŀőřėɱ⟧"
       },
-      "progress_filter_delivered": {
-        "en": "Delivered {count}",
-        "ja": "できたもの {count}",
-        "qps-ploc": "⟦Ḓėŀïṽėřėḓ {count} ŀőřėɱ⟧"
-      },
       "progress_filter_done": {
         "en": "Finished",
         "ja": "終わったもの",
@@ -29837,16 +29917,6 @@
         "en": "Timeline",
         "ja": "経過",
         "qps-ploc": "⟦Ŧïɱėŀïñė ŀőř⟧"
-      },
-      "progress_action_note": {
-        "en": "Send a note",
-        "ja": "ひとこと伝える",
-        "qps-ploc": "⟦Şėñḓ ȧ ñőŧė ŀőř⟧"
-      },
-      "progress_action_stop": {
-        "en": "Stop",
-        "ja": "止める",
-        "qps-ploc": "⟦Şŧőṗ ŀőř⟧"
       },
       "progress_open_mirror": {
         "en": "Watch the screen",
@@ -31134,9 +31204,9 @@
         "qps-ploc": "⟦Ėñŧřẏ {id} ŀőř⟧"
       },
       "hearing_inventory_open": {
-        "en": "View in Progress",
-        "ja": "「進み具合」で見る",
-        "qps-ploc": "⟦Ṽïėẇ ïñ Ṗřőɠřėşş ŀőřėɱ⟧"
+        "en": "View in Requests",
+        "ja": "「依頼」で見る",
+        "qps-ploc": "⟦Ṽïėẇ ïñ Řėɋůėşŧş ŀőřėɱ⟧"
       },
       "training_mark_done": {
         "en": "Done",
@@ -31167,11 +31237,6 @@
         "en": "Not started yet",
         "ja": "まだ始めていません",
         "qps-ploc": "⟦Ñőŧ şŧȧřŧėḓ ẏėŧ ŀőřė⟧"
-      },
-      "progress_ask_about": {
-        "en": "About {title}",
-        "ja": "{title} について",
-        "qps-ploc": "⟦Ȧƀőůŧ {title} ŀőřė⟧"
       },
       "hearing_req_tenant_item": {
         "en": "Item to decide",
@@ -31893,25 +31958,10 @@
         "ja": "履歴",
         "qps-ploc": "⟦Ħïşŧőřẏ ŀőř⟧"
       },
-      "progress_status_released": {
-        "en": "Released",
-        "ja": "終了（解放済み）",
-        "qps-ploc": "⟦Řėŀėȧşėḓ ŀőř⟧"
-      },
-      "progress_recovery": {
-        "en": "Discuss next steps",
-        "ja": "次の進め方を相談",
-        "qps-ploc": "⟦Ḓïşƈůşş ñėẋŧ şŧėṗş ŀőřėɱ⟧"
-      },
       "progress_load_failed": {
-        "en": "Could not load progress. Try again.",
-        "ja": "進み具合を読み込めませんでした。もう一度お試しください。",
-        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ŀőȧḓ ṗřőɠřėşş. Ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ⟧"
-      },
-      "progress_action_failed": {
-        "en": "The decision outcome could not be confirmed. Refresh its status before trying again.",
-        "ja": "判断の保存結果を確認できませんでした。再試行する前に状態を更新してください。",
-        "qps-ploc": "⟦Ŧħė ḓėƈïşïőñ őůŧƈőɱė ƈőůŀḓ ñőŧ ƀė ƈőñƒïřɱėḓ. Řėƒřėşħ ïŧş şŧȧŧůş ƀėƒőřė ŧřẏïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+        "en": "Could not load your requests. Try again.",
+        "ja": "依頼を読み込めませんでした。もう一度お試しください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ŀőȧḓ ẏőůř řėɋůėşŧş. Ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
       "progress_item_unavailable": {
         "en": "This work item is unavailable. Refresh or choose another item.",
@@ -31927,16 +31977,6 @@
         "en": "Refresh",
         "ja": "更新",
         "qps-ploc": "⟦Řėƒřėşħ ŀőř⟧"
-      },
-      "progress_scope_required": {
-        "en": "Your decision scope could not be verified. Refresh before recording a decision.",
-        "ja": "判断に使用するアカウントと範囲を確認できませんでした。判断を記録する前に更新してください。",
-        "qps-ploc": "⟦Ẏőůř ḓėƈïşïőñ şƈőṗė ƈőůŀḓ ñőŧ ƀė ṽėřïƒïėḓ. Řėƒřėşħ ƀėƒőřė řėƈőřḓïñɠ ȧ ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
-      },
-      "progress_storage_required": {
-        "en": "This browser cannot keep the pending decision safe across reloads. Allow session storage before recording a decision.",
-        "ja": "このブラウザーでは判断の処理状況を再読み込み後も保持できません。判断を記録する前にセッションストレージを許可してください。",
-        "qps-ploc": "⟦Ŧħïş ƀřőẇşėř ƈȧññőŧ ķėėṗ ŧħė ṗėñḓïñɠ ḓėƈïşïőñ şȧƒė ȧƈřőşş řėŀőȧḓş. Ȧŀŀőẇ şėşşïőñ şŧőřȧɠė ƀėƒőřė řėƈőřḓïñɠ ȧ ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
       },
       "conversation_storage_required": {
         "en": "Saved request state could not be verified. Restore it before sending, so a reload cannot repeat uncertain work.",
@@ -32132,21 +32172,6 @@
         "en": "What is ready?",
         "ja": "準備状況",
         "qps-ploc": "⟦Ẇħȧŧ ïş řėȧḓẏ? ŀőřė⟧"
-      },
-      "first_job_identity_unknown": {
-        "en": "Identity setup: not checked by this diagnostic.",
-        "ja": "利用者の基本設定：この診断では未確認です。",
-        "qps-ploc": "⟦Ïḓėñŧïŧẏ şėŧůṗ: ñőŧ ƈħėƈķėḓ ƀẏ ŧħïş ḓïȧɠñőşŧïƈ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
-      },
-      "first_job_baseline_unknown": {
-        "en": "Environment baseline: not checked by this diagnostic.",
-        "ja": "環境の基本チェック：この診断では未確認です。",
-        "qps-ploc": "⟦Ėñṽïřőñɱėñŧ ƀȧşėŀïñė: ñőŧ ƈħėƈķėḓ ƀẏ ŧħïş ḓïȧɠñőşŧïƈ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
-      },
-      "first_job_reasoning_unknown": {
-        "en": "External AI readiness: not checked and not needed for this job.",
-        "ja": "外部AIの準備状況：未確認です。この仕事には不要です。",
-        "qps-ploc": "⟦Ėẋŧėřñȧŀ ȦÏ řėȧḓïñėşş: ñőŧ ƈħėƈķėḓ ȧñḓ ñőŧ ñėėḓėḓ ƒőř ŧħïş ĵőƀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
       },
       "first_job_loading": {
         "en": "Checking the saved diagnostic setup…",
@@ -32537,11 +32562,6 @@
         "en": "Local public diagnostic receipt",
         "ja": "ローカルの公開用診断記録",
         "qps-ploc": "⟦Ŀőƈȧŀ ṗůƀŀïƈ ḓïȧɠñőşŧïƈ řėƈėïṗŧ ŀőřėɱ ïṗşů⟧"
-      },
-      "first_job_approval_expires": {
-        "en": "Approval expires",
-        "ja": "承認依頼の有効期限",
-        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ėẋṗïřėş ŀőřėɱ⟧"
       },
       "first_job_approval_payload_digest": {
         "en": "Exact diagnostic payload digest",
@@ -33318,6 +33338,21 @@
         "ja": "準備状況を確認できませんでした。下のエラーを確認し、「再確認」を試してください。前の依頼が失敗したと決めつけたり、再送したりしないでください。",
         "qps-ploc": "⟦Ṗřėṗȧřȧŧïőñ ƈőůŀḓ ñőŧ ƀė ƈħėƈķėḓ. Řėȧḓ ŧħė ėřřőř ƀėŀőẇ ȧñḓ ŧřẏ Řėƒřėşħ; ḓő ñőŧ ȧşşůɱė ȧ ṗřėṽïőůş řėɋůėşŧ ƒȧïŀėḓ őř şėñḓ ïŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
       },
+      "first_job_access_denied": {
+        "en": "This guide is only for the owner of this computer, signed in on this computer. Sign in as the owner, or open it on the computer itself. Nothing was sent.",
+        "ja": "このガイドは、このコンピューターの所有者が、このコンピューター上でサインインしているときだけ使えます。所有者としてサインインするか、このコンピューター本体で開いてください。何も送信していません。",
+        "qps-ploc": "⟦Ŧħïş ɠůïḓė ïş őñŀẏ ƒőř ŧħė őẇñėř őƒ ŧħïş ƈőɱṗůŧėř, şïɠñėḓ ïñ őñ ŧħïş ƈőɱṗůŧėř. Şïɠñ ïñ ȧş ŧħė őẇñėř, őř őṗėñ ïŧ őñ ŧħė ƈőɱṗůŧėř ïŧşėŀƒ. Ñőŧħïñɠ ẇȧş şėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőř⟧"
+      },
+      "first_job_rate_limited": {
+        "en": "Too many requests in a short time, so nothing was sent. Wait a moment, refresh, then try again.",
+        "ja": "短時間に操作が多すぎたため、何も送信していません。少し待ってから再確認し、もう一度お試しください。",
+        "qps-ploc": "⟦Ŧőő ɱȧñẏ řėɋůėşŧş ïñ ȧ şħőřŧ ŧïɱė, şő ñőŧħïñɠ ẇȧş şėñŧ. Ẇȧïŧ ȧ ɱőɱėñŧ, řėƒřėşħ, ŧħėñ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "first_job_origin_denied": {
+        "en": "This action did not come from this page, so nothing was sent. Reload the page and try again.",
+        "ja": "このページからの操作ではなかったため、何も送信していません。ページを再読み込みしてからやり直してください。",
+        "qps-ploc": "⟦Ŧħïş ȧƈŧïőñ ḓïḓ ñőŧ ƈőɱė ƒřőɱ ŧħïş ṗȧɠė, şő ñőŧħïñɠ ẇȧş şėñŧ. Řėŀőȧḓ ŧħė ṗȧɠė ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
       "workspace_destination_loading": {
         "en": "Checking available workspaces for this destination. Stay here to cancel without changing your current scope.",
         "ja": "この移動先で選べる作業先を確認しています。「この画面に戻る」で表示範囲を変えずに取り消せます。",
@@ -33348,30 +33383,15 @@
         "ja": "このタブに下書きを保存できませんでした。画面を離れる前や再読み込みの前に、文章をコピーしてください。",
         "qps-ploc": "⟦Ŧħïş ḓřȧƒŧ ƈőůŀḓ ñőŧ ƀė ķėṗŧ ïñ ŧħïş ŧȧƀ. Ƈőṗẏ ïŧ ƀėƒőřė ŀėȧṽïñɠ őř řėŀőȧḓïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
       },
-      "progress_loading": {
-        "en": "Loading progress…",
-        "ja": "進み具合を確認しています…",
-        "qps-ploc": "⟦Ŀőȧḓïñɠ ṗřőɠřėşş… ŀőřėɱ⟧"
-      },
       "progress_refreshing": {
-        "en": "Checking the latest progress…",
-        "ja": "最新の進み具合を確認しています…",
-        "qps-ploc": "⟦Ƈħėƈķïñɠ ŧħė ŀȧŧėşŧ ṗřőɠřėşş… ŀőřėɱ ïṗş⟧"
-      },
-      "progress_detail_loading": {
-        "en": "Loading details for {title}…",
-        "ja": "「{title}」の詳細を読み込んでいます…",
-        "qps-ploc": "⟦Ŀőȧḓïñɠ ḓėŧȧïŀş ƒőř {title}… ŀőřėɱ ïṗş⟧"
+        "en": "Checking your latest requests…",
+        "ja": "最新の依頼を確認しています…",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ẏőůř ŀȧŧėşŧ řėɋůėşŧş… ŀőřėɱ ïṗşů⟧"
       },
       "progress_detail_failed": {
         "en": "Could not load details for {title}. Try loading them again.",
         "ja": "「{title}」の詳細を読み込めませんでした。もう一度読み込んでください。",
         "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ŀőȧḓ ḓėŧȧïŀş ƒőř {title}. Ŧřẏ ŀőȧḓïñɠ ŧħėɱ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
-      },
-      "progress_detail_ready": {
-        "en": "Details for {title}",
-        "ja": "「{title}」の詳細",
-        "qps-ploc": "⟦Ḓėŧȧïŀş ƒőř {title} ŀőřėɱ ⟧"
       },
       "progress_detail_retry": {
         "en": "Try loading details again",
@@ -33408,86 +33428,6 @@
         "ja": "再試行",
         "qps-ploc": "⟦Řėŧřẏ ŀőř⟧"
       },
-      "progress_correction_draft_note": {
-        "en": "One correction draft is shared by files in this delivery while this page is open. Leaving or reloading can clear unsaved text.",
-        "ja": "この納品のファイル間で、一つの修正下書きを共有します。画面の移動や再読み込みで未保存の内容が消えることがあります。",
-        "qps-ploc": "⟦Őñė ƈőřřėƈŧïőñ ḓřȧƒŧ ïş şħȧřėḓ ƀẏ ƒïŀėş ïñ ŧħïş ḓėŀïṽėřẏ ẇħïŀė ŧħïş ṗȧɠė ïş őṗėñ. Ŀėȧṽïñɠ őř řėŀőȧḓïñɠ ƈȧñ ƈŀėȧř ůñşȧṽėḓ ŧėẋŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
-      },
-      "progress_correction_save": {
-        "en": "Save correction feedback",
-        "ja": "修正コメントを記録",
-        "qps-ploc": "⟦Şȧṽė ƈőřřėƈŧïőñ ƒėėḓƀȧƈķ ŀőřėɱ ï⟧"
-      },
-      "progress_correction_discard": {
-        "en": "Discard draft",
-        "ja": "下書きを破棄",
-        "qps-ploc": "⟦Ḓïşƈȧřḓ ḓřȧƒŧ ŀőřė⟧"
-      },
-      "progress_correction_local_text": {
-        "en": "Local correction text (save unconfirmed)",
-        "ja": "手元の修正文（保存未確認）",
-        "qps-ploc": "⟦Ŀőƈȧŀ ƈőřřėƈŧïőñ ŧėẋŧ (şȧṽė ůñƈőñƒïřɱėḓ) ŀőřėɱ ïṗşůɱ ḓ⟧"
-      },
-      "progress_correction_recovery_note": {
-        "en": "The recorded result above does not confirm this exact text was saved. This local text remains only on this page; copy it before leaving. Preparing a correction request uses recorded feedback, not this text.",
-        "ja": "上の記録済み結果だけでは、この文章が保存されたかは確認できません。手元の文章はこの画面にだけ残っています。移動する前にコピーしてください。修正依頼の準備には、この文章ではなく記録済みのコメントが使われます。",
-        "qps-ploc": "⟦Ŧħė řėƈőřḓėḓ řėşůŀŧ ȧƀőṽė ḓőėş ñőŧ ƈőñƒïřɱ ŧħïş ėẋȧƈŧ ŧėẋŧ ẇȧş şȧṽėḓ. Ŧħïş ŀőƈȧŀ ŧėẋŧ řėɱȧïñş őñŀẏ őñ ŧħïş ṗȧɠė; ƈőṗẏ ïŧ ƀėƒőřė ŀėȧṽïñɠ. Ṗřėṗȧřïñɠ ȧ ƈőřřėƈŧïőñ řėɋůėşŧ ůşėş řėƈőřḓėḓ ƒėėḓƀȧƈķ, ñőŧ ŧħïş ŧėẋŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
-      },
-      "progress_correction_recorded": {
-        "en": "Correction feedback recorded. You can review it before sending a new request.",
-        "ja": "修正コメントを記録しました。内容を確認して、次の依頼を送れます。",
-        "qps-ploc": "⟦Ƈőřřėƈŧïőñ ƒėėḓƀȧƈķ řėƈőřḓėḓ. Ẏőů ƈȧñ řėṽïėẇ ïŧ ƀėƒőřė şėñḓïñɠ ȧ ñėẇ řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
-      },
-      "progress_correction_prepare": {
-        "en": "Prepare correction request",
-        "ja": "修正依頼を準備",
-        "qps-ploc": "⟦Ṗřėṗȧřė ƈőřřėƈŧïőñ řėɋůėşŧ ŀőřėɱ ïṗ⟧"
-      },
-      "ask_correction_loading": {
-        "en": "Loading recorded feedback…",
-        "ja": "記録済みの修正コメントを読み込んでいます…",
-        "qps-ploc": "⟦Ŀőȧḓïñɠ řėƈőřḓėḓ ƒėėḓƀȧƈķ… ŀőřėɱ ïṗ⟧"
-      },
-      "ask_correction_failed": {
-        "en": "Recorded feedback could not be loaded. Your draft is unchanged.",
-        "ja": "記録済みの修正コメントを読み込めませんでした。入力中の下書きは変更していません。",
-        "qps-ploc": "⟦Řėƈőřḓėḓ ƒėėḓƀȧƈķ ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. Ẏőůř ḓřȧƒŧ ïş ůñƈħȧñɠėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
-      },
-      "ask_correction_retry": {
-        "en": "Retry loading feedback",
-        "ja": "修正コメントを再読み込み",
-        "qps-ploc": "⟦Řėŧřẏ ŀőȧḓïñɠ ƒėėḓƀȧƈķ ŀőřėɱ ï⟧"
-      },
-      "ask_correction_prepared": {
-        "en": "Recorded feedback is ready to review as a draft. Review the text before sending.",
-        "ja": "記録済みの修正コメントを下書きとして確認できます。内容を確認してから送信してください。",
-        "qps-ploc": "⟦Řėƈőřḓėḓ ƒėėḓƀȧƈķ ïş řėȧḓẏ ŧő řėṽïėẇ ȧş ȧ ḓřȧƒŧ. Řėṽïėẇ ŧħė ŧėẋŧ ƀėƒőřė şėñḓïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
-      },
-      "ask_correction_draft_intro": {
-        "en": "Please revise the artifact using this recorded feedback:",
-        "ja": "以下の記録済みの修正コメントに沿って成果物の修正をお願いします：",
-        "qps-ploc": "⟦Ṗŀėȧşė řėṽïşė ŧħė ȧřŧïƒȧƈŧ ůşïñɠ ŧħïş řėƈőřḓėḓ ƒėėḓƀȧƈķ: ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
-      },
-      "ask_correction_entry": {
-        "en": "Feedback ID",
-        "ja": "修正コメントID",
-        "qps-ploc": "⟦Ƒėėḓƀȧƈķ ÏḒ ŀőř⟧"
-      },
-      "ask_correction_artifact": {
-        "en": "Artifact ID",
-        "ja": "成果物ID",
-        "qps-ploc": "⟦Ȧřŧïƒȧƈŧ ÏḒ ŀőř⟧"
-      },
-      "ask_correction_title": {
-        "en": "Artifact",
-        "ja": "成果物",
-        "qps-ploc": "⟦Ȧřŧïƒȧƈŧ ŀőř⟧"
-      },
-      "ask_correction_note": {
-        "en": "Recorded feedback",
-        "ja": "記録済みの修正コメント",
-        "qps-ploc": "⟦Řėƈőřḓėḓ ƒėėḓƀȧƈķ ŀőřėɱ⟧"
-      },
       "ask_draft_too_long": {
         "en": "Drafts can contain up to 4,000 characters. Shorten this draft before sending.",
         "ja": "下書きは4,000文字までです。送信する前に内容を短くしてください。",
@@ -33497,51 +33437,6 @@
         "en": "Enter to send · Shift+Enter for a new line",
         "ja": "Enterで送信・Shift+Enterで改行",
         "qps-ploc": "⟦Ėñŧėř ŧő şėñḓ · Şħïƒŧ+Ėñŧėř ƒőř ȧ ñėẇ ŀïñė ŀőřėɱ ïṗşůɱ ḓő⟧"
-      },
-      "progress_leave_title": {
-        "en": "Leave this page?",
-        "ja": "この画面から移動しますか？",
-        "qps-ploc": "⟦Ŀėȧṽė ŧħïş ṗȧɠė? ŀőřėɱ⟧"
-      },
-      "progress_leave_draft": {
-        "en": "Leaving discards the correction text kept on this page. Copy any text you want to keep before leaving.",
-        "ja": "移動すると、この画面に残っている修正文は破棄されます。残したい文章は、移動する前にコピーしてください。",
-        "qps-ploc": "⟦Ŀėȧṽïñɠ ḓïşƈȧřḓş ŧħė ƈőřřėƈŧïőñ ŧėẋŧ ķėṗŧ őñ ŧħïş ṗȧɠė. Ƈőṗẏ ȧñẏ ŧėẋŧ ẏőů ẇȧñŧ ŧő ķėėṗ ƀėƒőřė ŀėȧṽïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
-      },
-      "progress_leave_pending": {
-        "en": "A decision is still being recorded. Leaving may not cancel it and discards any draft text on this page. Check Progress when you return before trying again.",
-        "ja": "判定を記録しています。移動しても処理が続く場合があり、この画面の下書きは破棄されます。戻ったら、再試行する前に進み具合を確認してください。",
-        "qps-ploc": "⟦Ȧ ḓėƈïşïőñ ïş şŧïŀŀ ƀėïñɠ řėƈőřḓėḓ. Ŀėȧṽïñɠ ɱȧẏ ñőŧ ƈȧñƈėŀ ïŧ ȧñḓ ḓïşƈȧřḓş ȧñẏ ḓřȧƒŧ ŧėẋŧ őñ ŧħïş ṗȧɠė. Ƈħėƈķ Ṗřőɠřėşş ẇħėñ ẏőů řėŧůřñ ƀėƒőřė ŧřẏïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőř⟧"
-      },
-      "progress_leave_uncertain": {
-        "en": "A decision still needs confirmation from the latest progress. Leaving discards any draft text on this page. Your pending decision remains protected from duplicate submission. Check Progress when you return.",
-        "ja": "最新の進み具合で判定結果を確認する必要があります。移動すると、この画面の下書きは破棄されます。判定の重複送信を防ぐ状態は保持されます。戻ったら進み具合を確認してください。",
-        "qps-ploc": "⟦Ȧ ḓėƈïşïőñ şŧïŀŀ ñėėḓş ƈőñƒïřɱȧŧïőñ ƒřőɱ ŧħė ŀȧŧėşŧ ṗřőɠřėşş. Ŀėȧṽïñɠ ḓïşƈȧřḓş ȧñẏ ḓřȧƒŧ ŧėẋŧ őñ ŧħïş ṗȧɠė. Ẏőůř ṗėñḓïñɠ ḓėƈïşïőñ řėɱȧïñş ṗřőŧėƈŧėḓ ƒřőɱ ḓůṗŀïƈȧŧė şůƀɱïşşïőñ. Ƈħėƈķ Ṗřőɠřėşş ẇħėñ ẏőů řėŧůřñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
-      },
-      "progress_leave_stay": {
-        "en": "Keep editing",
-        "ja": "入力を続ける",
-        "qps-ploc": "⟦Ķėėṗ ėḓïŧïñɠ ŀőř⟧"
-      },
-      "progress_leave_discard": {
-        "en": "Discard and leave",
-        "ja": "破棄して移動",
-        "qps-ploc": "⟦Ḓïşƈȧřḓ ȧñḓ ŀėȧṽė ŀőřėɱ⟧"
-      },
-      "progress_leave_anyway": {
-        "en": "Leave anyway",
-        "ja": "確認して移動",
-        "qps-ploc": "⟦Ŀėȧṽė ȧñẏẇȧẏ ŀőř⟧"
-      },
-      "progress_leave_unavailable": {
-        "en": "The leave confirmation could not be displayed. Your draft is unchanged. Try the navigation again.",
-        "ja": "移動の確認を表示できませんでした。下書きは変更していません。もう一度移動を選んでください。",
-        "qps-ploc": "⟦Ŧħė ŀėȧṽė ƈőñƒïřɱȧŧïőñ ƈőůŀḓ ñőŧ ƀė ḓïşṗŀȧẏėḓ. Ẏőůř ḓřȧƒŧ ïş ůñƈħȧñɠėḓ. Ŧřẏ ŧħė ñȧṽïɠȧŧïőñ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
-      },
-      "progress_leave_stay_page": {
-        "en": "Stay on this page",
-        "ja": "この画面に留まる",
-        "qps-ploc": "⟦Şŧȧẏ őñ ŧħïş ṗȧɠė ŀőřėɱ⟧"
       },
       "progress_task_state_collecting_requirements": {
         "en": "Requirements being gathered (recorded)",
@@ -33603,11 +33498,6 @@
         "ja": "状況未確認",
         "qps-ploc": "⟦Şŧȧŧůş ůñƈőñƒïřɱėḓ ŀőřėɱ⟧"
       },
-      "progress_task_recorded_state": {
-        "en": "Recorded task status",
-        "ja": "記録された仕事の状態",
-        "qps-ploc": "⟦Řėƈőřḓėḓ ŧȧşķ şŧȧŧůş ŀőřėɱ ⟧"
-      },
       "progress_task_latest_update": {
         "en": "Latest recorded update",
         "ja": "最後に記録された更新",
@@ -33667,16 +33557,6 @@
         "en": "Review submitted text",
         "ja": "送信した内容を確認",
         "qps-ploc": "⟦Řėṽïėẇ şůƀɱïŧŧėḓ ŧėẋŧ ŀőřėɱ ⟧"
-      },
-      "progress_delivery_verdict_scope": {
-        "en": "Receiving or recording feedback applies to the whole delivery. Discard its correction draft before receiving it.",
-        "ja": "受け取り・修正コメントは、この納品全体に適用されます。受け取る場合は、先に修正の下書きを破棄してください。",
-        "qps-ploc": "⟦Řėƈėïṽïñɠ őř řėƈőřḓïñɠ ƒėėḓƀȧƈķ ȧṗṗŀïėş ŧő ŧħė ẇħőŀė ḓėŀïṽėřẏ. Ḓïşƈȧřḓ ïŧş ƈőřřėƈŧïőñ ḓřȧƒŧ ƀėƒőřė řėƈėïṽïñɠ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
-      },
-      "progress_correction_unavailable": {
-        "en": "Correction editor unavailable. Reload this page before entering feedback.",
-        "ja": "修正欄を読み込めませんでした。ページを再読み込みしてから、コメントを入力してください。",
-        "qps-ploc": "⟦Ƈőřřėƈŧïőñ ėḓïŧőř ůñȧṽȧïŀȧƀŀė. Řėŀőȧḓ ŧħïş ṗȧɠė ƀėƒőřė ėñŧėřïñɠ ƒėėḓƀȧƈķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
       },
       "hearing_conflict_stale_snapshot": {
         "en": "This hearing changed during the request. Check its latest state before continuing.",

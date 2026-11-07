@@ -1,8 +1,11 @@
 import { loadPeerNetworkCatalog, type PeerNetworkPeerRecord } from './peer-messaging.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { streamJsonLines } from '../jsonl-read.js';
-import { parkedCompactionCopies } from '../jsonl-parked-read.js';
-import { maintainStoreAfterAppend, type MaintainStoreOutcome } from '../append-only-store.js';
+import { streamJsonLines } from '../storage/jsonl-read.js';
+import { parkedCompactionCopies } from '../storage/jsonl-parked-read.js';
+import {
+  maintainStoreAfterAppend,
+  type MaintainStoreOutcome,
+} from '../storage/append-only-store.js';
 import { withExecutionContext } from '../authority.js';
 import { normalizeIso } from '../foundation/time.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';

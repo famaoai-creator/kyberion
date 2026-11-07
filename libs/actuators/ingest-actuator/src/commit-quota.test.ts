@@ -16,7 +16,7 @@
 import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { INGEST_QUOTA_POLICY_REPO_PATH, ingestQuotaCounterPath } from '@agent/core/ingest-quota';
+import { INGEST_QUOTA_POLICY_REPO_PATH, ingestQuotaCounterPath } from './ingest-quota.js';
 import { readAssetLedger } from '@agent/core/ingest-asset-ledger';
 import { pathResolver } from '@agent/core/path-resolver';
 import {

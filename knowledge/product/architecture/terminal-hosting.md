@@ -24,7 +24,7 @@ kind: evergreen
 
 ### 2.1 Backend: PTY Engine (`node-pty`)
 
-- **実装**: `libs/core/reflex-terminal.ts`
+- **実装**: `libs/core/shell/reflex-terminal.ts`
 - **役割**: macOS/Linux の PTY インターフェースを直接叩き、本物のシェルプロセス（bash/zsh）を生成・制御する。
 - **進化**: `child_process.spawn` ではなく `node-pty` を採用することで、双方向のインタラクティブ操作を可能にした。
 

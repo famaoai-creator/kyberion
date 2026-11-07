@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from '../authority.js';
-import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
+import { resetAppendOnlyStoreMaintenanceState } from '../storage/append-only-store.js';
 import {
   safeExistsSync,
   safeMkdir,

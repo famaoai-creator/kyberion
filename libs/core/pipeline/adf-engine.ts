@@ -7,7 +7,7 @@ import {
   executeGraph,
   type GraphExecutionOutcome,
   type GraphNode,
-} from '../graph-scheduler.js';
+} from './graph-scheduler.js';
 import {
   advanceToolCallRepeatGovernor,
   buildToolCallRepeatForceStopMessage,

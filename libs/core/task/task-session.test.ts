@@ -2,7 +2,7 @@ import path from 'node:path';
 import AjvModule from 'ajv';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { compileSchemaFromPath } from '../schema-loader.js';
 import {
   safeExistsSync,

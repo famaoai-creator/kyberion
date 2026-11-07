@@ -1,7 +1,3 @@
-import {
-  registerAuditIoConsumer,
-  registerDeferrableAuditRecorder,
-} from '../foundation/deferrable-audit-sink.js';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { createLogger } from '../logger.js';
 import { isValidTenantSlug } from '../entity-scope.js';
@@ -24,23 +20,23 @@ import {
   resolveAuditChainKey,
   type ChainAlg,
   verifyAuditEntryHash,
-} from '../chain-integrity.js';
-export { registerChainIntegrityIo } from '../chain-integrity.js';
+} from './chain-integrity.js';
+export { registerChainIntegrityIo } from './chain-integrity.js';
 import {
   eventScopeMatches,
   normalizeEventScope,
   parseEventScopeFromRecord,
   type EventScope,
   type EventScopeFilter,
-} from '../event-scope.js';
-import { parseActorRef, type ActorRef } from '../actor.js';
+} from '../event/event-scope.js';
+import { parseActorRef, type ActorRef } from '../contracts/actor.js';
 import {
   fileEndsWithNewline,
   readLastJsonLine,
   streamTextLines,
   type JsonlByteSource,
   type JsonlScanOptions,
-} from '../jsonl-read.js';
+} from '../storage/jsonl-read.js';
 
 const logger = createLogger('audit-chain');
 
@@ -1280,15 +1276,3 @@ if (!(globalThis as any)[GLOBAL_KEY]) {
 }
 auditChainInstance = (globalThis as any)[GLOBAL_KEY];
 export const auditChain: AuditChainImpl = auditChainInstance;
-
-// Publish this module's seam endpoints into the zero-dependency sink so
-// secure-io never imports the audit pipeline statically. Registration order
-// is irrelevant: the sink connects whichever side arrives second.
-registerAuditIoConsumer('auditChainIo', (io) => {
-  if (isVitestProcess()) {
-    auditIo ??= testAuditChainIo();
-    return;
-  }
-  registerAuditChainIo(io as AuditChainIo);
-});
-registerDeferrableAuditRecorder((record) => auditChain.recordDeferrable(record));

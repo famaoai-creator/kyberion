@@ -1,4 +1,4 @@
-import type { VisualReviewReport } from '../visual-review.js';
+import type { VisualReviewReport } from '../media/visual-review.js';
 
 export type ArtifactVerificationStage =
   'job' | 'file' | 'content' | 'visual_review' | 'human_approval';

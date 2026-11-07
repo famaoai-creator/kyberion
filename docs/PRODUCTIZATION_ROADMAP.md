@@ -176,7 +176,7 @@ Phase A〜D' は OSS / self-hosted / FDE の基盤レーンであり、SaaS の�
 | A-4 | ✅   | preflight doctor 強化                 | `pnpm run doctor` が must/should/nice の 3 列で不足を出す               | `pipelines/vital-check.json` + `scripts/run_doctor.ts` | D1     |
 | A-5 | ✅   | **Voice first win 実装**              | "Hello Kyberion" pipeline (tier-0, zero external deps)                  | `pipelines/voice-hello.json`                           | D1, D6 |
 | A-6 | ❌   | デモ素材 3 本                         | terminal cast / GIF / 短編動画 を README から見える場所に               | `docs/demos/` + README 埋め込み                        | D6     |
-| A-7 | ✅   | エラー分類器                          | `unknown` エラーを原因タイプ × 推奨対処に分類（12 カテゴリ 28+ ルール） | `libs/core/error-classifier.ts`                        | D3     |
+| A-7 | ✅   | エラー分類器                          | `unknown` エラーを原因タイプ × 推奨対処に分類（12 カテゴリ 28+ ルール） | `libs/core/analysis/error-classifier.ts`               | D3     |
 | A-8 | ✅   | Privacy / Telemetry スタンス明示      | telemetry は **デフォルト off**、何を送るかを 1 ページで宣言            | `docs/PRIVACY.md`                                      | D6     |
 | A-9 | ✅   | LICENSE / 第三者依存棚卸し            | LICENSE 既存 + 第三者ライセンスの棚卸しを月次自動化                     | `scripts/license_audit.ts`                             | D4     |
 

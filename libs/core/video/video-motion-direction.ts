@@ -3,7 +3,7 @@ import { pathResolver } from '../path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { safeExistsSync } from '../secure-io.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
-import { tryRepairJson } from '../json-repair.js';
+import { tryRepairJson } from '../foundation/json-repair.js';
 import type { VideoCompositionSceneRole } from './video-composition-contract.js';
 import {
   withReasoningPayloadScope,

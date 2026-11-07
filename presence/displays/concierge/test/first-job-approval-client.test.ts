@@ -1,0 +1,1042 @@
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { act, createElement, useState, type ReactElement } from 'react';
+import type { Root } from 'react-dom/client';
+import { safeReadFile } from '@agent/core/secure-io';
+import { readJson } from '@agent/core/foundation';
+import {
+  FakeElement,
+  fireEvent,
+  installFakeDom,
+} from '../../../../libs/shared-ui/vanilla/fake-dom.test-support';
+
+// 初めての仕事 approval view (FirstJobApprovalPanel + FirstJobApprovalSection),
+// ported from presence-studio first-job-approval-client.test.ts when the page
+// moved to Concierge (Kyberion server phase 2). The panel and its React
+// section render on their own into the shared fake DOM, driven by a context
+// exactly as the Studio harness drove `KyberionFirstJobApproval.check`.
+// Inert DOM/network fixtures only. This does not exercise a live sign-in or approve real work.
+const network = vi.hoisted(() => ({
+  handler: undefined as undefined | ((url: string, init?: RequestInit) => Promise<unknown>),
+}));
+vi.mock('../src/lib/front-desk-fetch', () => ({
+  frontDeskFetch: (url: string, init?: RequestInit) => network.handler!(url, init),
+}));
+
+const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const readSource = (relative: string) =>
+  String(safeReadFile(path.join(appDir, relative), { encoding: 'utf8' }));
+let dom: ReturnType<typeof installFakeDom>;
+let client: typeof import('react-dom/client');
+let panelModule: typeof import('../src/app/first-job/first-job-approval-panel');
+let sectionModule: typeof import('../src/app/first-job/first-job-approval-section');
+let mounted: Root | undefined;
+beforeAll(async () => {
+  dom = installFakeDom();
+  client = await import('react-dom/client');
+  panelModule = await import('../src/app/first-job/first-job-approval-panel');
+  sectionModule = await import('../src/app/first-job/first-job-approval-section');
+});
+afterAll(() => {
+  if (mounted) act(() => mounted!.unmount());
+  dom.restore();
+});
+
+function allBelow(element: FakeElement): FakeElement[] {
+  return element.children.flatMap((child) => [
+    child as FakeElement,
+    ...allBelow(child as FakeElement),
+  ]);
+}
+const wrapped = new WeakMap<FakeElement, Node>();
+const wrap = (element: FakeElement) => {
+  let node = wrapped.get(element);
+  if (!node) wrapped.set(element, (node = new Node(element)));
+  return node;
+};
+/** A rendered node, shaped like the Studio harness's element double. */
+class Node {
+  constructor(readonly element: FakeElement) {}
+  get tagName(): string {
+    return this.element.localName;
+  }
+  get textContent(): string {
+    return this.element.textContent;
+  }
+  get disabled(): boolean {
+    return (this.element as unknown as { disabled: boolean }).disabled;
+  }
+  get hidden(): boolean {
+    return this.element.hasAttribute('hidden');
+  }
+  focus() {
+    this.element.focus();
+  }
+  descendants(): Node[] {
+    return allBelow(this.element).map(wrap);
+  }
+  fire() {
+    act(() => {
+      fireEvent(this.element, 'click');
+    });
+  }
+}
+/** A Studio element id; an absent element reads as hidden, empty and disabled. */
+class View {
+  constructor(private readonly find: () => FakeElement | null) {}
+  private get el(): FakeElement | null {
+    return this.find();
+  }
+  private control(): FakeElement | null {
+    const el = this.el;
+    if (!el || el.localName !== 'span') return el;
+    return el.querySelector('button') ?? el.querySelector('a') ?? el;
+  }
+  get hidden(): boolean {
+    const el = this.el;
+    return !el || el.hasAttribute('hidden');
+  }
+  get disabled(): boolean {
+    const control = this.control();
+    return !control || (control as unknown as { disabled?: boolean }).disabled === true;
+  }
+  get textContent(): string {
+    return this.el?.textContent ?? '';
+  }
+  descendants(): Node[] {
+    return (this.el ? allBelow(this.el) : []).map(wrap);
+  }
+  fire() {
+    const control = this.control();
+    if (!control || (control as unknown as { disabled?: boolean }).disabled) return;
+    act(() => {
+      fireEvent(control, 'click');
+    });
+  }
+}
+
+const session = 'concierge-' + 'a'.repeat(64);
+const approvalId = '11111111-1111-4111-8111-111111111111';
+const requestId = '22222222-2222-4222-8222-222222222222';
+const displayDigest = 'd'.repeat(64);
+const payloadHash = 'b'.repeat(64);
+const binding = 'first-job:' + 'c'.repeat(64);
+const now = new Date('2026-10-05T18:00:00Z');
+const item = (overrides: Record<string, unknown> = {}) => ({
+  approval_request_id: approvalId,
+  request_id: requestId,
+  revision: 2,
+  expires_at: '2026-10-08T18:00:00Z',
+  execution_deadline_at: '2026-10-05T19:00:00Z',
+  display_digest: displayDigest,
+  payload_hash: payloadHash,
+  effect_binding: binding,
+  artifact_path: '/private/never-render-me.json',
+  receipt_format: 'pretty',
+  tenant: 'test-tenant',
+  ...overrides,
+});
+const view = (overrides: Record<string, unknown> = {}) => ({
+  ok: true,
+  auth: { status: 'ready', login_href: '/login?next=%2Ffirst-job' },
+  readiness: { ready: true, status: 'ready' },
+  approvals: [item()],
+  ...overrides,
+});
+const response = (body: unknown, status = 200) => ({
+  ok: status >= 200 && status < 300,
+  status,
+  json: async () => body,
+});
+const flush = async () => {
+  await act(async () => {
+    for (let i = 0; i < 40; i++) await Promise.resolve();
+  });
+};
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+function harness(
+  options: {
+    get?: () => Promise<ReturnType<typeof response>> | ReturnType<typeof response>;
+    post?: (body: Record<string, unknown>) => Promise<ReturnType<typeof response>>;
+    snapshot?: Record<string, unknown>;
+    signal?: AbortSignal;
+  } = {}
+) {
+  if (mounted) act(() => mounted!.unmount());
+  const context = {
+    signal: options.signal,
+    snapshot: {
+      sessionId: session,
+      scope: { tenant: 'test-tenant', tier: 'public' },
+      readiness: { ready: true, status: 'diagnostic_mapping_ready' },
+      ...options.snapshot,
+    },
+    locale: 'en',
+    onChange: vi.fn(),
+    onDecision: vi.fn(),
+  };
+  const fetch = vi.fn(
+    async (
+      url: string,
+      init?: {
+        method?: string;
+        body?: string;
+        headers?: Record<string, string>;
+        signal?: AbortSignal;
+      }
+    ) => {
+      if (init?.method === 'POST')
+        return options.post
+          ? options.post(JSON.parse(init.body!))
+          : response({
+              ok: true,
+              approval_request_id: approvalId,
+              status: JSON.parse(init.body!).decision,
+            });
+      if (url.startsWith('/api/first-job/approvals?'))
+        return options.get ? options.get() : response(view());
+      throw new Error('Unexpected request: ' + url);
+    }
+  );
+  network.handler = (url, init) => fetch(url, init as Parameters<typeof fetch>[1]);
+  Object.assign(dom.window, {
+    setTimeout: (handler: () => void, delay: number) => setTimeout(handler, delay),
+    clearTimeout: (timer: ReturnType<typeof setTimeout>) => clearTimeout(timer),
+  });
+  const host = { notify: () => undefined as void };
+  const panel = new panelModule.FirstJobApprovalPanel(() => host.notify());
+  const text = (key: string) => 'front_desk:first_job_' + key;
+  function Host(): ReactElement {
+    const [, setVersion] = useState(0);
+    host.notify = () => setVersion((value) => value + 1);
+    return createElement(
+      'div',
+      null,
+      createElement(
+        'ul',
+        null,
+        createElement(sectionModule.FirstJobApprovalReadiness, { panel, text })
+      ),
+      createElement(sectionModule.FirstJobApprovalSection, {
+        panel,
+        text,
+        locale: 'en',
+        act: (run: () => Promise<void> | void) => void run(),
+      })
+    );
+  }
+  const container = dom.document.createElement('div');
+  dom.document.body.appendChild(container);
+  const root = client.createRoot(container as unknown as Element);
+  mounted = root;
+  act(() => root.render(createElement(Host)));
+  type Context = Parameters<typeof panel.check>[0];
+  const window = {
+    KyberionFirstJobApproval: {
+      check: (next: unknown) => panel.check(next as Context),
+      invalidate: () => act(() => panel.invalidate()),
+    },
+  };
+  void act(() => {
+    void panel.check(context as unknown as Context);
+  });
+  const get = (id: string) =>
+    new View(() => container.querySelector(`[data-fj="approval-${id}"]`) as FakeElement | null);
+  return {
+    context,
+    fetch,
+    window,
+    document: {
+      get activeElement() {
+        const active = dom.document.activeElement;
+        return active ? wrap(active) : null;
+      },
+    },
+    get,
+    posts: () => fetch.mock.calls.filter(([, init]) => init?.method === 'POST'),
+    buttons: () =>
+      get('items')
+        .descendants()
+        .filter((node) => node.tagName === 'button'),
+    refresh: () =>
+      act(async () => {
+        await panel.check(context as unknown as Context);
+      }),
+    /** Re-render without touching the panel (the page re-renders on any guide change). */
+    rerender: () => act(() => host.notify()),
+  };
+}
+
+beforeEach(() => vi.useFakeTimers({ now, toFake: ['Date', 'setTimeout', 'clearTimeout'] }));
+afterEach(() => vi.useRealTimers());
+
+describe('Dedicated diagnostic approval UI with inert fixtures', () => {
+  it('reads on load only and passes no caller identity or tenant selection', async () => {
+    const h = harness();
+    await flush();
+    expect(h.posts()).toHaveLength(0);
+    expect(h.fetch.mock.calls[0][0]).toBe(
+      '/api/first-job/approvals?session_id=' + session + '&locale=en'
+    );
+    expect(h.context.onChange).toHaveBeenLastCalledWith({ ready: true, busy: false });
+    expect(h.get('readiness').textContent).toContain('approval_ready');
+  });
+
+  it.each([
+    ['authentication_required', 'approval_auth_needed', false],
+    ['authentication_configuration_required', 'approval_configuration', true],
+    ['access_denied', 'approval_forbidden', true],
+    ['loopback', 'approval_unknown', true],
+  ])(
+    'blocks pre-task eligibility and decisions for auth status %s',
+    async (status, key, hideLogin) => {
+      const h = harness({
+        get: () =>
+          response(
+            view({
+              auth: { status },
+              readiness: { ready: false, status: 'authentication_required' },
+            })
+          ),
+      });
+      await flush();
+      expect(h.context.onChange).toHaveBeenLastCalledWith({
+        ready: false,
+        busy: false,
+        ...(status === 'loopback' ? {} : { accessLost: true }),
+        ...(status === 'loopback'
+          ? {}
+          : status === 'access_denied'
+            ? { setupScopeInvalidated: true }
+            : { setupInvalidated: true }),
+      });
+      expect(h.get('readiness').textContent).toContain(key);
+      expect(h.get('signin').hidden).toBe(hideLogin);
+      expect(h.buttons()).toHaveLength(0);
+      expect(h.posts()).toHaveLength(0);
+    }
+  );
+
+  it('recognizes verified eligibility even before any diagnostic request exists', async () => {
+    const h = harness({ get: () => response(view({ approvals: [] })) });
+    await flush();
+    expect(h.context.onChange).toHaveBeenLastCalledWith({ ready: true, busy: false });
+    expect(h.get('status').textContent).toContain('approval_empty');
+  });
+
+  it('displays exact bounded effects and effective session deadline without raw filesystem paths', async () => {
+    const h = harness();
+    await flush();
+    const content = h.get('items').textContent;
+    for (const value of [
+      approvalId,
+      requestId,
+      displayDigest,
+      payloadHash,
+      binding,
+      'test-tenant',
+      'approval_destination_local',
+      'approval_effect',
+      'approval_validity',
+    ])
+      expect(content).toContain(value);
+    expect(content).toContain(new Date('2026-10-05T19:00:00Z').toLocaleString('en'));
+    expect(content).not.toContain(new Date('2026-10-08T18:00:00Z').toLocaleString('en'));
+    expect(content).not.toMatch(/private|never-render|artifact_path|undefined/);
+  });
+
+  it.each(['approved', 'rejected'])(
+    'sends an exact digest-bound %s decision only on its explicit click',
+    async (decision) => {
+      const h = harness();
+      await flush();
+      h.buttons()[decision === 'approved' ? 0 : 1].fire();
+      await flush();
+      expect(h.posts()).toHaveLength(1);
+      const [url, init] = h.posts()[0];
+      expect(url).toBe('/api/first-job/approvals/' + approvalId + '/decision');
+      expect(JSON.parse(init!.body!)).toEqual({
+        decision,
+        display_digest: displayDigest,
+        session_id: session,
+      });
+      expect(init!.headers).toEqual({ 'Content-Type': 'application/json' });
+      expect(h.context.onDecision).toHaveBeenCalledOnce();
+      expect(h.get('status').textContent).toContain('approval_recorded');
+    }
+  );
+
+  it('suppresses duplicate clicks while sending and never races approve against reject', async () => {
+    const pending = deferred<ReturnType<typeof response>>();
+    const h = harness({ post: async () => pending.promise });
+    await flush();
+    const [approve, reject] = h.buttons();
+    approve.fire();
+    approve.fire();
+    reject.fire();
+    await flush();
+    expect(h.posts()).toHaveLength(1);
+    expect(h.context.onChange).toHaveBeenLastCalledWith({ ready: false, busy: true });
+    pending.resolve(response({ ok: true, approval_request_id: approvalId, status: 'approved' }));
+    await flush();
+    expect(h.posts()).toHaveLength(1);
+  });
+
+  it('invalidates old displayed digests after refresh changes the request', async () => {
+    let changed = false;
+    const h = harness({
+      get: () =>
+        response(
+          view({ approvals: [item({ display_digest: changed ? 'e'.repeat(64) : displayDigest })] })
+        ),
+    });
+    await flush();
+    const oldButton = h.buttons()[0];
+    changed = true;
+    await h.refresh();
+    oldButton.fire();
+    await flush();
+    expect(h.posts()).toHaveLength(0);
+    h.buttons()[0].fire();
+    await flush();
+    expect(JSON.parse(h.posts()[0][1]!.body!).display_digest).toBe('e'.repeat(64));
+  });
+
+  it('does not auto-replay an uncertain decision; a new view only reads', async () => {
+    const h = harness({
+      post: async () => {
+        throw new Error('response lost');
+      },
+    });
+    await flush();
+    h.buttons()[0].fire();
+    await flush();
+    expect(h.get('error').textContent).toContain('approval_uncertain');
+    expect(h.context.onDecision).not.toHaveBeenCalled();
+    expect(h.buttons().every((button) => button.disabled)).toBe(true);
+    expect(h.posts()).toHaveLength(1);
+    const reloaded = harness();
+    await flush();
+    expect(reloaded.posts()).toHaveLength(0);
+  });
+
+  it.each([
+    ['approved', 'fetch'],
+    ['approved', 'body'],
+    ['rejected', 'fetch'],
+    ['rejected', 'body'],
+  ])(
+    'bounds a stalled %s decision %s response and ignores late success',
+    async (decision, stage) => {
+      const pending = deferred<ReturnType<typeof response>>();
+      const pendingBody = deferred<unknown>();
+      let signedOut = false;
+      const h = harness({
+        get: () =>
+          response(
+            signedOut
+              ? view({
+                  auth: { status: 'authentication_required' },
+                  readiness: { ready: false, status: 'authentication_required' },
+                  approvals: [],
+                })
+              : view()
+          ),
+        post: () =>
+          stage === 'fetch'
+            ? pending.promise
+            : Promise.resolve({ ok: true, status: 200, json: () => pendingBody.promise }),
+      });
+      await flush();
+      const button = h.buttons()[decision === 'approved' ? 0 : 1];
+      button.fire();
+      button.fire();
+      await flush();
+      expect(h.posts()).toHaveLength(1);
+      expect(h.get('refresh').disabled).toBe(true);
+      await vi.advanceTimersByTimeAsync(14999);
+      expect(h.get('refresh').disabled).toBe(true);
+      await vi.advanceTimersByTimeAsync(1);
+      await flush();
+      expect(h.get('error').textContent).toContain('approval_uncertain');
+      expect(h.get('refresh').disabled).toBe(false);
+      expect(h.context.onChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ ready: false, busy: false })
+      );
+      expect(h.context.onDecision).not.toHaveBeenCalled();
+      expect(h.buttons().every((item) => item.disabled)).toBe(true);
+      button.fire();
+      signedOut = true;
+      await h.refresh();
+      const late = { ok: true, approval_request_id: approvalId, status: decision };
+      pending.resolve(response(late));
+      pendingBody.resolve(late);
+      await flush();
+      expect(h.get('readiness').textContent).toContain('approval_auth_needed');
+      expect(h.get('status').textContent).not.toContain('approval_recorded');
+      expect(h.context.onDecision).not.toHaveBeenCalled();
+      expect(h.buttons()).toHaveLength(0);
+      expect(h.posts()).toHaveLength(1);
+    }
+  );
+
+  // Added in the Concierge port: the decision counterpart of Studio's
+  // "ignores an in-flight terminal response after invalidation" case.
+  it('ignores an in-flight decision response after invalidation and a new unauthenticated view', async () => {
+    const pending = deferred<ReturnType<typeof response>>();
+    let signedOut = false;
+    const h = harness({
+      get: () =>
+        response(
+          signedOut
+            ? view({
+                auth: { status: 'authentication_required' },
+                readiness: { ready: false, status: 'authentication_required' },
+                approvals: [],
+              })
+            : view()
+        ),
+      post: async () => pending.promise,
+    });
+    await flush();
+    h.buttons()[0].fire();
+    h.window.KyberionFirstJobApproval!.invalidate();
+    signedOut = true;
+    await h.refresh();
+    pending.resolve(response({ ok: true, approval_request_id: approvalId, status: 'approved' }));
+    await flush();
+    h.rerender();
+    expect(h.context.onDecision).not.toHaveBeenCalled();
+    expect(h.get('status').textContent).not.toContain('approval_recorded');
+    expect(h.get('readiness').textContent).toContain('approval_auth_needed');
+    expect(h.posts()).toHaveLength(1);
+  });
+
+  it('clears the decision deadline after a timely confirmed response', async () => {
+    const h = harness();
+    await flush();
+    h.buttons()[0].fire();
+    await flush();
+    expect(h.get('status').textContent).toContain('approval_recorded');
+    await vi.advanceTimersByTimeAsync(30000);
+    await flush();
+    expect(h.get('error').textContent).toBe('');
+    expect(h.context.onDecision).toHaveBeenCalledTimes(1);
+    expect(h.posts()).toHaveLength(1);
+  });
+
+  it('requires fresh review after stale-target rejection, without automatic retry', async () => {
+    const h = harness({
+      post: async () => response({ ok: false, error: 'stale_digest', retry_safe: true }, 409),
+    });
+    await flush();
+    h.buttons()[0].fire();
+    await flush();
+    expect(h.get('error').textContent).toContain('approval_changed');
+    expect(h.posts()).toHaveLength(1);
+    expect(h.buttons().every((button) => button.disabled)).toBe(true);
+  });
+
+  it.each([
+    { execution_deadline_at: undefined },
+    { execution_deadline_at: '2026-10-05T17:59:59Z' },
+    { execution_deadline_at: '2026-10-09T18:00:00Z' },
+    { tenant: 'other-tenant' },
+    { display_digest: '<script>bad</script>' },
+    { effect_binding: 'arbitrary-effect' },
+  ])('fails closed on malformed, out-of-scope, or expired approval data: %j', async (override) => {
+    const h = harness({ get: () => response(view({ approvals: [item(override)] })) });
+    await flush();
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ready: false, busy: false })
+    );
+    expect(h.buttons()).toHaveLength(0);
+    expect(h.posts()).toHaveLength(0);
+  });
+
+  it('rechecks the effective deadline at click time', async () => {
+    const h = harness();
+    await flush();
+    const button = h.buttons()[0];
+    vi.setSystemTime(new Date('2026-10-05T19:00:01Z'));
+    button.fire();
+    await flush();
+    expect(h.posts()).toHaveLength(0);
+    expect(h.get('error').textContent).toContain('approval_changed');
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ready: false, busy: false })
+    );
+  });
+
+  it('invalidates approval actions when the main diagnostic scope becomes unavailable', async () => {
+    const h = harness();
+    await flush();
+    const oldButton = h.buttons()[0];
+    h.window.KyberionFirstJobApproval!.invalidate();
+    oldButton.fire();
+    await flush();
+    expect(h.posts()).toHaveLength(0);
+    expect(h.buttons()).toHaveLength(0);
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ready: false, busy: false })
+    );
+  });
+
+  it('discards late reads from an older scope view', async () => {
+    const delayed = deferred<ReturnType<typeof response>>();
+    let firstRead = true;
+    const h = harness({
+      get: () => {
+        if (firstRead) {
+          firstRead = false;
+          return delayed.promise;
+        }
+        return response(
+          view({
+            auth: { status: 'access_denied' },
+            readiness: { ready: false, status: 'authentication_required' },
+          })
+        );
+      },
+    });
+    await h.refresh();
+    delayed.resolve(response(view()));
+    await flush();
+    expect(h.get('readiness').textContent).toContain('approval_forbidden');
+    expect(h.buttons()).toHaveLength(0);
+  });
+
+  it('uses only the existing fixed sign-in route and never copies a login URL from server data', () => {
+    const html = readSource('src/app/first-job/first-job-approval-section.tsx');
+    const js = readSource('src/app/first-job/first-job-approval-panel.ts');
+    expect(html).toContain("const LOGIN_HREF = '/login?next=%2Ffirst-job'");
+    expect(html).toContain('href={LOGIN_HREF}');
+    expect(js + html).not.toContain('login_href');
+    expect(js).not.toMatch(/document\.cookie|Authorization|localStorage/);
+  });
+
+  it('states that sign-out alone does not revoke approval while preserving expiry and invalidation guidance', () => {
+    const catalog = readJson<{ domains: { front_desk: Record<string, Record<string, string>> } }>(
+      'knowledge/product/orchestration/user-facing-vocabulary.json'
+    );
+    const copy = catalog.domains.front_desk.first_job_approval_validity;
+    expect(copy.en).toContain('Signing out does not by itself revoke a recorded approval.');
+    expect(copy.ja).toContain('サインアウトするだけでは、記録済みの承認は取り消されません。');
+    expect(copy.en).toContain('Session-key changes, revoked membership, or a changed request');
+    const script = readSource('src/app/first-job/first-job-approval-section.tsx');
+    expect(script).toContain("text('approval_validity')");
+    expect(script).toContain("'approval_execution_deadline'");
+  });
+
+  it('shows an owned held request as unverified and requiring operator recovery without an action', async () => {
+    const held = {
+      request_id: requestId,
+      status: 'approval_verification_failed',
+      recovery: 'operator_recovery',
+    };
+    const h = harness({ get: () => response(view({ approvals: [], held_requests: [held] })) });
+    await flush();
+    expect(h.get('status').textContent).toContain('approval_held');
+    expect(h.get('items').textContent).toContain(requestId);
+    expect(h.get('items').textContent).toContain('approval_held_detail');
+    expect(h.buttons()).toHaveLength(0);
+    expect(h.posts()).toHaveLength(0);
+    expect(h.context.onChange).toHaveBeenLastCalledWith({
+      ready: true,
+      busy: false,
+      heldRequests: [held],
+    });
+    h.window.KyberionFirstJobApproval!.invalidate();
+    expect(h.get('items').textContent).not.toContain(requestId);
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ready: false, busy: false })
+    );
+  });
+
+  it('fails closed on conflicting actionable and held entries', async () => {
+    const h = harness({
+      get: () =>
+        response(
+          view({
+            held_requests: [
+              {
+                request_id: requestId,
+                status: 'approval_verification_failed',
+                recovery: 'operator_recovery',
+              },
+            ],
+          })
+        ),
+    });
+    await flush();
+    expect(h.buttons()).toHaveLength(0);
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ready: false, busy: false })
+    );
+    expect(h.posts()).toHaveLength(0);
+  });
+});
+
+describe('Read-only approval fetch timeout and cancellation', () => {
+  it('aborts a hung GET at the read deadline and keeps explicit decision POST behavior untouched', async () => {
+    const pending = deferred<ReturnType<typeof response>>();
+    let firstRead = true;
+    const h = harness({
+      get: () => (firstRead ? ((firstRead = false), pending.promise) : response(view())),
+    });
+    await flush();
+    const signal = h.fetch.mock.calls[0][1]!.signal!;
+    expect(signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(15000);
+    await flush();
+    expect(signal.aborted).toBe(true);
+    expect(h.get('refresh').disabled).toBe(false);
+    expect(h.get('error').textContent).toContain('approval_failed');
+    expect(h.buttons()).toHaveLength(0);
+    expect(h.posts()).toHaveLength(0);
+    await h.refresh();
+    pending.resolve(response(view({ approvals: [item({ display_digest: 'e'.repeat(64) })] })));
+    await flush();
+    h.buttons()[0].fire();
+    await flush();
+    expect(h.posts()).toHaveLength(1);
+    expect(h.posts()[0][1]!.signal).toBeUndefined();
+    expect(JSON.parse(h.posts()[0][1]!.body!).display_digest).toBe(displayDigest);
+  });
+
+  it.each(['parent', 'invalidate', 'replace'])(
+    'cancels the old GET on %s and ignores its late approval data',
+    async (kind) => {
+      const pending = deferred<ReturnType<typeof response>>();
+      const controller = new AbortController();
+      let firstRead = true;
+      const h = harness({
+        signal: controller.signal,
+        get: () =>
+          firstRead ? ((firstRead = false), pending.promise) : response(view({ approvals: [] })),
+      });
+      await flush();
+      const signal = h.fetch.mock.calls[0][1]!.signal!;
+      if (kind === 'parent') controller.abort();
+      else if (kind === 'invalidate') h.window.KyberionFirstJobApproval!.invalidate();
+      else await h.refresh();
+      await flush();
+      expect(signal.aborted).toBe(true);
+      pending.resolve(response(view()));
+      await flush();
+      expect(h.buttons()).toHaveLength(0);
+      expect(h.posts()).toHaveLength(0);
+      expect(vi.getTimerCount()).toBe(0);
+    }
+  );
+});
+
+describe('Explicit parked-request recovery with inert fixtures', () => {
+  const recovery = (overrides: Record<string, unknown> = {}) => ({
+    request_id: requestId,
+    approval_request_id: approvalId,
+    session_id: session,
+    status: 'eligible',
+    display_digest: displayDigest,
+    revision: 2,
+    tenant: 'test-tenant',
+    ...overrides,
+  });
+  const recoveryView = (overrides: Record<string, unknown> = {}) =>
+    view({ approvals: [], recovery_requests: [recovery()], ...overrides });
+  const terminalResponse = () =>
+    response({ ok: true, request_id: requestId, status: 'terminated_unstarted' });
+  it('requires a separate review and confirm, retains old identities in the display, and sends only the terminal command', async () => {
+    const h = harness({
+      get: () => response(recoveryView()),
+      post: async () => terminalResponse(),
+    });
+    await flush();
+    expect(h.posts()).toHaveLength(0);
+    expect(h.get('items').textContent).toContain('recovery_effect');
+    expect(h.get('items').textContent).toContain(requestId);
+    expect(h.get('items').textContent).toContain(approvalId);
+    h.buttons()[0].fire();
+    await flush();
+    expect(h.posts()).toHaveLength(0);
+    expect(h.get('items').textContent).toContain('recovery_confirm_detail');
+    const confirm = h.buttons()[0];
+    confirm.fire();
+    confirm.fire();
+    await flush();
+    expect(h.posts()).toHaveLength(1);
+    expect(h.posts()[0][0]).toBe('/api/first-job/recovery/' + requestId);
+    expect(JSON.parse(h.posts()[0][1]!.body!)).toEqual({
+      session_id: session,
+      display_digest: displayDigest,
+      action: 'terminate_unstarted',
+    });
+    expect(h.context.onDecision).toHaveBeenCalledOnce();
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ready: false, busy: false })
+    );
+    expect(h.get('status').textContent).toContain('recovery_readback');
+    expect(h.get('items').textContent).not.toContain('recovery_terminated');
+  });
+  it('cancels without effects and never lets an old confirm button bypass a fresh review', async () => {
+    const h = harness({ get: () => response(recoveryView()) });
+    await flush();
+    h.buttons()[0].fire();
+    const [oldConfirm, cancel] = h.buttons();
+    cancel.fire();
+    oldConfirm.fire();
+    await flush();
+    expect(h.posts()).toHaveLength(0);
+    h.buttons()[0].fire();
+    expect(h.posts()).toHaveLength(0);
+  });
+  it('keeps keyboard focus on the replacement action when reviewing and cancelling recovery', async () => {
+    const h = harness({ get: () => response(recoveryView()) });
+    await flush();
+    h.buttons()[0].focus();
+    h.buttons()[0].fire();
+    expect(h.document.activeElement).toBe(h.buttons()[0]);
+    expect(h.document.activeElement!.textContent).toContain('recovery_confirm');
+    h.buttons()[1].focus();
+    h.buttons()[1].fire();
+    expect(h.document.activeElement).toBe(h.buttons()[0]);
+    expect(h.document.activeElement!.textContent).toContain('recovery_review');
+    expect(h.posts()).toHaveLength(0);
+  });
+  it('resets confirmation after a changed digest and rejects the prior displayed action', async () => {
+    let changed = false;
+    const h = harness({
+      get: () =>
+        response(
+          recoveryView({
+            recovery_requests: [
+              recovery({ display_digest: changed ? 'e'.repeat(64) : displayDigest }),
+            ],
+          })
+        ),
+      post: async () => terminalResponse(),
+    });
+    await flush();
+    h.buttons()[0].fire();
+    const old = h.buttons()[0];
+    changed = true;
+    await h.refresh();
+    old.fire();
+    expect(h.posts()).toHaveLength(0);
+    h.buttons()[0].fire();
+    h.buttons()[0].fire();
+    await flush();
+    expect(JSON.parse(h.posts()[0][1]!.body!).display_digest).toBe('e'.repeat(64));
+  });
+  it('shows lost response as unknown and refreshes only with GET before exposing terminal proof', async () => {
+    let ended = false;
+    const h = harness({
+      get: () =>
+        response(
+          recoveryView({
+            recovery_requests: [recovery({ status: ended ? 'terminated_unstarted' : 'eligible' })],
+          })
+        ),
+      post: async () => {
+        ended = true;
+        throw new Error('lost');
+      },
+    });
+    await flush();
+    h.buttons()[0].fire();
+    h.buttons()[0].fire();
+    await flush();
+    expect(h.get('error').textContent).toContain('recovery_uncertain');
+    expect(h.context.onDecision).not.toHaveBeenCalled();
+    expect(h.buttons().every((button) => button.disabled)).toBe(true);
+    await h.refresh();
+    expect(h.posts()).toHaveLength(1);
+    expect(h.buttons()).toHaveLength(0);
+    expect(h.get('items').textContent).toContain('recovery_terminated');
+    expect(h.context.onChange).toHaveBeenLastCalledWith({
+      ready: true,
+      busy: false,
+      recoveryRequests: [recovery({ status: 'terminated_unstarted' })],
+    });
+  });
+  it('times out without replaying and ignores a late terminal POST response', async () => {
+    const pending = deferred<ReturnType<typeof response>>();
+    const h = harness({ get: () => response(recoveryView()), post: async () => pending.promise });
+    await flush();
+    h.buttons()[0].fire();
+    h.buttons()[0].fire();
+    await vi.advanceTimersByTimeAsync(15000);
+    await flush();
+    expect(h.get('error').textContent).toContain('recovery_uncertain');
+    pending.resolve(terminalResponse());
+    await flush();
+    expect(h.context.onDecision).not.toHaveBeenCalled();
+    expect(h.posts()).toHaveLength(1);
+  });
+  it('ignores an in-flight terminal response after invalidation and a new unauthenticated view', async () => {
+    const pending = deferred<ReturnType<typeof response>>();
+    let signedOut = false;
+    const h = harness({
+      get: () =>
+        response(
+          signedOut
+            ? recoveryView({
+                auth: { status: 'authentication_required' },
+                readiness: { ready: false, status: 'authentication_required' },
+              })
+            : recoveryView()
+        ),
+      post: async () => pending.promise,
+    });
+    await flush();
+    h.buttons()[0].fire();
+    h.buttons()[0].fire();
+    h.window.KyberionFirstJobApproval!.invalidate();
+    signedOut = true;
+    await h.refresh();
+    pending.resolve(terminalResponse());
+    await flush();
+    expect(h.context.onDecision).not.toHaveBeenCalled();
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        ready: false,
+        busy: false,
+        accessLost: true,
+      })
+    );
+    expect(h.get('items').textContent).not.toContain(requestId);
+  });
+  it.each([
+    { session_id: 'concierge-' + 'b'.repeat(64) },
+    { tenant: 'other' },
+    { revision: 0 },
+    { approval_request_id: 'bad' },
+    { display_digest: 'bad' },
+    { status: 'incomplete' },
+  ])('offers no action for malformed or mismatched recovery evidence: %j', async (override) => {
+    const h = harness({
+      get: () => response(recoveryView({ recovery_requests: [recovery(override)] })),
+    });
+    await flush();
+    expect(h.buttons()).toHaveLength(0);
+    expect(h.posts()).toHaveLength(0);
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ready: false, busy: false })
+    );
+  });
+  it('clears recovery identities and reports authentication loss if the terminal POST is rejected', async () => {
+    const h = harness({
+      get: () => response(recoveryView()),
+      post: async () => response({ ok: false, retry_safe: true }, 401),
+    });
+    await flush();
+    h.buttons()[0].fire();
+    h.buttons()[0].fire();
+    await flush();
+    expect(h.get('items').textContent).not.toContain(requestId);
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        ready: false,
+        busy: false,
+        accessLost: true,
+      })
+    );
+    expect(h.get('signin').hidden).toBe(false);
+    expect(h.context.onDecision).not.toHaveBeenCalled();
+    expect(h.posts()).toHaveLength(1);
+  });
+  it.each([401, 403])(
+    'clears recovery and parent snapshot after a malformed GET body with HTTP %s',
+    async (status) => {
+      let accessLost = false;
+      const h = harness({
+        get: () =>
+          accessLost
+            ? {
+                ...response(null, status),
+                json: async () => {
+                  throw new SyntaxError('Invalid JSON');
+                },
+              }
+            : response(recoveryView()),
+      });
+      await flush();
+      expect(h.context.onChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ recoveryRequests: [recovery()] })
+      );
+      accessLost = true;
+      await h.refresh();
+      expect(h.get('items').textContent).not.toContain(requestId);
+      expect(h.buttons()).toHaveLength(0);
+      expect(h.context.onChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          ready: false,
+          busy: false,
+          accessLost: true,
+        })
+      );
+      expect(h.get('readiness').textContent).toContain(
+        status === 401 ? 'approval_auth_needed' : 'approval_forbidden'
+      );
+    }
+  );
+  it.each([401, 403])(
+    'clears recovery and parent snapshot after a malformed POST body with HTTP %s',
+    async (status) => {
+      const h = harness({
+        get: () => response(recoveryView()),
+        post: async () => ({
+          ...response(null, status),
+          json: async () => {
+            throw new SyntaxError('Invalid JSON');
+          },
+        }),
+      });
+      await flush();
+      h.buttons()[0].fire();
+      h.buttons()[0].fire();
+      await flush();
+      expect(h.get('items').textContent).not.toContain(requestId);
+      expect(h.buttons()).toHaveLength(0);
+      expect(h.context.onChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          ready: false,
+          busy: false,
+          accessLost: true,
+        })
+      );
+      expect(h.get('readiness').textContent).toContain(
+        status === 401 ? 'approval_auth_needed' : 'approval_forbidden'
+      );
+      expect(h.context.onDecision).not.toHaveBeenCalled();
+      expect(h.posts()).toHaveLength(1);
+    }
+  );
+  it('rejects duplicate or conflicting recovery entries', async () => {
+    for (const extra of [
+      { recovery_requests: [recovery(), recovery()] },
+      { approvals: [item()] },
+      {
+        held_requests: [
+          {
+            request_id: requestId,
+            status: 'approval_verification_failed',
+            recovery: 'operator_recovery',
+          },
+        ],
+      },
+    ]) {
+      const h = harness({ get: () => response(recoveryView(extra)) });
+      await flush();
+      expect(h.buttons()).toHaveLength(0);
+      expect(h.posts()).toHaveLength(0);
+    }
+  });
+});

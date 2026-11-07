@@ -4,7 +4,7 @@ import {
   getWriterLeaseMetrics,
   resetWriterLeaseMetrics,
   writerLeaseResourceId,
-} from '../writer-lease.js';
+} from '../lease/writer-lease.js';
 import { safeReadFile, safeRmSync, safeSymlinkSync, safeWriteFile } from '../secure-io.js';
 import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { pathResolver } from '../path-resolver.js';

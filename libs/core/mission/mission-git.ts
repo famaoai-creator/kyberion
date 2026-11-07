@@ -9,7 +9,7 @@ import { logger } from '../core.js';
 import { resolveRole } from '../authority.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { rootDir } from '../path-resolver.js';
-import type { SessionGitIndex } from '../session-git-index.js';
+import type { SessionGitIndex } from '../vcs/session-git-index.js';
 import {
   checkWorkspaceBudget,
   type WorkspaceBudgetOptions,

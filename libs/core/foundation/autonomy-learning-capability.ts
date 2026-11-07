@@ -68,7 +68,7 @@ export function autonomyLearningCapability(
       archive,
     ],
     // Write-time window retention of the outcomes ledger only
-    // (libs/core/append-only-store.ts rewriteParked): its parked staging
+    // (libs/core/storage/append-only-store.ts rewriteParked): its parked staging
     // copies, its two publish temp names, and its sibling compaction archive.
     // The store lock stays outside this capability, under the caller.
     namePrefixExact: [

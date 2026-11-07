@@ -250,7 +250,7 @@ pnpm vitest run libs/actuators/weather-actuator/
 - [ ] `schemas/<actuator>-action.schema.json` validates inputs (referenced by manifest).
 - [ ] CLI entry point exists with the `runActuator` / `createStandardYargs` pattern.
 - [ ] Trace integrated (see [`TRACE_MIGRATION_TEMPLATE.md`](./TRACE_MIGRATION_TEMPLATE.md)).
-- [ ] Errors classified via `classifyError` (see [`error-classifier.ts`](../../libs/core/error-classifier.ts)).
+- [ ] Errors classified via `classifyError` (see [`error-classifier.ts`](../../libs/core/analysis/error-classifier.ts)).
 - [ ] At least one unit test.
 - [ ] `pnpm tsx scripts/check_contract_semver.ts -- --rebaseline` recorded.
 - [ ] An entry added to [`CAPABILITIES_GUIDE.md`](../../CAPABILITIES_GUIDE.md) (generated from the actuator manifests; see the `capabilities-guide` check in `pnpm check`).

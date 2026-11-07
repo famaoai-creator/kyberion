@@ -4,7 +4,7 @@ import * as addFormatsModule from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
 import { compileSchemaFromPath } from '../schema-loader.js';
 import { safeReadFile } from '../secure-io.js';
-import { withoutSchemaMetadata } from '../test-governance-payload.js';
+import { withoutSchemaMetadata } from '../testing/test-governance-payload.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;

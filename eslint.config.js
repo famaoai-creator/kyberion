@@ -326,7 +326,7 @@ export default [
     ignores: [
       'libs/**/src/index.ts',
       'libs/**/examples/**',
-      'libs/core/cli-utils.ts',
+      'libs/core/harnessing/cli-utils.ts',
       'libs/core/skill-wrapper.ts',
       '**/*.test.ts',
     ],
@@ -355,7 +355,7 @@ export default [
       '**/*.test-support.ts',
       'libs/**/examples/**',
       'libs/core/script-harness.ts',
-      'libs/core/cli-utils.ts',
+      'libs/core/harnessing/cli-utils.ts',
       'libs/core/plugin/skill-wrapper.ts',
     ],
     rules: {

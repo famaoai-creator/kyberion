@@ -82,8 +82,13 @@ beforeAll(async () => {
 }, 30000);
 beforeEach(() => {
   for (const key of keys) if (key !== 'KYBERION_ROOT') delete process.env[key];
+  // Resetting an entire runtime ancestor also covers protected producer receipts.
+  context(
+    'mission_controller',
+    () => io.safeRmSync(path.join(ROOT, 'active'), { recursive: true, force: true }),
+    'sovereign'
+  );
   privileged(() => {
-    io.safeRmSync(path.join(ROOT, 'active'), { recursive: true, force: true });
     const write = (file: string, value: unknown) =>
       io.safeWriteFile(path.join(ROOT, file), JSON.stringify(value));
     write('knowledge/personal/members/assets-owner.json', {

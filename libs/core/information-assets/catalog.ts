@@ -14,7 +14,7 @@ import {
   withOrganizationPeopleMutation,
   recordPeopleManagementAudit,
 } from '../organization/organization-people-access.js';
-import { assetProvenanceRef, findAssetBySource } from '../ingest-asset-ledger.js';
+import { assetProvenanceRef, findAssetBySource } from './ingest-asset-ledger.js';
 import {
   assertInformationAssetScope,
   assertInformationAssetCatalogAuthorization,

@@ -51,8 +51,9 @@ export function useShellScope(): ShellScope {
 
 /**
  * Tab hrefs for a destination page: `?tab=` changes, the scope and other
- * page-wide parameters stay, list-local filters (`q`, `status`, `view`) reset,
- * and the default tab drops the parameter.
+ * page-wide parameters stay, list-local filters (`q`, `status`, `view`) and
+ * the opened request (`request`) reset, and the default tab drops the
+ * parameter.
  */
 export function destinationTabHref(
   pathname: string,
@@ -61,7 +62,7 @@ export function destinationTabHref(
   defaultTab: string
 ): string {
   const next = new URLSearchParams(current);
-  for (const key of ['tab', 'q', 'status', 'view', 'section']) next.delete(key);
+  for (const key of ['tab', 'q', 'status', 'view', 'section', 'request']) next.delete(key);
   if (tab !== defaultTab) next.set('tab', tab);
   const query = next.toString();
   return `${pathname}${query ? `?${query}` : ''}`;

@@ -10,7 +10,7 @@ import {
   signA2AContent,
   verifyA2AContent,
 } from './a2a-envelope-signature.js';
-import { enforceNhiActorPolicy } from '../nhi-actor-verification.js';
+import { enforceNhiActorPolicy } from '../agent/nhi-actor-verification.js';
 import {
   DelegationAttenuationError,
   parseDelegationChain,
@@ -44,7 +44,7 @@ import {
   readConversationHistory,
   rehydrateConversation,
 } from './a2a-conversation-store.js';
-import { Semaphore } from '../semaphore.js';
+import { Semaphore } from '../foundation/semaphore.js';
 import { parseInflightLimit } from '../foundation/inflight-limit.js';
 import {
   appendSupervisorEvent,
@@ -63,7 +63,7 @@ import {
   shutdownAgentRuntimeViaDaemon,
   toSupervisorEnsurePayload,
 } from '../agent/agent-runtime-supervisor-client.js';
-import { normalizeAgentContextMode, type AgentContextMode } from '../context-boundary.js';
+import { normalizeAgentContextMode, type AgentContextMode } from '../contracts/context-boundary.js';
 import { type TaskModelHint } from '../reasoning/reasoning-model-routing.js';
 import { isRecord } from '../foundation/primitives.js';
 import {
@@ -74,7 +74,7 @@ import {
   validateContextSecurityScope,
   validateReasoningEgress,
   type ContextSecurityScope,
-} from '../context-security-scope.js';
+} from '../governance/context-security-scope.js';
 
 /**
  * A2A-to-ACP Bridge v1.1 [SECURITY HARDENED]

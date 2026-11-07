@@ -10,7 +10,7 @@ import {
   spawnManagedProcess,
   stopManagedProcess,
   type ManagedProcessHandle,
-} from '../managed-process.js';
+} from '../tool/managed-process.js';
 import {
   claimWorkItem,
   clearWorkCoordinationNamespace,

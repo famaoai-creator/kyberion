@@ -14,12 +14,12 @@
  */
 
 import * as path from 'node:path';
-import { spawnManagedProcess } from '../managed-process.js';
+import { spawnManagedProcess } from '../tool/managed-process.js';
 import { loadPipelineRunJournal } from './pipeline-run-journal.js';
-import { evaluateStateProbe, type StateProbeDeps, type StateProbeSpec } from '../state-probe.js';
+import { evaluateStateProbe, type StateProbeDeps, type StateProbeSpec } from './state-probe.js';
 import { pathResolver, shared, rootDir } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from '../secure-io.js';
-import { missionTierScanDirs } from '../owner-scope.js';
+import { missionTierScanDirs } from '../governance/owner-scope.js';
 
 export interface AwaitResumeOutcome {
   runId: string;

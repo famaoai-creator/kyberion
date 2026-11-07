@@ -54,9 +54,9 @@ Chronos の `/api/headless/a2ui/plugin-views` は承認済みプラグインの�
 
 `sandboxed-iframe` ビュー(PH-02)の HTML 文書は `GET /api/headless/a2ui/plugin-views/frame?plugin_id=…&view_id=…` が返す。認可は一覧と同じ(`chronos.plugin_view.read`、viewer から見えないビューは 404、改ざん・未承認のプラグインは 403)で、応答ヘッダは `pluginViewFrameResponseHeaders()` と完全一致(CSP `sandbox allow-scripts; default-src 'none'; …`、`nosniff`、`no-referrer`、`no-store`、CORP `same-origin`、Permissions-Policy 全拒否)。Chronos は `<iframe sandbox="allow-scripts">` で埋め込み、postMessage のアクション要求はホストの確認ダイアログを経て既存の `POST` に渡す。Chronos のページは `frame-src 'self'`。Chronos のプラグインホスト(PH-01)は `KYBERION_CHRONOS_PLUGIN_HOST` で有効化した場合のみ承認済みプラグインをプロセス内で起動する。
 
-**UI から呼ばない(headless 専用)API**: Chronos の `/api/os/share-grants`(share grant の読み取り)と `/api/headless/*`(`libs/core/headless-surface-contract.ts` が契約を定義する外部・自動化クライアント向けの面)は、Chronos の画面からは呼ばれない。画面を持たない呼び出し元(CLI・他ランタイム・自動化)のための API として意図的に残している。同じ viewer / scope 認可が適用される。
+**UI から呼ばない(headless 専用)API**: Chronos の `/api/os/share-grants`(share grant の読み取り)と `/api/headless/*`(`libs/core/surface/headless-surface-contract.ts` が契約を定義する外部・自動化クライアント向けの面)は、Chronos の画面からは呼ばれない。画面を持たない呼び出し元(CLI・他ランタイム・自動化)のための API として意図的に残している。同じ viewer / scope 認可が適用される。
 
-presence-studio の `/ui-gallery` は開発者向けのコンポーネントギャラリーであり、共有ナビ(`libs/core/front-desk-nav.ts`)には載せない。`/work`(作業台)はナビの「作業スペース」として載る。ナビのリンク先 URL は surface manifest(`active-surfaces.json`)のポートから導出する。
+presence-studio の `/ui-gallery` は開発者向けのコンポーネントギャラリーであり、共有ナビ(`libs/core/surface/front-desk-nav.ts`)には載せない。`/work`(作業台)はナビの「作業スペース」として載る。ナビのリンク先 URL は surface manifest(`active-surfaces.json`)のポートから導出する。
 
 ## フロントデスク(共有レール)
 
@@ -75,12 +75,12 @@ presence-studio の `/ui-gallery` は開発者向けのコンポーネントギ�
 | グループ   | 項目(ホスト)                                                                                                                           |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | 仕事       | 上の 4 項目 + 作業スペース(相棒 `/work`)・ミッション・作業一覧(管制塔 `?section=missions` / `work-items`)                              |
-| 資料・学習 | 成果物・ナレッジ・ディスカッション(管制塔)、資料の取込(秘書室 `/ingest`)、はじめての仕事・使い方を見る(相棒 `/first-job` `/help`)      |
+| 資料・学習 | 成果物・ナレッジ・ディスカッション(管制塔)、資料の取込(秘書室 `/ingest`)、はじめての仕事・使い方を見る(秘書室 `/first-job` `/help`)    |
 | 管理       | 組織(秘書室 `/management`)、エージェント運用・画面の管理・診断(管制塔 `?section=operations` / `surface-control` / `diagnostics`)、設定 |
 
 管制塔(chronos-mirror-v2)ホストの行き先は、そのエンドポイントの有界チェックに成功した場合だけ表示される(`availableSurfaces`)。
 
-レールの実装は 1 つ(`libs/core/front-desk-nav.ts`)を両サーフェスが読む。ラベル・href・許可(role gate)はすべて `GET /api/front-desk/nav` から、「私は誰でどのテナントを見ているか」は `GET /api/me` から取得する(`?tenant=` クエリは許可集合を狭めるだけで、絶対に拡大しない)。相棒の `/help`(使い方を見る)もこのレールの一部で、5 項目のメニューには含めないヘルプリンクとして両サーフェスから同じ定義で描画される。
+レールの実装は 1 つ(`libs/core/surface/front-desk-nav.ts`)を両サーフェスが読む。ラベル・href・許可(role gate)はすべて `GET /api/front-desk/nav` から、「私は誰でどのテナントを見ているか」は `GET /api/me` から取得する(`?tenant=` クエリは許可集合を狭めるだけで、絶対に拡大しない)。相棒の `/help`(使い方を見る)もこのレールの一部で、5 項目のメニューには含めないヘルプリンクとして両サーフェスから同じ定義で描画される。
 
 写真からのアバター(PA-10): 秘書室「設定 › 写真・音声」で登録済みの写真から表情セットを作る。写真を送る前に送信先プロバイダ名を示す同意ダイアログを出し、生成結果は `avatar/draft/` に置かれ、「このアバターを使う」を選ぶまで今のアバターは変わらない。表情セットは personal tier で、所有者セッション限定の `/api/me/avatar` からだけ配信される。
 

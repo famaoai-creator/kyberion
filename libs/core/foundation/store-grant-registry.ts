@@ -23,6 +23,7 @@ import type { ResourceAccessOperation, ResourceAccessScope } from './resource-ac
 
 /** The store grants tier-guard knows, in evaluation order. */
 export const STORE_GRANT_IDS = [
+  'asset-derivation',
   'memory-provenance',
   'pr-publication',
   'person-charter',

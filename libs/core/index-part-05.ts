@@ -6,15 +6,15 @@ export * from './contracts/judge-route.js';
 
 export * from './reasoning/judgment-backend.js';
 
-export * from './typesafe-jev-judgment-backend.js';
+export * from './provider/typesafe-jev-judgment-backend.js';
 
-export * from './laya-mlx-judgment-backend.js';
+export * from './provider/laya-mlx-judgment-backend.js';
 
 export * from './reasoning/judgment-provider-bootstrap.js';
 
 export * from './reasoning/judgment-assist.js';
 
-export * from './error-classifier-judgment.js';
+export * from './reasoning/error-classifier-judgment.js';
 
 export * from './knowledge/knowledge-relevance-judgment.js';
 
@@ -40,9 +40,9 @@ export { enforceApprovalGate, hasHuman } from './governance/approval-gate.js';
 
 export type { ApprovalGateParams, ApprovalGateResult } from './governance/approval-gate.js';
 
-export { RISKY_OPS, isKnownRiskyOp, requireApprovalForOp } from './risky-op-registry.js';
+export { RISKY_OPS, isKnownRiskyOp, requireApprovalForOp } from './governance/risky-op-registry.js';
 
-export type { RequireApprovalParams, RiskyOpId } from './risky-op-registry.js';
+export type { RequireApprovalParams, RiskyOpId } from './governance/risky-op-registry.js';
 
 export {
   DEFAULT_THRESHOLDS as INTENT_DRIFT_THRESHOLDS,
@@ -80,7 +80,7 @@ export {
   readNode as readRelationshipNode,
   recordInteraction,
   suggestFieldUpdate,
-} from './relationship-graph-store.js';
+} from './organization/relationship-graph-store.js';
 
 export {
   listHeuristics,
@@ -89,7 +89,7 @@ export {
   scoreValidity,
   summarizeHeuristics,
   validateHeuristic,
-} from './heuristic-feedback.js';
+} from './knowledge/heuristic-feedback.js';
 
 export {
   evaluateCustomerSignoffGate,
@@ -97,7 +97,7 @@ export {
   readRequirementsDraft,
   recordCustomerSignoff,
   saveRequirementsDraft,
-} from './requirements-draft-store.js';
+} from './mission/requirements-draft-store.js';
 
 export type {
   GateResult as RequirementsGateResult,
@@ -106,7 +106,7 @@ export type {
   SaveRequirementsDraftParams,
   SignoffChannel,
   StakeholderSignoff,
-} from './requirements-draft-store.js';
+} from './mission/requirements-draft-store.js';
 
 export {
   evaluateArchitectureReadyGate,
@@ -118,7 +118,7 @@ export {
   saveDesignSpec,
   saveTaskPlan,
   saveTestPlan,
-} from './sdlc-artifact-store.js';
+} from './mission/sdlc-artifact-store.js';
 
 export { executeTaskPlan } from './task/task-executor.js';
 
@@ -154,12 +154,12 @@ export {
   delegateCoordinatedCliSubagentTask,
   delegateCoordinatedAgentTask,
   getCoordinatedAgentExecutionPort,
-} from './coordinated-agent-execution-port.js';
+} from './agent/coordinated-agent-execution-port.js';
 
 export type {
   CoordinatedAgentExecutionReceipt,
   CoordinatedAgentTaskEnvelope,
-} from './coordinated-agent-execution-port.js';
+} from './agent/coordinated-agent-execution-port.js';
 
 export {
   readCanonicalWorkGraph,
@@ -283,23 +283,19 @@ export type {
   ResolvedKnowledgeSlice,
 } from './knowledge/knowledge-slices.js';
 
-export { loadRestrictedActionRules, matchRestrictedAction } from './restricted-action-policy.js';
-
-export type { RestrictedActionMatch, RestrictedActionRule } from './restricted-action-policy.js';
-
 export {
   assertCapabilityAllowed,
   checkCapabilityRestriction,
   evaluateCapabilityRestriction,
   loadCapabilityRestrictionPolicy,
-} from './capability-restriction-policy.js';
+} from './governance/capability-restriction-policy.js';
 
 export type {
   CapabilityRestrictionDecision,
   CapabilityRestrictionPolicy,
   CapabilityRestrictionRecord,
   CapabilityRestrictionStatus,
-} from './capability-restriction-policy.js';
+} from './governance/capability-restriction-policy.js';
 
 export { loadMeetingFacilitatorPolicy } from './meeting/meeting-facilitator-policy.js';
 
@@ -331,9 +327,9 @@ export {
   resetEnvironmentCapabilityProbeRegistry,
   verifyManifestSignature,
   verifyReady,
-} from './environment-capability.js';
+} from './daemon/environment-capability.js';
 
-export { installCoreEnvironmentProbes } from './environment-capability-probes.js';
+export { installCoreEnvironmentProbes } from './daemon/environment-capability-probes.js';
 
 export {
   formatEnvValidationReport,
@@ -344,7 +340,7 @@ export {
   validateEnvAgainstRegistry,
   validateStartupEnv,
   suggestRegisteredEnvNames,
-} from './env-validator.js';
+} from './harnessing/env-validator.js';
 
 export type {
   EnvRegistryValidationEntry,
@@ -354,7 +350,7 @@ export type {
   EnvValidationIssue,
   EnvValidationReport,
   RegisteredEnvReadOptions,
-} from './env-validator.js';
+} from './harnessing/env-validator.js';
 
 export type {
   BootstrapOptions,
@@ -367,21 +363,21 @@ export type {
   EnvironmentManifest,
   ReadinessReport,
   SetupReceipt,
-} from './environment-capability.js';
+} from './daemon/environment-capability.js';
 
-export * from './seam-provider-selection.js';
+export * from './provider/seam-provider-selection.js';
 
-export * from './seam-selection-defaults.js';
-export * from './seam-selection-rules.js';
+export * from './provider/seam-selection-defaults.js';
+export * from './provider/seam-selection-rules.js';
 
-export * from './seam-calibration.js';
+export * from './provider/seam-calibration.js';
 
-export * from './authn-principal-resolver.js';
+export * from './authn/authn-principal-resolver.js';
 
 export * from './authn/authn-providers.js';
 
-export * from './authz-policy-engine.js';
+export * from './governance/authz-policy-engine.js';
 
-export * from './authz-providers.js';
+export * from './governance/authz-providers.js';
 
 export * from './surface/surface-authn.js';

@@ -9,8 +9,8 @@ vi.mock('../organization/member-registry.js', async (importOriginal) => {
       ownerMember.present === false ? null : actual.resolveMemberByPrincipal(...args),
   };
 });
-vi.mock('../stance-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../stance-resolver.js')>();
+vi.mock('../authn/stance-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../authn/stance-resolver.js')>();
   const { customerRootWithSodOverlay } =
     await import('../governance/__tests__/sod-overlay-state.js');
   return { ...actual, stanceRoot: customerRootWithSodOverlay(actual.stanceRoot) };
@@ -73,7 +73,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
-import { sha256 } from '../marketing-workload.js';
+import { sha256 } from '../organization/marketing-workload.js';
 import {
   approvalEventLogicalPath,
   approvalRequestLogicalPath,

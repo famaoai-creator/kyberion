@@ -5,6 +5,7 @@ import {
   viewerPersonIds,
 } from '@agent/core/surface/surface-authorization';
 import {
+  viewerCanReadTier,
   strictViewerScopeOrganizationIds,
   strictViewerScopeProjectIds,
   strictViewerScopeTenantSlugs,
@@ -22,7 +23,9 @@ export function isDiscussionVisibleToViewer(
   scope: DiscussionScope,
   requestedTenant?: string
 ): boolean {
+  if (!viewerCanReadTier(viewer, scope.tier ?? 'confidential')) return false;
   const tenants = strictViewerScopeTenantSlugs(viewer, requestedTenant);
+  if (requestedTenant && scope.tenant_slug !== requestedTenant) return false;
   if (
     // `admitsCustody` decides for 'all' too: tenant/system custody admits, but
     // person custody stays identity-bound even for an all-tenant viewer.

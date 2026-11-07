@@ -31,10 +31,19 @@ export function registerIdentityContextResolver(
   next: IdentityContextResolver,
   metadata: SeamProviderMetadata = DEFAULT_METADATA
 ): () => void {
-  const restoreSeam = identityContextResolverSeam.register('authority', next, metadata);
   const restoreResolver = registerPolicyIdentityResolver(next);
-  return () => {
-    restoreSeam();
+  let restoreSeam: () => void;
+  try {
+    restoreSeam = identityContextResolverSeam.register('authority', next, metadata);
+  } catch (error) {
     restoreResolver();
+    throw error;
+  }
+  return () => {
+    try {
+      restoreSeam();
+    } finally {
+      restoreResolver();
+    }
   };
 }

@@ -172,7 +172,7 @@ check_documentation_links
 
 ```text
 tsc --noEmit
-vitest run libs/core/ceo-surface-summary.test.ts libs/core/knowledge/vocabulary-catalog.test.ts
+vitest run libs/core/surface/ceo-surface-summary.test.ts libs/core/knowledge/vocabulary-catalog.test.ts
 node --import ./scripts/ts-loader.mjs scripts/check_governance_rules.ts
 node --import ./scripts/ts-loader.mjs scripts/check_max_file_lines.ts
 node --import ./scripts/ts-loader.mjs scripts/check_module_boundaries.ts
@@ -250,7 +250,7 @@ git diff --check
 - browser actuator の passkey runtime を `browser-passkey-helpers.ts`、control operation を `browser-control-helpers.ts` へ分離した。`browser-pipeline-helpers.ts` は **2,149 → 1,497 行**となり、max-file-lines の記名例外を **6 → 5 件**へ削減した。既存の passkey/control/capture/apply 公開動作は維持し、browser actuator **5 files / 60 tests** と `build:actuators` が green である。
 - 以前のレビュー記述に残っていた状態資料の矛盾を訂正した。2026-08 索引を現在の状態正本、各計画の実装状況節を詳細正本、2026-07 `STATUS.ja.md` を凍結記録とする境界を維持し、`ROADMAP_COMPLETION_LEDGER.md` と `CHANGELOG.md` にも「補助資料であり現在状態の正本ではない」旨を追加した。完了計画の全件アーカイブ、docs 件数削減、knowledge corpus 全件整備は未完のため SX-13 は PARTIAL のままとする。
 - 実測: `check:max-file-lines` **OK (max 1500)**、`check:script-integrity` **OK**、`check:module-boundaries` **0 cycles / 62 direction violations / 73 dynamic imports tracked**、package scripts **240 件**。残存する構造指標を baseline 消化とは扱わない。
-- foundation の孤児経路も整理した。内部利用のない `libs/core/validators.ts` の `readJsonFile` wrapper と declaration/test を削除し、JSON file reader の実行経路を `secure-io` / `cli-input` に限定した。`validators.test.ts` **4 tests** と `typecheck` は green。
+- foundation の孤児経路も整理した。内部利用のない `libs/core/foundation/validators.ts` の `readJsonFile` wrapper と declaration/test を削除し、JSON file reader の実行経路を `secure-io` / `cli-input` に限定した。`validators.test.ts` **4 tests** と `typecheck` は green。
 - actuator ABI は self-described `op-catalog` を持つ **14 actuator** を `defineCatalogBackedActuator` へ移行し、旧 `defineLegacyPipelineActuator` index は media / working-memory の 2 件だけに縮小した。両者はまだ全 operation catalog の個別化が必要なため、SX-10 は PARTIAL を維持する。actuator 全体回帰は **80 files / 867 passed / 11 skipped**、`build:actuators` は green。
 
 ## 15. 2026-08-26 継続修正: 全 actuator operation catalog 化

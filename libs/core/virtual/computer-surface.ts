@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { dispatchA2UI, type A2UIMessage } from '../a2ui.js';
+import { dispatchA2UI, type A2UIMessage } from '../surface/a2ui.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
 import {

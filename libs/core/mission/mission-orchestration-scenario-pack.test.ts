@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { compileSchemaFromPath } from '../schema-loader.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
-import { withoutSchemaMetadata } from '../test-governance-payload.js';
+import { withoutSchemaMetadata } from '../testing/test-governance-payload.js';
 import { resolveIntentResolutionPacket } from '../intent/intent-resolution.js';
 import { resolveMissionClassification } from './mission-classification.js';
 import { resolveMissionWorkflowDesign } from './mission-workflow-catalog.js';
 import { resolveMissionReviewDesign } from './mission-review-gates.js';
-import { classifyError } from '../error-classifier.js';
+import { classifyError } from '../analysis/error-classifier.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 

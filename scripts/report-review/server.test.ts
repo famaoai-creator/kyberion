@@ -27,7 +27,7 @@ describe('report review server harness boundary', () => {
 
   it('validates a target without binding in dry-run mode', async () => {
     const result = await runReportReviewServer([
-      'presence/displays/presence-studio/static/progress.html',
+      'presence/displays/presence-studio/static/ask.html',
       '--dry-run',
       '--quiet',
     ]);
@@ -45,7 +45,7 @@ describe('report review server harness boundary', () => {
     process.exitCode = undefined;
     try {
       const result = await runReportReviewServer([
-        'presence/displays/presence-studio/static/progress.html',
+        'presence/displays/presence-studio/static/ask.html',
         '65536',
         '--check',
         '--quiet',
@@ -60,7 +60,7 @@ describe('report review server harness boundary', () => {
 
   it('routes dry-run output through the injected printer', async () => {
     const output: unknown[] = [];
-    const result = await main(['presence/displays/presence-studio/static/progress.html'], {
+    const result = await main(['presence/displays/presence-studio/static/ask.html'], {
       dryRun: true,
       print: (value) => output.push(value),
     });

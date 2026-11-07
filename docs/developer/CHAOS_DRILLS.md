@@ -59,4 +59,4 @@ The maintainer-run reference deployment runs these on Sunday 04:00 UTC.
 ## Related
 
 - [`docs/developer/MISSION_LIFECYCLE_AUDIT.md`](./MISSION_LIFECYCLE_AUDIT.md) — Phase B-3 mission lifecycle gaps.
-- [`libs/core/error-classifier.ts`](../../libs/core/error-classifier.ts) — what the drills verify the classifier on.
+- [`libs/core/analysis/error-classifier.ts`](../../libs/core/analysis/error-classifier.ts) — what the drills verify the classifier on.

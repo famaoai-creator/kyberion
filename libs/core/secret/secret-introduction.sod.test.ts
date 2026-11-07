@@ -9,8 +9,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  */
 const fixture = vi.hoisted(() => ({ existing: null as string | null }));
 
-vi.mock('../stance-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../stance-resolver.js')>();
+vi.mock('../authn/stance-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../authn/stance-resolver.js')>();
   const { customerRootWithSodOverlay } =
     await import('../governance/__tests__/sod-overlay-state.js');
   return { ...actual, stanceRoot: customerRootWithSodOverlay(actual.stanceRoot) };
@@ -23,7 +23,7 @@ vi.mock('./secret-guard.js', () => ({
   getSecret: vi.fn(() => fixture.existing),
   storeConnectionDocument: vi.fn(() => ({ path: 'x', changedKeys: [] })),
 }));
-vi.mock('../ledger.js', () => ({ ledger: { record: vi.fn() } }));
+vi.mock('../governance/ledger.js', () => ({ ledger: { record: vi.fn() } }));
 
 import {
   approvalEventLogicalPath,

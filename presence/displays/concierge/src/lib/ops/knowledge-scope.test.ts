@@ -62,6 +62,27 @@ describe('chronos knowledge scope', () => {
 });
 
 describe('memory source scope is not the promotion destination', () => {
+  it('narrows an admitted owner or system record out of a tenant selection', () => {
+    const owner: ViewerContext = {
+      role: 'localadmin',
+      source: 'token',
+      principalId: 'owner',
+      tenantSlugs: 'all',
+      organizationIds: 'all',
+      projectIds: 'all',
+      tierAccess: ['public', 'confidential'],
+      includeUntenanted: true,
+    };
+    for (const scope of [
+      { tier: 'public' as const },
+      { tier: 'public' as const, owner_nhi: 'owner' },
+    ]) {
+      const row = { ...makeCandidate('MSN-SELECTION'), scope };
+      expect(memoryCandidateVisibleToViewer(row, owner)).toBe(true);
+      expect(memoryCandidateVisibleToViewer(row, { ...owner, permissions: [] })).toBe(false);
+      expect(memoryCandidateVisibleToViewer(row, owner, 'acme')).toBe(false);
+    }
+  });
   const viewer: ViewerContext = {
     role: 'localadmin',
     source: 'token',

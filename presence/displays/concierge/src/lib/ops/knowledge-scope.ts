@@ -11,6 +11,7 @@ import {
   type WorkspaceSelection,
 } from '@agent/core/surface/workspace-scope';
 import {
+  viewerCanReadTier,
   defaultTierAccess,
   strictViewerScopeTenantSlugs,
   strictViewerScopeOrganizationIds,
@@ -65,6 +66,12 @@ export function memoryCandidateVisibleToViewer(
   const organizations = strictViewerScopeOrganizationIds(viewer);
   const projects = strictViewerScopeProjectIds(viewer);
   const scope = sourceScope(candidate);
+  if (
+    !viewerCanReadTier(viewer, scope?.tier) ||
+    !viewerCanReadTier(viewer, candidate.sensitivity_tier)
+  )
+    return false;
+  if (requestedTenant && scope?.tenant_slug !== requestedTenant) return false;
   const tiers = viewer.tierAccess ?? defaultTierAccess(viewer.role);
   // Destination sensitivity is not authority to read the source material.
   if (

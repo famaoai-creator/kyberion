@@ -3,7 +3,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { resolveIntentResolutionPacket } from '../intent/intent-resolution.js';
-import type { SurfaceIntentResolutionOptions } from '../router-contract.js';
+import type { SurfaceIntentResolutionOptions } from '../intent/router-contract.js';
 import {
   listSurfaceQueryOverlayCatalogEntries,
   loadSurfaceQueryOverlayCatalog,

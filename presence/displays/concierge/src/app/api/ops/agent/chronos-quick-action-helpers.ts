@@ -198,7 +198,7 @@ export interface ScheduleWorkerDeps {
  * SYSTEM_ROLE=generation_schedule. That is exactly how the scheduler daemon
  * runs its own ticks (scripts/run_generation_schedule_daemon.ts spawns the
  * same CLI with its SYSTEM_ROLE), and that role's policy grants exactly
- * generation_scheduler: the tick path (libs/core/generation-scheduler.ts and
+ * generation_scheduler: the tick path (libs/core/daemon/generation-scheduler.ts and
  * the media-generation actuator it loads) assumes no other writer role —
  * reconcile_config_fallbacks belongs to the system-actuator pipeline op of
  * that name, which a tick never runs. Every dispatch is audited with the

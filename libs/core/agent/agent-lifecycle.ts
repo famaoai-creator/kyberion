@@ -27,7 +27,7 @@ import {
 import { isObsoleteAgentRuntimeProvider } from '../provider/provider-config.js';
 import { loadProviderConfig } from '../provider/provider-config.js';
 import type { TaskModelHint } from '../reasoning/reasoning-model-routing.js';
-import { normalizeEventScope, type EventScopeInput } from '../event-scope.js';
+import { normalizeEventScope, type EventScopeInput } from '../event/event-scope.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { isRecord } from '../foundation/text.js';
 import {

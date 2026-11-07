@@ -17,24 +17,24 @@ contributors to take on. The pattern below makes them low-friction to pick up.
 ## Why this is a good first issue
 
 - Estimated time: 1-2 hours
-- Files expected: <!-- e.g., libs/core/error-classifier.ts and libs/core/error-classifier.test.ts only -->
-- Validation command: <!-- e.g., pnpm exec vitest run libs/core/error-classifier.test.ts -->
+- Files expected: <!-- e.g., libs/core/analysis/error-classifier.ts and libs/core/analysis/error-classifier.test.ts only -->
+- Validation command: <!-- e.g., pnpm exec vitest run libs/core/analysis/error-classifier.test.ts -->
 - Out of scope: <!-- e.g., classifier taxonomy changes, unrelated CLI logging -->
 - No deep system knowledge required.
 - Existing tests cover the surrounding code.
 
 ## Steps
 
-1. <!-- e.g., Read libs/core/error-classifier.ts -->
+1. <!-- e.g., Read libs/core/analysis/error-classifier.ts -->
 2. <!-- e.g., Add a new rule for 'X' -->
 3. <!-- e.g., Add tests in error-classifier.test.ts -->
-4. <!-- Run `pnpm vitest run libs/core/error-classifier.test.ts` and verify -->
+4. <!-- Run `pnpm vitest run libs/core/analysis/error-classifier.test.ts` and verify -->
 
 ## Example slices
 
 - Add a troubleshooting note for `pnpm kyberion doctor`.
 - Split one section from `docs/user/meeting-facilitator.md` into a smaller page.
-- Add one rule to `libs/core/error-classifier.ts` and a matching test.
+- Add one rule to `libs/core/analysis/error-classifier.ts` and a matching test.
 - Reword one release workflow step and update the contract test.
 
 See [`docs/developer/GOOD_FIRST_ISSUES.md`](../../docs/developer/GOOD_FIRST_ISSUES.md) for a fuller list.

@@ -68,6 +68,8 @@ export interface DeliverableInboxQuery {
   /** When supplied, unknown-tier records are excluded (fail closed). */
   tierAccess?: readonly OsKnowledgeTier[];
   tenantSlugs?: string[] | 'all';
+  /** Explicit UI selection, applied after admission; never an authorization grant. */
+  requestedTenant?: string;
   /** Server-resolved only (the system selection): also admit company-less records. */
   includeUntenanted?: boolean;
   /** Server-resolved viewer identity — admits the viewer's own person custody. */
@@ -133,6 +135,49 @@ export function inferDeliverableTier(
   if (metadataTier) return metadataTier;
   const pathTier = normalizedPath?.match(/(?:^|\/)(personal|confidential|public)(?:\/|$)/)?.[1];
   return normalizeDeliverableTier(pathTier);
+}
+
+/**
+ * Paths in artifact records mix absolute and repo-relative; the UI, the asset
+ * route and the tier rule all speak repo-relative with forward slashes.
+ */
+export function normalizeArtifactRecordPath(recordPath: string | undefined): string | undefined {
+  if (!recordPath) return undefined;
+  const root = pathResolver.rootDir().replace(/\\/g, '/').replace(/\/$/, '');
+  const normalized = recordPath.replace(/\\/g, '/');
+  return normalized.startsWith(`${root}/`) ? normalized.slice(root.length + 1) : normalized;
+}
+
+/**
+ * The governing tier of one artifact record (mission state, then metadata,
+ * then path — `inferDeliverableTier`). `undefined` means unknown, which every
+ * viewer-facing reader denies. Shared by the 成果物 list and 仕事 › 依頼.
+ */
+export function resolveArtifactRecordTier(record: ArtifactRecord): OsKnowledgeTier | undefined {
+  return inferDeliverableTier(
+    record,
+    normalizeArtifactRecordPath(record.path),
+    readMissionContext(record.mission_id).tier
+  );
+}
+
+/**
+ * The governing tier of one deliverable-inbox entry: its mission's tier, else
+ * the tier its delivered paths sit under. `undefined` when neither says.
+ */
+export function resolveInboxEntryTier(
+  entry: Pick<DeliverableInboxEntry, 'mission_id' | 'artifact_paths'>
+): OsKnowledgeTier | undefined {
+  const missionTier = readMissionContext(entry.mission_id).tier;
+  if (missionTier) return missionTier;
+  for (const artifactPath of entry.artifact_paths) {
+    const tier = normalizeArtifactRecordPath(artifactPath)?.match(
+      /(?:^|\/)(personal|confidential|public)(?:\/|$)/
+    )?.[1];
+    const normalized = normalizeDeliverableTier(tier);
+    if (normalized) return normalized;
+  }
+  return undefined;
 }
 
 /** Tier filtering used by the request-boundary projection. Unknown is denied. */
@@ -207,6 +252,7 @@ function collectSearchText(item: DeliverableInboxItem): string {
 }
 
 export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): DeliverableInboxItem[] {
+  const custodyByItem = new WeakMap<object, ViewerRecordCustody>();
   const query = input.query?.trim().toLowerCase() || '';
   const missionId = input.missionId?.trim().toUpperCase() || '';
   const kind = input.kind?.trim().toLowerCase() || '';
@@ -218,14 +264,8 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
       const recordPath = resolveArtifactRecordPath(record.artifact_id);
       const safeRecordPath = resolveSafeExistingFile(recordPath);
       const stats = safeRecordPath ? safeLstat(safeRecordPath) : null;
-      // Paths in artifact records mix absolute and repo-relative; the UI and
-      // the asset route both speak repo-relative.
       const root = pathResolver.rootDir().replace(/\\/g, '/').replace(/\/$/, '');
-      const normalizedPath = record.path
-        ? record.path.replace(/\\/g, '/').startsWith(`${root}/`)
-          ? record.path.replace(/\\/g, '/').slice(root.length + 1)
-          : record.path.replace(/\\/g, '/')
-        : undefined;
+      const normalizedPath = normalizeArtifactRecordPath(record.path);
       // The DELIVERABLE file itself (not the record json): tmp sweeps and
       // mission archival routinely delete these — surface it honestly.
       const targetMissing = normalizedPath
@@ -244,11 +284,16 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
       });
       const missionContext = readMissionContext(record.mission_id);
       const tier = inferDeliverableTier(record, normalizedPath, missionContext.tier);
-      return {
+      const source = record as ArtifactRecord & { owner_nhi?: unknown; nhi_id?: unknown };
+      const declaredCustody = custodyOfScope(source);
+      const tenantSlug =
+        record.tenant_slug ||
+        (declaredCustody.kind === 'system' ? missionContext.tenantSlug : undefined);
+      const item = {
         artifactId: record.artifact_id,
         missing: targetMissing,
         missionId: record.mission_id,
-        tenantSlug: record.tenant_slug || missionContext.tenantSlug,
+        tenantSlug,
         // Latent person custody: carry whichever owner binding the record
         // declares (owner_nhi on memory-scope records, nhi_id on governed
         // ones) so it reaches the custody check below.
@@ -285,19 +330,29 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
           ? { awaitingInboxDecision: true }
           : {}),
       } satisfies DeliverableInboxItem;
+      custodyByItem.set(
+        item,
+        declaredCustody.kind === 'system'
+          ? custodyOfScope({ tenant_slug: tenantSlug })
+          : declaredCustody
+      );
+      return item;
     })
     .filter((item) => (missionId ? item.missionId?.toUpperCase() === missionId : true))
+    .filter((item) => !input.requestedTenant || item.tenantSlug === input.requestedTenant)
     // Custody admission first: a record with no tenant is org-shared —
     // admitted to a finite scope at public tier, or to the system selection
     // (`includeUntenanted`) — unless it names an owner, which makes it person
     // custody and identity-bound to that owner only.
     .filter((item) => {
-      const custody: ViewerRecordCustody = custodyOfScope({
-        tenant_slug: item.tenantSlug,
-        owner_nhi: item.ownerNhi,
-      });
+      const custody: ViewerRecordCustody =
+        custodyByItem.get(item) ??
+        custodyOfScope({
+          tenant_slug: item.tenantSlug,
+          owner_nhi: item.ownerNhi,
+        });
       return (
-        (custody.kind !== 'person' && !item.tenantSlug && item.tier === 'public') ||
+        (custody.kind === 'system' && !item.tenantSlug && item.tier === 'public') ||
         admitsCustody(
           {
             tenantSlugs: input.tenantSlugs ?? 'all',

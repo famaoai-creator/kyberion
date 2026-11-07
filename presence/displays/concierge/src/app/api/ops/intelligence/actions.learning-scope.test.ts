@@ -61,9 +61,7 @@ const run = (tenant = 'acme') =>
     viewer,
     'approval_decision'
   );
-// An untenanted person-custody record only reaches the decision when the
-// viewer scope is 'all' (a finite scope already 403s on the missing tenant),
-// so the owner check below is the last gate before the write.
+// Exercise all-scope and finite-scope viewers through the same decision path.
 const runAsAll = (overrides: Record<string, unknown> = {}) =>
   INTELLIGENCE_ACTION_HANDLERS.approval_decision(
     {
@@ -180,6 +178,25 @@ describe('scoped learning shared decision boundary', () => {
       'chronos_localadmin',
       expect.objectContaining({ requestId: 'review', decidedBy: 'user:alice' })
     );
+  });
+  it('admits the exact owner with finite tenant scope and rejects malformed alias bindings', async () => {
+    mocks.member.mockReturnValue({
+      member_id: 'alice',
+      memberships: [{ tenant_slug: 'acme', role: 'owner' }],
+    });
+    mocks.load.mockReturnValue({ ...row, scope: { tier: 'confidential', nhi_id: 'human:alice' } });
+    expect((await runAsAll({ principalId: 'human:alice', tenantSlugs: ['acme'] })).status).toBe(
+      200
+    );
+    for (const scope of [
+      { owner_nhi: '', nhi_id: 'human:alice' },
+      { owner_nhi: 'human:alice', nhi_id: 'human:bob' },
+    ]) {
+      mocks.decide.mockClear();
+      mocks.load.mockReturnValue({ ...row, scope: { tier: 'confidential', ...scope } });
+      expect((await runAsAll({ principalId: 'human:alice' })).status).toBe(403);
+      expect(mocks.decide).not.toHaveBeenCalled();
+    }
   });
   it('treats a tenant-scoped record as tenant custody even with owner_nhi set', async () => {
     mocks.load.mockReturnValue({

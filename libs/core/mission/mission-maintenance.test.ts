@@ -8,7 +8,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
-import { MetricsCollector } from '../metrics.js';
+import { MetricsCollector } from '../analysis/metrics.js';
 import { logger } from '../core.js';
 import {
   ensureRecoveryScaffold,
@@ -39,7 +39,7 @@ const usageCollector = vi.hoisted(() => ({
   current: null as null | Pick<MetricsCollector, 'recordResourceUsage'>,
 }));
 
-vi.mock('../managed-process.js', () => ({
+vi.mock('../tool/managed-process.js', () => ({
   spawnManagedProcess: mocks.spawnManagedProcess,
 }));
 // CD-09 seam: the real lock calls by default (no decision case → no-op);
@@ -57,8 +57,8 @@ vi.mock('./mission-decision-lock.js', async (importOriginal) => {
       decisionLock.reconcile(...args),
   };
 });
-vi.mock('../metrics.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../metrics.js')>();
+vi.mock('../analysis/metrics.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../analysis/metrics.js')>();
   const fallback = new actual.MetricsCollector({ persist: false });
   return {
     ...actual,

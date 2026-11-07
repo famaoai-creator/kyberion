@@ -63,10 +63,13 @@ const DIST_FILES = [
   'dist/scripts/customer-decision/learning.js',
   'dist/scripts/customer-decision/learning-op.js',
   'libs/core/dist/customer-decision/learning.js',
-  'libs/core/dist/operational-learning.js',
+  'libs/core/dist/knowledge/operational-learning.js',
 ];
 const SOURCE_DIRS = ['scripts/customer-decision', 'libs/core/customer-decision'];
-const SOURCE_FILES = ['scripts/customer_decision.ts', 'libs/core/operational-learning.ts'];
+const SOURCE_FILES = [
+  'scripts/customer_decision.ts',
+  'libs/core/knowledge/operational-learning.ts',
+];
 function staleDistReason(): string | null {
   const mtime = (relative: string) => {
     const file = path.join(SOURCE_ROOT, relative);

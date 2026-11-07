@@ -36,7 +36,7 @@ import {
   STRUCTURED_REASONING_SYSTEM_PROMPT,
   structuredReasoningSpecs,
   type StructuredOpSpec,
-} from '../structured-reasoning.js';
+} from '../reasoning/structured-reasoning.js';
 import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
 import {
   CodexAppServerAdapter,
@@ -46,7 +46,7 @@ import {
 import {
   getSubagentCapabilityProfile,
   type SubagentCapabilityProfile,
-} from '../subagent-capability-profiles.js';
+} from '../workforce/subagent-capability-profiles.js';
 import {
   resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
@@ -63,7 +63,7 @@ import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js'
 import {
   markDelegationExecutionStarted,
   runStartReportingDelegation,
-} from '../delegation-execution-tracker.js';
+} from '../workforce/delegation-execution-tracker.js';
 
 export interface CodexHarnessSession {
   boot(): Promise<void>;

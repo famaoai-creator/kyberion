@@ -22,13 +22,9 @@ import {
   isSameOriginMutation,
   SURFACE_SESSION_TOKEN_PREFIX,
 } from '@agent/core/surface/surface-session-cookie';
-import {
-  admitsCustody,
-  custodyOfScope,
-  viewerPersonIds,
-  type SurfaceAuthorizationContext,
-} from '@agent/core/surface/surface-authorization';
-import { eventScopeFromRecord, type EventScopeInput } from '@agent/core/event-scope';
+import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
+import type { EventScopeInput } from '@agent/core/event-scope';
+import { progressRecordInScope } from '@agent/core/surface/front-desk-progress';
 export {
   parsePersonalAgentIdentity as parsePresenceStudioAgentIdentity,
   parsePersonalSovereignIdentity as parsePresenceStudioSovereignIdentity,
@@ -337,7 +333,9 @@ export function toSurfaceAuthorizationContext(
  * `toSurfaceAuthorizationContext` above — a member-registry-aware `approver`
  * role has no server-side counterpart yet (FD-07).
  */
-export function toFrontDeskViewerScope(viewer: PresenceStudioViewerContext): SurfaceViewerScope {
+export function toFrontDeskViewerScope(
+  viewer: PresenceStudioViewerContext
+): SurfaceViewerScope & { principal?: ResolvedPrincipal } {
   return {
     role: viewer.source === 'loopback' ? 'localadmin' : 'readonly',
     tenantSlugs: viewer.tenantSlugs,
@@ -349,6 +347,7 @@ export function toFrontDeskViewerScope(viewer: PresenceStudioViewerContext): Sur
         : ['confidential', 'public'],
     source: viewer.source,
     principalId: viewer.principalId,
+    ...(viewer.principal ? { principal: viewer.principal } : {}),
     ...(viewer.principal?.memberId ? { memberId: viewer.principal.memberId } : {}),
   };
 }
@@ -379,64 +378,47 @@ export function presenceStudioConversationScope(
     : { scope_kind: 'system', tier: 'public' };
 }
 
-function recordTenant(value: unknown): string | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  const record = value as Record<string, unknown>;
-  const direct = record.tenant_slug;
-  if (typeof direct === 'string' && direct.trim()) return direct.trim();
-  for (const key of ['scope', 'project', 'project_context', 'requestedByContext', 'context']) {
-    const nested = recordTenant(record[key]);
-    if (nested) return nested;
-  }
-  return undefined;
-}
-
-function recordOwnerNhi(value: unknown): string | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  const record = value as Record<string, unknown>;
-  for (const key of ['owner_nhi', 'ownerNhi', 'nhi_id']) {
-    const direct = record[key];
-    if (typeof direct === 'string' && direct.trim()) return direct.trim();
-  }
-  for (const key of ['scope', 'project', 'project_context', 'requestedByContext', 'context']) {
-    const nested = recordOwnerNhi(record[key]);
-    if (nested) return nested;
-  }
-  return undefined;
-}
-
-/** Unknown tenant records are denied for a scoped remote viewer. */
+/**
+ * Unknown tenant records are denied for a scoped remote viewer. The rule is
+ * shared with Concierge (`progressRecordInScope`, libs/core).
+ */
 export function presenceStudioRecordInScope(
   viewer: PresenceStudioViewerContext,
   value: unknown
 ): boolean {
   const allowed = toFrontDeskViewerScope(viewer);
-  const tenant = recordTenant(value);
-  // Custody admission first — an owner-bound record is person custody and an
-  // 'all'-tenant viewer never admits another person's records (P4).
-  if (
-    !admitsCustody(
-      {
-        tenantSlugs: allowed.tenantSlugs,
-        personIds: viewerPersonIds(allowed),
-      },
-      custodyOfScope({ tenant_slug: tenant, owner_nhi: recordOwnerNhi(value) })
-    )
-  )
-    return false;
-  if (allowed.tenantSlugs !== 'all' && (!tenant || !allowed.tenantSlugs.includes(tenant)))
-    return false;
-  if (allowed.organizationIds === 'all' && allowed.projectIds === 'all') return true;
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  // Explicit narrower reads require canonical scope metadata. Unknown or
-  // conflicting legacy metadata is omitted rather than widening the result.
-  const scope = eventScopeFromRecord(value as Record<string, unknown>);
-  if (!scope) return false;
+  // Tier is an independent ceiling on the server adapter, not a custody
+  // property. Legacy records with no classification retain confidential.
+  let tier: 'personal' | 'confidential' | 'public' | undefined;
+  const seen = new WeakSet<object>();
+  const collectTier = (input: unknown, depth: number): boolean => {
+    if (!input || typeof input !== 'object' || Array.isArray(input) || depth > 3 || seen.has(input))
+      return false;
+    seen.add(input);
+    const record = input as Record<string, unknown>;
+    if (record.tier !== undefined) {
+      if (record.tier !== 'personal' && record.tier !== 'confidential' && record.tier !== 'public')
+        return false;
+      if (tier !== undefined && tier !== record.tier) return false;
+      tier = record.tier;
+    }
+    for (const key of [
+      'scope',
+      'scope_context',
+      'project',
+      'project_context',
+      'requestedByContext',
+      'context',
+      'metadata',
+    ]) {
+      if (record[key] != null && !collectTier(record[key], depth + 1)) return false;
+    }
+    return true;
+  };
   return (
-    (allowed.organizationIds === 'all' ||
-      Boolean(scope.organization_id && allowed.organizationIds.includes(scope.organization_id))) &&
-    (allowed.projectIds === 'all' ||
-      Boolean(scope.project_id && allowed.projectIds.includes(scope.project_id)))
+    collectTier(value, 0) &&
+    allowed.tierAccess.includes(tier ?? 'confidential') &&
+    progressRecordInScope(allowed, value)
   );
 }
 
@@ -564,14 +546,13 @@ export function requirePresenceStudioAccess(): RequestHandler {
     // remote-safe allowlist as the headless and OS control-plane APIs.
     // FD-02: /api/home and /api/home-vocabulary are the same shape (read-only,
     // viewer-scoped, no client-supplied widening) so they join it too.
-    // FD-05: /api/progress, /api/progress/:id, and /api/progress-vocabulary
-    // are read-only and viewer-scoped the same way — the mutating
-    // /api/outcomes/:id/verdict route deliberately does NOT join this list
-    // (it requires `requirePresenceStudioLocalAdmin`, i.e. loopback only).
+    // FD-05: /api/progress (the 頼む page's recent requests) is read-only and
+    // viewer-scoped the same way (the 進み具合 page itself moved to Concierge
+    // 仕事 › 依頼).
     // FD-03: /api/ask-vocabulary is the same read-only shape and joins the
     // list too; /api/conversation is a write (asking is a mutation) and
     // deliberately does NOT join it — it requires
-    // `requirePresenceStudioLocalAdmin`, same as /api/outcomes/:id/verdict.
+    // `requirePresenceStudioLocalAdmin`.
     const remoteSafe =
       path.startsWith('/api/headless/') ||
       path.startsWith('/api/os/') ||
@@ -580,8 +561,6 @@ export function requirePresenceStudioAccess(): RequestHandler {
       path === '/api/home' ||
       path === '/api/home-vocabulary' ||
       path === '/api/progress' ||
-      path.startsWith('/api/progress/') ||
-      path === '/api/progress-vocabulary' ||
       path === '/api/ask-vocabulary';
     if (remote && auth.reason === 'token' && !remoteSafe) {
       return res.status(403).json({
@@ -782,22 +761,6 @@ export const presenceStudioApprovalDecisionSchema = z
       .string()
       .regex(/^[0-9a-f]{64}$/u)
       .optional(),
-  })
-  .strict();
-
-/** FD-05: `POST /api/outcomes/:id/verdict` — `:id` is a deliverable-inbox
- * `entry_id` (see `progress.ts`'s module doc on the artifact-record vs
- * deliverable-inbox store gap). Only the two human-facing verdicts the
- * "進み具合" page offers (受け取る / 直してもらう) — never `changes_requested`,
- * which this surface never renders a control for. */
-export const presenceStudioOutcomeVerdictSchema = z
-  .object({
-    status: z.enum(['accepted', 'rejected']),
-    viewer_scope_id: z
-      .string()
-      .regex(/^[a-f0-9]{64}$/)
-      .optional(),
-    note: z.string().trim().min(1).max(4000).optional(),
   })
   .strict();
 

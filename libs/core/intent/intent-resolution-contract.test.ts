@@ -11,7 +11,7 @@ import { classifyTaskSessionIntent, getTaskIntentBuilder } from '../task/task-se
 import { pathResolver } from '../path-resolver.js';
 import { compileSchemaFromPath } from '../schema-loader.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 

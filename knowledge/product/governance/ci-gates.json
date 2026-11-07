@@ -435,7 +435,7 @@
       "paths": [
         "libs/actuators/**",
         "libs/core/actuator/**",
-        "libs/core/actuator-manifest-index.ts",
+        "libs/core/actuator/actuator-manifest-index.ts",
         "libs/core/pipeline/op-input-contract*",
         "libs/core/pipeline/pipeline-contract.ts",
         "knowledge/product/governance/actuator-op-registry.json",
@@ -683,7 +683,7 @@
       "paths": [
         "knowledge/product/governance/knowledge-sync-rules.json",
         "knowledge/product/schemas/knowledge-sync-rules.schema.json",
-        "libs/core/pii-scrubber.ts",
+        "libs/core/governance/pii-scrubber.ts",
         "tools/*/pii-rules.generated.js",
         "scripts/generate_pii_rules.ts"
       ],
@@ -1030,7 +1030,7 @@
         "libs/core/governance/autonomy-action-state.production-role.test.ts",
         "scripts/org.test.ts",
         "scripts/scope.test.ts",
-        "libs/core/customer-channel-binding.test.ts",
+        "libs/core/organization/customer-channel-binding.test.ts",
         "scripts/customer_channel.test.ts",
         "libs/core/governance/asset-scope-inspection.test.ts",
         "tests/process-boundary-governance.test.ts",
@@ -1052,7 +1052,7 @@
         "tests/measurement-backend-construction.test.ts",
         "libs/core/seam.test.ts",
         "libs/core/seam-lifecycle-contract.test.ts",
-        "libs/core/provider-module-boundaries.test.ts",
+        "libs/core/foundation/provider-module-boundaries.test.ts",
         "libs/core/ocr-bridge.test.ts",
         "libs/actuators/voice-actuator/src/voice-external-governance.test.ts",
         "libs/actuators/network-actuator/src/network-external-governance.test.ts"
@@ -1077,7 +1077,7 @@
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_runtime_store_whole_read.ts"],
       "baseline": "scripts/check_runtime_store_whole_read.baseline.json",
       "owner": "operations",
-      "rationale": "MSN-STORE-BOUNDS-2 P1: whole-file reads of append-only JSONL stores (readJsonLines, readJsonLinesCached, safeReadFile(...).split('\\n') in .jsonl files) may only decrease per file; past the 100MB read cap they make every read throw. Use the purpose readers in libs/core/jsonl-read.ts instead."
+      "rationale": "MSN-STORE-BOUNDS-2 P1: whole-file reads of append-only JSONL stores (readJsonLines, readJsonLinesCached, safeReadFile(...).split('\\n') in .jsonl files) may only decrease per file; past the 100MB read cap they make every read throw. Use the purpose readers in libs/core/storage/jsonl-read.ts instead."
     },
     {
       "id": "env_direct_read_budget",

@@ -21,6 +21,7 @@ const ENV_KEYS = ['KYBERION_PERSONA', 'MISSION_ROLE', 'KYBERION_SUDO', 'KYBERION
 interface Append {
   file: string;
   action: string;
+  tenantSlug?: string;
 }
 
 /** Tenant mirror partition (active/shared/runtime/audit-mirror/confidential/{slug}/). */
@@ -35,7 +36,8 @@ function fakeIo(appends: Append[], onAppend?: (file: string) => void): AuditChai
     readdir: () => [],
     append: (file, line) => {
       onAppend?.(file);
-      appends.push({ file, action: JSON.parse(line).action });
+      const entry = JSON.parse(line);
+      appends.push({ file, action: entry.action, tenantSlug: entry.tenantSlug });
     },
     assertSafePath: (file) => file,
   };
@@ -148,6 +150,40 @@ describe('audit chain lock', () => {
       'work.done',
       'policy_violation',
     ]);
+  });
+
+  it('durably records a secure-io denial in its originating tenant without a lazy recorder', () => {
+    const appends: Append[] = [];
+    restoreAuditIo = registerAuditChainIo(fakeIo(appends));
+    vi.spyOn(policyEngine, 'evaluate').mockReturnValue({
+      allowed: false,
+      action: 'deny',
+      message: 'synchronous audit regression',
+    });
+    process.env.KYBERION_TENANT = 'audit-origin-a';
+    const target = path.join(pathResolver.sharedTmp('audit-chain-lock-test'), 'denied.txt');
+    expect(() => safeWriteFile(target, 'x')).toThrow(/POLICY_BLOCKED/);
+    expect(masterActions(appends)).toHaveLength(1);
+    expect(masterActions(appends)[0].tenantSlug).toBe('audit-origin-a');
+    expect(appends.some((entry) => entry.file.includes('audit-origin-a'))).toBe(true);
+
+    process.env.KYBERION_TENANT = 'audit-later-b';
+    expect(masterActions(appends)).toHaveLength(1);
+    expect(appends.some((entry) => entry.file.includes('audit-later-b'))).toBe(false);
+  });
+
+  it('does not suppress a synchronous recorder failure on a denied secure-io operation', () => {
+    vi.spyOn(policyEngine, 'evaluate').mockReturnValue({
+      allowed: false,
+      action: 'deny',
+      message: 'denied operation',
+    });
+    const record = vi.spyOn(auditChain, 'recordDeferrable').mockImplementation(() => {
+      throw new Error('[AUDIT_UNAVAILABLE] recorder refused');
+    });
+    const target = path.join(pathResolver.sharedTmp('audit-chain-lock-test'), 'denied.txt');
+    expect(() => safeWriteFile(target, 'x')).toThrow('[AUDIT_UNAVAILABLE]');
+    expect(record).toHaveBeenCalledOnce();
   });
 
   it('reports a policy-denied safeWriteFile under the lock as the denial', () => {

@@ -4,7 +4,7 @@ import {
   gcAgentDesktopSessions,
   runAgentDesktopCommand,
   type AgentDesktopResult,
-} from '@agent/core/desktop-ax-bridge';
+} from '@agent/shared-perception/desktop-ax-bridge';
 import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
 import { approvalUsabilityRefusal } from '@agent/core/governance/approval-store';
 import {

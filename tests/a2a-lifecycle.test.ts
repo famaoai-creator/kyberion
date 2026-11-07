@@ -21,7 +21,7 @@ const LEDGER_BEFORE = fs.existsSync(LEDGER_PATH) ? fs.readFileSync(LEDGER_PATH, 
 // gates mission creation on a full "sovereign profile" (my-identity.json +
 // my-vision.md + agent-identity.json) resolved via resolveActiveProfileRoot()
 // (libs/core/mission/mission-state.ts). That resolver honors KYBERION_STANCE
-// as a profile-root override (libs/core/stance-resolver.ts: stanceRoot()),
+// as a profile-root override (libs/core/authn/stance-resolver.ts: stanceRoot()),
 // so this suite points the gate at an isolated `knowledge/personal/stances/{slug}/` overlay
 // instead of writing fixture identity content into the real
 // knowledge/personal/ tier — writing there was the root cause of

@@ -51,6 +51,7 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { t } from '@agent/core/t';
 import { summarizeBackupStatus } from './backup.js';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
+import { collectVcsHostDoctorLines } from './lib/doctor-vcs-host.js';
 import {
   defineScript,
   isDirectScript,
@@ -100,6 +101,8 @@ export interface DoctorRunReport {
   surfaceDeliveryLines: string[];
   localCapabilityLines: string[];
   desktopObservationLines: string[];
+  /** vcs-host provider selection (offline; auth only with --vcs-auth). Never counts as missing. */
+  vcsHostLines?: string[];
   appPreflight?: AppPreflightReport;
 }
 
@@ -469,6 +472,7 @@ export async function collectDoctorReport(argv: {
   mission?: string;
   platform?: 'ios' | 'android' | 'all';
   full?: boolean;
+  vcsAuth?: boolean;
 }): Promise<DoctorRunReport> {
   const missionId = argv.mission
     ? String(argv.mission)
@@ -531,6 +535,7 @@ export async function collectDoctorReport(argv: {
     surfaceDeliveryLines: collectSurfaceDeliveryDoctorLines(),
     localCapabilityLines: await collectLocalCapabilityDoctorLines(),
     desktopObservationLines: await collectDesktopObservationDoctorLines(),
+    vcsHostLines: await collectVcsHostDoctorLines({ probeAuth: argv.vcsAuth === true }),
     ...(appPreflight ? { appPreflight } : {}),
   };
 }
@@ -576,6 +581,7 @@ type DoctorArguments = {
   mission?: string;
   platform?: 'ios' | 'android' | 'all';
   full?: boolean;
+  vcsAuth?: boolean;
 };
 
 function normalizeDoctorArguments(args: string[]): string[] {
@@ -597,6 +603,11 @@ async function parseDoctorArguments(args: string[]): Promise<DoctorArguments> {
     .option('mission', { type: 'string' })
     .option('platform', { type: 'string', choices: ['ios', 'android', 'all'], default: 'all' })
     .option('full', { type: 'boolean', default: false })
+    .option('vcs-auth', {
+      type: 'boolean',
+      default: false,
+      describe: 'Also verify forge authentication for the selected vcs-host provider (network)',
+    })
     .parseSync();
   return {
     ...parsed,
@@ -638,6 +649,9 @@ export function formatDoctorReport(report: DoctorRunReport, argv: DoctorArgument
     lines.push(line);
   }
   for (const line of report.desktopObservationLines) {
+    lines.push(line);
+  }
+  for (const line of report.vcsHostLines ?? []) {
     lines.push(line);
   }
   if (report.appPreflight) {

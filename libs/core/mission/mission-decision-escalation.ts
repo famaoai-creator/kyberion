@@ -16,9 +16,9 @@
 import { createHash } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
 import { logger } from '../core.js';
-import { addInboxEntry } from '../deliverable-inbox.js';
+import { addInboxEntry } from '../task/deliverable-inbox.js';
 import { DELIVERABLE_INBOX_WRITER_ROLE } from '../foundation/deliverable-inbox-writer-capability.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
 
 /** Consecutive failed dispatch rounds after which a pin failure blocks the task (human decision: 3). */

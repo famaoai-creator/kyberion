@@ -23,7 +23,7 @@ import {
 } from '../mission/orchestrator-session.js';
 import { listActiveWorkLeases } from '../workforce/work-coordination.js';
 import { validateSurfaceUxContract } from './surface-ux-contract.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 
 export interface AssertSurfaceSteeringAuthorityParams {
   surface: string;

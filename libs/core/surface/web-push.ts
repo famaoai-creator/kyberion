@@ -29,7 +29,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '../secure-io.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 
 export interface WebPushPathOptions {
   rootDir?: string;

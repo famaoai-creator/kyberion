@@ -2,8 +2,8 @@ import type { NarratedVideoBrief } from './narrated-video-brief-compiler.js';
 import type { VideoCompositionSceneRole } from './video-composition-contract.js';
 import { buildVideoDesignCssVars, resolveVideoModeDefaults } from './video-design-system.js';
 import { resolveTenantDesign } from '../organization/tenant-design-resolver.js';
-import { resolveCreativeDesign } from '../creative-design-resolver.js';
-import { isWebThemePack, webThemePackToCssVars } from '../web-design-system.js';
+import { resolveCreativeDesign } from '../design/creative-design-resolver.js';
+import { isWebThemePack, webThemePackToCssVars } from '../design/web-design-system.js';
 import { clamp } from '../foundation/text.js';
 
 export type VideoPresentationMode = 'howto' | 'promo' | 'vtuber';

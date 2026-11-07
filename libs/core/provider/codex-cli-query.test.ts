@@ -8,9 +8,9 @@ import {
   rewrapCodexError,
   runCodexCliQuery,
 } from './codex-cli-query.js';
-import { delegationExecutionStartedFromError } from '../delegation-execution-tracker.js';
+import { delegationExecutionStartedFromError } from '../workforce/delegation-execution-tracker.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
-import { metrics } from '../metrics.js';
+import { metrics } from '../analysis/metrics.js';
 
 beforeEach(() => {
   vi.spyOn(metrics, 'record').mockImplementation(() => undefined as never);
@@ -33,7 +33,7 @@ const isProviderDescriptorPath = vi.hoisted(
   () => (filePath: string) => /[\\/]reasoning-providers[\\/][^\\/]+\.json$/u.test(String(filePath))
 );
 
-vi.mock('../session-git-index.js', () => ({
+vi.mock('../vcs/session-git-index.js', () => ({
   prepareSessionGitIndex: mocks.prepareSessionGitIndex,
 }));
 

@@ -12,7 +12,7 @@ import {
 import {
   generateImageWithWindowsNativeApi,
   probeWindowsNativeImageGeneration,
-} from '@agent/core/windows-native-image-generation-bridge';
+} from '../../windows-native-image-generation-bridge.js';
 import { getFallbackTargetPath } from '../provider-support.js';
 
 export class WindowsNativeImageGenerationProvider implements ImageGenerationProvider {

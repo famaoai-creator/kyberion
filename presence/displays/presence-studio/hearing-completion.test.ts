@@ -128,7 +128,7 @@ describe('hearing completion read model', () => {
       kind: 'inventory',
       status: 'ready',
       id: 'entry-1',
-      next: { href: '/progress?tenant=alpha' },
+      next: { href: 'https://review.example.test/work?tab=requests&tenant=alpha' },
     });
     expect(mocks.inventory).toHaveBeenCalledWith({ tenant_slug: 'alpha' }, 'entry-1');
     mocks.inventory.mockReturnValue(null);
@@ -182,7 +182,10 @@ describe('hearing completion read model', () => {
           source: 'loopback',
           tenantSlugs: tenantSlugs === 'all' ? 'all' : [],
         })?.next?.href
-      ).toBe('/progress');
+        // A personal-scope entry is listed in Concierge's personal view only:
+        // the hand-off selects it (仕事 › 依頼 shows the local owner's own
+        // personal inventory there).
+      ).toBe('https://review.example.test/work?tab=requests&tenant=personal');
     }
     expect(
       readHearingCompletion(hearing, { ...viewer, source: 'token', tenantSlugs: [] })?.status
@@ -332,7 +335,9 @@ describe('selected hierarchy completion proof', () => {
       {
         kind: 'inventory',
         status: 'ready',
-        next: { href: '/progress?tenant=alpha&organizationId=org-a' },
+        next: {
+          href: 'https://review.example.test/work?tab=requests&tenant=alpha&organizationId=org-a',
+        },
       }
     );
     expect(readHearingCompletion(hearing, { ...viewer, organizationIds: ['org-b'] })?.status).toBe(

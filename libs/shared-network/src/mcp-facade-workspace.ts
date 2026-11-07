@@ -11,7 +11,7 @@
  * (confidential + public); without a binding it sees public records only.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { resolveMcpRequestContext } from '@agent/core/mcp-request-context';
+import { resolveMcpRequestContext } from './mcp-request-context.js';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
 import {
   invokeSurfaceOperation,

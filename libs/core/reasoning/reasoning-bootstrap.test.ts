@@ -49,7 +49,7 @@ vi.mock('../provider/provider-discovery.js', () => ({
   discoverProviders: mockProviders.discoverProviders,
 }));
 
-vi.mock('../capability-broker.js', () => ({
+vi.mock('../provider/capability-broker.js', () => ({
   resolveProviderDecision: mockProviders.resolveProviderDecision,
 }));
 

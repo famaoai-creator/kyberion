@@ -1,11 +1,11 @@
-import type { EventScopeInput } from '../event-scope.js';
+import type { EventScopeInput } from '../event/event-scope.js';
 import {
   renderIntentAuthorityLabel,
   renderIntentOutcomeLabel,
 } from '../intent/intent-resolution-contract.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { detectTextLocale, type SupportedLocale } from '../foundation/locale-normalize.js';
-import { resolveLocale } from '../locale.js';
+import { resolveLocale } from '../localization/locale.js';
 import type {
   SurfaceAsyncChannel,
   SurfaceConversationAttachment,
