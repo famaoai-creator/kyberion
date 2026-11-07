@@ -1,8 +1,8 @@
-import { buildUserFacingError } from './error-classifier.js';
-import { renderVocabularyText } from './ux-vocabulary.js';
-import { logger } from './core.js';
-import { fixedWindowLimiter } from './foundation/rate-limit.js';
-import { loadRuntimeControlPolicy } from './runtime-control-policy.js';
+import { buildUserFacingError } from '@agent/core/error-classifier';
+import { renderVocabularyText } from '@agent/core/ux-vocabulary';
+import { logger } from '@agent/core/core';
+import { fixedWindowLimiter } from '@agent/core/foundation/rate-limit';
+import { loadRuntimeControlPolicy } from '@agent/core/runtime-control-policy';
 
 /**
  * Shared error/empty-reply presentation for text bridges (UX-01 Task 3).

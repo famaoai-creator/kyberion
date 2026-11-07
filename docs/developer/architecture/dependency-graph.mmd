@@ -140,9 +140,13 @@ graph TD
   agent_shared_voice --> agent_core
   agent_shared_voice --> agent_shared_interaction
   kyberion_discord_bridge --> agent_core
+  kyberion_discord_bridge --> agent_shared_interaction
   kyberion_imessage_bridge --> agent_core
+  kyberion_imessage_bridge --> agent_shared_interaction
   kyberion_slack_bridge --> agent_core
+  kyberion_slack_bridge --> agent_shared_interaction
   kyberion_telegram_bridge --> agent_core
+  kyberion_telegram_bridge --> agent_shared_interaction
   presence_chronos_mirror_v2 --> agent_core
   presence_concierge --> agent_core
   presence_concierge --> agent_shared_ui

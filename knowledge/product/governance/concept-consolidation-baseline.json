@@ -210,7 +210,7 @@
     "libs/core/baseline-check-cache.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/bridge-error-reply.ts": {
+    "libs/shared-interaction/src/bridge-error-reply.ts": {
       "rate_limiter_impl_budget": 1
     },
     "libs/shared-vision/src/browser-conversation-session.ts": {
