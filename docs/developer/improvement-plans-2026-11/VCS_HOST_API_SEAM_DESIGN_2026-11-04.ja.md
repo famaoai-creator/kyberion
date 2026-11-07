@@ -150,8 +150,20 @@ VH-01 が最大の制約で、gh 系公開関数は現在すべて同期。
 
 #1390 の `runtime-readiness-check` seam に `vcs-host` check を **登録しない**。forge の
 可用性はランタイムの ready 条件ではない (PR を作らない runtime も ready であるべき)。
-provider ごとの認証確認は `vcsHostAuthStatus()` で取得できる。`pnpm doctor` への表示は未実装 (doctor が
-ネットワーク probe を伴うため、表示形式と test の hermetic 化を別途決める)。
+provider ごとの認証確認は `vcsHostAuthStatus()` で取得できる。
+
+`pnpm doctor` は `VCS host:` の 1 行を表示する (`scripts/lib/doctor-vcs-host.ts`)。
+
+- 既定はネットワークに出ない。`inspectVcsHostSelection()` が実際の解決と同じ chain と `isAvailable()`
+  (gh-cli は手元の `gh --version`、github-rest は token 登録の有無) で、選ばれる provider・順序・順序の出所
+  (builtin / policy / `env:KYBERION_SEAM_DEFAULTS` などの保存済み既定) と各候補の状態を返す。
+- 認証確認は `--vcs-auth` を付けたときだけ行う。選ばれた provider に `vcsHostAuthStatus()` を
+  10 秒の上限付きで 1 回呼び、`ok` か失敗の種類を表示する。Apple Intelligence PCC と同じく、
+  ネットワークに出る確認は opt-in とする。
+- provider が 1 つも使えない場合も missing には数えない (上の readiness 方針と同じ)。
+  表示は `install gh or register GH_TOKEN` という対処を示す。
+- test は provider 解決と認証確認を注入して memory provider で行い、`gh` 起動もネットワークも使わない。
+  既定実行で認証確認が呼ばれないことを、呼ばれたら失敗する stub で確かめる。
 
 ## スコープ外
 
