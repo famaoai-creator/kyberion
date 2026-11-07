@@ -30,7 +30,7 @@ const SOURCES = [
   ['libs/core/provider/provider-health-registry.ts', /process\.env\.VITEST/u],
   ['libs/core/share-grant-graph.ts', /process\.env\.VITEST/u],
   ['libs/core/task/task-scoped-grants.ts', /process\.env\.VITEST/u],
-  ['libs/core/spend-guard.ts', /process\.env\.VITEST/u],
+  ['libs/core/finance/spend-guard.ts', /process\.env\.VITEST/u],
   ['libs/core/surface/operator-notifications.ts', /process\.env\.VITEST/u],
   ['scripts/run_baseline_check.ts', /process\.env\.VITEST/u],
   ['scripts/peer_network_register.ts', /process\.env\[secretEnv\]/u],

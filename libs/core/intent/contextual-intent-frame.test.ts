@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
-import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { pathResolver } from '../path-resolver.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
-import { matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
+import { matchesIntentPhrase } from './intent-phrase-lexicon.js';
 import {
   recordSchedulePreference,
   saveContextualIntentMemory,

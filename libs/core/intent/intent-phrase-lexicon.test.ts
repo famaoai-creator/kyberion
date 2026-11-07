@@ -37,7 +37,7 @@ const parity = JSON.parse(
 /** Files whose intent regex literals were migrated to lexicon concept ids. */
 const MIGRATED_SOURCES = [
   'libs/shared-vision/src/browser-conversation-session.ts',
-  'libs/core/contextual-intent-frame.ts',
+  'libs/core/intent/contextual-intent-frame.ts',
   'libs/core/execution-brief.ts',
   'libs/core/guided-coordination-brief.ts',
   'libs/core/intent/intent-contract.ts',

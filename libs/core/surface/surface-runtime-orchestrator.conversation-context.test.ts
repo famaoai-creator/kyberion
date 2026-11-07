@@ -19,7 +19,7 @@ vi.mock('../secure-io.js', async () => ({
   ...(await vi.importActual<typeof import('../secure-io.js')>('../secure-io.js')),
   safeExec: mocks.safeExec,
 }));
-vi.mock('../pending-intent-store.js', () => ({
+vi.mock('../intent/pending-intent-store.js', () => ({
   loadPendingIntent: mocks.pendingLoad,
   savePendingIntent: mocks.pendingSave,
 }));

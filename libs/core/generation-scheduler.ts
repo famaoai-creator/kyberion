@@ -28,10 +28,10 @@ import {
   type EventScope,
   type EventScopeInput,
 } from './event-scope.js';
-import { releaseGenerationQuota, reserveGenerationQuota } from './generation-quota.js';
+import { releaseGenerationQuota, reserveGenerationQuota } from './finance/generation-quota.js';
 import { resolveTenant } from './organization/tenant-registry.js';
 import { physicalScopedPath } from './physical-namespace.js';
-import { settleGenerationProviderCost } from './generation-cost-settlement.js';
+import { settleGenerationProviderCost } from './finance/generation-cost-settlement.js';
 
 export const GENERATION_SCHEDULE_DIR = 'active/shared/runtime/media-generation/schedules';
 export const GENERATION_ARTIFACT_ROOT = 'active/shared/runtime/media-generation/artifacts';

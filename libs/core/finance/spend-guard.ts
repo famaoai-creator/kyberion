@@ -11,19 +11,19 @@
  * continue or raise the cap".
  */
 
-import { logger } from './core.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { getRegisteredEnvText } from './foundation/env.js';
-import { isVitestProcess } from './foundation/env.js';
+import { logger } from '../core.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { isVitestProcess } from '../foundation/env.js';
 import {
   aggregateMetricsForEnforcement,
   onExecutionMetricsAppend,
   type ExecutionAppendNotice,
-} from './metrics.js';
-import type { StoragePartition } from './storage-layout.js';
-import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
-import { sendOpsAlert } from './ops-alert.js';
-import { pathResolver } from './path-resolver.js';
+} from '../metrics.js';
+import type { StoragePartition } from '../storage-layout.js';
+import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
+import { sendOpsAlert } from '../ops-alert.js';
+import { pathResolver } from '../path-resolver.js';
 import {
   resolveUsageCostAccounting,
   hasUsageCostEvidence,

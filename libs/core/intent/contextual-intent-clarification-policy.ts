@@ -1,8 +1,8 @@
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { pathResolver } from './path-resolver.js';
-import { matchesAnyTextRule, type TextMatchRule } from './foundation/text-rule-matcher.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { pathResolver } from '../path-resolver.js';
+import { matchesAnyTextRule, type TextMatchRule } from '../foundation/text-rule-matcher.js';
 import type { ContextualIntentFrame } from './contextual-intent-frame.js';
-import { clamp } from './foundation/text.js';
+import { clamp } from '../foundation/text.js';
 
 const POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/contextual-intent-clarification-policy.schema.json'

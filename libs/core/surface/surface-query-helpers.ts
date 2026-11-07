@@ -9,12 +9,12 @@ import { resolveFallbackLocationSummary } from '../location-fallback.js';
 import {
   buildContextualIntentFrame,
   type ContextualIntentFrame,
-} from '../contextual-intent-frame.js';
-import { assessContextualClarification } from '../contextual-intent-clarification-policy.js';
+} from '../intent/contextual-intent-frame.js';
+import { assessContextualClarification } from '../intent/contextual-intent-clarification-policy.js';
 import {
   recordSchedulePreference,
   resolveDefaultScheduleSource,
-} from '../contextual-intent-memory.js';
+} from '../intent/contextual-intent-memory.js';
 import { recordConversationSignal } from '../intent/conversation-signals.js';
 import { stripTags } from '../foundation/html-sanitize.js';
 import { decodeEntities } from '../foundation/text-escaping.js';

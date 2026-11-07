@@ -24,7 +24,7 @@ import { sendOpsAlert, type OpsAlertReceipt } from './ops-alert.js';
 import { pathResolver } from './path-resolver.js';
 import { discoverProviders } from './provider/provider-discovery.js';
 import { listDemotedProviders } from './provider/provider-health-registry.js';
-import type { FinanceControllerDecision } from './finance-controller.js';
+import type { FinanceControllerDecision } from './finance/finance-controller.js';
 
 export interface HealthThresholds {
   /** detectRegressions multiplier: last run vs historical average. */

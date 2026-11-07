@@ -3,7 +3,7 @@ import { pathResolver } from './path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
-import type { FinancialModel } from './financial-model.js';
+import type { FinancialModel } from './finance/financial-model.js';
 
 export interface OkrKeyResult {
   metric: string;

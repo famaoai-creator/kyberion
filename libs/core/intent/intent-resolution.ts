@@ -11,7 +11,7 @@ import {
 import {
   buildContextualIntentFrame,
   type ContextualIntentFrame,
-} from '../contextual-intent-frame.js';
+} from './contextual-intent-frame.js';
 import { sanitizeIntentPathSegment } from './intent-path-utils.js';
 import { segmentWords } from '../foundation/locale-normalize.js';
 import {

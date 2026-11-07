@@ -865,8 +865,8 @@
       "default": "./dist/context-security-scope.js"
     },
     "./contextual-intent-frame": {
-      "types": "./dist/contextual-intent-frame.d.ts",
-      "default": "./dist/contextual-intent-frame.js"
+      "types": "./dist/intent/contextual-intent-frame.d.ts",
+      "default": "./dist/intent/contextual-intent-frame.js"
     },
     "./contracts": {
       "types": "./dist/contracts/index.d.ts",
@@ -1073,8 +1073,8 @@
       "default": "./dist/voice/coreaudio-device-inventory.js"
     },
     "./cost-report": {
-      "types": "./dist/cost-report.d.ts",
-      "default": "./dist/cost-report.js"
+      "types": "./dist/finance/cost-report.d.ts",
+      "default": "./dist/finance/cost-report.js"
     },
     "./creative-design-resolver": {
       "types": "./dist/design/creative-design-resolver.d.ts",
@@ -1541,8 +1541,8 @@
       "default": "./dist/failure-tracker.js"
     },
     "./finance-controller": {
-      "types": "./dist/finance-controller.d.ts",
-      "default": "./dist/finance-controller.js"
+      "types": "./dist/finance/finance-controller.d.ts",
+      "default": "./dist/finance/finance-controller.js"
     },
     "./format": {
       "types": "./dist/format.d.ts",
@@ -1709,12 +1709,12 @@
       "default": "./dist/fs-utils.js"
     },
     "./generation-cost-settlement": {
-      "types": "./dist/generation-cost-settlement.d.ts",
-      "default": "./dist/generation-cost-settlement.js"
+      "types": "./dist/finance/generation-cost-settlement.d.ts",
+      "default": "./dist/finance/generation-cost-settlement.js"
     },
     "./generation-quota": {
-      "types": "./dist/generation-quota.d.ts",
-      "default": "./dist/generation-quota.js"
+      "types": "./dist/finance/generation-quota.d.ts",
+      "default": "./dist/finance/generation-quota.js"
     },
     "./generation-scheduler": {
       "types": "./dist/generation-scheduler.d.ts",
@@ -6905,16 +6905,16 @@
       "default": "./dist/unclassified-error-registry.js"
     },
     "./unhandled-intent-registry": {
-      "types": "./dist/unhandled-intent-registry.d.ts",
-      "default": "./dist/unhandled-intent-registry.js"
+      "types": "./dist/intent/unhandled-intent-registry.d.ts",
+      "default": "./dist/intent/unhandled-intent-registry.js"
     },
     "./untrusted-content": {
       "types": "./dist/untrusted-content.d.ts",
       "default": "./dist/untrusted-content.js"
     },
     "./usage-accounting": {
-      "types": "./dist/usage-accounting.d.ts",
-      "default": "./dist/usage-accounting.js"
+      "types": "./dist/finance/usage-accounting.d.ts",
+      "default": "./dist/finance/usage-accounting.js"
     },
     "./ux-vocabulary": {
       "types": "./dist/ux-vocabulary.d.ts",

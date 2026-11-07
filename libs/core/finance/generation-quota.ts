@@ -1,17 +1,17 @@
 import * as path from 'node:path';
-import * as pathResolver from './path-resolver.js';
-import { isValidTenantSlug } from './entity-scope.js';
-import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { nowIso } from './foundation/time.js';
+import * as pathResolver from '../path-resolver.js';
+import { isValidTenantSlug } from '../entity-scope.js';
+import { normalizeEventScope, type EventScope, type EventScopeInput } from '../event-scope.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { nowIso } from '../foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
   safeWriteFile,
-} from './secure-io.js';
-import { withLockSync } from './foundation/lock-utils.js';
+} from '../secure-io.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 
 export const GENERATION_QUOTA_POLICY_REPO_PATH =
   'knowledge/product/governance/media-generation-quota-policy.json';

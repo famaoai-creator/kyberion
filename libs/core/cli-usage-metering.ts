@@ -1,7 +1,11 @@
 import { metrics } from './metrics.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { getUsageAttribution, type UsageBillingMode, type UsageCause } from './usage-accounting.js';
+import {
+  getUsageAttribution,
+  type UsageBillingMode,
+  type UsageCause,
+} from './finance/usage-accounting.js';
 import {
   reportDelegationResultMetadata,
   type DelegationResultExtras,

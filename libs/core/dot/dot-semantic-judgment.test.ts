@@ -21,7 +21,7 @@ const fixtureRoot = path.join(
 let bootstrapIo: typeof import('../secure-io.js');
 let observer: typeof import('./dot-semantic-judgment.js');
 let runtime: typeof import('./dot-runtime.js');
-let accounting: typeof import('../usage-accounting.js');
+let accounting: typeof import('../finance/usage-accounting.js');
 let events: typeof import('../event-scope.js');
 let latency: typeof import('../organization/judgment-latency-fixture.js');
 let precedents: typeof import('../organization/judgment-precedents.js');
@@ -307,7 +307,7 @@ describe('contract-only dot semantic observer (no production reservation/provide
     } as Parameters<typeof saveProjectRecord>[0]);
     observer = await import('./dot-semantic-judgment.js');
     runtime = await import('./dot-runtime.js');
-    accounting = await import('../usage-accounting.js');
+    accounting = await import('../finance/usage-accounting.js');
     events = await import('../event-scope.js');
     latency = await import('../organization/judgment-latency-fixture.js');
     precedents = await import('../organization/judgment-precedents.js');

@@ -53,7 +53,7 @@ import {
   type ScopedSurfaceConversationRuntime,
 } from './surface-conversation-runtime-context.js';
 import { classifyTaskSessionIntent } from '../task/task-session.js';
-import { loadPendingIntent, savePendingIntent } from '../pending-intent-store.js';
+import { loadPendingIntent, savePendingIntent } from '../intent/pending-intent-store.js';
 import { currentScope } from '../scope-context.js';
 import { recordClarificationSignal, recordFeedbackSignal } from './surface-conversation-signals.js';
 import {

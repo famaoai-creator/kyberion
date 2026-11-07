@@ -80,7 +80,7 @@ import {
 } from './dot-charter.js';
 import { evaluateStateProbe, probeSpecId, type StateProbeDeps } from '../state-probe.js';
 import { createLogger } from '../logger.js';
-import { getUsageAttribution } from '../usage-accounting.js';
+import { getUsageAttribution } from '../finance/usage-accounting.js';
 import { estimateWakeTokensFromText, withDotWakeUsage } from './dot-wake-usage.js';
 import {
   withDotWakeSemanticObserver,

@@ -255,7 +255,8 @@ describe('reconcile ops (LE-03)', () => {
   });
 
   it('persists the catalog-normalized unhandled intent registry', async () => {
-    const { writeUnhandledIntentRegistryAtPath } = await import('./unhandled-intent-registry.js');
+    const { writeUnhandledIntentRegistryAtPath } =
+      await import('./intent/unhandled-intent-registry.js');
     const registryPath = path.join(tmpRoot, 'active', 'shared', 'tmp', 'normalized.json');
     writeUnhandledIntentRegistryAtPath(registryPath, {
       version: '1.0.0',
@@ -274,7 +275,7 @@ describe('reconcile ops (LE-03)', () => {
 
   it('never records utterance text for tenant-scoped turns', async () => {
     const { recordUnhandledIntent, listUnhandledIntents } =
-      await import('./unhandled-intent-registry.js');
+      await import('./intent/unhandled-intent-registry.js');
     recordUnhandledIntent({
       missType: 'unrecognized',
       utterance: 'tenant secret request',

@@ -1570,7 +1570,10 @@
     },
     "calendar_source.google": {
       "old_regex": "/(Google Calendar|Googleカレンダー|calendar\\.google\\.com|Google)/i",
-      "sites": ["libs/core/contextual-intent-frame.ts:137", "libs/core/task/task-session.ts:648"],
+      "sites": [
+        "libs/core/intent/contextual-intent-frame.ts:137",
+        "libs/core/task/task-session.ts:648"
+      ],
       "match": [
         "Googleカレンダー",
         "GOOGLEカレンダー",
@@ -1609,7 +1612,10 @@
     },
     "calendar_source.outlook": {
       "old_regex": "/(Outlook|Microsoft 365|Microsoft|Teams)/i",
-      "sites": ["libs/core/contextual-intent-frame.ts:136", "libs/core/task/task-session.ts:647"],
+      "sites": [
+        "libs/core/intent/contextual-intent-frame.ts:136",
+        "libs/core/task/task-session.ts:647"
+      ],
       "match": [
         "Outlook",
         "OUTLOOK",
@@ -1649,7 +1655,7 @@
     },
     "contextual_frame.change_action": {
       "old_regex": "/(調整|変更|リスケ|ずら|移動|移して|修正|入れ替え|前倒し|後ろ|見直し|再調整|詰め直し|組み直|並べ替え|再編成|再配置|整えて|代わりに参加|代理参加|change|update|resched|reschedule)/i",
-      "sites": ["libs/core/contextual-intent-frame.ts:63"],
+      "sites": ["libs/core/intent/contextual-intent-frame.ts:63"],
       "match": [
         "調整",
         "ねえ 調整 して",
@@ -1693,7 +1699,7 @@
     },
     "contextual_frame.read_action": {
       "old_regex": "/(教えて|見せて|確認|見る|空き|予定|会議|ミーティング|打ち合わせ|アポイント|agenda|available|availability|show|see)/i",
-      "sites": ["libs/core/contextual-intent-frame.ts:69"],
+      "sites": ["libs/core/intent/contextual-intent-frame.ts:69"],
       "match": [
         "教えて",
         "ねえ 教えて して",
@@ -1737,7 +1743,7 @@
     },
     "contextual_frame.schedule_object": {
       "old_regex": "/(調整|変更|リスケ|ずら|移動|移して|修正|入れ替え|前倒し|後ろ|見直し|再調整|詰め直し|組み直|並べ替え|再編成|再配置|整えて|calendar|schedule)/i",
-      "sites": ["libs/core/contextual-intent-frame.ts:97"],
+      "sites": ["libs/core/intent/contextual-intent-frame.ts:97"],
       "match": [
         "調整",
         "ねえ 調整 して",
@@ -1781,7 +1787,7 @@
     },
     "contextual_frame.subject_schedule_implicit": {
       "old_regex": "/(予定|スケジュール|日程|空き時間|会議|ミーティング|アポイント|打ち合わせ|カレンダー|calendar|リスケ|調整|変更|ずら|移動|修正|schedule)/i",
-      "sites": ["libs/core/contextual-intent-frame.ts:115"],
+      "sites": ["libs/core/intent/contextual-intent-frame.ts:115"],
       "match": [
         "予定",
         "ねえ 予定 して",
@@ -1825,7 +1831,7 @@
     },
     "contextual_frame.subject_self": {
       "old_regex": "/(私|自分|俺|僕|私の|自分の|my|me|mine|operator|本人)/i",
-      "sites": ["libs/core/contextual-intent-frame.ts:112"],
+      "sites": ["libs/core/intent/contextual-intent-frame.ts:112"],
       "match": [
         "私",
         "ねえ 私 して",
@@ -1876,7 +1882,7 @@
     },
     "contextual_frame.subject_team": {
       "old_regex": "/(チーム|みんな|全員|team|our)/i",
-      "sites": ["libs/core/contextual-intent-frame.ts:113"],
+      "sites": ["libs/core/intent/contextual-intent-frame.ts:113"],
       "match": [
         "チーム",
         "ねえ チーム して",
@@ -2008,7 +2014,7 @@
     },
     "date_range.next_month": {
       "old_regex": "/(来月|next month)/i",
-      "sites": ["libs/core/contextual-intent-frame.ts:130"],
+      "sites": ["libs/core/intent/contextual-intent-frame.ts:130"],
       "match": [
         "来月",
         "ねえ 来月 して",
@@ -2038,7 +2044,7 @@
     },
     "date_range.next_week": {
       "old_regex": "/(来週|next week)/i",
-      "sites": ["libs/core/contextual-intent-frame.ts:128"],
+      "sites": ["libs/core/intent/contextual-intent-frame.ts:128"],
       "match": [
         "来週",
         "ねえ 来週 して",
@@ -2076,7 +2082,7 @@
     },
     "date_range.this_month": {
       "old_regex": "/(今月|this month)/i",
-      "sites": ["libs/core/contextual-intent-frame.ts:129"],
+      "sites": ["libs/core/intent/contextual-intent-frame.ts:129"],
       "match": [
         "今月",
         "ねえ 今月 して",
@@ -2104,7 +2110,7 @@
     },
     "date_range.this_week": {
       "old_regex": "/(今週|this week)/i",
-      "sites": ["libs/core/contextual-intent-frame.ts:127"],
+      "sites": ["libs/core/intent/contextual-intent-frame.ts:127"],
       "match": [
         "今週",
         "ねえ 今週 して",
@@ -2137,7 +2143,7 @@
     },
     "date_range.today": {
       "old_regex": "/(今日|本日|today)/i",
-      "sites": ["libs/core/contextual-intent-frame.ts:125"],
+      "sites": ["libs/core/intent/contextual-intent-frame.ts:125"],
       "match": [
         "今日",
         "ねえ 今日 して",
@@ -2171,7 +2177,7 @@
     },
     "date_range.tomorrow": {
       "old_regex": "/(明日|tomorrow)/i",
-      "sites": ["libs/core/contextual-intent-frame.ts:126"],
+      "sites": ["libs/core/intent/contextual-intent-frame.ts:126"],
       "match": [
         "明日",
         "ねえ 明日 して",
@@ -3761,7 +3767,7 @@
       "old_regex": "/(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|カレンダー|agenda|availability|calendar)/i",
       "sites": [
         "libs/core/execution-brief.ts:93",
-        "libs/core/contextual-intent-frame.ts:103",
+        "libs/core/intent/contextual-intent-frame.ts:103",
         "libs/core/intent/intent-resolution.ts:475"
       ],
       "match": [

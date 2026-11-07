@@ -101,11 +101,11 @@ export * from './knowledge/knowledge-index-usage.js';
 export * from './knowledge/knowledge-taxonomy.js';
 export * from './volatile-knowledge.js';
 
-export * from './financial-model.js';
+export * from './finance/financial-model.js';
 
-export * from './finance-controller.js';
+export * from './finance/finance-controller.js';
 
-export * from './finance-controller-cost-report.js';
+export * from './finance/finance-controller-cost-report.js';
 
 export * from './okr-tracker.js';
 
@@ -135,9 +135,9 @@ export * from './mesh/handoff-history.js';
 
 export * from './secret/secret-encryption.js';
 
-export * from './spend-guard.js';
+export * from './finance/spend-guard.js';
 
-export * from './cost-report.js';
+export * from './finance/cost-report.js';
 
 export * from './chain-integrity.js';
 

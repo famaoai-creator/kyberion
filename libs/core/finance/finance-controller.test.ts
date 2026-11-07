@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { resolveFinanceControllerDecision } from './finance-controller.js';
 import type { FinancialModel } from './financial-model.js';
-import type { OkrTracker } from './okr-tracker.js';
+import type { OkrTracker } from '../okr-tracker.js';
 
 describe('finance-controller', () => {
   const baseFinancial: FinancialModel = {

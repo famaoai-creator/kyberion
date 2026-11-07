@@ -22,7 +22,7 @@ import {
   resolveUsageCostAccounting,
   hasUsageCostEvidence,
   type ResolvedUsageCostAccounting,
-} from '../usage-accounting.js';
+} from '../finance/usage-accounting.js';
 import { isRecord } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';

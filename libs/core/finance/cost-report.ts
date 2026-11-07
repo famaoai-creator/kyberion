@@ -4,9 +4,9 @@ import {
   type ExecutionMetricsReadScope,
   type ResourceUsageReadScope,
   type ResourceUsageStatus,
-} from './metrics.js';
-import { eventScopeMatches, type EventScope, type EventScopeFilter } from './event-scope.js';
-import { resolveScopeForRecord } from './scope-migration.js';
+} from '../metrics.js';
+import { eventScopeMatches, type EventScope, type EventScopeFilter } from '../event-scope.js';
+import { resolveScopeForRecord } from '../scope-migration.js';
 import {
   normalizeUsageCause,
   resolveUsageCostAccounting,

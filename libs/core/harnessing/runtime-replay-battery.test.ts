@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OpenAiCompatibleBackend } from '../provider/openai-compatible-backend.js';
 import { runGoalDrivenLoop } from '../workforce/worker-goal-driver.js';
 import { parseClaudeCliUsage, parseCodexCliUsage } from '../cli-usage-metering.js';
-import { resolveUsageCostAccounting } from '../usage-accounting.js';
+import { resolveUsageCostAccounting } from '../finance/usage-accounting.js';
 import { classifyProbeSet } from './decision-axis.js';
 import type { RunOutcome } from './probe-runner.js';
 

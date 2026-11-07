@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { assessContextualClarification } from '../contextual-intent-clarification-policy.js';
-import { buildContextualIntentFrame } from '../contextual-intent-frame.js';
+import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
+import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { classifyTaskSessionIntent } from '../task/task-session.js';
 import { t } from '../t.js';
 import type { SupportedLocale } from '../foundation/locale-normalize.js';

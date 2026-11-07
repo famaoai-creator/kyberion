@@ -1,9 +1,14 @@
-import { pathResolver } from './path-resolver.js';
-import { nowIso } from './foundation/time.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { nowIso } from '../foundation/time.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from '../secure-io.js';
 import * as nodePath from 'node:path';
-import { createLogger } from './logger.js';
+import { createLogger } from '../logger.js';
 const logger = createLogger('unhandled-intent-registry');
 
 export type IntentMissType = 'unrouted' | 'unrecognized';

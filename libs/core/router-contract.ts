@@ -8,7 +8,7 @@ import {
   type IntentResolutionPacket,
 } from './intent/intent-resolution.js';
 import { pathResolver } from './path-resolver.js';
-import { recordUnhandledIntent } from './unhandled-intent-registry.js';
+import { recordUnhandledIntent } from './intent/unhandled-intent-registry.js';
 import { recordConversationSignal } from './intent/conversation-signals.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 

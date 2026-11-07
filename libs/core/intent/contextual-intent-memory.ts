@@ -1,17 +1,17 @@
-import { pathResolver } from './path-resolver.js';
-import { logger } from './core.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
+import { pathResolver } from '../path-resolver.js';
+import { logger } from '../core.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
   safeWriteFile,
-} from './secure-io.js';
-import type { ScopeContext } from './scope-context.js';
-import { physicalScopedPath } from './physical-namespace.js';
-import { getRegisteredEnvText } from './foundation/env.js';
-import { nowIso } from './foundation/time.js';
+} from '../secure-io.js';
+import type { ScopeContext } from '../scope-context.js';
+import { physicalScopedPath } from '../physical-namespace.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { nowIso } from '../foundation/time.js';
 
 export type ScheduleSourceKind =
   'operator_default_calendar' | 'google_calendar' | 'outlook_calendar' | 'browser_calendar';

@@ -6,12 +6,12 @@ import { getCoordinationExecutionOverride } from './coordination-actuator-routin
 import {
   buildContextualIntentFrame,
   type ContextualIntentFrame,
-} from './contextual-intent-frame.js';
-import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
+} from './intent/contextual-intent-frame.js';
+import { assessContextualClarification } from './intent/contextual-intent-clarification-policy.js';
 import {
   resolveDefaultApprovalSystem,
   resolveDefaultScheduleSource,
-} from './contextual-intent-memory.js';
+} from './intent/contextual-intent-memory.js';
 import type { GuidedCoordinationBrief } from './contracts/guided-coordination-brief.js';
 import type { ActuatorExecutionBrief } from './contracts/actuator-execution-brief.js';
 import { resolveInputBindings, type InputBinding } from './input-binding.js';

@@ -9,7 +9,7 @@ import {
 import { applyCacheBreakpointToSystemBlocks } from '../reasoning/prompt-cache-discipline.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { metrics, MetricsCollector } from '../metrics.js';
-import { getUsageAttribution, withUsageAttribution } from '../usage-accounting.js';
+import { getUsageAttribution, withUsageAttribution } from '../finance/usage-accounting.js';
 import { evaluateBudgetThrottle } from '../governance/org-budget-governor.js';
 import type { LoadedDotCharter } from '../dot/dot-charter.js';
 import { withExecutionContextAsync } from '../authority.js';

@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { resolveFinancialModel, summarizeFinancialModel } from './financial-model.js';
-import { pathResolver } from './path-resolver.js';
+import { pathResolver } from '../path-resolver.js';
 import {
   safeExistsSync,
   safeMkdir,
   safeRmSync,
   safeSymlinkSync,
   safeWriteFile,
-} from './secure-io.js';
+} from '../secure-io.js';
 
 describe('financial-model', () => {
   const tmpRoot = pathResolver.sharedTmp('financial-model-test');

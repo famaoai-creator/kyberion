@@ -35,7 +35,7 @@ import {
 } from '../task/task-session.js';
 import type { TaskSession } from '../task/task-session.js';
 import type { ApprovalRequestDraft } from '../governance/approval-store.js';
-import { loadPendingIntent } from '../pending-intent-store.js';
+import { loadPendingIntent } from '../intent/pending-intent-store.js';
 import { executeCapturePhotoTaskSession } from '../capture-photo-task-session-executor.js';
 import { executeApprovedClaudeTaskSession } from '../provider/claude-task-session-executor.js';
 import { truncateTextWithCount } from '../foundation/text-truncation.js';

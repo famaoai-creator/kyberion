@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   clearPendingIntent,
   getPendingIntentPath,
@@ -8,7 +8,7 @@ import {
   loadPendingIntent,
   savePendingIntent,
 } from './pending-intent-store.js';
-import { isCorrectionUtterance } from './correction-detection.js';
+import { isCorrectionUtterance } from '../correction-detection.js';
 
 function cleanupPendingIntentStore() {
   const dir = pathResolver.sharedTmp('pending-intents');
