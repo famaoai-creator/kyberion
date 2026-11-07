@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { loadBrandTokensAtPath } from './brand-tokens.js';
 
 const testRoot = pathResolver.sharedTmp(`brand-tokens-loader-${process.pid}`);

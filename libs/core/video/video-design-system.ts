@@ -2,8 +2,8 @@ import {
   composeWebDesignSystem,
   DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK,
   DEFAULT_CHRONOS_WEB_THEME_PACK,
-} from '../web-design-system.js';
-import { semanticToken } from '../semantic-design-tokens.js';
+} from '../design/web-design-system.js';
+import { semanticToken } from '../design/semantic-design-tokens.js';
 import type { VideoPresentationMode, VideoContentBrief } from './video-content-brief-contract.js';
 
 export interface VideoModeDefaults {

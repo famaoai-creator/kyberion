@@ -7,16 +7,16 @@ import {
   buildSlidePatternDiagnostics,
   validateSlidePatternContent,
 } from './presentation-slide-pattern.js';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { pathResolver } from './path-resolver.js';
+import { compileSchemaFromPath } from '../schema-loader.js';
+import { pathResolver } from '../path-resolver.js';
 import {
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeSymlinkSync,
   safeWriteFile,
-} from './secure-io.js';
-import { withExecutionContext } from './authority.js';
+} from '../secure-io.js';
+import { withExecutionContext } from '../authority.js';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;

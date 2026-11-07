@@ -1,7 +1,7 @@
 ---
 title: Hermes additional adoption deep dive after the October runtime integration
 tags: [hermes-agent, comparative-research, security, operations, memory, ux, evaluation]
-last_updated: 2026-10-28
+last_updated: 2026-11-07
 status: researched
 runtime_stages: [planning, review]
 ---
@@ -142,7 +142,7 @@ P1 は次の限定実装へ進めやすい候補、P2 は境界・運用設計�
 ### A07: 定期ジョブの原因別 incident
 
 - **Hermes 根拠:** [`cron/incidents.py:137–199,237–249`](https://github.com/NousResearch/hermes-agent/blob/e5ea5fd9ccdf2913c0b21b24eb3d22b321d2e2a6/cron/incidents.py#L137) は job＋正規化エラー署名、ack、closed と resolved を区別する。`tests/cron/test_cron_incidents.py:123–137,221–300` と `test_cron_incidents_resolve.py:22–43` が根拠。
-- **Kyberion の既存境界と差分:** [feedback-loop.ts:280–351](../../../libs/core/knowledge/feedback-loop.ts) は失敗集約・連続失敗・成功時 reset を持ち、[scheduler-alert-markers.ts:1–35](../../../libs/core/scheduler-alert-markers.ts) に durable dedup がある。追加対象は job＋原因への ack と、復旧・別原因での再発の関係である。
+- **Kyberion の既存境界と差分:** [feedback-loop.ts:280–351](../../../libs/core/knowledge/feedback-loop.ts) は失敗集約・連続失敗・成功時 reset を持ち、[scheduler-alert-markers.ts:1–35](../../../libs/core/daemon/scheduler-alert-markers.ts) に durable dedup がある。追加対象は job＋原因への ack と、復旧・別原因での再発の関係である。
 - **適用:** 既存 ops alert / inbox / 実行履歴の上に projection を置き、「この原因は確認済み」「復旧」「別原因で再発」を表示する。
 - **注意と検証:** error code と原因分類を優先し、文字列だけで無関係な障害をまとめない。同原因、原因変更、成功後再発、ack 期限、tenant 分離を検証する。
 

@@ -40,7 +40,7 @@ export * from './service/service-pid-registry.js';
 
 export * from './voice/voice-profile-registry.js';
 
-export * from './presentation-preference-registry.js';
+export * from './design/presentation-preference-registry.js';
 
 export * from './imessage-bridge.js';
 
@@ -314,7 +314,7 @@ export * from './provider/cursor-cli-reasoning-backend.js';
 
 export * from './provider/cursor-cli-session-adapter.js';
 
-export * from './opencode-cli-reasoning-backend.js';
+export * from './provider/opencode-cli-reasoning-backend.js';
 
 export * from './agent/agent-adapter.js';
 

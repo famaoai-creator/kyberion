@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeReadFile } from '../secure-io.js';
 import {
   contrastRatio,
   findDesignStyle,
@@ -13,7 +13,7 @@ import {
   type CompositionSpec,
 } from './design-foundation.js';
 import { resolveCreativeDesign } from './creative-design-resolver.js';
-import { buildCampaignPlan, type CampaignBrief } from './campaign-suite.js';
+import { buildCampaignPlan, type CampaignBrief } from '../campaign-suite.js';
 
 const foundation = loadDesignFoundation();
 

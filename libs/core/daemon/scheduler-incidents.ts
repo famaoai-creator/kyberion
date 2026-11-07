@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { currentScope, type ScopeContext } from './scope-context.js';
-import { appendOpsAlertLogRecord } from './ops-alert-log.js';
-import { defaultOpsAlertLogPath, readOpsAlertLogRecordsIncludingSegments } from './ops-alert.js';
+import { currentScope, type ScopeContext } from '../scope-context.js';
+import { appendOpsAlertLogRecord } from '../ops-alert-log.js';
+import { defaultOpsAlertLogPath, readOpsAlertLogRecordsIncludingSegments } from '../ops-alert.js';
 
 type IncidentScope = Pick<ScopeContext, 'tier' | 'tenant_slug' | 'organization_id' | 'project_id'>;
 export interface SchedulerIncident {

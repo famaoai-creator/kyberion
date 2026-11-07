@@ -1,5 +1,5 @@
-import { logger } from './core.js';
-import type { PresentationPreferenceProfile } from './contracts/presentation-preference-profile.js';
+import { logger } from '../core.js';
+import type { PresentationPreferenceProfile } from '../contracts/presentation-preference-profile.js';
 import type { PresentationSlidePatternSelectionPolicy } from './presentation-slide-pattern.js';
 
 export type PresentationDeckPurpose =

@@ -17,7 +17,7 @@
  */
 import { matchesCron } from './pipeline/cron-utils.js';
 import type { InstalledUnit, InstalledUnitsReport } from './daemon/installed-units.js';
-import { DAEMON_TICK_IN_PROGRESS_MAX_MS } from './daemon-heartbeat.js';
+import { DAEMON_TICK_IN_PROGRESS_MAX_MS } from './daemon/daemon-heartbeat.js';
 import { TRIGGER_STORE_ROTATE_COMMAND } from './trigger-runner.js';
 
 export type { InstalledUnit, InstalledUnitsReport };

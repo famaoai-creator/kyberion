@@ -26,8 +26,8 @@ const allowedCoreFsImports = [
   'libs/core/chronos-token-registry-reader.test.ts',
   'libs/core/cli-subagent-team.e2e.test.ts',
   'libs/core/data-vault.test.ts',
-  'libs/core/creative-design-resolver.test.ts',
-  'libs/core/semantic-design-tokens.test.ts',
+  'libs/core/design/creative-design-resolver.test.ts',
+  'libs/core/design/semantic-design-tokens.test.ts',
   'libs/core/mission/delegation-concurrency.test.ts',
   'libs/core/deliverable-inbox.test.ts',
   'libs/core/knowledge/distill-knowledge-injector.test.ts',
@@ -82,7 +82,7 @@ const allowedCoreFsImports = [
   // Vision attachment tests plant a real PNG fixture under active/shared/tmp/
   // so the governed path/signature validators run against real disk bytes;
   // raw fs is the honest fixture seam for those test files.
-  'libs/core/opencode-cli-reasoning-backend.test.ts',
+  'libs/core/provider/opencode-cli-reasoning-backend.test.ts',
   'libs/core/mission/mission-phase-exit-gates.test.ts',
   'libs/core/process-logger.test.ts',
   'libs/core/promoted-memory.test.ts',

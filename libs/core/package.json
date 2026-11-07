@@ -657,8 +657,8 @@
       "default": "./dist/integrations/bluebubbles-adapter.js"
     },
     "./brand-tokens": {
-      "types": "./dist/brand-tokens.d.ts",
-      "default": "./dist/brand-tokens.js"
+      "types": "./dist/design/brand-tokens.d.ts",
+      "default": "./dist/design/brand-tokens.js"
     },
     "./bridge-poll-loop": {
       "types": "./dist/integrations/bridge-poll-loop.d.ts",
@@ -1077,8 +1077,8 @@
       "default": "./dist/cost-report.js"
     },
     "./creative-design-resolver": {
-      "types": "./dist/creative-design-resolver.d.ts",
-      "default": "./dist/creative-design-resolver.js"
+      "types": "./dist/design/creative-design-resolver.d.ts",
+      "default": "./dist/design/creative-design-resolver.js"
     },
     "./cron-utils": {
       "types": "./dist/pipeline/cron-utils.d.ts",
@@ -1113,8 +1113,8 @@
       "default": "./dist/customer-outbound-templates.js"
     },
     "./daemon-heartbeat": {
-      "types": "./dist/daemon-heartbeat.d.ts",
-      "default": "./dist/daemon-heartbeat.js"
+      "types": "./dist/daemon/daemon-heartbeat.d.ts",
+      "default": "./dist/daemon/daemon-heartbeat.js"
     },
     "./daemon/installed-units": {
       "types": "./dist/daemon/installed-units.d.ts",
@@ -1201,20 +1201,20 @@
       "default": "./dist/actuator/deployment-adapter.js"
     },
     "./design-fonts": {
-      "types": "./dist/design-fonts.d.ts",
-      "default": "./dist/design-fonts.js"
+      "types": "./dist/design/design-fonts.d.ts",
+      "default": "./dist/design/design-fonts.js"
     },
     "./design-foundation": {
-      "types": "./dist/design-foundation.d.ts",
-      "default": "./dist/design-foundation.js"
+      "types": "./dist/design/design-foundation.d.ts",
+      "default": "./dist/design/design-foundation.js"
     },
     "./design-foundation-ui": {
-      "types": "./dist/design-foundation-ui.d.ts",
-      "default": "./dist/design-foundation-ui.js"
+      "types": "./dist/design/design-foundation-ui.d.ts",
+      "default": "./dist/design/design-foundation-ui.js"
     },
     "./design-qa": {
-      "types": "./dist/design-qa.d.ts",
-      "default": "./dist/design-qa.js"
+      "types": "./dist/design/design-qa.d.ts",
+      "default": "./dist/design/design-qa.js"
     },
     "./desktop-event-feed": {
       "types": "./dist/virtual/desktop-event-feed.d.ts",
@@ -4585,12 +4585,12 @@
       "default": "./dist/presence-surface.js"
     },
     "./presentation-preference-registry": {
-      "types": "./dist/presentation-preference-registry.d.ts",
-      "default": "./dist/presentation-preference-registry.js"
+      "types": "./dist/design/presentation-preference-registry.d.ts",
+      "default": "./dist/design/presentation-preference-registry.js"
     },
     "./presentation-slide-pattern": {
-      "types": "./dist/presentation-slide-pattern.d.ts",
-      "default": "./dist/presentation-slide-pattern.js"
+      "types": "./dist/design/presentation-slide-pattern.d.ts",
+      "default": "./dist/design/presentation-slide-pattern.js"
     },
     "./procedure-dispatcher": {
       "types": "./dist/knowledge/procedure-dispatcher.d.ts",
@@ -5545,8 +5545,8 @@
       "default": "./dist/scenario/scenario-trajectory.js"
     },
     "./scheduler-incidents": {
-      "types": "./dist/scheduler-incidents.d.ts",
-      "default": "./dist/scheduler-incidents.js"
+      "types": "./dist/daemon/scheduler-incidents.d.ts",
+      "default": "./dist/daemon/scheduler-incidents.js"
     },
     "./schema-loader": {
       "types": "./dist/schema-loader.d.ts",
@@ -5733,8 +5733,8 @@
       "default": "./dist/semantic-degradation-log.js"
     },
     "./semantic-design-tokens": {
-      "types": "./dist/semantic-design-tokens.d.ts",
-      "default": "./dist/semantic-design-tokens.js"
+      "types": "./dist/design/semantic-design-tokens.d.ts",
+      "default": "./dist/design/semantic-design-tokens.js"
     },
     "./semaphore": {
       "types": "./dist/semaphore.d.ts",
@@ -7397,8 +7397,8 @@
       "default": "./dist/volatile-knowledge.js"
     },
     "./web-design-system": {
-      "types": "./dist/web-design-system.d.ts",
-      "default": "./dist/web-design-system.js"
+      "types": "./dist/design/web-design-system.d.ts",
+      "default": "./dist/design/web-design-system.js"
     },
     "./web-search-runtime-bridge": {
       "types": "./dist/search/web-search-runtime-bridge.d.ts",

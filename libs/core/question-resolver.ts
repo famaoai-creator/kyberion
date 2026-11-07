@@ -11,8 +11,8 @@ import {
 import { getMeetingBriefQuestions } from './meeting/meeting-operations-profile.js';
 import { notifyOperator } from './surface/operator-notifications.js';
 import { getNarratedVideoBriefQuestions } from './video/narrated-video-preference-profile.js';
-import { getPresentationPreferenceProfile } from './presentation-preference-registry.js';
-import { getPresentationBriefQuestions } from './presentation-preference-profile.js';
+import { getPresentationPreferenceProfile } from './design/presentation-preference-registry.js';
+import { getPresentationBriefQuestions } from './design/presentation-preference-profile.js';
 import { clamp, slugify } from './foundation/text.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 import type { ActuatorExecutionBrief } from './contracts/actuator-execution-brief.js';

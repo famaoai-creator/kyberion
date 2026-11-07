@@ -8,8 +8,8 @@ import {
   DAEMON_TICK_IN_PROGRESS_MAX_MS,
   tickInProgressAgeMs,
 } from './daemon-heartbeat.js';
-import { pathResolver } from './index.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { pathResolver } from '../index.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 
 const HEARTBEAT_TEST_ROOT = pathResolver.sharedTmp('daemon-heartbeat-test');
 
