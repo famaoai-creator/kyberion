@@ -10,7 +10,7 @@ import {
   ProviderTransportError,
   getProviderTransport,
   resolveProviderTransport,
-} from '../provider-transport.js';
+} from './provider-transport.js';
 import './loopback-transport.js';
 import { createRemoteProviderFacade } from './remote-provider-facade.js';
 

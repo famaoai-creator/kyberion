@@ -1,6 +1,6 @@
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
-import { matchesAnyTextRule, type TextMatchRule } from '../text-rule-matcher.js';
+import { matchesAnyTextRule, type TextMatchRule } from '../foundation/text-rule-matcher.js';
 
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 import type { UserIntentFlow } from '../intent/intent-contract.js';

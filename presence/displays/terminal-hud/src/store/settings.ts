@@ -3,7 +3,7 @@ import type { OperatorHomeApprovalItem } from '@agent/core/surface/operator-home
 import { getInstalledReasoningMode } from '@agent/core/reasoning/reasoning-bootstrap';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { pathResolver } from '@agent/core/path-resolver';
-import { activeCustomer } from '@agent/core/customer-resolver';
+import { activeStance } from '@agent/core/stance-resolver';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { resolveSurfaceBrowserUrl } from '@agent/core/surface/surface-url';
 import type { I18n } from '../i18n.js';
@@ -40,7 +40,7 @@ export function loadSettings(): SettingsData {
   }
   return {
     reasoningMode: reasoningMode || 'auto',
-    customer: activeCustomer() ?? '-',
+    customer: activeStance() ?? '-',
     profileRoot: resolveActiveProfileRoot(),
     rootDir: pathResolver.rootDir(),
     connectionsUrl,
@@ -48,7 +48,7 @@ export function loadSettings(): SettingsData {
 }
 
 export function settingsWatchPaths(): string[] {
-  return [pathResolver.active('shared/runtime/customer.env')];
+  return [pathResolver.active('shared/runtime/stance.env')];
 }
 
 export function settingsViewModel(data: SettingsData, i18n: I18n): PanelViewModel {

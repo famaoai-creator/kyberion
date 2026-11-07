@@ -14,23 +14,6 @@ const ALLOWED_CJS_FILES = new Set([
   'templates/skill-template-cjs/scripts/main.cjs',
 ]);
 const ALLOWED_NON_MODULE_PACKAGES = new Set(['templates/skill-template-cjs/package.json']);
-const ALLOWED_WORKSPACE_SOURCE_IMPORT_FILES = new Set<string>([
-  // Bootstrap exception: clean.ts runs BEFORE build on a fresh checkout, so
-  // @agent/core's dist entry points do not exist yet. It must import source.
-  'scripts/clean.ts',
-  // Source-only compiler bootstrap and standalone clean cannot depend on the
-  // package outputs they remove/rebuild (also excluded from runtime emission).
-  'scripts/build_repository.ts',
-  'scripts/clean_entrypoint.ts',
-  // Dependency policy checks also run BEFORE build in CI and need secure-io
-  // without relying on @agent/core's not-yet-built dist entry points.
-  'scripts/check_install_script_allowlist.ts',
-  'scripts/check_lockfile_commit_gate.ts',
-  'scripts/check_pinned_deps.ts',
-  // bindings.ts is imported by the standalone scripts test suite, which runs
-  // without the package build and therefore needs source seam registrations.
-  'scripts/bindings.ts',
-]);
 const ALLOWED_CORE_LEGACY_JS = new Set<string>([]);
 const LEGACY_JS_GUARDED_PREFIXES = [
   'libs/core/',
@@ -42,6 +25,10 @@ const LEGACY_JS_GUARDED_PREFIXES = [
   // shared-ui guards only its TS sources; vanilla/ ships a hand-written ES module.
   'libs/shared-ui/src/',
   'libs/shared-vision/',
+  'libs/shared-video/',
+  'libs/shared-interaction/',
+  'libs/shared-perception/',
+  'libs/shared-voice/',
   'libs/actuators/',
 ];
 const PACKAGE_SCAN_ROOTS = ['libs', 'presence', 'satellites', 'templates', 'package.json'];
@@ -56,8 +43,10 @@ const NODE_SOURCE_SCAN_ROOTS = [
 const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', 'coverage', '.next']);
 const IMPORT_EXTENSIONLESS_RE =
   /\b(?:import|export)\b[\s\S]{0,200}from\s+['"](\.{1,2}\/[^'"]+)['"]/g;
+// libs/core source imports are owned by scripts/check_core_single_instance.ts
+// (gate core-single-instance), which resolves every runtime import form.
 const FORBIDDEN_WORKSPACE_SOURCE_IMPORT_RE =
-  /\b(?:import|export)\b[\s\S]{0,200}from\s+['"]([^'"]*(?:libs\/core\/|libs\/shared-[^/]+\/src\/)[^'"]+)['"]/g;
+  /\b(?:import|export)\b[\s\S]{0,200}from\s+['"]([^'"]*libs\/shared-[^/]+\/src\/[^'"]+)['"]/g;
 const CJS_RE =
   /\bmodule\.exports\b|\bexports\.[A-Za-z_$]|\brequire\.main\s*===\s*module\b|\b__dirname\b|\b__filename\b/;
 
@@ -130,9 +119,6 @@ function checkSourceFile(filePath: string, violations: string[]) {
 
   for (const match of content.matchAll(FORBIDDEN_WORKSPACE_SOURCE_IMPORT_RE)) {
     const specifier = match[1];
-    if (ALLOWED_WORKSPACE_SOURCE_IMPORT_FILES.has(relativePath)) {
-      continue;
-    }
     violations.push(
       `${relativePath}: import exported workspace packages via package name, not source path (${specifier})`
     );

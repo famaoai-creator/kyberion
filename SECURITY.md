@@ -81,7 +81,7 @@ Kyberion enforces layered guardrails around agent-initiated execution:
 - **Shell command policy** (`libs/core/shell/shell-command-policy.ts` + `knowledge/product/governance/shell-command-policy.json`): commands are parsed (executable + arguments, not substring matching) and evaluated against a denylist and an allowlist. Anything unmatched defaults to `require_approval` (**fail-closed**), including when the policy file is missing.
 - **Sub-agent Bash gating** (`libs/core/provider/claude-agent-governance.ts`): sub-agents get no unconditional Bash; every command runs through the shell policy, and non-`allow` verdicts are denied with the reason surfaced. The ACP mediator applies the same policy and denies unmatched tool calls by default.
 - **ADF static guardrails** (`libs/core/pipeline/adf-guardrails.ts`): validated pipelines are additionally scanned before execution — command hooks against the shell policy, HTTP targets against the egress policy, and step/loop limits against governance caps. `readValidatedPipelineAdf` rejects pipelines with error-severity findings.
-- **Runtime bounds** (`libs/core/execution-bounds.ts`): shared step-count / wall-clock / loop-iteration backstops (`[SAFETY_LIMIT]`) used by pipeline engines as the last line of defense.
+- **Runtime bounds** (`libs/core/contracts/execution-bounds.ts`): shared step-count / wall-clock / loop-iteration backstops (`[SAFETY_LIMIT]`) used by pipeline engines as the last line of defense.
 
 These guardrails are one layer of defense in depth against naive-to-moderate dangerous commands — they are **not** a sandbox. Full isolation (containers/eBPF) is tracked as future work in `docs/developer/improvement-plans-2026-07/SA-02_ADF_SHELL_GUARDRAILS.ja.md`.
 
@@ -104,7 +104,7 @@ We credit reporters here unless they request anonymity.
 
 Kyberion executes browser automation, talks to LLMs, and reads from your filesystem. A vulnerability could:
 
-- Leak `customer/{slug}/` or `knowledge/personal/` content to an LLM provider.
+- Leak `knowledge/personal/stances/{slug}/` or `knowledge/personal/` content to an LLM provider.
 - Bypass tier-guard and read confidential knowledge across customers.
 - Execute arbitrary commands via a malformed ADF pipeline.
 - Persist malicious state into a mission's git repo.

@@ -4,8 +4,8 @@ import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
-import { resolveVars } from '@agent/core/logic-utils';
+} from '@agent/core/contracts/execution-bounds';
+import { resolveVars } from '@agent/core/pipeline/logic-utils';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { nowIso } from '@agent/core/foundation';

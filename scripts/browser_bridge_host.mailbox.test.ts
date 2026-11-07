@@ -9,7 +9,7 @@ import {
   BROWSER_BRIDGE_OBSERVE_PROCEDURE_ID,
   enqueueBrowserBridgeRequest,
   loadBrowserBridgeRequest,
-} from '@agent/core/browser/browser-bridge-mailbox';
+} from '@agent/shared-vision/browser-bridge-mailbox';
 
 const ingestMain = vi.hoisted(() =>
   vi.fn(async (_argv: string[], print: (value: unknown) => void) => {

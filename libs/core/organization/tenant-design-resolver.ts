@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-import { customerRoot } from '../customer-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 import {
@@ -148,17 +147,18 @@ function isConfidentialTenantDesignPath(
 function collectTenantOverridePaths(rootDir: string, customerId?: string): string[] {
   const candidates = new Set<string>();
 
-  if (customerId) {
-    const customerPath = customerRoot(
-      path.join('design', 'tenant-override.json'),
-      {
-        ...process.env,
-        KYBERION_CUSTOMER: customerId,
-      },
-      rootDir
+  if (customerId && isSafeTenantSegment(customerId)) {
+    // The tenant's own design (a company asset in its home) wins over the index.
+    const own = path.join(
+      rootDir,
+      'knowledge',
+      'confidential',
+      customerId,
+      'design',
+      'tenant-override.json'
     );
-    if (customerPath && safeExistsSync(customerPath)) {
-      return [path.resolve(customerPath)];
+    if (safeExistsSync(own) && isConfidentialTenantDesignPath(own, rootDir, customerId)) {
+      return [path.resolve(own)];
     }
   }
 

@@ -4,6 +4,7 @@ import { safeRmSync, safeWriteFile } from '../secure-io.js';
 import { loadDotExecutionPolicy } from './dot-execution-policy.js';
 import { dotLearnedFloorHolds } from './dot-autonomy.js';
 import type { DotFeedbackEntry } from './dot-feedback.js';
+import { compileSchema } from '../foundation/ajv.js';
 
 const fixture = pathResolver.sharedTmp('dot-policy-tests/policy.json');
 const knowledge = pathResolver.knowledge;
@@ -45,4 +46,20 @@ describe('governed Dot execution policy', () => {
     expect(loadDotExecutionPolicy().intake.enabled).toBe(false);
     expect(loadDotExecutionPolicy().learning.enabled).toBe(false);
   });
+  it.each(['missing', 'invalid'] as const)(
+    'keeps the %s policy fallback disabled and schema-valid',
+    (state) => {
+      configure({ allow_all: true });
+      if (state === 'missing') safeRmSync(fixture, { force: true });
+
+      const fallback = loadDotExecutionPolicy();
+      const validate = compileSchema(knowledge('product/schemas/dot-execution-policy.schema.json'));
+
+      expect(validate(fallback)).toBe(true);
+      expect(fallback.intake.enabled).toBe(false);
+      expect(fallback.learning.enabled).toBe(false);
+      expect(fallback.learning.l2_release_approvals).toBe(1000000);
+      expect(fallback.learning.l3_release_approvals).toBe(1000000);
+    }
+  );
 });

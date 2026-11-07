@@ -5,7 +5,7 @@
  * (MIT OR Apache-2.0): named entities, whitespace as character refs, drop
  * characters XML 1.0 cannot carry.
  */
-import { decodeEntities } from '../text-escaping.js';
+import { decodeEntities } from '../foundation/text-escaping.js';
 
 function isXmlChar(code: number): boolean {
   return (

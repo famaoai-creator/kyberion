@@ -29,7 +29,7 @@ export async function requestWorkItemMissionAlignment(authorized: WorkItem) {
   if (!safeExistsSync(script)) throw new Error('build the governed mission alignment script first');
   const env = serverDelegatedChildEnv('mission_controller');
   delete env.MISSION_ID;
-  delete env.KYBERION_CUSTOMER;
+  delete env.KYBERION_STANCE;
   delete env.KYBERION_PROJECT_ID;
   env.KYBERION_TENANT = scope.tenant_slug;
   if (scope.organization_id) env.KYBERION_ORGANIZATION_ID = scope.organization_id;

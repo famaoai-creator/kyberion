@@ -8,12 +8,12 @@ import { pathResolver } from '../path-resolver.js';
  * and a policy the store cannot read never relaxes anything.
  */
 const mocks = vi.hoisted(() => ({
-  customerRoot: vi.fn(() => null as string | null),
+  stanceRoot: vi.fn(() => null as string | null),
   warn: vi.fn(),
 }));
 
-vi.mock('../customer-resolver.js', () => ({
-  customerRoot: mocks.customerRoot,
+vi.mock('../stance-resolver.js', () => ({
+  stanceRoot: mocks.stanceRoot,
 }));
 
 vi.mock('../logger.js', async (importOriginal) => {
@@ -34,7 +34,7 @@ function overlay(contents: string): void {
     `approval-assurance-mode-${process.pid}-${Date.now()}-${fixture++}.json`
   );
   safeWriteFile(file, contents);
-  mocks.customerRoot.mockReturnValue(file);
+  mocks.stanceRoot.mockReturnValue(file);
 }
 
 function policyWith(fields: Record<string, unknown>): string {
@@ -64,7 +64,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  mocks.customerRoot.mockReturnValue(null);
+  mocks.stanceRoot.mockReturnValue(null);
   vi.unstubAllEnvs();
 });
 

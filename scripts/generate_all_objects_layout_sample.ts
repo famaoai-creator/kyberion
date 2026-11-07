@@ -1,10 +1,10 @@
-import { generateNativePptx } from '@agent/core/media/media-contracts';
+import { generateNativePptx } from '@agent/shared-media/media-contracts';
 import {
   createPptxLayoutKit,
   textElement as txt,
   shapeElement as shape,
   lineElement as line,
-} from '@agent/core/media/native-pptx-engine/layout-primitives';
+} from '@agent/shared-media/native-pptx-engine/layout-primitives';
 import type { PptxDesignProtocol, PptxElement, PptxSlide } from '@agent/core/types';
 import { nowIso } from '@agent/core/foundation';
 import { currentProcessArgv } from './lib/harness.js';

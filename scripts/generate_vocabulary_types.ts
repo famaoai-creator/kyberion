@@ -4,7 +4,7 @@
  * Two generated artifacts, both derived from
  * `knowledge/product/orchestration/user-facing-vocabulary.json`:
  *
- *   1. `libs/core/locale-normalize.ts`'s `SUPPORTED_LOCALES` array (spliced
+ *   1. `libs/core/foundation/locale-normalize.ts`'s `SUPPORTED_LOCALES` array (spliced
  *      between `GENERATED-LOCALES:BEGIN`/`END` markers) — from the catalog's
  *      `required_locales` field. `SupportedLocale` is derived from this array
  *      via `(typeof SUPPORTED_LOCALES)[number]`, so adding a locale is a data
@@ -36,7 +36,10 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { readTextFile } from '@agent/core/foundation';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { loadVocabularyCatalog } from '@agent/core/knowledge/vocabulary-catalog';
-import { buildUiMessageBundle, type SupportedLocale } from '@agent/core/locale-normalize';
+import {
+  buildUiMessageBundle,
+  type SupportedLocale,
+} from '@agent/core/foundation/locale-normalize';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 interface VocabularyCatalogFile {
@@ -47,7 +50,7 @@ interface VocabularyCatalogFile {
 }
 
 const CATALOG_PATH = pathResolver.knowledge('product/orchestration/user-facing-vocabulary.json');
-const LOCALE_NORMALIZE_PATH = pathResolver.rootResolve('libs/core/locale-normalize.ts');
+const LOCALE_NORMALIZE_PATH = pathResolver.rootResolve('libs/core/foundation/locale-normalize.ts');
 const VOCABULARY_KEYS_PATH = pathResolver.rootResolve(
   'libs/core/knowledge/vocabulary-keys.generated.ts'
 );

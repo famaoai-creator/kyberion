@@ -54,7 +54,7 @@ import {
   type AuthnResolveDeps,
   type ResolvedPrincipal,
 } from '../authn-principal-resolver.js';
-import '../authn-providers.js';
+import '../authn/authn-providers.js';
 import {
   authorizeWithPolicyEngine,
   type AuthzDecision,

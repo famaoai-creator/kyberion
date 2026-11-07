@@ -170,7 +170,7 @@
 
 1. Phase 0 の MCP サーバ + Phase1〜3 のツールをプラグイン・マニフェストに登録。
 2. Kyberion 既存 skill（`skill-wrapper` / `skill-install-package-map`）と Cowork SKILL.md の対応付け。
-3. 顧客向けは `customer/{slug}/` オーバーレイで fork なしカスタマイズ（既存方針を踏襲）。
+3. 顧客向けは `knowledge/personal/stances/{slug}/` オーバーレイで fork なしカスタマイズ（既存方針を踏襲）。
 
 **依存:** Phase 0–3
 **DoD:** Cowork のプラグイン導入フローで Kyberion を追加でき、上記ツール/スキルが即利用可能。

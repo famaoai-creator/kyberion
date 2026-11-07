@@ -22,7 +22,7 @@ import {
   browserSessionKey as compatibilityKey,
   mintBrowserSessionToken,
   verifyBrowserSessionToken,
-} from './authn-providers.js';
+} from './authn/authn-providers.js';
 beforeEach(() => {
   state.document = undefined;
   state.denied = false;

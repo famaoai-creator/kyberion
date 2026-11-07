@@ -1,5 +1,5 @@
 import { logger } from '../../core.js';
-import { OcrRequest, OcrResult, OcrProvider } from '../../ocr-types.js';
+import { OcrRequest, OcrResult, OcrProvider } from '../../contracts/ocr-types.js';
 import { resolveOcrImagePath, toTesseractLanguage } from '../provider-support.js';
 
 export class TesseractOcrProvider implements OcrProvider {

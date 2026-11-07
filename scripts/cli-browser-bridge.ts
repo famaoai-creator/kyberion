@@ -1,6 +1,6 @@
 /**
  * `pnpm kyberion browser-bridge request|status|wait` — Kyberion → Chrome
- * extension pull mailbox (libs/core/browser/browser-bridge-mailbox.ts).
+ * extension pull mailbox (libs/shared-vision/src/browser-bridge-mailbox.ts).
  *
  *   request observe --purpose <text> [--origins <o1,o2>] [--mode text|structure]
  *   request infer   --task <task> (--input <text> | --input-file <path>) [--options-json <json>]
@@ -25,7 +25,7 @@ import {
   type BrowserBridgeLocalTask,
   type BrowserBridgeRequest,
   type EnqueueBrowserBridgeRequestInput,
-} from '@agent/core/browser/browser-bridge-mailbox';
+} from '@agent/shared-vision/browser-bridge-mailbox';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { parseGuardedCliArgs, type CliOptionSpec } from '@agent/core/cli-guard';
 import {

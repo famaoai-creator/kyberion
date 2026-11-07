@@ -22,7 +22,7 @@
  * refused.
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { withLockSync } from '../lock-utils.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import type { ApprovalStoreRole } from './approval-store-role.js';
 import {
   approvalPasskeyChallengesLogicalDirAt,

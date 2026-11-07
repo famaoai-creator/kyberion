@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { SettingsExitGuardProvider, useSettingsExitGuard } from '../lib/settings-exit-guard';
 import { A2UIActionProvider, AppShell, KbI18nProvider, type A2UILinkProps } from '@agent/shared-ui';
-import { buildUiMessageBundle } from '@agent/core/locale-normalize';
+import { buildUiMessageBundle } from '@agent/core/foundation/locale-normalize';
 import vocabularyCatalog from '../../../../../knowledge/product/orchestration/user-facing-vocabulary.json';
 import { ConciergeI18nProvider, useConciergeI18n } from '../lib/use-concierge-i18n';
 import {

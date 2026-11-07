@@ -10,7 +10,7 @@ import {
 import { MetricsCollector, metricsWithheldNotice } from '../metrics.js';
 import { resolveUsageCost } from '../cost-report.js';
 import { hasUsageCostEvidence } from '../usage-accounting.js';
-import { listApprovalRequests } from '../governance/approval-store.js';
+import { listApprovalRequests } from '../governance/approval-store-reader.js';
 import { listArtifactRecords } from '../workforce/artifact-record.js';
 import { buildNextAction, type NextAction } from '../next-action.js';
 import { listInboxEntries, type DeliverableInboxEntry } from '../deliverable-inbox.js';

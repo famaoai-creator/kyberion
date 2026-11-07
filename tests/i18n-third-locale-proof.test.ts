@@ -3,7 +3,7 @@ import { main as runCli } from '../scripts/cli.js';
 import { t } from '@agent/core/t';
 import { _resetLocaleModuleStateForTests } from '@agent/core/locale';
 import { formatClarificationPacketConcise } from '@agent/core/intent/intent-contract';
-import { extractPlaceholderNames } from '@agent/core/message-format';
+import { extractPlaceholderNames } from '@agent/core/foundation/message-format';
 import {
   CHRONOS_LOCALE_STORAGE_KEY,
   chronosSpeechLocale,

@@ -41,12 +41,11 @@ import {
 import {
   evaluateApprovalUsability,
   assertApprovalUsable,
-  computeApprovalPayloadHash,
-  createApprovalRequest,
-  loadApprovalRequest,
-  listApprovalRequests,
-  type ApprovalRequestRecord,
-} from '../governance/approval-store.js';
+} from '../governance/approval-separation-of-duties.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
+import { createApprovalRequest } from '../governance/approval-request-create.js';
+import { loadApprovalRequest, listApprovalRequests } from '../governance/approval-store-reader.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 
 const PIPELINE_REF_PATTERN = /^pipelines\/[A-Za-z0-9._/-]+\.json$/u;
 const MANAGED_SKILL_REF_PATTERN =

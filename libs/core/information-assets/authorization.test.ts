@@ -14,6 +14,7 @@ import { assertInformationAssetCatalogAuthorization } from './access.js';
 import { informationAssetCoverageReadAllowed } from '../foundation/information-asset-coverage-capability.js';
 import { withExecutionContext } from '../authority.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+import { withConciergeManagementAccess } from '../surface/concierge-management-access.js';
 import { subjectAuthorization } from '../foundation/authorization-registry.js';
 import {
   serializeRegistryDocument,
@@ -71,6 +72,19 @@ describe('information asset canonical authorization subjects', () => {
   });
   it('does not let a coverage resource capability override registry strengthening', () => {
     const allowed = () =>
+      withConciergeManagementAccess(
+        {
+          tenantSlug: 'acme',
+          organizationId: 'org-a',
+          reads: [checkpoint],
+          writes: [],
+          mkdir: [],
+          identity: { projectId: null },
+        },
+        () => informationAssetCoverageReadAllowed(checkpoint, undefined)
+      );
+    // G2: the role name alone (no live grant) no longer admits the coverage read.
+    expect(
       runInResourceAccessScope(
         {
           tenantSlug: 'acme',
@@ -88,7 +102,8 @@ describe('information asset canonical authorization subjects', () => {
             'org-a',
             { projectId: null }
           )
-      );
+      )
+    ).toBe(false);
     expect(allowed()).toBe(true);
     state.overrides.set(coverage, { authority: { kind: 'approval' } });
     expect(allowed()).toBe(false);

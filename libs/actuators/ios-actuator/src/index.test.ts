@@ -41,11 +41,12 @@ const iosTestDoubles = vi.hoisted(() => ({
   },
   pathResolver: {
     rootDir: vi.fn().mockReturnValue('/mock/root'),
+    primaryCheckoutRootDir: vi.fn().mockReturnValue('/mock/root'),
     shared: vi.fn((p = '') => `/mock/shared/${String(p).replace(/^\/+/, '')}`),
     sharedTmp: vi.fn().mockReturnValue('/mock/tmp'),
     resolve: vi.fn((p: string) => `/mock/root/${p}`),
     rootResolve: vi.fn((p: string) => `/mock/root/${p}`),
-    knowledge: vi.fn().mockReturnValue('/mock/knowledge'),
+    knowledge: vi.fn((p = '') => `/mock/root/knowledge/${p}`),
   },
 }));
 
@@ -66,6 +67,20 @@ vi.mock('@agent/core/path-resolver', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/path-resolver')>()),
   pathResolver: iosTestDoubles.pathResolver,
 }));
+// Compile the real retry contract without reading through the sentinel checkout.
+vi.mock('../../../core/foundation/ajv.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../core/foundation/ajv.js')>();
+  const { default: schema } =
+    await import('../../../../knowledge/product/schemas/retry-policy.schema.json');
+  return {
+    ...actual,
+    compileSchema: (schemaPath: string) =>
+      schemaPath.endsWith('/retry-policy.schema.json')
+        ? actual.createAjv().compile(schema)
+        : actual.compileSchema(schemaPath),
+  };
+});
+
 vi.mock('@agent/core/async-utils', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/async-utils')>()),
   retry: iosTestDoubles.retry,

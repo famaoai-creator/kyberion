@@ -55,6 +55,6 @@ TTS/STT と reasoning provider/model は、資格情報、モデル、送信先�
 
 ```bash
 pnpm run build:packages
-pnpm exec vitest run libs/core/actuator/adapter-default-selection.test.ts libs/core/browser/browser-onboarding.test.ts
+pnpm exec vitest run libs/core/actuator/adapter-default-selection.test.ts libs/shared-vision/src/browser-onboarding.test.ts
 pnpm pipeline --input pipelines/baseline-check.json
 ```

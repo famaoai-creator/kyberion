@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DecisionRecord } from '../decision-ledger/model.js';
-import type { ScopeContext } from '../scope-context-validation.js';
+import type { ScopeContext } from '../foundation/scope-context-validation.js';
 import {
   createJudgmentPrecedentSnapshot,
   judgmentCanonicalHash,

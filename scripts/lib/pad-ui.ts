@@ -32,10 +32,10 @@ import {
   normalizeLocale,
   SUPPORTED_LOCALES,
   type SupportedLocale,
-} from '@agent/core/locale-normalize';
+} from '@agent/core/foundation/locale-normalize';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { resolveVocabularyEntry } from '@agent/core/knowledge/vocabulary-catalog';
-import type { MessageParams } from '@agent/core/message-format';
+import type { MessageParams } from '@agent/core/foundation/message-format';
 import { readKyberionDesignTokens, renderKyberionUiTokenBlock } from '../design-token-utils.js';
 
 /** Shared server-side mirror of the language choice (same as computer-surface). */

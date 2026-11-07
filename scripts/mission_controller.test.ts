@@ -839,7 +839,7 @@ describe('mission_controller argument parsing', () => {
       'organization-catalogs [--json] [--organization-id <ORG>] [--selected-only] [--summary]'
     );
     expect(help).toContain(
-      'organization-profiles [--json] [--organization-id <ORG>] [--active-only] [--ready-only] [--missing-only] [--source <customer|public>] [--summary]'
+      'organization-profiles [--json] [--organization-id <ORG>] [--active-only] [--ready-only] [--missing-only] [--source <tenant|public>] [--summary]'
     );
     expect(help).toContain('organization-profile [--json] [--organization-id <ORG>] [--summary]');
     expect(help).toContain('organization-profiles --json --summary');

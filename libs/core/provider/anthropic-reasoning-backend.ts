@@ -24,7 +24,7 @@ import {
   DEFAULT_COMPLETION_FLOOR_TOKENS,
   computeCompletionTokenBudget,
   estimateRequestInputTokens,
-} from '../completion-token-budget.js';
+} from './completion-token-budget.js';
 import { resolveContextWindowProfile } from '../workforce/context-window-profile.js';
 import type {
   BranchForkInput,

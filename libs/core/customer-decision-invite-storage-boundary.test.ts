@@ -8,7 +8,7 @@ import * as initialIO from './secure-io.js';
  * The invite store on a fresh root: the ordinary Vitest live-store remap
  * places invite bytes outside the protected root, so only a fixture root
  * exercises the real tier/tenant guard. No confidential persona is set; the
- * only binding is the tenant the store role is assumed for.
+ * only binding is the tenant of the exact invite capability (G2: no store role).
  */
 const SOURCE_ROOT = rootDir();
 const ROOT = path.join(SOURCE_ROOT, 'active/shared/tmp/cd-invite-boundary-' + process.pid);
@@ -35,6 +35,7 @@ let io: typeof import('./secure-io.js');
 let authority: typeof import('./authority.js');
 let capabilityModule: typeof import('./foundation/customer-decision-invite-capability.js');
 let resourceScope: typeof import('./foundation/resource-access-scope.js');
+let guard: typeof import('./tier-guard.js');
 
 const base = (tenantSlug = TENANT) => ({
   tenantSlug,
@@ -72,6 +73,7 @@ beforeAll(async () => {
   invite = await import('./customer-decision/invite.js');
   capabilityModule = await import('./foundation/customer-decision-invite-capability.js');
   resourceScope = await import('./foundation/resource-access-scope.js');
+  guard = await import('./tier-guard.js');
   expect((await import('./path-resolver.js')).rootDir()).toBe(ROOT);
 }, 120_000);
 
@@ -107,18 +109,12 @@ beforeEach(() => {
   setProfile(UNREGISTERED, null);
 });
 
-/** A raw write of one invite record as the store role, inside its exact capability. */
+/** A raw write of one invite record inside its exact capability alone (no role). */
 function writeAsStore(tenant: string, inviteId: string, content: string): void {
   const relative = `${STORE}/confidential/${tenant}/${inviteId}.json`;
   resourceScope.runInResourceAccessScope(
     capabilityModule.customerDecisionInviteCapability(tenant, relative, true),
-    () =>
-      authority.withExecutionContext(
-        capabilityModule.CUSTOMER_DECISION_INVITE_STORE_ROLE,
-        () => io.safeWriteFile(path.join(ROOT, relative), content),
-        undefined,
-        tenant
-      )
+    () => io.safeWriteFile(path.join(ROOT, relative), content)
   );
 }
 
@@ -191,22 +187,16 @@ describe('customer decision invite store on the real tier/tenant guard', () => {
     expect(() =>
       capabilityModule.customerDecisionInviteCapability(TENANT, otherFile, false)
     ).toThrow(/RESOURCE_SCOPE_INVALID/u);
-    // Inside TENANT's capability and role, the other tenant's record stays unreadable.
+    // Inside TENANT's capability, the other tenant's record stays unreadable.
     const { invite: foreign } = invite.issueInvite(base(OTHER));
     const ownFile = `${STORE}/confidential/${TENANT}/inv-0000000000000000.json`;
     expect(() =>
       resourceScope.runInResourceAccessScope(
         capabilityModule.customerDecisionInviteCapability(TENANT, ownFile, false),
         () =>
-          authority.withExecutionContext(
-            capabilityModule.CUSTOMER_DECISION_INVITE_STORE_ROLE,
-            () =>
-              io.safeReadFile(path.join(tenantDir(OTHER), `${foreign.invite_id}.json`), {
-                encoding: 'utf8',
-              }),
-            undefined,
-            TENANT
-          )
+          io.safeReadFile(path.join(tenantDir(OTHER), `${foreign.invite_id}.json`), {
+            encoding: 'utf8',
+          })
       )
     ).toThrow(/RESOURCE_SCOPE_DENIED|tenant\.scope_violation/u);
   });
@@ -256,7 +246,7 @@ describe('customer decision invite store on the real tier/tenant guard', () => {
     expect(readRaw(TENANT, issued.invite_id).uses).toEqual([]);
     // No new invite.
     expect(() => invite.issueInvite(base())).toThrow(/\[CD_INVITE_TENANT_NOT_REGISTERED\]/u);
-    // A brand-new record written directly as the store role is refused too.
+    // A brand-new record written directly inside the capability is refused too.
     const fresh = { ...readRaw(TENANT, issued.invite_id), invite_id: 'inv-00000000000000aa' };
     expect(() => writeAsStore(TENANT, 'inv-00000000000000aa', JSON.stringify(fresh))).toThrow(
       /\[CD_INVITE_TENANT_NOT_REGISTERED\]/u
@@ -297,22 +287,32 @@ describe('customer decision invite store on the real tier/tenant guard', () => {
     ).toEqual([issued.invite_id, second.invite_id].sort());
   });
 
-  it('an active tenant is unchanged: a direct write as the store role still lands', () => {
+  it('an active tenant is unchanged: a direct write inside the capability still lands', () => {
     const { invite: issued } = invite.issueInvite(base());
     const changed = { ...readRaw(TENANT, issued.invite_id), uses: [{ at: NOW, action: 'view' }] };
     writeAsStore(TENANT, issued.invite_id, JSON.stringify(changed));
     expect(readRaw(TENANT, issued.invite_id).uses).toEqual([{ at: NOW, action: 'view' }]);
   });
 
-  it('the store role requires its exact capability', () => {
-    expect(() =>
-      authority.withExecutionContext(
-        capabilityModule.CUSTOMER_DECISION_INVITE_STORE_ROLE,
-        () => undefined,
-        undefined,
-        TENANT
+  it('has no store role: the exact capability alone authorizes, every lookalike fails closed', () => {
+    const { invite: issued } = invite.issueInvite(base());
+    const relative = `${STORE}/confidential/${TENANT}/${issued.invite_id}.json`;
+    const file = path.join(ROOT, relative);
+    const writable = () => guard.validateWritePermission(file).allowed;
+    // The former role name grants nothing, with or without a tenant.
+    expect(
+      authority.withExecutionContext('customer_decision_invite_store', writable, undefined, TENANT)
+    ).toBe(false);
+    // The exact capability alone authorizes its one record, for the record's own tenant.
+    const exact = capabilityModule.customerDecisionInviteCapability(TENANT, relative, true);
+    expect(resourceScope.runInResourceAccessScope(exact, writable)).toBe(true);
+    // A read-only capability never writes; a listing capability never writes or mkdirs.
+    expect(
+      resourceScope.runInResourceAccessScope(
+        capabilityModule.customerDecisionInviteCapability(TENANT, relative, false),
+        writable
       )
-    ).toThrow(/RESOURCE_SCOPE_REQUIRED/u);
+    ).toBe(false);
     expect(() =>
       capabilityModule.customerDecisionInviteCapability(
         TENANT,
@@ -320,5 +320,27 @@ describe('customer decision invite store on the real tier/tenant guard', () => {
         true
       )
     ).toThrow(/RESOURCE_SCOPE_INVALID/u);
+    // A broadened or append-enlarged lookalike is not the invite capability.
+    for (const forged of [
+      { ...exact, writeExact: [...exact.writeExact, `${relative}.other`] },
+      { ...exact, organizationId: 'org-a' },
+      { ...exact, namePrefixExact: [`${STORE}/confidential/${TENANT}/inv-`] },
+    ])
+      expect(resourceScope.runInResourceAccessScope(forged, writable)).toBe(false);
+    expect(
+      resourceScope.runInResourceAccessScope(
+        { ...exact, appendExact: [`${relative}.other`] },
+        () => guard.validateWritePermission(`${file}.other`, 'append').allowed
+      )
+    ).toBe(false);
+    // A caller bound to another tenant gains nothing from the capability.
+    process.env.KYBERION_TENANT = OTHER;
+    try {
+      expect(resourceScope.runInResourceAccessScope(exact, writable)).toBe(false);
+    } finally {
+      delete process.env.KYBERION_TENANT;
+    }
+    // Outside the capability's lifetime nothing remains.
+    expect(writable()).toBe(false);
   });
 });

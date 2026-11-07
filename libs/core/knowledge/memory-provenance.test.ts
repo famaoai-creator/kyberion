@@ -14,7 +14,7 @@ import { KnowledgeHintIndex, queryKnowledge, queryKnowledgeHybrid } from './know
 import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
 import {
   memoryProvenanceStatePath,
-  MEMORY_PROVENANCE_READER_ROLE,
+  MEMORY_PROVENANCE_GRANT_ISSUANCE_RIGHT,
 } from './memory-provenance-capability.js';
 import { savePromotedMemoryRecord } from '../promoted-memory.js';
 import { createDistillCandidateRecord } from './distill-candidate-registry.js';
@@ -357,9 +357,10 @@ describe('memory lineage and current-use eligibility', () => {
       expect(() =>
         withExecutionContext('worker', () => safeWriteFile(memoryProvenanceStatePath(scope), '{}'))
       ).toThrow('outside worker-mutable');
-      expect(() => withExecutionContext(MEMORY_PROVENANCE_READER_ROLE, () => undefined)).toThrow(
-        'read capability'
-      );
+      // G2: the former reader role name is only the grant's issuance right.
+      expect(() =>
+        withExecutionContext(MEMORY_PROVENANCE_GRANT_ISSUANCE_RIGHT, () => undefined)
+      ).toThrow('ROLE_ASSUMPTION_DENIED');
     }));
   it('refuses an ordinary reader attempting another tenant partition', () =>
     governed(() => {

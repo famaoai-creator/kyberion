@@ -4,11 +4,11 @@ import * as pathResolver from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 
 const mocks = vi.hoisted(() => ({
-  customerRoot: vi.fn(() => null as string | null),
+  stanceRoot: vi.fn(() => null as string | null),
 }));
 
-vi.mock('../customer-resolver.js', () => ({
-  customerRoot: mocks.customerRoot,
+vi.mock('../stance-resolver.js', () => ({
+  stanceRoot: mocks.stanceRoot,
 }));
 
 import {
@@ -32,7 +32,7 @@ describe('voice profile registry', () => {
     delete process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH;
     delete process.env.KYBERION_VOICE_PROFILE_REGISTRY_DIR;
     delete process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH;
-    mocks.customerRoot.mockReturnValue(null);
+    mocks.stanceRoot.mockReturnValue(null);
     resetVoiceProfileRegistryCache();
   });
 
@@ -231,7 +231,7 @@ describe('voice profile registry', () => {
         ],
       })
     );
-    mocks.customerRoot.mockReturnValue(customerOverlayPath);
+    mocks.stanceRoot.mockReturnValue(customerOverlayPath);
     process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = overlayPath;
 
     const registry = getVoiceProfileRegistry();

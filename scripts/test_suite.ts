@@ -13,8 +13,8 @@ import { readSafeJsonFile } from './lib/json-input.js';
 
 export const TEST_SUITES = {
   smoke: ['tests/smoke.test.ts'],
-  unit: ['libs/core/', 'libs/actuators/'],
-  core: ['libs/core/', '--no-file-parallelism'],
+  unit: ['libs/core/', 'libs/shared-', 'libs/actuators/'],
+  core: ['libs/core/', 'libs/shared-', '--no-file-parallelism'],
   'meeting-dry-run': [
     'libs/core/meeting/meeting-participation-coordinator.test.ts',
     'libs/actuators/meeting-browser-driver/src/index.test.ts',

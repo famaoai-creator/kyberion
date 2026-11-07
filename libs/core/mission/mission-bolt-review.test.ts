@@ -18,7 +18,7 @@ import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { withExecutionContext } from '../authority.js';
-import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+import { currentResourceAccessScope } from '../foundation/resource-access-scope.js';
 import type { DecisionAgenda } from '../customer-decision/model.js';
 import {
   readAgenda,
@@ -27,8 +27,9 @@ import {
 } from '../customer-decision/store.js';
 import { boltMilestone } from '../customer-decision/bolt-review.js';
 import {
-  CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
+  CUSTOMER_DECISION_MILESTONE_GRANT_ISSUANCE_RIGHT,
   customerDecisionMilestoneCapability,
+  withCustomerDecisionMilestoneCapability,
   isCustomerDecisionMilestoneCapability,
 } from '../foundation/customer-decision-milestone-capability.js';
 import {
@@ -199,13 +200,22 @@ describe('mission bolt review (CD-10)', () => {
       writeAgenda({ dir }, review('agd-review0001', BOLT_1));
       const file = 'agendas/agd-review0001.json';
       const asMilestoneRole = <T>(fn: () => T): T =>
-        runInResourceAccessScope(
-          customerDecisionMilestoneCapability(TENANT, pathResolver.toRepoRelative(dir), {
-            read: [],
-            write: file,
-          }),
-          () => withExecutionContext(CUSTOMER_DECISION_MILESTONE_STORE_ROLE, fn, undefined, TENANT)
+        withCustomerDecisionMilestoneCapability(
+          TENANT,
+          pathResolver.toRepoRelative(dir),
+          { read: [], write: file },
+          // G2: the grant is the authority; the caller keeps its own role.
+          () => withExecutionContext('mission_controller', fn, undefined, TENANT)
         );
+      // The former role name is only the grant's issuance right.
+      expect(() =>
+        withExecutionContext(
+          CUSTOMER_DECISION_MILESTONE_GRANT_ISSUANCE_RIGHT,
+          () => 0,
+          undefined,
+          TENANT
+        )
+      ).toThrow('ROLE_ASSUMPTION_DENIED');
       const current = readAgenda({ dir }, 'agd-review0001') as DecisionAgenda;
       for (const changed of [
         { ...current, title: 'Changed' },
@@ -242,7 +252,16 @@ describe('mission bolt review (CD-10)', () => {
         writeExact: [`${caseDir}/agendas/agd-review0001.json`],
         mkdirExact: [`${caseDir}/agendas`],
       });
-      expect(isCustomerDecisionMilestoneCapability(scope)).toBe(true);
+      // G2: the ceiling is data; only the private issuer's live grant is the capability.
+      expect(isCustomerDecisionMilestoneCapability(scope)).toBe(false);
+      expect(
+        withCustomerDecisionMilestoneCapability(
+          TENANT,
+          caseDir,
+          { read: ['agendas'], write: 'agendas/agd-review0001.json' },
+          () => isCustomerDecisionMilestoneCapability(currentResourceAccessScope())
+        )
+      ).toBe(true);
       for (const access of [
         { read: ['decisions.jsonl'] },
         { read: ['consumers'] },

@@ -3,10 +3,8 @@ import { z } from 'zod';
 import type { WorkItem, WorkLease } from '../workforce/work-coordination-types.js';
 import { workEffectOwnership } from '../workforce/work-effect-ownership.js';
 import type { AutonomousOpsGateResult } from '../governance/autonomous-ops-gate.js';
-import {
-  isApprovalRequestExpired,
-  type ApprovalRequestRecord,
-} from '../governance/approval-store.js';
+import { isApprovalRequestExpired } from '../governance/approval-store-reader.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import { judgmentCanonicalHash } from '../organization/judgment-precedents.js';
 import {
   latencyProposalFactsSchema,

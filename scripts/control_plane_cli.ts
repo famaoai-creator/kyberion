@@ -7,7 +7,7 @@ import {
 import {
   createNextActionContract,
   validateNextActionContract,
-} from '@agent/core/next-action-contract';
+} from '@agent/core/contracts/next-action-contract';
 import {
   findIntentOutcomePattern,
   loadIntentOutcomePatterns,

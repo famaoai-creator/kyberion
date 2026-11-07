@@ -190,8 +190,8 @@ generated registries, validation, and security boundaries), follow the
 
 Where the identity is saved, and where baseline-check L3 looks, depends on the active stance. Decide **before saving the identity**.
 
-- Use as yourself: leave `KYBERION_CUSTOMER` unset. The destination is `knowledge/personal/`.
-- Use as a customer / company: switch with `pnpm stance:switch <customer-slug>` (create the overlay first with `pnpm stance:create <customer-slug>` if it does not exist). The destination is `customer/{slug}/`.
+- Use as yourself: leave `KYBERION_STANCE` unset. The destination is `knowledge/personal/`.
+- Use as a customer / company: switch with `pnpm stance:switch <customer-slug>` (create the overlay first with `pnpm stance:create <customer-slug>` if it does not exist). The destination is `knowledge/personal/stances/{slug}/`.
 
 ### Stage 7: Soul infusion (identity)
 
@@ -219,10 +219,10 @@ scope 内の未確認を本人設定の欠落と判断して onboarding をや�
 - **Operator identity for approvals**: the terminal records approvals as the local owner member (`user:owner`, `knowledge/personal/members/owner.json`), with your onboarding name kept beside it for display. Opening the concierge or presence-studio creates this member; from a terminal only, run `pnpm organization member ensure-owner` (idempotent). It is needed when separation of duties is switched on (`approval-policy.json` `separation_of_duties.enabled`): without it, opening or approving a request from the terminal stops with a diagnostic.
 - **To start over**: `pnpm onboarding reset` removes the onboarding state and the generated identity / vision / agent artifacts.
 - **Physical changes**:
-  - `customer/{slug}/my-identity.json` is created. When `KYBERION_CUSTOMER` is unset, it is `knowledge/personal/my-identity.json`.
-  - `customer/{slug}/my-vision.md` is created (or updated). When `KYBERION_CUSTOMER` is unset, it is `knowledge/personal/my-vision.md`.
-  - `customer/{slug}/onboarding/onboarding-state.json` and `onboarding-summary.md` are created. When `KYBERION_CUSTOMER` is unset, they are under `knowledge/personal/onboarding/`.
-  - At the end of identity setup the agent introduces itself and agrees an Agent ID (its public name for A2A communication and records) with the sovereign. `customer/{slug}/agent-identity.json` is created; with `KYBERION_CUSTOMER` unset, `knowledge/personal/agent-identity.json`.
+  - `knowledge/personal/stances/{slug}/my-identity.json` is created. When `KYBERION_STANCE` is unset, it is `knowledge/personal/my-identity.json`.
+  - `knowledge/personal/stances/{slug}/my-vision.md` is created (or updated). When `KYBERION_STANCE` is unset, it is `knowledge/personal/my-vision.md`.
+  - `knowledge/personal/stances/{slug}/onboarding/onboarding-state.json` and `onboarding-summary.md` are created. When `KYBERION_STANCE` is unset, they are under `knowledge/personal/onboarding/`.
+  - At the end of identity setup the agent introduces itself and agrees an Agent ID (its public name for A2A communication and records) with the sovereign. `knowledge/personal/stances/{slug}/agent-identity.json` is created; with `KYBERION_STANCE` unset, `knowledge/personal/agent-identity.json`.
   - Service connection candidates (`connections/*.json`), tenant candidates, and the first tutorial plan (`onboarding/tutorial-plan.md`) are created under the same profile. They are candidates; no external side effects occur.
 
 ### Stage 8: Bring the baseline to all_clear
@@ -242,13 +242,13 @@ scope 内の未確認を本人設定の欠落と判断して onboarding をや�
 
 For personal-only use this stage is not needed. If you work with tenants, run Steps 5-8 of the [standard flow](../knowledge/product/governance/onboarding-flow.md) in order. Here are the three distinct things those steps tie together.
 
-| What it refers to                         | Role                                                             | Where it lives                                  |
-| ----------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------- |
-| **customer-slug** (stance / acting party) | "Which party am I acting as right now" — **runtime setting**     | `customer/{slug}/` + `KYBERION_CUSTOMER`        |
-| **tenant-slug** (tenant)                  | "Inside which confidentiality boundary am I" — **data boundary** | `knowledge/confidential/{tenant-slug}/`         |
-| **organization-id** (organization)        | "How that tenant is run" — the operating model under the tenant  | `active/organizations/{tier}/{tenant}/{org_id}` |
+| What it refers to                         | Role                                                             | Where it lives                                           |
+| ----------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
+| **customer-slug** (stance / acting party) | "Which party am I acting as right now" — **runtime setting**     | `knowledge/personal/stances/{slug}/` + `KYBERION_STANCE` |
+| **tenant-slug** (tenant)                  | "Inside which confidentiality boundary am I" — **data boundary** | `knowledge/confidential/{tenant-slug}/`                  |
+| **organization-id** (organization)        | "How that tenant is run" — the operating model under the tenant  | `active/organizations/{tier}/{tenant}/{org_id}`          |
 
-`customer-slug` and `tenant-slug` are often spelled the same but are not the same thing (one is a setting, the other a boundary). The containment order is canonical in [entity-scope-hierarchy](../knowledge/product/architecture/entity-scope-hierarchy.md); the three-way distinction is in [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md). A tenant's own customers live in `knowledge/confidential/{tenant-slug}/customers/`, not in `customer/{slug}/`.
+`customer-slug` and `tenant-slug` are often spelled the same but are not the same thing (one is a setting, the other a boundary). The containment order is canonical in [entity-scope-hierarchy](../knowledge/product/architecture/entity-scope-hierarchy.md); the three-way distinction is in [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md). A tenant's own customers live in `knowledge/confidential/{tenant-slug}/customers/`, not in `knowledge/personal/stances/{slug}/`.
 
 To start as an AI company, `pnpm onboarding company --vertical <vertical> --slug <company-slug> --name "<company name>" --owner-id human:<owner> --goal "<first outcome>" --tenant-slug <tenant-slug> --dry-run` previews tenant registration and context binding together. AI workers can prepare and execute work, but final decisions on contracts, payments, external publication and permission changes stay with the human given as `--owner-id`. Company onboarding does not complete activation automatically.
 

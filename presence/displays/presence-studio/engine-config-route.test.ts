@@ -6,7 +6,7 @@ const state = vi.hoisted(() => ({
   update: vi.fn(),
   auth: vi.fn(),
 }));
-vi.mock('@agent/core/voice/engine-runtime-preferences-operator', () => ({
+vi.mock('@agent/shared-voice/engine-runtime-preferences-operator', () => ({
   getOperatorEngineRuntimePreferences: state.get,
   updateOperatorEngineRuntimePreferences: state.update,
   EngineRuntimeOperatorError: class extends Error {
@@ -35,7 +35,7 @@ vi.mock('./security.js', () => ({
   },
 }));
 import { registerEngineConfigRoute } from './engine-config-route.js';
-import { EngineRuntimeOperatorError } from '@agent/core/voice/engine-runtime-preferences-operator';
+import { EngineRuntimeOperatorError } from '@agent/shared-voice/engine-runtime-preferences-operator';
 type Handler = (req: unknown, res: unknown) => unknown;
 const handlers = new Map<string, Handler>();
 let parserFailure: express.ErrorRequestHandler;

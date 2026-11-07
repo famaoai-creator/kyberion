@@ -3,7 +3,7 @@ import { assessContextualClarification } from '../contextual-intent-clarificatio
 import { buildContextualIntentFrame } from '../contextual-intent-frame.js';
 import { classifyTaskSessionIntent } from '../task/task-session.js';
 import { t } from '../t.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import {
   loadResolvedStandardIntentCatalog,
   resolveIntentResolutionPacket,

@@ -78,6 +78,7 @@ const MATCHER_METHODS = new Set(['test', 'exec', 'match', 'matchAll', 'search'])
  */
 const LOCALE_RULE_ALLOWLIST: RegExp[] = [
   /^libs\/core\/locale[^/]*\.ts$/u,
+  /^libs\/core\/foundation\/locale[^/]*\.ts$/u,
   /^libs\/core\/knowledge\/vocabulary-keys\.generated\.ts$/u,
   // this scanner names the tags it forbids
   /^scripts\/lib\/locale-token-scan\.ts$/u,
@@ -87,6 +88,7 @@ const INTENT_REGEX_ALLOWLIST: RegExp[] = [/^libs\/core\/intent\/intent-phrase-le
 /** Artifact-engine directories: colours resolve through semantic design tokens. */
 const ENGINE_DIR_PATTERNS: RegExp[] = [
   /^libs\/core\/(?:media|video)\//u,
+  /^libs\/shared-(?:media|video)\/src\//u,
   /^libs\/actuators\/(?:media|media-generation|video-composition)-actuator\/src\//u,
 ];
 

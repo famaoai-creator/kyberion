@@ -32,7 +32,7 @@ pnpm pipeline --input pipelines/example.json
 - pnpm version: <!-- `pnpm --version` -->
 - OS: <!-- macOS Sonoma / Ubuntu 22.04 / Windows 11 / etc. -->
 - Reasoning backend: <!-- output of `pnpm kyberion doctor` re. backend, or `KYBERION_REASONING_BACKEND` -->
-- Customer overlay: <!-- `KYBERION_CUSTOMER` value, or "none" -->
+- Customer overlay: <!-- `KYBERION_STANCE` value, or "none" -->
 
 ## `pnpm kyberion doctor` output
 

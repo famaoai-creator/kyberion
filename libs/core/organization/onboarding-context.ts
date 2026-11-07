@@ -6,7 +6,8 @@ import {
   readTenantProfile,
   type TenantProfile,
 } from './tenant-registry.js';
-import { customerDirForSlug } from '../customer-resolver.js';
+import { stanceDirForSlug } from '../stance-resolver.js';
+import { tenantHomePath } from './tenant-home.js';
 import { isTenantActivationActive } from './tenant-activation.js';
 import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
 import {
@@ -199,7 +200,7 @@ function assertCustomerSlug(slug: string): string {
 
 function contextPath(customerSlug: string, rootDir = pathResolver.rootDir()): string {
   return assertSafeRepositoryPath(
-    path.join(rootDir, 'customer', customerSlug, 'onboarding', 'organization-context.json'),
+    path.join(stanceDirForSlug(customerSlug, rootDir), 'onboarding', 'organization-context.json'),
     { allowMissingLeaf: true, rootDir }
   );
 }
@@ -219,7 +220,7 @@ export function readOptionalOnboardingFile(filePath: string, label: string): str
 
 function firstWorkPath(customerSlug: string, rootDir = pathResolver.rootDir()): string {
   return assertSafeRepositoryPath(
-    path.join(rootDir, 'customer', customerSlug, 'onboarding', 'first-work-resolution.json'),
+    path.join(stanceDirForSlug(customerSlug, rootDir), 'onboarding', 'first-work-resolution.json'),
     { allowMissingLeaf: true, rootDir }
   );
 }
@@ -285,13 +286,29 @@ function archiveOnboardingWorkItem(item: WorkItem | undefined, rootDir: string):
   }
 }
 
+/**
+ * The tenant home that holds the company's organization profile: the bound
+ * tenant's, else the company slug's (company onboarding run before a tenant
+ * was chosen keys the company files by its slug).
+ */
+export function companyProfileHome(
+  tenantSlug: string,
+  customerSlug: string,
+  rootDir: string
+): string {
+  for (const slug of [tenantSlug, customerSlug]) {
+    if (safeExistsSync(tenantHomePath(slug, 'organization-profile.json', rootDir))) return slug;
+  }
+  return tenantSlug;
+}
+
 function withCustomer<T>(customerSlug: string, fn: () => T): T {
-  const previous = getRegisteredEnvText('KYBERION_CUSTOMER');
-  setRegisteredEnv('KYBERION_CUSTOMER', customerSlug);
+  const previous = getRegisteredEnvText('KYBERION_STANCE');
+  setRegisteredEnv('KYBERION_STANCE', customerSlug);
   try {
     return fn();
   } finally {
-    setRegisteredEnv('KYBERION_CUSTOMER', previous);
+    setRegisteredEnv('KYBERION_STANCE', previous);
   }
 }
 
@@ -520,7 +537,7 @@ function resolveTenantForCustomer(
 ): TenantProfile {
   const profile = readTenantProfile(tenantSlug, {
     rootDir,
-    env: { ...process.env, KYBERION_CUSTOMER: customerSlug },
+    env: { ...process.env, KYBERION_STANCE: customerSlug },
   });
   if (!profile) {
     throw new Error(`Tenant '${tenantSlug}' is not registered for customer '${customerSlug}'.`);
@@ -611,12 +628,15 @@ export function resolveOnboardingContext(
 ): OnboardingContextResolution {
   const customerSlug = assertCustomerSlug(input.customerSlug);
   const rootDir = input.rootDir || pathResolver.rootDir();
-  const customerPath = customerDirForSlug(customerSlug, rootDir);
+  const customerPath = stanceDirForSlug(customerSlug, rootDir);
   const customerExists = safeExistsSync(customerPath);
   if (!customerExists) throw new Error(`Customer overlay '${customerSlug}' does not exist.`);
   const tenantSlug = input.tenantSlug.trim();
   const tenant = resolveTenantForCustomer(customerSlug, tenantSlug, rootDir);
-  const profile = withCustomer(customerSlug, () => loadOrganizationProfile(rootDir));
+  const profile = loadOrganizationProfile(
+    rootDir,
+    companyProfileHome(tenantSlug, customerSlug, rootDir)
+  );
   const binding = bindingFor({ ...input, customerSlug, tenantSlug }, profile);
   const organizationState = loadOrganizationOperationalState(binding.organization_id, {
     tier: binding.tier,

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { isScopeEnvOnly, transportedScopeLineage } from './foundation/scope-resolution-mode.js';
 export { withScopeEnvOnly } from './foundation/scope-resolution-mode.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { resolveClaimedNhiId } from './nhi-id.js';
+import { resolveClaimedNhiId } from './contracts/nhi-id.js';
 import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
@@ -13,7 +13,7 @@ import {
   normalizeScopeContext,
   type ScopeContext,
   type ScopeContextInput,
-} from './scope-context-validation.js';
+} from './foundation/scope-context-validation.js';
 export {
   assertScopeContext,
   normalizeScopeContext,
@@ -21,7 +21,7 @@ export {
   type ScopeContext,
   type ScopeContextInput,
   type ScopeContextValidationOptions,
-} from './scope-context-validation.js';
+} from './foundation/scope-context-validation.js';
 import {
   safeExistsSync,
   safeLstat,
@@ -301,7 +301,7 @@ export function resolveScopeResolution(
   const { values, provenance } = mergeScopeSources(input, env, options);
   const scope = normalizeScopeContext({
     ...values,
-    customer_stance: input.customer_stance || envText(env, 'KYBERION_CUSTOMER'),
+    customer_stance: input.customer_stance || envText(env, 'KYBERION_STANCE'),
     viewer_principal: input.viewer_principal || envText(env, 'KYBERION_VIEWER_PRINCIPAL'),
     nhi_id:
       input.nhi_id ||

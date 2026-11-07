@@ -9,11 +9,11 @@ import type { TenantDesignOverride } from '@agent/core/organization/tenant-desig
 import {
   resolveThemeColorRole as resolveThemeColorRolePolicy,
   resolveThemeHexRole as resolveThemeHexRolePolicy,
-} from '@agent/core/media/media-theme-role-policy';
+} from '@agent/shared-media/media-theme-role-policy';
 import {
   resolveDocumentProfileCandidates as resolveDocumentProfileCandidatesPolicy,
   resolveDocumentProfileKeywords as resolveDocumentProfileKeywordsPolicy,
-} from '@agent/core/media/document-inference-policy';
+} from '@agent/shared-media/document-inference-policy';
 import { createProposalPptxFlow } from './proposal-pptx-helpers.js';
 import {
   createMediaDocumentPipelineHelpers,

@@ -153,7 +153,7 @@ it.skipIf(process.env.KYBERION_TEST_CHRONOS_BROWSER !== '1')(
       path.join(sourceRoot, 'active/shared/tmp/organization-dashboard-browser-')
     );
     const io = await import('@agent/core/secure-io');
-    const authn = await import('@agent/core/authn-providers');
+    const authn = await import('@agent/core/authn/authn-providers');
     const approvals = await import('@agent/core/governance/approval-store');
     const external = await import('@agent/core/governance/external-operation');
     const browser = await import('../libs/actuators/browser-actuator/src/index.js');

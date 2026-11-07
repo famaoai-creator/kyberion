@@ -20,7 +20,7 @@ import {
   writeI18nHardcodingBaselineAtPath,
   type I18nHardcodingBaseline,
 } from '@agent/core/i18n-hardcoding-baseline';
-import { replaceElementBlocks } from '@agent/core/html-sanitize';
+import { replaceElementBlocks } from '@agent/core/foundation/html-sanitize';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
 import {
@@ -141,6 +141,16 @@ export function resolveDefaultScanRoots(): string[] {
   for (const relativeDir of DIRECT_SCAN_ROOTS) {
     const abs = pathResolver.rootResolve(relativeDir);
     if (safeExistsSync(abs)) roots.push(abs);
+  }
+
+  // Every libs/shared-* package: capability runtimes split out of libs/core
+  // (video, media, voice, vision, interaction, perception, ...) keep the same
+  // ratchet they had while they lived in core.
+  const libsAbs = pathResolver.rootResolve('libs');
+  for (const entry of safeReaddir(libsAbs).sort()) {
+    if (!entry.startsWith('shared-') || entry === 'shared-ui') continue;
+    const childAbs = path.join(libsAbs, entry);
+    if (safeStat(childAbs).isDirectory()) roots.push(childAbs);
   }
 
   for (const parent of GLOB_SCAN_PARENTS) {

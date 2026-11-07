@@ -11,7 +11,7 @@ vi.mock('@agent/core/authority', () => ({
     ...base,
     MISSION_ROLE: role,
     MISSION_ID: 'live',
-    KYBERION_CUSTOMER: 'old',
+    KYBERION_STANCE: 'old',
   }),
   buildSystemRoleLaunchEnv: (base: Record<string, string>, role: string) => ({
     ...base,
@@ -114,7 +114,7 @@ describe('scoped server mission alignment adapter', () => {
       KYBERION_ORGANIZATION_ID: 'org-a',
     });
     expect(env).not.toHaveProperty('MISSION_ID');
-    expect(env).not.toHaveProperty('KYBERION_CUSTOMER');
+    expect(env).not.toHaveProperty('KYBERION_STANCE');
   });
   it('reconciles a failed child only from the original exact receipt', async () => {
     h.exec.mockResolvedValue({ status: 1 });

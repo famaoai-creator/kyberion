@@ -24,7 +24,7 @@ import {
   parseTrustedProxies,
   resolveClientAddress,
   type TrustedProxies,
-} from '@agent/core/rate-limit';
+} from '@agent/core/foundation/rate-limit';
 import * as path from 'node:path';
 import type { FacadeSpawner, FacadeVerb } from './facade.js';
 

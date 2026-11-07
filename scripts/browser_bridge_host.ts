@@ -44,8 +44,8 @@ import {
   saveProcedureDelta,
 } from '@agent/core/knowledge/procedure-self-repair';
 import { compileBrowserRecording } from '@agent/core/browser/browser-recording-compiler';
-import { judgeExtensionRun } from '@agent/core/browser/browser-golden-evidence';
-import { promoteBrowserProcedure } from '@agent/core/browser/browser-procedure-promotion';
+import { judgeExtensionRun } from '@agent/shared-vision/browser-golden-evidence';
+import { promoteBrowserProcedure } from '@agent/shared-vision/browser-procedure-promotion';
 import { dispatchProcedure } from '@agent/core/knowledge/procedure-dispatcher';
 import { collectProcedureUserInputs } from '@agent/core/knowledge/procedure-inputs';
 import {
@@ -76,7 +76,7 @@ import {
   toBrowserBridgeRequestView,
   type BrowserBridgeApprovalSummary,
   type BrowserBridgeScope,
-} from '@agent/core/browser/browser-bridge-mailbox';
+} from '@agent/shared-vision/browser-bridge-mailbox';
 import { redactObservationText } from '@agent/core/browser/browser-extension-bridge';
 import { resolveStorageFloor } from '@agent/core/storage-layout';
 import {
@@ -90,7 +90,7 @@ import type {
 } from '@agent/core/browser/browser-extension-bridge';
 import type { ProcedureEntry } from '@agent/core/knowledge/procedure-types';
 import { nowIso } from '@agent/core/foundation';
-import { formatWireError } from '@agent/core/wire-error';
+import { formatWireError } from '@agent/core/contracts/wire-error';
 import { parseBrowserBridgeMessage } from './browser-bridge-input.js';
 import {
   InspectionHandoffError,

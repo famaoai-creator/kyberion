@@ -35,8 +35,8 @@ vi.mock('@agent/core/async-utils', async (original) => ({
   ...(await original<typeof import('@agent/core/async-utils')>()),
   retry: mocks.retry,
 }));
-vi.mock('@agent/core/trace', async (original) => ({
-  ...(await original<typeof import('@agent/core/trace')>()),
+vi.mock('@agent/core/analysis/trace', async (original) => ({
+  ...(await original<typeof import('@agent/core/analysis/trace')>()),
   persistTrace: vi.fn(),
 }));
 import { resetOpPreflight, registerOpPreflightListener } from '@agent/core/pipeline/op-preflight';
@@ -278,6 +278,21 @@ describe('calendar external effect boundary', () => {
 vi.mock('@agent/core/governance/approval-store', async (original) => ({
   ...(await original<typeof import('@agent/core/governance/approval-store')>()),
   evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = mocks.gate.mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));
+// approval-separation-of-duties defines these; its importers bypass the facade.
+vi.mock('@agent/core/governance/approval-separation-of-duties', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('@agent/core/governance/approval-separation-of-duties')
+  >()),
+  evaluateApprovalUsability: () => null,
+}));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('@agent/core/governance/approval-store-reader', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/governance/approval-store-reader')>()),
   loadApprovalRequest: (_channel: string, id: string) => {
     const params = mocks.gate.mock.calls.at(-1)?.[0];
     return params ? externalApprovalFixture(params, id) : null;

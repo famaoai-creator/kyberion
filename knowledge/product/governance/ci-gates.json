@@ -109,6 +109,54 @@
       "rationale": "Prevents new production modules from exceeding the 1,500-line simplicity boundary."
     },
     {
+      "id": "package-export-surface",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_package_export_surface.ts"],
+      "baseline": "scripts/check_package_export_surface.baseline.json",
+      "owner": "architecture",
+      "rationale": "Ratchets the published subpath count of each libs/* package (the @agent/core public surface) so it can only shrink unless a change raises the baseline in review."
+    },
+    {
+      "id": "foundation-weight",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_foundation_weight.ts"],
+      "baseline": "scripts/check_foundation_weight.baseline.json",
+      "owner": "architecture",
+      "rationale": "Ratchets how many core modules secure-io, path-resolver, logger and every foundation/contracts module pull in at runtime (measured on libs/core/dist), so domain rules cannot silently make the base layer heavier."
+    },
+    {
+      "id": "store-catalog",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_store_catalog.ts"],
+      "baseline": "scripts/check_store_catalog.baseline.json",
+      "owner": "architecture",
+      "rationale": "Keeps store custody and role coverage aligned, validates every state/ledger/floor registration and its effective retention-policy reference, preserves partition binding, and ratchets unscoped-legacy stores down."
+    },
+    {
+      "id": "store-roots",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/generate_store_roots.ts", "--check"],
+      "owner": "architecture",
+      "rationale": "Keeps static foundation state/ledger/floor roots projected from validated catalog registrations without runtime catalog I/O."
+    },
+    {
+      "id": "package-dependency-graph",
+      "scope": "pr",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/generate_package_dependency_graph.ts",
+        "--check"
+      ],
+      "owner": "architecture",
+      "rationale": "Keeps docs/developer/architecture/dependency-graph.mmd generated from the workspace package manifests so the package layering diagram cannot go stale."
+    },
+    {
       "id": "first-win-docs",
       "scope": "pr",
       "executable": "node",
@@ -333,6 +381,14 @@
       "rationale": "Checks runtime ESM integrity."
     },
     {
+      "id": "core-single-instance",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_core_single_instance.ts"],
+      "owner": "architecture",
+      "rationale": "Keeps one @agent/core instance per process: production code outside libs/core imports it by package name, never by a relative path into libs/core, except the listed build/clean bootstrap files (a second instance duplicates module-private grant registries)."
+    },
+    {
       "id": "dist-workspace-imports",
       "scope": "pr",
       "executable": "node",
@@ -405,7 +461,7 @@
       "paths": [
         "knowledge/product/orchestration/user-facing-vocabulary.json",
         "knowledge/product/schemas/user-facing-vocabulary.schema.json",
-        "libs/core/locale-normalize.ts",
+        "libs/core/foundation/locale-normalize.ts",
         "libs/core/knowledge/vocabulary-*",
         "libs/shared-ui/vanilla/kyberion-ui-vocabulary.js",
         "scripts/generate_vocabulary_types.ts",
@@ -427,7 +483,7 @@
       "paths": [
         "knowledge/product/orchestration/user-facing-vocabulary.json",
         "knowledge/product/schemas/user-facing-vocabulary.schema.json",
-        "libs/core/message-format.ts",
+        "libs/core/foundation/message-format.ts",
         "libs/core/knowledge/vocabulary-*",
         "scripts/generate_pseudo_locale.ts"
       ],
@@ -956,11 +1012,34 @@
         "tests/text-similarity-tokenization-boundary.test.ts",
         "tests/core-fs-exception-boundary.test.ts",
         "tests/foundation-io-boundary.test.ts",
+        "libs/core/foundation/asset-address.test.ts",
+        "libs/core/foundation/resource-access-grant.test.ts",
+        "libs/core/foundation/credential-material-capability.test.ts",
+        "libs/core/foundation/resource-access-decision.test.ts",
+        "libs/core/foundation/governed-catalog.test.ts",
+        "libs/core/dot/dot-execution-policy.test.ts",
+        "libs/core/reasoning/model-role-fitness.test.ts",
+        "scripts/check_store_catalog.test.ts",
+        "scripts/generate_store_roots.test.ts",
+        "libs/core/foundation/runtime-state-roots.test.ts",
+        "libs/core/provider/custody-provider-attestation-governance.test.ts",
+        "libs/core/mission/mission-orchestration-worker.cd09-decision-lock.test.ts",
+        "libs/core/governance/delegated-execution.test.ts",
+        "libs/core/governance/delegated-execution.production-path.integration.test.ts",
+        "libs/core/pipeline/pipeline-run-journal.tenant-store.test.ts",
+        "libs/core/governance/autonomy-action-state.production-role.test.ts",
+        "scripts/org.test.ts",
+        "scripts/scope.test.ts",
+        "libs/core/customer-channel-binding.test.ts",
+        "scripts/customer_channel.test.ts",
+        "libs/core/governance/asset-scope-inspection.test.ts",
         "tests/process-boundary-governance.test.ts",
         "tests/runtime-child-process-boundary.test.ts",
         "tests/loopback-child-env-no-proxy-boundary.test.ts",
         "tests/provider-structured-result-redaction-boundary.test.ts",
         "tests/package-boundary-contract.test.ts",
+        "tests/workspace-build-contract.test.ts",
+        "migration/0003-deal-home.test.ts",
         "tests/plugin-execution-guard-boundary.test.ts",
         "tests/service-channel-boundary.test.ts",
         "tests/runtime-surface-boundary.test.ts",
@@ -968,6 +1047,7 @@
         "tests/script-topology-contract.test.ts",
         "tests/delegation-start-reporting.test.ts",
         "tests/tenant-runtime-store-registration.test.ts",
+        "tests/tenant-observability-store-registration.test.ts",
         "tests/reasoning-payload-scope-training-use.test.ts",
         "tests/measurement-backend-construction.test.ts",
         "libs/core/seam.test.ts",

@@ -23,11 +23,14 @@ interface Append {
   action: string;
 }
 
+/** Tenant mirror partition (active/shared/runtime/audit-mirror/confidential/{slug}/). */
+const MIRROR_SEGMENT = path.join('runtime', 'audit-mirror', 'confidential');
+
 function fakeIo(appends: Append[], onAppend?: (file: string) => void): AuditChainIo {
   return {
     read: () => '',
     loadJson: <T>() => ({}) as T,
-    exists: (file) => file.includes(`${path.sep}customer${path.sep}`),
+    exists: (file) => file.includes(MIRROR_SEGMENT),
     mkdir: () => undefined,
     readdir: () => [],
     append: (file, line) => {
@@ -39,7 +42,7 @@ function fakeIo(appends: Append[], onAppend?: (file: string) => void): AuditChai
 }
 
 const masterActions = (appends: Append[]) =>
-  appends.filter((append) => !append.file.includes(`${path.sep}customer${path.sep}`));
+  appends.filter((append) => !append.file.includes(MIRROR_SEGMENT));
 
 describe('audit chain lock', () => {
   const saved: Partial<Record<(typeof ENV_KEYS)[number], string>> = {};
@@ -120,7 +123,7 @@ describe('audit chain lock', () => {
     // A mirror write that policy denies, the way secure-io audits a denial.
     restoreAuditIo = registerAuditChainIo(
       fakeIo(appends, (file) => {
-        if (!file.includes(`${path.sep}customer${path.sep}`)) return;
+        if (!file.includes(MIRROR_SEGMENT)) return;
         auditChain.recordDeferrable({
           agentId: 'a',
           action: 'policy_violation',

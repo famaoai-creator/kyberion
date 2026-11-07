@@ -7,7 +7,10 @@ import { readDotActionLedgerStrict } from '../dot/dot-action-ledger.js';
 import { dotWorkItemInput } from '../dot/dot-work-item.js';
 import { dotAdmissionScopeHash } from '../dot/dot-admission-identity.js';
 import { recoveryEvidenceHash } from '../surface/front-desk-recovery-receipt.js';
-import { loadApprovalRequest, isApprovalRequestExpired } from '../governance/approval-store.js';
+import {
+  loadApprovalRequest,
+  isApprovalRequestExpired,
+} from '../governance/approval-store-reader.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
 import { approvalUsabilityRefusal } from '../governance/approval-linked-usability.js';
 import {

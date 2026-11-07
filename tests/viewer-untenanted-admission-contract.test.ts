@@ -68,6 +68,11 @@ vi.mock('@agent/core/governance/approval-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/governance/approval-store')>()),
   listApprovalRequests: () => fixture.approvals.map((record) => structuredClone(record)),
 }));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('@agent/core/governance/approval-store-reader', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/governance/approval-store-reader')>()),
+  listApprovalRequests: () => fixture.approvals.map((record) => structuredClone(record)),
+}));
 vi.mock('@agent/core/deliverable-inbox', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/deliverable-inbox')>()),
   listInboxEntries: () => fixture.inbox.map((entry) => structuredClone(entry)),

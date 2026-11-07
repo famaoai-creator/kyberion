@@ -13,7 +13,7 @@ import { metadataHandler } from '@modelcontextprotocol/sdk/server/auth/handlers/
 import { getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { InsufficientScopeError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
-import { SUPPORTED_LOCALES } from '@agent/core/locale-normalize';
+import { SUPPORTED_LOCALES } from '@agent/core/foundation/locale-normalize';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import {
   HUMAN_REQUEST_READ_SCOPE,

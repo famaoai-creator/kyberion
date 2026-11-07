@@ -5,7 +5,7 @@
  * Behaviour aligned with GridCraft `crates/xlsx/src/xml.rs`
  * (`decode_xstring` / `encode_xstring` / `esc` / `esc_attr`, MIT OR Apache-2.0).
  */
-import { escapeXml } from '../text-escaping.js';
+import { escapeXml } from '../foundation/text-escaping.js';
 
 function isXmlChar(code: number): boolean {
   return (

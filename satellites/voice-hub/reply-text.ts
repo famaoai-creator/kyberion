@@ -1,6 +1,6 @@
 /** Reply text shaping for voice-hub speech output. */
-import type { SupportedLocale } from '@agent/core/locale-normalize';
-import { getVoiceTtsLanguageConfig } from '@agent/core/voice/voice-tts-config';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
+import { getVoiceTtsLanguageConfig } from '@agent/shared-voice/voice-tts-config';
 
 export function detectReplyLanguage(text: string): 'ja' | 'en' {
   return /[ぁ-んァ-ン一-龯]/.test(text) ? 'ja' : 'en';

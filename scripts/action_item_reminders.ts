@@ -6,7 +6,7 @@
  * mirrors the reminder into the Slack outbox for operator visibility.
  */
 
-import { coerceLocale } from '@agent/core/locale-normalize';
+import { coerceLocale } from '@agent/core/foundation/locale-normalize';
 import { resolveLocale } from '@agent/core/locale';
 import { runActionItemReminderSweepOp } from '../libs/actuators/meeting-actuator/src/meeting-intelligence-ops.js';
 import { defineScript, isDirectScript } from './lib/harness.js';

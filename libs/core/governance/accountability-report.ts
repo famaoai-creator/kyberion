@@ -10,7 +10,7 @@ import {
   loadCharterObservationPolicy,
   type CharterObservationPolicy,
 } from './charter-decision-vocabulary.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import type { Charter } from './accountability-charter.js';
 import type { LedgerEntry } from './accountability-charter-registry.js';
 

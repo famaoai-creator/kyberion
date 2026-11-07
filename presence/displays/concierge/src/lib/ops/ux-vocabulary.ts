@@ -2,18 +2,18 @@ import vocabularyCatalog from '../../../../../../knowledge/product/orchestration
 import {
   createBrowserVocabularyResolver,
   type BrowserVocabularyEntry,
-} from '@agent/core/locale-normalize';
+} from '@agent/core/foundation/locale-normalize';
 import {
   localeToBcp47,
   normalizeLocale,
   nextSupportedLocale,
   type SupportedLocale,
-} from '@agent/core/locale-normalize';
-import { renderMessage } from '@agent/core/message-format';
+} from '@agent/core/foundation/locale-normalize';
+import { renderMessage } from '@agent/core/foundation/message-format';
 
 /**
  * I18N-01: the canonical `SupportedLocale` type and normalization rules come
- * from `@agent/core/locale-normalize`, which is import-free precisely so it
+ * from `@agent/core/foundation/locale-normalize`, which is import-free precisely so it
  * is safe to pull into a `'use client'` browser bundle. (`@agent/core/locale`
  * itself is NOT safe here — it reads the identity file via `node:path` +
  * secure-io at module scope, and ESM executes the whole imported graph
@@ -177,7 +177,7 @@ export function uxTextOr(key: string, fallback: string, locale = resolveChronosL
  * number the operator needed is gone.
  *
  * Catalog entries here use ICU-lite `{name}` placeholders, rendered by the
- * shared `@agent/core/message-format` (import-free, hence browser-bundle
+ * shared `@agent/core/foundation/message-format` (import-free, hence browser-bundle
  * safe — the same reason `locale-normalize` is split out).
  */
 export function uxMessage(

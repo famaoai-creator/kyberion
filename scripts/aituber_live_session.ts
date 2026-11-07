@@ -36,7 +36,7 @@ import {
   generateRealtimeAssistantReply,
   recordRealtimeVoiceConversationExchange,
   synthesizeRealtimeVoice,
-} from '@agent/core/voice/realtime-voice-conversation';
+} from '@agent/shared-voice/realtime-voice-conversation';
 import { reflectPresenceAgentReply } from '@agent/core/presence-bridge';
 import { getSecret } from '@agent/core/secret/secret-guard';
 import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';

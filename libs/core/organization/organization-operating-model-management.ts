@@ -12,7 +12,7 @@ import {
   nextOrganizationOperationDue,
   organizationOperationDueProjection,
 } from './organization-operation-runtime.js';
-import { matchCronField } from '../cron-utils.js';
+import { matchCronField } from '../pipeline/cron-utils.js';
 
 import {
   validatorFor,

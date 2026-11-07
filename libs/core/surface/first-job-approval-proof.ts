@@ -3,11 +3,9 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
 import { assertBuiltinOnlyWorkerEventStream } from '../workforce/worker-event-stream.js';
 import { browserSessionKey } from '../authn-browser-session-key.js';
-import {
-  computeApprovalPayloadHash,
-  isApprovalRequestExpired,
-  type ApprovalRequestRecord,
-} from '../governance/approval-store.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
+import { isApprovalRequestExpired } from '../governance/approval-store-reader.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import { assertFrontDeskDiagnosticDotCharter, type DotCharter } from '../dot/dot-charter.js';
 import { resolveMemberByPrincipal, readMemberProfile } from '../organization/member-registry.js';
 import {

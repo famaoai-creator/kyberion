@@ -1,7 +1,7 @@
 import {
   normalizeRejectionReasonCategory,
   type RejectionReasonCategory,
-} from '@agent/core/rejection-reason';
+} from '@agent/core/contracts/rejection-reason';
 import type { DeliverableVerdict } from '../../../../lib/ops/deliverable-review';
 
 const VERDICTS = new Set<DeliverableVerdict>(['accept', 'reject', 'request-changes']);

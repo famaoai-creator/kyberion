@@ -131,6 +131,8 @@ describe('reasoning-bootstrap', () => {
   // claude-agent host-detection rule and pollute provider-fallback assertions.
   let savedClaudeCode: string | undefined;
   beforeEach(() => {
+    // Auto-selection cases supply their own provider context instead of runner defaults.
+    vi.stubEnv('KYBERION_REASONING_BACKEND', undefined);
     savedClaudeCode = process.env.CLAUDECODE;
     delete process.env.CLAUDECODE;
   });

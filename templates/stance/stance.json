@@ -1,0 +1,6 @@
+{
+  "slug": "your-stance-slug",
+  "display_name": "Which hat this is (e.g. Acme engagement, Board seat at Example Co.)",
+  "kind": "engagement",
+  "notes": "kind is engagement (acting for an end customer) or affiliation (acting as one of several entities you belong to). Free-form notes are not parsed by Kyberion."
+}
