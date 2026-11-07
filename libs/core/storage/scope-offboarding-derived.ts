@@ -1,11 +1,15 @@
 /** Guard the exact regular-file generation selected by authoritative lineage. */
 import { createHash } from 'node:crypto';
+import * as path from 'node:path';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   safeExistsSync,
   safeLstat,
   safeReadFileSnapshot,
   MAX_SNAPSHOT_READ_BYTES,
+  safeMkdir,
+  safeWriteFile,
 } from '../secure-io.js';
 import { listHonoredDerivedPathsForCustodian } from '../information-assets/asset-derivation.js';
 
@@ -23,6 +27,37 @@ interface FileGeneration {
 }
 // Keep execution guards private; exported manifests remain stable path/kind records.
 const generations = new WeakMap<object, FileGeneration>();
+
+export function retainCollectedLeftovers(
+  targets: readonly { path: string }[],
+  removed: readonly string[],
+  verification: { clean: boolean; leftovers: string[] }
+): void {
+  const deleted = new Set(removed);
+  const remaining = targets
+    .filter((target) => !deleted.has(target.path))
+    .map((target) => target.path)
+    .filter((relative) => {
+      try {
+        return safeExistsSync(pathResolver.rootResolve(relative));
+      } catch {
+        return true;
+      }
+    });
+  if (remaining.length > 0) {
+    verification.leftovers.push(...remaining);
+    verification.clean = false;
+  }
+}
+
+export function exportUnchangedDerivedTarget(target: { path: string }, exportDir: string): void {
+  withLockSync(`asset-derivation-delete:${target.path}`, () => {
+    const bytes = readUnchangedDerivedTarget(target);
+    const destination = path.join(exportDir, ...target.path.split('/'));
+    safeMkdir(path.dirname(destination), { recursive: true });
+    safeWriteFile(destination, bytes);
+  });
+}
 
 function snapshot(relative: string): { generation: FileGeneration; bytes: Buffer } {
   const absolute = pathResolver.rootResolve(relative);
