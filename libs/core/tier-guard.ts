@@ -1,12 +1,16 @@
 import { engineRuntimeResourceAccessDenial as resourceAccessDenial } from './voice/engine-runtime-preferences-access.js';
 import { isMemoryProvenanceStatePath } from './knowledge/memory-provenance-capability.js';
-import { narrowStoreRoleDenial } from './foundation/narrow-store-role-denial.js';
 import { RETIRED_STORE_ROLE_NAMES } from './foundation/retired-store-roles.js';
 import {
   storeGrantAuthorizes as registeredStoreGrantAuthorizes,
   storeGrantNarrowingDenial,
+  storeGrantRule,
   storeGrantRules,
 } from './foundation/store-grant-registry.js';
+import {
+  roleNarrowAllowsStructuralMkdir,
+  roleNarrowingDenial,
+} from './foundation/role-narrowing-denial.js';
 import type { WriteContent } from './foundation/customer-decision-record-content.js';
 /**
  * TypeScript version of the Knowledge Tier Guard.
@@ -54,7 +58,7 @@ export {
 } from './tier-guard-tenant-store-partitions.js';
 import { isAllowedVaultMountPath } from './secret/vault-mount.js';
 import { currentExecutionScope } from './foundation/execution-scope.js';
-import { informationAssetCoverageReadAllowed } from './foundation/information-asset-coverage-capability.js';
+import { informationAssetCoverageReadAllowed } from './foundation/information-asset-coverage-access.js';
 import {
   currentResourceAccessScope,
   type ResourceAccessOperation,
@@ -114,7 +118,7 @@ type PolicyLoad = { status: 'loaded'; policy: any } | { status: 'missing' } | { 
 let corruptPolicyWarned = false;
 
 /**
- * A missing policy preserves bootstrap access outside protected durable state.
+ * A missing policy preserves role-less bootstrap access outside protected durable state.
  * A policy that exists but cannot be parsed must NOT silently disable tier
  * isolation — protected tiers fail closed until the file is repaired.
  */
@@ -531,7 +535,8 @@ function isScopedStructuralMkdir(
   relativePath: string,
   protectedPrefix: string,
   tenantSlug: string | undefined,
-  access: { kind: 'read' | 'write' | 'append' | 'mkdir'; role?: string }
+  access: { kind: 'read' | 'write' | 'append' | 'mkdir'; role?: string },
+  policy: unknown
 ): boolean {
   if (access.kind !== 'mkdir') return false;
   // G3: a live store grant may decide its own structural container (the PR publication grant:
@@ -555,7 +560,14 @@ function isScopedStructuralMkdir(
   const sharedChecks = grantRules.some(
     (rule) => rule.structuralMkdir?.(relativePath, prefix, tenantSlug, scope) === 'shared-checks'
   );
-  if (!sharedChecks && access.role !== 'concierge_management_writer') return false;
+  // G3: a role may attempt the shared checks only when its security-policy
+  // narrow declaration marks it structural-mkdir capable
+  // (authority_role_permissions.<role>.narrow.structural_mkdir).
+  if (
+    !sharedChecks &&
+    !(access.role !== undefined && roleNarrowAllowsStructuralMkdir(policy, access.role))
+  )
+    return false;
   const resource = currentResourceAccessScope();
   if (
     !tenantSlug ||
@@ -665,7 +677,8 @@ function checkTenantScope(
   }
   const targetTenant = scoped.tenant;
   if (!targetTenant || !cfg.slugPattern.test(targetTenant) || !isValidTenantSlug(targetTenant)) {
-    if (isScopedStructuralMkdir(relativePath, scoped.prefix, tenantSlug, access)) return null;
+    if (isScopedStructuralMkdir(relativePath, scoped.prefix, tenantSlug, access, policy))
+      return null;
     // Pre-tenant migrations stored a mission directly under
     // active/missions/confidential/{MISSION_ID}/. Keep that layout usable
     // only for an unmistakable legacy mission directory. A non-slug mission
@@ -881,6 +894,7 @@ export type { WriteContent };
 function requestResourceDenial(
   relativePath: string,
   operation: ResourceAccessOperation,
+  getPolicy: () => PolicyLoad,
   content?: WriteContent
 ): { allowed: false; reason: string } | null {
   const denial = resourceAccessDenial(relativePath, operation);
@@ -926,37 +940,89 @@ function requestResourceDenial(
   // inside it, over every literal and canonical candidate of the path.
   const storeDenial = storeGrantNarrowingDenial(['pr-publication', 'person-charter'], grantInput);
   if (storeDenial) return { allowed: false, reason: storeDenial };
-  const narrowDenial = narrowStoreRoleDenial({
-    role: normalizedRole,
-    relativePath,
-    operation,
-    scope: currentResourceAccessScope(),
-    content,
-    readRepoFile,
-  });
-  if (narrowDenial) return { allowed: false, reason: narrowDenial };
+  // `shared` is the personal storage marker, never a tenant credential. An
+  // unbound tenant-store reader must not reinterpret this owner namespace.
+  // G2: only the live personal approval owner window (no role) reaches an owner partition
+  // (G3: asked through the store grant registry; an unloaded window module admits nothing).
   if (
-    normalizedRole === 'concierge_management_reader' &&
-    (!currentResourceAccessScope() ||
-      operation === 'write' ||
-      operation === 'append' ||
-      operation === 'mkdir')
-  ) {
+    /(?:^|\/)tenant-approvals\/personal\/shared\/owners(?:\/|$)/u.test(relativePath) &&
+    storeGrantRule('personal-approval')?.pathAllowed?.(relativePath, operation) !== true
+  )
     return {
       allowed: false,
-      reason: '[RESOURCE_SCOPE_REQUIRED] Management reader needs a read-only tenant capability',
+      reason: '[PERSONAL_APPROVAL_SCOPE_REQUIRED] Personal owner partition requires exact owner IO',
     };
-  }
-  if (
-    normalizedRole === 'concierge_management_writer' &&
-    !currentResourceAccessScope()?.organizationId
-  ) {
-    return {
-      allowed: false,
-      reason: '[RESOURCE_SCOPE_REQUIRED] Management writer needs a bound request capability',
-    };
+  // G2/G3: the live store grants narrow every I/O made inside them (no role), in registry order:
+  // the personal approval window, the task source workspace window (its liveness check runs
+  // with the window suspended, so it is never narrowed), the invite capability's tenant/content
+  // check, and the content checks of every write inside a consumer-lock or milestone grant.
+  const grantDenial = storeGrantNarrowingDenial(
+    [
+      'personal-approval',
+      'task-source-workspace',
+      'customer-decision-invite',
+      'customer-decision-consumer',
+      'customer-decision-milestone',
+    ],
+    {
+      relativePath,
+      operation,
+      candidates: () => [relativePath],
+      scope: currentResourceAccessScope(),
+      content,
+      readRepoFile,
+    }
+  );
+  if (grantDenial) return { allowed: false, reason: grantDenial };
+  // G3: deny-only role narrowing is a security-policy declaration
+  // (authority_role_permissions.<role>.narrow), evaluated by one generic rule —
+  // per-role modules and role-name branches are gone from the gate. A missing or
+  // corrupt policy must not remove an explicit role's deny-only constraints.
+  // With no assumed role the policy is not loaded by this stage.
+  if (normalizedRole) {
+    const narrowingPolicy = getPolicy();
+    if (narrowingPolicy.status !== 'loaded')
+      return {
+        allowed: false,
+        reason: `[ROLE_NARROWING_POLICY_UNAVAILABLE] security-policy.json is ${narrowingPolicy.status}; restore a valid policy before role '${normalizedRole}' performs resource I/O`,
+      };
+    const roleDenial = roleNarrowingDenial({
+      policy: narrowingPolicy.policy,
+      role: normalizedRole,
+      relativePath,
+      operation,
+      scope: currentResourceAccessScope(),
+      content,
+      readRepoFile,
+    });
+    if (roleDenial !== null) return { allowed: false, reason: roleDenial };
   }
   return null;
+}
+
+/**
+ * G3(e): the one decision stage every tier-guard entry (read, write, append,
+ * mkdir, metadata) passes through — resolve the path to its policy-relative
+ * form and evaluate the shared resource gate (engine-runtime denial, retired
+ * names, live grant narrowings, declared role narrowings). A denied entry
+ * stops here; an admitted one continues to its kind-specific residual checks.
+ */
+function decide(
+  filePath: string,
+  operation: ResourceAccessOperation,
+  content?: WriteContent
+):
+  | { denied: { allowed: false; reason: string } }
+  | { resolvedPath: string; relativePath: string; getPolicy: () => PolicyLoad } {
+  const resolvedPath = path.resolve(filePath);
+  const relativePath = normalizePath(policyRelativePath(resolvedPath));
+  // One lazy snapshot for narrowing and base/structural checks. Besides avoiding
+  // duplicate I/O, this cannot combine an allow from two different policy versions.
+  let policy: PolicyLoad | undefined;
+  const getPolicy = () => (policy ??= loadPolicy());
+  const resourceDenial = requestResourceDenial(relativePath, operation, getPolicy, content);
+  if (resourceDenial) return { denied: resourceDenial };
+  return { resolvedPath, relativePath, getPolicy };
 }
 
 export function validateWritePermission(
@@ -964,13 +1030,9 @@ export function validateWritePermission(
   operation: 'write' | 'append' | 'mkdir' = 'write',
   content?: WriteContent
 ): { allowed: boolean; reason?: string } {
-  const resolvedPath = path.resolve(filePath);
-  const resourceDenial = requestResourceDenial(
-    normalizePath(policyRelativePath(resolvedPath)),
-    operation,
-    content
-  );
-  if (resourceDenial) return resourceDenial;
+  const decided = decide(filePath, operation, content);
+  if ('denied' in decided) return decided.denied;
+  const { resolvedPath, relativePath } = decided;
   try {
     assertSandboxWriteAllowed(resolvedPath);
   } catch (error) {
@@ -979,7 +1041,6 @@ export function validateWritePermission(
       reason: error instanceof Error ? error.message : String(error),
     };
   }
-  const relativePath = normalizePath(policyRelativePath(resolvedPath));
   const currentMission = resolveProjectScope().missionId;
 
   if (isOutsideProjectRoot(relativePath)) {
@@ -993,7 +1054,7 @@ export function validateWritePermission(
   const identity = resolvePolicyIdentityContext();
   const { role: currentRole, authorities, tenantSlug, brokeredTenants, brokerApproval } = identity;
 
-  const loaded = loadPolicy();
+  const loaded = decided.getPolicy();
   if (loaded.status === 'missing') {
     return isProtectedRuntimeStatePath(relativePath)
       ? MISSING_RUNTIME_STATE_POLICY_DENIAL
@@ -1147,10 +1208,9 @@ export function inspectReadPermission(
   filePath: string,
   operation: 'read' | 'metadata' = 'read'
 ): ReadPermissionDecision {
-  const resolvedPath = path.resolve(filePath);
-  const relativePath = normalizePath(policyRelativePath(resolvedPath));
-  const resourceDenial = requestResourceDenial(relativePath, operation);
-  if (resourceDenial) return resourceDenial;
+  const decided = decide(filePath, operation);
+  if ('denied' in decided) return decided.denied;
+  const { resolvedPath, relativePath } = decided;
 
   if (isOutsideProjectRoot(relativePath)) {
     if (isAllowedVaultMountPath(resolvedPath)) {
@@ -1170,7 +1230,7 @@ export function inspectReadPermission(
     (/\/(?:personal|confidential)\//u.test(relativePath) ||
       isProtectedStorageFloorTier(partitionedRuntimeStateTierInPath(relativePath)))
   ) {
-    const loaded = loadPolicy();
+    const loaded = decided.getPolicy();
     if (loaded.status === 'missing' && isProtectedRuntimeStatePath(relativePath)) {
       return MISSING_RUNTIME_STATE_POLICY_DENIAL;
     }
@@ -1282,7 +1342,7 @@ export function inspectReadPermission(
     return { allowed: true };
   }
 
-  const loaded = loadPolicy();
+  const loaded = decided.getPolicy();
   if (loaded.status === 'missing') return { allowed: true };
   if (loaded.status === 'corrupt') return CORRUPT_POLICY_DENIAL;
   const policy = loaded.policy;

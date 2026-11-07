@@ -196,23 +196,46 @@ describe('deliverable_inbox_writer on the real tier guard', () => {
     ).toThrow();
   });
 
-  it('the path rule allows exactly the inbox file, its directories and the inbox lock', () => {
-    const lock = `active/shared/runtime/locks/deliverable-inbox-${'a'.repeat(64)}.lock`;
-    expect(
-      writer.deliverableInboxWriterPathAllowed('active/shared/inbox/entries.jsonl', 'write')
-    ).toBe(true);
-    expect(writer.deliverableInboxWriterPathAllowed(lock, 'write')).toBe(true);
-    expect(writer.deliverableInboxWriterPathAllowed(`${lock}.reclaim`, 'write')).toBe(true);
-    expect(writer.deliverableInboxWriterPathAllowed('active/shared/inbox', 'mkdir')).toBe(true);
-    expect(
-      writer.deliverableInboxWriterPathAllowed('active/shared/runtime/locks/../x.lock', 'write')
-    ).toBe(false);
-    expect(
-      writer.deliverableInboxWriterPathAllowed(
-        'active/shared/runtime/locks/deliverable-inbox-x.lock',
-        'write'
+  it('the declared narrowing allows exactly the inbox file, its directories and the inbox lock', async () => {
+    // G3: the path rule is a security-policy `narrow` declaration, evaluated by
+    // foundation/role-narrowing-denial.ts. Assert the declaration through the
+    // generic evaluator on the policy fixture copied under ROOT.
+    const narrowing = await import('./foundation/role-narrowing-denial.js');
+    const policy = JSON.parse(
+      String(
+        initialContext('ecosystem_architect', () =>
+          initialIO.safeReadFile(
+            path.join(ROOT, 'knowledge/product/governance/security-policy.json'),
+            { encoding: 'utf8' }
+          )
+        )
       )
-    ).toBe(false);
+    );
+    const denial = (relativePath: string, operation: 'write' | 'mkdir', content?: Buffer) =>
+      narrowing.roleNarrowingDenial({
+        policy,
+        role: writer.DELIVERABLE_INBOX_WRITER_ROLE,
+        relativePath,
+        operation,
+        scope: undefined,
+        content,
+        readRepoFile: () => undefined,
+      });
+    // A path outside the declared `only` set is refused with the SCOPE reason;
+    // inside the set the entries file then reaches its declared content check.
+    const pathAllowed = (relativePath: string, operation: 'write' | 'mkdir') =>
+      denial(relativePath, operation)?.includes('DELIVERABLE_INBOX_WRITER_SCOPE') !== true;
+    const lock = `active/shared/runtime/locks/deliverable-inbox-${'a'.repeat(64)}.lock`;
+    expect(denial('active/shared/inbox/entries.jsonl', 'write')).toContain(
+      'DELIVERABLE_INBOX_WRITE_REFUSED'
+    );
+    expect(pathAllowed(lock, 'write')).toBe(true);
+    expect(pathAllowed(`${lock}.reclaim`, 'write')).toBe(true);
+    expect(pathAllowed('active/shared/inbox', 'mkdir')).toBe(true);
+    expect(pathAllowed('active/shared/runtime/locks/../x.lock', 'write')).toBe(false);
+    expect(pathAllowed('active/shared/runtime/locks/deliverable-inbox-x.lock', 'write')).toBe(
+      false
+    );
   });
 
   it('appends after a malformed and an older-format line, keeping both byte-identical', () => {

@@ -24,7 +24,7 @@ describeStoreGrantBoundary(
       ['libs/core/project/project-management.ts', ['conciergeManagementGrantKind']],
     ]),
   },
-  { formerConsumers: ['libs/core/foundation/information-asset-coverage-capability.ts'] }
+  { formerConsumers: ['libs/core/foundation/information-asset-coverage-access.ts'] }
 );
 
 // The Web management mediators open their exact request ceiling only through the facade.

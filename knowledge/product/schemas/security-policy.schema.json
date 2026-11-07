@@ -11,7 +11,16 @@
     "tenant_scope": { "type": "object", "additionalProperties": true },
     "tier_restrictions": { "type": "object", "additionalProperties": true },
     "persona_permissions": { "type": "object", "additionalProperties": true },
-    "authority_role_permissions": { "type": "object", "additionalProperties": true },
+    "authority_role_permissions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "narrow": { "$ref": "#/$defs/narrow_declaration" }
+        }
+      }
+    },
     "authority_permissions": { "type": "object", "additionalProperties": true },
     "project_permissions": { "type": "object", "additionalProperties": true },
     "network_guardrails": { "type": "object", "additionalProperties": true },
@@ -26,5 +35,85 @@
     "tier_restrictions",
     "persona_permissions",
     "authority_role_permissions"
-  ]
+  ],
+  "$defs": {
+    "resource_operation": {
+      "type": "string",
+      "enum": ["read", "write", "append", "mkdir", "metadata"]
+    },
+    "deniable_operation": {
+      "type": "string",
+      "enum": ["read", "write", "mkdir", "metadata"]
+    },
+    "narrow_path_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "prefix": { "type": "string", "minLength": 1 },
+        "pattern": { "type": "string", "minLength": 1 }
+      },
+      "anyOf": [{ "required": ["path"] }, { "required": ["prefix"] }, { "required": ["pattern"] }]
+    },
+    "narrow_declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "deny": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/deniable_operation" },
+          "minItems": 1
+        },
+        "deny_reason": { "type": "string", "minLength": 1 },
+        "only": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/deniable_operation" },
+          "additionalProperties": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/narrow_path_rule" },
+            "minItems": 1
+          }
+        },
+        "only_reason": { "type": "string", "minLength": 1 },
+        "content_check": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "kind": { "const": "append_only_jsonl" },
+              "id_field": { "type": "string", "minLength": 1 },
+              "refusal_prefix": { "type": "string", "minLength": 1 }
+            },
+            "required": ["path", "kind", "id_field"]
+          },
+          "minItems": 1
+        },
+        "require_scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fields": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "minItems": 1
+            },
+            "exact": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "read_only": { "type": "boolean" },
+                "read_path_pattern": { "type": "string", "minLength": 1 },
+                "read_path_tenant_group": { "type": "integer", "minimum": 1 },
+                "allow_product_knowledge_read": { "type": "boolean" }
+              }
+            },
+            "reason": { "type": "string", "minLength": 1 }
+          }
+        },
+        "structural_mkdir": { "type": "boolean" }
+      }
+    }
+  }
 }
