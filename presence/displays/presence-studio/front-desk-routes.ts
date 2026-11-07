@@ -1,4 +1,3 @@
-import { registerFirstJobRoutes } from './first-job-routes.js';
 // Front-desk API routes, split out of `server.ts` purely to keep that file
 // under the repo's `max-file-lines` gate (knowledge/product/governance/
 // max-file-lines.json) — no behavior change. `registerFrontDeskRoutes` is
@@ -313,6 +312,5 @@ export function registerFrontDeskRoutes(app: express.Express): void {
     res.json({ ok: true, locale, texts });
   });
 
-  registerFirstJobRoutes(app);
   registerConversationRoutes(app);
 }

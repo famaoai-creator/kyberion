@@ -335,7 +335,7 @@ describe('rail placement and destinations', () => {
   });
 
   it('still resolves Studio destinations that left the rail', () => {
-    for (const id of ['ask', 'first-job', 'home-studio']) {
+    for (const id of ['ask', 'home-studio']) {
       expect(
         resolveFrontDeskDestination(id, { currentSurface: 'concierge', role: 'owner' })?.surface,
         id
@@ -359,6 +359,18 @@ describe('rail placement and destinations', () => {
         urls: { concierge: 'https://desk.example.test/' },
       })
     ).toMatchObject({ href: 'https://desk.example.test/work?tab=requests', external: true });
+  });
+
+  it('resolves 初めての仕事 on Concierge itself (moved in Kyberion server phase 2)', () => {
+    expect(
+      resolveFrontDeskDestination('first-job', { currentSurface: 'concierge', role: 'approver' })
+    ).toMatchObject({ surface: 'concierge', href: '/first-job', external: false, allowed: true });
+    expect(
+      resolveFrontDeskDestination('first-job', {
+        currentSurface: 'presence-studio',
+        urls: { concierge: 'https://desk.example.test/' },
+      })
+    ).toMatchObject({ href: 'https://desk.example.test/first-job', external: true });
   });
 
   it('resolves 使い方 on Concierge itself (moved in Kyberion server phase 2)', () => {
