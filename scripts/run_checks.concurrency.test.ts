@@ -92,6 +92,7 @@ describe.each([undefined, 'true'])('bounded check scheduling (GITHUB_ACTIONS=%s)
           .filter((gate) => gate.scope === 'pr' || (scope === 'full' && gate.scope === 'full'))
           .map((gate) => gate.id)
       );
+      expect(selected.map((gate) => gate.id)).toContain('vcs-host-boundary');
       const expectedCommands = selected.map(declaredCommand).sort();
       const failingCommand = declaredCommand(selected[0]);
       const reports: Report[] = [];

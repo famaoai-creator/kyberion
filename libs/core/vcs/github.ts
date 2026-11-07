@@ -245,6 +245,10 @@ function ghExecOptions(options: GhCallOptions): SafeExecOptions {
   return { ...options, ...(Object.keys(env).length > 0 ? { env } : {}) };
 }
 
+/**
+ * @deprecated Use `vcsHostGithubApiGet` or a typed verb (`@agent/core/vcs/vcs-host-verbs`). Kept for the
+ *   vcs-host contract parity tests; new callers are rejected by `check:vcs-host-boundary`.
+ */
 export function ghRun(
   args: string[],
   options: GhCallOptions = {},
@@ -266,6 +270,10 @@ export function ghRun(
 
 const PR_QUEUE_QUERY =
   'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){mergeQueueEntry{id}}}}';
+/**
+ * @deprecated Use `vcsHostPrQueued` (`@agent/core/vcs/vcs-host-verbs`). Kept for the
+ *   vcs-host contract parity tests; new callers are rejected by `check:vcs-host-boundary`.
+ */
 export function ghPrQueued(
   params: GhCallOptions & { owner: string; name: string; number: number; hostname: string },
   run?: VcsCommandRunner
@@ -345,6 +353,10 @@ function assertGhRead(args: string[]): void {
   );
 }
 
+/**
+ * @deprecated Use a typed verb from `@agent/core/vcs/vcs-host-verbs`. Kept for the
+ *   vcs-host contract parity tests; new callers are rejected by `check:vcs-host-boundary`.
+ */
 export function ghMust(
   args: string[],
   options: GhCallOptions = {},
@@ -415,6 +427,7 @@ function parseJsonStdout<T>(stdout: string, label: string): T {
   }
 }
 
+/** gh CLI diagnostic (vcs-actuator `gh_status`); supported, not a forge operation. */
 export function ghVersion(
   options: GhCallOptions = {},
   run: VcsCommandRunner = safeExecResult
@@ -429,6 +442,10 @@ export function ghAuthStatus(
   return ghRun(['auth', 'status'], options, run);
 }
 
+/**
+ * @deprecated Use `vcsHostDefaultBranch` (`@agent/core/vcs/vcs-host-verbs`). Kept for the
+ *   vcs-host contract parity tests; new callers are rejected by `check:vcs-host-boundary`.
+ */
 export function ghRepoDefaultBranch(
   options: GhCallOptions = {},
   run: VcsCommandRunner = safeExecResult
@@ -449,6 +466,10 @@ export interface PrViewParams extends GhCallOptions {
   fields: string;
 }
 
+/**
+ * @deprecated Use `vcsHostPrViewFields` (`@agent/core/vcs/vcs-host-verbs`). Kept for the
+ *   vcs-host contract parity tests; new callers are rejected by `check:vcs-host-boundary`.
+ */
 export function ghPrView(params: PrViewParams, run?: VcsCommandRunner): Record<string, unknown> {
   assertNotFlagLike(params.ref, 'pr ref');
   const stdout = ghMust(['pr', 'view', params.ref, '--json', params.fields], params, run);
@@ -465,6 +486,10 @@ export interface PrListEntry {
   state?: string;
 }
 
+/**
+ * @deprecated Use `vcsHostPrList` (`@agent/core/vcs/vcs-host-verbs`). Kept for the
+ *   vcs-host contract parity tests; new callers are rejected by `check:vcs-host-boundary`.
+ */
 export function ghPrList(
   params: {
     state?: 'open' | 'closed' | 'merged' | 'all';
@@ -512,6 +537,8 @@ export interface PrChecksResult {
  * `gh pr checks --json name,state,bucket,link`. `gh` exits non-zero while any
  * check is pending or failed — the JSON payload is still valid, so callers get
  * the parsed state regardless of exit status.
+ * @deprecated Use `vcsHostPrChecks` (`@agent/core/vcs/vcs-host-verbs`). Kept for the
+ *   vcs-host contract parity tests; new callers are rejected by `check:vcs-host-boundary`.
  */
 export function ghPrChecks(
   params: { ref: string; ignore?: string[] } & GhCallOptions,
@@ -559,6 +586,8 @@ const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
  * The `gh pr checks --watch` equivalent as a governed op: poll until every
  * check reaches a terminal bucket, or `timeoutMs` elapses (fail-closed with
  * the last observed state). `sleep` is injectable for deterministic tests.
+ * @deprecated Use `vcsHostPrChecksWait` (`@agent/core/vcs/vcs-host-verbs`). Kept for the
+ *   vcs-host contract parity tests; new callers are rejected by `check:vcs-host-boundary`.
  */
 export async function ghPrChecksWait(
   params: {
@@ -607,6 +636,10 @@ export async function ghPrChecksWait(
   return { ...last, waited_ms: Date.now() - started, timed_out: timedOut };
 }
 
+/**
+ * @deprecated Use `vcsHostPrMerge` (`@agent/core/vcs/vcs-host-verbs`). Kept for the
+ *   vcs-host contract parity tests; new callers are rejected by `check:vcs-host-boundary`.
+ */
 export function ghPrMerge(
   params: {
     ref: string;
@@ -675,6 +708,10 @@ export function ghPrMerge(
   );
 }
 
+/**
+ * @deprecated Use `vcsHostPrCreate` (`@agent/core/vcs/vcs-host-verbs`). Kept for the
+ *   vcs-host contract parity tests; new callers are rejected by `check:vcs-host-boundary`.
+ */
 export function ghPrCreate(
   params: {
     title: string;
@@ -787,7 +824,10 @@ export function ghPrCreate(
   );
 }
 
-/** Verified repo visibility for delegation gating — never trust a claim. */
+/**
+ * Verified repo visibility for delegation gating — never trust a claim.
+ * Supported sync probe: `gitPush` and onboarding grant creation are sync.
+ */
 export function ghRepositoryVisibility(
   params: GhCallOptions & { repository?: { host: string; slug: string } },
   run: VcsCommandRunner = safeExecResult
