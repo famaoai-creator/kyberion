@@ -55,7 +55,7 @@ It provides a small, governed list of backends for:
 - `video`
 - `music`
 
-For local FLUX image generation, use the governed image backend `media-generation.local_flux` and the environment policy defined in `libs/core/media/image-generation-policy.ts`:
+For local FLUX image generation, use the governed image backend `media-generation.local_flux` and the environment policy defined in `libs/shared-media/src/image-generation-policy.ts`:
 
 - `KYBERION_MFLUX_PACKAGE`
 - `KYBERION_MFLUX_MODEL`

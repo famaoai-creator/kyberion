@@ -77,14 +77,14 @@ const WARMUP_MISSION_DIR = pathResolver.tenantMissionDir(
 describe('meeting-to-value e2e', () => {
   const originalMissionRole = process.env.MISSION_ROLE;
   const originalPersona = process.env.KYBERION_PERSONA;
-  const originalCustomer = process.env.KYBERION_CUSTOMER;
+  const originalCustomer = process.env.KYBERION_STANCE;
   const originalTenant = process.env.KYBERION_TENANT;
   const originalReasoning = process.env.KYBERION_REASONING_BACKEND;
 
   const applySuiteEnv = (): void => {
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
-    process.env.KYBERION_CUSTOMER = CUSTOMER_SLUG;
+    process.env.KYBERION_STANCE = CUSTOMER_SLUG;
     process.env.KYBERION_TENANT = CUSTOMER_SLUG;
     process.env.KYBERION_REASONING_BACKEND = 'stub';
     setWorkCoordinationNamespace(`meeting-to-value-e2e-${process.pid}`);
@@ -174,8 +174,8 @@ describe('meeting-to-value e2e', () => {
     else process.env.MISSION_ROLE = originalMissionRole;
     if (originalPersona === undefined) delete process.env.KYBERION_PERSONA;
     else process.env.KYBERION_PERSONA = originalPersona;
-    if (originalCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
-    else process.env.KYBERION_CUSTOMER = originalCustomer;
+    if (originalCustomer === undefined) delete process.env.KYBERION_STANCE;
+    else process.env.KYBERION_STANCE = originalCustomer;
     if (originalTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = originalTenant;
     if (originalReasoning === undefined) delete process.env.KYBERION_REASONING_BACKEND;

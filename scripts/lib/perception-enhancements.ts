@@ -1,10 +1,10 @@
 import type { CommonArgs, PerceptionDeps } from './perception.js';
 import { ScriptExitError } from './harness.js';
-import type { Observation, PerceptionSource } from '@agent/core/perception/observation';
-import type * as Audio from '@agent/core/perception/audio-analysis';
-import type * as Tracking from '@agent/core/perception/tracking';
-import type * as Visual from '@agent/core/perception/visual-change';
-import type * as Semantic from '@agent/core/perception/semantic-index';
+import type { Observation, PerceptionSource } from '@agent/shared-perception/observation';
+import type * as Audio from '@agent/shared-perception/audio-analysis';
+import type * as Tracking from '@agent/shared-perception/tracking';
+import type * as Visual from '@agent/shared-perception/visual-change';
+import type * as Semantic from '@agent/shared-perception/semantic-index';
 
 export interface PerceptionOptions {
   grounded?: boolean;
@@ -27,9 +27,9 @@ export interface PerceptionOptions {
 }
 export interface PerceptionEnhancementDeps {
   source?: (path: string) => PerceptionSource;
-  ocrObservations?: typeof import('@agent/core/perception/observation').ocrObservations;
-  transcriptObservations?: typeof import('@agent/core/perception/observation').transcriptObservations;
-  observation?: typeof import('@agent/core/perception/observation').observation;
+  ocrObservations?: typeof import('@agent/shared-perception/observation').ocrObservations;
+  transcriptObservations?: typeof import('@agent/shared-perception/observation').transcriptObservations;
+  observation?: typeof import('@agent/shared-perception/observation').observation;
   analyzeAudio?: typeof Audio.analyzeAudio;
   alignSpeakers?: typeof Audio.alignSpeakerSegments;
   track?: typeof Tracking.trackMedia;
@@ -144,8 +144,8 @@ export function validatePerceptionOptions(
 }
 export async function enhancementDeps(deps: PerceptionDeps) {
   const [observation, visual] = await Promise.all([
-    import('@agent/core/perception/observation'),
-    import('@agent/core/perception/visual-change'),
+    import('@agent/shared-perception/observation'),
+    import('@agent/shared-perception/visual-change'),
   ]);
   return {
     ...observation,

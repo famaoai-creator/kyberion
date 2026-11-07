@@ -15,7 +15,7 @@
  */
 
 import { agentActor } from '../actor.js';
-import { buildNhiId, NHI_SLUG_PATTERN } from '../nhi-id.js';
+import { buildNhiId, NHI_SLUG_PATTERN } from '../contracts/nhi-id.js';
 import {
   parseInformationFlowFacts,
   type CharterAction,

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Badge, Button, Callout, Disclosure, Section } from '@agent/shared-ui';
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import { conciergeText, frontDeskText, type ConciergeLocale } from '../../lib/i18n';
 import { cardSummary, kindBrief, renderDisplayText } from '../../lib/decision-brief-view';
 import { deriveCardFields, type DecideQueueEntry } from '../../lib/decide-view';

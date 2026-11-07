@@ -34,6 +34,16 @@ vi.mock('./governance/approval-store.js', async (original) => ({
   createApprovalRequest: (_role: unknown, params: unknown) => mocks.create(params),
   loadApprovalRequest: () => mocks.record,
 }));
+// approval-request-create defines these; its importers bypass the facade.
+vi.mock('./governance/approval-request-create.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./governance/approval-request-create.js')>()),
+  createApprovalRequest: (_role: unknown, params: unknown) => mocks.create(params),
+}));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('./governance/approval-store-reader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./governance/approval-store-reader.js')>()),
+  loadApprovalRequest: () => mocks.record,
+}));
 vi.mock('./governance/approval-separation-of-duties.js', async (original) => ({
   ...(await original<typeof import('./governance/approval-separation-of-duties.js')>()),
   assertApprovalUsable: (...args: unknown[]) => mocks.usable(...args),

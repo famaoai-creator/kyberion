@@ -1,12 +1,10 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 
-import {
-  assertApprovalUsable,
-  createApprovalRequest,
-  loadApprovalRequest,
-  type ApprovalRequestRecord,
-} from '../governance/approval-store.js';
+import { assertApprovalUsable } from '../governance/approval-separation-of-duties.js';
+import { createApprovalRequest } from '../governance/approval-request-create.js';
+import { loadApprovalRequest } from '../governance/approval-store-reader.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import { NON_HUMAN_PROOF_AUTH_METHODS } from '../governance/approval-assurance.js';
 import {
   appendGovernedArtifactJsonl,

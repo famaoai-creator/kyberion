@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { RealtimeVoiceConversationPreferences } from '@agent/core/voice/realtime-voice-preferences';
+import type { RealtimeVoiceConversationPreferences } from '@agent/shared-voice/realtime-voice-preferences';
 import { readFileSync } from 'node:fs';
 import {
   registerSpeechToTextBridge,
@@ -17,8 +17,8 @@ import {
 const preferenceState = vi.hoisted(() => ({
   current: null as RealtimeVoiceConversationPreferences | null,
 }));
-vi.mock('@agent/core/voice/realtime-voice-preferences', async (original) => ({
-  ...(await original<typeof import('@agent/core/voice/realtime-voice-preferences')>()),
+vi.mock('@agent/shared-voice/realtime-voice-preferences', async (original) => ({
+  ...(await original<typeof import('@agent/shared-voice/realtime-voice-preferences')>()),
   loadRealtimeVoiceConversationPreferences: () => preferenceState.current,
 }));
 

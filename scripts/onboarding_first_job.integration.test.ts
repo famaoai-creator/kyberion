@@ -55,7 +55,7 @@ let work: typeof import('@agent/core/workforce/work-coordination');
 let dispatch: typeof import('@agent/core/dot/dot-dispatch');
 let executor: typeof import('./dot_executor_step.js');
 let execution: typeof import('@agent/core/surface/front-desk-execution');
-let browser: typeof import('@agent/core/authn-providers');
+let browser: typeof import('@agent/core/authn/authn-providers');
 let approvals: typeof import('@agent/core/surface/first-job-approval');
 let api: typeof import('./onboarding_first_job.js');
 let authority: typeof import('@agent/core/authority');
@@ -145,7 +145,7 @@ beforeAll(async () => {
   dispatch = await import('@agent/core/dot/dot-dispatch');
   executor = await import('./dot_executor_step.js');
   execution = await import('@agent/core/surface/front-desk-execution');
-  browser = await import('@agent/core/authn-providers');
+  browser = await import('@agent/core/authn/authn-providers');
   approvals = await import('@agent/core/surface/first-job-approval');
 }, 60_000);
 beforeEach(() => {

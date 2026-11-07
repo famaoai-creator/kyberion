@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { resolveLocale } from './locale.js';
-import { localeToBcp47 } from './locale-normalize.js';
+import { localeToBcp47 } from './foundation/locale-normalize.js';
 import { pathResolver } from './path-resolver.js';
+import { TENANT_DEALS_DIR, TENANT_HOME_ROOT } from './organization/tenant-home.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { readTextFile } from './foundation/text.js';
@@ -15,7 +16,7 @@ import {
 } from './secure-io.js';
 import { logger } from './core.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
-import type { DealRecord, DealStage } from './deal-store.js';
+import { asDealStore, type DealRecord, type DealStage } from './deal-store.js';
 import type { ExtractedRequirements } from './reasoning/reasoning-backend.js';
 import { getReasoningBackend } from './reasoning/reasoning-backend.js';
 import { getSpeechToTextBridge } from './voice/speech-to-text-bridge.js';
@@ -166,12 +167,12 @@ function dealRequirementsPath(tenantSlug: string, dealId: string): string {
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{2,127}$/.test(dealId)) {
     throw new Error(`[DEAL_SCOPE] invalid deal id: ${dealId}`);
   }
-  // Lives in the deal's document directory (customer/<tenant>/deals/<id>/,
+  // Lives in the deal's document directory (knowledge/confidential/<tenant>/deals/<id>/,
   // same convention as deal-documents) — NOT as a sibling of DEAL-*.json,
   // which listDeals() would misread as a deal record.
   return assertSafeRepositoryPath(
     pathResolver.rootResolve(
-      path.join('customer', tenantSlug, 'deals', dealId, 'requirements.json')
+      path.join(TENANT_HOME_ROOT, tenantSlug, TENANT_DEALS_DIR, dealId, 'requirements.json')
     ),
     { allowMissingLeaf: true }
   );
@@ -191,8 +192,10 @@ export function readDealRequirementsCapture(
 ): DealRequirementsCapture | null {
   const filePath = dealRequirementsPath(tenantSlug, dealId);
   try {
-    if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return null;
-    return dealRequirementsCaptureCatalog(filePath).load();
+    return asDealStore(tenantSlug, () => {
+      if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return null;
+      return dealRequirementsCaptureCatalog(filePath).load();
+    });
   } catch (err) {
     logger.warn(
       `[customer-conversation-modes] unreadable requirements capture ${filePath}: ${err instanceof Error ? err.message : String(err)}`
@@ -215,9 +218,11 @@ export function saveDealRequirementsCapture(input: {
     requirements: input.requirements,
   };
   const filePath = dealRequirementsPath(input.tenantSlug, input.dealId);
-  safeMkdir(path.dirname(filePath), { recursive: true });
   const validated = dealRequirementsCaptureCatalog(filePath).validate(capture, filePath);
-  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
+  asDealStore(input.tenantSlug, () => {
+    safeMkdir(path.dirname(filePath), { recursive: true });
+    safeWriteFile(filePath, JSON.stringify(validated, null, 2));
+  });
   return validated;
 }
 

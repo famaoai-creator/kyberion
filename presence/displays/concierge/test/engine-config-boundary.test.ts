@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
 
 /**
- * The engine runtime operator role writes the personal / customer profile
- * (security-policy: knowledge/personal/, customer/). Concierge may assume it
+ * The engine runtime operator role writes the personal / stance profile
+ * (security-policy: knowledge/personal/). Concierge may assume it
  * only for 設定 › エンジン, so only that route calls the operator module and
  * nothing in Concierge opens an engine-runtime access binding itself.
  */
@@ -24,7 +24,7 @@ describe('engine runtime operator boundary', () => {
     const users = sources(src)
       .filter((file) => {
         const text = String(safeReadFile(file, { encoding: 'utf8' }) ?? '');
-        return /from '@agent\/core\/voice\/engine-runtime-preferences-(?:operator|access)'/u.test(
+        return /from '(?:@agent\/shared-voice\/engine-runtime-preferences-operator|@agent\/core\/voice\/engine-runtime-preferences-(?:operator|access))'/u.test(
           text.replace(/import type [^;]+;/gu, '')
         );
       })

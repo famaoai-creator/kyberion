@@ -64,7 +64,7 @@ vi.mock('@agent/core/surface/front-desk-conversation-store', async (original) =>
   ...(await original<typeof import('@agent/core/surface/front-desk-conversation-store')>()),
   readConversationHistory: state.read,
 }));
-import { mintBrowserSessionToken } from '@agent/core/authn-providers';
+import { mintBrowserSessionToken } from '@agent/core/authn/authn-providers';
 import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface/surface-authn';
 import { conciergeCredential } from '../../../lib/viewer-context';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';

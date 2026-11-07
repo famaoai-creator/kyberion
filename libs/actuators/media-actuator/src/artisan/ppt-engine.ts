@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { DocumentArtifact } from '@agent/core/shared-business-types';
+import { DocumentArtifact } from '@agent/core/contracts/shared-business-types';
 import {
   safeWriteFile,
   safeUnlinkSync,

@@ -24,7 +24,7 @@
  * blindly.
  */
 
-import { segmentKeywordTerms } from '../locale-normalize.js';
+import { segmentKeywordTerms } from '../foundation/locale-normalize.js';
 
 export const RECALL_MAX_CHARS = 6_000;
 export const MAX_FACTS = 300;
@@ -281,7 +281,28 @@ function formatBullet(text: string, date: string): string {
 }
 
 function provenanceMarkers(text: string): string[] {
-  return text.match(/\(said in [^)]+\)|\[claimed source: [^\]]+\]/giu) ?? [];
+  // Fixed-length openers and monotonic delimiter searches avoid rescanning
+  // the suffix for every repeated unterminated marker.
+  const openers = /\(said in |\[claimed source: /giu;
+  const markers: string[] = [];
+  let roundEnd = -1;
+  let squareEnd = -1;
+  for (let match = openers.exec(text); match; match = openers.exec(text)) {
+    const start = match.index;
+    const body = openers.lastIndex;
+    const round = text[start] === '(';
+    let end = round ? roundEnd : squareEnd;
+    if (end < body) {
+      const found = text.indexOf(round ? ')' : ']', body);
+      end = found < 0 ? Infinity : found;
+      if (round) roundEnd = end;
+      else squareEnd = end;
+    }
+    if (end === Infinity || end === body) continue;
+    markers.push(text.slice(start, end + 1));
+    openers.lastIndex = end + 1;
+  }
+  return markers;
 }
 
 /**

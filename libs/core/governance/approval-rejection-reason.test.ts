@@ -181,7 +181,7 @@ describe('approval rejection reason capture (LC-10)', () => {
   });
 
   it('normalizes reason categories from loose input', async () => {
-    const { normalizeRejectionReasonCategory } = await import('../rejection-reason.js');
+    const { normalizeRejectionReasonCategory } = await import('../contracts/rejection-reason.js');
     expect(normalizeRejectionReasonCategory('incorrect-content')).toBe('incorrect_content');
     expect(normalizeRejectionReasonCategory('WRONG DIRECTION')).toBe('wrong_direction');
     expect(normalizeRejectionReasonCategory('not-a-category')).toBeUndefined();

@@ -74,7 +74,7 @@ L4 人間フィードバック 却下 → ask-why 1問(5カテゴリ) → イベ
       + KM-03 promotion queue に memory candidate(統治付き、直接 HINTS.md は書かない)
 ```
 
-- **共有語彙**: `libs/core/rejection-reason.ts`(5カテゴリ + `normalizeRejectionReasonCategory`)。カテゴリを閉じているのは学習側の dedup を決定論化するため。
+- **共有語彙**: `libs/core/contracts/rejection-reason.ts`(5カテゴリ + `normalizeRejectionReasonCategory`)。カテゴリを閉じているのは学習側の dedup を決定論化するため。
 - **機械由来のギャップ**(goal 不充足)は IL-04 が元から閉じている。L4 はそこに**人間由来の却下を同じ状態機械で合流**させた(新設なし)。
 
 ## 主要な環境変数

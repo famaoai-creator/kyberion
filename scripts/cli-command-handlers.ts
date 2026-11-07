@@ -182,7 +182,8 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
       printActuatorList(actuators);
       const hasCheck = normalizedArgs.includes('--check');
       if (hasCheck) {
-        const { checkAllActuatorCapabilities } = await import('@agent/core/actuator-capability');
+        const { checkAllActuatorCapabilities } =
+          await import('@agent/core/actuator/actuator-capability');
         const statuses = await checkAllActuatorCapabilities();
         printText('\n=== Runtime Capability Check ===');
         for (const status of statuses) {
@@ -427,7 +428,7 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
         throw new ScriptExitError(1, 'Usage: pnpm kyberion preview <pipeline.json>');
       }
       const { assertPipelinePreviewResourcePath, previewPipeline } =
-        await import('@agent/core/pipeline-preview');
+        await import('@agent/core/pipeline/pipeline-preview');
       const resolvedPreviewPath = pathResolver.rootResolve(filePath);
       assertPipelinePreviewResourcePath(resolvedPreviewPath);
       const content = readCliTextFile(resolvedPreviewPath, 'pipeline preview file');
@@ -486,7 +487,7 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
 
       const subAction = firstArg; // register, list, remove
       const { listScheduledPipelines, registerScheduledPipeline, unregisterScheduledPipeline } =
-        await import('@agent/core/pipeline-scheduler');
+        await import('@agent/core/pipeline/pipeline-scheduler');
       if (subAction === 'list') {
         const schedules = listScheduledPipelines();
         if (schedules.length === 0) {

@@ -54,26 +54,21 @@ function provision() {
     initialIO.safeRmSync(ROOT, { recursive: true, force: true });
     initialIO.safeWriteFile(path.join(ROOT, 'package.json'), '{"name":"information-assets-test"}');
     const copy = (relative: string) => {
+      initialIO.safeMkdir(path.join(ROOT, relative), { recursive: true });
       for (const name of initialIO.safeReaddir(path.join(SOURCE, relative))) {
         const file = path.join(relative, name);
         const stat = initialIO.safeLstat(path.join(SOURCE, file));
         if (stat.isSymbolicLink()) throw Error('Linked governance fixture');
         if (stat.isDirectory()) copy(file);
         else if (/\.(json|yaml)$/.test(name))
-          initialIO.safeWriteFile(
-            path.join(ROOT, file),
-            initialIO.safeReadFile(path.join(SOURCE, file))
-          );
+          initialIO.safeCopyFileSync(path.join(SOURCE, file), path.join(ROOT, file));
       }
     };
     copy('knowledge/product/governance');
     copy('knowledge/product/schemas');
-    initialIO.safeWriteFile(
-      path.join(ROOT, 'knowledge/product/orchestration/information-asset-types.json'),
-      initialIO.safeReadFile(
-        path.join(SOURCE, 'knowledge/product/orchestration/information-asset-types.json')
-      )
-    );
+    const types = 'knowledge/product/orchestration/information-asset-types.json';
+    initialIO.safeMkdir(path.join(ROOT, path.dirname(types)), { recursive: true });
+    initialIO.safeCopyFileSync(path.join(SOURCE, types), path.join(ROOT, types));
   });
 }
 beforeAll(async () => {
@@ -264,29 +259,40 @@ describe('catalog real governed IO', () => {
     });
     const { runInResourceAccessScope } = await import('../foundation/resource-access-scope.js');
     const relative = (target: string) => path.relative(ROOT, target).split(path.sep).join('/');
-    for (const role of ['concierge_management_reader', 'chronos_operator', 'chronos_localadmin'])
+    const { withConciergeManagementAccess } =
+      await import('../surface/concierge-management-access.js');
+    const reads = [file, observation, foreign, project].map(relative);
+    const checks = () => {
+      expect(() => io.safeReadFile(file, { encoding: 'utf8' })).not.toThrow();
+      for (const target of [observation, foreign, project])
+        expect(() => io.safeReadFile(target, { encoding: 'utf8' })).toThrow();
+      expect(() => io.safeWriteFile(file, 'overwrite')).toThrow();
+    };
+    // G2: the Concierge management reader is its live grant, opened by the governed facade.
+    withConciergeManagementAccess(
+      {
+        tenantSlug: scope.tenant_slug,
+        organizationId: scope.organization_id,
+        reads,
+        writes: [],
+        mkdir: [],
+        identity: { projectId: null },
+      },
+      checks
+    );
+    for (const role of ['chronos_operator', 'chronos_localadmin'])
       runInResourceAccessScope(
         {
           tenantSlug: scope.tenant_slug,
           organizationId: scope.organization_id,
-          readExact: [file, observation, foreign, project].map(relative),
+          readExact: reads,
           writeExact: [],
           mkdirExact: [],
         },
         () =>
-          context(
-            role,
-            () => {
-              expect(() => io.safeReadFile(file, { encoding: 'utf8' })).not.toThrow();
-              for (const target of [observation, foreign, project])
-                expect(() => io.safeReadFile(target, { encoding: 'utf8' })).toThrow();
-              expect(() => io.safeWriteFile(file, 'overwrite')).toThrow();
-            },
-            undefined,
-            scope.tenant_slug,
-            scope.organization_id,
-            { projectId: null }
-          )
+          context(role, checks, undefined, scope.tenant_slug, scope.organization_id, {
+            projectId: null,
+          })
       );
   });
   it('registers a tenant binding with exact capability and CAS under concurrent mutation', async () => {

@@ -22,7 +22,7 @@ import {
 } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 import { estimateSpeechDurationMs } from '@agent/core/presence-surface';
-import { getVoiceTtsLanguageConfig } from '@agent/core/voice/voice-tts-config';
+import { getVoiceTtsLanguageConfig } from '@agent/shared-voice/voice-tts-config';
 import {
   getVoiceEngineRegistry,
   resolveVoiceEngineForPlatform,

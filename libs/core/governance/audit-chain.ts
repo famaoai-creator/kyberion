@@ -9,6 +9,7 @@ import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { rootDir } from '../path-resolver.js';
+import { TENANT_AUDIT_MIRROR_ROOT_PATH } from '../foundation/runtime-state-roots.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 export { registerLockIo } from '../foundation/lock-utils.js';
 import {
@@ -467,7 +468,7 @@ export type TenantMirrorWriterContext = <T>(tenantSlug: string, fn: () => T) => 
 let tenantMirrorWriterContext: TenantMirrorWriterContext | undefined;
 
 /**
- * G17: the mirror under customer/{slug}/logs/audit/ is part of the chain's own
+ * G17: the tenant mirror (active/shared/runtime/audit-mirror/confidential/{slug}/) is part of the chain's own
  * persistence, like the master file. Writing it under the caller's identity
  * failed whenever the caller was inside a narrow store-writer assumption (e.g.
  * work coordination as infrastructure_sentinel), which left the mirror short
@@ -505,6 +506,14 @@ export function registerAuditChainIo(io: AuditChainIo): () => void {
     auditIo = previous;
     if (previous) auditChainInstance?.initializeFromDisk();
   };
+}
+
+/** Mirrors are confidential: tenant audit entries never land in a public partition. */
+function tenantMirrorRoot(root: string): string {
+  const mirror = path.join(root, TENANT_AUDIT_MIRROR_ROOT_PATH, 'confidential');
+  return typeof pathResolver.vitestLivePath === 'function'
+    ? pathResolver.vitestLivePath(mirror)
+    : mirror;
 }
 
 function safeAuditPath(
@@ -902,16 +911,16 @@ class AuditChainImpl {
       }
     }
 
-    const customersDir = path.join(pathResolver.rootDir(), 'customer');
-    const safeCustomersDir = safeAuditPath(customersDir, { allowMissingLeaf: true });
-    if (!safeCustomersDir) return { ok: false, findings: ['tenant_mirror_path_unsafe:root'] };
-    if (!auditIo.exists(safeCustomersDir)) return { ok: true, findings };
+    const mirrorRoot = tenantMirrorRoot(pathResolver.rootDir());
+    const safeMirrorRoot = safeAuditPath(mirrorRoot, { allowMissingLeaf: true });
+    if (!safeMirrorRoot) return { ok: false, findings: ['tenant_mirror_path_unsafe:root'] };
+    if (!auditIo.exists(safeMirrorRoot)) return { ok: true, findings };
 
     // Tenant identity comes from the chained master entries, not from arbitrary
-    // directory names under the customer stance overlay.
+    // directory names under the mirror root.
     for (const slug of masterByTenant.keys()) {
       if (!isValidTenantSlug(slug)) continue;
-      const mirrorDir = path.join(safeCustomersDir, slug, 'logs', 'audit');
+      const mirrorDir = path.join(safeMirrorRoot, slug);
       const safeMirrorDir = safeAuditPath(mirrorDir, { allowMissingLeaf: true });
       if (!safeMirrorDir) {
         findings.push(`tenant_mirror_path_unsafe:${slug}`);
@@ -1152,17 +1161,10 @@ class AuditChainImpl {
       logger.error(`[AUDIT_CHAIN] Failed to persist: ${err.message}`);
     }
 
-    // Per-tenant mirror: copy to customer/{slug}/logs/audit/ when slug is present.
-    //
-    // EG-14: the mirror follows an existing stance overlay; it never creates one.
-    // `customer/{slug}/` is a stance overlay owned by `pnpm stance:create`, and
-    // entity-scope-hierarchy is explicit that "readers must not create missing
-    // directories as a side effect; creation belongs to the governed writer".
-    // Mirroring used to mkdir -p the whole path, so any audit entry carrying a
-    // novel slug — including a test fixture's — materialised a directory that
-    // later read back as if a tenant existed. Skipping is lossless: the master
-    // chain still holds the entry, and verifyTenantMirrors() skips slugs with no
-    // mirror directory, so master and mirror stay consistent.
+    // Per-tenant mirror: copy to the tenant's partition of the audit mirror store
+    // (active/shared/runtime/audit-mirror/confidential/{slug}/) when slug is present.
+    // The partition is the mirror's own store: creating it never makes a tenant
+    // appear anywhere else (EG-14), and only audit_mirror_writer may write it.
     if (entry.tenantSlug && isValidTenantSlug(entry.tenantSlug)) {
       const tenantSlug = entry.tenantSlug;
       const io = auditIo;
@@ -1177,10 +1179,7 @@ class AuditChainImpl {
   }
 
   private appendTenantMirror(io: AuditChainIo, tenantSlug: string, entry: AuditEntry): void {
-    const stanceDir = path.join(rootDir(), 'customer', tenantSlug);
-    const safeStanceDir = safeAuditPath(stanceDir, { allowMissingLeaf: true });
-    if (!safeStanceDir || !io.exists(safeStanceDir)) return;
-    const tenantAuditDir = path.join(safeStanceDir, 'logs', 'audit');
+    const tenantAuditDir = path.join(tenantMirrorRoot(rootDir()), tenantSlug);
     const safeTenantAuditDir = safeAuditPath(tenantAuditDir, { allowMissingLeaf: true });
     if (!safeTenantAuditDir) return;
     if (!io.exists(safeTenantAuditDir)) {

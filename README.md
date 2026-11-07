@@ -60,14 +60,14 @@ Most agent frameworks stop at "execute". Kyberion closes the loop:
 
 ### Core concepts in one minute
 
-| Concept            | What it is                                                                                                                                                                                                            |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Mission**        | One unit of work with its own git repo, state and evidence; survives 24h+ runs.                                                                                                                                       |
-| **ADF / pipeline** | Declarative, schema-validated plan format (sub-pipelines, `on_error` recovery). Ready-made ones live in [`pipelines/`](./pipelines/README.md).                                                                        |
-| **Actuator**       | A governed capability module (browser, file, voice, code, …). Full list: [catalog](./CAPABILITIES_GUIDE.md).                                                                                                          |
-| **Surface**        | A human-facing entrance: Chronos, Concierge, Presence Studio, terminal HUD, chat bridges, capture pads.                                                                                                               |
-| **Tier & tenant**  | `personal/` → `confidential/` → `public/` knowledge, scoped per tenant; nothing leaks downward.                                                                                                                       |
-| **Stance**         | `customer/{slug}/` overlay that swaps identity, connections and policy for the entity you act as — without forks. Not a tenant ([how they differ](./knowledge/product/architecture/stance-tenant-customer-model.md)). |
+| Concept            | What it is                                                                                                                                                                                                                              |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Mission**        | One unit of work with its own git repo, state and evidence; survives 24h+ runs.                                                                                                                                                         |
+| **ADF / pipeline** | Declarative, schema-validated plan format (sub-pipelines, `on_error` recovery). Ready-made ones live in [`pipelines/`](./pipelines/README.md).                                                                                          |
+| **Actuator**       | A governed capability module (browser, file, voice, code, …). Full list: [catalog](./CAPABILITIES_GUIDE.md).                                                                                                                            |
+| **Surface**        | A human-facing entrance: Chronos, Concierge, Presence Studio, terminal HUD, chat bridges, capture pads.                                                                                                                                 |
+| **Tier & tenant**  | `personal/` → `confidential/` → `public/` knowledge, scoped per tenant; nothing leaks downward.                                                                                                                                         |
+| **Stance**         | `knowledge/personal/stances/{slug}/` overlay that swaps identity, connections and policy for the entity you act as — without forks. Not a tenant ([how they differ](./knowledge/product/architecture/stance-tenant-customer-model.md)). |
 
 New here? Read [`docs/CORE_CONCEPTS.md`](./docs/CORE_CONCEPTS.md) — the 5 concepts you need first. Concept map: [`kyberion-concept-map`](./knowledge/product/architecture/kyberion-concept-map.md) · Parent architecture: [`organization-work-loop`](./knowledge/product/architecture/organization-work-loop.md).
 

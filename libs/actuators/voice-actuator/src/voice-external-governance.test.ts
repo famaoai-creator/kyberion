@@ -139,7 +139,7 @@ import {
   withExternalOperationPipelineRun,
 } from '@agent/core/governance/external-operation';
 import { safeExec } from '@agent/core/secure-io';
-import { speak } from '@agent/core/media/native-tts';
+import { speak } from '@agent/shared-voice/native-tts';
 import { createVirtualAudioOutputPlaybackBridge } from '@agent/core/virtual/virtual-audio-output-playback-bridge';
 import {
   registerSpeechToTextBridge,
@@ -150,7 +150,7 @@ import {
   registerVoicePlaybackPlatformAdapter,
   resolveVoicePlaybackPlatformAdapter,
 } from './voice-runtime-helpers.js';
-import { recordVoiceSample } from '@agent/core/voice/voice-sample-recorder';
+import { recordVoiceSample } from '@agent/shared-voice/voice-sample-recorder';
 import { outputToVirtualCamera } from './voice-media-output-helpers.js';
 import { safeExecShellScript } from '@agent/core/secure-io';
 import { installObsVirtualCameraOutputBridge } from '@agent/core/obs-virtual-camera-output';
@@ -710,6 +710,21 @@ describe('voice external operation boundaries', () => {
 vi.mock('@agent/core/governance/approval-store', async (original) => ({
   ...(await original<typeof import('@agent/core/governance/approval-store')>()),
   evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = vi.mocked(enforceApprovalGate).mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));
+// approval-separation-of-duties defines these; its importers bypass the facade.
+vi.mock('@agent/core/governance/approval-separation-of-duties', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('@agent/core/governance/approval-separation-of-duties')
+  >()),
+  evaluateApprovalUsability: () => null,
+}));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('@agent/core/governance/approval-store-reader', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/governance/approval-store-reader')>()),
   loadApprovalRequest: (_channel: string, id: string) => {
     const params = vi.mocked(enforceApprovalGate).mock.calls.at(-1)?.[0];
     return params ? externalApprovalFixture(params, id) : null;

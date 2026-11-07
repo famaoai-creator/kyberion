@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractPlaceholderNames } from '@agent/core/message-format';
+import { extractPlaceholderNames } from '@agent/core/foundation/message-format';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 import catalog from '../knowledge/product/orchestration/user-facing-vocabulary.json';

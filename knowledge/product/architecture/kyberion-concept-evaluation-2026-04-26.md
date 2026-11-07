@@ -376,7 +376,7 @@ interface MemoryCandidate {
 
 実装候補:
 
-- 新規: `libs/core/next-action-contract.ts`
+- 新規: `libs/core/contracts/next-action-contract.ts`
 - 更新: `scripts/control_plane_cli.ts`
 - 更新: Chronos route または presenter 層
 
@@ -397,7 +397,7 @@ next action 種別:
 
 実装状況:
 
-- `libs/core/next-action-contract.ts` と `libs/core/next-action-contract.test.ts` で固定済み。
+- `libs/core/contracts/next-action-contract.ts` と `libs/core/contracts/next-action-contract.test.ts` で固定済み。
 
 ### P3-1. Concept Drift Guard を CI に追加する
 

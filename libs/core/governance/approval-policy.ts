@@ -1,4 +1,4 @@
-import * as customerResolver from '../customer-resolver.js';
+import * as customerResolver from '../stance-resolver.js';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
@@ -57,7 +57,7 @@ export interface ApprovalPolicyResolution {
 const approvalPolicyCatalog = defineCatalog<ApprovalPolicyFile>({
   id: 'approval-policy',
   path: () => {
-    const customerPolicyPath = customerResolver.customerRoot('policy/approval-policy.json');
+    const customerPolicyPath = customerResolver.stanceRoot('policy/approval-policy.json');
     const fallbackPath = assertSafeRepositoryPath(
       pathResolver.knowledge('product/governance/approval-policy.json')
     );
@@ -122,13 +122,13 @@ export function loadApprovalPolicy(): ApprovalPolicyFile {
  * request's requester identity is refused — the choke point is
  * `decideApprovalRequest` in `approval-store.ts`. The setting lives in
  * `approval-policy.json` and therefore follows that file's existing scoping:
- * the active customer overlay (`customer/{slug}/policy/approval-policy.json`)
+ * the active stance overlay (`knowledge/personal/stances/{slug}/policy/approval-policy.json`)
  * replaces the product default wholesale. There is no per-tenant or
  * per-organization override.
  */
 /** Whether any approval-policy.json exists (customer overlay or product default). */
 function approvalPolicyFilePresent(): boolean {
-  const customerPolicyPath = customerResolver.customerRoot('policy/approval-policy.json');
+  const customerPolicyPath = customerResolver.stanceRoot('policy/approval-policy.json');
   const candidates = [
     ...(customerPolicyPath ? [customerPolicyPath] : []),
     pathResolver.knowledge('product/governance/approval-policy.json'),

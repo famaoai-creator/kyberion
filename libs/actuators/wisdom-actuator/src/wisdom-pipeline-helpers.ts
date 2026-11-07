@@ -11,7 +11,7 @@ import {
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveMissionDir } from '@agent/core/owner-scope';
-import { resolveVars, evaluateCondition, getPathValue } from '@agent/core/logic-utils';
+import { resolveVars, evaluateCondition, getPathValue } from '@agent/core/pipeline/logic-utils';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 
 import { classifyError } from '@agent/core/error-classifier';
@@ -22,7 +22,7 @@ import {
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
+} from '@agent/core/contracts/execution-bounds';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import {

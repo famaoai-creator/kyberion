@@ -7,11 +7,11 @@ import { resolveIdentityContext } from './authority.js';
 import { resolveStorageFloor } from './storage-layout.js';
 import { safeMkdir, safeWriteFile, safeRmSync } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
+import { createApprovalRequest } from './governance/approval-request-create.js';
 import {
-  createApprovalRequest,
   loadApprovalRequest,
   isApprovalRequestExpired,
-} from './governance/approval-store.js';
+} from './governance/approval-store-reader.js';
 import { assertApprovalUsable } from './governance/approval-separation-of-duties.js';
 import { consumeApprovalWithin } from './governance/approval-revocation.js';
 import { validateHumanFinalDecision } from './governance/approval-human-decision.js';

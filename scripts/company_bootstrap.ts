@@ -59,12 +59,14 @@ export function main(argv: string[], print: (value: unknown) => void = () => und
     force,
   });
   logger.success(`🏢 Company '${slug}' bootstrapped from vertical '${vertical}'.`);
-  logger.info(`   Customer dir: ${result.customerDir}`);
+  logger.info(`   Tenant dir: ${result.tenantDir}`);
   logger.info(`   Team template catalog: ${result.catalogId}`);
   logger.info('   Next steps:');
-  logger.info(`     export KYBERION_CUSTOMER=${slug}`);
+  logger.info(`     export KYBERION_STANCE=${slug}`);
   logger.info('     node dist/scripts/mission_controller.js organization-profile --summary');
-  logger.info(`     edit customer/${slug}/vision.md and customer.json with real company facts`);
+  logger.info(
+    `     edit knowledge/confidential/${slug}/vision.md and company.json with real company facts`
+  );
   return 0;
 }
 

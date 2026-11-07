@@ -18,7 +18,7 @@ import {
   safeSymlinkSync,
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
-import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
+import { resolveVars, evaluateCondition } from '@agent/core/pipeline/logic-utils';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 
 import { pathResolver } from '@agent/core/path-resolver';
@@ -37,7 +37,7 @@ import type { AdfEngineContext, AdfRunResult, AdfStep } from '@agent/core/pipeli
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
+} from '@agent/core/contracts/execution-bounds';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
 import { executeTaskPlanFromOrchestrator, taskPlanCoordinator } from './task-plan-coordinator.js';

@@ -9,10 +9,10 @@ import {
 } from '../governance/approval-store.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { nowIso } from '../foundation/time.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import { resolveApprovalLocale } from '../governance/approval-decision-card.js';
 import { t } from '../t.js';
-import type { RejectionReasonCategory } from '../rejection-reason.js';
+import type { RejectionReasonCategory } from '../contracts/rejection-reason.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
 import {
   applySurfaceApprovalDecision,

@@ -29,7 +29,7 @@ vi.mock('../../../../lib/ops/ops-viewer', () => ({
 // test is hermetic and still exercises the route's real logic (it calls
 // resolveOverlay(fileName) and reads whatever path comes back).
 const mockResolveOverlay = vi.fn((fileName: string) => path.join(fixtureDir(), fileName));
-vi.mock('@agent/core/customer-resolver', () => ({
+vi.mock('@agent/core/stance-resolver', () => ({
   resolveOverlay: (fileName: string) => mockResolveOverlay(fileName),
 }));
 

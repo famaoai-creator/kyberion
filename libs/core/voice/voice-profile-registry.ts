@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { logger } from '../core.js';
-import * as customerResolver from '../customer-resolver.js';
+import * as customerResolver from '../stance-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 import {
@@ -212,7 +212,7 @@ function getPersonalOverlayPath(): string | null {
 
 function getCustomerOverlayPath(): string | null {
   if (getRegisteredEnvText('KYBERION_VOICE_PROFILE_REGISTRY_PATH')?.trim()) return null;
-  const configured = customerResolver.customerRoot(DEFAULT_CUSTOMER_OVERLAY_PATH);
+  const configured = customerResolver.stanceRoot(DEFAULT_CUSTOMER_OVERLAY_PATH);
   if (!configured) return null;
   const safePath = assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
   return safeExistsSync(safePath) ? safePath : null;

@@ -7,6 +7,8 @@ import * as textIo from '../foundation/text.js';
 import { pathResolver } from '../path-resolver.js';
 import { auditChain } from '../governance/audit-chain.js';
 import * as approvals from '../governance/approval-store.js';
+// createApprovalRequest is defined in approval-request-create; the workflow imports it there.
+import * as approvalCreate from '../governance/approval-request-create.js';
 import { writeMemberProfile, memberProfilePath } from '../organization/member-registry.js';
 import {
   createMemoryPromotionCandidate,
@@ -188,8 +190,8 @@ describe('scoped learning UI workflow', () => {
 
   it('keeps curation durable when request creation fails, and recovers an unknown created outcome', () => {
     const f = fixture();
-    const original = approvals.createApprovalRequest;
-    vi.spyOn(approvals, 'createApprovalRequest').mockImplementationOnce(() => {
+    const original = approvalCreate.createApprovalRequest;
+    vi.spyOn(approvalCreate, 'createApprovalRequest').mockImplementationOnce(() => {
       throw new Error('synthetic failure before creation');
     });
     expect(() =>
@@ -200,7 +202,7 @@ describe('scoped learning UI workflow', () => {
     ).toThrow(/before creation/);
     expect(f.current().curation).toEqual(f.curation);
     expect(inspectScopedLearningCandidate(f.address).learning.state).toBe('draft');
-    vi.mocked(approvals.createApprovalRequest).mockImplementationOnce((...args) => {
+    vi.mocked(approvalCreate.createApprovalRequest).mockImplementationOnce((...args) => {
       original(...args);
       throw new Error('synthetic lost response after creation');
     });

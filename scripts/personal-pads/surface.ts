@@ -1,7 +1,7 @@
 /** Surface seams shared by the menu shell and the localhost transport. */
 import type { LocalPadContext } from '../lib/local-artifact-pad.js';
 import type { EventScope } from '@agent/core/event-scope';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import {
   executePadAction,
   getPadActionAvailability,

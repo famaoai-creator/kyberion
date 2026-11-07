@@ -1,4 +1,4 @@
-import { detectTextLocale, type SupportedLocale } from '../locale-normalize.js';
+import { detectTextLocale, type SupportedLocale } from '../foundation/locale-normalize.js';
 import { resolveLocale } from '../locale.js';
 import { t, type VocabularyKey } from '../t.js';
 

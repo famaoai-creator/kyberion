@@ -1,5 +1,5 @@
 import { getVoiceProfileRecord } from '@agent/core/voice/voice-profile-registry';
-import { getVoiceTtsLanguageConfig } from '@agent/core/voice/voice-tts-config';
+import { getVoiceTtsLanguageConfig } from '@agent/shared-voice/voice-tts-config';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveVoiceEngineForPlatform } from '@agent/core/voice/voice-engine-registry';
 import { safeExec, safeMkdir, safeReadFile, safeRmSync } from '@agent/core/secure-io';
@@ -9,7 +9,7 @@ import type { AudioChunk, AudioFormat } from '@agent/core/meeting/meeting-sessio
 import type {
   TtsLoopbackVerificationRequest,
   TtsSource,
-} from '@agent/core/voice/tts-loopback-verifier';
+} from '@agent/shared-voice/tts-loopback-verifier';
 import { isRecord, nowIso } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { renderNativeArtifact } from './voice-runtime-helpers.js';

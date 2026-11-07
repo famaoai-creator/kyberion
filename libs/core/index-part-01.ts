@@ -18,7 +18,7 @@ export * from './metrics.js';
 
 export * from './generation-cost-settlement.js';
 
-export * from './wire-error.js';
+export * from './contracts/wire-error.js';
 
 export * from './trust-requiring-resources.js';
 
@@ -105,7 +105,7 @@ export * from './knowledge/knowledge-scope.js';
 
 export type { VolatileScope, VolatileCadence } from './path-resolver.js';
 
-export * as customerResolver from './customer-resolver.js';
+export * as customerResolver from './stance-resolver.js';
 
 // Error Classification (Phase A-7)
 
@@ -123,19 +123,6 @@ export type {
 } from './error-classifier.js';
 
 // Native OS TTS (Phase A-5, voice tier 0)
-
-export {
-  speak as nativeTtsSpeak,
-  probeNativeTts,
-  currentPlatform as nativeTtsCurrentPlatform,
-  hasBuiltInTts as nativeTtsHasBuiltIn,
-} from './media/native-tts.js';
-
-export type {
-  SpeakOptions as NativeTtsSpeakOptions,
-  SpeakResult as NativeTtsSpeakResult,
-  Platform as NativeTtsPlatform,
-} from './media/native-tts.js';
 
 export {
   rootDir,
@@ -266,15 +253,11 @@ export * from './command-runner.js';
 
 export * from './job-lifecycle.js';
 
-export * from './voice/voice-capability-bridge.js';
-
-export * from './voice/voice-path-policy.js';
-
 export * from './camera-output-bridge.js';
 
 export * from './ledger.js';
 
-export * from './text-escaping.js';
+export * from './foundation/text-escaping.js';
 
 export * from './pipeline/logic-utils.js';
 
@@ -322,8 +305,6 @@ export * from './video/video-motion-direction.js';
 
 export * from './video/video-scene-composition.js';
 
-export * from './video/video-composition-lint.js';
-
 export * from './reasoning/reasoning-egress-scope.js';
 
 export * from './visual-raster.js';
@@ -335,10 +316,6 @@ export * from './visual-review-loop.js';
 export * from './workforce/artifact-verification.js';
 export * from './training-catalog.js';
 export * from './hearing-scenario-catalog.js';
-
-export * from './media/media-brief-lock.js';
-
-export * from './deck-theme-direction.js';
 
 export * from './semantic-decide.js';
 
@@ -399,8 +376,6 @@ export * from './meeting/meeting-participation-runtime-plan.js';
 export * from './deliverable-quality.js';
 
 export * from './deliverable-inbox.js';
-
-export * from './media/font-stack.js';
 
 export { resolveInputBindings, classifyInputId, isPathInput } from './input-binding.js';
 

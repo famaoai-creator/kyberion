@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { parseEventScopeInput } from '../event-scope.js';
-import { assertScopeContext } from '../scope-context-validation.js';
+import { assertScopeContext } from '../foundation/scope-context-validation.js';
 
 import { pathResolver } from '../path-resolver.js';
 import {

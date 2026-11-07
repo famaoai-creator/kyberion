@@ -41,7 +41,7 @@ import {
   mintBrowserSessionToken,
   verifyJwtSignature,
   type OidcConfig,
-} from '../authn-providers.js';
+} from '../authn/authn-providers.js';
 import { withExecutionContext } from '../authority.js';
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
 import { auditChain } from '../governance/audit-chain.js';

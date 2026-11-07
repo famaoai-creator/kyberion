@@ -5,7 +5,7 @@ import {
   getVoiceSelectionSnapshot,
   saveVoiceSelectionPreferences,
   voiceSelectionRequestSchema,
-} from '@agent/core/voice/voice-selection-preferences';
+} from '@agent/shared-voice/voice-selection-preferences';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
 

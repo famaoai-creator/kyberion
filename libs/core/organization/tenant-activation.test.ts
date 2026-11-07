@@ -23,9 +23,9 @@ const probeRefs = {
 };
 
 function seed(): void {
-  safeMkdir(path.join(rootDir, 'customer', 'acme-ai'), { recursive: true });
+  safeMkdir(path.join(rootDir, 'knowledge', 'personal', 'stances', 'acme-ai'), { recursive: true });
   safeWriteFile(
-    path.join(rootDir, 'customer', 'acme-ai', 'organization-profile.json'),
+    path.join(rootDir, 'knowledge', 'confidential', 'acme-ai', 'organization-profile.json'),
     JSON.stringify({
       version: '1.0.0',
       organization_id: 'org-acme-ai',
@@ -96,9 +96,12 @@ describe('tenant activation', () => {
       'accountable_human must be an explicit human:* resource'
     );
 
-    safeRmSync(path.join(rootDir, 'customer/acme-ai/onboarding/organization-context.json'), {
-      force: true,
-    });
+    safeRmSync(
+      path.join(rootDir, 'knowledge/personal/stances/acme-ai/onboarding/organization-context.json'),
+      {
+        force: true,
+      }
+    );
     const unowned = resolveTenantActivation(scope);
     expect(unowned.record.owner_id).toBe('');
     expect(unowned.record.checks.accountable_human).toBe(false);
@@ -111,7 +114,9 @@ describe('tenant activation', () => {
     seed();
     const bindingPath = path.join(
       rootDir,
-      'customer',
+      'knowledge',
+      'personal',
+      'stances',
       'acme-ai',
       'onboarding',
       'organization-context.json'
@@ -300,7 +305,9 @@ describe('tenant activation', () => {
     seed();
     const receiptPath = path.join(
       rootDir,
-      'customer',
+      'knowledge',
+      'personal',
+      'stances',
       'acme-ai',
       'onboarding',
       'tenant-activation',

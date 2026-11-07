@@ -11,12 +11,12 @@ Targets: small/mid IT teams, FinOps, security audits.
 
 ## Customer-specific inputs
 
-| Input | Where to find it | Example |
-|---|---|---|
-| `SAAS_SERVICES` | List of services to audit | `["github", "slack", "notion", "1password", "miro"]` |
-| `HR_SOURCE` | Source of truth for active employees | `connections/google-workspace.json` (Workspace directory) |
-| `EXPIRY_HORIZON_DAYS` | How far ahead to flag expiring licenses | `60` |
-| `REPORT_OUT_PATH` | Where to drop the report | `customer/{slug}/reports/saas-inventory-{YYYY-MM}.md` |
+| Input                 | Where to find it                        | Example                                                                 |
+| --------------------- | --------------------------------------- | ----------------------------------------------------------------------- |
+| `SAAS_SERVICES`       | List of services to audit               | `["github", "slack", "notion", "1password", "miro"]`                    |
+| `HR_SOURCE`           | Source of truth for active employees    | `connections/google-workspace.json` (Workspace directory)               |
+| `EXPIRY_HORIZON_DAYS` | How far ahead to flag expiring licenses | `60`                                                                    |
+| `REPORT_OUT_PATH`     | Where to drop the report                | `knowledge/personal/stances/{slug}/reports/saas-inventory-{YYYY-MM}.md` |
 
 ## What it produces
 

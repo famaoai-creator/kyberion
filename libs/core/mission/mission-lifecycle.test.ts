@@ -37,7 +37,7 @@ import {
   publishMeetingDeliverablesIfNeeded,
   updateMissionMemorySidecar,
 } from './mission-lifecycle-completion.js';
-import * as customerResolver from '../customer-resolver.js';
+import * as customerResolver from '../stance-resolver.js';
 import { emitIntentSnapshot, listSnapshots } from '../intent/intent-snapshot-store.js';
 import * as pathResolver from '../path-resolver.js';
 import { logger } from '../core.js';
@@ -177,7 +177,10 @@ afterEach(() => {
     recursive: true,
     force: true,
   });
-  safeRmSync(pathResolver.rootResolve('customer/demo'), { recursive: true, force: true });
+  safeRmSync(pathResolver.rootResolve('knowledge/personal/stances/demo'), {
+    recursive: true,
+    force: true,
+  });
   safeRmSync(missionPath, { recursive: true, force: true });
   safeRmSync(demoTenantMissionPath, { recursive: true, force: true });
   safeRmSync(personalRepairMissionPath, { recursive: true, force: true });
@@ -1695,12 +1698,12 @@ describe('mission lifecycle finish gate', () => {
   });
 
   it('rejects a directory replacing meeting evidence before customer delivery', () => {
-    const previousCustomer = process.env.KYBERION_CUSTOMER;
-    process.env.KYBERION_CUSTOMER = 'demo';
+    const previousCustomer = process.env.KYBERION_STANCE;
+    process.env.KYBERION_STANCE = 'demo';
     try {
-      const customerRoot = customerResolver.customerRoot('', process.env);
-      if (!customerRoot) throw new Error('Expected demo customer root to resolve.');
-      safeMkdir(path.join(customerRoot, 'deliverables'), { recursive: true });
+      const stanceRoot = customerResolver.stanceRoot('', process.env);
+      if (!stanceRoot) throw new Error('Expected demo customer root to resolve.');
+      safeMkdir(path.join(stanceRoot, 'deliverables'), { recursive: true });
       prepareMissionState('completed', 'meeting_facilitation', 'demo');
       safeMkdir(path.join(missionPath, 'evidence', 'minutes.md'), { recursive: true });
 
@@ -1714,23 +1717,23 @@ describe('mission lifecycle finish gate', () => {
         })
       ).toThrow('[DELIVERY_RESOURCE] evidence must be a regular file');
     } finally {
-      if (previousCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
-      else process.env.KYBERION_CUSTOMER = previousCustomer;
+      if (previousCustomer === undefined) delete process.env.KYBERION_STANCE;
+      else process.env.KYBERION_STANCE = previousCustomer;
     }
   });
 
   it('publishes meeting_facilitation deliverables into the active customer root on finish', async () => {
-    const previousCustomer = process.env.KYBERION_CUSTOMER;
+    const previousCustomer = process.env.KYBERION_STANCE;
     const previousTenant = process.env.KYBERION_TENANT;
-    process.env.KYBERION_CUSTOMER = 'demo';
+    process.env.KYBERION_STANCE = 'demo';
     // The fixture declares tenant_slug 'demo'; a tenant-bound mission is only
     // visible to a process running under that tenant.
     process.env.KYBERION_TENANT = 'demo';
     try {
-      const customerRoot = customerResolver.customerRoot('', process.env);
-      if (!customerRoot) throw new Error('Expected demo customer root to resolve.');
-      safeMkdir(customerRoot, { recursive: true });
-      safeMkdir(path.join(customerRoot, 'deliverables'), { recursive: true });
+      const stanceRoot = customerResolver.stanceRoot('', process.env);
+      if (!stanceRoot) throw new Error('Expected demo customer root to resolve.');
+      safeMkdir(stanceRoot, { recursive: true });
+      safeMkdir(path.join(stanceRoot, 'deliverables'), { recursive: true });
 
       prepareMissionState('completed', 'meeting_facilitation', 'demo', {
         requested_result: 'Meeting follow-up delivered to customer demo.',
@@ -1793,7 +1796,7 @@ describe('mission lifecycle finish gate', () => {
 
       await finishMission(missionId, false, args);
 
-      const missionDeliverablesDir = path.join(customerRoot, 'deliverables', missionId);
+      const missionDeliverablesDir = path.join(stanceRoot, 'deliverables', missionId);
       expect(safeExistsSync(missionDeliverablesDir)).toBe(true);
       expect(safeExistsSync(path.join(missionDeliverablesDir, 'minutes.md'))).toBe(true);
       expect(safeExistsSync(path.join(missionDeliverablesDir, 'action-items.jsonl'))).toBe(true);
@@ -1812,16 +1815,16 @@ describe('mission lifecycle finish gate', () => {
       expect(String(deliveryPack.summary)).toContain('customer demo');
 
       const deliveryLog = safeReadFile(
-        path.join(customerRoot, 'deliverables', 'delivery-log.jsonl'),
+        path.join(stanceRoot, 'deliverables', 'delivery-log.jsonl'),
         {
           encoding: 'utf8',
         }
       ) as string;
       expect(deliveryLog).toContain(missionId);
-      expect(deliveryLog).toContain('customer/demo/deliverables');
+      expect(deliveryLog).toContain('knowledge/personal/stances/demo/deliverables');
     } finally {
-      if (previousCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
-      else process.env.KYBERION_CUSTOMER = previousCustomer;
+      if (previousCustomer === undefined) delete process.env.KYBERION_STANCE;
+      else process.env.KYBERION_STANCE = previousCustomer;
       if (previousTenant === undefined) delete process.env.KYBERION_TENANT;
       else process.env.KYBERION_TENANT = previousTenant;
     }

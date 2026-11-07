@@ -14,7 +14,7 @@ Kyberion がデータに対して何をして、何をしないか。
 | パス                                    | 内容                                                                                                                                                                                                                                                                                         |
 | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `knowledge/personal/`                   | identity, vision, connections, voice プロファイル。**gitignored**                                                                                                                                                                                                                            |
-| `customer/{slug}/`                      | stance オーバーレイ — いま振る舞っている主体の identity/connections/policy（`KYBERION_CUSTOMER` 設定時）。**gitignored**（`_template/` 除く）                                                                                                                                                |
+| `knowledge/personal/stances/{slug}/`    | stance オーバーレイ — いま振る舞っている主体の identity/connections/policy（`KYBERION_STANCE` 設定時）。**gitignored**（`_template/` 除く）                                                                                                                                                  |
 | `active/missions/{id}/`                 | mission ごとの git repo・state・evidence。**gitignored**                                                                                                                                                                                                                                     |
 | `active/shared/logs/traces/`            | 構造化実行 trace (JSONL)。**gitignored**                                                                                                                                                                                                                                                     |
 | `active/shared/runtime/`                | runtime state, ロック, surface metadata。**gitignored**                                                                                                                                                                                                                                      |
@@ -57,7 +57,7 @@ Kyberion がデータに対して何をして、何をしないか。
 
 - 一般的な API key パターン (`sk-…`, `AIza…` 等) の文字列
 - `secret-actuator` 由来の値
-- `knowledge/personal/` および `customer/{slug}/secrets.json` のファイルパス
+- `knowledge/personal/` および `knowledge/personal/stances/{slug}/secrets.json` のファイルパス
 
 これは **best-effort で、セキュリティ境界ではない**。Kyberion に処理させるデータはすべて LLM プロバイダに送られる可能性がある前提で扱う。機密データは `KYBERION_REASONING_BACKEND=stub`（オフライン）か、自前ホストの推論エンドポイントで動かす。
 

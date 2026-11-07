@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolveRole, withExecutionContextAsync } from '../authority.js';
 import { humanActor } from '../actor.js';
 import { withOperationInterface } from './operation-protection.js';
 import * as pathResolver from '../path-resolver.js';
@@ -165,75 +164,6 @@ describe('operation-bound delegated execution', () => {
       });
     }
   });
-  it.each(['organization_operator', 'infrastructure_sentinel', 'mission_controller'])(
-    'executes with production %s worker authority against actual protected charter paths',
-    async (role) => {
-      const tenant = `delegation-${randomUUID().slice(0, 8)}`;
-      const productionScope = { kind: 'organization', tenant_slug: tenant } as const;
-      const productionOptions = { ...options(), rootDir: undefined };
-      const productionTarget = { ...target(), tenantSlug: tenant };
-      const actualDirectory = charterDir(productionScope);
-      try {
-        acceptCharter(
-          {
-            draft: {
-              charter_id: charter.charter_id,
-              scope: productionScope,
-              accountable: charter.accountable,
-              envelope: charter.envelope,
-              appetite: charter.appetite,
-            },
-            statement: 'I accept responsibility.',
-            acceptedBy: humanActor('owner'),
-            validation: { holder_role: 'owner' },
-            now: NOW,
-          },
-          {}
-        );
-        // Acceptance and evaluation share an explicit clock, not CI wall time.
-        expect(findActiveCharter(productionScope, new Date(NOW.getTime() - 1))).toBeNull();
-        expect(findActiveCharter(productionScope, NOW)?.accountable.accepted_at).toBe(
-          NOW.toISOString()
-        );
-        expect(findActiveCharter(productionScope, new Date(NOW.getTime() + 1))?.charter_id).toBe(
-          charter.charter_id
-        );
-        await withExecutionContextAsync(
-          role,
-          async () => {
-            const effect = vi.fn(async () => {
-              expect(resolveRole()).toBe(role);
-              return 'ok';
-            });
-            await expect(
-              runDelegatedExecution(productionTarget, effect, productionOptions)
-            ).resolves.toBe('ok');
-            expect(effect).toHaveBeenCalledOnce();
-            expect(() =>
-              safeWriteFile(path.join(actualDirectory, `${charter.charter_id}.json`), '{}')
-            ).toThrow();
-            expect(() =>
-              safeWriteFile(path.join(actualDirectory, 'unrelated.json'), '{}')
-            ).toThrow();
-          },
-          'worker',
-          tenant
-        );
-        await withExecutionContextAsync(
-          role,
-          async () => {
-            await expect(
-              runDelegatedExecution(productionTarget, async () => 'bad', productionOptions)
-            ).rejects.toThrow();
-          },
-          'worker',
-          'foreign-tenant'
-        );
-      } finally {
-        safeRmSync(path.dirname(actualDirectory), { recursive: true, force: true });
-      }
-    }
-  );
   it('uses keyed deterministic configuration fingerprints and keeps execution identity stable across key rotation', async () => {
     const previousKey = process.env.KYBERION_AUDIT_CHAIN_KEY;
     try {

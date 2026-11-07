@@ -15,7 +15,7 @@ describe('CLI reasoning provider module', () => {
       expect(source).not.toMatch(/env\.(CLAUDECODE|ANTHROPIC_API_KEY)/u);
     }
     const seamSource = String(
-      safeReadFile(pathResolver.rootResolve('libs/core/cli-provider-bundle.ts'), {
+      safeReadFile(pathResolver.rootResolve('libs/core/provider/cli-provider-bundle.ts'), {
         encoding: 'utf8',
       })
     );

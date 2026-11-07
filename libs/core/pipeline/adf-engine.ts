@@ -29,7 +29,7 @@ import {
   assertExecutionBounds,
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '../execution-bounds.js';
+} from '../contracts/execution-bounds.js';
 
 export type AdfStepType = 'capture' | 'transform' | 'apply' | 'control';
 

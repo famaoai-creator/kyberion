@@ -2,13 +2,12 @@ import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import type { NextRequest } from 'next/server';
 import { humanActor } from '@agent/core/actor';
-import { withExecutionContextAsync } from '@agent/core/authority';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
-import { runInResourceAccessScope } from '@agent/core/foundation/resource-access-scope';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { readTenantProfile, tenantProfilePath } from '@agent/core/organization/tenant-registry';
 import {
+  readSurfaceManagementExact,
   readSurfaceManagementResource,
   verifySurfaceManagementAuthorization,
   SurfaceManagementError,
@@ -100,16 +99,7 @@ async function readExact<T>(
   files: string[],
   fn: () => T
 ): Promise<T> {
-  return runInResourceAccessScope(
-    {
-      tenantSlug: auth.tenantSlug,
-      readExact: files.map((file) => pathResolver.toRepoRelative(file)),
-      writeExact: [],
-      mkdirExact: [],
-      allowProductKnowledgeRead: true,
-    },
-    () => withExecutionContextAsync('concierge_management_reader', fn, undefined, auth.tenantSlug)
-  );
+  return readSurfaceManagementExact(auth, files, fn);
 }
 export async function managementSnapshot(
   auth: SurfaceManagementAuthorization,

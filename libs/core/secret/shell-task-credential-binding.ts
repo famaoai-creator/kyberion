@@ -2,7 +2,7 @@ import type { TaskCredentialBinding } from '../foundation/credential-binding.js'
 import { credentialExecutionIdentity } from '../foundation/credential-binding.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import { currentActor } from '../actor-context.js';
-import { assertScopeContext, type ScopeContext } from '../scope-context-validation.js';
+import { assertScopeContext, type ScopeContext } from '../foundation/scope-context-validation.js';
 import { getWorkItem, listActiveWorkLeases } from '../workforce/work-coordination.js';
 import { assertIsolatedProviderHome } from '../provider/provider-auth-home.js';
 

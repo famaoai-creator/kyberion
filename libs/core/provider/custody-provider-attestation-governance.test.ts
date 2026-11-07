@@ -9,19 +9,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 
 const sod = vi.hoisted(() => ({ overlayPath: null as string | null }));
-vi.mock('../customer-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../customer-resolver.js')>();
+vi.mock('../stance-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../stance-resolver.js')>();
   return {
     ...actual,
-    customerRoot: (subPath = '', ...rest: unknown[]) =>
+    stanceRoot: (subPath = '', ...rest: unknown[]) =>
       subPath === 'policy/approval-policy.json' && sod.overlayPath
         ? sod.overlayPath
-        : (actual.customerRoot as (...args: unknown[]) => string | null)(subPath, ...rest),
+        : (actual.stanceRoot as (...args: unknown[]) => string | null)(subPath, ...rest),
   };
 });
 
 import { withExecutionContext } from '../authority.js';
 import { auditChain } from '../governance/audit-chain.js';
+import { resolveSeparationOfDutiesPolicy } from '../governance/approval-policy.js';
 import {
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
@@ -295,6 +296,7 @@ describe('custody provider attestation governance', () => {
         JSON.stringify({ ...product, separation_of_duties: { enabled: true } })
       );
       sod.overlayPath = overlayPath;
+      expect(resolveSeparationOfDutiesPolicy()).toEqual({ enabled: true });
     });
 
     afterEach(() => {

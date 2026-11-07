@@ -9,7 +9,7 @@ import {
   safeReaddir,
   safeWriteFile,
 } from '../secure-io.js';
-import { SPECIALIST_IDS } from '../specialist-ids.js';
+import { SPECIALIST_IDS } from '../contracts/specialist-ids.js';
 import { slugify } from '../foundation/text.js';
 import { matchesIntentPhrase } from '../intent/intent-phrase-lexicon.js';
 

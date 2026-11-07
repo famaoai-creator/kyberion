@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fixedWindowLimiter } from './rate-limit.js';
+import { fixedWindowLimiter } from './foundation/rate-limit.js';
 
 describe('fixed window limiter', () => {
   it('denies within the window, expires exactly at its boundary and isolates keys', () => {

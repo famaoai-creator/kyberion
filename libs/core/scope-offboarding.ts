@@ -471,6 +471,8 @@ export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   execution_metrics: 'tenant_execution_metrics',
   tenant_ledger: 'tenant_ledger',
   tenant_approvals: 'tenant_approvals',
+  // A copy of the tenant's master audit entries; the master chain keeps them.
+  tenant_audit_mirror: 'tenant_runtime_state',
   customer_decision_invites: 'customer_decision_invites',
   pipeline_library_runs: 'tenant_runtime_state',
   autonomy_learning: 'tenant_runtime_state',

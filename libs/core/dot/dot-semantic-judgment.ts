@@ -17,7 +17,7 @@ import type {
   JudgmentEvidenceResult,
   saveJudgmentEvidence,
 } from '../organization/judgment-evidence.js';
-import type { ScopeContext } from '../scope-context-validation.js';
+import type { ScopeContext } from '../foundation/scope-context-validation.js';
 import type { DotProposal } from './dot-proposals.js';
 
 export interface DotSemanticParent {

@@ -14,9 +14,9 @@ import {
 } from '@agent/core';
 import { nowIso } from '@agent/core/foundation';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
-import { withLock } from '@agent/core/lock-utils';
+import { withLock } from '@agent/core/foundation/lock-utils';
 import { assertSafeRepositoryPath } from '@agent/core/path-resolver';
 import { createHash } from 'node:crypto';
 import path from 'node:path';

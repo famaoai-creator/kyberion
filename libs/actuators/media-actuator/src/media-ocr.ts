@@ -1,5 +1,5 @@
 import { ocrImage } from '@agent/core/ocr-bridge';
-import type { OcrRequest, OcrResult } from '@agent/core/ocr-types';
+import type { OcrRequest, OcrResult } from '@agent/core/contracts/ocr-types';
 
 /**
  * Media-document OCR seam.

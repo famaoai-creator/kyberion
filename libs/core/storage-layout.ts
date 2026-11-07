@@ -1,15 +1,15 @@
 import * as path from 'node:path';
 import {
-  DELEGATION_RECORD_ROOT_PATH,
   PARTITIONED_RUNTIME_STATE_ROOTS,
-  TENANT_APPROVAL_ROOT_PATH,
-  TENANT_LEDGER_ROOT_PATH,
+  PARTITIONED_RUNTIME_LEDGER_ROOTS,
+  STORAGE_FLOOR_ROOTS,
+  SURFACE_MANAGEMENT_ROOT_PATH,
 } from './foundation/runtime-state-roots.js';
 import { createHash } from 'node:crypto';
 import { rootDir } from './path-resolver.js';
 import { isReservedScopeName, isValidTenantSlug } from './foundation/scope.js';
 
-export { PARTITIONED_RUNTIME_STATE_ROOTS };
+export { PARTITIONED_RUNTIME_STATE_ROOTS, PARTITIONED_RUNTIME_LEDGER_ROOTS, STORAGE_FLOOR_ROOTS };
 
 /**
  * Runtime storage layout — one governed place per storage purpose.
@@ -39,18 +39,13 @@ export const STORAGE_DATA_TIERS: readonly StorageDataTier[] = [
   'public',
 ] as const;
 
-/** Floors resolved by this module, mapped to their repo-relative roots. */
-export const STORAGE_FLOOR_ROOTS = {
-  /** Consumable intermediates; 24h TTL. Re-creatable by contract. */
-  scratch: 'active/shared/tmp',
-  /** Inbound external files waiting for perception / ingest; short TTL. */
-  staging: 'active/shared/staging',
-  /** Derived, re-generable data (digest-keyed sidecars, build trees, models). */
-  cache: 'active/shared/cache',
-  /** Deliverables owned by the platform or a tenant (no narrower scope). */
-  artifact: 'active/shared/artifacts',
-} as const;
-
+/**
+ * Floors resolved by this module (roots are projected into the foundation map):
+ * - scratch: consumable intermediates; 24h TTL, re-creatable by contract.
+ * - staging: inbound files waiting for perception / ingest; short TTL.
+ * - cache: derived, re-generable sidecars, build trees and models.
+ * - artifact: deliverables owned by the platform or a tenant (no narrower scope).
+ */
 export type StorageFloor = keyof typeof STORAGE_FLOOR_ROOTS;
 
 export const STORAGE_FLOORS = Object.keys(STORAGE_FLOOR_ROOTS) as StorageFloor[];
@@ -205,31 +200,19 @@ export function protectedStorageFloorPrefixes(): string[] {
  * Their personal/confidential subtrees are tenant_scope protected prefixes in
  * security-policy.json; tier-guard gives reads of them the tenant check plus the
  * persona read rules of `knowledge/<tier>/`, and tenant offboarding purges them.
+ *
+ * Hash-chained tenant partitions of the hybrid ledger (`libs/core/ledger.ts`):
+ * `<personal|confidential>/<tenant>/ledger.jsonl`, written and verified as `tenant_ledger_store`.
+ * Tenant records and tenant mission metadata never reach the system ledger.
+ *
+ * Per-tenant approval store partitions (`libs/core/governance/approval-store-location.ts`):
+ * `<personal|confidential>/<tenant>/<channel>/` request records, passkey challenges and the
+ * channel's `approvals.jsonl` event log, read and written as `tenant_approval_store`.
+ * Untenanted records (and pre-activation tenant requests) stay in the system tree.
+ *
+ * Audit chain mirrors (`governance/audit-chain.ts`) use
+ * `confidential/<tenant>/audit-<date>.jsonl`, appended as `audit_mirror_writer`.
  */
-export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
-  resource_usage: 'active/shared/runtime/usage-ledger',
-  execution_metrics: 'active/shared/runtime/execution-metrics',
-  /**
-   * Hash-chained tenant partitions of the hybrid ledger (`libs/core/ledger.ts`):
-   * `<personal|confidential>/<tenant>/ledger.jsonl`, written and verified as `tenant_ledger_store`.
-   * Tenant records and tenant mission metadata never reach the system ledger.
-   */
-  tenant_ledger: TENANT_LEDGER_ROOT_PATH,
-  /**
-   * Per-tenant approval store partitions (`libs/core/governance/approval-store-location.ts`):
-   * `<personal|confidential>/<tenant>/<channel>/` request records, passkey challenges and the
-   * channel's `approvals.jsonl` event log, read and written as `tenant_approval_store`.
-   * Untenanted records (and pre-activation tenant requests) stay in the system tree.
-   */
-  tenant_approvals: TENANT_APPROVAL_ROOT_PATH,
-  /**
-   * Delegated-task audit trace + resumable records
-   * (`libs/core/delegated-task-observability.ts`): `system/` for untenanted
-   * delegations, `confidential/<tenant>/` for tenant ones (instruction, context
-   * and result text), read and written as `delegation_record_store`.
-   */
-  delegations: DELEGATION_RECORD_ROOT_PATH,
-} as const;
 
 /**
  * Partitioned ledger roots whose tenant partitions belong to one dedicated,
@@ -249,6 +232,10 @@ export const TENANT_STORE_LEDGER_ROOTS = {
   tenant_approvals: {
     root: PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals,
     storeRole: 'tenant_approval_store',
+  },
+  tenant_audit_mirror: {
+    root: PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_audit_mirror,
+    storeRole: 'audit_mirror_writer',
   },
   delegations: {
     root: PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations,
@@ -427,6 +414,35 @@ export function partitionedRuntimeStateKnowledgePath(filePath: string): string |
 export function partitionedRuntimeStateTierInPath(filePath: string): StorageDataTier | undefined {
   const normalized = filePath.replace(/\\/gu, '/');
   for (const root of Object.values(PARTITIONED_RUNTIME_STATE_ROOTS)) {
+    const escaped = root.replace(/[.*+?^$()|[\]\\]/gu, '\\$&');
+    const match = normalized.match(
+      new RegExp('(?:^|/)' + escaped + '/(personal|confidential|public)(?:/|$)', 'u')
+    );
+    if (match) return match[1] as StorageDataTier;
+  }
+  return undefined;
+}
+
+/**
+ * Tier-partitioned runtime roots that are neither state roots nor floors: the
+ * authority-evidence ledger roots and the surface management partitions
+ * (`<root>/<personal|confidential|public>/<tenant>/`). detectTier reads their
+ * tier from the path so a confidential ledger partition is never reported as
+ * public (egress and publication checks key on it). The metrics ledgers
+ * (resource usage, execution metrics) keep their legacy public classification:
+ * they hold counts, and their consumers rely on it.
+ */
+export const TIER_PARTITIONED_RUNTIME_ROOTS: readonly string[] = [
+  PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_ledger,
+  PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals,
+  PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_audit_mirror,
+  SURFACE_MANAGEMENT_ROOT_PATH,
+];
+
+/** The tier segment of a path under a ledger or other tier-partitioned runtime root. */
+export function partitionedRuntimeTierInPath(filePath: string): StorageDataTier | undefined {
+  const normalized = filePath.replace(/\\/gu, '/');
+  for (const root of TIER_PARTITIONED_RUNTIME_ROOTS) {
     const escaped = root.replace(/[.*+?^$()|[\]\\]/gu, '\\$&');
     const match = normalized.match(
       new RegExp('(?:^|/)' + escaped + '/(personal|confidential|public)(?:/|$)', 'u')

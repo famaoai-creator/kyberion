@@ -6,8 +6,8 @@ import {
   resolveVideoFilterProvider,
   validateVideoFilterRequest,
   validateVideoFilterSourceId,
-} from '@agent/core/video/video-filter';
-import { installBuiltinVideoFilterProviders } from '@agent/core/video/video-filter-bootstrap';
+} from '@agent/shared-video/video-filter';
+import { installBuiltinVideoFilterProviders } from '@agent/shared-video/video-filter-bootstrap';
 import { readJson } from '@agent/core/foundation/json';
 import { parseGuardedCliArgs } from '@agent/core/cli-guard';
 import { defineScript, isDirectScript } from './lib/harness.js';

@@ -39,7 +39,7 @@ vi.mock('@agent/core/organization/member-registry', async (original) => ({
   readMemberProfile: (id: string) =>
     structuredClone(state.members.find((member) => member.member_id === id) ?? null),
 }));
-vi.mock('@agent/core/lock-utils', () => ({
+vi.mock('@agent/core/foundation/lock-utils', () => ({
   withLockSync: (_key: string, fn: () => unknown) => {
     state.locks++;
     return fn();
@@ -63,7 +63,7 @@ vi.mock('@agent/core/surface/front-desk-execution-contract', async (original) =>
 import {
   mintBrowserSessionToken,
   verifiedBrowserSessionIdentity,
-} from '@agent/core/authn-providers';
+} from '@agent/core/authn/authn-providers';
 import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface/surface-authn';
 import {
   resolveBrowserHumanRequestIdentity,

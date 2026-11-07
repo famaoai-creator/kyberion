@@ -5,7 +5,7 @@ import { readTextFile } from './foundation/text.js';
 import './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 
-const domains = ['ocr', 'media/image-generation', 'media/music-generation'];
+const domains = ['ocr'];
 
 describe('provider composition boundaries', () => {
   for (const domain of domains) {

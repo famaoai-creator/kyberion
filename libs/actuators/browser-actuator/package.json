@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@agent/core": "workspace:*",
+    "@agent/shared-perception": "workspace:*",
     "@agent/shared-vision": "workspace:*",
     "@playwright/test": "^1.64.1",
     "chalk": "^6.0.1",

@@ -9,10 +9,10 @@ const guard = vi.hoisted(() => ({ denied: null as Response | null }));
 const roles = vi.hoisted(() => [] as string[]);
 const viewer = vi.hoisted(() => ({ response: null as Response | null }));
 
-vi.mock('@agent/core/voice/voice-selection-preferences', async () => {
+vi.mock('@agent/shared-voice/voice-selection-preferences', async () => {
   const actual = await vi.importActual<
-    typeof import('@agent/core/voice/voice-selection-preferences')
-  >('@agent/core/voice/voice-selection-preferences');
+    typeof import('@agent/shared-voice/voice-selection-preferences')
+  >('@agent/shared-voice/voice-selection-preferences');
   return { ...core, voiceSelectionRequestSchema: actual.voiceSelectionRequestSchema };
 });
 vi.mock('@agent/core/authority', () => ({

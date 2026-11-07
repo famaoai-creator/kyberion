@@ -1,4 +1,4 @@
-import { segmentKeywordTerms } from '@agent/core/locale-normalize';
+import { segmentKeywordTerms } from '@agent/core/foundation/locale-normalize';
 import { PANELS, PANEL_LABEL_KEYS, type PanelId } from '../keymap.js';
 import type { I18n } from '../i18n.js';
 

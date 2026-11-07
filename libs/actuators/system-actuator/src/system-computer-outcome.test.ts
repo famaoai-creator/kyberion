@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MarkTargetError } from '@agent/core/mark-target-resolver';
+import { MarkTargetError } from '@agent/shared-perception/mark-target-resolver';
 import { applyInteractionOutcome, stampInteractionError } from './system-computer-outcome.js';
 
 describe('system computer_interaction outcome vocabulary', () => {

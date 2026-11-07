@@ -94,24 +94,24 @@ vi.mock('@agent/core/service/service-engine', async (importOriginal) => ({
   executeServicePreset: mocks.executeServicePreset,
 }));
 
-vi.mock('@agent/core/media/music-workflow-compiler', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/media/music-workflow-compiler')>()),
+vi.mock('@agent/shared-media/music-workflow-compiler', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/shared-media/music-workflow-compiler')>()),
   compileMusicGenerationADF: mocks.compileMusicGenerationADF,
 }));
 
-vi.mock('@agent/core/visual-workflow-compiler', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/visual-workflow-compiler')>()),
+vi.mock('@agent/shared-media/visual-workflow-compiler', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/shared-media/visual-workflow-compiler')>()),
   compileImageGenerationADF: mocks.compileImageGenerationADF,
   compileVideoGenerationADF: mocks.compileVideoGenerationADF,
 }));
 
-vi.mock('@agent/core/media/image-generation-bridge', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/media/image-generation-bridge')>()),
+vi.mock('@agent/shared-media/image-generation-bridge', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/shared-media/image-generation-bridge')>()),
   generateImage: mocks.generateImage,
 }));
 
-vi.mock('@agent/core/media/music-generation-bridge', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@agent/core/media/music-generation-bridge')>()),
+vi.mock('@agent/shared-media/music-generation-bridge', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/shared-media/music-generation-bridge')>()),
   generateMusic: mocks.generateMusic,
   listMusicGenerationCandidates: mocks.listMusicGenerationCandidates,
 }));

@@ -15,7 +15,7 @@ vi.mock('./governance/audit-chain.js', () => ({
 }));
 
 const { AdaptivePolicyRouter } = await import('./ocr-bridge.js');
-import type { OcrProvider, OcrDataEgress } from './ocr-types.js';
+import type { OcrProvider, OcrDataEgress } from './contracts/ocr-types.js';
 
 const rulesDir = pathResolver.sharedTmp('ocr-provider-selection-test');
 const rulesFile = path.join(rulesDir, 'rules.json');

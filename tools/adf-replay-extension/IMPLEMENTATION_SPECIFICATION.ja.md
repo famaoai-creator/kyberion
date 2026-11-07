@@ -78,7 +78,7 @@ V1 は Native Messaging のみを採用する。ローカル loopback HTTP、任
 
 ### 4.3 Kyberion から拡張への依頼（pull mailbox）
 
-Kyberion から拡張への方向も Native Messaging だけで行う。拡張が native host に問い合わせ（`poll_requests`）、host が統制された runtime store（`libs/core/browser/browser-bridge-mailbox.ts`）を読む **pull 型の受信箱** とする。拡張は待ち受けポートを開かない。
+Kyberion から拡張への方向も Native Messaging だけで行う。拡張が native host に問い合わせ（`poll_requests`）、host が統制された runtime store（`libs/shared-vision/src/browser-bridge-mailbox.ts`）を読む **pull 型の受信箱** とする。拡張は待ち受けポートを開かない。
 
 | 項目           | 規則                                                                                                                                                                                                                                                                                                                                                                         |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

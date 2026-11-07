@@ -93,7 +93,7 @@ export function defineCatalog<T>(options: GovernedCatalogOptions<T>): GovernedCa
           return cached;
         } catch (error) {
           if (!options.fallbackOnInvalid || options.fallback === undefined) throw error;
-          const fallback = cloneFallback(options.fallback);
+          const fallback = validate(cloneFallback(options.fallback), catalogPath);
           options.onFallback?.(error, fallback);
           cached = fallback;
           cachedPath = catalogPath;
@@ -104,7 +104,7 @@ export function defineCatalog<T>(options: GovernedCatalogOptions<T>): GovernedCa
       if (options.fallback === undefined) {
         throw new Error(`Catalog ${options.id} is missing: ${catalogPath}`);
       }
-      const fallback = cloneFallback(options.fallback);
+      const fallback = validate(cloneFallback(options.fallback), catalogPath);
       options.onFallback?.(new Error(`Catalog ${options.id} is missing: ${catalogPath}`), fallback);
       cached = fallback;
       cachedPath = catalogPath;

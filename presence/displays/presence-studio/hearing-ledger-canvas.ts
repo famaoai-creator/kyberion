@@ -9,7 +9,7 @@
 // no external resource, so it satisfies the same forbidden-pattern list the
 // sanitizer applies to the model's output (proved in the test).
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import {
   resolveCreativeDesign,
   type ResolvedCreativeDesign,

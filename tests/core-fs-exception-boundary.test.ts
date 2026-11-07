@@ -112,11 +112,8 @@ const allowedCoreFsImports = [
   'libs/core/knowledge/feedback-loop.test.ts',
   'libs/core/knowledge/knowledge-cache-budget.test.ts',
   'libs/core/knowledge/knowledge-index.test.ts',
-  'libs/core/media/native-docx-engine/__tests__/docx-engine.test.ts',
-  'libs/core/media/native-pdf-engine/__tests__/pdf-binary.test.ts',
   'libs/core/media/native-pptx-engine/__tests__/pptx-engine.test.ts',
   'libs/core/media/native-pptx-engine/__tests__/pptx-filter-slides.test.ts',
-  'libs/core/media/native-xlsx-engine/__tests__/xlsx-engine.test.ts',
   'libs/core/pfc/PfcController.test.ts',
   'libs/core/pfc/SovereignSentinel.test.ts',
   'libs/core/pipeline/pipeline-engine.test.ts',
@@ -163,8 +160,6 @@ const allowedCoreFsImports = [
   'libs/core/virtual/virtual-audio-input-recording-bridge.test.ts',
   'libs/core/virtual/virtual-audio-output-playback-bridge.test.ts',
   'libs/core/voice/voice-profile-registry.test.ts',
-  'libs/core/voice/voice-sample-collection.test.ts',
-  'libs/core/voice/voice-sample-ingestion-policy.test.ts',
   'libs/core/workforce/work-graph-projection.test.ts',
   // Module-mock fixtures: these tests vi.mock (or vi.spyOn) `./secure-io.js` /
   // `node:fs` itself, or seed a real OS-tmpdir root outside the repo, so the

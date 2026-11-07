@@ -59,7 +59,8 @@ import { assertFrontDeskDispatchLockHeld } from './front-desk-dispatch-lock.js';
 import { assertFrontDeskRecoveryOutputsAbsent } from './front-desk-recovery-evidence.js';
 import { findRepoDotCharter } from '../dot/dot-charter.js';
 import { firstJobApprovalEffect } from './first-job-approval-proof.js';
-import { loadApprovalRequest, computeApprovalPayloadHash } from '../governance/approval-store.js';
+import { loadApprovalRequest } from '../governance/approval-store-reader.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
 import {
   readDotActionLedgerStrict,
   dotActionRecordHash,
@@ -72,10 +73,10 @@ import {
   type FrontDeskExecutionRecoveryReceipt,
 } from './front-desk-recovery-receipt.js';
 export type { FrontDeskExecutionRecoveryReceipt } from './front-desk-recovery-receipt.js';
-import { withLockSync } from '../lock-utils.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { redactSensitiveString } from '../network.js';
 import { narrowSurfaceViewerScope } from './surface-mutation-guard.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import { t } from '../t.js';
 import {
   applyConversationTurnOutcome,

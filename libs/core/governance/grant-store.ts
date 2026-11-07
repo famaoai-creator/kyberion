@@ -47,17 +47,18 @@ import {
 } from './grant-capability-policy.js';
 import {
   assertApprovalUsable,
-  assuranceOfAuthMethod,
-  computeApprovalPayloadHash,
-  createApprovalRequest,
   evaluateApprovalUsability,
+} from './approval-separation-of-duties.js';
+import { assuranceOfAuthMethod } from './approval-assurance.js';
+import { computeApprovalPayloadHash } from './approval-presentation.js';
+import { createApprovalRequest } from './approval-request-create.js';
+import {
   isApprovalRequestExpired,
   listApprovalRequests,
   loadApprovalRequest,
-  validateHumanFinalDecision,
-  type ApprovalAssuranceLevel,
-  type ApprovalRequestRecord,
-} from './approval-store.js';
+} from './approval-store-reader.js';
+import { validateHumanFinalDecision } from './approval-human-decision.js';
+import type { ApprovalAssuranceLevel, ApprovalRequestRecord } from './approval-store.js';
 import { markApprovalConsumed, revokeStandingEffectApproval } from './approval-revocation.js';
 import {
   approvalRequesterActorId,

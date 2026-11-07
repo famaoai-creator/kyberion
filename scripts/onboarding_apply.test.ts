@@ -56,7 +56,7 @@ describe('onboarding_apply', () => {
     for (const file of [
       'scripts/onboarding_apply.ts',
       'scripts/onboarding_wizard.ts',
-      'libs/core/browser/browser-onboarding.ts',
+      'libs/shared-vision/src/browser-onboarding.ts',
       'libs/core/integrations/slack-onboarding.ts',
     ]) {
       expect(read(file)).toContain('writePersonalAgentIdentityAtPath(');

@@ -1,4 +1,4 @@
-import type { Observation } from '@agent/core/perception/observation';
+import type { Observation } from '@agent/shared-perception/observation';
 import {
   PERCEPTION_OPTIONS_HELP,
   validatePerceptionOptions,
@@ -18,7 +18,7 @@ import {
  */
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolvePerceptionScope } from '@agent/core/perception/observation';
+import { resolvePerceptionScope } from '@agent/shared-perception/observation';
 import type { TranscriptSegment } from '@agent/core/voice/speech-to-text-bridge';
 import { ScriptExitError } from './lib/harness.js';
 import {
@@ -64,13 +64,13 @@ interface ListenArgs extends CommonArgs {
 }
 
 export interface ListenResult {
-  source?: import('@agent/core/perception/observation').PerceptionSource;
+  source?: import('@agent/shared-perception/observation').PerceptionSource;
   file: string;
   backend: string;
   language?: string;
   text: string;
   segments?: (TranscriptSegment & { speaker_id?: string })[];
-  analysis?: import('@agent/core/perception/audio-analysis').AudioAnalysisResult;
+  analysis?: import('@agent/shared-perception/audio-analysis').AudioAnalysisResult;
   observations?: Observation[];
   warnings: string[];
 }
@@ -224,7 +224,7 @@ export async function runListenCommand(
       if (options.diarize || options.events) {
         const wav = path.join(workDir, 'analysis-16k-mono.wav');
         await extractSttWav(deps, absolute, wav, 601);
-        const audio = await import('@agent/core/perception/audio-analysis');
+        const audio = await import('@agent/shared-perception/audio-analysis');
         result.analysis = await withPerceptionMediaRole(inputScope, () =>
           (deps.enhancements?.analyzeAudio ?? audio.analyzeAudio)({
             path: wav,

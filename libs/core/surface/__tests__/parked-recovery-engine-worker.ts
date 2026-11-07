@@ -71,7 +71,7 @@ import {
 import { writeMemberProfile } from '../../organization/member-registry.js';
 import type { MemberProfile } from '../../organization/member-registry.js';
 import { nowIso } from '../../foundation/time.js';
-import { mintBrowserSessionToken } from '../../authn-providers.js';
+import { mintBrowserSessionToken } from '../../authn/authn-providers.js';
 import { readFirstJobRecoveries, terminateFirstJobRequest } from '../first-job-recovery.js';
 import { getRegisteredEnvText } from '../../foundation/env.js';
 const FIRST_JOB_TEST_ISSUER = 'https://fixture.example';

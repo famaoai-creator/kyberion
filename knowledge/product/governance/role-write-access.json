@@ -127,7 +127,7 @@
       "allow": []
     },
     "audit_mirror_writer": {
-      "allow": ["customer/${KYBERION_TENANT}/logs/audit/"]
+      "allow": ["active/shared/runtime/audit-mirror/confidential/${KYBERION_TENANT}/"]
     },
     "tenant_ledger_store": {
       "allow": [
@@ -208,7 +208,7 @@
         "active/shared/runtime/",
         "active/shared/observability/",
         "active/shared/logs/traces/",
-        "customer/${KYBERION_CUSTOMER}/logs/traces/"
+        "active/shared/logs/stances/${KYBERION_STANCE}/traces/"
       ]
     },
     "deliverable_inbox_writer": {
@@ -218,7 +218,7 @@
       "allow": []
     },
     "customer_channel_binding_store": {
-      "allow": ["customer/${KYBERION_TENANT}/connections/"]
+      "allow": ["knowledge/confidential/${KYBERION_TENANT}/connections/"]
     }
   }
 }

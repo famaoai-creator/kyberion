@@ -16,8 +16,8 @@ import {
   resolveDefaultScheduleSource,
 } from '../contextual-intent-memory.js';
 import { recordConversationSignal } from '../intent/conversation-signals.js';
-import { stripTags } from '../html-sanitize.js';
-import { decodeEntities } from '../text-escaping.js';
+import { stripTags } from '../foundation/html-sanitize.js';
+import { decodeEntities } from '../foundation/text-escaping.js';
 import { extractSurfaceBlocks } from './surface-response-blocks.js';
 import { resolveSurfaceIntent } from '../router-contract.js';
 import type { IntentResolutionPacket } from '../intent/intent-resolution.js';

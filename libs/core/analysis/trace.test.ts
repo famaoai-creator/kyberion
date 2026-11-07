@@ -192,13 +192,13 @@ describe('WI-13: deriveTraceOrigin priority table', () => {
 
 describe('WI-13: vitest trace-persistence guard', () => {
   const savedOptIn = process.env.KYBERION_TRACE_TEST_PERSIST;
-  const savedCustomer = process.env.KYBERION_CUSTOMER;
+  const savedCustomer = process.env.KYBERION_STANCE;
 
   afterEach(() => {
     if (savedOptIn === undefined) delete process.env.KYBERION_TRACE_TEST_PERSIST;
     else process.env.KYBERION_TRACE_TEST_PERSIST = savedOptIn;
-    if (savedCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
-    else process.env.KYBERION_CUSTOMER = savedCustomer;
+    if (savedCustomer === undefined) delete process.env.KYBERION_STANCE;
+    else process.env.KYBERION_STANCE = savedCustomer;
   });
 
   it('an explicit dir always persists for real, opt-in or not', () => {
@@ -211,7 +211,7 @@ describe('WI-13: vitest trace-persistence guard', () => {
 
   it('skips the write under vitest with no explicit dir and no opt-in, but returns the same path shape', () => {
     delete process.env.KYBERION_TRACE_TEST_PERSIST;
-    delete process.env.KYBERION_CUSTOMER;
+    delete process.env.KYBERION_STANCE;
 
     const expectedDir = pathResolver.shared('logs/traces');
     const today = new Date().toISOString().slice(0, 10);
@@ -232,11 +232,11 @@ describe('WI-13: vitest trace-persistence guard', () => {
   });
 
   it('KYBERION_TRACE_TEST_PERSIST=1 re-enables persistence to the default (resolved) dir', () => {
-    delete process.env.KYBERION_CUSTOMER;
+    delete process.env.KYBERION_STANCE;
     process.env.KYBERION_TRACE_TEST_PERSIST = '1';
 
-    // customerIsConfigured() only redirects to customer/{slug}/logs/traces/
-    // once that directory already exists on disk (customer-resolver.ts), so
+    // stanceIsConfigured() only redirects to customer/{slug}/logs/traces/
+    // once that directory already exists on disk (stance-resolver.ts), so
     // proving the opt-in re-enables persistence means writing to — and
     // precisely restoring — the real default dir's day file.
     const expectedDir = pathResolver.shared('logs/traces');

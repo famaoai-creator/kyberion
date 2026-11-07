@@ -2,7 +2,7 @@ import {
   dispositionFor,
   stampOutcome,
   type ComputerInteractionOutcome,
-} from '@agent/core/computer-interaction-outcome';
+} from '@agent/core/contracts/computer-interaction-outcome';
 
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';

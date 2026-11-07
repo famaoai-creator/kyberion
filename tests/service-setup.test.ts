@@ -72,8 +72,8 @@ vi.mock('@agent/core/path-resolver', async (importOriginal) => {
   };
 });
 
-vi.mock('@agent/core/customer-resolver', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core/customer-resolver')>();
+vi.mock('@agent/core/stance-resolver', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/stance-resolver')>();
   return {
     ...actual,
     resolveOverlay: mocks.resolveOverlay,

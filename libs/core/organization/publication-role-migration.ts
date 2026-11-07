@@ -1,4 +1,8 @@
-/** Explicit, additive installation upgrade for the PR host's narrow IO roles. */
+/**
+ * Explicit, additive installation upgrade for the PR host's narrow IO roles. The PR publication
+ * and person charter stores need no role (G2: their grants are the authority); only their
+ * issuance rights are registered.
+ */
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -51,8 +55,15 @@ import {
 export const PUBLICATION_MIGRATION_ROLES = [
   'notification_preferences_reader',
   'tool_runtime_policy_reader',
-  'person_charter_store',
+] as const;
+/**
+ * Store-grant issuance rights the PR host needs registered (G2): no role card, permission or
+ * index entry exists for them, only the role-assumption shared core role registration that
+ * authority.ts assertStoreGrantIssuanceAllowed requires before the grant is issued.
+ */
+export const PUBLICATION_MIGRATION_ISSUANCE_RIGHTS = [
   'pr_publication_store',
+  'person_charter_store',
 ] as const;
 const GOVERNANCE = 'knowledge/product/governance/';
 const CATALOGS = [
@@ -286,6 +297,11 @@ function previewPublicationRoleMigrationInScope(sourceRoot: string): Publication
       throw new Error(`[PUBLICATION_ROLE_MIGRATION] divergent role card: ${role}`);
     if (before === null) change(relative, null, `${JSON.stringify(card, null, 2)}\n`);
     if (!targetShared.includes(role)) targetShared.push(role);
+  }
+  for (const right of PUBLICATION_MIGRATION_ISSUANCE_RIGHTS) {
+    if (!sourceShared.includes(right) || sourcePermissions[right] || sourceIndex[right])
+      throw new Error(`[PUBLICATION_ROLE_MIGRATION] incomplete source issuance right: ${right}`);
+    if (!targetShared.includes(right)) targetShared.push(right);
   }
   for (const name of CATALOGS) {
     const relative = GOVERNANCE + name;

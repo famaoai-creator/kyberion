@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { pathResolver } from '../path-resolver.js';
 import {
   evaluateRoleFitnessResponse,
   listRoleFitnessProbes,
   loadRoleFitnessProbeCatalog,
   normalizeFitnessProviderId,
+  resetRoleFitnessProbeCatalog,
   type RoleFitnessProbe,
 } from './model-role-fitness.js';
 
@@ -11,6 +13,32 @@ const REVIEWER_PROBE = listRoleFitnessProbes('reviewer')[0]!;
 const PLANNER_PROBE = listRoleFitnessProbes('planner')[0]!;
 
 describe('role fitness probe catalog (TC-15)', () => {
+  it('rejects a missing governed probe policy instead of fabricating an empty probe set', () => {
+    const missing = pathResolver.sharedTmp(
+      `model-role-fitness-missing-${crypto.randomUUID()}/probes.json`
+    );
+    const knowledge = pathResolver.knowledge;
+    const spy = vi
+      .spyOn(pathResolver, 'knowledge')
+      .mockImplementation((...args) =>
+        args[0] === 'product/governance/model-role-fitness-probes.json'
+          ? missing
+          : knowledge(...args)
+      );
+    resetRoleFitnessProbeCatalog();
+    try {
+      expect(() => loadRoleFitnessProbeCatalog()).toThrow(
+        /Catalog model-role-fitness-probes is missing/
+      );
+      expect(() => listRoleFitnessProbes('reviewer')).toThrow(
+        /Catalog model-role-fitness-probes is missing/
+      );
+    } finally {
+      spy.mockRestore();
+      resetRoleFitnessProbeCatalog();
+    }
+  });
+
   it('normalizes model catalog and backend provider identifiers', () => {
     expect(normalizeFitnessProviderId('anthropic')).toBe('claude');
     expect(normalizeFitnessProviderId('openai')).toBe('codex');

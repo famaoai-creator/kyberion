@@ -538,7 +538,7 @@ A-5 のタスク完了条件に「30 秒以内の terminal cast + ブラウザ�
 
 - A-5.1: `npx kyberion init --voice` で段 0 経路（presence surface 起動 → ブラウザ自動 open → first win 質問提示）を 1 コマンドにまとめる
 - A-5.2: presence surface に Web Speech API 入力 UI を追加（既存ならば動作確認）
-- A-5.3: OS 標準 TTS の薄いラッパ `libs/core/media/native-tts.ts`（`say` / `espeak` / `SAPI` の差異を吸収）
+- A-5.3: OS 標準 TTS の薄いラッパ `libs/shared-voice/src/native-tts.ts`（`say` / `espeak` / `SAPI` の差異を吸収）
 - A-5.4: 段 0 用 e2e ADF `pipelines/voice-hello.json`（greeting → mission → reply、外部依存ゼロを宣言）
 - A-5.5: voice preflight（マイク権限、ブラウザ、TTS 経路）を `pipelines/vital-check.json` に統合
 - A-5.6: 失敗フォールバック（A.4）の実装

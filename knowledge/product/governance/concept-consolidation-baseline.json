@@ -213,19 +213,19 @@
     "libs/core/bridge-error-reply.ts": {
       "rate_limiter_impl_budget": 1
     },
-    "libs/core/browser/browser-conversation-session.ts": {
+    "libs/shared-vision/src/browser-conversation-session.ts": {
       "json_state_write_budget": 4
     },
     "libs/core/browser/browser-extension-bridge.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/browser/browser-golden-evidence.ts": {
+    "libs/shared-vision/src/browser-golden-evidence.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/browser/browser-onboarding-state.ts": {
+    "libs/shared-vision/src/browser-onboarding-state.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/browser/browser-procedure-promotion.ts": {
+    "libs/shared-vision/src/browser-procedure-promotion.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/browser/chrome-extension-meeting-driver.ts": {
@@ -524,22 +524,22 @@
     "libs/core/marketing-workload.ts": {
       "exported_type_name_duplication_budget": 1
     },
-    "libs/core/media/image-generation/provider-support.ts": {
+    "libs/shared-media/src/image-generation/provider-support.ts": {
       "rate_limiter_impl_budget": 1
     },
-    "libs/core/media/image-generation/providers/host-bridge.ts": {
+    "libs/shared-media/src/image-generation/providers/host-bridge.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/media/image-generation/providers/llm-api.ts": {
+    "libs/shared-media/src/image-generation/providers/llm-api.ts": {
       "json_state_write_budget": 2
     },
-    "libs/core/media/image-generation/providers/local-flux.ts": {
+    "libs/shared-media/src/image-generation/providers/local-flux.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "libs/core/media/music-generation/providers/musicgen-mlx.ts": {
+    "libs/shared-media/src/music-generation/providers/musicgen-mlx.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "libs/core/media/native-tts.ts": {
+    "libs/shared-voice/src/native-tts.ts": {
       "exported_type_name_duplication_budget": 1
     },
     "libs/core/mesh/a2a-envelope-signature.ts": {
@@ -932,9 +932,6 @@
     "libs/core/storage-janitor.ts": {
       "json_state_write_budget": 5
     },
-    "libs/core/storage-layout.ts": {
-      "runtime_path_literal_budget": 2
-    },
     "libs/core/storage-retention-catalog.ts": {
       "runtime_path_literal_budget": 4
     },
@@ -1020,16 +1017,16 @@
       "env_direct_read_budget": 1,
       "json_state_write_budget": 1
     },
-    "libs/core/video/ingest/video-brief.ts": {
+    "libs/shared-video/src/ingest/video-brief.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/video/video-composition-compiler.ts": {
+    "libs/shared-video/src/video-composition-compiler.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/video/video-device-lease.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/video/video-recut.ts": {
+    "libs/shared-video/src/video-recut.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/virtual/computer-surface.ts": {
@@ -1044,31 +1041,31 @@
     "libs/core/voice/audio-device-lease.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/voice/realtime-voice-conversation.ts": {
+    "libs/shared-voice/src/realtime-voice-conversation.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/voice/realtime-voice-preferences.ts": {
+    "libs/shared-voice/src/realtime-voice-preferences.ts": {
       "json_state_write_budget": 2
     },
     "libs/core/voice/speech-to-text-bridge.ts": {
       "json_state_write_budget": 2
     },
-    "libs/core/voice/tts-loopback-verifier.ts": {
+    "libs/shared-voice/src/tts-loopback-verifier.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/voice/voice-first-phrase-cache.ts": {
+    "libs/shared-voice/src/voice-first-phrase-cache.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/voice/voice-profile-promotion.ts": {
+    "libs/shared-voice/src/voice-profile-promotion.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/voice/voice-profile-registry.ts": {
       "json_state_write_budget": 2
     },
-    "libs/core/voice/voice-sample-collection.ts": {
+    "libs/shared-voice/src/voice-sample-collection.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/voice/voice-selection-preferences.ts": {
+    "libs/shared-voice/src/voice-selection-preferences.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/volatile-knowledge.ts": {
@@ -1442,7 +1439,7 @@
     "scripts/cowork_knowledge_bridge.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/customer_migrate_from_personal.ts": {
+    "scripts/stance_migrate_from_personal.ts": {
       "json_state_write_budget": 1
     },
     "scripts/daily-desk/server.ts": {
@@ -1950,7 +1947,7 @@
     ],
     "SpeakResult": [
       "libs/core/discussion/discussion-speaker.ts",
-      "libs/core/media/native-tts.ts",
+      "libs/shared-voice/src/native-tts.ts",
       "scripts/cli-speak.ts"
     ]
   }

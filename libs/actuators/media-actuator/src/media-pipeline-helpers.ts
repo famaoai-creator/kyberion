@@ -6,15 +6,15 @@ import type {
   AdfStepHooks,
   AdfStepOutcome,
 } from '@agent/core/pipeline/adf-engine';
-import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/execution-bounds';
+import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/contracts/execution-bounds';
 import { isRecord, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import type { PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
-import { resolveRef } from '@agent/core/pipeline-engine';
+import { resolveRef } from '@agent/core/pipeline/pipeline-engine';
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator/actuator-trace';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
-import type { TraceContext } from '@agent/core/trace';
+import type { TraceContext } from '@agent/core/analysis/trace';
 import * as path from 'node:path';
 
 export interface MediaPipelineStep {

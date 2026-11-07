@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import * as customerResolver from './customer-resolver.js';
+import * as customerResolver from './stance-resolver.js';
 import {
   aggregateMarketingReviews,
   canCompleteMarketingMission,
@@ -421,25 +421,25 @@ describe('marketing workload gates', () => {
     const defaultPolicy = loadMarketingRiskPolicy({});
     expect(defaultPolicy.allowed_channels).toContain('linkedin');
     expect(defaultPolicy.levels['4'].dry_run_required).toBe(true);
-    expect(() => loadMarketingRiskPolicy({ KYBERION_CUSTOMER: '../other-customer' })).toThrow(
-      'Invalid KYBERION_CUSTOMER'
+    expect(() => loadMarketingRiskPolicy({ KYBERION_STANCE: '../other-customer' })).toThrow(
+      'Invalid KYBERION_STANCE'
     );
   });
 
   it('resolves different customers to isolated policy roots', () => {
-    const customerA = customerResolver.customerRoot('policy/marketing-risk-policy.json', {
-      KYBERION_CUSTOMER: 'customer-a',
+    const customerA = customerResolver.stanceRoot('policy/marketing-risk-policy.json', {
+      KYBERION_STANCE: 'customer-a',
     });
-    const customerB = customerResolver.customerRoot('policy/marketing-risk-policy.json', {
-      KYBERION_CUSTOMER: 'customer-b',
+    const customerB = customerResolver.stanceRoot('policy/marketing-risk-policy.json', {
+      KYBERION_STANCE: 'customer-b',
     });
     expect(customerA.replaceAll('\\', '/')).toContain(
-      '/customer/customer-a/policy/marketing-risk-policy.json'
+      '/knowledge/personal/stances/customer-a/policy/marketing-risk-policy.json'
     );
     expect(customerB.replaceAll('\\', '/')).toContain(
-      '/customer/customer-b/policy/marketing-risk-policy.json'
+      '/knowledge/personal/stances/customer-b/policy/marketing-risk-policy.json'
     );
     expect(customerA).not.toBe(customerB);
-    expect(customerResolver.customerRoot('policy/marketing-risk-policy.json', {})).toBeNull();
+    expect(customerResolver.stanceRoot('policy/marketing-risk-policy.json', {})).toBeNull();
   });
 });

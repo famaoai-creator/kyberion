@@ -2,7 +2,7 @@ import { uxText, uxTextOr } from './ux-vocabulary';
 import {
   normalizeLocale as normalizeSupportedLocale,
   type SupportedLocale,
-} from '@agent/core/locale-normalize';
+} from '@agent/core/foundation/locale-normalize';
 
 type Locale = SupportedLocale;
 

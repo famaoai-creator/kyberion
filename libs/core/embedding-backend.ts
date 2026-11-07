@@ -1,5 +1,5 @@
 import { coreSeamCatalog, createSeam, createSeamLifecycle } from './seam.js';
-import { segmentKeywordTerms } from './locale-normalize.js';
+import { segmentKeywordTerms } from './foundation/locale-normalize.js';
 
 export interface EmbeddingBackend {
   name: string;

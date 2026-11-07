@@ -38,7 +38,7 @@ function storedRecordPath(id: string): string {
   if (!located) throw new Error(`fixture request ${id} not found`);
   return approvalStore.approvalRequestLogicalPathAt(located.partition, 'autonomy', id);
 }
-let browser: typeof import('@agent/core/authn-providers');
+let browser: typeof import('@agent/core/authn/authn-providers');
 let authority: typeof import('@agent/core/authority');
 let foundation: typeof import('@agent/core/foundation');
 let charters: typeof import('@agent/core/dot/dot-charter');
@@ -184,7 +184,7 @@ beforeAll(async () => {
   executor = await import('./dot_executor_step.js');
   approval = await import('@agent/core/surface/first-job-approval');
   approvalStore = await import('@agent/core/governance/approval-store');
-  browser = await import('@agent/core/authn-providers');
+  browser = await import('@agent/core/authn/authn-providers');
   charters = await import('@agent/core/dot/dot-charter');
   results = await import('@agent/core/dot/dot-executor-reports');
   control = await import('@agent/core/cloudflare-os-shared');

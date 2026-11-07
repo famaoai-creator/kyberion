@@ -13,7 +13,7 @@ import { humanActor } from '@agent/core/actor';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from '@agent/core/path-resolver';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import {
   createHearingRecord,
   hearingRevision,

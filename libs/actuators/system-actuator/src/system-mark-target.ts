@@ -5,7 +5,7 @@ import {
   resolveMarkTarget,
   type MarkTargetResolution,
   type ResolveMarkTargetOptions,
-} from '@agent/core/mark-target-resolver';
+} from '@agent/shared-perception/mark-target-resolver';
 import { dhashFile } from '@agent/core/media/image-dhash';
 import { pathResolver } from '@agent/core/path-resolver';
 import { createScreenCaptureBridge } from '@agent/core/virtual/screen-capture-bridge';

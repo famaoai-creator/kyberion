@@ -139,7 +139,7 @@ Selection is not wired into the Surfaces' display preferences yet. Evaluate with
 
 Tenant-specific branding overlays the canonical tokens through one shared resolver:
 
-- **Resolver**: `libs/core/organization/tenant-design-resolver.ts` (`resolveTenantDesign({ customerId | brandName | designSystemId })`). Sources: `customer/<slug>/design/tenant-override.json` (bound customers) and `knowledge/confidential/<tenant>/design/tenant-override.json` (+ `theme.json`, `layout-templates.json`, `assets/logo.png`).
+- **Resolver**: `libs/core/organization/tenant-design-resolver.ts` (`resolveTenantDesign({ customerId | brandName | designSystemId })`). Sources: `knowledge/confidential/<slug>/design/tenant-override.json` (bound customers) and `knowledge/confidential/<tenant>/design/tenant-override.json` (+ `theme.json`, `layout-templates.json`, `assets/logo.png`).
 - **Consumers**: media-actuator (PPTX/theme packs), video content briefs (VDS-07), and chronos-mirror `/api/tenant-design` (css_vars for UI theming; guarded by the standard chronos API auth).
 - **Tier isolation (acceptance 4, pinned by tests)**: with no tenant context the resolver returns `source: 'default'` and never reads confidential values into the result; non-matching contexts do not fall through to another tenant. See `tenant-design-resolver.test.ts` (DS-02 tier isolation suite).
 

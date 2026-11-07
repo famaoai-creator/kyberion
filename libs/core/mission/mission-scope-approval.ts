@@ -29,14 +29,14 @@ import {
   type ApprovalRequesterRef,
 } from '../governance/approval-requester.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { evaluateApprovalUsability } from '../governance/approval-separation-of-duties.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
+import { createApprovalRequest } from '../governance/approval-request-create.js';
 import {
-  evaluateApprovalUsability,
-  computeApprovalPayloadHash,
-  createApprovalRequest,
   isApprovalRequestExpired,
   listApprovalRequests,
-  type ApprovalRequestRecord,
-} from '../governance/approval-store.js';
+} from '../governance/approval-store-reader.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import { hasAuthority, resolveIdentityContext } from '../authority.js';
 import { findMissionPath } from '../path-resolver.js';
 import {

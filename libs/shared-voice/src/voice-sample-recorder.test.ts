@@ -1,0 +1,288 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { preferencesReadiness } = vi.hoisted(() => ({
+  preferencesReadiness: vi.fn(
+    (): ReturnType<
+      typeof import('@agent/core/voice/engine-runtime-preferences').engineRuntimePreferencesReadiness
+    > => ({ status: 'missing' })
+  ),
+}));
+vi.mock('@agent/core/voice/engine-runtime-preferences', () => ({
+  engineRuntimePreferencesReadiness: preferencesReadiness,
+}));
+import { pathResolver } from '@agent/core/path-resolver';
+vi.mock('@agent/core/governance/external-operation', () => ({
+  runExternalOperation: vi.fn(async (_input, execute) => execute()),
+}));
+
+const mocks = vi.hoisted(() => ({
+  recordingWritten: false,
+  safeExecShellScript: vi.fn(() => {
+    mocks.recordingWritten = true;
+    return '';
+  }),
+  safeMkdir: vi.fn(),
+  safeWriteFile: vi.fn(),
+  sharedTmp: vi.fn((value: string) => `/tmp/${value}`),
+  createVirtualDeviceInventoryBridge: vi.fn(),
+  createVirtualAudioInputRecordingBridge: vi.fn(),
+}));
+
+vi.mock('@agent/core/secure-io', async () => {
+  const actual =
+    await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+  return {
+    ...actual,
+    // The recorder suite uses /tmp as an isolated output seam; production
+    // path confinement is covered by the real secure-io implementation.
+    assertSafeRepositoryPath: (filePath: string) => filePath,
+    safeExecShellScript: mocks.safeExecShellScript,
+    safeMkdir: mocks.safeMkdir,
+    safeWriteFile: mocks.safeWriteFile,
+    safeExistsSync: vi.fn((filePath: string) =>
+      filePath.endsWith('.wav') ? mocks.recordingWritten : actual.safeExistsSync(filePath)
+    ),
+    safeLstat: vi.fn(() => ({ isFile: () => true })),
+    safeStat: vi.fn(() => ({ size: 4096 })),
+    safeReadFile: vi.fn((filePath: string, options?: unknown) =>
+      filePath.endsWith('.wav')
+        ? Buffer.from('captured sample')
+        : actual.safeReadFile(filePath, options as never)
+    ),
+  };
+});
+
+vi.mock('@agent/core/path-resolver', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/path-resolver')>(
+    '@agent/core/path-resolver'
+  );
+  return {
+    ...actual,
+    pathResolver: {
+      ...actual.pathResolver,
+      sharedTmp: mocks.sharedTmp,
+    },
+  };
+});
+
+vi.mock('@agent/core/virtual/virtual-device-inventory-bridge', () => ({
+  createVirtualDeviceInventoryBridge: mocks.createVirtualDeviceInventoryBridge,
+}));
+
+vi.mock('@agent/core/virtual/virtual-audio-input-recording-bridge', () => ({
+  createVirtualAudioInputRecordingBridge: mocks.createVirtualAudioInputRecordingBridge,
+}));
+
+import { recordVoiceSample } from './voice-sample-recorder.js';
+import { safeReadFile } from '@agent/core/secure-io';
+
+describe('voice-sample-recorder', () => {
+  it('routes recording command environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/shared-voice/src/voice-sample-recorder.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
+  const originalPlatform = process.platform;
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    delete process.env.KYBERION_AUDIO_RECORD_COMMAND;
+  });
+
+  beforeEach(() => {
+    mocks.recordingWritten = false;
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: 'darwin',
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: originalPlatform,
+    });
+  });
+
+  it('uses the microphone bridge when no recording command is configured', async () => {
+    const streamChunk = {
+      format: {
+        encoding: 'pcm_s16le',
+        sample_rate_hz: 16000,
+        channels: 1,
+      },
+      payload: new Uint8Array(256000).fill(0x7f),
+      ts_ms: 0,
+    };
+    mocks.createVirtualDeviceInventoryBridge.mockReturnValue({
+      bridge_id: 'virtual-device-inventory-bridge',
+      probe: vi.fn(async () => ({
+        bridge_id: 'virtual-device-inventory-bridge',
+        platform: 'darwin',
+        available: true,
+        inventory: {
+          audio_inputs: [
+            {
+              kind: 'audio-input',
+              name: 'Built-in Microphone',
+              platform: 'darwin',
+              source: 'system_profiler',
+              available: true,
+            },
+          ],
+          audio_outputs: [],
+          cameras: [],
+          virtual_audio_devices: [],
+          virtual_cameras: [],
+          notes: [],
+        },
+      })),
+    });
+    mocks.createVirtualAudioInputRecordingBridge.mockReturnValue({
+      bridge_id: 'virtual-audio-input-recording-bridge',
+      probe: vi.fn(async () => ({
+        bridge_id: 'virtual-audio-input-recording-bridge',
+        platform: 'darwin',
+        available: true,
+        inputs: ['Built-in Microphone'],
+      })),
+      captureStream: vi.fn(async function* () {
+        yield streamChunk;
+      }),
+    });
+
+    const result = await recordVoiceSample({
+      action: 'record_voice_sample',
+      request_id: 'rec-1',
+      sample_id: 's1',
+      duration_sec: 8,
+      prompt_text: 'Tell me about Kyberion.',
+      recording_countdown_sec: 0,
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.selected_input_device).toBe('Built-in Microphone');
+    expect(result.backend).toBe('ffmpeg-avfoundation-stream');
+    expect(mocks.createVirtualAudioInputRecordingBridge).toHaveBeenCalled();
+    expect(mocks.safeExecShellScript).not.toHaveBeenCalled();
+    expect(mocks.safeWriteFile).toHaveBeenCalledWith(
+      '/tmp/voice-sample-recording/rec-1/s1.wav',
+      expect.any(Buffer)
+    );
+  });
+
+  it('returns blocked when no recording command is configured and no bridge is available', async () => {
+    mocks.createVirtualDeviceInventoryBridge.mockReturnValue({
+      bridge_id: 'virtual-device-inventory-bridge',
+      probe: vi.fn(async () => ({
+        bridge_id: 'virtual-device-inventory-bridge',
+        platform: 'darwin',
+        available: false,
+        reason: 'no audio inputs found',
+        inventory: {
+          audio_inputs: [],
+          audio_outputs: [],
+          cameras: [],
+          virtual_audio_devices: [],
+          virtual_cameras: [],
+          notes: [],
+        },
+      })),
+    });
+    mocks.createVirtualAudioInputRecordingBridge.mockReturnValue({
+      bridge_id: 'virtual-audio-input-recording-bridge',
+      probe: vi.fn(async () => ({
+        bridge_id: 'virtual-audio-input-recording-bridge',
+        platform: 'darwin',
+        available: false,
+        reason: 'no audio inputs found',
+        inputs: [],
+      })),
+      captureStream: vi.fn(),
+    });
+
+    const result = await recordVoiceSample({
+      action: 'record_voice_sample',
+      request_id: 'rec-1',
+      sample_id: 's1',
+      duration_sec: 8,
+      prompt_text: 'Tell me about Kyberion.',
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.reason).toContain('no audio inputs found');
+  });
+
+  it('invokes the configured shell recording command', async () => {
+    process.env.KYBERION_AUDIO_RECORD_COMMAND =
+      'record-tool --out {{output}} --sec {{duration_sec}}';
+    const result = await recordVoiceSample({
+      action: 'record_voice_sample',
+      request_id: 'rec-2',
+      sample_id: 's2',
+      duration_sec: 12,
+      prompt_text: 'Please read this line.',
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.output_path).toBe('/tmp/voice-sample-recording/rec-2/s2.wav');
+    expect(mocks.safeWriteFile).toHaveBeenCalledWith(
+      '/tmp/voice-sample-recording/rec-2/s2.prompt.txt',
+      'Please read this line.\n'
+    );
+    expect(mocks.safeExecShellScript).toHaveBeenCalledWith(
+      expect.any(String),
+      'record-tool --out "/tmp/voice-sample-recording/rec-2/s2.wav" --sec 12',
+      expect.objectContaining({ login: true, timeoutMs: 30000 })
+    );
+  });
+});
+
+beforeEach(() => {
+  preferencesReadiness.mockReset();
+  preferencesReadiness.mockReturnValue({ status: 'missing' });
+});
+
+describe('recording preference boundaries', () => {
+  const input = {
+    action: 'record_voice_sample' as const,
+    request_id: 'isolated',
+    sample_id: 'sample',
+    duration_sec: 1,
+    prompt_text: 'Read this.',
+  };
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+  it('never reads live personal defaults when an injected environment is provided', async () => {
+    preferencesReadiness.mockImplementation(() => {
+      throw new Error('profile denied');
+    });
+    const original = process.platform;
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' });
+    try {
+      const result = await recordVoiceSample(input, {});
+      expect(result.status).toBe('blocked');
+      expect(preferencesReadiness).not.toHaveBeenCalled();
+      expect(mocks.safeExecShellScript).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(process, 'platform', { configurable: true, value: original });
+    }
+  });
+  it('skips lower priority preferences for an environment command and preserves genuine errors', async () => {
+    preferencesReadiness.mockImplementation(() => {
+      throw new Error('profile denied');
+    });
+    mocks.recordingWritten = false;
+    vi.stubEnv('KYBERION_AUDIO_RECORD_COMMAND', 'record --out {{output}}');
+    await recordVoiceSample(input);
+    expect(preferencesReadiness).not.toHaveBeenCalled();
+    vi.stubEnv('KYBERION_AUDIO_RECORD_COMMAND', '');
+    await expect(recordVoiceSample(input)).rejects.toThrow('profile denied');
+  });
+});

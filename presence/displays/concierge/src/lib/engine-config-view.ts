@@ -1,7 +1,7 @@
 /**
  * 設定 › エンジン (pure helpers): the profile's engine runtime defaults as the
  * form edits them. Mirrors the contract of `/api/voice/engine-config`
- * (libs/core/voice/engine-runtime-preferences-operator.ts).
+ * (libs/shared-voice/src/engine-runtime-preferences-operator.ts).
  */
 export const ENGINE_CONFIG_FIELDS = [
   'ffmpeg_bin',

@@ -2,13 +2,13 @@ import { pickStructuredSectionFields } from './media-structured-content.js';
 import {
   resolveDocumentContentsLabel,
   resolveDocumentContentsSubtitle,
-} from '@agent/core/media/document-contents-policy';
+} from '@agent/shared-media/document-contents-policy';
 import {
   resolveMediaSemanticType,
   resolveProposalEvidenceIndex,
   resolveProposalSectionKeywords,
-} from '@agent/core/media/media-semantic-map';
-import { resolveReportSectionTitle } from '@agent/core/media/document-outline-label-policy';
+} from '@agent/shared-media/media-semantic-map';
+import { resolveReportSectionTitle } from '@agent/shared-media/document-outline-label-policy';
 import {
   buildSlidePatternDiagnostics,
   selectSlidePattern,

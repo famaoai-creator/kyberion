@@ -9,7 +9,7 @@ import {
   proposeKnowledgeRankingWeightRecalculation,
 } from '@agent/core/knowledge/knowledge-weight-recalculation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { recordHumanKnowledgeFeedback } from '@agent/core/knowledge-feedback-loop';
+import { recordHumanKnowledgeFeedback } from '@agent/core/knowledge/knowledge-feedback-loop';
 import { resolveTenant } from '@agent/core/organization/tenant-registry';
 import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';

@@ -20,7 +20,7 @@ vi.mock('./organization-operating-model-operations.js', () => ({
   loadOrganizationIncident: mocks.loadIncident,
   saveOrganizationIncident: mocks.saveIncident,
 }));
-vi.mock('../lock-utils.js', () => ({
+vi.mock('../foundation/lock-utils.js', () => ({
   withLock: (_id: string, fn: () => Promise<unknown>) => fn(),
 }));
 

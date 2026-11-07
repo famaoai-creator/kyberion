@@ -40,11 +40,11 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     consumers: ['libs/actuators/voice-actuator/src/voice-media-output-helpers.ts'],
   },
   'video-filter-provider': {
-    declaration: 'libs/core/video/video-filter.ts',
+    declaration: 'libs/shared-video/src/video-filter.ts',
     consumers: ['scripts/video_filter.ts'],
   },
   'cli-provider-bundle': {
-    declaration: 'libs/core/cli-provider-bundle.ts',
+    declaration: 'libs/core/provider/cli-provider-bundle.ts',
     consumers: [
       'libs/core/reasoning/reasoning-cli-provider.ts',
       'libs/core/reasoning/reasoning-bootstrap.ts',
@@ -59,7 +59,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     consumers: ['libs/core/provider/provider-backend-resolver.ts'],
   },
   'provider-transport': {
-    declaration: 'libs/core/provider-transport.ts',
+    declaration: 'libs/core/provider/provider-transport.ts',
     consumers: [
       'libs/core/provider/loopback-transport.ts',
       'libs/core/provider/remote-provider-facade.ts',
@@ -124,24 +124,24 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     ],
   },
   'image-generation-provider': {
-    declaration: 'libs/core/media/image-generation/provider-registry.ts',
+    declaration: 'libs/shared-media/src/image-generation/provider-registry.ts',
     consumers: [
-      'libs/core/media/image-generation/router.ts',
-      'libs/core/media/image-generation-bridge.ts',
+      'libs/shared-media/src/image-generation/router.ts',
+      'libs/shared-media/src/image-generation-bridge.ts',
     ],
   },
   'music-generation-provider': {
-    declaration: 'libs/core/media/music-generation/provider-registry.ts',
+    declaration: 'libs/shared-media/src/music-generation/provider-registry.ts',
     consumers: [
-      'libs/core/media/music-generation/router.ts',
-      'libs/core/media/music-generation-bridge.ts',
+      'libs/shared-media/src/music-generation/router.ts',
+      'libs/shared-media/src/music-generation-bridge.ts',
     ],
   },
   'video-generation-provider-adapter': {
-    declaration: 'libs/core/media/video-generation/provider-registry.ts',
+    declaration: 'libs/shared-media/src/video-generation/provider-registry.ts',
     consumers: [
-      'libs/core/media/video-generation/builtin-adapters.ts',
-      'libs/core/media/video-generation/provider.ts',
+      'libs/shared-media/src/video-generation/builtin-adapters.ts',
+      'libs/shared-media/src/video-generation/provider.ts',
       'libs/actuators/media-generation-actuator/src/video-generation-provider.ts',
     ],
   },
@@ -165,7 +165,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     consumers: ['libs/core/meeting/calendar-workflow.ts'],
   },
   'browser-automation-runtime': {
-    declaration: 'libs/core/browser/browser-automation-runtime-bridge.ts',
+    declaration: 'libs/shared-vision/src/browser-automation-runtime-bridge.ts',
     consumers: ['libs/actuators/browser-actuator/src/browser-runtime-helpers.ts'],
   },
   'web-search-runtime': {

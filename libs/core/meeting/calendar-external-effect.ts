@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { currentScopeEnvelope } from '../scope-envelope.js';
-import { computeApprovalPayloadHash } from '../governance/approval-store.js';
+import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
 import {
   runExternalOperation,
   type ExternalOperationAuthority,

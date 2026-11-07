@@ -29,7 +29,7 @@
  * code declarations only — missing data resolves to the fail-safe default.
  */
 import { pathResolver } from '../path-resolver.js';
-import * as customerResolver from '../customer-resolver.js';
+import * as customerResolver from '../stance-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { createLogger } from '../logger.js';
@@ -52,7 +52,7 @@ interface OverlayFile {
 export const authorizationOverlayCatalog = defineCatalog<OverlayFile>({
   id: 'authorization-registry',
   path: () => {
-    const customerPath = customerResolver.customerRoot('policy/authorization-registry.json');
+    const customerPath = customerResolver.stanceRoot('policy/authorization-registry.json');
     const fallbackPath = assertSafeRepositoryPath(
       pathResolver.knowledge('product/governance/authorization-registry.json')
     );

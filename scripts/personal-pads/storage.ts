@@ -11,7 +11,7 @@ import {
 } from '@agent/core/secure-io';
 import { isReservedScopeName, isValidTenantSlug } from '@agent/core/entity-scope';
 import { assertSafeRepositoryPath, pathResolver, toRepoRelative } from '@agent/core/path-resolver';
-import { withLockSync } from '@agent/core/lock-utils';
+import { withLockSync } from '@agent/core/foundation/lock-utils';
 import { nowIso, readJson } from '@agent/core/foundation';
 import type { EventScope } from '@agent/core/event-scope';
 import type { PadId } from './registry.js';

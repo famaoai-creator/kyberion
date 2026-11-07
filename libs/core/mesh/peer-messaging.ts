@@ -27,7 +27,7 @@ import {
   type EventScope,
   type EventScopeInput,
 } from '../event-scope.js';
-import { toWireError } from '../wire-error.js';
+import { toWireError } from '../contracts/wire-error.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,

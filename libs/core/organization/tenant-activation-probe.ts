@@ -7,7 +7,8 @@
 import * as path from 'node:path';
 import { getAgentIdentity } from '../agent/agent-identity.js';
 import { getRegisteredEnvText, nowIso } from '../foundation/index.js';
-import { loadOnboardingContextBinding } from './onboarding-context.js';
+import { companyProfileHome, loadOnboardingContextBinding } from './onboarding-context.js';
+import { tenantHomePath } from './tenant-home.js';
 import {
   TENANT_ACTIVATION_PROBE_CHECKS,
   TENANT_ACTIVATION_PROBE_EVIDENCE_KIND,
@@ -79,7 +80,11 @@ function checkTenantScopedConsistency(
       return failure;
     const profile = loadOrganizationProfileAtPath(
       assertSafeRepositoryPath(
-        path.join(rootDir, 'customer', input.customerSlug, 'organization-profile.json'),
+        tenantHomePath(
+          companyProfileHome(input.tenantSlug, input.customerSlug, rootDir),
+          'organization-profile.json',
+          rootDir
+        ),
         { rootDir }
       )
     );

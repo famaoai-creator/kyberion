@@ -2,7 +2,8 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { withExecutionContext } from '../authority.js';
+import { currentExecutionScope, runInExecutionScope } from '../foundation/execution-scope.js';
+import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
 import { pathResolver } from '../path-resolver.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { readJsonLines } from '../foundation/json.js';
@@ -152,15 +153,29 @@ function privileged<T>(
   operation: DotResultStoreOperation,
   io: () => T
 ): T {
-  return withDotResultStoreCapability(binding, operation, () =>
-    withExecutionContext(
-      DOT_RESULT_STORE_ROLE,
-      io,
-      undefined,
-      binding.scope.tenant_slug,
-      binding.scope.organization_id
-    )
-  );
+  // The grant is the authority (no store role); while it is active the I/O is
+  // bound to the grant's tenant and organization. A caller already bound to
+  // another tenant is refused: a caller-supplied grant never broadens access.
+  return withDotResultStoreCapability(binding, operation, () => {
+    const tenant = binding.scope.tenant_slug;
+    const active = resolvePolicyIdentityContext().tenantSlug;
+    if (active && active !== tenant)
+      throw new Error(
+        `[ROLE_TENANT_SCOPE_MISMATCH] DOT result grant for tenant '${tenant}' used by a caller bound to '${active}'`
+      );
+    const { tenantCleared: _cleared, ...current } = currentExecutionScope() ?? {
+      tenantBound: false,
+    };
+    return runInExecutionScope(
+      {
+        ...current,
+        tenantBound: true,
+        tenantSlug: tenant,
+        organizationId: binding.scope.organization_id,
+      },
+      io
+    );
+  });
 }
 function parseRow(value: unknown): DotWorkResultRow & { attempt_id: string } {
   const before = dotResultCanonicalJson(value),

@@ -612,7 +612,7 @@ describe('codex-cli-query', () => {
 
     it('carries a configured auxiliary CLI bundle deadline to the spawned request', async () => {
       await import('./bundles/codex-cli.js');
-      const { buildCliProviderBundle } = await import('../cli-provider-bundle.js');
+      const { buildCliProviderBundle } = await import('./cli-provider-bundle.js');
       mocks.safeReadFile.mockReturnValue(JSON.stringify({ answer: 'compact result' }));
       mocks.spawnMock.mockReturnValueOnce(createChild());
       const bundle = buildCliProviderBundle({

@@ -6,7 +6,7 @@ import {
   strictViewerTier,
   type ViewerContext,
 } from '../../../../lib/ops/ops-viewer';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import { t } from '@agent/core/t';
 import { type CompanyAggregate } from '@agent/core/company';
 import { type ApprovalAuditDrilldownSummary } from '@agent/core/governance/approval-audit';

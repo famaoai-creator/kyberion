@@ -4,11 +4,11 @@ import {
   readDotActionLedgerStrict,
 } from './dot-action-ledger.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../customer-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../customer-resolver.js')>();
+vi.mock('../stance-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../stance-resolver.js')>();
   const { customerRootWithSodOverlay } =
     await import('../governance/__tests__/sod-overlay-state.js');
-  return { ...actual, customerRoot: customerRootWithSodOverlay(actual.customerRoot) };
+  return { ...actual, stanceRoot: customerRootWithSodOverlay(actual.stanceRoot) };
 });
 import {
   clearSeparationOfDuties,

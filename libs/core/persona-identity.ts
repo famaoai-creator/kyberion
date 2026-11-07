@@ -1,6 +1,6 @@
 /** Conversational persona links are descriptive metadata, never execution authority. */
 import { z } from 'zod';
-import { NHI_ID_PATTERN } from './nhi-id.js';
+import { NHI_ID_PATTERN } from './contracts/nhi-id.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { getAgentIdentity, type AgentIdentityRecord } from './agent/agent-identity.js';
 import {

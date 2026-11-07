@@ -214,7 +214,7 @@ export function resumePipelineRunAfterApproval(
       KYBERION_SUDO: '',
       KYBERION_SUDO_SCOPE: '',
       KYBERION_SUDO_KEY: '',
-      KYBERION_CUSTOMER: scope.customer_stance ?? '',
+      KYBERION_STANCE: scope.customer_stance ?? '',
       KYBERION_VIEWER_PRINCIPAL: scope.viewer_principal ?? '',
       KYBERION_NHI_ID: originalAuthority.nhi_id,
       KYBERION_AGENT_ID: originalAuthority.agent_id,

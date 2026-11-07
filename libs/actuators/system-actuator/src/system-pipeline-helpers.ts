@@ -14,13 +14,13 @@ import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveDesktopLaunchAdapter } from '@agent/core/virtual/desktop-launch-adapter';
-import { getPathValue } from '@agent/core/logic-utils';
-import { createVoiceCapabilityBridge } from '@agent/core/voice/voice-capability-bridge';
+import { getPathValue } from '@agent/core/pipeline/logic-utils';
+import { createVoiceCapabilityBridge } from '@agent/shared-voice/voice-capability-bridge';
 import { retry } from '@agent/core/async-utils';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
-} from '@agent/core/execution-bounds';
+} from '@agent/core/contracts/execution-bounds';
 import {
   performMouseOperation,
   launchApplication,
@@ -252,7 +252,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     case 'voice':
-      const { say } = await import('@agent/core/voice/voice-synth');
+      const { say } = await import('@agent/shared-voice/voice-synth');
       await say(resolve(params.text || '{{last_capture}}'));
       break;
     case 'native_tts_speak': {

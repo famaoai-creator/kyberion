@@ -76,7 +76,7 @@ beforeAll(async () => {
     'KYBERION_PROJECT_ID',
     'KYBERION_TASK_ID',
     'KYBERION_SUDO',
-    'KYBERION_CUSTOMER',
+    'KYBERION_STANCE',
   ])
     vi.stubEnv(name, '');
   vi.stubEnv('KYBERION_DELEGATION_DEPTH', '0');

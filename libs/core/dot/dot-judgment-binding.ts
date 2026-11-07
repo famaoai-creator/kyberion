@@ -1,6 +1,6 @@
 /** Server-authored synthetic references, not persisted-source proof or execution authority. */
 import { z } from 'zod';
-import type { ScopeContext } from '../scope-context-validation.js';
+import type { ScopeContext } from '../foundation/scope-context-validation.js';
 import {
   judgmentBindingSchema,
   judgmentScopeSchema,

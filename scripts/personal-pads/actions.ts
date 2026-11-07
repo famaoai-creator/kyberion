@@ -20,7 +20,7 @@ import { pathResolver, assertSafeRepositoryPath } from '@agent/core/path-resolve
 import { getSpeechToTextBridge } from '@agent/core/voice/speech-to-text-bridge';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { isLinux, isMacOS } from '@agent/core/platform';
-import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import { planRoutingCompare } from '@agent/core';
 import type { LocalPadContext } from '../lib/local-artifact-pad.js';
 import { readOsClipboardText } from '../clipboard-inbox/server.js';

@@ -1,6 +1,6 @@
 /** Synthetic routing only: persisted semantic evidence never replaces the existing effect gate. */
 import { z } from 'zod';
-import { detectRouteCycle, selectJudgeRoute } from '../judge-route.js';
+import { detectRouteCycle, selectJudgeRoute } from '../contracts/judge-route.js';
 import type { AutonomousOpsGateResult } from '../governance/autonomous-ops-gate.js';
 import {
   latencyProposalFactsSchema,

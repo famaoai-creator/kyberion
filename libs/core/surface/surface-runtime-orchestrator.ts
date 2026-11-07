@@ -6,7 +6,11 @@ import { missionSteeringRouteHandler } from './surface-mission-steering.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExec } from '../secure-io.js';
 import { deriveReplyLocale, getReplyLocale, resolveLocale, runWithReplyLocale } from '../locale.js';
-import { detectTextLocale, normalizeLocale, type SupportedLocale } from '../locale-normalize.js';
+import {
+  detectTextLocale,
+  normalizeLocale,
+  type SupportedLocale,
+} from '../foundation/locale-normalize.js';
 import { t } from '../t.js';
 import { a2aBridge } from '../mesh/a2a-bridge.js';
 import type { A2AMessage } from '../mesh/a2a-bridge.js';

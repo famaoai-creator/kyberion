@@ -1,6 +1,7 @@
 import { currentResourceAccessScope } from './resource-access-scope.js';
 import { currentExecutionScope } from './execution-scope.js';
 import { subjectAuthorization } from './authorization-registry.js';
+import { storeGrantRule } from './store-grant-registry.js';
 
 /** Exact coverage checkpoint projection; observation/content and mutation have no capability. */
 export function informationAssetCoverageReadAllowed(
@@ -15,8 +16,11 @@ export function informationAssetCoverageReadAllowed(
     entry.authority.kind !== 'free'
   )
     return false;
+  // G2: the Concierge management reader is its live grant, not the role name (G3: asked
+  // through the store grant registry; an unloaded grant module has no live grant).
   if (
-    !['concierge_management_reader', 'chronos_operator', 'chronos_localadmin'].includes(role ?? '')
+    !['chronos_operator', 'chronos_localadmin'].includes(role ?? '') &&
+    storeGrantRule('concierge-management')?.kind?.() !== 'reader'
   )
     return false;
   const resource = currentResourceAccessScope();

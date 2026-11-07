@@ -53,6 +53,19 @@ vi.mock('../governance/approval-store.js', async (original) => ({
     return params ? externalApprovalFixture(params, id) : null;
   },
 }));
+// approval-separation-of-duties defines these; its importers bypass the facade.
+vi.mock('../governance/approval-separation-of-duties.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../governance/approval-separation-of-duties.js')>()),
+  evaluateApprovalUsability: () => null,
+}));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('../governance/approval-store-reader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../governance/approval-store-reader.js')>()),
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = vi.mocked(enforceApprovalGate).mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));
 import {
   withExternalOperationAuthority,
   withOperationArgumentOrigins,

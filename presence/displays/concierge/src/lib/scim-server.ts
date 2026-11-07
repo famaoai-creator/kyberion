@@ -29,7 +29,7 @@ import {
 } from '@agent/core/organization/scim-token-registry';
 import { extractSurfaceBearerToken } from '@agent/core/surface/surface-mutation-guard';
 import { resolveSurfaceBrowserUrl, resolveSurfaceUrl } from '@agent/core/surface/surface-url';
-import { toWireError } from '@agent/core/wire-error';
+import { toWireError } from '@agent/core/contracts/wire-error';
 import { checkConciergeRateLimit, conciergeClientAddress } from './viewer-context';
 
 const logger = createLogger('concierge-scim');

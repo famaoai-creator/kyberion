@@ -14,7 +14,7 @@ describe('mission controller contract', () => {
     // DS refactor: help text lives in refactor/mission-controller-help.ts
     const helpModule = read('scripts/refactor/mission-controller-help.ts');
     expect(helpModule).toContain(
-      'Defaults to the active customer vision when KYBERION_CUSTOMER is set'
+      'Defaults to the active customer vision when KYBERION_STANCE is set'
     );
   });
 });

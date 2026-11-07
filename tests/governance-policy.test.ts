@@ -23,16 +23,20 @@ describe('Governance Policy-as-Code Enforcement', () => {
     expect(safeExistsSync(TEST_FILE)).toBe(true);
   });
 
-  it('Scenario: sovereign persona can write customer overlay files during onboarding', () => {
-    const CUSTOMER_FILE = pathResolver.rootResolve('customer/story-demo/customer.json');
+  it('Scenario: sovereign persona can write tenant company files during onboarding', () => {
+    const CUSTOMER_FILE = pathResolver.rootResolve(
+      'knowledge/confidential/story-demo/company.json'
+    );
     process.env.KYBERION_PERSONA = 'sovereign';
     process.env.MISSION_ROLE = 'sovereign_concierge';
     const check = validateWritePermission(CUSTOMER_FILE);
     expect(check.allowed).toBe(true);
   });
 
-  it('Scenario: knowledge_steward can write customer tenant drafts during onboarding', () => {
-    const TENANT_FILE = pathResolver.rootResolve('customer/story-demo/tenants/acme.json');
+  it('Scenario: knowledge_steward can write stance tenant drafts during onboarding', () => {
+    const TENANT_FILE = pathResolver.rootResolve(
+      'knowledge/personal/stances/story-demo/tenants/acme.json'
+    );
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'knowledge_steward';
     const check = validateWritePermission(TENANT_FILE);

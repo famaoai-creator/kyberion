@@ -10,13 +10,17 @@ import {
   windowsPowerShellEnv,
 } from './os-accessibility-detector.js';
 import { dhashFile } from '../media/image-dhash.js';
-import { clearMarks, resolveMarkTarget, saveMarks } from '../mark-target-resolver.js';
+import {
+  clearMarks,
+  resolveMarkTarget,
+  saveMarks,
+} from '@agent/shared-perception/mark-target-resolver';
 import { clickAt } from './os-automation.js';
 import { pathResolver } from '../path-resolver.js';
 import { createScreenCaptureBridge } from './screen-capture-bridge.js';
 import { safeExecResult, safeExistsSync, safeMkdir, safeRmSync } from '../secure-io.js';
 import { fuseSetOfMarks, type SomBox, type SomCandidate } from '../set-of-marks.js';
-import { inspectSomImage } from '../som-overlay.js';
+import { inspectSomImage } from '@agent/shared-perception/som-overlay';
 import { runWindowsPointerActions } from '../windows-os-automation.js';
 
 /**

@@ -54,9 +54,9 @@ describe('financial-model', () => {
   });
 
   it('falls back to legacy customer financial fields when no model exists', () => {
-    safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential/acme`, { recursive: true });
     safeWriteFile(
-      `${tmpRoot}/customer/acme/customer.json`,
+      `${tmpRoot}/knowledge/confidential/acme/company.json`,
       JSON.stringify(
         {
           display_name: 'ACME Inc.',
@@ -73,7 +73,7 @@ describe('financial-model', () => {
 
     const model = resolveFinancialModel('acme', tmpRoot);
 
-    expect(model.source_kind).toBe('customer');
+    expect(model.source_kind).toBe('confidential');
     expect(model.periods).toHaveLength(1);
     expect(model.periods[0]?.revenue_jpy).toBe(1000000);
     expect(model.periods[0]?.gross_profit_jpy).toBe(250000);
@@ -81,9 +81,9 @@ describe('financial-model', () => {
   });
 
   it('skips an invalid higher-priority model and rejects an invalid tenant slug', () => {
-    safeMkdir(`${tmpRoot}/customer/acme/finance`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential/acme/finance`, { recursive: true });
     safeWriteFile(
-      `${tmpRoot}/customer/acme/finance/financial-model.json`,
+      `${tmpRoot}/knowledge/confidential/acme/finance/financial-model.json`,
       JSON.stringify({ company_id: 'acme', tenant_slug: 'acme', periods: 'invalid' })
     );
 
@@ -98,9 +98,9 @@ describe('financial-model', () => {
   });
 
   it('fails closed when legacy customer financial fields are malformed', () => {
-    safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential/acme`, { recursive: true });
     safeWriteFile(
-      `${tmpRoot}/customer/acme/customer.json`,
+      `${tmpRoot}/knowledge/confidential/acme/company.json`,
       JSON.stringify({ display_name: 'ACME Inc.', financials_prev_fy: 'invalid' })
     );
 
@@ -111,7 +111,7 @@ describe('financial-model', () => {
   });
 
   it('rejects a symlinked financial model before reading it', () => {
-    safeMkdir(`${tmpRoot}/customer/acme/finance`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/confidential/acme/finance`, { recursive: true });
     safeMkdir(`${tmpRoot}/outside`, { recursive: true });
     safeWriteFile(
       `${tmpRoot}/outside/financial-model.json`,
@@ -119,7 +119,7 @@ describe('financial-model', () => {
     );
     safeSymlinkSync(
       `${tmpRoot}/outside/financial-model.json`,
-      `${tmpRoot}/customer/acme/finance/financial-model.json`
+      `${tmpRoot}/knowledge/confidential/acme/finance/financial-model.json`
     );
 
     expect(() => resolveFinancialModel('acme', tmpRoot)).toThrow('[RESOURCE_PATH_SYMLINK]');

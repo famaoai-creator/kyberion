@@ -7,7 +7,7 @@ import {
   safeExistsSync,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { resolveVars } from '@agent/core/logic-utils';
+import { resolveVars } from '@agent/core/pipeline/logic-utils';
 import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import { getVoiceBridge } from '@agent/core/voice/voice-bridge';
 import {
@@ -31,7 +31,7 @@ import type {
   ToolDefinition,
 } from '@agent/core/reasoning/reasoning-backend-contracts';
 import { curateBackgroundReviewProposals } from '@agent/core/workforce/background-review-curator';
-import { generateKnowledgeCurationReport } from '@agent/core/knowledge-curation-report';
+import { generateKnowledgeCurationReport } from '@agent/core/knowledge/knowledge-curation-report';
 import { writeProcedureCheckReport } from '@agent/core/knowledge/golden-scenario-maintenance';
 import { runKnowledgeValidationSweep } from '@agent/core/report-ops';
 import { deriveExecutionGraph, executeGraph } from '@agent/core/graph-scheduler';

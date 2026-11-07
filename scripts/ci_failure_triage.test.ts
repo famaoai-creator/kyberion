@@ -100,6 +100,7 @@ describe('ci failure triage', () => {
     expect(REMEDIES['capability-seams']?.generator).toBe(
       'node --import ./scripts/ts-loader.mjs scripts/generate_capability_seams.ts'
     );
+    expect(RESOLVE_GENERATED_GATE_IDS).toContain('store-roots');
     expect(REMEDIES['type-ratchet']?.generator).toBeUndefined();
   });
 

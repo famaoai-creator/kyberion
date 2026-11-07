@@ -120,7 +120,7 @@ The `--persona` flag selects an **Org Role**, not a `Persona`; the flag name is 
 | Work Visibility Scope    | Which of six projections over WorkItems a view shows                                       | [Work Visibility Scope](#work-visibility-scope)                    |
 | Binding Scope (volatile) | What a working-memory face is bound to (`session` … `global`)                              | [Scope (Volatile)](#scope-volatile)                                |
 
-Tier (`personal` / `confidential` / `public`) and Stance (`customer/{slug}/`) are separate axes, not scopes; they never appear in the entity scope chain.
+Tier (`personal` / `confidential` / `public`) and Stance (`knowledge/personal/stances/{slug}/`) are separate axes, not scopes; they never appear in the entity scope chain.
 
 When the question is "what may be done with this information asset", use the **information asset scope model** (proposed): _custody_ (whose asset: `system` / `tenant` / `person`), _disclosure_ (who may see it: internal viewers → other custodians → external processors → external recipients → public), and _processing_ (what may be derived from it, and what derivatives inherit). Create / edit / delete / execute are operations judged by the existing authority layer, and tier is the classification label that caps disclosure and processing. → [INFORMATION_ASSET_SCOPE_MODEL_DESIGN](./developer/improvement-plans-2026-11/INFORMATION_ASSET_SCOPE_MODEL_DESIGN_2026-11-05.ja.md)
 
@@ -302,7 +302,7 @@ One canonical term per layer; the aliases are names you will meet in code, docs,
 | A local capture screen                          | **Pad**        | capture pad, Capture desk                               | first-win |
 | The CEO-secretary surface                       | **Concierge**  | 秘書室                                                  | first-win |
 | The shared menu rail (5 core verbs + groups)    | **Front Desk** | フロントデスク, front-desk nav                          | first-win |
-| A runtime identity overlay                      | **Stance**     | customer overlay, `customer/{slug}/`                    | advanced  |
+| A runtime identity overlay                      | **Stance**     | customer overlay, `knowledge/personal/stances/{slug}/`  | advanced  |
 
 ### Surface
 
@@ -342,7 +342,7 @@ One canonical term per layer; the aliases are names you will meet in code, docs,
 
 ### Stance (vs tenant customer)
 
-**(advanced)** A **stance** is the `customer/{slug}/` overlay selected by `KYBERION_CUSTOMER` — "which hat am I wearing" — layered over `knowledge/personal/`. It is runtime configuration, **not** a scope in the `tenant → organization → project → mission → task` chain. A **tenant's customers** are the end customers a tenant delivers to; they live inside that tenant's own boundary (`knowledge/confidential/{tenant-slug}/`), never under `customer/`. See [Stance (Customer Overlay)](#stance-customer-overlay) and [Tenant's Customers](#tenants-customers).
+**(advanced)** A **stance** is the `knowledge/personal/stances/{slug}/` overlay selected by `KYBERION_STANCE` — "which hat am I wearing" — layered over `knowledge/personal/`. It is runtime configuration, **not** a scope in the `tenant → organization → project → mission → task` chain. A **tenant's customers** are the end customers a tenant delivers to; they live inside that tenant's own boundary (`knowledge/confidential/{tenant-slug}/`), never under `customer/`. See [Stance (Customer Overlay)](#stance-customer-overlay) and [Tenant's Customers](#tenants-customers).
 
 ## Lifecycle terms
 
@@ -661,7 +661,7 @@ HMAC-signed peer-to-peer messaging between tenant instances. Peers are registere
 
 ### Stance (Customer Overlay)
 
-The `customer/{slug}/` overlay selected by `KYBERION_CUSTOMER`, layering one identity / connections / policy / voice set over `knowledge/personal/` without forking (`libs/core/customer-resolver.ts`). It answers "which hat am I wearing right now" — an FDE engagement is one such stance, and holding roles at several independent legal entities is another. A stance is runtime configuration, not a scope: it does not appear in the entity scope hierarchy, and the directory keeps its historical `customer/` name. → [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md)
+The `knowledge/personal/stances/{slug}/` overlay selected by `KYBERION_STANCE`, layering one identity / connections / policy / voice set over `knowledge/personal/` without forking (`libs/core/stance-resolver.ts`). It answers "which hat am I wearing right now" — an FDE engagement is one such stance, and holding roles at several independent legal entities is another. A stance is runtime configuration, not a scope: it does not appear in the entity scope hierarchy. Stances used to live in the top-level `customer/` directory (selected by the now-deprecated `KYBERION_CUSTOMER`). → [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md)
 
 ### Tenant's Customers
 

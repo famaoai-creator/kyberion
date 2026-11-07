@@ -1,6 +1,6 @@
 'use client';
 
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import * as React from 'react';
 import {
   ArrowDown,

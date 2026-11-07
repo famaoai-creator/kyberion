@@ -22,7 +22,7 @@ import {
 } from './pipeline/pipeline-run-journal.js';
 import { pathResolver } from './path-resolver.js';
 import type { ScopeContext } from './scope-context.js';
-import { assertScopeContext } from './scope-context-validation.js';
+import { assertScopeContext } from './foundation/scope-context-validation.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,

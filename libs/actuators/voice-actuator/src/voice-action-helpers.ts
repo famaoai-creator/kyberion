@@ -1,10 +1,10 @@
 import { checkMeetingParticipationConsent } from '@agent/core/meeting/meeting-participation-coordinator';
 import { getStreamingSttBridge } from '@agent/core/voice/streaming-stt-bridge';
 import { getVoiceProfileRegistry } from '@agent/core/voice/voice-profile-registry';
-import { getVoiceTtsLanguageConfig } from '@agent/core/voice/voice-tts-config';
+import { getVoiceTtsLanguageConfig } from '@agent/shared-voice/voice-tts-config';
 import { installShellStreamingSttBridgeFromEnv } from '@agent/core/shell/shell-streaming-stt-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
-import { TtsLoopbackVerifier } from '@agent/core/voice/tts-loopback-verifier';
+import { TtsLoopbackVerifier } from '@agent/shared-voice/tts-loopback-verifier';
 import { resolveVoiceBackend } from '@agent/core/media/media-backend-registry';
 import { resolveVoiceEngineForPlatform } from '@agent/core/voice/voice-engine-registry';
 import { resolveAudioBus, type AudioBusId } from '@agent/core/voice/audio-bus-resolver';

@@ -30,7 +30,7 @@ clone 後に「初期設定して」と頼まれたら、[プロンプト経由�
 | 3. 既存テナント追加 | 0〜11 すべて                                                      |
 
 ルート 2 は `onboard company` の直後に company stance へ切り替え、その stance でも identity を
-保存する（mission start が `customer/<slug>/my-identity.json` などを要求するため）。順序の詳細は
+保存する（mission start が `knowledge/personal/stances/<slug>/my-identity.json` などを要求するため）。順序の詳細は
 標準フローの「ルート 2（AI 会社）の実行順」を参照する。
 
 ## 実行順

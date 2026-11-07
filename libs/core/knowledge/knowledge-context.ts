@@ -2,7 +2,7 @@ import {
   assertScopeContext,
   type ScopeContext,
   type ScopeContextInput,
-} from '../scope-context-validation.js';
+} from '../foundation/scope-context-validation.js';
 
 export type KnowledgePurpose = 'capture' | 'recall' | 'promote' | 'publish' | 'forget';
 export type KnowledgeRetention = 'session' | 'until_distilled' | 'durable' | 'expiry';

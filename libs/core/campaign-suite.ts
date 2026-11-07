@@ -2,7 +2,7 @@ import { resolveCreativeDesign, type ResolvedCreativeDesign } from './creative-d
 import { webThemePackToCssVars, type WebThemePack } from './web-design-system.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { slugify } from './foundation/text.js';
-import { escapeHtml } from './text-escaping.js';
+import { escapeHtml } from './foundation/text-escaping.js';
 import { pathResolver } from './path-resolver.js';
 
 /**

@@ -3,15 +3,15 @@ import {
   generateImage,
   planImageGeneration,
   type ImageGenerationPlan,
-} from '@agent/core/media/image-generation-bridge';
+} from '@agent/shared-media/image-generation-bridge';
 import type {
   ImageEgressConsent,
   ImageGenerationMode,
   ImageGenerationRequest,
   ImageGenerationResult,
   ImageReference,
-} from '@agent/core/media/image-generation-types';
-import { createImageEgressConsent } from '@agent/core/media/image-reference-consent';
+} from '@agent/shared-media/image-generation-types';
+import { createImageEgressConsent } from '@agent/shared-media/image-reference-consent';
 import { detectAgentExecutionContext } from '@agent/core/agent-execution-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';

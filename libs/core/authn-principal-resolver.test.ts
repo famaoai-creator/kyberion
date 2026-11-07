@@ -63,7 +63,7 @@ vi.mock('./provider/provider-pins-store.js', () => ({
 const { AuthnError, listAuthnProviders, resolveAuthnPrincipal, toSurfaceViewerScope } =
   await import('./authn-principal-resolver.js');
 const { AGENT_TOKEN_ISSUER, BUILTIN_AUTHN_PROVIDER_IDS, issueAgentToken } =
-  await import('./authn-providers.js');
+  await import('./authn/authn-providers.js');
 const {
   activateAgentIdentity,
   issueAgentIdentity,

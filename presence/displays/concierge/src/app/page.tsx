@@ -3,7 +3,7 @@
 import { withPageProjectScope } from '../lib/project-selection';
 import * as React from 'react';
 import { PageHeader } from '@agent/shared-ui';
-import { localeToBcp47 } from '@agent/core/locale-normalize';
+import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import { frontDeskFetch } from '../lib/front-desk-fetch';
 import { TENANT_CHANGED_EVENT } from '../lib/tenant-context';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';

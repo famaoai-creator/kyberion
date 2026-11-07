@@ -8,7 +8,7 @@ const core = vi.hoisted(() => ({
     principal: { role: 'localadmin', source: 'loopback', principalId: 'h', loopback: true },
   } as Record<string, unknown>,
 }));
-vi.mock('@agent/core/voice/engine-runtime-preferences-operator', () => {
+vi.mock('@agent/shared-voice/engine-runtime-preferences-operator', () => {
   class EngineRuntimeOperatorError extends Error {
     constructor(readonly code: string) {
       super(code);
@@ -24,7 +24,7 @@ vi.mock('../../../../lib/engine-config-access', () => ({
   resolveEngineConfigOperator: () => core.access,
 }));
 
-import { EngineRuntimeOperatorError } from '@agent/core/voice/engine-runtime-preferences-operator';
+import { EngineRuntimeOperatorError } from '@agent/shared-voice/engine-runtime-preferences-operator';
 import { GET, POST } from './route.js';
 
 const post = (body: unknown) =>

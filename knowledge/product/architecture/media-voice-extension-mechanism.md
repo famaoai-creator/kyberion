@@ -38,9 +38,9 @@ policy (`knowledge/product/governance/seam-provider-selection/*.json`).
 | Modality         | Extension seam                                           | Registration                                                    | Selection                                      |
 | ---------------- | -------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------- |
 | OCR              | `ocr-provider`                                           | `libs/core/ocr/provider-registry.ts` (`createProviderRegistry`) | `ocr/router.ts` (`ProviderChainRouter`)        |
-| Image generation | `image-generation-provider`                              | `libs/core/media/image-generation/provider-registry.ts`         | `image-generation/router.ts`                   |
-| Music generation | `music-generation-provider`                              | `libs/core/media/music-generation/provider-registry.ts`         | `music-generation/router.ts`                   |
-| Video generation | `video-generation-provider-adapter`                      | `libs/core/media/video-generation/provider-registry.ts`         | `video-generation/provider.ts` selection block |
+| Image generation | `image-generation-provider`                              | `libs/shared-media/src/image-generation/provider-registry.ts`   | `image-generation/router.ts`                   |
+| Music generation | `music-generation-provider`                              | `libs/shared-media/src/music-generation/provider-registry.ts`   | `music-generation/router.ts`                   |
+| Video generation | `video-generation-provider-adapter`                      | `libs/shared-media/src/video-generation/provider-registry.ts`   | `video-generation/provider.ts` selection block |
 | Voice engines    | `voice-engine`                                           | `libs/core/voice/voice-engine-registry.ts` (`defineCatalog`)    | `engine-runtime-preferences`                   |
 | TTS / STT / VAD  | per-kind seams (`streaming-tts`, `streaming-stt`, `vad`) | `libs/core/voice/*-bridge.ts`, `vad-registry.ts`                | seam-provider-selection rules                  |
 | Viseme           | `viseme-provider`                                        | `libs/core/voice/viseme-provider-registry.ts`                   | seam-provider-selection                        |
@@ -104,6 +104,6 @@ policy (`knowledge/product/governance/seam-provider-selection/*.json`).
 Shared iOS/Android pipeline primitives
 (`ensureParentDir`, `safeOrigin`, `resolveObjectRef`, `resolveAppProfile`,
 `buildSessionHandoffArtifact`) live in
-`libs/core/mobile-runtime-helpers.ts`. The platform-specific `opApply` /
+`libs/shared-mobile/src/mobile-runtime-helpers.ts`. The platform-specific `opApply` /
 `opCapture` / `opTransform` implementations stay in each actuator — their
 selector strategies and device pipelines genuinely differ.

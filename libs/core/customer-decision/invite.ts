@@ -13,26 +13,24 @@
  * (`PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites`). Every read
  * and write is schema-validated; an invalid stored file is treated as unknown.
  *
- * All invite I/O runs as the narrow `customer_decision_invite_store` role bound
- * to the tenant, inside an exact resource capability for one invite record (or
- * a read-only listing of the tenant directory), so it needs no confidential
- * persona and never touches another tenant or any knowledge path. A store
+ * All invite I/O runs bound to the tenant, inside an exact resource capability
+ * for one invite record (or a read-only listing of the tenant directory). The
+ * capability itself is the authority (G2: no store role), so the I/O needs no
+ * confidential persona and never touches another tenant or any knowledge path. A store
  * that cannot be read (permission or I/O failure) is reported as
  * `unavailable`, never as an unknown invite.
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
-import { withExecutionContext } from '../authority.js';
 import { isActiveCustomerTenant } from '../customer-channel-binding.js';
-import {
-  CUSTOMER_DECISION_INVITE_STORE_ROLE,
-  customerDecisionInviteCapability,
-} from '../foundation/customer-decision-invite-capability.js';
+import { customerDecisionInviteCapability } from '../foundation/customer-decision-invite-capability.js';
+import { currentExecutionScope, runInExecutionScope } from '../foundation/execution-scope.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { writeJson } from '../foundation/json.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
+import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
 import {
@@ -108,8 +106,10 @@ function inviteFilePath(tenantSlug: string, inviteId: string): string {
 }
 
 /**
- * Run `fn` as the invite store role bound to `tenantSlug`, inside the exact
- * capability for `target` (one invite file, or the tenant directory for a listing).
+ * Run `fn` inside the exact capability for `target` (one invite file, or the
+ * tenant directory for a listing), bound to `tenantSlug`. The capability is the
+ * authority (G2: no store role); the caller keeps its own role. A caller already
+ * bound to another tenant is refused: a caller-supplied tenant never broadens access.
  */
 function asInviteStore<T>(tenantSlug: string, target: string, write: boolean, fn: () => T): T {
   const capability = customerDecisionInviteCapability(
@@ -117,9 +117,20 @@ function asInviteStore<T>(tenantSlug: string, target: string, write: boolean, fn
     pathResolver.toRepoRelative(target),
     write
   );
-  return runInResourceAccessScope(capability, () =>
-    withExecutionContext(CUSTOMER_DECISION_INVITE_STORE_ROLE, fn, undefined, tenantSlug)
-  );
+  return runInResourceAccessScope(capability, () => {
+    const active = resolvePolicyIdentityContext().tenantSlug;
+    if (active && active !== tenantSlug)
+      throw new Error(
+        `[ROLE_TENANT_SCOPE_MISMATCH] customer decision invite capability for tenant '${tenantSlug}' used by a caller bound to '${active}'`
+      );
+    // The capability carries no organization, so none is inherited into the I/O.
+    const {
+      tenantCleared: _cleared,
+      organizationId: _organization,
+      ...current
+    } = currentExecutionScope() ?? { tenantBound: false };
+    return runInExecutionScope({ ...current, tenantBound: true, tenantSlug }, fn);
+  });
 }
 
 function inviteCatalog(filePath: string) {
@@ -160,7 +171,7 @@ function readInvite(tenantSlug: string, inviteId: string): InviteRead {
   } catch (error) {
     logger.warn(
       `customer decision invite store unreadable — ${errorText(error)} | ` +
-        `check the customer_decision_invite_store grant and the store directory permissions | ` +
+        `check the invite capability, the caller's tenant binding and the store directory permissions | ` +
         `tenant=${tenantSlug} invite=${inviteId}`
     );
     return { kind: 'unavailable' };

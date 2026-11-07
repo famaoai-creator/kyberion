@@ -30,7 +30,7 @@ describe('vital_check', () => {
   beforeEach(() => {
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_CUSTOMER = CUSTOMER_SLUG;
+    process.env.KYBERION_STANCE = CUSTOMER_SLUG;
     safeRmSync(FIXTURE_ROOT);
     safeRmSync(ACTIVE_MISSION);
     safeRmSync(PERSONAL_MISSION);
@@ -44,7 +44,7 @@ describe('vital_check', () => {
     safeRmSync(CUSTOMER_OVERLAY_ROOT);
     delete process.env.KYBERION_PERSONA;
     delete process.env.MISSION_ROLE;
-    delete process.env.KYBERION_CUSTOMER;
+    delete process.env.KYBERION_STANCE;
   });
 
   it('checks file and directory targets through secure I/O', () => {

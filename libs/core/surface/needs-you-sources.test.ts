@@ -12,6 +12,11 @@ vi.mock('../governance/approval-store.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../governance/approval-store.js')>()),
   listApprovalRequests: mocks.approvals,
 }));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('../governance/approval-store-reader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../governance/approval-store-reader.js')>()),
+  listApprovalRequests: mocks.approvals,
+}));
 vi.mock('../deliverable-inbox.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../deliverable-inbox.js')>()),
   listInboxEntries: mocks.inbox,

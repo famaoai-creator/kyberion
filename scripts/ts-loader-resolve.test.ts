@@ -2,7 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { preservesSymlinks } from './ts-loader-cache.mjs';
 
 // Differential test for the loader's direct TypeScript resolution
@@ -106,6 +112,56 @@ describe('ts-loader direct TypeScript resolution', () => {
     const fastOut = JSON.parse(fast.stdout);
     expect(fastOut).toEqual(JSON.parse(slow.stdout));
     expect(fastOut['./linked.js'].url).not.toContain('/real/linked.ts');
+  }, 150_000);
+
+  it('loads one @agent/core per process: dist or source, never both', () => {
+    const coreModule = (name: string) =>
+      path
+        .relative(fixture, path.join(pathResolver.rootDir(), 'libs/core', name))
+        .split(path.sep)
+        .join('/');
+    // A bootstrap script imports core by relative source path first: its later
+    // package imports (e.g. build readiness checks) must reach the same files.
+    safeWriteFile(
+      path.join(fixture, 'core-source-first.mts'),
+      `const relative = await import(${JSON.stringify('./' + coreModule('path-resolver.js'))});
+const pkg = await import('@agent/core/path-resolver');
+process.stdout.write(JSON.stringify({
+  same: relative.pathResolver === pkg.pathResolver,
+  urls: ['@agent/core/path-resolver', '@agent/core/secure-io', '@agent/core'].map((s) => import.meta.resolve(s)),
+}));
+`
+    );
+    safeWriteFile(
+      path.join(fixture, 'core-package-first.mts'),
+      `const urls = ['@agent/core/path-resolver', '@agent/core/secure-io', '@agent/core'].map((s) => import.meta.resolve(s));
+process.stdout.write(JSON.stringify({ urls }));
+`
+    );
+    const run = (file: string) => {
+      const result = spawnSync(
+        process.execPath,
+        ['--import', './scripts/ts-loader.mjs', path.join(fixture, file)],
+        {
+          cwd: pathResolver.rootDir(),
+          encoding: 'utf8',
+          timeout: 60_000,
+          env: { ...process.env, KYBERION_TS_LOADER_CACHE: '0' },
+        }
+      );
+      expect(result.stderr).toBe('');
+      expect(result.status).toBe(0);
+      return JSON.parse(result.stdout) as { same?: boolean; urls: string[] };
+    };
+    const sourceFirst = run('core-source-first.mts');
+    expect(sourceFirst.same).toBe(true);
+    for (const url of sourceFirst.urls) {
+      expect(url).toContain('/libs/core/');
+      expect(url).not.toContain('/libs/core/dist/');
+    }
+    const packageFirst = run('core-package-first.mts');
+    const built = safeExistsSync(path.join(pathResolver.rootDir(), 'libs/core/dist/index.js'));
+    for (const url of packageFirst.urls) expect(url.includes('/libs/core/dist/'), url).toBe(built);
   }, 150_000);
 
   it('detects every way of asking Node to preserve symlinks', () => {

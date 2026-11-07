@@ -1,10 +1,10 @@
-import { collectVoiceSamples } from '@agent/core/voice/voice-sample-collection';
+import { collectVoiceSamples } from '@agent/shared-voice/voice-sample-collection';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { t } from '@agent/core/t';
 import {
   getVoiceSampleIngestionPolicy,
   validateVoiceProfileRegistration,
-} from '@agent/core/voice/voice-sample-ingestion-policy';
+} from '@agent/shared-voice/voice-sample-ingestion-policy';
 import {
   getVoiceEngineRecord,
   getVoiceEngineRegistry,
@@ -16,8 +16,8 @@ import {
   materializeVoiceProfileSampleRefs,
   writeVoiceProfileRegistry,
 } from '@agent/core/voice/voice-profile-registry';
-import { getVoiceRuntimePolicy } from '@agent/core/voice/voice-runtime-policy';
-import { getVoiceTtsLanguageConfig } from '@agent/core/voice/voice-tts-config';
+import { getVoiceRuntimePolicy } from '@agent/shared-voice/voice-runtime-policy';
+import { getVoiceTtsLanguageConfig } from '@agent/shared-voice/voice-tts-config';
 import { logger } from '@agent/core/core';
 import { nowIso } from '@agent/core/foundation';
 import {
@@ -30,14 +30,14 @@ import {
 import { pathResolver } from '@agent/core/path-resolver';
 import { listToolRuntimeInventory } from '@agent/core/tool/tool-runtime-registry';
 import { resolveFfmpegBin } from '@agent/core/tool/tool-binary-resolvers';
-import { recordVoiceSample } from '@agent/core/voice/voice-sample-recorder';
-import { verifyVoiceTranscript } from '@agent/core/voice/voice-transcript-alignment';
-import { resolveVoicePath } from '@agent/core/voice/voice-path-policy';
-import { VoiceGenerationRuntime } from '@agent/core/voice/voice-generation-runtime';
+import { recordVoiceSample } from '@agent/shared-voice/voice-sample-recorder';
+import { verifyVoiceTranscript } from '@agent/shared-voice/voice-transcript-alignment';
+import { resolveVoicePath } from '@agent/shared-voice/voice-path-policy';
+import { VoiceGenerationRuntime } from '@agent/shared-voice/voice-generation-runtime';
 import { splitVoiceTextIntoChunks } from '@agent/core/voice/voice-text-chunking';
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator/actuator-trace';
 import { resolveVoiceBackend } from '@agent/core/media/media-backend-registry';
-import { createVoiceCapabilityBridge } from '@agent/core/voice/voice-capability-bridge';
+import { createVoiceCapabilityBridge } from '@agent/shared-voice/voice-capability-bridge';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import {

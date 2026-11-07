@@ -3,7 +3,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { clamp } from '../foundation/text.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
-import { matchesAnyTextRule, type TextMatchRule } from '../text-rule-matcher.js';
+import { matchesAnyTextRule, type TextMatchRule } from '../foundation/text-rule-matcher.js';
 import {
   resolveCapabilityBundleForIntent,
   resolveCapabilityBundlesForUtterance,
@@ -13,7 +13,7 @@ import {
   type ContextualIntentFrame,
 } from '../contextual-intent-frame.js';
 import { sanitizeIntentPathSegment } from './intent-path-utils.js';
-import { segmentWords } from '../locale-normalize.js';
+import { segmentWords } from '../foundation/locale-normalize.js';
 import {
   intentPhraseFlags,
   intentPhraseSource,
@@ -216,7 +216,7 @@ function loadIntentCatalogFromPath(filePath: string): StandardIntentDefinition[]
 function defaultTenantId(): string | undefined {
   const tenant =
     getRegisteredEnvText('KYBERION_TENANT')?.trim() ||
-    getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() ||
+    getRegisteredEnvText('KYBERION_STANCE')?.trim() ||
     '';
   return tenant || undefined;
 }

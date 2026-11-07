@@ -2,7 +2,7 @@
 
 export * from './governance/approval-store.js';
 
-export * from './judge-route.js';
+export * from './contracts/judge-route.js';
 
 export * from './reasoning/judgment-backend.js';
 
@@ -17,8 +17,6 @@ export * from './reasoning/judgment-assist.js';
 export * from './error-classifier-judgment.js';
 
 export * from './knowledge/knowledge-relevance-judgment.js';
-
-export * from './browser/browser-judgment.js';
 
 export * from './reasoning/judgment-calibration-fit.js';
 
@@ -380,7 +378,7 @@ export * from './seam-calibration.js';
 
 export * from './authn-principal-resolver.js';
 
-export * from './authn-providers.js';
+export * from './authn/authn-providers.js';
 
 export * from './authz-policy-engine.js';
 

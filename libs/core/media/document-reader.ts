@@ -33,7 +33,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { ocrImage } from '../ocr-bridge.js';
-import type { OcrDataPolicy, OcrDataTier, OcrRoutingMode } from '../ocr-types.js';
+import type { OcrDataPolicy, OcrDataTier, OcrRoutingMode } from '../contracts/ocr-types.js';
 import {
   rasterizePdfPages,
   rasterizeVectorImage,

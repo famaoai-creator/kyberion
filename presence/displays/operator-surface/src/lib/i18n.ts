@@ -3,7 +3,7 @@ import vocabularyCatalog from '../../../../../knowledge/product/orchestration/us
 import {
   buildUiMessageBundle,
   createBrowserVocabularyResolver,
-} from '@agent/core/locale-normalize';
+} from '@agent/core/foundation/locale-normalize';
 
 /**
  * UI-08: 監査モニタ strings live in the shared user-facing vocabulary catalog

@@ -23,6 +23,11 @@ vi.mock('../intent/conversation-signals.js', () => ({
   listConversationSignals: mocks.conversation,
 }));
 vi.mock('../governance/approval-store.js', () => ({ loadApprovalRequest: mocks.approval }));
+// approval-store-reader defines these; its importers bypass the facade.
+vi.mock('../governance/approval-store-reader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../governance/approval-store-reader.js')>()),
+  loadApprovalRequest: mocks.approval,
+}));
 vi.mock('../workforce/worker-event-stream.js', () => ({
   readWorkerEventStreamJsonl: mocks.workerEvents,
 }));

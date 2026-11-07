@@ -4,7 +4,7 @@ import {
   renderIntentOutcomeLabel,
 } from '../intent/intent-resolution-contract.js';
 import { t } from '../t.js';
-import { detectTextLocale, type SupportedLocale } from '../locale-normalize.js';
+import { detectTextLocale, type SupportedLocale } from '../foundation/locale-normalize.js';
 import { resolveLocale } from '../locale.js';
 import type {
   SurfaceAsyncChannel,

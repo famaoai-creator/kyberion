@@ -8,7 +8,7 @@ vi.mock('../governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() }
 import { auditChain } from '../governance/audit-chain.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeRmSync } from '../secure-io.js';
-import { RISKY_OPS } from '../risky-op-ids.js';
+import { RISKY_OPS } from '../contracts/risky-op-ids.js';
 import type { SurfaceRuntimeDefinition } from '../surface/surface-runtime.js';
 import type { IngressExposure, PublicIngressProvider } from './public-ingress-contract.js';
 import { resetPublicIngressProviderLoads } from './public-ingress-provider-registry.js';
