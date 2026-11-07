@@ -72,7 +72,6 @@ import {
 
 import {
   ASK_VOCABULARY_KEYS,
-  HELP_VOCABULARY_KEYS,
   HOME_VOCABULARY_KEYS,
   PROGRESS_VOCABULARY_KEYS,
 } from './front-desk-pages.js';
@@ -610,18 +609,6 @@ export function registerFrontDeskRoutes(app: express.Express): void {
     const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
     const texts = Object.fromEntries(
       ASK_VOCABULARY_KEYS.map((key) => [key, catalogT(key, undefined, locale)])
-    );
-    res.setHeader('Cache-Control', 'no-store');
-    res.json({ ok: true, locale, texts });
-  });
-
-  // HT-06: exactly the `front_desk` keys `static/help.js` renders for the
-  // training block. Mirrors `/api/home-vocabulary` / `/api/progress-vocabulary`
-  // / `/api/ask-vocabulary` above.
-  app.get('/api/help-vocabulary', (req, res) => {
-    const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
-    const texts = Object.fromEntries(
-      HELP_VOCABULARY_KEYS.map((key) => [key, catalogT(key, undefined, locale)])
     );
     res.setHeader('Cache-Control', 'no-store');
     res.json({ ok: true, locale, texts });

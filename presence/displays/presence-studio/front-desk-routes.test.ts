@@ -924,18 +924,13 @@ describe('HT-06 i18n gate: hearing canvas + training help vocabulary', () => {
     expect(askJs).toMatch(/locale=.*encodeURIComponent\(state\.locale\)/);
   });
 
-  it('extends the remote-safe allowlist to /api/help-vocabulary', () => {
-    const source = readRepoFile('presence/displays/presence-studio/security.ts');
-    expect(source).toContain("path === '/api/help-vocabulary'");
-  });
-
-  it('wires GET /api/help-vocabulary the same shape as /api/ask-vocabulary', () => {
-    const source = readRepoFile('presence/displays/presence-studio/front-desk-routes.ts');
-    expect(source).toContain("app.get('/api/help-vocabulary'");
-    const helpVocabStart = source.indexOf("app.get('/api/help-vocabulary'");
-    const helpVocabRoute = source.slice(helpVocabStart, helpVocabStart + 400);
-    expect(helpVocabRoute).toContain('HELP_VOCABULARY_KEYS');
-    expect(helpVocabRoute).toContain("res.setHeader('Cache-Control', 'no-store')");
+  it('no longer serves the help vocabulary (使い方 moved to Concierge)', () => {
+    expect(readRepoFile('presence/displays/presence-studio/security.ts')).not.toContain(
+      '/api/help-vocabulary'
+    );
+    expect(readRepoFile('presence/displays/presence-studio/front-desk-routes.ts')).not.toContain(
+      "app.get('/api/help-vocabulary'"
+    );
   });
 });
 
