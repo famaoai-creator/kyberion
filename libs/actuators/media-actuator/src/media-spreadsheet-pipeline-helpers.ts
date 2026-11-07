@@ -8,8 +8,8 @@ import {
 } from './media-document-helpers.js';
 import type { SemanticRenderTokenCatalog } from './media-layout-design-tokens.js';
 import { loadMediaSignalEntryPolicyCatalog } from '@agent/shared-media/media-signal-entry-policy';
-import { loadTrackerSheetPolicyCatalog } from '@agent/core/tracker-sheet-policy';
-import { resolveSpreadsheetStyleIndex } from '@agent/core/spreadsheet-style-policy';
+import { loadTrackerSheetPolicyCatalog } from '@agent/shared-media/tracker-sheet-policy';
+import { resolveSpreadsheetStyleIndex } from '@agent/shared-media/spreadsheet-style-policy';
 import { resolveMediaToneStyle } from '@agent/shared-media/media-tone-style-map';
 import { nowIso } from '@agent/core/foundation';
 import { semanticToken } from '@agent/core/semantic-design-tokens';

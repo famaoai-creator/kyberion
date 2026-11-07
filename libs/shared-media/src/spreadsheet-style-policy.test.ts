@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 import {
   loadSpreadsheetStylePolicyCatalog,
   resolveSpreadsheetStyleIndex,
@@ -8,9 +8,12 @@ import {
 
 describe('spreadsheet-style-policy', () => {
   it('uses the canonical catalog without a duplicated fallback definition', () => {
-    const source = safeReadFile(pathResolver.rootResolve('libs/core/spreadsheet-style-policy.ts'), {
-      encoding: 'utf8',
-    }) as string;
+    const source = safeReadFile(
+      pathResolver.rootResolve('libs/shared-media/src/spreadsheet-style-policy.ts'),
+      {
+        encoding: 'utf8',
+      }
+    ) as string;
     expect(source).not.toContain('FALLBACK_CATALOG');
   });
 

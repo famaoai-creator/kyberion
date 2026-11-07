@@ -1,5 +1,5 @@
 import { listDesignStyles } from '@agent/core/design-foundation';
-import { draftDeckSectionBodies, selectDeckTheme } from '@agent/core/deck-theme-direction';
+import { draftDeckSectionBodies, selectDeckTheme } from '@agent/shared-media/deck-theme-direction';
 import { DECK_CANVAS_4_3, DECK_CANVAS_16_9, htmlToDeckProtocol } from './html-deck-helpers.js';
 import { buildDeckMeasurementScript, geometryToDeckProtocol } from './deck-geometry-helpers.js';
 import { logger } from '@agent/core/core';
