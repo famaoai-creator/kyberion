@@ -40,6 +40,10 @@
       "types": "./dist/font-stack.d.ts",
       "default": "./dist/font-stack.js"
     },
+    "./host-image-handoff": {
+      "types": "./dist/host-image-handoff.d.ts",
+      "default": "./dist/host-image-handoff.js"
+    },
     "./image-generation-bridge": {
       "types": "./dist/image-generation-bridge.d.ts",
       "default": "./dist/image-generation-bridge.js"

@@ -5,9 +5,9 @@
  * parameterized by `platform`) live here.
  */
 import * as path from 'node:path';
-import { safeExistsSync, safeMkdir } from './secure-io.js';
-import { assertValidMobileAppProfile } from './mobile-profile-validators.js';
-import type { MobileAppProfile } from './types.js';
+import { safeExistsSync, safeMkdir } from '@agent/core/secure-io';
+import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
+import type { MobileAppProfile } from '@agent/core/types';
 
 export type MobilePlatform = 'android' | 'ios';
 

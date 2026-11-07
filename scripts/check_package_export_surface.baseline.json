@@ -1,14 +1,14 @@
 {
   "version": 1,
   "packages": {
-    "libs/core": 1948,
+    "libs/core": 1943,
     "libs/kernel": 4,
     "libs/shared-interaction": 9,
-    "libs/shared-media": 75,
-    "libs/shared-perception": 7,
+    "libs/shared-media": 76,
+    "libs/shared-perception": 9,
     "libs/shared-ui": 3,
     "libs/shared-video": 21,
     "libs/shared-vision": 9,
-    "libs/shared-voice": 31
+    "libs/shared-voice": 32
   }
 }

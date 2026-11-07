@@ -23,7 +23,7 @@ import {
 import {
   isHostImageHandoffOutput,
   recordHostImageHandoffRequest,
-} from '@agent/core/host-image-handoff';
+} from '../../host-image-handoff.js';
 import { isInsideProviderHarness } from '@agent/core/agent-execution-context';
 import { getFallbackTargetPath } from '../provider-support.js';
 

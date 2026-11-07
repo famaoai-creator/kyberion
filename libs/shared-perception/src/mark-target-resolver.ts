@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { dhashFile, hamming } from './media/image-dhash.js';
-import { assertVolatileId, findMissionPath, pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
-import { writeJson } from './foundation/json.js';
-import { safeMarkLabel, type SomImageSize, type SomMark } from './set-of-marks.js';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { dhashFile, hamming } from '@agent/core/media/image-dhash';
+import { assertVolatileId, findMissionPath, pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeRmSync } from '@agent/core/secure-io';
+import { writeJson } from '@agent/core/foundation/json';
+import { safeMarkLabel, type SomImageSize, type SomMark } from '@agent/core/set-of-marks';
 
 /**
  * Session-volatile store for Set-of-Marks results and the `mark:<n>` target

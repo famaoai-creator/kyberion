@@ -53,7 +53,7 @@ vi.mock('@agent/core/apple-intelligence-bridge', () => ({
   probeAppleImageGeneration: mocks.probeAppleImageGeneration,
 }));
 
-vi.mock('@agent/core/host-image-handoff', () => ({
+vi.mock('./host-image-handoff.js', () => ({
   isHostImageHandoffOutput: mocks.isHostOutput,
   recordHostImageHandoffRequest: mocks.recordHostRequest,
 }));
