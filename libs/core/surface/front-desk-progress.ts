@@ -29,7 +29,11 @@
  * each caller's own (Concierge: `lib/progress-server.ts`).
  */
 import { eventScopeFromRecord } from '../event/event-scope.js';
-import { admitsTenant } from './surface-authorization.js';
+import {
+  admitsCustody,
+  custodyOfScope,
+  type ViewerCustodyContext,
+} from './surface-authorization.js';
 import { resolveSurfaceBrowserUrl } from './surface-url.js';
 
 /**
@@ -464,6 +468,10 @@ export interface ProgressViewerScope {
   projectIds: string[] | 'all';
   /** The system selection only: also admit records that carry no tenant. */
   includeUntenanted?: boolean;
+  memberId?: ViewerCustodyContext['memberId'];
+  principalId?: ViewerCustodyContext['principalId'];
+  principal?: ViewerCustodyContext['principal'];
+  personIds?: readonly string[];
 }
 
 /**
@@ -474,7 +482,39 @@ export interface ProgressViewerScope {
  * metadata is omitted rather than widening the result.
  */
 export function progressRecordInScope(scope: ProgressViewerScope, value: unknown): boolean {
-  if (!admitsTenant(scope, progressRecordTenant(value))) return false;
+  const claims: Record<string, unknown> = {};
+  const aliases: Record<string, string> = {
+    tenantSlug: 'tenant_slug',
+    tenantId: 'tenant_slug',
+    tenant_id: 'tenant_slug',
+    ownerNhi: 'owner_nhi',
+    nhiId: 'nhi_id',
+  };
+  const seen = new WeakSet<object>();
+  const collect = (input: unknown, depth: number): boolean => {
+    if (!input || typeof input !== 'object' || Array.isArray(input) || depth > 3 || seen.has(input))
+      return false;
+    seen.add(input);
+    const record = input as Record<string, unknown>;
+    for (const [raw, value] of Object.entries(record)) {
+      const key = aliases[raw] ?? raw;
+      if (!['tenant_slug', 'owner_nhi', 'nhi_id'].includes(key) || value == null) continue;
+      if (claims[key] !== undefined && claims[key] !== value) return false;
+      claims[key] = value;
+    }
+    for (const key of [
+      'scope',
+      'scope_context',
+      'project',
+      'project_context',
+      'requestedByContext',
+      'context',
+    ]) {
+      if (record[key] !== undefined && !collect(record[key], depth + 1)) return false;
+    }
+    return true;
+  };
+  if (!collect(value, 0) || !admitsCustody(scope, custodyOfScope(claims))) return false;
   if (scope.organizationIds === 'all' && scope.projectIds === 'all') return true;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const recordScope = eventScopeFromRecord(value as Record<string, unknown>);
