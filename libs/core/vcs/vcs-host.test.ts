@@ -57,7 +57,13 @@ import {
 } from './github-rest-host-provider.js';
 import { createMemoryVcsHostProvider } from './memory-vcs-host-provider.js';
 import { parseVcsPrFields } from './vcs-host.js';
-import { vcsHostGithubApiGet, vcsHostPrViewFields } from './vcs-host-verbs.js';
+import {
+  vcsHostGithubApiGet,
+  vcsHostPrViewFields,
+  vcsHostOptionsForRunner,
+  vcsHostRepositoryVisibility,
+} from './vcs-host-verbs.js';
+import { vcsDefaultRunner } from './vcs-backend.js';
 import { restPullField } from './github-rest-host-provider.js';
 
 const HEAD = 'a'.repeat(40);
@@ -666,5 +672,62 @@ describe('gh CLI failure detail', () => {
     await expect(provider.repository(ctx())).rejects.toThrow(
       'gh repo view failed — error connecting to api.github.com'
     );
+  });
+});
+
+describe('repository visibility verb', () => {
+  let unregister: (() => void) | undefined;
+  afterEach(() => unregister?.());
+  const repository = { host: 'github.com', slug: 'acme/widgets' };
+
+  it('reads visibility through the selected provider without gh', async () => {
+    const provider = createMemoryVcsHostProvider({
+      id: 'memory-visibility',
+      visibility: 'private',
+    });
+    unregister = registerVcsHostProvider(provider);
+    await expect(
+      vcsHostRepositoryVisibility({ provider: 'memory-visibility', repository })
+    ).resolves.toBe('private');
+  });
+
+  it('is unknown for a missing or malformed repository, before any provider call', async () => {
+    const visibility = vi.fn(async () => 'private' as const);
+    const hostProvider = { ...createMemoryVcsHostProvider(), visibility };
+    await expect(vcsHostRepositoryVisibility({ hostProvider })).resolves.toBe('unknown');
+    await expect(
+      vcsHostRepositoryVisibility({
+        hostProvider,
+        repository: { host: 'github.com', slug: '../x' },
+      })
+    ).resolves.toBe('unknown');
+    await expect(
+      vcsHostRepositoryVisibility({
+        hostProvider,
+        repository: { host: 'evil.test/github.com', slug: 'acme/widgets' },
+      })
+    ).resolves.toBe('unknown');
+    expect(visibility).not.toHaveBeenCalled();
+  });
+
+  it('is unknown (not private) when the provider cannot verify it', async () => {
+    const hostProvider = {
+      ...createMemoryVcsHostProvider(),
+      visibility: async () => {
+        throw new VcsHostError('auth', 'no credentials');
+      },
+    };
+    await expect(vcsHostRepositoryVisibility({ hostProvider, repository })).resolves.toBe(
+      'unknown'
+    );
+  });
+
+  it('injects gh-cli only over a caller-owned runner, never over the ambient defaults', () => {
+    expect(vcsHostOptionsForRunner({ cwd: '/x' }, vcsDefaultRunner)).toEqual({ cwd: '/x' });
+    expect(vcsHostOptionsForRunner({ cwd: '/x' })).toEqual({ cwd: '/x' });
+    const run: VcsCommandRunner = () => ({ status: 0, stdout: '', stderr: '' });
+    const injected = vcsHostOptionsForRunner({ cwd: '/x' }, run);
+    expect(injected.git).toBe(run);
+    expect(injected.hostProvider?.id).toBe('gh-cli');
   });
 });

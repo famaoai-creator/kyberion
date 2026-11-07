@@ -44,11 +44,9 @@ describe('check:vcs-host-boundary', () => {
     );
     expect(rules('scripts/x.ts', 'const map = { ghPrCreate: 1 };')).toEqual([]);
     expect(
-      rules(
-        'libs/core/x.ts',
-        "import { ghRepositoryVisibility, ghVersion, ghAuthStatus } from './vcs/github.js';"
-      )
+      rules('libs/core/x.ts', "import { ghVersion, ghAuthStatus } from './vcs/github.js';")
     ).toEqual([]);
+    expect(rules('scripts/x.ts', 'ghRepositoryVisibility({}, run);')).toEqual(['sync-gh-verb']);
   });
 
   it('reports allowlist entries that no longer exec gh or no longer exist', () => {

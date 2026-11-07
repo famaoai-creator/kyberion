@@ -1,4 +1,4 @@
-import { governVcsCommand } from './external-vcs.js';
+import { governVcsCommand, governVcsCommandAsync } from './external-vcs.js';
 import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
 import { assertNotFlagLike } from './git-arguments.js';
 export { assertNotFlagLike } from './git-arguments.js';
@@ -7,7 +7,7 @@ import {
   readGitRemotePublicationHead,
   type GitPublicationSource,
 } from './git-publication-source.js';
-import { ghRepositoryVisibility } from './github.js';
+import { vcsHostOptionsForRunner, vcsHostRepositoryVisibility } from './vcs-host-verbs.js';
 import { normalizeRepositoryTarget } from '../governance/external-operation-target.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import { resolveScopeContext } from '../scope-context.js';
@@ -181,7 +181,13 @@ export function gitCommit(
   return gitRun(['commit', '-m', message.trim()], cwd, run);
 }
 
-export function gitPush(
+/**
+ * Governed push of one local branch. Async because the destination's
+ * visibility is verified through the vcs-host seam (gh-cli, or github-rest
+ * where gh is absent) both at admission and again immediately before send.
+ * An injected `run` also serves as the gh transport, as before.
+ */
+export async function gitPush(
   cwd: string,
   options: {
     remote?: string;
@@ -189,7 +195,7 @@ export function gitPush(
     setUpstream?: boolean;
   } = {},
   run: VcsCommandRunner = vcsDefaultRunner
-): VcsCommandResult {
+): Promise<VcsCommandResult> {
   assertVcsCwdScope(cwd);
   if (options.remote !== undefined) assertNotFlagLike(options.remote, 'remote');
   if (options.ref !== undefined) assertNotFlagLike(options.ref, 'ref');
@@ -230,7 +236,7 @@ export function gitPush(
     ? readGitPublicationSource(cwd, bound.head, run, remoteHead.head)
     : { publication_source_tier: 'protected_or_unknown' as const };
   const scope = currentScopeEnvelope()?.identity ?? resolveScopeContext();
-  const visibility = () => {
+  const visibility = async () => {
     if (scope.tier === 'public' && sourceFacts.publication_source_tier === 'public')
       return 'unknown';
     const normalized = normalizeRepositoryTarget(bound.url);
@@ -238,9 +244,12 @@ export function gitPush(
     const url = new URL(normalized);
     const slug = url.pathname.replace(/^\//u, '');
     if (!/^[\w.-]+\/[\w.-]+$/u.test(slug)) return 'unknown';
-    return ghRepositoryVisibility({ cwd, repository: { host: url.host, slug } }, run);
+    return vcsHostRepositoryVisibility({
+      ...vcsHostOptionsForRunner({ cwd }, run),
+      repository: { host: url.host, slug },
+    });
   };
-  const repositoryVisibility = visibility();
+  const repositoryVisibility = await visibility();
   const envelope = currentScopeEnvelope();
   const sourceTier = sourceFacts.publication_source_tier;
   const ranks = { public: 1, confidential: 2, personal: 3 } as const;
@@ -257,7 +266,7 @@ export function gitPush(
     throw new Error(
       '[VCS_SOURCE_SCOPE_DENIED] Push source and destination violate the active scope'
     );
-  return governVcsCommand(
+  return governVcsCommandAsync(
     'vcs:push',
     {
       ...bound,
@@ -265,7 +274,7 @@ export function gitPush(
       remote_history: remoteHead,
       repository_visibility: repositoryVisibility,
     },
-    () => {
+    async () => {
       if (computeApprovalPayloadHash(snapshot()) !== computeApprovalPayloadHash(bound))
         throw new Error('[VCS_SNAPSHOT_CHANGED] Publication target or source changed before send');
       if (
@@ -273,7 +282,7 @@ export function gitPush(
         computeApprovalPayloadHash(remoteHead)
       )
         throw new Error('[VCS_SNAPSHOT_CHANGED] Remote history changed before send');
-      if (visibility() !== repositoryVisibility)
+      if ((await visibility()) !== repositoryVisibility)
         throw new Error('[VCS_SNAPSHOT_CHANGED] Repository visibility changed before send');
       const result = run('git', ['push', '--', bound.url, `${bound.head}:${destination}`], { cwd });
       if (result.status === 0 && !result.error && options.setUpstream) {
