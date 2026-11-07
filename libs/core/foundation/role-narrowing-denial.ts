@@ -1,5 +1,9 @@
 import * as path from 'node:path';
-import type { ResourceAccessOperation, ResourceAccessScope } from './resource-access-scope.js';
+import type {
+  ResourceAccessCustody,
+  ResourceAccessOperation,
+  ResourceAccessScope,
+} from './resource-access-scope.js';
 import type { WriteContent } from './customer-decision-record-content.js';
 import { isValidTenantSlug } from './scope.js';
 import { isRecord } from './text.js';
@@ -42,6 +46,12 @@ interface NarrowContentCheck {
 interface NarrowRequireScope {
   /** Scope fields that must be present (e.g. 'organizationId'). */
   fields?: string[];
+  /**
+   * Custody kinds the bound scope may hold (G4). Absent means any custody is
+   * fine; present requires the scope's normalized custody kind to be listed —
+   * a scope with no explicit `custody` is tenant.
+   */
+  custody?: ResourceAccessCustody['kind'] | readonly ResourceAccessCustody['kind'][];
   /**
    * Read-only single-path ceiling fingerprint (a ceiling requirement):
    * exactly one `readExact` entry, no write/append/mkdir/metadata lists, no
@@ -184,8 +194,8 @@ function exactScopeMatches(
     if (!match) return false;
     if (
       exact.read_path_tenant_group !== undefined &&
-      (match[exact.read_path_tenant_group] !== scope.tenantSlug ||
-        !isValidTenantSlug(scope.tenantSlug))
+      (!isValidTenantSlug(scope.tenantSlug ?? '') ||
+        match[exact.read_path_tenant_group] !== scope.tenantSlug)
     )
       return false;
   }
@@ -257,6 +267,16 @@ export function narrowDeclarationValid(narrow: unknown): boolean {
       if (!Array.isArray(scope.fields) || scope.fields.length === 0) return false;
       if (scope.fields.some((field) => typeof field !== 'string')) return false;
     }
+    if (scope.custody !== undefined) {
+      const kinds = Array.isArray(scope.custody) ? scope.custody : [scope.custody];
+      if (
+        kinds.length === 0 ||
+        kinds.some(
+          (kind) => typeof kind !== 'string' || !['system', 'tenant', 'person'].includes(kind)
+        )
+      )
+        return false;
+    }
     if (scope.reason !== undefined && typeof scope.reason !== 'string') return false;
     const exact = scope.exact;
     if (exact !== undefined) {
@@ -326,9 +346,15 @@ export function roleNarrowingDenial(input: {
     const missingField = (require.fields ?? []).find(
       (field) => !scope?.[field as keyof ResourceAccessScope]
     );
+    const custodyKinds = Array.isArray(require.custody)
+      ? require.custody
+      : require.custody === undefined
+        ? []
+        : [require.custody];
     const fails =
       !scope ||
       missingField !== undefined ||
+      (custodyKinds.length > 0 && !custodyKinds.includes(scope.custody?.kind ?? 'tenant')) ||
       (require.exact !== undefined && !exactScopeMatches(scope, require.exact));
     if (fails) {
       return (

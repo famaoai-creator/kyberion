@@ -1,10 +1,31 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import * as path from 'node:path';
-import { isValidTenantSlug } from './scope.js';
+import { isValidMemberId, isValidTenantSlug } from './scope.js';
+
+/**
+ * The custodian a request ceiling binds (G4 of the store-catalog guard design):
+ * `tenant` — one tenant's material; `system` — installation-level material with
+ * no tenant; `person` — personal material of one member (`ref` omitted binds
+ * the installation's person scope, mirroring custody-owner's optional
+ * principal). A scope names whose ceiling it is; the declaration alone confers
+ * nothing — it only ever narrows.
+ */
+export type ResourceAccessCustody =
+  | { readonly kind: 'system' }
+  | { readonly kind: 'tenant' }
+  | { readonly kind: 'person'; readonly ref?: string };
 
 /** A server-created, deny-only ceiling. Never populate paths from client input. */
 export interface ResourceAccessScope {
-  readonly tenantSlug: string;
+  /**
+   * Custodian of this ceiling. Omitted means tenant custody (backwards
+   * compatible); `freezeScope` normalizes it so a frozen scope always carries
+   * one. Non-tenant custody must not name a tenant, organization or project.
+   */
+  readonly custody?: ResourceAccessCustody;
+  /** The bound tenant slug; required and present only for tenant custody. */
+  readonly tenantSlug?: string;
+  /** Tenant-context bindings; valid only with tenant custody. */
   readonly organizationId?: string;
   readonly projectId?: string;
   /** Metadata only: no file contents, directory listing, or mutation. */
@@ -78,10 +99,55 @@ export function matchesNamePrefix(scope: ResourceAccessScope, target: string): b
   );
 }
 
+/** Custody normalization — a malformed declaration fails closed. */
+function freezeCustody(scope: ResourceAccessScope): ResourceAccessCustody {
+  const custody = scope.custody;
+  if (custody !== undefined && custody !== null) {
+    if (typeof custody !== 'object' || !['system', 'tenant', 'person'].includes(custody.kind))
+      throw new Error('[RESOURCE_SCOPE_INVALID] Unknown custody kind');
+    if (custody.kind !== 'tenant') {
+      if (
+        scope.tenantSlug !== undefined ||
+        scope.organizationId !== undefined ||
+        scope.projectId !== undefined
+      )
+        throw new Error(
+          '[RESOURCE_SCOPE_INVALID] Non-tenant custody cannot bind a tenant, organization or project'
+        );
+      if (custody.kind === 'person') {
+        if (
+          custody.ref !== undefined &&
+          (typeof custody.ref !== 'string' || !isValidMemberId(custody.ref))
+        )
+          throw new Error('[RESOURCE_SCOPE_INVALID] Invalid person custody ref');
+        return Object.freeze(
+          custody.ref === undefined
+            ? { kind: 'person' as const }
+            : { kind: 'person' as const, ref: custody.ref }
+        );
+      }
+      return Object.freeze({ kind: 'system' as const });
+    }
+  }
+  if (!isValidTenantSlug(scope.tenantSlug ?? ''))
+    throw new Error('[RESOURCE_SCOPE_INVALID] Missing or invalid resource binding');
+  return Object.freeze({ kind: 'tenant' as const });
+}
+
+/** Two frozen scopes nest only when they bind the same custodian. */
+function sameCustody(left: ResourceAccessScope, right: ResourceAccessScope): boolean {
+  const lc = left.custody ?? { kind: 'tenant' as const };
+  const rc = right.custody ?? { kind: 'tenant' as const };
+  if (lc.kind !== rc.kind) return false;
+  if (lc.kind === 'tenant') return left.tenantSlug === right.tenantSlug;
+  if (lc.kind === 'person' && rc.kind === 'person') return lc.ref === rc.ref;
+  return true;
+}
+
 function freezeScope(scope: ResourceAccessScope): ResourceAccessScope {
+  if (!scope) throw new Error('[RESOURCE_SCOPE_INVALID] Missing or invalid resource binding');
+  const custody = freezeCustody(scope);
   if (
-    !scope ||
-    !isValidTenantSlug(scope.tenantSlug) ||
     (scope.organizationId !== undefined && !ID.test(scope.organizationId)) ||
     (scope.projectId !== undefined && (!scope.organizationId || !ID.test(scope.projectId))) ||
     (scope.allowProductKnowledgeRead !== undefined &&
@@ -98,7 +164,8 @@ function freezeScope(scope: ResourceAccessScope): ResourceAccessScope {
     return Object.freeze([...new Set(values)]);
   };
   const result: ResourceAccessScope = {
-    tenantSlug: scope.tenantSlug,
+    custody,
+    ...(scope.tenantSlug ? { tenantSlug: scope.tenantSlug } : {}),
     ...(scope.organizationId ? { organizationId: scope.organizationId } : {}),
     ...(scope.projectId ? { projectId: scope.projectId } : {}),
     metadataExact: copy(scope.metadataExact ?? []),
@@ -129,7 +196,7 @@ function runInFrozenResourceAccessScope<T>(frozen: ResourceAccessScope, fn: () =
   if (
     outer.some(
       (parent) =>
-        parent.tenantSlug !== frozen.tenantSlug ||
+        !sameCustody(parent, frozen) ||
         (parent.organizationId && parent.organizationId !== frozen.organizationId) ||
         (parent.projectId && parent.projectId !== frozen.projectId)
     )
