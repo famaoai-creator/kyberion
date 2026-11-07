@@ -482,6 +482,33 @@ describe('Workspace build contract', () => {
     }
   });
 
+  it('keeps the ingest quota and sync cursors inside the ingest actuator', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    for (const name of ['ingest-quota', 'ingest-sync-cursors']) {
+      expect(core.exports[`./${name}`]).toBeUndefined();
+      for (const suffix of ['.ts', '.test.ts']) {
+        expect(safeExistsSync(path.join(rootDir, `libs/core/${name}${suffix}`))).toBe(false);
+        expect(
+          safeExistsSync(path.join(rootDir, `libs/actuators/ingest-actuator/src/${name}${suffix}`))
+        ).toBe(true);
+      }
+    }
+    // The tier gate keeps script + actuator consumers and stays in core with
+    // the ledger, PII scrubber, and governed-catalog plumbing the moved
+    // modules still import.
+    for (const subpath of [
+      './ingest-tier-gate',
+      './ingest-asset-ledger',
+      './pii-scrubber',
+      './foundation/governed-catalog',
+      './entity-scope',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
   it('keeps the BlackHole routing guard beside its pipeline-execution consumers', () => {
     const core = JSON.parse(
       safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
