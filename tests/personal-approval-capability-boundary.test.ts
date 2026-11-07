@@ -22,6 +22,7 @@ describeStoreGrantBoundary(
     formerConsumers: [
       'libs/core/tier-guard-store-grants.ts',
       'libs/core/foundation/narrow-store-role-denial.ts',
+      'libs/core/foundation/role-narrowing-denial.ts',
     ],
   }
 );
