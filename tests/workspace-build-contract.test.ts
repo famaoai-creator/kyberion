@@ -152,6 +152,68 @@ describe('Workspace build contract', () => {
     }
   });
 
+  it('keeps media policy and visual compilation leaves beside their consumers', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const media = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-media/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    for (const name of [
+      'deck-theme-direction',
+      'legacy-media-ops',
+      'spreadsheet-style-policy',
+      'tracker-sheet-policy',
+      'visual-workflow-compiler',
+    ]) {
+      expect(core.exports[`./${name}`]).toBeUndefined();
+      expect(media.exports[`./${name}`]).toEqual({
+        types: `./dist/${name}.d.ts`,
+        default: `./dist/${name}.js`,
+      });
+      for (const suffix of ['.ts', '.test.ts']) {
+        expect(safeExistsSync(path.join(rootDir, `libs/core/${name}${suffix}`))).toBe(false);
+        expect(safeExistsSync(path.join(rootDir, `libs/shared-media/src/${name}${suffix}`))).toBe(
+          true
+        );
+      }
+      for (const suffix of ['.js', '.d.ts', '.js.map', '.d.ts.map']) {
+        expect(safeExistsSync(path.join(rootDir, `libs/core/dist/${name}${suffix}`))).toBe(false);
+        expect(safeExistsSync(path.join(rootDir, `libs/shared-media/dist/${name}${suffix}`))).toBe(
+          true
+        );
+      }
+    }
+    for (const actuator of ['media', 'media-generation']) {
+      const manifest = JSON.parse(
+        safeReadFile(path.join(rootDir, `libs/actuators/${actuator}-actuator/package.json`), {
+          encoding: 'utf8',
+        }) as string
+      );
+      expect(manifest.dependencies['@agent/shared-media']).toBe('workspace:*');
+    }
+    for (const subpath of [
+      './logger',
+      './foundation/locale-normalize',
+      './foundation/safe-json',
+      './json-repair',
+      './reasoning/reasoning-backend',
+      './path-resolver',
+      './foundation/governed-catalog',
+      './secure-io',
+      './contracts/image-generation-adf',
+      './contracts/video-generation-adf',
+      './foundation/text',
+      './video/video-design-system',
+    ]) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+    expect(media.dependencies['@agent/core']).toBe('workspace:*');
+    expect(core.dependencies?.['@agent/shared-media']).toBeUndefined();
+  });
+
   it('keeps mobile runtime helpers in shared-mobile without closing legacy deep imports', () => {
     const core = JSON.parse(
       safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string

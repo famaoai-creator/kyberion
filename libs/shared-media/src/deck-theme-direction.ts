@@ -1,7 +1,7 @@
-import { createLogger } from './logger.js';
-import { pickByLocale } from './foundation/locale-normalize.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { tryRepairJson } from './json-repair.js';
+import { createLogger } from '@agent/core/logger';
+import { pickByLocale } from '@agent/core/foundation/locale-normalize';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { tryRepairJson } from '@agent/core/json-repair';
 
 // Deck counterpart of video-visual-direction (agy/media design quality):
 // documents and decks always fell back to the preset default theme
@@ -54,7 +54,7 @@ export async function selectDeckTheme(input: SelectDeckThemeInput): Promise<stri
     const generate =
       input.generate ??
       (async (p: string) => {
-        const { getReasoningBackend } = await import('./reasoning/reasoning-backend.js');
+        const { getReasoningBackend } = await import('@agent/core/reasoning/reasoning-backend');
         return String(await getReasoningBackend().prompt(p));
       });
     const raw = await generate(prompt);
@@ -126,7 +126,7 @@ export async function draftDeckSectionBodies(
     const generate =
       input.generate ??
       (async (p: string) => {
-        const { getReasoningBackend } = await import('./reasoning/reasoning-backend.js');
+        const { getReasoningBackend } = await import('@agent/core/reasoning/reasoning-backend');
         return String(await getReasoningBackend().prompt(p));
       });
     const raw = await generate(prompt);
