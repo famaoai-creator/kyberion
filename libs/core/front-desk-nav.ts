@@ -143,7 +143,7 @@ export const FRONT_DESK_LINKED_DESTINATIONS: readonly FrontDeskMenuItem[] = [
     id: 'help',
     label_key: 'front_desk:nav_help',
     sublabel_key: 'front_desk:nav_help_sub',
-    surface: 'presence-studio',
+    surface: 'concierge',
     path: '/help',
     min_role: 'viewer',
     group_key: 'front_desk:nav_group_resources',
@@ -174,7 +174,7 @@ export const FRONT_DESK_LINKED_DESTINATIONS: readonly FrontDeskMenuItem[] = [
 export const FRONT_DESK_HELP_LINK = {
   id: 'help',
   label_key: 'front_desk:nav_help',
-  surface: 'presence-studio',
+  surface: 'concierge',
   path: '/help',
 } as const;
 

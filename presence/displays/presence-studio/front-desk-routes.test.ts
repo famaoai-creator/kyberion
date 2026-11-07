@@ -375,14 +375,15 @@ describe('security.ts remote-safe allowlist wiring (Deliverable 1)', () => {
 // new module for route content and the runtime-data module only for the
 // call-site ordering around `express.static`.
 describe('FD-08 help page routing', () => {
-  it('serves help.html at /help instead of the interim /onboarding redirect', () => {
+  it('hands /help to Concierge (Kyberion server phase 2) instead of serving a studio page', () => {
     const source = readRepoFile('presence/displays/presence-studio/front-desk-pages.ts');
-
-    const helpStart = source.indexOf("app.get('/help'");
+    const helpStart = source.indexOf('const toConciergeHelp');
     expect(helpStart).toBeGreaterThan(-1);
-    const helpRoute = source.slice(helpStart, helpStart + 200);
-    expect(helpRoute).toContain("'help.html'");
-    expect(helpRoute).not.toContain('res.redirect');
+    const helpRoute = source.slice(helpStart);
+    expect(helpRoute).toContain('readFrontDeskSurfaceUrls().concierge');
+    expect(helpRoute).toContain("app.get('/help'");
+    expect(helpRoute).toContain("app.get('/help/:track'");
+    expect(helpRoute).not.toContain('help.html');
   });
 });
 
@@ -401,7 +402,7 @@ describe('FD-05 progress page routing (Deliverable 4)', () => {
   it('serves progress.html at /progress instead of the interim /work redirect', () => {
     const source = readRepoFile('presence/displays/presence-studio/front-desk-pages.ts');
     const progressStart = source.indexOf("app.get('/progress'");
-    const helpStart = source.indexOf("app.get('/help'");
+    const helpStart = source.indexOf('const toConciergeHelp');
     expect(progressStart).toBeGreaterThan(-1);
     expect(source.slice(progressStart, helpStart)).toContain("'progress.html'");
     expect(source.slice(progressStart, helpStart)).not.toContain('res.redirect');
@@ -436,7 +437,7 @@ describe('FD-02 home page routing (Deliverable 3)', () => {
 });
 
 describe('static rail mount (Deliverable 3)', () => {
-  it('mounts the rail in home.html as current "home", and in index.html / help.html as expected', () => {
+  it('mounts the rail in home.html as current "home", and in index.html as expected', () => {
     const homeHtml = readRepoFile('presence/displays/presence-studio/static/home.html');
     expect(homeHtml).toContain('id="front-desk-rail"');
     expect(homeHtml).not.toContain('front-desk-rail.css');
@@ -453,14 +454,6 @@ describe('static rail mount (Deliverable 3)', () => {
     // FD-02: index.html moved from `/` to `/work` — nothing renders as
     // "current" there anymore (home.html owns the "home" rail item).
     expect(indexHtml).toContain('current: null');
-
-    // FD-08: /help is not one of the 5 rail items either — like /work,
-    // nothing renders as "current" there.
-    const helpHtml = readRepoFile('presence/displays/presence-studio/static/help.html');
-    expect(helpHtml).toContain('id="front-desk-rail"');
-    expect(helpHtml).not.toContain('front-desk-rail.css');
-    expect(helpHtml).toContain('front-desk-rail.js');
-    expect(helpHtml).toContain('current: null');
   });
 
   it('never opens a rail link in a new tab and never hardcodes the loopback host', () => {
@@ -779,49 +772,8 @@ describe('front-desk-routes.ts route wiring (FD-03 Deliverable 1)', () => {
   });
 });
 
-describe('FD-08 help page static contract', () => {
-  it('mounts the rail in help.html as current null and links to /ask, decide, and /progress', () => {
-    const helpHtml = readRepoFile('presence/displays/presence-studio/static/help.html');
-    expect(helpHtml).toContain('id="front-desk-rail"');
-    expect(helpHtml).not.toContain('front-desk-rail.css');
-    expect(helpHtml).toContain('front-desk-rail.js');
-    expect(helpHtml).toContain('current: null');
-    expect(helpHtml).toContain('id="help-ask-link"');
-    expect(helpHtml).toContain('id="help-decide-link"');
-    expect(helpHtml).toContain('id="help-progress-link"');
-  });
-
-  it('fills every link and sentence from GET /api/front-desk/nav, never a hardcoded port', () => {
-    const helpJs = readRepoFile('presence/displays/presence-studio/static/help.js');
-    expect(helpJs).toContain("fetch('/api/front-desk/nav?locale=");
-    expect(helpJs).not.toContain('127.0.0.1');
-    expect(helpJs).not.toContain('target=');
-  });
-
-  it('help.html/help.js never use target="_blank", emoji, 127.0.0.1, or internal vocabulary', () => {
-    const helpHtml = readRepoFile('presence/displays/presence-studio/static/help.html');
-    const helpJs = readRepoFile('presence/displays/presence-studio/static/help.js');
-    const combined = `${helpHtml}\n${helpJs}`;
-
-    expect(combined).not.toContain('target=');
-    expect(combined).not.toContain('127.0.0.1');
-    expect(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(combined)).toBe(false);
-
-    const forbiddenWords = [
-      'mission',
-      'ADF',
-      'actuator',
-      'pipeline',
-      'stimuli',
-      'A2UI',
-      'Presence Studio',
-      'ports',
-    ];
-    for (const word of forbiddenWords) {
-      expect(combined.toLowerCase()).not.toContain(word.toLowerCase());
-    }
-  });
-});
+// The FD-08 help page static contract moved with the page to Concierge
+// (presence/displays/concierge/test/help-page.test.ts).
 
 describe('FD-08 removed presence-studio dashboard panels', () => {
   it('drops the moved-to-control-plane panel ids and the developer A2UI sandbox from index.html', () => {
@@ -972,68 +924,13 @@ describe('HT-06 i18n gate: hearing canvas + training help vocabulary', () => {
     expect(askJs).toMatch(/locale=.*encodeURIComponent\(state\.locale\)/);
   });
 
-  it('help.html/help.js training block has no raw Japanese fixed copy and reads it from /api/help-vocabulary', () => {
-    const helpJs = readRepoFile('presence/displays/presence-studio/static/help.js');
-    for (const oldText of [
-      'トラックから選ぶ',
-      '開く',
-      '使い方の一覧に戻る',
-      'やってみる',
-      'できたこと:',
-      '未着手',
-      '進行中',
-      '完了',
-    ]) {
-      expect(helpJs).not.toContain(oldText);
-    }
-    expect(helpJs).toContain("fetch('/api/help-vocabulary?locale=");
-    expect(helpJs).toContain("vt(vocab, 'front_desk:training_choose_track')");
-    expect(helpJs).toContain("vt(vocab, 'front_desk:training_open')");
-    expect(helpJs).toContain("vt(vocab, 'front_desk:training_back')");
-    expect(helpJs).toContain("vt(vocab, 'front_desk:training_try')");
-    expect(helpJs).toContain("vt(vocab, 'front_desk:training_done_prefix')");
-    expect(helpJs).toContain('TRAINING_LEVEL_KEY');
-    expect(helpJs).toContain('TRAINING_STATUS_KEY');
-  });
-
-  it('extends the remote-safe allowlist to /api/help-vocabulary', () => {
-    const source = readRepoFile('presence/displays/presence-studio/security.ts');
-    expect(source).toContain("path === '/api/help-vocabulary'");
-  });
-
-  it('wires GET /api/help-vocabulary the same shape as /api/ask-vocabulary', () => {
-    const source = readRepoFile('presence/displays/presence-studio/front-desk-routes.ts');
-    expect(source).toContain("app.get('/api/help-vocabulary'");
-    const helpVocabStart = source.indexOf("app.get('/api/help-vocabulary'");
-    const helpVocabRoute = source.slice(helpVocabStart, helpVocabStart + 400);
-    expect(helpVocabRoute).toContain('HELP_VOCABULARY_KEYS');
-    expect(helpVocabRoute).toContain("res.setHeader('Cache-Control', 'no-store')");
-  });
-
-  it('HT-04/05 second pass: help.js marks a lesson done by posting complete, using the training_mark_done* keys and no raw copy', () => {
-    const helpJs = readRepoFile('presence/displays/presence-studio/static/help.js');
-
-    // `HELP_VOCABULARY_KEYS` is frozen for this wave, so the mark-done copy
-    // comes from a dedicated `/api/training/vocabulary` fetch instead.
-    expect(helpJs).toContain("fetch('/api/training/vocabulary?locale=");
-    expect(helpJs).toContain("fetch('/api/training/progress', {");
-    expect(helpJs).toContain("method: 'POST'");
-    expect(helpJs).toContain("status: 'complete'");
-    expect(helpJs).toContain('lesson_id: lessonId');
-    expect(helpJs).toContain("vt(vocab, 'front_desk:training_mark_done')");
-    expect(helpJs).toContain("vt(vocab, 'front_desk:training_mark_done_recorded')");
-    expect(helpJs).toContain("vt(vocab, 'front_desk:training_mark_done_failed')");
-
-    // No raw stand-in copy for the new button/notice text.
-    for (const oldText of ['できた', '記録しました', '記録できませんでした']) {
-      expect(helpJs).not.toContain(oldText);
-    }
-
-    // Same posture as every other page: no hardcoded ports, no target=,
-    // no emoji, no internal jargon leaking into the surface.
-    expect(helpJs).not.toContain('127.0.0.1');
-    expect(helpJs).not.toContain('target=');
-    expect(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(helpJs)).toBe(false);
+  it('no longer serves the help vocabulary (使い方 moved to Concierge)', () => {
+    expect(readRepoFile('presence/displays/presence-studio/security.ts')).not.toContain(
+      '/api/help-vocabulary'
+    );
+    expect(readRepoFile('presence/displays/presence-studio/front-desk-routes.ts')).not.toContain(
+      "app.get('/api/help-vocabulary'"
+    );
   });
 });
 

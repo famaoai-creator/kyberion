@@ -83,9 +83,8 @@ export function buildFrontDeskNavPayload(
     availableSurfaces: input.availableSurfaces,
   });
   const tr = (key: string) => t(key as VocabularyKey, undefined, locale);
-  // `FRONT_DESK_HELP_LINK.surface` is a fixed presence-studio literal today,
-  // but this stays a runtime string comparison (not a type narrowing) so it
-  // keeps working if that ever changes.
+  // 使い方 is served by Concierge itself today; this stays a runtime string
+  // comparison (not a type narrowing) so a future move still resolves.
   const helpExternal = (FRONT_DESK_HELP_LINK.surface as string) !== 'concierge';
   const helpHref = helpExternal
     ? (urls?.[FRONT_DESK_HELP_LINK.surface] ??

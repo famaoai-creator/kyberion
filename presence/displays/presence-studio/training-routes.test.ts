@@ -121,8 +121,10 @@ describe('training-routes.ts route wiring', () => {
     const { app, handlers } = createFakeApp();
     registerTrainingRoutes(app);
     expect(handlers.has('GET /api/training/catalog')).toBe(true);
-    expect(handlers.has('GET /api/training/progress')).toBe(true);
-    expect(handlers.has('POST /api/training/progress')).toBe(true);
+    // The viewer's own progress moved to Concierge `/api/training/me`.
+    expect(handlers.has('GET /api/training/progress')).toBe(false);
+    expect(handlers.has('POST /api/training/progress')).toBe(false);
+    expect(handlers.has('GET /api/training/vocabulary')).toBe(false);
     expect(handlers.has('GET /api/training/assignments')).toBe(true);
     expect(handlers.has('POST /api/training/assignments')).toBe(true);
   });
@@ -145,95 +147,6 @@ describe('GET /api/training/catalog', () => {
     const body = res.body as { ok: boolean; catalog: { tracks: unknown[] } };
     expect(body.ok).toBe(true);
     expect(body.catalog.tracks.length).toBeGreaterThan(0);
-  });
-});
-
-describe('POST /api/training/progress is localadmin-only', () => {
-  const { app, handlers } = createFakeApp();
-  registerTrainingRoutes(app);
-  const postProgress = handlers.get('POST /api/training/progress')!;
-  const originalToken = process.env.PRESENCE_STUDIO_TOKEN;
-
-  beforeEach(() => {
-    vi.mocked(resolveMemberByPrincipal).mockReset();
-  });
-
-  afterEach(() => {
-    if (originalToken === undefined) delete process.env.PRESENCE_STUDIO_TOKEN;
-    else process.env.PRESENCE_STUDIO_TOKEN = originalToken;
-    withExecutionContext('ecosystem_architect', () =>
-      safeRmSync(path.join(pathResolver.rootDir(), 'knowledge/personal/members', TEST_MEMBER_ID), {
-        recursive: true,
-        force: true,
-      })
-    );
-  });
-
-  it('rejects a remote token viewer (requirePresenceStudioLocalAdmin) with 403, never reaching the member/catalog write', () => {
-    const savedTenant = process.env.KYBERION_TENANT;
-    process.env.KYBERION_TENANT = 'zz-training-route-test';
-    process.env.PRESENCE_STUDIO_TOKEN = 'training-route-test-token';
-    vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
-
-    const res = fakeResponse();
-    postProgress(
-      fakeRequest({
-        remoteAddress: '198.51.100.24',
-        authorization: 'Bearer training-route-test-token',
-        body: { lesson_id: 'first-request', status: 'complete' },
-      }),
-      res
-    );
-
-    expect(res.statusCode).toBe(403);
-    expect(resolveMemberByPrincipal).not.toHaveBeenCalled();
-
-    if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
-    else process.env.KYBERION_TENANT = savedTenant;
-  });
-
-  it('writes progress for the server-resolved member on a loopback (localadmin) request', () => {
-    vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
-
-    const res = fakeResponse();
-    postProgress(
-      fakeRequest({
-        remoteAddress: '127.0.0.1',
-        body: { lesson_id: 'first-request', status: 'complete' },
-      }),
-      res
-    );
-
-    expect(res.statusCode).toBe(200);
-    const body = res.body as {
-      ok: boolean;
-      progress: { lessons: Record<string, { status: string; completed_at?: string }> };
-    };
-    expect(body.ok).toBe(true);
-    expect(body.progress.lessons['first-request']?.status).toBe('complete');
-    expect(body.progress.lessons['first-request']?.completed_at).toBeTruthy();
-
-    // Never keyed by a client-supplied member id — the write lands under the
-    // server-resolved TEST_MEMBER_ID's own progress file.
-    const persisted = withExecutionContext('ecosystem_architect', () =>
-      readTrainingProgress(TEST_MEMBER_ID)
-    );
-    expect(persisted.lessons['first-request']?.status).toBe('complete');
-  });
-
-  it('rejects an unknown lesson id or status', () => {
-    vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
-
-    const res = fakeResponse();
-    postProgress(
-      fakeRequest({
-        remoteAddress: '127.0.0.1',
-        body: { lesson_id: 'does-not-exist', status: 'complete' },
-      }),
-      res
-    );
-
-    expect(res.statusCode).toBe(400);
   });
 });
 
@@ -373,19 +286,5 @@ describe('GET /api/training/progress/overview is owner-only and tenant-narrowed'
     expect(memberSummary?.last_completed_at).toBe('2026-09-01T00:00:00.000Z');
     const ownerSummary = body.overview.find((item) => item.member_id === OVERVIEW_OWNER_ID);
     expect(ownerSummary?.lessons_done).toBe(0);
-  });
-});
-
-describe('GET /api/training/vocabulary', () => {
-  it('mirrors /api/help-vocabulary’s shape for the "mark done" copy help.js needs', () => {
-    const { app, handlers } = createFakeApp();
-    registerTrainingRoutes(app);
-    const res = fakeResponse();
-    handlers.get('GET /api/training/vocabulary')!(fakeRequest({ remoteAddress: '127.0.0.1' }), res);
-    const body = res.body as { ok: boolean; locale: string; texts: Record<string, string> };
-    expect(body.ok).toBe(true);
-    expect(body.texts['front_desk:training_mark_done']).toBeTruthy();
-    expect(body.texts['front_desk:training_mark_done_recorded']).toBeTruthy();
-    expect(body.texts['front_desk:training_mark_done_failed']).toBeTruthy();
   });
 });
