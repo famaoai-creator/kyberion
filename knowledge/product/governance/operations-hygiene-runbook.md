@@ -3125,8 +3125,10 @@ the failed and affected suites against the frozen generation before claiming com
 Validate narrowing declarations against the schema before evaluating them: reject unknown
 keys, empty reasons and malformed matchers rather than treating them as absent declarations.
 An explicitly selected role must refuse resource I/O when its policy is unavailable or
-corrupt. Preserve the documented role-less bootstrap behavior. Resolve one lazy policy
-snapshot per I/O decision so narrowing and base permissions cannot observe different policy
+corrupt. Preserve the documented role-less bootstrap behavior.
+Fixtures exercising role-bound I/O must seed the canonical security policy alongside
+the agent policy; an absent policy must never be worked around by weakening the guard.
+Resolve one lazy policy snapshot per I/O decision so narrowing and base permissions cannot observe different policy
 generations. Structural mkdir checks must use that same snapshot.
 
 Custody fixtures must override the scope's actual fields, including forbidden tenant,
