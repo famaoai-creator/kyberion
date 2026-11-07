@@ -6,21 +6,24 @@
  * OBS, so callers do not need an OS-specific branch or a vendor-specific API.
  */
 
-import { registerCameraOutputBridge } from './camera-output-bridge.js';
+import { registerCameraOutputBridge } from '@agent/core/camera-output-bridge';
 import type {
   AvatarOutputRequest,
   AvatarOutputResult,
   CameraOutputBridge,
   CameraOutputCapabilities,
   CameraOutputProbe,
-} from './camera-output-bridge.js';
+} from '@agent/core/camera-output-bridge';
 import {
   createVirtualCameraInjectionBridge,
   type VirtualCameraInjectionBridge,
-} from './virtual/virtual-camera-injection-bridge.js';
-import { safeExec } from './secure-io.js';
-import { VideoDeviceLeaseManager, type VideoDeviceLease } from './video/video-device-lease.js';
-import type { VideoRouteHealth, VideoRouteMetrics } from './video/video-route.js';
+} from '@agent/core/virtual/virtual-camera-injection-bridge';
+import { safeExec } from '@agent/core/secure-io';
+import {
+  VideoDeviceLeaseManager,
+  type VideoDeviceLease,
+} from '@agent/core/video/video-device-lease';
+import type { VideoRouteHealth, VideoRouteMetrics } from '@agent/core/video/video-route';
 
 export const V4L2_VIRTUAL_CAMERA_BRIDGE_ID = 'v4l2-virtual-cam' as const;
 

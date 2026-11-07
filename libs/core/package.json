@@ -6732,10 +6732,6 @@
       "types": "./dist/ux-vocabulary.d.ts",
       "default": "./dist/ux-vocabulary.js"
     },
-    "./v4l2-virtual-camera-output": {
-      "types": "./dist/v4l2-virtual-camera-output.d.ts",
-      "default": "./dist/v4l2-virtual-camera-output.js"
-    },
     "./vad-registry": {
       "types": "./dist/voice/vad-registry.d.ts",
       "default": "./dist/voice/vad-registry.js"

@@ -3,10 +3,10 @@ import {
   V4L2_VIRTUAL_CAMERA_BRIDGE_ID,
   V4l2VirtualCameraOutputBridge,
 } from './v4l2-virtual-camera-output.js';
-import type { VirtualCameraInjectionBridge } from './virtual/virtual-camera-injection-bridge.js';
-import { safeRmSync } from './secure-io.js';
-import * as pathResolver from './path-resolver.js';
-import { VideoDeviceLeaseManager } from './video/video-device-lease.js';
+import type { VirtualCameraInjectionBridge } from '@agent/core/virtual/virtual-camera-injection-bridge';
+import { safeRmSync } from '@agent/core/secure-io';
+import * as pathResolver from '@agent/core/path-resolver';
+import { VideoDeviceLeaseManager } from '@agent/core/video/video-device-lease';
 
 const leaseDir = pathResolver.sharedTmp('v4l2-virtual-camera-output-tests');
 
