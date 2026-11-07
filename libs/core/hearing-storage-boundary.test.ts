@@ -45,7 +45,7 @@ const ROOT = path.join(SOURCE_ROOT, 'active/shared/tmp/hearing-boundary-' + proc
 let withExecutionContext = initialContext;
 let { safeReadFile, safeRmSync, safeWriteFile, safeSymlinkSync, safeLinkExclusiveSync } = initialIO;
 let guard: typeof import('./tier-guard.js');
-let retention: typeof import('./storage-retention-catalog.js');
+let retention: typeof import('./storage/storage-retention-catalog.js');
 const savedRoot = process.env.KYBERION_ROOT;
 
 // A fresh root preserves the real logical tier paths. The ordinary Vitest
@@ -77,7 +77,7 @@ beforeAll(async () => {
     await import('./secure-io.js'));
   ({ withExecutionContext } = await import('./authority.js'));
   guard = await import('./tier-guard.js');
-  retention = await import('./storage-retention-catalog.js');
+  retention = await import('./storage/storage-retention-catalog.js');
   expect((await import('./path-resolver.js')).rootDir()).toBe(ROOT);
 }, 30_000);
 
@@ -209,7 +209,7 @@ describe('durable hearing storage uses real secureIO tier and tenant boundaries'
       );
     }));
 
-  it('fails closed for missing policy only on protected hearing state', () =>
+  it('fails closed for missing policy on protected and bootstrap state under an explicit role', () =>
     privileged(() => {
       policyState.missing = true;
       for (const file of [session(), personal]) {
@@ -220,7 +220,29 @@ describe('durable hearing storage uses real secureIO tier and tenant boundaries'
         );
         expect(() => safeWriteFile(file, 'replace')).toThrow(/security-policy.json is missing/);
       }
-      // Existing bootstrap semantics, including metrics, remain unchanged.
+      // An explicit role cannot bypass its missing policy through legacy bootstrap paths.
+      for (const relative of [
+        'knowledge/personal/bootstrap.md',
+        'active/shared/runtime/usage-ledger/personal/shared/bootstrap.json',
+        'active/shared/runtime/execution-metrics/confidential/acme/bootstrap.json',
+      ]) {
+        const file = path.join(ROOT, relative);
+        expect(guard.validateReadPermission(file).allowed).toBe(false);
+        expect(guard.validateWritePermission(file).allowed).toBe(false);
+        expect(guard.validateReadPermission(file).reason).toContain(
+          'ROLE_NARROWING_POLICY_UNAVAILABLE'
+        );
+      }
+      policyState.missing = false;
+    }));
+
+  it('preserves role-less missing-policy bootstrap while denying protected hearing state', () => {
+    policyState.missing = true;
+    try {
+      for (const file of [session(), personal]) {
+        expect(guard.validateReadPermission(file).allowed).toBe(false);
+        expect(guard.validateWritePermission(file).allowed).toBe(false);
+      }
       for (const relative of [
         'knowledge/personal/bootstrap.md',
         'active/shared/runtime/usage-ledger/personal/shared/bootstrap.json',
@@ -230,8 +252,10 @@ describe('durable hearing storage uses real secureIO tier and tenant boundaries'
         expect(guard.validateReadPermission(file).allowed).toBe(true);
         expect(guard.validateWritePermission(file).allowed).toBe(true);
       }
+    } finally {
       policyState.missing = false;
-    }));
+    }
+  });
 
   it.each(['empty', 'missing_hearing_prefixes', 'shadowed_hearing', 'shared_hearing'] as const)(
     'fails closed before hearing access for a loaded but invalid %s policy declaration',
@@ -243,10 +267,10 @@ describe('durable hearing storage uses real secureIO tier and tenant boundaries'
             expect(guard.validateReadPermission(file).allowed).toBe(false);
             expect(guard.validateWritePermission(file).allowed).toBe(false);
             expect(() => safeReadFile(file, { encoding: 'utf8' })).toThrow(
-              /hearing.policy_declaration_invalid/
+              mode === 'empty' ? /ROLE_NARROWING_INVALID/ : /hearing.policy_declaration_invalid/
             );
             expect(() => safeWriteFile(file, 'must not replace')).toThrow(
-              /hearing.policy_declaration_invalid/
+              mode === 'empty' ? /ROLE_NARROWING_INVALID/ : /hearing.policy_declaration_invalid/
             );
           }
           if (mode === 'missing_hearing_prefixes') {
@@ -271,8 +295,10 @@ describe('durable hearing storage uses real secureIO tier and tenant boundaries'
       for (const file of [session(), personal]) {
         expect(guard.validateReadPermission(file).allowed).toBe(false);
         expect(guard.validateWritePermission(file).allowed).toBe(false);
-        expect(() => safeReadFile(file, { encoding: 'utf8' })).toThrow(/cannot be parsed/);
-        expect(() => safeWriteFile(file, 'replace')).toThrow(/cannot be parsed/);
+        expect(() => safeReadFile(file, { encoding: 'utf8' })).toThrow(
+          /ROLE_NARROWING_POLICY_UNAVAILABLE/
+        );
+        expect(() => safeWriteFile(file, 'replace')).toThrow(/ROLE_NARROWING_POLICY_UNAVAILABLE/);
       }
       policyState.corrupt = false;
     }));
@@ -307,7 +333,7 @@ describe('durable hearing storage uses real secureIO tier and tenant boundaries'
   });
 
   it('keeps durable hearing receipts out of automatic tenant offboarding targets', async () => {
-    const { collectScopeTargets } = await import('./scope-offboarding.js');
+    const { collectScopeTargets } = await import('./storage/scope-offboarding.js');
     privileged(() => {
       const targets = collectScopeTargets('tenant', TENANT);
       expect(

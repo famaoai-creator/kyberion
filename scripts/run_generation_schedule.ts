@@ -22,7 +22,7 @@ import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harn
  *
  * The CLI now owns only argument handling and `register`; `list`/`tick`
  * delegate to the single governed implementation in
- * `libs/core/generation-scheduler.ts`, which holds the leader lease, the
+ * `libs/core/daemon/generation-scheduler.ts`, which holds the leader lease, the
  * TriggerRunner idempotency gate, and the `generation_scheduler` authority.
  */
 export async function runGenerationScheduleAction(argv: {

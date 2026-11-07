@@ -1,5 +1,5 @@
 import { buildExecutionEnv } from '../authority.js';
-import { tryResolveOwnerScope } from '../owner-scope.js';
+import { tryResolveOwnerScope } from '../governance/owner-scope.js';
 import { safeExistsSync } from '../secure-io.js';
 import { logger } from '../core.js';
 import { ensureMissionTeamRuntimeViaSupervisor } from '../agent/agent-runtime-supervisor.js';
@@ -20,14 +20,14 @@ import {
   prepareArtifactReviewTask,
   resolveReviewTargetForTask,
 } from './mission-orchestration-artifact-review.js';
-import { deriveExecutionGraph, executeGraph, type GraphNode } from '../graph-scheduler.js';
+import { deriveExecutionGraph, executeGraph, type GraphNode } from '../pipeline/graph-scheduler.js';
 import {
   buildMissionGraphInputs,
   collectMissionGraphHandoffs,
   type MissionGraphHandoff,
 } from './mission-graph-handoff.js';
 import { openOrCreateMissionGraphRunJournal } from './mission-graph-run-journal.js';
-import { ledger } from '../ledger.js';
+import { ledger } from '../governance/ledger.js';
 import { TraceContext } from '../analysis/trace.js';
 import type { PlannedNextTask, TaskResultBlock } from './mission-orchestration-worker-contracts.js';
 import type { DispatchMissionTaskOutcome } from './mission-orchestration-worker.js';

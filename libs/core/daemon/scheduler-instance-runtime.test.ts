@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
-import { recordDaemonHeartbeat, readDaemonHeartbeat } from '../daemon-heartbeat.js';
+import { recordDaemonHeartbeat, readDaemonHeartbeat } from './daemon-heartbeat.js';
 import {
   registerScheduledPipeline,
   loadScheduleRegistry,

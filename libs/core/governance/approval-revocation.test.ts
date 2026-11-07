@@ -11,8 +11,8 @@ vi.mock('../organization/member-registry.js', async (importOriginal) => {
         : null,
   };
 });
-vi.mock('../stance-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../stance-resolver.js')>();
+vi.mock('../authn/stance-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../authn/stance-resolver.js')>();
   const { customerRootWithSodOverlay } = await import('./__tests__/sod-overlay-state.js');
   return { ...actual, stanceRoot: customerRootWithSodOverlay(actual.stanceRoot) };
 });

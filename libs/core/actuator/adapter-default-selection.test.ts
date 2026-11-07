@@ -9,7 +9,7 @@ import { AdapterDefaultPreferences } from './adapter-default-preferences.js';
 const PROFILE_ROOT = pathResolver.sharedTmp('adapter-default-selection-tests/profile');
 const PORTABLE_EMAIL_BACKEND = process.platform === 'darwin' ? 'mac_mailapp' : 'smtp';
 
-vi.mock('../profile-root.js', () => ({
+vi.mock('../authn/profile-root.js', () => ({
   resolveActiveProfileRoot: () => PROFILE_ROOT,
 }));
 

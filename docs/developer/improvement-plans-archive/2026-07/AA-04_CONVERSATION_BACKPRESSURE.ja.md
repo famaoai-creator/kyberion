@@ -45,7 +45,7 @@ status: archived
 
 1. supervisor daemon の `handleRequest` に admission を追加: 全体上限(既定 8)と agent 単位上限(既定 2)を超える `ask` は `{ok:false, error:{type:'busy', retry_after_ms}}` で即応答。上限は env/設定で調整可能。
 2. `a2aBridge.route` は busy 応答を `AgentBusyError` に変換。`withRetry` を使う呼び出し元(agent-actuator)が busy を retryable として扱うことを確認。mission worker(MO-03 の並列ディスパッチャ)は busy 時に該当 agent のキューを一時停止する。
-3. in-process フォールバック経路にも同じセマフォ(`libs/core/semaphore.ts` が既存)を適用。
+3. in-process フォールバック経路にも同じセマフォ(`libs/core/foundation/semaphore.ts` が既存)を適用。
 4. テスト: 上限超過で即拒否、解放後に通ること、agent 単位と全体上限の独立性。
 
 ### Task 4: 観測 — `claude-haiku`

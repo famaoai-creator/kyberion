@@ -6,7 +6,7 @@
   "review_task_id": "self_review-code-review",
   "review_target_task_id": "execution-implement",
   "artifact": {
-    "path": "libs/core/customer-conversation.ts",
+    "path": "libs/core/organization/customer-conversation.ts",
     "sha256": "cc5b098c530813e2fdf23dede20839bee101dedcc293364f31d0b6c89af1a447",
     "kind": "code"
   },
@@ -29,7 +29,7 @@
       "severity": "suggestion",
       "category": "api-design",
       "description": "An inactive CustomerAudienceFloor composes to allow-all; only sendToCustomer gates on floor.active. Future callers must check active before enforcement.",
-      "location": "libs/core/customer-conversation.ts"
+      "location": "libs/core/organization/customer-conversation.ts"
     }
   ],
   "acceptance_criteria": ["must_fix 指摘が解消済み"],

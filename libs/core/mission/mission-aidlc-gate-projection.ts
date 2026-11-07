@@ -8,10 +8,10 @@ import {
   saveAiDlcPhaseState,
   type AiDlcGateReceipt,
   type AiDlcPhaseState,
-} from '../aidlc-phase-state.js';
+} from './aidlc-phase-state.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from '../secure-io.js';
-import { frameUntrustedInput } from '../untrusted-input-framing.js';
+import { frameUntrustedInput } from '../governance/untrusted-input-framing.js';
 import {
   existingMissionPath,
   loadMissionGateRecordAtPath,

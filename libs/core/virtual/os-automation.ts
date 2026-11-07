@@ -2,7 +2,7 @@ import {
   createMouseOperationExecutor,
   resolveOsAutomationPlatform,
 } from './os-automation-platform.js';
-import type { FocusedInputState } from '../apple-event-bridge.js';
+import type { FocusedInputState } from './apple-event-bridge.js';
 
 const platform = resolveOsAutomationPlatform();
 

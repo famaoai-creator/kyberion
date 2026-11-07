@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { agentActor } from '../actor.js';
+import { agentActor } from '../contracts/actor.js';
 
 vi.mock('./approval-policy.js', () => ({ resolveApprovalPolicy: vi.fn() }));
-vi.mock('../decision-rights.js', () => ({
+vi.mock('../organization/decision-rights.js', () => ({
   resolveDecisionRightsMatrix: vi.fn(() => null),
   evaluateDecisionRights: vi.fn(() => null),
 }));
-import { evaluateDecisionRights } from '../decision-rights.js';
+import { evaluateDecisionRights } from '../organization/decision-rights.js';
 vi.mock('./approval-store.js', async (importOriginal) => ({
   isApprovalRequestExpired: (await importOriginal<typeof import('./approval-store.js')>())
     .isApprovalRequestExpired,

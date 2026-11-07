@@ -48,18 +48,18 @@ viewer scope / provenance taint / Charter `information_flow` の上に意味づ�
 
 ## 現状の調査結果
 
-| ID    | 確認した事実                                                                                                                                                                                                                                        | 帰結                                                                                            |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| AS-01 | 包含チェーン `tenant_slug → organization_id → project_id → mission_id → task_id → session`（`libs/core/entity-scope.ts`）。テナントが頂点で、システムと個人はこの中に無い。                                                                         | 管理スコープの「テナント配下」はこれをそのまま使える。                                          |
-| AS-02 | 保存区画は `system/` か `<tier>/<tenant\|shared>/`（`libs/core/storage-layout.ts`）。`system` は「テナントや個人のデータを持たない」と定義されている。                                                                                              | 区画は管理スコープの物理表現としてすでに 3 系統（system / tenant / personal）に分かれている。   |
-| AS-03 | イベントと ledger は `scope_kind: system` でテナント無しの記録を表す（`entity-scope-hierarchy.md`）。`public` / `shared` を擬似テナントにしない。                                                                                                   | システムの管理は記録の上ではすでに概念として存在する。                                          |
-| AS-04 | tier は機密度の軸で、`RESERVED_SCOPE_NAMES` によりテナント名に使えない。`personal` は `knowledge/personal/` という置き場所も兼ねる。                                                                                                                | tier が「機密度」と「個人の管理下」の二役を持っている（SM-06 の原因）。                         |
-| AS-05 | Viewer Scope（`ViewerContext` → `SurfaceAuthorizationContext`）はサーバー側で決まり、クライアントの値は狭めるだけ。`includeUntenanted` で全社 viewer がテナント無しの項目を見る。                                                                   | 開示スコープの「内部の閲覧者」はこれで表せる。判定は共通化が必要（SM-05）。                     |
-| AS-06 | `provider-egress-policy.json` はインストール全体に効く（`training_use: none` 宣言、`approved_providers` 例外）が、公開の同梱ファイルなので全プロバイダが `unknown` で出荷される。テナントの証明は `provider_attestations`（TTL 180 日、承認つき）。 | 処理者への開示の証明は、テナント単位しか実体が無い。                                            |
-| AS-07 | Charter `information_flow` は **processor（処理者）** と **recipient（受領者）** を区別し、purpose・categories・attachment_count を持つ（AI_USE_CHARTER_PLAN）。推論の許可を最終送信の許可に転用しない。                                            | 開示先の分類はすでに部分的に存在する。                                                          |
-| AS-08 | provenance taint（`libs/core/provenance-taint.ts`）は mission 単位で観測の最高 tier・関係テナント・`prohibitExternal` を集め、`combineProvenanceTaint` で厳しい方に寄せる。`requestDeclassify`（SC-06）は hash に束縛した承認つきの引き下げ。       | 「派生物は厳しい方を引き継ぎ、広げるのは承認だけ」という加工の規則は mission 単位では実装済み。 |
-| AS-09 | 来歴は `ingest-asset-ledger.ts`、`knowledge/memory-provenance.ts`、`resource-provenance.ts` に分散している。派生物の削除は来歴をたどらず、保持期間カタログと退会時の対象リストで行う。                                                              | 削除が派生関係を使っていない（SM-03, SM-04）。                                                  |
-| AS-10 | 権限は Authority Role、作業項目の担当権（claim）、タスク契約の書き込み範囲、Scope Envelope（狭めるだけ）、各種 grant で判定済み。                                                                                                                   | 編集・実行は新しく作らず、既存の権限レイヤーに置く。                                            |
+| ID    | 確認した事実                                                                                                                                                                                                                                             | 帰結                                                                                            |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| AS-01 | 包含チェーン `tenant_slug → organization_id → project_id → mission_id → task_id → session`（`libs/core/entity-scope.ts`）。テナントが頂点で、システムと個人はこの中に無い。                                                                              | 管理スコープの「テナント配下」はこれをそのまま使える。                                          |
+| AS-02 | 保存区画は `system/` か `<tier>/<tenant\|shared>/`（`libs/core/storage-layout.ts`）。`system` は「テナントや個人のデータを持たない」と定義されている。                                                                                                   | 区画は管理スコープの物理表現としてすでに 3 系統（system / tenant / personal）に分かれている。   |
+| AS-03 | イベントと ledger は `scope_kind: system` でテナント無しの記録を表す（`entity-scope-hierarchy.md`）。`public` / `shared` を擬似テナントにしない。                                                                                                        | システムの管理は記録の上ではすでに概念として存在する。                                          |
+| AS-04 | tier は機密度の軸で、`RESERVED_SCOPE_NAMES` によりテナント名に使えない。`personal` は `knowledge/personal/` という置き場所も兼ねる。                                                                                                                     | tier が「機密度」と「個人の管理下」の二役を持っている（SM-06 の原因）。                         |
+| AS-05 | Viewer Scope（`ViewerContext` → `SurfaceAuthorizationContext`）はサーバー側で決まり、クライアントの値は狭めるだけ。`includeUntenanted` で全社 viewer がテナント無しの項目を見る。                                                                        | 開示スコープの「内部の閲覧者」はこれで表せる。判定は共通化が必要（SM-05）。                     |
+| AS-06 | `provider-egress-policy.json` はインストール全体に効く（`training_use: none` 宣言、`approved_providers` 例外）が、公開の同梱ファイルなので全プロバイダが `unknown` で出荷される。テナントの証明は `provider_attestations`（TTL 180 日、承認つき）。      | 処理者への開示の証明は、テナント単位しか実体が無い。                                            |
+| AS-07 | Charter `information_flow` は **processor（処理者）** と **recipient（受領者）** を区別し、purpose・categories・attachment_count を持つ（AI_USE_CHARTER_PLAN）。推論の許可を最終送信の許可に転用しない。                                                 | 開示先の分類はすでに部分的に存在する。                                                          |
+| AS-08 | provenance taint（`libs/core/governance/provenance-taint.ts`）は mission 単位で観測の最高 tier・関係テナント・`prohibitExternal` を集め、`combineProvenanceTaint` で厳しい方に寄せる。`requestDeclassify`（SC-06）は hash に束縛した承認つきの引き下げ。 | 「派生物は厳しい方を引き継ぎ、広げるのは承認だけ」という加工の規則は mission 単位では実装済み。 |
+| AS-09 | 来歴は `ingest-asset-ledger.ts`、`knowledge/memory-provenance.ts`、`resource-provenance.ts` に分散している。派生物の削除は来歴をたどらず、保持期間カタログと退会時の対象リストで行う。                                                                   | 削除が派生関係を使っていない（SM-03, SM-04）。                                                  |
+| AS-10 | 権限は Authority Role、作業項目の担当権（claim）、タスク契約の書き込み範囲、Scope Envelope（狭めるだけ）、各種 grant で判定済み。                                                                                                                        | 編集・実行は新しく作らず、既存の権限レイヤーに置く。                                            |
 
 ## モデル
 
@@ -194,7 +194,7 @@ Work Visibility Scope、Binding Scope）はそのまま残る。このモデル�
 
 **P3 の実施（MSN-SCOPE-P3-20261107）。**
 
-- `libs/core/asset-derivation.ts` に派生関係を実装した。参照形式は一つ:
+- `libs/core/information-assets/asset-derivation.ts` に派生関係を実装した。参照形式は一つ:
   `asset:{tenant}:{id}@v{n}`（ingest 台帳の資産）と `path:{repo-relative}`
   （任意の資産パス）。memory provenance の記録は `memoryProvenanceRefs`
   で `path:` 参照に写像してつなぐ（内容ハッシュ・`external:` の origin
@@ -262,7 +262,7 @@ Work Visibility Scope、Binding Scope）はそのまま残る。このモデル�
   削除が見えなくならない）。保持期間側への接続口は
   `listDerivedPathsForCustodian` / `listDerivedRecordsForCustodian`
   （janitor 配線は後続段階）。
-- 受入 fixture テスト `libs/core/asset-derivation.test.ts`（19件）+
+- 受入 fixture テスト `libs/core/information-assets/asset-derivation.test.ts`（初期19件、レビュー修正で拡張）+
   `scope-offboarding.test.ts`（退会収集・外部着地点拒否）:
   資産→要約→蒸留（多段）・キャッシュ・委譲結果を記録し、資産削除で
   全て消えることを確認。加えて低 tier 区画への記録拒否・malformed
@@ -327,6 +327,25 @@ Work Visibility Scope、Binding Scope）はそのまま残る。このモデル�
 
 各段階は独立した PR とし、P1 から始める。P1 はガバナンスの中核を変えるので、
 独立レビューを必須とする。
+
+### P3 レビューによる信頼境界の補強（2026-11-08）
+
+上記の区画束縛だけでは、正しい源泉と無関係な system ファイルを組み合わせた
+偽造を拒否できない。custodian 台帳は索引として扱い、登録済みの同じ
+asset-derivations ストアの system 区画に、信頼する producer が源泉と出力の
+パス・内容ハッシュを結んだ発行証跡を先に記録する。生の証跡へのアクセスは
+mission_controller・knowledge_steward・chronos_gateway に制限する。通常の退会
+確認は対象テナントの台帳に対する通常権限を先に確認し、共通の同期読取 grant
+で証跡を読み取る。grant は正規の証跡ファイルの読取だけに限定し、計画処理に
+移る前に失効する。呼出者には対象テナントの派生パスだけを返し、証跡の生データや
+別テナントの台帳は開示しない。要求自体の resource ceiling は拡張しない。
+索引の行だけでは削除を認可しない。既存の未証明行や壊れた追跡情報があれば、
+退会は正常完了とせず、確認と再発行を必要とする。
+
+退会対象は信頼する多段階の閉包で求める。古いパス単位の削除監査では、
+現在存在するファイルを除外しない。収集時の inode・metadata・内容を export と
+削除の直前に再照合し、不一致なら停止して追跡台帳を残す。協調ロックは任意の
+外部プロセスによる置換を原子的に防ぐものではない。
 
 ## 非目標
 

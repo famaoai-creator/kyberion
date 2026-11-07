@@ -3,9 +3,9 @@ import * as path from 'node:path';
 import { logger } from '../core.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
-import { fileEndsWithNewline, readJsonLinesSince } from '../jsonl-read.js';
-import { maintainStoreAfterAppend } from '../append-only-store.js';
-import { parkedCompactionCopies } from '../jsonl-parked-read.js';
+import { fileEndsWithNewline, readJsonLinesSince } from '../storage/jsonl-read.js';
+import { maintainStoreAfterAppend } from '../storage/append-only-store.js';
+import { parkedCompactionCopies } from '../storage/jsonl-parked-read.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
 
 /**

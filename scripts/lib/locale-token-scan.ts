@@ -77,7 +77,7 @@ const MATCHER_METHODS = new Set(['test', 'exec', 'match', 'matchAll', 'search'])
  *  - generated vocabulary output.
  */
 const LOCALE_RULE_ALLOWLIST: RegExp[] = [
-  /^libs\/core\/locale[^/]*\.ts$/u,
+  /^libs\/core\/localization\/locale[^/]*\.ts$/u,
   /^libs\/core\/foundation\/locale[^/]*\.ts$/u,
   /^libs\/core\/knowledge\/vocabulary-keys\.generated\.ts$/u,
   // this scanner names the tags it forbids

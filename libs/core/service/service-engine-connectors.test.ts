@@ -33,7 +33,7 @@ vi.mock('../index.js', async () => {
   };
 });
 
-vi.mock('../async-utils.js', () => ({
+vi.mock('../pipeline/async-utils.js', () => ({
   retry: mocks.retry,
 }));
 
@@ -52,7 +52,7 @@ vi.mock('../secure-io.js', async () => {
   return { ...actual, safeExec: mocks.safeExec };
 });
 
-vi.mock('../stance-resolver.js', () => ({
+vi.mock('../authn/stance-resolver.js', () => ({
   resolveOverlay: mocks.resolveOverlay,
 }));
 
@@ -385,7 +385,7 @@ describe('DA-02 extraction connector presets (real catalog contract)', () => {
   describe('egress gate coverage for the new HTTP connectors', () => {
     it('routes every box/slack read op host through an allowlisted egress domain', async () => {
       const { evaluateEgressPolicy, _resetEgressPolicyCacheForTests } = (await vi.importActual(
-        '../egress-policy.js'
+        '../governance/egress-policy.js'
       )) as any;
       _resetEgressPolicyCacheForTests();
 

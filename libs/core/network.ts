@@ -8,10 +8,10 @@ import {
   evaluateEgressPolicy,
   resolveEgressPayloadContext,
   type EgressPayloadContext,
-} from './egress-policy.js';
+} from './governance/egress-policy.js';
 import { auditChain } from './governance/audit-chain.js';
 import { recordGovernanceAction } from './governance/governance-action-recorder.js';
-import { assertOperationPolicy } from './operation-policy-gate.js';
+import { assertOperationPolicy } from './governance/operation-policy-gate.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { isRecord } from './foundation/text.js';
 

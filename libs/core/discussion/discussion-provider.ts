@@ -8,7 +8,7 @@ import {
   assertReasoningEgressAllowed,
   withReasoningPayloadScope,
 } from '../reasoning/reasoning-egress-scope.js';
-import { frameUntrustedInput } from '../untrusted-input-framing.js';
+import { frameUntrustedInput } from '../governance/untrusted-input-framing.js';
 import {
   appendDiscussionEvent,
   claimDiscussionProviderExecution,

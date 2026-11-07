@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ContextSecurityScope } from '../context-security-scope.js';
+import type { ContextSecurityScope } from '../governance/context-security-scope.js';
 import { ConfidentialTaskDecisionValues } from '../customer-decision/task-decision-values.js';
 
 // CD-09 tier gate (human decision 2026-10-25): a resumed task's confirmed

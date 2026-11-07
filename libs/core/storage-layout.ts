@@ -196,12 +196,12 @@ export function protectedStorageFloorPrefixes(): string[] {
 
 /**
  * Tier/tenant-partitioned runtime ledgers (state purpose, runtime-storage-layout):
- * `<root>/<tier>/<tenant|shared>/<file>.jsonl`, written by `libs/core/metrics.ts`.
+ * `<root>/<tier>/<tenant|shared>/<file>.jsonl`, written by `libs/core/analysis/metrics.ts`.
  * Their personal/confidential subtrees are tenant_scope protected prefixes in
  * security-policy.json; tier-guard gives reads of them the tenant check plus the
  * persona read rules of `knowledge/<tier>/`, and tenant offboarding purges them.
  *
- * Hash-chained tenant partitions of the hybrid ledger (`libs/core/ledger.ts`):
+ * Hash-chained tenant partitions of the hybrid ledger (`libs/core/governance/ledger.ts`):
  * `<personal|confidential>/<tenant>/ledger.jsonl`, written and verified as `tenant_ledger_store`.
  * Tenant records and tenant mission metadata never reach the system ledger.
  *
@@ -241,24 +241,12 @@ export const TENANT_STORE_LEDGER_ROOTS = {
     root: PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations,
     storeRole: 'delegation_record_store',
   },
-  asset_derivations: {
-    root: PARTITIONED_RUNTIME_LEDGER_ROOTS.asset_derivations,
-    storeRole: 'asset_derivation_store',
-    /**
-     * The derivation lineage ledgers partition as `confidential/<tenant>`,
-     * `personal/<member-ref>` and `system/` — the `system/` segment is a
-     * store partition of this root only (reported with tier 'system' and an
-     * empty tenant), so ambient runtime writers cannot append to it. Other
-     * roots' `system/` segments keep the ordinary rules.
-     */
-    systemPartition: true,
-  },
 } as const;
 
 export interface TenantStoreLedgerPartition {
   root: string;
   storeRole: string;
-  tier: StorageDataTier | 'system';
+  tier: StorageDataTier;
   /** Empty for the bare tier directory itself (`<root>/<tier>`). */
   tenant: string;
 }
@@ -273,14 +261,11 @@ export function tenantStoreLedgerPartitionOf(
   filePath: string
 ): TenantStoreLedgerPartition | undefined {
   const relative = toPosixRelative(filePath);
-  for (const { root, storeRole, ...extra } of Object.values(TENANT_STORE_LEDGER_ROOTS)) {
+  for (const { root, storeRole } of Object.values(TENANT_STORE_LEDGER_ROOTS)) {
     if (!relative.startsWith(root + '/')) continue;
     const [tier, tenant = ''] = relative.slice(root.length + 1).split('/');
     if (STORAGE_DATA_TIERS.includes(tier as StorageDataTier)) {
       return { root, storeRole, tier: tier as StorageDataTier, tenant };
-    }
-    if (tier === 'system' && 'systemPartition' in extra && extra.systemPartition) {
-      return { root, storeRole, tier: 'system', tenant };
     }
   }
   return undefined;

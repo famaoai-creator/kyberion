@@ -19,7 +19,7 @@ import { withExecutionContext } from '../authority.js';
 import {
   RETENTION_ARTIFACT_CLASSES,
   type RetentionArtifactClass,
-} from '../storage-retention-catalog.js';
+} from '../storage/storage-retention-catalog.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -41,7 +41,7 @@ import {
   resolveOwnerScope,
   SHARED_TENANT,
   type OwnerRef,
-} from '../owner-scope.js';
+} from '../governance/owner-scope.js';
 import type { ArtifactKind } from './artifact-registry.js';
 import {
   createArtifactRecord,

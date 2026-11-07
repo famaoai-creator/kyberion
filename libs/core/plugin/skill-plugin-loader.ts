@@ -46,7 +46,7 @@ import {
   type ManagedPluginRecord,
 } from './plugin-managed-install.js';
 import type { ScopeContext } from '../scope-context.js';
-import { applyNarrowOnlyFilter } from '../resource-provenance.js';
+import { applyNarrowOnlyFilter } from '../contracts/resource-provenance.js';
 import {
   activatePluginContributions,
   type PluginContributionActivation,

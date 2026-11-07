@@ -29,7 +29,7 @@ import { randomBytes } from 'node:crypto';
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { auditChain } from './audit-chain.js';
-import { parseActorRef } from '../actor.js';
+import { parseActorRef } from '../contracts/actor.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { readJsonIfPresent, writeJson } from '../foundation/json.js';
 import { isValidTenantSlug } from '../foundation/scope.js';

@@ -5,7 +5,7 @@
 
 import * as path from 'node:path';
 import { composeMissionTeamPlan, writeMissionTeamPlan } from './mission-team-plan-composer.js';
-import { resolveCompany, buildCompanyVisionRef } from '../company.js';
+import { resolveCompany, buildCompanyVisionRef } from '../organization/company.js';
 import * as pathResolver from '../path-resolver.js';
 import {
   findMissionPath,
@@ -13,11 +13,11 @@ import {
   tenantMissionDir,
 } from '../path-resolver.js';
 import { initializeMissionTeamBindings } from './mission-team-binding.js';
-import { ledger } from '../ledger.js';
+import { ledger } from '../governance/ledger.js';
 import { logger } from '../core.js';
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
 import { readTextFile } from '../foundation/text.js';
-import { inferMissionOutcomeContract } from '../outcome-contract.js';
+import { inferMissionOutcomeContract } from '../task/outcome-contract.js';
 import { ensureDefaultTenantProfile, resolveTenant } from '../organization/tenant-registry.js';
 import { loadOrganizationProfile } from '../organization/organization-profile.js';
 import {

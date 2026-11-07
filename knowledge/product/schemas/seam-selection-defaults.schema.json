@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "seam-selection-defaults.schema.json",
   "title": "Saved seam provider defaults",
-  "description": "Saved default provider per seam (libs/core/seam-selection-defaults.ts). One file per layer: the operator file (active/shared/runtime/seam-selection/defaults.json) uses only `defaults`; a scope partition file (active/shared/runtime/seam-selection-defaults/<tier>/<tenant|shared>/defaults.json) holds the tenant layer in `defaults` plus organization and project layers. A saved default applies only when the caller gives no explicit provider and no purpose; mission pins and operator rules still win, and eligibility always decides.",
+  "description": "Saved default provider per seam (libs/core/provider/seam-selection-defaults.ts). One file per layer: the operator file (active/shared/runtime/seam-selection/defaults.json) uses only `defaults`; a scope partition file (active/shared/runtime/seam-selection-defaults/<tier>/<tenant|shared>/defaults.json) holds the tenant layer in `defaults` plus organization and project layers. A saved default applies only when the caller gives no explicit provider and no purpose; mission pins and operator rules still win, and eligibility always decides.",
   "type": "object",
   "additionalProperties": false,
   "properties": {

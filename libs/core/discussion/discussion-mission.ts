@@ -1,5 +1,5 @@
 import { withExecutionContext } from '../authority.js';
-import { parseEventScopeInput } from '../event-scope.js';
+import { parseEventScopeInput } from '../event/event-scope.js';
 import { assertScopeContext } from '../foundation/scope-context-validation.js';
 import { approvalUsabilityRefusal } from '../governance/approval-linked-usability.js';
 import { createApprovalRequest } from '../governance/approval-request-create.js';

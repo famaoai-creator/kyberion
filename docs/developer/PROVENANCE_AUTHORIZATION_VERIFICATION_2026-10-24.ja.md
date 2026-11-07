@@ -43,11 +43,11 @@ last_updated: 2026-10-25
 CI=true KYBERION_TEST_LEAK_STRICT=1 pnpm exec vitest run \
   libs/core/governance libs/core/knowledge libs/core/pipeline \
   libs/core/scenario libs/core/service \
-  libs/core/lifecycle-hook-engine.test.ts \
+  libs/core/harnessing/lifecycle-hook-engine.test.ts \
   libs/core/plugin/plugin-managed-install.test.ts \
   libs/core/integrations/email-external-governance.test.ts \
-  libs/core/promoted-memory.test.ts libs/core/promoted-memory-scope.test.ts \
-  libs/core/autonomous-repair.test.ts \
+  libs/core/knowledge/promoted-memory.test.ts libs/core/knowledge/promoted-memory-scope.test.ts \
+  libs/core/pipeline/autonomous-repair.test.ts \
   libs/core/organization/tenant-knowledge-retrieval.test.ts \
   libs/actuators/service-actuator/src \
   scripts/pipeline-execution-approval.test.ts scripts/scenario_runner.test.ts \

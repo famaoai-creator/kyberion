@@ -15,8 +15,8 @@ import { createDistillCandidateRecord } from '../knowledge/distill-candidate-reg
 import {
   saveExecutionFeedbackCandidate,
   executionFeedbackScopeRoot,
-} from '../execution-feedback-candidates.js';
-import { queueExecutionFeedbackLearning } from '../execution-feedback-learning.js';
+} from '../knowledge/execution-feedback-candidates.js';
+import { queueExecutionFeedbackLearning } from '../knowledge/execution-feedback-learning.js';
 import {
   loadMemoryPromotionCandidate,
   updateMemoryPromotionCandidateStatus,

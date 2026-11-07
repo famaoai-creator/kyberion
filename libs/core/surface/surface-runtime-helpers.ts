@@ -1,8 +1,8 @@
 import { extractSurfaceBlocks, sanitizeSurfaceReplyText } from './surface-response-blocks.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { detectTextLocale } from '../foundation/locale-normalize.js';
-import { resolveLocale } from '../locale.js';
+import { resolveLocale } from '../localization/locale.js';
 import type {
   SurfaceConversationResult,
   SurfaceDelegationResult,

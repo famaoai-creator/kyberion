@@ -68,7 +68,9 @@ describe('check_plugin_views_e2e helpers (PE-02)', () => {
 
   it('seeds the token registry through the governed issuance facade (TR-02)', () => {
     const script = registryTokenIssueScript('/opt/kyberion/libs/core/dist', TENANT_SLUG);
-    expect(script).toContain('file:///opt/kyberion/libs/core/dist/chronos-access-registry.js');
+    expect(script).toContain(
+      'file:///opt/kyberion/libs/core/dist/authn/chronos-access-registry.js'
+    );
     expect(script).toContain("withExecutionContext('sovereign_concierge'");
     expect(script).toContain(
       `issueChronosAccessToken({ role: 'readonly', tenantSlugs: ["${TENANT_SLUG}"] })`

@@ -3802,7 +3802,7 @@
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "Process-level saved seam defaults, `seam=provider;seam2=provider` (libs/core/seam-selection-defaults.ts). Highest saved-default layer (above project/organization/tenant/operator); applies only when no explicit provider and no purpose is given, and eligibility still decides.",
+      "description": "Process-level saved seam defaults, `seam=provider;seam2=provider` (libs/core/provider/seam-selection-defaults.ts). Highest saved-default layer (above project/organization/tenant/operator); applies only when no explicit provider and no purpose is given, and eligibility still decides.",
       "documented": true,
       "subsystem": "runtime"
     },

@@ -21,8 +21,8 @@ const fixtureRoot = path.join(
 let bootstrapIo: typeof import('../secure-io.js');
 let observer: typeof import('./dot-semantic-judgment.js');
 let runtime: typeof import('./dot-runtime.js');
-let accounting: typeof import('../usage-accounting.js');
-let events: typeof import('../event-scope.js');
+let accounting: typeof import('../finance/usage-accounting.js');
+let events: typeof import('../event/event-scope.js');
 let latency: typeof import('../organization/judgment-latency-fixture.js');
 let precedents: typeof import('../organization/judgment-precedents.js');
 let validation: typeof import('../organization/judgment-validation.js');
@@ -291,6 +291,10 @@ describe('contract-only dot semantic observer (no production reservation/provide
       path.join(sourceRoot, 'knowledge/product/governance/agent-policies.yaml'),
       path.join(fixtureRoot, 'knowledge/product/governance/agent-policies.yaml')
     );
+    copy(
+      path.join(sourceRoot, 'knowledge/product/governance/security-policy.json'),
+      path.join(fixtureRoot, 'knowledge/product/governance/security-policy.json')
+    );
     bootstrapIo.safeWriteFile(path.join(fixtureRoot, 'package.json'), '{}');
     vi.stubEnv('KYBERION_ROOT', fixtureRoot);
     vi.stubEnv('MISSION_ROLE', 'mission_controller');
@@ -307,8 +311,8 @@ describe('contract-only dot semantic observer (no production reservation/provide
     } as Parameters<typeof saveProjectRecord>[0]);
     observer = await import('./dot-semantic-judgment.js');
     runtime = await import('./dot-runtime.js');
-    accounting = await import('../usage-accounting.js');
-    events = await import('../event-scope.js');
+    accounting = await import('../finance/usage-accounting.js');
+    events = await import('../event/event-scope.js');
     latency = await import('../organization/judgment-latency-fixture.js');
     precedents = await import('../organization/judgment-precedents.js');
     validation = await import('../organization/judgment-validation.js');

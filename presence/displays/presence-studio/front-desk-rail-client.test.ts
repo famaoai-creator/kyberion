@@ -130,7 +130,7 @@ function harness(
 }
 describe('shipped grouped front-desk rail client', () => {
   it('renders the seven destinations with 設定 pinned in the footer and scoped hrefs', async () => {
-    const h = harness('/first-job');
+    const h = harness('/help');
     await h.mount();
     const props = h.rendered.at(-1)!.components[0].props;
     const items = props.items;
@@ -148,7 +148,7 @@ describe('shipped grouped front-desk rail client', () => {
     expect(
       [...items, ...footer].every((item) => item.icon && item.href.includes('tenant=alpha'))
     ).toBe(true);
-    // Studio pages are not rail destinations, so nothing is marked current.
+    // Pages that are not rail destinations mark nothing current.
     expect([...items, ...footer].filter((item) => item.active)).toHaveLength(0);
     expect(items.find((item) => item.id === 'work').href).toContain('/work');
   });
@@ -170,7 +170,7 @@ describe('shipped grouped front-desk rail client', () => {
   it('ignores an interrupted older mount', async () => {
     const old = deferred<unknown>();
     let count = 0;
-    const h = harness('/first-job', async (url) =>
+    const h = harness('/work', async (url) =>
       url.includes('/api/me') && ++count === 1 ? old.promise : undefined
     );
     const first = h.mount();

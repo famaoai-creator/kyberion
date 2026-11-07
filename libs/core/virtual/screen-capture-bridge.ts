@@ -15,7 +15,7 @@ import type { VideoFrameBus } from '../video/video-frame-bus.js';
 import { platform } from '../platform.js';
 import { takeScreenshot } from './os-automation.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
-import { savedSeamDefaultFor } from '../seam-provider-selection.js';
+import { savedSeamDefaultFor } from '../provider/seam-provider-selection.js';
 
 export const SCREEN_CAPTURE_BRIDGE_ID = 'screen-capture-bridge' as const;
 

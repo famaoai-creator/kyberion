@@ -3,7 +3,7 @@
  * trigger delivery journal that keeps growing because stable keys inside the
  * 7-day dedupe window alone exceed its retention threshold
  * ([TRIGGER_STORE_WINDOW_FULL], ops-health trigger-store-growth;
- * libs/core/trigger-runner.ts never drops those on its own). Size never stops
+ * libs/core/daemon/trigger-runner.ts never drops those on its own). Size never stops
  * appends or dedupe, so this sheds growth; it does not unblock triggers.
  *
  * Dry-run by default: prints what a rotation keeps (in-flight claims, the

@@ -30,7 +30,7 @@ import {
 import { withExecutionContext } from '../authority.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
 import { peerRuntimeLogicalPath, setPeerLedgerStoreTuningForTests } from './peer-messaging.js';
-import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
+import { resetAppendOnlyStoreMaintenanceState } from '../storage/append-only-store.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   safeExistsSync,

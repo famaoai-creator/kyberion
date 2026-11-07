@@ -1,7 +1,11 @@
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
-import { OwnerScopeError, resolveOwnerScope, tryResolveOwnerScope } from '../owner-scope.js';
+import {
+  OwnerScopeError,
+  resolveOwnerScope,
+  tryResolveOwnerScope,
+} from '../governance/owner-scope.js';
 import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import {
@@ -9,7 +13,7 @@ import {
   resolveEventScopeAgainstAuthority,
   type EventScope,
   type EventScopeInput,
-} from '../event-scope.js';
+} from '../event/event-scope.js';
 import {
   MISSION_ORCHESTRATION_EVENT_TYPES,
   type MissionOrchestrationEvent,

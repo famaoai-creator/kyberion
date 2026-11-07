@@ -17,11 +17,11 @@ import { pathResolver } from '../path-resolver.js';
 import { detectTier } from '../tier-guard.js';
 import { readJsonIfPresent } from '../foundation/json.js';
 import { currentScopeEnvelope, runtimeScopeIdentity } from '../scope-envelope.js';
-import { sharedControlPlane } from '../cloudflare-os-shared.js';
+import { sharedControlPlane } from '../governance/cloudflare-os-shared.js';
 import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
-import { classifyEgressDestination } from '../egress-policy.js';
-import { evaluateProvenanceEgress } from '../provenance-taint.js';
-import type { OsKnowledgeTier } from '../cloudflare-os-control-plane.js';
+import { classifyEgressDestination } from '../governance/egress-policy.js';
+import { evaluateProvenanceEgress } from '../governance/provenance-taint.js';
+import type { OsKnowledgeTier } from '../governance/cloudflare-os-control-plane.js';
 import { OP_GOVERNANCE_STAMP_KEYS } from './op-preflight.js';
 import type { OpPreflightCall, OpPreflightListenerResult } from './op-preflight.js';
 

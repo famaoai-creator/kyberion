@@ -16,7 +16,7 @@ import {
   validateChainAttenuation,
   type DelegationChain,
 } from './delegation-chain.js';
-import { SUBAGENT_CAPABILITY_PROFILES } from '../subagent-capability-profiles.js';
+import { SUBAGENT_CAPABILITY_PROFILES } from '../workforce/subagent-capability-profiles.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 

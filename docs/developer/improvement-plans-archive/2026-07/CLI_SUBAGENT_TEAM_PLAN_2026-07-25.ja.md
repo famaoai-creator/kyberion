@@ -41,7 +41,7 @@ Claude 向け初版の最小追加は2つであり、Codex 対応は CT-05 で�
 ### 1.2 チーム構成の SSoT はあるが、CLI サブエージェント定義に射影されていない
 
 - 役割レジストリ: `knowledge/product/orchestration/team-roles/*.json`(implementer / facilitator / attacker / defender / devils_advocate 等)+ `knowledge/product/roles/<role>/PROCEDURE.md`。
-- 能力ティア: `libs/core/subagent-capability-profiles.ts`(KD-05: implementer / explorer / planner の型付き allowlist + system prompt 枠)。
+- 能力ティア: `libs/core/workforce/subagent-capability-profiles.ts`(KD-05: implementer / explorer / planner の型付き allowlist + system prompt 枠)。
 - リポジトリに `.claude/agents/` は存在せず、CLI 側でチームを組む場合は**その場の手書きプロンプトになる** — SSoT からのドリフトを検知する仕組みもない。
 
 ### 1.3 連携プリミティブは CLI 非依存で揃っている(未接続なだけ)
