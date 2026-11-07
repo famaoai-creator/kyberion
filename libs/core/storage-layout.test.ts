@@ -407,10 +407,18 @@ describe('tenant runtime partitions', () => {
 
   it('lists one partition per tier and root, filtered by the exists probe', () => {
     const all = tenantRuntimePartitionPaths('acme');
-    expect(all).toHaveLength(TENANT_RUNTIME_PARTITION_ROOTS.length * STORAGE_DATA_TIERS.length);
+    const expected = TENANT_RUNTIME_PARTITION_ROOTS.reduce(
+      (count, entry) => count + (entry.tenantTiers ?? STORAGE_DATA_TIERS).length,
+      0
+    );
+    expect(all).toHaveLength(expected);
     expect(all.map((p) => p.path)).toContain(
       'active/shared/runtime/tenant-ledger/confidential/acme'
     );
+    // The derivation ledger's `personal/` partitions are member-keyed — a
+    // tenant never sweeps them (and `public/` is not a tenant tier there).
+    const derivations = all.filter((p) => p.key === 'asset_derivations');
+    expect(derivations.map((p) => p.tier)).toEqual(['confidential']);
     const present = new Set(['active/shared/runtime/grants/personal/acme']);
     expect(tenantRuntimePartitionPaths('acme', (p) => present.has(p))).toEqual([
       expect.objectContaining({ key: 'grants', tier: 'personal', tenant: 'acme' }),

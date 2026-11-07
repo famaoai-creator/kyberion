@@ -36,7 +36,10 @@ import {
   isPersistentInstructionPath,
 } from './foundation/persistent-instruction-effect.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
-import { PARTITIONED_RUNTIME_STATE_ROOTS } from './foundation/runtime-state-roots.js';
+import {
+  PARTITIONED_RUNTIME_STATE_ROOTS,
+  PARTITIONED_RUNTIME_LEDGER_ROOTS,
+} from './foundation/runtime-state-roots.js';
 // The policy gate is intentionally part of secure-io bootstrap; policy-engine
 // also validates policy-file paths through secure-io, so this known cycle must
 // remain explicit rather than being hidden by a second I/O implementation.
@@ -852,6 +855,26 @@ function assertRuntimeStateAggregateAccess(resolved: string, canonical: string):
     if (stat?.isDirectory() && !stat.isSymbolicLink()) {
       for (const tier of ['personal', 'confidential']) inspect(path.join(root, tier));
     }
+  }
+  const receipts = path.join(
+    pathResolver.rootDir(),
+    PARTITIONED_RUNTIME_LEDGER_ROOTS.asset_derivations,
+    'system'
+  );
+  // Preserve existing descendant-denial diagnostics, then also guard the
+  // receipt directory and its ancestors before any aggregate mutation.
+  if (isInside(resolved, receipts) !== undefined || isInside(canonical, receipts) !== undefined) {
+    const decision = validateWritePermission(receipts);
+    if (!decision.allowed) throw new Error(decision.reason);
+    // Producer authority over system receipts does not authorize a tenant-bound
+    // producer to mutate every tenant's index through their public ancestor.
+    const tenantContainer = path.join(path.dirname(receipts), 'confidential');
+    const read = validateReadPermission(tenantContainer);
+    const write = validateWritePermission(tenantContainer);
+    if (!read.allowed || !write.allowed)
+      throw new Error(
+        '[SECURITY] derivation.aggregate_denied — tenant index container requires read/write authority'
+      );
   }
 }
 
