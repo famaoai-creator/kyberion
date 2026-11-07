@@ -1,7 +1,5 @@
 /** Generated public API barrel part. Keep exports in source order. */
 
-export { loadTrackerSheetPolicyCatalog } from './tracker-sheet-policy.js';
-
 export {
   loadPromotedReportTemplatePolicyCatalog,
   resolvePromotedReportAudience,
@@ -54,13 +52,6 @@ export {
 } from './production-evidence-summary-policy.js';
 
 export { loadChangelogPolicyCatalog, resolveChangelogPolicy } from './changelog-policy.js';
-
-export {
-  loadSpreadsheetStylePolicyCatalog,
-  resolveSpreadsheetStyleIndex,
-} from './spreadsheet-style-policy.js';
-
-export { isLegacyMediaOp, loadLegacyMediaOpsCatalog } from './legacy-media-ops.js';
 
 export { installEmbeddingBackendIfAvailable } from './embedding-bootstrap.js';
 
