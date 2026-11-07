@@ -3176,6 +3176,40 @@ fallbacks and warning order. Verify parity against the old matcher, including ad
 escaped quotes, Unicode, cross-line spans and long unrelated text. The catalog integrity
 suite and the unchanged catalog gate deadline enforce this bounded lookup behavior.
 
+## Derivation issuance and scope deletion
+
+Tenant-writable lineage is an index, not deletion authority. Producers must bind source
+snapshots and output bytes in the protected system partition of the registered derivation
+ledger. Replay requires the matching trusted issuance receipt and propagates inherited
+custodian taint through every hop. Missing, malformed, or unattested reachable lineage
+must block a clean offboarding result. Recreated files are reconsidered regardless of old
+path-only deletion audit entries. Before export and deletion, revalidate a planned regular
+file's identity and bytes; preserve lineage when any derived deletion fails. Cooperative
+checks do not provide an atomic conditional rename against an arbitrary external writer.
+The derivation receipt authority contract and adversarial derivation/offboarding tests
+enforce these boundaries, including aggregate rename/removal of the receipt directory.
+
+Operator offboarding must use the scope-limited lineage query, not a producer-role wrapper.
+The query authorizes the requested tenant's index through ordinary policy before testing
+existence, reads the exact system receipt file through a synchronous private store grant,
+revokes that grant before planning, and returns only the requested custodian's derived paths.
+Raw receipt reads remain producer-only. Test the ordinary operator identity with an
+unrelated receipt present, a foreign-tenant denial, raw-read denial and grant revocation;
+mocked offboarding I/O alone cannot establish this entrypoint's usability or isolation.
+
+Governed-store fixtures must declare their controller role and persona explicitly. Resetting
+a whole runtime ancestor also covers protected receipt state; keep the operation's actual
+actor unchanged when elevating only fixture teardown. Preserve canonical exports in partial
+path-resolver mocks and rebase mutable roots. Unix socket fixtures in deep checkouts should
+bind a checkout-relative address and reject listener errors directly, so path-length or
+sandbox IPC failures are not disguised as test timeouts. Verify under the existing CI
+settings; do not relax production grants or deadlines to accommodate a fixture.
+
+CLI dry-run fixtures that expect `not_found` must also declare the legitimate controller
+identity: checking an absent lineage index still requires ordinary read authority. Run the
+entire CLI suite with the scripts CI runner's empty role/persona defaults, and include a
+roleless negative case. Never skip permission checks because a path does not exist.
+
 ## Intake extension CI checks
 
 When adding a service operation, validate the shipped discovery count and service-harness operation inventory together with the exact kind/risk/approval assertions. Registry-overlay fixtures must assert the shipped exact declarations as well as the mutation fallback. For boundary tests, partially mock shared path resolvers so new legitimate imports retain their real APIs; a minimal hand-built resolver can fail during module initialization before the tested gate runs. Run the impacted existing tests in addition to the extension fixtures. For single-use admission capabilities, compare private in-memory snapshots of request and configuration values. Do not send credential-bearing configuration into hash or HMAC APIs: keyed fast hashes still trigger password-hashing checks and are unnecessary when the capability's private WeakMap already supplies the trust boundary. Never log or persist these snapshots.
