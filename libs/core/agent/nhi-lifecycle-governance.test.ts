@@ -101,6 +101,8 @@ beforeAll(async () => {
   fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
   process.env.KYBERION_ROOT = tmpRoot;
   process.env.MISSION_ROLE = 'mission_controller';
+  // Accountable-human fixtures are personal records, accessed as their owner.
+  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
 
   // safeWriteFile runs the policy-engine gate — seed the real policy file so
   // writes inside the temp root are allowed.
@@ -109,6 +111,10 @@ beforeAll(async () => {
   fs.copyFileSync(
     path.join(REPO_ROOT, 'knowledge/product/governance/agent-policies.yaml'),
     path.join(policyTarget, 'agent-policies.yaml')
+  );
+  fs.copyFileSync(
+    path.join(REPO_ROOT, 'knowledge/product/governance/security-policy.json'),
+    path.join(policyTarget, 'security-policy.json')
   );
   // findMissionPath resolves tiered mission roots through this config — without
   // it, a seeded mission tree in the temp root would read as "scope missing"
@@ -138,6 +144,7 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
+  vi.unstubAllEnvs();
   delete process.env.KYBERION_ROOT;
   delete process.env.MISSION_ROLE;
   fs.rmSync(tmpRoot, { recursive: true, force: true });

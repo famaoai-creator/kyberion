@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { MissionState } from './mission-types.js';
 import type { OrganizationDigest } from '../organization/organization-digest.js';
 
@@ -60,6 +60,10 @@ describe('mission artifact promotion', () => {
       path.join(REPO_ROOT, 'knowledge/product/governance/agent-policies.yaml'),
       policy
     );
+    fs.copyFileSync(
+      path.join(REPO_ROOT, 'knowledge/product/governance/security-policy.json'),
+      path.join(path.dirname(policy), 'security-policy.json')
+    );
     // ArtifactRecord validation ($ref chain) needs the full schema directory.
     fs.cpSync(
       path.join(REPO_ROOT, 'knowledge/product/schemas'),
@@ -68,6 +72,8 @@ describe('mission artifact promotion', () => {
     );
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.MISSION_ROLE = 'mission_controller';
+    // Promotion includes confidential organization-owned fixture deliverables.
+    vi.stubEnv('KYBERION_PERSONA', 'sovereign');
     store = await import('../workforce/artifact-store.js');
     records = await import('../workforce/artifact-record.js');
     promotion = await import('./mission-artifact-promotion.js');
@@ -127,6 +133,7 @@ describe('mission artifact promotion', () => {
   });
 
   afterAll(() => {
+    vi.unstubAllEnvs();
     delete process.env.KYBERION_ROOT;
     delete process.env.MISSION_ROLE;
     fs.rmSync(tmpRoot, { recursive: true, force: true });

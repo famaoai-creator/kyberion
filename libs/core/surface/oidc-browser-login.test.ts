@@ -1159,7 +1159,7 @@ describe('follow-ups: rate limit, 405, retry link, cross-site logout', () => {
     expect(denied).toBeGreaterThan(0);
   });
 
-  it('exempts loopback and, for an indistinguishable "shared" caller, applies only the surface ceiling', async () => {
+  it('exempts loopback from the surface and per-client ceilings', async () => {
     for (let i = 0; i < 700; i++) {
       const res = await handleSurfaceAuthRoute(
         { ...base, loopback: true, clientKey: '127.0.0.1' },
@@ -1167,7 +1167,9 @@ describe('follow-ups: rate limit, 405, retry link, cross-site logout', () => {
       );
       expect(res?.status).toBe(200);
     }
-    resetSurfaceAuthRateLimitForTests();
+  });
+
+  it('applies only the surface ceiling to an indistinguishable shared caller', async () => {
     // 121st shared request is still served (no per-client cap on an unknown caller)...
     let last;
     for (let i = 0; i < 121; i++) {

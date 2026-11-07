@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -57,10 +57,21 @@ describe('resolveOwnerScope', () => {
     tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kyb-owner-scope-'));
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
     seed('knowledge/product/governance/agent-policies.yaml');
+    seed('knowledge/product/governance/security-policy.json');
     seed('knowledge/product/governance/mission-management-config.json');
     seed('knowledge/product/schemas');
+    const tenants = path.join(tmpRoot, 'knowledge/personal/tenants');
+    fs.mkdirSync(tenants, { recursive: true });
+    for (const tenant of ['acme', 'globex']) {
+      fs.writeFileSync(
+        path.join(tenants, `${tenant}.json`),
+        JSON.stringify({ tenant_slug: tenant, status: 'active' })
+      );
+    }
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.MISSION_ROLE = 'mission_controller';
+    // Owner discovery spans public and confidential synthetic organizations.
+    vi.stubEnv('KYBERION_PERSONA', 'sovereign');
     delete process.env.KYBERION_TENANT;
     scope = await import('./owner-scope.js');
     projects = await import('../project/project-registry.js');
@@ -133,6 +144,7 @@ describe('resolveOwnerScope', () => {
   });
 
   afterAll(() => {
+    vi.unstubAllEnvs();
     if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = savedTenant;
     delete process.env.KYBERION_ROOT;

@@ -437,10 +437,13 @@ function resolveOrganization(owner: OwnerRef, hint?: OwnerScopeHint): OwnerScope
   const tiers = hint?.tier ? [hint.tier] : OWNER_TIERS;
   for (const tier of tiers) {
     const tierRoot = path.join(pathResolver.rootDir(), 'active', 'organizations', tier);
+    const bound = boundTenant();
     const tenants =
       hint?.tenant !== undefined
         ? [normalizeTenant(hint.tenant)]
-        : childDirectories(tierRoot).filter(isTenantDirectoryName);
+        : bound && tier !== 'public'
+          ? [bound]
+          : childDirectories(tierRoot).filter(isTenantDirectoryName);
     for (const tenantDir of tenants) {
       const tenant = normalizeTenant(tenantDir);
       if (!visibleToProcess(tenant)) continue;

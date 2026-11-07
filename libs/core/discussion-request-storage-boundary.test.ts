@@ -201,7 +201,7 @@ describe('durable discussion-create-requests storage uses real secureIO tier and
       );
     }));
 
-  it('fails closed for missing policy only on protected discussion-create-requests state', () =>
+  it('fails closed for missing policy on protected and bootstrap state under an explicit role', () =>
     privileged(() => {
       policyState.missing = true;
       for (const file of [session(), personal]) {
@@ -212,7 +212,29 @@ describe('durable discussion-create-requests storage uses real secureIO tier and
         );
         expect(() => safeWriteFile(file, 'replace')).toThrow(/security-policy.json is missing/);
       }
-      // Existing bootstrap semantics, including metrics, remain unchanged.
+      // An explicit role cannot bypass its missing policy through legacy bootstrap paths.
+      for (const relative of [
+        'knowledge/personal/bootstrap.md',
+        'active/shared/runtime/usage-ledger/personal/shared/bootstrap.json',
+        'active/shared/runtime/execution-metrics/confidential/acme/bootstrap.json',
+      ]) {
+        const file = path.join(ROOT, relative);
+        expect(guard.validateReadPermission(file).allowed).toBe(false);
+        expect(guard.validateWritePermission(file).allowed).toBe(false);
+        expect(guard.validateReadPermission(file).reason).toContain(
+          'ROLE_NARROWING_POLICY_UNAVAILABLE'
+        );
+      }
+      policyState.missing = false;
+    }));
+
+  it('preserves role-less missing-policy bootstrap while denying protected discussion state', () => {
+    policyState.missing = true;
+    try {
+      for (const file of [session(), personal]) {
+        expect(guard.validateReadPermission(file).allowed).toBe(false);
+        expect(guard.validateWritePermission(file).allowed).toBe(false);
+      }
       for (const relative of [
         'knowledge/personal/bootstrap.md',
         'active/shared/runtime/usage-ledger/personal/shared/bootstrap.json',
@@ -222,8 +244,10 @@ describe('durable discussion-create-requests storage uses real secureIO tier and
         expect(guard.validateReadPermission(file).allowed).toBe(true);
         expect(guard.validateWritePermission(file).allowed).toBe(true);
       }
+    } finally {
       policyState.missing = false;
-    }));
+    }
+  });
 
   it.each([
     'empty',
@@ -240,10 +264,10 @@ describe('durable discussion-create-requests storage uses real secureIO tier and
             expect(guard.validateReadPermission(file).allowed).toBe(false);
             expect(guard.validateWritePermission(file).allowed).toBe(false);
             expect(() => safeReadFile(file, { encoding: 'utf8' })).toThrow(
-              /hearing.policy_declaration_invalid/
+              mode === 'empty' ? /ROLE_NARROWING_INVALID/ : /hearing.policy_declaration_invalid/
             );
             expect(() => safeWriteFile(file, 'must not replace')).toThrow(
-              /hearing.policy_declaration_invalid/
+              mode === 'empty' ? /ROLE_NARROWING_INVALID/ : /hearing.policy_declaration_invalid/
             );
           }
           if (mode === 'missing_discussion-create-requests_prefixes') {
@@ -268,8 +292,10 @@ describe('durable discussion-create-requests storage uses real secureIO tier and
       for (const file of [session(), personal]) {
         expect(guard.validateReadPermission(file).allowed).toBe(false);
         expect(guard.validateWritePermission(file).allowed).toBe(false);
-        expect(() => safeReadFile(file, { encoding: 'utf8' })).toThrow(/cannot be parsed/);
-        expect(() => safeWriteFile(file, 'replace')).toThrow(/cannot be parsed/);
+        expect(() => safeReadFile(file, { encoding: 'utf8' })).toThrow(
+          /ROLE_NARROWING_POLICY_UNAVAILABLE/
+        );
+        expect(() => safeWriteFile(file, 'replace')).toThrow(/ROLE_NARROWING_POLICY_UNAVAILABLE/);
       }
       policyState.corrupt = false;
     }));
