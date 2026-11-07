@@ -11,6 +11,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./automation-blueprint-slack": {
+      "types": "./dist/automation-blueprint-slack.d.ts",
+      "default": "./dist/automation-blueprint-slack.js"
+    },
     "./backchannel-policy": {
       "types": "./dist/backchannel-policy.d.ts",
       "default": "./dist/backchannel-policy.js"

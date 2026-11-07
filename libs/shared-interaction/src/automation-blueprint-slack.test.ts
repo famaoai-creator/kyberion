@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createAutomationBlueprintFromPipeline } from './automation-blueprint.js';
+import { createAutomationBlueprintFromPipeline } from '@agent/core/automation-blueprint';
 import {
   buildAutomationSlackModal,
   extractAutomationSlackFormValues,
