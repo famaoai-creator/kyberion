@@ -727,6 +727,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-video':
+        specifier: workspace:*
+        version: link:../../shared-video
       '@agent/shared-voice':
         specifier: workspace:*
         version: link:../../shared-voice
@@ -902,6 +905,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../core
+      ws:
+        specifier: ^8.22.0
+        version: 8.22.0
 
   libs/shared-vision:
     dependencies:

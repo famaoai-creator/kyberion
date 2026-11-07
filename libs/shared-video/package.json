@@ -43,6 +43,10 @@
       "types": "./dist/obs-video-filter-provider.d.ts",
       "default": "./dist/obs-video-filter-provider.js"
     },
+    "./obs-virtual-camera-output": {
+      "types": "./dist/obs-virtual-camera-output.d.ts",
+      "default": "./dist/obs-virtual-camera-output.js"
+    },
     "./video-composition-compiler": {
       "types": "./dist/video-composition-compiler.d.ts",
       "default": "./dist/video-composition-compiler.js"
@@ -96,6 +100,7 @@
     "build": "tsc -b tsconfig.json && node ../../scripts/write_core_dist_scope.mjs --run"
   },
   "dependencies": {
-    "@agent/core": "workspace:*"
+    "@agent/core": "workspace:*",
+    "ws": "^8.22.0"
   }
 }
