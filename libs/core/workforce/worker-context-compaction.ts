@@ -36,7 +36,7 @@ export {
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { estimateTokens, readTextFile } from '../foundation/text.js';
 export { estimateTokens } from '../foundation/text.js';
-import { metrics } from '../metrics.js';
+import { metrics } from '../analysis/metrics.js';
 import type { MissionWorkingMemory } from '../mission/mission-working-memory.js';
 import { pathResolver } from '../path-resolver.js';
 import {
@@ -51,12 +51,15 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '../secure-io.js';
-import { notifyAllDynamicInjectionRegistries } from '../dynamic-injection.js';
-import { fireLifecycleHooks, getDefaultLifecycleHookEngine } from '../lifecycle-hook-engine.js';
-import { ensureTrustedExternalHooksRegistered } from '../external-hook-discovery.js';
+import { notifyAllDynamicInjectionRegistries } from '../reasoning/dynamic-injection.js';
+import {
+  fireLifecycleHooks,
+  getDefaultLifecycleHookEngine,
+} from '../harnessing/lifecycle-hook-engine.js';
+import { ensureTrustedExternalHooksRegistered } from '../harnessing/external-hook-discovery.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 import type { ScopeContext } from '../scope-context.js';
-import { physicalScopedPath } from '../physical-namespace.js';
+import { physicalScopedPath } from '../storage/physical-namespace.js';
 import { checkProviderEgress } from '../provider/provider-egress-gate.js';
 import {
   withReasoningPayloadScope,

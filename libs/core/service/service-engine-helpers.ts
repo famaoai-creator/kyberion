@@ -1,15 +1,15 @@
-import { classifyError } from '../error-classifier.js';
+import { classifyError } from '../analysis/error-classifier.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { createLogger } from '../logger.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 const logger = createLogger('service-engine-helpers');
-import * as customerResolver from '../stance-resolver.js';
+import * as customerResolver from '../authn/stance-resolver.js';
 import { pathResolver } from '../path-resolver.js';
-import { resolveRepositoryPathToken } from '../path-token-resolver.js';
+import { resolveRepositoryPathToken } from '../storage/path-token-resolver.js';
 import { resolveServiceBinding } from './service-binding.js';
 import { assertSafeRepositoryPath, safeLstat, safeWriteFile } from '../secure-io.js';
 import { secretGuard } from '../secret/secret-guard.js';
-import { transform } from '../transformer.js';
+import { transform } from '../pipeline/transformer.js';
 
 export type RetryPolicy = {
   maxRetries?: number;

@@ -8,12 +8,12 @@ const { resolveActiveProfileRootMock } = vi.hoisted(() => ({
   resolveActiveProfileRootMock: vi.fn(),
 }));
 
-vi.mock('../profile-root.js', () => ({
+vi.mock('../authn/profile-root.js', () => ({
   resolveActiveProfileRoot: resolveActiveProfileRootMock,
 }));
 
 import { resolveOperatorDisplayName, resolveOperatorLocale } from './operator-identity.js';
-import { _resetLocaleModuleStateForTests } from '../locale.js';
+import { _resetLocaleModuleStateForTests } from '../localization/locale.js';
 import { SUPPORTED_LOCALES } from '../foundation/locale-normalize.js';
 
 const TEST_PROFILE_ROOT = pathResolver.sharedTmp('operator-identity-test');

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getUsageAttribution } from '../usage-accounting.js';
+import { getUsageAttribution } from '../finance/usage-accounting.js';
 import { getReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
 import { getFoundationIo } from '../foundation/io.js';
 import * as secureIo from '../secure-io.js';
@@ -13,7 +13,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
-import { setAppendOnlyStoreTestHooks } from '../append-only-store.js';
+import { setAppendOnlyStoreTestHooks } from '../storage/append-only-store.js';
 import type { DotCharter } from './dot-charter.js';
 import { personalDotCharterDir } from './dot-charter.js';
 import {
@@ -1450,7 +1450,7 @@ describe('dot wake usage attribution', () => {
   it('counts late SDK usage from a timed-out attempt separately from a successful wake', async () => {
     const { AnthropicReasoningBackend } =
       await import('../provider/anthropic-reasoning-backend.js');
-    const { metrics, MetricsCollector } = await import('../metrics.js');
+    const { metrics, MetricsCollector } = await import('../analysis/metrics.js');
     const { computeBudgetUsage } = await import('../governance/org-budget-governor.js');
     const now = new Date('2026-10-04T10:00:00Z');
     const current: DotCharter = {

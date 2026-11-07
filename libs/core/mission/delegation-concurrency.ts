@@ -84,7 +84,7 @@
 
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { nowIso } from '../foundation/time.js';
-import { Semaphore } from '../semaphore.js';
+import { Semaphore } from '../foundation/semaphore.js';
 import { withDelegationProgress } from './delegation-progress.js';
 import { logger } from '../core.js';
 import { recordGovernanceAction } from '../governance/governance-action-recorder.js';

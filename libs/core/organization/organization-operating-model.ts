@@ -1,10 +1,10 @@
 import { type OrganizationProfile } from './organization-profile.js';
-import type { SupportedLocale } from '../locale.js';
+import type { SupportedLocale } from '../localization/locale.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { safeRmSync } from '../secure-io.js';
-import type { KeyResultSpec } from '../key-result-spec.js';
+import type { KeyResultSpec } from './key-result-spec.js';
 
 export type OrganizationTier = 'personal' | 'confidential' | 'public';
 export type OrganizationWorkShape =

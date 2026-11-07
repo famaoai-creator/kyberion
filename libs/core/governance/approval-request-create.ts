@@ -20,7 +20,7 @@ import {
 import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 import { nowIso } from '../foundation/time.js';
 import { validateDecisionCard, type DecisionCard } from './decision-card.js';
-import { normalizeEventScope, type EventScopeInput } from '../event-scope.js';
+import { normalizeEventScope, type EventScopeInput } from '../event/event-scope.js';
 import { withDefaultMinAssurance } from './approval-human-decision.js';
 import {
   buildOrganizationWorkLoopSummary,

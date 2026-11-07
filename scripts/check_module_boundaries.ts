@@ -9,6 +9,10 @@ import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 
 type Layer = 'foundation' | 'contracts' | 'domain' | 'orchestration';
+export type CorePlacementPolicy = {
+  root_modules: Record<string, { responsibility: string; reason: string }>;
+  domain_roles: Record<string, string>;
+};
 type BoundaryConfig = {
   layers: Layer[];
   patterns: Array<{ layer: Layer; pattern: string }>;
@@ -19,6 +23,7 @@ type BoundaryConfig = {
     reason: string;
   }>;
   default_layer: Layer;
+  core_placement?: CorePlacementPolicy;
 };
 type BoundaryBaseline = {
   version: 1;
@@ -33,6 +38,44 @@ const ROOT = pathResolver.rootDir();
 const CONFIG_PATH = pathResolver.knowledge('product/governance/module-layer-boundaries.json');
 const BASELINE_PATH = resolveCiGateBaselinePath('module-boundaries');
 const SOURCE_ROOTS = ['libs', 'presence', 'satellites', 'scripts'];
+
+/** Ownership is exhaustive: root entries need a reason; domain directories need a role. */
+export function checkCoreModulePlacement(
+  files: readonly string[],
+  policy: CorePlacementPolicy | undefined
+): string[] {
+  if (!policy) return ['core placement policy is missing'];
+  const errors: string[] = [];
+  const roots = new Set<string>();
+  const domains = new Set<string>();
+  for (const file of files) {
+    const relativePath = file.replaceAll('\\', '/').replace(/^libs\/core\//u, '');
+    if (!/\.(?:[cm]?[jt]sx?|swift|py)$/u.test(relativePath)) continue;
+    if (/\.d\.[cm]?ts$/u.test(relativePath) || /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(relativePath))
+      continue;
+    if (relativePath.startsWith('dist/')) continue;
+    if (!relativePath.includes('/')) {
+      roots.add(relativePath);
+      const owner = policy.root_modules[relativePath];
+      if (!owner?.responsibility?.trim() || !owner?.reason?.trim()) {
+        errors.push(`unclassified core root module: ${relativePath}`);
+      }
+    } else {
+      const domain = relativePath.split('/')[0];
+      domains.add(domain);
+      if (!policy.domain_roles[domain]?.trim()) errors.push(`unclassified core domain: ${domain}`);
+    }
+  }
+  for (const name of Object.keys(policy.root_modules)) {
+    if (name.includes('/') || !roots.has(name))
+      errors.push(`stale core root classification: ${name}`);
+  }
+  for (const domain of Object.keys(policy.domain_roles)) {
+    if (domain.includes('/') || !domains.has(domain))
+      errors.push(`stale core domain classification: ${domain}`);
+  }
+  return [...new Set(errors)].sort();
+}
 
 export function readModuleBoundaryTextFile(filePath: string): string {
   if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
@@ -96,12 +139,26 @@ function sourceFiles(): string[] {
   );
 }
 
-function resolveImport(importer: string, specifier: string): string | undefined {
+let coreExportTargets: Record<string, { types?: string; default?: string }> | undefined;
+
+export function resolveModuleBoundaryImport(
+  importer: string,
+  specifier: string
+): string | undefined {
   let base: string;
   if (specifier.startsWith('.')) base = path.resolve(path.dirname(importer), specifier);
   else if (specifier === '@agent/core') base = pathResolver.rootResolve('libs/core/index');
   else if (specifier.startsWith('@agent/core/')) {
-    base = pathResolver.rootResolve(`libs/core/${specifier.slice('@agent/core/'.length)}`);
+    coreExportTargets ??= readSafeJsonFile<{
+      exports: Record<string, { types?: string; default?: string }>;
+    }>(pathResolver.rootResolve('libs/core/package.json'), 'core package exports').exports;
+    const name = specifier.slice('@agent/core/'.length);
+    const entry = coreExportTargets[`./${name}`];
+    const target = entry?.types ?? entry?.default;
+    const source = target?.startsWith('./dist/')
+      ? target.slice('./dist/'.length).replace(/\.d\.([cm]?ts)$/u, '.$1')
+      : name;
+    base = pathResolver.rootResolve(`libs/core/${source}`);
   } else return undefined;
 
   const sourceBase = base.replace(/\.(?:[cm]?js|[cm]?ts|tsx)$/, '');
@@ -113,7 +170,7 @@ function resolveImport(importer: string, specifier: string): string | undefined 
     `${sourceBase}.mts`,
     path.join(sourceBase, 'index.ts'),
   ];
-  return candidates.find((candidate) => safeExistsSync(candidate));
+  return candidates.find((candidate) => safeExistsSync(candidate) && safeLstat(candidate).isFile());
 }
 
 /** Keep source offsets stable while removing comment text from import scans. */
@@ -222,7 +279,7 @@ function parseSourceImports(files: string[]): Map<string, ParsedImports> {
 
 function resolveTargets(importer: string, specifiers: string[]): string[] {
   return [...new Set(specifiers)]
-    .map((specifier) => resolveImport(importer, specifier))
+    .map((specifier) => resolveModuleBoundaryImport(importer, specifier))
     .filter((target): target is string => Boolean(target));
 }
 
@@ -405,6 +462,8 @@ export function checkModuleBoundaries(): {
         direction_violations: directionViolations.length,
       };
   const violations: string[] = [];
+  const coreFiles = getAllFiles(pathResolver.rootResolve('libs/core')).map(relative);
+  violations.push(...checkCoreModulePlacement(coreFiles, manifest.core_placement));
   if (cycles.length > baseline.cycles)
     violations.push(`cycles increased from ${baseline.cycles} to ${cycles.length}`);
   if (baseline.runtime_cycles !== undefined && runtimeCycles.length > baseline.runtime_cycles) {

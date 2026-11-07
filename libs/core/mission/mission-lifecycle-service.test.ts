@@ -415,20 +415,27 @@ describe('mission-lifecycle-service — argv independence (SO-01 landmine regres
     fs.rmSync(PROFILE_ROOT, { recursive: true, force: true });
   });
 
-  it('start() behaves identically whether or not process.argv happens to contain --ephemeral/--force/--intent-goal', async () => {
+  // Each real start independently proves the same defaults without combining
+  // two integration operations into one test's execution budget.
+  it.each([
+    { argvCase: 'polluted', missionId: missionIdArgvPolluted, polluted: true },
+    { argvCase: 'clean', missionId: missionIdArgvClean, polluted: false },
+  ])('start() preserves explicit defaults with $argvCase argv', async ({ missionId, polluted }) => {
     const { missionLifecycleService: realFacade } = await import('./mission-lifecycle-service.js');
 
     // Simulate a host process whose argv carries flags meant for a totally
     // different CLI invocation sharing the process (the historical bug: a
     // bare `process.argv.includes('--ephemeral')` read anywhere in the
     // process would see these).
-    process.argv = [
-      ...originalArgv,
-      '--ephemeral',
-      '--force',
-      '--intent-goal',
-      '/tmp/does-not-exist-and-must-not-be-read.json',
-    ];
+    process.argv = polluted
+      ? [
+          ...originalArgv,
+          '--ephemeral',
+          '--force',
+          '--intent-goal',
+          '/tmp/does-not-exist-and-must-not-be-read.json',
+        ]
+      : [...originalArgv];
     // NOTE: `withExecutionContext` restores its env vars as soon as the
     // *synchronous* portion of the wrapped callback returns — it does not
     // survive across an `await` inside a multi-await async chain like the
@@ -445,7 +452,7 @@ describe('mission-lifecycle-service — argv independence (SO-01 landmine regres
     const defaultTenantFile = tenantProfilePath('default');
     const defaultTenantExisted = fs.existsSync(defaultTenantFile);
     await realFacade.start(
-      missionIdArgvPolluted,
+      missionId,
       'public',
       'worker',
       'default',
@@ -456,32 +463,14 @@ describe('mission-lifecycle-service — argv independence (SO-01 landmine regres
       {} // no explicit ephemeral/intentGoal/force — deterministic defaults
     );
 
-    // Clean argv — no flags at all.
-    process.argv = [...originalArgv];
-    await realFacade.start(
-      missionIdArgvClean,
-      'public',
-      'worker',
-      'default',
-      'development',
-      undefined,
-      {},
-      undefined,
-      {}
-    );
-
     const { loadState } = await import('./mission-state.js');
-    const pollutedState = loadState(missionIdArgvPolluted);
-    const cleanState = loadState(missionIdArgvClean);
+    const state = loadState(missionId);
 
-    expect(pollutedState).not.toBeNull();
-    expect(cleanState).not.toBeNull();
+    expect(state).not.toBeNull();
     // Neither run must have picked up --ephemeral from an argv it never
     // explicitly opted into via options.
-    expect((pollutedState as any).is_ephemeral).toBeFalsy();
-    expect((cleanState as any).is_ephemeral).toBeFalsy();
-    expect(pollutedState!.status).toBe(cleanState!.status);
-    expect(pollutedState!.status).toBe('active');
+    expect((state as any).is_ephemeral).toBeFalsy();
+    expect(state!.status).toBe('active');
     expect(fs.existsSync(defaultTenantFile)).toBe(defaultTenantExisted);
   });
 });

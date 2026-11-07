@@ -1,7 +1,7 @@
 /** Read-only mission record and classification readers shared with orchestration. */
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
-import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../governance/owner-scope.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';

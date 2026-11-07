@@ -1099,7 +1099,7 @@
         "validating",
         "working"
       ],
-      "description": "Canonical dashboard status vocabulary (libs/core/ux-vocabulary.ts renderStatus domains)."
+      "description": "Canonical dashboard status vocabulary (libs/core/localization/ux-vocabulary.ts renderStatus domains)."
     },
     "status-domain": {
       "enum": ["readiness", "connection", "provider", "mission", "progress", "runtime"]

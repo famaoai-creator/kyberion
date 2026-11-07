@@ -22,7 +22,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
-import { tryResolveOwnerScope, type OwnerScope } from '../owner-scope.js';
+import { tryResolveOwnerScope, type OwnerScope } from '../governance/owner-scope.js';
 import type { ScopeContext } from '../foundation/scope-context-validation.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 

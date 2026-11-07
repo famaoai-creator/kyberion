@@ -25,7 +25,7 @@ because a stance is configuration, not a scope.
 
 `knowledge/personal/stances/{slug}/` overlays `knowledge/personal/`: identity, connections, policy,
 voice, mission seeds, onboarding and the tenant profiles the stance may act for
-(`libs/core/stance-resolver.ts`). Setting `KYBERION_STANCE` changes _who Kyberion
+(`libs/core/authn/stance-resolver.ts`). Setting `KYBERION_STANCE` changes _who Kyberion
 thinks it is acting as_. A stance is the operator's own configuration (custody
 `person`), so it lives in the personal space; its run traces go to
 `active/shared/logs/stances/{slug}/traces/`.

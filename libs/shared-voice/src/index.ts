@@ -1,5 +1,6 @@
 /** Public surface for @agent/shared-voice — voice runtime moved out of @agent/core. */
 export * from './audio-text-similarity.js';
+export * from './streaming-voice-playback.js';
 export * from './realtime-voice-conversation.js';
 export * from './realtime-voice-loop.js';
 export * from './realtime-voice-preferences.js';

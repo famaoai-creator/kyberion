@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { safeRmSync } from '../secure-io.js';
-import { createDelegationHandle, type DelegationHandle } from '../delegated-task-observability.js';
+import {
+  createDelegationHandle,
+  type DelegationHandle,
+} from '../workforce/delegated-task-observability.js';
 import {
   buildRoleAwareReasoningBackend,
   stubReasoningBackend,

@@ -99,4 +99,4 @@ rollbackはタスク単位のrevert。認可漏れ、順序崩れ、missing even
 
 ### PERF-09 / 条件付きP1 / S: MLX同期子プロセス
 
-根拠: libs/core/mlx-embedding-backend.ts:96-109。async API内のexecFileSyncがNodeイベントループを止める。120秒timeoutと応答検証はあるが、参照先scripts/mlx_embed.pyが現在checkoutに存在せず、既定構成の実害は未確認。まず登録状態と実行可能性を確認。使用中なら既存の承認付きprocess基盤を使い非同期化。受入: 遅い模擬子プロセス中にtimerが進む、timeoutで子終了、stderr診断とvector形状維持。モデル常駐化は別タスク。
+根拠: libs/core/provider/mlx-embedding-backend.ts:96-109。async API内のexecFileSyncがNodeイベントループを止める。120秒timeoutと応答検証はあるが、参照先scripts/mlx_embed.pyが現在checkoutに存在せず、既定構成の実害は未確認。まず登録状態と実行可能性を確認。使用中なら既存の承認付きprocess基盤を使い非同期化。受入: 遅い模擬子プロセス中にtimerが進む、timeoutで子終了、stderr診断とvector形状維持。モデル常駐化は別タスク。

@@ -7,7 +7,7 @@ import { AnthropicReasoningBackend } from './anthropic-reasoning-backend.js';
 import { AnthropicIntentExtractor } from './anthropic-intent-extractor.js';
 import { AnthropicVoiceBridge } from './anthropic-voice-bridge.js';
 import { createAnthropicCredentialClient } from './anthropic-credential-client.js';
-import { metrics } from '../metrics.js';
+import { metrics } from '../analysis/metrics.js';
 
 // Credential ownership is the subject here; provider egress has its own scoped suites.
 vi.mock('../reasoning/reasoning-egress-scope.js', async (original) => ({

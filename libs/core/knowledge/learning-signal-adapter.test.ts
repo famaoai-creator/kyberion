@@ -8,7 +8,7 @@ const persistHints = vi.hoisted(() => vi.fn());
 const identity = vi.hoisted(() => ({ tenantSlug: undefined as string | undefined }));
 
 vi.mock('../core.js', () => ({ logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
-vi.mock('../operational-learning.js', () => ({ enqueueOperationalLearningSignal: enqueueSignal }));
+vi.mock('./operational-learning.js', () => ({ enqueueOperationalLearningSignal: enqueueSignal }));
 vi.mock('./feedback-loop.js', () => ({ persistHints }));
 vi.mock('../authority.js', () => ({ resolveIdentityContext: () => identity }));
 

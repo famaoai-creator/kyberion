@@ -28,7 +28,7 @@ import {
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
-import { delegationExecutionStartedFromError } from '../delegation-execution-tracker.js';
+import { delegationExecutionStartedFromError } from '../workforce/delegation-execution-tracker.js';
 
 describe('CopilotAcpReasoningBackend', () => {
   beforeEach(() => {

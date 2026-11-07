@@ -7,7 +7,7 @@ import {
   resolveScopeLocale,
   runWithReplyLocale,
   _resetLocaleModuleStateForTests,
-} from '../locale.js';
+} from '../localization/locale.js';
 import { logger } from '../core.js';
 import { resetRoleAssumptionPolicyCache } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
@@ -15,7 +15,7 @@ import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io
 import { withExecutionContext } from '../governance.js';
 import { buildSlackApprovalBlocks } from '../integrations/slack-approval-ui.js';
 import { detectTextLocale } from '../foundation/locale-normalize.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import {
   formatSteeringRejection,
   SurfaceSteeringAuthorityError,

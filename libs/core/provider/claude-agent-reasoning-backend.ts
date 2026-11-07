@@ -41,7 +41,7 @@ import type {
   SimulationResult,
   SynthesizedPersona,
 } from '../reasoning/reasoning-backend.js';
-import { getSubagentCapabilityProfile } from '../subagent-capability-profiles.js';
+import { getSubagentCapabilityProfile } from '../workforce/subagent-capability-profiles.js';
 import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js';
 import {
   buildClaudeNativeAgentDefinitions,
@@ -51,7 +51,7 @@ import {
 import type { ObservedNativeSubagent } from './claude-agent-query.js';
 import type { ProviderPermissionProfileName } from './provider-permission-profiles.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
-import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
+import { runStartReportingDelegation } from '../workforce/delegation-execution-tracker.js';
 
 const SYSTEM_PROMPT = `You are a judgment-support reasoning engine for a CEO work-automation platform.
 

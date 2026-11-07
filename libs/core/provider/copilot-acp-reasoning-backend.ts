@@ -6,13 +6,13 @@ import {
   structuredReasoningSpecs,
   STRUCTURED_REASONING_SYSTEM_PROMPT,
   type StructuredOpSpec,
-} from '../structured-reasoning.js';
+} from '../reasoning/structured-reasoning.js';
 import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
 import { getActiveSandboxPolicy } from '../shell/sandbox-policy.js';
 import {
   markDelegationExecutionStarted,
   runStartReportingDelegation,
-} from '../delegation-execution-tracker.js';
+} from '../workforce/delegation-execution-tracker.js';
 import type {
   BranchForkInput,
   CritiqueInput,

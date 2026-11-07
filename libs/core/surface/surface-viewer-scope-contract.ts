@@ -1,6 +1,6 @@
 /** Pure viewer identity, scope, and error contracts shared by surface adapters. */
-import type { ChronosAccessRole } from '../chronos-access-registry.js';
-import type { OsKnowledgeTier } from '../cloudflare-os-control-plane.js';
+import type { ChronosAccessRole } from '../authn/chronos-access-registry.js';
+import type { OsKnowledgeTier } from '../governance/cloudflare-os-control-plane.js';
 
 /** Opt-in human ownership namespace. Authentication evidence stays transport-owned. */
 export interface CanonicalHumanRequestIdentity {

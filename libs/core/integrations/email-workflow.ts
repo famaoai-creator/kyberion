@@ -11,7 +11,7 @@ import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { clamp, extractFencedBlock } from '../foundation/text.js';
 import { readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
-import { processUntrustedContent } from '../untrusted-content.js';
+import { processUntrustedContent } from '../governance/untrusted-content.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -23,7 +23,7 @@ import {
 } from '../secure-io.js';
 import { createLogger } from '../logger.js';
 import { getAdapterDefault } from '../actuator/adapter-default-preferences.js';
-import { resolveSeamDefaultOrder } from '../seam-provider-selection.js';
+import { resolveSeamDefaultOrder } from '../provider/seam-provider-selection.js';
 import { type EmailAccountId, type EmailAccountOperation } from './email-account-catalog.js';
 export { listEmailAccountProviders } from './email-account-catalog.js';
 export type {

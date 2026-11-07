@@ -638,7 +638,7 @@
       }
     },
     "execution_feedback.prefix": {
-      "description": "Leading word of an execution-feedback reply (`評価 <scenario-id>: <outcome>` / `feedback <scenario-id>: <outcome>`). Composed into the parser in libs/core/execution-feedback.ts.",
+      "description": "Leading word of an execution-feedback reply (`評価 <scenario-id>: <outcome>` / `feedback <scenario-id>: <outcome>`). Composed into the parser in libs/core/knowledge/execution-feedback.ts.",
       "locales": {
         "ja": {
           "phrases": ["評価"]

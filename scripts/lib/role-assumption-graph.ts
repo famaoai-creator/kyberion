@@ -87,7 +87,7 @@ const CORE_SPAWN_HELPERS: ReadonlyArray<{
     optionsIndex: 2,
   },
   {
-    file: 'libs/core/managed-process.ts',
+    file: 'libs/core/tool/managed-process.ts',
     name: /^spawn/,
     inheritsByDefault: true,
     optionsIndex: 0,

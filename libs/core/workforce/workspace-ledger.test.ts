@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as pathResolver from '../path-resolver.js';
-import { clearOwnerScopeCache } from '../owner-scope.js';
+import { clearOwnerScopeCache } from '../governance/owner-scope.js';
 import { withExecutionContextAsync } from '../authority.js';
 import {
   safeExecResult,

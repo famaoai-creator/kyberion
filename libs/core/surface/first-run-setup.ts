@@ -14,7 +14,7 @@
  */
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { issueChronosAccessToken } from '../chronos-access-registry.js';
+import { issueChronosAccessToken } from '../authn/chronos-access-registry.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { isVitestProcess } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';

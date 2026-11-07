@@ -35,13 +35,13 @@
  * `[VCS_HOST_UNAVAILABLE]` when none is.
  */
 
-import { createProviderRegistry } from '../provider-registry.js';
+import { createProviderRegistry } from '../provider/provider-registry.js';
 import type { SeamProviderMetadata } from '../seam.js';
 import {
   getSeamSelectionPolicy,
   resolveSeamDefaultOrder,
   savedSeamDefaultFor,
-} from '../seam-provider-selection.js';
+} from '../provider/seam-provider-selection.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { assertVcsCwdScope } from './cwd-scope.js';
 import { vcsDefaultRunner, type VcsCommandRunner } from './vcs-backend.js';

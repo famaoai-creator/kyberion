@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://kyberion.local/schemas/tasktype-artifact-map.schema.json",
   "title": "Task Type Artifact Map",
-  "description": "Canonical task_type -> artifact-kind mapping. Single source of truth for resolveTaskTypeArtifact() in libs/core/outcome-contract.ts. Extend mappings here when a new task type gains a governed artifact; the TS fallback mirrors these values.",
+  "description": "Canonical task_type -> artifact-kind mapping. Single source of truth for resolveTaskTypeArtifact() in libs/core/task/outcome-contract.ts. Extend mappings here when a new task type gains a governed artifact; the TS fallback mirrors these values.",
   "type": "object",
   "required": ["version", "mappings", "fallback"],
   "properties": {

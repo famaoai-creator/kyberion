@@ -7,7 +7,7 @@ import { renderCarryoverBlock } from '../workforce/worker-context-compaction.js'
 import {
   completeDelegatedTaskTrace,
   startDelegatedTaskTrace,
-} from '../delegated-task-observability.js';
+} from '../workforce/delegated-task-observability.js';
 import {
   delegationNotificationsPath,
   enqueueDelegationNotification,

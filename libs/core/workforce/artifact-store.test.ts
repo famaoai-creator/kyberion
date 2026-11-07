@@ -35,11 +35,6 @@ describe('artifact attempts with the unchanged tenant security policy', () => {
     policyRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kyb-attempt-policy-'));
     fs.writeFileSync(path.join(policyRoot, 'package.json'), '{}');
     seedPolicyFile(policyRoot);
-    const governance = path.join(policyRoot, 'knowledge/product/governance');
-    fs.copyFileSync(
-      path.join(REPO_ROOT, 'knowledge/product/governance/security-policy.json'),
-      path.join(governance, 'security-policy.json')
-    );
     fs.mkdirSync(path.join(policyRoot, 'knowledge/personal/tenants'), { recursive: true });
     fs.writeFileSync(
       path.join(policyRoot, 'knowledge/personal/tenants/synthetic-latency.json'),
@@ -126,11 +121,16 @@ describe('artifact attempts with the unchanged tenant security policy', () => {
   });
 });
 
-/** secure-io's policy engine fails closed without policies — seed the real file. */
+/** Policy-engine and role-narrowing guards require canonical policies. */
 function seedPolicyFile(root: string): void {
-  const target = path.join(root, 'knowledge', 'product', 'governance', 'agent-policies.yaml');
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.copyFileSync(path.join(REPO_ROOT, 'knowledge/product/governance/agent-policies.yaml'), target);
+  const governance = path.join(root, 'knowledge', 'product', 'governance');
+  fs.mkdirSync(governance, { recursive: true });
+  for (const policy of ['agent-policies.yaml', 'security-policy.json']) {
+    fs.copyFileSync(
+      path.join(REPO_ROOT, 'knowledge/product/governance', policy),
+      path.join(governance, policy)
+    );
+  }
   const schemaTarget = path.join(
     root,
     'knowledge',
@@ -158,8 +158,11 @@ describe('writeScopedArtifact (AL-02)', () => {
     tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kyb-scoped-artifact-'));
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
     seedPolicyFile(tmpRoot);
-    process.env.KYBERION_ROOT = tmpRoot;
-    process.env.MISSION_ROLE = 'mission_controller';
+    vi.stubEnv('KYBERION_ROOT', tmpRoot);
+    vi.stubEnv('MISSION_ROLE', 'mission_controller');
+    // This placement suite deliberately spans confidential tenant fixtures;
+    // use the canonical permitted persona rather than relying on absent policy.
+    vi.stubEnv('KYBERION_PERSONA', 'sovereign');
     store = await import('./artifact-store.js');
     // Owned scopes are placed by their owner's record, so the owners exist.
     const missionState = (missionId: string, tier: string) =>
@@ -214,8 +217,8 @@ describe('writeScopedArtifact (AL-02)', () => {
   });
 
   afterAll(() => {
-    delete process.env.KYBERION_ROOT;
-    delete process.env.MISSION_ROLE;
+    vi.unstubAllEnvs();
+    vi.resetModules();
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 

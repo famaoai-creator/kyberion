@@ -7,17 +7,17 @@ import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import {
   classifyQuestionDecision,
   resolveQuestionInteractionPacket,
-} from '../question-resolver.js';
+} from '../intent/question-resolver.js';
 import type { TaskCustomerDecisionRequest } from '../surface/channel-surface-types.js';
 import { parsePlanningReviewVerdict } from './mission-planning-packet.js';
 import { extractSurfaceBlocks } from '../surface/surface-response-blocks.js';
-import { renderStructuredOutputSchemaPrompt } from '../structured-output-contracts.js';
+import { renderStructuredOutputSchemaPrompt } from '../contracts/structured-output-contracts.js';
 import { evaluateMissionGate, writeMissionGateRecord } from './mission-gate-engine.js';
 import { logger } from '../core.js';
-import { type DynamicInjectionProvider } from '../dynamic-injection.js';
+import { type DynamicInjectionProvider } from '../reasoning/dynamic-injection.js';
 import { buildExecutionEnv } from '../authority.js';
 import { missionEvidenceDir } from '../path-resolver.js';
-import { resolveMissionDir } from '../owner-scope.js';
+import { resolveMissionDir } from '../governance/owner-scope.js';
 import { pathResolver } from '../path-resolver.js';
 import { type MissionContextPackPruningSummary } from './mission-context-pack.js';
 import { appendPromptVisibilityRecord } from '../reasoning/prompt-visibility-ledger.js';
@@ -33,7 +33,7 @@ import * as path from 'node:path';
 import { sanitizeIdSegment } from '../foundation/text.js';
 import { WorkerStateJournal } from '../workforce/worker-state-journal.js';
 import { restoreJournalCompaction } from '../workforce/worker-compaction-snapshot.js';
-import { frameUntrustedInput } from '../untrusted-input-framing.js';
+import { frameUntrustedInput } from '../governance/untrusted-input-framing.js';
 import { assertSafeRepositoryPath, safeExec, safeExistsSync, safeLstat } from '../secure-io.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import { createMissionProgressController } from './mission-orchestration-progress.js';
@@ -68,7 +68,7 @@ import {
   type CompactionReason,
   type WorkerContextMessage,
 } from '../workforce/worker-context-compaction.js';
-import { listActiveDelegatedTaskRecords } from '../delegated-task-observability.js';
+import { listActiveDelegatedTaskRecords } from '../workforce/delegated-task-observability.js';
 import {
   claimPendingDelegationNotifications,
   renderDelegationNotificationLines,
@@ -107,7 +107,7 @@ export function recordMissionVisiblePrompt(input: {
   form: string;
   contextPackId?: string;
   knowledgeRefs?: DeliveredKnowledgeRef[];
-  securityScope?: import('../context-security-scope.js').ContextSecurityScope;
+  securityScope?: import('../governance/context-security-scope.js').ContextSecurityScope;
 }): void {
   const tier = input.securityScope?.write_tier || 'public';
   // The context pack marks an untenanted mission with the 'default' sentinel
@@ -538,7 +538,7 @@ export async function maybeCompactDispatchSections(input: {
   missionGoalLines: string[];
   upstreamResultLines: string[];
   teamSnapshotLines: string[];
-  securityScope?: import('../context-security-scope.js').ContextSecurityScope;
+  securityScope?: import('../governance/context-security-scope.js').ContextSecurityScope;
   force?: boolean;
   reason?: CompactionReason;
 }): Promise<{ upstreamResultLines: string[]; teamSnapshotLines: string[] }> {
@@ -1050,7 +1050,7 @@ export async function buildNeedsKnowledgeReinforcementLines(input: {
   teamRole?: string;
   needs: string[];
   deliveredKnowledgeRefs: DeliveredKnowledgeRef[];
-  securityScope?: import('../context-security-scope.js').ContextSecurityScope;
+  securityScope?: import('../governance/context-security-scope.js').ContextSecurityScope;
 }): Promise<string[]> {
   if (input.needs.length === 0) return [];
   try {

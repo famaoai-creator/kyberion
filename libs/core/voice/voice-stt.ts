@@ -5,8 +5,8 @@ import {
   listSeamSelectionPurposes,
   resolveSeamProviderDecision,
   resolveSeamSelectionEntry,
-} from '../seam-provider-selection.js';
-import { matchSeamSelectionRule } from '../seam-selection-rules.js';
+} from '../provider/seam-provider-selection.js';
+import { matchSeamSelectionRule } from '../provider/seam-selection-rules.js';
 import { trimEndChars } from '../foundation/text.js';
 
 export type VoiceSttBackend =

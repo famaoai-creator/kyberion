@@ -21,7 +21,7 @@ import { randomBytes } from 'node:crypto';
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { auditChain } from '../governance/audit-chain.js';
-import { humanActor } from '../actor.js';
+import { humanActor } from '../contracts/actor.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { nowIso } from '../foundation/time.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';

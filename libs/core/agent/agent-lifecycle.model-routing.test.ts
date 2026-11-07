@@ -5,7 +5,7 @@ import {
   type SpawnOptions,
 } from './agent-lifecycle.js';
 import { agentRegistry, resolveAgentTrustScore } from './agent-registry.js';
-import { trustEngine } from '../trust-engine.js';
+import { trustEngine } from '../governance/trust-engine.js';
 import { ACPMediator } from '../mesh/acp-mediator.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync } from '../secure-io.js';

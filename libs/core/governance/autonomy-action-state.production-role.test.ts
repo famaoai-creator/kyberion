@@ -8,8 +8,8 @@ import type { AutonomyOutcomeRow } from './autonomy-action-state.js';
 
 // Keep the retention audit out of the shared audit log during tests.
 const retentionAudits = vi.hoisted(() => [] as Array<Record<string, unknown>>);
-vi.mock('../storage-retention-expiry.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../storage-retention-expiry.js')>();
+vi.mock('../storage/storage-retention-expiry.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../storage/storage-retention-expiry.js')>();
   return {
     ...actual,
     appendRetentionAudit: (record: Record<string, unknown>) => retentionAudits.push(record),
@@ -25,8 +25,8 @@ let safeWriteFile: typeof import('../secure-io.js').safeWriteFile;
 let safeMkdir: typeof import('../secure-io.js').safeMkdir;
 let pathResolver: typeof import('../path-resolver.js').pathResolver;
 let validateWritePermission: typeof import('../tier-guard.js').validateWritePermission;
-let streamJsonLines: typeof import('../jsonl-read.js').streamJsonLines;
-let resetAppendOnlyStoreMaintenanceState: typeof import('../append-only-store.js').resetAppendOnlyStoreMaintenanceState;
+let streamJsonLines: typeof import('../storage/jsonl-read.js').streamJsonLines;
+let resetAppendOnlyStoreMaintenanceState: typeof import('../storage/append-only-store.js').resetAppendOnlyStoreMaintenanceState;
 let autonomyLearningCapability: typeof import('../foundation/autonomy-learning-capability.js').autonomyLearningCapability;
 let withAutonomyLearningCapability: typeof import('../foundation/autonomy-learning-capability.js').withAutonomyLearningCapability;
 let runInResourceAccessScope: typeof import('../foundation/resource-access-scope.js').runInResourceAccessScope;
@@ -64,8 +64,8 @@ beforeAll(async () => {
   ({ safeReaddir, safeWriteFile, safeMkdir } = await import('../secure-io.js'));
   ({ pathResolver } = await import('../path-resolver.js'));
   ({ validateWritePermission } = await import('../tier-guard.js'));
-  ({ streamJsonLines } = await import('../jsonl-read.js'));
-  ({ resetAppendOnlyStoreMaintenanceState } = await import('../append-only-store.js'));
+  ({ streamJsonLines } = await import('../storage/jsonl-read.js'));
+  ({ resetAppendOnlyStoreMaintenanceState } = await import('../storage/append-only-store.js'));
   ({ autonomyLearningCapability, withAutonomyLearningCapability } =
     await import('../foundation/autonomy-learning-capability.js'));
   ({ runInResourceAccessScope } = await import('../foundation/resource-access-scope.js'));

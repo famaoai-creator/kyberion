@@ -9,7 +9,7 @@ status: active
 
 > **作成日**: 2026-09-15
 > **対象**: 6 つの surface(chronos-mirror-v2 / computer-surface / concierge / operator-surface / presence-studio / terminal-hud)がそれぞれ別の殻(Next.js × 2、Express + 静的 HTML × 2、TUI …)で UI を持っている現状を、**業務フロー単位の A2UI 部品** + **部品レジストリ** + **堅牢なレンダラ 1 つ(ホスト)** + **AI が叩けるヘッドレス API** に寄せる。
-> **前提**: `libs/core/a2ui.ts`(A2UI message / component 契約・検証・dispatcher)、`libs/core/headless-surface-contract.ts`(operation descriptor・manifest・envelope・viewer scope)、chronos-mirror-v2 の `HeadlessA2UIWorkspace` + `A2UIComponentLibrary`(React レンダラの芽)、フロントデスクの共有レール([FRONT_DESK_REDESIGN_PLAN](./FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md) FD-00〜10)、フェーズ式ヒアリング([FRONT_DESK_HEARING_TRAINING_PLAN](./FRONT_DESK_HEARING_TRAINING_PLAN_2026-09-14.ja.md))。
+> **前提**: `libs/core/surface/a2ui.ts`(A2UI message / component 契約・検証・dispatcher)、`libs/core/surface/headless-surface-contract.ts`(operation descriptor・manifest・envelope・viewer scope)、chronos-mirror-v2 の `HeadlessA2UIWorkspace` + `A2UIComponentLibrary`(React レンダラの芽)、フロントデスクの共有レール([FRONT_DESK_REDESIGN_PLAN](./FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md) FD-00〜10)、フェーズ式ヒアリング([FRONT_DESK_HEARING_TRAINING_PLAN](./FRONT_DESK_HEARING_TRAINING_PLAN_2026-09-14.ja.md))。
 > **ステータス表記**: 各フェーズ末尾の「実装状況」節に記録(07 月次規約と同一)。
 
 ---
@@ -86,7 +86,7 @@ tenant / viewer / role の解決、HTML、スタイル、ポート番号、語�
 
 ### AU-01: 部品レジストリ(P0)
 
-schema + catalog + `libs/core/ui-component-registry.ts`(読込・ロール別一覧・id 検索)+ catalog integrity 登録。既存機能を登録: ヒアリング(`a2ui`)、決定台帳(`planned`)、承認(`page` → 秘書室)、進み具合(`page`)。
+schema + catalog + `libs/core/surface/ui-component-registry.ts`(読込・ロール別一覧・id 検索)+ catalog integrity 登録。既存機能を登録: ヒアリング(`a2ui`)、決定台帳(`planned`)、承認(`page` → 秘書室)、進み具合(`page`)。
 
 ### AU-02: ホスト(P0)
 
@@ -131,7 +131,7 @@ repo 内契約 ⇄ 外部仕様の変換を 1 モジュールに閉じ、chronos
 
 - 2026-09-15: 計画作成。AU-00 の判断(ホスト = フロントデスク共有レール)を確定。
 - 2026-09-15: **AU-01〜AU-03 初期実装(実装コンセプトが動く形)** —
-  - レジストリ: `knowledge/product/orchestration/ui-component-registry.json` + schema(catalog integrity 登録)、`libs/core/ui-component-registry.ts`(ロール別一覧・id 検索・manifest との突合 `unknownComponentOperations`)。登録: ヒアリング(`a2ui`)、決定台帳(`planned`)、承認(`page` → 秘書室)、進み具合(`page`)。
+  - レジストリ: `knowledge/product/orchestration/ui-component-registry.json` + schema(catalog integrity 登録)、`libs/core/surface/ui-component-registry.ts`(ロール別一覧・id 検索・manifest との突合 `unknownComponentOperations`)。登録: ヒアリング(`a2ui`)、決定台帳(`planned`)、承認(`page` → 秘書室)、進み具合(`page`)。
   - ホスト: `/flow/:component`(`static/flow.html` / `flow.js` / `flow.css`)、`static/a2ui-host.js`(固定 library 13 種: text / button / card / container / display:hero / section / card / list / kv / progress / alert / badges / status。DOM API のみ、未知型は「まだ表示できません」、`button.action` はヘッドレス operation をホストが実行して再取得)、`GET /api/components`(レジストリをロール別に、語彙解決・href 付き)、`GET /api/flow-vocabulary`。
   - 第 1 部品: `hearing-a2ui.ts`(純関数の投影: hero / progress(フェーズ)/ alert(次の質問)/ フェーズごとの section + kv / decide・handoff ボタン)、`GET /api/headless/a2ui/hearing`(envelope `{a2ui, actions, input}`)。manifest に `presence.components.read`・`presence.hearing.view.a2ui`・`presence.hearing.answer / decide / handoff` を追加(write は localadmin + `surface.headless.write`)。
   - 実機(相棒 :3031、Playwright): `/flow/hearing` で部品メニュー → 7 項目を入力バーから回答 → フェーズ進捗が更新 → 「この内容で進める」→ 確定表示と「要件を確定して依頼にする」ボタンまで到達。console error 0、未知型 0。

@@ -30,7 +30,7 @@ Typical slots:
 
 A question raised while a mission task is executing has one of three owners.
 Classify it before asking anyone (`classifyQuestionDecision` in
-`libs/core/question-resolver.ts`):
+`libs/core/intent/question-resolver.ts`):
 
 | Class                                     | When                                                                                                                                   | What happens                                                                                       |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |

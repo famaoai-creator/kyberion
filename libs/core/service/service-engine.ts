@@ -16,7 +16,7 @@ import {
 } from './operator-service-connection-admission.js';
 import { SecureFetchError } from '../network.js';
 import { loadServiceEndpointsCatalog } from './service-endpoint-registry.js';
-import { fetchWithVaultCache } from '../data-vault.js';
+import { fetchWithVaultCache } from '../storage/data-vault.js';
 import { resolveServiceBinding } from './service-binding.js';
 import { getServicePresetRecord } from './service-preset-registry.js';
 import {

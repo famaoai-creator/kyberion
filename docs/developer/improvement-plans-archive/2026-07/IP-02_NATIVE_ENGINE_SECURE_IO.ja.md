@@ -23,7 +23,7 @@ AGENTS.md §1 は「ファイル I/O は `@agent/core/secure-io` 経由のみ」
 | `libs/core/media/native-docx-engine/engine.ts`                  | `:7` import、`:681`                                                     |
 | `libs/core/media/native-pptx-engine/engine.ts`                  | `:2` import、`:334`,`:402`(画像読み込み+zip)                            |
 | `libs/core/media/native-xlsx-engine/engine.ts`                  | `:7` import                                                             |
-| `libs/core/mlx-embedding-backend.ts`                            | `:15` import                                                            |
+| `libs/core/provider/mlx-embedding-backend.ts`                   | `:15` import                                                            |
 | `libs/core/media/native-docx-engine/examples/roundtrip_docx.ts` | `:8`(example スクリプト)                                                |
 
 **scripts 内(次点):**
@@ -65,7 +65,7 @@ AGENTS.md §1 は「ファイル I/O は `@agent/core/secure-io` 経由のみ」
 
 ### Task 4: mlx-embedding-backend と scripts 4本の移行 — `claude-sonnet-4`
 
-1. `libs/core/mlx-embedding-backend.ts:15` を secure-io 経由に置換。埋め込みモデルのファイル存在確認・読み込みが対象。
+1. `libs/core/provider/mlx-embedding-backend.ts:15` を secure-io 経由に置換。埋め込みモデルのファイル存在確認・読み込みが対象。
 2. `scripts/dependency_resolver.ts`, `scripts/chronos_daemon.ts`, `scripts/scenario_storage_governance.ts`, `scripts/verify-design-resolution.mjs` を同様に移行。scripts は `@agent/core` を import できる(既存の他 scripts が前例)。`.mjs` ファイルはコンパイル経路が異なるため、`node scripts/verify-design-resolution.mjs` の手動実行で動作確認する。
 3. 各スクリプトに対応するテストがあれば実行、なければ最低限「ヘルプ表示 or dry-run 実行」で起動確認する。
 

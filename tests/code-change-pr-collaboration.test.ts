@@ -57,7 +57,7 @@ vi.mock('../libs/core/mission/mission-team-plan-composer.js', async (importOrigi
     resolveMissionTeamReceiver: mocks.resolveMissionTeamReceiver,
   };
 });
-vi.mock('../libs/core/ledger.js', () => ({ ledger: { record: mocks.record } }));
+vi.mock('../libs/core/governance/ledger.js', () => ({ ledger: { record: mocks.record } }));
 vi.mock('../libs/core/mission/mission-task-events.js', () => ({
   emitMissionTaskEvent: mocks.emitMissionTaskEvent,
   // Must stay inside the repository: the secure-io resource-path scope rejects

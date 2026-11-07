@@ -27,7 +27,7 @@ vi.mock('../mission/mission-context-pack.js', async (importOriginal) => {
 // XP-03: checkProviderEgress emits an ops-alert on denial (acceptance
 // criterion 3). Mocked here rather than exercised for real so this suite
 // never touches the shared ops-alerts.jsonl sink.
-vi.mock('../ops-alert.js', () => ({ sendOpsAlert: mocks.sendOpsAlert }));
+vi.mock('../daemon/ops-alert.js', () => ({ sendOpsAlert: mocks.sendOpsAlert }));
 
 import {
   buildMissionContextPack,

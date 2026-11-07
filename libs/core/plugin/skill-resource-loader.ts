@@ -12,10 +12,10 @@ import {
   type ResourceProvenance,
   type ResourceProvenanceScope,
   type ResourceTrust,
-} from '../resource-provenance.js';
+} from '../contracts/resource-provenance.js';
 import { isSkillAllowed } from './skill-plugin-loader.js';
 import { assertScopeContext, type ScopeContext } from '../scope-context.js';
-import { requiresProjectTrust } from '../trust-requiring-resources.js';
+import { requiresProjectTrust } from '../governance/trust-requiring-resources.js';
 import type { ToolDefinition } from '../reasoning/reasoning-backend.js';
 import {
   planDeferredToolLoading,

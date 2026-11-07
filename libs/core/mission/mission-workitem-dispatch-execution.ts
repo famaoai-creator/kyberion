@@ -5,7 +5,7 @@
 
 import * as nodePath from 'node:path';
 import { logger } from '../core.js';
-import type { AgentContextMode } from '../context-boundary.js';
+import type { AgentContextMode } from '../contracts/context-boundary.js';
 import { readCanonicalWorkGraph } from '../workforce/work-graph-projection.js';
 import { readMissionTeamSelectionDispatch } from './mission-team-selection.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
@@ -19,7 +19,7 @@ import {
   buildCognitiveRouteDecision,
   formatCognitiveRouteDecision,
   type CognitiveRouteDecision,
-} from '../cognitive-routing.js';
+} from '../provider/cognitive-routing.js';
 import {
   advanceReasoningDriftWatchdog,
   encodeReasoningDriftWatchdogState,
@@ -37,12 +37,12 @@ import {
   saveMissionContextPack,
 } from './mission-context-pack.js';
 import { type TaskModelHint } from '../reasoning/reasoning-model-routing.js';
-import { resolveQuestionInteractionPacket } from '../question-resolver.js';
+import { resolveQuestionInteractionPacket } from '../intent/question-resolver.js';
 import { type TaskResultBlock } from '../surface/channel-surface-types.js';
 import { type OperatorInteractionPacket } from '../contracts/operator-interaction-packet.js';
-import { buildWorkingPrinciplesLines } from '../working-principles.js';
+import { buildWorkingPrinciplesLines } from '../workforce/working-principles.js';
 import type { MissionState } from './mission-types.js';
-import type { ContextSecurityScope } from '../context-security-scope.js';
+import type { ContextSecurityScope } from '../governance/context-security-scope.js';
 import { countWords as countWordsFromDispatchIO } from './mission-dispatch-io.js';
 import { type MissionExecutionSurface } from './mission-execution-surface.js';
 import { clamp } from '../foundation/text.js';

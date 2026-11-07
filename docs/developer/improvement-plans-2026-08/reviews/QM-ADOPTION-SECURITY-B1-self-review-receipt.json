@@ -23,7 +23,7 @@
       "severity": "suggestion",
       "category": "performance",
       "description": "rotateQuarantineIfOversized reads the entire quarantine file on every recordQuarantine; a stat-based size check would avoid the O(file) read.",
-      "location": "libs/core/security-screen.ts"
+      "location": "libs/core/governance/security-screen.ts"
     },
     {
       "severity": "suggestion",

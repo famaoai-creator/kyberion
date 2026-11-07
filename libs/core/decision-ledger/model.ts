@@ -20,7 +20,7 @@
  *     `decided`; only a human actor promotes, and only within the authority
  *     of their `level` (see `promote.ts`).
  */
-import type { ActorRef } from '../actor.js';
+import type { ActorRef } from '../contracts/actor.js';
 
 export const DECISION_LEVELS = [
   'product-fixed',

@@ -8,17 +8,17 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => ({ query: mocks.query }));
 vi.mock('../reasoning/reasoning-egress-scope.js', () => ({
   assertReasoningEgressAllowed: vi.fn(),
 }));
-vi.mock('../metrics.js', () => ({
+vi.mock('../analysis/metrics.js', () => ({
   metrics: { record: vi.fn(), increment: vi.fn(), observe: vi.fn() },
 }));
 
 import { runClaudeAgentTask, runClaudeAgentQuery } from './claude-agent-query.js';
-import { metrics } from '../metrics.js';
+import { metrics } from '../analysis/metrics.js';
 import {
   delegationExecutionStartedFromError,
   runStartReportingDelegation,
   runWithDelegationExecutionTracker,
-} from '../delegation-execution-tracker.js';
+} from '../workforce/delegation-execution-tracker.js';
 
 function stream(messages: Record<string, unknown>[]): AsyncIterable<unknown> {
   return {

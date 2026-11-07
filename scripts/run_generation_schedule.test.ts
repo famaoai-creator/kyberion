@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * gate. The duplicate is gone.
  *
  * So the tick behaviour is no longer this file's to test; it lives in
- * `libs/core/generation-scheduler.tick.test.ts`. What remains here is the CLI's
+ * `libs/core/daemon/generation-scheduler.tick.test.ts`. What remains here is the CLI's
  * own contract: `register` stays under surface_runtime, and `list`/`tick`
  * delegate to the governed implementation under the generation_scheduler role.
  */

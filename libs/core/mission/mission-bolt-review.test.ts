@@ -5,8 +5,8 @@ const mocks = vi.hoisted(() => ({
   addInboxEntry: vi.fn(),
   notify: vi.fn(() => ({ status: 'accepted' as const })),
 }));
-vi.mock('../deliverable-inbox.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../deliverable-inbox.js')>()),
+vi.mock('../task/deliverable-inbox.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../task/deliverable-inbox.js')>()),
   addInboxEntry: mocks.addInboxEntry,
 }));
 vi.mock('../surface/operator-notifications.js', async (importOriginal) => ({

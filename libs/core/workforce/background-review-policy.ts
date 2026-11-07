@@ -1,4 +1,4 @@
-import { t, type VocabularyKey } from '../t.js';
+import { t, type VocabularyKey } from '../localization/t.js';
 /**
  * HA-01 background-review guardrails.
  *

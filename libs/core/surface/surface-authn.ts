@@ -40,9 +40,9 @@
  * is governed by the same seam machinery.
  */
 
-import { humanActor, serviceActor } from '../actor.js';
-import { findChronosTokenRegistration } from '../chronos-access-registry.js';
-import type { OsKnowledgeTier } from '../cloudflare-os-control-plane.js';
+import { humanActor, serviceActor } from '../contracts/actor.js';
+import { findChronosTokenRegistration } from '../authn/chronos-access-registry.js';
+import type { OsKnowledgeTier } from '../governance/cloudflare-os-control-plane.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { isValidMemberId } from '../organization/member-id-grammar.js';
 import { isScimProvisioningTokenFormat } from '../organization/scim-protocol.js';
@@ -53,7 +53,7 @@ import {
   type AuthnRequest,
   type AuthnResolveDeps,
   type ResolvedPrincipal,
-} from '../authn-principal-resolver.js';
+} from '../authn/authn-principal-resolver.js';
 import '../authn/authn-providers.js';
 import {
   authorizeWithPolicyEngine,
@@ -61,9 +61,9 @@ import {
   type AuthzOperation,
   type AuthzResolveDeps,
   type AuthzResource,
-} from '../authz-policy-engine.js';
-import '../authz-providers.js';
-import type { SeamProviderDecision } from '../seam-provider-selection.js';
+} from '../governance/authz-policy-engine.js';
+import '../governance/authz-providers.js';
+import type { SeamProviderDecision } from '../provider/seam-provider-selection.js';
 import {
   SurfaceViewerScopeError,
   type SurfaceViewerScope,

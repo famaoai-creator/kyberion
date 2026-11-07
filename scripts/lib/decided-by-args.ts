@@ -8,7 +8,7 @@
  * `memory-approve`, `memory-reject`).
  *
  * `--decided-by` only ever names a human member (`user:<member-id>`) — never
- * an agent or service id. `libs/core/actor.ts` (FD-10a, a concurrently
+ * an agent or service id. `libs/core/contracts/actor.ts` (FD-10a, a concurrently
  * developed sibling module) will eventually supply a shared actor type; this
  * module defines its own minimal, structurally-identical shape
  * (`HumanDecidedBy` from `@agent/core/mission-types`) so it does not depend

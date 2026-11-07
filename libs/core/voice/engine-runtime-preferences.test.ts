@@ -7,11 +7,11 @@ import * as tierGuard from '../tier-guard.js';
 import * as lockUtils from '../foundation/lock-utils.js';
 import { getFoundationIo } from '../foundation/io.js';
 import { resolveStorageFloor } from '../storage-layout.js';
-import * as profileResolver from '../profile-root.js';
-import * as customerResolver from '../stance-resolver.js';
+import * as profileResolver from '../authn/profile-root.js';
+import * as customerResolver from '../authn/stance-resolver.js';
 
 const profileRoot = vi.hoisted(() => ({ value: '', fixtureRoot: '' }));
-vi.mock('../profile-root.js', () => ({
+vi.mock('../authn/profile-root.js', () => ({
   resolveActiveProfileRoot: () => profileRoot.value,
 }));
 
@@ -152,7 +152,9 @@ describe('engine-runtime preferences', () => {
   });
 
   it('authorizes customer targets before guarded customer/symlink probes and preserves denials', async () => {
-    const actual = await vi.importActual<typeof import('../profile-root.js')>('../profile-root.js');
+    const actual = await vi.importActual<typeof import('../authn/profile-root.js')>(
+      '../authn/profile-root.js'
+    );
     vi.spyOn(profileResolver, 'resolveActiveProfileRoot').mockImplementation(
       actual.resolveActiveProfileRoot
     );
@@ -196,7 +198,9 @@ describe('engine-runtime preferences', () => {
   });
 
   it('rejects malformed customer selection before target permission inspection', async () => {
-    const actual = await vi.importActual<typeof import('../profile-root.js')>('../profile-root.js');
+    const actual = await vi.importActual<typeof import('../authn/profile-root.js')>(
+      '../authn/profile-root.js'
+    );
     vi.spyOn(profileResolver, 'resolveActiveProfileRoot').mockImplementation(
       actual.resolveActiveProfileRoot
     );

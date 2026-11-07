@@ -1,8 +1,21 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { checkModuleBoundaries, readModuleBoundaryTextFile } from './check_module_boundaries.js';
+import {
+  checkModuleBoundaries,
+  readModuleBoundaryTextFile,
+  resolveModuleBoundaryImport,
+} from './check_module_boundaries.js';
 
 describe('module boundary ratchet', () => {
+  it('follows preserved public subpaths to their actual implementation and directory indexes', () => {
+    const caller = pathResolver.rootResolve('scripts/cost_report.ts');
+    expect(resolveModuleBoundaryImport(caller, '@agent/core/finance-controller')).toBe(
+      pathResolver.rootResolve('libs/core/finance/finance-controller.ts')
+    );
+    expect(resolveModuleBoundaryImport(caller, '@agent/core/foundation')).toBe(
+      pathResolver.rootResolve('libs/core/foundation/index.ts')
+    );
+  });
   // The full-repo import walk takes ~20s locally (longer on shared CI
   // runners); compute it once and share it instead of re-walking per test.
   let report: ReturnType<typeof checkModuleBoundaries>;

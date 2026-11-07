@@ -38,7 +38,7 @@ vi.mock('../surface/operator-notifications.js', () => ({ notifyOperator: vi.fn()
 
 import { rootResolve } from '../path-resolver.js';
 import { safeRmSync } from '../secure-io.js';
-import { humanActor } from '../actor.js';
+import { humanActor } from '../contracts/actor.js';
 import {
   acceptCharter,
   readCharterLedger,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CeoApprovalItem } from '../ceo-surface-summary.js';
+import type { CeoApprovalItem } from './ceo-surface-summary.js';
 import type { DecisionBrief } from './decision-brief.js';
 import {
   NEEDS_YOU_OVERDUE_AFTER_MS,

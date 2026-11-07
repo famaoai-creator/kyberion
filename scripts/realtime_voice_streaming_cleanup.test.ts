@@ -24,8 +24,8 @@ vi.mock('@agent/core/voice/audio-playback', async (original) => ({
   ...(await original<typeof import('@agent/core/voice/audio-playback')>()),
   probeAudioPlayback: probes.artifact,
 }));
-vi.mock('@agent/core/streaming-voice-playback', async (original) => ({
-  ...(await original<typeof import('@agent/core/streaming-voice-playback')>()),
+vi.mock('@agent/shared-voice/streaming-voice-playback', async (original) => ({
+  ...(await original<typeof import('@agent/shared-voice/streaming-voice-playback')>()),
   probePcmAudioStreaming: probes.pcm,
 }));
 vi.mock('@agent/shared-voice/realtime-voice-loop', async (original) => ({

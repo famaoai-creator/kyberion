@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { agentActor, humanActor } from '../actor.js';
+import { agentActor, humanActor } from '../contracts/actor.js';
 import * as pathResolver from '../path-resolver.js';
 import { safeReaddir, safeRmSync } from '../secure-io.js';
 import { appendJsonLine } from '../foundation/json.js';

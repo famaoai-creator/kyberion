@@ -4,13 +4,13 @@ import path from 'node:path';
 
 const { probe } = vi.hoisted(() => ({ probe: vi.fn() }));
 const { appleGate, applePrompt } = vi.hoisted(() => ({ appleGate: vi.fn(), applePrompt: vi.fn() }));
-vi.mock('../apple-intelligence-bridge.js', () => ({
+vi.mock('../provider/apple-intelligence-bridge.js', () => ({
   gateAppleLane: appleGate,
   appleFmPromptWithImage: applePrompt,
 }));
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
 
-vi.mock('../windows-native-image-recognition-bridge.js', () => ({
+vi.mock('../ocr/windows-native-image-recognition-bridge.js', () => ({
   probeWindowsNativeImageRecognition: probe,
   describeImageWithWindowsNativeApi: vi.fn(() => ''),
 }));

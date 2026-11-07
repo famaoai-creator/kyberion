@@ -16,7 +16,7 @@ status: archived
 
 | 系統                             | 発火源                                                     | 正本の置き場                                                                                                    | 実装                                                                               |
 | -------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| ① **トリガ層**(外→実行の起動)    | cron / process watch / surface wake                        | `active/shared/runtime/trigger-deliveries.jsonl`                                                                | `libs/core/trigger-runner.ts`                                                      |
+| ① **トリガ層**(外→実行の起動)    | cron / process watch / surface wake                        | `active/shared/runtime/trigger-deliveries.jsonl`                                                                | `libs/core/daemon/trigger-runner.ts`                                               |
 | ② **実行内イベント**(プロセス内) | turn / step / phase / approval / notification              | プロセス内 SPMC + `active/shared/logs/worker-events/**.jsonl`                                                   | `libs/core/workforce/worker-event-stream.ts`                                       |
 | ③ **ミッション/タスクイベント**  | orchestration 要求、task 発行〜受入                        | `active/shared/coordination/orchestration/events/*.json`、`active/shared/observability/mission-control/*.jsonl` | `mission-orchestration-events.ts` / `mission-task-events.ts`                       |
 | ④ **神経系(KANS)刺激バス**       | 任意プロセスからの `NerveMessage`                          | `presence/bridge/runtime/stimuli.jsonl`                                                                         | `nerve-bridge.ts` / `sensory-memory.ts` / `shared-nerve/reflex-engine.ts`          |
@@ -59,7 +59,7 @@ status: archived
 **現状**: cron 経路が二重系になっている。
 
 - `scripts/chronos_daemon.ts` — pipeline schedule。TriggerRunner 経由(冪等キー `cron:{id}:{分}`、`chronos_gateway` authority、leader lease、runLock、監査あり)
-- `scripts/run_generation_schedule_daemon.ts` → `run_generation_schedule.ts --action tick` — media generation schedule。**60 秒ごとに子プロセスを spawn するだけ**で、`isGenerationScheduleDue()`(`libs/core/generation-scheduler.ts:77`)が独自に due 判定し、そのまま submit する
+- `scripts/run_generation_schedule_daemon.ts` → `run_generation_schedule.ts --action tick` — media generation schedule。**60 秒ごとに子プロセスを spawn するだけ**で、`isGenerationScheduleDue()`(`libs/core/daemon/generation-scheduler.ts:77`)が独自に due 判定し、そのまま submit する
 
 **欠落しているもの**(generation 側):
 
@@ -82,7 +82,7 @@ status: archived
 
 ### EV-02: process watch / wake トリガの配線完遂または明示撤去(P1 / S)
 
-**現状**: `armTriggerWatch()`(`libs/core/trigger-runner.ts:470`)と `runWakeTrigger()`(`:506`)は実装・テスト済みだが、**production の呼び出し元が存在しない**(grep 上、参照は `trigger-runner.ts` 自身とテストのみ)。`managed-process.ts` の `armWatch` も同様に本体外の呼び出し元がない。
+**現状**: `armTriggerWatch()`(`libs/core/daemon/trigger-runner.ts:470`)と `runWakeTrigger()`(`:506`)は実装・テスト済みだが、**production の呼び出し元が存在しない**(grep 上、参照は `trigger-runner.ts` 自身とテストのみ)。`managed-process.ts` の `armWatch` も同様に本体外の呼び出し元がない。
 
 `pipelines/health-degradation-watch.json` / `pipelines/tenant-drift-watch.json` は名前が "watch" だが実体は cron(`30 * * * *` / `15 5 * * *`)であり、process watch ではない。
 
@@ -124,7 +124,7 @@ status: archived
 
 ### EV-04: nerve-bridge テール読取の堅牢化と TTL 執行(P1 / S)
 
-**現状**: `listenToNerve()`(`libs/core/nerve-bridge.ts:80`)は 1 秒ポーリング + **ファイルサイズ差分**で新着を読む。
+**現状**: `listenToNerve()`(`libs/core/ingress/nerve-bridge.ts:80`)は 1 秒ポーリング + **ファイルサイズ差分**で新着を読む。
 
 ```
 if (stats.size > lastSize) { …読む…; lastSize = stats.size; }
@@ -215,7 +215,7 @@ if (stats.size > lastSize) { …読む…; lastSize = stats.size; }
 
 **実装**:
 
-1. `libs/core/jsonl-tail.ts` を新設 — inode/指紋によるローテーション検知、未完結行バッファ、カーソル永続化、`AbortSignal` 対応を 1 箇所に実装(EV-04 の修正はここへ吸収)
+1. `libs/core/storage/jsonl-tail.ts` を新設 — inode/指紋によるローテーション検知、未完結行バッファ、カーソル永続化、`AbortSignal` 対応を 1 箇所に実装(EV-04 の修正はここへ吸収)
 2. `attachJsonlRecorder` の対になる `subscribeJsonl(filePath) → WorkerEventStream` アダプタを提供し、別プロセスが「ファイルを読む」のではなく「ストリームを購読する」形に統一
 3. `nerve-bridge.listenToNerve` / `agent-collaboration-projection` の再読み込み / terminal-hud のポーリングを順次このアダプタへ寄せる
 
@@ -279,9 +279,9 @@ if (stats.size > lastSize) { …読む…; lastSize = stats.size; }
 ## 6. 検証コマンド
 
 ```bash
-pnpm vitest run libs/core/trigger-runner.test.ts                # ① トリガ関門
+pnpm vitest run libs/core/daemon/trigger-runner.test.ts                # ① トリガ関門
 pnpm vitest run libs/core/pipeline/pipeline-scheduler.test.ts        # cron due 判定 / catch-up
-pnpm vitest run libs/core/managed-process.watch.test.ts         # process watch
+pnpm vitest run libs/core/tool/managed-process.watch.test.ts         # process watch
 pnpm vitest run libs/shared-nerve/src/reflex-engine.test.ts     # reflex
 pnpm pipeline --input pipelines/qm02-trigger-validation.json    # QM-02 検証パイプライン
 pnpm pipeline --input pipelines/storage-janitor.json            # EV-06 の uncovered 報告
@@ -302,14 +302,14 @@ pnpm daemon:watchdog -- --json                                  # EV-05
 #### 実装内容
 
 - **EV-10: 完了。** `scripts/check_event_wiring.ts` 新設（6 ルール: TriggerSource 全値の production 呼び出し元 / WORKER_EVENT_TYPES の emit 元 / reflex dispatcher bind / heartbeat を出す daemon の watchdog 登録 / イベントストアの retention 宣言 / 実装が消えた機能を説明する文書）。`pnpm check:event-wiring` として `validate` に登録。checker 自身を呼び出し元と誤認しないよう自己除外。テスト 18 件（各ルールが合成ツリーで確実に赤になることを含む）。
-- **EV-04 + EV-08: 完了。** `libs/core/jsonl-tail.ts` 新設。ローテーション検知を 3 経路（サイズ後退・inode 変化・**消費済みプレフィクスの**指紋変化）で行い、未完結行は消費しない。**指紋の基準を「ファイル先頭 N バイト」から「既に消費したオフセット」に変えた** — 前者は N 未満のファイルへの追記で毎回指紋が変わり、通常の追記をローテーションと誤検知してカーソルを巻き戻し続ける。`nerve-bridge.listenToNerve` をこれに載せ替え（戻り値が unsubscribe に変更）、TTL 執行を追加。`sensory-memory.getLatestByIntent` は `timeWindowMs` を**必須引数化**（無制限検索は `dynamic-permission-guard` の一時付与が閉じない原因だった）。
+- **EV-04 + EV-08: 完了。** `libs/core/storage/jsonl-tail.ts` 新設。ローテーション検知を 3 経路（サイズ後退・inode 変化・**消費済みプレフィクスの**指紋変化）で行い、未完結行は消費しない。**指紋の基準を「ファイル先頭 N バイト」から「既に消費したオフセット」に変えた** — 前者は N 未満のファイルへの追記で毎回指紋が変わり、通常の追記をローテーションと誤検知してカーソルを巻き戻し続ける。`nerve-bridge.listenToNerve` をこれに載せ替え（戻り値が unsubscribe に変更）、TTL 執行を追加。`sensory-memory.getLatestByIntent` は `timeWindowMs` を**必須引数化**（無制限検索は `dynamic-permission-guard` の一時付与が閉じない原因だった）。
 - **EV-06: 完了。** `EVENT_STORE_PREFIXES` / `eventStoreRetentionRules` / `coveredEventStoreDirs` を retention catalog モジュールに追加し、`scanEventStores` と `listUncoveredEventStoreDirs` を janitor に新設（report に `expiredEventStores` / `uncoveredEventStoreDirs` を追加）。catalog v1.3.0 に 6 エントリ追加（observability 残余 90d/audit・mission-control 90d/audit・channels 30d・chronos 30d・orchestration/events 14d・presence/bridge/runtime 7d）。`ops-alerts.jsonl` はファイルであり catalog はディレクトリを模すため専用エントリを置かず残余ルールに帰属させた。`scanEventStores` は各ファイルの所有エントリを longest-prefix で解決するため、残余ルールが具体ルールの TTL/audit を上書きしたり二重計上したりしない。`stimuli.jsonl` に 5MB 自己ローテーションを追加。dry-run 実測: 期限切れ 459 件（456 件は 2026-06〜07 の消費済み orchestration queue チケット、正本の journal は残存）、uncovered 0 件。
 - **EV-01: 完了。** `hasMissedCronOccurrence` / `sameZonedMinute` を `src/cron-utils.ts` に移して両スケジューラで共有（`maxLookbackMinutes` で長期停止時の走査を有界化）。generation tick を TriggerRunner 経由（冪等キー `gen:{id}:{分}`）+ leader lease + run lock（token 照合解放・期限切れ再取得）化。**`scripts/run_generation_schedule.ts` にあった tick の完全な二重実装を削除して libs/core に単一化** — デーモンが叩くのはスクリプト側だったため、ライブラリだけを直しても本番経路は governed にならなかった。authority role `generation_scheduler` を登録儀式で新設（`chronos_gateway` は media-generation への write scope を持たないため流用不可）。
 - **EV-05: 完了。** `run_generation_schedule_daemon.ts` に heartbeat（starting/running/error）と tick 失敗時の ops alert を追加し、**1回の tick 失敗でプロセスを落とすのをやめた**（それ自体が観測されない停止だった）。`DEFAULT_DAEMONS` に `generation-schedule-daemon` を追加・export。
 - **EV-02: 完了（方針 A）。** `resolveCurrentTriggerAuthority()` を新設（役割が可変な呼び出し元が registry から真の snapshot を導出できる）。`watch`: `acp-mediator` に `stallWatchMs` / `onStall` を追加し、`armTriggerWatch` で provider セッションの無出力を governed トリガ化（crash は既に `exit` で観測できていたが、生存したまま黙る場合は完全に不可視だった）。`wake`: `daemon_watchdog` に `requestDaemonRecovery` を追加し、不健全 daemon ごとに冪等な wake トリガを立てて `autonomous-ops-gate` の判定を記録。`daemon_restart` アクションを policy に登録（score 7 → **`approve`**: sandbox 外の service-manager コマンドであり、発火中のスケジューラ再起動は重複/欠落を生むため無人実行しない）。authority role `daemon_watchdog` を新設。
 - **EV-03: 完了（方針 A）。** reflex engine v2.0: `{{payload}}` の展開を**JSON テキストへの文字列置換 + 再パースから構造的置換へ**（引用符・波括弧・改行を含む payload が params の構造を変えられない）、`REFLEX_ALLOWED_ACTUATORS` によるロード時 + dispatch 時の二段検証、`TriggerRunner` の `wake` トリガによる冪等化（`reflex:{reflex_id}:{stimulus_id}`）と監査。actuator の op-registry 照合は allowlist が厳密に強いため dispatch 経路から外し、**allowlist 自体の妥当性をテストで担保**（実 registry を読む）。`nexus-daemon` の dispatcher は未対応 actuator で throw するようにし（従来は silent no-op）、authority role `nexus_daemon` を canonical 登録（未登録のままでは反射が本番で拒否される）。AUTONOMY_SYSTEM_GUIDE §2 にガバナンス表と「定義が無ければ 1 件も発火しない」旨を追記。
 - **EV-07: 完了。** `libs/core/event-vocabulary.ts` 新設。5 つの閉じた語彙（worker / orchestration / task / process watch / operator）を `Record<EnumType, CollaborationKind>` で**型による網羅性強制**にし、`collaborationKindFromEventType` を推測から表引きに置換。自由記述の `decision` 文字列だけは推論に残したが、**結果語を主語より先に評価する順序**に直した（`runtime` を spawn トークンにしていたため `agent_runtime_stopped` 等の終端イベントがすべて spawn に誤分類されていた）。**追加発見**: `phase_begin` / `phase_end` / `gate_evaluated` の 3 型はどこからも emit されていなかったため、遷移を決める唯一の地点 `advanceAiDlcPhase` から emit するよう配線（失敗ゲート時は phase が進まないので `alignment` を begin する）。
-- **EV-09: 完了。** `libs/core/trigger-correlation.ts` 新設（AsyncLocalStorage。並行配信が互いの ID を見ない）。TriggerRunner の delivery をこのスコープ内で実行し、`WorkerEventSource` に `trigger_delivery_id` を追加して**明示指定が無い場合のみ**自動付与。`operator-notifications` の correlation と dedupe キーにも伝播（1 発火から出た 2 通は同一イベントとして dedupe される）。
+- **EV-09: 完了。** `libs/core/event/trigger-correlation.ts` 新設（AsyncLocalStorage。並行配信が互いの ID を見ない）。TriggerRunner の delivery をこのスコープ内で実行し、`WorkerEventSource` に `trigger_delivery_id` を追加して**明示指定が無い場合のみ**自動付与。`operator-notifications` の correlation と dedupe キーにも伝播（1 発火から出た 2 通は同一イベントとして dedupe される）。
 
 #### 実装中に見つけた別系統の欠陥（本計画で修正）
 
@@ -321,9 +321,9 @@ pnpm daemon:watchdog -- --json                                  # EV-05
 - 新規・改修テスト **123 件**（3 回連続実行で安定）: `jsonl-tail`(13) `event-vocabulary`(8) `event-store-retention`(6) `trigger-correlation`(7) `stimuli-ttl`(5) `generation-scheduler.tick`(14) `cron-utils.catchup`(7) `lock-utils`(4) `reflex-engine`(13) `check_event_wiring`(18) `daemon_watchdog`(4) `run_generation_schedule`(6) + 既存 `trigger-runner` / `pipeline-scheduler`
 - `libs/core` 全体 4873 passed / `scripts` 全体 608 passed
 - `pnpm check:event-wiring` OK（2465 ファイル走査・6 ルール充足）、`pnpm run check -- --scope full --only catalogs` OK（authority-role 3 件追加に伴い `pnpm generate:knowledge-index` 実行）
-- **未解決の既存失敗（本計画と無関係）**: `libs/core/history-search-index.test.ts` 5 件 — Apple 版 sqlite3 の `trusted_schema=0` による `unsafe use of virtual table` で、当該ファイルに本計画の変更はない（`git diff` 空）。環境依存。
+- **未解決の既存失敗（本計画と無関係）**: `libs/core/search/history-search-index.test.ts` 5 件 — Apple 版 sqlite3 の `trusted_schema=0` による `unsafe use of virtual table` で、当該ファイルに本計画の変更はない（`git diff` 空）。環境依存。
 
 #### 残作業
 
-- `scripts/run_generation_schedule.ts` のテストは委譲の検証に縮小し、tick 本体は `libs/core/generation-scheduler.tick.test.ts` が正本。実運用での初回 janitor 実行で orchestration queue 456 件が削除される点は意図どおりだが、**実環境での初回実行は観測付きで行うこと**。
+- `scripts/run_generation_schedule.ts` のテストは委譲の検証に縮小し、tick 本体は `libs/core/daemon/generation-scheduler.tick.test.ts` が正本。実運用での初回 janitor 実行で orchestration queue 456 件が削除される点は意図どおりだが、**実環境での初回実行は観測付きで行うこと**。
 - EV-02 の `daemon_restart` は `approve` 判定なので、実際の再起動を実行する executor は未実装（意図的）。無人再起動を許すかは運用判断。

@@ -2,12 +2,12 @@ import {
   calendarDateInZone,
   isJapaneseBankBusinessDay,
   zonedWallTimeToInstant,
-} from '../business-calendar.js';
+} from '../temporal/business-calendar.js';
 import {
   resolveTemporalContext,
   type TemporalContextInput,
   type TemporalWorkingHours,
-} from '../temporal-context.js';
+} from '../temporal/temporal-context.js';
 
 export interface BusyWindow {
   start: string;

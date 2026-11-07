@@ -56,7 +56,7 @@ import {
   safeStat,
   safeWriteFile,
 } from '../secure-io.js';
-import { sha256 } from '../marketing-workload.js';
+import { sha256 } from '../organization/marketing-workload.js';
 import { withLock } from '../foundation/lock-utils.js';
 import { loadState, saveState } from './mission-state.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';

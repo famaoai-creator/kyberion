@@ -10,7 +10,7 @@ import {
   resolveProviderPermissionArgs,
   type ProviderId,
 } from './provider-permission-profiles.js';
-import { listSubagentCapabilityProfileNames } from '../subagent-capability-profiles.js';
+import { listSubagentCapabilityProfileNames } from '../workforce/subagent-capability-profiles.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
 
 describe('provider-permission-profiles', () => {

@@ -1,6 +1,6 @@
 /**
  * scripts/lib/ops-health-input.ts — gather the observations evaluateOpsHealth
- * (libs/core/ops-health.ts) judges. Shared by the baseline check (L10/L12)
+ * (libs/core/daemon/ops-health.ts) judges. Shared by the baseline check (L10/L12)
  * and `pnpm kyberion doctor`, so both surfaces read the same state with the
  * same thresholds. Every reader fails soft: an unreadable source becomes
  * `null` (the evaluator then skips that family) instead of throwing.

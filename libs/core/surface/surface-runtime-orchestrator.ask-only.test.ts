@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../workforce/background-review-runner.js', () => ({
   triggerBackgroundReviewFork: mocks.triggerBackgroundReviewFork,
 }));
-vi.mock('../execution-feedback.js', () => ({
+vi.mock('../knowledge/execution-feedback.js', () => ({
   recordExecutionFeedback: mocks.recordExecutionFeedback,
   parseExecutionFeedbackText: mocks.parseExecutionFeedbackText,
 }));
@@ -47,7 +47,7 @@ vi.mock('../task/task-session.js', () => ({
   updateTaskSession: vi.fn(),
   getActiveTaskSession: vi.fn(),
 }));
-vi.mock('../router-contract.js', () => ({
+vi.mock('../intent/router-contract.js', () => ({
   resolveSurfaceIntent: mocks.resolveSurfaceIntent,
   resolveDirectIntentCommand: () => null,
 }));

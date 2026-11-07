@@ -8,7 +8,10 @@ import { type ArtifactReviewReceipt } from '../workforce/artifact-review.js';
 import { nowIso } from '../foundation/time.js';
 import { executeServicePreset } from '../service/service-engine.js';
 import { type WorkItem } from '../workforce/work-coordination.js';
-import { formatCognitiveRouteDecision, type CognitiveRouteDecision } from '../cognitive-routing.js';
+import {
+  formatCognitiveRouteDecision,
+  type CognitiveRouteDecision,
+} from '../provider/cognitive-routing.js';
 import { type TaskModelHint } from '../reasoning/reasoning-model-routing.js';
 import { type TaskResultBlock } from '../surface/channel-surface-types.js';
 import { type OperatorInteractionPacket } from '../contracts/operator-interaction-packet.js';

@@ -25,7 +25,7 @@
  *
  * Refusal reasons are stable, customer-safe codes; nothing here carries prose.
  */
-import { humanActor } from '../actor.js';
+import { humanActor } from '../contracts/actor.js';
 import {
   canonicalJson,
   type DecisionCustomerActor,

@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { withExecutionContext } from '../authority.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
-import { resolveActiveProfileRoot } from '../profile-root.js';
+import { resolveActiveProfileRoot } from '../authn/profile-root.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,

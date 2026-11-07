@@ -40,15 +40,15 @@ export * from './service/service-pid-registry.js';
 
 export * from './voice/voice-profile-registry.js';
 
-export * from './presentation-preference-registry.js';
+export * from './design/presentation-preference-registry.js';
 
-export * from './imessage-bridge.js';
+export * from './integrations/imessage-bridge.js';
 
-export * from './imessage-utils.js';
+export * from './integrations/imessage-utils.js';
 
 export * from './integrations/bluebubbles-adapter.js';
 
-export * from './history-search-index.js';
+export * from './search/history-search-index.js';
 
 export * from './voice/voice-engine-registry.js';
 
@@ -72,13 +72,13 @@ export * from './platform.js';
 
 export { terminalBridge } from './shell/terminal-bridge.js';
 
-export { ReflexTerminal } from './reflex-terminal.js';
+export { ReflexTerminal } from './shell/reflex-terminal.js';
 
-export type { ReflexTerminalOptions } from './reflex-terminal.js';
+export type { ReflexTerminalOptions } from './shell/reflex-terminal.js';
 
-export * from './sensor-engine.js';
+export * from './event/sensor-engine.js';
 
-export * from './sensory-memory.js';
+export * from './event/sensory-memory.js';
 
 export * from './provider/provider-capability-scanner.js';
 
@@ -98,7 +98,7 @@ export * from './provider/claude-task-session-executor.js';
 
 export * from './actuator/actuator-op-registry.js';
 
-export * from './stimuli-journal.js';
+export * from './event/stimuli-journal.js';
 
 // Mission Status Guard
 
@@ -135,7 +135,7 @@ export {
   TRASH_REPO_SUBPATH,
   ARCHIVE_REPO_SUBPATH,
   COMPACTION_ARCHIVE_REPO_SUBPATH,
-} from './storage-janitor.js';
+} from './storage/storage-janitor.js';
 
 export type {
   JanitorReport,
@@ -147,7 +147,7 @@ export type {
   SweepDelegationChildrenOptions,
   SweepDelegationChildrenResult,
   SweepAppendOnlyStoresResult,
-} from './storage-janitor.js';
+} from './storage/storage-janitor.js';
 
 // Autonomous ops loop stage 1+2: anomaly probe -> findings + work items.
 export {
@@ -157,8 +157,12 @@ export {
   probeUncoveredStores,
   OPS_FINDINGS_PATH,
   OPS_ALERTS_PATH,
-} from './ops-health-probe.js';
-export type { OpsFinding, OpsHealthProbeDeps, OpsHealthProbeResult } from './ops-health-probe.js';
+} from './daemon/ops-health-probe.js';
+export type {
+  OpsFinding,
+  OpsHealthProbeDeps,
+  OpsHealthProbeResult,
+} from './daemon/ops-health-probe.js';
 
 // Scope-linked GC & offboarding (AL-04)
 
@@ -170,7 +174,7 @@ export {
   OFFBOARDING_EXPORT_SUBDIR,
   INGEST_CURSORS_REPO_SUBPATH,
   INGEST_DEDUP_REGISTRY_REPO_PATH,
-} from './scope-offboarding.js';
+} from './storage/scope-offboarding.js';
 
 export type {
   GcMissionRuntimeResidueResult,
@@ -185,7 +189,7 @@ export type {
   OffboardTarget,
   OffboardTargetKind,
   OffboardVerification,
-} from './scope-offboarding.js';
+} from './storage/scope-offboarding.js';
 
 // Delegation Concurrency & Wall-Clock Budget (XP-06)
 
@@ -220,7 +224,7 @@ export {
   registerDelegatedTaskWorker,
   spawnDelegatedTaskWorkerProcess,
   wakeDelegatedTaskWorker,
-} from './delegated-task-observability.js';
+} from './workforce/delegated-task-observability.js';
 
 export type {
   DelegatedTaskTrace,
@@ -234,9 +238,9 @@ export type {
   DelegatedTaskWorkerProcessSpec,
   DelegationHandle,
   DelegatedTaskOutcome,
-} from './delegated-task-observability.js';
-export * from './delegation-result.js';
-export * from './delegation-idempotency.js';
+} from './workforce/delegated-task-observability.js';
+export * from './workforce/delegation-result.js';
+export * from './workforce/delegation-idempotency.js';
 
 export type {
   DelegationSlotOptions,
@@ -256,7 +260,7 @@ export {
   invalidateVaultEntry,
   listVaultEntries,
   loadVaultEntryAtPath,
-} from './data-vault.js';
+} from './storage/data-vault.js';
 
 export type {
   VaultEntry,
@@ -264,7 +268,7 @@ export type {
   FetchWithVaultCacheResult,
   DataVaultTier,
   VaultEntryFilter,
-} from './data-vault.js';
+} from './storage/data-vault.js';
 
 // Process Logger (file-backed logger for long-running daemons)
 
@@ -272,9 +276,13 @@ export {
   createProcessLogger,
   resetProcessLoggerRegistry,
   ProcessLogger,
-} from './process-logger.js';
+} from './daemon/process-logger.js';
 
-export type { ProcessLogEntry, ProcessLogLevel, ProcessLoggerOptions } from './process-logger.js';
+export type {
+  ProcessLogEntry,
+  ProcessLogLevel,
+  ProcessLoggerOptions,
+} from './daemon/process-logger.js';
 
 // Service Engine (vault-cached variant)
 
@@ -294,10 +302,10 @@ export {
 
 // A2UI Protocol
 
-export * from './a2ui.js';
+export * from './surface/a2ui.js';
 export * from './surface/a2ui-catalog.js';
 
-export * from './headless-surface-contract.js';
+export * from './surface/headless-surface-contract.js';
 export * from './surface/surface-authorization.js';
 
 // PTY Engine (Logical Kernel)
@@ -314,7 +322,7 @@ export * from './provider/cursor-cli-reasoning-backend.js';
 
 export * from './provider/cursor-cli-session-adapter.js';
 
-export * from './opencode-cli-reasoning-backend.js';
+export * from './provider/opencode-cli-reasoning-backend.js';
 
 export * from './agent/agent-adapter.js';
 
@@ -332,7 +340,7 @@ export * from './voice/audio-bus-bridge.js';
 
 export * from './meeting/calendar-provider-bridge.js';
 
-export * from './temporal-context.js';
+export * from './temporal/temporal-context.js';
 
 export * from './meeting/calendar-slot-planner.js';
 
@@ -351,19 +359,19 @@ export * from './provider/provider-capability-registry.js';
 export * from './provider/provider-egress-gate.js';
 
 // Information-asset scope P1: custody owner + system/person provider attestations.
-export * from './custody-owner.js';
+export * from './contracts/custody-owner.js';
 export * from './provider/custody-provider-attestation-store.js';
 export * from './provider/custody-provider-attestation-governance.js';
 
 export * from './provider/provider-backend-resolver.js'; // XP-07 close-out: real per-provider backend resolver
 
-export * from './best-of-providers.js'; // XP-07: model-diverse best-of-N delegation
+export * from './provider/best-of-providers.js'; // XP-07: model-diverse best-of-N delegation
 
 export * from './agent/agent-provider-resolution.js';
 
 export * from './provider/provider-health-registry.js';
 
-export * from './capability-broker.js';
+export * from './provider/capability-broker.js';
 
 export * from './tool/runtime-supervisor.js';
 

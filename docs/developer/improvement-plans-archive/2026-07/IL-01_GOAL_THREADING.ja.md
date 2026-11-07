@@ -17,7 +17,7 @@ status: archived
 
 - サーフェスがミッションに昇格するとき、`handleGovernedExecutionHint` は `mission_controller.js create <id> public` に **mission-id・tier・任意の `--routing-decision` しか渡さない**(`surface-runtime-orchestrator.ts:1056-1068,1119-1130`)。元の発話も `compiledFlow.intentContract.goal` も `outcome_ids` も渡さない。
 - `mission_controller create` は `visionRef` を受け取れる(`scripts/mission_controller.ts:334`)のに、サーフェスは供給しない。
-- 結果、ミッションは**汎用の outcome contract を再生成**する: `requested_result = "Complete mission scope for type ${missionType}"`、`success_criteria = ["Mission lifecycle reaches completed with verification and distillation."]`(`libs/core/outcome-contract.ts:88-105`)。受信時の本物の goal は消え、ミッションの「ゴール」はプロセスの空文になる。
+- 結果、ミッションは**汎用の outcome contract を再生成**する: `requested_result = "Complete mission scope for type ${missionType}"`、`success_criteria = ["Mission lifecycle reaches completed with verification and distillation."]`(`libs/core/task/outcome-contract.ts:88-105`)。受信時の本物の goal は消え、ミッションの「ゴール」はプロセスの空文になる。
 
 ## ゴール(受入条件)
 

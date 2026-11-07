@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { missionDir } from '../path-resolver.js';
-import { loadAiDlcPhaseState, resumeAiDlcPhaseState } from '../aidlc-phase-state.js';
+import { loadAiDlcPhaseState, resumeAiDlcPhaseState } from './aidlc-phase-state.js';
 import { safeMkdir, safeMoveSync, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { readJson } from '../foundation/json.js';
 import { evaluateStoredMissionGate } from './mission-process-planning.js';

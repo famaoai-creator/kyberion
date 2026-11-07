@@ -8,7 +8,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 import { AgyCliBackend, buildAgyCliBackendFromEnv } from './agy-cli-backend.js';
 import { AgySdkAdapter } from './agy-sdk-adapter.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
-import { delegationExecutionStartedFromError } from '../delegation-execution-tracker.js';
+import { delegationExecutionStartedFromError } from '../workforce/delegation-execution-tracker.js';
 
 const { spawnMock, withWallClockBudgetMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),

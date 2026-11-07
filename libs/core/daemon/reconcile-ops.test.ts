@@ -1,0 +1,319 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { randomUUID } from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const secureIo = vi.hoisted(() => ({
+  assertSafeRepositoryPath: (filePath: string) => filePath,
+  safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
+  safeMkdir: (dirPath: string) => fs.mkdirSync(dirPath, { recursive: true }),
+  safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
+    options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
+  loadJson: <T>(filePath: string): T => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
+  loadJsonIfPresent: <T>(filePath: string): T | null => {
+    if (!fs.existsSync(filePath)) return null;
+    try {
+      return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+    } catch {
+      return null;
+    }
+  },
+  safeWriteFile: (filePath: string, data: string | Buffer) => {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, data);
+  },
+}));
+
+vi.mock('../secure-io.js', () => secureIo);
+
+import { registerFoundationIo } from '../foundation/io.js';
+
+describe('reconcile ops (LE-03)', () => {
+  let tmpRoot: string;
+
+  beforeEach(() => {
+    tmpRoot = path.join(os.tmpdir(), `kyberion-reconcile-${randomUUID()}`);
+    fs.mkdirSync(path.join(tmpRoot, 'active', 'shared', 'tmp'), { recursive: true });
+    fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
+    process.env.KYBERION_ROOT = tmpRoot;
+    registerFoundationIo({
+      loadJson: <T>(filePath: string): T => {
+        if (filePath.includes('config-fallback-registry.schema.json')) {
+          return JSON.parse(
+            fs.readFileSync(
+              path.resolve('knowledge/product/schemas/config-fallback-registry.schema.json'),
+              'utf8'
+            )
+          ) as T;
+        }
+        if (filePath.includes('unhandled-intent-registry.schema.json')) {
+          return JSON.parse(
+            fs.readFileSync(
+              path.resolve('knowledge/product/schemas/unhandled-intent-registry.schema.json'),
+              'utf8'
+            )
+          ) as T;
+        }
+        if (filePath.includes('unclassified-error-registry.schema.json')) {
+          return JSON.parse(
+            fs.readFileSync(
+              path.resolve('knowledge/product/schemas/unclassified-error-registry.schema.json'),
+              'utf8'
+            )
+          ) as T;
+        }
+        return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+      },
+      loadJsonIfPresent: <T>(filePath: string): T | null => {
+        try {
+          return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+        } catch {
+          return null;
+        }
+      },
+      appendFile: () => undefined,
+      exists: (filePath: string) => fs.existsSync(filePath),
+      readFile: (filePath: string) => fs.readFileSync(filePath, 'utf8'),
+      stat: (filePath: string) => fs.statSync(filePath),
+      writeFile: (filePath: string, content: string) => fs.writeFileSync(filePath, content),
+    });
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    delete process.env.KYBERION_ROOT;
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+    vi.resetModules();
+  });
+
+  it('reconcileConfigFallbacks returns an empty result on a missing registry', async () => {
+    const { reconcileConfigFallbacks } = await import('./reconcile-ops.js');
+    expect(reconcileConfigFallbacks()).toEqual({
+      applied: false,
+      repaired: [],
+      planned: [],
+      proposals_written: [],
+      skipped: [],
+      pruned: 0,
+    });
+  });
+
+  it('reconcileConfigFallbacks creates public-tier files and skips other tiers', async () => {
+    const registry = {
+      version: '1.0.0',
+      entries: [
+        {
+          knowledge_path: 'public/demo/le03-sample.json',
+          first_seen: '2026-07-15T00:00:00.000Z',
+          last_seen: '2026-07-15T00:00:00.000Z',
+          occurrence_count: 1,
+          last_error: 'ENOENT',
+          reason: 'file_not_found',
+          defaults_snapshot: { hello: 'world' },
+          resolved: false,
+        },
+        {
+          knowledge_path: 'confidential/tenant/secret.json',
+          first_seen: '2026-07-15T00:00:00.000Z',
+          last_seen: '2026-07-15T00:00:00.000Z',
+          occurrence_count: 1,
+          last_error: 'ENOENT',
+          reason: 'file_not_found',
+          defaults_snapshot: {},
+          resolved: false,
+        },
+      ],
+    };
+    fs.writeFileSync(
+      path.join(tmpRoot, 'active', 'shared', 'tmp', 'config-fallback-registry.json'),
+      JSON.stringify(registry)
+    );
+
+    const { reconcileConfigFallbacks } = await import('./reconcile-ops.js');
+    const created = path.join(tmpRoot, 'knowledge', 'public', 'demo', 'le03-sample.json');
+
+    // B1: without apply the sweep is proposal-only — nothing under knowledge/.
+    const preview = reconcileConfigFallbacks();
+    expect(preview.applied).toBe(false);
+    expect(preview.repaired).toEqual([]);
+    expect(preview.planned).toEqual([
+      {
+        knowledge_path: 'public/demo/le03-sample.json',
+        action: 'would create from defaults_snapshot (re-run with --apply)',
+      },
+    ]);
+    expect(fs.existsSync(created)).toBe(false);
+
+    const result = reconcileConfigFallbacks({ apply: true });
+
+    expect(result.applied).toBe(true);
+    expect(result.repaired).toEqual([
+      { knowledge_path: 'public/demo/le03-sample.json', action: 'created from defaults_snapshot' },
+    ]);
+    expect(result.skipped).toEqual([
+      {
+        knowledge_path: 'confidential/tenant/secret.json',
+        reason: 'not in public/ tier — auto-create skipped for safety',
+      },
+    ]);
+    expect(JSON.parse(fs.readFileSync(created, 'utf8'))).toEqual({ hello: 'world' });
+  });
+
+  it('reconcileUnclassifiedErrors writes a proposal stub per unreconciled entry', async () => {
+    const registry = {
+      version: '1.0.0',
+      entries: [
+        {
+          message_excerpt: 'Totally novel failure mode',
+          occurrence_count: 3,
+          first_seen: '2026-07-15T00:00:00.000Z',
+          last_seen: '2026-07-15T00:00:00.000Z',
+          reconciled: false,
+        },
+      ],
+    };
+    fs.writeFileSync(
+      path.join(tmpRoot, 'active', 'shared', 'tmp', 'unclassified-error-registry.json'),
+      JSON.stringify(registry)
+    );
+
+    const { reconcileUnclassifiedErrors } = await import('./reconcile-ops.js');
+    const result = reconcileUnclassifiedErrors();
+
+    expect(result.total_unreconciled).toBe(1);
+    expect(result.proposals_written).toHaveLength(1);
+    const proposalPath = path.join(tmpRoot, result.proposals_written[0].proposal_path);
+    const proposal = JSON.parse(fs.readFileSync(proposalPath, 'utf8'));
+    expect(proposal.suggested_rule.patterns).toHaveLength(1);
+  });
+
+  it('reconcileUnhandledIntents produces summary_line and proposal stubs', async () => {
+    const registry = {
+      version: '1.0.0',
+      entries: [
+        {
+          miss_type: 'unrouted',
+          intent_id: 'demo.intent',
+          shape: 'pipeline',
+          utterance_samples: ['run the demo'],
+          occurrence_count: 2,
+          first_seen: '2026-07-15T00:00:00.000Z',
+          last_seen: '2026-07-15T00:00:00.000Z',
+          reconciled: false,
+        },
+      ],
+    };
+    fs.writeFileSync(
+      path.join(tmpRoot, 'active', 'shared', 'tmp', 'unhandled-intent-registry.json'),
+      JSON.stringify(registry)
+    );
+
+    const { reconcileUnhandledIntents } = await import('./reconcile-ops.js');
+    const result = reconcileUnhandledIntents();
+
+    expect(result.total_unreconciled).toBe(1);
+    expect(result.summary_line).toContain('demo.intent');
+    expect(result.top_unreconciled?.key).toBe('demo.intent');
+    expect(result.proposals_written[0].miss_type).toBe('unrouted');
+    const summary = fs.readFileSync(
+      path.join(tmpRoot, 'active', 'shared', 'tmp', 'unhandled-intent-last-run.summary.txt'),
+      'utf8'
+    );
+    expect(summary).toContain('unreconciled=1');
+  });
+
+  it('ignores schema-invalid observation registries and keeps reconciliation safe', async () => {
+    fs.writeFileSync(
+      path.join(tmpRoot, 'active', 'shared', 'tmp', 'unclassified-error-registry.json'),
+      JSON.stringify({ version: '1.0.0', entries: [{ message_excerpt: '' }] })
+    );
+    fs.writeFileSync(
+      path.join(tmpRoot, 'active', 'shared', 'tmp', 'unhandled-intent-registry.json'),
+      JSON.stringify({
+        version: '1.0.0',
+        entries: [{ miss_type: 'unrouted', utterance_samples: ['missing intent id'] }],
+      })
+    );
+
+    const { reconcileUnclassifiedErrors, reconcileUnhandledIntents } =
+      await import('./reconcile-ops.js');
+
+    expect(reconcileUnclassifiedErrors()).toEqual({
+      proposals_written: [],
+      skipped: [],
+      total_unreconciled: 0,
+    });
+    expect(reconcileUnhandledIntents()).toMatchObject({
+      proposals_written: [],
+      skipped: [],
+      total_unreconciled: 0,
+      top_unreconciled: null,
+      summary_line: '[UNHANDLED-INTENT] unreconciled=0 top=none',
+    });
+  });
+
+  it('persists the catalog-normalized unhandled intent registry', async () => {
+    const { writeUnhandledIntentRegistryAtPath } =
+      await import('../intent/unhandled-intent-registry.js');
+    const registryPath = path.join(tmpRoot, 'active', 'shared', 'tmp', 'normalized.json');
+    writeUnhandledIntentRegistryAtPath(registryPath, {
+      version: '1.0.0',
+      entries: [],
+      $schema: 'governance-metadata',
+    } as unknown as {
+      version: '1.0.0';
+      entries: [];
+    });
+
+    expect(JSON.parse(fs.readFileSync(registryPath, 'utf8'))).toEqual({
+      version: '1.0.0',
+      entries: [],
+    });
+  });
+
+  it('never records utterance text for tenant-scoped turns', async () => {
+    const { recordUnhandledIntent, listUnhandledIntents } =
+      await import('../intent/unhandled-intent-registry.js');
+    recordUnhandledIntent({
+      missType: 'unrecognized',
+      utterance: 'tenant secret request',
+      tenantId: 'acme',
+    });
+    recordUnhandledIntent({
+      missType: 'unrouted',
+      intentId: 'some-intent',
+      utterance: 'tenant secret follow-up',
+      tenantId: 'acme',
+    });
+    recordUnhandledIntent({ missType: 'unrecognized', utterance: 'shared question' });
+
+    const entries = listUnhandledIntents();
+    expect(entries).toHaveLength(2);
+    expect(JSON.stringify(entries)).not.toContain('tenant secret');
+    expect(entries.find((e) => e.intent_id === 'some-intent')?.utterance_samples).toEqual([]);
+    expect(entries.find((e) => e.miss_type === 'unrecognized')?.utterance_samples).toEqual([
+      'shared question',
+    ]);
+  });
+
+  it('persists the catalog-normalized unclassified error registry', async () => {
+    const { writeUnclassifiedErrorRegistryAtPath } =
+      await import('./unclassified-error-registry.js');
+    const registryPath = path.join(tmpRoot, 'active', 'shared', 'tmp', 'normalized-errors.json');
+    writeUnclassifiedErrorRegistryAtPath(registryPath, {
+      version: '1.0.0',
+      entries: [],
+      $schema: 'governance-metadata',
+    } as unknown as {
+      version: '1.0.0';
+      entries: [];
+    });
+
+    expect(JSON.parse(fs.readFileSync(registryPath, 'utf8'))).toEqual({
+      version: '1.0.0',
+      entries: [],
+    });
+  });
+});
