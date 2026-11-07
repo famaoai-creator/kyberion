@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
     const raw = safeReadFile(safeTracePath, { encoding: 'utf8' }) as string;
     const content = filterTraceLogContent(raw, safeTracePath, {
       tenantSlugs: resolvedViewer.context.tenantSlugs,
+      includeUntenanted: resolvedViewer.context.includeUntenanted,
       tierAccess: resolvedViewer.context.tierAccess ?? ['public', 'confidential'],
     });
     return new NextResponse(content, {

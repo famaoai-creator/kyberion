@@ -1,7 +1,7 @@
 import type { MemoryCandidate } from '@agent/core/knowledge/memory-promotion-queue';
 import { assertMemoryScope } from '@agent/core/knowledge/memory-scope';
+import { admitsScopeAudience, viewerPersonIds } from '@agent/core/surface/surface-authorization';
 import type { ConciergeViewerContext } from './viewer-context';
-import { tenantVisibleToViewer } from './tenant-visibility';
 
 /** Promotion destination tier never widens access to the source content. */
 export function memoryCandidateVisibleToViewer(
@@ -20,7 +20,10 @@ export function memoryCandidateVisibleToViewer(
     !viewer.tierAccess.includes(sourceTier)
   )
     return false;
-  if (!tenantVisibleToViewer(viewer, scope?.tenant_slug)) return false;
+  // Custody admission (P4): tenant rows by scope, untenanted rows by the
+  // system selection, owner-bound rows to the owner — plus the record's own
+  // audience grant on person custody, admitted by identity, never by scope.
+  if (!admitsScopeAudience(viewer, scope)) return false;
   if (
     viewer.organizationIds !== 'all' &&
     (!scope?.organization_id || !viewer.organizationIds.includes(scope.organization_id))
@@ -31,7 +34,7 @@ export function memoryCandidateVisibleToViewer(
     (!scope?.project_id || !viewer.projectIds.includes(scope.project_id))
   )
     return false;
-  const principals = [viewer.principal?.actor.id, viewer.principalId].filter(Boolean);
+  const principals = viewerPersonIds(viewer);
   const audience = scope?.allowed_audience ?? [];
   const audienceMatch = audience.some((id) => principals.includes(id));
   if (audience.length && !audienceMatch) return false;

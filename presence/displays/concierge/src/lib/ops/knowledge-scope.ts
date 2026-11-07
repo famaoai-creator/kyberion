@@ -4,6 +4,7 @@ import { loadState } from '@agent/core/mission/mission-state';
 import { loadArtifactRecord } from '@agent/core/workforce/artifact-record';
 import { assertMemoryScope, type MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
 import type { MemoryCandidate } from '@agent/core/knowledge/memory-promotion-queue';
+import { admitsScopeAudience, viewerPersonIds } from '@agent/core/surface/surface-authorization';
 import {
   workspaceScopeMatchesResource,
   type ResolvedWorkspaceScope,
@@ -74,7 +75,19 @@ export function memoryCandidateVisibleToViewer(
     !tiers.includes(candidate.sensitivity_tier)
   )
     return false;
-  if (tenants !== 'all' && (!scope.tenant_slug || !tenants.includes(scope.tenant_slug)))
+  // Custody admission plus the record's own audience grant: person custody
+  // stays identity-bound for every viewer, 'all' included; a listed audience
+  // member is admitted by identity — never by scope.
+  if (
+    !admitsScopeAudience(
+      {
+        tenantSlugs: tenants,
+        includeUntenanted: viewer.includeUntenanted,
+        personIds: viewerPersonIds(viewer),
+      },
+      scope
+    )
+  )
     return false;
   if (
     organizations !== 'all' &&
@@ -83,7 +96,7 @@ export function memoryCandidateVisibleToViewer(
     return false;
   if (projects !== 'all' && (!scope.project_id || !projects.includes(scope.project_id)))
     return false;
-  const principals = [viewer.principal?.actor.id, viewer.principalId].filter(Boolean);
+  const principals = viewerPersonIds(viewer);
   const audience = scope.allowed_audience ?? [];
   const audienceMatch = audience.some((id) => principals.includes(id));
   if (audience.length && !audienceMatch) return false;
