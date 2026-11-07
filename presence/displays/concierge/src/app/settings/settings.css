@@ -107,6 +107,13 @@
   margin: 0;
 }
 
+/* Machine values in prose (agent ids, charter ids, URLs) wrap instead of
+   widening the page on a phone. */
+.settings-row-block p,
+.settings-row-block li {
+  overflow-wrap: anywhere;
+}
+
 .settings-row-block + .settings-row-block,
 .kb-setting-row + .settings-row-block,
 .settings-row-block + .kb-setting-row,

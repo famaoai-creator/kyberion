@@ -27,6 +27,7 @@ import * as path from 'node:path';
 import { resolveIdentityContext, withExecutionContext } from '../authority.js';
 import { appendJsonLine, readJsonLines, writeJson } from '../foundation/json.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
+import { withScopeEnvOnly } from '../foundation/scope-resolution-mode.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
 import {
@@ -290,8 +291,14 @@ function asPersonalApprovalStore<T>(
   writing: boolean,
   fn: () => T
 ): T {
+  // The personal partition is the owner's, never a tenant's. Resolve its IO
+  // from the registered env only: a persisted `pnpm scope use <tenant>` (or a
+  // persisted tenant-bound MISSION_ID) would otherwise bind the tenant and
+  // read `personal/shared/owners/…` as an invalid tenant segment. An env or
+  // explicit tenant binding still applies, so a tenant-bound process stays
+  // fenced; access stays confined to the exact owner IO window above.
   return withPersonalApprovalIo(partition.owner_hash, logicalPath, writing, () =>
-    withExecutionContext(PERSONAL_APPROVAL_STORE_ROLE, fn, 'worker')
+    withScopeEnvOnly(() => withExecutionContext(PERSONAL_APPROVAL_STORE_ROLE, fn, 'worker'))
   );
 }
 
