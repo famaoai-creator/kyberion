@@ -29,7 +29,15 @@ describe('test suite dispatcher', () => {
       'vitest',
       'run',
       'libs/core/',
+      'libs/shared-',
       '--no-file-parallelism',
+    ]);
+    expect(buildVitestArgs('unit')).toEqual([
+      'vitest',
+      'run',
+      'libs/core/',
+      'libs/shared-',
+      'libs/actuators/',
     ]);
   });
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { generateNativePdf } from '../engine.js';
 import { pickCjkFontSource } from '../primitives.js';
 import { distillPdfDesign } from '@agent/core/media/pdf-utils';
+import type { PdfDesignProtocol, PdfRenderOptions } from '@agent/core/contracts/pdf-protocol';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as zlib from 'node:zlib';
@@ -1130,18 +1131,16 @@ trailer<< /Size 7 /Root 1 0 R /Info 6 0 R >>
     safeRmSync(output, { force: true });
     try {
       for (const source of ['options', 'protocol'] as const) {
-        const protocol = {
+        // Invalid runtime values are intentional negative inputs, not valid render options.
+        const renderOptions = { encrypt } as unknown as PdfRenderOptions;
+        const protocol: PdfDesignProtocol = {
           version: '1.0.0',
           generatedAt: new Date().toISOString(),
           source: { format: 'markdown', body: 'Synthetic confidential sentinel' },
-          ...(source === 'protocol' ? { renderOptions: { encrypt } } : {}),
+          ...(source === 'protocol' ? { renderOptions } : {}),
         };
         await expect(
-          generateNativePdf(
-            protocol as any,
-            output,
-            source === 'options' ? ({ encrypt } as any) : undefined
-          )
+          generateNativePdf(protocol, output, source === 'options' ? renderOptions : undefined)
         ).rejects.toThrow('PDF_ENCRYPTION_UNSUPPORTED');
         expect(safeExistsSync(output)).toBe(false);
       }
@@ -1156,19 +1155,19 @@ trailer<< /Size 7 /Root 1 0 R /Info 6 0 R >>
     const output = OUT + '.preserved';
     safeWriteFile(output, original);
     try {
-      const protocol = {
+      const protocol: PdfDesignProtocol = {
         version: '1.0.0',
         generatedAt: new Date().toISOString(),
         source: { format: 'markdown', body: 'Synthetic confidential sentinel' },
         renderOptions: { encrypt: { userPassword: 'synthetic-user' } },
       };
-      await expect(
-        generateNativePdf(protocol as any, output, { encrypt: undefined })
-      ).rejects.toThrow('PDF_ENCRYPTION_UNSUPPORTED');
+      await expect(generateNativePdf(protocol, output, { encrypt: undefined })).rejects.toThrow(
+        'PDF_ENCRYPTION_UNSUPPORTED'
+      );
       expect(safeReadFile(output, { encoding: null })).toEqual(original);
-      await expect(
-        generateNativePdf(protocol as any, output + '/missing/target.pdf')
-      ).rejects.toThrow('PDF_ENCRYPTION_UNSUPPORTED');
+      await expect(generateNativePdf(protocol, output + '/missing/target.pdf')).rejects.toThrow(
+        'PDF_ENCRYPTION_UNSUPPORTED'
+      );
     } finally {
       safeRmSync(output, { force: true });
     }
