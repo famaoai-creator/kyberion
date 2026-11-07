@@ -7,8 +7,8 @@ import {
   streamTtsAudioPlayback,
   type StreamingSynthesizedAudio,
 } from './streaming-voice-playback.js';
-import type { PlaybackHandle, PlaybackResult } from './voice/audio-playback.js';
-import type { AudioChunk } from './meeting/meeting-session-types.js';
+import type { PlaybackHandle, PlaybackResult } from '@agent/core/voice/audio-playback';
+import type { AudioChunk } from '@agent/core/meeting/meeting-session-types';
 
 const format = {
   encoding: 'pcm_s16le' as const,

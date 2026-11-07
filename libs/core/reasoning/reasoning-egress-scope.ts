@@ -6,7 +6,7 @@ import {
   loadCharterUsage,
 } from '../governance/accountability-charter-registry.js';
 import { evaluateInformationFlow } from '../governance/accountability-charter.js';
-import { isLocalOnlyReasoningBackend } from '../backend-capability-profile.js';
+import { isLocalOnlyReasoningBackend } from './backend-capability-profile.js';
 import { assertSandboxNetworkAllowed } from '../shell/sandbox-policy.js';
 import {
   isLocalReasoningEndpoint,

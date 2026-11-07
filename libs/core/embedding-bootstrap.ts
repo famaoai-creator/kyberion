@@ -15,7 +15,7 @@ import { resolveSeamDefaultOrder } from './seam-provider-selection.js';
 import {
   unmetRuntimeRequirements,
   type ProviderRuntimeRequirement,
-} from './provider-runtime-requirements.js';
+} from './provider/provider-runtime-requirements.js';
 import { logger } from './core.js';
 
 interface EmbeddingCandidate {

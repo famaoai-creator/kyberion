@@ -20,8 +20,8 @@ const allowedManagedProcessConsumers = [
   // hung on-device inference can never outlive its timeout.
   'libs/core/apple-intelligence-bridge.ts',
   'libs/core/shortcut-bridge.ts',
-  'libs/core/blackhole-audio-bus.ts',
-  'libs/core/coreaudio-output-bridge.ts',
+  'libs/core/voice/blackhole-audio-bus.ts',
+  'libs/core/voice/coreaudio-output-bridge.ts',
   'libs/core/managed-process.watch.test.ts',
   // Detached mobile-mirror daemon: owned, supervised child; ops coordinate via state file + SIGTERM.
   'libs/shared-mobile/src/mirror-session.ts',

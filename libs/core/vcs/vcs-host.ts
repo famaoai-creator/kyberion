@@ -35,7 +35,7 @@
  * `[VCS_HOST_UNAVAILABLE]` when none is.
  */
 
-import { createProviderRegistry } from '../provider-registry.js';
+import { createProviderRegistry } from '../provider/provider-registry.js';
 import type { SeamProviderMetadata } from '../seam.js';
 import { resolveSeamDefaultOrder } from '../seam-provider-selection.js';
 import { getRegisteredEnvText } from '../foundation/env.js';

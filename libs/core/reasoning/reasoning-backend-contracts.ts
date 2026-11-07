@@ -8,7 +8,7 @@ import type { DelegationHandle } from '../delegated-task-observability.js';
 import type {
   BackendCapabilityProfile,
   ConstrainedSampling,
-} from '../backend-capability-profile.js';
+} from './backend-capability-profile.js';
 
 export type PersonaLabel = string;
 

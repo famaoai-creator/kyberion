@@ -677,20 +677,20 @@
       "default": "./dist/autonomous-repair.js"
     },
     "./backend-capability-honesty": {
-      "types": "./dist/backend-capability-honesty.d.ts",
-      "default": "./dist/backend-capability-honesty.js"
+      "types": "./dist/reasoning/backend-capability-honesty.d.ts",
+      "default": "./dist/reasoning/backend-capability-honesty.js"
     },
     "./backend-capability-profile": {
-      "types": "./dist/backend-capability-profile.d.ts",
-      "default": "./dist/backend-capability-profile.js"
+      "types": "./dist/reasoning/backend-capability-profile.d.ts",
+      "default": "./dist/reasoning/backend-capability-profile.js"
     },
     "./backend-conformance": {
-      "types": "./dist/backend-conformance.d.ts",
-      "default": "./dist/backend-conformance.js"
+      "types": "./dist/reasoning/backend-conformance.d.ts",
+      "default": "./dist/reasoning/backend-conformance.js"
     },
     "./backend-live-scenarios": {
-      "types": "./dist/backend-live-scenarios.d.ts",
-      "default": "./dist/backend-live-scenarios.js"
+      "types": "./dist/reasoning/backend-live-scenarios.d.ts",
+      "default": "./dist/reasoning/backend-live-scenarios.js"
     },
     "./background-review": {
       "types": "./dist/workforce/background-review-patch.d.ts",
@@ -713,12 +713,12 @@
       "default": "./dist/baseline-check-cache.js"
     },
     "./blackhole-audio-bus": {
-      "types": "./dist/blackhole-audio-bus.d.ts",
-      "default": "./dist/blackhole-audio-bus.js"
+      "types": "./dist/voice/blackhole-audio-bus.d.ts",
+      "default": "./dist/voice/blackhole-audio-bus.js"
     },
     "./blackhole-routing-guard": {
-      "types": "./dist/blackhole-routing-guard.d.ts",
-      "default": "./dist/blackhole-routing-guard.js"
+      "types": "./dist/voice/blackhole-routing-guard.d.ts",
+      "default": "./dist/voice/blackhole-routing-guard.js"
     },
     "./bluebubbles-adapter": {
       "types": "./dist/integrations/bluebubbles-adapter.d.ts",
@@ -777,8 +777,8 @@
       "default": "./dist/build-readiness.js"
     },
     "./business-calendar": {
-      "types": "./dist/business-calendar.d.ts",
-      "default": "./dist/business-calendar.js"
+      "types": "./dist/temporal/business-calendar.d.ts",
+      "default": "./dist/temporal/business-calendar.js"
     },
     "./calendar-provider-bridge": {
       "types": "./dist/meeting/calendar-provider-bridge.d.ts",
@@ -1089,8 +1089,8 @@
       "default": "./dist/core.js"
     },
     "./coreaudio-device-inventory": {
-      "types": "./dist/coreaudio-device-inventory.d.ts",
-      "default": "./dist/coreaudio-device-inventory.js"
+      "types": "./dist/voice/coreaudio-device-inventory.d.ts",
+      "default": "./dist/voice/coreaudio-device-inventory.js"
     },
     "./cost-report": {
       "types": "./dist/cost-report.d.ts",
@@ -2601,8 +2601,8 @@
       "default": "./dist/lifecycle-hook-engine.js"
     },
     "./llm-selection-preferences": {
-      "types": "./dist/llm-selection-preferences.d.ts",
-      "default": "./dist/llm-selection-preferences.js"
+      "types": "./dist/reasoning/llm-selection-preferences.d.ts",
+      "default": "./dist/reasoning/llm-selection-preferences.js"
     },
     "./local-stt-discovery": {
       "types": "./dist/local-stt-discovery.d.ts",
@@ -5005,8 +5005,8 @@
       "default": "./dist/shell/pty-engine.js"
     },
     "./pulse-audio-bus": {
-      "types": "./dist/pulse-audio-bus.d.ts",
-      "default": "./dist/pulse-audio-bus.js"
+      "types": "./dist/voice/pulse-audio-bus.d.ts",
+      "default": "./dist/voice/pulse-audio-bus.js"
     },
     "./python-voice-bridge": {
       "types": "./dist/python-voice-bridge.d.ts",
@@ -6067,10 +6067,6 @@
     "./streaming-tts-bridge": {
       "types": "./dist/voice/streaming-tts-bridge.d.ts",
       "default": "./dist/voice/streaming-tts-bridge.js"
-    },
-    "./streaming-voice-playback": {
-      "types": "./dist/streaming-voice-playback.d.ts",
-      "default": "./dist/streaming-voice-playback.js"
     },
     "./subagent-capability-profiles": {
       "types": "./dist/subagent-capability-profiles.d.ts",
@@ -7697,8 +7693,8 @@
       "default": "./dist/information-assets/collector-capture.js"
     },
     "./provider-runtime-requirements": {
-      "types": "./dist/provider-runtime-requirements.d.ts",
-      "default": "./dist/provider-runtime-requirements.js"
+      "types": "./dist/provider/provider-runtime-requirements.d.ts",
+      "default": "./dist/provider/provider-runtime-requirements.js"
     },
     "./media/docx-xml": {
       "types": "./dist/media/docx-xml.d.ts",
@@ -7709,24 +7705,20 @@
       "default": "./dist/media/xlsx-xstring.js"
     },
     "./provider-chain-router": {
-      "types": "./dist/provider-chain-router.d.ts",
-      "default": "./dist/provider-chain-router.js"
+      "types": "./dist/provider/provider-chain-router.d.ts",
+      "default": "./dist/provider/provider-chain-router.js"
     },
     "./provider-registry": {
-      "types": "./dist/provider-registry.d.ts",
-      "default": "./dist/provider-registry.js"
+      "types": "./dist/provider/provider-registry.d.ts",
+      "default": "./dist/provider/provider-registry.js"
     },
     "./windows-native-image-generation-bridge": {
       "types": "./dist/windows-native-image-generation-bridge.d.ts",
       "default": "./dist/windows-native-image-generation-bridge.js"
     },
     "./barge-in-controller": {
-      "types": "./dist/barge-in-controller.d.ts",
-      "default": "./dist/barge-in-controller.js"
-    },
-    "./segmented-voice-playback": {
-      "types": "./dist/segmented-voice-playback.d.ts",
-      "default": "./dist/segmented-voice-playback.js"
+      "types": "./dist/voice/barge-in-controller.d.ts",
+      "default": "./dist/voice/barge-in-controller.js"
     },
     "./voice/engine-runtime-preferences-access": {
       "types": "./dist/voice/engine-runtime-preferences-access.d.ts",

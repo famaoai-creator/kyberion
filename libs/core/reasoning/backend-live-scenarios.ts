@@ -46,24 +46,27 @@
 
 import * as path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { logger } from './core.js';
-import { nowIso } from './foundation/time.js';
-import { readJsonIfPresent, writeJson } from './foundation/json.js';
-import * as pathResolver from './path-resolver.js';
+import { logger } from '../core.js';
+import { nowIso } from '../foundation/time.js';
+import { readJsonIfPresent, writeJson } from '../foundation/json.js';
+import * as pathResolver from '../path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeReaddir,
-} from './secure-io.js';
-import { createScratchWorkspace, deleteRegisteredWorkspace } from './workforce/workspace-ledger.js';
-import type { ReasoningBackend } from './reasoning/reasoning-backend-contracts.js';
+} from '../secure-io.js';
+import {
+  createScratchWorkspace,
+  deleteRegisteredWorkspace,
+} from '../workforce/workspace-ledger.js';
+import type { ReasoningBackend } from './reasoning-backend-contracts.js';
 import {
   classifyMeasuredAbortRejection,
   measurementAbortReason,
-} from './reasoning/reasoning-abort-measurement.js';
-import { delegationAbortChildExit } from './mission/delegation-concurrency.js';
+} from './reasoning-abort-measurement.js';
+import { delegationAbortChildExit } from '../mission/delegation-concurrency.js';
 
 export const LIVE_SCENARIO_NAMES = [
   'first',

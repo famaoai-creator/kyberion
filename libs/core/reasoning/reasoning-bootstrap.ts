@@ -59,7 +59,7 @@ import {
 } from '../foundation/credential-binding.js';
 import type Anthropic from '@anthropic-ai/sdk';
 import { clearReasoningDegraded, markReasoningDegraded } from './reasoning-degradation.js';
-import { loadLlmSelectionPreferences } from '../llm-selection-preferences.js';
+import { loadLlmSelectionPreferences } from './llm-selection-preferences.js';
 import { initializeAdapterDefaultPreferences } from '../actuator/adapter-default-selection.js';
 import type { OpenAiCompatibleBackendOverrides } from '../provider/openai-compatible-backend.js';
 import {

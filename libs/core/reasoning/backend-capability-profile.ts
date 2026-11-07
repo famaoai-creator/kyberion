@@ -15,12 +15,12 @@
  * capability as proven unless a recorded measurement backs it.
  */
 
-import type { ReasoningBackendMode } from './reasoning/reasoning-backend-policy.js';
+import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import {
   listReasoningProviderDescriptors,
   resolveReasoningProviderDescriptor,
   type ReasoningProviderDescriptor,
-} from './reasoning/reasoning-provider-registry.js';
+} from './reasoning-provider-registry.js';
 
 export type BackendTransport = 'cli' | 'sdk' | 'api' | 'local-server' | 'in-process';
 /** Whether prompts stay on this machine or are sent to a hosted provider. */
