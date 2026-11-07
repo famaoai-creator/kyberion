@@ -1213,14 +1213,14 @@ security-policy のパスの一覧だけで効いている（門番のコード�
 
 **段階の計画。** どの段階も挙動を変えず、旧と新の tier-guard の判定を並べて確かめる。
 
-| 段階 | 内容                                                                                                                                                                                                | 状態                     |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| (a)  | 許可証の登録簿（`foundation/store-grant-registry.ts`）。各 capability モジュールが読み込まれたときに自分の判定（認可・絞り込み・内容検査・構造上の mkdir）を登録し、tier-guard は登録簿だけに尋ねる | 実施（下）               |
-| (b)  | カタログに `grant_required` / `issuer` / `content_check` / `shape` を宣言し、カタログのゲートが登録簿の id と発行者の登録を突き合わせる                                                             | 未実施                   |
-| (c)  | Concierge の Web 管理の 3 つの規則（祖先のメタデータ、祖先の mkdir、網羅の読み取り）をカタログの宣言にし、2 つのロールを外す                                                                        | 実施（G3 第 2 段階）     |
-| (d)  | パスだけのロール 3 件と、門番に分岐の無い 24 件を許可証かカタログの形にする                                                                                                                         | 実施（G3 第 2 段階）     |
-| (e)  | tier-guard の各入口を `decide(主体, 住所, 操作, 内容)` に通す                                                                                                                                       | 実施（G3 第 2 段階）     |
-| (f)  | secure-io の import を削る                                                                                                                                                                          | 未実施（考え直す条件 2） |
+| 段階 | 内容                                                                                                                                                                                                | 状態                                      |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| (a)  | 許可証の登録簿（`foundation/store-grant-registry.ts`）。各 capability モジュールが読み込まれたときに自分の判定（認可・絞り込み・内容検査・構造上の mkdir）を登録し、tier-guard は登録簿だけに尋ねる | 実施（下）                                |
+| (b)  | カタログに `grant_required` / `issuer` / `content_check` / `shape` を宣言し、カタログのゲートが登録簿の id と発行者の登録を突き合わせる                                                             | 未実施                                    |
+| (c)  | Concierge の Web 管理の 3 つの規則（祖先のメタデータ、祖先の mkdir、網羅の読み取り）をカタログの宣言にし、2 つのロールを外す                                                                        | 実施（G3 第 2 段階）                      |
+| (d)  | パスだけのロール 3 件と、門番に分岐の無い 24 件を許可証かカタログの形にする                                                                                                                         | 実施（G3 第 2 段階）                      |
+| (e)  | tier-guard の各入口を `decide(主体, 住所, 操作, 内容)` に通す                                                                                                                                       | 実施（G3 第 2 段階）                      |
+| (f)  | secure-io の import を削る                                                                                                                                                                          | 実施（MSN-SCOPE-SECIO-20261107、50 → 40） |
 
 **第 1 段階 (a): 許可証の登録簿。**
 
@@ -1339,6 +1339,22 @@ policy engine）の分離として別の段階に置くか。これらを決め�
 - **secure-io の依存の分離**: secure-io が tier-guard を除いても読み込む 33（audit chain、policy engine、
   governance action recorder など）を、遅延の読み込みか別の package に分ける。G3 の前に決めた 40 以下は
   この段階の目標にする。
+
+  **実施済み（MSN-SCOPE-SECIO-20261107、50 → 40）。** 「遅延の読み込み」ではなく依存の向きを反転させた:
+  - `foundation/deferrable-audit-sink.ts`（実行時の依存 0）が録画系の対称登録簿。secure-io は
+    `recordDeferrableAudit` / `recordGovernanceActionReport` / `provideAuditIo` だけを呼び、
+    audit-chain・governance-action-recorder・chain-integrity・lock-utils が読み込まれたときに自分の
+    recorder と IO consumer を登録する（どちらが先に読み込まれても、後着側の登録時に接続される）。
+    recorder 未到着の記録は 256 件までの bounded queue に残り、登録時に順序どおり flush される。
+    認可の判定（policy-engine / tier-guard）は静的 import のまま — 動くのは監視経路だけで、
+    `governance-action-recorder` が元から持つ「sink 未登録なら best-effort」契約と同じ取り決め。
+  - `foundation/identity-context.ts` に sole-resolver の軽量登録簿と defaultResolver を移し、
+    `identity-context-bridge.ts` は seam 登録 + 軽量登録簿の二重登録だけを行う（公開 API は再輸出で
+    不変）。tier-guard / `engine-runtime-preferences-access` が bridge → seam → invariants の
+    3 本を引かなくなった。
+  - 残るゲート常駐の規則（policy-engine = fail-closed の実判定、shell/sandbox-policy の SSRF 検査）は
+    静的 import のまま — 未読み込み時に黙って素通しになる形にはしない。
+
 - **流れの分解**: `dot_lifecycle_writer` と `concierge_management_writer` は、流れの facade が保存先ごとに
   許可証を発行する形に分けるまでロールのまま残す。
 

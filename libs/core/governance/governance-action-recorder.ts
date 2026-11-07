@@ -1,3 +1,4 @@
+import { registerGovernanceActionRecorder } from '../foundation/deferrable-audit-sink.js';
 import { createLogger } from '../logger.js';
 
 export type GovernanceActionRecord = {
@@ -90,3 +91,10 @@ export function recordGovernanceAction(
   }
   pending.push(record);
 }
+
+// Publish this module's entry point into the zero-dependency sink so
+// secure-io never imports the governance pipeline statically. Records that
+// arrive before this registration queue in the sink and flush here.
+registerGovernanceActionRecorder((record) =>
+  recordGovernanceAction(record.agentId, record.operation, record.reason, record.policyViolation)
+);

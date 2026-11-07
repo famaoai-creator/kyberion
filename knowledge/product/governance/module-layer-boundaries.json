@@ -13,11 +13,6 @@
   "direction_exceptions": [
     {
       "source": "libs/core/secure-io.ts",
-      "target": "libs/core/governance/audit-chain.ts",
-      "reason": "audit-chain must receive the secure persistence adapter during secure-io bootstrap"
-    },
-    {
-      "source": "libs/core/secure-io.ts",
       "target": "libs/core/shell/sandbox-policy.ts",
       "reason": "secure-io enforces the active provider sandbox before filesystem and network operations"
     },

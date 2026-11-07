@@ -32,7 +32,6 @@ describe('module boundary ratchet', () => {
       // secure-io's own permission guards, split out of secure-io.ts.
       'libs/core/secure-io-path-guard.ts -> libs/core/secret/vault-mount.ts',
       'libs/core/secure-io-path-guard.ts -> libs/core/tier-guard.ts',
-      'libs/core/secure-io.ts -> libs/core/governance/audit-chain.ts',
       'libs/core/secure-io.ts -> libs/core/shell/sandbox-policy.ts',
       'libs/core/secure-io.ts -> libs/core/tier-guard.ts',
     ]);
