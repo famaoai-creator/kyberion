@@ -5,7 +5,7 @@ import {
   approvalStoreRoots,
   loadApprovalRequest,
 } from '@agent/core/governance/approval-store';
-import { buildBridgeEmptyReplyText } from '@agent/core/bridge-error-reply';
+import { buildBridgeEmptyReplyText } from '@agent/shared-interaction/bridge-error-reply';
 import { createSurfaceApprovalRequest } from '@agent/core/surface/channel-surface';
 import { compactApprovalPresentedDigest } from '@agent/core/governance/approval-presentation';
 import { withExecutionContext } from '@agent/core/authority';

@@ -101,7 +101,7 @@
     },
     "locale_literal": {
       "libs/core/apple-intelligence-bridge.ts": 2,
-      "libs/core/apple-speech-file-stt-bridge.ts": 2,
+      "libs/shared-voice/src/apple-speech-file-stt-bridge.ts": 2,
       "libs/core/contextual-intent-frame.ts": 4,
       "libs/core/deal-documents.ts": 1,
       "libs/core/media/native-pptx-engine/builders.ts": 3,

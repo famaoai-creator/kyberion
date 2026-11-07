@@ -54,8 +54,6 @@ export * from './voice/audio-tee.js';
 
 export * from './voice/vad-registry.js';
 
-export * from './silero-vad-bridge.js';
-
 export * from './actuator/actuator-serve-client.js';
 
 export * from './in-room-meeting-driver.js';
@@ -101,21 +99,11 @@ export type { OnErrorConfig, RefParams } from './pipeline/pipeline-engine.js';
 
 export * from './surface/channel-surface.js';
 
-export * from './cowork-surface.js';
-export {
-  loadCoworkArtifactPacketAtPath,
-  validateCoworkArtifactPacket,
-} from './cowork-artifact-packet.js';
-
-export * from './cowork-knowledge-bridge.js';
-
 export {
   delegationChildrenRegistryPath,
   loadDelegationChildrenRegistryAtPath,
   writeDelegationChildrenRegistryAtPath,
 } from './mission/delegation-child-registry.js';
-
-export * from './cowork-health-check.js';
 
 export * from './surface/surface-runtime-router.js';
 
@@ -241,8 +229,6 @@ export * from './platform-command-adapters.js';
 
 export * from './virtual/desktop-launch-adapter.js';
 
-export * from './windows-native-image-generation-bridge.js';
-
 export * from './virtual/os-automation-bridge.js';
 
 export * from './macos-automation-bridge.js';
@@ -277,10 +263,6 @@ export * from './entity-scope.js';
 export * from './organization/tenant-knowledge-retrieval.js';
 
 export * from './ingest-asset-ledger.js';
-
-export * from './ingest-quota.js';
-
-export * from './ingest-sync-cursors.js';
 
 export * from './pii-scrubber.js';
 
@@ -327,21 +309,6 @@ export * from './subagent-capability-profiles.js';
 export * from './subagent-prompt-framing.js';
 
 export * from './provider/claude-native-subagent.js';
-
-export {
-  buildBridgeErrorReplyText,
-  buildBridgeEmptyReplyText,
-  shouldPostBridgeError,
-  resetBridgeErrorRateLimiter,
-  postBridgeError,
-  chunkBridgeMessage,
-  chunkSurfaceMessage,
-  getSurfaceCapability,
-  listSurfaceCapabilities,
-  isSurfaceFormatError,
-  stripSurfaceMarkup,
-  sendSurfaceTextWithFallback,
-} from './bridge-error-reply.js';
 
 export {
   recordConfigFallback,

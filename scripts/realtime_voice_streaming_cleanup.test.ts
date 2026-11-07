@@ -45,8 +45,8 @@ vi.mock('@agent/shared-voice/realtime-voice-preferences', async (original) => ({
   ...(await original<typeof import('@agent/shared-voice/realtime-voice-preferences')>()),
   loadRealtimeVoiceConversationPreferences: () => null,
 }));
-vi.mock('@agent/core/silero-vad-bridge', () => ({ installSileroVadBackend: vi.fn() }));
-vi.mock('@agent/core/ten-vad-bridge', () => ({ installTenVadBackend: vi.fn() }));
+vi.mock('@agent/shared-voice/silero-vad-bridge', () => ({ installSileroVadBackend: vi.fn() }));
+vi.mock('@agent/shared-voice/ten-vad-bridge', () => ({ installTenVadBackend: vi.fn() }));
 vi.mock('@agent/core/vad-registry', async (original) => ({
   ...(await original<typeof import('@agent/core/vad-registry')>()),
   resolveVadBackend: () => ({ backend: { backend_id: 'fixture', create: vi.fn() } }),

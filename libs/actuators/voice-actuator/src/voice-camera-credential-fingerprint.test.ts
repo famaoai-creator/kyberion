@@ -14,7 +14,7 @@ vi.mock('@agent/core/chain-integrity', async (original) => ({
 // This suite isolates credential identity, not the approval gate. Real camera
 // admission/transport behavior is covered by voice-external-governance.test.ts.
 vi.mock('@agent/core/governance/external-operation', () => ({ runExternalOperation: fixture.run }));
-vi.mock('@agent/core/obs-virtual-camera-output', () => ({
+vi.mock('@agent/shared-video/obs-virtual-camera-output', () => ({
   installObsVirtualCameraOutputBridge: () => {
     fixture.install();
     fixture.bridges.set('obs-virtual-cam', {
