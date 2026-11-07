@@ -28,7 +28,7 @@
  * both surfaces apply before mapping. Data-tier rules (personal, unknown) are
  * each caller's own (Concierge: `lib/progress-server.ts`).
  */
-import { eventScopeFromRecord } from '../event-scope.js';
+import { eventScopeFromRecord } from '../event/event-scope.js';
 import { admitsTenant } from './surface-authorization.js';
 import { resolveSurfaceBrowserUrl } from './surface-url.js';
 
