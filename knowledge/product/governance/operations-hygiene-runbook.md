@@ -3205,6 +3205,11 @@ bind a checkout-relative address and reject listener errors directly, so path-le
 sandbox IPC failures are not disguised as test timeouts. Verify under the existing CI
 settings; do not relax production grants or deadlines to accommodate a fixture.
 
+CLI dry-run fixtures that expect `not_found` must also declare the legitimate controller
+identity: checking an absent lineage index still requires ordinary read authority. Run the
+entire CLI suite with the scripts CI runner's empty role/persona defaults, and include a
+roleless negative case. Never skip permission checks because a path does not exist.
+
 ## Intake extension CI checks
 
 When adding a service operation, validate the shipped discovery count and service-harness operation inventory together with the exact kind/risk/approval assertions. Registry-overlay fixtures must assert the shipped exact declarations as well as the mutation fallback. For boundary tests, partially mock shared path resolvers so new legitimate imports retain their real APIs; a minimal hand-built resolver can fail during module initialization before the tested gate runs. Run the impacted existing tests in addition to the extension fixtures. For single-use admission capabilities, compare private in-memory snapshots of request and configuration values. Do not send credential-bearing configuration into hash or HMAC APIs: keyed fast hashes still trigger password-hashing checks and are unnecessary when the capability's private WeakMap already supplies the trust boundary. Never log or persist these snapshots.
