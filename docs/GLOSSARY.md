@@ -110,15 +110,16 @@ The `--persona` flag selects an **Org Role**, not a `Persona`; the flag name is 
 
 ### Scope terms
 
-"Scope" carries five meanings. Name the one you mean.
+"Scope" carries six meanings. Name the one you mean.
 
-| Term                     | Meaning                                                                                    | Entry                                                              |
-| ------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| Entity scope chain       | Containment: `tenant_slug → organization_id → project_id → mission_id → task_id → session` | [WorkItem Context](#workitem-context), `libs/core/entity-scope.ts` |
-| Scope Envelope           | An attenuation record minted at delegation; a child can only narrow it                     | [Scope Envelope](#scope-envelope)                                  |
-| Viewer Scope             | The tenants an HTTP viewer may see, resolved server-side                                   | [ViewerContext / Viewer Scope](#viewercontext--viewer-scope)       |
-| Work Visibility Scope    | Which of six projections over WorkItems a view shows                                       | [Work Visibility Scope](#work-visibility-scope)                    |
-| Binding Scope (volatile) | What a working-memory face is bound to (`session` … `global`)                              | [Scope (Volatile)](#scope-volatile)                                |
+| Term                     | Meaning                                                                                                                                                            | Entry                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| Entity scope chain       | Containment: `tenant_slug → organization_id → project_id → mission_id → task_id → session`                                                                         | [WorkItem Context](#workitem-context), `libs/core/entity-scope.ts` |
+| Scope Envelope           | An attenuation record minted at delegation; a child can only narrow it                                                                                             | [Scope Envelope](#scope-envelope)                                  |
+| Viewer Scope             | The tenants an HTTP viewer may see, resolved server-side                                                                                                           | [ViewerContext / Viewer Scope](#viewercontext--viewer-scope)       |
+| Work Visibility Scope    | Which of six projections over WorkItems a view shows                                                                                                               | [Work Visibility Scope](#work-visibility-scope)                    |
+| Binding Scope (volatile) | What a working-memory face is bound to (`session` … `global`)                                                                                                      | [Scope (Volatile)](#scope-volatile)                                |
+| Resource Access Scope    | A server-created, deny-only path ceiling (`ResourceAccessScope`); its `custody` names the custodian it binds — `tenant` (with `tenantSlug`), `system`, or `person` | `libs/core/foundation/resource-access-scope.ts`                    |
 
 Tier (`personal` / `confidential` / `public`) and Stance (`knowledge/personal/stances/{slug}/`) are separate axes, not scopes; they never appear in the entity scope chain.
 
