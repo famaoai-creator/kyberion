@@ -16,74 +16,6 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    "./contracts/asset-scope": {
-      "types": "./dist/contracts/asset-scope.d.ts",
-      "default": "./dist/contracts/asset-scope.js"
-    },
-    "./foundation/asset-address": {
-      "types": "./dist/foundation/asset-address.d.ts",
-      "default": "./dist/foundation/asset-address.js"
-    },
-    "./governance/asset-scope-inspection": {
-      "types": "./dist/governance/asset-scope-inspection.d.ts",
-      "default": "./dist/governance/asset-scope-inspection.js"
-    },
-    "./pipeline/pipeline-reuse": {
-      "types": "./dist/pipeline/pipeline-reuse.d.ts",
-      "default": "./dist/pipeline/pipeline-reuse.js"
-    },
-    "./pipeline/pipeline-promotion-evidence": {
-      "types": "./dist/pipeline/pipeline-promotion-evidence.d.ts",
-      "default": "./dist/pipeline/pipeline-promotion-evidence.js"
-    },
-    "./knowledge/reusable-learning": {
-      "types": "./dist/knowledge/reusable-learning.d.ts",
-      "default": "./dist/knowledge/reusable-learning.js"
-    },
-    "./knowledge/knowledge-reuse-contract": {
-      "types": "./dist/knowledge/knowledge-reuse-contract.d.ts",
-      "default": "./dist/knowledge/knowledge-reuse-contract.js"
-    },
-    "./knowledge/knowledge-verification": {
-      "types": "./dist/knowledge/knowledge-verification.d.ts",
-      "default": "./dist/knowledge/knowledge-verification.js"
-    },
-    "./search": {
-      "types": "./dist/search/index.d.ts",
-      "default": "./dist/search/index.js"
-    },
-    "./search/web-search-runtime-bridge": {
-      "types": "./dist/search/web-search-runtime-bridge.d.ts",
-      "default": "./dist/search/web-search-runtime-bridge.js"
-    },
-    "./surface/workspace-work": {
-      "types": "./dist/surface/workspace-work.d.ts",
-      "default": "./dist/surface/workspace-work.js"
-    },
-    "./surface/workspace": {
-      "types": "./dist/surface/workspace.d.ts",
-      "default": "./dist/surface/workspace.js"
-    },
-    "./surface/workspace-autonomy": {
-      "types": "./dist/surface/workspace-autonomy.d.ts",
-      "default": "./dist/surface/workspace-autonomy.js"
-    },
-    "./surface/workspace-scope": {
-      "types": "./dist/surface/workspace-scope.d.ts",
-      "default": "./dist/surface/workspace-scope.js"
-    },
-    "./surface/workspace-query": {
-      "types": "./dist/surface/workspace-query.d.ts",
-      "default": "./dist/surface/workspace-query.js"
-    },
-    "./surface/scoped-workspace-ingest": {
-      "types": "./dist/surface/scoped-workspace-ingest.d.ts",
-      "default": "./dist/surface/scoped-workspace-ingest.js"
-    },
-    "./chain-integrity": {
-      "types": "./dist/chain-integrity.d.ts",
-      "default": "./dist/chain-integrity.js"
-    },
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
@@ -108,6 +40,10 @@
       "types": "./dist/surface/a2ui-catalog.d.ts",
       "default": "./dist/surface/a2ui-catalog.js"
     },
+    "./accepted-pipeline-bindings": {
+      "types": "./dist/accepted-pipeline-bindings.d.ts",
+      "default": "./dist/accepted-pipeline-bindings.js"
+    },
     "./acp-mediator": {
       "types": "./dist/mesh/acp-mediator-entry.d.ts",
       "default": "./dist/mesh/acp-mediator-entry.js"
@@ -119,6 +55,10 @@
     "./actor": {
       "types": "./dist/actor.d.ts",
       "default": "./dist/actor.js"
+    },
+    "./actor-context": {
+      "types": "./dist/actor-context.d.ts",
+      "default": "./dist/actor-context.js"
     },
     "./actuator": {
       "types": "./dist/actuator/index.d.ts",
@@ -500,13 +440,13 @@
       "types": "./dist/analysis/observability-gate.d.ts",
       "default": "./dist/analysis/observability-gate.js"
     },
-    "./analysis/trace-exporter": {
-      "types": "./dist/analysis/trace-exporter.d.ts",
-      "default": "./dist/analysis/trace-exporter.js"
-    },
     "./analysis/trace": {
       "types": "./dist/analysis/trace.d.ts",
       "default": "./dist/analysis/trace.js"
+    },
+    "./analysis/trace-exporter": {
+      "types": "./dist/analysis/trace-exporter.d.ts",
+      "default": "./dist/analysis/trace-exporter.js"
     },
     "./analysis/trace-schema": {
       "types": "./dist/analysis/trace-schema.d.ts",
@@ -523,10 +463,6 @@
     "./apple-intelligence-bridge": {
       "types": "./dist/apple-intelligence-bridge.d.ts",
       "default": "./dist/apple-intelligence-bridge.js"
-    },
-    "./apple-speech-file-stt-bridge": {
-      "types": "./dist/apple-speech-file-stt-bridge.d.ts",
-      "default": "./dist/apple-speech-file-stt-bridge.js"
     },
     "./approval-audit": {
       "types": "./dist/governance/approval-audit.d.ts",
@@ -664,10 +600,6 @@
       "types": "./dist/automation-blueprint.d.ts",
       "default": "./dist/automation-blueprint.js"
     },
-    "./automation-blueprint-slack": {
-      "types": "./dist/automation-blueprint-slack.d.ts",
-      "default": "./dist/automation-blueprint-slack.js"
-    },
     "./autonomous-ops-gate": {
       "types": "./dist/governance/autonomous-ops-gate.d.ts",
       "default": "./dist/governance/autonomous-ops-gate.js"
@@ -708,6 +640,10 @@
       "types": "./dist/workforce/background-review-patch.d.ts",
       "default": "./dist/workforce/background-review-patch.js"
     },
+    "./barge-in-controller": {
+      "types": "./dist/barge-in-controller.d.ts",
+      "default": "./dist/barge-in-controller.js"
+    },
     "./baseline-check-cache": {
       "types": "./dist/baseline-check-cache.d.ts",
       "default": "./dist/baseline-check-cache.js"
@@ -716,10 +652,6 @@
       "types": "./dist/blackhole-audio-bus.d.ts",
       "default": "./dist/blackhole-audio-bus.js"
     },
-    "./blackhole-routing-guard": {
-      "types": "./dist/blackhole-routing-guard.d.ts",
-      "default": "./dist/blackhole-routing-guard.js"
-    },
     "./bluebubbles-adapter": {
       "types": "./dist/integrations/bluebubbles-adapter.d.ts",
       "default": "./dist/integrations/bluebubbles-adapter.js"
@@ -727,10 +659,6 @@
     "./brand-tokens": {
       "types": "./dist/brand-tokens.d.ts",
       "default": "./dist/brand-tokens.js"
-    },
-    "./bridge-error-reply": {
-      "types": "./dist/bridge-error-reply.d.ts",
-      "default": "./dist/bridge-error-reply.js"
     },
     "./bridge-poll-loop": {
       "types": "./dist/bridge-poll-loop.d.ts",
@@ -812,6 +740,10 @@
       "types": "./dist/ceo-surface-summary.d.ts",
       "default": "./dist/ceo-surface-summary.js"
     },
+    "./chain-integrity": {
+      "types": "./dist/chain-integrity.d.ts",
+      "default": "./dist/chain-integrity.js"
+    },
     "./changelog-policy": {
       "types": "./dist/changelog-policy.d.ts",
       "default": "./dist/changelog-policy.js"
@@ -835,6 +767,10 @@
     "./channel-surface-types": {
       "types": "./dist/surface/channel-surface-types.d.ts",
       "default": "./dist/surface/channel-surface-types.js"
+    },
+    "./check-harness": {
+      "types": "./dist/check-harness.d.ts",
+      "default": "./dist/check-harness.js"
     },
     "./chrome-extension-meeting-driver": {
       "types": "./dist/browser/chrome-extension-meeting-driver.d.ts",
@@ -864,6 +800,10 @@
       "types": "./dist/provider/claude-task-session-executor.d.ts",
       "default": "./dist/provider/claude-task-session-executor.js"
     },
+    "./cli-guard": {
+      "types": "./dist/cli-guard.d.ts",
+      "default": "./dist/cli-guard.js"
+    },
     "./cli-utils": {
       "types": "./dist/cli-utils.d.ts",
       "default": "./dist/cli-utils.js"
@@ -888,29 +828,25 @@
       "types": "./dist/co-session.d.ts",
       "default": "./dist/co-session.js"
     },
+    "./command-harness": {
+      "types": "./dist/command-harness.d.ts",
+      "default": "./dist/command-harness.js"
+    },
     "./command-runner": {
       "types": "./dist/command-runner.d.ts",
       "default": "./dist/command-runner.js"
-    },
-    "./company": {
-      "types": "./dist/company.d.ts",
-      "default": "./dist/company.js"
     },
     "./compaction-copy-recovery": {
       "types": "./dist/compaction-copy-recovery.d.ts",
       "default": "./dist/compaction-copy-recovery.js"
     },
-    "./contracts/computer-interaction-outcome": {
-      "types": "./dist/contracts/computer-interaction-outcome.d.ts",
-      "default": "./dist/contracts/computer-interaction-outcome.js"
+    "./company": {
+      "types": "./dist/company.d.ts",
+      "default": "./dist/company.js"
     },
     "./computer-surface": {
       "types": "./dist/virtual/computer-surface.d.ts",
       "default": "./dist/virtual/computer-surface.js"
-    },
-    "./desktop-ax-bridge": {
-      "types": "./dist/desktop-ax-bridge.d.ts",
-      "default": "./dist/desktop-ax-bridge.js"
     },
     "./config-change": {
       "types": "./dist/config-change.d.ts",
@@ -952,6 +888,14 @@
       "types": "./dist/contracts/architecture-adf.d.ts",
       "default": "./dist/contracts/architecture-adf.js"
     },
+    "./contracts/asset-scope": {
+      "types": "./dist/contracts/asset-scope.d.ts",
+      "default": "./dist/contracts/asset-scope.js"
+    },
+    "./contracts/computer-interaction-outcome": {
+      "types": "./dist/contracts/computer-interaction-outcome.d.ts",
+      "default": "./dist/contracts/computer-interaction-outcome.js"
+    },
     "./contracts/delivery-pack": {
       "types": "./dist/contracts/delivery-pack.d.ts",
       "default": "./dist/contracts/delivery-pack.js"
@@ -963,6 +907,14 @@
     "./contracts/docx-protocol": {
       "types": "./dist/contracts/docx-protocol.d.ts",
       "default": "./dist/contracts/docx-protocol.js"
+    },
+    "./contracts/evidence": {
+      "types": "./dist/contracts/evidence.d.ts",
+      "default": "./dist/contracts/evidence.js"
+    },
+    "./contracts/execution-bounds": {
+      "types": "./dist/contracts/execution-bounds.d.ts",
+      "default": "./dist/contracts/execution-bounds.js"
     },
     "./contracts/generation-job": {
       "types": "./dist/contracts/generation-job.d.ts",
@@ -983,6 +935,10 @@
     "./contracts/index": {
       "types": "./dist/contracts/index.d.ts",
       "default": "./dist/contracts/index.js"
+    },
+    "./contracts/judge-route": {
+      "types": "./dist/contracts/judge-route.d.ts",
+      "default": "./dist/contracts/judge-route.js"
     },
     "./contracts/meeting-operations-brief": {
       "types": "./dist/contracts/meeting-operations-brief.d.ts",
@@ -1020,6 +976,18 @@
       "types": "./dist/contracts/narrated-video-upload-package.d.ts",
       "default": "./dist/contracts/narrated-video-upload-package.js"
     },
+    "./contracts/next-action-contract": {
+      "types": "./dist/contracts/next-action-contract.d.ts",
+      "default": "./dist/contracts/next-action-contract.js"
+    },
+    "./contracts/nhi-id": {
+      "types": "./dist/contracts/nhi-id.d.ts",
+      "default": "./dist/contracts/nhi-id.js"
+    },
+    "./contracts/ocr-types": {
+      "types": "./dist/contracts/ocr-types.d.ts",
+      "default": "./dist/contracts/ocr-types.js"
+    },
     "./contracts/operator-interaction-packet": {
       "types": "./dist/contracts/operator-interaction-packet.d.ts",
       "default": "./dist/contracts/operator-interaction-packet.js"
@@ -1039,6 +1007,14 @@
     "./contracts/proposal-storyline-adf": {
       "types": "./dist/contracts/proposal-storyline-adf.d.ts",
       "default": "./dist/contracts/proposal-storyline-adf.js"
+    },
+    "./contracts/rejection-reason": {
+      "types": "./dist/contracts/rejection-reason.d.ts",
+      "default": "./dist/contracts/rejection-reason.js"
+    },
+    "./contracts/shared-business-types": {
+      "types": "./dist/contracts/shared-business-types.d.ts",
+      "default": "./dist/contracts/shared-business-types.js"
     },
     "./contracts/skill-output": {
       "types": "./dist/contracts/skill-output.d.ts",
@@ -1063,6 +1039,10 @@
     "./contracts/web-app-profile": {
       "types": "./dist/contracts/web-app-profile.d.ts",
       "default": "./dist/contracts/web-app-profile.js"
+    },
+    "./contracts/wire-error": {
+      "types": "./dist/contracts/wire-error.d.ts",
+      "default": "./dist/contracts/wire-error.js"
     },
     "./contracts/wisdom-action": {
       "types": "./dist/contracts/wisdom-action.d.ts",
@@ -1096,38 +1076,6 @@
       "types": "./dist/cost-report.d.ts",
       "default": "./dist/cost-report.js"
     },
-    "./cowork-artifact-packet": {
-      "types": "./dist/cowork-artifact-packet.d.ts",
-      "default": "./dist/cowork-artifact-packet.js"
-    },
-    "./cowork-artifact-packet.js": {
-      "types": "./dist/cowork-artifact-packet.d.ts",
-      "default": "./dist/cowork-artifact-packet.js"
-    },
-    "./cowork-health-check": {
-      "types": "./dist/cowork-health-check.d.ts",
-      "default": "./dist/cowork-health-check.js"
-    },
-    "./cowork-health-check.js": {
-      "types": "./dist/cowork-health-check.d.ts",
-      "default": "./dist/cowork-health-check.js"
-    },
-    "./cowork-knowledge-bridge": {
-      "types": "./dist/cowork-knowledge-bridge.d.ts",
-      "default": "./dist/cowork-knowledge-bridge.js"
-    },
-    "./cowork-knowledge-bridge.js": {
-      "types": "./dist/cowork-knowledge-bridge.d.ts",
-      "default": "./dist/cowork-knowledge-bridge.js"
-    },
-    "./cowork-surface": {
-      "types": "./dist/cowork-surface.d.ts",
-      "default": "./dist/cowork-surface.js"
-    },
-    "./cowork-surface.js": {
-      "types": "./dist/cowork-surface.d.ts",
-      "default": "./dist/cowork-surface.js"
-    },
     "./creative-design-resolver": {
       "types": "./dist/creative-design-resolver.d.ts",
       "default": "./dist/creative-design-resolver.js"
@@ -1152,6 +1100,10 @@
       "types": "./dist/customer-conversation-modes.d.ts",
       "default": "./dist/customer-conversation-modes.js"
     },
+    "./customer-decision": {
+      "types": "./dist/customer-decision/index.d.ts",
+      "default": "./dist/customer-decision/index.js"
+    },
     "./customer-decision/operator-handoff": {
       "types": "./dist/customer-decision/operator-handoff.d.ts",
       "default": "./dist/customer-decision/operator-handoff.js"
@@ -1159,10 +1111,6 @@
     "./customer-outbound-templates": {
       "types": "./dist/customer-outbound-templates.d.ts",
       "default": "./dist/customer-outbound-templates.js"
-    },
-    "./stance-resolver": {
-      "types": "./dist/stance-resolver.d.ts",
-      "default": "./dist/stance-resolver.js"
     },
     "./daemon-heartbeat": {
       "types": "./dist/daemon-heartbeat.d.ts",
@@ -1211,6 +1159,10 @@
     "./decision-card": {
       "types": "./dist/governance/decision-card.d.ts",
       "default": "./dist/governance/decision-card.js"
+    },
+    "./decision-ledger": {
+      "types": "./dist/decision-ledger/index.d.ts",
+      "default": "./dist/decision-ledger/index.js"
     },
     "./decision-rights": {
       "types": "./dist/decision-rights.d.ts",
@@ -1296,10 +1248,6 @@
       "types": "./dist/direct-entry.d.ts",
       "default": "./dist/direct-entry.js"
     },
-    "./dirty-tile-describer": {
-      "types": "./dist/dirty-tile-describer.d.ts",
-      "default": "./dist/dirty-tile-describer.js"
-    },
     "./discussion": {
       "types": "./dist/discussion/index.d.ts",
       "default": "./dist/discussion/index.js"
@@ -1315,6 +1263,10 @@
     "./discussion/discussion-copy": {
       "types": "./dist/discussion/discussion-copy.d.ts",
       "default": "./dist/discussion/discussion-copy.js"
+    },
+    "./discussion/discussion-create-request": {
+      "types": "./dist/discussion/discussion-create-request.d.ts",
+      "default": "./dist/discussion/discussion-create-request.js"
     },
     "./discussion/discussion-dialogue-actions": {
       "types": "./dist/discussion/discussion-dialogue-actions.d.ts",
@@ -1436,13 +1388,13 @@
       "types": "./dist/dot/dot-extensions.d.ts",
       "default": "./dist/dot/dot-extensions.js"
     },
-    "./dot/dot-feedback": {
-      "types": "./dist/dot/dot-feedback.d.ts",
-      "default": "./dist/dot/dot-feedback.js"
-    },
     "./dot/dot-feed-source": {
       "types": "./dist/dot/dot-feed-source.d.ts",
       "default": "./dist/dot/dot-feed-source.js"
+    },
+    "./dot/dot-feedback": {
+      "types": "./dist/dot/dot-feedback.d.ts",
+      "default": "./dist/dot/dot-feedback.js"
     },
     "./dot/dot-followups": {
       "types": "./dist/dot/dot-followups.d.ts",
@@ -1524,6 +1476,10 @@
       "types": "./dist/embedding-bootstrap.d.ts",
       "default": "./dist/embedding-bootstrap.js"
     },
+    "./engine-runtime-preferences": {
+      "types": "./dist/voice/engine-runtime-preferences.d.ts",
+      "default": "./dist/voice/engine-runtime-preferences.js"
+    },
     "./entity-scope": {
       "types": "./dist/entity-scope.d.ts",
       "default": "./dist/entity-scope.js"
@@ -1552,10 +1508,6 @@
       "types": "./dist/error-classifier-judgment.d.ts",
       "default": "./dist/error-classifier-judgment.js"
     },
-    "./contracts/evidence": {
-      "types": "./dist/contracts/evidence.d.ts",
-      "default": "./dist/contracts/evidence.js"
-    },
     "./event-scope": {
       "types": "./dist/event-scope.d.ts",
       "default": "./dist/event-scope.js"
@@ -1572,10 +1524,6 @@
       "types": "./dist/event/memory-event-bus.d.ts",
       "default": "./dist/event/memory-event-bus.js"
     },
-    "./contracts/execution-bounds": {
-      "types": "./dist/contracts/execution-bounds.d.ts",
-      "default": "./dist/contracts/execution-bounds.js"
-    },
     "./execution-feedback": {
       "types": "./dist/execution-feedback.d.ts",
       "default": "./dist/execution-feedback.js"
@@ -1588,6 +1536,10 @@
       "types": "./dist/facet-registry.d.ts",
       "default": "./dist/facet-registry.js"
     },
+    "./failure-tracker": {
+      "types": "./dist/failure-tracker.d.ts",
+      "default": "./dist/failure-tracker.js"
+    },
     "./finance-controller": {
       "types": "./dist/finance-controller.d.ts",
       "default": "./dist/finance-controller.js"
@@ -1596,17 +1548,25 @@
       "types": "./dist/format.d.ts",
       "default": "./dist/format.js"
     },
+    "./foundation": {
+      "types": "./dist/foundation/index.d.ts",
+      "default": "./dist/foundation/index.js"
+    },
     "./foundation/approval-domains": {
       "types": "./dist/foundation/approval-domains.d.ts",
       "default": "./dist/foundation/approval-domains.js"
     },
-    "./foundation/authorization-registry": {
-      "types": "./dist/foundation/authorization-registry.d.ts",
-      "default": "./dist/foundation/authorization-registry.js"
+    "./foundation/asset-address": {
+      "types": "./dist/foundation/asset-address.d.ts",
+      "default": "./dist/foundation/asset-address.js"
     },
     "./foundation/authorization-policy-document": {
       "types": "./dist/foundation/authorization-policy-document.d.ts",
       "default": "./dist/foundation/authorization-policy-document.js"
+    },
+    "./foundation/authorization-registry": {
+      "types": "./dist/foundation/authorization-registry.d.ts",
+      "default": "./dist/foundation/authorization-registry.js"
     },
     "./foundation/command-credential-policy": {
       "types": "./dist/foundation/command-credential-policy.d.ts",
@@ -1616,10 +1576,6 @@
       "types": "./dist/foundation/credential-binding.d.ts",
       "default": "./dist/foundation/credential-binding.js"
     },
-    "./foundation": {
-      "types": "./dist/foundation/index.d.ts",
-      "default": "./dist/foundation/index.js"
-    },
     "./foundation/env": {
       "types": "./dist/foundation/env.d.ts",
       "default": "./dist/foundation/env.js"
@@ -1627,6 +1583,10 @@
     "./foundation/governed-catalog": {
       "types": "./dist/foundation/governed-catalog.d.ts",
       "default": "./dist/foundation/governed-catalog.js"
+    },
+    "./foundation/html-sanitize": {
+      "types": "./dist/foundation/html-sanitize.d.ts",
+      "default": "./dist/foundation/html-sanitize.js"
     },
     "./foundation/inflight-limit": {
       "types": "./dist/foundation/inflight-limit.d.ts",
@@ -1640,17 +1600,49 @@
       "types": "./dist/foundation/json.d.ts",
       "default": "./dist/foundation/json.js"
     },
+    "./foundation/json-state": {
+      "types": "./dist/foundation/json-state.d.ts",
+      "default": "./dist/foundation/json-state.js"
+    },
+    "./foundation/knowledge-tier": {
+      "types": "./dist/foundation/knowledge-tier.d.ts",
+      "default": "./dist/foundation/knowledge-tier.js"
+    },
+    "./foundation/locale-normalize": {
+      "types": "./dist/foundation/locale-normalize.d.ts",
+      "default": "./dist/foundation/locale-normalize.js"
+    },
     "./foundation/lock-utils": {
       "types": "./dist/foundation/lock-utils.d.ts",
       "default": "./dist/foundation/lock-utils.js"
+    },
+    "./foundation/message-format": {
+      "types": "./dist/foundation/message-format.d.ts",
+      "default": "./dist/foundation/message-format.js"
+    },
+    "./foundation/pcm-wav": {
+      "types": "./dist/foundation/pcm-wav.d.ts",
+      "default": "./dist/foundation/pcm-wav.js"
     },
     "./foundation/primitives": {
       "types": "./dist/foundation/primitives.d.ts",
       "default": "./dist/foundation/primitives.js"
     },
+    "./foundation/project-scope-env": {
+      "types": "./dist/foundation/project-scope-env.d.ts",
+      "default": "./dist/foundation/project-scope-env.js"
+    },
+    "./foundation/rate-limit": {
+      "types": "./dist/foundation/rate-limit.d.ts",
+      "default": "./dist/foundation/rate-limit.js"
+    },
     "./foundation/resource-access-scope": {
       "types": "./dist/foundation/resource-access-scope.d.ts",
       "default": "./dist/foundation/resource-access-scope.js"
+    },
+    "./foundation/runtime-state-roots": {
+      "types": "./dist/foundation/runtime-state-roots.d.ts",
+      "default": "./dist/foundation/runtime-state-roots.js"
     },
     "./foundation/safe-json": {
       "types": "./dist/foundation/safe-json.d.ts",
@@ -1660,13 +1652,25 @@
       "types": "./dist/foundation/scope.d.ts",
       "default": "./dist/foundation/scope.js"
     },
+    "./foundation/scope-context-validation": {
+      "types": "./dist/foundation/scope-context-validation.d.ts",
+      "default": "./dist/foundation/scope-context-validation.js"
+    },
     "./foundation/scope-resolution-mode": {
       "types": "./dist/foundation/scope-resolution-mode.d.ts",
       "default": "./dist/foundation/scope-resolution-mode.js"
     },
+    "./foundation/secret-resolution-session": {
+      "types": "./dist/foundation/secret-resolution-session.d.ts",
+      "default": "./dist/foundation/secret-resolution-session.js"
+    },
     "./foundation/text": {
       "types": "./dist/foundation/text.d.ts",
       "default": "./dist/foundation/text.js"
+    },
+    "./foundation/text-escaping": {
+      "types": "./dist/foundation/text-escaping.d.ts",
+      "default": "./dist/foundation/text-escaping.js"
     },
     "./foundation/time": {
       "types": "./dist/foundation/time.d.ts",
@@ -1740,22 +1744,6 @@
       "types": "./dist/governance/accountability-charter-registry.d.ts",
       "default": "./dist/governance/accountability-charter-registry.js"
     },
-    "./governance/charter-payment-settlement": {
-      "types": "./dist/governance/charter-payment-settlement.d.ts",
-      "default": "./dist/governance/charter-payment-settlement.js"
-    },
-    "./governance/delegated-execution": {
-      "types": "./dist/governance/delegated-execution.d.ts",
-      "default": "./dist/governance/delegated-execution.js"
-    },
-    "./scope-envelope": {
-      "types": "./dist/scope-envelope.d.ts",
-      "default": "./dist/scope-envelope.js"
-    },
-    "./governance/human-execution": {
-      "types": "./dist/governance/human-execution.d.ts",
-      "default": "./dist/governance/human-execution.js"
-    },
     "./governance/accountability-digest": {
       "types": "./dist/governance/accountability-digest.d.ts",
       "default": "./dist/governance/accountability-digest.js"
@@ -1763,6 +1751,10 @@
     "./governance/accountability-report": {
       "types": "./dist/governance/accountability-report.d.ts",
       "default": "./dist/governance/accountability-report.js"
+    },
+    "./governance/adapter-effect-proxy": {
+      "types": "./dist/governance/adapter-effect-proxy.d.ts",
+      "default": "./dist/governance/adapter-effect-proxy.js"
     },
     "./governance/approval-audit": {
       "types": "./dist/governance/approval-audit.d.ts",
@@ -1788,30 +1780,6 @@
       "types": "./dist/governance/approval-gate.d.ts",
       "default": "./dist/governance/approval-gate.js"
     },
-    "./governance/external-operation-occurrence": {
-      "types": "./dist/governance/external-operation-occurrence.d.ts",
-      "default": "./dist/governance/external-operation-occurrence.js"
-    },
-    "./governance/external-operation-runtime": {
-      "types": "./dist/governance/external-operation-runtime.d.ts",
-      "default": "./dist/governance/external-operation-runtime.js"
-    },
-    "./governance/external-operation-store": {
-      "types": "./dist/governance/external-operation-store.d.ts",
-      "default": "./dist/governance/external-operation-store.js"
-    },
-    "./governance/external-operation-target": {
-      "types": "./dist/governance/external-operation-target.d.ts",
-      "default": "./dist/governance/external-operation-target.js"
-    },
-    "./governance/adapter-effect-proxy": {
-      "types": "./dist/governance/adapter-effect-proxy.d.ts",
-      "default": "./dist/governance/adapter-effect-proxy.js"
-    },
-    "./governance/external-operation": {
-      "types": "./dist/governance/external-operation.d.ts",
-      "default": "./dist/governance/external-operation.js"
-    },
     "./governance/approval-gate-summary": {
       "types": "./dist/governance/approval-gate-summary.d.ts",
       "default": "./dist/governance/approval-gate-summary.js"
@@ -1832,10 +1800,6 @@
       "types": "./dist/governance/approval-presentation.d.ts",
       "default": "./dist/governance/approval-presentation.js"
     },
-    "./governance/approval-separation-of-duties": {
-      "types": "./dist/governance/approval-separation-of-duties.d.ts",
-      "default": "./dist/governance/approval-separation-of-duties.js"
-    },
     "./governance/approval-requester": {
       "types": "./dist/governance/approval-requester.d.ts",
       "default": "./dist/governance/approval-requester.js"
@@ -1843,6 +1807,10 @@
     "./governance/approval-revocation": {
       "types": "./dist/governance/approval-revocation.d.ts",
       "default": "./dist/governance/approval-revocation.js"
+    },
+    "./governance/approval-separation-of-duties": {
+      "types": "./dist/governance/approval-separation-of-duties.d.ts",
+      "default": "./dist/governance/approval-separation-of-duties.js"
     },
     "./governance/approval-store": {
       "types": "./dist/governance/approval-store.d.ts",
@@ -1856,13 +1824,17 @@
       "types": "./dist/governance/approval-store-paths.d.ts",
       "default": "./dist/governance/approval-store-paths.js"
     },
-    "./governance/work-effect-release-request": {
-      "types": "./dist/governance/work-effect-release-request.d.ts",
-      "default": "./dist/governance/work-effect-release-request.js"
+    "./governance/approval-store-reader": {
+      "types": "./dist/governance/approval-store-reader.d.ts",
+      "default": "./dist/governance/approval-store-reader.js"
     },
     "./governance/approval-veto-window": {
       "types": "./dist/governance/approval-veto-window.d.ts",
       "default": "./dist/governance/approval-veto-window.js"
+    },
+    "./governance/asset-scope-inspection": {
+      "types": "./dist/governance/asset-scope-inspection.d.ts",
+      "default": "./dist/governance/asset-scope-inspection.js"
     },
     "./governance/audit-chain": {
       "types": "./dist/governance/audit-chain.d.ts",
@@ -1871,6 +1843,14 @@
     "./governance/audit-forwarder": {
       "types": "./dist/governance/audit-forwarder.d.ts",
       "default": "./dist/governance/audit-forwarder.js"
+    },
+    "./governance/authenticated-personal-approvals": {
+      "types": "./dist/governance/authenticated-personal-approvals.d.ts",
+      "default": "./dist/governance/authenticated-personal-approvals.js"
+    },
+    "./governance/authorization-overlay": {
+      "types": "./dist/governance/authorization-overlay.d.ts",
+      "default": "./dist/governance/authorization-overlay.js"
     },
     "./governance/autonomous-ops-gate": {
       "types": "./dist/governance/autonomous-ops-gate.d.ts",
@@ -1888,6 +1868,10 @@
       "types": "./dist/governance/charter-decision-vocabulary.d.ts",
       "default": "./dist/governance/charter-decision-vocabulary.js"
     },
+    "./governance/charter-payment-settlement": {
+      "types": "./dist/governance/charter-payment-settlement.d.ts",
+      "default": "./dist/governance/charter-payment-settlement.js"
+    },
     "./governance/charter-proposal": {
       "types": "./dist/governance/charter-proposal.d.ts",
       "default": "./dist/governance/charter-proposal.js"
@@ -1903,6 +1887,30 @@
     "./governance/decision-card": {
       "types": "./dist/governance/decision-card.d.ts",
       "default": "./dist/governance/decision-card.js"
+    },
+    "./governance/delegated-execution": {
+      "types": "./dist/governance/delegated-execution.d.ts",
+      "default": "./dist/governance/delegated-execution.js"
+    },
+    "./governance/external-operation": {
+      "types": "./dist/governance/external-operation.d.ts",
+      "default": "./dist/governance/external-operation.js"
+    },
+    "./governance/external-operation-occurrence": {
+      "types": "./dist/governance/external-operation-occurrence.d.ts",
+      "default": "./dist/governance/external-operation-occurrence.js"
+    },
+    "./governance/external-operation-runtime": {
+      "types": "./dist/governance/external-operation-runtime.d.ts",
+      "default": "./dist/governance/external-operation-runtime.js"
+    },
+    "./governance/external-operation-store": {
+      "types": "./dist/governance/external-operation-store.d.ts",
+      "default": "./dist/governance/external-operation-store.js"
+    },
+    "./governance/external-operation-target": {
+      "types": "./dist/governance/external-operation-target.d.ts",
+      "default": "./dist/governance/external-operation-target.js"
     },
     "./governance/governance-action-recorder": {
       "types": "./dist/governance/governance-action-recorder.d.ts",
@@ -1928,6 +1936,10 @@
       "types": "./dist/governance/grant-store.d.ts",
       "default": "./dist/governance/grant-store.js"
     },
+    "./governance/human-execution": {
+      "types": "./dist/governance/human-execution.d.ts",
+      "default": "./dist/governance/human-execution.js"
+    },
     "./governance/kill-switch": {
       "types": "./dist/governance/kill-switch.d.ts",
       "default": "./dist/governance/kill-switch.js"
@@ -1936,17 +1948,13 @@
       "types": "./dist/governance/mandate-shadow.d.ts",
       "default": "./dist/governance/mandate-shadow.js"
     },
-    "./governance/authorization-overlay": {
-      "types": "./dist/governance/authorization-overlay.d.ts",
-      "default": "./dist/governance/authorization-overlay.js"
+    "./governance/operation-protection": {
+      "types": "./dist/governance/operation-protection.d.ts",
+      "default": "./dist/governance/operation-protection.js"
     },
     "./governance/operations-halt": {
       "types": "./dist/governance/operations-halt.d.ts",
       "default": "./dist/governance/operations-halt.js"
-    },
-    "./governance/operation-protection": {
-      "types": "./dist/governance/operation-protection.d.ts",
-      "default": "./dist/governance/operation-protection.js"
     },
     "./governance/org-budget-governor": {
       "types": "./dist/governance/org-budget-governor.d.ts",
@@ -1963,6 +1971,10 @@
     "./governance/pr-shadow": {
       "types": "./dist/governance/pr-shadow.d.ts",
       "default": "./dist/governance/pr-shadow.js"
+    },
+    "./governance/work-effect-release-request": {
+      "types": "./dist/governance/work-effect-release-request.d.ts",
+      "default": "./dist/governance/work-effect-release-request.js"
     },
     "./graph-run-artifact": {
       "types": "./dist/graph-run-artifact.d.ts",
@@ -2036,10 +2048,6 @@
       "types": "./dist/history-search-index.d.ts",
       "default": "./dist/history-search-index.js"
     },
-    "./foundation/html-sanitize": {
-      "types": "./dist/foundation/html-sanitize.d.ts",
-      "default": "./dist/foundation/html-sanitize.js"
-    },
     "./html-to-markdown": {
       "types": "./dist/html-to-markdown.d.ts",
       "default": "./dist/html-to-markdown.js"
@@ -2084,25 +2092,53 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./information-assets/access": {
+      "types": "./dist/information-assets/access.d.ts",
+      "default": "./dist/information-assets/access.js"
+    },
+    "./information-assets/catalog": {
+      "types": "./dist/information-assets/catalog.d.ts",
+      "default": "./dist/information-assets/catalog.js"
+    },
+    "./information-assets/collector": {
+      "types": "./dist/information-assets/collector.d.ts",
+      "default": "./dist/information-assets/collector.js"
+    },
+    "./information-assets/collector-capture": {
+      "types": "./dist/information-assets/collector-capture.d.ts",
+      "default": "./dist/information-assets/collector-capture.js"
+    },
+    "./information-assets/completion": {
+      "types": "./dist/information-assets/completion.d.ts",
+      "default": "./dist/information-assets/completion.js"
+    },
+    "./information-assets/provider": {
+      "types": "./dist/information-assets/provider.d.ts",
+      "default": "./dist/information-assets/provider.js"
+    },
+    "./information-assets/recipes": {
+      "types": "./dist/information-assets/recipes.d.ts",
+      "default": "./dist/information-assets/recipes.js"
+    },
+    "./information-assets/types": {
+      "types": "./dist/information-assets/types.d.ts",
+      "default": "./dist/information-assets/types.js"
+    },
+    "./information-assets/work": {
+      "types": "./dist/information-assets/work.d.ts",
+      "default": "./dist/information-assets/work.js"
+    },
+    "./information-assets/work-types": {
+      "types": "./dist/information-assets/work-types.d.ts",
+      "default": "./dist/information-assets/work-types.js"
+    },
     "./ingest-asset-ledger": {
       "types": "./dist/ingest-asset-ledger.d.ts",
       "default": "./dist/ingest-asset-ledger.js"
     },
-    "./ingest-quota": {
-      "types": "./dist/ingest-quota.d.ts",
-      "default": "./dist/ingest-quota.js"
-    },
-    "./ingest-sync-cursors": {
-      "types": "./dist/ingest-sync-cursors.d.ts",
-      "default": "./dist/ingest-sync-cursors.js"
-    },
     "./ingest-tier-gate": {
       "types": "./dist/ingest-tier-gate.d.ts",
       "default": "./dist/ingest-tier-gate.js"
-    },
-    "./intake-vectors": {
-      "types": "./dist/intake-vectors.d.ts",
-      "default": "./dist/intake-vectors.js"
     },
     "./ingress/providers/tailscale-funnel": {
       "types": "./dist/ingress/providers/tailscale-funnel.d.ts",
@@ -2292,6 +2328,10 @@
       "types": "./dist/intent/intent-path-utils.d.ts",
       "default": "./dist/intent/intent-path-utils.js"
     },
+    "./intent/intent-phrase-lexicon": {
+      "types": "./dist/intent/intent-phrase-lexicon.d.ts",
+      "default": "./dist/intent/intent-phrase-lexicon.js"
+    },
     "./intent/intent-reconciliation": {
       "types": "./dist/intent/intent-reconciliation.d.ts",
       "default": "./dist/intent/intent-reconciliation.js"
@@ -2339,10 +2379,6 @@
     "./jsonl-read": {
       "types": "./dist/jsonl-read.d.ts",
       "default": "./dist/jsonl-read.js"
-    },
-    "./contracts/judge-route": {
-      "types": "./dist/contracts/judge-route.d.ts",
-      "default": "./dist/contracts/judge-route.js"
     },
     "./judgment-assist": {
       "types": "./dist/reasoning/judgment-assist.d.ts",
@@ -2432,6 +2468,10 @@
       "types": "./dist/knowledge/golden-scenario-maintenance.d.ts",
       "default": "./dist/knowledge/golden-scenario-maintenance.js"
     },
+    "./knowledge/golden-scenario-verdict": {
+      "types": "./dist/knowledge/golden-scenario-verdict.d.ts",
+      "default": "./dist/knowledge/golden-scenario-verdict.js"
+    },
     "./knowledge/knowledge-adapter": {
       "types": "./dist/knowledge/knowledge-adapter.d.ts",
       "default": "./dist/knowledge/knowledge-adapter.js"
@@ -2472,6 +2512,10 @@
       "types": "./dist/knowledge/knowledge-relevance-judgment.d.ts",
       "default": "./dist/knowledge/knowledge-relevance-judgment.js"
     },
+    "./knowledge/knowledge-reuse-contract": {
+      "types": "./dist/knowledge/knowledge-reuse-contract.d.ts",
+      "default": "./dist/knowledge/knowledge-reuse-contract.js"
+    },
     "./knowledge/knowledge-scope": {
       "types": "./dist/knowledge/knowledge-scope.d.ts",
       "default": "./dist/knowledge/knowledge-scope.js"
@@ -2495,6 +2539,10 @@
     "./knowledge/knowledge-usage-aggregate": {
       "types": "./dist/knowledge/knowledge-usage-aggregate.d.ts",
       "default": "./dist/knowledge/knowledge-usage-aggregate.js"
+    },
+    "./knowledge/knowledge-verification": {
+      "types": "./dist/knowledge/knowledge-verification.d.ts",
+      "default": "./dist/knowledge/knowledge-verification.js"
     },
     "./knowledge/knowledge-weight-recalculation": {
       "types": "./dist/knowledge/knowledge-weight-recalculation.d.ts",
@@ -2556,13 +2604,29 @@
       "types": "./dist/knowledge/procedure-types.d.ts",
       "default": "./dist/knowledge/procedure-types.js"
     },
+    "./knowledge/reusable-learning": {
+      "types": "./dist/knowledge/reusable-learning.d.ts",
+      "default": "./dist/knowledge/reusable-learning.js"
+    },
     "./knowledge/scoped-learning-approval": {
       "types": "./dist/knowledge/scoped-learning-approval.d.ts",
       "default": "./dist/knowledge/scoped-learning-approval.js"
     },
+    "./knowledge/scoped-learning-approval-visibility": {
+      "types": "./dist/knowledge/scoped-learning-approval-visibility.d.ts",
+      "default": "./dist/knowledge/scoped-learning-approval-visibility.js"
+    },
     "./knowledge/scoped-learning-contract": {
       "types": "./dist/knowledge/scoped-learning-contract.d.ts",
       "default": "./dist/knowledge/scoped-learning-contract.js"
+    },
+    "./knowledge/scoped-learning-domain": {
+      "types": "./dist/knowledge/scoped-learning-domain.d.ts",
+      "default": "./dist/knowledge/scoped-learning-domain.js"
+    },
+    "./knowledge/scoped-learning-workflow": {
+      "types": "./dist/knowledge/scoped-learning-workflow.d.ts",
+      "default": "./dist/knowledge/scoped-learning-workflow.js"
     },
     "./knowledge/vocabulary-catalog": {
       "types": "./dist/knowledge/vocabulary-catalog.d.ts",
@@ -2576,6 +2640,10 @@
       "types": "./dist/laya-mlx-judgment-backend.d.ts",
       "default": "./dist/laya-mlx-judgment-backend.js"
     },
+    "./lease/kv-lease-backend.stub": {
+      "types": "./dist/lease/kv-lease-backend.stub.d.ts",
+      "default": "./dist/lease/kv-lease-backend.stub.js"
+    },
     "./lease/lease-backend": {
       "types": "./dist/lease/lease-backend.d.ts",
       "default": "./dist/lease/lease-backend.js"
@@ -2587,10 +2655,6 @@
     "./lease/memory-lease-backend": {
       "types": "./dist/lease/memory-lease-backend.d.ts",
       "default": "./dist/lease/memory-lease-backend.js"
-    },
-    "./lease/kv-lease-backend.stub": {
-      "types": "./dist/lease/kv-lease-backend.stub.d.ts",
-      "default": "./dist/lease/kv-lease-backend.stub.js"
     },
     "./ledger": {
       "types": "./dist/ledger.d.ts",
@@ -2604,25 +2668,17 @@
       "types": "./dist/llm-selection-preferences.d.ts",
       "default": "./dist/llm-selection-preferences.js"
     },
-    "./local-stt-discovery": {
-      "types": "./dist/local-stt-discovery.d.ts",
-      "default": "./dist/local-stt-discovery.js"
-    },
     "./local-ipc": {
       "types": "./dist/local-ipc.d.ts",
       "default": "./dist/local-ipc.js"
     },
-    "./windows-named-pipe-security": {
-      "types": "./dist/windows-named-pipe-security.d.ts",
-      "default": "./dist/windows-named-pipe-security.js"
+    "./local-stt-discovery": {
+      "types": "./dist/local-stt-discovery.d.ts",
+      "default": "./dist/local-stt-discovery.js"
     },
     "./locale": {
       "types": "./dist/locale.d.ts",
       "default": "./dist/locale.js"
-    },
-    "./foundation/locale-normalize": {
-      "types": "./dist/foundation/locale-normalize.d.ts",
-      "default": "./dist/foundation/locale-normalize.js"
     },
     "./logger": {
       "types": "./dist/logger.d.ts",
@@ -2652,10 +2708,6 @@
       "types": "./dist/max-file-lines-config.d.ts",
       "default": "./dist/max-file-lines-config.js"
     },
-    "./mcp-request-context": {
-      "types": "./dist/mcp-request-context.d.ts",
-      "default": "./dist/mcp-request-context.js"
-    },
     "./media": {
       "types": "./dist/media/index.d.ts",
       "default": "./dist/media/index.js"
@@ -2671,6 +2723,10 @@
     "./media/docx-utils": {
       "types": "./dist/media/docx-utils.d.ts",
       "default": "./dist/media/docx-utils.js"
+    },
+    "./media/docx-xml": {
+      "types": "./dist/media/docx-xml.d.ts",
+      "default": "./dist/media/docx-xml.js"
     },
     "./media/image-description-bridge": {
       "types": "./dist/media/image-description-bridge.d.ts",
@@ -2751,6 +2807,10 @@
     "./media/xlsx-utils": {
       "types": "./dist/media/xlsx-utils.d.ts",
       "default": "./dist/media/xlsx-utils.js"
+    },
+    "./media/xlsx-xstring": {
+      "types": "./dist/media/xlsx-xstring.d.ts",
+      "default": "./dist/media/xlsx-xstring.js"
     },
     "./meeting": {
       "types": "./dist/meeting/index.d.ts",
@@ -2960,10 +3020,6 @@
       "types": "./dist/mesh/peer-auto-reply.d.ts",
       "default": "./dist/mesh/peer-auto-reply.js"
     },
-    "./mesh/peer-task-exchange": {
-      "types": "./dist/mesh/peer-task-exchange.d.ts",
-      "default": "./dist/mesh/peer-task-exchange.js"
-    },
     "./mesh/peer-conversation": {
       "types": "./dist/mesh/peer-conversation.d.ts",
       "default": "./dist/mesh/peer-conversation.js"
@@ -2976,9 +3032,9 @@
       "types": "./dist/mesh/peer-runtime-recovery.d.ts",
       "default": "./dist/mesh/peer-runtime-recovery.js"
     },
-    "./foundation/message-format": {
-      "types": "./dist/foundation/message-format.d.ts",
-      "default": "./dist/foundation/message-format.js"
+    "./mesh/peer-task-exchange": {
+      "types": "./dist/mesh/peer-task-exchange.d.ts",
+      "default": "./dist/mesh/peer-task-exchange.js"
     },
     "./metrics": {
       "types": "./dist/metrics.d.ts",
@@ -3248,6 +3304,10 @@
       "types": "./dist/mission/delegation-request.d.ts",
       "default": "./dist/mission/delegation-request.js"
     },
+    "./mission/mission-admission": {
+      "types": "./dist/mission/mission-admission.d.ts",
+      "default": "./dist/mission/mission-admission.js"
+    },
     "./mission/mission-advisory-panel": {
       "types": "./dist/mission/mission-advisory-panel.d.ts",
       "default": "./dist/mission/mission-advisory-panel.js"
@@ -3291,6 +3351,18 @@
     "./mission/mission-decision-lock": {
       "types": "./dist/mission/mission-decision-lock.d.ts",
       "default": "./dist/mission/mission-decision-lock.js"
+    },
+    "./mission/mission-development-continuation": {
+      "types": "./dist/mission/mission-development-continuation.d.ts",
+      "default": "./dist/mission/mission-development-continuation.js"
+    },
+    "./mission/mission-development-gates": {
+      "types": "./dist/mission/mission-development-gates.d.ts",
+      "default": "./dist/mission/mission-development-gates.js"
+    },
+    "./mission/mission-development-proof": {
+      "types": "./dist/mission/mission-development-proof.d.ts",
+      "default": "./dist/mission/mission-development-proof.js"
     },
     "./mission/mission-dispatch-io": {
       "types": "./dist/mission/mission-dispatch-io.d.ts",
@@ -3379,6 +3451,10 @@
     "./mission/mission-management-config": {
       "types": "./dist/mission/mission-management-config.d.ts",
       "default": "./dist/mission/mission-management-config.js"
+    },
+    "./mission/mission-mutation-snapshot": {
+      "types": "./dist/mission/mission-mutation-snapshot.d.ts",
+      "default": "./dist/mission/mission-mutation-snapshot.js"
     },
     "./mission/mission-next-task-reader": {
       "types": "./dist/mission/mission-next-task-reader.d.ts",
@@ -3476,6 +3552,10 @@
       "types": "./dist/mission/mission-planning-packet.d.ts",
       "default": "./dist/mission/mission-planning-packet.js"
     },
+    "./mission/mission-prerequisite-identity": {
+      "types": "./dist/mission/mission-prerequisite-identity.d.ts",
+      "default": "./dist/mission/mission-prerequisite-identity.js"
+    },
     "./mission/mission-process-governance": {
       "types": "./dist/mission/mission-process-governance.d.ts",
       "default": "./dist/mission/mission-process-governance.js"
@@ -3532,25 +3612,13 @@
       "types": "./dist/mission/mission-seed-registry.d.ts",
       "default": "./dist/mission/mission-seed-registry.js"
     },
-    "./mission/mission-prerequisite-identity": {
-      "types": "./dist/mission/mission-prerequisite-identity.d.ts",
-      "default": "./dist/mission/mission-prerequisite-identity.js"
-    },
     "./mission/mission-state": {
       "types": "./dist/mission/mission-state.d.ts",
       "default": "./dist/mission/mission-state.js"
     },
-    "./mission/mission-admission": {
-      "types": "./dist/mission/mission-admission.d.ts",
-      "default": "./dist/mission/mission-admission.js"
-    },
     "./mission/mission-state-reader": {
       "types": "./dist/mission/mission-state-reader.d.ts",
       "default": "./dist/mission/mission-state-reader.js"
-    },
-    "./mission/mission-mutation-snapshot": {
-      "types": "./dist/mission/mission-mutation-snapshot.d.ts",
-      "default": "./dist/mission/mission-mutation-snapshot.js"
     },
     "./mission/mission-status": {
       "types": "./dist/mission/mission-status.d.ts",
@@ -3576,13 +3644,13 @@
       "types": "./dist/mission/mission-task-source-workspace.d.ts",
       "default": "./dist/mission/mission-task-source-workspace.js"
     },
-    "./mission/mission-task-supersede-proof": {
-      "types": "./dist/mission/mission-task-supersede-proof.d.ts",
-      "default": "./dist/mission/mission-task-supersede-proof.js"
-    },
     "./mission/mission-task-supersede": {
       "types": "./dist/mission/mission-task-supersede.d.ts",
       "default": "./dist/mission/mission-task-supersede.js"
+    },
+    "./mission/mission-task-supersede-proof": {
+      "types": "./dist/mission/mission-task-supersede-proof.d.ts",
+      "default": "./dist/mission/mission-task-supersede-proof.js"
     },
     "./mission/mission-team-binding": {
       "types": "./dist/mission/mission-team-binding.d.ts",
@@ -3740,10 +3808,6 @@
       "types": "./dist/next-action.d.ts",
       "default": "./dist/next-action.js"
     },
-    "./contracts/next-action-contract": {
-      "types": "./dist/contracts/next-action-contract.d.ts",
-      "default": "./dist/contracts/next-action-contract.js"
-    },
     "./nhi-lifecycle-governance": {
       "types": "./dist/nhi-lifecycle-governance.d.ts",
       "default": "./dist/nhi-lifecycle-governance.js"
@@ -3756,10 +3820,6 @@
       "types": "./dist/oauth-session-store.d.ts",
       "default": "./dist/oauth-session-store.js"
     },
-    "./obs-virtual-camera-output": {
-      "types": "./dist/obs-virtual-camera-output.d.ts",
-      "default": "./dist/obs-virtual-camera-output.js"
-    },
     "./observation-distill": {
       "types": "./dist/observation-distill.d.ts",
       "default": "./dist/observation-distill.js"
@@ -3767,10 +3827,6 @@
     "./ocr-bridge": {
       "types": "./dist/ocr-bridge.d.ts",
       "default": "./dist/ocr-bridge.js"
-    },
-    "./contracts/ocr-types": {
-      "types": "./dist/contracts/ocr-types.d.ts",
-      "default": "./dist/contracts/ocr-types.js"
     },
     "./onboarding-apply-input": {
       "types": "./dist/organization/onboarding-apply-input.d.ts",
@@ -3844,25 +3900,17 @@
       "types": "./dist/ops-alert.d.ts",
       "default": "./dist/ops-alert.js"
     },
-    "./scheduler-incidents": {
-      "types": "./dist/scheduler-incidents.d.ts",
-      "default": "./dist/scheduler-incidents.js"
-    },
-    "./verification-source-snapshot": {
-      "types": "./dist/verification-source-snapshot.d.ts",
-      "default": "./dist/verification-source-snapshot.js"
-    },
     "./ops-health": {
       "types": "./dist/ops-health.d.ts",
       "default": "./dist/ops-health.js"
     },
-    "./ops-health-state": {
-      "types": "./dist/ops-health-state.d.ts",
-      "default": "./dist/ops-health-state.js"
-    },
     "./ops-health-probe": {
       "types": "./dist/ops-health-probe.d.ts",
       "default": "./dist/ops-health-probe.js"
+    },
+    "./ops-health-state": {
+      "types": "./dist/ops-health-state.d.ts",
+      "default": "./dist/ops-health-state.js"
     },
     "./orchestrator-session": {
       "types": "./dist/mission/orchestrator-session.d.ts",
@@ -3920,6 +3968,46 @@
       "types": "./dist/organization/authority-role-registry.d.ts",
       "default": "./dist/organization/authority-role-registry.js"
     },
+    "./organization/company-bootstrap": {
+      "types": "./dist/organization/company-bootstrap.d.ts",
+      "default": "./dist/organization/company-bootstrap.js"
+    },
+    "./organization/company-onboarding": {
+      "types": "./dist/organization/company-onboarding.d.ts",
+      "default": "./dist/organization/company-onboarding.js"
+    },
+    "./organization/company-setup-workflow": {
+      "types": "./dist/organization/company-setup-workflow.d.ts",
+      "default": "./dist/organization/company-setup-workflow.js"
+    },
+    "./organization/continuous-development-consent": {
+      "types": "./dist/organization/continuous-development-consent.d.ts",
+      "default": "./dist/organization/continuous-development-consent.js"
+    },
+    "./organization/continuous-mission-scope": {
+      "types": "./dist/organization/continuous-mission-scope.d.ts",
+      "default": "./dist/organization/continuous-mission-scope.js"
+    },
+    "./organization/continuous-operations": {
+      "types": "./dist/organization/continuous-operations.d.ts",
+      "default": "./dist/organization/continuous-operations.js"
+    },
+    "./organization/continuous-operations-policy": {
+      "types": "./dist/organization/continuous-operations-policy.d.ts",
+      "default": "./dist/organization/continuous-operations-policy.js"
+    },
+    "./organization/continuous-operations-sources": {
+      "types": "./dist/organization/continuous-operations-sources.d.ts",
+      "default": "./dist/organization/continuous-operations-sources.js"
+    },
+    "./organization/continuous-work-owner": {
+      "types": "./dist/organization/continuous-work-owner.d.ts",
+      "default": "./dist/organization/continuous-work-owner.js"
+    },
+    "./organization/continuous-work-plan": {
+      "types": "./dist/organization/continuous-work-plan.d.ts",
+      "default": "./dist/organization/continuous-work-plan.js"
+    },
     "./organization/identity-directory": {
       "types": "./dist/organization/identity-directory.d.ts",
       "default": "./dist/organization/identity-directory.js"
@@ -3936,37 +4024,21 @@
       "types": "./dist/organization/member-invite.d.ts",
       "default": "./dist/organization/member-invite.js"
     },
-    "./organization/member-registry": {
-      "types": "./dist/organization/member-registry.d.ts",
-      "default": "./dist/organization/member-registry.js"
-    },
     "./organization/member-management": {
       "types": "./dist/organization/member-management.d.ts",
       "default": "./dist/organization/member-management.js"
     },
-    "./organization/publication-role-migration": {
-      "types": "./dist/organization/publication-role-migration.d.ts",
-      "default": "./dist/organization/publication-role-migration.js"
+    "./organization/member-registry": {
+      "types": "./dist/organization/member-registry.d.ts",
+      "default": "./dist/organization/member-registry.js"
     },
-    "./organization/organization-people-access": {
-      "types": "./dist/organization/organization-people-access.d.ts",
-      "default": "./dist/organization/organization-people-access.js"
-    },
-    "./organization/organization-participants": {
-      "types": "./dist/organization/organization-participants.d.ts",
-      "default": "./dist/organization/organization-participants.js"
-    },
-    "./organization/organization-agent-management": {
-      "types": "./dist/organization/organization-agent-management.d.ts",
-      "default": "./dist/organization/organization-agent-management.js"
+    "./organization/nhi-session-admission": {
+      "types": "./dist/organization/nhi-session-admission.d.ts",
+      "default": "./dist/organization/nhi-session-admission.js"
     },
     "./organization/onboarding-apply-input": {
       "types": "./dist/organization/onboarding-apply-input.d.ts",
       "default": "./dist/organization/onboarding-apply-input.js"
-    },
-    "./organization/onboarding-context": {
-      "types": "./dist/organization/onboarding-context.d.ts",
-      "default": "./dist/organization/onboarding-context.js"
     },
     "./organization/onboarding-authority": {
       "types": "./dist/organization/onboarding-authority.d.ts",
@@ -3976,25 +4048,17 @@
       "types": "./dist/organization/onboarding-authority-runtime.d.ts",
       "default": "./dist/organization/onboarding-authority-runtime.js"
     },
-    "./organization/onboarding-runtime-identity": {
-      "types": "./dist/organization/onboarding-runtime-identity.d.ts",
-      "default": "./dist/organization/onboarding-runtime-identity.js"
-    },
-    "./organization/nhi-session-admission": {
-      "types": "./dist/organization/nhi-session-admission.d.ts",
-      "default": "./dist/organization/nhi-session-admission.js"
-    },
-    "./persona-identity": {
-      "types": "./dist/persona-identity.d.ts",
-      "default": "./dist/persona-identity.js"
-    },
-    "./personal-identity-state": {
-      "types": "./dist/personal-identity-state.d.ts",
-      "default": "./dist/personal-identity-state.js"
+    "./organization/onboarding-context": {
+      "types": "./dist/organization/onboarding-context.d.ts",
+      "default": "./dist/organization/onboarding-context.js"
     },
     "./organization/onboarding-flow-policy": {
       "types": "./dist/organization/onboarding-flow-policy.d.ts",
       "default": "./dist/organization/onboarding-flow-policy.js"
+    },
+    "./organization/onboarding-runtime-identity": {
+      "types": "./dist/organization/onboarding-runtime-identity.d.ts",
+      "default": "./dist/organization/onboarding-runtime-identity.js"
     },
     "./organization/onboarding-state": {
       "types": "./dist/organization/onboarding-state.d.ts",
@@ -4003,6 +4067,10 @@
     "./organization/onboarding-summary-policy": {
       "types": "./dist/organization/onboarding-summary-policy.d.ts",
       "default": "./dist/organization/onboarding-summary-policy.js"
+    },
+    "./organization/organization-agent-management": {
+      "types": "./dist/organization/organization-agent-management.d.ts",
+      "default": "./dist/organization/organization-agent-management.js"
     },
     "./organization/organization-cadence": {
       "types": "./dist/organization/organization-cadence.d.ts",
@@ -4056,6 +4124,14 @@
       "types": "./dist/organization/organization-operation-tick.d.ts",
       "default": "./dist/organization/organization-operation-tick.js"
     },
+    "./organization/organization-participants": {
+      "types": "./dist/organization/organization-participants.d.ts",
+      "default": "./dist/organization/organization-participants.js"
+    },
+    "./organization/organization-people-access": {
+      "types": "./dist/organization/organization-people-access.d.ts",
+      "default": "./dist/organization/organization-people-access.js"
+    },
     "./organization/organization-profile": {
       "types": "./dist/organization/organization-profile.d.ts",
       "default": "./dist/organization/organization-profile.js"
@@ -4067,6 +4143,10 @@
     "./organization/organization-standup": {
       "types": "./dist/organization/organization-standup.d.ts",
       "default": "./dist/organization/organization-standup.js"
+    },
+    "./organization/publication-role-migration": {
+      "types": "./dist/organization/publication-role-migration.d.ts",
+      "default": "./dist/organization/publication-role-migration.js"
     },
     "./organization/role-assumption-trace": {
       "types": "./dist/organization/role-assumption-trace.d.ts",
@@ -4112,6 +4192,14 @@
       "types": "./dist/organization/tenant-activation.d.ts",
       "default": "./dist/organization/tenant-activation.js"
     },
+    "./organization/tenant-activation-approval": {
+      "types": "./dist/organization/tenant-activation-approval.d.ts",
+      "default": "./dist/organization/tenant-activation-approval.js"
+    },
+    "./organization/tenant-activation-probe": {
+      "types": "./dist/organization/tenant-activation-probe.d.ts",
+      "default": "./dist/organization/tenant-activation-probe.js"
+    },
     "./organization/tenant-design-override": {
       "types": "./dist/organization/tenant-design-override.d.ts",
       "default": "./dist/organization/tenant-design-override.js"
@@ -4136,13 +4224,17 @@
       "types": "./dist/organization/tenant-registry.d.ts",
       "default": "./dist/organization/tenant-registry.js"
     },
-    "./organization/tenant-rename": {
-      "types": "./dist/organization/tenant-rename.d.ts",
-      "default": "./dist/organization/tenant-rename.js"
+    "./organization/tenant-registry-consistency": {
+      "types": "./dist/organization/tenant-registry-consistency.d.ts",
+      "default": "./dist/organization/tenant-registry-consistency.js"
     },
     "./organization/tenant-registry-exceptions": {
       "types": "./dist/organization/tenant-registry-exceptions.d.ts",
       "default": "./dist/organization/tenant-registry-exceptions.js"
+    },
+    "./organization/tenant-rename": {
+      "types": "./dist/organization/tenant-rename.d.ts",
+      "default": "./dist/organization/tenant-rename.js"
     },
     "./os-automation": {
       "types": "./dist/virtual/os-automation.d.ts",
@@ -4176,10 +4268,6 @@
       "types": "./dist/path-tenant-attribution.d.ts",
       "default": "./dist/path-tenant-attribution.js"
     },
-    "./foundation/pcm-wav": {
-      "types": "./dist/foundation/pcm-wav.d.ts",
-      "default": "./dist/foundation/pcm-wav.js"
-    },
     "./pdf-protocol": {
       "types": "./dist/contracts/pdf-protocol.d.ts",
       "default": "./dist/contracts/pdf-protocol.js"
@@ -4196,9 +4284,17 @@
       "types": "./dist/mesh/peer-runtime-recovery.d.ts",
       "default": "./dist/mesh/peer-runtime-recovery.js"
     },
+    "./persona-identity": {
+      "types": "./dist/persona-identity.d.ts",
+      "default": "./dist/persona-identity.js"
+    },
     "./personal-identity-reader": {
       "types": "./dist/personal-identity-reader.d.ts",
       "default": "./dist/personal-identity-reader.js"
+    },
+    "./personal-identity-state": {
+      "types": "./dist/personal-identity-state.d.ts",
+      "default": "./dist/personal-identity-state.js"
     },
     "./pfc": {
       "types": "./dist/pfc/index.d.ts",
@@ -4280,13 +4376,13 @@
       "types": "./dist/pipeline/op-preflight.d.ts",
       "default": "./dist/pipeline/op-preflight.js"
     },
-    "./pipeline/op-preflight-defaults": {
-      "types": "./dist/pipeline/op-preflight-defaults.d.ts",
-      "default": "./dist/pipeline/op-preflight-defaults.js"
-    },
     "./pipeline/op-preflight-charter": {
       "types": "./dist/pipeline/op-preflight-charter.d.ts",
       "default": "./dist/pipeline/op-preflight-charter.js"
+    },
+    "./pipeline/op-preflight-defaults": {
+      "types": "./dist/pipeline/op-preflight-defaults.d.ts",
+      "default": "./dist/pipeline/op-preflight-defaults.js"
     },
     "./pipeline/op-preflight-stages": {
       "types": "./dist/pipeline/op-preflight-stages.d.ts",
@@ -4331,6 +4427,14 @@
     "./pipeline/pipeline-preview": {
       "types": "./dist/pipeline/pipeline-preview.d.ts",
       "default": "./dist/pipeline/pipeline-preview.js"
+    },
+    "./pipeline/pipeline-promotion-evidence": {
+      "types": "./dist/pipeline/pipeline-promotion-evidence.d.ts",
+      "default": "./dist/pipeline/pipeline-promotion-evidence.js"
+    },
+    "./pipeline/pipeline-reuse": {
+      "types": "./dist/pipeline/pipeline-reuse.d.ts",
+      "default": "./dist/pipeline/pipeline-reuse.js"
     },
     "./pipeline/pipeline-run-journal": {
       "types": "./dist/pipeline/pipeline-run-journal.d.ts",
@@ -4656,6 +4760,10 @@
       "types": "./dist/provider/provider-capability-scanner.d.ts",
       "default": "./dist/provider/provider-capability-scanner.js"
     },
+    "./provider-chain-router": {
+      "types": "./dist/provider-chain-router.d.ts",
+      "default": "./dist/provider-chain-router.js"
+    },
     "./provider-cli-capability-report-policy": {
       "types": "./dist/provider/provider-cli-capability-report-policy.d.ts",
       "default": "./dist/provider/provider-cli-capability-report-policy.js"
@@ -4680,9 +4788,13 @@
       "types": "./dist/provider/provider-pins-store.d.ts",
       "default": "./dist/provider/provider-pins-store.js"
     },
-    "./provider/provider-transport": {
-      "types": "./dist/provider/provider-transport.d.ts",
-      "default": "./dist/provider/provider-transport.js"
+    "./provider-registry": {
+      "types": "./dist/provider-registry.d.ts",
+      "default": "./dist/provider-registry.js"
+    },
+    "./provider-runtime-requirements": {
+      "types": "./dist/provider-runtime-requirements.d.ts",
+      "default": "./dist/provider-runtime-requirements.js"
     },
     "./provider/agy-cli-backend": {
       "types": "./dist/provider/agy-cli-backend.d.ts",
@@ -4836,22 +4948,6 @@
       "types": "./dist/provider/codex-cli-query.d.ts",
       "default": "./dist/provider/codex-cli-query.js"
     },
-    "./provider/codex-isolated-query": {
-      "types": "./dist/provider/codex-isolated-query.d.ts",
-      "default": "./dist/provider/codex-isolated-query.js"
-    },
-    "./provider/custody-provider-attestation-governance": {
-      "types": "./dist/provider/custody-provider-attestation-governance.d.ts",
-      "default": "./dist/provider/custody-provider-attestation-governance.js"
-    },
-    "./provider/custody-provider-attestation-store": {
-      "types": "./dist/provider/custody-provider-attestation-store.d.ts",
-      "default": "./dist/provider/custody-provider-attestation-store.js"
-    },
-    "./provider/isolated-text-generator": {
-      "types": "./dist/provider/isolated-text-generator.d.ts",
-      "default": "./dist/provider/isolated-text-generator.js"
-    },
     "./provider/codex-cli-reasoning-backend": {
       "types": "./dist/provider/codex-cli-reasoning-backend.d.ts",
       "default": "./dist/provider/codex-cli-reasoning-backend.js"
@@ -4859,6 +4955,10 @@
     "./provider/codex-cli-voice-bridge": {
       "types": "./dist/provider/codex-cli-voice-bridge.d.ts",
       "default": "./dist/provider/codex-cli-voice-bridge.js"
+    },
+    "./provider/codex-isolated-query": {
+      "types": "./dist/provider/codex-isolated-query.d.ts",
+      "default": "./dist/provider/codex-isolated-query.js"
     },
     "./provider/codex-profile": {
       "types": "./dist/provider/codex-profile.d.ts",
@@ -4875,6 +4975,14 @@
     "./provider/cursor-cli-session-adapter": {
       "types": "./dist/provider/cursor-cli-session-adapter.d.ts",
       "default": "./dist/provider/cursor-cli-session-adapter.js"
+    },
+    "./provider/custody-provider-attestation-governance": {
+      "types": "./dist/provider/custody-provider-attestation-governance.d.ts",
+      "default": "./dist/provider/custody-provider-attestation-governance.js"
+    },
+    "./provider/custody-provider-attestation-store": {
+      "types": "./dist/provider/custody-provider-attestation-store.d.ts",
+      "default": "./dist/provider/custody-provider-attestation-store.js"
     },
     "./provider/devin-cli-reasoning-backend": {
       "types": "./dist/provider/devin-cli-reasoning-backend.d.ts",
@@ -4915,6 +5023,10 @@
     "./provider/grok-cli-voice-bridge": {
       "types": "./dist/provider/grok-cli-voice-bridge.d.ts",
       "default": "./dist/provider/grok-cli-voice-bridge.js"
+    },
+    "./provider/isolated-text-generator": {
+      "types": "./dist/provider/isolated-text-generator.d.ts",
+      "default": "./dist/provider/isolated-text-generator.js"
     },
     "./provider/loopback-transport": {
       "types": "./dist/provider/loopback-transport.d.ts",
@@ -4996,6 +5108,10 @@
       "types": "./dist/provider/provider-spawn-env.d.ts",
       "default": "./dist/provider/provider-spawn-env.js"
     },
+    "./provider/provider-transport": {
+      "types": "./dist/provider/provider-transport.d.ts",
+      "default": "./dist/provider/provider-transport.js"
+    },
     "./provider/remote-provider-facade": {
       "types": "./dist/provider/remote-provider-facade.d.ts",
       "default": "./dist/provider/remote-provider-facade.js"
@@ -5023,10 +5139,6 @@
     "./realtime-media-session": {
       "types": "./dist/realtime-media-session.d.ts",
       "default": "./dist/realtime-media-session.js"
-    },
-    "./engine-runtime-preferences": {
-      "types": "./dist/voice/engine-runtime-preferences.d.ts",
-      "default": "./dist/voice/engine-runtime-preferences.js"
     },
     "./reasoning": {
       "types": "./dist/reasoning/index.d.ts",
@@ -5160,21 +5272,13 @@
       "types": "./dist/reasoning/prompt-visibility-ledger.d.ts",
       "default": "./dist/reasoning/prompt-visibility-ledger.js"
     },
-    "./reasoning/reasoning-api-provider": {
-      "types": "./dist/reasoning/reasoning-api-provider.d.ts",
-      "default": "./dist/reasoning/reasoning-api-provider.js"
-    },
-    "./foundation/secret-resolution-session": {
-      "types": "./dist/foundation/secret-resolution-session.d.ts",
-      "default": "./dist/foundation/secret-resolution-session.js"
-    },
-    "./secret/credential-allocations": {
-      "types": "./dist/secret/credential-allocations.d.ts",
-      "default": "./dist/secret/credential-allocations.js"
-    },
     "./reasoning/reasoning-api-credentials": {
       "types": "./dist/reasoning/reasoning-api-credentials.d.ts",
       "default": "./dist/reasoning/reasoning-api-credentials.js"
+    },
+    "./reasoning/reasoning-api-provider": {
+      "types": "./dist/reasoning/reasoning-api-provider.d.ts",
+      "default": "./dist/reasoning/reasoning-api-provider.js"
     },
     "./reasoning/reasoning-auth-preflight": {
       "types": "./dist/reasoning/reasoning-auth-preflight.d.ts",
@@ -5292,10 +5396,6 @@
       "types": "./dist/reflex-terminal.d.ts",
       "default": "./dist/reflex-terminal.js"
     },
-    "./contracts/rejection-reason": {
-      "types": "./dist/contracts/rejection-reason.d.ts",
-      "default": "./dist/contracts/rejection-reason.js"
-    },
     "./relationship-graph-store": {
       "types": "./dist/relationship-graph-store.d.ts",
       "default": "./dist/relationship-graph-store.js"
@@ -5316,10 +5416,6 @@
       "types": "./dist/resource-provenance.d.ts",
       "default": "./dist/resource-provenance.js"
     },
-    "./restricted-action-policy": {
-      "types": "./dist/restricted-action-policy.d.ts",
-      "default": "./dist/restricted-action-policy.js"
-    },
     "./review-reentry": {
       "types": "./dist/review-reentry.d.ts",
       "default": "./dist/review-reentry.js"
@@ -5331,6 +5427,14 @@
     "./risky-op-registry": {
       "types": "./dist/risky-op-registry.d.ts",
       "default": "./dist/risky-op-registry.js"
+    },
+    "./router-contract": {
+      "types": "./dist/router-contract.d.ts",
+      "default": "./dist/router-contract.js"
+    },
+    "./runtime-control-policy": {
+      "types": "./dist/runtime-control-policy.d.ts",
+      "default": "./dist/runtime-control-policy.js"
     },
     "./runtime-health-history": {
       "types": "./dist/tool/runtime-health-history.d.ts",
@@ -5440,6 +5544,10 @@
       "types": "./dist/scenario/scenario-trajectory.d.ts",
       "default": "./dist/scenario/scenario-trajectory.js"
     },
+    "./scheduler-incidents": {
+      "types": "./dist/scheduler-incidents.d.ts",
+      "default": "./dist/scheduler-incidents.js"
+    },
     "./schema-loader": {
       "types": "./dist/schema-loader.d.ts",
       "default": "./dist/schema-loader.js"
@@ -5447,6 +5555,10 @@
     "./scope-context": {
       "types": "./dist/scope-context.d.ts",
       "default": "./dist/scope-context.js"
+    },
+    "./scope-envelope": {
+      "types": "./dist/scope-envelope.d.ts",
+      "default": "./dist/scope-envelope.js"
     },
     "./scope-migration": {
       "types": "./dist/scope-migration.d.ts",
@@ -5516,6 +5628,14 @@
       "types": "./dist/seam-selection-rules.d.ts",
       "default": "./dist/seam-selection-rules.js"
     },
+    "./search": {
+      "types": "./dist/search/index.d.ts",
+      "default": "./dist/search/index.js"
+    },
+    "./search/web-search-runtime-bridge": {
+      "types": "./dist/search/web-search-runtime-bridge.d.ts",
+      "default": "./dist/search/web-search-runtime-bridge.js"
+    },
     "./secret": {
       "types": "./dist/secret/index.d.ts",
       "default": "./dist/secret/index.js"
@@ -5548,6 +5668,18 @@
       "types": "./dist/secret/secret-types.d.ts",
       "default": "./dist/secret/secret-types.js"
     },
+    "./secret/credential-allocations": {
+      "types": "./dist/secret/credential-allocations.d.ts",
+      "default": "./dist/secret/credential-allocations.js"
+    },
+    "./secret/external-secret-providers": {
+      "types": "./dist/secret/external-secret-providers.d.ts",
+      "default": "./dist/secret/external-secret-providers.js"
+    },
+    "./secret/provider-registry": {
+      "types": "./dist/secret/provider-registry.d.ts",
+      "default": "./dist/secret/provider-registry.js"
+    },
     "./secret/secret-bridge": {
       "types": "./dist/secret/secret-bridge.d.ts",
       "default": "./dist/secret/secret-bridge.js"
@@ -5571,14 +5703,6 @@
     "./secret/secret-introduction": {
       "types": "./dist/secret/secret-introduction.d.ts",
       "default": "./dist/secret/secret-introduction.js"
-    },
-    "./secret/external-secret-providers": {
-      "types": "./dist/secret/external-secret-providers.d.ts",
-      "default": "./dist/secret/external-secret-providers.js"
-    },
-    "./secret/provider-registry": {
-      "types": "./dist/secret/provider-registry.d.ts",
-      "default": "./dist/secret/provider-registry.js"
     },
     "./secret/secret-resolver": {
       "types": "./dist/secret/secret-resolver.d.ts",
@@ -5764,6 +5888,10 @@
       "types": "./dist/service/service-pid-registry.d.ts",
       "default": "./dist/service/service-pid-registry.js"
     },
+    "./service/service-preflight": {
+      "types": "./dist/service/service-preflight.d.ts",
+      "default": "./dist/service/service-preflight.js"
+    },
     "./service/service-preset-policy": {
       "types": "./dist/service/service-preset-policy.d.ts",
       "default": "./dist/service/service-preset-policy.js"
@@ -5828,10 +5956,6 @@
       "types": "./dist/share-grant-live-sessions.d.ts",
       "default": "./dist/share-grant-live-sessions.js"
     },
-    "./contracts/shared-business-types": {
-      "types": "./dist/contracts/shared-business-types.d.ts",
-      "default": "./dist/contracts/shared-business-types.js"
-    },
     "./shell": {
       "types": "./dist/shell/index.d.ts",
       "default": "./dist/shell/index.js"
@@ -5888,9 +6012,9 @@
       "types": "./dist/shell/terminal-keys.d.ts",
       "default": "./dist/shell/terminal-keys.js"
     },
-    "./silero-vad-bridge": {
-      "types": "./dist/silero-vad-bridge.d.ts",
-      "default": "./dist/silero-vad-bridge.js"
+    "./shortcut-bridge": {
+      "types": "./dist/shortcut-bridge.d.ts",
+      "default": "./dist/shortcut-bridge.js"
     },
     "./skill-index": {
       "types": "./dist/plugin/skill-index.d.ts",
@@ -6028,6 +6152,10 @@
       "types": "./dist/staffing-coverage.d.ts",
       "default": "./dist/staffing-coverage.js"
     },
+    "./stance-resolver": {
+      "types": "./dist/stance-resolver.d.ts",
+      "default": "./dist/stance-resolver.js"
+    },
     "./state-probe": {
       "types": "./dist/state-probe.d.ts",
       "default": "./dist/state-probe.js"
@@ -6044,10 +6172,6 @@
       "types": "./dist/storage-layout.d.ts",
       "default": "./dist/storage-layout.js"
     },
-    "./storage/storage-backend": {
-      "types": "./dist/storage/storage-backend.d.ts",
-      "default": "./dist/storage/storage-backend.js"
-    },
     "./storage/local-storage-backend": {
       "types": "./dist/storage/local-storage-backend.d.ts",
       "default": "./dist/storage/local-storage-backend.js"
@@ -6059,6 +6183,10 @@
     "./storage/object-storage-backend.stub": {
       "types": "./dist/storage/object-storage-backend.stub.d.ts",
       "default": "./dist/storage/object-storage-backend.stub.js"
+    },
+    "./storage/storage-backend": {
+      "types": "./dist/storage/storage-backend.d.ts",
+      "default": "./dist/storage/storage-backend.js"
     },
     "./streaming-stt-bridge": {
       "types": "./dist/voice/streaming-stt-bridge.d.ts",
@@ -6300,6 +6428,14 @@
       "types": "./dist/surface/installation-owner-access.d.ts",
       "default": "./dist/surface/installation-owner-access.js"
     },
+    "./surface/needs-you": {
+      "types": "./dist/surface/needs-you.d.ts",
+      "default": "./dist/surface/needs-you.js"
+    },
+    "./surface/needs-you-sources": {
+      "types": "./dist/surface/needs-you-sources.d.ts",
+      "default": "./dist/surface/needs-you-sources.js"
+    },
     "./surface/oidc-browser-login": {
       "types": "./dist/surface/oidc-browser-login.d.ts",
       "default": "./dist/surface/oidc-browser-login.js"
@@ -6324,6 +6460,18 @@
       "types": "./dist/surface/operator-provider-preferences.d.ts",
       "default": "./dist/surface/operator-provider-preferences.js"
     },
+    "./surface/scoped-workspace-ingest": {
+      "types": "./dist/surface/scoped-workspace-ingest.d.ts",
+      "default": "./dist/surface/scoped-workspace-ingest.js"
+    },
+    "./surface/setup-checklist": {
+      "types": "./dist/surface/setup-checklist.d.ts",
+      "default": "./dist/surface/setup-checklist.js"
+    },
+    "./surface/setup-checklist-model": {
+      "types": "./dist/surface/setup-checklist-model.d.ts",
+      "default": "./dist/surface/setup-checklist-model.js"
+    },
     "./surface/surface-access-policy": {
       "types": "./dist/surface/surface-access-policy.d.ts",
       "default": "./dist/surface/surface-access-policy.js"
@@ -6339,30 +6487,6 @@
     "./surface/surface-artifact-store": {
       "types": "./dist/surface/surface-artifact-store.d.ts",
       "default": "./dist/surface/surface-artifact-store.js"
-    },
-    "./surface/surface-operation-registry": {
-      "types": "./dist/surface/surface-operation-registry.d.ts",
-      "default": "./dist/surface/surface-operation-registry.js"
-    },
-    "./surface/needs-you": {
-      "types": "./dist/surface/needs-you.d.ts",
-      "default": "./dist/surface/needs-you.js"
-    },
-    "./surface/needs-you-sources": {
-      "types": "./dist/surface/needs-you-sources.d.ts",
-      "default": "./dist/surface/needs-you-sources.js"
-    },
-    "./surface/setup-checklist": {
-      "types": "./dist/surface/setup-checklist.d.ts",
-      "default": "./dist/surface/setup-checklist.js"
-    },
-    "./surface/setup-checklist-model": {
-      "types": "./dist/surface/setup-checklist-model.d.ts",
-      "default": "./dist/surface/setup-checklist-model.js"
-    },
-    "./surface/workspace-graph": {
-      "types": "./dist/surface/workspace-graph.d.ts",
-      "default": "./dist/surface/workspace-graph.js"
     },
     "./surface/surface-auth-routes": {
       "types": "./dist/surface/surface-auth-routes.d.ts",
@@ -6419,6 +6543,10 @@
     "./surface/surface-mutation-guard": {
       "types": "./dist/surface/surface-mutation-guard.d.ts",
       "default": "./dist/surface/surface-mutation-guard.js"
+    },
+    "./surface/surface-operation-registry": {
+      "types": "./dist/surface/surface-operation-registry.d.ts",
+      "default": "./dist/surface/surface-operation-registry.js"
     },
     "./surface/surface-provider-manifest": {
       "types": "./dist/surface/surface-provider-manifest.d.ts",
@@ -6524,6 +6652,30 @@
       "types": "./dist/surface/web-push.d.ts",
       "default": "./dist/surface/web-push.js"
     },
+    "./surface/workspace": {
+      "types": "./dist/surface/workspace.d.ts",
+      "default": "./dist/surface/workspace.js"
+    },
+    "./surface/workspace-autonomy": {
+      "types": "./dist/surface/workspace-autonomy.d.ts",
+      "default": "./dist/surface/workspace-autonomy.js"
+    },
+    "./surface/workspace-graph": {
+      "types": "./dist/surface/workspace-graph.d.ts",
+      "default": "./dist/surface/workspace-graph.js"
+    },
+    "./surface/workspace-query": {
+      "types": "./dist/surface/workspace-query.d.ts",
+      "default": "./dist/surface/workspace-query.js"
+    },
+    "./surface/workspace-scope": {
+      "types": "./dist/surface/workspace-scope.d.ts",
+      "default": "./dist/surface/workspace-scope.js"
+    },
+    "./surface/workspace-work": {
+      "types": "./dist/surface/workspace-work.d.ts",
+      "default": "./dist/surface/workspace-work.js"
+    },
     "./t": {
       "types": "./dist/t.d.ts",
       "default": "./dist/t.js"
@@ -6576,10 +6728,6 @@
       "types": "./dist/organization/team-decision-support-metrics.d.ts",
       "default": "./dist/organization/team-decision-support-metrics.js"
     },
-    "./ten-vad-bridge": {
-      "types": "./dist/ten-vad-bridge.d.ts",
-      "default": "./dist/ten-vad-bridge.js"
-    },
     "./tenant-activation": {
       "types": "./dist/organization/tenant-activation.d.ts",
       "default": "./dist/organization/tenant-activation.js"
@@ -6620,25 +6768,13 @@
       "types": "./dist/shell/terminal-keys.d.ts",
       "default": "./dist/shell/terminal-keys.js"
     },
-    "./testing/reasoning-backend-conformance": {
-      "types": "./dist/testing/reasoning-backend-conformance.d.ts",
-      "default": "./dist/testing/reasoning-backend-conformance.js"
-    },
     "./testing/mission-fixture": {
       "types": "./dist/testing/mission-fixture.d.ts",
       "default": "./dist/testing/mission-fixture.js"
     },
-    "./accepted-pipeline-bindings": {
-      "types": "./dist/accepted-pipeline-bindings.d.ts",
-      "default": "./dist/accepted-pipeline-bindings.js"
-    },
-    "./ui-component-registry": {
-      "types": "./dist/ui-component-registry.d.ts",
-      "default": "./dist/ui-component-registry.js"
-    },
-    "./foundation/text-escaping": {
-      "types": "./dist/foundation/text-escaping.d.ts",
-      "default": "./dist/foundation/text-escaping.js"
+    "./testing/reasoning-backend-conformance": {
+      "types": "./dist/testing/reasoning-backend-conformance.d.ts",
+      "default": "./dist/testing/reasoning-backend-conformance.js"
     },
     "./tier-guard": {
       "types": "./dist/tier-guard.d.ts",
@@ -6760,6 +6896,10 @@
       "types": "./dist/typesafe-jev-judgment-backend.d.ts",
       "default": "./dist/typesafe-jev-judgment-backend.js"
     },
+    "./ui-component-registry": {
+      "types": "./dist/ui-component-registry.d.ts",
+      "default": "./dist/ui-component-registry.js"
+    },
     "./ui-element-detector": {
       "types": "./dist/surface/ui-element-detector.d.ts",
       "default": "./dist/surface/ui-element-detector.js"
@@ -6784,10 +6924,6 @@
       "types": "./dist/ux-vocabulary.d.ts",
       "default": "./dist/ux-vocabulary.js"
     },
-    "./v4l2-virtual-camera-output": {
-      "types": "./dist/v4l2-virtual-camera-output.d.ts",
-      "default": "./dist/v4l2-virtual-camera-output.js"
-    },
     "./vad-registry": {
       "types": "./dist/voice/vad-registry.d.ts",
       "default": "./dist/voice/vad-registry.js"
@@ -6808,6 +6944,14 @@
       "types": "./dist/vcs/index.d.ts",
       "default": "./dist/vcs/index.js"
     },
+    "./vcs/cwd-scope": {
+      "types": "./dist/vcs/cwd-scope.d.ts",
+      "default": "./dist/vcs/cwd-scope.js"
+    },
+    "./vcs/gh-cli-host-provider": {
+      "types": "./dist/vcs/gh-cli-host-provider.d.ts",
+      "default": "./dist/vcs/gh-cli-host-provider.js"
+    },
     "./vcs/git": {
       "types": "./dist/vcs/git.d.ts",
       "default": "./dist/vcs/git.js"
@@ -6815,6 +6959,10 @@
     "./vcs/github": {
       "types": "./dist/vcs/github.d.ts",
       "default": "./dist/vcs/github.js"
+    },
+    "./vcs/github-rest-host-provider": {
+      "types": "./dist/vcs/github-rest-host-provider.d.ts",
+      "default": "./dist/vcs/github-rest-host-provider.js"
     },
     "./vcs/governance-host": {
       "types": "./dist/vcs/governance-host.d.ts",
@@ -6824,9 +6972,37 @@
       "types": "./dist/vcs/index.d.ts",
       "default": "./dist/vcs/index.js"
     },
+    "./vcs/local-git-backend": {
+      "types": "./dist/vcs/local-git-backend.d.ts",
+      "default": "./dist/vcs/local-git-backend.js"
+    },
+    "./vcs/memory-vcs-backend": {
+      "types": "./dist/vcs/memory-vcs-backend.d.ts",
+      "default": "./dist/vcs/memory-vcs-backend.js"
+    },
+    "./vcs/memory-vcs-host-provider": {
+      "types": "./dist/vcs/memory-vcs-host-provider.d.ts",
+      "default": "./dist/vcs/memory-vcs-host-provider.js"
+    },
     "./vcs/publication-host": {
       "types": "./dist/vcs/publication-host.d.ts",
       "default": "./dist/vcs/publication-host.js"
+    },
+    "./vcs/vcs-backend": {
+      "types": "./dist/vcs/vcs-backend.d.ts",
+      "default": "./dist/vcs/vcs-backend.js"
+    },
+    "./vcs/vcs-host": {
+      "types": "./dist/vcs/vcs-host.d.ts",
+      "default": "./dist/vcs/vcs-host.js"
+    },
+    "./vcs/vcs-host-verbs": {
+      "types": "./dist/vcs/vcs-host-verbs.d.ts",
+      "default": "./dist/vcs/vcs-host-verbs.js"
+    },
+    "./verification-source-snapshot": {
+      "types": "./dist/verification-source-snapshot.d.ts",
+      "default": "./dist/verification-source-snapshot.js"
     },
     "./video": {
       "types": "./dist/video/index.d.ts",
@@ -7144,13 +7320,21 @@
       "types": "./dist/voice/engine-runtime-preferences.d.ts",
       "default": "./dist/voice/engine-runtime-preferences.js"
     },
-    "./voice/speech-languages": {
-      "types": "./dist/voice/speech-languages.d.ts",
-      "default": "./dist/voice/speech-languages.js"
+    "./voice/engine-runtime-preferences-access": {
+      "types": "./dist/voice/engine-runtime-preferences-access.d.ts",
+      "default": "./dist/voice/engine-runtime-preferences-access.js"
+    },
+    "./voice/engine-runtime-preferences-transaction": {
+      "types": "./dist/voice/engine-runtime-preferences-transaction.d.ts",
+      "default": "./dist/voice/engine-runtime-preferences-transaction.js"
     },
     "./voice/speech-cpp-client": {
       "types": "./dist/voice/speech-cpp-client.d.ts",
       "default": "./dist/voice/speech-cpp-client.js"
+    },
+    "./voice/speech-languages": {
+      "types": "./dist/voice/speech-languages.d.ts",
+      "default": "./dist/voice/speech-languages.js"
     },
     "./voice/speech-to-text-bridge": {
       "types": "./dist/voice/speech-to-text-bridge.d.ts",
@@ -7224,9 +7408,9 @@
       "types": "./dist/search/web-search-runtime-bridge.d.ts",
       "default": "./dist/search/web-search-runtime-bridge.js"
     },
-    "./contracts/wire-error": {
-      "types": "./dist/contracts/wire-error.d.ts",
-      "default": "./dist/contracts/wire-error.js"
+    "./windows-named-pipe-security": {
+      "types": "./dist/windows-named-pipe-security.d.ts",
+      "default": "./dist/windows-named-pipe-security.js"
     },
     "./work-coordination": {
       "types": "./dist/workforce/work-coordination.d.ts",
@@ -7300,6 +7484,10 @@
       "types": "./dist/workforce/index.d.ts",
       "default": "./dist/workforce/index.js"
     },
+    "./workforce/agent-worktree": {
+      "types": "./dist/workforce/agent-worktree.d.ts",
+      "default": "./dist/workforce/agent-worktree.js"
+    },
     "./workforce/artifact-bundle": {
       "types": "./dist/workforce/artifact-bundle.d.ts",
       "default": "./dist/workforce/artifact-bundle.js"
@@ -7364,10 +7552,6 @@
       "types": "./dist/workforce/work-coordination.d.ts",
       "default": "./dist/workforce/work-coordination.js"
     },
-    "./workforce/work-item-change-request": {
-      "types": "./dist/workforce/work-item-change-request.d.ts",
-      "default": "./dist/workforce/work-item-change-request.js"
-    },
     "./workforce/work-coordination-error": {
       "types": "./dist/workforce/work-coordination-error.d.ts",
       "default": "./dist/workforce/work-coordination-error.js"
@@ -7424,6 +7608,10 @@
       "types": "./dist/workforce/work-inventory-scoring.d.ts",
       "default": "./dist/workforce/work-inventory-scoring.js"
     },
+    "./workforce/work-item-change-request": {
+      "types": "./dist/workforce/work-item-change-request.d.ts",
+      "default": "./dist/workforce/work-item-change-request.js"
+    },
     "./workforce/work-scope-decision": {
       "types": "./dist/workforce/work-scope-decision.d.ts",
       "default": "./dist/workforce/work-scope-decision.js"
@@ -7464,10 +7652,6 @@
       "types": "./dist/workforce/workspace-budget.d.ts",
       "default": "./dist/workforce/workspace-budget.js"
     },
-    "./workforce/agent-worktree": {
-      "types": "./dist/workforce/agent-worktree.d.ts",
-      "default": "./dist/workforce/agent-worktree.js"
-    },
     "./workforce/workspace-ledger": {
       "types": "./dist/workforce/workspace-ledger.d.ts",
       "default": "./dist/workforce/workspace-ledger.js"
@@ -7495,278 +7679,6 @@
     "./workspace-sweep": {
       "types": "./dist/workforce/workspace-sweep.d.ts",
       "default": "./dist/workforce/workspace-sweep.js"
-    },
-    "./organization/continuous-operations": {
-      "types": "./dist/organization/continuous-operations.d.ts",
-      "default": "./dist/organization/continuous-operations.js"
-    },
-    "./organization/continuous-operations-policy": {
-      "types": "./dist/organization/continuous-operations-policy.d.ts",
-      "default": "./dist/organization/continuous-operations-policy.js"
-    },
-    "./organization/continuous-operations-sources": {
-      "types": "./dist/organization/continuous-operations-sources.d.ts",
-      "default": "./dist/organization/continuous-operations-sources.js"
-    },
-    "./organization/continuous-work-plan": {
-      "types": "./dist/organization/continuous-work-plan.d.ts",
-      "default": "./dist/organization/continuous-work-plan.js"
-    },
-    "./organization/continuous-work-owner": {
-      "types": "./dist/organization/continuous-work-owner.d.ts",
-      "default": "./dist/organization/continuous-work-owner.js"
-    },
-    "./organization/continuous-development-consent": {
-      "types": "./dist/organization/continuous-development-consent.d.ts",
-      "default": "./dist/organization/continuous-development-consent.js"
-    },
-    "./organization/continuous-mission-scope": {
-      "types": "./dist/organization/continuous-mission-scope.d.ts",
-      "default": "./dist/organization/continuous-mission-scope.js"
-    },
-    "./mission/mission-development-continuation": {
-      "types": "./dist/mission/mission-development-continuation.d.ts",
-      "default": "./dist/mission/mission-development-continuation.js"
-    },
-    "./mission/mission-development-proof": {
-      "types": "./dist/mission/mission-development-proof.d.ts",
-      "default": "./dist/mission/mission-development-proof.js"
-    },
-    "./mission/mission-development-gates": {
-      "types": "./dist/mission/mission-development-gates.d.ts",
-      "default": "./dist/mission/mission-development-gates.js"
-    },
-    "./vcs/cwd-scope": {
-      "types": "./dist/vcs/cwd-scope.d.ts",
-      "default": "./dist/vcs/cwd-scope.js"
-    },
-    "./vcs/vcs-backend": {
-      "types": "./dist/vcs/vcs-backend.d.ts",
-      "default": "./dist/vcs/vcs-backend.js"
-    },
-    "./vcs/local-git-backend": {
-      "types": "./dist/vcs/local-git-backend.d.ts",
-      "default": "./dist/vcs/local-git-backend.js"
-    },
-    "./vcs/memory-vcs-backend": {
-      "types": "./dist/vcs/memory-vcs-backend.d.ts",
-      "default": "./dist/vcs/memory-vcs-backend.js"
-    },
-    "./vcs/vcs-host": {
-      "types": "./dist/vcs/vcs-host.d.ts",
-      "default": "./dist/vcs/vcs-host.js"
-    },
-    "./vcs/vcs-host-verbs": {
-      "types": "./dist/vcs/vcs-host-verbs.d.ts",
-      "default": "./dist/vcs/vcs-host-verbs.js"
-    },
-    "./vcs/gh-cli-host-provider": {
-      "types": "./dist/vcs/gh-cli-host-provider.d.ts",
-      "default": "./dist/vcs/gh-cli-host-provider.js"
-    },
-    "./vcs/github-rest-host-provider": {
-      "types": "./dist/vcs/github-rest-host-provider.d.ts",
-      "default": "./dist/vcs/github-rest-host-provider.js"
-    },
-    "./vcs/memory-vcs-host-provider": {
-      "types": "./dist/vcs/memory-vcs-host-provider.d.ts",
-      "default": "./dist/vcs/memory-vcs-host-provider.js"
-    },
-    "./governance/authenticated-personal-approvals": {
-      "types": "./dist/governance/authenticated-personal-approvals.d.ts",
-      "default": "./dist/governance/authenticated-personal-approvals.js"
-    },
-    "./discussion/discussion-create-request": {
-      "types": "./dist/discussion/discussion-create-request.d.ts",
-      "default": "./dist/discussion/discussion-create-request.js"
-    },
-    "./organization/company-bootstrap": {
-      "types": "./dist/organization/company-bootstrap.d.ts",
-      "default": "./dist/organization/company-bootstrap.js"
-    },
-    "./organization/company-onboarding": {
-      "types": "./dist/organization/company-onboarding.d.ts",
-      "default": "./dist/organization/company-onboarding.js"
-    },
-    "./organization/company-setup-workflow": {
-      "types": "./dist/organization/company-setup-workflow.d.ts",
-      "default": "./dist/organization/company-setup-workflow.js"
-    },
-    "./organization/tenant-activation-approval": {
-      "types": "./dist/organization/tenant-activation-approval.d.ts",
-      "default": "./dist/organization/tenant-activation-approval.js"
-    },
-    "./organization/tenant-activation-probe": {
-      "types": "./dist/organization/tenant-activation-probe.d.ts",
-      "default": "./dist/organization/tenant-activation-probe.js"
-    },
-    "./organization/tenant-registry-consistency": {
-      "types": "./dist/organization/tenant-registry-consistency.d.ts",
-      "default": "./dist/organization/tenant-registry-consistency.js"
-    },
-    "./service/service-preflight": {
-      "types": "./dist/service/service-preflight.d.ts",
-      "default": "./dist/service/service-preflight.js"
-    },
-    "./knowledge/scoped-learning-domain": {
-      "types": "./dist/knowledge/scoped-learning-domain.d.ts",
-      "default": "./dist/knowledge/scoped-learning-domain.js"
-    },
-    "./knowledge/scoped-learning-workflow": {
-      "types": "./dist/knowledge/scoped-learning-workflow.d.ts",
-      "default": "./dist/knowledge/scoped-learning-workflow.js"
-    },
-    "./knowledge/scoped-learning-approval-visibility": {
-      "types": "./dist/knowledge/scoped-learning-approval-visibility.d.ts",
-      "default": "./dist/knowledge/scoped-learning-approval-visibility.js"
-    },
-    "./actor-context": {
-      "types": "./dist/actor-context.d.ts",
-      "default": "./dist/actor-context.js"
-    },
-    "./foundation/knowledge-tier": {
-      "types": "./dist/foundation/knowledge-tier.d.ts",
-      "default": "./dist/foundation/knowledge-tier.js"
-    },
-    "./foundation/json-state": {
-      "types": "./dist/foundation/json-state.d.ts",
-      "default": "./dist/foundation/json-state.js"
-    },
-    "./failure-tracker": {
-      "types": "./dist/failure-tracker.d.ts",
-      "default": "./dist/failure-tracker.js"
-    },
-    "./check-harness": {
-      "types": "./dist/check-harness.d.ts",
-      "default": "./dist/check-harness.js"
-    },
-    "./command-harness": {
-      "types": "./dist/command-harness.d.ts",
-      "default": "./dist/command-harness.js"
-    },
-    "./cli-guard": {
-      "types": "./dist/cli-guard.d.ts",
-      "default": "./dist/cli-guard.js"
-    },
-    "./runtime-control-policy": {
-      "types": "./dist/runtime-control-policy.d.ts",
-      "default": "./dist/runtime-control-policy.js"
-    },
-    "./shortcut-bridge": {
-      "types": "./dist/shortcut-bridge.d.ts",
-      "default": "./dist/shortcut-bridge.js"
-    },
-    "./information-assets/types": {
-      "types": "./dist/information-assets/types.d.ts",
-      "default": "./dist/information-assets/types.js"
-    },
-    "./information-assets/catalog": {
-      "types": "./dist/information-assets/catalog.d.ts",
-      "default": "./dist/information-assets/catalog.js"
-    },
-    "./information-assets/access": {
-      "types": "./dist/information-assets/access.d.ts",
-      "default": "./dist/information-assets/access.js"
-    },
-    "./information-assets/collector": {
-      "types": "./dist/information-assets/collector.d.ts",
-      "default": "./dist/information-assets/collector.js"
-    },
-    "./information-assets/provider": {
-      "types": "./dist/information-assets/provider.d.ts",
-      "default": "./dist/information-assets/provider.js"
-    },
-    "./information-assets/recipes": {
-      "types": "./dist/information-assets/recipes.d.ts",
-      "default": "./dist/information-assets/recipes.js"
-    },
-    "./information-assets/work": {
-      "types": "./dist/information-assets/work.d.ts",
-      "default": "./dist/information-assets/work.js"
-    },
-    "./information-assets/work-types": {
-      "types": "./dist/information-assets/work-types.d.ts",
-      "default": "./dist/information-assets/work-types.js"
-    },
-    "./information-assets/completion": {
-      "types": "./dist/information-assets/completion.d.ts",
-      "default": "./dist/information-assets/completion.js"
-    },
-    "./information-assets/collector-capture": {
-      "types": "./dist/information-assets/collector-capture.d.ts",
-      "default": "./dist/information-assets/collector-capture.js"
-    },
-    "./provider-runtime-requirements": {
-      "types": "./dist/provider-runtime-requirements.d.ts",
-      "default": "./dist/provider-runtime-requirements.js"
-    },
-    "./media/docx-xml": {
-      "types": "./dist/media/docx-xml.d.ts",
-      "default": "./dist/media/docx-xml.js"
-    },
-    "./media/xlsx-xstring": {
-      "types": "./dist/media/xlsx-xstring.d.ts",
-      "default": "./dist/media/xlsx-xstring.js"
-    },
-    "./provider-chain-router": {
-      "types": "./dist/provider-chain-router.d.ts",
-      "default": "./dist/provider-chain-router.js"
-    },
-    "./provider-registry": {
-      "types": "./dist/provider-registry.d.ts",
-      "default": "./dist/provider-registry.js"
-    },
-    "./windows-native-image-generation-bridge": {
-      "types": "./dist/windows-native-image-generation-bridge.d.ts",
-      "default": "./dist/windows-native-image-generation-bridge.js"
-    },
-    "./barge-in-controller": {
-      "types": "./dist/barge-in-controller.d.ts",
-      "default": "./dist/barge-in-controller.js"
-    },
-    "./segmented-voice-playback": {
-      "types": "./dist/segmented-voice-playback.d.ts",
-      "default": "./dist/segmented-voice-playback.js"
-    },
-    "./voice/engine-runtime-preferences-access": {
-      "types": "./dist/voice/engine-runtime-preferences-access.d.ts",
-      "default": "./dist/voice/engine-runtime-preferences-access.js"
-    },
-    "./voice/engine-runtime-preferences-transaction": {
-      "types": "./dist/voice/engine-runtime-preferences-transaction.d.ts",
-      "default": "./dist/voice/engine-runtime-preferences-transaction.js"
-    },
-    "./governance/approval-store-reader": {
-      "types": "./dist/governance/approval-store-reader.d.ts",
-      "default": "./dist/governance/approval-store-reader.js"
-    },
-    "./intent/intent-phrase-lexicon": {
-      "types": "./dist/intent/intent-phrase-lexicon.d.ts",
-      "default": "./dist/intent/intent-phrase-lexicon.js"
-    },
-    "./knowledge/golden-scenario-verdict": {
-      "types": "./dist/knowledge/golden-scenario-verdict.d.ts",
-      "default": "./dist/knowledge/golden-scenario-verdict.js"
-    },
-    "./router-contract": {
-      "types": "./dist/router-contract.d.ts",
-      "default": "./dist/router-contract.js"
-    },
-    "./customer-decision": {
-      "types": "./dist/customer-decision/index.d.ts",
-      "default": "./dist/customer-decision/index.js"
-    },
-    "./decision-ledger": {
-      "types": "./dist/decision-ledger/index.d.ts",
-      "default": "./dist/decision-ledger/index.js"
-    },
-    "./foundation/rate-limit": {
-      "types": "./dist/foundation/rate-limit.d.ts",
-      "default": "./dist/foundation/rate-limit.js"
-    },
-    "./foundation/scope-context-validation": {
-      "types": "./dist/foundation/scope-context-validation.d.ts",
-      "default": "./dist/foundation/scope-context-validation.js"
     }
   },
   "dependencies": {

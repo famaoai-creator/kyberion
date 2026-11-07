@@ -7,3 +7,4 @@ export * from './semantic-index.js';
 export * from './image-dimensions.js';
 export * from './som-overlay.js';
 export * from './mark-target-resolver.js';
+export * from './desktop-ax-bridge.js';
