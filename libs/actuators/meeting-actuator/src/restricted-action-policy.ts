@@ -14,11 +14,11 @@
  * via `KYBERION_RESTRICTED_ACTIONS_POLICY` for tenant-scoped tightening.
  */
 
-import { logger } from './core.js';
-import { getRegisteredEnvText } from './foundation/env.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
-import * as pathResolver from './path-resolver.js';
-import { assertSafeRepositoryPath } from './secure-io.js';
+import { logger } from '@agent/core/core';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { defineCatalog } from '@agent/core/foundation/governed-catalog';
+import * as pathResolver from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 
 export interface RestrictedActionRule {
   id: string;
