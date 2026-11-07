@@ -1,7 +1,7 @@
 ---
 title: 'Surface roles: Concierge vs Presence Studio (and Chronos Mirror)'
 tags: [surfaces, architecture, concierge, presence-studio, roles]
-last_updated: 2026-11-04
+last_updated: 2026-11-08
 ---
 
 # Surface roles: Concierge vs Presence Studio (and Chronos Mirror)
@@ -37,11 +37,12 @@ second operator surface in practice, not a caption overlay.
 
 ## Non-overlap (why one process is premature)
 
-- **Realtime voice/hearing**: studio owns `hearing-runtime`, hearing
-  completion/handoff/recovery — a live session lifecycle with its own
+- **Realtime voice/hearing**: studio serves the hearing routes (the hearing
+  logic itself — `hearing-runtime`, completion/handoff/recovery — lives in
+  `libs/core/surface/hearing-*.ts`) — a live session lifecycle with its own
   failure domain. Folding it into the Next.js concierge couples the
   slow-moving settings app to the realtime loop's crash/restart surface.
-- **A2UI host**: `component-host-routes` + `hearing-a2ui` make studio the
+- **A2UI host**: `component-host-routes` + core `hearing-a2ui` make studio the
   in-process renderer/host for agent-composed UIs. Concierge is a typed
   Next app — different rendering contracts.
 - **Trust tiers**: concierge = member-authenticated operator console.

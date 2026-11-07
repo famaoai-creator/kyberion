@@ -52,7 +52,7 @@ import {
   HearingConflictError,
   HearingOperationError,
   assertHearingHandoffReplay,
-} from './hearing-runtime.js';
+} from '@agent/core/surface/hearing-runtime';
 import { hearingStorageForViewer } from './hearing-storage-access.js';
 import {
   HearingScopeError,
@@ -60,27 +60,23 @@ import {
   resolveHearingHandoffScope,
 } from './hearing-request-scope.js';
 import { assertHearingHandoffSnapshot } from './hearing-handoff-snapshot.js';
-import type { HearingDecidedBy, HearingRecord } from './hearing.js';
+import type { HearingDecidedBy, HearingRecord } from '@agent/core/surface/hearing';
+import type { HearingMissionHandoffFields } from '@agent/core/surface/hearing-completion';
 import {
   buildHearingMissionCreateArgs,
   hearingRecordToMissionBrief,
   type HearingMissionMember,
   type MissionBrief,
-} from './hearing-mission.js';
+} from '@agent/core/surface/hearing-mission';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
 
 const CONTROLLER_RELATIVE = 'dist/scripts/mission_controller.js';
 const ALIGNMENT_REQUEST_RELATIVE = 'dist/scripts/mission_alignment_request.js';
 
-/** Additive fields this route owns on the hearing record. `hearing.ts` (the
- * base `HearingRecord` contract, `decided_by`/`decided_at` included) is the
- * concurrent sibling's file — these three fields are only ever read/written
- * here, via an intersection type, never added to the base interface. */
-export interface HearingMissionHandoffFields {
-  mission_id?: string;
-  approval_request_id?: string;
-  handed_off_at?: string;
-}
+/** Additive fields this route owns on the hearing record — declared next to the
+ * completion reader in core (`libs/core/surface/hearing-completion.ts`), only
+ * ever read/written here via an intersection type, never on the base interface. */
+export type { HearingMissionHandoffFields };
 
 export type HearingRecordWithMissionHandoff = HearingRecord & HearingMissionHandoffFields;
 

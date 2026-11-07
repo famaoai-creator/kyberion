@@ -5,15 +5,15 @@ import {
   safeWriteFile,
   safeMoveSync,
   safeRmSync,
-} from '@agent/core/secure-io';
-import { withLockSync } from '@agent/core/foundation/lock-utils';
-import { readJson } from '@agent/core/foundation/json';
-import { isValidTenantSlug } from '@agent/core/entity-scope';
-import { humanActor } from '@agent/core/actor';
+} from '../secure-io.js';
+import { withLockSync } from '../foundation/lock-utils.js';
+import { readJson } from '../foundation/json.js';
+import { isValidTenantSlug } from '../entity-scope.js';
+import { humanActor } from '../contracts/actor.js';
 import { randomUUID } from 'node:crypto';
-import { pathResolver } from '@agent/core/path-resolver';
-import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
+import { pathResolver } from '../path-resolver.js';
+import { t as catalogT, type VocabularyKey } from '../localization/t.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import {
   createHearingRecord,
   hearingRevision,
