@@ -11,7 +11,7 @@ import type { WorkflowPhaseSpec } from './mission-workflow-catalog.js';
 /**
  * FD-10 wave 1b (front-desk redesign plan §2.5 principle 4): the human
  * member who made a mission or memory decision (start/pause/cancel,
- * memory-approve/memory-reject). Minimal local shape — `libs/core/actor.ts`
+ * memory-approve/memory-reject). Minimal local shape — `libs/core/contracts/actor.ts`
  * (FD-10a, a concurrently developed sibling module) will eventually supply a
  * shared actor type; this interface is additive and does not depend on it.
  */

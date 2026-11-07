@@ -3,7 +3,7 @@ import {
   frontDeskExecutionParentArtifactPath,
 } from './front-desk-execution-artifact.js';
 /** Viewer-authorized, readback-verified projection. This module cannot execute work. */
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import { createHash } from 'node:crypto';
 import { assertSafeRepositoryPath, safeLstat, safeReadFileRange } from '../secure-io.js';

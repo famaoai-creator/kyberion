@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CeoApprovalItem } from '../ceo-surface-summary.js';
+import type { CeoApprovalItem } from './ceo-surface-summary.js';
 import type { DecisionBrief } from './decision-brief.js';
 import {
   NEEDS_YOU_OVERDUE_AFTER_MS,
@@ -359,11 +359,11 @@ describe('needs-you scope narrowing', () => {
 
   it('organization and project narrowing keep only items that name them', () => {
     expect(
-      narrowNeedsYouItem({ tenant_slug: 'a', organization_id: 'o1' }, ALL, {
+      narrowNeedsYouItem({ tenant_slug: 'acme', organization_id: 'o1' }, ALL, {
         organization_id: 'o1',
       })
     ).toBe(true);
-    expect(narrowNeedsYouItem({ tenant_slug: 'a' }, ALL, { organization_id: 'o1' })).toBe(false);
+    expect(narrowNeedsYouItem({ tenant_slug: 'acme' }, ALL, { organization_id: 'o1' })).toBe(false);
     expect(
       narrowNeedsYouItem(
         { project_id: 'p2' },

@@ -12,8 +12,12 @@ import { safeExistsSync } from '../secure-io.js';
 import {
   retryPendingSharedIndexReconcile,
   type RunReconcileOptions,
-} from '../session-git-index.js';
-import { OwnerScopeError, resolveOwnerScope, tryResolveOwnerScope } from '../owner-scope.js';
+} from '../vcs/session-git-index.js';
+import {
+  OwnerScopeError,
+  resolveOwnerScope,
+  tryResolveOwnerScope,
+} from '../governance/owner-scope.js';
 import { loadWorkspaceBudgetPolicy, measureWorkspaceBytes } from './workspace-budget.js';
 import {
   annotateWorkspace,

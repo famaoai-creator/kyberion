@@ -1,4 +1,4 @@
-import { requireApprovalForOp, RISKY_OPS } from '../risky-op-registry.js';
+import { requireApprovalForOp, RISKY_OPS } from '../governance/risky-op-registry.js';
 import {
   buildClaudeCliOptionsFromEnv,
   probeShellClaudeCliAvailability,

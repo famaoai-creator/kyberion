@@ -22,7 +22,7 @@ vi.mock('../governance/kill-switch.js', () => ({
   recordGovernanceAction: (...args: unknown[]) => recordGovernanceAction(...args),
 }));
 
-import { RewindableWorkerContext } from '../context-rewind.js';
+import { RewindableWorkerContext } from './context-rewind.js';
 import {
   getAgentRuntimeManualDriverRegistration,
   type AgentRuntimeManualDriver,
@@ -30,7 +30,7 @@ import {
 import {
   resetDefaultDynamicInjectionRegistry,
   ScopedDynamicInjectionRegistry,
-} from '../dynamic-injection.js';
+} from '../reasoning/dynamic-injection.js';
 import type {
   GenerateWithToolsResult,
   ReasoningBackend,

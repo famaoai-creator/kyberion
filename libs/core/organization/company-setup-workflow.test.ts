@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SurfaceManagementAuthorization } from '../surface/surface-management-mutations.js';
-import type { ResolvedPrincipal } from '../authn-principal-resolver.js';
+import type { ResolvedPrincipal } from '../authn/authn-principal-resolver.js';
 interface BindingFixture {
   tenant_slug: string;
   organization_id: string;

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const broker = vi.hoisted(() => ({ resolve: vi.fn() }));
-vi.mock('../capability-broker.js', () => ({ resolveProviderDecision: broker.resolve }));
+vi.mock('../provider/capability-broker.js', () => ({ resolveProviderDecision: broker.resolve }));
 import { consultCapabilityBrokerForMode, resetReasoningBootstrap } from './reasoning-bootstrap.js';
 
 describe('fixed reasoning capability broker constraints', () => {

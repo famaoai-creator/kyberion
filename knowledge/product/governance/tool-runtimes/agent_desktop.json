@@ -61,7 +61,7 @@
           }
         }
       },
-      "notes": "Apache-2.0 Rust CLI for accessibility-tree computer use (observe -> snapshot-qualified refs -> act). Invoked as an external binary only, never vendored; every call runs through libs/core/desktop-ax-bridge with an allowlisted subcommand set, per-mission AGENT_DESKTOP_SESSION, and AGENT_DESKTOP_HOME redirected to the governed runtime floor so refmaps/traces (screen content) never reach the knowledge tier. Preferred install: `pnpm tool:setup -- --tool agent_desktop --apply` downloads the checksum-pinned release tarball into the managed env and extracts bin/agent-desktop plus its platform helper (bin/agent-desktop-macos-helper on darwin, bin/agent-desktop-linux-clipboard-owner on linux). Override the binary with KYBERION_AGENT_DESKTOP_BIN."
+      "notes": "Apache-2.0 Rust CLI for accessibility-tree computer use (observe -> snapshot-qualified refs -> act). Invoked as an external binary only, never vendored; every call runs through libs/shared-perception/src/desktop-ax-bridge.ts with an allowlisted subcommand set, per-mission AGENT_DESKTOP_SESSION, and AGENT_DESKTOP_HOME redirected to the governed runtime floor so refmaps/traces (screen content) never reach the knowledge tier. Preferred install: `pnpm tool:setup -- --tool agent_desktop --apply` downloads the checksum-pinned release tarball into the managed env and extracts bin/agent-desktop plus its platform helper (bin/agent-desktop-macos-helper on darwin, bin/agent-desktop-linux-clipboard-owner on linux). Override the binary with KYBERION_AGENT_DESKTOP_BIN."
     }
   ]
 }

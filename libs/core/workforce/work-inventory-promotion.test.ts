@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   listApprovalRequests: vi.fn(),
 }));
 
-vi.mock('../operational-learning.js', () => ({
+vi.mock('../knowledge/operational-learning.js', () => ({
   enqueueOperationalLearningSignal: mocks.enqueue,
 }));
 vi.mock('../path-resolver.js', async (importOriginal) => {

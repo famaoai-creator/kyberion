@@ -28,7 +28,7 @@ import {
   setWorkCoordinationNamespace,
 } from '../workforce/work-coordination.js';
 
-vi.mock('../delegated-task-observability.js', () => ({
+vi.mock('../workforce/delegated-task-observability.js', () => ({
   startDelegatedTaskTrace: vi.fn(() => ({ traceId: 'test-trace' })),
   completeDelegatedTaskTrace: vi.fn(),
 }));

@@ -10,7 +10,7 @@ import {
   sendBlueBubblesText,
   verifyBlueBubblesWebhookSecret,
 } from './bluebubbles-adapter.js';
-import { describeIMessageBridgeHealth } from '../imessage-bridge.js';
+import { describeIMessageBridgeHealth } from './imessage-bridge.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 

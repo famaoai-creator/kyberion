@@ -61,7 +61,7 @@ vi.mock('../index.js', async () => {
   };
 });
 
-vi.mock('../async-utils.js', () => ({
+vi.mock('../pipeline/async-utils.js', () => ({
   retry: mocks.retry,
 }));
 
@@ -85,7 +85,7 @@ vi.mock('../platform.js', async () => {
   return { ...actual, platform: { ...actual.platform, checkBinary: mocks.checkBinary } };
 });
 
-vi.mock('../stance-resolver.js', () => ({
+vi.mock('../authn/stance-resolver.js', () => ({
   resolveOverlay: mocks.resolveOverlay,
 }));
 

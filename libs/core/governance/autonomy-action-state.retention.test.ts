@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Keep the retention audit out of the shared audit log during tests.
 const retentionAudits = vi.hoisted(() => [] as Array<Record<string, unknown>>);
-vi.mock('../storage-retention-expiry.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../storage-retention-expiry.js')>();
+vi.mock('../storage/storage-retention-expiry.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../storage/storage-retention-expiry.js')>();
   return {
     ...actual,
     appendRetentionAudit: (record: Record<string, unknown>) => retentionAudits.push(record),
@@ -20,8 +20,8 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
-import { streamJsonLines } from '../jsonl-read.js';
-import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
+import { streamJsonLines } from '../storage/jsonl-read.js';
+import { resetAppendOnlyStoreMaintenanceState } from '../storage/append-only-store.js';
 import {
   AUTONOMY_OUTCOMES_MIN_RETENTION_MS,
   AUTONOMY_OUTCOMES_PATH,

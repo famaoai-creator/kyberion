@@ -1,6 +1,35 @@
 import * as path from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Retrospective metrics/proposals have their own tests; lifecycle tests verify
+// the completion handoff without reading shared histories or invoking a model.
+vi.mock('./mission-retrospective.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./mission-retrospective.js')>();
+  return { ...actual, runMissionRetrospective: vi.fn().mockResolvedValue(undefined) };
+});
+
+// Completion requests maintenance, but a unit fixture must not launch a GC
+// pipeline over the checkout. Keep every other command real, including AL-03 Git.
+vi.mock('../secure-io.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../secure-io.js')>();
+  return {
+    ...actual,
+    safeExec: vi.fn((...args: Parameters<typeof actual.safeExec>) => {
+      const [command, commandArgs = []] = args;
+      if (
+        command === process.execPath &&
+        commandArgs.length === 3 &&
+        commandArgs[0]?.replace(/\\/g, '/').endsWith('/dist/scripts/run_pipeline.js') &&
+        commandArgs[1] === '--input' &&
+        commandArgs[2] === 'pipelines/volatile-gc.json'
+      ) {
+        return '';
+      }
+      return actual.safeExec(...args);
+    }),
+  };
+});
+
 // finishMission fires real operator notifications (deliverable_ready /
 // mission_completed); without this mock every battery run appends phantom
 // entries to the REAL inbox (dev-practices §3).
@@ -37,7 +66,7 @@ import {
   publishMeetingDeliverablesIfNeeded,
   updateMissionMemorySidecar,
 } from './mission-lifecycle-completion.js';
-import * as customerResolver from '../stance-resolver.js';
+import * as customerResolver from '../authn/stance-resolver.js';
 import { emitIntentSnapshot, listSnapshots } from '../intent/intent-snapshot-store.js';
 import * as pathResolver from '../path-resolver.js';
 import { logger } from '../core.js';
@@ -52,12 +81,13 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { transitionStatus } from './mission-status.js';
+import { runMissionRetrospective } from './mission-retrospective.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
   listMemoryPromotionCandidates,
 } from '../knowledge/memory-promotion-queue.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import {
   collectMissionEvidence,
   evaluateMissionFinishExitGate,
@@ -109,7 +139,7 @@ function prepareMissionState(
   }
 ): void {
   const latestCommit = safeExec('git', ['rev-parse', 'HEAD'], {
-    cwd: pathResolver.rootDir(),
+    cwd: missionPath,
   }).trim();
   if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });
   safeWriteFile(
@@ -162,9 +192,19 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  vi.mocked(runMissionRetrospective).mockClear();
+  vi.mocked(safeExec).mockClear();
   process.env.MISSION_ROLE = 'mission_controller';
   process.env.KYBERION_PERSONA = 'worker';
   if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });
+  // Keep finishMission's Git writes inside the fixture, even when its parent
+  // checkout has uncommitted changes. Never discover the enclosing repository.
+  safeExec('git', ['init', '-q'], { cwd: missionPath });
+  safeExec('git', ['config', 'user.name', 'mission-lifecycle-test'], { cwd: missionPath });
+  safeExec('git', ['config', 'user.email', 'mission-lifecycle@test.invalid'], { cwd: missionPath });
+  safeExec('git', ['config', 'commit.gpgsign', 'false'], { cwd: missionPath });
+  safeExec('git', ['config', 'core.hooksPath', '.git/disabled-hooks'], { cwd: missionPath });
+  safeExec('git', ['commit', '--allow-empty', '-q', '-m', 'fixture init'], { cwd: missionPath });
 });
 
 afterEach(() => {
@@ -1023,6 +1063,7 @@ describe('mission lifecycle finish gate', () => {
 
     await finishMission(missionId, false, args);
 
+    expect(runMissionRetrospective).toHaveBeenCalledExactlyOnceWith(missionId);
     expect(safeExistsSync(`${missionPath}/mission-state.json`)).toBe(false);
     const state = JSON.parse(safeReadFile(archivedStatePath(), { encoding: 'utf8' }) as string);
     expect(state.status).toBe('archived');

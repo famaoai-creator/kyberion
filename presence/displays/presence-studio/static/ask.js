@@ -2,7 +2,7 @@
  * ask.js — FD-03: the presence-studio "頼む" (ask) page.
  *
  * Plain browser script (no modules, no external resources) loaded by
- * `ask.html` with a plain <script> tag, mirroring `home.js` / `progress.js`.
+ * `ask.html` with a plain <script> tag, mirroring `home.js`.
  * All copy comes from the server (`/api/ask-vocabulary`, `/api/front-desk/nav`)
  * and the conversation/progress read models (`/api/conversation`,
  * `/api/progress`) — this file never hardcodes a surface port or host, and
@@ -260,16 +260,6 @@
   var hasBootVocabulary = readRecovery.hasBootVocabulary;
   var refreshRecent = readRecovery.refreshRecent;
   var renderStartup = readRecovery.renderStartup;
-
-  var correction =
-    window.KyberionAskCorrection &&
-    window.KyberionAskCorrection.create({
-      state: state,
-      fetchJson: fetchReadJson,
-      scopedUrl: scopedUrl,
-      proposeDraft: proposeDraft,
-      vt: vt,
-    });
 
   var hearingRecovery =
     window.KyberionAskHearingRecovery &&
@@ -1359,16 +1349,6 @@
       var params = new URLSearchParams(window.location.search);
       // A resume URL is always read-only, even when unrelated prefill parameters are present.
       if (params.has('request')) return;
-      if (params.has('correction')) {
-        if (correction) correction.apply();
-        else {
-          var status = document.getElementById('ask-correction-status');
-          var retry = document.getElementById('ask-correction-retry');
-          if (status) status.hidden = false;
-          if (retry) retry.hidden = false;
-        }
-        return;
-      }
       var ask = params.get('ask');
       var mic = params.get('mic') === '1';
       if (ask) {
@@ -1444,14 +1424,6 @@
     }
     if (hearingRecovery) hearingRecovery.mount();
     if (hearingCompletion) hearingCompletion.mount();
-    if (correction) correction.mount();
-    else {
-      var correctionRetry = document.getElementById('ask-correction-retry');
-      if (correctionRetry)
-        correctionRetry.addEventListener('click', function () {
-          window.location.reload();
-        });
-    }
     wireDraft();
     wireForm();
     wireMic();

@@ -1,8 +1,13 @@
 /** Public surface for @agent/shared-voice — voice runtime moved out of @agent/core. */
 export * from './audio-text-similarity.js';
+export * from './streaming-voice-playback.js';
 export * from './realtime-voice-conversation.js';
 export * from './realtime-voice-loop.js';
 export * from './realtime-voice-preferences.js';
+export * from './segmented-voice-playback.js';
+export * from './ten-vad-bridge.js';
+export * from './silero-vad-bridge.js';
+export * from './apple-speech-file-stt-bridge.js';
 export * from './tts-loopback-verifier.js';
 export * from './two-stage-barge-in.js';
 export * from './vad-turn-recorder.js';

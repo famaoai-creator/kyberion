@@ -1,13 +1,13 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
+vi.mock('../daemon/ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 
 // Separation of duties is read from approval-policy.json; tests switch it on
 // through a customer overlay of the product policy (the real config path).
 const sod = vi.hoisted(() => ({ overlayPath: null as string | null }));
-vi.mock('../stance-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../stance-resolver.js')>();
+vi.mock('../authn/stance-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../authn/stance-resolver.js')>();
   return {
     ...actual,
     stanceRoot: (subPath = '', ...rest: unknown[]) =>
@@ -47,7 +47,7 @@ import {
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
 import { collectOperatorHomeSummary } from '../surface/operator-home-summary.js';
-import { composeCeoSurfaceSummary } from '../ceo-surface-summary.js';
+import { composeCeoSurfaceSummary } from '../surface/ceo-surface-summary.js';
 import { readTenantProfile, recordTenantProviderAttestation } from './tenant-registry.js';
 import { pathResolver } from '../path-resolver.js';
 import {

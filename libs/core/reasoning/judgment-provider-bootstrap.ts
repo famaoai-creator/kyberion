@@ -20,11 +20,14 @@
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { createLogger } from '../logger.js';
 import { registerOrganizationWorkJudgment } from '../organization/organization-operating-model-persistence.js';
-import { LAYA_MLX_PROVIDER, registerLayaMlxBackend } from '../laya-mlx-judgment-backend.js';
+import {
+  LAYA_MLX_PROVIDER,
+  registerLayaMlxBackend,
+} from '../provider/laya-mlx-judgment-backend.js';
 import {
   TYPESAFE_JEV_PROVIDER,
   registerTypeSafeJevBackend,
-} from '../typesafe-jev-judgment-backend.js';
+} from '../provider/typesafe-jev-judgment-backend.js';
 import {
   BUILTIN_JUDGMENT_PROVIDER,
   listJudgmentBackends,

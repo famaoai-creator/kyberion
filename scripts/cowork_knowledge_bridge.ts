@@ -8,7 +8,7 @@
  *   pnpm knowledge:cowork-sync -- --max-hints 20
  */
 
-import { runCoworkKnowledgeSync } from '@agent/core/cowork-knowledge-bridge';
+import { runCoworkKnowledgeSync } from '@agent/shared-network/cowork-knowledge-bridge';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 function usage(): string {

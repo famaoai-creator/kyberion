@@ -19,12 +19,13 @@ vi.mock('../secure-io.js', async () => {
   };
 });
 
-vi.mock('../managed-process.js', () => ({
+vi.mock('../tool/managed-process.js', () => ({
   spawnManagedProcess: mocks.spawnManagedProcess,
 }));
 
-vi.mock('../ops-alert.js', async () => {
-  const actual = await vi.importActual<typeof import('../ops-alert.js')>('../ops-alert.js');
+vi.mock('../daemon/ops-alert.js', async () => {
+  const actual =
+    await vi.importActual<typeof import('../daemon/ops-alert.js')>('../daemon/ops-alert.js');
   return { ...actual, sendOpsAlert: mocks.sendOpsAlert };
 });
 

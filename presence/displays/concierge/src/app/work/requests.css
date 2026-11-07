@@ -1,0 +1,226 @@
+/*
+ * 仕事 › 依頼 (/work?tab=requests): request list and detail. Buttons, badges
+ * and callouts are kyberion-base classes; tokens are --kb-ui-* only. Every
+ * text wraps (overflow-wrap: anywhere) so nothing scrolls sideways at 390px.
+ */
+.requests {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-4);
+  min-width: 0;
+}
+
+.requests-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kb-ui-space-3);
+}
+
+.requests-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--kb-ui-space-5);
+  min-width: 0;
+}
+
+@media (min-width: 960px) {
+  .requests-columns {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    align-items: start;
+  }
+}
+
+.requests-list-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-5);
+  min-width: 0;
+}
+
+.requests-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  min-width: 0;
+}
+
+.requests-heading {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-lg);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.requests-subheading {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-md);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.requests-count {
+  font-size: var(--kb-ui-font-size-sm);
+  font-weight: 400;
+  color: var(--kb-ui-text-muted);
+}
+
+.requests-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.requests-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  width: 100%;
+  min-width: 0;
+  padding: var(--kb-ui-space-3) var(--kb-ui-space-4);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  color: var(--kb-ui-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.requests-row:hover {
+  border-color: var(--kb-ui-border-strong);
+}
+
+.requests-row:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+}
+
+.requests-row[aria-current='true'] {
+  border-color: var(--kb-ui-accent);
+  background: var(--kb-ui-accent-soft);
+}
+
+.requests-row__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kb-ui-space-2);
+  min-width: 0;
+}
+
+.requests-row__title {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.requests-row__meta {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.requests-row__estimate {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  min-width: 0;
+}
+
+.requests-row__bar {
+  width: 100%;
+  height: var(--kb-ui-space-2);
+  accent-color: var(--kb-ui-accent);
+}
+
+.requests-detail {
+  min-width: 0;
+  padding: var(--kb-ui-space-5);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-lg);
+  box-sizing: border-box;
+}
+
+.requests-detail > section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-4);
+  min-width: 0;
+}
+
+.requests-detail__title:focus {
+  outline: none;
+}
+
+.requests-detail__title:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+}
+
+.requests-detail__block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--kb-ui-space-2);
+  min-width: 0;
+}
+
+.requests-detail__block > * {
+  max-width: 100%;
+}
+
+.requests-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.requests-bullets,
+.requests-log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  margin: 0;
+  padding-inline-start: var(--kb-ui-space-5);
+  min-width: 0;
+}
+
+.requests-link {
+  align-self: flex-start;
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-accent-text);
+  overflow-wrap: anywhere;
+}
+
+/* 業務の自動化候補: the status counts read as one row of chips. */
+.requests-inventory__counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kb-ui-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A candidate row: the same card as a request row, without the button. */
+.requests-inventory__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  min-width: 0;
+  padding: var(--kb-ui-space-3) var(--kb-ui-space-4);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  box-sizing: border-box;
+}

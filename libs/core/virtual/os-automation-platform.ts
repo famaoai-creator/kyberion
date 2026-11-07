@@ -1,6 +1,6 @@
-import * as mac from '../apple-event-bridge.js';
-import * as windows from '../windows-os-automation.js';
-import type { FocusedInputState } from '../apple-event-bridge.js';
+import * as mac from './apple-event-bridge.js';
+import * as windows from './windows-os-automation.js';
+import type { FocusedInputState } from './apple-event-bridge.js';
 
 export interface OsAutomationPlatformAdapter {
   launchApplication(application: string): boolean;

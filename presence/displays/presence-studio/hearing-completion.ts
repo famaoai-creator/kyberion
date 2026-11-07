@@ -15,7 +15,10 @@ import {
   toFrontDeskViewerScope,
   type PresenceStudioViewerContext,
 } from './security.js';
-import { resolveWorkInventoryScopeForViewer } from './work-inventory-routes.js';
+import {
+  resolveWorkInventoryScopeForViewer,
+  workInventoryHandoffHref,
+} from './work-inventory-routes.js';
 import { hearingNamespace } from './hearing-runtime.js';
 import { hearingScopedUrl } from './hearing-request-scope.js';
 import type { HearingRecord } from './hearing.js';
@@ -64,7 +67,8 @@ function completionHref(
     // These destinations accept one hierarchy selection, never an expanded set.
     if (values.length !== 1) return undefined;
   }
-  return hearingScopedUrl(item.href, viewer);
+  const scoped = hearingScopedUrl(item.href, viewer);
+  return kind === 'inventory' ? workInventoryHandoffHref(scoped, viewer) : scoped;
 }
 
 /** Mission project membership is canonical under relationships, unlike inventory scope.

@@ -36,17 +36,17 @@ import {
   isPersistentInstructionPath,
 } from './foundation/persistent-instruction-effect.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
-import { PARTITIONED_RUNTIME_STATE_ROOTS } from './foundation/runtime-state-roots.js';
+import {
+  PARTITIONED_RUNTIME_STATE_ROOTS,
+  PARTITIONED_RUNTIME_LEDGER_ROOTS,
+} from './foundation/runtime-state-roots.js';
 // The policy gate is intentionally part of secure-io bootstrap; policy-engine
 // also validates policy-file paths through secure-io, so this known cycle must
 // remain explicit rather than being hidden by a second I/O implementation.
 // eslint-disable-next-line import/no-cycle
 import { policyEngine } from './governance/policy-engine.js';
-import {
-  provideAuditIo,
-  recordDeferrableAudit,
-  recordGovernanceActionReport,
-} from './foundation/deferrable-audit-sink.js';
+import * as auditChainModule from './governance/audit-chain.js';
+import { recordGovernanceAction } from './governance/governance-action-recorder.js';
 import { createLogger } from './logger.js';
 import { currentExecutionScope, executionPersonaText } from './foundation/execution-scope.js';
 import {
@@ -75,7 +75,7 @@ export { safeRealpath } from './secure-io-path-guard.js';
 import { platformFacts } from './platform-facts.js';
 
 const logger = createLogger('secure-io');
-const auditChain = { recordDeferrable: recordDeferrableAudit };
+const auditChain = auditChainModule.auditChain;
 
 /**
  * Secure I/O utilities for Kyberion Ecosystem (TypeScript Edition)
@@ -649,12 +649,12 @@ export function safeWriteFile(
         message: `Write to ${resolved}`,
       });
       if (!policyDecision.allowed) {
-        recordGovernanceActionReport({
-          agentId: executionPersonaText() || 'unknown',
-          operation: 'file_write',
-          reason: `${resolved}:denied`,
-          policyViolation: true,
-        });
+        recordGovernanceAction(
+          executionPersonaText() || 'unknown',
+          'file_write',
+          `${resolved}:denied`,
+          true
+        );
         // A write made under the audit chain lock (mirror reconcile, tenant
         // rename) would otherwise wait out the lock on itself and surface as
         // a lock timeout instead of this denial.
@@ -855,6 +855,26 @@ function assertRuntimeStateAggregateAccess(resolved: string, canonical: string):
     if (stat?.isDirectory() && !stat.isSymbolicLink()) {
       for (const tier of ['personal', 'confidential']) inspect(path.join(root, tier));
     }
+  }
+  const receipts = path.join(
+    pathResolver.rootDir(),
+    PARTITIONED_RUNTIME_LEDGER_ROOTS.asset_derivations,
+    'system'
+  );
+  // Preserve existing descendant-denial diagnostics, then also guard the
+  // receipt directory and its ancestors before any aggregate mutation.
+  if (isInside(resolved, receipts) !== undefined || isInside(canonical, receipts) !== undefined) {
+    const decision = validateWritePermission(receipts);
+    if (!decision.allowed) throw new Error(decision.reason);
+    // Producer authority over system receipts does not authorize a tenant-bound
+    // producer to mutate every tenant's index through their public ancestor.
+    const tenantContainer = path.join(path.dirname(receipts), 'confidential');
+    const read = validateReadPermission(tenantContainer);
+    const write = validateWritePermission(tenantContainer);
+    if (!read.allowed || !write.allowed)
+      throw new Error(
+        '[SECURITY] derivation.aggregate_denied — tenant index container requires read/write authority'
+      );
   }
 }
 
@@ -1185,12 +1205,12 @@ function assertExecPolicy(command: string, args: readonly string[] = []): void {
     ...(Number.isFinite(ring) ? { agent_ring: ring } : {}),
   });
   if (!decision.allowed) {
-    recordGovernanceActionReport({
-      agentId: executionPersonaText() || 'unknown',
-      operation: 'execute_command',
-      reason: `${command}:denied`,
-      policyViolation: true,
-    });
+    recordGovernanceAction(
+      executionPersonaText() || 'unknown',
+      'execute_command',
+      `${command}:denied`,
+      true
+    );
     auditChain.recordDeferrable({
       agentId: executionPersonaText() || 'unknown',
       action: 'policy_violation',
@@ -1785,11 +1805,20 @@ registerFoundationIo({
   writeFile: (filePath, content) => safeWriteFile(filePath, content),
 });
 
-// Audit-side modules (audit-chain, chain-integrity, lock-utils) consume these
-// guarded adapters through the deferrable-audit-sink registry: whichever side
-// loads second connects at registration time, and a reduced test/plugin
-// adapter simply never registers a consumer.
-provideAuditIo('auditChainIo', {
+// Test and plugin adapters may expose a deliberately reduced audit-chain
+// surface. Optional chaining does not protect a Vitest namespace proxy from
+// a missing named export, so resolve optional registrations behind a guarded
+// lookup and keep secure-io initialization fail-closed but non-fragile.
+function registerOptionalAuditIo(name: string, io: unknown): void {
+  try {
+    const register = (auditChainModule as unknown as Record<string, unknown>)[name];
+    if (typeof register === 'function') (register as (value: unknown) => void)(io);
+  } catch {
+    // A reduced adapter simply has no corresponding integration seam.
+  }
+}
+
+registerOptionalAuditIo('registerAuditChainIo', {
   read: (filePath) => safeReadFile(filePath, { encoding: 'utf8' }) as string,
   loadJson: secureLoadJson,
   exists: safeExistsSync,
@@ -1801,14 +1830,14 @@ provideAuditIo('auditChainIo', {
   size: (filePath) => (safeExistsSync(filePath) ? safeStat(filePath).size : undefined),
   readRange: safeReadFileRange,
 });
-provideAuditIo('chainIntegrityIo', {
+registerOptionalAuditIo('registerChainIntegrityIo', {
   exists: safeExistsSync,
   read: (filePath) => safeReadFile(filePath, { encoding: 'utf8' }) as string,
   mkdir: (dirPath) => safeMkdir(dirPath, { recursive: true }),
   createExclusive: (filePath, content) => safeCreateExclusiveFileSync(filePath, content),
   chmod: safeChmodSync,
 });
-provideAuditIo('lockIo', {
+registerOptionalAuditIo('registerLockIo', {
   exists: safeExistsSync,
   mkdir: (dirPath) => safeMkdir(dirPath, { recursive: true }),
   createExclusive: (filePath, content) => safeCreateExclusiveFileSync(filePath, content),

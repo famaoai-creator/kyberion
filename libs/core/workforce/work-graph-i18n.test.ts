@@ -6,7 +6,7 @@ const graphConsumerPaths = [
   'libs/core/workforce/work-graph-projection.ts',
   'libs/core/mission/mission-workitem-dispatch.ts',
   'libs/core/mission/mission-work-reconciliation.ts',
-  'libs/core/coordinated-agent-execution-port.ts',
+  'libs/core/agent/coordinated-agent-execution-port.ts',
   'scripts/sovereign_dashboard.ts',
 ];
 

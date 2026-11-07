@@ -9,10 +9,13 @@ import { createHash, randomUUID } from 'crypto';
 import * as path from 'node:path';
 import { getRegisteredEnvText, isCiProcess, isVitestProcess } from '../foundation/env.js';
 import * as pathResolver from '../path-resolver.js';
-import { stanceLogDir, stanceIsConfigured } from '../stance-resolver.js';
+import { stanceLogDir, stanceIsConfigured } from '../authn/stance-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning/reasoning-egress-scope.js';
-import { currentTriggerCorrelation, type TriggerCorrelationScope } from '../trigger-correlation.js';
+import {
+  currentTriggerCorrelation,
+  type TriggerCorrelationScope,
+} from '../event/trigger-correlation.js';
 import {
   sanitizeTraceForPersistence,
   validateTraceReplay,

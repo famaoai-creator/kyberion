@@ -14,7 +14,7 @@ import {
 } from './surface-provider-policy.js';
 import { compileSchemaFromPath } from '../schema-loader.js';
 import { safeReadFile } from '../secure-io.js';
-import { withoutSchemaMetadata } from '../test-governance-payload.js';
+import { withoutSchemaMetadata } from '../testing/test-governance-payload.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;

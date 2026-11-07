@@ -30,7 +30,10 @@ import {
   WorkInventoryStoreError,
   type WorkInventoryScope,
 } from '@agent/core/workforce/work-inventory';
-import { resolveWorkInventoryScopeForViewer } from './work-inventory-routes.js';
+import {
+  resolveWorkInventoryScopeForViewer,
+  workInventoryHandoffHref,
+} from './work-inventory-routes.js';
 import {
   PresenceStudioViewerError,
   requirePresenceStudioLocalAdmin,
@@ -200,7 +203,9 @@ function buildWorkInventoryNextAction(
   return {
     label_key: 'front_desk:hearing_inventory_open' as const,
     label: catalogT('front_desk:hearing_inventory_open', undefined, locale),
-    href: progressItem?.allowed ? hearingScopedUrl(progressItem.href, viewer) : '',
+    href: progressItem?.allowed
+      ? workInventoryHandoffHref(hearingScopedUrl(progressItem.href, viewer), viewer)
+      : '',
   };
 }
 

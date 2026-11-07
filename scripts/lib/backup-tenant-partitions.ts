@@ -249,9 +249,6 @@ function asPartitionStore<T>(absolutePath: string, fn: () => T): T {
   if (store.storeRole === 'delegation_record_store') {
     return withExecutionContext('delegation_record_store', fn, undefined, store.tenant);
   }
-  if (store.storeRole === 'asset_derivation_store') {
-    return withExecutionContext('asset_derivation_store', fn, undefined, store.tenant);
-  }
   throw new Error(`[BACKUP_RESTORE_STORE_ROLE_UNKNOWN] ${store.storeRole}`);
 }
 

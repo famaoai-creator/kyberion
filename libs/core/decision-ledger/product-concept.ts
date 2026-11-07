@@ -8,7 +8,7 @@
  * Pure. Unanswered requirements are omitted, never invented (same contract
  * as `applyHearingTurn`).
  */
-import type { ActorRef } from '../actor.js';
+import type { ActorRef } from '../contracts/actor.js';
 import { trimEndChars, trimStartChars } from '../foundation/text.js';
 import type { LedgerHearingAnswer } from './hearing-scenario.js';
 

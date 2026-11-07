@@ -1,13 +1,13 @@
 /** Scoped document intake publishes an existing artifact, never a tenant-wide knowledge card. */
 import { createHash } from 'node:crypto';
-import type { OsKnowledgeTier } from '../cloudflare-os-control-plane.js';
+import type { OsKnowledgeTier } from '../governance/cloudflare-os-control-plane.js';
 import * as path from 'node:path';
 import {
   readDocument,
   inferDocumentFormat,
   type ReadableDocumentFormat,
 } from '../media/document-reader.js';
-import { scrubContent } from '../pii-scrubber.js';
+import { scrubContent } from '../governance/pii-scrubber.js';
 import {
   writeScopedArtifact,
   type WriteScopedArtifactInput,

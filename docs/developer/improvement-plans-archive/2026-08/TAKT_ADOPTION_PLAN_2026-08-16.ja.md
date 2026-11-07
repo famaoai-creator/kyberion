@@ -256,14 +256,14 @@ Wave 4 (P3):               TK-09 facet pack  ・ TK-10 OTel  ・ TK-11 facet eva
 - ADF schema に `judge_route` / `await_decision` の宣言契約を追加し、guardrail で未定義ターゲット・不正な hop 上限・意図しない `continue` を検出する。
 - `executeGraph` は judge 出力 channel を `when` edge として扱い、ADF engine は `COMPLETE` terminal と suspend control flow をプロセス境界まで伝播する。
 - `pipeline-run-journal` は `run_suspended` と再開時の suspension 消去を永続化する。承認要求の正本は既存 approval-store のままで、run journal は再開に必要な参照だけを保持する。
-- 検証: `pnpm exec vitest run scripts/run_pipeline.test.ts libs/core/graph-scheduler.test.ts libs/core/pipeline/adf-guardrails.test.ts libs/core/pipeline/pipeline-run-journal.test.ts`、`pnpm run typecheck`、`pnpm lint`。
+- 検証: `pnpm exec vitest run scripts/run_pipeline.test.ts libs/core/pipeline/graph-scheduler.test.ts libs/core/pipeline/adf-guardrails.test.ts libs/core/pipeline/pipeline-run-journal.test.ts`、`pnpm run typecheck`、`pnpm lint`。
 
 ### Wave 2 実装証跡 (2026-08-16)
 
 - `facets` は `knowledge/confidential/{tenant}/facets/` → `knowledge/product/facets/` → legacy role/builtin の順で解決する。public scopeからtenant facetを指定した場合や、未登録名を指定した場合は拒否する。
 - pipeline step の `reasoning` は route profile と provider/modelを既存の `reasoning-route-policy` に投影し、`route_profile` と provider権限用 `profile` を分離して実行時に渡す。`reasoning.route_selected` Trace eventに選択層を記録する。
 - context packは明示されたfacetだけを含め、同じtenant/tier boundaryで検証する。facet purityは `pnpm check -- --scope full --only facet-purity` をvalidateへ組み込んだ。
-- 検証: `pnpm exec vitest run libs/core/facet-registry.test.ts libs/core/reasoning/reasoning-route-resolver.test.ts libs/core/mission/mission-context-pack.test.ts scripts/run_pipeline.test.ts`、`pnpm run typecheck`、`pnpm lint`、`pnpm run validate` (exit 0)。
+- 検証: `pnpm exec vitest run libs/core/plugin/facet-registry.test.ts libs/core/reasoning/reasoning-route-resolver.test.ts libs/core/mission/mission-context-pack.test.ts scripts/run_pipeline.test.ts`、`pnpm run typecheck`、`pnpm lint`、`pnpm run validate` (exit 0)。
 
 ### TK-08 実装証跡 (2026-08-16)
 

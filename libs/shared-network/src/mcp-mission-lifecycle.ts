@@ -7,7 +7,7 @@ import {
   resolveMcpRequestContext,
   assertMcpCallerRole,
   type McpRequestContext,
-} from '@agent/core/mcp-request-context';
+} from './mcp-request-context.js';
 import { loadState } from '@agent/core/mission/mission-state';
 import { missionMutationSnapshot } from '@agent/core/mission/mission-mutation-snapshot';
 import { buildExecutionEnv, resolveIdentityContext } from '@agent/core/authority';

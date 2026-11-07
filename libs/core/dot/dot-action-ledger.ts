@@ -6,7 +6,7 @@ import { pathResolver } from '../path-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { safeMkdir, safeLstat, assertSafeRepositoryPath } from '../secure-io.js';
 import { appendJsonLine, writeJsonLines } from '../foundation/json.js';
-import { jsonlFileSize, streamJsonLines } from '../jsonl-read.js';
+import { jsonlFileSize, streamJsonLines } from '../storage/jsonl-read.js';
 import { createLogger } from '../logger.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';

@@ -44,7 +44,7 @@ vi.mock('../libs/core/mission/mission-team-plan-composer.js', () => ({
   resolveMissionTeamPlan: mocks.resolveMissionTeamPlan,
   resolveMissionTeamReceiver: mocks.resolveMissionTeamReceiver,
 }));
-vi.mock('../libs/core/ledger.js', () => ({ ledger: { record: mocks.record } }));
+vi.mock('../libs/core/governance/ledger.js', () => ({ ledger: { record: mocks.record } }));
 // Measured under load (operations-hygiene-runbook §5): each dispatch spawned a
 // real `node dist/scripts/mission_controller.js record-task` child (0.7-0.9s
 // idle, several seconds at load 10+), and the first dispatch installed the real

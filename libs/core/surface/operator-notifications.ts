@@ -7,7 +7,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { isVitestProcess } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { fixedWindowLimiter } from '../foundation/rate-limit.js';
-import { loadRuntimeControlPolicy } from '../runtime-control-policy.js';
+import { loadRuntimeControlPolicy } from '../governance/runtime-control-policy.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -18,7 +18,7 @@ import {
   safeUnlinkSync,
 } from '../secure-io.js';
 import { logger } from '../core.js';
-import { t, type VocabularyKey } from '../t.js';
+import { t, type VocabularyKey } from '../localization/t.js';
 import { formatDiagnostic } from '../logger.js';
 import {
   enqueueSurfaceOutboxMessage,
@@ -26,10 +26,10 @@ import {
 } from './surface-coordination-store.js';
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 import { getChannelAdapter, listOperatorNotificationChannels } from './channel-adapter-registry.js';
-import { addInboxEntry, listInboxEntries } from '../deliverable-inbox.js';
-import { sendIMessage } from '../imessage-bridge.js';
-import { currentTriggerDeliveryId } from '../trigger-correlation.js';
-import { appendOpsAlertLogRecord } from '../ops-alert-log.js';
+import { addInboxEntry, listInboxEntries } from '../task/deliverable-inbox.js';
+import { sendIMessage } from '../integrations/imessage-bridge.js';
+import { currentTriggerDeliveryId } from '../event/trigger-correlation.js';
+import { appendOpsAlertLogRecord } from '../daemon/ops-alert-log.js';
 import { withExecutionContext } from '../authority.js';
 import { sendWebPushForEvent, webPushWouldDeliver } from './web-push.js';
 

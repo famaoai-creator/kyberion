@@ -138,7 +138,17 @@ describe('mission retrospective loop', () => {
         path.join(tmpRoot, `knowledge/product/schemas/${schemaName}.schema.json`)
       );
     }
-    process.env.KYBERION_ROOT = tmpRoot;
+    const governance = path.join(tmpRoot, 'knowledge/product/governance');
+    fs.mkdirSync(governance, { recursive: true });
+    for (const policy of ['security-policy.json', 'agent-policies.yaml']) {
+      fs.copyFileSync(
+        path.resolve(process.cwd(), 'knowledge/product/governance', policy),
+        path.join(governance, policy)
+      );
+    }
+    vi.stubEnv('KYBERION_ROOT', tmpRoot);
+    vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+    vi.stubEnv('MISSION_ROLE', 'mission_controller');
 
     fs.writeFileSync(
       path.join(missionDir, 'NEXT_TASKS.json'),
@@ -250,7 +260,7 @@ describe('mission retrospective loop', () => {
   });
 
   afterEach(() => {
-    delete process.env.KYBERION_ROOT;
+    vi.unstubAllEnvs();
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 
@@ -461,7 +471,7 @@ describe('mission retrospective loop', () => {
       expect(mod.collectMissionExecutionStats(MISSION).usage_unrecorded).toBe(false);
 
       completeTasks();
-      const { MetricsCollector } = await import('../metrics.js');
+      const { MetricsCollector } = await import('../analysis/metrics.js');
       const { recordDirectCliTaskUsage } = await import('./mission-direct-cli-usage.js');
       const [entry] = recordDirectCliTaskUsage({
         missionId: MISSION,
@@ -497,7 +507,7 @@ describe('mission retrospective loop', () => {
         statePath,
         JSON.stringify({ ...state, tier: 'confidential', tenant_slug: 'tenant-a' })
       );
-      const { MetricsCollector } = await import('../metrics.js');
+      const { MetricsCollector } = await import('../analysis/metrics.js');
       const { recordDirectCliTaskUsage } = await import('./mission-direct-cli-usage.js');
       for (const [taskId, tenant] of [
         ['T-1', 'tenant-a'],
@@ -544,7 +554,7 @@ describe('mission retrospective loop', () => {
         statePath,
         JSON.stringify({ ...state, tier: 'confidential', tenant_slug: 'tenant-a' })
       );
-      const { MetricsCollector } = await import('../metrics.js');
+      const { MetricsCollector } = await import('../analysis/metrics.js');
       const collector = new MetricsCollector();
       const call = (tokens: number, scope?: { tier: 'confidential'; tenant_slug: string }) =>
         collector.record('anthropic-sdk', 1, 'success', {

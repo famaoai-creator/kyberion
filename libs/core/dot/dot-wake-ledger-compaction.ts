@@ -25,8 +25,8 @@ import {
   writeTimeArchiveDir,
   type StoreLineFilter,
   type StoreScanOptions,
-} from '../append-only-store.js';
-import { jsonlFileSize } from '../jsonl-read.js';
+} from '../storage/append-only-store.js';
+import { jsonlFileSize } from '../storage/jsonl-read.js';
 import { safeExistsSync } from '../secure-io.js';
 
 /** Compact only when the ledger is large — hot sweeps stat once and skip. */
