@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   reachable: vi.fn(),
 }));
-vi.mock('@agent/core/obs-virtual-camera-output', () => ({
+vi.mock('./obs-virtual-camera-output.js', () => ({
   ObsVirtualCamera: class {
     constructor(options: unknown) {
       mocks.client(options);

@@ -436,6 +436,53 @@ describe('Workspace build contract', () => {
     }
   });
 
+  it('keeps the OBS virtual-camera output in shared-video with its filter provider', () => {
+    const core = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string
+    );
+    const video = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/shared-video/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(core.exports['./obs-virtual-camera-output']).toBeUndefined();
+    for (const suffix of ['.ts', '.test.ts']) {
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/core/obs-virtual-camera-output${suffix}`))
+      ).toBe(false);
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/shared-video/src/obs-virtual-camera-output${suffix}`)
+        )
+      ).toBe(true);
+    }
+    for (const suffix of ['.js', '.d.ts', '.js.map', '.d.ts.map']) {
+      expect(
+        safeExistsSync(path.join(rootDir, `libs/core/dist/obs-virtual-camera-output${suffix}`))
+      ).toBe(false);
+      expect(
+        safeExistsSync(
+          path.join(rootDir, `libs/shared-video/dist/obs-virtual-camera-output${suffix}`)
+        )
+      ).toBe(true);
+    }
+    expect(video.exports['./obs-virtual-camera-output']).toEqual({
+      types: './dist/obs-virtual-camera-output.d.ts',
+      default: './dist/obs-virtual-camera-output.js',
+    });
+    const actuator = JSON.parse(
+      safeReadFile(path.join(rootDir, 'libs/actuators/voice-actuator/package.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(actuator.dependencies['@agent/shared-video']).toBe('workspace:*');
+    // The camera-output seam contract and env registry stay in core; only the
+    // OBS backend moved.
+    for (const subpath of ['./camera-output-bridge', './foundation/env', './video/video-route']) {
+      expect(core.exports[subpath]).toBeDefined();
+    }
+  });
+
   it('keeps the desktop AX bridge in shared-perception with its system-actuator consumer', () => {
     const core = JSON.parse(
       safeReadFile(path.join(rootDir, 'libs/core/package.json'), { encoding: 'utf8' }) as string

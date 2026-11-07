@@ -321,19 +321,6 @@ export {
 export * from './meeting/meeting-platform-registry.js';
 
 export {
-  installObsVirtualCameraOutputBridge,
-  OBS_VIRTUAL_CAMERA_BRIDGE_ID,
-  OBS_VIRTUAL_CAMERA_CAPABILITIES,
-  ObsVirtualCamera,
-  ObsVirtualCameraOutputBridge,
-} from './obs-virtual-camera-output.js';
-
-export type {
-  ObsVirtualCameraBridgeOptions,
-  ObsVirtualCameraOptions,
-} from './obs-virtual-camera-output.js';
-
-export {
   recordActionItem,
   updateActionItemStatus,
   appendReminder,

@@ -3716,10 +3716,6 @@
       "types": "./dist/oauth-session-store.d.ts",
       "default": "./dist/oauth-session-store.js"
     },
-    "./obs-virtual-camera-output": {
-      "types": "./dist/obs-virtual-camera-output.d.ts",
-      "default": "./dist/obs-virtual-camera-output.js"
-    },
     "./observation-distill": {
       "types": "./dist/observation-distill.d.ts",
       "default": "./dist/observation-distill.js"

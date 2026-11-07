@@ -16,7 +16,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import {
   registerCameraOutputBridge,
   type AvatarOutputRequest,
@@ -24,7 +24,8 @@ import {
   type CameraOutputBridge,
   type CameraOutputCapabilities,
   type CameraOutputProbe,
-} from './camera-output-bridge.js';
+} from '@agent/core/camera-output-bridge';
+import type { VideoRouteHealth, VideoRouteMetrics } from '@agent/core/video/video-route';
 export interface ObsVirtualCameraOptions {
   /** ws:// host. Default 127.0.0.1. */
   host?: string;
@@ -652,7 +653,7 @@ export class ObsVirtualCameraOutputBridge implements CameraOutputBridge {
     }
   }
 
-  health(): import('./video/video-route.js').VideoRouteHealth {
+  health(): VideoRouteHealth {
     return {
       status: this.status,
       input_process_alive: false,
@@ -667,7 +668,7 @@ export class ObsVirtualCameraOutputBridge implements CameraOutputBridge {
     };
   }
 
-  metrics(): import('./video/video-route.js').VideoRouteMetrics {
+  metrics(): VideoRouteMetrics {
     return {
       frames_in: 0,
       // OBS does not expose per-frame counters through this bridge.
