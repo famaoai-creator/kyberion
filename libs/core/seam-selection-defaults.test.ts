@@ -12,7 +12,7 @@ vi.mock('./provider/provider-pins-store.js', () => ({
 const { safeExistsSync, safeRmSync } = await import('./secure-io.js');
 const defaults = await import('./seam-selection-defaults.js');
 const selection = await import('./seam-provider-selection.js');
-const { ProviderChainRouter } = await import('./provider-chain-router.js');
+const { ProviderChainRouter } = await import('./provider/provider-chain-router.js');
 
 const {
   listSavedSeamDefaultLayers,

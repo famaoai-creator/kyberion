@@ -59,7 +59,7 @@ export {
   markRouterInactive,
   isRouterActive,
   resetRouterSync,
-} from './blackhole-routing-guard.js';
+} from './voice/blackhole-routing-guard.js';
 
 // ---------------------------------------------------------------------------
 // Intent-driven automation (P0-P4) — procedure catalog, compiler, dispatcher,
@@ -286,7 +286,7 @@ export type {
   GrammarSamplingRequest,
   ThinkingLevel,
   ThinkingLevelMap,
-} from './backend-capability-profile.js';
+} from './reasoning/backend-capability-profile.js';
 
 export {
   BACKEND_CAPABILITY_PROFILES,
@@ -298,4 +298,4 @@ export {
   modesWithUtilityFit,
   resolveConstrainedSampling,
   resolveThinkingLevel,
-} from './backend-capability-profile.js';
+} from './reasoning/backend-capability-profile.js';

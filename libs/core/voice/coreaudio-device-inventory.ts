@@ -1,8 +1,8 @@
-import { safeExecResult } from './secure-io.js';
-import { rootResolve } from './path-resolver.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
-import type { AudioDeviceDescriptor } from './voice/audio-route.js';
-import { isRecord } from './foundation/text.js';
+import { safeExecResult } from '../secure-io.js';
+import { rootResolve } from '../path-resolver.js';
+import { parseSafeJsonInput } from '../foundation/safe-json.js';
+import type { AudioDeviceDescriptor } from './audio-route.js';
+import { isRecord } from '../foundation/text.js';
 
 export const COREAUDIO_DEVICE_INVENTORY_BRIDGE_ID = 'coreaudio-device-inventory' as const;
 

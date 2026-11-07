@@ -43,7 +43,7 @@ import {
   type SeamProviderDecision,
 } from './seam-provider-selection.js';
 import { type SeamProviderMetadata } from './seam.js';
-import { createProviderRegistry } from './provider-registry.js';
+import { createProviderRegistry } from './provider/provider-registry.js';
 
 const logger = createLogger('authn-principal-resolver');
 

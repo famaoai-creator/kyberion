@@ -1,11 +1,11 @@
 import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 
 const profileRoot = vi.hoisted(() => ({ value: '' }));
 
-vi.mock('./profile-root.js', () => ({
+vi.mock('../profile-root.js', () => ({
   resolveActiveProfileRoot: () => profileRoot.value,
 }));
 

@@ -36,7 +36,7 @@ import {
   type SeamProviderDecision,
 } from './seam-provider-selection.js';
 import { type SeamProviderMetadata } from './seam.js';
-import { createProviderRegistry } from './provider-registry.js';
+import { createProviderRegistry } from './provider/provider-registry.js';
 import type { ResolvedPrincipal } from './authn-principal-resolver.js';
 
 const logger = createLogger('authz-policy-engine');

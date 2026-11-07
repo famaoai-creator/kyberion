@@ -1,17 +1,17 @@
-import { nowIso } from './foundation/time.js';
-import { readJson } from './foundation/json.js';
-import * as pathResolver from './path-resolver.js';
-import { safeExistsSync } from './secure-io.js';
+import { nowIso } from '../foundation/time.js';
+import { readJson } from '../foundation/json.js';
+import * as pathResolver from '../path-resolver.js';
+import { safeExistsSync } from '../secure-io.js';
 import {
   BACKEND_CAPABILITY_PROFILES,
   type BackendUtilityFit,
 } from './backend-capability-profile.js';
-import { providerIdForReasoningIdentifier } from './provider/provider-egress-gate.js';
+import { providerIdForReasoningIdentifier } from '../provider/provider-egress-gate.js';
 import {
   loadModelRoleFitnessRecords,
   normalizeFitnessProviderId,
   type ModelRoleFitnessRecord,
-} from './reasoning/model-role-fitness.js';
+} from './model-role-fitness.js';
 import {
   loadBackendLiveScenarioRecords,
   type BackendLiveScenarioRecord,

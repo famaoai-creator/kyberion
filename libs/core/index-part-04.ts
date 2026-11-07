@@ -332,7 +332,7 @@ export * from './voice/audio-bus-bridge.js';
 
 export * from './meeting/calendar-provider-bridge.js';
 
-export * from './temporal-context.js';
+export * from './temporal/temporal-context.js';
 
 export * from './meeting/calendar-slot-planner.js';
 

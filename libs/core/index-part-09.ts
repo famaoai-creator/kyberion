@@ -50,10 +50,6 @@ export * from './foundation/pcm-wav.js';
 
 export * from './voice/audio-playback.js';
 
-export * from './segmented-voice-playback.js';
-
-export * from './streaming-voice-playback.js';
-
 export * from './voice/audio-tee.js';
 
 export * from './voice/vad-registry.js';

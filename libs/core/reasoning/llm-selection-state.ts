@@ -1,8 +1,8 @@
 import * as path from 'node:path';
-import { defineCatalog } from './foundation/governed-catalog.js';
-import { pathResolver } from './path-resolver.js';
-import { resolveActiveProfileRoot } from './profile-root.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { pathResolver } from '../path-resolver.js';
+import { resolveActiveProfileRoot } from '../profile-root.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 
 export interface LlmSelectionPreferences {
   version: '1.0.0';

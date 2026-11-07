@@ -8,7 +8,7 @@
  * its own organizations' digests in surfaces.
  */
 import { createHash } from 'node:crypto';
-import { calendarDateInZone } from '../business-calendar.js';
+import { calendarDateInZone } from '../temporal/business-calendar.js';
 import { createLogger } from '../logger.js';
 import { writeScopedArtifact } from '../workforce/artifact-store.js';
 import type { OrganizationDigest, OrganizationDigestEntry } from './organization-digest.js';

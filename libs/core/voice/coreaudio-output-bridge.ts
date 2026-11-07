@@ -1,13 +1,13 @@
-import { buildSafeExecEnv } from './secure-io.js';
+import { buildSafeExecEnv } from '../secure-io.js';
 import {
   spawnManagedProcess,
   stopManagedProcess,
   type ManagedProcessHandle,
-} from './managed-process.js';
-import { rootResolve } from './path-resolver.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { isRecord } from './foundation/text.js';
-import type { AudioChunk, AudioFormat } from './meeting/meeting-session-types.js';
+} from '../managed-process.js';
+import { rootResolve } from '../path-resolver.js';
+import { parseSafeJsonInput } from '../foundation/safe-json.js';
+import { isRecord } from '../foundation/text.js';
+import type { AudioChunk, AudioFormat } from '../meeting/meeting-session-types.js';
 import {
   createCoreAudioDeviceInventoryBridge,
   type CoreAudioDeviceInventoryBridge,
@@ -19,7 +19,7 @@ import {
   type AudioRouteHealth,
   type AudioRouteMetrics,
   type AudioRouteProbe,
-} from './voice/audio-route.js';
+} from './audio-route.js';
 
 export interface CoreAudioOutputBridgeOptions {
   inventory_bridge?: CoreAudioDeviceInventoryBridge;

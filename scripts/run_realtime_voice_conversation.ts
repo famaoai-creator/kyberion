@@ -62,7 +62,10 @@ import { installSileroVadBackend } from '@agent/core/silero-vad-bridge';
 import { installTenVadBackend } from '@agent/core/ten-vad-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
 import { probeAudioPlayback } from '@agent/core/voice/audio-playback';
-import { playPcmAudioStream, probePcmAudioStreaming } from '@agent/core/streaming-voice-playback';
+import {
+  playPcmAudioStream,
+  probePcmAudioStreaming,
+} from '@agent/shared-voice/streaming-voice-playback';
 import { probeMicCapture, resolveMicDevice } from '@agent/core/mic-capture';
 import { resolveFfmpegBin } from '@agent/core/tool/tool-binary-resolvers';
 import { recordVadTurn, type VadTurnState } from '@agent/shared-voice/vad-turn-recorder';

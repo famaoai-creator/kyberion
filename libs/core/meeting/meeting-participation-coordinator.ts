@@ -47,7 +47,7 @@ import {
   transcriptChunkToMediaEvent,
   type MediaEvent,
 } from '../realtime-media-session.js';
-import { BargeInController } from '../barge-in-controller.js';
+import { BargeInController } from '../voice/barge-in-controller.js';
 import {
   evaluateMissionVoiceConsent,
   type MissionVoiceConsentResult,
