@@ -920,6 +920,9 @@ importers:
       '@agent/shared-interaction':
         specifier: workspace:*
         version: link:../shared-interaction
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
 
   presence/bridge/terminal:
     dependencies:
