@@ -1,6 +1,6 @@
 ---
 title: 'Kyberion Development Practices — Hard-Won Rules for Changing This Repo'
-last_updated: 2026-11-06
+last_updated: 2026-11-07
 ---
 
 # Kyberion Development Practices — Hard-Won Rules for Changing This Repo
@@ -435,6 +435,14 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
   a role the process already may assume (`role-assumption-policy.json`), and
   name the route in that role's rationale. Never widen the process role.
   (MSN-SERVER-STUDIO-P2A-20261106: the voice selection save.)
+- **A moved route keeps the old gate's exact checks, not just the role.**
+  Surfaces describe a viewer differently: Studio's local-admin gate checks
+  `source === 'loopback'`, while a Concierge `role === 'localadmin'` is also
+  reachable through a remote token. Port each condition the old gate tested,
+  and pin a remote-token case in a test. Run the route's own refusals before
+  the shared mutation guard, and return an `error_code` the page maps to its
+  own copy. Otherwise the person sees the guard's internal English text.
+  (MSN-SERVER-STUDIO-HELP-20261107: 使い方 mark-done.)
 
 ## 6. Process discipline for repo work
 
