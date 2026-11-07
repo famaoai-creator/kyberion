@@ -263,7 +263,7 @@ export function parseVoiceSelectionResponse(value: unknown): VoiceSelection | un
 
 // 組織とメンバー 研修: read-only catalog (proxied via /api/training/catalog)
 // plus per-tenant assignments (/api/training/assignments) — same shape as
-// libs/core/training-catalog.ts, duplicated here because the client never
+// libs/core/organization/training-catalog.ts, duplicated here because the client never
 // imports server-only core modules directly.
 export type TrainingTrack = { id: string; title: string };
 export type TrainingAssignmentStatus = 'not_started' | 'in_progress' | 'complete';
@@ -329,7 +329,7 @@ export function parseTrainingAssignmentsResponse(
 
 // HT-05 second pass: per-member progress overview
 // (`/api/training/progress`, owner-only, tenant-narrowed server-side) — same
-// shape as `libs/core/training-catalog.ts`'s `summarizeTrainingProgress`
+// shape as `libs/core/organization/training-catalog.ts`'s `summarizeTrainingProgress`
 // output plus the joined `display_name`.
 export type TrainingProgressSummary = {
   member_id: string;

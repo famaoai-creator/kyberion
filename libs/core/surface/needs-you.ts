@@ -36,7 +36,7 @@
  * publication previews) through the same builder.
  */
 
-import type { CeoApprovalItem, CeoExceptionItem, CeoOutcomeItem } from '../ceo-surface-summary.js';
+import type { CeoApprovalItem, CeoExceptionItem, CeoOutcomeItem } from './ceo-surface-summary.js';
 import { compareDecisionUrgency, groupByDecision } from './decision-brief.js';
 import type { DisplayText } from './display-humanize.js';
 import {

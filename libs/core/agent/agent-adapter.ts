@@ -11,7 +11,7 @@ import {
   spawnManagedProcess,
   stopManagedProcess,
   touchManagedProcess,
-} from '../managed-process.js';
+} from '../tool/managed-process.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';

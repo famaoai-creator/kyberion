@@ -109,8 +109,8 @@ vi.mock('./approval-policy.js', async (importOriginal) => ({
 
 // The hermetic root has no reasoning-provider registry either; the store-level
 // agent refusal is covered by approval-human-proof.test.ts.
-vi.mock('../agent-execution-context.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../agent-execution-context.js')>()),
+vi.mock('../agent/agent-execution-context.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../agent/agent-execution-context.js')>()),
   detectAgentExecutionContext: () => ({
     isAgent: false,
     principal: null,

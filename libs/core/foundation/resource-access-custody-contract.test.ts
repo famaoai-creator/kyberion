@@ -11,6 +11,7 @@ import { roleNarrowingDenial } from './role-narrowing-denial.js';
 import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
+import { withExecutionContext } from '../authority.js';
 
 vi.mock('../governance/audit-chain.js', () => ({
   auditChain: { record: vi.fn() },
@@ -116,7 +117,11 @@ describe('G4 custody on the request ceiling', () => {
           // not disclosure, so the persona gate still denies personal-tier
           // reads for a bare process (P4 wires the viewer path).
           expect(resourceAccessDenial(PERSON_CHARTER, 'read')).toBeNull();
-          const personal = validateReadPermission(abs(PERSON_CHARTER));
+          const personal = withExecutionContext(
+            'worker',
+            () => validateReadPermission(abs(PERSON_CHARTER)),
+            'worker'
+          );
           expect(personal.allowed).toBe(false);
           expect(personal.reason).not.toContain('RESOURCE_SCOPE');
           expect(validateWritePermission(abs(exact)).allowed).toBe(true);
@@ -127,19 +132,33 @@ describe('G4 custody on the request ceiling', () => {
   );
 
   it('fails closed on malformed custody declarations', () => {
-    for (const scope of [
-      { custody: { kind: 'system' }, tenantSlug: 'acme-corp' },
-      { custody: { kind: 'system' }, organizationId: 'org-a' },
-      { custody: { kind: 'person' }, projectId: 'proj-a', organizationId: 'org-a' },
-      { custody: { kind: 'person', ref: 'Bad Ref!' } },
-      { custody: { kind: 'nobody' } },
-      { custody: 'system' },
-      { custody: { kind: 'tenant' } },
-    ])
+    const nonTenantBindingError =
+      '[RESOURCE_SCOPE_INVALID] Non-tenant custody cannot bind a tenant, organization or project';
+    const personRefError = '[RESOURCE_SCOPE_INVALID] Invalid person custody ref';
+    const unknownKindError = '[RESOURCE_SCOPE_INVALID] Unknown custody kind';
+    for (const [scope, error] of [
+      [{ custody: { kind: 'system' }, tenantSlug: 'acme-corp' }, nonTenantBindingError],
+      [{ custody: { kind: 'system' }, organizationId: 'org-a' }, nonTenantBindingError],
+      [{ custody: { kind: 'person' }, projectId: 'proj-a' }, nonTenantBindingError],
+      [{ custody: { kind: 'person', ref: 'Bad Ref!' } }, personRefError],
+      [{ custody: { kind: 'person', ref: 123 } }, personRefError],
+      [{ custody: { kind: 'person', ref: '' } }, personRefError],
+      [{ custody: { kind: 'person', ref: '   ' } }, personRefError],
+      [{ custody: { kind: 'nobody' } }, unknownKindError],
+      [{ custody: 'system' }, unknownKindError],
+      [
+        { custody: { kind: 'tenant' } },
+        '[RESOURCE_SCOPE_INVALID] Missing or invalid resource binding',
+      ],
+    ] as const)
       expect(
-        () => runInResourceAccessScope(custodyScope(scope as never, {}), () => null),
+        () =>
+          runInResourceAccessScope(
+            custodyScope(undefined, scope as unknown as Partial<ResourceAccessScope>),
+            () => null
+          ),
         JSON.stringify(scope)
-      ).toThrow(/RESOURCE_SCOPE_INVALID/);
+      ).toThrow(error);
     // tenant custody with a slug still validates
     runInResourceAccessScope(custodyScope({ kind: 'tenant' }, { tenantSlug: 'acme-corp' }), () =>
       expect(currentResourceAccessScope()?.custody).toEqual({ kind: 'tenant' })

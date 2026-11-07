@@ -16,74 +16,6 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    "./contracts/asset-scope": {
-      "types": "./dist/contracts/asset-scope.d.ts",
-      "default": "./dist/contracts/asset-scope.js"
-    },
-    "./foundation/asset-address": {
-      "types": "./dist/foundation/asset-address.d.ts",
-      "default": "./dist/foundation/asset-address.js"
-    },
-    "./governance/asset-scope-inspection": {
-      "types": "./dist/governance/asset-scope-inspection.d.ts",
-      "default": "./dist/governance/asset-scope-inspection.js"
-    },
-    "./pipeline/pipeline-reuse": {
-      "types": "./dist/pipeline/pipeline-reuse.d.ts",
-      "default": "./dist/pipeline/pipeline-reuse.js"
-    },
-    "./pipeline/pipeline-promotion-evidence": {
-      "types": "./dist/pipeline/pipeline-promotion-evidence.d.ts",
-      "default": "./dist/pipeline/pipeline-promotion-evidence.js"
-    },
-    "./knowledge/reusable-learning": {
-      "types": "./dist/knowledge/reusable-learning.d.ts",
-      "default": "./dist/knowledge/reusable-learning.js"
-    },
-    "./knowledge/knowledge-reuse-contract": {
-      "types": "./dist/knowledge/knowledge-reuse-contract.d.ts",
-      "default": "./dist/knowledge/knowledge-reuse-contract.js"
-    },
-    "./knowledge/knowledge-verification": {
-      "types": "./dist/knowledge/knowledge-verification.d.ts",
-      "default": "./dist/knowledge/knowledge-verification.js"
-    },
-    "./search": {
-      "types": "./dist/search/index.d.ts",
-      "default": "./dist/search/index.js"
-    },
-    "./search/web-search-runtime-bridge": {
-      "types": "./dist/search/web-search-runtime-bridge.d.ts",
-      "default": "./dist/search/web-search-runtime-bridge.js"
-    },
-    "./surface/workspace-work": {
-      "types": "./dist/surface/workspace-work.d.ts",
-      "default": "./dist/surface/workspace-work.js"
-    },
-    "./surface/workspace": {
-      "types": "./dist/surface/workspace.d.ts",
-      "default": "./dist/surface/workspace.js"
-    },
-    "./surface/workspace-autonomy": {
-      "types": "./dist/surface/workspace-autonomy.d.ts",
-      "default": "./dist/surface/workspace-autonomy.js"
-    },
-    "./surface/workspace-scope": {
-      "types": "./dist/surface/workspace-scope.d.ts",
-      "default": "./dist/surface/workspace-scope.js"
-    },
-    "./surface/workspace-query": {
-      "types": "./dist/surface/workspace-query.d.ts",
-      "default": "./dist/surface/workspace-query.js"
-    },
-    "./surface/scoped-workspace-ingest": {
-      "types": "./dist/surface/scoped-workspace-ingest.d.ts",
-      "default": "./dist/surface/scoped-workspace-ingest.js"
-    },
-    "./chain-integrity": {
-      "types": "./dist/chain-integrity.d.ts",
-      "default": "./dist/chain-integrity.js"
-    },
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
@@ -101,24 +33,32 @@
       "default": "./dist/mesh/a2a-envelope-signature.js"
     },
     "./a2ui": {
-      "types": "./dist/a2ui.d.ts",
-      "default": "./dist/a2ui.js"
+      "types": "./dist/surface/a2ui.d.ts",
+      "default": "./dist/surface/a2ui.js"
     },
     "./a2ui-catalog": {
       "types": "./dist/surface/a2ui-catalog.d.ts",
       "default": "./dist/surface/a2ui-catalog.js"
+    },
+    "./accepted-pipeline-bindings": {
+      "types": "./dist/pipeline/accepted-pipeline-bindings.d.ts",
+      "default": "./dist/pipeline/accepted-pipeline-bindings.js"
     },
     "./acp-mediator": {
       "types": "./dist/mesh/acp-mediator-entry.d.ts",
       "default": "./dist/mesh/acp-mediator-entry.js"
     },
     "./action-item-store": {
-      "types": "./dist/action-item-store.d.ts",
-      "default": "./dist/action-item-store.js"
+      "types": "./dist/meeting/action-item-store.d.ts",
+      "default": "./dist/meeting/action-item-store.js"
     },
     "./actor": {
-      "types": "./dist/actor.d.ts",
-      "default": "./dist/actor.js"
+      "types": "./dist/contracts/actor.d.ts",
+      "default": "./dist/contracts/actor.js"
+    },
+    "./actor-context": {
+      "types": "./dist/authn/actor-context.d.ts",
+      "default": "./dist/authn/actor-context.js"
     },
     "./actuator": {
       "types": "./dist/actuator/index.d.ts",
@@ -133,8 +73,8 @@
       "default": "./dist/actuator/actuator-forwarding-port.js"
     },
     "./actuator-manifest-index": {
-      "types": "./dist/actuator-manifest-index.d.ts",
-      "default": "./dist/actuator-manifest-index.js"
+      "types": "./dist/actuator/actuator-manifest-index.d.ts",
+      "default": "./dist/actuator/actuator-manifest-index.js"
     },
     "./actuator-op-discovery": {
       "types": "./dist/actuator/actuator-op-discovery.d.ts",
@@ -257,8 +197,8 @@
       "default": "./dist/agent/agent-exec-adapter-bridge.js"
     },
     "./agent-execution-context": {
-      "types": "./dist/agent-execution-context.d.ts",
-      "default": "./dist/agent-execution-context.js"
+      "types": "./dist/agent/agent-execution-context.d.ts",
+      "default": "./dist/agent/agent-execution-context.js"
     },
     "./agent-execution-port": {
       "types": "./dist/agent/agent-execution-port.d.ts",
@@ -477,8 +417,8 @@
       "default": "./dist/agent/agentic-source-review-verification.js"
     },
     "./aidlc-phase-state": {
-      "types": "./dist/aidlc-phase-state.d.ts",
-      "default": "./dist/aidlc-phase-state.js"
+      "types": "./dist/mission/aidlc-phase-state.d.ts",
+      "default": "./dist/mission/aidlc-phase-state.js"
     },
     "./analysis": {
       "types": "./dist/analysis/index.d.ts",
@@ -500,33 +440,29 @@
       "types": "./dist/analysis/observability-gate.d.ts",
       "default": "./dist/analysis/observability-gate.js"
     },
-    "./analysis/trace-exporter": {
-      "types": "./dist/analysis/trace-exporter.d.ts",
-      "default": "./dist/analysis/trace-exporter.js"
-    },
     "./analysis/trace": {
       "types": "./dist/analysis/trace.d.ts",
       "default": "./dist/analysis/trace.js"
+    },
+    "./analysis/trace-exporter": {
+      "types": "./dist/analysis/trace-exporter.d.ts",
+      "default": "./dist/analysis/trace-exporter.js"
     },
     "./analysis/trace-schema": {
       "types": "./dist/analysis/trace-schema.d.ts",
       "default": "./dist/analysis/trace-schema.js"
     },
     "./app-profile-index-loader": {
-      "types": "./dist/app-profile-index-loader.d.ts",
-      "default": "./dist/app-profile-index-loader.js"
+      "types": "./dist/integrations/app-profile-index-loader.d.ts",
+      "default": "./dist/integrations/app-profile-index-loader.js"
     },
     "./append-only-store": {
-      "types": "./dist/append-only-store.d.ts",
-      "default": "./dist/append-only-store.js"
+      "types": "./dist/storage/append-only-store.d.ts",
+      "default": "./dist/storage/append-only-store.js"
     },
     "./apple-intelligence-bridge": {
-      "types": "./dist/apple-intelligence-bridge.d.ts",
-      "default": "./dist/apple-intelligence-bridge.js"
-    },
-    "./apple-speech-file-stt-bridge": {
-      "types": "./dist/apple-speech-file-stt-bridge.d.ts",
-      "default": "./dist/apple-speech-file-stt-bridge.js"
+      "types": "./dist/provider/apple-intelligence-bridge.d.ts",
+      "default": "./dist/provider/apple-intelligence-bridge.js"
     },
     "./approval-audit": {
       "types": "./dist/governance/approval-audit.d.ts",
@@ -593,12 +529,12 @@
       "default": "./dist/workforce/artifact-verification.js"
     },
     "./assistant-compiler-request": {
-      "types": "./dist/assistant-compiler-request.d.ts",
-      "default": "./dist/assistant-compiler-request.js"
+      "types": "./dist/intent/assistant-compiler-request.d.ts",
+      "default": "./dist/intent/assistant-compiler-request.js"
     },
     "./async-utils": {
-      "types": "./dist/async-utils.d.ts",
-      "default": "./dist/async-utils.js"
+      "types": "./dist/pipeline/async-utils.d.ts",
+      "default": "./dist/pipeline/async-utils.js"
     },
     "./audio-bus": {
       "types": "./dist/voice/audio-bus.d.ts",
@@ -625,8 +561,8 @@
       "default": "./dist/governance/audit-forwarder.js"
     },
     "./authn-principal-resolver": {
-      "types": "./dist/authn-principal-resolver.d.ts",
-      "default": "./dist/authn-principal-resolver.js"
+      "types": "./dist/authn/authn-principal-resolver.d.ts",
+      "default": "./dist/authn/authn-principal-resolver.js"
     },
     "./authn/authn-providers": {
       "types": "./dist/authn/authn-providers.d.ts",
@@ -653,44 +589,40 @@
       "default": "./dist/authority.js"
     },
     "./authz-policy-engine": {
-      "types": "./dist/authz-policy-engine.d.ts",
-      "default": "./dist/authz-policy-engine.js"
+      "types": "./dist/governance/authz-policy-engine.d.ts",
+      "default": "./dist/governance/authz-policy-engine.js"
     },
     "./authz-providers": {
-      "types": "./dist/authz-providers.d.ts",
-      "default": "./dist/authz-providers.js"
+      "types": "./dist/governance/authz-providers.d.ts",
+      "default": "./dist/governance/authz-providers.js"
     },
     "./automation-blueprint": {
-      "types": "./dist/automation-blueprint.d.ts",
-      "default": "./dist/automation-blueprint.js"
-    },
-    "./automation-blueprint-slack": {
-      "types": "./dist/automation-blueprint-slack.d.ts",
-      "default": "./dist/automation-blueprint-slack.js"
+      "types": "./dist/pipeline/automation-blueprint.d.ts",
+      "default": "./dist/pipeline/automation-blueprint.js"
     },
     "./autonomous-ops-gate": {
       "types": "./dist/governance/autonomous-ops-gate.d.ts",
       "default": "./dist/governance/autonomous-ops-gate.js"
     },
     "./autonomous-repair": {
-      "types": "./dist/autonomous-repair.d.ts",
-      "default": "./dist/autonomous-repair.js"
+      "types": "./dist/pipeline/autonomous-repair.d.ts",
+      "default": "./dist/pipeline/autonomous-repair.js"
     },
     "./backend-capability-honesty": {
-      "types": "./dist/backend-capability-honesty.d.ts",
-      "default": "./dist/backend-capability-honesty.js"
+      "types": "./dist/reasoning/backend-capability-honesty.d.ts",
+      "default": "./dist/reasoning/backend-capability-honesty.js"
     },
     "./backend-capability-profile": {
-      "types": "./dist/backend-capability-profile.d.ts",
-      "default": "./dist/backend-capability-profile.js"
+      "types": "./dist/reasoning/backend-capability-profile.d.ts",
+      "default": "./dist/reasoning/backend-capability-profile.js"
     },
     "./backend-conformance": {
-      "types": "./dist/backend-conformance.d.ts",
-      "default": "./dist/backend-conformance.js"
+      "types": "./dist/reasoning/backend-conformance.d.ts",
+      "default": "./dist/reasoning/backend-conformance.js"
     },
     "./backend-live-scenarios": {
-      "types": "./dist/backend-live-scenarios.d.ts",
-      "default": "./dist/backend-live-scenarios.js"
+      "types": "./dist/reasoning/backend-live-scenarios.d.ts",
+      "default": "./dist/reasoning/backend-live-scenarios.js"
     },
     "./background-review": {
       "types": "./dist/workforce/background-review-patch.d.ts",
@@ -708,37 +640,33 @@
       "types": "./dist/workforce/background-review-patch.d.ts",
       "default": "./dist/workforce/background-review-patch.js"
     },
+    "./barge-in-controller": {
+      "types": "./dist/voice/barge-in-controller.d.ts",
+      "default": "./dist/voice/barge-in-controller.js"
+    },
     "./baseline-check-cache": {
-      "types": "./dist/baseline-check-cache.d.ts",
-      "default": "./dist/baseline-check-cache.js"
+      "types": "./dist/daemon/baseline-check-cache.d.ts",
+      "default": "./dist/daemon/baseline-check-cache.js"
     },
     "./blackhole-audio-bus": {
-      "types": "./dist/blackhole-audio-bus.d.ts",
-      "default": "./dist/blackhole-audio-bus.js"
-    },
-    "./blackhole-routing-guard": {
-      "types": "./dist/blackhole-routing-guard.d.ts",
-      "default": "./dist/blackhole-routing-guard.js"
+      "types": "./dist/voice/blackhole-audio-bus.d.ts",
+      "default": "./dist/voice/blackhole-audio-bus.js"
     },
     "./bluebubbles-adapter": {
       "types": "./dist/integrations/bluebubbles-adapter.d.ts",
       "default": "./dist/integrations/bluebubbles-adapter.js"
     },
     "./brand-tokens": {
-      "types": "./dist/brand-tokens.d.ts",
-      "default": "./dist/brand-tokens.js"
-    },
-    "./bridge-error-reply": {
-      "types": "./dist/bridge-error-reply.d.ts",
-      "default": "./dist/bridge-error-reply.js"
+      "types": "./dist/design/brand-tokens.d.ts",
+      "default": "./dist/design/brand-tokens.js"
     },
     "./bridge-poll-loop": {
-      "types": "./dist/bridge-poll-loop.d.ts",
-      "default": "./dist/bridge-poll-loop.js"
+      "types": "./dist/integrations/bridge-poll-loop.d.ts",
+      "default": "./dist/integrations/bridge-poll-loop.js"
     },
     "./bridge-typing": {
-      "types": "./dist/bridge-typing.d.ts",
-      "default": "./dist/bridge-typing.js"
+      "types": "./dist/integrations/bridge-typing.d.ts",
+      "default": "./dist/integrations/bridge-typing.js"
     },
     "./browser": {
       "types": "./dist/browser/index.d.ts",
@@ -765,20 +693,20 @@
       "default": "./dist/browser/chrome-extension-meeting-driver.js"
     },
     "./build-coordination": {
-      "types": "./dist/build-coordination.d.ts",
-      "default": "./dist/build-coordination.js"
+      "types": "./dist/harnessing/build-coordination.d.ts",
+      "default": "./dist/harnessing/build-coordination.js"
     },
     "./build-generation": {
-      "types": "./dist/build-generation.d.ts",
-      "default": "./dist/build-generation.js"
+      "types": "./dist/harnessing/build-generation.d.ts",
+      "default": "./dist/harnessing/build-generation.js"
     },
     "./build-readiness": {
-      "types": "./dist/build-readiness.d.ts",
-      "default": "./dist/build-readiness.js"
+      "types": "./dist/harnessing/build-readiness.d.ts",
+      "default": "./dist/harnessing/build-readiness.js"
     },
     "./business-calendar": {
-      "types": "./dist/business-calendar.d.ts",
-      "default": "./dist/business-calendar.js"
+      "types": "./dist/temporal/business-calendar.d.ts",
+      "default": "./dist/temporal/business-calendar.js"
     },
     "./calendar-provider-bridge": {
       "types": "./dist/meeting/calendar-provider-bridge.d.ts",
@@ -793,28 +721,32 @@
       "default": "./dist/meeting/calendar-workflow.js"
     },
     "./camera-output-bridge": {
-      "types": "./dist/camera-output-bridge.d.ts",
-      "default": "./dist/camera-output-bridge.js"
+      "types": "./dist/media/camera-output-bridge.d.ts",
+      "default": "./dist/media/camera-output-bridge.js"
     },
     "./campaign-suite": {
-      "types": "./dist/campaign-suite.d.ts",
-      "default": "./dist/campaign-suite.js"
+      "types": "./dist/media/campaign-suite.d.ts",
+      "default": "./dist/media/campaign-suite.js"
     },
     "./capability-bundle-registry": {
-      "types": "./dist/capability-bundle-registry.d.ts",
-      "default": "./dist/capability-bundle-registry.js"
+      "types": "./dist/plugin/capability-bundle-registry.d.ts",
+      "default": "./dist/plugin/capability-bundle-registry.js"
     },
     "./ce-adoption": {
-      "types": "./dist/ce-adoption.d.ts",
-      "default": "./dist/ce-adoption.js"
+      "types": "./dist/harnessing/ce-adoption.d.ts",
+      "default": "./dist/harnessing/ce-adoption.js"
     },
     "./ceo-surface-summary": {
-      "types": "./dist/ceo-surface-summary.d.ts",
-      "default": "./dist/ceo-surface-summary.js"
+      "types": "./dist/surface/ceo-surface-summary.d.ts",
+      "default": "./dist/surface/ceo-surface-summary.js"
+    },
+    "./chain-integrity": {
+      "types": "./dist/governance/chain-integrity.d.ts",
+      "default": "./dist/governance/chain-integrity.js"
     },
     "./changelog-policy": {
-      "types": "./dist/changelog-policy.d.ts",
-      "default": "./dist/changelog-policy.js"
+      "types": "./dist/harnessing/changelog-policy.d.ts",
+      "default": "./dist/harnessing/changelog-policy.js"
     },
     "./channel-adapter": {
       "types": "./dist/surface/channel-adapter.d.ts",
@@ -836,17 +768,21 @@
       "types": "./dist/surface/channel-surface-types.d.ts",
       "default": "./dist/surface/channel-surface-types.js"
     },
+    "./check-harness": {
+      "types": "./dist/harnessing/check-harness.d.ts",
+      "default": "./dist/harnessing/check-harness.js"
+    },
     "./chrome-extension-meeting-driver": {
       "types": "./dist/browser/chrome-extension-meeting-driver.d.ts",
       "default": "./dist/browser/chrome-extension-meeting-driver.js"
     },
     "./chronos-access-registry": {
-      "types": "./dist/chronos-access-registry.d.ts",
-      "default": "./dist/chronos-access-registry.js"
+      "types": "./dist/authn/chronos-access-registry.d.ts",
+      "default": "./dist/authn/chronos-access-registry.js"
     },
     "./chronos-delivery": {
-      "types": "./dist/chronos-delivery.d.ts",
-      "default": "./dist/chronos-delivery.js"
+      "types": "./dist/surface/chronos-delivery.d.ts",
+      "default": "./dist/surface/chronos-delivery.js"
     },
     "./claude-code-hook": {
       "types": "./dist/provider/claude-code-hook.d.ts",
@@ -864,73 +800,73 @@
       "types": "./dist/provider/claude-task-session-executor.d.ts",
       "default": "./dist/provider/claude-task-session-executor.js"
     },
+    "./cli-guard": {
+      "types": "./dist/harnessing/cli-guard.d.ts",
+      "default": "./dist/harnessing/cli-guard.js"
+    },
     "./cli-utils": {
-      "types": "./dist/cli-utils.d.ts",
-      "default": "./dist/cli-utils.js"
+      "types": "./dist/harnessing/cli-utils.d.ts",
+      "default": "./dist/harnessing/cli-utils.js"
     },
     "./cloudflare-os-control-plane": {
-      "types": "./dist/cloudflare-os-control-plane.d.ts",
-      "default": "./dist/cloudflare-os-control-plane.js"
+      "types": "./dist/governance/cloudflare-os-control-plane.d.ts",
+      "default": "./dist/governance/cloudflare-os-control-plane.js"
     },
     "./cloudflare-os-journal": {
-      "types": "./dist/cloudflare-os-journal.d.ts",
-      "default": "./dist/cloudflare-os-journal.js"
+      "types": "./dist/governance/cloudflare-os-journal.d.ts",
+      "default": "./dist/governance/cloudflare-os-journal.js"
     },
     "./cloudflare-os-shared": {
-      "types": "./dist/cloudflare-os-shared.d.ts",
-      "default": "./dist/cloudflare-os-shared.js"
+      "types": "./dist/governance/cloudflare-os-shared.d.ts",
+      "default": "./dist/governance/cloudflare-os-shared.js"
     },
     "./cloudflare-os-surface": {
-      "types": "./dist/cloudflare-os-surface.d.ts",
-      "default": "./dist/cloudflare-os-surface.js"
+      "types": "./dist/governance/cloudflare-os-surface.d.ts",
+      "default": "./dist/governance/cloudflare-os-surface.js"
     },
     "./co-session": {
-      "types": "./dist/co-session.d.ts",
-      "default": "./dist/co-session.js"
+      "types": "./dist/workforce/co-session.d.ts",
+      "default": "./dist/workforce/co-session.js"
+    },
+    "./command-harness": {
+      "types": "./dist/harnessing/command-harness.d.ts",
+      "default": "./dist/harnessing/command-harness.js"
     },
     "./command-runner": {
-      "types": "./dist/command-runner.d.ts",
-      "default": "./dist/command-runner.js"
-    },
-    "./company": {
-      "types": "./dist/company.d.ts",
-      "default": "./dist/company.js"
+      "types": "./dist/harnessing/command-runner.d.ts",
+      "default": "./dist/harnessing/command-runner.js"
     },
     "./compaction-copy-recovery": {
-      "types": "./dist/compaction-copy-recovery.d.ts",
-      "default": "./dist/compaction-copy-recovery.js"
+      "types": "./dist/storage/compaction-copy-recovery.d.ts",
+      "default": "./dist/storage/compaction-copy-recovery.js"
     },
-    "./contracts/computer-interaction-outcome": {
-      "types": "./dist/contracts/computer-interaction-outcome.d.ts",
-      "default": "./dist/contracts/computer-interaction-outcome.js"
+    "./company": {
+      "types": "./dist/organization/company.d.ts",
+      "default": "./dist/organization/company.js"
     },
     "./computer-surface": {
       "types": "./dist/virtual/computer-surface.d.ts",
       "default": "./dist/virtual/computer-surface.js"
     },
-    "./desktop-ax-bridge": {
-      "types": "./dist/desktop-ax-bridge.d.ts",
-      "default": "./dist/desktop-ax-bridge.js"
-    },
     "./config-change": {
-      "types": "./dist/config-change.d.ts",
-      "default": "./dist/config-change.js"
+      "types": "./dist/governance/config-change.d.ts",
+      "default": "./dist/governance/config-change.js"
     },
     "./config-fallback-registry": {
-      "types": "./dist/config-fallback-registry.d.ts",
-      "default": "./dist/config-fallback-registry.js"
+      "types": "./dist/governance/config-fallback-registry.d.ts",
+      "default": "./dist/governance/config-fallback-registry.js"
     },
     "./config-mission": {
-      "types": "./dist/config-mission.d.ts",
-      "default": "./dist/config-mission.js"
+      "types": "./dist/mission/config-mission.d.ts",
+      "default": "./dist/mission/config-mission.js"
     },
     "./context-security-scope": {
-      "types": "./dist/context-security-scope.d.ts",
-      "default": "./dist/context-security-scope.js"
+      "types": "./dist/governance/context-security-scope.d.ts",
+      "default": "./dist/governance/context-security-scope.js"
     },
     "./contextual-intent-frame": {
-      "types": "./dist/contextual-intent-frame.d.ts",
-      "default": "./dist/contextual-intent-frame.js"
+      "types": "./dist/intent/contextual-intent-frame.d.ts",
+      "default": "./dist/intent/contextual-intent-frame.js"
     },
     "./contracts": {
       "types": "./dist/contracts/index.d.ts",
@@ -952,6 +888,14 @@
       "types": "./dist/contracts/architecture-adf.d.ts",
       "default": "./dist/contracts/architecture-adf.js"
     },
+    "./contracts/asset-scope": {
+      "types": "./dist/contracts/asset-scope.d.ts",
+      "default": "./dist/contracts/asset-scope.js"
+    },
+    "./contracts/computer-interaction-outcome": {
+      "types": "./dist/contracts/computer-interaction-outcome.d.ts",
+      "default": "./dist/contracts/computer-interaction-outcome.js"
+    },
     "./contracts/delivery-pack": {
       "types": "./dist/contracts/delivery-pack.d.ts",
       "default": "./dist/contracts/delivery-pack.js"
@@ -963,6 +907,14 @@
     "./contracts/docx-protocol": {
       "types": "./dist/contracts/docx-protocol.d.ts",
       "default": "./dist/contracts/docx-protocol.js"
+    },
+    "./contracts/evidence": {
+      "types": "./dist/contracts/evidence.d.ts",
+      "default": "./dist/contracts/evidence.js"
+    },
+    "./contracts/execution-bounds": {
+      "types": "./dist/contracts/execution-bounds.d.ts",
+      "default": "./dist/contracts/execution-bounds.js"
     },
     "./contracts/generation-job": {
       "types": "./dist/contracts/generation-job.d.ts",
@@ -983,6 +935,10 @@
     "./contracts/index": {
       "types": "./dist/contracts/index.d.ts",
       "default": "./dist/contracts/index.js"
+    },
+    "./contracts/judge-route": {
+      "types": "./dist/contracts/judge-route.d.ts",
+      "default": "./dist/contracts/judge-route.js"
     },
     "./contracts/meeting-operations-brief": {
       "types": "./dist/contracts/meeting-operations-brief.d.ts",
@@ -1020,6 +976,18 @@
       "types": "./dist/contracts/narrated-video-upload-package.d.ts",
       "default": "./dist/contracts/narrated-video-upload-package.js"
     },
+    "./contracts/next-action-contract": {
+      "types": "./dist/contracts/next-action-contract.d.ts",
+      "default": "./dist/contracts/next-action-contract.js"
+    },
+    "./contracts/nhi-id": {
+      "types": "./dist/contracts/nhi-id.d.ts",
+      "default": "./dist/contracts/nhi-id.js"
+    },
+    "./contracts/ocr-types": {
+      "types": "./dist/contracts/ocr-types.d.ts",
+      "default": "./dist/contracts/ocr-types.js"
+    },
     "./contracts/operator-interaction-packet": {
       "types": "./dist/contracts/operator-interaction-packet.d.ts",
       "default": "./dist/contracts/operator-interaction-packet.js"
@@ -1039,6 +1007,14 @@
     "./contracts/proposal-storyline-adf": {
       "types": "./dist/contracts/proposal-storyline-adf.d.ts",
       "default": "./dist/contracts/proposal-storyline-adf.js"
+    },
+    "./contracts/rejection-reason": {
+      "types": "./dist/contracts/rejection-reason.d.ts",
+      "default": "./dist/contracts/rejection-reason.js"
+    },
+    "./contracts/shared-business-types": {
+      "types": "./dist/contracts/shared-business-types.d.ts",
+      "default": "./dist/contracts/shared-business-types.js"
     },
     "./contracts/skill-output": {
       "types": "./dist/contracts/skill-output.d.ts",
@@ -1064,6 +1040,10 @@
       "types": "./dist/contracts/web-app-profile.d.ts",
       "default": "./dist/contracts/web-app-profile.js"
     },
+    "./contracts/wire-error": {
+      "types": "./dist/contracts/wire-error.d.ts",
+      "default": "./dist/contracts/wire-error.js"
+    },
     "./contracts/wisdom-action": {
       "types": "./dist/contracts/wisdom-action.d.ts",
       "default": "./dist/contracts/wisdom-action.js"
@@ -1073,100 +1053,68 @@
       "default": "./dist/contracts/xlsx-protocol.js"
     },
     "./control-plane-client": {
-      "types": "./dist/control-plane-client.d.ts",
-      "default": "./dist/control-plane-client.js"
+      "types": "./dist/surface/control-plane-client.d.ts",
+      "default": "./dist/surface/control-plane-client.js"
     },
     "./coordinated-agent-execution-port": {
-      "types": "./dist/coordinated-agent-execution-port.d.ts",
-      "default": "./dist/coordinated-agent-execution-port.js"
+      "types": "./dist/agent/coordinated-agent-execution-port.d.ts",
+      "default": "./dist/agent/coordinated-agent-execution-port.js"
     },
     "./coordination-actuator-routing": {
-      "types": "./dist/coordination-actuator-routing.d.ts",
-      "default": "./dist/coordination-actuator-routing.js"
+      "types": "./dist/actuator/coordination-actuator-routing.d.ts",
+      "default": "./dist/actuator/coordination-actuator-routing.js"
     },
     "./core": {
       "types": "./dist/core.d.ts",
       "default": "./dist/core.js"
     },
     "./coreaudio-device-inventory": {
-      "types": "./dist/coreaudio-device-inventory.d.ts",
-      "default": "./dist/coreaudio-device-inventory.js"
+      "types": "./dist/voice/coreaudio-device-inventory.d.ts",
+      "default": "./dist/voice/coreaudio-device-inventory.js"
     },
     "./cost-report": {
-      "types": "./dist/cost-report.d.ts",
-      "default": "./dist/cost-report.js"
-    },
-    "./cowork-artifact-packet": {
-      "types": "./dist/cowork-artifact-packet.d.ts",
-      "default": "./dist/cowork-artifact-packet.js"
-    },
-    "./cowork-artifact-packet.js": {
-      "types": "./dist/cowork-artifact-packet.d.ts",
-      "default": "./dist/cowork-artifact-packet.js"
-    },
-    "./cowork-health-check": {
-      "types": "./dist/cowork-health-check.d.ts",
-      "default": "./dist/cowork-health-check.js"
-    },
-    "./cowork-health-check.js": {
-      "types": "./dist/cowork-health-check.d.ts",
-      "default": "./dist/cowork-health-check.js"
-    },
-    "./cowork-knowledge-bridge": {
-      "types": "./dist/cowork-knowledge-bridge.d.ts",
-      "default": "./dist/cowork-knowledge-bridge.js"
-    },
-    "./cowork-knowledge-bridge.js": {
-      "types": "./dist/cowork-knowledge-bridge.d.ts",
-      "default": "./dist/cowork-knowledge-bridge.js"
-    },
-    "./cowork-surface": {
-      "types": "./dist/cowork-surface.d.ts",
-      "default": "./dist/cowork-surface.js"
-    },
-    "./cowork-surface.js": {
-      "types": "./dist/cowork-surface.d.ts",
-      "default": "./dist/cowork-surface.js"
+      "types": "./dist/finance/cost-report.d.ts",
+      "default": "./dist/finance/cost-report.js"
     },
     "./creative-design-resolver": {
-      "types": "./dist/creative-design-resolver.d.ts",
-      "default": "./dist/creative-design-resolver.js"
+      "types": "./dist/design/creative-design-resolver.d.ts",
+      "default": "./dist/design/creative-design-resolver.js"
     },
     "./cron-utils": {
       "types": "./dist/pipeline/cron-utils.d.ts",
       "default": "./dist/pipeline/cron-utils.js"
     },
     "./custody-owner": {
-      "types": "./dist/custody-owner.d.ts",
-      "default": "./dist/custody-owner.js"
+      "types": "./dist/contracts/custody-owner.d.ts",
+      "default": "./dist/contracts/custody-owner.js"
     },
     "./customer-channel-binding": {
-      "types": "./dist/customer-channel-binding.d.ts",
-      "default": "./dist/customer-channel-binding.js"
+      "types": "./dist/organization/customer-channel-binding.d.ts",
+      "default": "./dist/organization/customer-channel-binding.js"
     },
     "./customer-conversation": {
-      "types": "./dist/customer-conversation.d.ts",
-      "default": "./dist/customer-conversation.js"
+      "types": "./dist/organization/customer-conversation.d.ts",
+      "default": "./dist/organization/customer-conversation.js"
     },
     "./customer-conversation-modes": {
-      "types": "./dist/customer-conversation-modes.d.ts",
-      "default": "./dist/customer-conversation-modes.js"
+      "types": "./dist/organization/customer-conversation-modes.d.ts",
+      "default": "./dist/organization/customer-conversation-modes.js"
+    },
+    "./customer-decision": {
+      "types": "./dist/customer-decision/index.d.ts",
+      "default": "./dist/customer-decision/index.js"
     },
     "./customer-decision/operator-handoff": {
       "types": "./dist/customer-decision/operator-handoff.d.ts",
       "default": "./dist/customer-decision/operator-handoff.js"
     },
     "./customer-outbound-templates": {
-      "types": "./dist/customer-outbound-templates.d.ts",
-      "default": "./dist/customer-outbound-templates.js"
-    },
-    "./stance-resolver": {
-      "types": "./dist/stance-resolver.d.ts",
-      "default": "./dist/stance-resolver.js"
+      "types": "./dist/organization/customer-outbound-templates.d.ts",
+      "default": "./dist/organization/customer-outbound-templates.js"
     },
     "./daemon-heartbeat": {
-      "types": "./dist/daemon-heartbeat.d.ts",
-      "default": "./dist/daemon-heartbeat.js"
+      "types": "./dist/daemon/daemon-heartbeat.d.ts",
+      "default": "./dist/daemon/daemon-heartbeat.js"
     },
     "./daemon/installed-units": {
       "types": "./dist/daemon/installed-units.d.ts",
@@ -1193,32 +1141,36 @@
       "default": "./dist/daemon/systemd-user.js"
     },
     "./dashboard-event-parser": {
-      "types": "./dist/dashboard-event-parser.d.ts",
-      "default": "./dist/dashboard-event-parser.js"
+      "types": "./dist/surface/dashboard-event-parser.d.ts",
+      "default": "./dist/surface/dashboard-event-parser.js"
     },
     "./data-vault": {
-      "types": "./dist/data-vault.d.ts",
-      "default": "./dist/data-vault.js"
+      "types": "./dist/storage/data-vault.d.ts",
+      "default": "./dist/storage/data-vault.js"
     },
     "./deal-documents": {
-      "types": "./dist/deal-documents.d.ts",
-      "default": "./dist/deal-documents.js"
+      "types": "./dist/organization/deal-documents.d.ts",
+      "default": "./dist/organization/deal-documents.js"
     },
     "./deal-store": {
-      "types": "./dist/deal-store.d.ts",
-      "default": "./dist/deal-store.js"
+      "types": "./dist/organization/deal-store.d.ts",
+      "default": "./dist/organization/deal-store.js"
     },
     "./decision-card": {
       "types": "./dist/governance/decision-card.d.ts",
       "default": "./dist/governance/decision-card.js"
     },
+    "./decision-ledger": {
+      "types": "./dist/decision-ledger/index.d.ts",
+      "default": "./dist/decision-ledger/index.js"
+    },
     "./decision-rights": {
-      "types": "./dist/decision-rights.d.ts",
-      "default": "./dist/decision-rights.js"
+      "types": "./dist/organization/decision-rights.d.ts",
+      "default": "./dist/organization/decision-rights.js"
     },
     "./delegated-task-observability": {
-      "types": "./dist/delegated-task-observability.d.ts",
-      "default": "./dist/delegated-task-observability.js"
+      "types": "./dist/workforce/delegated-task-observability.d.ts",
+      "default": "./dist/workforce/delegated-task-observability.js"
     },
     "./delegation-child-registry": {
       "types": "./dist/mission/delegation-child-registry.d.ts",
@@ -1237,32 +1189,32 @@
       "default": "./dist/mission/delegation-request.js"
     },
     "./deliverable-inbox": {
-      "types": "./dist/deliverable-inbox.d.ts",
-      "default": "./dist/deliverable-inbox.js"
+      "types": "./dist/task/deliverable-inbox.d.ts",
+      "default": "./dist/task/deliverable-inbox.js"
     },
     "./dependency-vulnerability-ledger": {
-      "types": "./dist/dependency-vulnerability-ledger.d.ts",
-      "default": "./dist/dependency-vulnerability-ledger.js"
+      "types": "./dist/governance/dependency-vulnerability-ledger.d.ts",
+      "default": "./dist/governance/dependency-vulnerability-ledger.js"
     },
     "./deployment-adapter": {
       "types": "./dist/actuator/deployment-adapter.d.ts",
       "default": "./dist/actuator/deployment-adapter.js"
     },
     "./design-fonts": {
-      "types": "./dist/design-fonts.d.ts",
-      "default": "./dist/design-fonts.js"
+      "types": "./dist/design/design-fonts.d.ts",
+      "default": "./dist/design/design-fonts.js"
     },
     "./design-foundation": {
-      "types": "./dist/design-foundation.d.ts",
-      "default": "./dist/design-foundation.js"
+      "types": "./dist/design/design-foundation.d.ts",
+      "default": "./dist/design/design-foundation.js"
     },
     "./design-foundation-ui": {
-      "types": "./dist/design-foundation-ui.d.ts",
-      "default": "./dist/design-foundation-ui.js"
+      "types": "./dist/design/design-foundation-ui.d.ts",
+      "default": "./dist/design/design-foundation-ui.js"
     },
     "./design-qa": {
-      "types": "./dist/design-qa.d.ts",
-      "default": "./dist/design-qa.js"
+      "types": "./dist/design/design-qa.d.ts",
+      "default": "./dist/design/design-qa.js"
     },
     "./desktop-event-feed": {
       "types": "./dist/virtual/desktop-event-feed.d.ts",
@@ -1293,12 +1245,8 @@
       "default": "./dist/virtual/desktop-recording-compiler.js"
     },
     "./direct-entry": {
-      "types": "./dist/direct-entry.d.ts",
-      "default": "./dist/direct-entry.js"
-    },
-    "./dirty-tile-describer": {
-      "types": "./dist/dirty-tile-describer.d.ts",
-      "default": "./dist/dirty-tile-describer.js"
+      "types": "./dist/harnessing/direct-entry.d.ts",
+      "default": "./dist/harnessing/direct-entry.js"
     },
     "./discussion": {
       "types": "./dist/discussion/index.d.ts",
@@ -1315,6 +1263,10 @@
     "./discussion/discussion-copy": {
       "types": "./dist/discussion/discussion-copy.d.ts",
       "default": "./dist/discussion/discussion-copy.js"
+    },
+    "./discussion/discussion-create-request": {
+      "types": "./dist/discussion/discussion-create-request.d.ts",
+      "default": "./dist/discussion/discussion-create-request.js"
     },
     "./discussion/discussion-dialogue-actions": {
       "types": "./dist/discussion/discussion-dialogue-actions.d.ts",
@@ -1381,8 +1333,8 @@
       "default": "./dist/media/document-reader.js"
     },
     "./documentation-source-map": {
-      "types": "./dist/documentation-source-map.d.ts",
-      "default": "./dist/documentation-source-map.js"
+      "types": "./dist/harnessing/documentation-source-map.d.ts",
+      "default": "./dist/harnessing/documentation-source-map.js"
     },
     "./dot/dot-action-ledger": {
       "types": "./dist/dot/dot-action-ledger.d.ts",
@@ -1436,13 +1388,13 @@
       "types": "./dist/dot/dot-extensions.d.ts",
       "default": "./dist/dot/dot-extensions.js"
     },
-    "./dot/dot-feedback": {
-      "types": "./dist/dot/dot-feedback.d.ts",
-      "default": "./dist/dot/dot-feedback.js"
-    },
     "./dot/dot-feed-source": {
       "types": "./dist/dot/dot-feed-source.d.ts",
       "default": "./dist/dot/dot-feed-source.js"
+    },
+    "./dot/dot-feedback": {
+      "types": "./dist/dot/dot-feedback.d.ts",
+      "default": "./dist/dot/dot-feedback.js"
     },
     "./dot/dot-followups": {
       "types": "./dist/dot/dot-followups.d.ts",
@@ -1497,8 +1449,8 @@
       "default": "./dist/dot/dot-wake-orchestration.js"
     },
     "./egress-policy": {
-      "types": "./dist/egress-policy.d.ts",
-      "default": "./dist/egress-policy.js"
+      "types": "./dist/governance/egress-policy.d.ts",
+      "default": "./dist/governance/egress-policy.js"
     },
     "./email-account-catalog": {
       "types": "./dist/integrations/email-account-catalog.d.ts",
@@ -1517,12 +1469,16 @@
       "default": "./dist/integrations/email-workflow.js"
     },
     "./embedding-backend": {
-      "types": "./dist/embedding-backend.d.ts",
-      "default": "./dist/embedding-backend.js"
+      "types": "./dist/reasoning/embedding-backend.d.ts",
+      "default": "./dist/reasoning/embedding-backend.js"
     },
     "./embedding-bootstrap": {
-      "types": "./dist/embedding-bootstrap.d.ts",
-      "default": "./dist/embedding-bootstrap.js"
+      "types": "./dist/reasoning/embedding-bootstrap.d.ts",
+      "default": "./dist/reasoning/embedding-bootstrap.js"
+    },
+    "./engine-runtime-preferences": {
+      "types": "./dist/voice/engine-runtime-preferences.d.ts",
+      "default": "./dist/voice/engine-runtime-preferences.js"
     },
     "./entity-scope": {
       "types": "./dist/entity-scope.d.ts",
@@ -1533,32 +1489,28 @@
       "default": "./dist/entry-ledger.js"
     },
     "./env-validator": {
-      "types": "./dist/env-validator.d.ts",
-      "default": "./dist/env-validator.js"
+      "types": "./dist/harnessing/env-validator.d.ts",
+      "default": "./dist/harnessing/env-validator.js"
     },
     "./environment-capability": {
-      "types": "./dist/environment-capability.d.ts",
-      "default": "./dist/environment-capability.js"
+      "types": "./dist/daemon/environment-capability.d.ts",
+      "default": "./dist/daemon/environment-capability.js"
     },
     "./environment-capability-probes": {
-      "types": "./dist/environment-capability-probes.d.ts",
-      "default": "./dist/environment-capability-probes.js"
+      "types": "./dist/daemon/environment-capability-probes.d.ts",
+      "default": "./dist/daemon/environment-capability-probes.js"
     },
     "./error-classifier": {
-      "types": "./dist/error-classifier.d.ts",
-      "default": "./dist/error-classifier.js"
+      "types": "./dist/analysis/error-classifier.d.ts",
+      "default": "./dist/analysis/error-classifier.js"
     },
     "./error-classifier-judgment": {
-      "types": "./dist/error-classifier-judgment.d.ts",
-      "default": "./dist/error-classifier-judgment.js"
-    },
-    "./contracts/evidence": {
-      "types": "./dist/contracts/evidence.d.ts",
-      "default": "./dist/contracts/evidence.js"
+      "types": "./dist/reasoning/error-classifier-judgment.d.ts",
+      "default": "./dist/reasoning/error-classifier-judgment.js"
     },
     "./event-scope": {
-      "types": "./dist/event-scope.d.ts",
-      "default": "./dist/event-scope.js"
+      "types": "./dist/event/event-scope.d.ts",
+      "default": "./dist/event/event-scope.js"
     },
     "./event/event-bus": {
       "types": "./dist/event/event-bus.d.ts",
@@ -1572,41 +1524,49 @@
       "types": "./dist/event/memory-event-bus.d.ts",
       "default": "./dist/event/memory-event-bus.js"
     },
-    "./contracts/execution-bounds": {
-      "types": "./dist/contracts/execution-bounds.d.ts",
-      "default": "./dist/contracts/execution-bounds.js"
-    },
     "./execution-feedback": {
-      "types": "./dist/execution-feedback.d.ts",
-      "default": "./dist/execution-feedback.js"
+      "types": "./dist/knowledge/execution-feedback.d.ts",
+      "default": "./dist/knowledge/execution-feedback.js"
     },
     "./external-hook-discovery": {
-      "types": "./dist/external-hook-discovery.d.ts",
-      "default": "./dist/external-hook-discovery.js"
+      "types": "./dist/harnessing/external-hook-discovery.d.ts",
+      "default": "./dist/harnessing/external-hook-discovery.js"
     },
     "./facet-registry": {
-      "types": "./dist/facet-registry.d.ts",
-      "default": "./dist/facet-registry.js"
+      "types": "./dist/plugin/facet-registry.d.ts",
+      "default": "./dist/plugin/facet-registry.js"
+    },
+    "./failure-tracker": {
+      "types": "./dist/foundation/failure-tracker.d.ts",
+      "default": "./dist/foundation/failure-tracker.js"
     },
     "./finance-controller": {
-      "types": "./dist/finance-controller.d.ts",
-      "default": "./dist/finance-controller.js"
+      "types": "./dist/finance/finance-controller.d.ts",
+      "default": "./dist/finance/finance-controller.js"
     },
     "./format": {
-      "types": "./dist/format.d.ts",
-      "default": "./dist/format.js"
+      "types": "./dist/localization/format.d.ts",
+      "default": "./dist/localization/format.js"
+    },
+    "./foundation": {
+      "types": "./dist/foundation/index.d.ts",
+      "default": "./dist/foundation/index.js"
     },
     "./foundation/approval-domains": {
       "types": "./dist/foundation/approval-domains.d.ts",
       "default": "./dist/foundation/approval-domains.js"
     },
-    "./foundation/authorization-registry": {
-      "types": "./dist/foundation/authorization-registry.d.ts",
-      "default": "./dist/foundation/authorization-registry.js"
+    "./foundation/asset-address": {
+      "types": "./dist/foundation/asset-address.d.ts",
+      "default": "./dist/foundation/asset-address.js"
     },
     "./foundation/authorization-policy-document": {
       "types": "./dist/foundation/authorization-policy-document.d.ts",
       "default": "./dist/foundation/authorization-policy-document.js"
+    },
+    "./foundation/authorization-registry": {
+      "types": "./dist/foundation/authorization-registry.d.ts",
+      "default": "./dist/foundation/authorization-registry.js"
     },
     "./foundation/command-credential-policy": {
       "types": "./dist/foundation/command-credential-policy.d.ts",
@@ -1616,10 +1576,6 @@
       "types": "./dist/foundation/credential-binding.d.ts",
       "default": "./dist/foundation/credential-binding.js"
     },
-    "./foundation": {
-      "types": "./dist/foundation/index.d.ts",
-      "default": "./dist/foundation/index.js"
-    },
     "./foundation/env": {
       "types": "./dist/foundation/env.d.ts",
       "default": "./dist/foundation/env.js"
@@ -1627,6 +1583,10 @@
     "./foundation/governed-catalog": {
       "types": "./dist/foundation/governed-catalog.d.ts",
       "default": "./dist/foundation/governed-catalog.js"
+    },
+    "./foundation/html-sanitize": {
+      "types": "./dist/foundation/html-sanitize.d.ts",
+      "default": "./dist/foundation/html-sanitize.js"
     },
     "./foundation/inflight-limit": {
       "types": "./dist/foundation/inflight-limit.d.ts",
@@ -1640,17 +1600,49 @@
       "types": "./dist/foundation/json.d.ts",
       "default": "./dist/foundation/json.js"
     },
+    "./foundation/json-state": {
+      "types": "./dist/foundation/json-state.d.ts",
+      "default": "./dist/foundation/json-state.js"
+    },
+    "./foundation/knowledge-tier": {
+      "types": "./dist/foundation/knowledge-tier.d.ts",
+      "default": "./dist/foundation/knowledge-tier.js"
+    },
+    "./foundation/locale-normalize": {
+      "types": "./dist/foundation/locale-normalize.d.ts",
+      "default": "./dist/foundation/locale-normalize.js"
+    },
     "./foundation/lock-utils": {
       "types": "./dist/foundation/lock-utils.d.ts",
       "default": "./dist/foundation/lock-utils.js"
+    },
+    "./foundation/message-format": {
+      "types": "./dist/foundation/message-format.d.ts",
+      "default": "./dist/foundation/message-format.js"
+    },
+    "./foundation/pcm-wav": {
+      "types": "./dist/foundation/pcm-wav.d.ts",
+      "default": "./dist/foundation/pcm-wav.js"
     },
     "./foundation/primitives": {
       "types": "./dist/foundation/primitives.d.ts",
       "default": "./dist/foundation/primitives.js"
     },
+    "./foundation/project-scope-env": {
+      "types": "./dist/foundation/project-scope-env.d.ts",
+      "default": "./dist/foundation/project-scope-env.js"
+    },
+    "./foundation/rate-limit": {
+      "types": "./dist/foundation/rate-limit.d.ts",
+      "default": "./dist/foundation/rate-limit.js"
+    },
     "./foundation/resource-access-scope": {
       "types": "./dist/foundation/resource-access-scope.d.ts",
       "default": "./dist/foundation/resource-access-scope.js"
+    },
+    "./foundation/runtime-state-roots": {
+      "types": "./dist/foundation/runtime-state-roots.d.ts",
+      "default": "./dist/foundation/runtime-state-roots.js"
     },
     "./foundation/safe-json": {
       "types": "./dist/foundation/safe-json.d.ts",
@@ -1660,37 +1652,49 @@
       "types": "./dist/foundation/scope.d.ts",
       "default": "./dist/foundation/scope.js"
     },
+    "./foundation/scope-context-validation": {
+      "types": "./dist/foundation/scope-context-validation.d.ts",
+      "default": "./dist/foundation/scope-context-validation.js"
+    },
     "./foundation/scope-resolution-mode": {
       "types": "./dist/foundation/scope-resolution-mode.d.ts",
       "default": "./dist/foundation/scope-resolution-mode.js"
     },
+    "./foundation/secret-resolution-session": {
+      "types": "./dist/foundation/secret-resolution-session.d.ts",
+      "default": "./dist/foundation/secret-resolution-session.js"
+    },
     "./foundation/text": {
       "types": "./dist/foundation/text.d.ts",
       "default": "./dist/foundation/text.js"
+    },
+    "./foundation/text-escaping": {
+      "types": "./dist/foundation/text-escaping.d.ts",
+      "default": "./dist/foundation/text-escaping.js"
     },
     "./foundation/time": {
       "types": "./dist/foundation/time.d.ts",
       "default": "./dist/foundation/time.js"
     },
     "./frame-redaction": {
-      "types": "./dist/frame-redaction.d.ts",
-      "default": "./dist/frame-redaction.js"
+      "types": "./dist/virtual/frame-redaction.d.ts",
+      "default": "./dist/virtual/frame-redaction.js"
     },
     "./front-desk-identity": {
-      "types": "./dist/front-desk-identity.d.ts",
-      "default": "./dist/front-desk-identity.js"
+      "types": "./dist/surface/front-desk-identity.d.ts",
+      "default": "./dist/surface/front-desk-identity.js"
     },
     "./front-desk-nav": {
-      "types": "./dist/front-desk-nav.d.ts",
-      "default": "./dist/front-desk-nav.js"
+      "types": "./dist/surface/front-desk-nav.d.ts",
+      "default": "./dist/surface/front-desk-nav.js"
     },
     "./front-desk-roles": {
-      "types": "./dist/front-desk-roles.d.ts",
-      "default": "./dist/front-desk-roles.js"
+      "types": "./dist/surface/front-desk-roles.d.ts",
+      "default": "./dist/surface/front-desk-roles.js"
     },
     "./frontmatter-exclusions": {
-      "types": "./dist/frontmatter-exclusions.d.ts",
-      "default": "./dist/frontmatter-exclusions.js"
+      "types": "./dist/knowledge/frontmatter-exclusions.d.ts",
+      "default": "./dist/knowledge/frontmatter-exclusions.js"
     },
     "./fs-primitives": {
       "types": "./dist/fs-primitives.d.ts",
@@ -1701,24 +1705,24 @@
       "default": "./dist/fs-primitives.js"
     },
     "./fs-utils": {
-      "types": "./dist/fs-utils.d.ts",
-      "default": "./dist/fs-utils.js"
+      "types": "./dist/storage/fs-utils.d.ts",
+      "default": "./dist/storage/fs-utils.js"
     },
     "./generation-cost-settlement": {
-      "types": "./dist/generation-cost-settlement.d.ts",
-      "default": "./dist/generation-cost-settlement.js"
+      "types": "./dist/finance/generation-cost-settlement.d.ts",
+      "default": "./dist/finance/generation-cost-settlement.js"
     },
     "./generation-quota": {
-      "types": "./dist/generation-quota.d.ts",
-      "default": "./dist/generation-quota.js"
+      "types": "./dist/finance/generation-quota.d.ts",
+      "default": "./dist/finance/generation-quota.js"
     },
     "./generation-scheduler": {
-      "types": "./dist/generation-scheduler.d.ts",
-      "default": "./dist/generation-scheduler.js"
+      "types": "./dist/daemon/generation-scheduler.d.ts",
+      "default": "./dist/daemon/generation-scheduler.js"
     },
     "./golden-output": {
-      "types": "./dist/golden-output.d.ts",
-      "default": "./dist/golden-output.js"
+      "types": "./dist/harnessing/golden-output.d.ts",
+      "default": "./dist/harnessing/golden-output.js"
     },
     "./governance": {
       "types": "./dist/governance.d.ts",
@@ -1740,22 +1744,6 @@
       "types": "./dist/governance/accountability-charter-registry.d.ts",
       "default": "./dist/governance/accountability-charter-registry.js"
     },
-    "./governance/charter-payment-settlement": {
-      "types": "./dist/governance/charter-payment-settlement.d.ts",
-      "default": "./dist/governance/charter-payment-settlement.js"
-    },
-    "./governance/delegated-execution": {
-      "types": "./dist/governance/delegated-execution.d.ts",
-      "default": "./dist/governance/delegated-execution.js"
-    },
-    "./scope-envelope": {
-      "types": "./dist/scope-envelope.d.ts",
-      "default": "./dist/scope-envelope.js"
-    },
-    "./governance/human-execution": {
-      "types": "./dist/governance/human-execution.d.ts",
-      "default": "./dist/governance/human-execution.js"
-    },
     "./governance/accountability-digest": {
       "types": "./dist/governance/accountability-digest.d.ts",
       "default": "./dist/governance/accountability-digest.js"
@@ -1763,6 +1751,10 @@
     "./governance/accountability-report": {
       "types": "./dist/governance/accountability-report.d.ts",
       "default": "./dist/governance/accountability-report.js"
+    },
+    "./governance/adapter-effect-proxy": {
+      "types": "./dist/governance/adapter-effect-proxy.d.ts",
+      "default": "./dist/governance/adapter-effect-proxy.js"
     },
     "./governance/approval-audit": {
       "types": "./dist/governance/approval-audit.d.ts",
@@ -1788,30 +1780,6 @@
       "types": "./dist/governance/approval-gate.d.ts",
       "default": "./dist/governance/approval-gate.js"
     },
-    "./governance/external-operation-occurrence": {
-      "types": "./dist/governance/external-operation-occurrence.d.ts",
-      "default": "./dist/governance/external-operation-occurrence.js"
-    },
-    "./governance/external-operation-runtime": {
-      "types": "./dist/governance/external-operation-runtime.d.ts",
-      "default": "./dist/governance/external-operation-runtime.js"
-    },
-    "./governance/external-operation-store": {
-      "types": "./dist/governance/external-operation-store.d.ts",
-      "default": "./dist/governance/external-operation-store.js"
-    },
-    "./governance/external-operation-target": {
-      "types": "./dist/governance/external-operation-target.d.ts",
-      "default": "./dist/governance/external-operation-target.js"
-    },
-    "./governance/adapter-effect-proxy": {
-      "types": "./dist/governance/adapter-effect-proxy.d.ts",
-      "default": "./dist/governance/adapter-effect-proxy.js"
-    },
-    "./governance/external-operation": {
-      "types": "./dist/governance/external-operation.d.ts",
-      "default": "./dist/governance/external-operation.js"
-    },
     "./governance/approval-gate-summary": {
       "types": "./dist/governance/approval-gate-summary.d.ts",
       "default": "./dist/governance/approval-gate-summary.js"
@@ -1832,10 +1800,6 @@
       "types": "./dist/governance/approval-presentation.d.ts",
       "default": "./dist/governance/approval-presentation.js"
     },
-    "./governance/approval-separation-of-duties": {
-      "types": "./dist/governance/approval-separation-of-duties.d.ts",
-      "default": "./dist/governance/approval-separation-of-duties.js"
-    },
     "./governance/approval-requester": {
       "types": "./dist/governance/approval-requester.d.ts",
       "default": "./dist/governance/approval-requester.js"
@@ -1843,6 +1807,10 @@
     "./governance/approval-revocation": {
       "types": "./dist/governance/approval-revocation.d.ts",
       "default": "./dist/governance/approval-revocation.js"
+    },
+    "./governance/approval-separation-of-duties": {
+      "types": "./dist/governance/approval-separation-of-duties.d.ts",
+      "default": "./dist/governance/approval-separation-of-duties.js"
     },
     "./governance/approval-store": {
       "types": "./dist/governance/approval-store.d.ts",
@@ -1856,13 +1824,17 @@
       "types": "./dist/governance/approval-store-paths.d.ts",
       "default": "./dist/governance/approval-store-paths.js"
     },
-    "./governance/work-effect-release-request": {
-      "types": "./dist/governance/work-effect-release-request.d.ts",
-      "default": "./dist/governance/work-effect-release-request.js"
+    "./governance/approval-store-reader": {
+      "types": "./dist/governance/approval-store-reader.d.ts",
+      "default": "./dist/governance/approval-store-reader.js"
     },
     "./governance/approval-veto-window": {
       "types": "./dist/governance/approval-veto-window.d.ts",
       "default": "./dist/governance/approval-veto-window.js"
+    },
+    "./governance/asset-scope-inspection": {
+      "types": "./dist/governance/asset-scope-inspection.d.ts",
+      "default": "./dist/governance/asset-scope-inspection.js"
     },
     "./governance/audit-chain": {
       "types": "./dist/governance/audit-chain.d.ts",
@@ -1871,6 +1843,14 @@
     "./governance/audit-forwarder": {
       "types": "./dist/governance/audit-forwarder.d.ts",
       "default": "./dist/governance/audit-forwarder.js"
+    },
+    "./governance/authenticated-personal-approvals": {
+      "types": "./dist/governance/authenticated-personal-approvals.d.ts",
+      "default": "./dist/governance/authenticated-personal-approvals.js"
+    },
+    "./governance/authorization-overlay": {
+      "types": "./dist/governance/authorization-overlay.d.ts",
+      "default": "./dist/governance/authorization-overlay.js"
     },
     "./governance/autonomous-ops-gate": {
       "types": "./dist/governance/autonomous-ops-gate.d.ts",
@@ -1888,6 +1868,10 @@
       "types": "./dist/governance/charter-decision-vocabulary.d.ts",
       "default": "./dist/governance/charter-decision-vocabulary.js"
     },
+    "./governance/charter-payment-settlement": {
+      "types": "./dist/governance/charter-payment-settlement.d.ts",
+      "default": "./dist/governance/charter-payment-settlement.js"
+    },
     "./governance/charter-proposal": {
       "types": "./dist/governance/charter-proposal.d.ts",
       "default": "./dist/governance/charter-proposal.js"
@@ -1903,6 +1887,30 @@
     "./governance/decision-card": {
       "types": "./dist/governance/decision-card.d.ts",
       "default": "./dist/governance/decision-card.js"
+    },
+    "./governance/delegated-execution": {
+      "types": "./dist/governance/delegated-execution.d.ts",
+      "default": "./dist/governance/delegated-execution.js"
+    },
+    "./governance/external-operation": {
+      "types": "./dist/governance/external-operation.d.ts",
+      "default": "./dist/governance/external-operation.js"
+    },
+    "./governance/external-operation-occurrence": {
+      "types": "./dist/governance/external-operation-occurrence.d.ts",
+      "default": "./dist/governance/external-operation-occurrence.js"
+    },
+    "./governance/external-operation-runtime": {
+      "types": "./dist/governance/external-operation-runtime.d.ts",
+      "default": "./dist/governance/external-operation-runtime.js"
+    },
+    "./governance/external-operation-store": {
+      "types": "./dist/governance/external-operation-store.d.ts",
+      "default": "./dist/governance/external-operation-store.js"
+    },
+    "./governance/external-operation-target": {
+      "types": "./dist/governance/external-operation-target.d.ts",
+      "default": "./dist/governance/external-operation-target.js"
     },
     "./governance/governance-action-recorder": {
       "types": "./dist/governance/governance-action-recorder.d.ts",
@@ -1928,6 +1936,10 @@
       "types": "./dist/governance/grant-store.d.ts",
       "default": "./dist/governance/grant-store.js"
     },
+    "./governance/human-execution": {
+      "types": "./dist/governance/human-execution.d.ts",
+      "default": "./dist/governance/human-execution.js"
+    },
     "./governance/kill-switch": {
       "types": "./dist/governance/kill-switch.d.ts",
       "default": "./dist/governance/kill-switch.js"
@@ -1936,17 +1948,13 @@
       "types": "./dist/governance/mandate-shadow.d.ts",
       "default": "./dist/governance/mandate-shadow.js"
     },
-    "./governance/authorization-overlay": {
-      "types": "./dist/governance/authorization-overlay.d.ts",
-      "default": "./dist/governance/authorization-overlay.js"
+    "./governance/operation-protection": {
+      "types": "./dist/governance/operation-protection.d.ts",
+      "default": "./dist/governance/operation-protection.js"
     },
     "./governance/operations-halt": {
       "types": "./dist/governance/operations-halt.d.ts",
       "default": "./dist/governance/operations-halt.js"
-    },
-    "./governance/operation-protection": {
-      "types": "./dist/governance/operation-protection.d.ts",
-      "default": "./dist/governance/operation-protection.js"
     },
     "./governance/org-budget-governor": {
       "types": "./dist/governance/org-budget-governor.d.ts",
@@ -1964,13 +1972,17 @@
       "types": "./dist/governance/pr-shadow.d.ts",
       "default": "./dist/governance/pr-shadow.js"
     },
+    "./governance/work-effect-release-request": {
+      "types": "./dist/governance/work-effect-release-request.d.ts",
+      "default": "./dist/governance/work-effect-release-request.js"
+    },
     "./graph-run-artifact": {
-      "types": "./dist/graph-run-artifact.d.ts",
-      "default": "./dist/graph-run-artifact.js"
+      "types": "./dist/pipeline/graph-run-artifact.d.ts",
+      "default": "./dist/pipeline/graph-run-artifact.js"
     },
     "./graph-scheduler": {
-      "types": "./dist/graph-scheduler.d.ts",
-      "default": "./dist/graph-scheduler.js"
+      "types": "./dist/pipeline/graph-scheduler.d.ts",
+      "default": "./dist/pipeline/graph-scheduler.js"
     },
     "./handoff-history": {
       "types": "./dist/mesh/handoff-history.d.ts",
@@ -2021,36 +2033,32 @@
       "import": "./dist/harnessing/surface-spec.js"
     },
     "./headless-surface-contract": {
-      "types": "./dist/headless-surface-contract.d.ts",
-      "default": "./dist/headless-surface-contract.js"
+      "types": "./dist/surface/headless-surface-contract.d.ts",
+      "default": "./dist/surface/headless-surface-contract.js"
     },
     "./health-degradation": {
-      "types": "./dist/health-degradation.d.ts",
-      "default": "./dist/health-degradation.js"
+      "types": "./dist/daemon/health-degradation.d.ts",
+      "default": "./dist/daemon/health-degradation.js"
     },
     "./hearing-scenario-catalog": {
-      "types": "./dist/hearing-scenario-catalog.d.ts",
-      "default": "./dist/hearing-scenario-catalog.js"
+      "types": "./dist/surface/hearing-scenario-catalog.d.ts",
+      "default": "./dist/surface/hearing-scenario-catalog.js"
     },
     "./history-search-index": {
-      "types": "./dist/history-search-index.d.ts",
-      "default": "./dist/history-search-index.js"
-    },
-    "./foundation/html-sanitize": {
-      "types": "./dist/foundation/html-sanitize.d.ts",
-      "default": "./dist/foundation/html-sanitize.js"
+      "types": "./dist/search/history-search-index.d.ts",
+      "default": "./dist/search/history-search-index.js"
     },
     "./html-to-markdown": {
-      "types": "./dist/html-to-markdown.d.ts",
-      "default": "./dist/html-to-markdown.js"
+      "types": "./dist/media/html-to-markdown.d.ts",
+      "default": "./dist/media/html-to-markdown.js"
     },
     "./i18n-coverage-history": {
-      "types": "./dist/i18n-coverage-history.d.ts",
-      "default": "./dist/i18n-coverage-history.js"
+      "types": "./dist/localization/i18n-coverage-history.d.ts",
+      "default": "./dist/localization/i18n-coverage-history.js"
     },
     "./i18n-hardcoding-baseline": {
-      "types": "./dist/i18n-hardcoding-baseline.d.ts",
-      "default": "./dist/i18n-hardcoding-baseline.js"
+      "types": "./dist/localization/i18n-hardcoding-baseline.d.ts",
+      "default": "./dist/localization/i18n-hardcoding-baseline.js"
     },
     "./identity-context-bridge": {
       "types": "./dist/identity-context-bridge.d.ts",
@@ -2065,44 +2073,72 @@
       "default": "./dist/media/image-dhash.js"
     },
     "./imessage-bridge": {
-      "types": "./dist/imessage-bridge.d.ts",
-      "default": "./dist/imessage-bridge.js"
+      "types": "./dist/integrations/imessage-bridge.d.ts",
+      "default": "./dist/integrations/imessage-bridge.js"
     },
     "./imessage-utils": {
-      "types": "./dist/imessage-utils.d.ts",
-      "default": "./dist/imessage-utils.js"
+      "types": "./dist/integrations/imessage-utils.d.ts",
+      "default": "./dist/integrations/imessage-utils.js"
     },
     "./in-room-meeting-driver": {
-      "types": "./dist/in-room-meeting-driver.d.ts",
-      "default": "./dist/in-room-meeting-driver.js"
+      "types": "./dist/meeting/in-room-meeting-driver.d.ts",
+      "default": "./dist/meeting/in-room-meeting-driver.js"
     },
     "./in-room-minutes-recorder": {
-      "types": "./dist/in-room-minutes-recorder.d.ts",
-      "default": "./dist/in-room-minutes-recorder.js"
+      "types": "./dist/meeting/in-room-minutes-recorder.d.ts",
+      "default": "./dist/meeting/in-room-minutes-recorder.js"
     },
     "./index": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./information-assets/access": {
+      "types": "./dist/information-assets/access.d.ts",
+      "default": "./dist/information-assets/access.js"
+    },
+    "./information-assets/catalog": {
+      "types": "./dist/information-assets/catalog.d.ts",
+      "default": "./dist/information-assets/catalog.js"
+    },
+    "./information-assets/collector": {
+      "types": "./dist/information-assets/collector.d.ts",
+      "default": "./dist/information-assets/collector.js"
+    },
+    "./information-assets/collector-capture": {
+      "types": "./dist/information-assets/collector-capture.d.ts",
+      "default": "./dist/information-assets/collector-capture.js"
+    },
+    "./information-assets/completion": {
+      "types": "./dist/information-assets/completion.d.ts",
+      "default": "./dist/information-assets/completion.js"
+    },
+    "./information-assets/provider": {
+      "types": "./dist/information-assets/provider.d.ts",
+      "default": "./dist/information-assets/provider.js"
+    },
+    "./information-assets/recipes": {
+      "types": "./dist/information-assets/recipes.d.ts",
+      "default": "./dist/information-assets/recipes.js"
+    },
+    "./information-assets/types": {
+      "types": "./dist/information-assets/types.d.ts",
+      "default": "./dist/information-assets/types.js"
+    },
+    "./information-assets/work": {
+      "types": "./dist/information-assets/work.d.ts",
+      "default": "./dist/information-assets/work.js"
+    },
+    "./information-assets/work-types": {
+      "types": "./dist/information-assets/work-types.d.ts",
+      "default": "./dist/information-assets/work-types.js"
+    },
     "./ingest-asset-ledger": {
-      "types": "./dist/ingest-asset-ledger.d.ts",
-      "default": "./dist/ingest-asset-ledger.js"
-    },
-    "./ingest-quota": {
-      "types": "./dist/ingest-quota.d.ts",
-      "default": "./dist/ingest-quota.js"
-    },
-    "./ingest-sync-cursors": {
-      "types": "./dist/ingest-sync-cursors.d.ts",
-      "default": "./dist/ingest-sync-cursors.js"
+      "types": "./dist/information-assets/ingest-asset-ledger.d.ts",
+      "default": "./dist/information-assets/ingest-asset-ledger.js"
     },
     "./ingest-tier-gate": {
-      "types": "./dist/ingest-tier-gate.d.ts",
-      "default": "./dist/ingest-tier-gate.js"
-    },
-    "./intake-vectors": {
-      "types": "./dist/intake-vectors.d.ts",
-      "default": "./dist/intake-vectors.js"
+      "types": "./dist/knowledge/ingest-tier-gate.d.ts",
+      "default": "./dist/knowledge/ingest-tier-gate.js"
     },
     "./ingress/providers/tailscale-funnel": {
       "types": "./dist/ingress/providers/tailscale-funnel.d.ts",
@@ -2292,6 +2328,10 @@
       "types": "./dist/intent/intent-path-utils.d.ts",
       "default": "./dist/intent/intent-path-utils.js"
     },
+    "./intent/intent-phrase-lexicon": {
+      "types": "./dist/intent/intent-phrase-lexicon.d.ts",
+      "default": "./dist/intent/intent-phrase-lexicon.js"
+    },
     "./intent/intent-reconciliation": {
       "types": "./dist/intent/intent-reconciliation.d.ts",
       "default": "./dist/intent/intent-reconciliation.js"
@@ -2325,24 +2365,20 @@
       "default": "./dist/intent/intent-use-case-scenario.js"
     },
     "./invariants": {
-      "types": "./dist/invariants.d.ts",
-      "default": "./dist/invariants.js"
+      "types": "./dist/foundation/invariants.d.ts",
+      "default": "./dist/foundation/invariants.js"
     },
     "./job-lifecycle": {
-      "types": "./dist/job-lifecycle.d.ts",
-      "default": "./dist/job-lifecycle.js"
+      "types": "./dist/tool/job-lifecycle.d.ts",
+      "default": "./dist/tool/job-lifecycle.js"
     },
     "./json-repair": {
-      "types": "./dist/json-repair.d.ts",
-      "default": "./dist/json-repair.js"
+      "types": "./dist/foundation/json-repair.d.ts",
+      "default": "./dist/foundation/json-repair.js"
     },
     "./jsonl-read": {
-      "types": "./dist/jsonl-read.d.ts",
-      "default": "./dist/jsonl-read.js"
-    },
-    "./contracts/judge-route": {
-      "types": "./dist/contracts/judge-route.d.ts",
-      "default": "./dist/contracts/judge-route.js"
+      "types": "./dist/storage/jsonl-read.d.ts",
+      "default": "./dist/storage/jsonl-read.js"
     },
     "./judgment-assist": {
       "types": "./dist/reasoning/judgment-assist.d.ts",
@@ -2365,8 +2401,8 @@
       "default": "./dist/reasoning/judgment-provider-bootstrap.js"
     },
     "./key-result-spec": {
-      "types": "./dist/key-result-spec.d.ts",
-      "default": "./dist/key-result-spec.js"
+      "types": "./dist/organization/key-result-spec.d.ts",
+      "default": "./dist/organization/key-result-spec.js"
     },
     "./kill-switch": {
       "types": "./dist/governance/kill-switch.d.ts",
@@ -2377,8 +2413,8 @@
       "default": "./dist/knowledge/index.js"
     },
     "./knowledge-index": {
-      "types": "./dist/knowledge-index.d.ts",
-      "default": "./dist/knowledge-index.js"
+      "types": "./dist/knowledge/knowledge-index.d.ts",
+      "default": "./dist/knowledge/knowledge-index.js"
     },
     "./knowledge-index-cache": {
       "types": "./dist/knowledge/knowledge-index-cache.d.ts",
@@ -2432,6 +2468,10 @@
       "types": "./dist/knowledge/golden-scenario-maintenance.d.ts",
       "default": "./dist/knowledge/golden-scenario-maintenance.js"
     },
+    "./knowledge/golden-scenario-verdict": {
+      "types": "./dist/knowledge/golden-scenario-verdict.d.ts",
+      "default": "./dist/knowledge/golden-scenario-verdict.js"
+    },
     "./knowledge/knowledge-adapter": {
       "types": "./dist/knowledge/knowledge-adapter.d.ts",
       "default": "./dist/knowledge/knowledge-adapter.js"
@@ -2472,6 +2512,10 @@
       "types": "./dist/knowledge/knowledge-relevance-judgment.d.ts",
       "default": "./dist/knowledge/knowledge-relevance-judgment.js"
     },
+    "./knowledge/knowledge-reuse-contract": {
+      "types": "./dist/knowledge/knowledge-reuse-contract.d.ts",
+      "default": "./dist/knowledge/knowledge-reuse-contract.js"
+    },
     "./knowledge/knowledge-scope": {
       "types": "./dist/knowledge/knowledge-scope.d.ts",
       "default": "./dist/knowledge/knowledge-scope.js"
@@ -2495,6 +2539,10 @@
     "./knowledge/knowledge-usage-aggregate": {
       "types": "./dist/knowledge/knowledge-usage-aggregate.d.ts",
       "default": "./dist/knowledge/knowledge-usage-aggregate.js"
+    },
+    "./knowledge/knowledge-verification": {
+      "types": "./dist/knowledge/knowledge-verification.d.ts",
+      "default": "./dist/knowledge/knowledge-verification.js"
     },
     "./knowledge/knowledge-weight-recalculation": {
       "types": "./dist/knowledge/knowledge-weight-recalculation.d.ts",
@@ -2556,13 +2604,29 @@
       "types": "./dist/knowledge/procedure-types.d.ts",
       "default": "./dist/knowledge/procedure-types.js"
     },
+    "./knowledge/reusable-learning": {
+      "types": "./dist/knowledge/reusable-learning.d.ts",
+      "default": "./dist/knowledge/reusable-learning.js"
+    },
     "./knowledge/scoped-learning-approval": {
       "types": "./dist/knowledge/scoped-learning-approval.d.ts",
       "default": "./dist/knowledge/scoped-learning-approval.js"
     },
+    "./knowledge/scoped-learning-approval-visibility": {
+      "types": "./dist/knowledge/scoped-learning-approval-visibility.d.ts",
+      "default": "./dist/knowledge/scoped-learning-approval-visibility.js"
+    },
     "./knowledge/scoped-learning-contract": {
       "types": "./dist/knowledge/scoped-learning-contract.d.ts",
       "default": "./dist/knowledge/scoped-learning-contract.js"
+    },
+    "./knowledge/scoped-learning-domain": {
+      "types": "./dist/knowledge/scoped-learning-domain.d.ts",
+      "default": "./dist/knowledge/scoped-learning-domain.js"
+    },
+    "./knowledge/scoped-learning-workflow": {
+      "types": "./dist/knowledge/scoped-learning-workflow.d.ts",
+      "default": "./dist/knowledge/scoped-learning-workflow.js"
     },
     "./knowledge/vocabulary-catalog": {
       "types": "./dist/knowledge/vocabulary-catalog.d.ts",
@@ -2573,8 +2637,12 @@
       "default": "./dist/knowledge/vocabulary-keys.generated.js"
     },
     "./laya-mlx-judgment-backend": {
-      "types": "./dist/laya-mlx-judgment-backend.d.ts",
-      "default": "./dist/laya-mlx-judgment-backend.js"
+      "types": "./dist/provider/laya-mlx-judgment-backend.d.ts",
+      "default": "./dist/provider/laya-mlx-judgment-backend.js"
+    },
+    "./lease/kv-lease-backend.stub": {
+      "types": "./dist/lease/kv-lease-backend.stub.d.ts",
+      "default": "./dist/lease/kv-lease-backend.stub.js"
     },
     "./lease/lease-backend": {
       "types": "./dist/lease/lease-backend.d.ts",
@@ -2588,73 +2656,57 @@
       "types": "./dist/lease/memory-lease-backend.d.ts",
       "default": "./dist/lease/memory-lease-backend.js"
     },
-    "./lease/kv-lease-backend.stub": {
-      "types": "./dist/lease/kv-lease-backend.stub.d.ts",
-      "default": "./dist/lease/kv-lease-backend.stub.js"
-    },
     "./ledger": {
-      "types": "./dist/ledger.d.ts",
-      "default": "./dist/ledger.js"
+      "types": "./dist/governance/ledger.d.ts",
+      "default": "./dist/governance/ledger.js"
     },
     "./lifecycle-hook-engine": {
-      "types": "./dist/lifecycle-hook-engine.d.ts",
-      "default": "./dist/lifecycle-hook-engine.js"
+      "types": "./dist/harnessing/lifecycle-hook-engine.d.ts",
+      "default": "./dist/harnessing/lifecycle-hook-engine.js"
     },
     "./llm-selection-preferences": {
-      "types": "./dist/llm-selection-preferences.d.ts",
-      "default": "./dist/llm-selection-preferences.js"
-    },
-    "./local-stt-discovery": {
-      "types": "./dist/local-stt-discovery.d.ts",
-      "default": "./dist/local-stt-discovery.js"
+      "types": "./dist/reasoning/llm-selection-preferences.d.ts",
+      "default": "./dist/reasoning/llm-selection-preferences.js"
     },
     "./local-ipc": {
-      "types": "./dist/local-ipc.d.ts",
-      "default": "./dist/local-ipc.js"
+      "types": "./dist/tool/local-ipc.d.ts",
+      "default": "./dist/tool/local-ipc.js"
     },
-    "./windows-named-pipe-security": {
-      "types": "./dist/windows-named-pipe-security.d.ts",
-      "default": "./dist/windows-named-pipe-security.js"
+    "./local-stt-discovery": {
+      "types": "./dist/voice/local-stt-discovery.d.ts",
+      "default": "./dist/voice/local-stt-discovery.js"
     },
     "./locale": {
-      "types": "./dist/locale.d.ts",
-      "default": "./dist/locale.js"
-    },
-    "./foundation/locale-normalize": {
-      "types": "./dist/foundation/locale-normalize.d.ts",
-      "default": "./dist/foundation/locale-normalize.js"
+      "types": "./dist/localization/locale.d.ts",
+      "default": "./dist/localization/locale.js"
     },
     "./logger": {
       "types": "./dist/logger.d.ts",
       "default": "./dist/logger.js"
     },
     "./macos-automation-bridge": {
-      "types": "./dist/macos-automation-bridge.d.ts",
-      "default": "./dist/macos-automation-bridge.js"
+      "types": "./dist/virtual/macos-automation-bridge.d.ts",
+      "default": "./dist/virtual/macos-automation-bridge.js"
     },
     "./macos-native-automation": {
-      "types": "./dist/macos-native-automation.d.ts",
-      "default": "./dist/macos-native-automation.js"
+      "types": "./dist/virtual/macos-native-automation.d.ts",
+      "default": "./dist/virtual/macos-native-automation.js"
     },
     "./macos-permission-warmup": {
-      "types": "./dist/macos-permission-warmup.d.ts",
-      "default": "./dist/macos-permission-warmup.js"
+      "types": "./dist/virtual/macos-permission-warmup.d.ts",
+      "default": "./dist/virtual/macos-permission-warmup.js"
     },
     "./managed-process": {
-      "types": "./dist/managed-process.d.ts",
-      "default": "./dist/managed-process.js"
+      "types": "./dist/tool/managed-process.d.ts",
+      "default": "./dist/tool/managed-process.js"
     },
     "./marketing-workload": {
-      "types": "./dist/marketing-workload.d.ts",
-      "default": "./dist/marketing-workload.js"
+      "types": "./dist/organization/marketing-workload.d.ts",
+      "default": "./dist/organization/marketing-workload.js"
     },
     "./max-file-lines-config": {
-      "types": "./dist/max-file-lines-config.d.ts",
-      "default": "./dist/max-file-lines-config.js"
-    },
-    "./mcp-request-context": {
-      "types": "./dist/mcp-request-context.d.ts",
-      "default": "./dist/mcp-request-context.js"
+      "types": "./dist/governance/max-file-lines-config.d.ts",
+      "default": "./dist/governance/max-file-lines-config.js"
     },
     "./media": {
       "types": "./dist/media/index.d.ts",
@@ -2671,6 +2723,10 @@
     "./media/docx-utils": {
       "types": "./dist/media/docx-utils.d.ts",
       "default": "./dist/media/docx-utils.js"
+    },
+    "./media/docx-xml": {
+      "types": "./dist/media/docx-xml.d.ts",
+      "default": "./dist/media/docx-xml.js"
     },
     "./media/image-description-bridge": {
       "types": "./dist/media/image-description-bridge.d.ts",
@@ -2751,6 +2807,10 @@
     "./media/xlsx-utils": {
       "types": "./dist/media/xlsx-utils.d.ts",
       "default": "./dist/media/xlsx-utils.js"
+    },
+    "./media/xlsx-xstring": {
+      "types": "./dist/media/xlsx-xstring.d.ts",
+      "default": "./dist/media/xlsx-xstring.js"
     },
     "./meeting": {
       "types": "./dist/meeting/index.d.ts",
@@ -2960,10 +3020,6 @@
       "types": "./dist/mesh/peer-auto-reply.d.ts",
       "default": "./dist/mesh/peer-auto-reply.js"
     },
-    "./mesh/peer-task-exchange": {
-      "types": "./dist/mesh/peer-task-exchange.d.ts",
-      "default": "./dist/mesh/peer-task-exchange.js"
-    },
     "./mesh/peer-conversation": {
       "types": "./dist/mesh/peer-conversation.d.ts",
       "default": "./dist/mesh/peer-conversation.js"
@@ -2976,21 +3032,21 @@
       "types": "./dist/mesh/peer-runtime-recovery.d.ts",
       "default": "./dist/mesh/peer-runtime-recovery.js"
     },
-    "./foundation/message-format": {
-      "types": "./dist/foundation/message-format.d.ts",
-      "default": "./dist/foundation/message-format.js"
+    "./mesh/peer-task-exchange": {
+      "types": "./dist/mesh/peer-task-exchange.d.ts",
+      "default": "./dist/mesh/peer-task-exchange.js"
     },
     "./metrics": {
-      "types": "./dist/metrics.d.ts",
-      "default": "./dist/metrics.js"
+      "types": "./dist/analysis/metrics.d.ts",
+      "default": "./dist/analysis/metrics.js"
     },
     "./mic-capture": {
-      "types": "./dist/mic-capture.d.ts",
-      "default": "./dist/mic-capture.js"
+      "types": "./dist/voice/mic-capture.d.ts",
+      "default": "./dist/voice/mic-capture.js"
     },
     "./migration-state": {
-      "types": "./dist/migration-state.d.ts",
-      "default": "./dist/migration-state.js"
+      "types": "./dist/storage/migration-state.d.ts",
+      "default": "./dist/storage/migration-state.js"
     },
     "./mission": {
       "types": "./dist/mission/index.d.ts",
@@ -3073,8 +3129,8 @@
       "default": "./dist/mission/mission-llm.js"
     },
     "./mission-lookup": {
-      "types": "./dist/mission-lookup.d.ts",
-      "default": "./dist/mission-lookup.js"
+      "types": "./dist/mission/mission-lookup.d.ts",
+      "default": "./dist/mission/mission-lookup.js"
     },
     "./mission-maintenance": {
       "types": "./dist/mission/mission-maintenance.d.ts",
@@ -3248,6 +3304,10 @@
       "types": "./dist/mission/delegation-request.d.ts",
       "default": "./dist/mission/delegation-request.js"
     },
+    "./mission/mission-admission": {
+      "types": "./dist/mission/mission-admission.d.ts",
+      "default": "./dist/mission/mission-admission.js"
+    },
     "./mission/mission-advisory-panel": {
       "types": "./dist/mission/mission-advisory-panel.d.ts",
       "default": "./dist/mission/mission-advisory-panel.js"
@@ -3291,6 +3351,18 @@
     "./mission/mission-decision-lock": {
       "types": "./dist/mission/mission-decision-lock.d.ts",
       "default": "./dist/mission/mission-decision-lock.js"
+    },
+    "./mission/mission-development-continuation": {
+      "types": "./dist/mission/mission-development-continuation.d.ts",
+      "default": "./dist/mission/mission-development-continuation.js"
+    },
+    "./mission/mission-development-gates": {
+      "types": "./dist/mission/mission-development-gates.d.ts",
+      "default": "./dist/mission/mission-development-gates.js"
+    },
+    "./mission/mission-development-proof": {
+      "types": "./dist/mission/mission-development-proof.d.ts",
+      "default": "./dist/mission/mission-development-proof.js"
     },
     "./mission/mission-dispatch-io": {
       "types": "./dist/mission/mission-dispatch-io.d.ts",
@@ -3379,6 +3451,10 @@
     "./mission/mission-management-config": {
       "types": "./dist/mission/mission-management-config.d.ts",
       "default": "./dist/mission/mission-management-config.js"
+    },
+    "./mission/mission-mutation-snapshot": {
+      "types": "./dist/mission/mission-mutation-snapshot.d.ts",
+      "default": "./dist/mission/mission-mutation-snapshot.js"
     },
     "./mission/mission-next-task-reader": {
       "types": "./dist/mission/mission-next-task-reader.d.ts",
@@ -3476,6 +3552,10 @@
       "types": "./dist/mission/mission-planning-packet.d.ts",
       "default": "./dist/mission/mission-planning-packet.js"
     },
+    "./mission/mission-prerequisite-identity": {
+      "types": "./dist/mission/mission-prerequisite-identity.d.ts",
+      "default": "./dist/mission/mission-prerequisite-identity.js"
+    },
     "./mission/mission-process-governance": {
       "types": "./dist/mission/mission-process-governance.d.ts",
       "default": "./dist/mission/mission-process-governance.js"
@@ -3532,25 +3612,13 @@
       "types": "./dist/mission/mission-seed-registry.d.ts",
       "default": "./dist/mission/mission-seed-registry.js"
     },
-    "./mission/mission-prerequisite-identity": {
-      "types": "./dist/mission/mission-prerequisite-identity.d.ts",
-      "default": "./dist/mission/mission-prerequisite-identity.js"
-    },
     "./mission/mission-state": {
       "types": "./dist/mission/mission-state.d.ts",
       "default": "./dist/mission/mission-state.js"
     },
-    "./mission/mission-admission": {
-      "types": "./dist/mission/mission-admission.d.ts",
-      "default": "./dist/mission/mission-admission.js"
-    },
     "./mission/mission-state-reader": {
       "types": "./dist/mission/mission-state-reader.d.ts",
       "default": "./dist/mission/mission-state-reader.js"
-    },
-    "./mission/mission-mutation-snapshot": {
-      "types": "./dist/mission/mission-mutation-snapshot.d.ts",
-      "default": "./dist/mission/mission-mutation-snapshot.js"
     },
     "./mission/mission-status": {
       "types": "./dist/mission/mission-status.d.ts",
@@ -3576,13 +3644,13 @@
       "types": "./dist/mission/mission-task-source-workspace.d.ts",
       "default": "./dist/mission/mission-task-source-workspace.js"
     },
-    "./mission/mission-task-supersede-proof": {
-      "types": "./dist/mission/mission-task-supersede-proof.d.ts",
-      "default": "./dist/mission/mission-task-supersede-proof.js"
-    },
     "./mission/mission-task-supersede": {
       "types": "./dist/mission/mission-task-supersede.d.ts",
       "default": "./dist/mission/mission-task-supersede.js"
+    },
+    "./mission/mission-task-supersede-proof": {
+      "types": "./dist/mission/mission-task-supersede-proof.d.ts",
+      "default": "./dist/mission/mission-task-supersede-proof.js"
     },
     "./mission/mission-team-binding": {
       "types": "./dist/mission/mission-team-binding.d.ts",
@@ -3689,12 +3757,12 @@
       "default": "./dist/mission/refactoring-evidence.js"
     },
     "./mlx-embedding-backend": {
-      "types": "./dist/mlx-embedding-backend.d.ts",
-      "default": "./dist/mlx-embedding-backend.js"
+      "types": "./dist/provider/mlx-embedding-backend.d.ts",
+      "default": "./dist/provider/mlx-embedding-backend.js"
     },
     "./mobile-profile-validators": {
-      "types": "./dist/mobile-profile-validators.d.ts",
-      "default": "./dist/mobile-profile-validators.js"
+      "types": "./dist/integrations/mobile-profile-validators.d.ts",
+      "default": "./dist/integrations/mobile-profile-validators.js"
     },
     "./model-performance-index": {
       "types": "./dist/reasoning/model-performance-index.d.ts",
@@ -3729,48 +3797,36 @@
       "default": "./dist/media/native-pptx-engine/design-cascade.js"
     },
     "./nerve-bridge": {
-      "types": "./dist/nerve-bridge.d.ts",
-      "default": "./dist/nerve-bridge.js"
+      "types": "./dist/ingress/nerve-bridge.d.ts",
+      "default": "./dist/ingress/nerve-bridge.js"
     },
     "./network": {
       "types": "./dist/network.d.ts",
       "default": "./dist/network.js"
     },
     "./next-action": {
-      "types": "./dist/next-action.d.ts",
-      "default": "./dist/next-action.js"
-    },
-    "./contracts/next-action-contract": {
-      "types": "./dist/contracts/next-action-contract.d.ts",
-      "default": "./dist/contracts/next-action-contract.js"
+      "types": "./dist/surface/next-action.d.ts",
+      "default": "./dist/surface/next-action.js"
     },
     "./nhi-lifecycle-governance": {
-      "types": "./dist/nhi-lifecycle-governance.d.ts",
-      "default": "./dist/nhi-lifecycle-governance.js"
+      "types": "./dist/agent/nhi-lifecycle-governance.d.ts",
+      "default": "./dist/agent/nhi-lifecycle-governance.js"
     },
     "./oauth-broker": {
-      "types": "./dist/oauth-broker.d.ts",
-      "default": "./dist/oauth-broker.js"
+      "types": "./dist/authn/oauth-broker.d.ts",
+      "default": "./dist/authn/oauth-broker.js"
     },
     "./oauth-session-store": {
-      "types": "./dist/oauth-session-store.d.ts",
-      "default": "./dist/oauth-session-store.js"
-    },
-    "./obs-virtual-camera-output": {
-      "types": "./dist/obs-virtual-camera-output.d.ts",
-      "default": "./dist/obs-virtual-camera-output.js"
+      "types": "./dist/authn/oauth-session-store.d.ts",
+      "default": "./dist/authn/oauth-session-store.js"
     },
     "./observation-distill": {
-      "types": "./dist/observation-distill.d.ts",
-      "default": "./dist/observation-distill.js"
+      "types": "./dist/reasoning/observation-distill.d.ts",
+      "default": "./dist/reasoning/observation-distill.js"
     },
     "./ocr-bridge": {
       "types": "./dist/ocr-bridge.d.ts",
       "default": "./dist/ocr-bridge.js"
-    },
-    "./contracts/ocr-types": {
-      "types": "./dist/contracts/ocr-types.d.ts",
-      "default": "./dist/contracts/ocr-types.js"
     },
     "./onboarding-apply-input": {
       "types": "./dist/organization/onboarding-apply-input.d.ts",
@@ -3825,8 +3881,8 @@
       "default": "./dist/provider/openrouter-model-policy.js"
     },
     "./operational-learning": {
-      "types": "./dist/operational-learning.d.ts",
-      "default": "./dist/operational-learning.js"
+      "types": "./dist/knowledge/operational-learning.d.ts",
+      "default": "./dist/knowledge/operational-learning.js"
     },
     "./operator-home-summary": {
       "types": "./dist/surface/operator-home-summary.d.ts",
@@ -3841,36 +3897,28 @@
       "default": "./dist/surface/operator-notifications.js"
     },
     "./ops-alert": {
-      "types": "./dist/ops-alert.d.ts",
-      "default": "./dist/ops-alert.js"
-    },
-    "./scheduler-incidents": {
-      "types": "./dist/scheduler-incidents.d.ts",
-      "default": "./dist/scheduler-incidents.js"
-    },
-    "./verification-source-snapshot": {
-      "types": "./dist/verification-source-snapshot.d.ts",
-      "default": "./dist/verification-source-snapshot.js"
+      "types": "./dist/daemon/ops-alert.d.ts",
+      "default": "./dist/daemon/ops-alert.js"
     },
     "./ops-health": {
-      "types": "./dist/ops-health.d.ts",
-      "default": "./dist/ops-health.js"
-    },
-    "./ops-health-state": {
-      "types": "./dist/ops-health-state.d.ts",
-      "default": "./dist/ops-health-state.js"
+      "types": "./dist/daemon/ops-health.d.ts",
+      "default": "./dist/daemon/ops-health.js"
     },
     "./ops-health-probe": {
-      "types": "./dist/ops-health-probe.d.ts",
-      "default": "./dist/ops-health-probe.js"
+      "types": "./dist/daemon/ops-health-probe.d.ts",
+      "default": "./dist/daemon/ops-health-probe.js"
+    },
+    "./ops-health-state": {
+      "types": "./dist/daemon/ops-health-state.d.ts",
+      "default": "./dist/daemon/ops-health-state.js"
     },
     "./orchestrator-session": {
       "types": "./dist/mission/orchestrator-session.d.ts",
       "default": "./dist/mission/orchestrator-session.js"
     },
     "./org-chart": {
-      "types": "./dist/org-chart.d.ts",
-      "default": "./dist/org-chart.js"
+      "types": "./dist/organization/org-chart.d.ts",
+      "default": "./dist/organization/org-chart.js"
     },
     "./organization": {
       "types": "./dist/organization/index.d.ts",
@@ -3920,6 +3968,46 @@
       "types": "./dist/organization/authority-role-registry.d.ts",
       "default": "./dist/organization/authority-role-registry.js"
     },
+    "./organization/company-bootstrap": {
+      "types": "./dist/organization/company-bootstrap.d.ts",
+      "default": "./dist/organization/company-bootstrap.js"
+    },
+    "./organization/company-onboarding": {
+      "types": "./dist/organization/company-onboarding.d.ts",
+      "default": "./dist/organization/company-onboarding.js"
+    },
+    "./organization/company-setup-workflow": {
+      "types": "./dist/organization/company-setup-workflow.d.ts",
+      "default": "./dist/organization/company-setup-workflow.js"
+    },
+    "./organization/continuous-development-consent": {
+      "types": "./dist/organization/continuous-development-consent.d.ts",
+      "default": "./dist/organization/continuous-development-consent.js"
+    },
+    "./organization/continuous-mission-scope": {
+      "types": "./dist/organization/continuous-mission-scope.d.ts",
+      "default": "./dist/organization/continuous-mission-scope.js"
+    },
+    "./organization/continuous-operations": {
+      "types": "./dist/organization/continuous-operations.d.ts",
+      "default": "./dist/organization/continuous-operations.js"
+    },
+    "./organization/continuous-operations-policy": {
+      "types": "./dist/organization/continuous-operations-policy.d.ts",
+      "default": "./dist/organization/continuous-operations-policy.js"
+    },
+    "./organization/continuous-operations-sources": {
+      "types": "./dist/organization/continuous-operations-sources.d.ts",
+      "default": "./dist/organization/continuous-operations-sources.js"
+    },
+    "./organization/continuous-work-owner": {
+      "types": "./dist/organization/continuous-work-owner.d.ts",
+      "default": "./dist/organization/continuous-work-owner.js"
+    },
+    "./organization/continuous-work-plan": {
+      "types": "./dist/organization/continuous-work-plan.d.ts",
+      "default": "./dist/organization/continuous-work-plan.js"
+    },
     "./organization/identity-directory": {
       "types": "./dist/organization/identity-directory.d.ts",
       "default": "./dist/organization/identity-directory.js"
@@ -3936,37 +4024,21 @@
       "types": "./dist/organization/member-invite.d.ts",
       "default": "./dist/organization/member-invite.js"
     },
-    "./organization/member-registry": {
-      "types": "./dist/organization/member-registry.d.ts",
-      "default": "./dist/organization/member-registry.js"
-    },
     "./organization/member-management": {
       "types": "./dist/organization/member-management.d.ts",
       "default": "./dist/organization/member-management.js"
     },
-    "./organization/publication-role-migration": {
-      "types": "./dist/organization/publication-role-migration.d.ts",
-      "default": "./dist/organization/publication-role-migration.js"
+    "./organization/member-registry": {
+      "types": "./dist/organization/member-registry.d.ts",
+      "default": "./dist/organization/member-registry.js"
     },
-    "./organization/organization-people-access": {
-      "types": "./dist/organization/organization-people-access.d.ts",
-      "default": "./dist/organization/organization-people-access.js"
-    },
-    "./organization/organization-participants": {
-      "types": "./dist/organization/organization-participants.d.ts",
-      "default": "./dist/organization/organization-participants.js"
-    },
-    "./organization/organization-agent-management": {
-      "types": "./dist/organization/organization-agent-management.d.ts",
-      "default": "./dist/organization/organization-agent-management.js"
+    "./organization/nhi-session-admission": {
+      "types": "./dist/organization/nhi-session-admission.d.ts",
+      "default": "./dist/organization/nhi-session-admission.js"
     },
     "./organization/onboarding-apply-input": {
       "types": "./dist/organization/onboarding-apply-input.d.ts",
       "default": "./dist/organization/onboarding-apply-input.js"
-    },
-    "./organization/onboarding-context": {
-      "types": "./dist/organization/onboarding-context.d.ts",
-      "default": "./dist/organization/onboarding-context.js"
     },
     "./organization/onboarding-authority": {
       "types": "./dist/organization/onboarding-authority.d.ts",
@@ -3976,25 +4048,17 @@
       "types": "./dist/organization/onboarding-authority-runtime.d.ts",
       "default": "./dist/organization/onboarding-authority-runtime.js"
     },
-    "./organization/onboarding-runtime-identity": {
-      "types": "./dist/organization/onboarding-runtime-identity.d.ts",
-      "default": "./dist/organization/onboarding-runtime-identity.js"
-    },
-    "./organization/nhi-session-admission": {
-      "types": "./dist/organization/nhi-session-admission.d.ts",
-      "default": "./dist/organization/nhi-session-admission.js"
-    },
-    "./persona-identity": {
-      "types": "./dist/persona-identity.d.ts",
-      "default": "./dist/persona-identity.js"
-    },
-    "./personal-identity-state": {
-      "types": "./dist/personal-identity-state.d.ts",
-      "default": "./dist/personal-identity-state.js"
+    "./organization/onboarding-context": {
+      "types": "./dist/organization/onboarding-context.d.ts",
+      "default": "./dist/organization/onboarding-context.js"
     },
     "./organization/onboarding-flow-policy": {
       "types": "./dist/organization/onboarding-flow-policy.d.ts",
       "default": "./dist/organization/onboarding-flow-policy.js"
+    },
+    "./organization/onboarding-runtime-identity": {
+      "types": "./dist/organization/onboarding-runtime-identity.d.ts",
+      "default": "./dist/organization/onboarding-runtime-identity.js"
     },
     "./organization/onboarding-state": {
       "types": "./dist/organization/onboarding-state.d.ts",
@@ -4003,6 +4067,10 @@
     "./organization/onboarding-summary-policy": {
       "types": "./dist/organization/onboarding-summary-policy.d.ts",
       "default": "./dist/organization/onboarding-summary-policy.js"
+    },
+    "./organization/organization-agent-management": {
+      "types": "./dist/organization/organization-agent-management.d.ts",
+      "default": "./dist/organization/organization-agent-management.js"
     },
     "./organization/organization-cadence": {
       "types": "./dist/organization/organization-cadence.d.ts",
@@ -4056,6 +4124,14 @@
       "types": "./dist/organization/organization-operation-tick.d.ts",
       "default": "./dist/organization/organization-operation-tick.js"
     },
+    "./organization/organization-participants": {
+      "types": "./dist/organization/organization-participants.d.ts",
+      "default": "./dist/organization/organization-participants.js"
+    },
+    "./organization/organization-people-access": {
+      "types": "./dist/organization/organization-people-access.d.ts",
+      "default": "./dist/organization/organization-people-access.js"
+    },
     "./organization/organization-profile": {
       "types": "./dist/organization/organization-profile.d.ts",
       "default": "./dist/organization/organization-profile.js"
@@ -4067,6 +4143,10 @@
     "./organization/organization-standup": {
       "types": "./dist/organization/organization-standup.d.ts",
       "default": "./dist/organization/organization-standup.js"
+    },
+    "./organization/publication-role-migration": {
+      "types": "./dist/organization/publication-role-migration.d.ts",
+      "default": "./dist/organization/publication-role-migration.js"
     },
     "./organization/role-assumption-trace": {
       "types": "./dist/organization/role-assumption-trace.d.ts",
@@ -4112,6 +4192,14 @@
       "types": "./dist/organization/tenant-activation.d.ts",
       "default": "./dist/organization/tenant-activation.js"
     },
+    "./organization/tenant-activation-approval": {
+      "types": "./dist/organization/tenant-activation-approval.d.ts",
+      "default": "./dist/organization/tenant-activation-approval.js"
+    },
+    "./organization/tenant-activation-probe": {
+      "types": "./dist/organization/tenant-activation-probe.d.ts",
+      "default": "./dist/organization/tenant-activation-probe.js"
+    },
     "./organization/tenant-design-override": {
       "types": "./dist/organization/tenant-design-override.d.ts",
       "default": "./dist/organization/tenant-design-override.js"
@@ -4136,13 +4224,17 @@
       "types": "./dist/organization/tenant-registry.d.ts",
       "default": "./dist/organization/tenant-registry.js"
     },
-    "./organization/tenant-rename": {
-      "types": "./dist/organization/tenant-rename.d.ts",
-      "default": "./dist/organization/tenant-rename.js"
+    "./organization/tenant-registry-consistency": {
+      "types": "./dist/organization/tenant-registry-consistency.d.ts",
+      "default": "./dist/organization/tenant-registry-consistency.js"
     },
     "./organization/tenant-registry-exceptions": {
       "types": "./dist/organization/tenant-registry-exceptions.d.ts",
       "default": "./dist/organization/tenant-registry-exceptions.js"
+    },
+    "./organization/tenant-rename": {
+      "types": "./dist/organization/tenant-rename.d.ts",
+      "default": "./dist/organization/tenant-rename.js"
     },
     "./os-automation": {
       "types": "./dist/virtual/os-automation.d.ts",
@@ -4153,16 +4245,16 @@
       "default": "./dist/virtual/os-automation-bridge.js"
     },
     "./outcome-contract": {
-      "types": "./dist/outcome-contract.d.ts",
-      "default": "./dist/outcome-contract.js"
+      "types": "./dist/task/outcome-contract.d.ts",
+      "default": "./dist/task/outcome-contract.js"
     },
     "./output-artifacts": {
-      "types": "./dist/output-artifacts.d.ts",
-      "default": "./dist/output-artifacts.js"
+      "types": "./dist/workforce/output-artifacts.d.ts",
+      "default": "./dist/workforce/output-artifacts.js"
     },
     "./owner-scope": {
-      "types": "./dist/owner-scope.d.ts",
-      "default": "./dist/owner-scope.js"
+      "types": "./dist/governance/owner-scope.d.ts",
+      "default": "./dist/governance/owner-scope.js"
     },
     "./patch-decision": {
       "types": "./dist/pipeline/patch-decision.d.ts",
@@ -4173,12 +4265,8 @@
       "default": "./dist/path-resolver.js"
     },
     "./path-tenant-attribution": {
-      "types": "./dist/path-tenant-attribution.d.ts",
-      "default": "./dist/path-tenant-attribution.js"
-    },
-    "./foundation/pcm-wav": {
-      "types": "./dist/foundation/pcm-wav.d.ts",
-      "default": "./dist/foundation/pcm-wav.js"
+      "types": "./dist/governance/path-tenant-attribution.d.ts",
+      "default": "./dist/governance/path-tenant-attribution.js"
     },
     "./pdf-protocol": {
       "types": "./dist/contracts/pdf-protocol.d.ts",
@@ -4196,9 +4284,17 @@
       "types": "./dist/mesh/peer-runtime-recovery.d.ts",
       "default": "./dist/mesh/peer-runtime-recovery.js"
     },
+    "./persona-identity": {
+      "types": "./dist/authn/persona-identity.d.ts",
+      "default": "./dist/authn/persona-identity.js"
+    },
     "./personal-identity-reader": {
-      "types": "./dist/personal-identity-reader.d.ts",
-      "default": "./dist/personal-identity-reader.js"
+      "types": "./dist/authn/personal-identity-reader.d.ts",
+      "default": "./dist/authn/personal-identity-reader.js"
+    },
+    "./personal-identity-state": {
+      "types": "./dist/authn/personal-identity-state.d.ts",
+      "default": "./dist/authn/personal-identity-state.js"
     },
     "./pfc": {
       "types": "./dist/pfc/index.d.ts",
@@ -4221,12 +4317,12 @@
       "default": "./dist/pfc/SovereignSentinel.js"
     },
     "./physical-namespace": {
-      "types": "./dist/physical-namespace.d.ts",
-      "default": "./dist/physical-namespace.js"
+      "types": "./dist/storage/physical-namespace.d.ts",
+      "default": "./dist/storage/physical-namespace.js"
     },
     "./pii-scrubber": {
-      "types": "./dist/pii-scrubber.d.ts",
-      "default": "./dist/pii-scrubber.js"
+      "types": "./dist/governance/pii-scrubber.d.ts",
+      "default": "./dist/governance/pii-scrubber.js"
     },
     "./pipeline": {
       "types": "./dist/pipeline/index.d.ts",
@@ -4280,13 +4376,13 @@
       "types": "./dist/pipeline/op-preflight.d.ts",
       "default": "./dist/pipeline/op-preflight.js"
     },
-    "./pipeline/op-preflight-defaults": {
-      "types": "./dist/pipeline/op-preflight-defaults.d.ts",
-      "default": "./dist/pipeline/op-preflight-defaults.js"
-    },
     "./pipeline/op-preflight-charter": {
       "types": "./dist/pipeline/op-preflight-charter.d.ts",
       "default": "./dist/pipeline/op-preflight-charter.js"
+    },
+    "./pipeline/op-preflight-defaults": {
+      "types": "./dist/pipeline/op-preflight-defaults.d.ts",
+      "default": "./dist/pipeline/op-preflight-defaults.js"
     },
     "./pipeline/op-preflight-stages": {
       "types": "./dist/pipeline/op-preflight-stages.d.ts",
@@ -4332,6 +4428,14 @@
       "types": "./dist/pipeline/pipeline-preview.d.ts",
       "default": "./dist/pipeline/pipeline-preview.js"
     },
+    "./pipeline/pipeline-promotion-evidence": {
+      "types": "./dist/pipeline/pipeline-promotion-evidence.d.ts",
+      "default": "./dist/pipeline/pipeline-promotion-evidence.js"
+    },
+    "./pipeline/pipeline-reuse": {
+      "types": "./dist/pipeline/pipeline-reuse.d.ts",
+      "default": "./dist/pipeline/pipeline-reuse.js"
+    },
     "./pipeline/pipeline-run-journal": {
       "types": "./dist/pipeline/pipeline-run-journal.d.ts",
       "default": "./dist/pipeline/pipeline-run-journal.js"
@@ -4349,8 +4453,8 @@
       "default": "./dist/platform.js"
     },
     "./platform-command-adapters": {
-      "types": "./dist/platform-command-adapters.d.ts",
-      "default": "./dist/platform-command-adapters.js"
+      "types": "./dist/tool/platform-command-adapters.d.ts",
+      "default": "./dist/tool/platform-command-adapters.js"
     },
     "./platform-facts": {
       "types": "./dist/platform-facts.d.ts",
@@ -4469,24 +4573,24 @@
       "default": "./dist/plugin/skill-wrapper.js"
     },
     "./presence-avatar": {
-      "types": "./dist/presence-avatar.d.ts",
-      "default": "./dist/presence-avatar.js"
+      "types": "./dist/surface/presence-avatar.d.ts",
+      "default": "./dist/surface/presence-avatar.js"
     },
     "./presence-bridge": {
-      "types": "./dist/presence-bridge.d.ts",
-      "default": "./dist/presence-bridge.js"
+      "types": "./dist/surface/presence-bridge.d.ts",
+      "default": "./dist/surface/presence-bridge.js"
     },
     "./presence-surface": {
-      "types": "./dist/presence-surface.d.ts",
-      "default": "./dist/presence-surface.js"
+      "types": "./dist/surface/presence-surface.d.ts",
+      "default": "./dist/surface/presence-surface.js"
     },
     "./presentation-preference-registry": {
-      "types": "./dist/presentation-preference-registry.d.ts",
-      "default": "./dist/presentation-preference-registry.js"
+      "types": "./dist/design/presentation-preference-registry.d.ts",
+      "default": "./dist/design/presentation-preference-registry.js"
     },
     "./presentation-slide-pattern": {
-      "types": "./dist/presentation-slide-pattern.d.ts",
-      "default": "./dist/presentation-slide-pattern.js"
+      "types": "./dist/design/presentation-slide-pattern.d.ts",
+      "default": "./dist/design/presentation-slide-pattern.js"
     },
     "./procedure-dispatcher": {
       "types": "./dist/knowledge/procedure-dispatcher.d.ts",
@@ -4509,36 +4613,36 @@
       "default": "./dist/knowledge/procedure-types.js"
     },
     "./process-definition-registry": {
-      "types": "./dist/process-definition-registry.d.ts",
-      "default": "./dist/process-definition-registry.js"
+      "types": "./dist/governance/process-definition-registry.d.ts",
+      "default": "./dist/governance/process-definition-registry.js"
     },
     "./process-guards": {
-      "types": "./dist/process-guards.d.ts",
-      "default": "./dist/process-guards.js"
+      "types": "./dist/daemon/process-guards.d.ts",
+      "default": "./dist/daemon/process-guards.js"
     },
     "./process-logger": {
-      "types": "./dist/process-logger.d.ts",
-      "default": "./dist/process-logger.js"
+      "types": "./dist/daemon/process-logger.d.ts",
+      "default": "./dist/daemon/process-logger.js"
     },
     "./production-evidence-register": {
-      "types": "./dist/production-evidence-register.d.ts",
-      "default": "./dist/production-evidence-register.js"
+      "types": "./dist/scenario/production-evidence-register.d.ts",
+      "default": "./dist/scenario/production-evidence-register.js"
     },
     "./production-evidence-summary-policy": {
-      "types": "./dist/production-evidence-summary-policy.d.ts",
-      "default": "./dist/production-evidence-summary-policy.js"
+      "types": "./dist/scenario/production-evidence-summary-policy.d.ts",
+      "default": "./dist/scenario/production-evidence-summary-policy.js"
     },
     "./productivity-task-plan": {
-      "types": "./dist/productivity-task-plan.d.ts",
-      "default": "./dist/productivity-task-plan.js"
+      "types": "./dist/task/productivity-task-plan.d.ts",
+      "default": "./dist/task/productivity-task-plan.js"
     },
     "./profile-root": {
-      "types": "./dist/profile-root.d.ts",
-      "default": "./dist/profile-root.js"
+      "types": "./dist/authn/profile-root.d.ts",
+      "default": "./dist/authn/profile-root.js"
     },
     "./programmatic-tool-calling": {
-      "types": "./dist/programmatic-tool-calling.d.ts",
-      "default": "./dist/programmatic-tool-calling.js"
+      "types": "./dist/tool/programmatic-tool-calling.d.ts",
+      "default": "./dist/tool/programmatic-tool-calling.js"
     },
     "./project": {
       "types": "./dist/project/index.d.ts",
@@ -4605,16 +4709,16 @@
       "default": "./dist/project/project-trust.js"
     },
     "./promoted-memory": {
-      "types": "./dist/promoted-memory.d.ts",
-      "default": "./dist/promoted-memory.js"
+      "types": "./dist/knowledge/promoted-memory.d.ts",
+      "default": "./dist/knowledge/promoted-memory.js"
     },
     "./promoted-report-template-policy": {
-      "types": "./dist/promoted-report-template-policy.d.ts",
-      "default": "./dist/promoted-report-template-policy.js"
+      "types": "./dist/knowledge/promoted-report-template-policy.d.ts",
+      "default": "./dist/knowledge/promoted-report-template-policy.js"
     },
     "./promotion-candidates": {
-      "types": "./dist/promotion-candidates.d.ts",
-      "default": "./dist/promotion-candidates.js"
+      "types": "./dist/pipeline/promotion-candidates.d.ts",
+      "default": "./dist/pipeline/promotion-candidates.js"
     },
     "./prompt-cache-discipline": {
       "types": "./dist/reasoning/prompt-cache-discipline.d.ts",
@@ -4625,16 +4729,16 @@
       "default": "./dist/reasoning/prompt-visibility-ledger.js"
     },
     "./protocol-service-lifecycle": {
-      "types": "./dist/protocol-service-lifecycle.d.ts",
-      "default": "./dist/protocol-service-lifecycle.js"
+      "types": "./dist/service/protocol-service-lifecycle.d.ts",
+      "default": "./dist/service/protocol-service-lifecycle.js"
     },
     "./protocol-service-registry": {
-      "types": "./dist/protocol-service-registry.d.ts",
-      "default": "./dist/protocol-service-registry.js"
+      "types": "./dist/service/protocol-service-registry.d.ts",
+      "default": "./dist/service/protocol-service-registry.js"
     },
     "./provenance-taint": {
-      "types": "./dist/provenance-taint.d.ts",
-      "default": "./dist/provenance-taint.js"
+      "types": "./dist/governance/provenance-taint.d.ts",
+      "default": "./dist/governance/provenance-taint.js"
     },
     "./provider": {
       "types": "./dist/provider/index.d.ts",
@@ -4655,6 +4759,10 @@
     "./provider-capability-scanner": {
       "types": "./dist/provider/provider-capability-scanner.d.ts",
       "default": "./dist/provider/provider-capability-scanner.js"
+    },
+    "./provider-chain-router": {
+      "types": "./dist/provider/provider-chain-router.d.ts",
+      "default": "./dist/provider/provider-chain-router.js"
     },
     "./provider-cli-capability-report-policy": {
       "types": "./dist/provider/provider-cli-capability-report-policy.d.ts",
@@ -4680,9 +4788,13 @@
       "types": "./dist/provider/provider-pins-store.d.ts",
       "default": "./dist/provider/provider-pins-store.js"
     },
-    "./provider/provider-transport": {
-      "types": "./dist/provider/provider-transport.d.ts",
-      "default": "./dist/provider/provider-transport.js"
+    "./provider-registry": {
+      "types": "./dist/provider/provider-registry.d.ts",
+      "default": "./dist/provider/provider-registry.js"
+    },
+    "./provider-runtime-requirements": {
+      "types": "./dist/provider/provider-runtime-requirements.d.ts",
+      "default": "./dist/provider/provider-runtime-requirements.js"
     },
     "./provider/agy-cli-backend": {
       "types": "./dist/provider/agy-cli-backend.d.ts",
@@ -4836,22 +4948,6 @@
       "types": "./dist/provider/codex-cli-query.d.ts",
       "default": "./dist/provider/codex-cli-query.js"
     },
-    "./provider/codex-isolated-query": {
-      "types": "./dist/provider/codex-isolated-query.d.ts",
-      "default": "./dist/provider/codex-isolated-query.js"
-    },
-    "./provider/custody-provider-attestation-governance": {
-      "types": "./dist/provider/custody-provider-attestation-governance.d.ts",
-      "default": "./dist/provider/custody-provider-attestation-governance.js"
-    },
-    "./provider/custody-provider-attestation-store": {
-      "types": "./dist/provider/custody-provider-attestation-store.d.ts",
-      "default": "./dist/provider/custody-provider-attestation-store.js"
-    },
-    "./provider/isolated-text-generator": {
-      "types": "./dist/provider/isolated-text-generator.d.ts",
-      "default": "./dist/provider/isolated-text-generator.js"
-    },
     "./provider/codex-cli-reasoning-backend": {
       "types": "./dist/provider/codex-cli-reasoning-backend.d.ts",
       "default": "./dist/provider/codex-cli-reasoning-backend.js"
@@ -4859,6 +4955,10 @@
     "./provider/codex-cli-voice-bridge": {
       "types": "./dist/provider/codex-cli-voice-bridge.d.ts",
       "default": "./dist/provider/codex-cli-voice-bridge.js"
+    },
+    "./provider/codex-isolated-query": {
+      "types": "./dist/provider/codex-isolated-query.d.ts",
+      "default": "./dist/provider/codex-isolated-query.js"
     },
     "./provider/codex-profile": {
       "types": "./dist/provider/codex-profile.d.ts",
@@ -4875,6 +4975,14 @@
     "./provider/cursor-cli-session-adapter": {
       "types": "./dist/provider/cursor-cli-session-adapter.d.ts",
       "default": "./dist/provider/cursor-cli-session-adapter.js"
+    },
+    "./provider/custody-provider-attestation-governance": {
+      "types": "./dist/provider/custody-provider-attestation-governance.d.ts",
+      "default": "./dist/provider/custody-provider-attestation-governance.js"
+    },
+    "./provider/custody-provider-attestation-store": {
+      "types": "./dist/provider/custody-provider-attestation-store.d.ts",
+      "default": "./dist/provider/custody-provider-attestation-store.js"
     },
     "./provider/devin-cli-reasoning-backend": {
       "types": "./dist/provider/devin-cli-reasoning-backend.d.ts",
@@ -4915,6 +5023,10 @@
     "./provider/grok-cli-voice-bridge": {
       "types": "./dist/provider/grok-cli-voice-bridge.d.ts",
       "default": "./dist/provider/grok-cli-voice-bridge.js"
+    },
+    "./provider/isolated-text-generator": {
+      "types": "./dist/provider/isolated-text-generator.d.ts",
+      "default": "./dist/provider/isolated-text-generator.js"
     },
     "./provider/loopback-transport": {
       "types": "./dist/provider/loopback-transport.d.ts",
@@ -4996,6 +5108,10 @@
       "types": "./dist/provider/provider-spawn-env.d.ts",
       "default": "./dist/provider/provider-spawn-env.js"
     },
+    "./provider/provider-transport": {
+      "types": "./dist/provider/provider-transport.d.ts",
+      "default": "./dist/provider/provider-transport.js"
+    },
     "./provider/remote-provider-facade": {
       "types": "./dist/provider/remote-provider-facade.d.ts",
       "default": "./dist/provider/remote-provider-facade.js"
@@ -5005,28 +5121,24 @@
       "default": "./dist/shell/pty-engine.js"
     },
     "./pulse-audio-bus": {
-      "types": "./dist/pulse-audio-bus.d.ts",
-      "default": "./dist/pulse-audio-bus.js"
+      "types": "./dist/voice/pulse-audio-bus.d.ts",
+      "default": "./dist/voice/pulse-audio-bus.js"
     },
     "./python-voice-bridge": {
-      "types": "./dist/python-voice-bridge.d.ts",
-      "default": "./dist/python-voice-bridge.js"
+      "types": "./dist/voice/python-voice-bridge.d.ts",
+      "default": "./dist/voice/python-voice-bridge.js"
     },
     "./question-resolver": {
-      "types": "./dist/question-resolver.d.ts",
-      "default": "./dist/question-resolver.js"
+      "types": "./dist/intent/question-resolver.d.ts",
+      "default": "./dist/intent/question-resolver.js"
     },
     "./ranking-signals": {
-      "types": "./dist/ranking-signals.d.ts",
-      "default": "./dist/ranking-signals.js"
+      "types": "./dist/knowledge/ranking-signals.d.ts",
+      "default": "./dist/knowledge/ranking-signals.js"
     },
     "./realtime-media-session": {
-      "types": "./dist/realtime-media-session.d.ts",
-      "default": "./dist/realtime-media-session.js"
-    },
-    "./engine-runtime-preferences": {
-      "types": "./dist/voice/engine-runtime-preferences.d.ts",
-      "default": "./dist/voice/engine-runtime-preferences.js"
+      "types": "./dist/media/realtime-media-session.d.ts",
+      "default": "./dist/media/realtime-media-session.js"
     },
     "./reasoning": {
       "types": "./dist/reasoning/index.d.ts",
@@ -5160,21 +5272,13 @@
       "types": "./dist/reasoning/prompt-visibility-ledger.d.ts",
       "default": "./dist/reasoning/prompt-visibility-ledger.js"
     },
-    "./reasoning/reasoning-api-provider": {
-      "types": "./dist/reasoning/reasoning-api-provider.d.ts",
-      "default": "./dist/reasoning/reasoning-api-provider.js"
-    },
-    "./foundation/secret-resolution-session": {
-      "types": "./dist/foundation/secret-resolution-session.d.ts",
-      "default": "./dist/foundation/secret-resolution-session.js"
-    },
-    "./secret/credential-allocations": {
-      "types": "./dist/secret/credential-allocations.d.ts",
-      "default": "./dist/secret/credential-allocations.js"
-    },
     "./reasoning/reasoning-api-credentials": {
       "types": "./dist/reasoning/reasoning-api-credentials.d.ts",
       "default": "./dist/reasoning/reasoning-api-credentials.js"
+    },
+    "./reasoning/reasoning-api-provider": {
+      "types": "./dist/reasoning/reasoning-api-provider.d.ts",
+      "default": "./dist/reasoning/reasoning-api-provider.js"
     },
     "./reasoning/reasoning-auth-preflight": {
       "types": "./dist/reasoning/reasoning-auth-preflight.d.ts",
@@ -5281,64 +5385,64 @@
       "default": "./dist/reasoning/reasoning-tier-declaration.js"
     },
     "./reconcile-ops": {
-      "types": "./dist/reconcile-ops.d.ts",
-      "default": "./dist/reconcile-ops.js"
+      "types": "./dist/daemon/reconcile-ops.d.ts",
+      "default": "./dist/daemon/reconcile-ops.js"
     },
     "./recovery-policy": {
-      "types": "./dist/recovery-policy.d.ts",
-      "default": "./dist/recovery-policy.js"
+      "types": "./dist/pipeline/recovery-policy.d.ts",
+      "default": "./dist/pipeline/recovery-policy.js"
     },
     "./reflex-terminal": {
-      "types": "./dist/reflex-terminal.d.ts",
-      "default": "./dist/reflex-terminal.js"
-    },
-    "./contracts/rejection-reason": {
-      "types": "./dist/contracts/rejection-reason.d.ts",
-      "default": "./dist/contracts/rejection-reason.js"
+      "types": "./dist/shell/reflex-terminal.d.ts",
+      "default": "./dist/shell/reflex-terminal.js"
     },
     "./relationship-graph-store": {
-      "types": "./dist/relationship-graph-store.d.ts",
-      "default": "./dist/relationship-graph-store.js"
+      "types": "./dist/organization/relationship-graph-store.d.ts",
+      "default": "./dist/organization/relationship-graph-store.js"
     },
     "./report-contract": {
-      "types": "./dist/report-contract.d.ts",
-      "default": "./dist/report-contract.js"
+      "types": "./dist/task/report-contract.d.ts",
+      "default": "./dist/task/report-contract.js"
     },
     "./report-ops": {
-      "types": "./dist/report-ops.d.ts",
-      "default": "./dist/report-ops.js"
+      "types": "./dist/daemon/report-ops.d.ts",
+      "default": "./dist/daemon/report-ops.js"
     },
     "./requirements-draft-store": {
-      "types": "./dist/requirements-draft-store.d.ts",
-      "default": "./dist/requirements-draft-store.js"
+      "types": "./dist/mission/requirements-draft-store.d.ts",
+      "default": "./dist/mission/requirements-draft-store.js"
     },
     "./resource-provenance": {
-      "types": "./dist/resource-provenance.d.ts",
-      "default": "./dist/resource-provenance.js"
-    },
-    "./restricted-action-policy": {
-      "types": "./dist/restricted-action-policy.d.ts",
-      "default": "./dist/restricted-action-policy.js"
+      "types": "./dist/contracts/resource-provenance.d.ts",
+      "default": "./dist/contracts/resource-provenance.js"
     },
     "./review-reentry": {
-      "types": "./dist/review-reentry.d.ts",
-      "default": "./dist/review-reentry.js"
+      "types": "./dist/workforce/review-reentry.d.ts",
+      "default": "./dist/workforce/review-reentry.js"
     },
     "./risky-op-approval-port": {
-      "types": "./dist/risky-op-approval-port.d.ts",
-      "default": "./dist/risky-op-approval-port.js"
+      "types": "./dist/governance/risky-op-approval-port.d.ts",
+      "default": "./dist/governance/risky-op-approval-port.js"
     },
     "./risky-op-registry": {
-      "types": "./dist/risky-op-registry.d.ts",
-      "default": "./dist/risky-op-registry.js"
+      "types": "./dist/governance/risky-op-registry.d.ts",
+      "default": "./dist/governance/risky-op-registry.js"
+    },
+    "./router-contract": {
+      "types": "./dist/intent/router-contract.d.ts",
+      "default": "./dist/intent/router-contract.js"
+    },
+    "./runtime-control-policy": {
+      "types": "./dist/governance/runtime-control-policy.d.ts",
+      "default": "./dist/governance/runtime-control-policy.js"
     },
     "./runtime-health-history": {
       "types": "./dist/tool/runtime-health-history.d.ts",
       "default": "./dist/tool/runtime-health-history.js"
     },
     "./runtime-readiness": {
-      "types": "./dist/runtime-readiness.d.ts",
-      "default": "./dist/runtime-readiness.js"
+      "types": "./dist/daemon/runtime-readiness.d.ts",
+      "default": "./dist/daemon/runtime-readiness.js"
     },
     "./runtime-supervisor": {
       "types": "./dist/tool/runtime-supervisor.d.ts",
@@ -5440,6 +5544,10 @@
       "types": "./dist/scenario/scenario-trajectory.d.ts",
       "default": "./dist/scenario/scenario-trajectory.js"
     },
+    "./scheduler-incidents": {
+      "types": "./dist/daemon/scheduler-incidents.d.ts",
+      "default": "./dist/daemon/scheduler-incidents.js"
+    },
     "./schema-loader": {
       "types": "./dist/schema-loader.d.ts",
       "default": "./dist/schema-loader.js"
@@ -5448,25 +5556,29 @@
       "types": "./dist/scope-context.d.ts",
       "default": "./dist/scope-context.js"
     },
+    "./scope-envelope": {
+      "types": "./dist/scope-envelope.d.ts",
+      "default": "./dist/scope-envelope.js"
+    },
     "./scope-migration": {
-      "types": "./dist/scope-migration.d.ts",
-      "default": "./dist/scope-migration.js"
+      "types": "./dist/governance/scope-migration.d.ts",
+      "default": "./dist/governance/scope-migration.js"
     },
     "./scope-offboarding": {
-      "types": "./dist/scope-offboarding.d.ts",
-      "default": "./dist/scope-offboarding.js"
+      "types": "./dist/storage/scope-offboarding.d.ts",
+      "default": "./dist/storage/scope-offboarding.js"
     },
     "./scoped-registry": {
-      "types": "./dist/scoped-registry.d.ts",
-      "default": "./dist/scoped-registry.js"
+      "types": "./dist/governance/scoped-registry.d.ts",
+      "default": "./dist/governance/scoped-registry.js"
     },
     "./scratch-promotion": {
-      "types": "./dist/scratch-promotion.d.ts",
-      "default": "./dist/scratch-promotion.js"
+      "types": "./dist/storage/scratch-promotion.d.ts",
+      "default": "./dist/storage/scratch-promotion.js"
     },
     "./scratch-promotion-grace": {
-      "types": "./dist/scratch-promotion-grace.d.ts",
-      "default": "./dist/scratch-promotion-grace.js"
+      "types": "./dist/storage/scratch-promotion-grace.d.ts",
+      "default": "./dist/storage/scratch-promotion-grace.js"
     },
     "./screen-capture-bridge": {
       "types": "./dist/virtual/screen-capture-bridge.d.ts",
@@ -5489,32 +5601,40 @@
       "default": "./dist/script-harness.js"
     },
     "./sdlc-artifact-store": {
-      "types": "./dist/sdlc-artifact-store.d.ts",
-      "default": "./dist/sdlc-artifact-store.js"
+      "types": "./dist/mission/sdlc-artifact-store.d.ts",
+      "default": "./dist/mission/sdlc-artifact-store.js"
     },
     "./sdlc-gate-readiness": {
-      "types": "./dist/sdlc-gate-readiness.d.ts",
-      "default": "./dist/sdlc-gate-readiness.js"
+      "types": "./dist/mission/sdlc-gate-readiness.d.ts",
+      "default": "./dist/mission/sdlc-gate-readiness.js"
     },
     "./seam": {
       "types": "./dist/seam.d.ts",
       "default": "./dist/seam.js"
     },
     "./seam-calibration": {
-      "types": "./dist/seam-calibration.d.ts",
-      "default": "./dist/seam-calibration.js"
+      "types": "./dist/provider/seam-calibration.d.ts",
+      "default": "./dist/provider/seam-calibration.js"
     },
     "./seam-provider-selection": {
-      "types": "./dist/seam-provider-selection.d.ts",
-      "default": "./dist/seam-provider-selection.js"
+      "types": "./dist/provider/seam-provider-selection.d.ts",
+      "default": "./dist/provider/seam-provider-selection.js"
     },
     "./seam-selection-defaults": {
-      "types": "./dist/seam-selection-defaults.d.ts",
-      "default": "./dist/seam-selection-defaults.js"
+      "types": "./dist/provider/seam-selection-defaults.d.ts",
+      "default": "./dist/provider/seam-selection-defaults.js"
     },
     "./seam-selection-rules": {
-      "types": "./dist/seam-selection-rules.d.ts",
-      "default": "./dist/seam-selection-rules.js"
+      "types": "./dist/provider/seam-selection-rules.d.ts",
+      "default": "./dist/provider/seam-selection-rules.js"
+    },
+    "./search": {
+      "types": "./dist/search/index.d.ts",
+      "default": "./dist/search/index.js"
+    },
+    "./search/web-search-runtime-bridge": {
+      "types": "./dist/search/web-search-runtime-bridge.d.ts",
+      "default": "./dist/search/web-search-runtime-bridge.js"
     },
     "./secret": {
       "types": "./dist/secret/index.d.ts",
@@ -5548,6 +5668,18 @@
       "types": "./dist/secret/secret-types.d.ts",
       "default": "./dist/secret/secret-types.js"
     },
+    "./secret/credential-allocations": {
+      "types": "./dist/secret/credential-allocations.d.ts",
+      "default": "./dist/secret/credential-allocations.js"
+    },
+    "./secret/external-secret-providers": {
+      "types": "./dist/secret/external-secret-providers.d.ts",
+      "default": "./dist/secret/external-secret-providers.js"
+    },
+    "./secret/provider-registry": {
+      "types": "./dist/secret/provider-registry.d.ts",
+      "default": "./dist/secret/provider-registry.js"
+    },
     "./secret/secret-bridge": {
       "types": "./dist/secret/secret-bridge.d.ts",
       "default": "./dist/secret/secret-bridge.js"
@@ -5572,14 +5704,6 @@
       "types": "./dist/secret/secret-introduction.d.ts",
       "default": "./dist/secret/secret-introduction.js"
     },
-    "./secret/external-secret-providers": {
-      "types": "./dist/secret/external-secret-providers.d.ts",
-      "default": "./dist/secret/external-secret-providers.js"
-    },
-    "./secret/provider-registry": {
-      "types": "./dist/secret/provider-registry.d.ts",
-      "default": "./dist/secret/provider-registry.js"
-    },
     "./secret/secret-resolver": {
       "types": "./dist/secret/secret-resolver.d.ts",
       "default": "./dist/secret/secret-resolver.js"
@@ -5597,32 +5721,32 @@
       "default": "./dist/secure-io.js"
     },
     "./security-asset-ledger": {
-      "types": "./dist/security-asset-ledger.d.ts",
-      "default": "./dist/security-asset-ledger.js"
+      "types": "./dist/information-assets/security-asset-ledger.d.ts",
+      "default": "./dist/information-assets/security-asset-ledger.js"
     },
     "./semantic-decide": {
-      "types": "./dist/semantic-decide.d.ts",
-      "default": "./dist/semantic-decide.js"
+      "types": "./dist/reasoning/semantic-decide.d.ts",
+      "default": "./dist/reasoning/semantic-decide.js"
     },
     "./semantic-degradation-log": {
-      "types": "./dist/semantic-degradation-log.d.ts",
-      "default": "./dist/semantic-degradation-log.js"
+      "types": "./dist/reasoning/semantic-degradation-log.d.ts",
+      "default": "./dist/reasoning/semantic-degradation-log.js"
     },
     "./semantic-design-tokens": {
-      "types": "./dist/semantic-design-tokens.d.ts",
-      "default": "./dist/semantic-design-tokens.js"
+      "types": "./dist/design/semantic-design-tokens.d.ts",
+      "default": "./dist/design/semantic-design-tokens.js"
     },
     "./semaphore": {
-      "types": "./dist/semaphore.d.ts",
-      "default": "./dist/semaphore.js"
+      "types": "./dist/foundation/semaphore.d.ts",
+      "default": "./dist/foundation/semaphore.js"
     },
     "./sensitive-path-policy": {
       "types": "./dist/sensitive-path-policy.d.ts",
       "default": "./dist/sensitive-path-policy.js"
     },
     "./sensory-memory": {
-      "types": "./dist/sensory-memory.d.ts",
-      "default": "./dist/sensory-memory.js"
+      "types": "./dist/event/sensory-memory.d.ts",
+      "default": "./dist/event/sensory-memory.js"
     },
     "./service": {
       "types": "./dist/service/index.d.ts",
@@ -5764,6 +5888,10 @@
       "types": "./dist/service/service-pid-registry.d.ts",
       "default": "./dist/service/service-pid-registry.js"
     },
+    "./service/service-preflight": {
+      "types": "./dist/service/service-preflight.d.ts",
+      "default": "./dist/service/service-preflight.js"
+    },
     "./service/service-preset-policy": {
       "types": "./dist/service/service-preset-policy.d.ts",
       "default": "./dist/service/service-preset-policy.js"
@@ -5813,24 +5941,20 @@
       "default": "./dist/service/service-validator.js"
     },
     "./set-of-marks": {
-      "types": "./dist/set-of-marks.d.ts",
-      "default": "./dist/set-of-marks.js"
+      "types": "./dist/virtual/set-of-marks.d.ts",
+      "default": "./dist/virtual/set-of-marks.js"
     },
     "./share-grant-authorizer": {
-      "types": "./dist/share-grant-authorizer.d.ts",
-      "default": "./dist/share-grant-authorizer.js"
+      "types": "./dist/governance/share-grant-authorizer.d.ts",
+      "default": "./dist/governance/share-grant-authorizer.js"
     },
     "./share-grant-graph": {
-      "types": "./dist/share-grant-graph.d.ts",
-      "default": "./dist/share-grant-graph.js"
+      "types": "./dist/governance/share-grant-graph.d.ts",
+      "default": "./dist/governance/share-grant-graph.js"
     },
     "./share-grant-live-sessions": {
-      "types": "./dist/share-grant-live-sessions.d.ts",
-      "default": "./dist/share-grant-live-sessions.js"
-    },
-    "./contracts/shared-business-types": {
-      "types": "./dist/contracts/shared-business-types.d.ts",
-      "default": "./dist/contracts/shared-business-types.js"
+      "types": "./dist/governance/share-grant-live-sessions.d.ts",
+      "default": "./dist/governance/share-grant-live-sessions.js"
     },
     "./shell": {
       "types": "./dist/shell/index.d.ts",
@@ -5888,9 +6012,9 @@
       "types": "./dist/shell/terminal-keys.d.ts",
       "default": "./dist/shell/terminal-keys.js"
     },
-    "./silero-vad-bridge": {
-      "types": "./dist/silero-vad-bridge.d.ts",
-      "default": "./dist/silero-vad-bridge.js"
+    "./shortcut-bridge": {
+      "types": "./dist/virtual/shortcut-bridge.d.ts",
+      "default": "./dist/virtual/shortcut-bridge.js"
     },
     "./skill-index": {
       "types": "./dist/plugin/skill-index.d.ts",
@@ -5925,24 +6049,24 @@
       "default": "./dist/integrations/slack-onboarding.js"
     },
     "./soak-evidence-manifest": {
-      "types": "./dist/soak-evidence-manifest.d.ts",
-      "default": "./dist/soak-evidence-manifest.js"
+      "types": "./dist/testing/soak-evidence-manifest.d.ts",
+      "default": "./dist/testing/soak-evidence-manifest.js"
     },
     "./soak-restart-state": {
-      "types": "./dist/soak-restart-state.d.ts",
-      "default": "./dist/soak-restart-state.js"
+      "types": "./dist/testing/soak-restart-state.d.ts",
+      "default": "./dist/testing/soak-restart-state.js"
     },
     "./software-quality": {
-      "types": "./dist/software-quality.d.ts",
-      "default": "./dist/software-quality.js"
+      "types": "./dist/testing/software-quality.d.ts",
+      "default": "./dist/testing/software-quality.js"
     },
     "./software-quality-operations": {
-      "types": "./dist/software-quality-operations.d.ts",
-      "default": "./dist/software-quality-operations.js"
+      "types": "./dist/testing/software-quality-operations.d.ts",
+      "default": "./dist/testing/software-quality-operations.js"
     },
     "./source-analysis": {
-      "types": "./dist/source-analysis.d.ts",
-      "default": "./dist/source-analysis.js"
+      "types": "./dist/analysis/source-analysis.d.ts",
+      "default": "./dist/analysis/source-analysis.js"
     },
     "./speech-to-text-bridge": {
       "types": "./dist/voice/speech-to-text-bridge.d.ts",
@@ -6025,28 +6149,28 @@
       "default": "./dist/media/xlsx-utils.js"
     },
     "./staffing-coverage": {
-      "types": "./dist/staffing-coverage.d.ts",
-      "default": "./dist/staffing-coverage.js"
+      "types": "./dist/workforce/staffing-coverage.d.ts",
+      "default": "./dist/workforce/staffing-coverage.js"
+    },
+    "./stance-resolver": {
+      "types": "./dist/authn/stance-resolver.d.ts",
+      "default": "./dist/authn/stance-resolver.js"
     },
     "./state-probe": {
-      "types": "./dist/state-probe.d.ts",
-      "default": "./dist/state-probe.js"
+      "types": "./dist/pipeline/state-probe.d.ts",
+      "default": "./dist/pipeline/state-probe.js"
     },
     "./stimuli-journal": {
-      "types": "./dist/stimuli-journal.d.ts",
-      "default": "./dist/stimuli-journal.js"
+      "types": "./dist/event/stimuli-journal.d.ts",
+      "default": "./dist/event/stimuli-journal.js"
     },
     "./storage-janitor": {
-      "types": "./dist/storage-janitor.d.ts",
-      "default": "./dist/storage-janitor.js"
+      "types": "./dist/storage/storage-janitor.d.ts",
+      "default": "./dist/storage/storage-janitor.js"
     },
     "./storage-layout": {
       "types": "./dist/storage-layout.d.ts",
       "default": "./dist/storage-layout.js"
-    },
-    "./storage/storage-backend": {
-      "types": "./dist/storage/storage-backend.d.ts",
-      "default": "./dist/storage/storage-backend.js"
     },
     "./storage/local-storage-backend": {
       "types": "./dist/storage/local-storage-backend.d.ts",
@@ -6060,6 +6184,10 @@
       "types": "./dist/storage/object-storage-backend.stub.d.ts",
       "default": "./dist/storage/object-storage-backend.stub.js"
     },
+    "./storage/storage-backend": {
+      "types": "./dist/storage/storage-backend.d.ts",
+      "default": "./dist/storage/storage-backend.js"
+    },
     "./streaming-stt-bridge": {
       "types": "./dist/voice/streaming-stt-bridge.d.ts",
       "default": "./dist/voice/streaming-stt-bridge.js"
@@ -6068,21 +6196,17 @@
       "types": "./dist/voice/streaming-tts-bridge.d.ts",
       "default": "./dist/voice/streaming-tts-bridge.js"
     },
-    "./streaming-voice-playback": {
-      "types": "./dist/streaming-voice-playback.d.ts",
-      "default": "./dist/streaming-voice-playback.js"
-    },
     "./subagent-capability-profiles": {
-      "types": "./dist/subagent-capability-profiles.d.ts",
-      "default": "./dist/subagent-capability-profiles.js"
+      "types": "./dist/workforce/subagent-capability-profiles.d.ts",
+      "default": "./dist/workforce/subagent-capability-profiles.js"
     },
     "./subagent-prompt-framing": {
-      "types": "./dist/subagent-prompt-framing.d.ts",
-      "default": "./dist/subagent-prompt-framing.js"
+      "types": "./dist/workforce/subagent-prompt-framing.d.ts",
+      "default": "./dist/workforce/subagent-prompt-framing.js"
     },
     "./super-nerve-execution-port": {
-      "types": "./dist/super-nerve-execution-port.d.ts",
-      "default": "./dist/super-nerve-execution-port.js"
+      "types": "./dist/pipeline/super-nerve-execution-port.d.ts",
+      "default": "./dist/pipeline/super-nerve-execution-port.js"
     },
     "./surface": {
       "types": "./dist/surface/index.d.ts",
@@ -6280,6 +6404,10 @@
       "types": "./dist/surface/front-desk-execution-status.d.ts",
       "default": "./dist/surface/front-desk-execution-status.js"
     },
+    "./surface/front-desk-progress": {
+      "types": "./dist/surface/front-desk-progress.d.ts",
+      "default": "./dist/surface/front-desk-progress.js"
+    },
     "./surface/front-desk-request-projection": {
       "types": "./dist/surface/front-desk-request-projection.d.ts",
       "default": "./dist/surface/front-desk-request-projection.js"
@@ -6299,6 +6427,14 @@
     "./surface/installation-owner-access": {
       "types": "./dist/surface/installation-owner-access.d.ts",
       "default": "./dist/surface/installation-owner-access.js"
+    },
+    "./surface/needs-you": {
+      "types": "./dist/surface/needs-you.d.ts",
+      "default": "./dist/surface/needs-you.js"
+    },
+    "./surface/needs-you-sources": {
+      "types": "./dist/surface/needs-you-sources.d.ts",
+      "default": "./dist/surface/needs-you-sources.js"
     },
     "./surface/oidc-browser-login": {
       "types": "./dist/surface/oidc-browser-login.d.ts",
@@ -6324,6 +6460,18 @@
       "types": "./dist/surface/operator-provider-preferences.d.ts",
       "default": "./dist/surface/operator-provider-preferences.js"
     },
+    "./surface/scoped-workspace-ingest": {
+      "types": "./dist/surface/scoped-workspace-ingest.d.ts",
+      "default": "./dist/surface/scoped-workspace-ingest.js"
+    },
+    "./surface/setup-checklist": {
+      "types": "./dist/surface/setup-checklist.d.ts",
+      "default": "./dist/surface/setup-checklist.js"
+    },
+    "./surface/setup-checklist-model": {
+      "types": "./dist/surface/setup-checklist-model.d.ts",
+      "default": "./dist/surface/setup-checklist-model.js"
+    },
     "./surface/surface-access-policy": {
       "types": "./dist/surface/surface-access-policy.d.ts",
       "default": "./dist/surface/surface-access-policy.js"
@@ -6339,30 +6487,6 @@
     "./surface/surface-artifact-store": {
       "types": "./dist/surface/surface-artifact-store.d.ts",
       "default": "./dist/surface/surface-artifact-store.js"
-    },
-    "./surface/surface-operation-registry": {
-      "types": "./dist/surface/surface-operation-registry.d.ts",
-      "default": "./dist/surface/surface-operation-registry.js"
-    },
-    "./surface/needs-you": {
-      "types": "./dist/surface/needs-you.d.ts",
-      "default": "./dist/surface/needs-you.js"
-    },
-    "./surface/needs-you-sources": {
-      "types": "./dist/surface/needs-you-sources.d.ts",
-      "default": "./dist/surface/needs-you-sources.js"
-    },
-    "./surface/setup-checklist": {
-      "types": "./dist/surface/setup-checklist.d.ts",
-      "default": "./dist/surface/setup-checklist.js"
-    },
-    "./surface/setup-checklist-model": {
-      "types": "./dist/surface/setup-checklist-model.d.ts",
-      "default": "./dist/surface/setup-checklist-model.js"
-    },
-    "./surface/workspace-graph": {
-      "types": "./dist/surface/workspace-graph.d.ts",
-      "default": "./dist/surface/workspace-graph.js"
     },
     "./surface/surface-auth-routes": {
       "types": "./dist/surface/surface-auth-routes.d.ts",
@@ -6419,6 +6543,10 @@
     "./surface/surface-mutation-guard": {
       "types": "./dist/surface/surface-mutation-guard.d.ts",
       "default": "./dist/surface/surface-mutation-guard.js"
+    },
+    "./surface/surface-operation-registry": {
+      "types": "./dist/surface/surface-operation-registry.d.ts",
+      "default": "./dist/surface/surface-operation-registry.js"
     },
     "./surface/surface-provider-manifest": {
       "types": "./dist/surface/surface-provider-manifest.d.ts",
@@ -6524,9 +6652,33 @@
       "types": "./dist/surface/web-push.d.ts",
       "default": "./dist/surface/web-push.js"
     },
+    "./surface/workspace": {
+      "types": "./dist/surface/workspace.d.ts",
+      "default": "./dist/surface/workspace.js"
+    },
+    "./surface/workspace-autonomy": {
+      "types": "./dist/surface/workspace-autonomy.d.ts",
+      "default": "./dist/surface/workspace-autonomy.js"
+    },
+    "./surface/workspace-graph": {
+      "types": "./dist/surface/workspace-graph.d.ts",
+      "default": "./dist/surface/workspace-graph.js"
+    },
+    "./surface/workspace-query": {
+      "types": "./dist/surface/workspace-query.d.ts",
+      "default": "./dist/surface/workspace-query.js"
+    },
+    "./surface/workspace-scope": {
+      "types": "./dist/surface/workspace-scope.d.ts",
+      "default": "./dist/surface/workspace-scope.js"
+    },
+    "./surface/workspace-work": {
+      "types": "./dist/surface/workspace-work.d.ts",
+      "default": "./dist/surface/workspace-work.js"
+    },
     "./t": {
-      "types": "./dist/t.d.ts",
-      "default": "./dist/t.js"
+      "types": "./dist/localization/t.d.ts",
+      "default": "./dist/localization/t.js"
     },
     "./task": {
       "types": "./dist/task/index.d.ts",
@@ -6576,10 +6728,6 @@
       "types": "./dist/organization/team-decision-support-metrics.d.ts",
       "default": "./dist/organization/team-decision-support-metrics.js"
     },
-    "./ten-vad-bridge": {
-      "types": "./dist/ten-vad-bridge.d.ts",
-      "default": "./dist/ten-vad-bridge.js"
-    },
     "./tenant-activation": {
       "types": "./dist/organization/tenant-activation.d.ts",
       "default": "./dist/organization/tenant-activation.js"
@@ -6620,25 +6768,13 @@
       "types": "./dist/shell/terminal-keys.d.ts",
       "default": "./dist/shell/terminal-keys.js"
     },
-    "./testing/reasoning-backend-conformance": {
-      "types": "./dist/testing/reasoning-backend-conformance.d.ts",
-      "default": "./dist/testing/reasoning-backend-conformance.js"
-    },
     "./testing/mission-fixture": {
       "types": "./dist/testing/mission-fixture.d.ts",
       "default": "./dist/testing/mission-fixture.js"
     },
-    "./accepted-pipeline-bindings": {
-      "types": "./dist/accepted-pipeline-bindings.d.ts",
-      "default": "./dist/accepted-pipeline-bindings.js"
-    },
-    "./ui-component-registry": {
-      "types": "./dist/ui-component-registry.d.ts",
-      "default": "./dist/ui-component-registry.js"
-    },
-    "./foundation/text-escaping": {
-      "types": "./dist/foundation/text-escaping.d.ts",
-      "default": "./dist/foundation/text-escaping.js"
+    "./testing/reasoning-backend-conformance": {
+      "types": "./dist/testing/reasoning-backend-conformance.d.ts",
+      "default": "./dist/testing/reasoning-backend-conformance.js"
     },
     "./tier-guard": {
       "types": "./dist/tier-guard.d.ts",
@@ -6717,20 +6853,20 @@
       "default": "./dist/analysis/trace-schema.js"
     },
     "./training-catalog": {
-      "types": "./dist/training-catalog.d.ts",
-      "default": "./dist/training-catalog.js"
+      "types": "./dist/organization/training-catalog.d.ts",
+      "default": "./dist/organization/training-catalog.js"
     },
     "./trigger-runner": {
-      "types": "./dist/trigger-runner.d.ts",
-      "default": "./dist/trigger-runner.js"
+      "types": "./dist/daemon/trigger-runner.d.ts",
+      "default": "./dist/daemon/trigger-runner.js"
     },
     "./trust-engine": {
-      "types": "./dist/trust-engine.d.ts",
-      "default": "./dist/trust-engine.js"
+      "types": "./dist/governance/trust-engine.d.ts",
+      "default": "./dist/governance/trust-engine.js"
     },
     "./trust-requiring-resources": {
-      "types": "./dist/trust-requiring-resources.d.ts",
-      "default": "./dist/trust-requiring-resources.js"
+      "types": "./dist/governance/trust-requiring-resources.d.ts",
+      "default": "./dist/governance/trust-requiring-resources.js"
     },
     "./types": {
       "types": "./dist/types.d.ts",
@@ -6757,36 +6893,36 @@
       "default": "./dist/contracts/xlsx-protocol.js"
     },
     "./typesafe-jev-judgment-backend": {
-      "types": "./dist/typesafe-jev-judgment-backend.d.ts",
-      "default": "./dist/typesafe-jev-judgment-backend.js"
+      "types": "./dist/provider/typesafe-jev-judgment-backend.d.ts",
+      "default": "./dist/provider/typesafe-jev-judgment-backend.js"
+    },
+    "./ui-component-registry": {
+      "types": "./dist/surface/ui-component-registry.d.ts",
+      "default": "./dist/surface/ui-component-registry.js"
     },
     "./ui-element-detector": {
       "types": "./dist/surface/ui-element-detector.d.ts",
       "default": "./dist/surface/ui-element-detector.js"
     },
     "./unclassified-error-registry": {
-      "types": "./dist/unclassified-error-registry.d.ts",
-      "default": "./dist/unclassified-error-registry.js"
+      "types": "./dist/daemon/unclassified-error-registry.d.ts",
+      "default": "./dist/daemon/unclassified-error-registry.js"
     },
     "./unhandled-intent-registry": {
-      "types": "./dist/unhandled-intent-registry.d.ts",
-      "default": "./dist/unhandled-intent-registry.js"
+      "types": "./dist/intent/unhandled-intent-registry.d.ts",
+      "default": "./dist/intent/unhandled-intent-registry.js"
     },
     "./untrusted-content": {
-      "types": "./dist/untrusted-content.d.ts",
-      "default": "./dist/untrusted-content.js"
+      "types": "./dist/governance/untrusted-content.d.ts",
+      "default": "./dist/governance/untrusted-content.js"
     },
     "./usage-accounting": {
-      "types": "./dist/usage-accounting.d.ts",
-      "default": "./dist/usage-accounting.js"
+      "types": "./dist/finance/usage-accounting.d.ts",
+      "default": "./dist/finance/usage-accounting.js"
     },
     "./ux-vocabulary": {
-      "types": "./dist/ux-vocabulary.d.ts",
-      "default": "./dist/ux-vocabulary.js"
-    },
-    "./v4l2-virtual-camera-output": {
-      "types": "./dist/v4l2-virtual-camera-output.d.ts",
-      "default": "./dist/v4l2-virtual-camera-output.js"
+      "types": "./dist/localization/ux-vocabulary.d.ts",
+      "default": "./dist/localization/ux-vocabulary.js"
     },
     "./vad-registry": {
       "types": "./dist/voice/vad-registry.d.ts",
@@ -6797,8 +6933,8 @@
       "default": "./dist/validate.js"
     },
     "./validators": {
-      "types": "./dist/validators.d.ts",
-      "default": "./dist/validators.js"
+      "types": "./dist/foundation/validators.d.ts",
+      "default": "./dist/foundation/validators.js"
     },
     "./vault-mount": {
       "types": "./dist/secret/vault-mount.d.ts",
@@ -6808,6 +6944,14 @@
       "types": "./dist/vcs/index.d.ts",
       "default": "./dist/vcs/index.js"
     },
+    "./vcs/cwd-scope": {
+      "types": "./dist/vcs/cwd-scope.d.ts",
+      "default": "./dist/vcs/cwd-scope.js"
+    },
+    "./vcs/gh-cli-host-provider": {
+      "types": "./dist/vcs/gh-cli-host-provider.d.ts",
+      "default": "./dist/vcs/gh-cli-host-provider.js"
+    },
     "./vcs/git": {
       "types": "./dist/vcs/git.d.ts",
       "default": "./dist/vcs/git.js"
@@ -6815,6 +6959,10 @@
     "./vcs/github": {
       "types": "./dist/vcs/github.d.ts",
       "default": "./dist/vcs/github.js"
+    },
+    "./vcs/github-rest-host-provider": {
+      "types": "./dist/vcs/github-rest-host-provider.d.ts",
+      "default": "./dist/vcs/github-rest-host-provider.js"
     },
     "./vcs/governance-host": {
       "types": "./dist/vcs/governance-host.d.ts",
@@ -6824,9 +6972,37 @@
       "types": "./dist/vcs/index.d.ts",
       "default": "./dist/vcs/index.js"
     },
+    "./vcs/local-git-backend": {
+      "types": "./dist/vcs/local-git-backend.d.ts",
+      "default": "./dist/vcs/local-git-backend.js"
+    },
+    "./vcs/memory-vcs-backend": {
+      "types": "./dist/vcs/memory-vcs-backend.d.ts",
+      "default": "./dist/vcs/memory-vcs-backend.js"
+    },
+    "./vcs/memory-vcs-host-provider": {
+      "types": "./dist/vcs/memory-vcs-host-provider.d.ts",
+      "default": "./dist/vcs/memory-vcs-host-provider.js"
+    },
     "./vcs/publication-host": {
       "types": "./dist/vcs/publication-host.d.ts",
       "default": "./dist/vcs/publication-host.js"
+    },
+    "./vcs/vcs-backend": {
+      "types": "./dist/vcs/vcs-backend.d.ts",
+      "default": "./dist/vcs/vcs-backend.js"
+    },
+    "./vcs/vcs-host": {
+      "types": "./dist/vcs/vcs-host.d.ts",
+      "default": "./dist/vcs/vcs-host.js"
+    },
+    "./vcs/vcs-host-verbs": {
+      "types": "./dist/vcs/vcs-host-verbs.d.ts",
+      "default": "./dist/vcs/vcs-host-verbs.js"
+    },
+    "./verification-source-snapshot": {
+      "types": "./dist/testing/verification-source-snapshot.d.ts",
+      "default": "./dist/testing/verification-source-snapshot.js"
     },
     "./video": {
       "types": "./dist/video/index.d.ts",
@@ -7049,20 +7225,20 @@
       "default": "./dist/virtual/virtual-media-device-control-bridge.js"
     },
     "./vision-resolver": {
-      "types": "./dist/vision-resolver.d.ts",
-      "default": "./dist/vision-resolver.js"
+      "types": "./dist/organization/vision-resolver.d.ts",
+      "default": "./dist/organization/vision-resolver.js"
     },
     "./visual-raster": {
-      "types": "./dist/visual-raster.d.ts",
-      "default": "./dist/visual-raster.js"
+      "types": "./dist/media/visual-raster.d.ts",
+      "default": "./dist/media/visual-raster.js"
     },
     "./visual-review": {
-      "types": "./dist/visual-review.d.ts",
-      "default": "./dist/visual-review.js"
+      "types": "./dist/media/visual-review.d.ts",
+      "default": "./dist/media/visual-review.js"
     },
     "./visual-review-loop": {
-      "types": "./dist/visual-review-loop.d.ts",
-      "default": "./dist/visual-review-loop.js"
+      "types": "./dist/media/visual-review-loop.d.ts",
+      "default": "./dist/media/visual-review-loop.js"
     },
     "./vocabulary-catalog": {
       "types": "./dist/knowledge/vocabulary-catalog.d.ts",
@@ -7144,13 +7320,21 @@
       "types": "./dist/voice/engine-runtime-preferences.d.ts",
       "default": "./dist/voice/engine-runtime-preferences.js"
     },
-    "./voice/speech-languages": {
-      "types": "./dist/voice/speech-languages.d.ts",
-      "default": "./dist/voice/speech-languages.js"
+    "./voice/engine-runtime-preferences-access": {
+      "types": "./dist/voice/engine-runtime-preferences-access.d.ts",
+      "default": "./dist/voice/engine-runtime-preferences-access.js"
+    },
+    "./voice/engine-runtime-preferences-transaction": {
+      "types": "./dist/voice/engine-runtime-preferences-transaction.d.ts",
+      "default": "./dist/voice/engine-runtime-preferences-transaction.js"
     },
     "./voice/speech-cpp-client": {
       "types": "./dist/voice/speech-cpp-client.d.ts",
       "default": "./dist/voice/speech-cpp-client.js"
+    },
+    "./voice/speech-languages": {
+      "types": "./dist/voice/speech-languages.d.ts",
+      "default": "./dist/voice/speech-languages.js"
     },
     "./voice/speech-to-text-bridge": {
       "types": "./dist/voice/speech-to-text-bridge.d.ts",
@@ -7213,20 +7397,20 @@
       "default": "./dist/voice/voice-turn-taking-lexicon.js"
     },
     "./volatile-knowledge": {
-      "types": "./dist/volatile-knowledge.d.ts",
-      "default": "./dist/volatile-knowledge.js"
+      "types": "./dist/knowledge/volatile-knowledge.d.ts",
+      "default": "./dist/knowledge/volatile-knowledge.js"
     },
     "./web-design-system": {
-      "types": "./dist/web-design-system.d.ts",
-      "default": "./dist/web-design-system.js"
+      "types": "./dist/design/web-design-system.d.ts",
+      "default": "./dist/design/web-design-system.js"
     },
     "./web-search-runtime-bridge": {
       "types": "./dist/search/web-search-runtime-bridge.d.ts",
       "default": "./dist/search/web-search-runtime-bridge.js"
     },
-    "./contracts/wire-error": {
-      "types": "./dist/contracts/wire-error.d.ts",
-      "default": "./dist/contracts/wire-error.js"
+    "./windows-named-pipe-security": {
+      "types": "./dist/virtual/windows-named-pipe-security.d.ts",
+      "default": "./dist/virtual/windows-named-pipe-security.js"
     },
     "./work-coordination": {
       "types": "./dist/workforce/work-coordination.d.ts",
@@ -7300,6 +7484,10 @@
       "types": "./dist/workforce/index.d.ts",
       "default": "./dist/workforce/index.js"
     },
+    "./workforce/agent-worktree": {
+      "types": "./dist/workforce/agent-worktree.d.ts",
+      "default": "./dist/workforce/agent-worktree.js"
+    },
     "./workforce/artifact-bundle": {
       "types": "./dist/workforce/artifact-bundle.d.ts",
       "default": "./dist/workforce/artifact-bundle.js"
@@ -7364,10 +7552,6 @@
       "types": "./dist/workforce/work-coordination.d.ts",
       "default": "./dist/workforce/work-coordination.js"
     },
-    "./workforce/work-item-change-request": {
-      "types": "./dist/workforce/work-item-change-request.d.ts",
-      "default": "./dist/workforce/work-item-change-request.js"
-    },
     "./workforce/work-coordination-error": {
       "types": "./dist/workforce/work-coordination-error.d.ts",
       "default": "./dist/workforce/work-coordination-error.js"
@@ -7424,6 +7608,10 @@
       "types": "./dist/workforce/work-inventory-scoring.d.ts",
       "default": "./dist/workforce/work-inventory-scoring.js"
     },
+    "./workforce/work-item-change-request": {
+      "types": "./dist/workforce/work-item-change-request.d.ts",
+      "default": "./dist/workforce/work-item-change-request.js"
+    },
     "./workforce/work-scope-decision": {
       "types": "./dist/workforce/work-scope-decision.d.ts",
       "default": "./dist/workforce/work-scope-decision.js"
@@ -7464,10 +7652,6 @@
       "types": "./dist/workforce/workspace-budget.d.ts",
       "default": "./dist/workforce/workspace-budget.js"
     },
-    "./workforce/agent-worktree": {
-      "types": "./dist/workforce/agent-worktree.d.ts",
-      "default": "./dist/workforce/agent-worktree.js"
-    },
     "./workforce/workspace-ledger": {
       "types": "./dist/workforce/workspace-ledger.d.ts",
       "default": "./dist/workforce/workspace-ledger.js"
@@ -7481,8 +7665,8 @@
       "default": "./dist/workforce/workspace-sweep.js"
     },
     "./working-principles": {
-      "types": "./dist/working-principles.d.ts",
-      "default": "./dist/working-principles.js"
+      "types": "./dist/workforce/working-principles.d.ts",
+      "default": "./dist/workforce/working-principles.js"
     },
     "./workspace-budget": {
       "types": "./dist/workforce/workspace-budget.d.ts",
@@ -7495,278 +7679,6 @@
     "./workspace-sweep": {
       "types": "./dist/workforce/workspace-sweep.d.ts",
       "default": "./dist/workforce/workspace-sweep.js"
-    },
-    "./organization/continuous-operations": {
-      "types": "./dist/organization/continuous-operations.d.ts",
-      "default": "./dist/organization/continuous-operations.js"
-    },
-    "./organization/continuous-operations-policy": {
-      "types": "./dist/organization/continuous-operations-policy.d.ts",
-      "default": "./dist/organization/continuous-operations-policy.js"
-    },
-    "./organization/continuous-operations-sources": {
-      "types": "./dist/organization/continuous-operations-sources.d.ts",
-      "default": "./dist/organization/continuous-operations-sources.js"
-    },
-    "./organization/continuous-work-plan": {
-      "types": "./dist/organization/continuous-work-plan.d.ts",
-      "default": "./dist/organization/continuous-work-plan.js"
-    },
-    "./organization/continuous-work-owner": {
-      "types": "./dist/organization/continuous-work-owner.d.ts",
-      "default": "./dist/organization/continuous-work-owner.js"
-    },
-    "./organization/continuous-development-consent": {
-      "types": "./dist/organization/continuous-development-consent.d.ts",
-      "default": "./dist/organization/continuous-development-consent.js"
-    },
-    "./organization/continuous-mission-scope": {
-      "types": "./dist/organization/continuous-mission-scope.d.ts",
-      "default": "./dist/organization/continuous-mission-scope.js"
-    },
-    "./mission/mission-development-continuation": {
-      "types": "./dist/mission/mission-development-continuation.d.ts",
-      "default": "./dist/mission/mission-development-continuation.js"
-    },
-    "./mission/mission-development-proof": {
-      "types": "./dist/mission/mission-development-proof.d.ts",
-      "default": "./dist/mission/mission-development-proof.js"
-    },
-    "./mission/mission-development-gates": {
-      "types": "./dist/mission/mission-development-gates.d.ts",
-      "default": "./dist/mission/mission-development-gates.js"
-    },
-    "./vcs/cwd-scope": {
-      "types": "./dist/vcs/cwd-scope.d.ts",
-      "default": "./dist/vcs/cwd-scope.js"
-    },
-    "./vcs/vcs-backend": {
-      "types": "./dist/vcs/vcs-backend.d.ts",
-      "default": "./dist/vcs/vcs-backend.js"
-    },
-    "./vcs/local-git-backend": {
-      "types": "./dist/vcs/local-git-backend.d.ts",
-      "default": "./dist/vcs/local-git-backend.js"
-    },
-    "./vcs/memory-vcs-backend": {
-      "types": "./dist/vcs/memory-vcs-backend.d.ts",
-      "default": "./dist/vcs/memory-vcs-backend.js"
-    },
-    "./vcs/vcs-host": {
-      "types": "./dist/vcs/vcs-host.d.ts",
-      "default": "./dist/vcs/vcs-host.js"
-    },
-    "./vcs/vcs-host-verbs": {
-      "types": "./dist/vcs/vcs-host-verbs.d.ts",
-      "default": "./dist/vcs/vcs-host-verbs.js"
-    },
-    "./vcs/gh-cli-host-provider": {
-      "types": "./dist/vcs/gh-cli-host-provider.d.ts",
-      "default": "./dist/vcs/gh-cli-host-provider.js"
-    },
-    "./vcs/github-rest-host-provider": {
-      "types": "./dist/vcs/github-rest-host-provider.d.ts",
-      "default": "./dist/vcs/github-rest-host-provider.js"
-    },
-    "./vcs/memory-vcs-host-provider": {
-      "types": "./dist/vcs/memory-vcs-host-provider.d.ts",
-      "default": "./dist/vcs/memory-vcs-host-provider.js"
-    },
-    "./governance/authenticated-personal-approvals": {
-      "types": "./dist/governance/authenticated-personal-approvals.d.ts",
-      "default": "./dist/governance/authenticated-personal-approvals.js"
-    },
-    "./discussion/discussion-create-request": {
-      "types": "./dist/discussion/discussion-create-request.d.ts",
-      "default": "./dist/discussion/discussion-create-request.js"
-    },
-    "./organization/company-bootstrap": {
-      "types": "./dist/organization/company-bootstrap.d.ts",
-      "default": "./dist/organization/company-bootstrap.js"
-    },
-    "./organization/company-onboarding": {
-      "types": "./dist/organization/company-onboarding.d.ts",
-      "default": "./dist/organization/company-onboarding.js"
-    },
-    "./organization/company-setup-workflow": {
-      "types": "./dist/organization/company-setup-workflow.d.ts",
-      "default": "./dist/organization/company-setup-workflow.js"
-    },
-    "./organization/tenant-activation-approval": {
-      "types": "./dist/organization/tenant-activation-approval.d.ts",
-      "default": "./dist/organization/tenant-activation-approval.js"
-    },
-    "./organization/tenant-activation-probe": {
-      "types": "./dist/organization/tenant-activation-probe.d.ts",
-      "default": "./dist/organization/tenant-activation-probe.js"
-    },
-    "./organization/tenant-registry-consistency": {
-      "types": "./dist/organization/tenant-registry-consistency.d.ts",
-      "default": "./dist/organization/tenant-registry-consistency.js"
-    },
-    "./service/service-preflight": {
-      "types": "./dist/service/service-preflight.d.ts",
-      "default": "./dist/service/service-preflight.js"
-    },
-    "./knowledge/scoped-learning-domain": {
-      "types": "./dist/knowledge/scoped-learning-domain.d.ts",
-      "default": "./dist/knowledge/scoped-learning-domain.js"
-    },
-    "./knowledge/scoped-learning-workflow": {
-      "types": "./dist/knowledge/scoped-learning-workflow.d.ts",
-      "default": "./dist/knowledge/scoped-learning-workflow.js"
-    },
-    "./knowledge/scoped-learning-approval-visibility": {
-      "types": "./dist/knowledge/scoped-learning-approval-visibility.d.ts",
-      "default": "./dist/knowledge/scoped-learning-approval-visibility.js"
-    },
-    "./actor-context": {
-      "types": "./dist/actor-context.d.ts",
-      "default": "./dist/actor-context.js"
-    },
-    "./foundation/knowledge-tier": {
-      "types": "./dist/foundation/knowledge-tier.d.ts",
-      "default": "./dist/foundation/knowledge-tier.js"
-    },
-    "./foundation/json-state": {
-      "types": "./dist/foundation/json-state.d.ts",
-      "default": "./dist/foundation/json-state.js"
-    },
-    "./failure-tracker": {
-      "types": "./dist/failure-tracker.d.ts",
-      "default": "./dist/failure-tracker.js"
-    },
-    "./check-harness": {
-      "types": "./dist/check-harness.d.ts",
-      "default": "./dist/check-harness.js"
-    },
-    "./command-harness": {
-      "types": "./dist/command-harness.d.ts",
-      "default": "./dist/command-harness.js"
-    },
-    "./cli-guard": {
-      "types": "./dist/cli-guard.d.ts",
-      "default": "./dist/cli-guard.js"
-    },
-    "./runtime-control-policy": {
-      "types": "./dist/runtime-control-policy.d.ts",
-      "default": "./dist/runtime-control-policy.js"
-    },
-    "./shortcut-bridge": {
-      "types": "./dist/shortcut-bridge.d.ts",
-      "default": "./dist/shortcut-bridge.js"
-    },
-    "./information-assets/types": {
-      "types": "./dist/information-assets/types.d.ts",
-      "default": "./dist/information-assets/types.js"
-    },
-    "./information-assets/catalog": {
-      "types": "./dist/information-assets/catalog.d.ts",
-      "default": "./dist/information-assets/catalog.js"
-    },
-    "./information-assets/access": {
-      "types": "./dist/information-assets/access.d.ts",
-      "default": "./dist/information-assets/access.js"
-    },
-    "./information-assets/collector": {
-      "types": "./dist/information-assets/collector.d.ts",
-      "default": "./dist/information-assets/collector.js"
-    },
-    "./information-assets/provider": {
-      "types": "./dist/information-assets/provider.d.ts",
-      "default": "./dist/information-assets/provider.js"
-    },
-    "./information-assets/recipes": {
-      "types": "./dist/information-assets/recipes.d.ts",
-      "default": "./dist/information-assets/recipes.js"
-    },
-    "./information-assets/work": {
-      "types": "./dist/information-assets/work.d.ts",
-      "default": "./dist/information-assets/work.js"
-    },
-    "./information-assets/work-types": {
-      "types": "./dist/information-assets/work-types.d.ts",
-      "default": "./dist/information-assets/work-types.js"
-    },
-    "./information-assets/completion": {
-      "types": "./dist/information-assets/completion.d.ts",
-      "default": "./dist/information-assets/completion.js"
-    },
-    "./information-assets/collector-capture": {
-      "types": "./dist/information-assets/collector-capture.d.ts",
-      "default": "./dist/information-assets/collector-capture.js"
-    },
-    "./provider-runtime-requirements": {
-      "types": "./dist/provider-runtime-requirements.d.ts",
-      "default": "./dist/provider-runtime-requirements.js"
-    },
-    "./media/docx-xml": {
-      "types": "./dist/media/docx-xml.d.ts",
-      "default": "./dist/media/docx-xml.js"
-    },
-    "./media/xlsx-xstring": {
-      "types": "./dist/media/xlsx-xstring.d.ts",
-      "default": "./dist/media/xlsx-xstring.js"
-    },
-    "./provider-chain-router": {
-      "types": "./dist/provider-chain-router.d.ts",
-      "default": "./dist/provider-chain-router.js"
-    },
-    "./provider-registry": {
-      "types": "./dist/provider-registry.d.ts",
-      "default": "./dist/provider-registry.js"
-    },
-    "./windows-native-image-generation-bridge": {
-      "types": "./dist/windows-native-image-generation-bridge.d.ts",
-      "default": "./dist/windows-native-image-generation-bridge.js"
-    },
-    "./barge-in-controller": {
-      "types": "./dist/barge-in-controller.d.ts",
-      "default": "./dist/barge-in-controller.js"
-    },
-    "./segmented-voice-playback": {
-      "types": "./dist/segmented-voice-playback.d.ts",
-      "default": "./dist/segmented-voice-playback.js"
-    },
-    "./voice/engine-runtime-preferences-access": {
-      "types": "./dist/voice/engine-runtime-preferences-access.d.ts",
-      "default": "./dist/voice/engine-runtime-preferences-access.js"
-    },
-    "./voice/engine-runtime-preferences-transaction": {
-      "types": "./dist/voice/engine-runtime-preferences-transaction.d.ts",
-      "default": "./dist/voice/engine-runtime-preferences-transaction.js"
-    },
-    "./governance/approval-store-reader": {
-      "types": "./dist/governance/approval-store-reader.d.ts",
-      "default": "./dist/governance/approval-store-reader.js"
-    },
-    "./intent/intent-phrase-lexicon": {
-      "types": "./dist/intent/intent-phrase-lexicon.d.ts",
-      "default": "./dist/intent/intent-phrase-lexicon.js"
-    },
-    "./knowledge/golden-scenario-verdict": {
-      "types": "./dist/knowledge/golden-scenario-verdict.d.ts",
-      "default": "./dist/knowledge/golden-scenario-verdict.js"
-    },
-    "./router-contract": {
-      "types": "./dist/router-contract.d.ts",
-      "default": "./dist/router-contract.js"
-    },
-    "./customer-decision": {
-      "types": "./dist/customer-decision/index.d.ts",
-      "default": "./dist/customer-decision/index.js"
-    },
-    "./decision-ledger": {
-      "types": "./dist/decision-ledger/index.d.ts",
-      "default": "./dist/decision-ledger/index.js"
-    },
-    "./foundation/rate-limit": {
-      "types": "./dist/foundation/rate-limit.d.ts",
-      "default": "./dist/foundation/rate-limit.js"
-    },
-    "./foundation/scope-context-validation": {
-      "types": "./dist/foundation/scope-context-validation.d.ts",
-      "default": "./dist/foundation/scope-context-validation.js"
     }
   },
   "dependencies": {

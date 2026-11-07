@@ -17,7 +17,7 @@ import {
   computeTenantIngestCuration,
   TENANT_INGEST_DEFAULT_KIND,
 } from './knowledge-curation-tenant-ingest.js';
-import { deriveAssetId } from '../ingest-asset-ledger.js';
+import { deriveAssetId } from '../information-assets/ingest-asset-ledger.js';
 import {
   renderCurationReportMarkdown,
   type CurationSloConfig,

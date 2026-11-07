@@ -15,6 +15,39 @@ function viewer(overrides: Partial<ViewerContext>): ViewerContext {
 }
 
 describe('discussion visibility', () => {
+  it('enforces tier and effective read permission independently of owner/tenant admission', () => {
+    const owner = viewer({ principalId: 'owner', tenantSlugs: ['acme'], tierAccess: ['public'] });
+    for (const binding of [{ tenant_slug: 'acme' }, { owner_nhi: 'owner' }]) {
+      expect(isDiscussionVisibleToViewer(owner, { ...binding, tier: 'public' })).toBe(true);
+      expect(isDiscussionVisibleToViewer(owner, { ...binding, tier: 'confidential' })).toBe(false);
+      expect(isDiscussionVisibleToViewer(owner, binding as never)).toBe(false);
+      expect(isDiscussionVisibleToViewer(owner, { ...binding, tier: 'invalid' as never })).toBe(
+        false
+      );
+      expect(
+        isDiscussionVisibleToViewer({ ...owner, permissions: [] }, { ...binding, tier: 'public' })
+      ).toBe(false);
+    }
+  });
+  it('applies a tenant selection after system and person admission', () => {
+    const owner = viewer({ principalId: 'owner', includeUntenanted: true });
+    for (const scope of [{}, { owner_nhi: 'owner' }]) {
+      expect(
+        isDiscussionVisibleToViewer(
+          owner,
+          scope as Parameters<typeof isDiscussionVisibleToViewer>[1]
+        )
+      ).toBe(true);
+      expect(
+        isDiscussionVisibleToViewer(
+          owner,
+          scope as Parameters<typeof isDiscussionVisibleToViewer>[1],
+          'acme'
+        )
+      ).toBe(false);
+    }
+    expect(isDiscussionVisibleToViewer(owner, { tenant_slug: 'acme' }, 'acme')).toBe(true);
+  });
   it('shows every room to an unrestricted viewer', () => {
     expect(isDiscussionVisibleToViewer(viewer({}), {})).toBe(true);
     expect(isDiscussionVisibleToViewer(viewer({}), { tenant_slug: 'acme' })).toBe(true);

@@ -17,7 +17,7 @@
         },
         {
           "id": "see-progress",
-          "title": "進み具合を確認する",
+          "title": "依頼の状態を確認する",
           "goal": "頼んだことの状態とできたものを確認する",
           "try": { "kind": "progress" },
           "check": { "kind": "self", "text": "進行中のものと次の一手を確認できた" }

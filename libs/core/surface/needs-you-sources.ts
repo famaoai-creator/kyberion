@@ -7,8 +7,8 @@
  * count with the one builder.
  *
  * Admission is conservative: tier and tenant come from the server-resolved
- * viewer (tenant admission is `admitsTenant`, shared with every surface); a memory candidate with an audience or an owner restriction is left
- * out because this reader cannot prove who the caller is.
+ * viewer. Owner/audience restrictions use the same authenticated identity
+ * admission as the Concierge reader.
  */
 
 import { createHash } from 'node:crypto';
@@ -17,8 +17,8 @@ import {
   notificationMatchesScope,
   toCeoApprovalItem,
   type CeoApprovalItem,
-} from '../ceo-surface-summary.js';
-import { listInboxEntries } from '../deliverable-inbox.js';
+} from './ceo-surface-summary.js';
+import { listInboxEntries } from '../task/deliverable-inbox.js';
 import { listApprovalRequests } from '../governance/approval-store-reader.js';
 import { readApprovalPublicationPreview } from './approval-publication-preview.js';
 import { listSurfaceNotificationsAcrossChannels } from './surface-ux.js';
@@ -39,6 +39,7 @@ import type {
 } from './needs-you.js';
 import {
   admitsCustody,
+  admitsScopeAudience,
   custodyOfScope,
   viewerPersonIds,
   type SurfaceAuthorizationContext,
@@ -93,8 +94,24 @@ function knowledgeFor(viewer: SurfaceAuthorizationContext): NeedsYouKnowledgeInp
       const sourceTier = (scope?.tier ?? candidate.sensitivity_tier) as Tier;
       if (!tiers.includes(candidate.sensitivity_tier as Tier) || !tiers.includes(sourceTier))
         return false;
-      if (scope?.allowed_audience?.length || scope?.owner_nhi) return false;
-      return sourceTier === 'public' || admitsCustody(viewer, custodyOfScope(scope));
+      if (!admitsScopeAudience(viewer, scope)) return false;
+      if (
+        viewer.organizationIds !== 'all' &&
+        (!scope?.organization_id || !viewer.organizationIds.includes(scope.organization_id))
+      )
+        return false;
+      if (
+        viewer.projectIds !== 'all' &&
+        (!scope?.project_id || !viewer.projectIds.includes(scope.project_id))
+      )
+        return false;
+      const ids = viewerPersonIds(viewer);
+      const audience = scope?.allowed_audience ?? [];
+      const audienceMatch = audience.some((id) => ids.includes(id));
+      if (audience.length && !audienceMatch) return false;
+      if (scope?.owner_nhi && !ids.includes(scope.owner_nhi) && !audienceMatch) return false;
+      if (sourceTier === 'personal' && !scope?.owner_nhi && !audienceMatch) return false;
+      return true;
     })
     .map((candidate) => needsYouKnowledgeFromCandidate(candidate));
 }
@@ -156,7 +173,7 @@ function approvalsFor(viewer: SurfaceAuthorizationContext): CeoApprovalItem[] {
       // A public untenanted approval is everyone's — except when it names
       // an owner: person custody is identity-bound, never broadcast.
       const custody = custodyOfScope(record.scope);
-      if (!tenant && tier === 'public' && custody.kind !== 'person') return true;
+      if (!tenant && tier === 'public' && custody.kind === 'system') return true;
       return admitsCustody(viewer, custody);
     })
     .map((record) =>

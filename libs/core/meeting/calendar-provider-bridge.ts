@@ -14,7 +14,7 @@ import {
   createSeamLifecycle,
   type SeamProviderMetadata,
 } from '../seam.js';
-import { resolveSeamDefaultProvider } from '../seam-provider-selection.js';
+import { resolveSeamDefaultProvider } from '../provider/seam-provider-selection.js';
 
 export interface CalendarEventSummary {
   end: string;

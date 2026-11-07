@@ -10,7 +10,7 @@
  */
 
 import { fixedWindowLimiter } from '../foundation/rate-limit.js';
-import { loadRuntimeControlPolicy } from '../runtime-control-policy.js';
+import { loadRuntimeControlPolicy } from '../governance/runtime-control-policy.js';
 import {
   completeOidcLogin,
   loginTransactionCookieName,

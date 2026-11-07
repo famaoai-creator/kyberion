@@ -193,8 +193,10 @@ async function probeCoreAudioOutputBridge(
       }
     );
   }
-  const script = pathResolver.rootResolve('libs/core/coreaudio-output-bridge.swift');
-  const inventoryScript = pathResolver.rootResolve('libs/core/coreaudio-device-inventory.swift');
+  const script = pathResolver.rootResolve('libs/core/voice/coreaudio-output-bridge.swift');
+  const inventoryScript = pathResolver.rootResolve(
+    'libs/core/voice/coreaudio-device-inventory.swift'
+  );
   if (safeExistsSync(script) && safeExistsSync(inventoryScript)) {
     const inventory = await createCoreAudioDeviceInventoryBridge().probe();
     if (inventory.available) {
@@ -218,7 +220,7 @@ async function probeCoreAudioOutputBridge(
     'coreaudio.output.bridge',
     'fail',
     'CoreAudio output helper is missing from the repository',
-    'Rebuild Kyberion packages and restore libs/core/coreaudio-output-bridge.swift',
+    'Rebuild Kyberion packages and restore libs/core/voice/coreaudio-output-bridge.swift',
     { reasonCode: 'COREAUDIO_BRIDGE_MISSING' }
   );
 }

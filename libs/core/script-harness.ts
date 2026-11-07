@@ -2,7 +2,7 @@ import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secur
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { readTextFile } from './foundation/text.js';
 import { withExecutionContext } from './authority.js';
-import { isDirectEntry } from './direct-entry.js';
+import { isDirectEntry } from './harnessing/direct-entry.js';
 import { DiagnosticError } from './logger.js';
 
 export interface ScriptFlags {

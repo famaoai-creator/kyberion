@@ -55,8 +55,8 @@ status: archived
 
 ## 実装メモ
 
-- 2026-07-05: `knowledge/product/schemas/decision-rights.schema.json` と `knowledge/product/governance/decision-rights.json` を追加し、`libs/core/decision-rights.ts` / `libs/core/company.ts` から Company 集約経由で読めるようにした。Company dashboard でも決裁ポリシー要約を表示する。
-- 2026-07-05: `libs/core/governance/approval-gate.ts` が decision-rights を先に評価し、権限内の操作は即時許可するようにした。`libs/core/vision-resolver.ts` に黄金律優先順位ユーティリティを追加し、approval gate の監査メタデータへも流した。
+- 2026-07-05: `knowledge/product/schemas/decision-rights.schema.json` と `knowledge/product/governance/decision-rights.json` を追加し、`libs/core/organization/decision-rights.ts` / `libs/core/organization/company.ts` から Company 集約経由で読めるようにした。Company dashboard でも決裁ポリシー要約を表示する。
+- 2026-07-05: `libs/core/governance/approval-gate.ts` が decision-rights を先に評価し、権限内の操作は即時許可するようにした。`libs/core/organization/vision-resolver.ts` に黄金律優先順位ユーティリティを追加し、approval gate の監査メタデータへも流した。
 - 2026-07-05: `libs/core/governance/approval-audit.ts` を拡張し、決裁種別・相関 ID ごとの drill-down 集計を追加した。Chronos / sovereign dashboard / Company API で approval audit の要約と drill-down を表示するようにした。
 - 2026-07-05: AO-01 の ops-gate 横断統合は引き続き別タスクだが、本計画の「決裁監査の詳細 drill-down」は完了した。
 - 2026-07-14 精査: Task1/2/4 は実装+テスト21本緑(decision-rights.test.ts / approval-gate.test.ts / vision-resolver.test.ts / approval-audit.test.ts)を確認。**Task3 は未了と判明**: `resolveGoldenRulePriorityOrder`(vision-resolver.ts)は `approval-gate.ts` の監査メタデータへ付与されるのみで、本タスクが要求する「decision-support mission / wisdom-actuator の decision-ops での競合タイブレーク」経路には接続されていない(`decision-ops.ts` に参照なし)。次の一手: wisdom-actuator の意思決定系 op(例: 複数選択肢を比較する decision-ops)に golden-rule 優先順位での決定論的タイブレークを組み込み、競合解決テストを追加する。

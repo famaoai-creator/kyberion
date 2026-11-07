@@ -5,8 +5,8 @@ vi.mock('../workforce/worker-compaction-snapshot.js', async (original) => ({
   ...(await original<typeof import('../workforce/worker-compaction-snapshot.js')>()),
   restoreJournalCompaction: mocks.restore,
 }));
-vi.mock('../owner-scope.js', async (original) => ({
-  ...(await original<typeof import('../owner-scope.js')>()),
+vi.mock('../governance/owner-scope.js', async (original) => ({
+  ...(await original<typeof import('../governance/owner-scope.js')>()),
   resolveMissionDir: () => 'active/shared/tmp/vitest-mission-compaction-caller',
 }));
 vi.mock('../workforce/worker-context-compaction.js', async (original) => ({

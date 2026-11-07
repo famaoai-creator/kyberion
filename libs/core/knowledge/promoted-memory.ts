@@ -1,0 +1,726 @@
+import {
+  buildPromotedMemoryRecord,
+  buildPromotedMemoryMarkdown,
+  normalizePromotedMemoryLines as normalizeLines,
+  type PromotedMemoryRecord,
+  type PromotedKnowledgeHintRecord,
+} from './promoted-memory-builder.js';
+export {
+  buildPromotedMemoryRecord,
+  buildPromotedMemoryMarkdown,
+} from './promoted-memory-builder.js';
+export type {
+  PromotedMemoryRecord,
+  PromotedPatternRecord,
+  PromotedSopRecord,
+  PromotedKnowledgeHintRecord,
+  PromotedReportTemplateRecord,
+} from './promoted-memory-builder.js';
+import { withLockSync } from '../foundation/lock-utils.js';
+import type { ValidateFunction } from 'ajv';
+import * as path from 'node:path';
+import { createHash } from 'node:crypto';
+import { withExecutionContext } from '../authority.js';
+import { pathResolver } from '../path-resolver.js';
+import { compileSchema } from '../foundation/ajv.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { readJsonIfPresent } from '../foundation/json.js';
+import { readTextFile } from '../foundation/text.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from '../secure-io.js';
+import type { DistillCandidateRecord } from './distill-candidate-registry.js';
+import { assertScopedLearningRecord } from './scoped-learning-publication.js';
+import { assertScopedLearningScope, scopedLearningMarkdownPath } from './scoped-learning-domain.js';
+import type { MemoryScopeEnvelope } from './memory-scope.js';
+import {
+  isPublicMemoryEvidencePath,
+  loadMemoryPromotionCandidate,
+  type MemoryApprovalChannel,
+} from './memory-promotion-queue.js';
+import {
+  readGitProvenance,
+  resolvePromotionTargetRoot,
+  writePromotedFilesToWorktree,
+  type GitRunner,
+  type WorktreeFileWriter,
+} from './memory-promotion-git.js';
+import { logger } from '../core.js';
+import { registerMemoryProvenance, type MemoryOriginRef } from './memory-provenance.js';
+const validatorCache = new Map<string, ValidateFunction>();
+// Test isolation (env override): the distill E2E rewrites HINTS.md, and a
+// parallel catalog-integrity test can observe the mid-test dirty state.
+// Overriding the paths lets tests run against a scratch copy.
+function tenantEvolutionRoot(scope?: MemoryScopeEnvelope): string | undefined {
+  const tenant = scope?.tier === 'confidential' ? scope.tenant_slug?.trim() : undefined;
+  if (
+    !tenant ||
+    tenant.includes('/') ||
+    tenant.includes('\\') ||
+    tenant === '.' ||
+    tenant === '..'
+  ) {
+    return undefined;
+  }
+  // KYBERION_HINTS_PATH is a legacy/global file override used by tests and
+  // the shared governance lane. It must never become the parent of a tenant
+  // namespace (a file path would otherwise turn into
+  // `<HINTS_PATH>/<tenant>/evolution`). Tenant promotion always resolves from
+  // the authoritative confidential knowledge root.
+  return assertSafeRepositoryPath(
+    path.join(pathResolver.knowledge('confidential'), tenant, 'evolution'),
+    { allowMissingLeaf: true }
+  );
+}
+
+function safeOverridePath(override: string | undefined, fallback: string): string {
+  if (override) {
+    try {
+      return assertSafeRepositoryPath(pathResolver.rootResolve(override), {
+        allowMissingLeaf: true,
+      });
+    } catch {
+      // An optional test/runtime override must never widen the write surface.
+    }
+  }
+  return assertSafeRepositoryPath(fallback, { allowMissingLeaf: true });
+}
+
+function resolveHintsPath(scope?: MemoryScopeEnvelope): string {
+  const tenantRoot = tenantEvolutionRoot(scope);
+  if (tenantRoot)
+    return assertSafeRepositoryPath(path.join(tenantRoot, 'HINTS.md'), {
+      allowMissingLeaf: true,
+    });
+  const override = getRegisteredEnvText('KYBERION_HINTS_PATH');
+  return safeOverridePath(override, pathResolver.knowledge('product/governance/HINTS.md'));
+}
+function resolveHintsArchiveDir(scope?: MemoryScopeEnvelope): string {
+  const tenantRoot = tenantEvolutionRoot(scope);
+  if (tenantRoot)
+    return assertSafeRepositoryPath(path.join(tenantRoot, 'hints-archive'), {
+      allowMissingLeaf: true,
+    });
+  const override = getRegisteredEnvText('KYBERION_HINTS_ARCHIVE_DIR');
+  return safeOverridePath(override, pathResolver.knowledge('product/hints/archive'));
+}
+const HINTS_MARKER =
+  '<!-- Distillation pipeline will append structured hint blocks below this line -->';
+const HINTS_MAX_SECTIONS = 50;
+
+type PromotedMemoryExecutionRole = 'mission_controller' | 'chronos_gateway';
+
+function withPromotedMemoryExecutionContext<T>(role: PromotedMemoryExecutionRole, fn: () => T): T {
+  return withExecutionContext(role, fn, 'ecosystem_architect');
+}
+
+function schemaPathForKind(kind: PromotedMemoryRecord['kind']): string {
+  switch (kind) {
+    case 'pattern':
+      return pathResolver.knowledge('product/schemas/generated-pattern-record.schema.json');
+    case 'sop_candidate':
+      return pathResolver.knowledge('product/schemas/generated-sop-record.schema.json');
+    case 'knowledge_hint':
+      return pathResolver.knowledge('product/schemas/generated-knowledge-hint-record.schema.json');
+    case 'report_template':
+      return pathResolver.knowledge('product/schemas/generated-report-template-record.schema.json');
+  }
+}
+
+function ensureValidator(kind: PromotedMemoryRecord['kind']): ValidateFunction {
+  const cached = validatorCache.get(kind);
+  if (cached) return cached;
+  const validator = compileSchema(schemaPathForKind(kind));
+  validatorCache.set(kind, validator);
+  return validator;
+}
+
+function logicalDirFor(input: {
+  kind: PromotedMemoryRecord['kind'];
+  domain: PromotedMemoryRecord['knowledge_domain'];
+  tier: PromotedMemoryRecord['tier'];
+  scope?: MemoryScopeEnvelope;
+}): string {
+  const kindDir =
+    input.kind === 'sop_candidate'
+      ? 'operations'
+      : input.kind === 'report_template'
+        ? 'templates'
+        : input.kind === 'pattern'
+          ? 'patterns'
+          : 'wisdom';
+  if (
+    input.domain === 'organization' &&
+    input.scope?.tier === 'confidential' &&
+    (input.scope.organization_id || input.scope.project_id || input.kind === 'sop_candidate')
+  ) {
+    if (input.kind !== 'sop_candidate')
+      throw new Error(
+        '[LEARNING_SCOPE_UNSUPPORTED] Narrow scoped publication currently supports SOP only'
+      );
+    return path.posix.dirname(scopedLearningMarkdownPath(input.scope, 'scope-path'));
+  }
+  if (input.domain === 'product') return `knowledge/product/evolution/${kindDir}/generated`;
+  if (input.domain === 'personal') {
+    const ownerNhi = input.scope?.owner_nhi?.trim();
+    if (!ownerNhi) throw new Error('Personal knowledge requires an explicit owner_nhi.');
+    const ownerKey = createHash('sha256').update(ownerNhi).digest('hex').slice(0, 20);
+    return `knowledge/personal/owners/${ownerKey}/${kindDir}/generated`;
+  }
+  const tenantRoot = tenantEvolutionRoot(input.scope);
+  if (tenantRoot) {
+    const kindDir =
+      input.kind === 'pattern'
+        ? 'patterns'
+        : input.kind === 'sop_candidate'
+          ? 'operations'
+          : input.kind === 'knowledge_hint'
+            ? 'wisdom'
+            : 'templates';
+    return `${tenantRoot}/${kindDir}`;
+  }
+  switch (input.kind) {
+    case 'pattern':
+      return `knowledge/${input.tier}/common/patterns/generated`;
+    case 'sop_candidate':
+      return `knowledge/${input.tier}/common/operations/generated`;
+    case 'knowledge_hint':
+      return `knowledge/${input.tier}/common/wisdom/generated`;
+    case 'report_template':
+      return `knowledge/${input.tier}/common/templates/generated`;
+  }
+}
+
+function buildHintsBlock(record: PromotedKnowledgeHintRecord): string {
+  return [
+    `## ${record.record_id} (${record.created_at.slice(0, 10)})`,
+    '',
+    record.summary,
+    '',
+    `source_ref: ${record.candidate_id}`,
+    `evidence_refs:`,
+    ...record.evidence_refs.map((ref) => `- ${ref}`),
+    '',
+  ].join('\n');
+}
+
+function splitHintsBlocks(raw: string): string[] {
+  const markerIndex = raw.indexOf(HINTS_MARKER);
+  if (markerIndex < 0) return [];
+  const tail = raw.slice(markerIndex + HINTS_MARKER.length).trim();
+  if (!tail) return [];
+  return tail
+    .split(/\n{2,}(?=## )/u)
+    .map((block) => block.trim())
+    .filter(Boolean);
+}
+
+function buildHintsArchivePath(
+  record: PromotedKnowledgeHintRecord,
+  scope?: MemoryScopeEnvelope
+): string {
+  const stamp = record.created_at.replace(/[:.]/gu, '-');
+  return `${resolveHintsArchiveDir(scope)}/${stamp}-${record.record_id}.md`;
+}
+
+function archiveGovernanceHintBlocks(
+  blocks: string[],
+  record: PromotedKnowledgeHintRecord,
+  scope?: MemoryScopeEnvelope
+): void {
+  if (blocks.length === 0) return;
+  const archivePath = buildHintsArchivePath(record, scope);
+  if (!safeExistsSync(resolveHintsArchiveDir(scope)))
+    safeMkdir(resolveHintsArchiveDir(scope), { recursive: true });
+  const content = [
+    '# Archived Operational Hints',
+    '',
+    `archived_at: ${record.created_at}`,
+    `source: ${resolveHintsPath(scope)}`,
+    `archived_sections: ${blocks.length}`,
+    '',
+    ...blocks,
+  ].join('\n\n');
+  safeWriteFile(archivePath, `${content.replace(/\n?$/, '\n')}`);
+}
+
+function buildLiveHintsDocument(existing: string, retainedBlocks: string[]): string {
+  const markerIndex = existing.indexOf(HINTS_MARKER);
+  const baseDocument =
+    markerIndex >= 0
+      ? existing.slice(0, markerIndex + HINTS_MARKER.length).trimEnd()
+      : [
+          '# Operational Hints',
+          '',
+          '> **Generated by** `pipelines/fragments/memory-distillation.json` (via `volatile-gc` → `memory-promotion-queue`).',
+          '> Do not edit manually — content is overwritten by the distillation pipeline.',
+          '> **Purpose**: Condensed operational learnings from recent missions and volatile working-memory faces,',
+          '> surfaced here so Recovery and Alignment phases can read relevant hints without full knowledge search.',
+          '',
+          HINTS_MARKER,
+        ].join('\n');
+  if (retainedBlocks.length === 0) {
+    return `${baseDocument.trimEnd()}\n`;
+  }
+  return `${baseDocument.trimEnd()}\n\n${retainedBlocks.join('\n\n')}\n`;
+}
+
+function existingRegularPromotedMemoryFile(filePath: string, label: string): string | null {
+  if (!safeExistsSync(filePath)) return null;
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[PROMOTED_MEMORY_RESOURCE] ${label} must be a regular file: ${filePath}`);
+  }
+  return filePath;
+}
+
+function appendGovernanceHintRecord(
+  record: PromotedKnowledgeHintRecord,
+  scope?: MemoryScopeEnvelope
+): void {
+  const block = buildHintsBlock(record);
+  const hintsPath = resolveHintsPath(scope);
+  const existingHintsPath = existingRegularPromotedMemoryFile(hintsPath, 'hints')
+    ? hintsPath
+    : null;
+  const existing = existingHintsPath
+    ? readTextFile(existingHintsPath)
+    : [
+        '# Operational Hints',
+        '',
+        '> **Generated by** `pipelines/fragments/memory-distillation.json` (via `volatile-gc` → `memory-promotion-queue`).',
+        '> Do not edit manually — content is overwritten by the distillation pipeline.',
+        '> **Purpose**: Condensed operational learnings from recent missions and volatile working-memory faces,',
+        '> surfaced here so Recovery and Alignment phases can read relevant hints without full knowledge search.',
+        '',
+        HINTS_MARKER,
+        '',
+      ].join('\n');
+
+  const blocks = splitHintsBlocks(existing);
+  blocks.push(block);
+
+  const overflowCount = Math.max(0, blocks.length - HINTS_MAX_SECTIONS);
+  const overflowBlocks = overflowCount > 0 ? blocks.slice(0, overflowCount) : [];
+  const retainedBlocks = overflowCount > 0 ? blocks.slice(overflowCount) : blocks;
+
+  archiveGovernanceHintBlocks(overflowBlocks, record, scope);
+  const hintsDir = pathResolver.rootResolve(path.dirname(hintsPath));
+  if (!safeExistsSync(hintsDir)) safeMkdir(hintsDir, { recursive: true });
+  safeWriteFile(hintsPath, buildLiveHintsDocument(existing, retainedBlocks));
+}
+
+function resolvePromotedRecordPath(ref: string): string | null {
+  const normalized = String(ref || '').trim();
+  if (!normalized) return null;
+  if (normalized.endsWith('.md') || normalized.includes('/')) {
+    let abs: string;
+    try {
+      abs = assertSafeRepositoryPath(pathResolver.resolve(normalized), {
+        allowMissingLeaf: true,
+      });
+    } catch {
+      return null;
+    }
+    return existingRegularPromotedMemoryFile(abs, 'promoted record');
+  }
+  const kinds = ['pattern', 'sop_candidate', 'knowledge_hint', 'report_template'] as const;
+  const tiers = ['personal', 'confidential', 'public'] as const;
+  for (const tier of tiers) {
+    for (const kind of kinds) {
+      const dir =
+        kind === 'pattern'
+          ? `knowledge/${tier}/common/patterns/generated`
+          : kind === 'sop_candidate'
+            ? `knowledge/${tier}/common/operations/generated`
+            : kind === 'knowledge_hint'
+              ? `knowledge/${tier}/common/wisdom/generated`
+              : `knowledge/${tier}/common/templates/generated`;
+      const abs = pathResolver.resolve(`${dir}/${normalized}.md`);
+      const existing = existingRegularPromotedMemoryFile(abs, 'promoted record');
+      if (existing) return existing;
+    }
+  }
+  return null;
+}
+
+function updateFrontmatterField(absPath: string, key: string, value: string): void {
+  const existingPath = existingRegularPromotedMemoryFile(absPath, 'promoted record');
+  if (!existingPath) return;
+  const raw = readTextFile(existingPath);
+  const lines = raw.split(/\r?\n/);
+  const start = lines.indexOf('---');
+  if (start < 0) return;
+  const end = lines.indexOf('---', start + 1);
+  if (end < 0) return;
+  const nextValue = `${key}: ${value}`;
+  let updated = false;
+  for (let i = start + 1; i < end; i += 1) {
+    if (lines[i].startsWith(`${key}:`)) {
+      lines[i] = nextValue;
+      updated = true;
+      break;
+    }
+  }
+  if (!updated) lines.splice(end, 0, nextValue);
+  safeWriteFile(existingPath, `${lines.join('\n').replace(/\n?$/, '\n')}`);
+}
+
+function backlinkSupersededRecord(record: PromotedMemoryRecord): void {
+  const targetRef = record.supersedes;
+  if (!targetRef) return;
+  const targetPath = resolvePromotedRecordPath(targetRef);
+  if (!targetPath) {
+    logger.warn(
+      `[promoted-memory] superseded record not found for ${record.record_id}: ${targetRef}`
+    );
+    return;
+  }
+  updateFrontmatterField(targetPath, 'superseded_by', record.record_id);
+}
+
+/**
+ * Pattern used to mark test-only tracks. Promotion is suppressed for these so
+ * that running the test suite (or any TEST-tier mission) does not pollute the
+ * committed `knowledge/public/common/.../generated/` directories with
+ * fixture-shaped records.
+ */
+const TEST_TRACK_PATTERN = /^TRK-TEST-/i;
+
+/**
+ * Generic fallback titles emitted by buildPromotedMemoryRecord when the source
+ * candidate had no real title. A record matching one of these is, by
+ * definition, all-fallback content and adds no new knowledge.
+ */
+const GENERIC_TITLE_PATTERN =
+  /^reusable (pattern|sop|sop\s+candidate|hint|knowledge\s+hint|template|report\s+template|memory)$/i;
+const MIN_TITLE_LENGTH = 8;
+const MIN_SUMMARY_LENGTH = 25;
+
+/**
+ * Thrown when a promotion candidate fails the value threshold and would
+ * otherwise have produced a generic / fallback record. Callers (e.g. the
+ * memory-promotion workflow) should catch this and mark the candidate as
+ * `rejected` rather than `promoted`.
+ */
+export class NotMeaningfulPromotionCandidateError extends Error {
+  constructor(
+    public readonly reason: string,
+    public readonly candidateId: string
+  ) {
+    super(`Promotion candidate ${candidateId} not meaningful: ${reason}`);
+    this.name = 'NotMeaningfulPromotionCandidateError';
+  }
+}
+
+export interface MeaningfulCheckResult {
+  ok: boolean;
+  reason?: string;
+}
+
+/**
+ * Returns true iff the candidate carries enough non-fallback content to be
+ * worth writing as a promoted memory record. Pure function — exported for
+ * unit testing.
+ */
+export function isMeaningfulPromotionCandidate(
+  candidate: DistillCandidateRecord
+): MeaningfulCheckResult {
+  if (candidate.track_id && TEST_TRACK_PATTERN.test(candidate.track_id)) {
+    return { ok: false, reason: `test track (${candidate.track_id}) — promotion suppressed` };
+  }
+  const title = (candidate.title || '').trim();
+  if (title.length < MIN_TITLE_LENGTH) {
+    return { ok: false, reason: `title too short: "${title || '<empty>'}"` };
+  }
+  if (GENERIC_TITLE_PATTERN.test(title)) {
+    return { ok: false, reason: `title is the generic fallback shape: "${title}"` };
+  }
+  const summary = (candidate.summary || '').trim();
+  if (summary.length < MIN_SUMMARY_LENGTH) {
+    return { ok: false, reason: `summary too short (< ${MIN_SUMMARY_LENGTH} chars)` };
+  }
+  const md = (candidate.metadata || {}) as Record<string, unknown>;
+  if (candidate.target_kind === 'pattern') {
+    const hasApplicability = normalizeLines(md.applicability).length > 0;
+    const hasSteps = normalizeLines(md.reusable_steps).length > 0;
+    const hasOutcome =
+      typeof md.expected_outcome === 'string' && md.expected_outcome.trim().length > 0;
+    if (!hasApplicability && !hasSteps && !hasOutcome) {
+      return {
+        ok: false,
+        reason: 'pattern has no applicability/steps/outcome metadata — would be all fallback',
+      };
+    }
+  } else if (candidate.target_kind === 'sop_candidate') {
+    const hasSteps = normalizeLines(md.procedure_steps).length > 0;
+    if (!hasSteps) {
+      return {
+        ok: false,
+        reason: 'sop_candidate has no procedure_steps metadata — would be all fallback',
+      };
+    }
+  } else if (candidate.target_kind === 'knowledge_hint') {
+    const hasScope = typeof md.hint_scope === 'string' && md.hint_scope.trim().length > 0;
+    const hasTriggers = normalizeLines(md.hint_triggers).length > 0;
+    if (!hasScope && !hasTriggers) {
+      return {
+        ok: false,
+        reason: 'knowledge_hint has no scope or triggers — would be all fallback',
+      };
+    }
+  } else if (candidate.target_kind === 'report_template') {
+    const hasSections = normalizeLines(md.template_sections).length > 0;
+    if (!hasSections) {
+      return {
+        ok: false,
+        reason: 'report_template has no template_sections — would be all fallback',
+      };
+    }
+  }
+  return { ok: true };
+}
+
+export interface SavePromotedMemoryRecordOptions {
+  executionRole?: PromotedMemoryExecutionRole;
+  /**
+   * KL-05: write the record files into this worktree of the same repository
+   * (e.g. a PR branch checkout) instead of the current root. Product domain only.
+   */
+  targetRoot?: string;
+  /**
+   * Approval channel of the queue candidate. A sibling-worktree `targetRoot`
+   * requires `pr_review`: the PR merge is the only ratification that record
+   * gets (KL-04), so steward-approved knowledge must not travel that way.
+   */
+  approvalChannel?: MemoryApprovalChannel;
+  /** Test seam: git runner used for target validation and provenance. */
+  gitRunner?: GitRunner;
+  /** Test seam: writer used for a sibling worktree target. */
+  worktreeWriter?: WorktreeFileWriter;
+}
+
+export function savePromotedMemoryRecord(
+  candidate: DistillCandidateRecord,
+  options: SavePromotedMemoryRecordOptions = {}
+): { logicalPath: string; record: PromotedMemoryRecord; targetRoot?: string } {
+  const metadata = candidate.metadata || {};
+  const domain =
+    metadata.knowledge_domain === 'product' || metadata.knowledge_domain === 'personal'
+      ? metadata.knowledge_domain
+      : 'organization';
+  if (domain === 'organization' && candidate.scope) {
+    // Other publishers do not yet preserve the complete source restrictions.
+    // Refuse before provenance lookup, role assumption, locks or file writes.
+    if (candidate.target_kind !== 'sop_candidate')
+      throw new Error(
+        '[LEARNING_SCOPE_UNSUPPORTED] Scoped organization publication supports canonical approved SOPs only'
+      );
+    assertScopedLearningScope(candidate.scope);
+  }
+  if (
+    domain === 'product' &&
+    (candidate.tier !== 'public' ||
+      candidate.scope ||
+      (candidate.evidence_refs || []).some((ref) => !isPublicMemoryEvidencePath(ref)))
+  ) {
+    throw new Error(
+      'Product knowledge promotion requires public, unscoped records with evidence under knowledge/public or active/missions/public.'
+    );
+  }
+  if (
+    domain === 'personal' &&
+    (candidate.tier !== 'personal' || !candidate.scope?.owner_nhi?.trim())
+  ) {
+    throw new Error(
+      'Personal knowledge promotion requires personal tier and an explicit owner_nhi.'
+    );
+  }
+  const meaningful = isMeaningfulPromotionCandidate(candidate);
+  if (!meaningful.ok) {
+    throw new NotMeaningfulPromotionCandidateError(
+      meaningful.reason || 'unknown reason',
+      candidate.candidate_id
+    );
+  }
+  const executionRole = options.executionRole || 'mission_controller';
+  const requestedTarget = options.targetRoot?.trim();
+  const target = requestedTarget
+    ? resolvePromotionTargetRoot(requestedTarget, { gitRunner: options.gitRunner })
+    : undefined;
+  const externalTargetRoot = target && !target.sameAsCurrent ? target.root : undefined;
+  if (externalTargetRoot) {
+    if (domain !== 'product') {
+      throw new Error(
+        `[PROMOTION_TARGET_ROOT] --target-root only supports product-domain knowledge — candidate ${candidate.candidate_id} is ${String(domain || 'organization')} | next: promote without --target-root`
+      );
+    }
+    if (options.approvalChannel !== 'pr_review') {
+      throw new Error(
+        `[PROMOTION_TARGET_ROOT] --target-root requires approval_channel=pr_review — candidate ${candidate.candidate_id} is ${options.approvalChannel || 'steward'}; a record written into another worktree is only ratified by its PR reaching origin/main | next: re-approve with \`mission_controller memory-approve <CANDIDATE_ID> --approval-channel pr_review\`, or promote without --target-root`
+      );
+    }
+    if (typeof metadata.supersedes === 'string' && metadata.supersedes.trim()) {
+      throw new Error(
+        `[PROMOTION_TARGET_ROOT] --supersedes cannot be combined with --target-root — the superseded record backlink would be written to the wrong checkout | next: promote without --supersedes, or run the promotion from the target checkout`
+      );
+    }
+  }
+  const provenance = readGitProvenance(
+    externalTargetRoot || pathResolver.rootDir(),
+    options.gitRunner
+  );
+  return withPromotedMemoryExecutionContext(executionRole, () => {
+    const publish = () => {
+      const record: PromotedMemoryRecord = {
+        ...buildPromotedMemoryRecord(candidate),
+        ...provenance,
+      };
+      if (domain === 'organization' && candidate.scope && record.kind === 'sop_candidate') {
+        const approved = loadMemoryPromotionCandidate(candidate.candidate_id, candidate.scope);
+        if (!approved)
+          throw new Error(
+            '[LEARNING_APPROVAL_REQUIRED] Scoped publication requires its canonical queue candidate'
+          );
+        if (approved.status !== 'approved' && approved.status !== 'promoted')
+          throw new Error('[LEARNING_APPROVAL_REQUIRED] Canonical candidate is not approved');
+        assertScopedLearningRecord({ ...approved, status: 'approved' }, record);
+      }
+      const validate = ensureValidator(record.kind);
+      if (!validate(record)) {
+        const errors = (validate.errors || []).map(
+          (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+        );
+        throw new Error(`Invalid promoted memory record: ${errors.join('; ')}`);
+      }
+      const logicalDir = logicalDirFor({
+        kind: record.kind,
+        tier: record.tier,
+        domain: record.knowledge_domain,
+        scope: candidate.scope,
+      });
+      const baseName = record.record_id;
+      const protectedLineage =
+        record.tier === 'public' ||
+        (record.tier === 'confidential' && !!candidate.scope?.tenant_slug) ||
+        (record.tier === 'personal' && !!candidate.scope?.owner_nhi);
+      if (!protectedLineage)
+        logger.debug(
+          `[memory-provenance] ${record.record_id}: legacy ${record.tier} publication has no authenticated tenant/owner; protected lineage was not minted`
+        );
+      if (externalTargetRoot) {
+        // The queue/distill state stays in this checkout; only the record files
+        // go to the target worktree. logicalDir is repo-relative for product
+        // knowledge, so the returned promoted_ref is valid in both checkouts.
+        (options.worktreeWriter || writePromotedFilesToWorktree)({
+          root: externalTargetRoot,
+          executionRole,
+          files: [
+            { path: `${logicalDir}/${baseName}.json`, content: JSON.stringify(record, null, 2) },
+            { path: `${logicalDir}/${baseName}.md`, content: buildPromotedMemoryMarkdown(record) },
+          ],
+        });
+        return {
+          logicalPath: `${logicalDir}/${baseName}.md`,
+          record,
+          targetRoot: externalTargetRoot,
+        };
+      }
+      const absDir = assertSafeRepositoryPath(pathResolver.resolve(logicalDir), {
+        allowMissingLeaf: true,
+      });
+      if (!safeExistsSync(absDir)) safeMkdir(absDir, { recursive: true });
+      const jsonPath = assertSafeRepositoryPath(path.join(absDir, `${baseName}.json`), {
+        allowMissingLeaf: true,
+      });
+      const mdPath = assertSafeRepositoryPath(path.join(absDir, `${baseName}.md`), {
+        allowMissingLeaf: true,
+      });
+      if (
+        record.scope &&
+        record.approved_payload_digest &&
+        (safeExistsSync(jsonPath) || safeExistsSync(mdPath))
+      ) {
+        if (!safeExistsSync(jsonPath))
+          throw new Error(
+            '[LEARNING_PUBLICATION_CONFLICT] Markdown exists without its canonical record'
+          );
+        const prior = readJsonIfPresent<PromotedMemoryRecord>(jsonPath);
+        const approved = loadMemoryPromotionCandidate(candidate.candidate_id, candidate.scope);
+        if (!approved)
+          throw new Error('[LEARNING_APPROVAL_REQUIRED] Canonical candidate disappeared');
+        if (approved.status !== 'approved' && approved.status !== 'promoted')
+          throw new Error('[LEARNING_APPROVAL_REQUIRED] Canonical candidate is not approved');
+        assertScopedLearningRecord({ ...approved, status: 'approved' }, prior);
+        const expectedMarkdown = buildPromotedMemoryMarkdown(prior);
+        if (safeExistsSync(mdPath) && readTextFile(mdPath) !== expectedMarkdown)
+          throw new Error(
+            '[LEARNING_PUBLICATION_CONFLICT] Existing Markdown differs from approved record'
+          );
+        if (!safeExistsSync(mdPath)) safeWriteFile(mdPath, expectedMarkdown);
+        if (protectedLineage)
+          registerMemoryProvenance({
+            scope: candidate.scope || { tier: record.tier },
+            documentPath: mdPath,
+          });
+        return { logicalPath: logicalDir + '/' + baseName + '.md', record: prior };
+      }
+      safeWriteFile(jsonPath, JSON.stringify(record, null, 2));
+      const markdown = buildPromotedMemoryMarkdown(record);
+      safeWriteFile(mdPath, markdown);
+      // Legacy personal/tenantless confidential publications lack an authenticated
+      // partition. Preserve their workflow without inventing an owner or tenant.
+      if (protectedLineage) {
+        const memoryScope = candidate.scope || { tier: record.tier };
+        const origins: MemoryOriginRef[] = [];
+        const sourceRefs: string[] = [];
+        const unverifiedRefs: string[] = [];
+        for (const evidence of record.evidence_refs || []) {
+          if (evidence.includes(':')) {
+            sourceRefs.push(evidence);
+            continue;
+          }
+          if (
+            !safeExistsSync(pathResolver.rootResolve(evidence)) ||
+            !safeLstat(pathResolver.rootResolve(evidence)).isFile()
+          ) {
+            unverifiedRefs.push(evidence);
+            continue;
+          }
+          origins.push(registerMemoryProvenance({ scope: memoryScope, documentPath: evidence }));
+        }
+        if (!origins.length && !sourceRefs.length && !unverifiedRefs.length) {
+          if (candidate.mission_id) sourceRefs.push('mission:' + candidate.mission_id);
+          if (candidate.task_session_id)
+            sourceRefs.push('task_session:' + candidate.task_session_id);
+          sourceRefs.push(...(candidate.artifact_ids || []).map((id) => 'artifact:' + id));
+        }
+        registerMemoryProvenance({
+          scope: memoryScope,
+          documentPath: mdPath,
+          origins,
+          sourceRefs,
+          unverifiedRefs,
+        });
+      }
+      backlinkSupersededRecord(record);
+      if (record.kind === 'knowledge_hint' && record.knowledge_domain === 'organization') {
+        appendGovernanceHintRecord(record, candidate.scope);
+      }
+      return {
+        logicalPath: `${logicalDir}/${baseName}.md`,
+        record,
+      };
+    };
+    return candidate.scope && domain === 'organization'
+      ? withLockSync(
+          'scoped-learning-publication:' +
+            createHash('sha256').update(candidate.candidate_id).digest('hex'),
+          publish
+        )
+      : publish();
+  });
+}

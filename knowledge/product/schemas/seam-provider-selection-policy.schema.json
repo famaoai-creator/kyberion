@@ -73,7 +73,7 @@
         },
         "allow_saved_default": {
           "type": "boolean",
-          "description": "false: saved seam defaults (KYBERION_SEAM_DEFAULTS and the project/organization/tenant/operator layers, libs/core/seam-selection-defaults.ts) are ignored for this seam. Use for security engines (authn/authz) whose provider must change only through explicit configuration, purposes or audited operator rules. Default true."
+          "description": "false: saved seam defaults (KYBERION_SEAM_DEFAULTS and the project/organization/tenant/operator layers, libs/core/provider/seam-selection-defaults.ts) are ignored for this seam. Use for security engines (authn/authz) whose provider must change only through explicit configuration, purposes or audited operator rules. Default true."
         },
         "default_chains": {
           "type": "object",

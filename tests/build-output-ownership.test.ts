@@ -143,7 +143,7 @@ describe('single-owner build contract', () => {
     write('libs/core/types.generated.ts');
     write('libs/core/handwritten.js');
     write('libs/core/ambient.d.ts');
-    write('libs/core/validators.ts');
+    write('libs/core/foundation/validators.ts');
     write('libs/core/validators.d.cts');
     write('libs/core/dist/generated.js');
     write('libs/core/dist/generated.ts');

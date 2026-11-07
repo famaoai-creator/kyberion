@@ -127,15 +127,16 @@ describe('mission-artifact-closure (AL-03)', () => {
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.MISSION_ROLE = 'mission_controller';
 
-    // safeWriteFile runs the policy-engine gate (agent-policies.yaml) —
-    // seed the REAL policy file so writes inside the temp root work (same
-    // convention as artifact-store.test.ts / mission-seal.test.ts).
+    // Seed canonical policies for both the policy engine and the role-narrowing
+    // guard: role-bound I/O must fail closed when security-policy.json is absent.
     const policyTarget = path.join(tmpRoot, 'knowledge', 'product', 'governance');
     fs.mkdirSync(policyTarget, { recursive: true });
-    fs.copyFileSync(
-      path.join(REPO_ROOT, 'knowledge/product/governance/agent-policies.yaml'),
-      path.join(policyTarget, 'agent-policies.yaml')
-    );
+    for (const policy of ['agent-policies.yaml', 'security-policy.json']) {
+      fs.copyFileSync(
+        path.join(REPO_ROOT, 'knowledge/product/governance', policy),
+        path.join(policyTarget, policy)
+      );
+    }
     const schemaTarget = path.join(tmpRoot, 'knowledge', 'product', 'schemas');
     fs.mkdirSync(schemaTarget, { recursive: true });
     for (const schema of [

@@ -11,7 +11,7 @@ import {
   validateMemoryPromotionCandidate,
   type MemoryCandidate,
 } from '../knowledge/memory-promotion-queue.js';
-import { ledger } from '../ledger.js';
+import { ledger } from '../governance/ledger.js';
 import { logger } from '../core.js';
 import * as pathResolver from '../path-resolver.js';
 import { resolveMissionDistillMarkdownPolicy } from './mission-distill-markdown-policy.js';

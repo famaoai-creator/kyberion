@@ -66,7 +66,7 @@ import type { RejectionReasonCategory } from '../contracts/rejection-reason.js';
 import type { SurfaceAsyncChannel } from '../surface/channel-surface-types.js';
 import type { DecisionCard } from './decision-card.js';
 import type { ApprovalVetoWindow } from './approval-veto-window.js';
-import type { EventScope } from '../event-scope.js';
+import type { EventScope } from '../event/event-scope.js';
 import type { OrganizationWorkLoopSummary } from '../workforce/work-design.js';
 
 export interface ApprovalRequestDraft {

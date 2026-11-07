@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { getWorkItem, listActiveWorkLeases } from '../workforce/work-coordination.js';
 import { workEffectOwnership } from '../workforce/work-effect-ownership.js';
-import { normalizeEventScope } from '../event-scope.js';
+import { normalizeEventScope } from '../event/event-scope.js';
 import { createApprovalRequest } from './approval-request-create.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from './approval-store-paths.js';
 import { workEffectReleaseProofBinding } from './work-effect-release.js';

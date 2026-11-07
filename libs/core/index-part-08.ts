@@ -5,7 +5,7 @@ export {
   resolvePromotedReportAudience,
   resolvePromotedReportOutputFormat,
   resolvePromotedReportTemplateSections,
-} from './promoted-report-template-policy.js';
+} from './knowledge/promoted-report-template-policy.js';
 
 export {
   loadOnboardingSummaryPolicyCatalog,
@@ -49,11 +49,14 @@ export {
 export {
   loadProductionEvidenceSummaryPolicyCatalog,
   resolveProductionEvidenceSummaryPolicy,
-} from './production-evidence-summary-policy.js';
+} from './scenario/production-evidence-summary-policy.js';
 
-export { loadChangelogPolicyCatalog, resolveChangelogPolicy } from './changelog-policy.js';
+export {
+  loadChangelogPolicyCatalog,
+  resolveChangelogPolicy,
+} from './harnessing/changelog-policy.js';
 
-export { installEmbeddingBackendIfAvailable } from './embedding-bootstrap.js';
+export { installEmbeddingBackendIfAvailable } from './reasoning/embedding-bootstrap.js';
 
 export {
   getEmbeddingBackend,
@@ -61,17 +64,17 @@ export {
   resetEmbeddingBackend,
   cosineSimilarity,
   reciprocalRankFusion,
-} from './embedding-backend.js';
+} from './reasoning/embedding-backend.js';
 
-export type { EmbeddingBackend } from './embedding-backend.js';
+export type { EmbeddingBackend } from './reasoning/embedding-backend.js';
 
 export {
   MlxEmbeddingBackend,
   isMlxAvailable,
   probeMlxEmbeddingBackend,
-} from './mlx-embedding-backend.js';
+} from './provider/mlx-embedding-backend.js';
 
-export type { MlxEmbeddingBackendOptions } from './mlx-embedding-backend.js';
+export type { MlxEmbeddingBackendOptions } from './provider/mlx-embedding-backend.js';
 
 export type {
   InstallAnthropicOptions,
@@ -114,7 +117,7 @@ export {
   type PlanningReviewVerdictResult,
   type StructuredOutputSchemaName,
   type StructuredOutputSchemaRef,
-} from './structured-output-contracts.js';
+} from './contracts/structured-output-contracts.js';
 
 export {
   loadMissionWorkItemDispatchResponseSeedAtPath,
@@ -144,7 +147,7 @@ export type {
   HeuristicValidation,
   MissionOutcome,
   ValidateParams as ValidateHeuristicParams,
-} from './heuristic-feedback.js';
+} from './knowledge/heuristic-feedback.js';
 
 export type {
   InteractionEntry,
@@ -154,7 +157,7 @@ export type {
   RelationshipNode,
   RelationshipSource,
   SuggestFieldUpdateParams,
-} from './relationship-graph-store.js';
+} from './organization/relationship-graph-store.js';
 
 export * from './knowledge/distill-candidate-registry.js';
 
@@ -162,7 +165,7 @@ export * from './pipeline/op-preflight.js';
 
 export * from './pipeline/op-preflight-defaults.js';
 
-export * from './promoted-memory.js';
+export * from './knowledge/promoted-memory.js';
 
 export * from './knowledge/memory-promotion-queue.js';
 
@@ -180,15 +183,13 @@ export * from './workforce/background-review-runner.js';
 
 export * from './workforce/background-review-nudge.js';
 
-export * from './chronos-delivery.js';
+export * from './surface/chronos-delivery.js';
 
-export * from './automation-blueprint.js';
+export * from './pipeline/automation-blueprint.js';
 
-export * from './automation-blueprint-slack.js';
+export * from './tool/programmatic-tool-calling.js';
 
-export * from './programmatic-tool-calling.js';
-
-export * from './managed-process.js';
+export * from './tool/managed-process.js';
 
 export * from './mission/mission-seed-registry.js';
 
@@ -198,7 +199,7 @@ export * from './mission/mission-classification.js';
 
 export * from './mission/mission-workflow-catalog.js';
 
-export * from './process-definition-registry.js';
+export * from './governance/process-definition-registry.js';
 
 export * from './pipeline/pipeline-dry-run.js';
 
@@ -226,11 +227,11 @@ export * from './mission/mission-context-pack.js';
 
 export * from './task/task-knowledge-provisioning.js';
 
-export * from './cognitive-routing.js';
+export * from './provider/cognitive-routing.js';
 
 export * from './reasoning/reasoning-drift-watchdog.js';
-export * from './cognitive-routing-palette.js';
-export * from './routing-compare.js';
+export * from './provider/cognitive-routing-palette.js';
+export * from './reasoning/routing-compare.js';
 
 export * from './mission/mission-team-binding.js';
 

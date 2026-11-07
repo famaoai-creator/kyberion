@@ -12,7 +12,7 @@ import {
 } from '../secure-io.js';
 import type { OrganizationWorkLoopSummary } from '../workforce/work-design.js';
 import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
-import { physicalScopedPath, assertPhysicalScopeSegment } from '../physical-namespace.js';
+import { physicalScopedPath, assertPhysicalScopeSegment } from '../storage/physical-namespace.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import * as path from 'node:path';

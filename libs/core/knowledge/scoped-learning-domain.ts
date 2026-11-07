@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
-import { assertPhysicalScopeSegment } from '../physical-namespace.js';
+import { assertPhysicalScopeSegment } from '../storage/physical-namespace.js';
 import { knowledgeWritePathFor } from './knowledge-scope.js';
 import type { MemoryCandidate } from './memory-promotion-queue.js';
 export type {

@@ -1,6 +1,6 @@
 /** Generated public API barrel part. Keep exports in source order. */
 
-export * from './nhi-actor-verification.js';
+export * from './agent/nhi-actor-verification.js';
 // NI-03: RFC 8693 act-chain-analog delegation chains with attenuation.
 
 export * from './mission/delegation-chain.js';
@@ -209,14 +209,14 @@ export {
   discoverLocalSttBackends,
   loadLocalSttDiscoveryRegistry,
   selectPreferredLocalSttBackend,
-} from './local-stt-discovery.js';
+} from './voice/local-stt-discovery.js';
 
 export type {
   LocalSttBackend,
   LocalSttCandidate,
   LocalSttDiscoveryOptions,
   LocalSttSource,
-} from './local-stt-discovery.js';
+} from './voice/local-stt-discovery.js';
 
 export type {
   ShellSpeechToTextBridgeOptions,
@@ -266,14 +266,14 @@ export {
   listPromotionCandidates,
   PROMOTION_CANDIDATE_MIN_RUNS,
   type AdhocRunTally,
-} from './promotion-candidates.js';
+} from './pipeline/promotion-candidates.js';
 
 export {
   appendSemanticDegradationRun,
   summarizeSemanticDegradations,
   type SemanticDegradationRun,
   type SemanticDegradationSummary,
-} from './semantic-degradation-log.js';
+} from './reasoning/semantic-degradation-log.js';
 
 export {
   REJECTION_REASON_CATEGORIES,
@@ -289,7 +289,7 @@ export {
   buildReviewGapText,
   type ReviewReentryRequest,
   type ReviewReentryVerdict,
-} from './review-reentry.js';
+} from './workforce/review-reentry.js';
 
 export {
   loadReasoningLevelPolicy,
@@ -326,7 +326,7 @@ export type {
 
 export * from './reasoning/reasoning-route-resolver.js';
 
-export * from './llm-selection-preferences.js';
+export * from './reasoning/llm-selection-preferences.js';
 
 export * from './reasoning/reasoning-route-doctor.js';
 export * from './reasoning/reasoning-provider-readiness.js';

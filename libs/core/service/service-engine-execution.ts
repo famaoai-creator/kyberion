@@ -7,8 +7,8 @@ import {
 import { platform } from '../platform.js';
 import { secureFetch } from '../network.js';
 import { safeExec } from '../secure-io.js';
-import { retry } from '../async-utils.js';
-import { tryRepairJson } from '../json-repair.js';
+import { retry } from '../pipeline/async-utils.js';
+import { tryRepairJson } from '../foundation/json-repair.js';
 import type { ServicePresetRecord } from './service-preset-registry.js';
 import {
   buildApiKeyQueryAuth,

@@ -140,7 +140,7 @@ That keeps the first slice useful without overcommitting to speculative automati
 - `tools/apple-intelligence-bridge/afm.swift` — dependency-free Swift CLI over
   FoundationModels (`availability` / `prompt`), compiled on demand with a
   single `swiftc` into `active/shared/runtime/apple-intelligence/afm`.
-- `libs/core/apple-intelligence-bridge.ts` — governed Node entry
+- `libs/core/provider/apple-intelligence-bridge.ts` — governed Node entry
   (managed-process spawn, availability probe with 10-min cache,
   `KYBERION_APPLE_FM=0` opt-out). Helpers: `appleFmPrompt`,
   `classifyLocallyWithAppleFm`, `summarizeLocallyWithAppleFm`. Every helper

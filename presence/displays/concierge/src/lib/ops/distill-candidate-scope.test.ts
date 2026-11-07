@@ -63,6 +63,25 @@ beforeEach(() => {
   mocks.project.mockReturnValue(null);
   mocks.mission.mockReturnValue(null);
 });
+
+it('narrows admitted owner and system candidates out of an explicit tenant selection', () => {
+  const owner = viewer({
+    tenantSlugs: 'all',
+    organizationIds: 'all',
+    projectIds: 'all',
+    principalId: 'owner',
+    includeUntenanted: true,
+  });
+  for (const scope of [
+    { tier: 'public' as const },
+    { tier: 'public' as const, owner_nhi: 'owner' },
+  ]) {
+    const row = candidate({ tier: 'public', scope });
+    expect(distillCandidateVisibleToViewer(row, owner)).toBe(true);
+    expect(distillCandidateVisibleToViewer(row, { ...owner, permissions: [] })).toBe(false);
+    expect(distillCandidateVisibleToViewer(row, owner, 'acme')).toBe(false);
+  }
+});
 describe('distill candidate viewer scope', () => {
   it('uses exact viewer tenant/org/project/tier bounds without global tenant inventory', () => {
     mocks.scoped.mockReturnValue([candidate()]);

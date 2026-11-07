@@ -5,8 +5,8 @@ import {
   claudeNativeAgentName,
   resolveClaudeNativeSessionPermission,
 } from './claude-native-subagent.js';
-import { SUBAGENT_PROFILE_CLI_TOOLS } from '../subagent-capability-profiles.js';
-import { SUBAGENT_SECURE_IO_CONSTRAINT } from '../subagent-prompt-framing.js';
+import { SUBAGENT_PROFILE_CLI_TOOLS } from '../workforce/subagent-capability-profiles.js';
+import { SUBAGENT_SECURE_IO_CONSTRAINT } from '../workforce/subagent-prompt-framing.js';
 
 describe('claude native subagent projection (CN-02)', () => {
   it('projects the implementer tier onto bypassPermissions and its full CLI tool set', () => {

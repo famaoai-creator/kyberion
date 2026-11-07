@@ -7,7 +7,7 @@ import { computeBudgetUsage } from '../governance/org-budget-governor.js';
 import * as autonomyState from '../governance/autonomy-action-state.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync } from '../secure-io.js';
-import { getUsageAttribution, withUsageAttribution } from '../usage-accounting.js';
+import { getUsageAttribution, withUsageAttribution } from '../finance/usage-accounting.js';
 import type {
   ClaimWorkItemInput,
   ReleaseWorkItemInput,

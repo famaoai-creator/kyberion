@@ -18,11 +18,11 @@ const allowedManagedProcessConsumers = [
   'libs/core/ocr/providers/native.ts',
   // Apple Intelligence bridge: short-lived afm CLI calls, supervised so a
   // hung on-device inference can never outlive its timeout.
-  'libs/core/apple-intelligence-bridge.ts',
-  'libs/core/shortcut-bridge.ts',
-  'libs/core/blackhole-audio-bus.ts',
-  'libs/core/coreaudio-output-bridge.ts',
-  'libs/core/managed-process.watch.test.ts',
+  'libs/core/provider/apple-intelligence-bridge.ts',
+  'libs/core/virtual/shortcut-bridge.ts',
+  'libs/core/voice/blackhole-audio-bus.ts',
+  'libs/core/voice/coreaudio-output-bridge.ts',
+  'libs/core/tool/managed-process.watch.test.ts',
   // Detached mobile-mirror daemon: owned, supervised child; ops coordinate via state file + SIGTERM.
   'libs/shared-mobile/src/mirror-session.ts',
   'libs/shared-mobile/src/mirror-daemon.ts',
@@ -50,7 +50,7 @@ const allowedManagedProcessConsumers = [
   'libs/core/agent/agent-runtime-supervisor-client.process.test.ts',
   'libs/core/agent/agent-runtime-supervisor.test.ts',
   'libs/core/agent/agent-runtime-supervisor.ts',
-  'libs/core/delegated-task-observability.ts',
+  'libs/core/workforce/delegated-task-observability.ts',
   'libs/core/mission/mission-orchestration-events.test.ts',
   'libs/core/mission/mission-orchestration-events.ts',
   'libs/core/mission/mission-orchestration-worker.resume.test.ts',
@@ -141,7 +141,7 @@ describe('Process boundary governance', () => {
       .filter((relPath) => !relPath.includes('/dist/'))
       .filter((relPath) => !relPath.includes('/.next/'))
       .filter((relPath) => !relPath.startsWith('vault/'))
-      .filter((relPath) => relPath !== 'libs/core/managed-process.ts')
+      .filter((relPath) => relPath !== 'libs/core/tool/managed-process.ts')
       .filter((relPath) =>
         /\bspawnManagedProcess\b|\bstopManagedProcess\b|\btouchManagedProcess\b/.test(read(relPath))
       )

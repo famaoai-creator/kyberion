@@ -20,7 +20,7 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeStat } from '../secure-io.js';
-import { savedSeamDefaultFor } from '../seam-provider-selection.js';
+import { savedSeamDefaultFor } from '../provider/seam-provider-selection.js';
 import {
   IngressError,
   type IngressNetworkClass,

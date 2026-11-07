@@ -1,5 +1,5 @@
 import { auditChain } from '../governance/audit-chain.js';
-import { metrics } from '../metrics.js';
+import { metrics } from '../analysis/metrics.js';
 import { evaluateShellCommandPolicy } from '../shell/shell-command-policy.js';
 import { detectTier, validateWritePermission } from '../tier-guard.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';

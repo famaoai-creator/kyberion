@@ -132,7 +132,7 @@ class DarwinAudioPlaybackAdapter implements AudioPlaybackBackendAdapter {
     options,
   }: AudioOutputPlaybackBackendRequest): string {
     const script = assertSafeRepositoryPath(
-      pathResolver.rootResolve('libs/core/virtual-audio-output-playback.swift')
+      pathResolver.rootResolve('libs/core/virtual/virtual-audio-output-playback.swift')
     );
     return safeExec(
       options.swift_bin ?? DEFAULT_SWIFT_BIN,

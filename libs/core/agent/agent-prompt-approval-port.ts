@@ -10,7 +10,7 @@
  * same outcome as before escalation existed, never an answer.
  */
 
-import type { EventScopeInput } from '../event-scope.js';
+import type { EventScopeInput } from '../event/event-scope.js';
 
 let pipelineApprovalStatus: ((channel: string, id: string) => string | undefined) | undefined;
 export function registerPipelineApprovalStatus(

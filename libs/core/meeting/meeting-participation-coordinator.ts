@@ -46,14 +46,14 @@ import {
   MediaEventBuffer,
   transcriptChunkToMediaEvent,
   type MediaEvent,
-} from '../realtime-media-session.js';
-import { BargeInController } from '../barge-in-controller.js';
+} from '../media/realtime-media-session.js';
+import { BargeInController } from '../voice/barge-in-controller.js';
 import {
   evaluateMissionVoiceConsent,
   type MissionVoiceConsentResult,
 } from '../voice/voice-consent.js';
 import { recordGrantMissionBinding, resolveStandingGrant } from '../governance/grant-resolver.js';
-import { missionPathOrNull } from '../mission-lookup.js';
+import { missionPathOrNull } from '../mission/mission-lookup.js';
 import { resolveIdentityContext } from '../authority.js';
 
 export interface ConversationAgent {
