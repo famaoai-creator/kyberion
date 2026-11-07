@@ -1,32 +1,58 @@
 /**
- * progress.ts — FD-05: pure payload builders for the presence studio
- * "進み具合" (progress) page — `GET /api/progress` and `GET /api/progress/:id`.
- * See `docs/developer/improvement-plans-2026-08/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md`
- * §2.1 / FD-05.
+ * front-desk-progress.ts — the shared read model behind "依頼" / "進み具合"
+ * (a person's requests: what is in progress, what was delivered, what is
+ * done). Concierge serves it at `GET /api/progress` + `GET /api/progress/[id]`
+ * (仕事 › 依頼, Kyberion server phase 2); presence-studio keeps `GET
+ * /api/progress` for its 頼む page's recent-requests list. Moved here from
+ * `presence/displays/presence-studio/progress.ts` (FD-05) so both surfaces
+ * build the payload with one implementation.
  *
  * Deliberately narrow input shapes (not the full `TaskSession` /
- * `ArtifactRecord` / `DeliverableInboxEntry` types from `@agent/core`) so
- * this stays a pure, easily-fixtured function — `server.ts` maps the real,
- * already-viewer-scoped runtime records into these shapes and performs all
- * I/O (including the manifest read for `mirror_href`); this module never
- * touches the filesystem or network.
+ * `ArtifactRecord` / `DeliverableInboxEntry` types) so the builders stay pure,
+ * easily-fixtured functions — each route maps the real, already-viewer-scoped
+ * runtime records into these shapes and performs all I/O (including the
+ * manifest read for `mirror_href`); the builders never touch the filesystem
+ * or network.
  *
  * Known gap, recorded here rather than invented (see FD-05 task notes):
  * `ArtifactRecord` (`artifact_id`, `active/shared/runtime/artifacts/*.json`)
  * and `DeliverableInboxEntry` (`entry_id`, `active/shared/inbox/entries.jsonl`)
  * are two different stores with two different id spaces — nothing in the
  * system links them except a best-effort `artifact_paths` match on
- * `ArtifactRecord.path` (done in `server.ts`). An artifact with no matching
- * inbox entry can only ever be `can_verdict: false` here — never fake a
- * verdict eligibility that doesn't exist.
+ * `ArtifactRecord.path` (`findMatchingInboxEntry`). `can_verdict` only says
+ * that the matched inbox entry still waits for a decision; no surface records
+ * that decision from this read model any more (Concierge links to 受信箱).
+ * An artifact with no matching entry is never `can_verdict: true`.
+ *
+ * Scope and tier: `progressRecordInScope` is the tenant / org / project rule
+ * both surfaces apply before mapping. Data-tier rules (personal, unknown) are
+ * each caller's own (Concierge: `lib/progress-server.ts`).
  */
-import { resolveSurfaceBrowserUrl } from '@agent/core/surface/surface-url';
-import { estimateTaskSessionPercent } from './home.js';
+import { eventScopeFromRecord } from '../event-scope.js';
+import { admitsTenant } from './surface-authorization.js';
+import { resolveSurfaceBrowserUrl } from './surface-url.js';
 
-export { estimateTaskSessionPercent };
+/**
+ * Coarse, documented estimate only — task sessions carry no numeric progress
+ * field anywhere in the system. Statuses not listed here (e.g. `blocked`,
+ * `paused`) render without a progress bar rather than guess a number. Also
+ * used by presence-studio's home read model (`home.ts`).
+ */
+const TASK_SESSION_STATUS_PERCENT: Record<string, number> = {
+  awaiting_instruction: 5,
+  collecting_requirements: 15,
+  planning: 30,
+  awaiting_confirmation: 45,
+  executing: 65,
+  verifying: 85,
+};
+
+export function estimateTaskSessionPercent(status: string): number | undefined {
+  return TASK_SESSION_STATUS_PERCENT[status];
+}
 
 /** Task sessions in these statuses are done, not "in progress" — same set
- * `home.ts` uses for its `in_progress` classification. */
+ * presence-studio's `home.ts` uses for its `in_progress` classification. */
 const TASK_SESSION_TERMINAL_STATUSES = new Set(['completed', 'failed', 'released']);
 
 /** Deliverable-inbox statuses that mean a verdict has already been recorded
@@ -98,11 +124,11 @@ export interface ProgressArtifactInput {
   /** Set only when a matching deliverable-inbox entry was found for this
    * artifact record (see the module doc gap above). */
   inbox_status?: 'unread' | 'read' | 'accepted' | 'rejected' | 'changes_requested';
-  /** The deliverable-inbox `entry_id` to call `POST /api/outcomes/:id/verdict`
-   * with — only present alongside `inbox_status`. */
+  /** The matching deliverable-inbox `entry_id` — only present alongside
+   * `inbox_status`. Decisions on it happen in the inbox, never here. */
   entry_id?: string;
-  /** Whether `GET /api/artifacts/:artifactId` can serve this artifact (same
-   * check the existing outcome-inbox panel uses for its download link). */
+  /** Whether the surface can serve this artifact's file(s) — each route
+   * decides with its own download endpoint's rule. */
   downloadable?: boolean;
 }
 
@@ -330,6 +356,137 @@ export function buildProgressDetail(
     ...(next.length > 0 ? { next } : {}),
     log,
   };
+}
+
+/** "Never dump raw markdown as a title": the record's file name, else a short
+ * first line of its preview, else its kind. Same rule as the outcome panels. */
+export function deriveProgressArtifactTitle(record: {
+  path?: string;
+  preview_text?: string;
+  kind: string;
+}): string {
+  const fromPath = record.path ? String(record.path).split('/').filter(Boolean).pop() : '';
+  if (fromPath) return fromPath;
+  const firstLine = String(record.preview_text || '')
+    .split('\n')[0]
+    .replace(/^#+\s*/, '')
+    .trim();
+  return firstLine.length > 3 && firstLine.length <= 60 ? firstLine : record.kind || 'outcome';
+}
+
+export function progressHistoryFromTaskSession(session: {
+  history?: Array<{ ts?: string; text?: string }>;
+}): ProgressHistoryEntryInput[] {
+  return Array.isArray(session.history)
+    ? session.history
+        .filter((entry): entry is { ts?: string; text: string } => Boolean(entry?.text))
+        .map((entry) => ({ when: entry.ts, text: entry.text }))
+    : [];
+}
+
+/** The fields of a `TaskSession` the progress read model uses. */
+export interface ProgressTaskSessionRecord {
+  session_id: string;
+  correlation_id?: string;
+  status: string;
+  updated_at?: string;
+  goal?: { summary?: string; success_condition?: string };
+  control?: { awaiting_user_input?: boolean };
+  completion_next_action?: { next_step?: string; gaps?: string[] };
+  history?: Array<{ ts?: string; text?: string }>;
+}
+
+/** One task session as a list row input. */
+export function progressTaskSessionInput(
+  session: ProgressTaskSessionRecord
+): ProgressTaskSessionInput {
+  return {
+    id: session.session_id,
+    correlation_id: session.correlation_id,
+    title: session.goal?.summary || session.session_id,
+    status: session.status,
+    awaiting_user_input: session.control?.awaiting_user_input === true,
+    when: session.updated_at,
+    history: progressHistoryFromTaskSession(session),
+  };
+}
+
+/** Detail of a task session — reached directly (`task_session`) or through
+ * an artifact that records it (`artifact`). */
+export function buildTaskSessionProgressDetail(
+  session: ProgressTaskSessionRecord,
+  kind: 'task_session' | 'artifact'
+): ProgressDetail {
+  return buildProgressDetail(
+    {
+      kind,
+      awaiting_user_input: session.control?.awaiting_user_input === true,
+      goal_summary: session.goal?.summary || session.session_id,
+      success_condition: session.goal?.success_condition,
+      status: session.status,
+      next_step: session.completion_next_action?.next_step,
+      gaps: session.completion_next_action?.gaps,
+    },
+    progressHistoryFromTaskSession(session)
+  );
+}
+
+/** Best-effort link from an artifact record to the deliverable-inbox entry
+ * that (maybe) carries it — see the module doc: these are two different
+ * stores with two different id spaces, and the only thing that can connect a
+ * given record to an entry is a shared `path` on both sides. No match means
+ * this artifact can never be verdict-eligible. */
+export function findMatchingInboxEntry<T extends { artifact_paths: readonly string[] }>(
+  inboxEntries: readonly T[],
+  artifactPath: string | undefined
+): T | undefined {
+  if (!artifactPath) return undefined;
+  return inboxEntries.find((entry) => entry.artifact_paths.includes(artifactPath));
+}
+
+/** The tenant a runtime record names, directly or in a nested scope envelope. */
+export function progressRecordTenant(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  const direct = record.tenant_slug;
+  if (typeof direct === 'string' && direct.trim()) return direct.trim();
+  for (const key of ['scope', 'project', 'project_context', 'requestedByContext', 'context']) {
+    const nested = progressRecordTenant(record[key]);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
+/** The server-resolved viewer scope a record is checked against. */
+export interface ProgressViewerScope {
+  tenantSlugs: string[] | 'all';
+  organizationIds: string[] | 'all';
+  projectIds: string[] | 'all';
+  /** The system selection only: also admit records that carry no tenant. */
+  includeUntenanted?: boolean;
+}
+
+/**
+ * Whether a runtime record is inside the viewer's scope. Unknown-tenant
+ * records are denied for a tenant-scoped viewer (unless the scope is the
+ * system selection, `includeUntenanted`). An explicit organization / project
+ * narrowing requires canonical scope metadata: unknown or conflicting legacy
+ * metadata is omitted rather than widening the result.
+ */
+export function progressRecordInScope(scope: ProgressViewerScope, value: unknown): boolean {
+  if (!admitsTenant(scope, progressRecordTenant(value))) return false;
+  if (scope.organizationIds === 'all' && scope.projectIds === 'all') return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const recordScope = eventScopeFromRecord(value as Record<string, unknown>);
+  if (!recordScope) return false;
+  return (
+    (scope.organizationIds === 'all' ||
+      Boolean(
+        recordScope.organization_id && scope.organizationIds.includes(recordScope.organization_id)
+      )) &&
+    (scope.projectIds === 'all' ||
+      Boolean(recordScope.project_id && scope.projectIds.includes(recordScope.project_id)))
+  );
 }
 
 /**

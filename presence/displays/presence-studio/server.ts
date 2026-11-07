@@ -97,7 +97,6 @@ import { registerComponentHostRoutes } from './component-host-routes.js';
 import { registerTrainingRoutes } from './training-routes.js';
 import { registerVoiceSynthesizeRoute } from './voice-synthesize-route.js';
 import { registerEngineConfigRoute } from './engine-config-route.js';
-import { registerWorkInventoryRoutes } from './work-inventory-routes.js';
 import { registerAvatarRoutes } from './avatar-routes.js';
 import { PRESENCE_STUDIO_VOCABULARY_KEYS } from './front-desk-pages.js';
 installReasoningBackendsForService('presence-studio');
@@ -144,8 +143,8 @@ presenceStudioData.app.get('/api/identity', (_req, res) => {
   }
 });
 
-// Front-desk API routes (GET /api/me, /api/front-desk/nav, home/progress/ask
-// vocabulary + pages, POST /api/outcomes/:id/verdict, POST /api/conversation,
+// Front-desk API routes (GET /api/me, /api/front-desk/nav, home/ask
+// vocabulary + pages, GET /api/progress, POST /api/conversation,
 // /api/onboarding/*) live in `front-desk-routes.ts` — split out purely to
 // keep this file under the repo's `max-file-lines` gate. Registered here, at
 // the same position these routes were inline before the split, so the
@@ -166,9 +165,6 @@ registerHearingLedgerRoutes(presenceStudioData.app);
 // `/api/flow-vocabulary`, `/api/headless/a2ui/hearing` (component-host-routes.ts).
 registerComponentHostRoutes(presenceStudioData.app, presenceStudioData.staticDir);
 registerTrainingRoutes(presenceStudioData.app);
-// WI-11: work-inventory automation-candidate panel for the progress page —
-// see work-inventory-routes.ts module doc.
-registerWorkInventoryRoutes(presenceStudioData.app);
 // PA-10: the user's generated avatar set (personal tier) — see avatar-routes.ts.
 registerAvatarRoutes(presenceStudioData.app);
 // PA-09: return-audio TTS for the talking avatar — see voice-synthesize-route.ts.
