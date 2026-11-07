@@ -434,7 +434,7 @@
     "libs/core/localization/i18n-hardcoding-baseline.ts": {
       "json_state_write_budget": 1
     },
-    "libs/core/identity-context-bridge.ts": {
+    "libs/core/foundation/identity-context.ts": {
       "env_direct_read_budget": 2
     },
     "libs/actuators/ingest-actuator/src/ingest-quota.ts": {

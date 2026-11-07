@@ -3210,6 +3210,24 @@ identity: checking an absent lineage index still requires ordinary read authorit
 entire CLI suite with the scripts CI runner's empty role/persona defaults, and include a
 roleless negative case. Never skip permission checks because a path does not exist.
 
+## Audit bootstrap and identity resolver lifecycle
+
+Reducing a low-level dependency closure must preserve the audited operation's original
+recording contract. Canonical audit entries validate attribution at submission time and
+persist synchronously unless already inside the audit lock; only prepared entries defer
+until that lock releases. An optional governance-action sink does not make mandatory
+audit persistence optional. Do not replace this with a consumer-registration queue that
+can relabel tenants, discard overflow, or never drain. Measure the dependency closure
+after the repair, retain the real audit boundary exception, and report unmet targets.
+
+Identity registration must remain sole, roll back both registries on partial failure and
+release both even if removal listeners throw. Its lifetime must follow the owning seam's
+module graph rather than retaining an old authority resolver across module re-evaluation.
+Verify registration failure, disposal failure and real authority import/reset/reimport,
+alongside tenant-attributed synchronous audit writes. Enforcing suites include
+`identity-context-bridge.test.ts`, `identity-context-module-lifecycle.test.ts`,
+`audit-chain-lock.test.ts` and `tests/identity-context-resolver-boundary.test.ts`.
+
 ## Intake extension CI checks
 
 When adding a service operation, validate the shipped discovery count and service-harness operation inventory together with the exact kind/risk/approval assertions. Registry-overlay fixtures must assert the shipped exact declarations as well as the mutation fallback. For boundary tests, partially mock shared path resolvers so new legitimate imports retain their real APIs; a minimal hand-built resolver can fail during module initialization before the tested gate runs. Run the impacted existing tests in addition to the extension fixtures. For single-use admission capabilities, compare private in-memory snapshots of request and configuration values. Do not send credential-bearing configuration into hash or HMAC APIs: keyed fast hashes still trigger password-hashing checks and are unnecessary when the capability's private WeakMap already supplies the trust boundary. Never log or persist these snapshots.
