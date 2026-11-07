@@ -15,7 +15,7 @@ import { pathResolver } from '../path-resolver.js';
 import { parseSafeJsonObjectValue } from '../foundation/json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { resolveMeshPeer } from './mesh-peer-directory.js';
-import { recordProtocolServiceLifecycleBestEffort } from '../protocol-service-lifecycle.js';
+import { recordProtocolServiceLifecycleBestEffort } from '../service/protocol-service-lifecycle.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,

@@ -20,7 +20,7 @@ import type { DotWorkResultRow, KrMeasurementRow } from '../dot/dot-state-paths.
 import { localeToBcp47, type SupportedLocale } from '../foundation/locale-normalize.js';
 import type { MessageParams } from '../foundation/message-format.js';
 import type { VocabularyKey } from '../knowledge/vocabulary-keys.generated.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { notifyOperatorSync } from '../surface/operator-notifications.js';
 import { listWorkItems, type WorkItem } from '../workforce/work-coordination.js';
 import { writeScopedArtifact } from '../workforce/artifact-store.js';

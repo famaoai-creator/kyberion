@@ -15,7 +15,7 @@ import {
   type ChannelAdapter,
 } from './channel-adapter.js';
 import { isSurfaceAsyncChannel } from './channel-surface-types.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 
 describe('SurfaceAsyncChannel registry', () => {
   it('accepts manifest channels and rejects unregistered values', () => {

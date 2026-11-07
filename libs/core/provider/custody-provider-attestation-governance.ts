@@ -50,8 +50,8 @@ import {
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
 import { resolveIdentityContext } from '../authority.js';
-import { normalizeEventScope } from '../event-scope.js';
-import { custodyOwnerLabel } from '../custody-owner.js';
+import { normalizeEventScope } from '../event/event-scope.js';
+import { custodyOwnerLabel } from '../contracts/custody-owner.js';
 import {
   assertPrintableCommandValue,
   shellQuoteArg,

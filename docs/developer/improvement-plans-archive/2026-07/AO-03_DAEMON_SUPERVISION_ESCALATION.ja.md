@@ -29,7 +29,7 @@ status: archived
 
 - **完了済み**: `libs/core/daemon-heartbeat.ts` を追加し、daemon が `active/shared/runtime/heartbeats/<daemon>.json` に PID・状態・timestamp・詳細を書けるようにした。stale/missing/malformed 判定と一覧取得も実装。
 - **完了済み**: `chronos_daemon` と `agent_runtime_supervisor_daemon` に heartbeat 書き込みを配線した。起動中/稼働中/停止中/エラー状態を記録する。
-- **完了済み**: `libs/core/ops-alert.ts` を追加し、運用アラートを `active/shared/observability/ops-alerts.jsonl` に必ず記録する sink を実装。`KYBERION_OPS_ALERT_WEBHOOK_URL` が明示された場合のみ webhook 送信を試み、同一問題の短時間重複を抑制する。
+- **完了済み**: `libs/core/daemon/ops-alert.ts` を追加し、運用アラートを `active/shared/observability/ops-alerts.jsonl` に必ず記録する sink を実装。`KYBERION_OPS_ALERT_WEBHOOK_URL` が明示された場合のみ webhook 送信を試み、同一問題の短時間重複を抑制する。
 - **完了済み**: chronos の scheduled pipeline 失敗、chronos fatal、agent runtime supervisor daemon の error/fatal を ops alert に配線した。
 - **完了済み**: `docs/operator/macos/` に agent-runtime-supervisor / chronos の launchd plist を追加し、`docs/operator/systemd/` に agent-runtime-supervisor / chronos の systemd unit を追加した。`DEPLOYMENT.md` の launchd TODO は実テンプレート参照へ置換済み。
 - **完了済み**: `scripts/daemon_watchdog.ts` と `pnpm daemon:watchdog` を追加し、`chronos-daemon` / `agent-runtime-supervisor-daemon` の heartbeat stale/missing/malformed を検知して ops alert に記録できるようにした。Linux では `kyberion-daemon-watchdog.timer` テンプレートで 1 分ごとの監視を提供する。
@@ -51,7 +51,7 @@ status: archived
 
 ### Task 3: 実アラート sink — `claude-sonnet-4`
 
-1. `libs/core/ops-alert.ts`: 運用アラートを既存の satellite bridge(slack-bridge、UX-01 で堅牢化)や webhook/email に送る sink。`sendOpsAlert({ severity, title, context, options, recommendation })` — 判断基準 §5 の材料付き framing(何が起きた/影響/自動で試したこと/選択肢と推奨/帰結)。
+1. `libs/core/daemon/ops-alert.ts`: 運用アラートを既存の satellite bridge(slack-bridge、UX-01 で堅牢化)や webhook/email に送る sink。`sendOpsAlert({ severity, title, context, options, recommendation })` — 判断基準 §5 の材料付き framing(何が起きた/影響/自動で試したこと/選択肢と推奨/帰結)。
 2. `watch_tenant_drift.ts` の欠落 `notify-slack.sh` 参照をこの sink に置換。トリガ源を配線: AO-01 の repair 失敗、AO-03 のデーモン死、OP-04 の劣化/SLO、AO-02 の緊急 CVE、OP-01 の予算危険。
 3. 多重通知抑制(同一問題はレート制限、UX-01 と同じ)。テスト: 各トリガでアラートが framing 付きで飛ぶこと、抑制。
 

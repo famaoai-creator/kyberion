@@ -31,8 +31,8 @@ import {
   PROVIDER_ENV_ALLOWLIST_ESCAPE_HATCH_VAR,
 } from './provider-permission-profiles.js';
 import { logger } from '../core.js';
-import { parseClaudeCliUsage, recordCliUsage } from '../cli-usage-metering.js';
-import { childDelegationEnv } from '../operation-policy-gate.js';
+import { parseClaudeCliUsage, recordCliUsage } from './cli-usage-metering.js';
+import { childDelegationEnv } from '../governance/operation-policy-gate.js';
 import {
   isProviderCredentialRelayEnabled,
   withoutRelayManagedCredentials,
@@ -43,7 +43,7 @@ import {
 } from '../workforce/workspace-ledger.js';
 import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
-import { markDelegationExecutionStarted } from '../delegation-execution-tracker.js';
+import { markDelegationExecutionStarted } from '../workforce/delegation-execution-tracker.js';
 
 /**
  * Record a claude-agent sub-agent call into the metrics collector so completed

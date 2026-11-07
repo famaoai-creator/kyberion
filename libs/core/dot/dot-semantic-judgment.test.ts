@@ -22,7 +22,7 @@ let bootstrapIo: typeof import('../secure-io.js');
 let observer: typeof import('./dot-semantic-judgment.js');
 let runtime: typeof import('./dot-runtime.js');
 let accounting: typeof import('../finance/usage-accounting.js');
-let events: typeof import('../event-scope.js');
+let events: typeof import('../event/event-scope.js');
 let latency: typeof import('../organization/judgment-latency-fixture.js');
 let precedents: typeof import('../organization/judgment-precedents.js');
 let validation: typeof import('../organization/judgment-validation.js');
@@ -308,7 +308,7 @@ describe('contract-only dot semantic observer (no production reservation/provide
     observer = await import('./dot-semantic-judgment.js');
     runtime = await import('./dot-runtime.js');
     accounting = await import('../finance/usage-accounting.js');
-    events = await import('../event-scope.js');
+    events = await import('../event/event-scope.js');
     latency = await import('../organization/judgment-latency-fixture.js');
     precedents = await import('../organization/judgment-precedents.js');
     validation = await import('../organization/judgment-validation.js');

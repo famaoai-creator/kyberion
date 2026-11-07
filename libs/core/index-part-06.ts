@@ -325,7 +325,7 @@ export {
   confirmActionItemBySpeaker,
   nextActionItemId,
   summarizeActionItemLifecycle,
-} from './action-item-store.js';
+} from './meeting/action-item-store.js';
 
 export type {
   ActionItem,
@@ -341,7 +341,7 @@ export type {
   ActionItemReviewState,
   ActionItemStatus,
   ActionItemLifecycleSummary,
-} from './action-item-store.js';
+} from './meeting/action-item-store.js';
 
 export type {
   DesignSpec,
@@ -351,7 +351,7 @@ export type {
   SaveTestPlanParams,
   TaskPlan,
   TestPlan,
-} from './sdlc-artifact-store.js';
+} from './mission/sdlc-artifact-store.js';
 
 export {
   signA2AContent,

@@ -1,5 +1,5 @@
 {
-  "description": "Tenant-partitioned runtime stores: physicalScopedPath (<base>/tenants/<slug>/...) call sites under active/shared/runtime/ that the gate cannot attribute to an offboarding PHYSICAL_* base in libs/core/scope-offboarding.ts. 'unresolved' entries name a base expression the static scan cannot evaluate (say what it resolves to and why it is covered); 'bases' entries name a resolved runtime base that is deliberately not offboarded. Gate: tests/tenant-runtime-store-registration.test.ts.",
+  "description": "Tenant-partitioned runtime stores: physicalScopedPath (<base>/tenants/<slug>/...) call sites under active/shared/runtime/ that the gate cannot attribute to an offboarding PHYSICAL_* base in libs/core/storage/scope-offboarding.ts. 'unresolved' entries name a base expression the static scan cannot evaluate (say what it resolves to and why it is covered); 'bases' entries name a resolved runtime base that is deliberately not offboarded. Gate: tests/tenant-runtime-store-registration.test.ts.",
   "unresolved": [
     {
       "file": "libs/core/knowledge/knowledge-index.ts",

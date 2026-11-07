@@ -17,7 +17,7 @@ import {
   withScopeEnvelope,
   type ScopeEnvelope,
 } from './scope-envelope.js';
-import type { ContextSecurityScope } from './context-security-scope.js';
+import type { ContextSecurityScope } from './governance/context-security-scope.js';
 
 const missingScopeEnv = 'active/shared/tmp/scope-envelope-test-missing.env';
 

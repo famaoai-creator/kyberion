@@ -6,10 +6,10 @@ import {
   type EventScope,
   type EventScopeFilter,
   type EventScopeInput,
-} from '../event-scope.js';
-import { aggregateMetricsForEnforcement, metrics, MetricsCollector } from '../metrics.js';
+} from '../event/event-scope.js';
+import { aggregateMetricsForEnforcement, metrics, MetricsCollector } from '../analysis/metrics.js';
 import { pathResolver } from '../path-resolver.js';
-import { partitionedScopedPath, physicalScopedPath } from '../physical-namespace.js';
+import { partitionedScopedPath, physicalScopedPath } from '../storage/physical-namespace.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from '../foundation/runtime-state-roots.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';

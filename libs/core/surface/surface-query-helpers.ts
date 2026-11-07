@@ -5,7 +5,7 @@ import {
   type KnowledgeScope,
 } from '../knowledge/knowledge-index.js';
 import { secureFetch } from '../network.js';
-import { resolveFallbackLocationSummary } from '../location-fallback.js';
+import { resolveFallbackLocationSummary } from './location-fallback.js';
 import {
   buildContextualIntentFrame,
   type ContextualIntentFrame,
@@ -19,7 +19,7 @@ import { recordConversationSignal } from '../intent/conversation-signals.js';
 import { stripTags } from '../foundation/html-sanitize.js';
 import { decodeEntities } from '../foundation/text-escaping.js';
 import { extractSurfaceBlocks } from './surface-response-blocks.js';
-import { resolveSurfaceIntent } from '../router-contract.js';
+import { resolveSurfaceIntent } from '../intent/router-contract.js';
 import type { IntentResolutionPacket } from '../intent/intent-resolution.js';
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import { currentScope } from '../scope-context.js';
@@ -33,8 +33,8 @@ import type {
   SurfaceDelegationResult,
 } from './channel-surface-types.js';
 import type { UserIntentFlow } from '../intent/intent-contract.js';
-import { t } from '../t.js';
-import { localeToBcp47, resolveLocale, type SupportedLocale } from '../locale.js';
+import { t } from '../localization/t.js';
+import { localeToBcp47, resolveLocale, type SupportedLocale } from '../localization/locale.js';
 
 function getScheduleDateRange(
   value?: 'today' | 'tomorrow' | 'this_week' | 'next_week' | 'this_month' | 'next_month' | 'custom'

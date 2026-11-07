@@ -33,9 +33,9 @@ import {
   aggregateMetricsForEnforcement,
   projectEnforcementRow,
   type EnforcementRowView,
-} from '../metrics.js';
+} from '../analysis/metrics.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { sendOpsAlert } from '../ops-alert.js';
+import { sendOpsAlert } from '../daemon/ops-alert.js';
 import { pathResolver } from '../path-resolver.js';
 
 const logger = createLogger('org-budget-governor');

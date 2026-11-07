@@ -28,7 +28,7 @@ vi.mock('../reasoning/reasoning-egress-scope.js', async (importOriginal) => ({
     if (mocks.egressDenied) throw new Error('[REASONING_EGRESS_DENIED] conformance denial');
   },
 }));
-vi.mock('../metrics.js', () => ({
+vi.mock('../analysis/metrics.js', () => ({
   metrics: { record: vi.fn(), increment: vi.fn(), observe: vi.fn() },
 }));
 vi.mock('./codex-cli-query.js', async (importOriginal) => ({

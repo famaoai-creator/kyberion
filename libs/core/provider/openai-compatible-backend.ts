@@ -53,7 +53,10 @@ import type {
   ReasoningCallOptions,
   ToolDefinition,
 } from '../reasoning/reasoning-backend.js';
-import { runStructuredReasoningOp, structuredReasoningSpecs } from '../structured-reasoning.js';
+import {
+  runStructuredReasoningOp,
+  structuredReasoningSpecs,
+} from '../reasoning/structured-reasoning.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning/reasoning-egress-scope.js';
 import {
   computeCompletionTokenBudget,
@@ -70,7 +73,7 @@ import {
   markDelegationExecutionStarted,
   reportDelegationResultMetadata,
   runStartReportingDelegation,
-} from '../delegation-execution-tracker.js';
+} from '../workforce/delegation-execution-tracker.js';
 
 export type LocalLlmProviderPreset =
   'generic' | 'ollama' | 'vllm' | 'lmstudio' | 'llamacpp' | 'mlx' | 'localai';

@@ -11,7 +11,7 @@ import { readVcsDevelopmentPr, readVcsDevelopmentCiProof } from '../vcs/developm
 import { runHardenedGitProbe } from '../shell/git-probe-hardening.js';
 import { hasCurrentRequiredCiEvidence } from './mission-development-ci-proof.js';
 import { findMissionPath } from '../path-resolver.js';
-import { missionPathOrNull } from '../mission-lookup.js';
+import { missionPathOrNull } from './mission-lookup.js';
 import { runPreparedVcsDevelopment } from '../vcs/development-loop.js';
 import type { MissionDevelopmentSpec } from './mission-development-continuation.js';
 

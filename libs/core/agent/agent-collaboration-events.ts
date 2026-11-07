@@ -1,4 +1,4 @@
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { randomUUID } from 'node:crypto';
 import { resolveCollaborationKind } from '../event/event-vocabulary.js';
 import {
@@ -7,7 +7,7 @@ import {
   type EventScope,
   type EventScopeInput,
   type EventScopeKind,
-} from '../event-scope.js';
+} from '../event/event-scope.js';
 
 export const AGENT_COLLABORATION_SCHEMA_VERSION = 'agent-collaboration-event.v1' as const;
 

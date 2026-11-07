@@ -2,9 +2,9 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import { appendJsonLine, writeJson } from '../foundation/json.js';
-import { streamJsonLines, type JsonlReadOptions } from '../jsonl-read.js';
-import { maintainStoreAfterAppend, writeTimeArchiveDir } from '../append-only-store.js';
-import { streamJsonLinesAcrossCompaction } from '../jsonl-parked-read.js';
+import { streamJsonLines, type JsonlReadOptions } from '../storage/jsonl-read.js';
+import { maintainStoreAfterAppend, writeTimeArchiveDir } from '../storage/append-only-store.js';
+import { streamJsonLinesAcrossCompaction } from '../storage/jsonl-parked-read.js';
 import { logger } from '../core.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { nowIso } from '../foundation/time.js';

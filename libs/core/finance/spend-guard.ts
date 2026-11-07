@@ -19,10 +19,10 @@ import {
   aggregateMetricsForEnforcement,
   onExecutionMetricsAppend,
   type ExecutionAppendNotice,
-} from '../metrics.js';
+} from '../analysis/metrics.js';
 import type { StoragePartition } from '../storage-layout.js';
 import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
-import { sendOpsAlert } from '../ops-alert.js';
+import { sendOpsAlert } from '../daemon/ops-alert.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   resolveUsageCostAccounting,

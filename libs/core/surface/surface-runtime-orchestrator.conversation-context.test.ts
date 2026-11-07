@@ -58,8 +58,10 @@ vi.mock('../task/task-session.js', async () => ({
   classifyTaskSessionIntent: mocks.classify,
   getActiveTaskSession: () => undefined,
 }));
-vi.mock('../router-contract.js', async () => ({
-  ...(await vi.importActual<typeof import('../router-contract.js')>('../router-contract.js')),
+vi.mock('../intent/router-contract.js', async () => ({
+  ...(await vi.importActual<typeof import('../intent/router-contract.js')>(
+    '../intent/router-contract.js'
+  )),
   resolveSurfaceIntent: mocks.resolvedIntent,
 }));
 vi.mock('./surface-runtime-router.js', async () => ({

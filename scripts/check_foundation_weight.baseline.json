@@ -118,6 +118,18 @@
     "logger": 3,
     "path-resolver": 4,
     "platform-facts": 0,
-    "secure-io": 53
+    "secure-io": 53,
+    "contracts/actor": 2,
+    "contracts/context-boundary": 0,
+    "contracts/custody-owner": 1,
+    "foundation/failure-tracker": 0,
+    "contracts/input-binding": 0,
+    "foundation/invariants": 0,
+    "foundation/json-repair": 1,
+    "foundation/registry-directory": 57,
+    "contracts/resource-provenance": 0,
+    "foundation/semaphore": 1,
+    "contracts/structured-output-contracts": 1,
+    "foundation/validators": 54
   }
 }

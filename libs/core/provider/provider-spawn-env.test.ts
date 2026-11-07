@@ -7,7 +7,7 @@ const sessionIndexMocks = vi.hoisted(() => ({
   attachChild: vi.fn(),
 }));
 
-vi.mock('../session-git-index.js', () => ({
+vi.mock('../vcs/session-git-index.js', () => ({
   prepareSessionGitIndex: sessionIndexMocks.prepareSessionGitIndex,
 }));
 
@@ -18,7 +18,7 @@ import {
   newDelegationSessionId,
   spawnWithDelegationEnv,
 } from './provider-spawn-env.js';
-import { runWithDelegationExecutionTracker } from '../delegation-execution-tracker.js';
+import { runWithDelegationExecutionTracker } from '../workforce/delegation-execution-tracker.js';
 
 const fakeBaseEnv = (): NodeJS.ProcessEnv =>
   ({

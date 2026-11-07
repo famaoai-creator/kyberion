@@ -23,7 +23,7 @@ vi.mock('node:child_process', async (importOriginal) => {
 vi.mock('../reasoning/reasoning-egress-scope.js', () => ({
   assertReasoningEgressAllowed: mocks.assertEgress,
 }));
-vi.mock('../metrics.js', () => ({
+vi.mock('../analysis/metrics.js', () => ({
   metrics: { record: vi.fn(), increment: vi.fn(), observe: vi.fn() },
 }));
 // Hermetic: no real active-child registry write. The mock keeps the seam's

@@ -23,7 +23,7 @@ import { checkSpendGuard } from '../finance/spend-guard.js';
 import {
   validateContextSecurityScope,
   type ContextSecurityScope,
-} from '../context-security-scope.js';
+} from '../governance/context-security-scope.js';
 import {
   currentScopeEnvelope,
   envelopeNarrowRequestErrors,

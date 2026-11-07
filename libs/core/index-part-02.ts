@@ -8,7 +8,7 @@ export type {
   CompletionReconciliation,
   NextAction,
   NextActionType,
-} from './next-action.js';
+} from './surface/next-action.js';
 
 export {
   listUxStatusValues,
@@ -16,15 +16,15 @@ export {
   renderVocabularyText,
   resolveVocabularyLocale,
   UX_STATUS_DOMAINS,
-} from './ux-vocabulary.js';
+} from './localization/ux-vocabulary.js';
 
-export type { UxStatusDomain, UxVocabularyLocale } from './ux-vocabulary.js';
+export type { UxStatusDomain, UxVocabularyLocale } from './localization/ux-vocabulary.js';
 // I18N-02: type-safe rendering entry point over the namespaced vocabulary
 // catalog, plus the ICU-lite message renderer it builds on.
 
-export { t } from './t.js';
+export { t } from './localization/t.js';
 
-export type { VocabularyKey } from './t.js';
+export type { VocabularyKey } from './localization/t.js';
 
 export { renderMessage, extractPlaceholderNames } from './foundation/message-format.js';
 
@@ -44,7 +44,7 @@ export type { VocabularyCatalogFile, VocabularyEntry } from './knowledge/vocabul
 
 export * from './surface/operator-home-summary.js';
 
-export { resolveActiveProfileRoot } from './profile-root.js';
+export { resolveActiveProfileRoot } from './authn/profile-root.js';
 
 export { resolveOperatorDisplayName, resolveOperatorLocale } from './surface/operator-identity.js';
 // I18N-01: single source of truth for locale resolution.
@@ -62,9 +62,9 @@ export {
   localeToBcp47,
   localeUsesWordSpaces,
   pickByLocale,
-} from './locale.js';
+} from './localization/locale.js';
 
-export type { SupportedLocale, LocaleContext } from './locale.js';
+export type { SupportedLocale, LocaleContext } from './localization/locale.js';
 // I18N-05: single source of truth for locale/timeZone-aware date, number,
 // currency, and relative-time formatting.
 
@@ -74,7 +74,7 @@ export {
   formatCurrency,
   formatRelativeTime,
   resolveTimeZone,
-} from './format.js';
+} from './localization/format.js';
 
 export type {
   DateTimeFormatStyle,
@@ -83,13 +83,13 @@ export type {
   FormatCurrencyOptions,
   FormatRelativeTimeOptions,
   ResolveTimeZoneContext,
-} from './format.js';
+} from './localization/format.js';
 
-export * from './company.js';
+export * from './organization/company.js';
 
-export * from './i18n-hardcoding-baseline.js';
+export * from './localization/i18n-hardcoding-baseline.js';
 
-export * from './frontmatter-exclusions.js';
+export * from './knowledge/frontmatter-exclusions.js';
 
 export * from './knowledge/knowledge-usage-aggregate.js';
 export * from './knowledge/knowledge-index-cache.js';
@@ -99,7 +99,7 @@ export * from './analysis/analysis-config.js';
 export * from './knowledge/knowledge-index-usage.js';
 
 export * from './knowledge/knowledge-taxonomy.js';
-export * from './volatile-knowledge.js';
+export * from './knowledge/volatile-knowledge.js';
 
 export * from './finance/financial-model.js';
 
@@ -107,29 +107,29 @@ export * from './finance/finance-controller.js';
 
 export * from './finance/finance-controller-cost-report.js';
 
-export * from './okr-tracker.js';
+export * from './organization/okr-tracker.js';
 
-export * from './decision-rights.js';
+export * from './organization/decision-rights.js';
 
-export * from './vision-resolver.js';
+export * from './organization/vision-resolver.js';
 
 export * from './governance/approval-audit.js';
 
-export * from './org-chart.js';
+export * from './organization/org-chart.js';
 
 export * from './daemon/daemon-heartbeat.js';
 
-export * from './soak-restart-state.js';
+export * from './testing/soak-restart-state.js';
 
-export * from './soak-evidence-manifest.js';
+export * from './testing/soak-evidence-manifest.js';
 
-export * from './i18n-coverage-history.js';
+export * from './localization/i18n-coverage-history.js';
 
-export * from './ops-alert.js';
+export * from './daemon/ops-alert.js';
 
-export * from './health-degradation.js';
+export * from './daemon/health-degradation.js';
 
-export * from './aidlc-phase-state.js';
+export * from './mission/aidlc-phase-state.js';
 
 export * from './mesh/handoff-history.js';
 
@@ -139,7 +139,7 @@ export * from './finance/spend-guard.js';
 
 export * from './finance/cost-report.js';
 
-export * from './chain-integrity.js';
+export * from './governance/chain-integrity.js';
 
 // Classification & Knowledge
 

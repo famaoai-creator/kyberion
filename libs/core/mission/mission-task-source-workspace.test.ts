@@ -23,7 +23,7 @@ vi.mock('./mission-state.js', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   loadState: () => fixture.state,
 }));
-vi.mock('../owner-scope.js', async (importOriginal) => ({
+vi.mock('../governance/owner-scope.js', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   resolveMissionDir: () => '/repo/active/missions/confidential/acme/MSN-PRIVATE',
 }));

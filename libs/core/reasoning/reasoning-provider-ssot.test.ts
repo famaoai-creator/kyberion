@@ -12,8 +12,8 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
-import { getAllFiles } from '../fs-utils.js';
-import { resetRegistryDirectoryCacheForTests } from '../registry-directory.js';
+import { getAllFiles } from '../storage/fs-utils.js';
+import { resetRegistryDirectoryCacheForTests } from '../foundation/registry-directory.js';
 import {
   explainReasoningProviderDescriptor,
   getReasoningProviderDescriptor,
@@ -29,7 +29,7 @@ import {
   backendCapabilityProfileForIdentifier,
   isLocalOnlyReasoningBackend,
 } from './backend-capability-profile.js';
-import { probeExplicitReasoningBackend } from '../environment-capability-probes.js';
+import { probeExplicitReasoningBackend } from '../daemon/environment-capability-probes.js';
 import { runBackendConformance, runBackendSandboxConformance } from './backend-conformance.js';
 import { reasoningBackendEndpoint } from './reasoning-egress-scope.js';
 import { providerIdForReasoningIdentifier } from '../provider/provider-egress-gate.js';

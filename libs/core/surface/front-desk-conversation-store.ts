@@ -77,7 +77,7 @@ import { withLockSync } from '../foundation/lock-utils.js';
 import { redactSensitiveString } from '../network.js';
 import { narrowSurfaceViewerScope } from './surface-mutation-guard.js';
 import type { SupportedLocale } from '../foundation/locale-normalize.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import {
   applyConversationTurnOutcome,
   routeConversationTaskTurn,

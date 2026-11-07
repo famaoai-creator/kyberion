@@ -89,8 +89,8 @@
       "presence/displays/presence-studio/hearing-work-inventory.ts": 4
     },
     "locale_compare": {
-      "libs/core/apple-intelligence-bridge.ts": 1,
-      "libs/core/question-resolver.ts": 1,
+      "libs/core/provider/apple-intelligence-bridge.ts": 1,
+      "libs/core/intent/question-resolver.ts": 1,
       "libs/core/surface/surface-auth-routes.ts": 2,
       "libs/core/surface/surface-login-pages.ts": 2,
       "scripts/capture_surface_screenshots.ts": 2,
@@ -100,10 +100,10 @@
       "presence/displays/a2ui-host/src/app/strings.ts": 1
     },
     "locale_literal": {
-      "libs/core/apple-intelligence-bridge.ts": 2,
+      "libs/core/provider/apple-intelligence-bridge.ts": 2,
       "libs/shared-voice/src/apple-speech-file-stt-bridge.ts": 2,
       "libs/core/intent/contextual-intent-frame.ts": 4,
-      "libs/core/deal-documents.ts": 1,
+      "libs/core/organization/deal-documents.ts": 1,
       "libs/core/media/native-pptx-engine/builders.ts": 3,
       "libs/core/media/native-pptx-engine/engine.ts": 1,
       "libs/shared-media/src/native-xlsx-engine/drawing.ts": 3,

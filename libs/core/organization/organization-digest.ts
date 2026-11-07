@@ -48,7 +48,7 @@ import { localeToBcp47, type SupportedLocale } from '../foundation/locale-normal
 import type { MessageParams } from '../foundation/message-format.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import type { VocabularyKey } from '../knowledge/vocabulary-keys.generated.js';
 
 export const ORGANIZATION_DIGEST_DEFAULT_TIMEZONE = 'Asia/Tokyo';

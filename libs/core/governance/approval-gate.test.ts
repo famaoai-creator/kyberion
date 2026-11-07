@@ -10,7 +10,7 @@ vi.mock('./approval-policy.js', () => ({
   resolveApprovalPolicy: vi.fn(),
 }));
 
-vi.mock('../decision-rights.js', () => ({
+vi.mock('../organization/decision-rights.js', () => ({
   resolveDecisionRightsMatrix: vi.fn(),
   evaluateDecisionRights: vi.fn(),
 }));
@@ -40,8 +40,11 @@ vi.mock('./audit-chain.js', () => ({
 
 import { enforceApprovalGate, MAX_APPROVAL_TTL_MS } from './approval-gate.js';
 import { resolveApprovalPolicy } from './approval-policy.js';
-import { evaluateDecisionRights, resolveDecisionRightsMatrix } from '../decision-rights.js';
-import type { DecisionRightsMatrix } from '../decision-rights.js';
+import {
+  evaluateDecisionRights,
+  resolveDecisionRightsMatrix,
+} from '../organization/decision-rights.js';
+import type { DecisionRightsMatrix } from '../organization/decision-rights.js';
 import {
   createApprovalRequest,
   expireApprovalRequest,

@@ -23,7 +23,7 @@ import { assertSafeRepositoryPath, safeExec, safeWriteFile } from '../secure-io.
 import { writeIntentGoalHandoff } from '../intent/intent-handoff.js';
 import { a2aBridge } from '../mesh/a2a-bridge.js';
 import { logger } from '../core.js';
-import { resolveFallbackLocationSummary } from '../location-fallback.js';
+import { resolveFallbackLocationSummary } from './location-fallback.js';
 import {
   classifyTaskSessionIntent,
   createTaskSession,
@@ -36,28 +36,28 @@ import {
 import type { TaskSession } from '../task/task-session.js';
 import type { ApprovalRequestDraft } from '../governance/approval-store.js';
 import { loadPendingIntent } from '../intent/pending-intent-store.js';
-import { executeCapturePhotoTaskSession } from '../capture-photo-task-session-executor.js';
+import { executeCapturePhotoTaskSession } from '../task/capture-photo-task-session-executor.js';
 import { executeApprovedClaudeTaskSession } from '../provider/claude-task-session-executor.js';
 import { truncateTextWithCount } from '../foundation/text-truncation.js';
-import { buildCompletionNextAction, formatCompletionNextAction } from '../next-action.js';
+import { buildCompletionNextAction, formatCompletionNextAction } from './next-action.js';
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import { currentScope } from '../scope-context.js';
 import { recordTurnOutcomeSignal } from './surface-conversation-signals.js';
-import { isCorrectionUtterance } from '../correction-detection.js';
+import { isCorrectionUtterance } from '../intent/correction-detection.js';
 import {
   surfaceChannelFromAgentId,
   type SurfaceRuntimeRouteContext,
 } from './surface-runtime-router.js';
-import { resolveSurfaceIntent, resolveDirectIntentCommand } from '../router-contract.js';
+import { resolveSurfaceIntent, resolveDirectIntentCommand } from '../intent/router-contract.js';
 import { recordIntentContractOutcome } from '../intent/intent-contract-learning.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import type { WorkScopeDecision } from '../workforce/work-scope-decision.js';
 import {
   registerService,
   updateServiceStats,
   extractProviderFromUtterance,
   resolveProviderUrl,
-} from '../external-service-registry.js';
+} from '../service/external-service-registry.js';
 import {
   buildKnowledgeQueryReply,
   buildTaskSessionReply,
@@ -156,7 +156,7 @@ import type {
   SurfaceConversationResult,
 } from './channel-surface-types.js';
 import type { UserIntentFlow } from '../intent/intent-contract.js';
-import { type ExecutionFeedbackRecord } from '../execution-feedback.js';
+import { type ExecutionFeedbackRecord } from '../knowledge/execution-feedback.js';
 
 export interface SurfaceRuntimeRouteHandler {
   /** Team Channel P1: true only for routes that start no work (direct replies). */

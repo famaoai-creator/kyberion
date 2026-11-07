@@ -14,8 +14,8 @@ import {
   spawnManagedProcess,
   stopManagedProcess,
   type ManagedProcessHandle,
-} from '../managed-process.js';
-import { registerEnvironmentCapabilityProbe } from '../environment-capability.js';
+} from '../tool/managed-process.js';
+import { registerEnvironmentCapabilityProbe } from '../daemon/environment-capability.js';
 import type { AudioBus, AudioBusProbe } from './audio-bus.js';
 import type { AudioChunk, AudioFormat } from '../meeting/meeting-session-types.js';
 import {

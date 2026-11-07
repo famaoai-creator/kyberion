@@ -5,13 +5,18 @@ import { missionSteeringRouteHandler } from './surface-mission-steering.js';
 
 import { pathResolver } from '../path-resolver.js';
 import { safeExec } from '../secure-io.js';
-import { deriveReplyLocale, getReplyLocale, resolveLocale, runWithReplyLocale } from '../locale.js';
+import {
+  deriveReplyLocale,
+  getReplyLocale,
+  resolveLocale,
+  runWithReplyLocale,
+} from '../localization/locale.js';
 import {
   detectTextLocale,
   normalizeLocale,
   type SupportedLocale,
 } from '../foundation/locale-normalize.js';
-import { t } from '../t.js';
+import { t } from '../localization/t.js';
 import { a2aBridge } from '../mesh/a2a-bridge.js';
 import type { A2AMessage } from '../mesh/a2a-bridge.js';
 import { getAgentManifest, resolveAgentSelectionHints } from '../agent/agent-manifest.js';
@@ -74,7 +79,7 @@ import {
   type SurfaceDelegationReceiver,
   type SurfaceRuntimeRouteContext,
 } from './surface-runtime-router.js';
-import { resolveSurfaceIntent } from '../router-contract.js';
+import { resolveSurfaceIntent } from '../intent/router-contract.js';
 import { resolveIntentResolutionPacket } from '../intent/intent-resolution.js';
 import {
   resolveIntentResolutionContract,
@@ -91,7 +96,7 @@ import {
   resolvedSurfaceIntent,
   structuredSurfaceQueryText,
 } from './surface-runtime-helpers.js';
-import { runAcceptedSurfacePipelineRoute } from '../surface-accepted-pipeline.js';
+import { runAcceptedSurfacePipelineRoute } from './surface-accepted-pipeline.js';
 
 export {
   buildDelegationSummaryContext,
@@ -101,7 +106,7 @@ export {
 export {
   executeAcceptedSurfacePipeline,
   resolveAcceptedSurfaceBindingContext,
-} from '../surface-accepted-pipeline.js';
+} from './surface-accepted-pipeline.js';
 
 import type {
   NerveRoutingProposal,
@@ -119,10 +124,10 @@ import {
   parseExecutionFeedbackText,
   recordExecutionFeedback,
   type ExecutionFeedbackInput,
-} from '../execution-feedback.js';
-import { executionFeedbackScopeKey } from '../execution-feedback-candidates.js';
+} from '../knowledge/execution-feedback.js';
+import { executionFeedbackScopeKey } from '../knowledge/execution-feedback-candidates.js';
 import { assertMemoryScope } from '../knowledge/memory-scope.js';
-import { normalizeEventScope, parseEventScopeInput } from '../event-scope.js';
+import { normalizeEventScope, parseEventScopeInput } from '../event/event-scope.js';
 import * as surfaceRuntimeData from './surface-runtime-conversation-data.js';
 
 export {

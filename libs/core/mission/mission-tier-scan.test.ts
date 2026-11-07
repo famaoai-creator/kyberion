@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as pathResolver from '../path-resolver.js';
-import { missionTierScanDirs } from '../owner-scope.js';
+import { missionTierScanDirs } from '../governance/owner-scope.js';
 import { listMissionsInSearchDirs } from './mission-state.js';
 
 /**

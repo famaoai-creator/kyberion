@@ -65,7 +65,7 @@ status: active
 
 ### DL-03 KPI ゴール
 
-- `libs/core/key-result-spec.ts`: `KeyResultSpec {kr_id,title,metric,target,direction,baseline?,unit?,weight?,every_s?,settle_minutes?}`、metric は `probe | file | signal_ratio | org_metric`。`keyResultProgress()`。
+- `libs/core/organization/key-result-spec.ts`: `KeyResultSpec {kr_id,title,metric,target,direction,baseline?,unit?,weight?,every_s?,settle_minutes?}`、metric は `probe | file | signal_ratio | org_metric`。`keyResultProgress()`。
 - charter: `goal.key_results` (≤10)、`team.goal_ref` は `string | {organization_id?, objective_id}`、`dotGoalRefLabel()`。
 - org: `OrganizationPurposeObjective.key_results`、`pnpm organization objective kr add|list|remove`。
 - `dot-key-results.ts`: 計測 → `kr-ledger.jsonl`（org は scoped `org-kr-ledger.jsonl`）、`dotGoalGapLines()` を wake prompt へ（`weight*(1-progress)` 順 + 24h trend）。

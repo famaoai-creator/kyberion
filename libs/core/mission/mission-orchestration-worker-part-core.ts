@@ -11,10 +11,10 @@ import {
   updateWorkItem,
 } from '../workforce/work-coordination.js';
 import { logger } from '../core.js';
-import { canonicalizeTeamRole } from '../working-principles.js';
+import { canonicalizeTeamRole } from '../workforce/working-principles.js';
 import { TraceContext } from '../analysis/trace.js';
 import { nowIso } from '../foundation/time.js';
-import { type GapRecorder } from '../gap-phase.js';
+import { type GapRecorder } from '../analysis/gap-phase.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
 import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';

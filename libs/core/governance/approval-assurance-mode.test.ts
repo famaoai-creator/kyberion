@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   warn: vi.fn(),
 }));
 
-vi.mock('../stance-resolver.js', () => ({
+vi.mock('../authn/stance-resolver.js', () => ({
   stanceRoot: mocks.stanceRoot,
 }));
 

@@ -1,9 +1,9 @@
-import * as customerResolver from '../stance-resolver.js';
+import * as customerResolver from '../authn/stance-resolver.js';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
-import { isInjectionSuspected } from '../injection-signal.js';
-import { resolveConfiguredPosture } from '../security-screen.js';
+import { isInjectionSuspected } from './injection-signal.js';
+import { resolveConfiguredPosture } from './security-screen.js';
 import { createLogger } from '../logger.js';
 import type { ApprovalAssuranceLevel, ApprovalAssuranceMode } from './approval-assurance.js';
 import {

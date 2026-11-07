@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { compileSchemaFromPath } from '../schema-loader.js';
 import { safeReadFile, safeRmSync } from '../secure-io.js';
-import { withoutSchemaMetadata } from '../test-governance-payload.js';
+import { withoutSchemaMetadata } from '../testing/test-governance-payload.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import { compileUserIntentFlow } from './intent-contract.js';

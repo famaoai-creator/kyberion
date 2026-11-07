@@ -2,7 +2,7 @@ import { withAuthenticatedPersonalApprovals } from '../governance/authenticated-
 /** Shared onboarding plan and once-only human-approved charter amendment.
  * Principals come from authenticated adapters, never from request JSON.
  */
-import { humanActor } from '../actor.js';
+import { humanActor } from '../contracts/actor.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { isValidMemberId, readMemberProfile } from './member-registry.js';
 import type { CharterScope, ExternalEffectPolicy } from '../governance/accountability-charter.js';

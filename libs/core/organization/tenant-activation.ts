@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { stanceDirForSlug } from '../stance-resolver.js';
+import { stanceDirForSlug } from '../authn/stance-resolver.js';
 import { resolveTenant } from './tenant-registry.js';
 import { loadOrganizationOperationalState } from './organization-operating-model.js';
 import { pathResolver } from '../path-resolver.js';

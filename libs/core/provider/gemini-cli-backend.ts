@@ -5,7 +5,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { cliOutputFormat, parseGeminiCliUsage, recordCliUsage } from '../cli-usage-metering.js';
+import { cliOutputFormat, parseGeminiCliUsage, recordCliUsage } from './cli-usage-metering.js';
 import { z, type ZodType } from 'zod';
 import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -47,7 +47,7 @@ import type {
   DecomposedTaskPlan,
   ReasoningCallOptions,
 } from '../reasoning/reasoning-backend.js';
-import { runStartReportingDelegation } from '../delegation-execution-tracker.js';
+import { runStartReportingDelegation } from '../workforce/delegation-execution-tracker.js';
 
 export interface GeminiCliBackendOptions {
   /** CLI binary. Defaults to `gemini` (resolved via PATH). */

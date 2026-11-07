@@ -5,7 +5,7 @@ import { missionDir } from '../path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 
 const draftRefineMock = vi.hoisted(() => ({ draftRefine: vi.fn() }));
-vi.mock('../draft-refine.js', () => draftRefineMock);
+vi.mock('../reasoning/draft-refine.js', () => draftRefineMock);
 
 import { applyDraftRefineToDeliverable } from './mission-orchestration-worker-part-results.js';
 import { writeMissionStateAtPath } from './mission-state-reader.js';

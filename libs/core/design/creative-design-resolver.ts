@@ -4,7 +4,7 @@ import { loadBrandTokensAtPath, type BrandTokens } from './brand-tokens.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
 import { DEFAULT_CHRONOS_WEB_THEME_PACK, type WebThemePack } from './web-design-system.js';
-import { deriveAccentPalette, type CeAccentPalette } from '../ce-adoption.js';
+import { deriveAccentPalette, type CeAccentPalette } from '../harnessing/ce-adoption.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import {
   buildFoundationModeVars,

@@ -21,7 +21,7 @@ Kyberion の正本となる containment chain は既に次で定義されてい�
 tenant_slug → organization_id → project_id → mission_id → task_id → session
 ```
 
-また、`libs/core/scope-context.ts` と `libs/core/event-scope.ts` に、tenant、tier、entity、viewer、NHI をまとめて検証する基盤がある。一方、今回調査した実行系の周辺では、次の三つのスコープが混在している。
+また、`libs/core/scope-context.ts` と `libs/core/event/event-scope.ts` に、tenant、tier、entity、viewer、NHI をまとめて検証する基盤がある。一方、今回調査した実行系の周辺では、次の三つのスコープが混在している。
 
 1. **process scope**: supervisor daemon や surface runtime がどのプロセス所有者として動くか。
 2. **request/entity scope**: どの tenant のどの organization / project / mission / task を処理するか。
@@ -54,7 +54,7 @@ tenant_slug → organization_id → project_id → mission_id → task_id → se
 **できていること**
 
 - `libs/core/scope-context.ts` が `tenant_slug`、organization / project / mission / task / session、tier、NHI、viewer principal を一つの context として検証できる。
-- `libs/core/event-scope.ts` が `system` から `session` までの scope kind、authority との lineage 一致、tenant viewer の fail-closed filter を提供している。
+- `libs/core/event/event-scope.ts` が `system` から `session` までの scope kind、authority との lineage 一致、tenant viewer の fail-closed filter を提供している。
 - `knowledge/product/architecture/entity-scope-hierarchy.md` は storage、authorization、artifact、identity、event / ledger の containment chain を同じ順序で説明している。
 - `knowledge/personal/stances/{slug}` を tenant とみなさない方針、tier 名を tenant とみなさない検証、tenant registry の active 判定は整備されている。
 
@@ -187,7 +187,7 @@ system: active/shared/runtime/media-generation/schedules/{id}.json
 tenant: active/shared/runtime/media-generation/schedules/tenants/{tenant}/{id}.json
 ```
 
-`libs/core/physical-namespace.ts` が tenant/entity lineage の path segment を検証し、surface coordination と generation scheduler が同じ resolver を使う。tenant-scoped read は対象 tenant subtree だけを走査する。system/operator の aggregate read は `includeTenantNamespaces` を明示した場合だけ tenant subtree を観測でき、tenant viewer の認可には使わない。外部 egress bridge は aggregate read を channel binding と scope の一致検証を通した brokered delivery として扱う。
+`libs/core/storage/physical-namespace.ts` が tenant/entity lineage の path segment を検証し、surface coordination と generation scheduler が同じ resolver を使う。tenant-scoped read は対象 tenant subtree だけを走査する。system/operator の aggregate read は `includeTenantNamespaces` を明示した場合だけ tenant subtree を観測でき、tenant viewer の認可には使わない。外部 egress bridge は aggregate read を channel binding と scope の一致検証を通した brokered delivery として扱う。
 
 既存 flat record は `pnpm namespace:migrate-physical -- --dry-run --kind all` で計画を出し、`--apply` で移動する。canonical / mission-derived scope がある record だけを tenant namespace へ移動し、unscoped / invalid record は tenant を推測せず `active/shared/runtime/migrations/physical-namespace/quarantine/` へ移す。destination collision は上書きせず停止する。今回の apply では surface の 10件を移動し、135件を quarantine した。apply 後の tenant reader は flat path を互換 source として扱わないため、quarantine manifest が cutover の監査証跡になる。
 
@@ -195,7 +195,7 @@ tenant: active/shared/runtime/media-generation/schedules/tenants/{tenant}/{id}.j
 
 ### 3.9 reader-side migration（第一段階完了）
 
-ledger は hash chain を持つため、既存 JSONL をその場で書き換える backfill はこの段階では行わない。`libs/core/scope-migration.ts` が durable record を次の規則で読み替える。
+ledger は hash chain を持つため、既存 JSONL をその場で書き換える backfill はこの段階では行わない。`libs/core/governance/scope-migration.ts` が durable record を次の規則で読み替える。
 
 - nested canonical `scope` が有効なら `canonical` として採用する。
 - scope がない legacy record は、mission state が現存し authority scope を復元できる場合だけ `mission-derived` として扱う。
@@ -574,18 +574,18 @@ surface はサービス本体が記録し、supervisor は同じ receipt を重�
 - `knowledge/product/architecture/channel-port-surface-model.md`
 - `libs/core/entity-scope.ts`
 - `libs/core/scope-context.ts`
-- `libs/core/event-scope.ts`
+- `libs/core/event/event-scope.ts`
 - `libs/core/organization/tenant-registry.ts`
 - `libs/core/agent/agent-runtime-supervisor.ts`
 - `libs/core/agent/agent-runtime-supervisor-client.ts`
 - `libs/core/tool/runtime-scope.ts`
-- `libs/core/scope-migration.ts`
-- `libs/core/generation-scheduler.ts`
+- `libs/core/governance/scope-migration.ts`
+- `libs/core/daemon/generation-scheduler.ts`
 - `libs/core/generation-quota.ts`
 - `knowledge/product/governance/media-generation-quota-policy.json`
 - `libs/core/agent/agent-registry.ts`
 - `libs/core/agent/agent-identity.ts`
-- `libs/core/generation-scheduler.ts`
+- `libs/core/daemon/generation-scheduler.ts`
 - `knowledge/product/schemas/generation-schedule.schema.json`
 - `libs/core/contracts/generation-schedule.ts`
 - `libs/core/surface/channel-surface-types.ts`
@@ -596,7 +596,7 @@ surface はサービス本体が記録し、supervisor は同じ receipt を重�
 - `knowledge/product/governance/surface-provider-manifests.json`
 - `knowledge/product/governance/protocol-service-registry.json`
 - `libs/core/surface/channel-directory.ts`
-- `libs/core/customer-channel-binding.ts`
+- `libs/core/organization/customer-channel-binding.ts`
 - `knowledge/product/schemas/channel-port.schema.json`
 - `knowledge/product/schemas/runtime-surface-manifest.schema.json`
 - `presence/displays/chronos-mirror-v2/src/lib/viewer-context.ts`

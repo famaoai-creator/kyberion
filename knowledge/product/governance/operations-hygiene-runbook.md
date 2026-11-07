@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-07
+last_updated: 2026-11-08
 ---
 
 # Operations Hygiene Runbook
@@ -464,7 +464,7 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
    be deleted. The janitor's mtime TTL walks only directories. A top-level append-only ledger
    therefore needs a self-bounding writer or `review_required`.
 3. **Never re-read a growing ledger in full on a hot path.** Use `readJsonLinesCached`
-   (`libs/core/jsonl-tail.ts`), which parses only bytes appended since the last call and replays on
+   (`libs/core/storage/jsonl-tail.ts`), which parses only bytes appended since the last call and replays on
    rotation or rewrite. Its rows are frozen and shared across calls: never mutate them. Do not prune a ledger whose rows mean "consumed forever" (for example the
    dot wake ledger); pruning it re-fires old wakes.
 4. **Run `pnpm check -- --only runtime-store-retention`** (part of `--scope pr`). It fails with
@@ -483,7 +483,7 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
   `security-policy.json` `tenant_scope.protected_prefixes`, add the prefixes to the
   `storage-layout.test.ts` expectation, and decide its offboarding disposition in
   `TENANT_RUNTIME_PARTITION_TARGET_KINDS` (the `satisfies` clause fails to compile until you do).
-- Build those paths with `partitionedScopedPath(root, scope, …)` (`libs/core/physical-namespace.ts`),
+- Build those paths with `partitionedScopedPath(root, scope, …)` (`libs/core/storage/physical-namespace.ts`),
   which keeps the scope's entity segments (`organizations/<id>/…`) below the partition. Do not use
   `physicalScopedPath` (`<base>/tenants/<slug>/…`) for new tenant state under
   `active/shared/runtime/`: that layout is invisible to tier-guard's tenant check, backup/restore
@@ -589,7 +589,7 @@ Everyone and Anonymous. Every application-owned Windows pipe listener must await
 client. The helper applies and reads back a DACL limited to the current user,
 SYSTEM and Administrators. Treat a hardening failure as startup failure. Keep the
 platform guard and fail-closed behavior covered by
-`libs/core/windows-named-pipe-security.test.ts`; run it with the terminal,
+`libs/core/virtual/windows-named-pipe-security.test.ts`; run it with the terminal,
 supervisor and PTC IPC tests when changing a listener.
 
 - **No overlapping ticks.** Use a self-rescheduling `setTimeout` loop with an in-flight flag, not an
@@ -993,7 +993,7 @@ mechanism has an off switch and a test that compares its output with the switch 
 | `ts.transpileModule` for every TypeScript module, in every process                                                                                                                                                          | Transpile cache in `node_modules/.cache/kyberion-ts-loader/` (`scripts/ts-loader-cache.mjs`), outside every agent-writable tree: key = SHA-256 of the cache module's own text (it holds the options), TypeScript version, absolute path and source; 0700 dirs, 0600 entries, owner/mode checked on read; temp file + rename; TypeScript is required only on a miss | `KYBERION_TS_LOADER_CACHE=0`            | `scripts/ts-loader-cache.test.ts` (invalidation, poisoning, concurrency), `libs/core/tier-guard-ts-loader-cache.test.ts` |
 | Node's default resolver runs `getPackageScopeConfig` for each `.ts` URL (type stripping is on by default in Node 24), and that call re-parses the whole `exports` string of the nearest package.json: 290KB for `libs/core` | `scripts/ts-loader.mjs` answers workspace TypeScript resolutions itself (`resolveTsSourceDirectly`, realpath URL)                                                                                                                                                                                                                                                  | `KYBERION_TS_LOADER_FAST_RESOLVE=0`     | `scripts/ts-loader-resolve.test.ts` (differential)                                                                       |
 | The same re-parse for each `libs/core/dist/*.js` module                                                                                                                                                                     | The core build writes `libs/core/dist/package.json` (`type` + `#imports` only) and one-line shims re-exporting the real `.mjs` modules (`scripts/write_core_dist_scope.mjs --run`; `--check` drift runs in the packaging-contract gate). External consumers still resolve `@agent/core/*` through the full exports map                                             | `KYBERION_CORE_DIST_SCOPE=0` (build)    | `scripts/write_core_dist_scope.test.ts` (differential)                                                                   |
-| `local-stt-discovery` probed every `python3.x` once per bridge installer                                                                                                                                                    | Memo + private host cache `node_modules/.cache/kyberion-stt-discovery/candidates.json`, both for 10 minutes, keyed on platform, PATH, registry content and the managed runtimes' bin lstat and site-packages mtimes; managed installers reset it; a hit rebuilds candidates from the registry and accepts only binaries the probe could have found                 | `KYBERION_STT_DISCOVERY_CACHE_TTL_MS=0` | `libs/core/local-stt-discovery.cache.test.ts`, `scripts/voice_setup.discovery-cache.test.ts`                             |
+| `local-stt-discovery` probed every `python3.x` once per bridge installer                                                                                                                                                    | Memo + private host cache `node_modules/.cache/kyberion-stt-discovery/candidates.json`, both for 10 minutes, keyed on platform, PATH, registry content and the managed runtimes' bin lstat and site-packages mtimes; managed installers reset it; a hit rebuilds candidates from the registry and accepts only binaries the probe could have found                 | `KYBERION_STT_DISCOVERY_CACHE_TTL_MS=0` | `libs/core/voice/local-stt-discovery.cache.test.ts`, `scripts/voice_setup.discovery-cache.test.ts`                       |
 
 Rules:
 
@@ -1126,14 +1126,14 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
   (`personaTierReadDecision`) — never a second persona table. Aggregate readers skip a denied
   partition with a diagnostic `debug` line instead of failing. Reuse the metrics ledgers'
   `PartitionedMetricsLedger` and the offboarding `METRICS_LEDGERS` table
-  (`libs/core/scope-offboarding.ts`: export, approval-gated legacy-row prune, audit) instead of a
+  (`libs/core/storage/scope-offboarding.ts`: export, approval-gated legacy-row prune, audit) instead of a
   new mechanism.
 - **A read gate never weakens a cap.** A cap or limit enforcer reads gated ledgers only through
-  `aggregateMetricsForEnforcement` (`libs/core/metrics.ts`; governed read-only role
+  `aggregateMetricsForEnforcement` (`libs/core/analysis/metrics.ts`; governed read-only role
   `metrics_cap_reader`, numbers only), never through a row reader, so a persona that may not read
   the rows still has its spend counted. A report or summary built from a gated read passes
   `onWithheld` and shows `metricsWithheldNotice` (one diagnostic warn + a "partial" line in its
-  output). Gate: `libs/core/metrics-enforcement-aggregate.test.ts`.
+  output). Gate: `libs/core/analysis/metrics-enforcement-aggregate.test.ts`.
 - **Caps are evaluated where they are read.** A tenant-bound process evaluates spend caps per
   bound tenant — policy (`spend-policy.json` `tenant_overrides`) and ledgers from the same
   tenant — and ignores (debug-logs) a different requested tenant instead of mixing them; it never
@@ -1164,7 +1164,7 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
   tier root: `existsSync` reads "missing", `lstat`/`readdir` throw `scope_invalid_prefix`, and
   any enumerator that lists the root silently sees nothing — or crashes the sweep that calls
   it. Every enumerator of a mission tier root must route through
-  `missionTierScanDirs` (`libs/core/owner-scope.ts`), which returns `<root>/<bound>` for a
+  `missionTierScanDirs` (`libs/core/governance/owner-scope.ts`), which returns `<root>/<bound>` for a
   bound identity on protected tiers and the whole root otherwise — never a hand-rolled
   try-readdir/probe-bound fallback per site. Flat (untenanted-dir) entries are unreachable by
   enumeration under a bound identity by design; they stay resolvable by id and through
@@ -1220,7 +1220,7 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
 2. When a store moves tenant rows out of a shared file, find every reader first
    (`grep` the loader, e.g. `loadHistory(` / `loadResourceUsageHistory(`) and give each an explicit
    read scope; a reader left on the default silently loses the tenant rows it used to see. Prove the
-   gate with the real tier-guard (pattern: `libs/core/metrics-ledger-persona-gate.test.ts` — one
+   gate with the real tier-guard (pattern: `libs/core/analysis/metrics-ledger-persona-gate.test.ts` — one
    persona allowed, one denied, aggregate read skips instead of throwing) and add a
    `scope-offboarding.test.ts` case for the purge.
 3. Verify onboarding-flow commands with the real CLI in a throwaway worktree.
@@ -1241,7 +1241,7 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
 **Delegation execution-start reporting (R5).** A keyed `delegateTask` failure whose start
 state is unknown counts as started: no retry, no failover, a terminal replay. A backend opts in to
 precise reporting by wrapping its `delegateTask` body in `runStartReportingDelegation`
-(`libs/core/delegation-execution-tracker.ts`) — only when EVERY dispatch path reports its start:
+(`libs/core/workforce/delegation-execution-tracker.ts`) — only when EVERY dispatch path reports its start:
 a pure completion call, a tool loop that calls `markDelegationExecutionStarted()` before its first
 tool, or a CLI spawned through `spawnWithDelegationEnv` (which marks once a child pid exists).
 An SDK or adapter that spawns or runs tools elsewhere (claude-agent, copilot-acp, agy native
@@ -1874,7 +1874,7 @@ empty string may clear a field. Re-observe after a rejected reference or timeout
 For terminal operations, retain the session ID and command exit code, and return
 missing-session or unsupported-capability diagnostics instead of false success.
 
-**Gate.** Run `scripts/actuator_playground.test.ts`, `libs/core/cli-utils.test.ts`,
+**Gate.** Run `scripts/actuator_playground.test.ts`, `libs/core/harnessing/cli-utils.test.ts`,
 the browser and terminal actuator tests, and `libs/core/shell/pty-engine.resize.test.ts`.
 Replay `scripts/browser_actuator_usability_probe.ts` and
 `scripts/terminal_actuator_usability_probe.ts` for live outcomes and recovery.
@@ -2014,7 +2014,7 @@ Never invoke real providers, notifications or resident daemons for these fixture
 janitor's mtime TTL — the append keeps its mtime fresh forever. Every such store
 needs a declared lifecycle in the retention catalog, or an explicit
 `review_required` note naming what bounds it. Its size must never fail a read or an
-append: readers come from `libs/core/jsonl-read.ts`, chosen by need, and retention
+append: readers come from `libs/core/storage/jsonl-read.ts`, chosen by need, and retention
 runs at write time (`maintainStoreAfterAppend`), not only in the janitor.
 
 **Procedure:**
@@ -2551,7 +2551,7 @@ operations; `libs/core/cloudflare-os-held-reconcile.test.ts` must prove that
 refresh alone retains a pending held action and explicit reconciliation recovers
 the decision. Service lifecycle receipt attribution must remain data: write
 through the shared `infrastructure_sentinel` store authority instead of assuming
-the receipt's actor role (`libs/core/protocol-service-lifecycle.test.ts`).
+the receipt's actor role (`libs/core/service/protocol-service-lifecycle.test.ts`).
 
 Shared readers must use purpose-scoped read grants: provider egress policy reads
 the selected tenant profile through `workspace_tenant_registry_reader`, and
@@ -2686,7 +2686,7 @@ preservation).
 **Process source schemas belong in governed descriptors.** JSON sources declare
 their schema under `knowledge/product/schemas/`; external or traversing paths
 are rejected. Adding a source identity must not require a TypeScript ID-to-schema
-table. Gate: `libs/core/process-definition-registry.test.ts` (novel source identity,
+table. Gate: `libs/core/governance/process-definition-registry.test.ts` (novel source identity,
 missing schema and unsafe references).
 
 **Dot extensions register through the typed registration API.** Keep capability
@@ -3080,6 +3080,40 @@ Preserve immutable result originals when adding modern report markers. For histo
 Under the common result-file lock, capture the retained file's actual UTF-8 byte length, terminal LF state and file identity during the existing read-state phase. Carry only this private metadata to the append capability; it must not read protected bodies. Supply a separating LF for a nonempty unterminated last record and reject an append whose exact serialized UTF-8 bytes, including delimiters, would exceed the same 16 MiB read ceiling. Recheck absence or the original device/inode/size/mtime plus regular-file and single-link constraints immediately before guarded append. Never raise the limit, overwrite, rotate or release an uncertain claim to make an append succeed.
 
 On overflow or concurrent file change, preserve the retained bytes and leave outcome ownership unknown or the report pending as appropriate. Test both outcome and marker appends with valid no-LF originals, exact-capacity success, one-byte UTF-8 overflow, changed file fingerprints, actual held-effect failure and report retry without effect replay. Enforcing gates are `dot-result-store`, `dot-result-store.integration` and the result-capability boundary tests; capacity padding fixtures belong only to their isolated stores.
+
+## Core module ownership and graph resolution
+
+Before moving a core implementation, read its imports, consumers and initialization
+behavior. Update its existing public export target and dependent source paths, move
+associated tests and native helpers, and preserve its dependency layer. Register each
+subsystem and each justified root boundary in `module-layer-boundaries.json` under
+`core_placement`; remove stale entries rather than weakening the ownership check.
+
+The module graph must resolve `@agent/core` subpaths through package exports and accept
+only file targets. A directory named like a public facade must never hide that facade's
+dependencies. Use direct authority imports when a consumer needs authority alone.
+Audit embedded child-process imports, escaped path allowlists, query-suffixed re-evaluation helpers and paths
+assembled from a core source/dist directory: public export compatibility does not repair
+these physical paths. Re-sort path registries without changing their membership, and
+recompute source hash pins only after confirming the implementation diff. Exercise the
+existing runtime-replay, seam re-evaluation, plugin-view issuance and installed-identity tests.
+Run `check_module_boundaries.test.ts`, `check_core_module_placement.test.ts`, the
+`module-boundaries` gate and the foundation-weight gate after moves; preserve the
+existing cycle and weight limits. Perform a clean build to remove obsolete emitted files.
+
+Keep verification independent from checkout size and local state. Mission finish fixtures
+must initialize their own Git repository before invoking lifecycle code so Git cannot
+search upward into the developer checkout. Mock retrospective aggregation and the exact
+volatile-GC child command in lifecycle unit fixtures; preserve real Git/archive assertions
+and verify the retrospective handoff. Their dedicated suites own real aggregation and GC.
+A pipeline wiring test should mock the janitor
+and assert its options; real retention scans belong in the janitor's isolated filesystem
+fixtures. Do not raise timeouts to accommodate scans of live runtime floors. Validate with
+`mission-lifecycle.test.ts`, `run_pipeline.test.ts` and the active-state leak guard.
+Provider-definition generation tests must generate and tamper with all provider outputs
+inside a UUID scratch fixture. Read canonical templates and policy from the checkout;
+never require or rewrite the developer's ignored provider-state directories. Enforce
+generation parity and tamper detection with `generate_subagent_definitions.test.ts`.
 
 ## Intake extension CI checks
 

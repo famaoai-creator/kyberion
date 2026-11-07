@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   stanceRoot: vi.fn(() => null as string | null),
 }));
 
-vi.mock('../stance-resolver.js', () => ({
+vi.mock('../authn/stance-resolver.js', () => ({
   stanceRoot: mocks.stanceRoot,
 }));
 

@@ -32,7 +32,7 @@ VOLATILE_KNOWLEDGE_PLAN の Phase 1〜5 は**コードとしてはほぼ完成�
 ### Task 1: cron 配線 — `claude-sonnet-4`
 
 1. `chronos_daemon.ts` のスケジュール仕様(`adf.schedule?.cron` の期待形式)を読み、4 パイプラインに `schedule` ブロックを追加する: volatile-gc 04:00 日次 / daily-routine 06:00 日次 / weekly-review 月曜 07:00 / volatile-index 05:00 日次(時刻は既存のスケジュール例があればそれに合わせる)。
-2. storage-janitor 用に `pipelines/storage-janitor.json`(`runJanitor` を呼ぶ 1 ステップ + 日次 cron)を新設する。`scenario_storage_governance.ts` 内の擬似レイテンシ sleep(`:96,156`)は本番パイプラインに持ち込まない(janitor 本体 `libs/core/storage-janitor.ts` を直接呼ぶ)。
+2. storage-janitor 用に `pipelines/storage-janitor.json`(`runJanitor` を呼ぶ 1 ステップ + 日次 cron)を新設する。`scenario_storage_governance.ts` 内の擬似レイテンシ sleep(`:96,156`)は本番パイプラインに持ち込まない(janitor 本体 `libs/core/storage/storage-janitor.ts` を直接呼ぶ)。
 3. パイプラインスキーマ(`pipeline-adf.schema.json`)が `schedule` を許容するか確認し、必要ならスキーマ更新。`check:pipeline-shell-independence` / `pnpm validate` を通す。
 4. chronos daemon をローカルで起動し、登録ログに 5 本が載ることを確認する。
 
@@ -60,17 +60,17 @@ VOLATILE_KNOWLEDGE_PLAN の Phase 1〜5 は**コードとしてはほぼ完成�
 
 ### フォールバック GC フック — 2026-07-05
 
-- `libs/core/storage-janitor.ts` に `runJanitorIfStale()` / `readJanitorLastRunMs()` を追加。実行完了時に `active/shared/runtime/state/janitor-last-run.json` へマーカーを永続化し、前回実行から 24h(`DEFAULT_TMP_TTL_MS`)以内なら skip する。
+- `libs/core/storage/storage-janitor.ts` に `runJanitorIfStale()` / `readJanitorLastRunMs()` を追加。実行完了時に `active/shared/runtime/state/janitor-last-run.json` へマーカーを永続化し、前回実行から 24h(`DEFAULT_TMP_TTL_MS`)以内なら skip する。
 - `scripts/run_baseline_check.ts` のセッション開始時に、失敗許容(try/catch + warn)で detached の `storage-janitor` dry-run job を submit する。baseline 本体は待たず、janitor が必要なときは report の `maintenance.janitor` と `status: needs_attention` で返す。
 - unit test 4件を `storage-janitor.test.ts` に追加(マーカー無し実行/24h以内 skip/stale 再実行/dry-run はマーカー非記録)。
 
 ### Task 1 shelf result — 2026-07-03
 
 - `pipelines/volatile-gc.json` / `daily-routine.json` / `weekly-review.json` / `volatile-index.json` に `schedule.cron` を追加した。
-- `pipelines/storage-janitor.json` を追加し、`libs/core/storage-janitor.ts` の `runJanitor()` を `core:run_janitor` 経由で直接呼ぶようにした。手動検証は `--context '{"dry_run":true}'` で削除なしに実行できる。
+- `pipelines/storage-janitor.json` を追加し、`libs/core/storage/storage-janitor.ts` の `runJanitor()` を `core:run_janitor` 経由で直接呼ぶようにした。手動検証は `--context '{"dry_run":true}'` で削除なしに実行できる。
 - `package.json` に `storage:janitor` を追加した。
 - 検証:
-  - `pnpm exec vitest run scripts/run_pipeline.test.ts libs/core/storage-janitor.test.ts`
+  - `pnpm exec vitest run scripts/run_pipeline.test.ts libs/core/storage/storage-janitor.test.ts`
   - `pnpm run typecheck`
   - `pnpm run check -- --scope pr --only script-integrity`
   - `pnpm run check -- --scope full --only pipeline-shell-independence`
@@ -86,7 +86,7 @@ VOLATILE_KNOWLEDGE_PLAN の Phase 1〜5 は**コードとしてはほぼ完成�
 - `knowledge/product/governance/phases/review.md` を、finish hook が Volatile Distillation Lane を自動実行する前提へ更新した。
 - 検証:
   - `pnpm run typecheck`
-  - `pnpm exec vitest run scripts/run_pipeline.test.ts libs/core/storage-janitor.test.ts`
+  - `pnpm exec vitest run scripts/run_pipeline.test.ts libs/core/storage/storage-janitor.test.ts`
   - `pnpm run build:repo`
 
 ### Task 3 shelf result — 2026-07-03

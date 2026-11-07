@@ -3,8 +3,8 @@ import type {
   SlackMissionProposalActionPayload,
 } from '../surface/channel-surface-types.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
-import { resolveLocale, type SupportedLocale } from '../locale.js';
-import { t } from '../t.js';
+import { resolveLocale, type SupportedLocale } from '../localization/locale.js';
+import { t } from '../localization/t.js';
 import {
   renderIntentAuthorityLabel,
   renderIntentOutcomeLabel,

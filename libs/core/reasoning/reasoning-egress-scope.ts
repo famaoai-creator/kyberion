@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createLogger } from '../logger.js';
-import { evaluateEgressPolicy } from '../egress-policy.js';
+import { evaluateEgressPolicy } from '../governance/egress-policy.js';
 import {
   findActiveCharter,
   loadCharterUsage,
@@ -25,7 +25,7 @@ import {
   custodyOwnerLabel,
   deriveCustodyOwner,
   type CustodyOwner,
-} from '../custody-owner.js';
+} from '../contracts/custody-owner.js';
 
 /**
  * Tier context for reasoning-backend sends.

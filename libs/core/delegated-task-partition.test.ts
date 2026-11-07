@@ -26,7 +26,7 @@ import {
   loadDelegatedTaskRecord,
   startDelegatedTaskTrace,
   systemDelegationTracePaths,
-} from './delegated-task-observability.js';
+} from './workforce/delegated-task-observability.js';
 import {
   claimPendingDelegationNotifications,
   delegationNotificationsPath,

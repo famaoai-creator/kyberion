@@ -7,8 +7,8 @@ vi.mock('./organization/tenant-registry.js', async (original) => ({
 import { resolveIdentityContext, withExecutionContext } from './authority.js';
 import { isRegisteredOperationalTenant } from './foundation/operational-store-policy.js';
 import { assertRecordIdentity } from './organization/organization-operating-model-persistence.js';
-import { withOpsAlertFileStore } from './ops-alert-log.js';
-import { defaultOpsAlertLogPath } from './ops-alert.js';
+import { withOpsAlertFileStore } from './daemon/ops-alert-log.js';
+import { defaultOpsAlertLogPath } from './daemon/ops-alert.js';
 import { pathResolver } from './path-resolver.js';
 
 afterEach(() => {
