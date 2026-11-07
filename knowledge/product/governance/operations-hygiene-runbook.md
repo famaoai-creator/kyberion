@@ -3138,6 +3138,27 @@ Enforce these rules with `role-narrowing-denial.test.ts`,
 `tier-guard-policy-corruption.test.ts`, `resource-access-scope.test.ts`,
 `resource-access-custody-contract.test.ts` and `tier-guard-structural-mkdir.test.ts`.
 
+Run role-sensitive regressions with the CI persona and mission role, not only a local
+operator environment. A fixture proving an unprivileged caller must explicitly bind that
+caller or clear and restore both role variables. Seed canonical security and agent policies
+before importing scoped stores; tenant fixtures also need valid tenant records. Preserve
+independent role-less bootstrap assertions when stronger explicit-role refusals change the
+first diagnostic. Metrics fixtures must retain positive own-tenant counts and negative
+other-tenant exclusion. Enforce with the hearing/discussion boundary, custody contract,
+owner-scope and mission-retrospective suites.
+
+Tenant-bound organization lookup must target its own protected partition directly, just
+like mission discovery; never enumerate the protected tier root and recover by swallowing
+its refusal. Keep public/unbound enumeration and final visibility checks distinct.
+
+Preview placeholder processing must be linear on repeated unmatched opening braces while
+preserving its exact nonempty-body and closing-brace semantics. Exercise warning extraction,
+interpolation and reference-path substitution with adversarial inputs in
+`pipeline-preview.test.ts`. For scanner alerts on moved code, distinguish real defects from
+metadata-only digests: a deterministic OS vault lookup label is not a password verifier.
+Preserve stored credential lookup compatibility and obtain explicit owner approval before
+changing an external security alert disposition.
+
 ## Intake extension CI checks
 
 When adding a service operation, validate the shipped discovery count and service-harness operation inventory together with the exact kind/risk/approval assertions. Registry-overlay fixtures must assert the shipped exact declarations as well as the mutation fallback. For boundary tests, partially mock shared path resolvers so new legitimate imports retain their real APIs; a minimal hand-built resolver can fail during module initialization before the tested gate runs. Run the impacted existing tests in addition to the extension fixtures. For single-use admission capabilities, compare private in-memory snapshots of request and configuration values. Do not send credential-bearing configuration into hash or HMAC APIs: keyed fast hashes still trigger password-hashing checks and are unnecessary when the capability's private WeakMap already supplies the trust boundary. Never log or persist these snapshots.

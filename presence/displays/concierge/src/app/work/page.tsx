@@ -8,10 +8,12 @@ import { IA_WORK_TABS, resolveIaTab, type IaWorkTab } from '../../lib/ia-routes'
 import { DestinationTabs } from '../destination-tabs';
 import { KindList } from '../w/kind-list';
 import { MissionPlanPanel } from '../../components/mission-plan/MissionPlanPanel';
+import { RequestsPanel } from './requests-panel';
 
 /**
  * `/work` 仕事 (MSN-SHELL-IA §1): missions as a state board plus their list,
- * and the work-item kanban. Replaces `/w/mission`, `/w/work_item` and the
+ * the work-item kanban, and 依頼 — the viewer's requests (moved from
+ * presence-studio 進み具合, Kyberion server phase 2). Replaces `/w/mission`, `/w/work_item` and the
  * console's missions / work-items sections; detail pages stay at
  * `/w/<kind>/<id>`.
  */
@@ -55,9 +57,12 @@ function Work() {
         tabs={[
           { id: 'missions', label: t('ia_shell_work_tab_missions') },
           { id: 'items', label: t('ia_shell_work_tab_items') },
+          { id: 'requests', label: t('ia_shell_work_tab_requests') },
         ]}
       />
-      {tab === 'items' ? (
+      {tab === 'requests' ? (
+        <RequestsPanel />
+      ) : tab === 'items' ? (
         <KindList key="items" t={t} kind="work_item" embedded />
       ) : (
         <KindList key={`missions-${listRevision}`} t={t} kind="mission" embedded />

@@ -160,11 +160,12 @@ export const FRONT_DESK_LINKED_DESTINATIONS: readonly FrontDeskMenuItem[] = [
     icon: 'home',
   },
   {
+    // 進み具合 is Concierge 仕事 › 依頼 (Kyberion server phase 2).
     id: 'progress',
     label_key: 'front_desk:nav_progress',
     sublabel_key: 'front_desk:nav_progress_sub',
-    surface: 'presence-studio',
-    path: '/progress',
+    surface: 'concierge',
+    path: '/work?tab=requests',
     min_role: 'viewer',
     group_key: 'front_desk:nav_group_work',
     icon: 'chart',

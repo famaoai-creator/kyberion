@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver, safeReadFile, safeRmSync } from '@agent/core';
 import { logger } from '@agent/core/core';
 import { t as catalogT } from '@agent/core/t';
+import { readFrontDeskSurfaceUrls } from '@agent/core/front-desk-nav';
 import { withExecutionContext } from '@agent/core/authority';
 import type express from 'express';
 
@@ -1145,7 +1146,13 @@ describe('POST /api/hearing/:session/inventory (WI-08)', () => {
       kind: 'inventory',
       status: 'ready',
       id: body.entry_id,
-      next: { href: '/progress?tenant=' + INVENTORY_TEST_TENANT },
+      // 進み具合 is Concierge 仕事 › 依頼 (Kyberion server phase 2).
+      next: {
+        href:
+          readFrontDeskSurfaceUrls().concierge +
+          '/work?tab=requests&tenant=' +
+          INVENTORY_TEST_TENANT,
+      },
     });
     expect(reloaded.record.work_inventory_entry_id).toBeUndefined();
     expect(reloaded.record.work_inventory_scope).toBeUndefined();

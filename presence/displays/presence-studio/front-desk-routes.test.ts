@@ -45,12 +45,6 @@ import {
   toFrontDeskViewerScope,
 } from './security.js';
 
-// This exact JavaScript identifier contains "adf" across its camel-case boundary.
-// Exclude this exact token only; retain the original forbidden-copy checks.
-function stripProgressInternalIdentifiers(source: string): string {
-  return source.replace(/\breadFilter\b/g, '');
-}
-
 function readRepoFile(relativePath: string): string {
   return String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }));
 }
@@ -398,14 +392,16 @@ describe('FD-03 ask page routing (Deliverable 3)', () => {
   });
 });
 
-describe('FD-05 progress page routing (Deliverable 4)', () => {
-  it('serves progress.html at /progress instead of the interim /work redirect', () => {
+describe('FD-05 progress page routing (Kyberion server phase 2)', () => {
+  it('hands /progress to Concierge 仕事 › 依頼 instead of serving progress.html', () => {
     const source = readRepoFile('presence/displays/presence-studio/front-desk-pages.ts');
     const progressStart = source.indexOf("app.get('/progress'");
     const helpStart = source.indexOf('const toConciergeHelp');
     expect(progressStart).toBeGreaterThan(-1);
-    expect(source.slice(progressStart, helpStart)).toContain("'progress.html'");
-    expect(source.slice(progressStart, helpStart)).not.toContain('res.redirect');
+    const progressRoute = source.slice(progressStart, helpStart);
+    expect(progressRoute).toContain('readFrontDeskSurfaceUrls().concierge');
+    expect(progressRoute).toContain('conciergeRequestsPath(');
+    expect(progressRoute).not.toContain('progress.html');
   });
 });
 
@@ -533,50 +529,15 @@ describe('FD-02 remote-safe allowlist wiring', () => {
   });
 });
 
-describe('FD-05 progress page static contract', () => {
-  it('mounts the rail in progress.html as current "progress"', () => {
-    const progressHtml = readRepoFile('presence/displays/presence-studio/static/progress.html');
-    expect(progressHtml).toContain('id="front-desk-rail"');
-    expect(progressHtml).not.toContain('front-desk-rail.css');
-    expect(progressHtml).toContain('front-desk-rail.js');
-    expect(progressHtml).toContain("current: 'progress'");
-  });
-
-  it('progress.html/progress.js never use target="_blank", emoji, 127.0.0.1, or internal vocabulary', () => {
-    const progressHtml = readRepoFile('presence/displays/presence-studio/static/progress.html');
-    const progressJs = readRepoFile('presence/displays/presence-studio/static/progress.js');
-    const combined = `${progressHtml}\n${progressJs}`;
-    const withoutInternalIdentifiers = `${progressHtml}\n${stripProgressInternalIdentifiers(progressJs)}`;
-
-    expect(combined).not.toContain('target=');
-    expect(combined).not.toContain('127.0.0.1');
-    expect(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(combined)).toBe(false);
-
-    const forbiddenWords = [
-      'mission',
-      'ADF',
-      'actuator',
-      'pipeline',
-      'stimuli',
-      'A2UI',
-      'Presence Studio',
-      'ports',
-    ];
-    for (const word of forbiddenWords) {
-      expect(withoutInternalIdentifiers.toLowerCase()).not.toContain(word.toLowerCase());
-    }
-  });
-});
-
 describe('FD-05 remote-safe allowlist wiring', () => {
-  it('extends the allowlist to /api/progress and /api/progress-vocabulary but leaves the verdict mutation out', () => {
+  it('keeps only /api/progress on the allowlist (no page vocabulary, no item subpaths)', () => {
     const source = readRepoFile('presence/displays/presence-studio/security.ts');
     expect(source).toContain("path === '/api/progress'");
-    expect(source).toContain("path.startsWith('/api/progress/')");
-    expect(source).toContain("path === '/api/progress-vocabulary'");
+    expect(source).not.toContain("path.startsWith('/api/progress/')");
+    expect(source).not.toContain("path === '/api/progress-vocabulary'");
   });
 
-  it('allows a remote token to reach /api/progress and /api/progress/:id but still blocks other /api/* routes', () => {
+  it('allows a remote token to reach /api/progress but blocks its retired subpaths and other /api/* routes', () => {
     process.env.PRESENCE_STUDIO_TOKEN = 'studio-token';
     const middleware = requirePresenceStudioAccess();
 
@@ -599,12 +560,13 @@ describe('FD-05 remote-safe allowlist wiring', () => {
       fakeRequest({
         remoteAddress: '198.51.100.24',
         authorization: 'Bearer studio-token',
-        urlPath: '/api/progress/ts-1',
+        urlPath: '/api/progress/ts-1/correction-context',
       }) as never,
       detailRes as never,
       detailNext
     );
-    expect(detailNext).toHaveBeenCalledTimes(1);
+    expect(detailNext).not.toHaveBeenCalled();
+    expect(detailRes.statusCode).toBe(403);
 
     const verdictRes = fakeResponse();
     const verdictNext = vi.fn();
@@ -625,16 +587,13 @@ describe('FD-05 remote-safe allowlist wiring', () => {
 });
 
 describe('front-desk-routes.ts route wiring (FD-05 Deliverable 2)', () => {
-  it('wires GET /api/progress, GET /api/progress/:id, GET /api/progress-vocabulary, and POST /api/outcomes/:id/verdict', () => {
+  it('keeps GET /api/progress for 頼む and removes the routes only the moved page used', () => {
     const source = readRepoFile('presence/displays/presence-studio/front-desk-routes.ts');
     expect(source).toContain("app.get('/api/progress'");
-    expect(source).toContain("app.get('/api/progress/:id'");
-    expect(source).toContain("app.get('/api/progress-vocabulary'");
-    expect(source).toContain("app.post('/api/outcomes/:id/verdict'");
-
-    const verdictStart = source.indexOf("app.post('/api/outcomes/:id/verdict'");
-    const verdictRoute = source.slice(verdictStart, verdictStart + 1500);
-    expect(verdictRoute).toContain('requirePresenceStudioLocalAdmin(');
+    expect(source).not.toContain("app.get('/api/progress/:id'");
+    expect(source).not.toContain("app.get('/api/progress-vocabulary'");
+    expect(source).not.toContain("app.post('/api/outcomes/:id/verdict'");
+    expect(source).not.toContain('registerCorrectionContextRoute');
   });
 });
 
@@ -932,22 +891,4 @@ describe('HT-06 i18n gate: hearing canvas + training help vocabulary', () => {
       "app.get('/api/help-vocabulary'"
     );
   });
-});
-
-describe('progress raw-copy scanner identifier exception', () => {
-  it('strips only the exact case-sensitive readFilter identifier', () => {
-    expect(stripProgressInternalIdentifiers('readFilter()')).toBe('()');
-    expect(
-      stripProgressInternalIdentifiers('readfilter READFILTER xreadFilter readFilterSuffix')
-    ).toBe('readfilter READFILTER xreadFilter readFilterSuffix');
-  });
-
-  it.each(['ADF', '[ADF]', 'mission', '(mission)', 'pipeline', 'pipeline:'])(
-    'still detects forbidden copy %s after removing the known identifier',
-    (copy) => {
-      const source = stripProgressInternalIdentifiers('readFilter(); ' + copy).toLowerCase();
-      const forbiddenWords = ['ADF', 'mission', 'pipeline'];
-      expect(forbiddenWords.some((word) => source.includes(word.toLowerCase()))).toBe(true);
-    }
-  );
 });
