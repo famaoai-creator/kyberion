@@ -53,6 +53,7 @@ import type { AgentAskOptions, AgentResponse } from '../agent/agent-adapter.js';
 import type { NativeSubagentAdopter } from '../media/native-subagent-adopter.js';
 import { getSubagentCapabilityProfile } from '../workforce/subagent-capability-profiles.js';
 import { CursorCliSessionAdapter } from './cursor-cli-session-adapter.js';
+import { parseCursorCliUsage, recordCliUsage } from './cli-usage-metering.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -360,12 +361,23 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
         env: spawnEnv.env,
       })
     );
+    const started = Date.now();
     let stderr = '';
+    let stdout = '';
+    let requestNotSent = false;
+    let completionChars = 0;
+    let status: 'success' | 'error' = 'error';
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
     child.stderr.on('data', (chunk) => {
       stderr = `${stderr}${chunk.toString()}`.slice(-2000);
     });
     const closePromise = new Promise<number>((resolve, reject) => {
-      child.once('error', reject);
+      child.once('error', (err) => {
+        if (!stdout) requestNotSent = true;
+        reject(err);
+      });
       child.once('close', (code) => resolve(code ?? 1));
     });
     const boundedClose = withWallClockBudget(
@@ -416,9 +428,11 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
           if (typeof record.timestamp_ms === 'number') {
             emittedPartialText = true;
             yielded = true;
+            completionChars += text.length;
             yield text;
           } else if (!emittedPartialText) {
             yielded = true;
+            completionChars += text.length;
             yield text;
           }
         }
@@ -432,7 +446,14 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
         );
       }
       if (!yielded) throw new Error('[cursor-cli] streaming CLI returned no text');
+      status = 'success';
     } finally {
+      recordCliUsage('cursor-cli', model, started, status, {
+        report: parseCursorCliUsage(stdout),
+        promptChars: prompt.length,
+        completionChars,
+        requestNotSent,
+      });
       options?.signal?.removeEventListener('abort', onAbort);
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
       spawnEnv.dispose();
@@ -608,7 +629,7 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
     ];
 
     try {
-      return await this.spawnAndParse(args, options?.signal, options?.profile);
+      return await this.spawnAndParse(args, model, options?.signal, options?.profile);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (
@@ -622,7 +643,7 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
         const fallbackArgs = args.map((arg, index) =>
           index > 0 && args[index - 1] === '--model' ? 'auto' : arg
         );
-        return this.spawnAndParse(fallbackArgs, options?.signal, options?.profile);
+        return this.spawnAndParse(fallbackArgs, 'auto', options?.signal, options?.profile);
       }
       throw err;
     }
@@ -630,11 +651,30 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
 
   private async spawnAndParse(
     args: string[],
+    model: string,
     signal?: AbortSignal,
     profile?: ProviderPermissionProfileName
   ): Promise<string> {
-    const stdout = await this.spawnCli(args, signal, profile);
-    return this.parseEnvelope(stdout);
+    const prompt = args.at(-1) ?? '';
+    const started = Date.now();
+    const capture = { stdout: '', requestNotSent: true };
+    let completionChars = 0;
+    let status: 'success' | 'error' = 'error';
+    try {
+      const stdout = await this.spawnCli(args, signal, profile, capture);
+      capture.stdout = stdout;
+      const result = this.parseEnvelope(stdout);
+      status = 'success';
+      completionChars = result.length;
+      return result;
+    } finally {
+      recordCliUsage('cursor-cli', model, started, status, {
+        report: parseCursorCliUsage(capture.stdout),
+        promptChars: prompt.length,
+        completionChars,
+        requestNotSent: capture.requestNotSent,
+      });
+    }
   }
 
   private parseEnvelope(stdout: string): string {
@@ -689,7 +729,8 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
   private spawnCli(
     args: string[],
     signal?: AbortSignal,
-    profile?: ProviderPermissionProfileName
+    profile?: ProviderPermissionProfileName,
+    capture: { stdout: string; requestNotSent: boolean } = { stdout: '', requestNotSent: true }
   ): Promise<string> {
     const spawnEnv = this.buildSpawnEnv(profile);
     const child = spawnWithDelegationEnv(spawnEnv, () =>
@@ -698,6 +739,7 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
         env: spawnEnv.env,
       })
     );
+    capture.requestNotSent = false;
 
     return withWallClockBudget(
       {
@@ -724,6 +766,7 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
             resolve(stdout);
           });
           child.on('error', (err) => {
+            if (!stdout) capture.requestNotSent = true;
             reject(new Error(`[cursor-cli] spawn failed: ${err.message}`));
           });
           child.stdin.end();

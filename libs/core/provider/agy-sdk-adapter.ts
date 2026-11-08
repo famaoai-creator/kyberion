@@ -12,6 +12,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonInput } from '../foundation/json.js';
 import { isRecord } from '../foundation/text.js';
 import { resolveGeminiApiKey } from './gemini-api-backend.js';
+import { parseAgyCliUsage, recordCliUsage, type CliUsageReport } from './cli-usage-metering.js';
 
 interface BridgeResponse {
   id?: string;
@@ -21,6 +22,7 @@ interface BridgeResponse {
   stopReason?: string;
   metadata?: Record<string, unknown>;
   error?: string;
+  usage?: Record<string, unknown>;
 }
 
 type AgySdkBridgeMessage = BridgeResponse & {
@@ -63,6 +65,9 @@ export function normalizeAgySdkBridgeMessage(value: unknown): AgySdkBridgeMessag
   const normalizedMetadata =
     metadata === undefined ? undefined : isRecord(metadata) ? metadata : null;
   if (normalizedMetadata === null) return null;
+  const usage = value.usage;
+  const normalizedUsage = usage === undefined ? undefined : isRecord(usage) ? usage : null;
+  if (normalizedUsage === null) return null;
   if (event === undefined && id === undefined) return null;
 
   return {
@@ -76,6 +81,7 @@ export function normalizeAgySdkBridgeMessage(value: unknown): AgySdkBridgeMessag
     ...(event !== undefined ? { event } : {}),
     ...(normalizedPid !== undefined ? { pid: normalizedPid } : {}),
     ...(sdk !== undefined ? { sdk } : {}),
+    ...(normalizedUsage !== undefined ? { usage: normalizedUsage } : {}),
   };
 }
 
@@ -257,24 +263,50 @@ export class AgySdkAdapter {
   }
 
   async askNativeSubagent(prompt: string, options: AgentAskOptions = {}): Promise<AgentResponse> {
-    await this.boot();
-    const profile = String(options.profile ?? 'explorer');
-    const response = await this.request(
-      {
-        op: 'ask',
-        prompt,
-        profile,
-        effort: options.effort ?? 'medium',
-      },
-      options.signal
-    );
-    if (!response.ok) throw this.unavailable(response.error ?? 'SDK bridge rejected the request.');
-    return {
-      text: response.text ?? '',
-      thought: response.thought,
-      stopReason: response.stopReason ?? 'completed',
-      metadata: response.metadata,
-    };
+    const started = Date.now();
+    const capture = { requestNotSent: true };
+    let report: CliUsageReport | undefined;
+    let completionChars = 0;
+    let status: 'success' | 'error' = 'error';
+    try {
+      await this.boot();
+      const profile = String(options.profile ?? 'explorer');
+      const response = await this.request(
+        {
+          op: 'ask',
+          prompt,
+          profile,
+          effort: options.effort ?? 'medium',
+        },
+        options.signal,
+        capture
+      );
+      // Only a pre-run refusal means zero inference: the bridge rejects a new
+      // ask while busy without starting a model turn. Mid-run failures stay
+      // metered as consumed-but-unknown usage.
+      if (response.ok === false && /busy/i.test(response.error ?? ''))
+        capture.requestNotSent = true;
+      if (response.usage) report = parseAgyCliUsage(JSON.stringify({ usage: response.usage }));
+      if (!response.ok)
+        throw this.unavailable(response.error ?? 'SDK bridge rejected the request.');
+      status = 'success';
+      const text = response.text ?? '';
+      completionChars = text.length;
+      return {
+        text,
+        thought: response.thought,
+        stopReason: response.stopReason ?? 'completed',
+        metadata: response.metadata,
+      };
+    } finally {
+      recordCliUsage('agy-sdk', 'agy', started, status, {
+        report,
+        promptChars: prompt.length,
+        completionChars,
+        requestNotSent: capture.requestNotSent,
+        cause: 'subagent',
+      });
+    }
   }
 
   getRuntimeInfo(): Record<string, unknown> {
@@ -341,7 +373,11 @@ export class AgySdkAdapter {
     });
   }
 
-  private request(payload: Record<string, unknown>, signal?: AbortSignal): Promise<BridgeResponse> {
+  private request(
+    payload: Record<string, unknown>,
+    signal?: AbortSignal,
+    sentOut?: { requestNotSent: boolean }
+  ): Promise<BridgeResponse> {
     const child = this.process;
     if (!child || !this.ready)
       return Promise.reject(this.unavailable('AGY SDK bridge is not ready.'));
@@ -368,7 +404,9 @@ export class AgySdkAdapter {
         this.pending.delete(id);
         clearTimeout(timer);
         reject(this.unavailable('AGY SDK bridge stdin is closed.'));
+        return;
       }
+      if (sentOut) sentOut.requestNotSent = false;
     });
   }
 
