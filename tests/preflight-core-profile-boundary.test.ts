@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import config from '../vitest.config.mjs';
-import { safeExecResult } from '../libs/core/secure-io.js';
-import { pathResolver } from '../libs/core/path-resolver.js';
+import { safeExecResult } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import { CORE_AFFECTED_TEST_EXCLUDES, isCoreAffectedTest } from '../scripts/pr_preflight.js';
 import { ciTestPaths, isCiTest } from '../scripts/lib/affected-tests.js';
 import { matchesGatePath } from '../scripts/lib/changed-gate-selection.js';
