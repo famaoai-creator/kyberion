@@ -1,7 +1,7 @@
 ---
 title: 'Installation-owner authorization — who may change settings of the whole machine'
 tags: [governance, security, authorization, concierge, passkey, loopback, settings]
-last_updated: 2026-11-04
+last_updated: 2026-11-08
 ---
 
 # Installation-owner authorization
@@ -164,6 +164,19 @@ instead:
 - a registry token bound to the `owner` member with role `localadmin`
   (for example the first-run token)
 - the escape hatch, for local automation that cannot sign in
+
+## Owner-only hearing and conversation routes
+
+Concierge `/api/hearing/*` and `/api/conversation` (moved from Presence
+Studio) use the same owner decision: reads of a tenant hearing are open to
+any viewer of that tenant, while the personal hearing store, decision
+receipts, the conversation and every write need the installation owner.
+Writes are browser requests. Each POST must carry an `Origin` (or `Referer`)
+that matches the Host it was sent to, whatever the credential. A bearer API
+client without one gets 403 `hearing_origin_denied`, as does a cross-site
+page. Decision-ledger hearings answer 503 `hearing_ledger_unavailable`,
+because the concierge role does not assume `decision_ledger`. The gate is in
+`presence/displays/concierge/src/lib/hearing-access.ts`.
 
 ## Related
 

@@ -13,11 +13,18 @@
 
 export type IaWorkTab = 'missions' | 'items' | 'requests';
 export type IaOrgTab = 'overview' | 'projects' | 'people';
-export type IaLibraryTab = 'deliverables' | 'knowledge' | 'ingest';
+export type IaLibraryTab = 'deliverables' | 'knowledge' | 'minutes' | 'ingest';
+export type IaAutomationTab = 'schedules' | 'pipelines';
 
 export const IA_WORK_TABS: readonly IaWorkTab[] = ['missions', 'items', 'requests'];
 export const IA_ORG_TABS: readonly IaOrgTab[] = ['overview', 'projects', 'people'];
-export const IA_LIBRARY_TABS: readonly IaLibraryTab[] = ['deliverables', 'knowledge', 'ingest'];
+export const IA_LIBRARY_TABS: readonly IaLibraryTab[] = [
+  'deliverables',
+  'knowledge',
+  'minutes',
+  'ingest',
+];
+export const IA_AUTOMATION_TABS: readonly IaAutomationTab[] = ['schedules', 'pipelines'];
 
 /** `?tab=` value, falling back to the first (default) tab for anything unknown. */
 export function resolveIaTab<T extends string>(tabs: readonly T[], value: string | null): T {

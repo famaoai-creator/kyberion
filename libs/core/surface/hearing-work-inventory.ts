@@ -3,11 +3,11 @@
  * own pieces — free-text parsing of its answers into work-inventory fields,
  * the deterministic (no model call) `work_inventory_table` canvas preview,
  * and the pure input builder the `POST /api/hearing/:session/inventory`
- * route (`hearing-routes.ts`) hands to `proposeWorkDecomposition`.
+ * route (`hearing-session-service.ts`) hands to `proposeWorkDecomposition`.
  *
  * Mirrors `hearing-mission.ts`'s split for the `mission` handoff: this
  * module only builds values from an already-loaded `HearingRecord`, it never
- * touches disk itself — `hearing-routes.ts` is the only place that calls
+ * touches disk itself — `hearing-session-service.ts` is the only place that calls
  * `proposeWorkDecomposition` with a real reasoning backend or
  * `saveWorkInventoryEntry`.
  */

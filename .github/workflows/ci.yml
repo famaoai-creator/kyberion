@@ -71,6 +71,8 @@ jobs:
         node-version: [24]
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
 
       - name: Setup Kyberion
         uses: ./.github/actions/setup-kyberion
@@ -118,7 +120,9 @@ jobs:
       # On pull_request and merge_group, pr-validation.yml (pr-gates) already
       # runs `--scope pr`; `full-only` is full minus the pr gates, so the two
       # workflows together cover `full` without running a pr gate twice.
-      # push to main and the weekly schedule still run every full gate here.
+      # Runner/manifest changes also exercise the combined full profile on PRs:
+      # its scheduling differs from the two independent pr/full-only profiles.
+      # Push to main and the weekly schedule still run every full gate here.
       - name: Run manifest-driven full checks
         if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
         env:
@@ -128,8 +132,25 @@ jobs:
           KYBERION_PERSONA: worker
           MISSION_ROLE: mission_controller
           CHECK_SCOPE: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 'full-only' || 'full' }}
+          CHECK_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         shell: bash
-        run: pnpm run check -- --scope "$CHECK_SCOPE" 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
+        run: |
+          if [[ "$CHECK_SCOPE" == 'full-only' ]]; then
+            if [[ ! "$CHECK_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo 'Missing valid base commit for gate-profile regression selection' >&2
+              exit 1
+            fi
+            if ! git cat-file -e "${CHECK_BASE_SHA}^{commit}" 2>/dev/null; then
+              git fetch --no-tags --depth=1 origin "$CHECK_BASE_SHA"
+            fi
+            if ! git diff --quiet "$CHECK_BASE_SHA" HEAD -- \
+              scripts/run_checks.ts scripts/run_checks.test.ts scripts/run_checks.concurrency.test.ts \
+              knowledge/product/governance/ci-gates.json knowledge/product/schemas/ci-gates.schema.json \
+              .github/workflows/ci.yml; then
+              CHECK_SCOPE='full'
+            fi
+          fi
+          pnpm run check -- --scope "$CHECK_SCOPE" 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
       # After build: the checker imports @agent/core, which resolves to the
       # package dist. Running it pre-build broke every main push since the

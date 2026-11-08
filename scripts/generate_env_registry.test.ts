@@ -6,6 +6,7 @@ import {
   describeDiscoveredEnv,
   discoverEnvNames,
   mergeRegistry,
+  renderFoundationConfigTypes,
   validateEnvRegistryQuality,
   type EnvRegistryFile,
 } from './generate_env_registry.js';
@@ -328,5 +329,45 @@ describe('validateEnvRegistryQuality', () => {
       'KYBERION_DYNAMIC_: category must be one of secret, path, flag, tuning, provider, runtime',
       'KYBERION_DYNAMIC_: enum values must be unique',
     ]);
+  });
+});
+
+describe('renderFoundationConfigTypes', () => {
+  it('emits a types-only name and value map from registry entries', () => {
+    const rendered = renderFoundationConfigTypes({
+      version: '1.0.0',
+      description: 'test',
+      entries: [
+        {
+          name: 'KYBERION_AGENT_RING',
+          category: 'tuning',
+          type: 'number',
+          required: false,
+          description: 'ring',
+          documented: true,
+        },
+        {
+          name: 'KYBERION_ALLOW_LOCAL_NETWORK',
+          category: 'flag',
+          type: 'boolean',
+          required: false,
+          description: 'flag',
+          documented: true,
+        },
+        {
+          name: 'KYBERION_TENANT',
+          category: 'runtime',
+          type: 'string',
+          required: false,
+          description: 'tenant',
+          documented: true,
+        },
+      ],
+    });
+    expect(rendered).toContain('export type RegisteredEnvName =');
+    expect(rendered).toContain("'KYBERION_TENANT'");
+    expect(rendered).toContain("'KYBERION_ALLOW_LOCAL_NETWORK': boolean;");
+    expect(rendered).toContain("'KYBERION_AGENT_RING': number;");
+    expect(rendered).toContain('do not edit by hand');
   });
 });

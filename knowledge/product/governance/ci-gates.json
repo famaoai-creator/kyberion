@@ -36,11 +36,12 @@
     },
     {
       "id": "golden",
+      "exclusive": true,
       "scope": "pr",
       "executable": "node",
       "args": ["dist/scripts/check_golden_output.js"],
       "owner": "quality",
-      "rationale": "Keeps deterministic pipeline output snapshots stable in every validation scope."
+      "rationale": "Keeps deterministic pipeline output snapshots stable in every validation scope. Resource isolation avoids overlapping baseline compiler/input scans with other CPU-heavy gates; an isolated diagnostic completed in 62s with natural exit and no retained handle. The exact failed-runner exit delay remains unattributed. Selection and the 120s timeout are unchanged."
     },
     {
       "id": "scenario-pr-deterministic",
@@ -93,12 +94,13 @@
     },
     {
       "id": "module-boundaries",
+      "exclusive": true,
       "scope": "pr",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_module_boundaries.ts"],
       "baseline": "scripts/check_module_boundaries.baseline.json",
       "owner": "architecture",
-      "rationale": "Prevents import cycles and layer direction debt from increasing."
+      "rationale": "Prevents import cycles and layer direction debt from increasing. Resource isolation prevents this repository-wide graph scan from competing with other gates after it reached the unchanged 120s deadline in a concurrent full run; contention is a mitigation hypothesis, not a uniquely confirmed cause."
     },
     {
       "id": "max-file-lines",
@@ -321,11 +323,12 @@
     },
     {
       "id": "capability-seams-ast",
+      "exclusive": true,
       "scope": "pr",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_capability_seams_ast.ts"],
       "owner": "architecture",
-      "rationale": "Checks capability seam adoption at the AST boundary."
+      "rationale": "Checks capability seam adoption at the AST boundary. Resource isolation prevents this repository-wide TypeScript scan from competing with other gates after it reached the unchanged 120s deadline in a concurrent full run; contention is a mitigation hypothesis, not a uniquely confirmed cause."
     },
     {
       "id": "vcs-host-boundary",
@@ -398,6 +401,7 @@
     },
     {
       "id": "catalogs",
+      "exclusive": true,
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_catalog_integrity.js"],
@@ -412,7 +416,7 @@
         "scripts/design-token-utils.ts"
       ],
       "owner": "governance",
-      "rationale": "Checks catalog and knowledge index integrity."
+      "rationale": "Checks catalog and knowledge index integrity. Resource isolation reduces contention during repository-wide catalog, vocabulary and knowledge-index scans after a concurrent full run increased from 114s to the unchanged 120s deadline; the exact timeout cause remains unattributed."
     },
     {
       "id": "facet-purity",
