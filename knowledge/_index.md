@@ -78,6 +78,7 @@
 - [Dot-Initiated Workflow — observation → claim → execution → learning](./product/architecture/dot-initiated-workflow.md) (public | Unknown)
 - [Enterprise Operating Kernel](./product/architecture/enterprise-operating-kernel.md) (public | Ecosystem Architect)
 - [Event Feed Intake — pull-side sources for resident dots](./product/architecture/event-feed-intake.md) (public | Ecosystem Architect)
+- [Executable safety models for orchestration](./product/architecture/executable-safety-models.md) (public | Unknown)
 - [Execution Improvement Report](./product/architecture/execution-improvement-report.md) (public | Unknown)
 - [Existing front-desk navigation](./product/architecture/front-desk-navigation.md) (public | Unknown)
 - [External Identity → Member Mapping and the Human Role Model](./product/architecture/external-identity-member-mapping.md) (public | ecosystem_architect)
