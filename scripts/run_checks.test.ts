@@ -40,8 +40,9 @@ describe('manifest-driven check runner', () => {
       'golden',
       'module-boundaries',
       'capability-seams-ast',
+      'catalogs',
     ]);
-    for (const id of ['module-boundaries', 'capability-seams-ast'])
+    for (const id of ['module-boundaries', 'capability-seams-ast', 'catalogs'])
       expect(
         manifest.gates.find((entry) => entry.id === id)?.timeout_ms ?? DEFAULT_GATE_TIMEOUT_MS
       ).toBe(120_000);
