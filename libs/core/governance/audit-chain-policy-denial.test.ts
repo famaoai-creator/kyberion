@@ -114,6 +114,43 @@ describe('audit-owned persistence under real production authority', () => {
       const ceiling = errorOf(() => runInResourceAccessScope({
         tenantSlug:tenant, readExact:[], writeExact:[], mkdirExact:[]
       }, () => asRuntime(() => auditChain.record(entry('ceiling-denied')))));
+      const aliasActions = [];
+      const aliasErrors = [];
+      const nonStringErrors = [];
+      const systemScopeErrors = [];
+      for (const mode of ['direct','held','deferred','assert']) {
+        for (const kind of ['empty-top','empty-scope','tojson-empty','null-top','null-scope']) {
+          const action = 'tenant-alias-'+mode+'-'+kind;
+          let value = entry(action);
+          if (kind === 'empty-top') value.tenantSlug = '';
+          if (kind === 'empty-scope') value.scope = {tier:'confidential',tenant_slug:''};
+          if (kind === 'null-top') value.tenantSlug = null;
+          if (kind === 'null-scope') value.scope = {tier:'confidential',tenant_slug:null};
+          if (kind === 'tojson-empty') value.toJSON = () => {
+            observe(mode,'empty-toJSON');
+            return {...entry(action),tenantSlug:'',scope:{tier:'confidential',tenant_slug:''}};
+          };
+          aliasErrors.push(errorOf(() => invoke(mode,value)));
+          if (mode !== 'assert') aliasActions.push(action);
+        }
+        for (const invalid of [0,false,{},[]])
+          for (const canonical of ['tenantSlug','scope']) {
+            const value = {...entry('non-string-'+mode),[canonical]:canonical === 'scope'
+              ? {tier:'confidential',tenant_slug:invalid} : invalid};
+            nonStringErrors.push(errorOf(() => invoke(mode,value)));
+          }
+        systemScopeErrors.push(errorOf(() => invoke(mode,{
+          ...entry('system-scope-'+mode),scope:{tier:'public',scope_kind:'system',tenant_slug:''}
+        })));
+      }
+      process.env.KYBERION_TIER = 'public';
+      withExecutionContext(role, () => auditChain.record({
+        ...entry('cleared-global'),tenantSlug:'',scope:{tier:'public',tenant_slug:''}
+      }), undefined, '');
+      process.env.KYBERION_TENANT = '';
+      withExecutionContext(role, () => auditChain.record({
+        ...entry('unbound-global'),tenantSlug:null
+      }));
       // Inspect only this synthetic fixture after leaving every tested scope.
       process.env.MISSION_ROLE = 'mission_controller';
       process.env.KYBERION_PERSONA = 'sovereign';
@@ -126,6 +163,7 @@ describe('audit-owned persistence under real production authority', () => {
       const mirror = readRows(root+'/active/shared/runtime/audit-mirror/confidential/'+tenant);
       process.stdout.write(JSON.stringify({
         denied, mismatch, ceiling, observations, cyclicErrors, foreignScopeErrors,
+        aliasActions, aliasErrors, nonStringErrors, systemScopeErrors,
         targetExists:io.safeExistsSync(target),
         keyExists:io.safeExistsSync(root+'/active/shared/runtime/audit/chain-key'),
         master, mirror,
@@ -160,7 +198,7 @@ describe('audit-owned persistence under real production authority', () => {
     expect(report.mismatch).toContain('AUDIT_SCOPE_DENIED');
     expect(report.ceiling).toBeTruthy();
     expect(report.otherMirrorExists).toBe(false);
-    expect(report.integrity).toMatchObject({ valid: 6, total: 6, corrupted: [] });
+    expect(report.integrity).toMatchObject({ valid: 23, total: 23, corrupted: [] });
     expect(report.mirrorIntegrity).toEqual({ ok: true, findings: [] });
     const denied = report.master.filter(
       (row: { action: string }) => row.action === 'policy_violation'
@@ -174,6 +212,9 @@ describe('audit-owned persistence under real production authority', () => {
       'callbacks-direct',
       'callbacks-held',
       'callbacks-deferred',
+      ...report.aliasActions,
+      'cleared-global',
+      'unbound-global',
     ]);
     expect(report.master[1]).toMatchObject({
       agentId: 'original-worker',
@@ -189,7 +230,9 @@ describe('audit-owned persistence under real production authority', () => {
       for (const callback of ['correlation', 'getter', 'toJSON', 'proxy', 'foreign-toJSON'])
         expect(observed.some((row: { callback: string }) => row.callback === callback)).toBe(true);
     }
-    for (const row of report.master.slice(3))
+    for (const row of report.master.filter((row: { action: string }) =>
+      row.action.startsWith('callbacks-')
+    ))
       expect(row).toMatchObject({
         actor: { kind: 'service', id: 'service:original' },
         correlationId: 'captured-' + row.action.replace('callbacks-', ''),
@@ -210,7 +253,30 @@ describe('audit-owned persistence under real production authority', () => {
       report.foreignScopeErrors.every((error: string) => error.includes('AUDIT_SCOPE_DENIED'))
     ).toBe(true);
     expect(report.mirror.map((row: { id: string }) => row.id)).toEqual(
-      report.master.map((row: { id: string }) => row.id)
+      report.master
+        .filter((row: { tenantSlug?: string }) => row.tenantSlug === 'audit-fixture-a')
+        .map((row: { id: string }) => row.id)
     );
+    expect(report.aliasErrors).toEqual(Array(20).fill(null));
+    expect(report.aliasActions).toHaveLength(15);
+    for (const row of report.master.filter((row: { action: string }) =>
+      row.action.startsWith('tenant-alias-')
+    ))
+      expect(row).toMatchObject({
+        tenantSlug: 'audit-fixture-a',
+        scope: { tier: 'confidential', tenant_slug: 'audit-fixture-a' },
+      });
+    expect(report.nonStringErrors).toHaveLength(32);
+    expect(
+      report.nonStringErrors.every((error: string) => error.includes('AUDIT_SCOPE_INVALID'))
+    ).toBe(true);
+    expect(report.systemScopeErrors).toHaveLength(4);
+    expect(
+      report.systemScopeErrors.every((error: string) => error.includes('AUDIT_SCOPE_INVALID'))
+    ).toBe(true);
+    for (const row of report.master.slice(-2)) {
+      expect(row.tenantSlug).toBeUndefined();
+      expect(row.scope).toEqual({ tier: 'public', scope_kind: 'system' });
+    }
   });
 });
