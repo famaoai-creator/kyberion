@@ -742,6 +742,7 @@ interface PreparedExecutionContext {
  * same as a process without a tenant.
  */
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
+  'actuator_playground_worker',
   'credential_allocation_reader',
   ARCHIVED_MISSION_STATE_READER_ROLE,
   'customer_channel_binding_store',

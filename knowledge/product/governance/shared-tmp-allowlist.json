@@ -402,12 +402,6 @@
       "note": "MCP actuator.invoke live CLI input staging"
     },
     {
-      "file": "scripts/actuator_playground.ts",
-      "count": 2,
-      "classification": "legit-tmp",
-      "note": "playground scratch dir + recorded-session/ADF-draft store"
-    },
-    {
       "file": "scripts/backup.ts",
       "count": 1,
       "classification": "legit-tmp",

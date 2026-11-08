@@ -792,13 +792,30 @@ export async function loadActuatorDispatch(
         );
       }
       const output = sdkResult.output;
-      result = {
-        handled: true,
-        ctx:
-          output && typeof output === 'object' && !Array.isArray(output)
-            ? { ...ctx, ...(output as Record<string, unknown>) }
-            : { ...ctx, [params.export_as || 'last_actuator_result']: output },
-      };
+      // Catalog-backed actuators return the action payload (e.g. `{ op, cwd,
+      // output }` for vcs:log). Capture / transform steps must land on the
+      // pipeline channel the engine checks (`last_capture` / `last_transform`),
+      // not by spreading payload keys into the context. Prefer an explicit
+      // export_as; otherwise use the step type's default channel. Apply/control
+      // keep the previous object-spread compatibility for handlers that already
+      // return `{ last_*: ... }` shaped maps.
+      const explicitExport =
+        typeof params.export_as === 'string' && params.export_as.trim()
+          ? params.export_as.trim()
+          : undefined;
+      if (explicitExport || type === 'capture' || type === 'transform') {
+        const exportKey =
+          explicitExport || (type === 'transform' ? 'last_transform' : 'last_capture');
+        result = { handled: true, ctx: { ...ctx, [exportKey]: output } };
+      } else {
+        result = {
+          handled: true,
+          ctx:
+            output && typeof output === 'object' && !Array.isArray(output)
+              ? { ...ctx, ...(output as Record<string, unknown>) }
+              : { ...ctx, [params.export_as || 'last_actuator_result']: output },
+        };
+      }
     } catch (err) {
       throw err; // Ensure error propagates out of dispatch
     }
