@@ -24,6 +24,7 @@ import {
   safeAppendFileSync,
   safeMkdir,
   safeRmSync,
+  safeReadFile,
   safeSymlinkSync,
   safeWriteFile,
 } from '../secure-io.js';
@@ -38,6 +39,7 @@ import {
   listDotCharters,
   loadDotCharter,
   validateDotCharter,
+  DOT_CHARTER_SCHEMA_PATH,
   type DotCharter,
 } from './dot-charter.js';
 
@@ -109,6 +111,100 @@ const tenantCharter = (slug: string, dotId: string, scope?: DotCharter['scope'])
 });
 
 describe('tenant dot charters', () => {
+  it.each(
+    [
+      'dot_result_writer',
+      'dot_lifecycle_writer',
+      'dot_charter_store',
+      'dot_lifecycle_runtime_store',
+    ].flatMap((role) => [
+      role,
+      role.toUpperCase(),
+      ` ${role} `,
+      role.replace(/_/g, ' '),
+      role.replace(/_/g, '\u00a0'),
+      role + '\n',
+      role + '\r\n',
+      role + '\t',
+      role + '\u00a0',
+    ])
+  )(
+    'refuses internal store execution role %s before draft creation or activation',
+    async (role) => {
+      const { createDraftDotCharter, transitionDotCharterStatus } =
+        await import('./dot-lifecycle.js');
+      const hasRole = vi.fn(() => true);
+      const draft = {
+        ...VALID_CHARTER,
+        status: 'draft' as const,
+        authority: { ...VALID_CHARTER.authority, authority_role: role },
+      };
+      for (const status of ['draft', 'active'] as const)
+        expect(() => validateDotCharter({ ...draft, status })).toThrow(/Invalid dot charter/);
+      expect(() => createDraftDotCharter(draft, { rootDir: TEST_ROOT, hasRole })).toThrow(
+        /Invalid dot charter/
+      );
+      const file = writeCharter(TEST_ROOT, 'internal-role.json', draft);
+      const before = safeReadFile(file, { encoding: 'utf8' });
+      expect(() =>
+        transitionDotCharterStatus(draft.dot_id, 'active', { rootDir: TEST_ROOT, hasRole })
+      ).toThrow();
+      expect(safeReadFile(file, { encoding: 'utf8' })).toBe(before);
+      expect(hasRole).not.toHaveBeenCalled();
+    }
+  );
+
+  it('continues accepting an ordinary worker authority role in draft and active charters', () => {
+    for (const status of ['draft', 'active'] as const)
+      expect(validateDotCharter({ ...VALID_CHARTER, status }).authority.authority_role).toBe(
+        'infrastructure_sentinel'
+      );
+  });
+
+  it('preserves literal hyphen and dot role grammar without treating it as role registration', () => {
+    expect(
+      validateDotCharter({
+        ...VALID_CHARTER,
+        authority: { authority_role: 'extension-worker.v2' },
+      }).authority.authority_role
+    ).toBe('extension-worker.v2');
+  });
+
+  it('rejects internal aliases and trailing whitespace through the raw AJV schema alone', async () => {
+    // Bootstrap the async secure-io mock before AJV's JSON helper imports it;
+    // the mock itself imports authority, whose catalog also depends on AJV.
+    const { compileSchema } = await import('../foundation/ajv.js');
+    const { pathResolver } = await import('../path-resolver.js');
+    const validate = compileSchema<DotCharter>(pathResolver.rootResolve(DOT_CHARTER_SCHEMA_PATH));
+    const accepts = (role: string) =>
+      validate({
+        ...VALID_CHARTER,
+        authority: { ...VALID_CHARTER.authority, authority_role: role },
+      });
+    for (const role of [
+      'dot_result_writer',
+      'dot_lifecycle_writer',
+      'dot_charter_store',
+      'dot_lifecycle_runtime_store',
+    ])
+      for (const alias of [
+        role,
+        role.toUpperCase(),
+        ` ${role} `,
+        role.replace(/_/g, ' '),
+        role.replace(/_/g, '\u00a0'),
+        role + '\n',
+        role + '\r\n',
+        role + '\t',
+        role + '\u00a0',
+      ])
+        expect(accepts(alias), JSON.stringify(alias)).toBe(false);
+    for (const suffix of ['\n', '\r\n', '\t', '\u00a0', '\u2028', '\u2029'])
+      expect(accepts('infrastructure_sentinel' + suffix), JSON.stringify(suffix)).toBe(false);
+    expect(accepts('infrastructure_sentinel')).toBe(true);
+    expect(accepts('extension-worker.v2')).toBe(true);
+  });
+
   it('refuses the internal result-store role as a charter execution role', async () => {
     const { assertDotAccountabilityCharter } = await import('./dot-authority.js');
     expect(() =>

@@ -5,10 +5,10 @@
 
 ## What belongs where
 
-- **Environment variables**: secrets, environment-specific endpoints/paths, and feature flags. Validated at startup by `libs/core/harnessing/env-validator.ts` (warn by default; missing required values are errors).
+- **Environment variables**: secrets, environment-specific endpoints/paths, and feature flags. Validated at startup by `libs/core/harnessing/env-validator.ts` (warn by default; missing required values are errors). Feature code should read them through `@agent/core/foundation/config` (`config.get` / `config.text` / `config.bool`), which is typed from this registry.
 - **Registry fields**: `required: true` is reserved for an unconditional startup prerequisite and must also be `documented: true`; conditional capability prerequisites stay in the environment manifests. `documented: false` is an honest discovery state, not a runtime failure.
 - **Secrets**: may be documented by name and purpose, but their values never belong in this registry and they cannot be marked required here. Secret requirements are enforced by the selected capability or command.
-- **Config files (`knowledge/product/**`)**: policy thresholds (SA plans), model IDs (IP-13), catalogs and vocabularies. These need review, diffing, and schema validation — not per-host overrides.
+- **Config files (`knowledge/product/**`)**: policy thresholds (SA plans), model IDs (IP-13), catalogs and vocabularies. These need review, diffing, and schema validation — not per-host overrides. They stay domain-owned catalogs, not this env facade.
 
 Copy [`env.example`](./env.example) to `.env` at the repo root for local overrides (the example is generated here because root dotfiles are write-protected by the policy engine).
 

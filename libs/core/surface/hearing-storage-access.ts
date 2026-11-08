@@ -13,15 +13,16 @@ import {
   HearingConflictError,
 } from './hearing-runtime.js';
 import { hearingRevision, hearingRequirementsKey, type HearingRecord } from './hearing.js';
+import type { HearingOwnerInput } from './hearing-scope.js';
 import {
   SurfaceViewerScopeError,
   type SurfaceViewerScope,
 } from './surface-viewer-scope-contract.js';
 
 /** The viewer facts hearing storage decides on. Surfaces pass their server-resolved viewer. */
-export type HearingStorageViewer = Pick<SurfaceViewerScope, 'tenantSlugs' | 'source'>;
+export type HearingStorageViewer = Pick<SurfaceViewerScope, 'tenantSlugs'>;
 
-export interface HearingStorageOptions {
+export interface HearingStorageOptions extends HearingOwnerInput {
   /** Builds the surface's own 403 refusal (default: `SurfaceViewerScopeError`). */
   denied?: (message: string) => Error;
 }
@@ -30,28 +31,26 @@ export interface HearingStorageOptions {
  * Capture immutable scope facts; elevation encloses only synchronous storage/lock calls,
  * never HTTP handling, async canvas generation, model work or downstream effects.
  * Generic runtime helpers deliberately remain non-elevating.
- * Used by: Studio (hearing routes), Concierge (next).
- * OWNER CHECK: "the local owner" here is `viewer.source === 'loopback'` (Studio's
- * meaning). A signed-in Concierge owner has `source: 'token'`; never pass a
- * viewer with a synthesized `source: 'loopback'` to get past this. Decide the owner
- * with the surface's own owner check and make it an explicit input first
- * (kyberion-development-practices.md, "The local owner is not the credential source").
+ * Used by: Studio (hearing routes), Concierge (hearing routes).
+ * Owner: `options.owner` is the surface's own decision that this request comes
+ * from the owner of this machine (see {@link HearingOwnerInput}). Only the owner
+ * reads the personal (no single tenant) store, and every write requires it.
+ * The viewer's credential `source` is never consulted here.
  */
 export function hearingStorageForScope(
   viewer: HearingStorageViewer,
-  options: HearingStorageOptions = {}
+  options: HearingStorageOptions
 ) {
   const denied = options.denied ?? ((message: string) => new SurfaceViewerScopeError(403, message));
   const namespace = hearingNamespace(viewer.tenantSlugs);
-  const source = viewer.source;
+  const owner = options.owner === true;
   const shared = namespace === 'all' || namespace === 'unscoped';
-  if (source !== 'loopback' && shared)
-    throw denied('Personal hearing storage requires a local owner session.');
+  if (!owner && shared) throw denied('Personal hearing storage requires a local owner session.');
   const tenant = shared ? undefined : namespace;
   const read = <T>(fn: () => T): T =>
     withExecutionContext('ecosystem_architect', fn, undefined, tenant);
   const write = <T>(fn: () => T): T => {
-    if (source !== 'loopback') throw denied('Hearing writes require a local owner session.');
+    if (!owner) throw denied('Hearing writes require a local owner session.');
     return read(fn);
   };
   const text = (value: string): string => {
@@ -166,7 +165,10 @@ export function hearingStorageForScope(
 export type HearingStorage = ReturnType<typeof hearingStorageForScope>;
 
 /** Exact receipt scope is server-derived, including narrower organization/project selection.
- * Used by: Studio, Concierge (next). */
+ * The key includes the surface's own `tierAccess`, so a receipt written on one
+ * surface (Studio's loopback viewer carries `personal`, Concierge masks it) does
+ * not replay on another: it fails closed as a conflict, never as a false proof.
+ * Used by: Studio, Concierge. */
 export function hearingDecisionScopeKey(
   scope: Pick<SurfaceViewerScope, 'tenantSlugs' | 'organizationIds' | 'projectIds' | 'tierAccess'>
 ): string {
