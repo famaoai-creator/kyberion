@@ -209,6 +209,31 @@ describe('pr preflight', () => {
       }
     });
 
+    it('retains early failure cases and their error when later stacks exceed the tail', () => {
+      const stdout = [
+        '\u001b[31m FAIL tests/first.test.ts > boundary case\u001b[0m',
+        'AssertionError: original boundary failure',
+        ...Array.from({ length: 60 }, (_, i) => 'later stack ' + i),
+        'FAIL tests/last.test.ts > later case',
+        'Error: later failure',
+      ].join('\n');
+      let message = '';
+      try {
+        runAffectedTests(() => undefined, undefined, {
+          git: fakeGit(['libs/core/a.ts']),
+          vitest: () => ({ status: 1, stdout, stderr: '' }),
+          exists: always,
+        });
+      } catch (error) {
+        message = String(error);
+      }
+      expect(message).toContain('FAIL tests/first.test.ts > boundary case');
+      expect(message).toContain('AssertionError: original boundary failure');
+      expect(message).toContain('FAIL tests/last.test.ts > later case');
+      expect(message).toContain('Error: later failure');
+      expect(message).not.toContain('later stack 10');
+    });
+
     it('fails preflight with the vitest output tail when a run fails', () => {
       expect(() =>
         runAffectedTests(() => undefined, undefined, {

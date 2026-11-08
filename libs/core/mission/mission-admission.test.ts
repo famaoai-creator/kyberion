@@ -91,7 +91,8 @@ vi.mock('../governance/autonomous-ops-gate.js', async (original) => ({
     shadow: !mocks.autoAllowed,
   }),
 }));
-vi.mock('../dot/dot-charter.js', () => ({
+vi.mock('../dot/dot-charter.js', async (original) => ({
+  ...(await original<typeof import('../dot/dot-charter.js')>()),
   findDotCharter: () => ({ charter: mocks.dot }),
   dotGoalRefLabel: () => undefined,
 }));
