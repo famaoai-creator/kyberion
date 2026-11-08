@@ -62,7 +62,9 @@ const INTERNAL_DOT_STORE_ROLES: ReadonlySet<string> = new Set([
 
 /** Store maintenance authority is never a resident agent's execution role. */
 export function isInternalDotStoreRole(role: string): boolean {
-  return INTERNAL_DOT_STORE_ROLES.has(role);
+  // Match withExecutionContext's effective role normalization before deciding
+  // whether a programmatically supplied charter may bind execution authority.
+  return INTERNAL_DOT_STORE_ROLES.has(role.trim().toLowerCase().replace(/\s+/g, '_'));
 }
 /** Same tenant-bound runner role chronos uses to scan tenant pipelines. */
 const DOT_TENANT_SCAN_ROLE = 'chronos_tenant_runner';

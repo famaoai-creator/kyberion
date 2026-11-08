@@ -743,6 +743,8 @@ For the Dot action ledger, keep `assertDotActionJudgmentBinding` real in
 regression gate for owner and mission admission compatibility. Never stub the validator
 to an unconditional success to repair a missing-export failure.
 
+An async mock factory must not await a module that transitively imports the module currently waiting for that factory. A new top-level validator import can create this cycle before any test or test timeout starts. Import the validator inside the schema-only test after the existing secure-I/O/authority bootstrap has completed; retain the raw-schema oracle. Verify the changed test alone before its consumer suite. Regression: `libs/core/dot/dot-charter.test.ts` exercises the raw AJV schema without changing the existing tenant mock.
+
 **Repository security scans under coverage.** A green PR shard does not prove the
 unsharded main core run passes with V8 coverage. When a repository-wide AST contract
 times out, compare the exact failing command (`pnpm test -- --suite core --coverage`)
