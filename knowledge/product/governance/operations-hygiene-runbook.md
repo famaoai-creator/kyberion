@@ -745,6 +745,8 @@ to an unconditional success to repair a missing-export failure.
 
 An async mock factory must not await a module that transitively imports the module currently waiting for that factory. A new top-level validator import can create this cycle before any test or test timeout starts. Import the validator inside the schema-only test after the existing secure-I/O/authority bootstrap has completed; retain the raw-schema oracle. Verify the changed test alone before its consumer suite. Regression: `libs/core/dot/dot-charter.test.ts` exercises the raw AJV schema without changing the existing tenant mock.
 
+Broad preflight failures must retain every failing case heading and its immediate error before the bounded output tail. Tail-only diagnostics can discard earlier failures after a long related-test run. Keep test selection, failure status and deadlines unchanged; reproduce the named cases and finish data-reader selections before publishing a repair batch. Gate: scripts/pr_preflight.test.ts covers an early ANSI-colored failure displaced by a later stack.
+
 **Repository security scans under coverage.** A green PR shard does not prove the
 unsharded main core run passes with V8 coverage. When a repository-wide AST contract
 times out, compare the exact failing command (`pnpm test -- --suite core --coverage`)
