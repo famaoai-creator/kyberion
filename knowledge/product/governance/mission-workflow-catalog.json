@@ -12030,6 +12030,21 @@
               "estimated_scope": "S",
               "risk": "medium",
               "deliverable_kind": "doc"
+            },
+            {
+              "task_id_suffix": "docs-sync",
+              "team_role": "implementer",
+              "phase_kind": "implement",
+              "description": "変更差分に対して pnpm check:docs-impact を実行し、ドキュメント面の抜け漏れを evidence/docs-sync-report.md に記録する。not_updated / unmapped の各項目は、ドキュメント更新を同じ変更に含めるか、対象外の理由をレポートの Resolution に記録して解消する",
+              "deliverable": "evidence/docs-sync-report.md",
+              "acceptance_criteria": [
+                "evidence/docs-sync-report.md に base・changed files・findings が記録されている",
+                "not_updated / unmapped の各項目について、ドキュメント更新または対象外理由が記録されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "doc"
             }
           ],
           "exit_gate": {
@@ -12039,6 +12054,12 @@
                 "kind": "evidence_exists",
                 "params": {
                   "path": "evidence/delivery-report.md"
+                }
+              },
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/docs-sync-report.md"
                 }
               },
               {
@@ -12351,6 +12372,21 @@
               "estimated_scope": "S",
               "risk": "medium",
               "deliverable_kind": "doc"
+            },
+            {
+              "task_id_suffix": "docs-sync",
+              "team_role": "implementer",
+              "phase_kind": "implement",
+              "description": "変更差分に対して pnpm check:docs-impact を実行し、ドキュメント面の抜け漏れを evidence/docs-sync-report.md に記録する。not_updated / unmapped の各項目は、ドキュメント更新を同じ変更に含めるか、対象外の理由をレポートの Resolution に記録して解消する",
+              "deliverable": "evidence/docs-sync-report.md",
+              "acceptance_criteria": [
+                "evidence/docs-sync-report.md に base・changed files・findings が記録されている",
+                "not_updated / unmapped の各項目について、ドキュメント更新または対象外理由が記録されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "doc"
             }
           ],
           "exit_gate": {
@@ -12360,6 +12396,12 @@
                 "kind": "evidence_exists",
                 "params": {
                   "path": "evidence/delivery-report.md"
+                }
+              },
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/docs-sync-report.md"
                 }
               },
               {
