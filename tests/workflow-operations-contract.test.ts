@@ -145,6 +145,7 @@ describe('Workflow operations contract', () => {
     };
     expect(gates.gates).toContainEqual({
       id: 'golden',
+      exclusive: true,
       scope: 'pr',
       executable: 'node',
       args: ['dist/scripts/check_golden_output.js'],

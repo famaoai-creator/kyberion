@@ -93,7 +93,7 @@ const deps = () => ({
 const bound = <T>(fn: () => T) =>
   withExecutionContext('infrastructure_sentinel', fn, 'worker', tenant);
 const writeFixtureCharter = (value: unknown) =>
-  withExecutionContext('dot_lifecycle_writer', () =>
+  withExecutionContext('dot_charter_store', () =>
     safeWriteFile(fixture.charters[0].path, JSON.stringify(value))
   );
 const prepareReceipt = (...args: Parameters<typeof prepareFrontDeskExecution>) =>
@@ -698,7 +698,7 @@ describe('durable diagnostic intake vertical slice', () => {
       executePipeline.mockImplementation(async (ref, context, c) => {
         const result = await run(ref, context, c);
         if (change === 'removed')
-          withExecutionContext('dot_lifecycle_writer', () => safeRmSync(fixture.charters[0].path));
+          withExecutionContext('dot_charter_store', () => safeRmSync(fixture.charters[0].path));
         else
           writeFixtureCharter({
             ...charter,

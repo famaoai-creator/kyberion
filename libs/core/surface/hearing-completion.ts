@@ -18,13 +18,13 @@ import {
 import { progressRecordInScope } from './front-desk-progress.js';
 import type { SurfaceViewerScope } from './surface-viewer-scope-contract.js';
 import { hearingNamespace } from './hearing-runtime.js';
-import { hearingScopedUrl } from './hearing-scope.js';
+import { hearingScopedUrl, type HearingOwnerInput } from './hearing-scope.js';
 import type { HearingRecord } from './hearing.js';
 
 /** Additive fields the mission hand-off owns on the hearing record. `hearing.ts`
  * (the base `HearingRecord` contract, `decided_by`/`decided_at` included) never
  * carries them — they are only ever read/written via an intersection type.
- * Used by: Studio (hearing-mission-routes), Concierge (next). */
+ * Used by: Studio (hearing-mission-routes), Concierge. */
 export interface HearingMissionHandoffFields {
   mission_id?: string;
   approval_request_id?: string;
@@ -33,7 +33,7 @@ export interface HearingMissionHandoffFields {
 
 /** WI-08: additive fields the work-inventory hand-off owns on the hearing
  * record, mirroring `HearingMissionHandoffFields` — never added to the base
- * interface. Used by: Studio (hearing-routes), Concierge (next). */
+ * interface. Used by: Studio (hearing-routes), Concierge. */
 export interface HearingWorkInventoryHandoffFields {
   work_inventory_entry_id?: string;
   work_inventory_scope?: WorkInventoryScope;
@@ -42,23 +42,19 @@ export interface HearingWorkInventoryHandoffFields {
 
 /** WI-11 / WI-15: the one work-inventory scope rule the hearing hand-off
  * reads and writes with. The viewer's first tenant slug -> that tenant's
- * scope. Without a concrete tenant — no tenant, or the loopback fallback
- * `'all'` a local owner gets when no tenant is configured — only a loopback
- * session (the local machine owner) resolves to the personal scope; a remote
- * viewer resolves to `null` (no single scope), never to someone's personal
- * inventory. Used by: Studio (work-inventory-routes), Concierge (next).
- * OWNER CHECK: "the local owner" here is `viewer.source === 'loopback'` (Studio's
- * meaning). A signed-in Concierge owner has `source: 'token'`; never pass a
- * viewer with a synthesized `source: 'loopback'` to get past this. Decide the owner
- * with the surface's own owner check and make it an explicit input first
- * (kyberion-development-practices.md, "The local owner is not the credential source").
+ * scope. Without a concrete tenant — no tenant, or the `'all'` fallback a
+ * local owner gets when no tenant is configured — only the owner of this
+ * machine ({@link HearingOwnerInput}, decided by the surface) resolves to the
+ * personal scope; anyone else resolves to `null` (no single scope), never to
+ * someone's personal inventory. Used by: Studio (work-inventory-routes), Concierge.
  */
 export function hearingWorkInventoryScope(
-  viewer: Pick<SurfaceViewerScope, 'tenantSlugs' | 'source'>
+  viewer: Pick<SurfaceViewerScope, 'tenantSlugs'>,
+  options: HearingOwnerInput
 ): WorkInventoryScope | null {
   const namespace = hearingNamespace(viewer.tenantSlugs);
   if (namespace === 'all' || namespace === 'unscoped') {
-    return viewer.source === 'loopback' ? {} : null;
+    return options.owner === true ? {} : null;
   }
   return { tenant_slug: namespace };
 }
@@ -75,13 +71,14 @@ const CONCIERGE_PERSONAL_SELECTION = 'personal';
  * Concierge, `scopedHref` already carries the viewer's scope). An entry filed
  * under the personal scope is listed there only in the personal view, so the
  * link selects it; a tenant-scoped entry keeps its `tenant`.
- * Used by: Studio (work-inventory-routes), Concierge (next).
+ * Used by: Studio (work-inventory-routes), Concierge.
  */
 export function hearingWorkInventoryHandoffHref(
   scopedHref: string,
-  viewer: Pick<SurfaceViewerScope, 'tenantSlugs' | 'source'>
+  viewer: Pick<SurfaceViewerScope, 'tenantSlugs'>,
+  options: HearingOwnerInput
 ): string {
-  const scope = hearingWorkInventoryScope(viewer);
+  const scope = hearingWorkInventoryScope(viewer, options);
   if (!scope || scope.tenant_slug) return scopedHref;
   const base = 'http://handoff.invalid';
   const url = new URL(scopedHref, base);
@@ -89,8 +86,9 @@ export function hearingWorkInventoryHandoffHref(
   return url.origin === base ? url.pathname + url.search + url.hash : url.href;
 }
 
-/** Where completion links are resolved from. Used by: Studio, Concierge (next). */
-export interface HearingCompletionOptions {
+/** Where completion links are resolved from, and whether the viewer is the
+ * owner of this machine ({@link HearingOwnerInput}). Used by: Studio, Concierge. */
+export interface HearingCompletionOptions extends HearingOwnerInput {
   /** The surface rendering the hearing; front-desk destinations hosted there stay relative. */
   currentSurface: FrontDeskSurfaceId;
 }
@@ -98,7 +96,7 @@ export interface HearingCompletionOptions {
 type StoredHearing = HearingRecord &
   HearingMissionHandoffFields &
   HearingWorkInventoryHandoffFields;
-/** Used by: Studio, Concierge (next). */
+/** Used by: Studio, Concierge. */
 export interface HearingCompletion {
   kind: 'mission' | 'inventory';
   status: 'ready' | 'unavailable';
@@ -107,7 +105,7 @@ export interface HearingCompletion {
 }
 
 /** Completion identifiers are projections, never trusted wire fields from storage.
- * Used by: Studio, Concierge (next). */
+ * Used by: Studio, Concierge. */
 export function withoutHearingCompletionFields(record: HearingRecord): HearingRecord {
   const sanitized = { ...record } as StoredHearing;
   delete sanitized.handoff_pending;
@@ -141,7 +139,7 @@ function completionHref(
     if (values.length !== 1) return undefined;
   }
   const scoped = hearingScopedUrl(item.href, viewer);
-  return kind === 'inventory' ? hearingWorkInventoryHandoffHref(scoped, viewer) : scoped;
+  return kind === 'inventory' ? hearingWorkInventoryHandoffHref(scoped, viewer, options) : scoped;
 }
 
 /** Mission project membership is canonical under relationships, unlike inventory scope.
@@ -179,14 +177,9 @@ function missionInHearingScope(viewer: SurfaceViewerScope, mission: MissionState
 
 /** Read-only proof of the handoff. Missing, corrupt and unauthorized targets all
  * yield the same non-actionable marker, without leaking IDs or enabling retries.
- * `viewer` is the surface's server-resolved viewer scope. Used by: Studio, Concierge (next).
- * OWNER CHECK: "the local owner" here is `viewer.source === 'loopback'` (Studio's
- * meaning). A signed-in Concierge owner has `source: 'token'`; never pass a
- * viewer with a synthesized `source: 'loopback'` to get past this. Decide the owner
- * with the surface's own owner check and make it an explicit input first
- * (kyberion-development-practices.md, "The local owner is not the credential source").
- * The decision scope key also takes the surface's own `tierAccess`, so a receipt
- * written on one surface may not replay on another (it fails closed as a conflict).
+ * `viewer` is the surface's server-resolved viewer scope. A personal-scope
+ * inventory entry is proven only to the owner (`options.owner`, decided by the
+ * surface — never the viewer's credential `source`). Used by: Studio, Concierge.
  */
 export function readHearingCompletion(
   record: HearingRecord,
@@ -260,7 +253,7 @@ export function readHearingCompletion(
       id = mission.mission_id;
     } else {
       if (!stored.work_inventory_entry_id) return unavailable;
-      const scope = hearingWorkInventoryScope(viewer);
+      const scope = hearingWorkInventoryScope(viewer, options);
       if (
         !scope ||
         (stored.work_inventory_scope &&
@@ -284,7 +277,7 @@ export function readHearingCompletion(
       } else {
         const allowed = viewer;
         if (
-          viewer.source !== 'loopback' ||
+          options.owner !== true ||
           allowed.organizationIds !== 'all' ||
           allowed.projectIds !== 'all'
         )
