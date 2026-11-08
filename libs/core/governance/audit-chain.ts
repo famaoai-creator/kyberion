@@ -582,6 +582,18 @@ class AuditChainImpl {
 
   private prepare(entry: AuditRecordInput): PreparedAuditRecord {
     const activeTenantSlug = resolveCurrentTenantSlug();
+    const fallbackTier = (getRegisteredEnvText('KYBERION_TIER') as EventScope['tier']) || 'public';
+    // All caller-controlled getters, proxies and toJSON callbacks must finish
+    // before persistence enters its own authority context or defers the entry.
+    let snapshot: unknown;
+    try {
+      snapshot = JSON.parse(JSON.stringify(entry));
+    } catch {
+      throw new Error('[AUDIT_INPUT_INVALID] audit record must be JSON serializable');
+    }
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot))
+      throw new Error('[AUDIT_INPUT_INVALID] audit record must serialize to an object');
+    entry = snapshot as AuditRecordInput;
     if (entry.tenantSlug && activeTenantSlug && entry.tenantSlug !== activeTenantSlug) {
       throw new Error(
         `[AUDIT_SCOPE_DENIED] tenantSlug '${entry.tenantSlug}' conflicts with active tenant '${activeTenantSlug}'`
@@ -608,14 +620,12 @@ class AuditChainImpl {
     const requestedTenant = entry.tenantSlug ?? entry.scope?.tenant_slug ?? activeTenantSlug;
     const requestedTenantSlug =
       requestedTenant && isValidTenantSlug(requestedTenant) ? requestedTenant : undefined;
-    const scope = resolveAuditScope(entry.scope, requestedTenantSlug);
+    const scope = resolveAuditScope(entry.scope, requestedTenantSlug, fallbackTier);
     if (entry.scope && !scope) {
       throw new Error('[AUDIT_SCOPE_INVALID] explicit audit scope failed validation');
     }
     return {
-      // Snapshot attribution before persistence borrows its own store context.
-      // Metadata remains caller-owned for compatibility; it grants no authority.
-      entry: { ...entry, ...(entry.actor ? { actor: { ...entry.actor } } : {}), scope },
+      entry: { ...entry, scope },
       requestedTenantSlug,
     };
   }
@@ -1209,14 +1219,16 @@ class AuditChainImpl {
 
 function resolveAuditScope(
   scope: EventScope | undefined,
-  tenantSlug: string | undefined
+  tenantSlug: string | undefined,
+  fallbackTier: EventScope['tier'] = (getRegisteredEnvText(
+    'KYBERION_TIER'
+  ) as EventScope['tier']) || 'public'
 ): EventScope | undefined {
   try {
     return normalizeEventScope({
       ...(scope || {}),
       ...(tenantSlug && !scope?.tenant_slug ? { tenant_slug: tenantSlug } : {}),
-      tier:
-        scope?.tier || (getRegisteredEnvText('KYBERION_TIER') as EventScope['tier']) || 'public',
+      tier: scope?.tier || fallbackTier,
     });
   } catch {
     return undefined;

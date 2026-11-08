@@ -33,7 +33,7 @@ describe('audit-owned persistence under real production authority', () => {
     );
     const script = `
       const io = await import(${JSON.stringify(moduleUrl('secure-io.js'))});
-      const { withExecutionContext } = await import(${JSON.stringify(moduleUrl('authority.js'))});
+      const { withExecutionContext, resolveRole } = await import(${JSON.stringify(moduleUrl('authority.js'))});
       const { auditChain, withAuditChainLock } = await import(${JSON.stringify(moduleUrl('governance/audit-chain.js'))});
       const { policyEngine } = await import(${JSON.stringify(moduleUrl('governance/policy-engine.js'))});
       const { runInResourceAccessScope } = await import(${JSON.stringify(moduleUrl('foundation/resource-access-scope.js'))});
@@ -61,6 +61,56 @@ describe('audit-owned persistence under real production authority', () => {
       });
       process.env.KYBERION_TIER = 'confidential';
       withAuditChainLock(() => asRuntime(() => auditChain.recordHeld(entry('held-original'))));
+      const observations = [];
+      const observe = (mode, callback) => observations.push({mode, callback, role:resolveRole()});
+      const invoke = (mode, value, submitted = () => {}) => {
+        if (mode === 'held' || mode === 'deferred')
+          return withAuditChainLock(() => {
+            asRuntime(() => mode === 'held'
+              ? auditChain.recordHeld(value) : auditChain.recordDeferrable(value));
+            submitted();
+          });
+        return asRuntime(() => mode === 'assert'
+          ? auditChain.assertRecordable(value) : auditChain.record(value));
+      };
+      for (const mode of ['direct','held','deferred','assert']) {
+        process.env.KYBERION_TIER = 'confidential';
+        const metadata = {
+          get correlationId() { observe(mode,'correlation'); return 'captured-'+mode; },
+          nested: { get value() { observe(mode,'getter'); return 'captured'; } },
+          converted: { toJSON() {
+            observe(mode,'toJSON');
+            process.env.KYBERION_TIER = 'personal';
+            return {value:'captured'};
+          } },
+          proxy: new Proxy({value:'captured'}, {
+            get(target,key,receiver) { observe(mode,'proxy'); return Reflect.get(target,key,receiver); },
+            ownKeys(target) { observe(mode,'proxy'); return Reflect.ownKeys(target); }
+          }),
+          mutable: {value:'captured'},
+        };
+        const value = {...entry('callbacks-'+mode),actor:{kind:'service',id:'service:original'},metadata};
+        invoke(mode,value,() => {
+          value.actor.id = 'service:forged';
+          metadata.mutable.value = 'changed-after-prepare';
+        });
+      }
+      process.env.KYBERION_TIER = 'confidential';
+      const cyclicErrors = [];
+      const foreignScopeErrors = [];
+      for (const mode of ['direct','held','deferred','assert']) {
+        const cyclic = {...entry('cyclic-'+mode),metadata:{}};
+        cyclic.metadata.self = cyclic.metadata;
+        cyclicErrors.push(errorOf(() => invoke(mode,cyclic)));
+        const foreign = {
+          ...entry('foreign-'+mode),scope:{tier:'confidential',tenant_slug:tenant},
+          toJSON() {
+            observe(mode,'foreign-toJSON');
+            return {...entry('foreign-'+mode),scope:{tier:'confidential',tenant_slug:'audit-fixture-b'}};
+          }
+        };
+        foreignScopeErrors.push(errorOf(() => invoke(mode,foreign)));
+      }
       const ceiling = errorOf(() => runInResourceAccessScope({
         tenantSlug:tenant, readExact:[], writeExact:[], mkdirExact:[]
       }, () => asRuntime(() => auditChain.record(entry('ceiling-denied')))));
@@ -75,7 +125,7 @@ describe('audit-owned persistence under real production authority', () => {
       const master = readRows(root+'/active/shared/logs/audit');
       const mirror = readRows(root+'/active/shared/runtime/audit-mirror/confidential/'+tenant);
       process.stdout.write(JSON.stringify({
-        denied, mismatch, ceiling,
+        denied, mismatch, ceiling, observations, cyclicErrors, foreignScopeErrors,
         targetExists:io.safeExistsSync(target),
         keyExists:io.safeExistsSync(root+'/active/shared/runtime/audit/chain-key'),
         master, mirror,
@@ -110,7 +160,7 @@ describe('audit-owned persistence under real production authority', () => {
     expect(report.mismatch).toContain('AUDIT_SCOPE_DENIED');
     expect(report.ceiling).toBeTruthy();
     expect(report.otherMirrorExists).toBe(false);
-    expect(report.integrity).toMatchObject({ valid: 3, total: 3, corrupted: [] });
+    expect(report.integrity).toMatchObject({ valid: 6, total: 6, corrupted: [] });
     expect(report.mirrorIntegrity).toEqual({ ok: true, findings: [] });
     const denied = report.master.filter(
       (row: { action: string }) => row.action === 'policy_violation'
@@ -121,12 +171,44 @@ describe('audit-owned persistence under real production authority', () => {
       'policy_violation',
       'deferred-original',
       'held-original',
+      'callbacks-direct',
+      'callbacks-held',
+      'callbacks-deferred',
     ]);
     expect(report.master[1]).toMatchObject({
       agentId: 'original-worker',
       actor: { kind: 'service', id: 'service:original' },
       scope: { tier: 'confidential', tenant_slug: 'audit-fixture-a' },
     });
+    for (const mode of ['direct', 'held', 'deferred', 'assert']) {
+      const observed = report.observations.filter((row: { mode: string }) => row.mode === mode);
+      expect(observed.length).toBeGreaterThan(0);
+      expect(
+        observed.every((row: { role: string }) => row.role === 'dot_lifecycle_runtime_store')
+      ).toBe(true);
+      for (const callback of ['correlation', 'getter', 'toJSON', 'proxy', 'foreign-toJSON'])
+        expect(observed.some((row: { callback: string }) => row.callback === callback)).toBe(true);
+    }
+    for (const row of report.master.slice(3))
+      expect(row).toMatchObject({
+        actor: { kind: 'service', id: 'service:original' },
+        correlationId: 'captured-' + row.action.replace('callbacks-', ''),
+        scope: { tier: 'confidential', tenant_slug: 'audit-fixture-a' },
+        metadata: {
+          nested: { value: 'captured' },
+          converted: { value: 'captured' },
+          proxy: { value: 'captured' },
+          mutable: { value: 'captured' },
+        },
+      });
+    expect(report.cyclicErrors).toHaveLength(4);
+    expect(
+      report.cyclicErrors.every((error: string) => error.includes('AUDIT_INPUT_INVALID'))
+    ).toBe(true);
+    expect(report.foreignScopeErrors).toHaveLength(4);
+    expect(
+      report.foreignScopeErrors.every((error: string) => error.includes('AUDIT_SCOPE_DENIED'))
+    ).toBe(true);
     expect(report.mirror.map((row: { id: string }) => row.id)).toEqual(
       report.master.map((row: { id: string }) => row.id)
     );
