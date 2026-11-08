@@ -110,7 +110,7 @@ describe('audit-owned persistence under real production authority', () => {
     expect(report.mismatch).toContain('AUDIT_SCOPE_DENIED');
     expect(report.ceiling).toBeTruthy();
     expect(report.otherMirrorExists).toBe(false);
-    expect(report.integrity.ok).toBe(true);
+    expect(report.integrity).toMatchObject({ valid: 3, total: 3, corrupted: [] });
     expect(report.mirrorIntegrity).toEqual({ ok: true, findings: [] });
     const denied = report.master.filter(
       (row: { action: string }) => row.action === 'policy_violation'
