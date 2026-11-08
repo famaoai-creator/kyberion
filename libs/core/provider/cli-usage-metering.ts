@@ -1,8 +1,13 @@
 import { metrics } from '../analysis/metrics.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
+import { resolveProjectScope } from '../foundation/project-scope-env.js';
+import { resolveMissionScope } from '../foundation/mission-scope-env.js';
+import { normalizeEventScope, type EventScope } from '../event/event-scope.js';
+import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
 import {
   getUsageAttribution,
+  type UsageAttribution,
   type UsageBillingMode,
   type UsageCause,
 } from '../finance/usage-accounting.js';
@@ -443,6 +448,54 @@ export interface RecordCliUsageOptions {
   agent?: string;
 }
 
+/**
+ * Ambient fallback when no `withUsageAttribution` binding exists: scope the row
+ * from the trusted process context (registered/persisted scope env + the
+ * mission's own state record) rather than leaving it unscoped. Explicit ALS
+ * attribution always wins. Derivation is read-only and honest — an
+ * unresolvable mission or missing tier yields no scope, never a guess.
+ * actor_id names the process identity (`kyberion:<role|persona>`), distinct
+ * from `agent` (the backend that consumed tokens).
+ */
+function ambientCliUsageAttribution(): UsageAttribution | undefined {
+  try {
+    const project = resolveProjectScope();
+    const missionId = project.missionId;
+    const mission = missionId ? resolveMissionScope(missionId) : undefined;
+    const tenantSlug = project.tenantSlug ?? mission?.tenantSlug;
+    const projectId = project.projectId ?? mission?.projectId;
+    let scope: EventScope | undefined;
+    if (missionId && mission?.tier) {
+      scope = normalizeEventScope({
+        scope_kind: project.taskId ? 'task' : 'mission',
+        tier: mission.tier,
+        ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+        ...(mission.organizationId ? { organization_id: mission.organizationId } : {}),
+        ...(projectId ? { project_id: projectId } : {}),
+        mission_id: missionId,
+        ...(project.taskId ? { task_id: project.taskId } : {}),
+      });
+    } else if (tenantSlug && (projectId || project.taskId)) {
+      scope = normalizeEventScope({
+        scope_kind: project.taskId ? 'task' : 'project',
+        tier: 'confidential',
+        tenant_slug: tenantSlug,
+        ...(projectId ? { project_id: projectId } : {}),
+        ...(project.taskId ? { task_id: project.taskId } : {}),
+      });
+    }
+    if (!scope) return undefined;
+    const identity = resolvePolicyIdentityContext();
+    const actorName = identity.role || identity.persona;
+    return {
+      actor_id: `kyberion:${actorName && actorName !== 'unknown' ? actorName : 'process'}`,
+      scope,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 /** One metric per provider model total; character fallback only on success. */
 export function recordCliUsage(
   component: string,
@@ -462,7 +515,7 @@ export function recordCliUsage(
     /* result metadata is bookkeeping and must never break reasoning */
   }
   try {
-    const attribution = getUsageAttribution();
+    const attribution = getUsageAttribution() ?? ambientCliUsageAttribution();
     const effectiveStatus = options.report?.isError ? 'error' : status;
     const providerEntries = options.requestNotSent ? [] : (options.report?.entries ?? []);
     const characterEstimate =
@@ -497,7 +550,12 @@ export function recordCliUsage(
               ...(attribution.accounting_id ? { accounting_id: attribution.accounting_id } : {}),
             }
           : {}),
-        mission_id: getRegisteredEnvText('MISSION_ID') || undefined,
+        mission_id:
+          getRegisteredEnvText('MISSION_ID') ||
+          (attribution?.scope.scope_kind === 'mission' || attribution?.scope.scope_kind === 'task'
+            ? attribution.scope.mission_id
+            : undefined) ||
+          undefined,
         estimated: characterEstimate,
         billing_mode: options.billingMode ?? 'unknown',
         usage_source: providerEntries.length

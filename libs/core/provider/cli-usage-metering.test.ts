@@ -15,6 +15,11 @@ import {
 } from './cli-usage-metering.js';
 import { withUsageAttribution } from '../finance/usage-accounting.js';
 import { runWithDelegationExecutionTracker } from '../workforce/delegation-execution-tracker.js';
+import { pathResolver, registerMissionLocator } from '../path-resolver.js';
+import { safeMkdir, safeWriteFile } from '../secure-io.js';
+import { withExecutionContext } from '../authority.js';
+import { resetMissionScopeCacheForTests } from '../foundation/mission-scope-env.js';
+import path from 'node:path';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -593,5 +598,92 @@ describe('R5 delegation result metadata from CLI usage envelopes', () => {
     expect(metadata).toEqual({
       usage: { input_tokens: 120, output_tokens: 10, total_tokens: 130 },
     });
+  });
+});
+
+describe('ambient usage attribution (no ALS binding)', () => {
+  const fixtureRoot = pathResolver.sharedTmp();
+  const located = new Map<string, string>();
+  registerMissionLocator((missionId) => located.get(missionId.toUpperCase()));
+
+  function seedMissionState(missionId: string, state: Record<string, unknown>): void {
+    const dir = path.join(fixtureRoot, `mission-scope-${process.pid}`, missionId);
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(dir, { recursive: true });
+      safeWriteFile(path.join(dir, 'mission-state.json'), JSON.stringify(state));
+    });
+    located.set(missionId.toUpperCase(), dir);
+    resetMissionScopeCacheForTests();
+  }
+
+  afterEach(() => {
+    located.clear();
+    resetMissionScopeCacheForTests();
+    delete process.env.MISSION_ID;
+  });
+
+  it('scopes the row to the mission record when MISSION_ID is bound', () => {
+    const spy = vi.spyOn(metrics, 'record').mockImplementation(() => undefined as never);
+    seedMissionState('MSN-AMBIENT-1', {
+      tier: 'confidential',
+      tenant_slug: 'acme-corp',
+      organization_id: 'org-acme',
+      relationships: { project: { project_id: 'proj-9' } },
+    });
+    process.env.MISSION_ID = 'MSN-AMBIENT-1';
+
+    recordCliUsage('devin-cli', 'swe', Date.now(), 'success', {
+      promptChars: 80,
+      completionChars: 20,
+    });
+
+    expect(spy).toHaveBeenCalledOnce();
+    const extra = spy.mock.calls[0][3] as Record<string, unknown>;
+    expect(extra.scope).toMatchObject({
+      scope_kind: 'mission',
+      tier: 'confidential',
+      tenant_slug: 'acme-corp',
+      organization_id: 'org-acme',
+      project_id: 'proj-9',
+      mission_id: 'MSN-AMBIENT-1',
+    });
+    expect(extra.mission_id).toBe('MSN-AMBIENT-1');
+    expect(String(extra.actor_id)).toMatch(/^kyberion:/);
+  });
+
+  it('leaves the row unscoped when the mission is not resolvable', () => {
+    const spy = vi.spyOn(metrics, 'record').mockImplementation(() => undefined as never);
+    process.env.MISSION_ID = 'MSN-DOES-NOT-EXIST-1';
+    resetMissionScopeCacheForTests();
+
+    recordCliUsage('devin-cli', 'swe', Date.now(), 'success', {
+      promptChars: 80,
+      completionChars: 20,
+    });
+
+    const extra = spy.mock.calls[0][3] as Record<string, unknown>;
+    expect(extra.mission_id).toBe('MSN-DOES-NOT-EXIST-1');
+    expect(extra).not.toHaveProperty('scope');
+    expect(extra).not.toHaveProperty('actor_id');
+  });
+
+  it('explicit withUsageAttribution wins over the ambient fallback', () => {
+    const spy = vi.spyOn(metrics, 'record').mockImplementation(() => undefined as never);
+    seedMissionState('MSN-AMBIENT-2', { tier: 'public', organization_id: 'org-wrong' });
+    process.env.MISSION_ID = 'MSN-AMBIENT-2';
+
+    withUsageAttribution(
+      { actor_id: 'dot:explicit', scope: { tier: 'public', scope_kind: 'system' } },
+      () =>
+        recordCliUsage('devin-cli', 'swe', Date.now(), 'success', {
+          promptChars: 80,
+          completionChars: 20,
+        })
+    );
+
+    const extra = spy.mock.calls[0][3] as Record<string, unknown>;
+    expect(extra.actor_id).toBe('dot:explicit');
+    expect(extra.scope).toMatchObject({ scope_kind: 'system' });
+    expect((extra.scope as Record<string, unknown>).organization_id).toBeUndefined();
   });
 });
