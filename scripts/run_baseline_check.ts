@@ -687,7 +687,7 @@ export async function runJanitorMaintenanceJob(
   return { status, logPath };
 }
 
-function maybeSubmitJanitorMaintenanceJob(): {
+export function maybeSubmitJanitorMaintenanceJob(): {
   submitted: boolean;
   pending: boolean;
   reason: string | null;
@@ -712,7 +712,7 @@ function maybeSubmitJanitorMaintenanceJob(): {
   // The detached child is this script in job mode: it runs the pipeline, keeps
   // its output in a process log and records a failure marker on non-zero exit
   // (a bare detached run with stdio 'ignore' failed without a trace).
-  spawnManagedProcess({
+  const maintenance = spawnManagedProcess({
     resourceId: `baseline-check:storage-janitor:${Date.now().toString(36)}`,
     kind: 'service',
     ownerId: 'baseline-check',
@@ -732,6 +732,9 @@ function maybeSubmitJanitorMaintenanceJob(): {
       source: 'baseline-check',
     },
   });
+  // Registration keeps this detached job observable, but its background
+  // lifetime must not keep a completed baseline (or golden check) alive.
+  maintenance.child.unref();
 
   markJanitorSubmission();
   return {
@@ -894,7 +897,7 @@ export async function runBaselineCheck() {
   killSwitch.startMonitor();
 
   // KM-01 fallback: without a resident chronos daemon the scheduled janitor
-  // never fires, so session start submits a detached dry-run maintenance job
+  // never fires, so session start submits a detached maintenance job
   // when the last completed run is stale. Failure-tolerant — maintenance must
   // never block the baseline check.
   let janitorMaintenance = {
