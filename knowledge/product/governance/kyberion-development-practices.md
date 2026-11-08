@@ -463,7 +463,11 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
   loopback peer plus the bound owner's principal), never with
   `viewer.source === 'loopback'`. Test the signed-in owner, not only a
   synthetic loopback viewer. (MSN-SERVER-STUDIO-PROGRESS-20261107: the
-  owner's personal 業務の自動化候補.)
+  owner's personal 業務の自動化候補.) Shared core functions take that decision
+  as an explicit input (`HearingOwnerInput { owner }` in
+  `libs/core/surface/hearing-scope.ts`); each surface adapter computes it, and
+  core never reads the credential source to decide it.
+  (MSN-SERVER-CONCIERGE-ASK-20261108: the hearing routes.)
 - **Deleting the old surface's tests can delete core coverage.** A surface's
   route or client tests often exercise `libs/core` logic for real, while the
   core package's own tests mock that module. Before deleting them, list each
@@ -472,6 +476,15 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
   For each case you drop, record why. Check the result by removing guard
   conditions one at a time: a mutant that survives marks lost coverage.
   (MSN-SERVER-STUDIO-FIRST-JOB-20261108: 初めての仕事.)
+- **A feature a surface may not serve fails closed on the resolved value.**
+  When a shared step serves a feature only if the surface supplies a
+  capability (a reader, a role), refusing the request field that names it is
+  not enough. The same value can arrive another way: a stored record, a
+  legacy inline object, a different parameter. Check the resolved value
+  after every load and before any effect, model call or admitted audit. Test
+  each arrival path with the capability absent, and seed a stored record.
+  (MSN-SERVER-CONCIERGE-ASK-20261108: decision-ledger hearings on Concierge;
+  review found the stored and inline paths in two rounds.)
 
 ## 6. Process discipline for repo work
 
