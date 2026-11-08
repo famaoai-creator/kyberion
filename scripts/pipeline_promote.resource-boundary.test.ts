@@ -3,6 +3,7 @@ import * as nodePath from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core';
+import { VITEST_LIVE_SANDBOX_ROOT } from '@agent/core/path-resolver';
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { deriveAssetId, readAssetLedger } from '@agent/core/ingest-asset-ledger';
 import {
@@ -196,8 +197,7 @@ describe('pipeline promotion resource boundaries', () => {
     const ledger = async () => readAssetLedger(tenant, { knowledgeRoot });
     const journals: string[] = [];
     const journalSandbox = pathResolver.rootResolve(
-      'active/shared/runtime/vitest-live',
-      'pool-pipeline-ledger-' + process.pid
+      VITEST_LIVE_SANDBOX_ROOT + '/pool-pipeline-ledger-' + process.pid
     );
     let runId: string;
     const writeSource = (message: string) => {
@@ -215,6 +215,7 @@ describe('pipeline promotion resource boundaries', () => {
       const journalRunId = newPipelineRunId();
       const journalScope = { tier: 'confidential' as const, tenantSlug: tenant };
       const journalPath = pipelineRunJournalPath(journalRunId, undefined, journalScope);
+      expect(journalPath.startsWith(journalSandbox + nodePath.sep)).toBe(true);
       // The run grant owns only pipeline-library-runs/confidential/<tenant>.
       // Initialize its sandbox runtime parent as fixture infrastructure, before
       // entering that exact grant; a fresh pool has no such ancestors yet.
