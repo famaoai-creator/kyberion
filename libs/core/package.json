@@ -1572,6 +1572,10 @@
       "types": "./dist/foundation/command-credential-policy.d.ts",
       "default": "./dist/foundation/command-credential-policy.js"
     },
+    "./foundation/config": {
+      "types": "./dist/foundation/config.d.ts",
+      "default": "./dist/foundation/config.js"
+    },
     "./foundation/credential-binding": {
       "types": "./dist/foundation/credential-binding.d.ts",
       "default": "./dist/foundation/credential-binding.js"
