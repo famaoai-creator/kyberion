@@ -83,6 +83,30 @@ diff; they do not prove that an arbitrary starting checkout was current. This
 checkout comparison is a required operational preflight, not a new claim made
 by those automated checks.
 
+## Lease backend exclusion across callback modes
+
+A namespace mutex must span the complete protected callback, even when a writer
+lease's TTL has elapsed. Memory providers must use shared admission for sync and
+async callers: refuse synchronous entry while async ownership is pending or
+active, retain sync re-entry refusal, and keep different namespaces independent.
+A timeout does not establish that an earlier callback has stopped.
+
+Keep the caller's returned Promise separate from the queue's private tail. The
+tail must settle successfully on callback success or failure and remove its
+reservation only if the map still contains that exact tail. Never compare a
+`finally`-derived tail with the original callback Promise: that retains entries
+and can create an unhandled rejection. Preserve callback error identity and FIFO
+handoff; KV-stub acquisition delay must also apply after predecessor failure.
+
+After changing a lease backend, run `lease-backend-exclusion.test.ts`,
+`lease-backend.model.test.ts`, `lease-backend.test.ts` and `writer-lease.test.ts`
+under strict live-state checking. Use deferred Promises and injected/fake clocks,
+not real sleeps. The independent model must reject a conflicting-admission
+mutation. These suites are the regression gate for this procedure. Affected-test
+selection follows imports; run all four explicitly even when the selected subset
+is smaller. Their finite model and KV
+stub do not establish real multi-node exclusion or crash recovery.
+
 ## NHI lifecycle and session-admission fencing
 
 Allocate identity-journal sequence numbers and check the expected identity revision
