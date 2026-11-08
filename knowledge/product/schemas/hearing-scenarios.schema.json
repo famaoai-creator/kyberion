@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "hearing-scenarios.schema.json",
   "title": "Hearing Scenario Catalog",
-  "description": "WI-08: data-driven hearing scenarios for the presence-studio /ask?mode=hearing flow — presence/displays/presence-studio/hearing.ts's WEB_APP_HEARING_SCENARIO and libs/core/surface/hearing-scenario-catalog.ts both read this catalog. Entries may group their requirements into ordered phases (a hearing sheet); default_scenario names the sheet a new session opens on.",
+  "description": "WI-08: data-driven hearing scenarios for the presence-studio /ask?mode=hearing flow — libs/core/surface/hearing.ts's WEB_APP_HEARING_SCENARIO and libs/core/surface/hearing-scenario-catalog.ts both read this catalog. Entries may group their requirements into ordered phases (a hearing sheet); default_scenario names the sheet a new session opens on.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "scenarios"],

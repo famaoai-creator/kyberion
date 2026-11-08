@@ -8,7 +8,7 @@
 // tenant, and never emits HTML. Labels arrive already resolved to the request
 // locale (the route owns vocabulary resolution), so the projection is a
 // deterministic function of its input.
-import { validateA2UIMessage, type A2UIComponent, type A2UIMessage } from '@agent/core/a2ui';
+import { validateA2UIMessage, type A2UIComponent, type A2UIMessage } from './a2ui.js';
 import type { HearingRecord } from './hearing.js';
 
 export const HEARING_A2UI_SURFACE_ID = 'flow:hearing';

@@ -7,14 +7,14 @@
 // and a sanitizer rejection or any failure falls back to the deterministic
 // `renderHearingCanvas` template (HT-01) — the model never gets to bypass
 // the fixed, escaped, external-resource-free canvas.
-import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
-import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
+import { t as catalogT, type VocabularyKey } from '../localization/t.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
+import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
 import {
   resolveCreativeDesign,
   type ResolvedCreativeDesign,
-} from '@agent/core/creative-design-resolver';
-import { readableText } from '@agent/core/ce-adoption';
+} from '../design/creative-design-resolver.js';
+import { readableText } from '../harnessing/ce-adoption.js';
 import type { HearingRecord } from './hearing.js';
 import { renderHearingCanvas } from './hearing-runtime.js';
 

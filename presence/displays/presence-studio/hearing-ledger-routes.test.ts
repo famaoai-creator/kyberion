@@ -4,7 +4,7 @@
 // the refusal paths that stop before any write are what this file proves.
 import { describe, expect, it } from 'vitest';
 import type express from 'express';
-import { createHearingRecord, applyHearingTurn } from './hearing.js';
+import { createHearingRecord, applyHearingTurn } from '@agent/core/surface/hearing';
 import {
   buildLedgerImportLines,
   registerHearingLedgerRoutes,
@@ -164,8 +164,8 @@ describe('hearing-ledger-routes.ts', () => {
 // and the tenant of a ledger hearing comes from the server-side viewer scope —
 // a `tenant`/`stance` query parameter never changes it.
 import { afterEach, beforeEach } from 'vitest';
-import { sanitizeGeneratedCanvasHtml } from './hearing-canvas.js';
-import { renderLedgerProjectionCanvas } from './hearing-ledger-canvas.js';
+import { sanitizeGeneratedCanvasHtml } from '@agent/core/surface/hearing-canvas';
+import { renderLedgerProjectionCanvas } from '@agent/core/surface/hearing-ledger-canvas';
 import { renderLedgerCanvasForRecord } from './hearing-ledger-routes.js';
 import type { ProjectionBrief } from '@agent/core/decision-ledger';
 
