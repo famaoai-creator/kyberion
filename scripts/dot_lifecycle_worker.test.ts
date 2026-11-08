@@ -135,7 +135,7 @@ describe('dot lifecycle worker under its own system role (L1)', () => {
     vi.stubEnv('MISSION_ROLE', '');
     try {
       // The activation gate reads the canonical role registry (repo root) and
-      // lists charters, then writes under dot_lifecycle_writer — every step
+      // lists charters, then writes under the dot lifecycle store roles — every step
       // runs under the worker's system role, so a missing grant would throw
       // [ROLE_ASSUMPTION_DENIED] here.
       const registry = loadAuthorityRoleIndex();

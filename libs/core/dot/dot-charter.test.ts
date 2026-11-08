@@ -24,6 +24,7 @@ import {
   safeAppendFileSync,
   safeMkdir,
   safeRmSync,
+  safeReadFile,
   safeSymlinkSync,
   safeWriteFile,
 } from '../secure-io.js';
@@ -109,6 +110,44 @@ const tenantCharter = (slug: string, dotId: string, scope?: DotCharter['scope'])
 });
 
 describe('tenant dot charters', () => {
+  it.each([
+    'dot_result_writer',
+    'dot_lifecycle_writer',
+    'dot_charter_store',
+    'dot_lifecycle_runtime_store',
+  ])(
+    'refuses internal store execution role %s before draft creation or activation',
+    async (role) => {
+      const { createDraftDotCharter, transitionDotCharterStatus } =
+        await import('./dot-lifecycle.js');
+      const hasRole = vi.fn(() => true);
+      const draft = {
+        ...VALID_CHARTER,
+        status: 'draft' as const,
+        authority: { ...VALID_CHARTER.authority, authority_role: role },
+      };
+      for (const status of ['draft', 'active'] as const)
+        expect(() => validateDotCharter({ ...draft, status })).toThrow(/Invalid dot charter/);
+      expect(() => createDraftDotCharter(draft, { rootDir: TEST_ROOT, hasRole })).toThrow(
+        /Invalid dot charter/
+      );
+      const file = writeCharter(TEST_ROOT, 'internal-role.json', draft);
+      const before = safeReadFile(file, { encoding: 'utf8' });
+      expect(() =>
+        transitionDotCharterStatus(draft.dot_id, 'active', { rootDir: TEST_ROOT, hasRole })
+      ).toThrow();
+      expect(safeReadFile(file, { encoding: 'utf8' })).toBe(before);
+      expect(hasRole).not.toHaveBeenCalled();
+    }
+  );
+
+  it('continues accepting an ordinary worker authority role in draft and active charters', () => {
+    for (const status of ['draft', 'active'] as const)
+      expect(validateDotCharter({ ...VALID_CHARTER, status }).authority.authority_role).toBe(
+        'infrastructure_sentinel'
+      );
+  });
+
   it('refuses the internal result-store role as a charter execution role', async () => {
     const { assertDotAccountabilityCharter } = await import('./dot-authority.js');
     expect(() =>

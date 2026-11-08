@@ -795,11 +795,11 @@ function prepareExecutionContext(
       throw new Error('[SCOPE_CONTEXT_INVALID] invalid execution identity');
   }
   assertRoleAssumptionAllowed(normalizedRole);
-  // G2: former store roles are only grant issuance rights now. Refusing them keeps an
+  // G2: former store roles are retired into grants or narrower stores. Refusing them keeps an
   // installation whose catalogs still declare an old role from granting its policy.
   if (RETIRED_STORE_ROLE_NAMES.has(normalizedRole))
     throw new Error(
-      `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant issuance right, not an assumable role`
+      `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a retired store role name, not an assumable role`
     );
   assertTenantBoundReaderScope(normalizedRole, tenantSlug);
   if (

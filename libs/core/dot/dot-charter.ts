@@ -53,6 +53,17 @@ export function resolveDotDelegationLimit(explicit?: number): number {
 
 export const DOT_CHARTER_SCHEMA_PATH = 'knowledge/product/schemas/dot-charter.schema.json';
 export const DOT_CHARTER_DIR = 'dots';
+const INTERNAL_DOT_STORE_ROLES: ReadonlySet<string> = new Set([
+  'dot_result_writer',
+  'dot_lifecycle_writer',
+  'dot_charter_store',
+  'dot_lifecycle_runtime_store',
+]);
+
+/** Store maintenance authority is never a resident agent's execution role. */
+export function isInternalDotStoreRole(role: string): boolean {
+  return INTERNAL_DOT_STORE_ROLES.has(role);
+}
 /** Same tenant-bound runner role chronos uses to scan tenant pipelines. */
 const DOT_TENANT_SCAN_ROLE = 'chronos_tenant_runner';
 
@@ -321,9 +332,9 @@ export function validateDotCharter(value: unknown, sourcePath = '<inline>'): Dot
   }
   isFrontDeskDiagnosticDot(candidate as DotCharter);
   const bound = candidate as DotCharter;
-  if (bound.authority.authority_role === 'dot_result_writer')
+  if (isInternalDotStoreRole(bound.authority.authority_role))
     throw new Error(
-      `Invalid dot charter at ${sourcePath}: dot_result_writer is an internal store role`
+      `Invalid dot charter at ${sourcePath}: ${bound.authority.authority_role} is an internal store role`
     );
   if (
     bound.work_binding &&
