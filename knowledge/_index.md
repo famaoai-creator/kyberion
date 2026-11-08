@@ -443,6 +443,7 @@
 - [Data Harvesting Best Practices: URL Resolution & Secure Download](./product/orchestration/data-harvesting-best-practices.md) (public | Ecosystem Architect)
 - [Decision Trail Playbook — auditable attempt log without duplicating the mission ledger](./product/orchestration/decision-trail-playbook.md) (public | Unknown)
 - [Delegated Task Observability](./product/orchestration/delegated-task-observability.md) (public | Ecosystem Architect)
+- [Delegation CLI Playbook — bounded governed delegation from the operator surface](./product/orchestration/delegation-cli-playbook.md) (public | Unknown)
 - [Design Clone Delivery Flow](./product/orchestration/design-clone-delivery-flow.md) (public | Unknown)
 - [Design Divergence Playbook — contested designs via existing Kyberion roles](./product/orchestration/design-divergence-playbook.md) (public | Unknown)
 - [Design hero verification learnings — preview gate and token fidelity](./product/orchestration/design-hero-verification-learnings.md) (public | Unknown)
