@@ -10,6 +10,7 @@
 docs/developer/CONFIGURATION.md linguist-generated=true merge=kyberion-regenerate
 docs/developer/env.example linguist-generated=true merge=kyberion-regenerate
 knowledge/_index.md linguist-generated=true merge=kyberion-regenerate
+libs/core/foundation/config.generated.ts linguist-generated=true merge=kyberion-regenerate
 # Curated + generated: the driver merges entries by name and only leaves a
 # conflict when the same entry changed on both sides. Not linguist-generated —
 # its descriptions are reviewed by hand.

@@ -2,7 +2,8 @@
  * Child-process environments for everything the Kyberion server (Concierge)
  * spawns. A child that runs without SYSTEM_ROLE is not bounded by the role
  * assumption policy, so a route could otherwise reach writer roles the
- * server itself must never hold (dot_lifecycle_writer, generation_scheduler,
+ * server itself must never hold (the dot lifecycle store roles
+ * dot_charter_store / dot_lifecycle_runtime_store, generation_scheduler,
  * reconcile_config_fallbacks, operational_learning_writer) indirectly. Every
  * spawn therefore uses one of these builders (tests/… server-child-env
  * contract in lib/server-child-env.test.ts):

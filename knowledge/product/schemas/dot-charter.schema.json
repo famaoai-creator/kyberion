@@ -601,10 +601,16 @@
       "properties": {
         "authority_role": {
           "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*(?![\\s\\S])",
           "not": {
-            "const": "dot_result_writer"
+            "enum": [
+              "dot_result_writer",
+              "dot_lifecycle_writer",
+              "dot_charter_store",
+              "dot_lifecycle_runtime_store"
+            ]
           },
-          "description": "Must be a role declared in security-policy.json authority_role_permissions."
+          "description": "Canonical lowercase role name declared in security-policy.json authority_role_permissions. Case and whitespace aliases are not accepted."
         },
         "accountability_charter_ref": {
           "type": "string",

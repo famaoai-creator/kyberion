@@ -38,8 +38,15 @@ second operator surface in practice, not a caption overlay.
 ## Non-overlap (why one process is premature)
 
 - **Realtime voice/hearing**: studio serves the hearing routes (the hearing
-  logic itself — `hearing-runtime`, completion/handoff/recovery — lives in
-  `libs/core/surface/hearing-*.ts`) — a live session lifecycle with its own
+  logic itself — `hearing-runtime`, completion/handoff/recovery, and the route
+  steps in `hearing-session-service` / `-mission-service` / `-ledger-service` —
+  lives in `libs/core/surface/hearing-*.ts`). Concierge serves the same
+  `/api/hearing/*`, `/api/conversation` and `/api/ask-vocabulary` from those
+  steps behind its own gate (`src/lib/hearing-access.ts`: the installation
+  owner decides "the owner", passed to core as `owner`), ahead of moving the
+  `/ask` page (MSN-SERVER-CONCIERGE-ASK-20261108). Decision-ledger hearings
+  fail closed there: the concierge role may not assume `decision_ledger`
+  (CD-12). The realtime voice loop stays a live session lifecycle with its own
   failure domain. Folding it into the Next.js concierge couples the
   slow-moving settings app to the realtime loop's crash/restart surface.
 - **A2UI host**: `component-host-routes` + core `hearing-a2ui` make studio the

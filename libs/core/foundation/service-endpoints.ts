@@ -1,4 +1,4 @@
-import { getRegisteredEnvText } from './env.js';
+import { config } from './config.js';
 import { defineCatalog } from './governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 
@@ -43,7 +43,7 @@ function stripTrailingSlashes(value: string): string {
 
 export function resolveComfyBaseUrl(override?: string): string {
   return stripTrailingSlashes(
-    (override || getRegisteredEnvText('KYBERION_COMFY_BASE_URL') || defaultComfyBaseUrl()).trim()
+    (override || config.text('KYBERION_COMFY_BASE_URL') || defaultComfyBaseUrl()).trim()
   );
 }
 
@@ -59,7 +59,7 @@ export function resolveComfyPort(): number {
 
 export function resolveProductRepositoryUrl(): string {
   return (
-    stripTrailingSlashes(getRegisteredEnvText('KYBERION_REPOSITORY_URL')?.trim() ?? '') ||
+    stripTrailingSlashes(config.text('KYBERION_REPOSITORY_URL')?.trim() ?? '') ||
     defaultProductRepositoryUrl()
   );
 }

@@ -1218,7 +1218,7 @@
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "presence/displays/presence-studio/hearing-mission-routes.ts": {
+    "libs/core/surface/hearing-mission-service.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/surface/hearing-runtime.ts": {
