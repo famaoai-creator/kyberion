@@ -1,3 +1,5 @@
+import { config } from './config.js';
+
 export class Semaphore {
   private active = 0;
   private readonly queue: Array<() => void> = [];
@@ -46,8 +48,7 @@ export class Semaphore {
   }
 }
 
-const parsedLimit = Number.parseInt(getRegisteredEnvText('KYBERION_LLM_CONCURRENCY') ?? '1', 10);
+const parsedLimit = Number.parseInt(config.text('KYBERION_LLM_CONCURRENCY') ?? '1', 10);
 export const llmSemaphore = new Semaphore(
   Number.isInteger(parsedLimit) && parsedLimit > 0 ? parsedLimit : 1
 );
-import { getRegisteredEnvText } from './env.js';
