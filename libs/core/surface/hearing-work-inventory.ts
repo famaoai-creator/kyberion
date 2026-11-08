@@ -11,18 +11,18 @@
  * `proposeWorkDecomposition` with a real reasoning backend or
  * `saveWorkInventoryEntry`.
  */
-import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
+import { t as catalogT, type VocabularyKey } from '../localization/t.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import {
   proposeWorkDecomposition,
   type ProposeWorkDecompositionInput,
-} from '@agent/core/workforce/work-inventory-decompose';
+} from '../workforce/work-inventory-decompose.js';
 import type {
   WorkInventoryFrequency,
   WorkInventoryScope,
   WorkInventoryStep,
   WorkTriggerKind,
-} from '@agent/core/workforce/work-inventory';
+} from '../workforce/work-inventory.js';
 import type { HearingRecord } from './hearing.js';
 import { sanitizeGeneratedCanvasHtml } from './hearing-canvas.js';
 

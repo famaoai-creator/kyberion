@@ -20,7 +20,7 @@ vi.mock('@agent/core/front-desk-nav', async () => ({
   }),
 }));
 import { readHearingCompletion, withoutHearingCompletionFields } from './hearing-completion.js';
-import type { HearingRecord } from './hearing.js';
+import type { HearingRecord } from '@agent/core/surface/hearing';
 import type { PresenceStudioViewerContext } from './security.js';
 const viewer: PresenceStudioViewerContext = {
   principalId: 'human:test',
@@ -71,6 +71,12 @@ describe('hearing completion read model', () => {
       next: { href: 'https://review.example.test/inbox?tenant=alpha' },
     });
     expect(mocks.approval).toHaveBeenCalledWith('brief', approvalId);
+  });
+  it('keeps a hearing that carries both mission and inventory markers unavailable', () => {
+    expect(readHearingCompletion(record({ work_inventory_entry_id: 'entry-1' }), viewer)).toEqual({
+      kind: 'mission',
+      status: 'unavailable',
+    });
   });
   it.each([{ approval_request_id: undefined }, { mission_id: undefined }])(
     'keeps partial handoffs unavailable',
