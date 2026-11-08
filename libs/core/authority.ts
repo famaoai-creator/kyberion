@@ -795,11 +795,11 @@ function prepareExecutionContext(
       throw new Error('[SCOPE_CONTEXT_INVALID] invalid execution identity');
   }
   assertRoleAssumptionAllowed(normalizedRole);
-  // G2: former store roles are only grant issuance rights now. Refusing them keeps an
+  // G2: former store roles are retired into grants or narrower stores. Refusing them keeps an
   // installation whose catalogs still declare an old role from granting its policy.
   if (RETIRED_STORE_ROLE_NAMES.has(normalizedRole))
     throw new Error(
-      `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant issuance right, not an assumable role`
+      `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a retired store role name, not an assumable role`
     );
   assertTenantBoundReaderScope(normalizedRole, tenantSlug);
   if (
@@ -1323,6 +1323,8 @@ registerOperationalAlertStore((fn) => withExecutionContext('ops_alert_store', fn
  * store writer or resident dot (infrastructure_sentinel) holds a mirror grant.
  */
 const TENANT_AUDIT_MIRROR_WRITER_ROLE = 'audit_mirror_writer';
+// The legacy seam also encloses canonical key/lock/master persistence after
+// caller validation. Its existing role grants and caller resource ceilings stay intact.
 // Guarded lookup, as in secure-io's registerOptionalAuditIo: a test's reduced
 // audit-chain mock may not export the seam.
 try {

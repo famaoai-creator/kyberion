@@ -11,7 +11,7 @@
  * - Promotion is a human decision only (`decided_by: {kind:'human', id:'user:<member>'}`,
  *   the same grammar `mission_controller --decided-by` enforces).
  * - The mission path mirrors the hearing hand-off
- *   (`presence/displays/presence-studio/hearing-mission-routes.ts`): the
+ *   (`libs/core/surface/hearing-mission-service.ts`): the
  *   governed `mission_controller.js create` and `mission_alignment_request.js`
  *   run as built subprocesses (never imported), and the brief is written to
  *   `<mission>/evidence/mission-brief.json` under the `mission_controller`

@@ -6,7 +6,7 @@
  *     --expect-status <status> --expect-admission-hash <hash> \
  *     --expect-scope-json '<scope>' [--actor <principal>] --json
  *
- * The Kyberion server (Concierge) never assumes `dot_lifecycle_writer`. Its
+ * The Kyberion server (Concierge) never assumes the dot lifecycle store roles. Its
  * `/api/ops/workspace/autonomy` route checks the viewer, the workplace scope,
  * the charter status and its admission hash read-only, then launches this
  * worker with `buildSystemRoleLaunchEnv(…, 'dot_lifecycle_worker')`. The worker

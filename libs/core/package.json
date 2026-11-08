@@ -6464,6 +6464,10 @@
       "types": "./dist/surface/hearing-scope.d.ts",
       "default": "./dist/surface/hearing-scope.js"
     },
+    "./surface/hearing-session-service": {
+      "types": "./dist/surface/hearing-session-service.d.ts",
+      "default": "./dist/surface/hearing-session-service.js"
+    },
     "./surface/hearing-storage-access": {
       "types": "./dist/surface/hearing-storage-access.d.ts",
       "default": "./dist/surface/hearing-storage-access.js"
