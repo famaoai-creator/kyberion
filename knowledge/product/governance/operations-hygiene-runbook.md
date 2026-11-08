@@ -7,6 +7,40 @@ last_updated: 2026-11-08
 
 # Operations Hygiene Runbook
 
+## Checkout relocation preserves resource tiers
+
+Classify logical repository paths through the shared policy-relative authority
+mapping before interpreting tier markers. An outer scratch, artifact or knowledge
+partition describes the checkout's location, not every resource inside it.
+Preserve primary authority-store mapping and normalized outside-root fallback;
+do not repair ancestor shadowing by reordering tier substring checks.
+
+Gate changes with `libs/core/tier-guard.path-model.test.ts` and the tier-guard,
+preflight observation, tenant-store and tiered-mission suites. Build before
+compiled-module integration tests. The [relocation model](../architecture/checkout-tier-path-model.md)
+checks declared inner partitions across tiered ancestor layouts, including a
+negative ancestor-first control; it does not replace tenant or symlink guards.
+
+## Explicit viewer tier caps
+
+At a data-bearing narrowing boundary, an already resolved empty cap means no
+access. Never restore role defaults because its array is empty. Default/role
+policy resolution belongs upstream; a client request can only select inside the
+server viewer's supplied set. Missing or non-array resolved caps fail closed.
+
+After changing tier narrowing, run `surface-viewer-tier.model.test.ts`,
+`surface-mutation-guard.test.ts` and the real Concierge `ops-viewer.test.ts` from
+the repository root with its canonical Vitest aliases. Gate all role/tier/subset
+combinations, grant-removal monotonicity, empty/default distinction and a negative
+fallback mutation. A zero-file test selection is not validation. The
+[subset model](../architecture/viewer-tier-subset-model.md) covers this finite
+boundary; it does not establish route-wide custody or credential guarantees.
+
+Caller fixtures must supply a resolved `ViewerContext`. Prefer partial mocks
+that preserve real scope predicates over whole-module mocks that silently omit
+new exports. Preserve no-inspection/no-execution assertions on refusal, including
+404 non-disclosure for an invisible cross-tenant mission.
+
 ## Review independence assurance
 
 Keep admission policy separate from evidence strength. Artifact-review v1 actor
@@ -143,6 +177,17 @@ Gates: agent-identity lease-interleaving and alternating-writer tests, session-a
 ABA/legacy-plan tests, post-append and uncertain-result compensation tests, live-before-
 expiry control and suspension/replay regressions. These synthetic gates do not establish
 that a real organization has been onboarded or admitted.
+
+Writer-lease numeric safety is a separate gate: run
+`libs/core/lease/writer-lease.numeric-model.test.ts` with the writer/backend and NHI
+lifecycle suites after changing token or expiry handling. Reject unsafe persisted
+fences and non-finite/negative clocks; refuse allocation at MAX_SAFE_INTEGER and
+validate finite, strictly-future expiry before writing. Never reset or clamp a
+fence to recover from malformed or exhausted state. Preserve fresh post-write and
+exit observations and the original-token-after-renew contract. A later clock
+failure can follow a valid write; do not describe that as an unchanged record.
+The [fencing model](../architecture/writer-fencing-safety-model.md) defines the
+initial-input no-write guarantee and its limits.
 
 ## Private task source preparation and local test boundaries
 

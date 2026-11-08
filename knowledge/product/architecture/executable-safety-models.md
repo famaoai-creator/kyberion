@@ -26,9 +26,11 @@ checking of a small finite graph. This implementation is a TypeScript safety
 checker, not TLC, TLA+ support, SMT solving, or a theorem prover. It adds no runtime
 dependency or external service.
 
-Writer-lease token arithmetic, clock validation and viewer-scope policy
-equivalence need separate models. The backend exclusion increment below does not
-establish guarantees about those properties or real distributed adapters.
+The follow-up models cover [writer fencing arithmetic and clocks](./writer-fencing-safety-model.md),
+[explicit viewer tier caps](./viewer-tier-subset-model.md), and
+[checkout-relative tier classification](./checkout-tier-path-model.md).
+These boundaries are checked separately: backend exclusion alone does not
+establish their guarantees or qualify real distributed adapters.
 
 ## Implementation and acceptance
 

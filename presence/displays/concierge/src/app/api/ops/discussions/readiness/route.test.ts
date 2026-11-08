@@ -35,7 +35,8 @@ vi.mock('../../../../../lib/ops/ops-request-guard', () => ({
 vi.mock('../../../../../lib/ops/su-surface-data', () => ({
   buildMissionHistoryItems: mocks.missions,
 }));
-vi.mock('../../../../../lib/ops/ops-viewer', () => ({
+vi.mock('../../../../../lib/ops/ops-viewer', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../lib/ops/ops-viewer')>()),
   resolveOpsViewerForRequest: mocks.viewer,
   viewerErrorResponse: (_error: unknown, status = 403) =>
     Response.json({ error: 'scope denied' }, { status }),
@@ -82,7 +83,15 @@ beforeEach(() => {
   });
   mocks.run.mockResolvedValue(undefined);
   mocks.viewer.mockReturnValue({
-    context: { role: 'localadmin', source: 'token', principalId: 'fixture-viewer' },
+    context: {
+      role: 'localadmin',
+      source: 'token',
+      principalId: 'fixture-viewer',
+      tenantSlugs: ['fixture'],
+      organizationIds: 'all',
+      projectIds: 'all',
+      tierAccess: ['public', 'confidential'],
+    },
   });
   mocks.tenants.mockReturnValue(['fixture']);
   mocks.organizations.mockReturnValue('all');
@@ -301,7 +310,8 @@ it.each(['tenant', 'organization_id', 'project_id'])(
       },
     ]);
     const response = await POST(createRequest({ mission_id: 'MSN-FIXTURE', [field]: 'other' }));
-    expect(response.status).toBe(400);
+    // A mismatched tenant hides the mission before canonical-chain validation.
+    expect(response.status).toBe(field === 'tenant' ? 404 : 400);
     expect(mocks.inspect).not.toHaveBeenCalled();
     expect(mocks.requestCreate).not.toHaveBeenCalled();
     expect(mocks.create).not.toHaveBeenCalled();
