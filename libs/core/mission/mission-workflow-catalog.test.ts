@@ -3,6 +3,8 @@ import {
   normalizeWorkflowPhases,
   resolveMissionWorkflowDesign,
 } from './mission-workflow-catalog.js';
+import { expandProcessTemplateTasks } from './mission-process-task-expansion.js';
+import { validatePlannedNextTasks } from './mission-next-task-validation.js';
 
 describe('mission-workflow-catalog', () => {
   it('requires current image acceptance before generation and playback before promotion', () => {
@@ -541,5 +543,30 @@ describe('mission-workflow-catalog', () => {
         'delivery',
       ])
     );
+  });
+
+  it('expands the AI-DLC development templates through the dispatch validator', () => {
+    // Regression: a delivery task once shipped team_role 'reviewer' without a
+    // review_target — expansion classified it review-kind, the board validator
+    // rejected the task, and every loadAllNextTasks for those missions failed.
+    for (const missionTypeHint of ['development', 'refactoring']) {
+      const design = resolveMissionWorkflowDesign({
+        missionClass: 'code_change',
+        deliveryShape: 'single_artifact',
+        riskProfile: 'review_required',
+        stage: 'planning',
+        executionShape: 'mission',
+        missionTypeHint,
+      });
+      const tasks = expandProcessTemplateTasks({
+        missionId: 'MSN-CATALOG-EXPANSION',
+        design,
+      });
+      expect(() => validatePlannedNextTasks(tasks, 'MSN-CATALOG-EXPANSION')).not.toThrow();
+      const docsSync = tasks.find((task) => task.task_id === 'delivery-docs-sync');
+      expect(docsSync?.assigned_to.role).toBe('implementer');
+      expect(docsSync?.review_target).toBeUndefined();
+      expect(docsSync?.deliverable).toBe('evidence/docs-sync-report.md');
+    }
   });
 });

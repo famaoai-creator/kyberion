@@ -1,0 +1,123 @@
+{
+  "$schema": "../schemas/docs-impact-map.schema.json",
+  "version": "1.0.0",
+  "description": "Changed-path -> documented-surface map consumed by `pnpm check:docs-impact`. A rule names the doc paths a change of that shape is expected to reflect in; the check reports each doc as updated (also in the diff) or not_updated. Rules are advisory — a not_updated finding is closed by updating the doc or by recording why the surface does not apply.",
+  "rules": [
+    {
+      "change": "package.json",
+      "docs": ["docs/CLI_REFERENCE.md", "AGENTS.md"],
+      "note": "package scripts are the operator surface — renamed/added scripts land in the CLI reference and the operating guide"
+    },
+    {
+      "change": "pnpm-workspace.yaml",
+      "docs": ["docs/COMPONENT_MAP.md"],
+      "note": "workspace layout changes land in the component map"
+    },
+    {
+      "change": "knowledge/product/governance/cli-commands.json",
+      "docs": ["docs/CLI_REFERENCE.md"],
+      "note": "command registry — regenerate the CLI reference"
+    },
+    {
+      "change": "knowledge/product/governance/mission-workflow-catalog.json",
+      "docs": [
+        "knowledge/product/orchestration/mission-kickoff-playbook.md",
+        "knowledge/product/governance/phases/"
+      ],
+      "note": "workflow templates define the mission lifecycle — phase docs and the kickoff playbook describe them"
+    },
+    {
+      "change": "knowledge/product/governance/work-scope-policy.json",
+      "docs": [
+        "AGENTS.md",
+        "knowledge/product/architecture/mission-task-classification-roadmap-5.4-mini.md"
+      ],
+      "note": "the mission-gate policy AGENTS.md §2 references"
+    },
+    {
+      "change": "knowledge/product/governance/*.json",
+      "docs": ["knowledge/product/governance/"],
+      "note": "governance policy/data — check the sibling .md and .ja.md docs that describe it"
+    },
+    {
+      "change": "knowledge/product/schemas/*.json",
+      "docs": [],
+      "note": "schemas describe their data files — no separate doc surface"
+    },
+    {
+      "change": "knowledge/product/orchestration/user-facing-vocabulary.json",
+      "docs": [],
+      "note": "help-text source — surfaces through `kyberion --help`, not prose docs"
+    },
+    {
+      "change": "knowledge/product/pipeline-templates/*.json",
+      "docs": ["knowledge/product/governance/phases/"],
+      "note": "phase pipeline templates are referenced from mission phase docs"
+    },
+    {
+      "change": "pipelines/**/*.json",
+      "docs": ["pipelines/README.md"],
+      "note": "every pipeline must be listed in the catalog readme (also enforced by the drift gate)"
+    },
+    {
+      "change": "AGENTS.md",
+      "docs": ["docs/QUICKSTART.md", "docs/GLOSSARY.md"],
+      "note": "operating-guide changes may alter onboarding flow or introduce terms"
+    },
+    {
+      "change": "GOVERNANCE.md",
+      "docs": ["AGENTS.md"],
+      "note": "top-level governance doc and the operating guide must not diverge"
+    },
+    {
+      "change": "scripts/*.ts",
+      "docs": ["docs/CLI_REFERENCE.md"],
+      "note": "script entrypoints that are CLI-registered land in the CLI reference"
+    },
+    {
+      "change": "libs/core/**/*.ts",
+      "docs": ["docs/COMPONENT_MAP.md"],
+      "note": "module additions/moves can shift the layer map"
+    },
+    {
+      "change": "libs/actuators/**/*.ts",
+      "docs": ["CAPABILITIES_GUIDE.md"],
+      "note": "actuator ops change the capability surface"
+    },
+    {
+      "change": ".github/workflows/*.yml",
+      "docs": ["knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md"],
+      "note": "CI gate changes must stay consistent with the pre-PR checklist"
+    },
+    {
+      "change": "docs/**",
+      "docs": [],
+      "note": "documentation change itself"
+    },
+    {
+      "change": "knowledge/**",
+      "docs": [],
+      "note": "knowledge/documentation change itself"
+    }
+  ],
+  "ignore": [
+    "tests/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.test-d.ts",
+    "changelog.d/**",
+    "CHANGELOG.md",
+    "dist/**",
+    "node_modules/**",
+    "coverage/**",
+    "active/**",
+    "evidence/**",
+    "work/**",
+    ".claude/**",
+    ".codex/**",
+    ".devin/**",
+    "pnpm-lock.yaml",
+    "**/*.map",
+    "**/*.snap"
+  ]
+}

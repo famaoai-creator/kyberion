@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
@@ -78,6 +78,11 @@ function request(query = ''): NextRequest {
 }
 
 beforeEach(() => {
+  // Pin "now" near the fixture requested_at (2026-11-05T10:00Z): overdue is
+  // computed against the real clock (NEEDS_YOU_OVERDUE_AFTER_MS = 3 days), so
+  // an unpinned test silently flips as wall time advances.
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-11-05T12:00:00.000Z'));
   invalidateCompanyFanoutCache();
   for (const mock of Object.values(mocks)) mock.mockReset();
   mocks.hygiene.mockReturnValue([]);
@@ -93,6 +98,10 @@ beforeEach(() => {
     outcome_feed: [],
     exception_feed: [],
   });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('GET /api/v1/needs-you/summary', () => {
