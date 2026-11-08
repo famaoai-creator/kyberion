@@ -583,6 +583,17 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
 **Daemon contract.** This applies to every long-running loop: scheduler, supervisor,
 generation-schedule, bridges.
 
+**Detached maintenance lifetime.** `detached: true` changes the OS process group;
+it does not release Node's `ChildProcess` event-loop reference. For explicitly
+background maintenance with ignored stdio and `shutdownPolicy: detached`, call
+the returned child's `unref()` after managed registration. Preserve submission
+markers, supervision, child logs and failure markers. Do not globally unref
+manual/watch children or use `process.exit()` to hide a retained handle. Verify
+the actual baseline call site and natural parent exit with a finite managed
+Node child in `scripts/run_baseline_check.maintenance-submission.test.ts`, then
+run the golden gate under its unchanged deadline. A successful output oracle
+alone does not prove the process exited.
+
 **Windows local IPC ACL.** Node's default named-pipe DACL grants read access to
 Everyone and Anonymous. Every application-owned Windows pipe listener must await
 `restrictWindowsNamedPipeAcl()` before it advertises readiness or processes a
