@@ -4,7 +4,7 @@ category: Orchestration
 tags: [actuator, playground, collaboration, adf, pipeline-promote, procedure, trust]
 importance: 8
 author: Kyberion
-last_updated: 2026-10-31
+last_updated: 2026-11-09
 role_affinity: [ecosystem_architect, mission_controller, operator, researcher]
 phase_affinity: [alignment, execution, review]
 ---
@@ -189,7 +189,29 @@ utterance class. The bar is deliberately high — `shape: pipeline`,
 and a hash-matched successful run — so most actuator work still routes
 through the normal compile path.
 
-## 5. Known gaps (verified 2026-10-26)
+## 5. Dispatch ABI (input vs output)
+
+Two different seams are easy to conflate:
+
+- **Input (`actionInput`, #860)** — optional adapter on
+  `defineCatalogBackedActuator` that shapes what the handler receives.
+  Default is a one-step `{ action: 'pipeline', steps: [...] }` envelope;
+  actuators whose handlers take `{ op, params }` / `{ action, params }`
+  (vcs, calendar, terminal, …) declare `actionInput` and keep that shape.
+  Do not remove it when changing output.
+- **Output (catalog dispatch payload)** — `actuator.dispatch` returns an
+  `ActuatorResult` whose `output` is the **op result**, never a one-step
+  pipeline run report (`status` / `results` / `context` / `total_steps`).
+  The SDK collapses legacy sub-pipeline envelopes: a channel value when
+  `export_as` / `last_capture` / `last_transform` is present, otherwise a
+  branded context patch for ad-hoc keys (`file:exists` → `exists`). The
+  pipeline engine then assigns capture/transform/`export_as` to a context
+  key or merges a patch. PTC `callOp` sees the same channel value.
+
+Follow-up (not this change): migrate remaining ad-hoc context keys onto
+declared channels so context-patch returns become rare. `actionInput` stays.
+
+## 6. Known gaps (verified 2026-10-26)
 
 - `actuator_action` in the execution-shape enum is declarative only — it
   projects to `task_session` and no route handler dispatches a bare actuator
@@ -209,7 +231,7 @@ through the normal compile path.
 - super-nerve `system:shell` execs `zsh -lc` directly, bypassing the
   typed-op/approval machinery it otherwise enforces.
 
-## 6. Failure map (where this flow used to stall)
+## 7. Failure map (where this flow used to stall)
 
 - Playground rejected valid step ops (`Machine mode requires --op`) — fixed by
   merging discovery ops; discovery-only ops on pipeline-accepting actuators
