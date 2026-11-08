@@ -93,7 +93,8 @@ describe('仕事 › 依頼 (/work?tab=requests) contract', () => {
       urls: { concierge: 'https://desk.example.test' },
     });
     expect(fromStudio?.href).toBe('https://desk.example.test/work?tab=requests');
-    const hearing = read('../presence-studio/hearing-routes.ts');
+    // The hand-off step is shared by Studio and Concierge (core hearing session service).
+    const hearing = read('../../../libs/core/surface/hearing-session-service.ts');
     expect(hearing).toMatch(/resolveFrontDeskDestination\('progress'/);
     const page = read('src/app/work/page.tsx');
     expect(page).toMatch(/tab === 'requests' \? \(\s*<RequestsPanel \/>/);
@@ -106,8 +107,8 @@ describe('仕事 › 依頼 (/work?tab=requests) contract', () => {
     // panel lists the local owner's own personal inventory.
     const handoff = read('../../../libs/core/surface/hearing-completion.ts');
     expect(handoff).toContain("url.searchParams.set('tenant', CONCIERGE_PERSONAL_SELECTION)");
-    expect(hearing).toContain(
-      'workInventoryHandoffHref(hearingScopedUrl(progressItem.href, viewer)'
+    expect(hearing).toMatch(
+      /hearingWorkInventoryHandoffHref\(\s*hearingScopedUrl\(progressItem\.href, ctx\.viewer\)/
     );
     const candidates = read('src/app/api/work-inventory/candidates/route.ts');
     expect(candidates).toContain("const personalView = resolved.selection.mode === 'personal'");
