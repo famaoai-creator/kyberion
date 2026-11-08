@@ -36,7 +36,7 @@ import {
 } from '@agent/core/surface/surface-conversation-runtime-context';
 import { resolveSurfaceBrowserUrl } from '@agent/core/surface/surface-url';
 import { loadStandardIntentCatalog } from '@agent/core/intent/intent-resolution';
-import { resolveIntentLabel, viewFromIntentResolution } from './ask-view.js';
+import { resolveIntentLabel, viewFromIntentResolution } from '@agent/core/surface/ask-view';
 import {
   PresenceStudioViewerError,
   resolvePresenceStudioViewerContext,

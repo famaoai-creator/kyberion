@@ -63,17 +63,17 @@ import {
   toFrontDeskViewerScope,
   type PresenceStudioViewerContext,
 } from './security.js';
-import { hearingNamespace, saveHearingRecord } from './hearing-runtime.js';
+import { hearingNamespace, saveHearingRecord } from '@agent/core/surface/hearing-runtime';
 import { resolveHearingRequestViewer } from './hearing-request-scope.js';
 import { hearingStorageForViewer } from './hearing-storage-access.js';
-import { renderLedgerProjectionCanvas } from './hearing-ledger-canvas.js';
+import { renderLedgerProjectionCanvas } from '@agent/core/surface/hearing-ledger-canvas';
 import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
 import {
   HEARING_SAFE_ID_PATTERN,
   type HearingDecidedBy,
   type HearingRecord,
   type HearingScenario,
-} from './hearing.js';
+} from '@agent/core/surface/hearing';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
 
 /** Runtime wiring of this surface to the governed facade — the one place these values live. */

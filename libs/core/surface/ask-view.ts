@@ -1,13 +1,13 @@
 /** Pure Ask view projection. Next actions only describe bounded editable drafts.
  * They carry no approval or execution authority; the enclosing durable HTTP
  * reply supplies request/session provenance separately. */
-import { isRecord } from '@agent/core/foundation/primitives';
+import { isRecord } from '../foundation/primitives.js';
 import {
   parseIntentResolutionContract,
   type IntentResolutionContract,
   type IntentResolutionShape,
-} from '@agent/core/intent/intent-resolution-contract-parser';
-import type { VocabularyKey } from '@agent/core/t';
+} from '../intent/intent-resolution-contract-parser.js';
+import type { VocabularyKey } from '../localization/t.js';
 
 export type AskConversationShape =
   'clarification' | 'execution_preview' | 'status_summary' | 'delivery_summary' | 'reply';
@@ -19,12 +19,13 @@ export type AskConversationShape =
  * even though those already cover all four `IntentResolutionShape` values:
  * their English text for `mission` is the literal word "mission", which
  * `docs/developer/improvement-plans-2026-08/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md`
- * §0 item 2 explicitly bans from the front-desk human surfaces (`front-desk-routes.test.ts`
- * enforces this at the source-file level for `static/ask.js`). Declared as
- * an exhaustive `Record` over `IntentResolutionShape` so a new enum member
- * fails `tsc` here before it can render as a raw internal id in
- * `static/ask.js`, which mirrors this exact map as `SHAPE_LABEL_KEY` (a
- * plain browser script cannot import this module — see its own module doc).
+ * §0 item 2 explicitly bans from the front-desk human surfaces (presence-studio's
+ * `front-desk-routes.test.ts` enforces this at the source-file level for
+ * `presence/displays/presence-studio/static/ask.js`). Declared as an exhaustive
+ * `Record` over `IntentResolutionShape` so a new enum member fails `tsc` here
+ * before it can render as a raw internal id in that `static/ask.js`, which
+ * mirrors this exact map as `SHAPE_LABEL_KEY` (a plain browser script cannot
+ * import this module — see its own module doc). Used by: Studio, Concierge (next).
  */
 export const ASK_SHAPE_LABEL_KEY: Record<IntentResolutionShape, VocabularyKey> = {
   direct_answer: 'front_desk:shape_direct_answer',
@@ -66,8 +67,9 @@ export interface AskIntentLabel {
  * FD-09: resolve `normalized_intent` to human wording for the "What I
  * understood" block — the standard-intent catalog's own `description` when
  * the id is registered there, else a humanized slug as a last resort. Pure:
- * the caller (`server.ts`) passes in whatever catalog lookup it already
- * built from `loadStandardIntentCatalog()` so this module stays I/O-free.
+ * the caller (presence-studio `conversation-routes.ts`) passes in whatever
+ * catalog lookup it already built from `loadStandardIntentCatalog()` so this
+ * module stays I/O-free. Used by: Studio, Concierge (next).
  */
 export function resolveIntentLabel(
   normalizedIntent: string,
@@ -110,6 +112,8 @@ function draftAction(
   };
 }
 
+/** Bounded editable-draft view of an intent resolution (distinct from the plain
+ * label projection in `front-desk-request-projection.ts`). Used by: Studio, Concierge (next). */
 export function viewFromIntentResolution(contract: IntentResolutionContract): AskConversationView {
   if (contract.authority_level === 'human_clarification_required') {
     const action =
