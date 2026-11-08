@@ -696,7 +696,7 @@ export function mapActuatorDispatchOutputToContext(
   if (output && typeof output === 'object' && !Array.isArray(output)) {
     return { ...ctx, ...(output as Record<string, unknown>) };
   }
-  return { ...ctx, [params.export_as || 'last_actuator_result']: output };
+  return { ...ctx, [explicitExport || 'last_actuator_result']: output };
 }
 
 export async function loadActuatorDispatch(
