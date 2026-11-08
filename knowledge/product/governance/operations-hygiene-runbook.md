@@ -190,6 +190,8 @@ had regressed.
 
 ## §1 CI workflows
 
+Generated Markdown that a commit hook formats must use the same repository Prettier configuration in its canonical generator. Verify formatter idempotence and rerun the generator in check mode after formatting; do not bypass hooks or weaken byte-comparison gates to ship generated inventory. The component inventory generator enforces this with `scripts/sync_component_inventory.contract.test.ts`.
+
 **Compiler readiness and recovery accounting.** `pnpm build`, `pnpm build:packages` and
 `pnpm build:repo` enter the source-only `scripts/build_repository.ts` bootstrap. The compiler
 writer and L2 baseline scanner share the `compiler-outputs` mutex; standalone clean uses the

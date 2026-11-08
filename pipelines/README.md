@@ -189,10 +189,11 @@ The three cadence pipelines above (`organization-operation-tick`, `organization-
 
 ### Source Engineering
 
-| Pipeline                          | Description                                                                                                                                                                                               |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `source-to-engineering-artifacts` | Analyze a workspace source tree and emit an evidence-backed design document, test inventory, safe test scenario pipeline, and proposal-only IaC artifacts under governed active storage.                  |
-| `agentic-source-code-review`      | Generate a threat-model plan first; only after explicit human approval does it run scoped static analysis, multi-perspective hypotheses, and independent critique. PoC and remediation remain human-only. |
+| Pipeline                          | Description                                                                                                                                                                                                                                               |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `source-to-engineering-artifacts` | Analyze a workspace source tree and emit an evidence-backed design document, test inventory, safe test scenario pipeline, and proposal-only IaC artifacts under governed active storage.                                                                  |
+| `document-review`                 | Bounded isolated comprehension review of an explicit document and references; design preset adds readiness and source drift. Returns tier-preserving report in `document_review`; caller persists it with `writeScopedArtifact` under its governed scope. |
+| `agentic-source-code-review`      | Generate a threat-model plan first; only after explicit human approval does it run scoped static analysis, multi-perspective hypotheses, and independent critique. PoC and remediation remain human-only.                                                 |
 
 Example:
 

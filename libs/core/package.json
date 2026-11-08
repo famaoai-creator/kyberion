@@ -7735,6 +7735,10 @@
     "./workspace-sweep": {
       "types": "./dist/workforce/workspace-sweep.d.ts",
       "default": "./dist/workforce/workspace-sweep.js"
+    },
+    "./document-review": {
+      "types": "./dist/workforce/document-review.d.ts",
+      "default": "./dist/workforce/document-review.js"
     }
   },
   "dependencies": {
