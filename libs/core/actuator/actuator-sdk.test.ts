@@ -4,6 +4,9 @@ import {
   buildSingleOpPipelinePayload,
   defineActuator,
   defineCatalogBackedActuator,
+  isActuatorContextPatch,
+  KYBERION_CONTEXT_PATCH_BRAND,
+  normalizeCatalogDispatchOutput,
   planActuatorDryRun,
   resolveCliActionKind,
   runAdfActuatorPipeline,
@@ -574,5 +577,67 @@ describe('actuator SDK', () => {
         execute: async (_op, context) => context,
       })
     ).rejects.toThrow('[SAFETY_LIMIT] Pipeline execution timed out (-1ms)');
+  });
+
+  it('normalizes catalog run envelopes into channel values or context patches', () => {
+    const envelope = {
+      status: 'succeeded',
+      results: [{ op: 'json_query', status: 'success' }],
+      context: { seed: 1, got: 'accepted', last_transform: 'accepted' },
+      total_steps: 1,
+    };
+    expect(
+      normalizeCatalogDispatchOutput(envelope, 'transform', { export_as: 'got' })
+    ).toBe('accepted');
+    expect(normalizeCatalogDispatchOutput(envelope, 'transform', {})).toBe('accepted');
+    const patch = normalizeCatalogDispatchOutput(
+      {
+        status: 'succeeded',
+        results: [],
+        context: { exists: true },
+        total_steps: 1,
+      },
+      'capture',
+      {}
+    );
+    expect(isActuatorContextPatch(patch)).toBe(true);
+    expect(patch).toMatchObject({
+      [KYBERION_CONTEXT_PATCH_BRAND]: true,
+      exists: true,
+    });
+    expect(
+      normalizeCatalogDispatchOutput({ op: 'log', output: 'x' }, 'capture', {})
+    ).toEqual({ op: 'log', output: 'x' });
+  });
+
+  it('strips run envelopes from defineCatalogBackedActuator dispatch output', async () => {
+    const actuator = defineCatalogBackedActuator({
+      id: 'envelope-demo',
+      describeOps: () => [{ op: 'probe', kind: 'capture' as const }],
+      handleAction: () => ({
+        status: 'succeeded',
+        results: [{ op: 'probe', status: 'success' }],
+        context: { last_capture: { ok: true }, noise: 1 },
+        total_steps: 1,
+      }),
+    });
+    await expect(actuator.dispatch('probe', {})).resolves.toMatchObject({
+      ok: true,
+      output: { ok: true },
+    });
+
+    const adHoc = defineCatalogBackedActuator({
+      id: 'adhoc-demo',
+      describeOps: () => [{ op: 'exists', kind: 'capture' as const }],
+      handleAction: () => ({
+        status: 'succeeded',
+        results: [],
+        context: { exists: true },
+        total_steps: 1,
+      }),
+    });
+    const adHocResult = await adHoc.dispatch('exists', {});
+    expect(adHocResult.ok).toBe(true);
+    expect(isActuatorContextPatch(adHocResult.output)).toBe(true);
   });
 });

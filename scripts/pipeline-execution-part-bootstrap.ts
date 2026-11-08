@@ -18,6 +18,11 @@ import {
   determineActuatorStepType,
   resolveActuatorOperation,
 } from '@agent/core/actuator/actuator-op-registry';
+import {
+  isActuatorContextPatch,
+  isPipelineRunEnvelope,
+  stripActuatorContextPatchBrand,
+} from '@agent/core/actuator/actuator-sdk';
 import { checkActuatorCapabilities } from '@agent/core/actuator/actuator-capability';
 import { validateOpInput } from '@agent/core/pipeline/op-input-contracts';
 import { getRegisteredEnv } from '@agent/core/foundation/env';
@@ -630,6 +635,58 @@ export function resolveReasoningContextParam(
   return params.context ?? ctx;
 }
 
+/**
+ * ADF engine routing collapses capture/transform into `apply` via
+ * `prepareEngineSteps`. Recover the catalog kind for channel assignment.
+ */
+export function resolveSemanticActuatorStepKind(
+  domain: string,
+  op: string,
+  engineType: string | undefined
+): string | undefined {
+  if (engineType === 'capture' || engineType === 'transform' || engineType === 'control') {
+    return engineType;
+  }
+  try {
+    return determineActuatorStepType(domain, op);
+  } catch {
+    return engineType;
+  }
+}
+
+/**
+ * Map normalized actuator SDK output onto pipeline context.
+ * Expects payload / context-patch (never a run envelope — SDK strips those).
+ */
+export function mapActuatorDispatchOutputToContext(
+  ctx: Record<string, unknown>,
+  output: unknown,
+  type: string | undefined,
+  params: Record<string, unknown>
+): Record<string, unknown> {
+  if (isPipelineRunEnvelope(output)) {
+    throw new Error(
+      '[ACTUATOR_OUTPUT_ENVELOPE] Catalog dispatch returned a pipeline run envelope; normalize at the SDK boundary'
+    );
+  }
+  if (isActuatorContextPatch(output)) {
+    return { ...ctx, ...stripActuatorContextPatchBrand(output) };
+  }
+  const explicitExport =
+    typeof params.export_as === 'string' && params.export_as.trim()
+      ? params.export_as.trim()
+      : undefined;
+  if (explicitExport || type === 'capture' || type === 'transform') {
+    const exportKey =
+      explicitExport || (type === 'transform' ? 'last_transform' : 'last_capture');
+    return { ...ctx, [exportKey]: output };
+  }
+  if (output && typeof output === 'object' && !Array.isArray(output)) {
+    return { ...ctx, ...(output as Record<string, unknown>) };
+  }
+  return { ...ctx, [params.export_as || 'last_actuator_result']: output };
+}
+
 export async function loadActuatorDispatch(
   domain: string,
   resolvedOperation?: ReturnType<typeof resolveActuatorOperation>
@@ -792,12 +849,10 @@ export async function loadActuatorDispatch(
         );
       }
       const output = sdkResult.output;
+      const semanticType = resolveSemanticActuatorStepKind(domain, op, type);
       result = {
         handled: true,
-        ctx:
-          output && typeof output === 'object' && !Array.isArray(output)
-            ? { ...ctx, ...(output as Record<string, unknown>) }
-            : { ...ctx, [params.export_as || 'last_actuator_result']: output },
+        ctx: mapActuatorDispatchOutputToContext(ctx, output, semanticType, params),
       };
     } catch (err) {
       throw err; // Ensure error propagates out of dispatch

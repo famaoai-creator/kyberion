@@ -623,6 +623,48 @@ describe('run_pipeline compatibility', () => {
     );
   });
 
+  it('lands system:json_query on export_as as a channel value (not a run envelope)', async () => {
+    const result = await runSteps(
+      [
+        {
+          id: 'query',
+          op: 'system:json_query',
+          params: { from: 'seed_data', path: 'status', export_as: 'got' },
+        },
+      ],
+      { seed_data: { status: 'accepted' } },
+      { quiet: true }
+    );
+    expect(result.status).toBe('succeeded');
+    expect(result.context.got).toBe('accepted');
+    expect(result.context).not.toEqual(
+      expect.objectContaining({
+        got: expect.objectContaining({
+          status: expect.anything(),
+          results: expect.anything(),
+          total_steps: expect.anything(),
+        }),
+      })
+    );
+  });
+
+  it('merges file:exists into context without requiring last_capture', async () => {
+    const result = await runSteps(
+      [
+        {
+          id: 'probe',
+          op: 'file:exists',
+          params: { path: pathResolver.rootResolve('package.json') },
+        },
+      ],
+      {},
+      { quiet: true }
+    );
+    expect(result.status).toBe('succeeded');
+    expect(result.context.exists).toBe(true);
+    expect(result.context.last_capture).toBeUndefined();
+  });
+
   it('executes direct commands without shell expansion', async () => {
     const result = await runSteps([
       {

@@ -4,7 +4,7 @@ category: Orchestration
 tags: [actuator, playground, collaboration, adf, pipeline-promote, procedure, trust]
 importance: 8
 author: Kyberion
-last_updated: 2026-10-31
+last_updated: 2026-11-09
 role_affinity: [ecosystem_architect, mission_controller, operator, researcher]
 phase_affinity: [alignment, execution, review]
 ---
@@ -147,7 +147,27 @@ Trust: `pipelines/` と templates 以外は `[TRUST_REQUIRED]` で失敗しま�
 スケジュールは `schedule{id,cron,timezone,enabled}` ブロックと
 `pnpm kyberion schedule register` が別途必要です。
 
-## 5. 詰まり地図（今回直した箇所）
+## 5. Dispatch ABI（入力と出力）
+
+混同しやすい2つの seam:
+
+- **入力（`actionInput`、#860）** — `defineCatalogBackedActuator` のオプション。
+  handler が受け取る形を決める。既定は one-step pipeline envelope。
+  `{ op, params }` / `{ action, params }` を取る actuator（vcs / calendar /
+  terminal など）は `actionInput` を宣言してその形を維持する。出力変更の
+  ついでに撤去しない。
+- **出力（catalog dispatch payload）** — `actuator.dispatch` の `output` は
+  **op の結果**であり、one-step の pipeline run レポート（`status` /
+  `results` / `context` / `total_steps`）ではない。SDK がレガシー envelope
+  を剥がし、`export_as` / `last_capture` / `last_transform` があればその
+  channel 値、なければ ad-hoc キー用の branded context patch（例:
+  `file:exists` → `exists`）を返す。エンジンは channel 載せか merge のみ。
+  PTC の `callOp` も同じ channel 値を見る。
+
+follow-up（今回外）: 残る ad-hoc context キーを宣言 channel へ寄せて
+context-patch を減らす。`actionInput` は維持。
+
+## 6. 詰まり地図（今回直した箇所）
 
 - playground が正当な step op を拒否（`Machine mode requires --op`）—
   discovery マージ＋ pipeline 受付型の自動包みで解消。

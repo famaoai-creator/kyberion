@@ -56,6 +56,7 @@ import {
   assertPipelineExecutionCurrent,
   PipelineSuspendedError,
   resolveStepType,
+  resolveSemanticActuatorStepKind,
   resolveExportKey,
   buildReasoningPolicyNote,
   resolvePipelineReasoningOptions,
@@ -1420,16 +1421,17 @@ async function dispatchResolvedActuatorOperation(
     throw new Error(`Unsupported pipeline op: ${step.op}`);
   }
 
-  // CRITICAL: Safety check for source (capture) ops.
-  // Resolve export key via produces > params.export_as > default.
-  if (effectiveType === 'capture') {
+  // CRITICAL: Safety check for source (capture) ops that declared a channel.
+  // Use registry semantics — prepareEngineSteps collapses capture → apply.
+  // Legacy ad-hoc captures (e.g. file:exists → `exists`) land via context patch
+  // without last_capture; only enforce when produces / export_as asked for a key.
+  const semanticType = resolveSemanticActuatorStepKind(domain, action, effectiveType);
+  if (semanticType === 'capture') {
     const exportKey = resolveExportKey(step, 'last_capture');
-    const actualCtx =
-      result.ctx && typeof result.ctx === 'object' && 'context' in result.ctx
-        ? (result.ctx as any).context
-        : result.ctx;
-    const data = actualCtx[exportKey];
-    if (data === undefined) {
+    const declaredChannel =
+      Boolean(step.produces) ||
+      (typeof params.export_as === 'string' && params.export_as.trim().length > 0);
+    if (declaredChannel && result.ctx?.[exportKey] === undefined) {
       logger.warn(
         `  [SYS_PIPELINE] Source op ${step.op} returned no data for channel: ${exportKey}.`
       );
@@ -1439,9 +1441,6 @@ async function dispatchResolvedActuatorOperation(
     }
   }
 
-  if (result.ctx && typeof result.ctx === 'object' && 'context' in result.ctx) {
-    return result.ctx.context as Record<string, unknown>;
-  }
   return result.ctx;
 }
 
