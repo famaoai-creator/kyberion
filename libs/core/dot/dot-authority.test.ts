@@ -31,6 +31,31 @@ const dot: DotCharter = {
 };
 const savedPersona = process.env.KYBERION_PERSONA;
 const savedRole = process.env.MISSION_ROLE;
+describe('DOT execution role boundary', () => {
+  it.each([
+    'dot_result_writer',
+    'dot_lifecycle_writer',
+    'dot_charter_store',
+    'dot_lifecycle_runtime_store',
+  ])('rejects programmatic store role %s even without an accountability ref', (role) => {
+    expect(() =>
+      assertDotAccountabilityCharter({
+        ...dot,
+        authority: { authority_role: role },
+      })
+    ).toThrow(`${role} is an internal store role`);
+  });
+
+  it('allows an ordinary worker role without an optional accountability ref', () => {
+    expect(() =>
+      assertDotAccountabilityCharter({
+        ...dot,
+        authority: { authority_role: 'infrastructure_sentinel' },
+      })
+    ).not.toThrow();
+  });
+});
+
 afterEach(() => {
   if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
   else process.env.KYBERION_PERSONA = savedPersona;

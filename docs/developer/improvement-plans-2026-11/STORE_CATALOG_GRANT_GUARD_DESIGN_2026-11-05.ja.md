@@ -1488,6 +1488,40 @@ secure-io の 40 以下は別の段階）。上の表は G0 の時点の見込�
     権限・resource ceiling を保つ。system producer 権限と confidential tenant-container の権限は
     別に検査し、保護された来歴を混合テナントのエラー詳細から漏らさない。
 
+**流れの分解（MSN-SCOPE-FLOWDECOMP-20261107、決めたこと）。**
+
+- **`dot_lifecycle_writer` を分解した。** 旧ロールは `dots/`・`knowledge/confidential/<tenant>/dots/`・
+  `knowledge/personal/dots/<hash>/` の 3 custody の契約書と、`active/shared/runtime/` 全体を含む
+  実行時面を 1 つのロールで書いていた。`dot-lifecycle.ts` の各操作の内側で
+  `withExecutionContext` を呼ぶ形（旧 `CHARTER_WRITER_ROLE` 方式）はそのままに、ロールを 2 つに分けた:
+  - `dot_charter_store` — 契約書の読み書き（3 custody 全部）と、移行判定が要る検証の読み取り
+    （`tenants/<t>.json`・組織の運用状態・`runtime/projects/`）。confidential custody は契約書の
+    テナントを束縛し、personal / system custody は ambient 束縛を `''`（tenantCleared）で明示
+    クリアする。`narrow` 宣言で `dots/**/*.json` 系への書き込みだけに絞る。
+  - `dot_lifecycle_runtime_store` — ライフサイクルの監査台帳
+    （`active/shared/runtime/dot-lifecycle-audit.jsonl`）、起動 heartbeat
+    （`runtime/heartbeats/`）、event-continuation 状態（`runtime/dot/<…>/event-continuations/`・
+    `events.jsonl`）。`narrow` の `only.write`/`only.mkdir` がこの 3 系統（と fixture ルート
+    `active/shared/tmp/` 下の同型ミラー）以外の書き込みを `[DOT_LIFECYCLE_RUNTIME_SCOPE]` で
+    拒否する。
+  - inter-process のロック（`active/shared/runtime/locks/`）は worker の ambient ロール
+    `dot_lifecycle_worker` の既存 grant で取り、2 つの store ロールには持たせない — facade が
+    ロックを ambient で取得してから store ロールを引き受ける順序にした。
+  - 旧名は `RETIRED_STORE_ROLE_NAMES` 入り（引き受けは `[ROLE_ASSUMPTION_DENIED]` で拒否）。
+    `dot_lifecycle_worker` の `may_assume` は新しい 2 ロールに差し替え。
+- **`concierge_management_writer` はロールのまま残す（第 2 段階ブロッカー 3 件）。** ただし第 1 段階は
+  完了済み: `authority.ts` の引き受けゲートが、reader には「読み取りだけの tenant 許可証」、writer には
+  「tenant + organization が一致する許可証」を `[RESOURCE_SCOPE_REQUIRED]` で強制する。ロールを外すには
+  (1) `allow_read`/`allow_write` の宣言が担う tier-guard の祖先 mkdir・coverage 規則を許可証側の
+  宣言に移す、(2) `${KYBERION_ORGANIZATION_ID}` 展開が要る「引き受け中のロール」を許可証の
+  実行スコープで表す、(3) 下流が読む assumed role/persona（project-view・子プロセス/監査）を
+  許可証の属性に移す、の 3 件が要る。
+- **横断して読むロール 3 件は残す（P4 の判断を確認）。** 役割ごとの強制状態:
+  `concierge_management_reader` は許可証必須（第 1 段階済み）、`peer_responder_reader` は
+  `TENANT_BOUND_READER_ROLES` の tenant 束縛強制、`workspace_graph_reader` は意図的な
+  プロセス横断読みで P4 の viewer admission が行を絞る。保存先レベルの許可証化は P4 の開示層とは
+  別の段階の仕事。
+
 ## スコープモデルとの対応
 
 | スコープモデル                       | この設計                                              |
@@ -1506,6 +1540,14 @@ secure-io の 40 以下は別の段階）。上の表は G0 の時点の見込�
 - 明示された役割の I/O は policy 欠落・破損時に `[ROLE_NARROWING_POLICY_UNAVAILABLE]` で拒否する。役割なし bootstrap は従来の残余判定を維持する。
 - 1 回の I/O の narrow・基本権限・structural mkdir は、遅延読込みした同じ policy snapshot を使う。異なる版の許可条件を組み合わせない。
 - 回帰検証は `role-narrowing-denial.test.ts`、`tier-guard-policy-corruption.test.ts`、`resource-access-scope.test.ts` で、正常な宣言と不正入力・policy 変更／欠落の双方を確認する。
+
+## FLOWDECOMP 統合レビュー（2026-11-08）
+
+- PR1453 の実際の親は修正前の `e45fc85f`。今回の追加差分だけを分類済み main に移し、旧 audit sink・遅延監査・flat module への巻き戻りを除いた。sink adapter の差分は現行の同期監査には不要なため取り込まない。
+- 内部用の `dot_charter_store` / `dot_lifecycle_runtime_store` と退役済み `dot_lifecycle_writer` は、schema・通常の契約検証・型付き runtime の入口で実行ロールへの指定を拒否する。既存の `dot_result_writer` 拒否も共有する。
+- runtime の機密データは guard 内で knowledge tier へ投影して判定される。用途別の物理パス制限に加え、必要な personal / 自テナント confidential の投影先許可を宣言した。`only.read` / `metadata` / `write` / `mkdir` により実際の knowledge ファイルにはこの許可を利用できない。
+- 実テストでは tenant 未指定の越境と通常 worker のロック失敗は再現せず、これらの初期指摘は撤回した。generic matcher やロック用ロールは追加していない。
+- 回帰は通常 worker で、内部ロール指定の拒否、正当なロールの許可、cold な confidential / personal 書き込み、実 knowledge と他テナントの拒否、symlink 迂回による元データ不変を確認する。
 
 ## 非目標
 
