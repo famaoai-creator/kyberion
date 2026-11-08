@@ -1580,6 +1580,10 @@
       "types": "./dist/foundation/env.d.ts",
       "default": "./dist/foundation/env.js"
     },
+    "./foundation/env-dotenv": {
+      "types": "./dist/foundation/env-dotenv.d.ts",
+      "default": "./dist/foundation/env-dotenv.js"
+    },
     "./foundation/governed-catalog": {
       "types": "./dist/foundation/governed-catalog.d.ts",
       "default": "./dist/foundation/governed-catalog.js"

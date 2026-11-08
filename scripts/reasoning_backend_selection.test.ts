@@ -19,8 +19,12 @@ describe('reasoning_backend_selection', () => {
   });
 
   it('uses the foundation reader for persisted operator preferences', () => {
-    const source = readTextFile(pathResolver.rootResolve('scripts/reasoning_backend_selection.ts'));
-    expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");
+    const source = readTextFile(pathResolver.rootResolve('libs/core/foundation/env-dotenv.ts'));
+    expect(source).toContain("import { readTextFile } from './text.js'");
+    const scriptSource = readTextFile(
+      pathResolver.rootResolve('scripts/reasoning_backend_selection.ts')
+    );
+    expect(scriptSource).not.toContain('node:fs');
   });
 
   it('derives the catalog from the reasoning-backend policy (LC-04c SSoT)', () => {
