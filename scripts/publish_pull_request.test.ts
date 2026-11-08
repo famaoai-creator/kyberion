@@ -539,6 +539,55 @@ describe('publication check concurrency', () => {
     expect(print).toHaveBeenLastCalledWith('[pr:publish] PR readiness gate passed.');
   });
 
+  it.each(['string', 'buffer'])(
+    'retains complete failed gate stdout as %s and rethrows the same cause',
+    (kind) => {
+      const stdout = [
+        '[check] scope=changed gates=97 failed=1',
+        '- FAILED first-gate',
+        ...Array.from({ length: 80 }, (_, index) => 'later diagnostic ' + index),
+        '- PASSED final-gate',
+      ].join('\n');
+      const cause = Object.assign(new Error('stderr-only process failure'), {
+        stdout: kind === 'buffer' ? Buffer.from(stdout) : stdout,
+      });
+      mocks.safeExec.mockImplementation(() => {
+        throw cause;
+      });
+      const print = vi.fn();
+      let caught: unknown;
+      try {
+        runPrePrReadiness(print);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBe(cause);
+      expect(print).toHaveBeenCalledWith(stdout);
+      expect(print.mock.calls.map(([line]) => line).join('\n')).toContain('- FAILED first-gate');
+      expect(print).not.toHaveBeenCalledWith('[pr:publish] PR readiness gate passed.');
+    }
+  );
+
+  it.each([undefined, '', Buffer.alloc(0)])(
+    'preserves readiness errors without nonempty stdout: %s',
+    (stdout) => {
+      const cause = Object.assign(new Error('readiness failure'), { stdout });
+      mocks.safeExec.mockImplementation(() => {
+        throw cause;
+      });
+      const print = vi.fn();
+      let caught: unknown;
+      try {
+        runPrePrReadiness(print);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBe(cause);
+      expect(print).toHaveBeenCalledOnce();
+      expect(print).not.toHaveBeenCalledWith('[pr:publish] PR readiness gate passed.');
+    }
+  );
+
   it('diffs the changed-path readiness gate against origin/<base> when --base is given', () => {
     expect(buildReadinessCheckArgs(undefined, 'main')).toEqual([
       'check',
