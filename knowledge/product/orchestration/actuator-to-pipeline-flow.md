@@ -134,10 +134,11 @@ When the draft declares `{{placeholders}}`, the run card appends the matching
   stub chain when there is no WorkItem credential binding, instead of
   stopping on `CREDENTIAL_BINDING_REQUIRED`. Steps that _do_ need reasoning /
   voice / secrets still require a claimed WorkItem binding.
-- **Capture channel.** Catalog-backed capture/transform outputs land on
-  `last_capture` / `last_transform` (or `params.export_as`). Prefer concrete
-  params when recording (e.g. `vcs:log` with `{"limit":5,"oneline":true}`) so
-  the draft is reviewable before promote.
+- **Capture channel.** Bare action payloads (e.g. `vcs:log`) land on
+  `last_capture` / `last_transform` (or `params.export_as`). One-step pipeline
+  envelopes still unwrap via `.context` so PTC / `system:json_query` keep
+  working. Prefer concrete params when recording (e.g. `vcs:log` with
+  `{"limit":5,"oneline":true}`) so the draft is reviewable before promote.
 - **Edits invalidate trust.** Any byte change to the ADF needs a new
   `--request-trust` / approval before `--project-trust-approval` will accept
   it again.
@@ -303,8 +304,12 @@ through the normal compile path.
   degrade reasoning instead of requiring a WorkItem binding just to run
   `vcs:log`.
 - Catalog-backed capture steps returned a payload object but left
-  `last_capture` empty — fixed by mapping capture/transform SDK outputs onto
-  `last_capture` / `last_transform` (or `export_as`).
+  `last_capture` empty — fixed by mapping bare action payloads onto
+  `last_capture` / `last_transform` (or `export_as`). A first cut that also
+  wrapped one-step pipeline envelopes under the channel key broke
+  `core:ptc`/`system:json_query` (envelope must keep its `.context` unwrap);
+  the engine now branches on output shape. Converging the SDK onto
+  payload-only dispatch results is a follow-up.
 - `pipeline:promote --tenant` from another checkout failed with missing ADF /
   journal / personal tenant profile — documented in §2 tenant-trial notes
   (same root, copy profile, set `MISSION_ROLE`/`KYBERION_PERSONA`).

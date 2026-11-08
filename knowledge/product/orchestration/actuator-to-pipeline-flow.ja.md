@@ -102,10 +102,11 @@ tenant-bound の `actuator_playground_worker` ロールで動きます（media s
   モデル不要です。WorkItem の credential binding が無くても stub reasoning に
   degrade して進み、`CREDENTIAL_BINDING_REQUIRED` で止まらせません。reasoning /
   voice / secrets が必要なステップは従来どおり claimed WorkItem が必要です。
-- **capture チャネル。** catalog-backed の capture/transform 出力は
+- **capture チャネル。** bare action payload（例: `vcs:log`）は
   `last_capture` / `last_transform`（または `params.export_as`）に載ります。
-  記録時は具体的な params を好みます（例: `vcs:log` は
-  `{"limit":5,"oneline":true}`）— promote 前に draft をレビューしやすくするため。
+  one-step pipeline envelope は `.context` unwrap のままなので PTC /
+  `system:json_query` も動きます。記録時は具体的な params を好みます
+  （例: `vcs:log` は `{"limit":5,"oneline":true}`）。
 - **編集は trust を無効化。** ADF のバイトが変わったら、再度
   `--request-trust` / 承認が必要です。
 
@@ -218,8 +219,11 @@ Trust: `pipelines/` と templates 以外は `[TRUST_REQUIRED]` で失敗しま�
   `pnpm kyberion approvals --approve`（TTY）を案内。actuator-only draft は
   WorkItem binding 無しでも stub reasoning に degrade。
 - catalog-backed capture が payload を返しても `last_capture` が空 —
-  capture/transform 出力を `last_capture` / `last_transform`（または
-  `export_as`）へ載せるよう修正。
+  bare payload を `last_capture` / `last_transform`（または `export_as`）へ
+  載せるよう修正。envelope ごとチャネルに載せた初版は
+  `core:ptc`/`system:json_query` を壊したため、output 形で分岐
+  （envelope は `.context` unwrap を維持）。SDK を payload 一本化するのは
+  後続。
 - 別 checkout からの `pipeline:promote --tenant` が ADF / journal /
   personal tenant profile 欠落で失敗 — §2 の tenant 試行メモに同 root・
   profile コピー・`MISSION_ROLE`/`KYBERION_PERSONA` を記載。

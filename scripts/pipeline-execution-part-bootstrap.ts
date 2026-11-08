@@ -630,6 +630,75 @@ export function resolveReasoningContextParam(
   return params.context ?? ctx;
 }
 
+/** One-step catalog sub-pipeline result still returned by many actuators. */
+export function isPipelineRunEnvelope(output: unknown): output is {
+  status: unknown;
+  results: unknown;
+  context: Record<string, unknown>;
+  total_steps: unknown;
+} {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return false;
+  const record = output as Record<string, unknown>;
+  return (
+    Object.hasOwn(record, 'status') &&
+    Object.hasOwn(record, 'results') &&
+    Object.hasOwn(record, 'total_steps') &&
+    !!record.context &&
+    typeof record.context === 'object' &&
+    !Array.isArray(record.context)
+  );
+}
+
+/**
+ * ADF engine routing collapses capture/transform into `apply` via
+ * `prepareEngineSteps` / `resolveEngineStepType`. Recover the catalog kind so
+ * payload mapping still targets `last_capture` / `last_transform`.
+ */
+export function resolveSemanticActuatorStepKind(
+  domain: string,
+  op: string,
+  engineType: string | undefined
+): string | undefined {
+  if (engineType === 'capture' || engineType === 'transform' || engineType === 'control') {
+    return engineType;
+  }
+  try {
+    return determineActuatorStepType(domain, op);
+  } catch {
+    return engineType;
+  }
+}
+
+/**
+ * Map an actuator SDK `output` onto pipeline context. Envelope outputs keep
+ * their shape for the downstream `.context` unwrap; bare payloads land on the
+ * capture/transform channel (or `export_as`).
+ */
+export function mapActuatorDispatchOutputToContext(
+  ctx: Record<string, unknown>,
+  output: unknown,
+  type: string | undefined,
+  params: Record<string, unknown>
+): Record<string, unknown> {
+  if (isPipelineRunEnvelope(output)) {
+    // Preserve top-level `context` so dispatchResolvedActuatorOperation can
+    // unwrap the sub-pipeline's channel map (including PTC `__ptc_result_*`).
+    return { ...ctx, ...(output as Record<string, unknown>) };
+  }
+  const explicitExport =
+    typeof params.export_as === 'string' && params.export_as.trim()
+      ? params.export_as.trim()
+      : undefined;
+  if (explicitExport || type === 'capture' || type === 'transform') {
+    const exportKey = explicitExport || (type === 'transform' ? 'last_transform' : 'last_capture');
+    return { ...ctx, [exportKey]: output };
+  }
+  if (output && typeof output === 'object' && !Array.isArray(output)) {
+    return { ...ctx, ...(output as Record<string, unknown>) };
+  }
+  return { ...ctx, [params.export_as || 'last_actuator_result']: output };
+}
+
 export async function loadActuatorDispatch(
   domain: string,
   resolvedOperation?: ReturnType<typeof resolveActuatorOperation>
@@ -792,30 +861,22 @@ export async function loadActuatorDispatch(
         );
       }
       const output = sdkResult.output;
-      // Catalog-backed actuators return the action payload (e.g. `{ op, cwd,
-      // output }` for vcs:log). Capture / transform steps must land on the
-      // pipeline channel the engine checks (`last_capture` / `last_transform`),
-      // not by spreading payload keys into the context. Prefer an explicit
-      // export_as; otherwise use the step type's default channel. Apply/control
-      // keep the previous object-spread compatibility for handlers that already
-      // return `{ last_*: ... }` shaped maps.
-      const explicitExport =
-        typeof params.export_as === 'string' && params.export_as.trim()
-          ? params.export_as.trim()
-          : undefined;
-      if (explicitExport || type === 'capture' || type === 'transform') {
-        const exportKey =
-          explicitExport || (type === 'transform' ? 'last_transform' : 'last_capture');
-        result = { handled: true, ctx: { ...ctx, [exportKey]: output } };
-      } else {
-        result = {
-          handled: true,
-          ctx:
-            output && typeof output === 'object' && !Array.isArray(output)
-              ? { ...ctx, ...(output as Record<string, unknown>) }
-              : { ...ctx, [params.export_as || 'last_actuator_result']: output },
-        };
-      }
+      // Interim dual-shape adapter (converge later at the SDK boundary onto
+      // payload-only dispatch results — see actuator-to-pipeline-flow failure
+      // map). Today `defineCatalogBackedActuator` still returns either:
+      //   A) a one-step pipeline envelope `{ status, results, context, total_steps }`
+      //      (system/file/network/…); downstream unwraps `.context`
+      //   B) a bare action payload / array (vcs/calendar/terminal/…)
+      // Capture / transform must put B onto `last_capture` / `last_transform`
+      // (or `export_as`). A must keep the envelope so the existing unwrap and
+      // PTC `export_as` path keep working — never stash the whole envelope under
+      // the channel key. Semantic kind comes from the op registry when the ADF
+      // engine has already collapsed capture/transform → apply.
+      const semanticType = resolveSemanticActuatorStepKind(domain, op, type);
+      result = {
+        handled: true,
+        ctx: mapActuatorDispatchOutputToContext(ctx, output, semanticType, params),
+      };
     } catch (err) {
       throw err; // Ensure error propagates out of dispatch
     }
