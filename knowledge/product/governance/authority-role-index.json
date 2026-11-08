@@ -18,6 +18,14 @@
       "allowed_actuators": [],
       "tier_access": ["public"]
     },
+    "check_chronos_perf_baseline": {
+      "description": "CE-08: weekly Chronos performance baseline (pnpm kyberion check chronos-perf, schedule ce-chronos-perf). Samples FPS and JS heap of the Chronos UI in a headless browser and writes exactly one report file; it never changes Chronos state.",
+      "default_persona": "worker",
+      "write_scopes": ["active/shared/observability/chronos/ce-08-perf-baseline.json"],
+      "scope_classes": ["observability"],
+      "allowed_actuators": [],
+      "tier_access": ["public"]
+    },
     "chronos_gateway": {
       "description": "Chronos control surface authority for coordination and terminal routing.",
       "default_persona": "worker",
@@ -98,14 +106,6 @@
       "allowed_actuators": [],
       "tier_access": ["personal"]
     },
-    "workspace_graph_reader": {
-      "description": "Workspace graph read model (MSN-SURFACE-UNIFY-20261103): read-only join of missions, projects, organizations, work items, approvals, agent identities, tenant profiles and member profiles for libs/core/surface/workspace-graph.ts. It is never tenant-bound: rows are filtered afterwards by the caller's server-resolved SurfaceAuthorizationContext (viewerAdmitsNode), so a client tenant can only narrow. No write grant; persona worker.",
-      "default_persona": "worker",
-      "write_scopes": [],
-      "scope_classes": [],
-      "allowed_actuators": [],
-      "tier_access": ["personal", "confidential", "public"]
-    },
     "concierge_management_reader": {
       "description": "Read-only management projection and fresh owner-membership verification. Requires an exact request resource capability; no write operations or credential access.",
       "default_persona": "unknown",
@@ -178,6 +178,14 @@
       "allowed_actuators": ["artifact-actuator"],
       "tier_access": ["confidential"]
     },
+    "delegation_record_store": {
+      "description": "Tenant-bound store role of the delegated-task trace and record partitions (libs/core/workforce/delegated-task-observability.ts). The delegation store assumes it (withExecutionContext / withExecutionContextAsync) for every tenant partition read and write — trace append, record write/read/listing, child-inbox queue I/O, background-completion notification queue (libs/core/mission/delegation-notifications.ts: <partition>/notifications.jsonl) append, read and claim — always bound to the delegation's tenant, so the grants resolve through ${KYBERION_TENANT} to that one tenant's active/shared/runtime/delegation-records/confidential/<tenant>/ partition. Tenant-bound (TENANT_BOUND_READER_ROLES): a caller with another active tenant cannot bind it, so a process bound to one tenant never reads another tenant's delegation instructions or results. The inter-process locks stay under the caller's role. No knowledge, mission, system partition, legacy observability or customer/ grant.",
+      "default_persona": "worker",
+      "write_scopes": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"],
+      "scope_classes": ["audit"],
+      "allowed_actuators": [],
+      "tier_access": ["confidential"]
+    },
     "deliverable_inbox_writer": {
       "description": "Deliverable inbox writer (libs/core/foundation/deliverable-inbox-writer-capability.ts): libs/core assumes it only to add an operator task to the deliverable inbox (active/shared/inbox/entries.jsonl, libs/core/task/deliverable-inbox.ts addInboxEntry) on behalf of a caller with no inbox grant: the CD-10 bolt-review rejection (libs/core/mission/mission-bolt-review.ts) and the CD-11 operator hand-off / manual reminder tasks (libs/core/customer-decision/operator-handoff.ts). Its grant is the inbox and the shared lock directory; the tier guard narrows every write and mkdir to the inbox entries file, its directory and the inbox's own deliverable-inbox-<sha256>.lock files. No other active/shared/runtime/ path, no knowledge, mission, approval or surface state.",
       "default_persona": "unknown",
@@ -194,18 +202,31 @@
       "allowed_actuators": ["file-actuator", "artifact-actuator"],
       "tier_access": ["public", "confidential"]
     },
-    "dot_lifecycle_writer": {
-      "description": "Writes dot charters (dots/) and the lifecycle audit ledger during governed status transitions (kyberion dot activate/pause/retire). Deliberately separate from any role a dot may bind at runtime, so an active dot can never rewrite the contract it runs under.",
+    "dot_charter_store": {
+      "description": "Store role of dot charter documents (libs/core/dot/dot-lifecycle.ts): dots/ at repo root, knowledge/confidential/<tenant>/dots/ and knowledge/personal/dots/<owner-hash>/ — all three custodies. The lifecycle facade assumes it (withExecutionContext) at each charter read/write inside the dot_lifecycle_worker process, binding the charter's tenant for confidential custody and explicitly clearing the ambient tenant ('' tenantCleared) for personal and system custody. Its read scopes additionally carry the validation reads that ran under the former dot_lifecycle_writer (tenants/<t>.json, organization operational state, runtime projects). Deliberately not a role a dot may bind at runtime, so an active dot can never rewrite the contract it runs under. The lifecycle audit ledger, activation heartbeats, event-continuation state and inter-process locks live under other roles (dot_lifecycle_runtime_store / the worker's ambient locks grant).",
       "default_persona": "worker",
       "write_scopes": [
         "dots/",
-        "knowledge/confidential/${KYBERION_TENANT}/dots/",
-        "active/shared/runtime/",
-        "active/shared/tmp/"
+        "knowledge/personal/dots/",
+        "knowledge/confidential/${KYBERION_TENANT}/dots/"
       ],
       "scope_classes": ["operations_runtime"],
       "allowed_actuators": [],
       "tier_access": ["public", "confidential", "personal"]
+    },
+    "dot_lifecycle_runtime_store": {
+      "description": "Store role of the dot lifecycle runtime surfaces (libs/core/dot/dot-lifecycle.ts): the lifecycle audit ledger (active/shared/runtime/dot-lifecycle-audit.jsonl, append-only), activation heartbeats (active/shared/runtime/heartbeats/) and dot event-continuation state (active/shared/runtime/dot/.../event-continuations/ + events.jsonl). Assumed inside the lifecycle facade for these writes only — charter documents go through dot_charter_store and inter-process locks stay under the dot_lifecycle_worker ambient role. The narrow.only declaration restricts writes to exactly those artifacts and their mkdir ancestors. Tenant-confidential event-continuation partitions bind the charter's tenant; personal and system partitions run with the ambient tenant explicitly cleared. Protected runtime data also requires projected knowledge-tier grants; the raw read/metadata/write/mkdir purpose ceilings forbid using those virtual grants on actual knowledge files. Confidential projection grants expand only from the bound tenant; cleared custody does not admit confidential data.",
+      "default_persona": "worker",
+      "write_scopes": [
+        "active/shared/runtime/dot-lifecycle-audit.jsonl",
+        "active/shared/runtime/heartbeats/",
+        "active/shared/runtime/dot/public/shared/",
+        "active/shared/runtime/dot/personal/shared/owners/",
+        "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/"
+      ],
+      "scope_classes": ["audit", "operations_runtime"],
+      "allowed_actuators": [],
+      "tier_access": ["confidential", "personal", "public"]
     },
     "ecosystem_architect": {
       "description": "Core architecture and repo evolution authority.",
@@ -224,14 +245,6 @@
       "scope_classes": ["knowledge_core", "codebase_core", "mission_state"],
       "allowed_actuators": ["code-actuator", "orchestrator-actuator", "artifact-actuator"],
       "tier_access": ["public", "confidential"]
-    },
-    "check_chronos_perf_baseline": {
-      "description": "CE-08: weekly Chronos performance baseline (pnpm kyberion check chronos-perf, schedule ce-chronos-perf). Samples FPS and JS heap of the Chronos UI in a headless browser and writes exactly one report file; it never changes Chronos state.",
-      "default_persona": "worker",
-      "write_scopes": ["active/shared/observability/chronos/ce-08-perf-baseline.json"],
-      "scope_classes": ["observability"],
-      "allowed_actuators": [],
-      "tier_access": ["public"]
     },
     "evaluate_model_role_fitness": {
       "description": "TC-15: role-fitness evaluator authority. Runs the governed model role-fitness probes and appends their verdicts. Its only write scope is that journal — it measures models, it never staffs, dispatches or reconfigures anything.",
@@ -524,14 +537,6 @@
       "allowed_actuators": [],
       "tier_access": ["confidential", "personal"]
     },
-    "delegation_record_store": {
-      "description": "Tenant-bound store role of the delegated-task trace and record partitions (libs/core/workforce/delegated-task-observability.ts). The delegation store assumes it (withExecutionContext / withExecutionContextAsync) for every tenant partition read and write — trace append, record write/read/listing, child-inbox queue I/O, background-completion notification queue (libs/core/mission/delegation-notifications.ts: <partition>/notifications.jsonl) append, read and claim — always bound to the delegation's tenant, so the grants resolve through ${KYBERION_TENANT} to that one tenant's active/shared/runtime/delegation-records/confidential/<tenant>/ partition. Tenant-bound (TENANT_BOUND_READER_ROLES): a caller with another active tenant cannot bind it, so a process bound to one tenant never reads another tenant's delegation instructions or results. The inter-process locks stay under the caller's role. No knowledge, mission, system partition, legacy observability or customer/ grant.",
-      "default_persona": "worker",
-      "write_scopes": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"],
-      "scope_classes": ["audit"],
-      "allowed_actuators": [],
-      "tier_access": ["confidential"]
-    },
     "tenant_approval_store": {
       "description": "Tenant-bound store role of the per-tenant approval store partitions (libs/core/governance/approval-store-location.ts). The approval store assumes it (withExecutionContext) for every tenant partition read and write, always bound to the record's tenant, so the grants resolve through ${KYBERION_TENANT} to that one tenant's active/shared/runtime/tenant-approvals/<personal|confidential>/<tenant>/ partition (public tenant records are stored in the confidential partition): it reads, writes and lists request records, reads and writes passkey challenges and appends the channel's approval event log. Tenant-bound (TENANT_BOUND_READER_ROLES): a caller with another active tenant cannot bind it, so a process bound to one tenant never finds another tenant's approvals. No knowledge, mission, system approval tree or customer/ grant.",
       "default_persona": "worker",
@@ -561,6 +566,14 @@
       "scope_classes": [],
       "allowed_actuators": [],
       "tier_access": ["public", "personal", "confidential"]
+    },
+    "workspace_graph_reader": {
+      "description": "Workspace graph read model (MSN-SURFACE-UNIFY-20261103): read-only join of missions, projects, organizations, work items, approvals, agent identities, tenant profiles and member profiles for libs/core/surface/workspace-graph.ts. It is never tenant-bound: rows are filtered afterwards by the caller's server-resolved SurfaceAuthorizationContext (viewerAdmitsNode), so a client tenant can only narrow. No write grant; persona worker.",
+      "default_persona": "worker",
+      "write_scopes": [],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["personal", "confidential", "public"]
     },
     "workspace_tenant_registry_index_reader": {
       "description": "Shared core read-only workspace tenant selector index reader. Used only for authenticated viewers whose tenant grants are all. Enumerates registry filenames only; descendant file reads are explicitly denied. Each valid slug is subsequently checked by the exact tenant-bound registry reader; no personal profile fields or write authority are exposed.",
