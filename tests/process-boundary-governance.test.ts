@@ -79,6 +79,10 @@ const allowedManagedProcessConsumers = [
   // managed-process owner so the UI loop remains responsive and the child
   // process has an explicit surface owner.
   'presence/displays/terminal-hud/src/actions/schedule-actions.ts',
+  // Concierge ops automation: schedule run-now and pipeline run dispatch
+  // detached ADF executions through the managed-process owner so the Next.js
+  // request handler returns immediately and the child has an explicit owner.
+  'presence/displays/concierge/src/lib/ops/pipeline-run.ts',
   // MCP server: background pipeline jobs outlive the 60s sync window and are
   // supervised so they die with the server session instead of leaking.
   'libs/shared-network/src/mcp-server-engine.ts',
