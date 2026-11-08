@@ -620,6 +620,7 @@ describe('ambient usage attribution (no ALS binding)', () => {
     located.clear();
     resetMissionScopeCacheForTests();
     delete process.env.MISSION_ID;
+    delete process.env.KYBERION_TENANT;
   });
 
   it('scopes the row to the mission record when MISSION_ID is bound', () => {
@@ -665,6 +666,25 @@ describe('ambient usage attribution (no ALS binding)', () => {
     expect(extra.mission_id).toBe('MSN-DOES-NOT-EXIST-1');
     expect(extra).not.toHaveProperty('scope');
     expect(extra).not.toHaveProperty('actor_id');
+  });
+
+  it('scopes to the tenant boundary when no mission or project is bound', () => {
+    const spy = vi.spyOn(metrics, 'record').mockImplementation(() => undefined as never);
+    process.env.KYBERION_TENANT = 'acme-corp';
+
+    recordCliUsage('devin-cli', 'swe', Date.now(), 'success', {
+      promptChars: 80,
+      completionChars: 20,
+    });
+
+    const extra = spy.mock.calls[0][3] as Record<string, unknown>;
+    expect(extra.scope).toMatchObject({
+      scope_kind: 'tenant',
+      tier: 'confidential',
+      tenant_slug: 'acme-corp',
+    });
+    expect((extra.scope as Record<string, unknown>).project_id).toBeUndefined();
+    expect(String(extra.actor_id)).toMatch(/^kyberion:/);
   });
 
   it('explicit withUsageAttribution wins over the ambient fallback', () => {
