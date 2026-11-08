@@ -751,6 +751,8 @@ Affected-test preflight must inherit the canonical core profile (TEST_SUITES.cor
 
 The readiness subprocess also writes its per-gate results to stdout. On failure, preserve captured string or Buffer stdout before rethrowing the original execution error; stderr-only exception messages can hide every failing gate. Never print the success marker after such a failure. Gate: scripts/publish_pull_request.test.ts covers complete early-gate evidence, unchanged exception identity and empty-output failures.
 
+Core code uses the same six deterministic shards as the PR and main CI matrices, executed sequentially with the serial core profile. The workflow parity assertion in the inventory gate rejects shard-count drift. Preserve the existing per-invocation budget; do not squeeze an unsharded core run into it by omitting tests or increasing the deadline.
+
 **Repository security scans under coverage.** A green PR shard does not prove the
 unsharded main core run passes with V8 coverage. When a repository-wide AST contract
 times out, compare the exact failing command (`pnpm test -- --suite core --coverage`)

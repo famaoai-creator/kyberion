@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import * as yaml from 'js-yaml';
 import config from '../vitest.config.mjs';
-import { safeExecResult } from '@agent/core/secure-io';
+import { safeExecResult, safeReadFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { CORE_AFFECTED_TEST_EXCLUDES, isCoreAffectedTest } from '../scripts/pr_preflight.js';
+import {
+  CORE_AFFECTED_TEST_EXCLUDES,
+  CORE_AFFECTED_TEST_SHARDS,
+  isCoreAffectedTest,
+} from '../scripts/pr_preflight.js';
 import { ciTestPaths, isCiTest } from '../scripts/lib/affected-tests.js';
 import { matchesGatePath } from '../scripts/lib/changed-gate-selection.js';
 import { TEST_SUITES } from '../scripts/test_suite.js';
@@ -45,5 +50,38 @@ describe('affected core profile inventory', () => {
     expect(eligible.filter(isCoreAffectedTest)).toEqual(core);
     expect(core.filter((file) => nonCore.includes(file))).toEqual([]);
     expect([...new Set([...core, ...nonCore])].sort()).toEqual(original);
+  });
+  it('keeps every local core shard aligned with both CI matrices', () => {
+    interface Workflow {
+      jobs: Record<
+        string,
+        {
+          strategy: { matrix: { shard: number[]; total?: number[] } };
+          steps: Array<{ run?: string }>;
+        }
+      >;
+    }
+    const read = (file: string) =>
+      yaml.load(
+        String(
+          safeReadFile(pathResolver.rootResolve(file), {
+            encoding: 'utf8',
+          })
+        )
+      ) as Workflow;
+    const pr = read('.github/workflows/pr-validation.yml').jobs['test-core'];
+    const ci = read('.github/workflows/ci.yml').jobs['core-coverage-shards'];
+    if (!pr || !ci) throw new Error('Canonical core CI jobs are missing');
+    const shards = Array.from({ length: CORE_AFFECTED_TEST_SHARDS }, (_, index) => index + 1);
+    expect(CORE_AFFECTED_TEST_SHARDS).toBeGreaterThan(0);
+    expect(pr.strategy.matrix.shard).toEqual(shards);
+    expect(pr.strategy.matrix.total).toEqual([CORE_AFFECTED_TEST_SHARDS]);
+    expect(ci.strategy.matrix.shard).toEqual(shards);
+    expect(pr.steps.map((step) => step.run ?? '').join('\n')).toContain(
+      '--shard=${{ matrix.shard }}/${{ matrix.total }}'
+    );
+    expect(ci.steps.map((step) => step.run ?? '').join('\n')).toContain(
+      '--shard=${{ matrix.shard }}/' + CORE_AFFECTED_TEST_SHARDS
+    );
   });
 });
