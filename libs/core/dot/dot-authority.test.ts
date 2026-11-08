@@ -32,12 +32,24 @@ const dot: DotCharter = {
 const savedPersona = process.env.KYBERION_PERSONA;
 const savedRole = process.env.MISSION_ROLE;
 describe('DOT execution role boundary', () => {
-  it.each([
-    'dot_result_writer',
-    'dot_lifecycle_writer',
-    'dot_charter_store',
-    'dot_lifecycle_runtime_store',
-  ])('rejects programmatic store role %s even without an accountability ref', (role) => {
+  it.each(
+    [
+      'dot_result_writer',
+      'dot_lifecycle_writer',
+      'dot_charter_store',
+      'dot_lifecycle_runtime_store',
+    ].flatMap((role) => [
+      role,
+      role.toUpperCase(),
+      ` ${role} `,
+      role.replace(/_/g, ' '),
+      role.replace(/_/g, '\u00a0'),
+      role + '\n',
+      role + '\r\n',
+      role + '\t',
+      role + '\u00a0',
+    ])
+  )('rejects programmatic store role %s even without an accountability ref', (role) => {
     expect(() =>
       assertDotAccountabilityCharter({
         ...dot,
