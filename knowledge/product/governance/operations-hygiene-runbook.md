@@ -747,6 +747,8 @@ An async mock factory must not await a module that transitively imports the modu
 
 Broad preflight failures must retain every failing case heading and its immediate error before the bounded output tail. Tail-only diagnostics can discard earlier failures after a long related-test run. Keep test selection, failure status and deadlines unchanged; reproduce the named cases and finish data-reader selections before publishing a repair batch. Gate: scripts/pr_preflight.test.ts covers an early ANSI-colored failure displaced by a later stack.
 
+Affected-test preflight must inherit the canonical core profile (TEST_SUITES.core), including no file parallelism: run core code and exact core readers first, then the remaining code and readers. Preserve the original CI selectors and exclude only the core-owned paths already covered; the real-inventory contract in tests/preflight-core-profile-boundary.test.ts proves the union and disjointness against Vitest include/exclude rules. Shared temporary ancestors can change while another file creates its fixture; do not relax snapshot identity/timestamp checks or silently retry integrity failures to accommodate a mixed parallel run. Keep strict mode and each invocation budget unchanged. Attempt every selected group even after failure and report all failures together. Native EPERM outside the governed guard remains a separate diagnostic question; a downstream policy-corrupt refusal is not evidence that the policy contents are invalid.
+
 **Repository security scans under coverage.** A green PR shard does not prove the
 unsharded main core run passes with V8 coverage. When a repository-wide AST contract
 times out, compare the exact failing command (`pnpm test -- --suite core --coverage`)

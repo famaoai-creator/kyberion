@@ -24,6 +24,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync } from '@agent/core/secure-io';
 import { collectChangedFiles, type GitRunner } from './run_checks.js';
 import { describeAffectedTestPlan, planAffectedTests } from './lib/affected-tests.js';
+import { TEST_SUITES } from './test_suite.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { guardCliArgsNormalized, type CliGuardSpec } from './lib/cli-guard.js';
 
@@ -120,6 +121,15 @@ export interface AffectedTestsResult {
   notRun: string[];
 }
 
+/** Ownership, not a substring such as tests/fixtures/libs/core/. */
+export function isCoreAffectedTest(file: string): boolean {
+  return TEST_SUITES.core
+    .filter((entry) => !entry.startsWith('-'))
+    .some((prefix) => file.startsWith(prefix));
+}
+
+export const CORE_AFFECTED_TEST_EXCLUDES = ['libs/core/**', 'libs/shared-*/**'] as const;
+
 /**
  * Checklist step 3.5: run the tests that import a changed file (vitest
  * `--changed`, limited to the CI suites) and the tests that read a changed
@@ -139,10 +149,19 @@ export function runAffectedTests(
   for (const line of describeAffectedTestPlan(plan)) print(line);
 
   const notRun: string[] = [];
+  const failures: string[] = [];
   let testFiles = 0;
   const runSelection = (label: string, args: string[]) => {
     print(`[pr:affected-tests] ${label}: vitest ${args.join(' ')}`);
-    const result = vitest(args);
+    let result: VitestRunResult;
+    try {
+      result = vitest(args);
+    } catch (cause) {
+      failures.push(
+        `[pr:affected-tests] ${label} tests failed: ${cause instanceof Error ? cause.message : String(cause)}`
+      );
+      return;
+    }
     const output = `${result.stdout}\n${result.stderr}`;
     const summary = summarizeVitestOutput(output);
     for (const line of summary.lines) print(`[pr:affected-tests]   ${line}`);
@@ -150,35 +169,52 @@ export function runAffectedTests(
       const lines = output.replace(ANSI_PATTERN, '').trim().split('\n');
       // A long failure list must retain every failing case, not just the last
       // stack trace: the broad run may take many minutes to reproduce.
-      const failures = lines.flatMap((line, index) =>
+      const failingCases = lines.flatMap((line, index) =>
         /^\s*FAIL\s/u.test(line) ? lines.slice(index, index + 3) : []
       );
-      const tail = [...failures, ...lines.slice(-40)].join('\n');
-      throw new Error(
+      const tail = [...failingCases, ...lines.slice(-40)].join('\n');
+      failures.push(
         `[pr:affected-tests] ${label} tests failed (exit ${String(result.status)})\n${tail}`
       );
+      return;
     }
     testFiles += summary.testFiles;
   };
 
+  let runCode = false;
   if (plan.codeFiles.length > 0 || plan.deletedCodeFiles.length > 0) {
     if (plan.rerunTriggers.length > 0) {
       notRun.push(
         `code tests: ${plan.rerunTriggers.join(', ')} changed, so vitest --changed would rerun every test; run the owning suites (pnpm test -- --suite <name>) instead`
       );
     } else {
-      runSelection('code', [
-        'run',
-        '--changed',
-        changed.mergeBase,
-        '--passWithNoTests',
-        ...plan.ciPaths,
-      ]);
+      runCode = true;
     }
   }
-  if (plan.readerTests.length > 0) {
-    runSelection('readers', ['run', '--passWithNoTests', ...plan.readerTests]);
-  }
+  const coreFlags = TEST_SUITES.core.filter((entry) => entry.startsWith('-'));
+  if (runCode)
+    runSelection('core code', [
+      'run',
+      '--changed',
+      changed.mergeBase,
+      '--passWithNoTests',
+      ...TEST_SUITES.core,
+    ]);
+  const coreReaders = plan.readerTests.filter(isCoreAffectedTest);
+  const nonCoreReaders = plan.readerTests.filter((file) => !isCoreAffectedTest(file));
+  if (coreReaders.length > 0)
+    runSelection('core readers', ['run', '--passWithNoTests', ...coreReaders, ...coreFlags]);
+  if (runCode)
+    runSelection('non-core code', [
+      'run',
+      '--changed',
+      changed.mergeBase,
+      '--passWithNoTests',
+      ...plan.ciPaths,
+      ...CORE_AFFECTED_TEST_EXCLUDES.flatMap((glob) => ['--exclude', glob]),
+    ]);
+  if (nonCoreReaders.length > 0)
+    runSelection('non-core readers', ['run', '--passWithNoTests', ...nonCoreReaders]);
   const broad = plan.readers.filter((reader) => reader.tooBroad).map((reader) => reader.file);
   if (broad.length > 0) notRun.push(`readers of ${broad.join(', ')}: too broad to select`);
   if (plan.nonCiReaderTests.length > 0) {
@@ -186,6 +222,7 @@ export function runAffectedTests(
   }
 
   for (const reason of notRun) print(`[pr:affected-tests] NOT RUN — ${reason}`);
+  if (failures.length > 0) throw new Error(failures.join('\n\n'));
   if (testFiles === 0) {
     print(
       '[pr:affected-tests] 0 test files ran — no test verified this change; record that in the PR Test plan.'
