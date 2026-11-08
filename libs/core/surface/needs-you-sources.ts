@@ -7,8 +7,8 @@
  * count with the one builder.
  *
  * Admission is conservative: tier and tenant come from the server-resolved
- * viewer (tenant admission is `admitsTenant`, shared with every surface); a memory candidate with an audience or an owner restriction is left
- * out because this reader cannot prove who the caller is.
+ * viewer. Owner/audience restrictions use the same authenticated identity
+ * admission as the Concierge reader.
  */
 
 import { createHash } from 'node:crypto';
@@ -37,7 +37,13 @@ import type {
   NeedsYouOutcomeInput,
   NeedsYouSourceData,
 } from './needs-you.js';
-import { admitsTenant, type SurfaceAuthorizationContext } from './surface-authorization.js';
+import {
+  admitsCustody,
+  admitsScopeAudience,
+  custodyOfScope,
+  viewerPersonIds,
+  type SurfaceAuthorizationContext,
+} from './surface-authorization.js';
 
 const logger = createLogger('needs-you-sources');
 
@@ -50,6 +56,11 @@ const TIERS: readonly Tier[] = ['personal', 'confidential', 'public'];
 
 function tiersOf(viewer: SurfaceAuthorizationContext): Tier[] {
   return TIERS.filter((tier) => tier !== 'personal' && viewer.tierAccess.includes(tier));
+}
+
+function personCustodyFields(scope: Parameters<typeof custodyOfScope>[0]): { owner_nhi?: string } {
+  const custody = custodyOfScope(scope);
+  return custody.kind === 'person' ? { owner_nhi: custody.ref } : {};
 }
 
 /** A memory candidate as the queue card shows it (summary clamped, origin humanized). */
@@ -76,6 +87,10 @@ export function needsYouKnowledgeFromCandidate(
       ? { organization_id: candidate.scope.organization_id }
       : {}),
     ...(candidate.scope?.project_id ? { project_id: candidate.scope.project_id } : {}),
+    ...personCustodyFields(candidate.scope),
+    ...(candidate.scope?.allowed_audience
+      ? { allowed_audience: candidate.scope.allowed_audience }
+      : {}),
   };
 }
 
@@ -88,8 +103,25 @@ function knowledgeFor(viewer: SurfaceAuthorizationContext): NeedsYouKnowledgeInp
       const sourceTier = (scope?.tier ?? candidate.sensitivity_tier) as Tier;
       if (!tiers.includes(candidate.sensitivity_tier as Tier) || !tiers.includes(sourceTier))
         return false;
-      if (scope?.allowed_audience?.length || scope?.owner_nhi) return false;
-      return sourceTier === 'public' || admitsTenant(viewer, scope?.tenant_slug);
+      if (!admitsScopeAudience(viewer, scope)) return false;
+      if (
+        viewer.organizationIds !== 'all' &&
+        (!scope?.organization_id || !viewer.organizationIds.includes(scope.organization_id))
+      )
+        return false;
+      if (
+        viewer.projectIds !== 'all' &&
+        (!scope?.project_id || !viewer.projectIds.includes(scope.project_id))
+      )
+        return false;
+      const ids = viewerPersonIds(viewer);
+      const audience = scope?.allowed_audience ?? [];
+      const audienceMatch = audience.some((id) => ids.includes(id));
+      if (audience.length && !audienceMatch) return false;
+      if (scope?.owner_nhi && !ids.includes(scope.owner_nhi) && !audienceMatch) return false;
+      if (sourceTier === 'personal' && custodyOfScope(scope).kind !== 'person' && !audienceMatch)
+        return false;
+      return true;
     })
     .map((candidate) => needsYouKnowledgeFromCandidate(candidate));
 }
@@ -99,7 +131,9 @@ function clarificationsFor(viewer: SurfaceAuthorizationContext): NeedsYouClarifi
   const report = withExecutionContext('sovereign_concierge', () => collectMissionHygieneReport());
   return [...report.abandoned, ...report.stale]
     .filter((finding) => tiers.includes(finding.tier as Tier))
-    .filter((finding) => finding.tier === 'public' || admitsTenant(viewer, finding.tenant_slug))
+    .filter(
+      (finding) => finding.tier === 'public' || admitsCustody(viewer, custodyOfScope(finding))
+    )
     .map((finding) => {
       let goal = '';
       let since: string | undefined;
@@ -146,10 +180,11 @@ function approvalsFor(viewer: SurfaceAuthorizationContext): CeoApprovalItem[] {
       const tenant = record.scope?.tenant_slug;
       // Personal approvals need an owner-authenticated reader (the shell's).
       if (!tier || !tiers.includes(tier)) return false;
-      // A public untenanted approval is everyone's; any other untenanted one
-      // belongs to the views that admit company-less records.
-      if (!tenant && tier === 'public') return true;
-      return admitsTenant(viewer, tenant);
+      // A public untenanted approval is everyone's — except when it names
+      // an owner: person custody is identity-bound, never broadcast.
+      const custody = custodyOfScope(record.scope);
+      if (!tenant && tier === 'public' && custody.kind === 'system') return true;
+      return admitsCustody(viewer, custody);
     })
     .map((record) =>
       toCeoApprovalItem(record, { publicationPreview: readApprovalPublicationPreview })
@@ -158,7 +193,7 @@ function approvalsFor(viewer: SurfaceAuthorizationContext): CeoApprovalItem[] {
 
 function outcomesFor(viewer: SurfaceAuthorizationContext): NeedsYouOutcomeInput[] {
   return listInboxEntries({ status: ['unread', 'read'], limit: NEEDS_YOU_READ_LIMIT })
-    .filter((entry) => admitsTenant(viewer, entry.tenant_slug))
+    .filter((entry) => admitsCustody(viewer, custodyOfScope(entry)))
     .map((entry) => ({
       entry_id: entry.entry_id,
       title: entry.title,
@@ -169,6 +204,7 @@ function outcomesFor(viewer: SurfaceAuthorizationContext): NeedsYouOutcomeInput[
       updated_at: entry.updated_at,
       ...(entry.kind ? { kind: entry.kind } : {}),
       ...(entry.tenant_slug ? { tenant_slug: entry.tenant_slug } : {}),
+      ...personCustodyFields(entry),
     }));
 }
 
@@ -211,6 +247,9 @@ export function readNeedsYouFailures(
         // Server-resolved only: company-less failures belong to the view that
         // admits untenanted records (the shell's system / all-company view).
         ...(viewer.includeUntenanted === true ? { includeUntenanted: true } : {}),
+        // Person custody admits to the owner — the viewer's own ids, resolved
+        // server-side upstream.
+        personIds: viewerPersonIds(viewer),
       })
     )
     .map((notification) => {
@@ -226,6 +265,11 @@ export function readNeedsYouFailures(
         surface: String(notification.surface || 'presence'),
         created_at: String(notification.created_at || ''),
         ...(tenant ? { tenant_slug: tenant } : {}),
+        ...personCustodyFields(
+          notification.scope && typeof notification.scope === 'object'
+            ? (notification.scope as Record<string, unknown>)
+            : notification
+        ),
       };
     });
 }

@@ -11,6 +11,7 @@ import {
 } from '@agent/core/secure-io';
 import * as secureIo from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
+import { admitsCustody, custodyOfScope } from '@agent/core/surface/surface-authorization';
 import {
   conciergeText,
   resolveConciergeLocale,
@@ -155,10 +156,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     if (!entry) {
       return NextResponse.json({ ok: false, error: t('api.outcome_not_found') }, { status: 404 });
     }
-    if (
-      resolved.context.tenantSlugs !== 'all' &&
-      (!entry.tenant_slug || !resolved.context.tenantSlugs.includes(entry.tenant_slug))
-    ) {
+    if (!admitsCustody(resolved.context, custodyOfScope(entry))) {
       return NextResponse.json(
         { ok: false, error: 'Concierge viewer tenant scope denied.' },
         { status: 403 }

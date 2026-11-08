@@ -2,6 +2,11 @@ import { scopedLearningApprovalVisibleToViewer } from './scoped-learning-approva
 import type { ViewerContext } from './ops-viewer';
 import { loadProjectRecord } from '@agent/core/project/project-registry';
 import {
+  admitsCustody,
+  custodyOfScope,
+  viewerPersonIds,
+} from '@agent/core/surface/surface-authorization';
+import {
   workspaceScopeMatchesResource,
   type ResolvedWorkspaceScope,
   type WorkspaceSelection,
@@ -74,6 +79,8 @@ export interface MissionHistoryQuery {
   projectIds?: string[] | 'all';
   kind?: string;
   missionId?: string;
+  /** Server-resolved only (the system selection): also admit company-less records. */
+  includeUntenanted?: boolean;
   limit?: number;
 }
 
@@ -203,6 +210,8 @@ export interface ApprovalQueueQuery {
   missionId?: string;
   tenant?: string;
   tenantSlugs?: string[] | 'all';
+  /** Server-resolved only (the system selection): also admit company-less records. */
+  includeUntenanted?: boolean;
   channel?: string;
   limit?: number;
 }
@@ -210,7 +219,8 @@ export interface ApprovalQueueQuery {
 /** An approval belongs to an operation only through explicit record provenance. */
 export function approvalMatchesWorkspace(
   record: ApprovalRequestRecord,
-  workspace: ResolvedWorkspaceScope
+  workspace: ResolvedWorkspaceScope,
+  viewer?: ViewerContext
 ): boolean {
   const contexts: Record<string, unknown>[] = [];
   for (const value of [record.scope, record.requestedByContext, record.work_loop?.context])
@@ -263,6 +273,13 @@ export function approvalMatchesWorkspace(
     } catch {
       return false;
     }
+  }
+  const custody = custodyOfScope(record.scope);
+  if (custody.kind === 'person' && viewer && admitsCustody(viewer, custody)) {
+    // Person admission is independent of the viewer's tenant memberships.
+    // Explicit selection and all other workspace ceilings still narrow it.
+    if (workspace.selection.tenant_slug) return false;
+    return workspaceScopeMatchesResource({ ...workspace, tenantSlugs: 'all' }, resource);
   }
   return workspaceScopeMatchesResource(workspace, resource);
 }
@@ -425,7 +442,13 @@ export function projectMissionHistoryItems(
       }
       if (query.tenantSlugs && query.tenantSlugs !== 'all') {
         const tenantValue = item.tenantSlug || item.tenantId;
-        if (!tenantValue || !query.tenantSlugs.includes(tenantValue)) return false;
+        if (
+          !admitsCustody(
+            { tenantSlugs: query.tenantSlugs, includeUntenanted: query.includeUntenanted },
+            custodyOfScope({ tenant_slug: tenantValue })
+          )
+        )
+          return false;
       }
       if (
         kindFilter &&
@@ -723,7 +746,8 @@ export function buildApprovalQueueItems(query: ApprovalQueueQuery = {}): Approva
       if (query.requestId && record.id !== query.requestId) return false;
       if (query.storageChannel && record.storageChannel !== query.storageChannel) return false;
       if (!scopedLearningApprovalVisibleToViewer(record, query.viewer, query.tenant)) return false;
-      if (query.workspace && !approvalMatchesWorkspace(record, query.workspace)) return false;
+      if (query.workspace && !approvalMatchesWorkspace(record, query.workspace, query.viewer))
+        return false;
       if (statusFilter && !statusFilter.has(record.status)) return false;
       if (kindFilter && !kindFilter.has(record.kind)) return false;
       if (missionFilter && record.requestedByContext?.missionId?.toUpperCase() !== missionFilter)
@@ -734,9 +758,24 @@ export function buildApprovalQueueItems(query: ApprovalQueueQuery = {}): Approva
           `${resolvedTenant || ''} ${record.requestedByContext?.actorId || ''} ${record.requestedByContext?.surface || ''} ${record.track_id || ''} ${record.track_name || ''}`.toLowerCase();
         if (!tenantValue.includes(tenantFilter)) return false;
       }
-      if (query.tenantSlugs && query.tenantSlugs !== 'all') {
-        if (!resolvedTenant || !query.tenantSlugs.includes(resolvedTenant)) return false;
-      }
+      // Custody admission is unconditional — a caller that forgets the scope
+      // resolves to 'all', which still never admits person custody.
+      const approvalScope = record.scope as { owner_nhi?: string; nhi_id?: string } | undefined;
+      if (
+        !admitsCustody(
+          {
+            tenantSlugs: query.tenantSlugs ?? 'all',
+            includeUntenanted: query.includeUntenanted,
+            personIds: query.viewer ? viewerPersonIds(query.viewer) : [],
+          },
+          custodyOfScope({
+            tenant_slug: resolvedTenant,
+            owner_nhi: approvalScope?.owner_nhi,
+            nhi_id: approvalScope?.nhi_id,
+          })
+        )
+      )
+        return false;
       if (
         channelFilter &&
         !`${record.channel} ${record.storageChannel}`.toLowerCase().includes(channelFilter)

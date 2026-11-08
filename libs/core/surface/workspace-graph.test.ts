@@ -172,6 +172,57 @@ const acmeViewer: SurfaceAuthorizationContext = {
 };
 
 describe('workspace graph', () => {
+  it('keeps tier and permission ceilings for member self and tenant-mate admission', () => {
+    const graph = collectWorkspaceGraph(sources());
+    const self = { ...acmeViewer, tenantSlugs: [] as string[], memberId: 'member-alice' };
+    expect(
+      getGraphEntity(filterWorkspaceGraph(graph, self), 'actor', 'member-alice')
+    ).toBeDefined();
+    for (const ceiling of [{ tierAccess: ['public'] }, { permissions: [] }]) {
+      expect(
+        getGraphEntity(
+          filterWorkspaceGraph(graph, { ...self, ...ceiling }),
+          'actor',
+          'member-alice'
+        )
+      ).toBeNull();
+      expect(
+        getGraphEntity(
+          filterWorkspaceGraph(graph, { ...acmeViewer, ...ceiling }),
+          'actor',
+          'member-alice'
+        )
+      ).toBeNull();
+    }
+  });
+
+  it('redacts foreign memberships for tenant mates while preserving the member own view', () => {
+    const graph = collectWorkspaceGraph(
+      sources({
+        members: () => [
+          {
+            member_id: 'member-alice',
+            display_name: 'Alice',
+            status: 'active',
+            memberships: [
+              { tenant_slug: 'acme', role: 'owner' },
+              { tenant_slug: 'beta', role: 'admin' },
+            ],
+          },
+        ],
+      })
+    );
+    const mate = getGraphEntity(filterWorkspaceGraph(graph, acmeViewer), 'actor', 'member-alice')!;
+    expect(mate.node.facts?.tenants).toBe('acme');
+    expect(mate.node.facts?.roles).toBe('acme:owner');
+    const self = getGraphEntity(
+      filterWorkspaceGraph(graph, { ...acmeViewer, tenantSlugs: [], memberId: 'member-alice' }),
+      'actor',
+      'member-alice'
+    )!;
+    expect(self.node.facts?.roles).toBe('acme:owner,beta:admin');
+    expect(getGraphEntity(graph, 'actor', 'member-alice')!.node.facts?.tenants).toBe('acme,beta');
+  });
   it('joins every store into one linked node set', () => {
     const graph = collectWorkspaceGraph(sources());
     const kinds = new Set(graph.nodes.map((n) => n.kind));

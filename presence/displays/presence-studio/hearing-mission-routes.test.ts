@@ -48,12 +48,14 @@ vi.mock('@agent/core/governance/approval-store', async () => {
   return { ...actual, listApprovalRequests: vi.fn() };
 });
 
-vi.mock('./hearing-canvas.js', async () => {
-  const actual = await vi.importActual<typeof import('./hearing-canvas.js')>('./hearing-canvas.js');
+vi.mock('@agent/core/surface/hearing-canvas', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/surface/hearing-canvas')>(
+    '@agent/core/surface/hearing-canvas'
+  );
   return { ...actual, generateHearingCanvas: vi.fn() };
 });
 
-import { generateHearingCanvas } from './hearing-canvas.js';
+import { generateHearingCanvas } from '@agent/core/surface/hearing-canvas';
 import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
 import { safeExecResult, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
@@ -79,9 +81,13 @@ import {
   createHearingRecord,
   type HearingRecord,
   type HearingScenario,
-} from './hearing.js';
-import { hearingNamespace, loadHearingRecord, saveHearingRecord } from './hearing-runtime.js';
-import { hearingMissionId, type MissionBrief } from './hearing-mission.js';
+} from '@agent/core/surface/hearing';
+import {
+  hearingNamespace,
+  loadHearingRecord,
+  saveHearingRecord,
+} from '@agent/core/surface/hearing-runtime';
+import { hearingMissionId, type MissionBrief } from '@agent/core/surface/hearing-mission';
 import {
   registerHearingMissionRoutes,
   type HearingRecordWithMissionHandoff,

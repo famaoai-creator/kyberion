@@ -150,7 +150,7 @@ export function productSourceFiles(): string[] {
 export function describeStoreGrantBoundary(
   title: string,
   boundary: StoreGrantBoundary,
-  options: { formerConsumers?: readonly string[] } = {}
+  options: { formerConsumers?: readonly string[]; privateModuleExportPath?: string } = {}
 ): void {
   const base = moduleBase(boundary);
   const issuers = [...boundary.issuers.keys()];
@@ -159,7 +159,8 @@ export function describeStoreGrantBoundary(
       const manifest = safeReadFile(path.join(process.cwd(), 'libs/core/package.json'), {
         encoding: 'utf8',
       }) as string;
-      expect(manifest).not.toContain(base);
+      // A public bridge may share the private module's basename prefix.
+      expect(manifest).not.toContain(options.privateModuleExportPath ?? base);
       expect(JSON.parse(manifest).exports?.['./*']).toBeUndefined();
     });
 

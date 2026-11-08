@@ -15,6 +15,7 @@ import {
 } from '@agent/core/organization/organization-operating-model-persistence';
 import { listOrganizationOperationRuns } from '@agent/core/organization/organization-operating-model-operations';
 import { collectDeliverableInbox } from './deliverable-inbox';
+import { viewerPersonIds } from '@agent/core/surface/surface-authorization';
 import { buildApprovalQueueItems } from './su-surface-data';
 import {
   withViewerExecutionContext,
@@ -147,7 +148,10 @@ export function collectWorkspaceOverview(
     'library',
     () =>
       collectDeliverableInbox({
+        requestedTenant: selection.tenant_slug,
         tenantSlugs: scope.tenantSlugs,
+        includeUntenanted: viewer.includeUntenanted,
+        personIds: viewerPersonIds(viewer),
         organizationIds: scope.organizationIds,
         projectIds: scope.projectIds,
         tier: selection.tier ?? '',
@@ -167,6 +171,7 @@ export function collectWorkspaceOverview(
         viewer: narrowedViewer,
         workspace: scope,
         tenantSlugs: scope.tenantSlugs,
+        includeUntenanted: viewer.includeUntenanted,
         limit: 50,
       }).map((item) => ({ id: item.id, title: item.title, status: item.status })),
     []

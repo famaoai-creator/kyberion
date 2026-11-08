@@ -21,7 +21,10 @@ import { toWireError } from '@agent/core/contracts/wire-error';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
-import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
+import {
+  authorizeSurfaceOperation,
+  type SurfaceAuthorizationContext,
+} from '@agent/core/surface/surface-authorization';
 import {
   ConciergeViewerError,
   defaultTierAccess as conciergeDefaultTierAccess,
@@ -69,6 +72,7 @@ export function defaultTierAccess(role: ChronosAccessRole): OsKnowledgeTier[] {
 
 export function toSurfaceAuthorizationContext(viewer: ViewerContext): SurfaceAuthorizationContext {
   return {
+    ...(viewer.permissions !== undefined ? { permissions: viewer.permissions } : {}),
     role: viewer.role,
     tenantSlugs: viewer.tenantSlugs,
     organizationIds: viewer.organizationIds ?? 'all',
@@ -82,6 +86,20 @@ export function toSurfaceAuthorizationContext(viewer: ViewerContext): SurfaceAut
     // loses its company-less records in every reader of this context.
     ...(viewer.includeUntenanted ? { includeUntenanted: true } : {}),
   };
+}
+
+/** Tier and effective read permissions are independent of row custody admission. */
+export function viewerCanReadTier(viewer: ViewerContext, tier: unknown): boolean {
+  if (tier !== 'public' && tier !== 'confidential' && tier !== 'personal') return false;
+  return authorizeSurfaceOperation({
+    context: toSurfaceAuthorizationContext(viewer),
+    operation: {
+      operationId: 'ops.reader.read',
+      effect: 'read',
+      requiredPermissions: ['surface.headless.read'],
+    },
+    resource: { tier },
+  }).allowed;
 }
 
 export function resolveViewerTierAccess(

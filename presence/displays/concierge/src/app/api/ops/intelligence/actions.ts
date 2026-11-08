@@ -10,6 +10,7 @@ import {
   resolveApprovalTenant,
   approvalMatchesWorkspace,
 } from '../../../../lib/ops/su-surface-data';
+import { custodyOfScope, viewerPersonIds } from '@agent/core/surface/surface-authorization';
 import type { ResolvedWorkspaceScope } from '@agent/core/surface/workspace-scope';
 import { memoryCandidateVisibleToViewer } from '../../../../lib/ops/knowledge-scope';
 import {
@@ -179,13 +180,17 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
     const workspaceViewer = resolvedViewer.context as typeof resolvedViewer.context &
       Partial<ResolvedWorkspaceScope>;
     if (
-      !approvalMatchesWorkspace(approvalRecord, {
-        tenantSlugs: workspaceViewer.tenantSlugs,
-        organizationIds: workspaceViewer.organizationIds ?? 'all',
-        projectIds: workspaceViewer.projectIds ?? 'all',
-        tierAccess: workspaceViewer.tierAccess ?? ['public', 'confidential'],
-        selection: workspaceViewer.selection ?? { kind: 'tenant' },
-      })
+      !approvalMatchesWorkspace(
+        approvalRecord,
+        {
+          tenantSlugs: workspaceViewer.tenantSlugs,
+          organizationIds: workspaceViewer.organizationIds ?? 'all',
+          projectIds: workspaceViewer.projectIds ?? 'all',
+          tierAccess: workspaceViewer.tierAccess ?? ['public', 'confidential'],
+          selection: workspaceViewer.selection ?? { kind: 'tenant' },
+        },
+        resolvedViewer.context
+      )
     )
       return NextResponse.json({ error: 'Approval request not found' }, { status: 404 });
     if (
@@ -201,7 +206,21 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
       resolvedViewer.context,
       typeof body?.tenant === 'string' ? body.tenant : undefined
     );
-    if (allowedTenants !== 'all' && (!approvalTenant || !allowedTenants.includes(approvalTenant))) {
+    const approvalCustody = custodyOfScope(approvalRecord.scope);
+    if (approvalCustody.kind === 'invalid') {
+      return NextResponse.json({ error: 'Invalid approval custody' }, { status: 403 });
+    }
+    if (approvalCustody.kind === 'person' && typeof body.tenant === 'string') {
+      return NextResponse.json(
+        { error: 'Approval is outside the selected tenant' },
+        { status: 403 }
+      );
+    }
+    if (
+      approvalCustody.kind !== 'person' &&
+      allowedTenants !== 'all' &&
+      (!approvalTenant || !allowedTenants.includes(approvalTenant))
+    ) {
       return NextResponse.json(
         { error: 'Approval is outside the viewer tenant scope' },
         { status: 403 }
@@ -238,6 +257,25 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
       );
     if (bindingDenied) {
       return NextResponse.json({ error: 'member binding could not be verified' }, { status: 403 });
+    }
+    // A person-bound approval can only be decided by its owner — a
+    // decision-capable membership on any tenant does not extend to
+    // another person's records (P4 custody on the decision path).
+    const decisionCustody = custodyOfScope(
+      approvalRecord.scope as
+        { tenant_slug?: string; owner_nhi?: string; nhi_id?: string } | undefined
+    );
+    if (decisionCustody.kind === 'person') {
+      const deciderIds = new Set([
+        ...viewerPersonIds(resolvedViewer.context),
+        ...(decisionMember ? [decisionMember.member_id] : []),
+      ]);
+      if (!deciderIds.has(decisionCustody.ref)) {
+        return NextResponse.json(
+          { error: 'Only the owner may decide this request' },
+          { status: 403 }
+        );
+      }
     }
     let decisionRole: 'owner' | 'approver' | 'sovereign' = 'sovereign';
     if (decisionMember) {

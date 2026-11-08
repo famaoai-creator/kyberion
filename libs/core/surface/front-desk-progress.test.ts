@@ -534,6 +534,19 @@ describe('record mappers shared by Concierge and presence-studio', () => {
 describe('progressRecordInScope', () => {
   const all = { tenantSlugs: 'all', organizationIds: 'all', projectIds: 'all' } as const;
   const alpha = { ...all, tenantSlugs: ['alpha'] };
+  it('admits own person across finite tenant scope while refusing malformed or contradictory aliases', () => {
+    const owner = { ...alpha, principalId: 'alice' };
+    expect(progressRecordInScope(owner, { nhi_id: 'alice' })).toBe(true);
+    expect(progressRecordInScope(owner, { scope: { owner_nhi: 'alice' } })).toBe(true);
+    expect(progressRecordInScope(owner, { nhi_id: 'bob' })).toBe(false);
+    for (const row of [
+      { owner_nhi: '', nhi_id: 'alice' },
+      { nhi_id: 12 },
+      { scope: { owner_nhi: 'alice' }, context: { owner_nhi: 'bob' } },
+      { owner_nhi: 'alice', nhi_id: 'bob' },
+    ])
+      expect(progressRecordInScope({ ...all, principalId: 'alice' }, row)).toBe(false);
+  });
 
   it('reads the tenant directly or from a nested scope envelope', () => {
     expect(progressRecordTenant({ tenant_slug: ' alpha ' })).toBe('alpha');

@@ -1213,14 +1213,14 @@ security-policy のパスの一覧だけで効いている（門番のコード�
 
 **段階の計画。** どの段階も挙動を変えず、旧と新の tier-guard の判定を並べて確かめる。
 
-| 段階 | 内容                                                                                                                                                                                                | 状態                     |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| (a)  | 許可証の登録簿（`foundation/store-grant-registry.ts`）。各 capability モジュールが読み込まれたときに自分の判定（認可・絞り込み・内容検査・構造上の mkdir）を登録し、tier-guard は登録簿だけに尋ねる | 実施（下）               |
-| (b)  | カタログに `grant_required` / `issuer` / `content_check` / `shape` を宣言し、カタログのゲートが登録簿の id と発行者の登録を突き合わせる                                                             | 未実施                   |
-| (c)  | Concierge の Web 管理の 3 つの規則（祖先のメタデータ、祖先の mkdir、網羅の読み取り）をカタログの宣言にし、2 つのロールを外す                                                                        | 実施（G3 第 2 段階）     |
-| (d)  | パスだけのロール 3 件と、門番に分岐の無い 24 件を許可証かカタログの形にする                                                                                                                         | 実施（G3 第 2 段階）     |
-| (e)  | tier-guard の各入口を `decide(主体, 住所, 操作, 内容)` に通す                                                                                                                                       | 実施（G3 第 2 段階）     |
-| (f)  | secure-io の import を削る                                                                                                                                                                          | 未実施（考え直す条件 2） |
+| 段階 | 内容                                                                                                                                                                                                | 状態                               |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| (a)  | 許可証の登録簿（`foundation/store-grant-registry.ts`）。各 capability モジュールが読み込まれたときに自分の判定（認可・絞り込み・内容検査・構造上の mkdir）を登録し、tier-guard は登録簿だけに尋ねる | 実施（下）                         |
+| (b)  | カタログに `grant_required` / `issuer` / `content_check` / `shape` を宣言し、カタログのゲートが登録簿の id と発行者の登録を突き合わせる                                                             | 未実施                             |
+| (c)  | Concierge の Web 管理の 3 つの規則（祖先のメタデータ、祖先の mkdir、網羅の読み取り）をカタログの宣言にし、2 つのロールを外す                                                                        | 実施（G3 第 2 段階）               |
+| (d)  | パスだけのロール 3 件と、門番に分岐の無い 24 件を許可証かカタログの形にする                                                                                                                         | 実施（G3 第 2 段階）               |
+| (e)  | tier-guard の各入口を `decide(主体, 住所, 操作, 内容)` に通す                                                                                                                                       | 実施（G3 第 2 段階）               |
+| (f)  | secure-io の import を削る                                                                                                                                                                          | identity 分離を実施、40 以下は未達 |
 
 **第 1 段階 (a): 許可証の登録簿。**
 
@@ -1339,6 +1339,23 @@ policy engine）の分離として別の段階に置くか。これらを決め�
 - **secure-io の依存の分離**: secure-io が tier-guard を除いても読み込む 33（audit chain、policy engine、
   governance action recorder など）を、遅延の読み込みか別の package に分ける。G3 の前に決めた 40 以下は
   この段階の目標にする。
+
+  **統合レビュー（MSN-SCOPE-SECIO-REVIEW-20261108）。** 当初の 50 → 40 という計測値は、
+  監査の永続化を未登録 recorder 待ちのキューへ変える案によるもので、採用しない。
+  - 未登録時のキューは送信時の tenant/authority を保持せず、別テナントで登録されたときに監査を
+    付け替える危険がある。recorder が読み込まれなければ永続化されず、256 件を超える記録も失う。
+    従来の `auditChain.recordDeferrable` は送信時に帰属を検査し、audit lock の内側だけ検証済みの
+    記録を解放時へ遅延する。governance-action の任意 sink と同じ契約ではない。
+  - secure-io は canonical audit-chain と governance-action-recorder を引き続き静的に読み込み、
+    従来の同期記録・帰属検査・lock 解放時の drain を維持する。新しいキューと IO 登録簿は追加しない。
+  - `foundation/identity-context.ts` に sole-resolver の軽量登録簿と defaultResolver を移し、
+    `identity-context-bridge.ts` は seam 登録 + 軽量登録簿の二重登録だけを行う（公開 API は再輸出で
+    不変）。tier-guard / `engine-runtime-preferences-access` が bridge → seam → invariants の
+    3 本を引かなくなった。既存ゲートの計数規則で再計測した結果は **50 → 48**。
+    実測値に baseline を下げ、40 以下の目標達成とは扱わない。
+  - 残るゲート常駐の規則（policy-engine = fail-closed の実判定、shell/sandbox-policy の SSRF 検査）は
+    静的 import のまま — 未読み込み時に黙って素通しになる形にはしない。
+
 - **流れの分解**: `dot_lifecycle_writer` と `concierge_management_writer` は、流れの facade が保存先ごとに
   許可証を発行する形に分けるまでロールのまま残す。
 
@@ -1436,6 +1453,40 @@ secure-io の 40 以下は別の段階）。上の表は G0 の時点の見込�
 
 意図して挙動を変える箇所（内容検査の移動、`system` / `person` の許可証の追加）は、食い違いとして
 記録し、一件ずつ理由を残して受け入れる。
+
+**後続フォローアップ（MSN-SCOPE-FOLLOWUP-20261107、決めたこと）。**
+
+- **横断して読むロール 3 件は残す（P4 の判断）。** `workspace_graph_reader`、
+  `concierge_management_reader`、`peer_responder_reader` は「プロセスが複数テナントの保存先を
+  読める」という I/O 権限であり、P4 で揃えた custody admission はその内側で「viewer にどの行を
+  開示するか」を決める別の層。ロールを外すには保存先レベルの許可証化（流れの分解の段階）が要る。
+- **派生台帳の storeRole 案（P3 F9）は統合レビューで置き換えた。** 当初案の
+  `asset_derivation_store` は、共有ロールへの切替と tenant 束縛の解除で他の区画にも書けるため、
+  producer の証明を安全に担えない。PR1442 の保護された producer receipt と限定された同期読取りを
+  正本とし、新しい共有ロール・権限宣言・バックアップ時のロール切替は追加しない。
+  custodian index は探索用であり、それだけでは削除権限にならない。来歴の記録は既存の governed
+  producer 3 ロールに限定し、source/output の世代・ハッシュ・custody を証明で検証する。
+  `personal/<ref>` はメンバー区画であり tenant としてバックアップ・削除しない。
+- **janitor 配線は既に充足。** retention カタログの
+  `active/shared/runtime/asset-derivations`（`action: review_required`）が台帳を「報告するが自動削除
+  しない」状態にしている — 削除は派生関係グラフ（R-09）に従うため。`runtime-store-retention` ゲートが
+  エントリを強制する。
+- **P4 レビューの残件 4 件もこのミッションで閉じた**: `approval_decision` の owner チェック
+  （person custody の承認は owner のみが決定できる）、`approvalMatchesScope` の unscoped/'all'
+  早期許可への custody ゲート、deliverable-inbox の public 早期リターンを custody 評価の後ろへ、
+  presence-studio の `presenceStudioRecordInScope` に `owner_nhi` クレームと custody admission。
+- **2 回目のレビュー（ブロッキング 2 件）。**
+  - `nhi_id` も person 束縛として読む。governed 承認レコードの person 束縛は `nhi_id`
+    で書かれる（`approval-review-scope.ts` が `owner_nhi !== nhi_id` を同一語彙として突合）。
+    `custodyOfScope` が `owner_nhi` だけを読むと `{tier:'confidential', nhi_id}` の無テナント
+    レコードが system custody に落ちて全員に開示・全員が決定できる — 両フィールドを読み
+    `tenant_slug > owner_nhi/nhi_id > system` の順で決める。なお knowledge ドメインの
+    「`nhi_id` から personal 置き場を推論しない」契約は保存先推論の層の話であり、開示層では
+    `nhi_id` を person 束縛として扱う方が fail-closed で整合する。
+  - 当初の `asAssetDerivationStore` は personal/system 追記時に ambient tenant を解除していたが、
+    解除は authority の代わりにならない。統合版ではこの helper 自体を採用せず、既存の呼出し元の
+    権限・resource ceiling を保つ。system producer 権限と confidential tenant-container の権限は
+    別に検査し、保護された来歴を混合テナントのエラー詳細から漏らさない。
 
 ## スコープモデルとの対応
 

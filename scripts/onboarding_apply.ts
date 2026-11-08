@@ -673,7 +673,7 @@ export function buildApplySummary(
     `1. Export the persona in your shell: \`export KYBERION_PERSONA=${resolveInputPersona(input)}\` (.env.local is not loaded by pnpm scripts).`,
     `2. ${activationNextStep(paths.activation)}`,
     '3. Run `pnpm pipeline --input pipelines/baseline-check.json` and continue the onboarding flow from its status.',
-    '4. Open Presence Studio Home and inspect First Job readiness at /first-job.',
+    '4. Open Concierge and inspect First Job readiness at /first-job.',
     '5. For an explicit public diagnostic setup, preview pnpm onboarding first-job --tenant <new-test-tenant> --json. See docs/developer/FIRST_JOB_DIAGNOSTIC_OPERATIONS.ja.md.',
   ];
   return lines.join('\n');

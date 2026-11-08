@@ -22,6 +22,12 @@ import { loadMissionStaffingAssignments } from '../mission/mission-team-binding.
 import { buildNhiLedgerReport } from '../agent/nhi-lifecycle-governance.js';
 import { loadMissionManagementConfig } from '../mission/mission-management-config.js';
 import { nowIso } from '../foundation/time.js';
+import {
+  admitsCustody,
+  custodyOfScope,
+  viewerPersonIds,
+  type ViewerRecordCustody,
+} from './surface-authorization.js';
 import { t } from '../localization/t.js';
 
 export interface OperatorHomeMissionItem {
@@ -184,6 +190,12 @@ export interface OperatorHomeScopeFilter {
   includeUntenanted?: boolean;
   /** Personal workspace only: admit already owner-authenticated personal approval rows. */
   includePersonalApprovals?: boolean;
+  /**
+   * The viewer's own person ids, resolved server-side upstream — admits
+   * person-custody records to their owner only. Identity-bound, never
+   * scope-bound: `tenantSlugs: 'all'` does not admit another person's data.
+   */
+  personIds?: readonly string[];
 }
 
 function scopeAllows(allowed: string[] | 'all' | undefined, value: string | undefined): boolean {
@@ -205,6 +217,30 @@ function legacyTenantOf(record: unknown): string | undefined {
 }
 
 /**
+ * Custody admission for this filter — `tenantSlugs` absent behaves as the
+ * historical unscoped "admit everything" (`'all'`); `legacyTenant` only
+ * disqualifies company-less (system-custody) records for enumerated tenant
+ * scopes, exactly as before. Person custody is admitted to the record's
+ * owner via `personIds`; everything routes through `admitsCustody`, the one
+ * rule every viewer-scoped reader shares.
+ */
+function scopeAdmitsCustody(
+  scope: OperatorHomeScopeFilter | undefined,
+  custody: ViewerRecordCustody,
+  legacyTenant?: string
+): boolean {
+  if (custody.kind === 'system' && Array.isArray(scope?.tenantSlugs) && legacyTenant) return false;
+  return admitsCustody(
+    {
+      tenantSlugs: scope?.tenantSlugs ?? 'all',
+      includeUntenanted: scope?.includeUntenanted,
+      personIds: scope?.personIds,
+    },
+    custody
+  );
+}
+
+/**
  * `legacyTenant` only decides whether a record without `tenantSlug` really
  * belongs to no company; tenant matching itself still uses `tenantSlug`.
  */
@@ -213,8 +249,11 @@ function tenantScopeAllows(
   tenantSlug: string | undefined,
   legacyTenant?: string
 ) {
-  if (!tenantSlug && scope?.includeUntenanted && !legacyTenant) return true;
-  return scopeAllows(scope?.tenantSlugs, tenantSlug);
+  return scopeAdmitsCustody(
+    scope,
+    tenantSlug ? { kind: 'tenant', ref: tenantSlug } : { kind: 'system' },
+    legacyTenant
+  );
 }
 
 function missionMatchesScope(
@@ -642,8 +681,17 @@ export function collectOperatorHomeSummary(
         input.scope
       );
     }
-    if (!input.scope || !isScoped) return true;
     const scope = approval.scope;
+    const custody = custodyOfScope(scope);
+    // An unscoped or all-'all' filter still cannot admit another person's
+    // records — person custody is identity-bound, not scope-bound.
+    if (!input.scope || !isScoped)
+      return (
+        custody.kind === 'system' ||
+        custody.kind === 'tenant' ||
+        (custody.kind === 'person' &&
+          viewerPersonIds({ personIds: input.scope?.personIds }).includes(custody.ref))
+      );
     const missionId =
       scope?.mission_id || approval.requestedByContext?.missionId || approval.steering?.missionId;
     const tenantSlug = scope?.tenant_slug;
@@ -654,18 +702,32 @@ export function collectOperatorHomeSummary(
     const tier = scope?.tier;
     const organizationId = scope?.organization_id;
     const projectId = scope?.project_id;
-    if (scope?.tier || scope?.tenant_slug || scope?.organization_id || scope?.project_id) {
+    // A person-bound scope must reach the custody check even when it carries
+    // none of the scope axes — the fallthroughs below would otherwise leak it
+    // to the mission's tenant or the system selection.
+    if (
+      scope?.tier ||
+      scope?.tenant_slug ||
+      scope?.organization_id ||
+      scope?.project_id ||
+      custody.kind === 'person'
+    ) {
       if (Array.isArray(input.scope.tiers) && !scopeAllows(input.scope.tiers, tier)) {
         // An explicit scope cannot be rescued by a visible mission label.
         // Mission-only fallback below is reserved for legacy unscoped rows.
         return false;
       }
       return (
-        (tenantScopeAllows(input.scope, tenantSlug, legacyTenant) ||
+        (scopeAdmitsCustody(input.scope, custody, legacyTenant) ||
           (input.scope.includePersonalApprovals === true &&
             tier === 'personal' &&
             !tenantSlug &&
-            !legacyTenant)) &&
+            !legacyTenant &&
+            // Defense in depth: a row that names its owner is person-custody
+            // even inside the owner-authenticated snapshot.
+            (custody.kind === 'system' ||
+              (custody.kind === 'person' &&
+                viewerPersonIds({ personIds: input.scope.personIds }).includes(custody.ref))))) &&
         scopeAllows(input.scope.organizationIds, organizationId) &&
         scopeAllows(input.scope.projectIds, projectId)
       );

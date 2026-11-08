@@ -44,6 +44,7 @@ export function GET(req: NextRequest) {
       missionId: readChronosOptionalStringParam(url.searchParams.get('missionId')),
       tenant: readChronosOptionalStringParam(url.searchParams.get('tenant')),
       tenantSlugs,
+      includeUntenanted: resolvedViewer.context.includeUntenanted,
       channel: readChronosOptionalStringParam(url.searchParams.get('channel')),
       limit: Number(readChronosStringParam(url.searchParams.get('limit')) || 24),
     });

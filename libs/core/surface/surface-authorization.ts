@@ -7,6 +7,7 @@
  */
 
 import type { ResolvedPrincipal } from '../authn/authn-principal-resolver.js';
+import { isValidTenantSlug } from '../foundation/scope.js';
 
 export type SurfaceAuthorizationRole = 'readonly' | 'localadmin';
 export type SurfaceAuthorizationEffect = 'read' | 'write';
@@ -108,6 +109,150 @@ function denied(
 }
 
 /**
+ * Custody kind of a disclosed record — the same system / tenant / person
+ * vocabulary as asset derivation custody (P3). `person` records MUST name
+ * their person: disclosure can never admit "somebody's" data anonymously.
+ */
+export type ViewerRecordCustody =
+  | { kind: 'system' }
+  | { kind: 'tenant'; ref: string }
+  | { kind: 'person'; ref: string }
+  | { kind: 'invalid' };
+
+function validPersonId(id: unknown): id is string {
+  return typeof id === 'string' && id.length > 0 && id.trim() === id && id !== '*';
+}
+
+/**
+ * The server-resolved viewer scope fields custody admission reads. Readers
+ * whose scope type is a projection filter (e.g. OperatorHomeScopeFilter)
+ * carry the already-resolved person id set as `personIds` instead of the
+ * principal fields.
+ */
+export type ViewerCustodyContext = Pick<
+  SurfaceAuthorizationContext,
+  'tenantSlugs' | 'includeUntenanted' | 'memberId' | 'principalId' | 'principal'
+> & {
+  /** Person ids resolved server-side upstream and carried by scope projections. */
+  personIds?: readonly string[];
+};
+
+/**
+ * The person identity set of a viewer, taken only from server-resolved
+ * context fields (token-bound member id, authenticated principal) or an
+ * upstream-resolved `personIds` projection. Person custody admission is
+ * exact-match against this set — no id-space translation, fail-closed.
+ */
+export function viewerPersonIds(
+  context: Pick<SurfaceAuthorizationContext, 'memberId' | 'principalId' | 'principal'> & {
+    personIds?: readonly string[];
+  }
+): readonly string[] {
+  const ids = [
+    ...(Array.isArray(context.personIds) ? context.personIds : []),
+    context.memberId,
+    context.principal?.actor?.id,
+    context.principalId,
+  ];
+  return [...new Set(ids.filter(validPersonId))];
+}
+
+/**
+ * Row-level custody admission shared by every reader that takes a viewer
+ * scope (P4 generalization of `admitsTenant`):
+ * - `tenant`  — `'all'` admits; otherwise membership in `tenantSlugs`.
+ * - `system`  — what "untenanted" always meant: `'all'` admits, otherwise
+ *   only when the server-resolved scope sets `includeUntenanted`.
+ * - `person`  — identity-bound, never scope-bound: admitted only when the
+ *   custody ref is one of the viewer's own person ids. `'all'` does NOT
+ *   admit another person's records.
+ * It never widens the scope: callers still apply tier / organization /
+ * project on top.
+ */
+export function admitsCustody(
+  context: ViewerCustodyContext,
+  custody: ViewerRecordCustody
+): boolean {
+  if (!custody || typeof custody !== 'object') return false;
+  if (custody.kind === 'tenant') {
+    if (typeof custody.ref !== 'string' || !isValidTenantSlug(custody.ref)) return false;
+    return context.tenantSlugs === 'all' || context.tenantSlugs.includes(custody.ref);
+  }
+  if (custody.kind === 'system') {
+    return context.tenantSlugs === 'all' || context.includeUntenanted === true;
+  }
+  return (
+    custody.kind === 'person' &&
+    validPersonId(custody.ref) &&
+    viewerPersonIds(context).includes(custody.ref)
+  );
+}
+
+/**
+ * Derive the custody of a record scope: a tenant slug binds the record to
+ * that tenant; absent a tenant, a person reference binds it to that person;
+ * anything else is system custody. The person field is `owner_nhi` on
+ * memory-scope envelopes and `nhi_id` on governed (event-scope) records —
+ * approval-review-scope already treats the two as one binding
+ * (`owner.scope.owner_nhi !== approval.scope?.nhi_id`). Records without a
+ * person field keep their previous tenant/system behavior.
+ */
+export function custodyOfScope(
+  scope: { tenant_slug?: unknown; owner_nhi?: unknown; nhi_id?: unknown } | null | undefined
+): ViewerRecordCustody {
+  if (scope != null && (typeof scope !== 'object' || Array.isArray(scope)))
+    return { kind: 'invalid' };
+  // Preserve legacy null/empty tenant absence; declared malformed ownership
+  // never becomes installation-owned data through a truthiness fallback.
+  if (
+    scope?.tenant_slug != null &&
+    scope.tenant_slug !== '' &&
+    (typeof scope.tenant_slug !== 'string' || !isValidTenantSlug(scope.tenant_slug))
+  )
+    return { kind: 'invalid' };
+  if (scope?.owner_nhi != null && !validPersonId(scope.owner_nhi)) return { kind: 'invalid' };
+  if (scope?.nhi_id != null && !validPersonId(scope.nhi_id)) return { kind: 'invalid' };
+  if (scope?.owner_nhi != null && scope?.nhi_id != null && scope.owner_nhi !== scope.nhi_id)
+    return { kind: 'invalid' };
+  if (typeof scope?.tenant_slug === 'string' && scope.tenant_slug)
+    return { kind: 'tenant', ref: scope.tenant_slug };
+  if (validPersonId(scope?.owner_nhi)) return { kind: 'person', ref: scope.owner_nhi };
+  if (validPersonId(scope?.nhi_id)) return { kind: 'person', ref: scope.nhi_id };
+  return { kind: 'system' };
+}
+
+/**
+ * Custody admission plus the record's own explicit share list. A
+ * person-custody record may carry `allowed_audience` — a brokered
+ * disclosure grant written by its owner: audience members are admitted by
+ * identity (exact match against the viewer's person ids), never by scope.
+ * For tenant/system custody the audience list grants nothing.
+ */
+export function admitsScopeAudience(
+  context: ViewerCustodyContext,
+  scope:
+    | {
+        tenant_slug?: string | null;
+        owner_nhi?: string | null;
+        nhi_id?: string | null;
+        allowed_audience?: readonly string[] | null;
+      }
+    | null
+    | undefined
+): boolean {
+  if (
+    scope?.allowed_audience != null &&
+    (!Array.isArray(scope.allowed_audience) || !scope.allowed_audience.every(validPersonId))
+  )
+    return false;
+  const custody = custodyOfScope(scope);
+  if (admitsCustody(context, custody)) return true;
+  if (custody.kind !== 'person') return false;
+  const ids = viewerPersonIds(context);
+  return (scope?.allowed_audience ?? []).some((id) => ids.includes(id));
+}
+
+/**
  * Row-level tenant admission shared by every reader that takes a viewer scope.
  * `'all'` admits every record; a record with no tenant is admitted only when
  * the server-resolved scope sets `includeUntenanted` (the shell's system
@@ -118,9 +263,10 @@ export function admitsTenant(
   context: Pick<SurfaceAuthorizationContext, 'tenantSlugs' | 'includeUntenanted'>,
   tenantSlug: string | null | undefined
 ): boolean {
-  if (context.tenantSlugs === 'all') return true;
-  if (!tenantSlug) return context.includeUntenanted === true;
-  return context.tenantSlugs.includes(tenantSlug);
+  return admitsCustody(
+    context,
+    tenantSlug ? { kind: 'tenant', ref: tenantSlug } : { kind: 'system' }
+  );
 }
 
 export function permissionsForSurfaceRole(
