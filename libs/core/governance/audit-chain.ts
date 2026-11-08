@@ -594,6 +594,15 @@ class AuditChainImpl {
     if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot))
       throw new Error('[AUDIT_INPUT_INVALID] audit record must serialize to an object');
     entry = snapshot as AuditRecordInput;
+    const tenantInput = (value: unknown): string | undefined => {
+      if (value === undefined || value === null || value === '') return undefined;
+      if (typeof value !== 'string')
+        throw new Error('[AUDIT_SCOPE_INVALID] audit tenant identifiers must be strings');
+      return value;
+    };
+    entry.tenantSlug = tenantInput(entry.tenantSlug);
+    const scopeTenant = tenantInput(entry.scope?.tenant_slug);
+    if (entry.scope) entry.scope = { ...entry.scope, tenant_slug: scopeTenant };
     if (entry.tenantSlug && activeTenantSlug && entry.tenantSlug !== activeTenantSlug) {
       throw new Error(
         `[AUDIT_SCOPE_DENIED] tenantSlug '${entry.tenantSlug}' conflicts with active tenant '${activeTenantSlug}'`
