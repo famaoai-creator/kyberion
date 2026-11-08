@@ -14,6 +14,7 @@ import {
   parseEventScopeFromRecord,
   type EventScopeInput,
 } from '@agent/core/event-scope';
+import { admitsCustody, custodyOfScope } from '@agent/core/surface/surface-authorization';
 import type { SurfaceViewerScope } from '@agent/core/surface/surface-mutation-guard';
 import { normalizeLocale } from '@agent/core/foundation/locale-normalize';
 import {
@@ -41,8 +42,17 @@ export function workHomeRecordInScope(viewer: SurfaceViewerScope, value: unknown
     tenant_id: 'tenant_slug',
     organizationId: 'organization_id',
     projectId: 'project_id',
+    ownerNhi: 'owner_nhi',
+    nhiId: 'nhi_id',
   };
-  const fields = new Set(['tier', 'tenant_slug', 'organization_id', 'project_id']);
+  const fields = new Set([
+    'tier',
+    'tenant_slug',
+    'organization_id',
+    'project_id',
+    'owner_nhi',
+    'nhi_id',
+  ]);
   function collect(input: unknown, depth: number): boolean {
     if (!input || typeof input !== 'object' || Array.isArray(input) || depth > 3) return false;
     const record = input as Record<string, unknown>;
@@ -77,8 +87,16 @@ export function workHomeRecordInScope(viewer: SurfaceViewerScope, value: unknown
   try {
     const normalized = normalizeEventScope(claims as EventScopeInput);
     return (
-      (viewer.tenantSlugs === 'all' ||
-        Boolean(normalized.tenant_slug && viewer.tenantSlugs.includes(normalized.tenant_slug))) &&
+      // `owner_nhi` is not an EventScope field (`nhi_id` is) — feed both
+      // to custody derivation so an owner-bound record admits to its owner only.
+      admitsCustody(
+        viewer,
+        custodyOfScope({
+          tenant_slug: normalized.tenant_slug,
+          owner_nhi: claims.owner_nhi,
+          nhi_id: claims.nhi_id,
+        })
+      ) &&
       (viewer.organizationIds === 'all' ||
         Boolean(
           normalized.organization_id && viewer.organizationIds.includes(normalized.organization_id)

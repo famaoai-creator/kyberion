@@ -615,6 +615,24 @@
       "note": "Tenant delegation traces, resumable records, child inboxes and completion notifications share this confidential partition. Untenanted delegations use the separate system/ partition; mixed legacy traces, records and notification queues are read-only fallbacks, not tenant custody inferred from this declaration."
     },
     {
+      "id": "runtime.asset-derivations",
+      "path": "active/shared/runtime/asset-derivations/confidential/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>"
+      },
+      "tiers": ["confidential"],
+      "status": "active",
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "ledger",
+        "key": "asset_derivations",
+        "order": 7,
+        "retention_path": "active/shared/runtime/asset-derivations"
+      },
+      "note": "P3 source-custodian derivation indexes and deletion audit. Protected system/derivations.jsonl holds producer issuance receipts binding source/output paths and hashes; a custodian index alone is not deletion authority. The tenant offboarding facade checks ordinary permission on its own index before an exact synchronous receipt read grant, then plans from a filtered private snapshot after grant revocation. Foreign tenant indexes are not enumerated. personal/<ref> is member-keyed and never swept as a tenant partition."
+    },
+    {
       "id": "runtime.execution-metrics",
       "path": "active/shared/runtime/execution-metrics",
       "custody": {

@@ -31,6 +31,7 @@ export function resolveDiscussionRequestScope(
           missionId,
           tier: 'confidential',
           tenantSlugs: strictViewerScopeTenantSlugs(viewer, tenant),
+          includeUntenanted: viewer.includeUntenanted,
           organizationIds: strictViewerScopeOrganizationIds(viewer, organization),
           projectIds: strictViewerScopeProjectIds(viewer, project),
           limit: 1,

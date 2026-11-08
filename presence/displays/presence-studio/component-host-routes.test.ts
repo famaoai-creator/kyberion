@@ -10,7 +10,7 @@ import {
   unknownComponentOperations,
 } from '@agent/core/ui-component-registry';
 import { buildPresenceHeadlessManifest } from './headless.js';
-import { applyHearingTurn, createHearingRecord } from './hearing.js';
+import { applyHearingTurn, createHearingRecord } from '@agent/core/surface/hearing';
 import { defaultCatalogScenario } from './hearing-routes.js';
 import {
   FLOW_VOCABULARY_KEYS,

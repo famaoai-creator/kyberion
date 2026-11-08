@@ -36,7 +36,7 @@ status: active
 
 ### 1.2 ヒアリング surface で成立していること(HT-01〜03 第 1 段)
 
-- `HearingScenario`(要件 id・語彙キー・別名)を差し替えられ、会話ターンから要件を埋める純関数と充足率がある(`presence/displays/presence-studio/hearing.ts`)。
+- `HearingScenario`(要件 id・語彙キー・別名)を差し替えられ、会話ターンから要件を埋める純関数と充足率がある(`libs/core/surface/hearing.ts`。2026-11-08 に presence-studio から移動)。
 - キャンバスは固定テンプレート(`hearing-runtime.ts` の `renderHearingCanvas`)を fallback に、モデル生成 + サニタイズ(`hearing-canvas.ts`)。
 - `decide` は全項目回答済みのときだけ、決定者は `HearingDecidedBy`(`kind: 'human'`、メンバー id、owner / approver / viewer)。確定した記録は mission brief に写像して `mission_controller` へ(`hearing-mission.ts`)。
 - **欠けているもの**: 記録の置き場が `active/shared/tmp/hearing/`(24 時間 TTL の床)で台帳にならない。決めた要件の下流は brief の自由文。顧客同席時の `on_behalf_of` は未定義。
