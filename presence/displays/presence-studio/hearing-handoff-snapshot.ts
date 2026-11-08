@@ -5,7 +5,7 @@ import {
   type HearingHandoffSnapshot,
 } from '@agent/core/surface/hearing-handoff-snapshot';
 import type { HearingRecord } from '@agent/core/surface/hearing';
-import { PRESENCE_STUDIO_HEARING_COMPLETION } from './hearing-completion.js';
+import { presenceStudioHearingCompletion } from './hearing-completion.js';
 import { hearingViewerScope } from './hearing-request-scope.js';
 import type { PresenceStudioViewerContext } from './security.js';
 
@@ -19,7 +19,7 @@ export function hearingHandoffSnapshot(
   return hearingHandoffSnapshotForScope(
     record,
     hearingViewerScope(viewer),
-    PRESENCE_STUDIO_HEARING_COMPLETION
+    presenceStudioHearingCompletion(viewer)
   );
 }
 
@@ -31,7 +31,7 @@ export function withHearingHandoffSnapshot(
   return withHearingHandoffSnapshotForScope(
     record,
     hearingViewerScope(viewer),
-    PRESENCE_STUDIO_HEARING_COMPLETION
+    presenceStudioHearingCompletion(viewer)
   );
 }
 
@@ -45,6 +45,6 @@ export function assertHearingHandoffSnapshot(
     body,
     record,
     hearingViewerScope(viewer),
-    PRESENCE_STUDIO_HEARING_COMPLETION
+    presenceStudioHearingCompletion(viewer)
   );
 }

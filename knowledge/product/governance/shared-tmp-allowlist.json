@@ -618,6 +618,12 @@
       "note": "empty working directory for the tool-less team-channel surface runtime (Team Channel E); holds no artifacts, recreated on demand"
     },
     {
+      "file": "libs/core/surface/hearing-ledger-service.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "pending JSONL handed to the governed decisions facade (sharedTmp('hearing-ledger')): written, passed to one `decisions import` child and removed in a finally block. Moved unchanged from presence-studio hearing-ledger-routes.ts (outside this ratchet's scan roots) by MSN-SERVER-CONCIERGE-ASK-20261108"
+    },
+    {
       "file": "libs/core/surface/hearing-runtime.ts",
       "count": 1,
       "classification": "migrate-candidate",

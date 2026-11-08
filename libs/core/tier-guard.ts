@@ -909,7 +909,7 @@ function requestResourceDenial(
   if (normalizedRole && RETIRED_STORE_ROLE_NAMES.has(normalizedRole))
     return {
       allowed: false,
-      reason: `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant issuance right, not a role`,
+      reason: `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a retired store role name, not a role`,
     };
   const readRepoFile = (relative: string) => {
     const target = path.join(projectRoot(), relative);

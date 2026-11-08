@@ -21067,6 +21067,321 @@
         "en": "Pick a date",
         "ja": "日時を指定",
         "qps-ploc": "⟦Ṗïƈķ ȧ ḓȧŧė ŀőř⟧"
+      },
+      "ia_shell_automation_title": {
+        "en": "Automation",
+        "ja": "自動化",
+        "qps-ploc": "⟦Ȧůŧőɱȧŧïőñ ŀőř⟧"
+      },
+      "ia_shell_automation_subtitle": {
+        "en": "Pipeline schedules and on-demand runs.",
+        "ja": "パイプラインのスケジュールと手動実行です。",
+        "qps-ploc": "⟦Ṗïṗėŀïñė şƈħėḓůŀėş ȧñḓ őñ-ḓėɱȧñḓ řůñş. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ia_shell_automation_tab_schedules": {
+        "en": "Schedules",
+        "ja": "スケジュール",
+        "qps-ploc": "⟦Şƈħėḓůŀėş ŀőř⟧"
+      },
+      "ia_shell_automation_tab_pipelines": {
+        "en": "Pipelines",
+        "ja": "パイプライン",
+        "qps-ploc": "⟦Ṗïṗėŀïñėş ŀőř⟧"
+      },
+      "ia_shell_library_tab_minutes": {
+        "en": "Minutes",
+        "ja": "議事録",
+        "qps-ploc": "⟦Ɱïñůŧėş ŀőř⟧"
+      },
+      "automation_schedule_col_schedule": {
+        "en": "Schedule",
+        "ja": "スケジュール",
+        "qps-ploc": "⟦Şƈħėḓůŀė ŀőř⟧"
+      },
+      "automation_schedule_col_pipeline": {
+        "en": "Pipeline",
+        "ja": "パイプライン",
+        "qps-ploc": "⟦Ṗïṗėŀïñė ŀőř⟧"
+      },
+      "automation_schedule_col_trigger": {
+        "en": "Trigger",
+        "ja": "トリガー",
+        "qps-ploc": "⟦Ŧřïɠɠėř ŀőř⟧"
+      },
+      "automation_schedule_col_enabled": {
+        "en": "Enabled",
+        "ja": "有効",
+        "qps-ploc": "⟦Ėñȧƀŀėḓ ŀőř⟧"
+      },
+      "automation_schedule_col_last_run": {
+        "en": "Last run",
+        "ja": "前回の実行",
+        "qps-ploc": "⟦Ŀȧşŧ řůñ ŀőř⟧"
+      },
+      "automation_schedule_col_actions": {
+        "en": "Actions",
+        "ja": "操作",
+        "qps-ploc": "⟦Ȧƈŧïőñş ŀőř⟧"
+      },
+      "automation_schedule_empty": {
+        "en": "No schedules are registered yet.",
+        "ja": "登録されているスケジュールはありません。",
+        "qps-ploc": "⟦Ñő şƈħėḓůŀėş ȧřė řėɠïşŧėřėḓ ẏėŧ. ŀőřėɱ ïṗşů⟧"
+      },
+      "automation_schedule_run_now": {
+        "en": "Run now",
+        "ja": "今すぐ実行",
+        "qps-ploc": "⟦Řůñ ñőẇ ŀőř⟧"
+      },
+      "automation_schedule_register": {
+        "en": "Register a schedule",
+        "ja": "スケジュールを登録",
+        "qps-ploc": "⟦Řėɠïşŧėř ȧ şƈħėḓůŀė ŀőřėɱ ⟧"
+      },
+      "automation_schedule_edit": {
+        "en": "Edit",
+        "ja": "編集",
+        "qps-ploc": "⟦Ėḓïŧ ŀőř⟧"
+      },
+      "automation_schedule_edit_title": {
+        "en": "Edit schedule",
+        "ja": "スケジュールを編集",
+        "qps-ploc": "⟦Ėḓïŧ şƈħėḓůŀė ŀőřė⟧"
+      },
+      "automation_schedule_delete": {
+        "en": "Delete",
+        "ja": "削除",
+        "qps-ploc": "⟦Ḓėŀėŧė ŀőř⟧"
+      },
+      "automation_schedule_delete_confirm": {
+        "en": "Delete schedule {id}?",
+        "ja": "スケジュール {id} を削除しますか？",
+        "qps-ploc": "⟦Ḓėŀėŧė şƈħėḓůŀė {id}? ŀőřėɱ ⟧"
+      },
+      "automation_schedule_save": {
+        "en": "Save",
+        "ja": "保存",
+        "qps-ploc": "⟦Şȧṽė ŀőř⟧"
+      },
+      "automation_schedule_cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "automation_schedule_due": {
+        "en": "Due now",
+        "ja": "実行時刻です",
+        "qps-ploc": "⟦Ḓůė ñőẇ ŀőř⟧"
+      },
+      "automation_schedule_excluded": {
+        "en": "Excluded on this host",
+        "ja": "このホストでは実行対象外",
+        "qps-ploc": "⟦Ėẋƈŀůḓėḓ őñ ŧħïş ħőşŧ ŀőřėɱ ⟧"
+      },
+      "automation_schedule_enabled": {
+        "en": "Enabled",
+        "ja": "有効",
+        "qps-ploc": "⟦Ėñȧƀŀėḓ ŀőř⟧"
+      },
+      "automation_schedule_disabled": {
+        "en": "Disabled",
+        "ja": "無効",
+        "qps-ploc": "⟦Ḓïşȧƀŀėḓ ŀőř⟧"
+      },
+      "automation_schedule_field_id": {
+        "en": "ID",
+        "ja": "ID",
+        "qps-ploc": "⟦ÏḒ ŀőř⟧"
+      },
+      "automation_schedule_field_name": {
+        "en": "Name",
+        "ja": "名前",
+        "qps-ploc": "⟦Ñȧɱė ŀőř⟧"
+      },
+      "automation_schedule_field_pipeline": {
+        "en": "Pipeline",
+        "ja": "パイプライン",
+        "qps-ploc": "⟦Ṗïṗėŀïñė ŀőř⟧"
+      },
+      "automation_schedule_field_trigger_type": {
+        "en": "Trigger type",
+        "ja": "トリガー種別",
+        "qps-ploc": "⟦Ŧřïɠɠėř ŧẏṗė ŀőř⟧"
+      },
+      "automation_schedule_field_cron": {
+        "en": "Cron expression",
+        "ja": "cron 式",
+        "qps-ploc": "⟦Ƈřőñ ėẋṗřėşşïőñ ŀőřė⟧"
+      },
+      "automation_schedule_field_interval": {
+        "en": "Interval (minutes)",
+        "ja": "間隔（分）",
+        "qps-ploc": "⟦Ïñŧėřṽȧŀ (ɱïñůŧėş) ŀőřėɱ⟧"
+      },
+      "automation_schedule_field_timezone": {
+        "en": "Timezone (optional)",
+        "ja": "タイムゾーン（任意）",
+        "qps-ploc": "⟦Ŧïɱėẑőñė (őṗŧïőñȧŀ) ŀőřėɱ ⟧"
+      },
+      "automation_schedule_field_actuator": {
+        "en": "Actuator",
+        "ja": "アクチュエータ",
+        "qps-ploc": "⟦Ȧƈŧůȧŧőř ŀőř⟧"
+      },
+      "automation_schedule_field_enabled": {
+        "en": "Enabled",
+        "ja": "有効にする",
+        "qps-ploc": "⟦Ėñȧƀŀėḓ ŀőř⟧"
+      },
+      "automation_schedule_trigger_cron": {
+        "en": "Cron",
+        "ja": "cron",
+        "qps-ploc": "⟦Ƈřőñ ŀőř⟧"
+      },
+      "automation_schedule_trigger_interval": {
+        "en": "Interval",
+        "ja": "インターバル",
+        "qps-ploc": "⟦Ïñŧėřṽȧŀ ŀőř⟧"
+      },
+      "automation_schedule_every_minutes": {
+        "en": "Every {minutes} min",
+        "ja": "{minutes} 分ごと",
+        "qps-ploc": "⟦Ėṽėřẏ {minutes} ɱïñ ŀőřėɱ ⟧"
+      },
+      "automation_schedule_never_run": {
+        "en": "Never run",
+        "ja": "未実行",
+        "qps-ploc": "⟦Ñėṽėř řůñ ŀőř⟧"
+      },
+      "automation_pipeline_choose": {
+        "en": "Choose a pipeline",
+        "ja": "パイプラインを選択",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ṗïṗėŀïñė ŀőřėɱ⟧"
+      },
+      "automation_pipeline_col_pipeline": {
+        "en": "Pipeline",
+        "ja": "パイプライン",
+        "qps-ploc": "⟦Ṗïṗėŀïñė ŀőř⟧"
+      },
+      "automation_pipeline_col_steps": {
+        "en": "Steps",
+        "ja": "ステップ数",
+        "qps-ploc": "⟦Şŧėṗş ŀőř⟧"
+      },
+      "automation_pipeline_col_state": {
+        "en": "State",
+        "ja": "状態",
+        "qps-ploc": "⟦Şŧȧŧė ŀőř⟧"
+      },
+      "automation_pipeline_has_schedule": {
+        "en": "Scheduled",
+        "ja": "スケジュールあり",
+        "qps-ploc": "⟦Şƈħėḓůŀėḓ ŀőř⟧"
+      },
+      "automation_pipeline_not_adf": {
+        "en": "Not a pipeline",
+        "ja": "パイプラインではありません",
+        "qps-ploc": "⟦Ñőŧ ȧ ṗïṗėŀïñė ŀőřė⟧"
+      },
+      "automation_pipeline_broken": {
+        "en": "Broken JSON",
+        "ja": "JSON が壊れています",
+        "qps-ploc": "⟦Ƀřőķėñ ĴŞŐÑ ŀőř⟧"
+      },
+      "automation_pipeline_run": {
+        "en": "Run",
+        "ja": "実行",
+        "qps-ploc": "⟦Řůñ ŀőř⟧"
+      },
+      "automation_pipeline_context": {
+        "en": "Context (JSON, optional)",
+        "ja": "コンテキスト（JSON・任意）",
+        "qps-ploc": "⟦Ƈőñŧėẋŧ (ĴŞŐÑ, őṗŧïőñȧŀ) ŀőřėɱ ï⟧"
+      },
+      "automation_pipeline_context_invalid": {
+        "en": "The context is not valid JSON. Fix it before running.",
+        "ja": "コンテキストの JSON が不正です。修正してから実行してください。",
+        "qps-ploc": "⟦Ŧħė ƈőñŧėẋŧ ïş ñőŧ ṽȧŀïḓ ĴŞŐÑ. Ƒïẋ ïŧ ƀėƒőřė řůññïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "automation_pipeline_dispatched": {
+        "en": "Dispatched {resourceId}.",
+        "ja": "実行を開始しました: {resourceId}",
+        "qps-ploc": "⟦Ḓïşṗȧŧƈħėḓ {resourceId}. ŀőřėɱ ï⟧"
+      },
+      "automation_pipeline_dispatched_note": {
+        "en": "The run continues in the background; the dispatch is recorded in the operations audit log.",
+        "ja": "実行はバックグラウンドで継続し、このディスパッチは運用監査ログに記録されます。",
+        "qps-ploc": "⟦Ŧħė řůñ ƈőñŧïñůėş ïñ ŧħė ƀȧƈķɠřőůñḓ; ŧħė ḓïşṗȧŧƈħ ïş řėƈőřḓėḓ ïñ ŧħė őṗėřȧŧïőñş ȧůḓïŧ ŀőɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "automation_pipeline_empty": {
+        "en": "No pipelines were found under pipelines/.",
+        "ja": "pipelines/ にパイプラインがありません。",
+        "qps-ploc": "⟦Ñő ṗïṗėŀïñėş ẇėřė ƒőůñḓ ůñḓėř ṗïṗėŀïñėş/. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "automation_load_error": {
+        "en": "The automation view could not be loaded.",
+        "ja": "自動化ビューを読み込めませんでした。",
+        "qps-ploc": "⟦Ŧħė ȧůŧőɱȧŧïőñ ṽïėẇ ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "automation_mutation_failed": {
+        "en": "The change could not be applied.",
+        "ja": "変更を適用できませんでした。",
+        "qps-ploc": "⟦Ŧħė ƈħȧñɠė ƈőůŀḓ ñőŧ ƀė ȧṗṗŀïėḓ. ŀőřėɱ ïṗşů⟧"
+      },
+      "minutes_title": {
+        "en": "Meeting minutes",
+        "ja": "議事録",
+        "qps-ploc": "⟦Ɱėėŧïñɠ ɱïñůŧėş ŀőřė⟧"
+      },
+      "minutes_col_updated": {
+        "en": "Updated",
+        "ja": "更新日時",
+        "qps-ploc": "⟦Ůṗḓȧŧėḓ ŀőř⟧"
+      },
+      "minutes_empty": {
+        "en": "No meeting minutes in this scope.",
+        "ja": "この範囲の議事録はありません。",
+        "qps-ploc": "⟦Ñő ɱėėŧïñɠ ɱïñůŧėş ïñ ŧħïş şƈőṗė. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "minutes_source_mission": {
+        "en": "Mission",
+        "ja": "ミッション",
+        "qps-ploc": "⟦Ɱïşşïőñ ŀőř⟧"
+      },
+      "minutes_source_pad": {
+        "en": "Pad",
+        "ja": "パッド",
+        "qps-ploc": "⟦Ṗȧḓ ŀőř⟧"
+      },
+      "minutes_source_notepad": {
+        "en": "Notepad",
+        "ja": "ノート",
+        "qps-ploc": "⟦Ñőŧėṗȧḓ ŀőř⟧"
+      },
+      "minutes_preview": {
+        "en": "Preview",
+        "ja": "プレビュー",
+        "qps-ploc": "⟦Ṗřėṽïėẇ ŀőř⟧"
+      },
+      "minutes_close": {
+        "en": "Close",
+        "ja": "閉じる",
+        "qps-ploc": "⟦Ƈŀőşė ŀőř⟧"
+      },
+      "minutes_loading": {
+        "en": "Loading…",
+        "ja": "読み込み中…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ… ŀőř⟧"
+      },
+      "minutes_load_error": {
+        "en": "The meeting minutes could not be loaded.",
+        "ja": "議事録を読み込めませんでした。",
+        "qps-ploc": "⟦Ŧħė ɱėėŧïñɠ ɱïñůŧėş ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "minutes_attachments": {
+        "en": "Attachments",
+        "ja": "添付",
+        "qps-ploc": "⟦Ȧŧŧȧƈħɱėñŧş ŀőř⟧"
       }
     },
     "onboarding": {

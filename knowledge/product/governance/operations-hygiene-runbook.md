@@ -338,6 +338,16 @@ A failed or resource-terminated gate remains a failure; never substitute an isol
 `--skip-readiness` for the complete run. Compare default and serial scheduling with
 `scripts/run_checks.concurrency.test.ts`, and verify the complete selected set on the host.
 
+The manifest marks `golden`, `module-boundaries`, `capability-seams-ast` and `catalogs` as
+`exclusive`: preceding gates drain, the selected gate runs alone, and normal
+concurrency resumes afterwards. The two repository-wide scans reached their
+120s deadlines in a concurrent full run while the isolated golden gate passed.
+The catalog scan also reached its 120s deadline after taking 114s in the
+preceding concurrent run; its catalog, vocabulary and knowledge-index checks
+remain intact. Isolation is a bounded resource mitigation, not proof of a unique root cause.
+Keep the commands, checks, baselines, default six workers and per-gate deadlines
+unchanged; validate isolated costs and the complete selected set after a change.
+
 A gate that times out on busy runs:
 
 1. Time it alone and under the concurrent run, and profile it (`node --cpu-prof`). Make it faster
@@ -742,6 +752,16 @@ For the Dot action ledger, keep `assertDotActionJudgmentBinding` real in
 `continuous-work-owner-state.test.ts` and `mission-admission.test.ts`; these suites are the
 regression gate for owner and mission admission compatibility. Never stub the validator
 to an unconditional success to repair a missing-export failure.
+
+An async mock factory must not await a module that transitively imports the module currently waiting for that factory. A new top-level validator import can create this cycle before any test or test timeout starts. Import the validator inside the schema-only test after the existing secure-I/O/authority bootstrap has completed; retain the raw-schema oracle. Verify the changed test alone before its consumer suite. Regression: `libs/core/dot/dot-charter.test.ts` exercises the raw AJV schema without changing the existing tenant mock.
+
+Broad preflight failures must retain every failing case heading and its immediate error before the bounded output tail. Tail-only diagnostics can discard earlier failures after a long related-test run. Keep test selection, failure status and deadlines unchanged; reproduce the named cases and finish data-reader selections before publishing a repair batch. Gate: scripts/pr_preflight.test.ts covers an early ANSI-colored failure displaced by a later stack.
+
+Affected-test preflight must inherit the canonical core profile (TEST_SUITES.core), including no file parallelism: run core code and exact core readers first, then the remaining code and readers. Preserve the original CI selectors and exclude only the core-owned paths already covered; the real-inventory contract in tests/preflight-core-profile-boundary.test.ts proves the union and disjointness against Vitest include/exclude rules. Shared temporary ancestors can change while another file creates its fixture; do not relax snapshot identity/timestamp checks or silently retry integrity failures to accommodate a mixed parallel run. Keep strict mode and each invocation budget unchanged. Attempt every selected group even after failure and report all failures together. Native EPERM outside the governed guard remains a separate diagnostic question; a downstream policy-corrupt refusal is not evidence that the policy contents are invalid.
+
+The readiness subprocess also writes its per-gate results to stdout. On failure, preserve captured string or Buffer stdout before rethrowing the original execution error; stderr-only exception messages can hide every failing gate. Never print the success marker after such a failure. Gate: scripts/publish_pull_request.test.ts covers complete early-gate evidence, unchanged exception identity and empty-output failures.
+
+Core code uses the same six deterministic shards as the PR and main CI matrices, executed sequentially with the serial core profile. The workflow parity assertion in the inventory gate rejects shard-count drift. Preserve the existing per-invocation budget; do not squeeze an unsharded core run into it by omitting tests or increasing the deadline.
 
 **Repository security scans under coverage.** A green PR shard does not prove the
 unsharded main core run passes with V8 coverage. When a repository-wide AST contract
@@ -2602,7 +2622,9 @@ When adopting `defineCheck`, remove obsolete caller flags such as `--fail` from 
 
 Keep the declared data tier separate from the tenant ownership boundary. Confidential drafts remain under `knowledge/confidential/<tenant>/dots/`; verified public organization/project drafts use `dots/`. Tenant-only public diagnostic drafts must pass `assertFrontDeskDiagnosticDotCharter` and registered-tenant resolution before creation: an arbitrary public label does not grant the diagnostic capability. Never repair a first-job setup failure by changing its public-only input protocol to confidential or relaxing its no-downgrade checks.
 
-Runtime operation-binding validation is read-only: use the existing tenant-bound `workspace_tenant_registry_reader`, not `dot_lifecycle_writer`. Regression checks are `libs/core/dot/dot-lifecycle.test.ts`, the real-store `scripts/onboarding_first_job*.test.ts` suites, and `libs/core/surface/front-desk-recovery.engine.integration.test.ts`. Recovery fixtures must create their actual synthetic tenant via the governed facade before creating a tenant-owned charter.
+Runtime operation-binding validation is read-only: use the existing tenant-bound `workspace_tenant_registry_reader`, not the dot lifecycle store roles (`dot_charter_store` / `dot_lifecycle_runtime_store`; formerly `dot_lifecycle_writer`). Regression checks are `libs/core/dot/dot-lifecycle.test.ts`, the real-store `scripts/onboarding_first_job*.test.ts` suites, and `libs/core/surface/front-desk-recovery.engine.integration.test.ts`. Recovery fixtures must create their actual synthetic tenant via the governed facade before creating a tenant-owned charter.
+
+When splitting internal store roles, forbid them at every runtime binding entrance: schema, charter validation and typed programmatic execution. Test the legitimate worker role alongside denial cases. Protected runtime stores are also checked through their projected knowledge tier; preserve the required projection grant while restricting every raw read/metadata/write/mkdir operation to the store's physical purpose. Add cold confidential/personal secure-I/O writes, direct-knowledge denial and symlink escape regressions (`tier-guard-dot-lifecycle-stores.test.ts`). Prove claimed lock or tenant failures through the real guard before adding roles or generic matcher features; retain withdrawn hypotheses in review evidence.
 
 ## People management: exact store grants
 
@@ -3242,3 +3264,19 @@ alongside tenant-attributed synchronous audit writes. Enforcing suites include
 ## Intake extension CI checks
 
 When adding a service operation, validate the shipped discovery count and service-harness operation inventory together with the exact kind/risk/approval assertions. Registry-overlay fixtures must assert the shipped exact declarations as well as the mutation fallback. For boundary tests, partially mock shared path resolvers so new legitimate imports retain their real APIs; a minimal hand-built resolver can fail during module initialization before the tested gate runs. Run the impacted existing tests in addition to the extension fixtures. For single-use admission capabilities, compare private in-memory snapshots of request and configuration values. Do not send credential-bearing configuration into hash or HMAC APIs: keyed fast hashes still trigger password-hashing checks and are unnecessary when the capability's private WeakMap already supplies the trust boundary. Never log or persist these snapshots.
+
+## Denial auditing from narrow application stores
+
+A rejected write must remain rejected and its required policy-violation record must reach the canonical audit store. Capture caller tenant, actor and normalized scope/tier before entering the audit-owned persistence context. Keep resource-access ceilings intact, use the same key/persistence boundary for preflight, direct and already-held append, and publish forwarders outside that context. Never fix this by granting the application store audit keys or master read/append privileges, clearing resource ceilings, adding a best-effort queue, or forcing process exit. Enforcing regression: `libs/core/governance/audit-chain-policy-denial.test.ts` uses fresh production adapters and a synthetic policy denial; verify denied target absence, exactly-once master and tenant mirror, original deferred attribution, no foreign mirror and continued resource-ceiling refusal. The existing `audit_mirror_writer` role grants remain unchanged; its legacy bootstrap seam also serves audit-owned master persistence through existing common defaults.
+
+## Validation resource isolation and combined profiles
+
+Keep each gate's deadline and checks unchanged when isolating resource-intensive work. `ci-gates.json` may mark a gate `exclusive`: all earlier selected work drains, that gate runs alone, and subsequent gates resume the requested concurrency. Golden baseline compiler scans use this isolation; a measured standalone run took 62 seconds and exited naturally. A buffered success line alone does not prove a retained handle or the exact failed-runner cause. Record gate execution time separately from package-manager queue wait, and observe child exit/close when investigating a deadline.
+
+Runner, manifest, schema or CI workflow changes must also run the combined full profile on PR/merge-group CI. Separate `pr` and `full-only` jobs do not exercise the combined scheduling used on main. Gate tests enforce exact-once selection, stable output order, rejection continuation, exclusive barriers, unchanged default concurrency and deadlines (`run_checks.test.ts`, `run_checks.concurrency.test.ts`). Strict local tests require a quiet owned worktree: stop only a verified worktree-owned background process through its graceful shutdown path, keep real primary/other-provider processes running, and use the offline reasoning stub for deterministic validation.
+
+## Capture audit input before delegating persistence
+
+Caller-owned objects can contain getters, toJSON methods or Proxy traps. Materialize a callback-free, independently owned JSON snapshot in the original caller context at intake, before any audit-store authority or deferred queue. Capture caller tenant and fallback tier before evaluating callbacks, then validate the serialized scope against that captured caller. Correlation lookup, hashing and persistence must use only the snapshot; assertRecordable follows the same validation. Reject invalid or cyclic input synchronously without appending. Keep resource ceilings, original attribution and forwarders outside the persistence authority. Gate: libs/core/governance/audit-chain-policy-denial.test.ts uses production adapters across direct, held, deferred and preflight entrypoints, observes callback roles without reading secrets, verifies mutation independence, and refuses toJSON scope substitution and cyclic data.
+
+Empty canonical tenant values cannot clear an active caller tenant: treat empty/null/omitted optional tenant fields as absent and use the captured caller tenant. Reject non-string JSON tenant values and retain the existing validation of nonempty IDs and aliases. Actual global audit events still require a genuinely unbound or trusted tenantCleared context. The production regression covers all four intake paths, tenant mirrors, explicit system-scope refusal and both legitimate global cases.

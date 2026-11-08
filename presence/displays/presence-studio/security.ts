@@ -3,6 +3,7 @@ import { voiceSelectionRequestSchema } from '@agent/shared-voice/voice-selection
 import type { Request, RequestHandler } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
+import { askConversationRequestSchema } from '@agent/core/surface/ask-view';
 import { logger } from '@agent/core/core';
 import { fixedWindowLimiter } from '@agent/core/foundation/rate-limit';
 import { loadRuntimeControlPolicy } from '@agent/core/runtime-control-policy';
@@ -764,25 +765,8 @@ export const presenceStudioApprovalDecisionSchema = z
   })
   .strict();
 
-/** FD-03: `POST /api/conversation` — the 頼む conversation turn. */
-export const presenceStudioConversationSchema = z
-  .object({
-    text: z.string().trim().min(1, 'text is required').max(4000, 'text is too long'),
-    locale: z.string().trim().min(2).max(32).optional(),
-    session_id: z.string().trim().min(1).max(128).optional(),
-    conversation_id: z
-      .string()
-      .regex(/^concierge-[a-f0-9]{64}$/)
-      .optional(),
-    request_id: z.string().uuid().optional(),
-    request_created_at: z.number().finite().nonnegative().optional(),
-    // Validated with the shared exact revision parser in the authenticated route.
-    artifactRevision: z.unknown().optional(),
-    organizationId: z.string().trim().min(1).max(128).optional(),
-    projectId: z.string().trim().min(1).max(128).optional(),
-    tenant: z.string().trim().min(1).max(32).optional(),
-  })
-  .strict();
+/** FD-03: `POST /api/conversation` — the 頼む conversation turn (shared with Concierge). */
+export const presenceStudioConversationSchema = askConversationRequestSchema;
 
 export function readPresenceStudioStringParam(value: unknown): string | null {
   if (typeof value !== 'string') return null;

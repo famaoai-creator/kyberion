@@ -16,7 +16,7 @@ import {
 const gates = (scope: 'pr' | 'full' = 'pr') => selectGates(loadGateManifest(), scope);
 type Report = {
   scope: string;
-  results: Array<{ id: string; status: string; exitCode: number | null }>;
+  results: Array<{ id: string; status: string; exitCode: number | null; elapsed_ms: number }>;
   failed: number;
   error?: string;
 };
@@ -101,12 +101,17 @@ describe.each([undefined, 'true'])('bounded check scheduling (GITHUB_ACTIONS=%s)
         let peak = 0;
         let packageActive = 0;
         let packagePeak = 0;
+        let exclusiveActive = false;
         let started = 0;
         const seen: string[] = [];
         mocks.execute.mockImplementation(
           async (command: string, args: string[], options: unknown) => {
             const key = commandKey(command, args);
             const declared = selected.find((gate) => declaredCommand(gate) === key)!;
+            if (declared.exclusive) {
+              expect(active).toBe(0);
+              exclusiveActive = true;
+            } else expect(exclusiveActive).toBe(false);
             expect(options).toEqual({
               cwd: pathResolver.rootDir(),
               timeoutMs: declared.timeout_ms ?? 120_000,
@@ -124,6 +129,7 @@ describe.each([undefined, 'true'])('bounded check scheduling (GITHUB_ACTIONS=%s)
             if (packageGate) packagePeak = Math.max(packagePeak, ++packageActive);
             await new Promise((resolve) => setTimeout(resolve, ordinal % 2 === 0 ? 4 : 1));
             active--;
+            if (declared.exclusive) exclusiveActive = false;
             if (packageGate) packageActive--;
             return {
               status: fail && key === failingCommand ? failureCode : 0,
@@ -149,8 +155,17 @@ describe.each([undefined, 'true'])('bounded check scheduling (GITHUB_ACTIONS=%s)
         expect(output[0].failed).toBe(fail ? 1 : 0);
         reports.push(output[0]);
       }
-      expect(reports[1]).toEqual(reports[0]);
-      expect(reports[2]).toEqual(reports[0]);
+      for (const report of reports)
+        for (const result of report.results) {
+          expect(Number.isFinite(result.elapsed_ms)).toBe(true);
+          expect(result.elapsed_ms).toBeGreaterThanOrEqual(0);
+        }
+      const semantics = (report: Report) => ({
+        ...report,
+        results: report.results.map(({ elapsed_ms: _elapsed, ...result }) => result),
+      });
+      expect(semantics(reports[1])).toEqual(semantics(reports[0]));
+      expect(semantics(reports[2])).toEqual(semantics(reports[0]));
     }
   );
 
