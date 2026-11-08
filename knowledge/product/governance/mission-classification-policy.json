@@ -32,6 +32,13 @@
       "mission_class": "web_design_improvement"
     },
     {
+      "id": "class-web-design-improvement-intent",
+      "match": {
+        "intent_ids": ["improve-web-design"]
+      },
+      "mission_class": "web_design_improvement"
+    },
+    {
       "id": "class-web-design-improvement-utterance",
       "match": {
         "utterance_patterns": [
