@@ -52,10 +52,13 @@ export function hearingScopedUrl(path: string, viewer: PresenceStudioViewerConte
 }
 
 /** Destination metadata must represent the selected hierarchy before any effect.
- * Hearing storage itself remains tenant/session-scoped, not org/project-partitioned. */
+ * Hearing storage itself remains tenant/session-scoped, not org/project-partitioned.
+ * Studio's owner is its loopback session, passed to core as the explicit owner input. */
 export function resolveHearingHandoffScope(
   viewer: PresenceStudioViewerContext,
   kind: 'mission' | 'inventory'
 ): { tenantSlug?: string; organizationId?: string; projectId?: string } {
-  return resolveHearingHandoffScopeForViewer(hearingViewerScope(viewer), kind);
+  return resolveHearingHandoffScopeForViewer(hearingViewerScope(viewer), kind, {
+    owner: viewer.source === 'loopback',
+  });
 }

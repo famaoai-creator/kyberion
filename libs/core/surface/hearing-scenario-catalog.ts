@@ -9,9 +9,8 @@
  * `hearing-runtime.ts`'s `renderHearingCanvas`; `work_inventory_table`, the
  * deterministic table canvas in `hearing-work-inventory.ts`, all next to
  * this file), and which governed hand-off the decided record confirms into
- * (`mission` via presence-studio's `hearing-mission-routes.ts`,
- * `work_inventory` via the `POST /api/hearing/:session/inventory` route in
- * its `hearing-routes.ts`).
+ * (`mission` via `hearing-mission-service.ts`, `work_inventory` via the
+ * `POST /api/hearing/:session/inventory` step in `hearing-session-service.ts`).
  *
  * `hearing.ts`'s `WEB_APP_HEARING_SCENARIO`
  * is a thin derived constant read from this catalog's `web_app_build`

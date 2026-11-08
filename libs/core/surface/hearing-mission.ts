@@ -6,7 +6,7 @@
 //
 // This module is deliberately dependency-light and side-effect-free (no
 // secure-io, no process exec, no @agent/core catalog loaders beyond `t`):
-// `hearing-mission-routes.ts` is the only caller that touches disk/child
+// `hearing-mission-service.ts` is the only caller that touches disk/child
 // processes. Two shapes are intentionally duplicated here rather than
 // imported, mirroring `scripts/lib/decided-by-args.ts`'s own stated reason
 // ("does not depend on that in-flight work"):
@@ -14,7 +14,7 @@
 //     lives in `scripts/mission-alignment-gate/mission-brief.ts`, but a
 //     front-desk surface must never import from `scripts/**` (governed CLIs
 //     are invoked as built subprocesses, never as library code — see
-//     `hearing-mission-routes.ts`'s module doc). The JSON Schema at
+//     `hearing-mission-service.ts`'s module doc). The JSON Schema at
 //     `knowledge/product/schemas/mission-brief.schema.json` is the single
 //     source of truth either side validates against.
 //   - the `--decided-by` id grammar (`user:<member-id>`) from
@@ -82,11 +82,11 @@ const MISSION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
 
 const missionBriefCatalog = defineCatalog<MissionBrief>({
   id: 'hearing-mission-brief',
-  // Never loaded from this path — `.validate()` only uses it to label a
-  // schema-violation error message. The brief is written to its real mission
-  // evidence path by `hearing-mission-routes.ts` via secure-io, not by this
-  // pure module.
-  path: 'presence-studio/hearing-mission-brief',
+  // Never loaded from this path and never persisted or compared — `.validate()`
+  // only uses it to label a schema-violation error message, so it names no
+  // surface. The brief is written to its real mission evidence path by
+  // `hearing-mission-service.ts` via secure-io, not by this pure module.
+  path: 'surface/hearing-mission-brief',
   schema: MISSION_BRIEF_SCHEMA_PATH,
 });
 
@@ -260,7 +260,7 @@ export interface BuildHearingMissionCreateArgsInput {
 
 /**
  * Build the positional + named argv for `mission_controller.js create`,
- * exactly as `hearing-mission-routes.ts` passes it to `safeExecResult`
+ * exactly as `hearing-mission-service.ts` passes it to `safeExecResult`
  * (prefixed with the controller's relative script path — see
  * `scripts/mission_controller.ts`'s `buildHelpText()` `create` grammar).
  */
