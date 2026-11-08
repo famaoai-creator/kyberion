@@ -5,7 +5,7 @@ import {
   defineActuator,
   defineCatalogBackedActuator,
   isActuatorContextPatch,
-  KYBERION_CONTEXT_PATCH_BRAND,
+  CONTEXT_PATCH_BRAND,
   normalizeCatalogDispatchOutput,
   planActuatorDryRun,
   resolveCliActionKind,
@@ -586,9 +586,9 @@ describe('actuator SDK', () => {
       context: { seed: 1, got: 'accepted', last_transform: 'accepted' },
       total_steps: 1,
     };
-    expect(
-      normalizeCatalogDispatchOutput(envelope, 'transform', { export_as: 'got' })
-    ).toBe('accepted');
+    expect(normalizeCatalogDispatchOutput(envelope, 'transform', { export_as: 'got' })).toBe(
+      'accepted'
+    );
     expect(normalizeCatalogDispatchOutput(envelope, 'transform', {})).toBe('accepted');
     const patch = normalizeCatalogDispatchOutput(
       {
@@ -602,12 +602,13 @@ describe('actuator SDK', () => {
     );
     expect(isActuatorContextPatch(patch)).toBe(true);
     expect(patch).toMatchObject({
-      [KYBERION_CONTEXT_PATCH_BRAND]: true,
+      [CONTEXT_PATCH_BRAND]: true,
       exists: true,
     });
-    expect(
-      normalizeCatalogDispatchOutput({ op: 'log', output: 'x' }, 'capture', {})
-    ).toEqual({ op: 'log', output: 'x' });
+    expect(normalizeCatalogDispatchOutput({ op: 'log', output: 'x' }, 'capture', {})).toEqual({
+      op: 'log',
+      output: 'x',
+    });
   });
 
   it('strips run envelopes from defineCatalogBackedActuator dispatch output', async () => {

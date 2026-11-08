@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  asActuatorContextPatch,
-  KYBERION_CONTEXT_PATCH_BRAND,
-} from '@agent/core/actuator/actuator-sdk';
+import { asActuatorContextPatch, CONTEXT_PATCH_BRAND } from '@agent/core/actuator/actuator-sdk';
 import {
   mapActuatorDispatchOutputToContext,
   resolveSemanticActuatorStepKind,
@@ -71,7 +68,7 @@ describe('actuator dispatch output → pipeline context mapping', () => {
       'apply',
       {}
     );
-    expect(mapped[KYBERION_CONTEXT_PATCH_BRAND]).toBeUndefined();
+    expect(mapped[CONTEXT_PATCH_BRAND]).toBeUndefined();
     expect(mapped.exists).toBe(true);
   });
 });
