@@ -8,8 +8,23 @@ import { hearingNamespace } from './hearing-runtime.js';
 import { narrowSurfaceViewerScope } from './surface-mutation-guard.js';
 import type { SurfaceViewerScope } from './surface-viewer-scope-contract.js';
 
+/**
+ * The owner decision every hearing function that reaches the personal store
+ * takes as an explicit input: `true` only when the surface itself decided that
+ * this request comes from the owner of this machine. Each surface decides it
+ * with its own check — Studio: the credential-free loopback session
+ * (`viewer.source === 'loopback'`); Concierge: `resolveConciergeInstallationAccess`
+ * (the bound installation owner on an attested peer, or with step-up). Never
+ * derive it from the viewer's credential `source` here, and never synthesize a
+ * `source: 'loopback'` viewer to obtain it
+ * (kyberion-development-practices.md, "The local owner is not the credential source").
+ */
+export interface HearingOwnerInput {
+  owner: boolean;
+}
+
 /** Canvas loads independently from the JSON request, so carry its validated scope.
- * Used by: Studio, Concierge (next). */
+ * Used by: Studio, Concierge. */
 export function hearingScopedUrl(
   path: string,
   scope: Pick<SurfaceViewerScope, 'tenantSlugs' | 'organizationIds' | 'projectIds'>
@@ -26,7 +41,7 @@ export function hearingScopedUrl(
   return url.origin === 'http://hearing.invalid' ? url.pathname + url.search + url.hash : url.href;
 }
 
-/** Used by: Studio (route error mapping), Concierge (next). */
+/** Used by: Studio and Concierge (route error mapping). */
 export class HearingScopeError extends Error {
   readonly status = 400 as const;
   constructor(
@@ -39,16 +54,13 @@ export class HearingScopeError extends Error {
 /** Destination metadata must represent the selected hierarchy before any effect.
  * Hearing storage itself remains tenant/session-scoped, not org/project-partitioned.
  * `viewer` is the surface's server-resolved, already narrowed viewer scope.
- * Used by: Studio, Concierge (next).
- * OWNER CHECK: "the local owner" here is `viewer.source === 'loopback'` (Studio's
- * meaning). A signed-in Concierge owner has `source: 'token'`; never pass a
- * viewer with a synthesized `source: 'loopback'` to get past this. Decide the owner
- * with the surface's own owner check and make it an explicit input first
- * (kyberion-development-practices.md, "The local owner is not the credential source").
+ * Only the owner ({@link HearingOwnerInput}) may file an inventory entry under the
+ * personal scope (no single tenant). Used by: Studio, Concierge.
  */
 export function resolveHearingHandoffScope(
   viewer: SurfaceViewerScope,
-  kind: 'mission' | 'inventory'
+  kind: 'mission' | 'inventory',
+  options: HearingOwnerInput
 ): { tenantSlug?: string; organizationId?: string; projectId?: string } {
   const allowed = viewer;
   if (kind === 'inventory' && allowed.projectIds !== 'all')
@@ -64,7 +76,7 @@ export function resolveHearingHandoffScope(
     throw new HearingScopeError('hearing_scope_unavailable');
   const namespace = hearingNamespace(viewer.tenantSlugs);
   if (namespace === 'all' || namespace === 'unscoped') {
-    if (kind === 'mission' || organizationId || projectId || viewer.source !== 'loopback')
+    if (kind === 'mission' || organizationId || projectId || options.owner !== true)
       throw new HearingScopeError('hearing_scope_unavailable');
     return {};
   }

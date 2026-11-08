@@ -12,7 +12,7 @@ import {
 } from './hearing-completion.js';
 import type { SurfaceViewerScope } from './surface-viewer-scope-contract.js';
 
-/** Used by: Studio, Concierge (next). */
+/** Used by: Studio, Concierge. */
 export interface HearingHandoffSnapshot {
   version: 1;
   token: string;
@@ -23,7 +23,7 @@ export interface HearingHandoffSnapshot {
  * pre-upgrade decision revisions are zero; subsequent decisions always advance.
  * `viewer` is the surface's server-resolved viewer scope, carrying the
  * principal, member and registration label member resolution reads.
- * Used by: Studio, Concierge (next). */
+ * Used by: Studio, Concierge. */
 export function hearingHandoffSnapshot(
   record: HearingRecord,
   viewer: SurfaceViewerScope,
@@ -83,7 +83,7 @@ export function hearingHandoffSnapshot(
 
 /** Keep proof and the exact displayed record in one atomic client assignment.
  * Never persist or trust a snapshot field accidentally present in stored data.
- * Used by: Studio, Concierge (next). */
+ * Used by: Studio, Concierge. */
 export function withHearingHandoffSnapshot(
   record: HearingRecord,
   viewer: SurfaceViewerScope,
@@ -98,7 +98,7 @@ export function withHearingHandoffSnapshot(
 
 /** Validate before preparation or replay. The reservation's semantic CAS then
  * carries this same viewed decision across any asynchronous preparation.
- * Used by: Studio, Concierge (next). */
+ * Used by: Studio, Concierge. */
 export function assertHearingHandoffSnapshot(
   body: unknown,
   record: HearingRecord,
