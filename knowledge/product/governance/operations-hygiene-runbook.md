@@ -338,6 +338,14 @@ A failed or resource-terminated gate remains a failure; never substitute an isol
 `--skip-readiness` for the complete run. Compare default and serial scheduling with
 `scripts/run_checks.concurrency.test.ts`, and verify the complete selected set on the host.
 
+The manifest marks `golden`, `module-boundaries` and `capability-seams-ast` as
+`exclusive`: preceding gates drain, the selected gate runs alone, and normal
+concurrency resumes afterwards. The two repository-wide scans reached their
+120s deadlines in a concurrent full run while the isolated golden gate passed.
+Isolation is a bounded resource mitigation, not proof of a unique root cause.
+Keep the commands, checks, baselines, default six workers and per-gate deadlines
+unchanged; validate isolated costs and the complete selected set after a change.
+
 A gate that times out on busy runs:
 
 1. Time it alone and under the concurrent run, and profile it (`node --cpu-prof`). Make it faster
