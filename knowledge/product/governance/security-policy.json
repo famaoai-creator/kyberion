@@ -692,6 +692,16 @@
         "active/shared/cache/personal/${KYBERION_TENANT}/perception/"
       ]
     },
+    "actuator_playground_worker": {
+      "allow_read": [
+        "active/shared/tmp/confidential/${KYBERION_TENANT}/actuator-playground/",
+        "active/shared/tmp/personal/${KYBERION_TENANT}/actuator-playground/"
+      ],
+      "allow_write": [
+        "active/shared/tmp/confidential/${KYBERION_TENANT}/actuator-playground/",
+        "active/shared/tmp/personal/${KYBERION_TENANT}/actuator-playground/"
+      ]
+    },
     "metrics_cap_reader": {
       "allow_read": [
         "active/shared/runtime/execution-metrics/",

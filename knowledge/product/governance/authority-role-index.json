@@ -2,6 +2,14 @@
   "$schema": "../schemas/authority-role-index.schema.json",
   "version": "1.0.0",
   "authority_roles": {
+    "actuator_playground_worker": {
+      "description": "Exact-tenant actuator-playground scratch worker. Interactive `pnpm playground` records sessions and ADF drafts under active/shared/tmp/{confidential,personal}/${KYBERION_TENANT}/actuator-playground/. Writes on the tmp floor are admitted by default_allow, but child actuators and session reads need an authorized identity on that partition. This role gives the playground the same effective identity on its own tenant scratch that the claimed-WorkItem path already has — never knowledge/, other tenants, other domains on the tmp floor, staging, cache, or system floors.",
+      "default_persona": "worker",
+      "write_scopes": [],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["personal", "confidential"]
+    },
     "archived_mission_state_reader": {
       "description": "Archived mission state reader (libs/core/foundation/archived-mission-state-capability.ts): read-only, tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). libs/core/mission/mission-decision-lock.ts loadDecisionCaseMissionState assumes it to read one archived tenant mission's active/archive/missions/<personal|confidential>/<tenant>/<id>/mission-state.json, always inside an exact read-only capability naming that file (plus product schemas). No write, no other file of the mission folder or archive, no mission lifecycle authority (it replaces the borrowed mission_controller role on that read).",
       "default_persona": "unknown",
