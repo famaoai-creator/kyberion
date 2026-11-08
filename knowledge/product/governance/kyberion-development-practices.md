@@ -476,6 +476,15 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
   For each case you drop, record why. Check the result by removing guard
   conditions one at a time: a mutant that survives marks lost coverage.
   (MSN-SERVER-STUDIO-FIRST-JOB-20261108: 初めての仕事.)
+- **A feature a surface may not serve fails closed on the resolved value.**
+  When a shared step serves a feature only if the surface supplies a
+  capability (a reader, a role), refusing the request field that names it is
+  not enough. The same value can arrive another way: a stored record, a
+  legacy inline object, a different parameter. Check the resolved value
+  after every load and before any effect, model call or admitted audit. Test
+  each arrival path with the capability absent, and seed a stored record.
+  (MSN-SERVER-CONCIERGE-ASK-20261108: decision-ledger hearings on Concierge;
+  review found the stored and inline paths in two rounds.)
 
 ## 6. Process discipline for repo work
 
