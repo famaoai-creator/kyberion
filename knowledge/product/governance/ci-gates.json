@@ -401,6 +401,7 @@
     },
     {
       "id": "catalogs",
+      "exclusive": true,
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_catalog_integrity.js"],
@@ -415,7 +416,7 @@
         "scripts/design-token-utils.ts"
       ],
       "owner": "governance",
-      "rationale": "Checks catalog and knowledge index integrity."
+      "rationale": "Checks catalog and knowledge index integrity. Resource isolation reduces contention during repository-wide catalog, vocabulary and knowledge-index scans after a concurrent full run increased from 114s to the unchanged 120s deadline; the exact timeout cause remains unattributed."
     },
     {
       "id": "facet-purity",
