@@ -262,7 +262,7 @@ function delegateCanvasPromptWithTimeout(
 /** Generate a model-drawn canvas for the current state of `record`. Always
  * resolves (never rejects) — any failure, timeout, or sanitizer rejection
  * yields the deterministic template result instead. Persistence is the
- * caller's job (`hearing-routes.ts`); this function never writes anything. */
+ * caller's job (`hearing-session-service.ts`); this function never writes anything. */
 export async function generateHearingCanvas(
   record: HearingRecord,
   options: HearingCanvasGenerationOptions

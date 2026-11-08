@@ -17,6 +17,10 @@
           "args": { "type": "array", "items": { "type": "string" } },
           "script": { "type": "string", "minLength": 1 },
           "timeout_ms": { "type": "integer", "minimum": 1 },
+          "exclusive": {
+            "type": "boolean",
+            "description": "Drain earlier gates and run this gate alone before resuming normal concurrency."
+          },
           "baseline": { "type": "string", "minLength": 1 },
           "paths": {
             "description": "full/release gates only: repo-relative glob patterns (*, ?, **, {a,b}) of the inputs the gate reads. `pnpm check -- --changed` runs the gate when a changed file matches.",

@@ -194,10 +194,18 @@ export function runPrePrReadiness(
       '[pr:publish] Pass --skip-readiness only for an explicit emergency bypass.',
     ].join('\n')
   );
-  safeExec('pnpm', args, {
-    cwd: pathResolver.rootDir(),
-    timeoutMs: 1_800_000,
-  });
+  try {
+    safeExec('pnpm', args, {
+      cwd: pathResolver.rootDir(),
+      timeoutMs: 1_800_000,
+    });
+  } catch (cause) {
+    const stdout =
+      cause && typeof cause === 'object' && 'stdout' in cause ? cause.stdout : undefined;
+    if (typeof stdout === 'string' && stdout.length > 0) print(stdout);
+    else if (Buffer.isBuffer(stdout) && stdout.length > 0) print(stdout.toString('utf8'));
+    throw cause;
+  }
   print('[pr:publish] PR readiness gate passed.');
 }
 

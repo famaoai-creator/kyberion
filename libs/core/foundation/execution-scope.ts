@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { config } from './config.js';
 import { getRegisteredEnvText } from './env.js';
 import { createLogger } from '../logger.js';
 
@@ -192,5 +193,5 @@ export function scopedPersona(): { bound: boolean; persona?: string } {
  */
 export function executionPersonaText(): string | undefined {
   const scoped = scopedPersona();
-  return scoped.bound ? scoped.persona : getRegisteredEnvText('KYBERION_PERSONA');
+  return scoped.bound ? scoped.persona : config.text('KYBERION_PERSONA');
 }

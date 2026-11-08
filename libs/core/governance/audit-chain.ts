@@ -460,7 +460,8 @@ function flushDeferredAppends(): void {
 }
 
 /**
- * Runs `fn` as the tenant audit mirror's own store-writer, bound to `tenantSlug`.
+ * Runs audit-owned persistence as its existing writer, bound to the captured tenant.
+ * The exported seam keeps its legacy mirror name for bootstrap compatibility.
  * authority.ts registers it (the audit chain sits below authority in the
  * import graph, so it cannot import withExecutionContext itself).
  */
@@ -478,7 +479,7 @@ export function registerTenantMirrorWriterContext(context: TenantMirrorWriterCon
   tenantMirrorWriterContext = context;
 }
 
-function asTenantMirrorWriter<T>(tenantSlug: string, fn: () => T): T {
+function asAuditStoreWriter<T>(tenantSlug: string, fn: () => T): T {
   return tenantMirrorWriterContext ? tenantMirrorWriterContext(tenantSlug, fn) : fn();
 }
 
@@ -581,6 +582,27 @@ class AuditChainImpl {
 
   private prepare(entry: AuditRecordInput): PreparedAuditRecord {
     const activeTenantSlug = resolveCurrentTenantSlug();
+    const fallbackTier = (getRegisteredEnvText('KYBERION_TIER') as EventScope['tier']) || 'public';
+    // All caller-controlled getters, proxies and toJSON callbacks must finish
+    // before persistence enters its own authority context or defers the entry.
+    let snapshot: unknown;
+    try {
+      snapshot = JSON.parse(JSON.stringify(entry));
+    } catch {
+      throw new Error('[AUDIT_INPUT_INVALID] audit record must be JSON serializable');
+    }
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot))
+      throw new Error('[AUDIT_INPUT_INVALID] audit record must serialize to an object');
+    entry = snapshot as AuditRecordInput;
+    const tenantInput = (value: unknown): string | undefined => {
+      if (value === undefined || value === null || value === '') return undefined;
+      if (typeof value !== 'string')
+        throw new Error('[AUDIT_SCOPE_INVALID] audit tenant identifiers must be strings');
+      return value;
+    };
+    entry.tenantSlug = tenantInput(entry.tenantSlug);
+    const scopeTenant = tenantInput(entry.scope?.tenant_slug);
+    if (entry.scope) entry.scope = { ...entry.scope, tenant_slug: scopeTenant };
     if (entry.tenantSlug && activeTenantSlug && entry.tenantSlug !== activeTenantSlug) {
       throw new Error(
         `[AUDIT_SCOPE_DENIED] tenantSlug '${entry.tenantSlug}' conflicts with active tenant '${activeTenantSlug}'`
@@ -604,18 +626,16 @@ class AuditChainImpl {
         `[AUDIT_SCOPE_DENIED] tenantSlug and scope.tenant_slug must identify the same tenant`
       );
     }
-    if (
-      entry.scope &&
-      !resolveAuditScope(
-        entry.scope,
-        entry.scope.tenant_slug ?? entry.tenantSlug ?? activeTenantSlug
-      )
-    ) {
+    const requestedTenant = entry.tenantSlug ?? entry.scope?.tenant_slug ?? activeTenantSlug;
+    const requestedTenantSlug =
+      requestedTenant && isValidTenantSlug(requestedTenant) ? requestedTenant : undefined;
+    const scope = resolveAuditScope(entry.scope, requestedTenantSlug, fallbackTier);
+    if (entry.scope && !scope) {
       throw new Error('[AUDIT_SCOPE_INVALID] explicit audit scope failed validation');
     }
     return {
-      entry,
-      requestedTenantSlug: entry.tenantSlug ?? entry.scope?.tenant_slug ?? activeTenantSlug,
+      entry: { ...entry, scope },
+      requestedTenantSlug,
     };
   }
 
@@ -626,10 +646,12 @@ class AuditChainImpl {
    * cannot leave the change half done.
    */
   assertRecordable(entry: AuditRecordInput): void {
-    this.prepare(entry);
-    if (!resolveAuditChainKey({ createIfMissing: true })) {
-      throw new Error('missing_audit_chain_key');
-    }
+    const prepared = this.prepare(entry);
+    asAuditStoreWriter(prepared.requestedTenantSlug ?? '', () => {
+      if (!resolveAuditChainKey({ createIfMissing: true })) {
+        throw new Error('missing_audit_chain_key');
+      }
+    });
   }
 
   /**
@@ -641,13 +663,18 @@ class AuditChainImpl {
     if (!holdsAuditChainLock()) {
       throw new Error('[AUDIT_LOCK_NOT_HELD] recordHeld runs only inside withAuditChainLock');
     }
-    const fullEntry = this.appendUnderLock(this.prepare(entry));
+    const prepared = this.prepare(entry);
+    const fullEntry = asAuditStoreWriter(prepared.requestedTenantSlug ?? '', () =>
+      this.appendUnderLock(prepared)
+    );
     void this.fanOutToForwarder(fullEntry);
     return fullEntry;
   }
 
   private append(prepared: PreparedAuditRecord): AuditEntry {
-    const fullEntry = withAuditChainLock(() => this.appendUnderLock(prepared));
+    const fullEntry = asAuditStoreWriter(prepared.requestedTenantSlug ?? '', () =>
+      withAuditChainLock(() => this.appendUnderLock(prepared))
+    );
 
     // Fan-out to the optional audit forwarder (SIEM / log sink). The
     // publisher is registered by audit-forwarder when that optional module is
@@ -692,7 +719,7 @@ class AuditChainImpl {
     delete entryWithoutTenantSlug.tenantSlug;
     delete entryWithoutTenantSlug.scope;
 
-    const scope = resolveAuditScope(entry.scope, tenantSlug);
+    const scope = entry.scope;
 
     // Hash the same field order the persisted reader reconstructs. Otherwise
     // additive actor/scope fields supplied in a different order corrupt a
@@ -1171,7 +1198,7 @@ class AuditChainImpl {
       try {
         // G17: the mirror is the chain's own store, written under its
         // tenant-bound store-writer role, never under the caller's identity.
-        asTenantMirrorWriter(tenantSlug, () => this.appendTenantMirror(io, tenantSlug, entry));
+        asAuditStoreWriter(tenantSlug, () => this.appendTenantMirror(io, tenantSlug, entry));
       } catch (err: any) {
         logger.warn(`[AUDIT_CHAIN] Tenant mirror failed for ${tenantSlug}: ${err.message}`);
       }
@@ -1201,14 +1228,16 @@ class AuditChainImpl {
 
 function resolveAuditScope(
   scope: EventScope | undefined,
-  tenantSlug: string | undefined
+  tenantSlug: string | undefined,
+  fallbackTier: EventScope['tier'] = (getRegisteredEnvText(
+    'KYBERION_TIER'
+  ) as EventScope['tier']) || 'public'
 ): EventScope | undefined {
   try {
     return normalizeEventScope({
       ...(scope || {}),
       ...(tenantSlug && !scope?.tenant_slug ? { tenant_slug: tenantSlug } : {}),
-      tier:
-        scope?.tier || (getRegisteredEnvText('KYBERION_TIER') as EventScope['tier']) || 'public',
+      tier: scope?.tier || fallbackTier,
     });
   } catch {
     return undefined;

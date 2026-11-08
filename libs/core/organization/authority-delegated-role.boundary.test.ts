@@ -26,6 +26,11 @@ function isTestSource(rel: string): boolean {
   return /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(rel) || /(?:^|\/)(?:tests?|__tests__)\//u.test(rel);
 }
 
+/** Type-only generated maps declare env names; they never write process.env. */
+function isGeneratedTypeMap(rel: string): boolean {
+  return /\.generated\.[cm]?[jt]sx?$/u.test(rel);
+}
+
 describe('DR-01 delegated role write boundary', () => {
   it('writes KYBERION_DELEGATED_ROLE only from libs/core/authority.ts', () => {
     const root = pathResolver.rootDir();
@@ -34,7 +39,7 @@ describe('DR-01 delegated role write boundary', () => {
       for (const file of getAllFiles(path.join(root, dir))) {
         if (!/\.(?:[cm]?[jt]sx?)$/u.test(file)) continue;
         const rel = path.relative(root, file).split(path.sep).join('/');
-        if (ALLOWED_WRITERS.has(rel) || isTestSource(rel)) continue;
+        if (ALLOWED_WRITERS.has(rel) || isTestSource(rel) || isGeneratedTypeMap(rel)) continue;
         const source = String(safeReadFile(file, { encoding: 'utf8' }));
         if (!source.includes('DELEGATED_ROLE')) continue;
         source.split('\n').forEach((line, index) => {

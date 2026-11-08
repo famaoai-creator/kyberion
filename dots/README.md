@@ -230,10 +230,13 @@ Activation is gated — the authority role must exist in the canonical role
 registry and the `heartbeat_id` must be unique among supervised daemons and
 active dots.
 
-Charter writes are performed under the dedicated `dot_lifecycle_writer`
-role — never under the role a dot binds at runtime — so an active dot cannot
-rewrite the contract it runs under. Every wake re-validates that the bound
-role still exists before any work runs.
+Charter writes are performed under the dedicated `dot_charter_store`
+role (the former `dot_lifecycle_writer` was decomposed into
+`dot_charter_store` + `dot_lifecycle_runtime_store`,
+MSN-SCOPE-FLOWDECOMP-20261107) — never under the role a dot binds at
+runtime — so an active dot cannot rewrite the contract it runs under.
+Every wake re-validates that the bound role still exists before any work
+runs.
 
 ## Wake semantics
 
