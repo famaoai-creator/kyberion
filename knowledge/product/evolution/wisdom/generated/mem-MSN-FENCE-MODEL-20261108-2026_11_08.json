@@ -1,0 +1,26 @@
+{
+  "record_id": "mem-MSN-FENCE-MODEL-20261108-2026_11_08",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Validate fencing arithmetic and fresh clock observations at the lease boundary",
+  "summary": "A monotonic fencing contract requires safe integer allocation and finite time validation independently of backend exclusion.",
+  "candidate_id": "mem-MSN-FENCE-MODEL-20261108-2026_11_08",
+  "evidence_refs": [
+    "active/missions/public/MSN-FENCE-MODEL-20261108/evidence/implementation-report.md",
+    "active/missions/public/MSN-FENCE-MODEL-20261108/evidence/test-report.md",
+    "active/missions/public/MSN-FENCE-MODEL-20261108/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-11-08T09:49:48.293Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "When implementing Number-based fencing, validate persisted records even for injected backends, reject allocation at MAX_SAFE_INTEGER, and never wrap, clamp or reset an exhausted counter. Validate each fresh clock observation and require a finite deadline strictly later than now, while preserving valid fractional durations. Keep post-allocation and exit observations; if a later observation fails after allocation, release only the matching reservation while retaining its allocated fence. After renewal, validate durable current expiry rather than requiring the original token expiry to match. Compare production against an independent arithmetic oracle over explicit invalid and boundary partitions, and require an overflow negative control. This is finite input safety evidence, not a distributed exclusion or liveness proof."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-FENCE-MODEL-20261108/evidence/implementation-report.md",
+    "active/missions/public/MSN-FENCE-MODEL-20261108/evidence/test-report.md",
+    "active/missions/public/MSN-FENCE-MODEL-20261108/evidence/REVIEW-execution-implement.md"
+  ],
+  "source_branch": "fix/formal-safety-boundaries-20261108",
+  "source_commit": "f15e02028d023dcef1b12598f81fef07b0d94972"
+}

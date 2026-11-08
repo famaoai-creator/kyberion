@@ -1,0 +1,26 @@
+{
+  "record_id": "mem-MSN-SCOPE-MODEL-20261108-2026_11_08",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Preserve explicit empty authority sets at viewer narrowing boundaries",
+  "summary": "An already resolved empty cap is the bottom authority set; defaults belong to upstream resolution.",
+  "candidate_id": "mem-MSN-SCOPE-MODEL-20261108-2026_11_08",
+  "evidence_refs": [
+    "active/missions/public/MSN-SCOPE-MODEL-20261108/evidence/implementation-report.md",
+    "active/missions/public/MSN-SCOPE-MODEL-20261108/evidence/test-report.md",
+    "active/missions/public/MSN-SCOPE-MODEL-20261108/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-11-08T09:50:14.641Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "For a server-resolved viewer cap, narrowing must check membership in the supplied set. An explicit empty array denies every tier; missing or non-array resolved values fail closed. Apply role defaults only in the upstream resolver where omission and emptiness are distinguished. Model every subset of the finite tier universe, verify grant-removal monotonicity, compare the implementation with an independent bitset oracle, and include a default-restoration negative control plus the actual caller. Keep credential, custody, tenant and audience policy outside this limited assurance claim."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-SCOPE-MODEL-20261108/evidence/implementation-report.md",
+    "active/missions/public/MSN-SCOPE-MODEL-20261108/evidence/test-report.md",
+    "active/missions/public/MSN-SCOPE-MODEL-20261108/evidence/REVIEW-execution-implement.md"
+  ],
+  "source_branch": "fix/formal-safety-boundaries-20261108",
+  "source_commit": "f15e02028d023dcef1b12598f81fef07b0d94972"
+}
