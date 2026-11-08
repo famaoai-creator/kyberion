@@ -52,16 +52,14 @@ export interface ActuatorResult<Output = unknown> {
 }
 
 /** Brand for a context merge patch returned by catalog dispatch (not a channel value). */
-export const KYBERION_CONTEXT_PATCH_BRAND = '__kyberion_context_patch' as const;
+export const CONTEXT_PATCH_BRAND = '__kyberion_context_patch' as const;
 
 export type ActuatorContextPatch = Record<string, unknown> & {
-  [KYBERION_CONTEXT_PATCH_BRAND]: true;
+  [CONTEXT_PATCH_BRAND]: true;
 };
 
 /** One-step catalog sub-pipeline run report (legacy dispatch output). */
-export function isPipelineRunEnvelope(
-  value: unknown
-): value is {
+export function isPipelineRunEnvelope(value: unknown): value is {
   status: unknown;
   results: unknown;
   context: Record<string, unknown>;
@@ -77,19 +75,17 @@ export function isPipelineRunEnvelope(
 }
 
 export function isActuatorContextPatch(value: unknown): value is ActuatorContextPatch {
-  return isRecord(value) && value[KYBERION_CONTEXT_PATCH_BRAND] === true;
+  return isRecord(value) && value[CONTEXT_PATCH_BRAND] === true;
 }
 
-export function asActuatorContextPatch(
-  context: Record<string, unknown>
-): ActuatorContextPatch {
-  return { [KYBERION_CONTEXT_PATCH_BRAND]: true, ...context };
+export function asActuatorContextPatch(context: Record<string, unknown>): ActuatorContextPatch {
+  return { [CONTEXT_PATCH_BRAND]: true, ...context };
 }
 
 export function stripActuatorContextPatchBrand(
   patch: ActuatorContextPatch
 ): Record<string, unknown> {
-  const { [KYBERION_CONTEXT_PATCH_BRAND]: _brand, ...rest } = patch;
+  const { [CONTEXT_PATCH_BRAND]: _brand, ...rest } = patch;
   return rest;
 }
 
