@@ -739,6 +739,8 @@ gets clean JSON.
 
 ## §5 Tests: pollution and host dependencies
 
+Before entering an exact-path resource scope, initialize any test-owned sandbox ancestor directories in fixture setup. A narrow capability may create its admitted leaf directories, never missing ancestors outside its grant. Verify a fresh sandbox as well as a warmed one; `scripts/pipeline_promote.resource-boundary.test.ts` covers journal setup without weakening the runtime guard.
+
 Production source inventories must exclude runtime storage roots before traversing
 them. The single-instance scan skips legacy root-level `work/` metrics, whose I/O is
 redirected into a per-test fixture; it still scans nested code directories named
