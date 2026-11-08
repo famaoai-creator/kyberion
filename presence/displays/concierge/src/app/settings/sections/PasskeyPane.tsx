@@ -3,7 +3,8 @@
 import { frontDeskFetch as fetch } from '../../../lib/front-desk-fetch';
 
 import * as React from 'react';
-import { Button, SettingsGroup } from '@agent/shared-ui';
+import { Button, SettingsGroup, TextField } from '@agent/shared-ui';
+import { FormScope, asText } from './form-scope';
 import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import type { ConciergeLocale } from '../../../lib/i18n';
 import {
@@ -108,14 +109,17 @@ export function PasskeyPane({ locale, t }: { locale: ConciergeLocale; t: Setting
       {supported && stepUp ? <p>{t('setup.passkey_step_up_hint')}</p> : null}
       {supported ? (
         <div className="settings-row-actions">
-          <input
-            type="text"
-            value={label}
-            maxLength={64}
-            aria-label={t('setup.passkey_label')}
-            placeholder={t('setup.passkey_label')}
-            onChange={(event) => setLabel(event.target.value)}
-          />
+          <FormScope fields={{ 'passkey.label': (value) => setLabel(asText(value)) }}>
+            <TextField
+              id="passkey-label"
+              name="passkey.label"
+              label={t('setup.passkey_label')}
+              hide_label
+              value={label}
+              maxlength={64}
+              disabled={busy}
+            />
+          </FormScope>
           <Button
             label={t('setup.passkey_add')}
             variant="primary"

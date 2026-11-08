@@ -181,7 +181,6 @@ export function AdvancedSection({
               {(
                 [
                   ['tenant_display_name', 'setup.tenant_display_name', undefined],
-                  ['tenant_role', 'setup.tenant_role', undefined],
                   ['agent_id', 'setup.agent_id', undefined],
                   ['agent_display_name', 'setup.agent_display_name', undefined],
                 ] as Array<[keyof ManagementState, ConciergeMessageKey, string | undefined]>
@@ -197,6 +196,31 @@ export function AdvancedSection({
                   />
                 </SettingRow>
               ))}
+              <SettingRow label={t('setup.tenant_role')}>
+                <Select
+                  id="management-tenant_role"
+                  name="management.tenant_role"
+                  label={t('setup.tenant_role')}
+                  hide_label
+                  value={management.tenant_role}
+                  options={[
+                    ...(['owner', 'approver', 'operator', 'viewer'].includes(management.tenant_role)
+                      ? []
+                      : management.tenant_role
+                        ? [
+                            {
+                              value: management.tenant_role,
+                              label: management.tenant_role,
+                            },
+                          ]
+                        : []),
+                    { value: 'owner', label: 'owner' },
+                    { value: 'approver', label: 'approver' },
+                    { value: 'operator', label: 'operator' },
+                    { value: 'viewer', label: 'viewer' },
+                  ]}
+                />
+              </SettingRow>
               {/* The engine and model are chosen in one place (エージェントと自律度);
                   the saved values are sent back unchanged. */}
               <SettingRow

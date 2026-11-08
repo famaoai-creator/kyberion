@@ -20,6 +20,37 @@
   ],
   "mission_class_rules": [
     {
+      "id": "class-web-design-improvement-hint",
+      "match": {
+        "mission_type_hints": [
+          "web_design_improvement",
+          "ui_improvement",
+          "ux_improvement",
+          "design_improvement"
+        ]
+      },
+      "mission_class": "web_design_improvement"
+    },
+    {
+      "id": "class-web-design-improvement-utterance",
+      "match": {
+        "utterance_patterns": [
+          "UI改善",
+          "UX改善",
+          "デザイン改善",
+          "見やすくして",
+          "画面を改善",
+          "ワイヤフレーム",
+          "wireframe",
+          "web design",
+          "ui improvement",
+          "settings ui",
+          "設定画面"
+        ]
+      },
+      "mission_class": "web_design_improvement"
+    },
+    {
       "id": "class-code-change-refactoring-hint",
       "match": {
         "mission_type_hints": ["refactoring", "code_change"]

@@ -716,7 +716,7 @@ export interface KbSegmentedProps extends KbFieldBase {
 
 export interface KbTextFieldProps extends KbFieldBase {
   value?: string | number;
-  type?: 'text' | 'email' | 'url' | 'number' | 'search';
+  type?: 'text' | 'email' | 'url' | 'number' | 'search' | 'time';
   placeholder?: string;
   maxlength?: number;
   min?: number;
