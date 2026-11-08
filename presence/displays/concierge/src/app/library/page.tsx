@@ -12,6 +12,7 @@ import { DeliverablesWorkspace } from '../../components/ops/DeliverablesWorkspac
 import { KnowledgeWorkspace } from '../../components/ops/KnowledgeWorkspace';
 import { DestinationTabs } from '../destination-tabs';
 import { IngestPanel } from './ingest-panel';
+import { MinutesPanel } from './minutes-panel';
 // The deliverable / knowledge browsers are console components scoped to `.kb-ops`.
 import '../ops/globals.css';
 
@@ -47,6 +48,7 @@ function Library() {
         tabs={[
           { id: 'deliverables', label: t('ia_shell_library_tab_deliverables') },
           { id: 'knowledge', label: t('ia_shell_library_tab_knowledge') },
+          { id: 'minutes', label: t('ia_shell_library_tab_minutes') },
           { id: 'ingest', label: t('ia_shell_library_tab_ingest') },
         ]}
       />
@@ -54,6 +56,13 @@ function Library() {
         // Intake is a form: 720 wide, aligned with the tabs (MSN-SHELL-IA §5).
         <div className="library-form">
           <IngestPanel />
+        </div>
+      ) : tab === 'minutes' ? (
+        // The scoped meeting-minutes index is a console component like the
+        // deliverable / knowledge browsers — `.kb-ops` scope + the shell's
+        // tenant / organization / project narrowing.
+        <div className="kb-ops">
+          <MinutesPanel key={`${scope.tenant}:${scope.organizationId}:${scope.projectId}`} />
         </div>
       ) : tab === 'knowledge' ? (
         <div className="kb-ops">
