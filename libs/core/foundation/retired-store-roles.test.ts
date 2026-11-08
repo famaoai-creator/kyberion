@@ -13,7 +13,7 @@ import { safeReadFile } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 
 describe('retired store role names (G2)', () => {
-  it('lists every store grant issuance right that replaced a shared core role', () => {
+  it('lists store roles retired into grants or narrower facade stores', () => {
     expect([...RETIRED_STORE_ROLE_NAMES].sort()).toEqual(
       [
         AUTONOMY_LEARNING_GRANT_ISSUANCE_RIGHT,
@@ -25,6 +25,7 @@ describe('retired store role names (G2)', () => {
         PERSONAL_APPROVAL_GRANT_ISSUANCE_RIGHT,
         PIPELINE_JOURNAL_GRANT_ISSUANCE_RIGHT,
         PR_PUBLICATION_GRANT_ISSUANCE_RIGHT,
+        'dot_lifecycle_writer',
       ].sort()
     );
   });

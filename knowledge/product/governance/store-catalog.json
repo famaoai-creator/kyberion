@@ -133,7 +133,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["concierge_management_reader"],
+      "legacy_roles": ["concierge_management_reader", "dot_lifecycle_runtime_store"],
       "sources": ["runtime-state-roots", "role-policy"],
       "registration": {
         "family": "state",
@@ -149,7 +149,7 @@
         "kind": "system"
       },
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_writer"],
+      "legacy_roles": ["dot_charter_store"],
       "sources": ["role-policy"],
       "note": "Resident-agent charters shipped with the repository."
     },
@@ -220,7 +220,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_writer"],
+      "legacy_roles": ["dot_charter_store", "dot_lifecycle_runtime_store"],
       "sources": ["storage-floor", "role-policy"],
       "note": "Floors also hold a system/ partition (custody system).",
       "registration": {
@@ -413,11 +413,24 @@
       "legacy_roles": [
         "concierge_management_reader",
         "concierge_management_writer",
-        "dot_lifecycle_writer",
+        "dot_charter_store",
         "operational_learning_writer",
         "workspace_graph_reader"
       ],
       "sources": ["role-policy"]
+    },
+    {
+      "id": "personal-knowledge",
+      "path": "knowledge/personal",
+      "custody": {
+        "kind": "derived",
+        "note": "Aggregate of the existing personal namespace. Contained stores retain their individually declared person or system custodian; this aggregate neither changes custody nor grants access."
+      },
+      "tiers": ["personal"],
+      "status": "active",
+      "legacy_roles": ["dot_lifecycle_runtime_store"],
+      "sources": ["role-policy"],
+      "note": "Tracks the existing namespace and its raw projected-tier policy reference, like the tenant-knowledge aggregate. The runtime store virtual projection grant is unusable on actual knowledge files because read/metadata/write/mkdir purpose ceilings apply first. No new storage root, runtime registration or permission is introduced."
     },
     {
       "id": "personal-knowledge.charters",
@@ -451,7 +464,7 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_writer"],
+      "legacy_roles": ["dot_charter_store"],
       "sources": ["role-policy"]
     },
     {
@@ -518,7 +531,7 @@
       "legacy_roles": [
         "concierge_management_reader",
         "concierge_management_writer",
-        "dot_lifecycle_writer",
+        "dot_charter_store",
         "first_job_tenant_status_reader",
         "peer_catalog_reader",
         "peer_responder_reader",
@@ -890,9 +903,9 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_writer"],
+      "legacy_roles": ["dot_charter_store", "dot_lifecycle_runtime_store"],
       "sources": ["role-policy"],
-      "note": "Whole runtime root granted to dot_lifecycle_writer; narrow it to the stores the DOT lifecycle writes (G2)."
+      "note": "Dot charter validation reads use dot_charter_store; lifecycle runtime writes use dot_lifecycle_runtime_store narrowed to audit, heartbeat and event-continuation artifacts. The rejected asset_derivation_store role remains absent."
     },
     {
       "id": "shared.state",
@@ -1013,9 +1026,9 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["peer_responder_reader"],
+      "legacy_roles": ["dot_lifecycle_runtime_store", "peer_responder_reader"],
       "sources": ["role-policy"],
-      "note": "The tenant home. Company assets live directly in it (organization/tenant-home.ts TENANT_ASSET_ENTRIES: company.json, vision.md, organization-profile.json, org-chart.json, okr.json, decision-rights.json, finance/, brand/, design/); S2 moved them from customer/<tenant>/."
+      "note": "The raw policy inventory includes the lifecycle runtime store projection grant. Its physical knowledge access remains denied by raw-purpose operation ceilings; this entry does not confer authority."
     },
     {
       "id": "tenant-knowledge.autonomy-action-overrides",
@@ -1082,7 +1095,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_writer"],
+      "legacy_roles": ["dot_charter_store"],
       "sources": ["role-policy"]
     },
     {
