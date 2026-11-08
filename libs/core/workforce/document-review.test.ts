@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   files: new Map<string, string>(),
+  unknownSources: new Set<string>(),
+  sourceScopes: new Map<
+    string,
+    { tier: 'public' | 'confidential' | 'personal'; tenant?: string }
+  >(),
   generate: vi.fn(),
   egress: vi.fn(),
   envelope: undefined as
@@ -43,10 +48,15 @@ vi.mock('../tier-guard.js', () => ({
         : 'public',
 }));
 vi.mock('../storage/scratch-promotion.js', () => ({
+  isUnknownTierSource: (value: string) => mocks.unknownSources.has(value),
   classifyPromotionSourceScope: (value: string) => {
-    const match = /^knowledge\/(personal|confidential)\/([^/]+)\//u.exec(value);
+    if (mocks.sourceScopes.has(value)) return mocks.sourceScopes.get(value);
+    const match = /^knowledge\/(personal|confidential)\/([^/]+)\//iu.exec(value);
     return match
-      ? { tier: match[1], tenant: match[1] === 'confidential' ? match[2] : undefined }
+      ? {
+          tier: match[1].toLowerCase(),
+          tenant: match[1].toLowerCase() === 'confidential' ? match[2] : undefined,
+        }
       : null;
   },
 }));
@@ -141,6 +151,8 @@ function finding(input: { userPrompt: string }, changes: Record<string, unknown>
 }
 beforeEach(() => {
   mocks.files.clear();
+  mocks.unknownSources.clear();
+  mocks.sourceScopes.clear();
   mocks.generate.mockReset();
   mocks.egress.mockReset();
   mocks.envelope = undefined;
@@ -330,6 +342,34 @@ describe('bounded document review', () => {
       runDocumentReview({ target: 'spec.md', references: Array(17).fill('reference.md') })
     ).rejects.toThrow();
     await expect(runDocumentReview({ target: 'spec.md', timeout_ms: 0 })).rejects.toThrow();
+    expect(mocks.generate).not.toHaveBeenCalled();
+  });
+  it.each([
+    'active/shared/tmp/inbound/customer.md',
+    'active/shared/staging/inbound/customer.md',
+    'active/missions/legacy/notes.md',
+  ])('rejects unclassified %s before reading or model dispatch', async (target) => {
+    mocks.unknownSources.add(target);
+    // No readable fixture exists: classification must fail before attempting content I/O.
+    await expect(runDocumentReview({ target })).rejects.toThrow('DOCUMENT_REVIEW_SCOPE_UNKNOWN');
+    expect(mocks.generate).not.toHaveBeenCalled();
+  });
+  it('accepts explicitly partitioned public input', async () => {
+    const target = 'active/shared/tmp/public/shared/notes.md';
+    mocks.files.set('/fixture/' + target, 'Public delivery design');
+    expect((await runDocumentReview({ target })).status).toBe('completed');
+  });
+  it.each([
+    'knowledge/Confidential/tenant-a/spec.md',
+    'active/archive/missions/confidential/tenant-a/MSN-EXAMPLE/spec.md',
+  ])('preserves private source classification for %s', async (target) => {
+    mocks.files.set('/fixture/' + target, 'Private delivery design');
+    mocks.sourceScopes.set(target, { tier: 'confidential', tenant: 'tenant-a' });
+    await expect(
+      withReasoningPayloadScope({ tier: 'public', tenant_slug: 'tenant-a' }, () =>
+        runDocumentReview({ target })
+      )
+    ).rejects.toThrow('DOCUMENT_REVIEW_SCOPE_MISMATCH');
     expect(mocks.generate).not.toHaveBeenCalled();
   });
   it('never lowers a private path into an absent or public payload scope', async () => {
