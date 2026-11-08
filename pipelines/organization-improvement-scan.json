@@ -1,0 +1,25 @@
+{
+  "action": "pipeline",
+  "name": "organization-improvement-scan",
+  "version": "1.0.0",
+  "description": "Purpose-driven improvement discovery: correlate objective progress, KR stagnation, operations friction and usage-ledger cost into a ranked candidate report. apply=true publishes a scoped artifact and requires a verified dot executor claim; read-only otherwise.",
+  "steps": [
+    {
+      "id": "scan",
+      "role": "source",
+      "op": "core:organization_improvement_scan",
+      "params": {
+        "tier": "confidential",
+        "tenant_slug": "kyberion-service-studio",
+        "organization_id": "kyberion-development-team",
+        "window_days": 7,
+        "apply": false
+      },
+      "produces": {
+        "channel": "improvement_scan",
+        "type": "OrganizationImprovementScanReport",
+        "sensitive": true
+      }
+    }
+  ]
+}

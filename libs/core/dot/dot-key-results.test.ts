@@ -211,6 +211,104 @@ describe('dot key results', () => {
     expect(forced[0]).toMatchObject({ kr_id: 'inc', value: 1 });
   });
 
+  it('measures cost org metrics from the injected cost report with window_days', async () => {
+    const scope = {
+      organizationId: 'org-c',
+      tenantSlug: 'acme',
+      tier: 'confidential' as const,
+    };
+    const purpose = {
+      objectives: [
+        {
+          objective_id: 'o1',
+          title: 'O1',
+          key_results: [
+            {
+              kr_id: 'spend',
+              title: 'Spend',
+              metric: { source: 'org_metric', metric: 'cost_usd', window_days: 30 },
+              target: 100,
+              direction: 'decrease',
+              baseline: 200,
+            },
+            {
+              kr_id: 'unknowns',
+              title: 'Unknown evidence',
+              metric: { source: 'org_metric', metric: 'unknown_cost_calls' },
+              target: 0,
+              direction: 'decrease',
+            },
+          ],
+        },
+      ],
+    } as never;
+    const seen: Array<{ since?: string; until?: string }> = [];
+    const costReport = (opts: { since?: string; until?: string }) => {
+      seen.push(opts);
+      const bucket = {
+        key: 'm',
+        cost_usd: 42,
+        estimated_cost_usd: 0,
+        reference_usd: 0,
+        reference_cost_calls: 0,
+        actual_cost_calls: 3,
+        estimated_cost_calls: 0,
+        included_calls: 0,
+        unknown_cost_calls: 0,
+        cost_complete: true,
+        calls: 3,
+        prompt_tokens: 100,
+        completion_tokens: 50,
+        cache_read_tokens: 20,
+        cache_write_tokens: 10,
+        cache_write_1h_tokens: 0,
+      };
+      return {
+        since: null,
+        until: null,
+        total_usd: 42,
+        estimated_usd: 0,
+        reference_usd: 0,
+        reference_cost_calls: 0,
+        actual_cost_calls: 3,
+        estimated_cost_calls: 0,
+        included_calls: 0,
+        unknown_cost_calls: 2,
+        cost_complete: false,
+        calls: 5,
+        by_mission: [bucket],
+        by_model: [bucket],
+        by_day: [],
+        actual_usd: 42,
+        committed_usd: 0,
+        resource_usage_entries: 0,
+        resource_usage_cost_usd: 0,
+        by_actor: [],
+        by_customer: [],
+        by_cost_center: [],
+        by_tenant: [],
+        by_organization: [],
+        by_project: [],
+        by_cause: [],
+      } as never;
+    };
+    const rows = await measureOrganizationKeyResults(scope, {
+      rootDir: ROOT,
+      now: at(0),
+      loadPurpose: () => purpose,
+      costReport,
+    });
+    expect(rows).toHaveLength(2);
+    expect(rows.find((r) => r.kr_id === 'spend')?.value).toBe(42);
+    expect(rows.find((r) => r.kr_id === 'unknowns')?.value).toBe(2);
+    // cost_usd spec asked for a 30-day trailing window; unknown_cost_calls defaulted to 7.
+    const days = seen.map((o) =>
+      Math.round((Date.parse(o.until ?? '') - Date.parse(o.since ?? '')) / 86_400_000)
+    );
+    expect(days.sort((a, b) => a - b)).toEqual([7, 30]);
+    expect(seen.every((o) => (o as never as { scopeFilter: unknown }).scopeFilter)).toBe(true);
+  });
+
   it('records a manual KR value that sweeps leave alone', async () => {
     const scope = { organizationId: 'org-m', tenantSlug: 'acme', tier: 'confidential' as const };
     const purpose = {

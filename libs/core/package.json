@@ -4080,6 +4080,10 @@
       "types": "./dist/organization/organization-cadence.d.ts",
       "default": "./dist/organization/organization-cadence.js"
     },
+    "./organization/organization-cost-metrics": {
+      "types": "./dist/organization/organization-cost-metrics.d.ts",
+      "default": "./dist/organization/organization-cost-metrics.js"
+    },
     "./organization/organization-digest": {
       "types": "./dist/organization/organization-digest.d.ts",
       "default": "./dist/organization/organization-digest.js"
@@ -4087,6 +4091,10 @@
     "./organization/organization-digest-artifacts": {
       "types": "./dist/organization/organization-digest-artifacts.d.ts",
       "default": "./dist/organization/organization-digest-artifacts.js"
+    },
+    "./organization/organization-improvement-scan": {
+      "types": "./dist/organization/organization-improvement-scan.d.ts",
+      "default": "./dist/organization/organization-improvement-scan.js"
     },
     "./organization/organization-interventions": {
       "types": "./dist/organization/organization-interventions.d.ts",
