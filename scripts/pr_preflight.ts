@@ -147,7 +147,13 @@ export function runAffectedTests(
     const summary = summarizeVitestOutput(output);
     for (const line of summary.lines) print(`[pr:affected-tests]   ${line}`);
     if (result.status !== 0) {
-      const tail = output.trim().split('\n').slice(-40).join('\n');
+      const lines = output.replace(ANSI_PATTERN, '').trim().split('\n');
+      // A long failure list must retain every failing case, not just the last
+      // stack trace: the broad run may take many minutes to reproduce.
+      const failures = lines.flatMap((line, index) =>
+        /^\s*FAIL\s/u.test(line) ? lines.slice(index, index + 3) : []
+      );
+      const tail = [...failures, ...lines.slice(-40)].join('\n');
       throw new Error(
         `[pr:affected-tests] ${label} tests failed (exit ${String(result.status)})\n${tail}`
       );
