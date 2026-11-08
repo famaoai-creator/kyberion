@@ -59,6 +59,7 @@ import {
   stripSharedScriptFlags,
   type ScriptContext,
 } from './lib/harness.js';
+import { safeExecResultAsync } from '@agent/core/secure-io';
 import { formatCliUsage, hasHelpFlag, type CliGuardSpec } from './lib/cli-guard.js';
 import { getRegisteredEnvText, isVitestProcess, setRegisteredEnv } from '@agent/core/foundation';
 import {
@@ -582,6 +583,7 @@ type DoctorArguments = {
   platform?: 'ios' | 'android' | 'all';
   full?: boolean;
   vcsAuth?: boolean;
+  fix?: boolean;
 };
 
 function normalizeDoctorArguments(args: string[]): string[] {
@@ -607,6 +609,12 @@ async function parseDoctorArguments(args: string[]): Promise<DoctorArguments> {
       type: 'boolean',
       default: false,
       describe: 'Also verify forge authentication for the selected vcs-host provider (network)',
+    })
+    .option('fix', {
+      type: 'boolean',
+      default: false,
+      describe:
+        'Automatically apply safe remedial actions for detected resident ops / scheduler gaps',
     })
     .parseSync();
   return {
@@ -748,6 +756,7 @@ export const DOCTOR_CLI: CliGuardSpec = {
     { flag: '--platform', value: '<ios|android|all>' },
     { flag: '--full' },
     { flag: '--json' },
+    { flag: '--fix' },
   ],
 };
 
@@ -760,7 +769,71 @@ export const runDoctor = defineScript<DoctorRunReport | undefined>({
       return undefined;
     }
     const argv = await parseDoctorArguments(context.argv);
-    const report = await collectDoctorReport(argv);
+    let report = await collectDoctorReport(argv);
+
+    if (argv.fix) {
+      context.print('Applying safe doctor remediations...');
+      const findings = report.scheduleLines.filter(
+        (line) => line.includes('ERROR') || line.includes('WARN')
+      );
+      for (const finding of findings) {
+        if (
+          finding.includes('unit-missing:chronos') ||
+          finding.includes('schedule-registry-empty')
+        ) {
+          context.print('  [fix] Installing chronos scheduler unit and syncing schedules...');
+          await safeExecResultAsync(
+            'node',
+            ['scripts/kyberion_cli_entry.mjs', 'scheduler', 'install', '--apply'],
+            { timeoutMs: 30000 }
+          );
+        }
+        if (finding.includes('unit-missing:daemon-watchdog')) {
+          context.print('  [fix] Installing daemon watchdog unit...');
+          await safeExecResultAsync(
+            'node',
+            [
+              'scripts/kyberion_cli_entry.mjs',
+              'scheduler',
+              'install',
+              '--daemon',
+              'daemon-watchdog',
+              '--apply',
+            ],
+            { timeoutMs: 30000 }
+          );
+        }
+        if (finding.includes('backup-archive-missing')) {
+          context.print('  [fix] Running initial backup pipeline...');
+          await safeExecResultAsync(
+            'node',
+            [
+              'scripts/run_built.mjs',
+              'dist/scripts/run_pipeline.bundle.js',
+              '--input',
+              'pipelines/backup-daily.json',
+            ],
+            { timeoutMs: 60000 }
+          );
+        }
+        if (finding.includes('backup-drill-missing')) {
+          context.print('  [fix] Running backup restore drill pipeline...');
+          await safeExecResultAsync(
+            'node',
+            [
+              'scripts/run_built.mjs',
+              'dist/scripts/run_pipeline.bundle.js',
+              '--input',
+              'pipelines/backup-restore-drill.json',
+            ],
+            { timeoutMs: 60000 }
+          );
+        }
+      }
+      context.print('Remediation complete. Re-evaluating health...');
+      report = await collectDoctorReport(argv);
+    }
+
     context.print(context.json ? report : formatDoctorReport(report, argv));
     if (report.totalMissing > 0) {
       throw new ScriptExitError(1, '', true, report);
