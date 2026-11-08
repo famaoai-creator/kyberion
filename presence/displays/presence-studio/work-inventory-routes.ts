@@ -1,5 +1,6 @@
-// WI-11 / WI-15: the one work-inventory scope rule presence-studio's hearing
-// hand-off reads and writes with (`hearing-routes.ts`, `hearing-completion.ts`).
+// WI-11 / WI-15: presence-studio's adapter for the one work-inventory scope rule
+// the hearing hand-off reads and writes with (`hearing-routes.ts`; the rule
+// itself lives in `libs/core/surface/hearing-completion.ts`).
 // The 業務の自動化候補 panel that used to be served from here
 // (`/api/front-desk/work-inventory`, `/api/work-inventory-vocabulary`) moved
 // with the 進み具合 page to Concierge 仕事 › 依頼
@@ -7,8 +8,11 @@
 // Kyberion server phase 2). Concierge mirrors this rule in
 // `src/lib/work-inventory-member.ts`.
 import type { WorkInventoryScope } from '@agent/core/workforce/work-inventory';
+import {
+  hearingWorkInventoryHandoffHref,
+  hearingWorkInventoryScope,
+} from '@agent/core/surface/hearing-completion';
 import type { PresenceStudioViewerContext } from './security.js';
-import { hearingNamespace } from './hearing-runtime.js';
 
 /**
  * The viewer's first tenant slug -> that tenant's scope. Without a concrete
@@ -20,19 +24,8 @@ import { hearingNamespace } from './hearing-runtime.js';
 export function resolveWorkInventoryScopeForViewer(
   viewer: PresenceStudioViewerContext
 ): WorkInventoryScope | null {
-  const namespace = hearingNamespace(viewer.tenantSlugs);
-  if (namespace === 'all' || namespace === 'unscoped') {
-    return viewer.source === 'loopback' ? {} : null;
-  }
-  return { tenant_slug: namespace };
+  return hearingWorkInventoryScope(viewer);
 }
-
-/**
- * Concierge's selection value for the personal view (`PERSONAL_SELECTION` in
- * `presence/displays/concierge/src/lib/tenant-context.ts`). A reserved tier
- * name, so it can never collide with a tenant slug.
- */
-const CONCIERGE_PERSONAL_SELECTION = 'personal';
 
 /**
  * Where the work-inventory hand-off sends the person (仕事 › 依頼 on
@@ -44,10 +37,5 @@ export function workInventoryHandoffHref(
   scopedHref: string,
   viewer: PresenceStudioViewerContext
 ): string {
-  const scope = resolveWorkInventoryScopeForViewer(viewer);
-  if (!scope || scope.tenant_slug) return scopedHref;
-  const base = 'http://handoff.invalid';
-  const url = new URL(scopedHref, base);
-  url.searchParams.set('tenant', CONCIERGE_PERSONAL_SELECTION);
-  return url.origin === base ? url.pathname + url.search + url.hash : url.href;
+  return hearingWorkInventoryHandoffHref(scopedHref, viewer);
 }
