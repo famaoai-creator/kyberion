@@ -129,6 +129,8 @@ export function isCoreAffectedTest(file: string): boolean {
 }
 
 export const CORE_AFFECTED_TEST_EXCLUDES = ['libs/core/**', 'libs/shared-*/**'] as const;
+/** Match the CI core-test and core-coverage matrices; each shard remains serial. */
+export const CORE_AFFECTED_TEST_SHARDS = 6;
 
 /**
  * Checklist step 3.5: run the tests that import a changed file (vitest
@@ -193,13 +195,15 @@ export function runAffectedTests(
   }
   const coreFlags = TEST_SUITES.core.filter((entry) => entry.startsWith('-'));
   if (runCode)
-    runSelection('core code', [
-      'run',
-      '--changed',
-      changed.mergeBase,
-      '--passWithNoTests',
-      ...TEST_SUITES.core,
-    ]);
+    for (let shard = 1; shard <= CORE_AFFECTED_TEST_SHARDS; shard++)
+      runSelection(`core code shard ${shard}/${CORE_AFFECTED_TEST_SHARDS}`, [
+        'run',
+        '--changed',
+        changed.mergeBase,
+        '--passWithNoTests',
+        ...TEST_SUITES.core,
+        `--shard=${shard}/${CORE_AFFECTED_TEST_SHARDS}`,
+      ]);
   const coreReaders = plan.readerTests.filter(isCoreAffectedTest);
   const nonCoreReaders = plan.readerTests.filter((file) => !isCoreAffectedTest(file));
   if (coreReaders.length > 0)
