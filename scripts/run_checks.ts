@@ -17,6 +17,8 @@ type Gate = {
   args?: string[];
   script?: string;
   timeout_ms?: number;
+  /** Run alone after earlier selected gates drain, then resume normal concurrency. */
+  exclusive?: boolean;
   baseline?: string;
   /** full/release only: repo-relative globs whose change selects this gate under `--changed`. */
   paths?: string[];
@@ -48,6 +50,49 @@ export type CheckScope = Gate['scope'] | 'full-only';
 const CHECK_SCOPES = new Set<CheckScope>([...VALID_SCOPES, 'full-only']);
 export const DEFAULT_GATE_TIMEOUT_MS = 120_000;
 export const DEFAULT_CONCURRENT_GATES = 6;
+
+/** Stable barrier phases; selection and gate objects are never changed. */
+export function buildGateRunPlan<T extends { exclusive?: boolean }>(gates: readonly T[]): T[][] {
+  const phases: T[][] = [];
+  let ordinary: T[] = [];
+  for (const gate of gates) {
+    if (gate.exclusive) {
+      if (ordinary.length) phases.push(ordinary);
+      ordinary = [];
+      phases.push([gate]);
+    } else ordinary.push(gate);
+  }
+  if (ordinary.length) phases.push(ordinary);
+  return phases;
+}
+
+/** Execute every gate once, retaining input order even when an executor rejects. */
+export async function runGatePlan<T extends { exclusive?: boolean }, R>(
+  gates: readonly T[],
+  jobs: number,
+  execute: (gate: T) => Promise<R>
+): Promise<PromiseSettledResult<R>[]> {
+  if (!Number.isInteger(jobs) || jobs < 1 || jobs > DEFAULT_CONCURRENT_GATES)
+    throw new Error('gate concurrency must be an integer from 1 to 6');
+  const results: PromiseSettledResult<R>[] = [];
+  for (const phase of buildGateRunPlan(gates)) {
+    const offset = results.length;
+    results.length += phase.length;
+    let next = 0;
+    const worker = async (): Promise<void> => {
+      while (next < phase.length) {
+        const index = next++;
+        try {
+          results[offset + index] = { status: 'fulfilled', value: await execute(phase[index]!) };
+        } catch (reason) {
+          results[offset + index] = { status: 'rejected', reason };
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(jobs, phase.length) }, () => worker()));
+  }
+  return results;
+}
 
 /** A scheduling bound only: never changes gate selection or pass/fail semantics. */
 export function parseCheckJobs(value: string | undefined, flag = '--jobs'): number {
@@ -134,6 +179,8 @@ export function validateGateManifest(manifest: GateManifest, availableScripts?: 
     ) {
       throw new Error(`ci gate ${gate.id} timeout_ms must be a positive integer`);
     }
+    if (gate.exclusive !== undefined && typeof gate.exclusive !== 'boolean')
+      throw new Error(`ci gate ${gate.id} exclusive must be a boolean`);
     const pathErrors = validateGatePaths(gate);
     if (pathErrors.length > 0) throw new Error(pathErrors.join('; '));
     const hasExecutable = typeof gate.executable === 'string' && gate.executable.trim().length > 0;
@@ -363,7 +410,7 @@ export async function main(
     );
     for (const match of changed.extra) print(describeChangedGateMatch(match));
   }
-  const results: Array<{
+  type GateResult = {
     id: string;
     owner: string;
     status: 'passed' | 'failed';
@@ -371,10 +418,25 @@ export async function main(
     stderr?: string;
     stdout?: string;
     error?: string;
-  }> = new Array(gates.length);
-  let nextGateIndex = 0;
-  const runGate = async (gate: Gate): Promise<(typeof results)[number]> => {
-    const execute = () => executeCheckGate(gate);
+    elapsed_ms: number;
+  };
+  const runGate = async (gate: Gate): Promise<GateResult> => {
+    let elapsed_ms = 0;
+    const execute = async () => {
+      const start = performance.now();
+      try {
+        return await executeCheckGate(gate);
+      } catch (cause) {
+        return {
+          status: 1,
+          stdout: '',
+          stderr: '',
+          error: cause instanceof Error ? cause : new Error(String(cause)),
+        };
+      } finally {
+        elapsed_ms = Math.max(0, Math.round(performance.now() - start));
+      }
+    };
     const result = usesPackageManager(gate)
       ? await withPackageManagerGateLock(execute)
       : await execute();
@@ -383,6 +445,7 @@ export async function main(
       owner: gate.owner,
       status: result.status === 0 ? 'passed' : 'failed',
       exitCode: result.status,
+      elapsed_ms,
       ...(result.status !== 0
         ? {
             stderr: result.stderr.trim().slice(-2000),
@@ -392,14 +455,19 @@ export async function main(
         : {}),
     };
   };
-  const worker = async (): Promise<void> => {
-    while (true) {
-      const index = nextGateIndex++;
-      if (index >= gates.length) return;
-      results[index] = await runGate(gates[index]!);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(jobs, gates.length) }, () => worker()));
+  const settled = await runGatePlan(gates, jobs, runGate);
+  const results: GateResult[] = settled.map((result, index) =>
+    result.status === 'fulfilled'
+      ? result.value
+      : {
+          id: gates[index]!.id,
+          owner: gates[index]!.owner,
+          status: 'failed',
+          exitCode: 1,
+          elapsed_ms: 0,
+          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        }
+  );
   const failed = results.filter((result) => result.status === 'failed');
   if (json)
     print({
@@ -420,7 +488,7 @@ export async function main(
   else {
     print(`[check] scope=${scope} gates=${results.length} failed=${failed.length}`);
     for (const result of results) {
-      print(`- ${result.status.toUpperCase()} ${result.id}`);
+      print(`- ${result.status.toUpperCase()} ${result.id} (${result.elapsed_ms}ms)`);
       if (result.status === 'failed') {
         if (result.stderr) print(`  stderr: ${result.stderr}`);
         if (result.stdout) print(`  stdout: ${result.stdout}`);
