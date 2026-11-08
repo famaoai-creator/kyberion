@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { seedFirstJobTestRoot } from '../../../scripts/fixtures/first-job-approval-fixture.js';
 import { safeWriteFile, safeReadFile, safeExecResult, safeRmSync } from '../secure-io.js';
 
@@ -50,6 +50,19 @@ beforeAll(async () => {
   workspace = await import('./mission-development-workspace.js');
   ledger = await import('../workforce/workspace-ledger.js');
 }, 60_000);
+beforeEach(() => {
+  // Clone semantics use a finite healthy fixture volume, not host free space.
+  // The real budget policy still runs, including the low-space denial below.
+  vi.spyOn(io, 'safeStatfs').mockReturnValue({
+    freeBytes: 4 * 1024 ** 3,
+    totalBytes: 8 * 1024 ** 3,
+  });
+});
+afterEach(() => {
+  // An assertion failure must not leak a command spy into the next test,
+  // whose captured "original" would otherwise be the same mutable spy.
+  vi.restoreAllMocks();
+});
 afterAll(() => {
   process.chdir(original);
   vi.restoreAllMocks();
@@ -85,6 +98,26 @@ describe('reviewed offline source clone', () => {
         expect(ledger.listWorkspaces()).toEqual(before);
         expect(io.safeExistsSync(target)).toBe(false);
       }
+    });
+  });
+  it('keeps the real disk floor denial before registration or clone', async () => {
+    vi.mocked(io.safeStatfs).mockReturnValue({ freeBytes: 0, totalBytes: 8 * 1024 ** 3 });
+    const execute = vi.spyOn(io, 'safeExecResult');
+    const register = vi.spyOn(ledger, 'registerWorkspace');
+    await authority.withExecutionContextAsync('mission_controller', async () => {
+      const before = ledger.listWorkspaces();
+      expect(() =>
+        workspace.ensureMissionDevelopmentSourceWorkspace(
+          { mission_id: 'MSN-LOW-SPACE', tier: 'public' },
+          'implement',
+          ['libs/core/example.ts'],
+          () => {},
+          { localBaselineCommit: sha }
+        )
+      ).toThrow('Private development workspace budget denied');
+      expect(register).not.toHaveBeenCalled();
+      expect(ledger.listWorkspaces()).toEqual(before);
+      expect(execute.mock.calls.some(([_command, args]) => args[0] === 'clone')).toBe(false);
     });
   });
   it('rolls back ledger registration when offline clone fails after allocate', async () => {
