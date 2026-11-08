@@ -1720,6 +1720,17 @@
       "group": "dev"
     },
     {
+      "id": "script.check.docs-impact",
+      "script": "check:docs-impact",
+      "command": "check docs-impact",
+      "noun": "check",
+      "verb": "docs-impact",
+      "audience": "dev",
+      "description": "cli_cmd_script_check_docs_impact",
+      "group": "dev",
+      "native_help": true
+    },
+    {
       "id": "script.check.improvement-plan-metadata",
       "module": "scripts/check_improvement_plan_metadata.ts",
       "command": "check improvement-plan-metadata",
@@ -1937,6 +1948,19 @@
       "group": "operate",
       "interactive": true,
       "long_running": true
+    },
+    {
+      "id": "script.delegate.default",
+      "script": "delegate",
+      "command": "delegate default",
+      "noun": "delegate",
+      "verb": "default",
+      "audience": "operator",
+      "description": "cli_cmd_script_delegate_default",
+      "group": "operate",
+      "native_help": true,
+      "long_running": true,
+      "effect": "state_change"
     },
     {
       "id": "script.deps.check",
