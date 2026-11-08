@@ -345,6 +345,7 @@
             },
             "op": {
               "enum": [
+                "document_review",
                 "a2a_fanout",
                 "perspective_fanout",
                 "a2a_roleplay",
@@ -416,7 +417,26 @@
             "params": {
               "$ref": "#/$defs/pipelineParams"
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "op": {
+                    "const": "document_review"
+                  }
+                }
+              },
+              "then": {
+                "required": ["params"],
+                "properties": {
+                  "params": {
+                    "$ref": "#/$defs/documentReviewParams"
+                  }
+                }
+              }
+            }
+          ]
         },
         {
           "type": "object",
@@ -431,6 +451,70 @@
             },
             "params": {
               "$ref": "#/$defs/pipelineParams"
+            }
+          }
+        }
+      ]
+    },
+    "documentReviewParams": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 16
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 16
+        },
+        "preset": {
+          "enum": ["comprehension", "design"]
+        },
+        "generator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 120000
+        },
+        "export_as": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["target"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": ["preset"],
+            "properties": {
+              "preset": {
+                "const": "design"
+              }
+            }
+          },
+          "then": {
+            "required": ["sources"],
+            "properties": {
+              "sources": {
+                "minItems": 1,
+                "type": "array"
+              }
             }
           }
         }
