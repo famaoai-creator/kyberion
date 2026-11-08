@@ -67,6 +67,7 @@ describe('audit-owned persistence under real production authority', () => {
       // Inspect only this synthetic fixture after leaving every tested scope.
       process.env.MISSION_ROLE = 'mission_controller';
       process.env.KYBERION_PERSONA = 'sovereign';
+      process.env.KYBERION_TENANT = '';
       const readRows = (dir) => io.safeExistsSync(dir)
         ? io.safeReaddir(dir).filter(name => name.endsWith('.jsonl')).flatMap(name =>
           String(io.safeReadFile(dir+'/'+name)).trim().split('\\n').filter(Boolean).map(JSON.parse))
@@ -78,6 +79,8 @@ describe('audit-owned persistence under real production authority', () => {
         targetExists:io.safeExistsSync(target),
         keyExists:io.safeExistsSync(root+'/active/shared/runtime/audit/chain-key'),
         master, mirror,
+        integrity:auditChain.verify(),
+        mirrorIntegrity:auditChain.verifyTenantMirrors(),
         otherMirrorExists:io.safeExistsSync(root+'/active/shared/runtime/audit-mirror/confidential/audit-fixture-b')
       })+'\\n');
     `;
@@ -107,6 +110,8 @@ describe('audit-owned persistence under real production authority', () => {
     expect(report.mismatch).toContain('AUDIT_SCOPE_DENIED');
     expect(report.ceiling).toBeTruthy();
     expect(report.otherMirrorExists).toBe(false);
+    expect(report.integrity.ok).toBe(true);
+    expect(report.mirrorIntegrity).toEqual({ ok: true, findings: [] });
     const denied = report.master.filter(
       (row: { action: string }) => row.action === 'policy_violation'
     );
