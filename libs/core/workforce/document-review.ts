@@ -6,7 +6,7 @@ import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeRealpath, safeReadFileSnapshot } from '../secure-io.js';
 import { detectTier } from '../tier-guard.js';
 import { KNOWLEDGE_TIER_RANK } from '../foundation/knowledge-tier.js';
-import { classifyPromotionSourceScope } from '../storage/scratch-promotion.js';
+import { classifyPromotionSourceScope, isUnknownTierSource } from '../storage/scratch-promotion.js';
 import { tenantRuntimePartitionOf } from '../storage-layout.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import {
@@ -143,18 +143,27 @@ function snapshotFile(ref: string): Snapshot {
   // Do not reclassify a private path as public through a link or alias.
   if (path.relative(literal, canonical))
     throw new Error('[DOCUMENT_REVIEW_LINK] Symlink inputs are not supported');
+  const relative = pathResolver.toRepoRelative(canonical).split(path.sep).join('/');
+  if (isUnknownTierSource(relative))
+    throw new Error(
+      '[DOCUMENT_REVIEW_SCOPE_UNKNOWN] Input tier is unclassified; use an explicit governed tier/tenant partition'
+    );
+  const source = classifyPromotionSourceScope(relative);
+  const pathTier = detectTier(canonical);
+  const tier =
+    source && KNOWLEDGE_TIER_RANK[source.tier] > KNOWLEDGE_TIER_RANK[pathTier]
+      ? source.tier
+      : pathTier;
   const raw = safeReadFileSnapshot(canonical, DOCUMENT_REVIEW_MAX_FILE_BYTES);
   const content = raw.toString('utf8');
   if (!content.trim() || content.includes('\0') || !Buffer.from(content).equals(raw))
     throw new Error('[DOCUMENT_REVIEW_TEXT] Input must contain nonempty UTF-8 text');
-  const relative = pathResolver.toRepoRelative(canonical).split(path.sep).join('/');
-  const source = classifyPromotionSourceScope(relative);
   const tenant = tenantRuntimePartitionOf(relative)?.tenant ?? source?.tenant;
   return {
     path: relative,
     sha256: sha256(raw),
     bytes: raw.length,
-    tier: detectTier(canonical),
+    tier,
     ...(tenant ? { tenant_slug: tenant } : {}),
     content,
   };

@@ -45,6 +45,7 @@ generator は既定 claude。codex は既存 isolated generator の tested-versi
   全 reviewer を通じた一つの期限であり、並列数や試行回数を増やさない。
   例示 pipeline は静的 schema 検証のため120000 ms固定。変更する場合は wisdom:document_review op を直接使う。
 - UTF-8 text のみ。空、binary、symlink、checkout 外、読み取り拒否は provider 呼び出し前に止める。
+- 未分類の scratch / staging / legacy mission は public と推定しない。明示した tier/tenant partition に配置してから実行する。パス分類器の保護 tier は大文字小文字によって下げない。
 - 読み取りは secure-io。入力の正規パスから tier / tenant を導き、既存 runtime scope を狭める。
   private 入力には対応する payload scope が必要。別 tenant の資料を一つのレビューへ混ぜない。
 - 出力は派生情報なので入力以上の保護を維持する。op の params には tier や waiver を受け付けない。
