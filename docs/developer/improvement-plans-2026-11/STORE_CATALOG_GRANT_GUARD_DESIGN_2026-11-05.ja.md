@@ -1554,3 +1554,7 @@ secure-io の 40 以下は別の段階）。上の表は G0 の時点の見込�
 - 推論送信・委譲の egress 判定（開示 D4）をこの設計で作り直すこと。P1 の範囲である。
 - Authority Role そのものの廃止。保存先専用のロールだけを許可証に置き換える。
 - 新しい保存先の追加。G0 は今ある保存先の写しから始める。
+
+## 用途制限下の拒否監査
+
+実 production adapter の比較で、狭いストアロール内の policy 拒否が global 監査の永続化も拒否し、記録を失う回帰を確認した。監査側の既存 writer context を key・lock・master・mirror の永続化へ用い、呼出し元の tenant / actor / scope / tier をその前に検証・固定する。旧 `audit_mirror_writer` の権限定義は変更せず、アプリケーションのストアロールへ監査権限を渡さない。resource ceiling と同期失敗は維持し、forwarder は委譲外で動かす。`assertRecordable` と既存ロック内の `recordHeld` も同じ境界に揃える。実 adapter 回帰の結果で最終確認する。
