@@ -6940,6 +6940,46 @@
       "execution_shape": "mission",
       "mission_class": "procurement_and_supply",
       "risk_profile": "approval_required"
+    },
+    {
+      "id": "improve-web-design",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "change",
+      "object": "web_ui_design",
+      "execution_shape": "task_session",
+      "mission_class": "web_design_improvement",
+      "risk_profile": "review_required",
+      "description": "Improve an existing web UI surface: inventory enumerable-but-freeform inputs, share a change plan (wireframe + approval only when the user asks or the change is large), then implement with shared UI components.",
+      "surface_examples": [
+        "設定画面が見づらいのでUI改善して",
+        "このページを使いやすくデザインし直して",
+        "ワイヤフレームを作ってから実装して"
+      ],
+      "plan_outline": [
+        "inventory current surface inputs and components (usability heuristics check)",
+        "share a change plan / layout proposal (wireframe + approval only if requested or high-risk)",
+        "implement with shared UI components and system-provided options",
+        "verify states, links, and contracts; apply diff-matched quality inspections"
+      ],
+      "outcome_ids": ["artifact:design_spec"],
+      "trigger_keywords": [
+        "UI改善",
+        "UX改善",
+        "デザイン改善",
+        "見づらい",
+        "ごちゃごちゃ",
+        "ワイヤフレーム",
+        "wireframe",
+        "ui improvement",
+        "web design"
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "result_shape": "artifact:design_spec"
+      }
     }
   ]
 }

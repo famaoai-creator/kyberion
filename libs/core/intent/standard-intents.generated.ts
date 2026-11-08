@@ -72,6 +72,7 @@ export interface Intent {
     | 'legal_and_compliance'
     | 'strategy_and_governance'
     | 'procurement_and_supply'
+    | 'web_design_improvement'
     | 'long_running_job';
   risk_profile: 'low' | 'review_required' | 'approval_required' | 'high_stakes';
   description: string;
