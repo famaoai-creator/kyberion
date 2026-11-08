@@ -460,7 +460,8 @@ function flushDeferredAppends(): void {
 }
 
 /**
- * Runs `fn` as the tenant audit mirror's own store-writer, bound to `tenantSlug`.
+ * Runs audit-owned persistence as its existing writer, bound to the captured tenant.
+ * The exported seam keeps its legacy mirror name for bootstrap compatibility.
  * authority.ts registers it (the audit chain sits below authority in the
  * import graph, so it cannot import withExecutionContext itself).
  */
@@ -478,7 +479,7 @@ export function registerTenantMirrorWriterContext(context: TenantMirrorWriterCon
   tenantMirrorWriterContext = context;
 }
 
-function asTenantMirrorWriter<T>(tenantSlug: string, fn: () => T): T {
+function asAuditStoreWriter<T>(tenantSlug: string, fn: () => T): T {
   return tenantMirrorWriterContext ? tenantMirrorWriterContext(tenantSlug, fn) : fn();
 }
 
@@ -604,18 +605,18 @@ class AuditChainImpl {
         `[AUDIT_SCOPE_DENIED] tenantSlug and scope.tenant_slug must identify the same tenant`
       );
     }
-    if (
-      entry.scope &&
-      !resolveAuditScope(
-        entry.scope,
-        entry.scope.tenant_slug ?? entry.tenantSlug ?? activeTenantSlug
-      )
-    ) {
+    const requestedTenant = entry.tenantSlug ?? entry.scope?.tenant_slug ?? activeTenantSlug;
+    const requestedTenantSlug =
+      requestedTenant && isValidTenantSlug(requestedTenant) ? requestedTenant : undefined;
+    const scope = resolveAuditScope(entry.scope, requestedTenantSlug);
+    if (entry.scope && !scope) {
       throw new Error('[AUDIT_SCOPE_INVALID] explicit audit scope failed validation');
     }
     return {
-      entry,
-      requestedTenantSlug: entry.tenantSlug ?? entry.scope?.tenant_slug ?? activeTenantSlug,
+      // Snapshot attribution before persistence borrows its own store context.
+      // Metadata remains caller-owned for compatibility; it grants no authority.
+      entry: { ...entry, ...(entry.actor ? { actor: { ...entry.actor } } : {}), scope },
+      requestedTenantSlug,
     };
   }
 
@@ -626,10 +627,12 @@ class AuditChainImpl {
    * cannot leave the change half done.
    */
   assertRecordable(entry: AuditRecordInput): void {
-    this.prepare(entry);
-    if (!resolveAuditChainKey({ createIfMissing: true })) {
-      throw new Error('missing_audit_chain_key');
-    }
+    const prepared = this.prepare(entry);
+    asAuditStoreWriter(prepared.requestedTenantSlug ?? '', () => {
+      if (!resolveAuditChainKey({ createIfMissing: true })) {
+        throw new Error('missing_audit_chain_key');
+      }
+    });
   }
 
   /**
@@ -641,13 +644,18 @@ class AuditChainImpl {
     if (!holdsAuditChainLock()) {
       throw new Error('[AUDIT_LOCK_NOT_HELD] recordHeld runs only inside withAuditChainLock');
     }
-    const fullEntry = this.appendUnderLock(this.prepare(entry));
+    const prepared = this.prepare(entry);
+    const fullEntry = asAuditStoreWriter(prepared.requestedTenantSlug ?? '', () =>
+      this.appendUnderLock(prepared)
+    );
     void this.fanOutToForwarder(fullEntry);
     return fullEntry;
   }
 
   private append(prepared: PreparedAuditRecord): AuditEntry {
-    const fullEntry = withAuditChainLock(() => this.appendUnderLock(prepared));
+    const fullEntry = asAuditStoreWriter(prepared.requestedTenantSlug ?? '', () =>
+      withAuditChainLock(() => this.appendUnderLock(prepared))
+    );
 
     // Fan-out to the optional audit forwarder (SIEM / log sink). The
     // publisher is registered by audit-forwarder when that optional module is
@@ -692,7 +700,7 @@ class AuditChainImpl {
     delete entryWithoutTenantSlug.tenantSlug;
     delete entryWithoutTenantSlug.scope;
 
-    const scope = resolveAuditScope(entry.scope, tenantSlug);
+    const scope = entry.scope;
 
     // Hash the same field order the persisted reader reconstructs. Otherwise
     // additive actor/scope fields supplied in a different order corrupt a
@@ -1171,7 +1179,7 @@ class AuditChainImpl {
       try {
         // G17: the mirror is the chain's own store, written under its
         // tenant-bound store-writer role, never under the caller's identity.
-        asTenantMirrorWriter(tenantSlug, () => this.appendTenantMirror(io, tenantSlug, entry));
+        asAuditStoreWriter(tenantSlug, () => this.appendTenantMirror(io, tenantSlug, entry));
       } catch (err: any) {
         logger.warn(`[AUDIT_CHAIN] Tenant mirror failed for ${tenantSlug}: ${err.message}`);
       }
