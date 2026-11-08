@@ -7,6 +7,8 @@ import {
   main,
   selectGates,
   validateGateManifest,
+  buildGateRunPlan,
+  runGatePlan,
 } from './run_checks.js';
 
 const gate = (id: string, scope: 'pr' | 'full' | 'release') => ({
@@ -18,6 +20,130 @@ const gate = (id: string, scope: 'pr' | 'full' | 'release') => ({
 });
 
 describe('manifest-driven check runner', () => {
+  it('accepts only boolean exclusive flags and keeps the unchanged golden budget', () => {
+    for (const exclusive of [true, false])
+      expect(() =>
+        validateGateManifest({
+          version: 1,
+          gates: [{ ...gate('bounded', 'pr'), exclusive }],
+        })
+      ).not.toThrow();
+    for (const exclusive of ['true', 1, null])
+      expect(() =>
+        validateGateManifest({
+          version: 1,
+          gates: [{ ...gate('bounded', 'pr'), exclusive }] as never,
+        })
+      ).toThrow('exclusive must be a boolean');
+    const manifest = loadGateManifest();
+    expect(manifest.gates.filter((entry) => entry.exclusive).map((entry) => entry.id)).toEqual([
+      'golden',
+    ]);
+    expect(
+      manifest.gates.find((entry) => entry.id === 'golden')?.timeout_ms ?? DEFAULT_GATE_TIMEOUT_MS
+    ).toBe(120_000);
+  });
+
+  it('builds stable phases around first, consecutive, last and sole exclusive gates', () => {
+    const a = { id: 'a', exclusive: false };
+    const b = { id: 'b', exclusive: false };
+    const x = { id: 'x', exclusive: true };
+    const y = { id: 'y', exclusive: true };
+    expect(buildGateRunPlan([])).toEqual([]);
+    expect(buildGateRunPlan([a, b])).toEqual([[a, b]]);
+    expect(buildGateRunPlan([x])).toEqual([[x]]);
+    expect(buildGateRunPlan([x, a, b, y, x])).toEqual([[x], [a, b], [y], [x]]);
+  });
+
+  it.each([1, 2, 6])(
+    'retains ordinary executor concurrency %s and stable results',
+    async (jobs) => {
+      const selected = Array.from({ length: 12 }, (_, id) => ({ id, exclusive: false }));
+      let active = 0;
+      let maximum = 0;
+      const seen: number[] = [];
+      const results = await runGatePlan(selected, jobs, async (entry) => {
+        seen.push(entry.id);
+        maximum = Math.max(maximum, ++active);
+        await Promise.resolve();
+        active--;
+        return entry.id;
+      });
+      expect(maximum).toBe(jobs);
+      expect(seen).toEqual(selected.map((entry) => entry.id));
+      expect(results).toEqual(selected.map((entry) => ({ status: 'fulfilled', value: entry.id })));
+    }
+  );
+
+  it('drains ordinary work around exclusive barriers and continues after executor rejection', async () => {
+    const selected = [
+      { id: 'a' },
+      { id: 'b' },
+      { id: 'c' },
+      { id: 'x', exclusive: true },
+      { id: 'd' },
+      { id: 'e' },
+      { id: 'y', exclusive: true },
+      { id: 'f' },
+    ];
+    const deferred = <T>() => {
+      let resolve!: (value: T) => void;
+      let reject!: (reason: Error) => void;
+      const promise = new Promise<T>((yes, no) => {
+        resolve = yes;
+        reject = no;
+      });
+      return { promise, resolve, reject };
+    };
+    const started = new Map(selected.map((entry) => [entry.id, deferred<void>()]));
+    const finish = new Map(selected.map((entry) => [entry.id, deferred<string>()]));
+    const active = new Set<string>();
+    const seen: string[] = [];
+    let maximum = 0;
+    const pending = runGatePlan(selected, 2, async (entry) => {
+      if (entry.exclusive) expect(active.size).toBe(0);
+      else expect([...active].some((id) => ['x', 'y'].includes(id))).toBe(false);
+      active.add(entry.id);
+      seen.push(entry.id);
+      maximum = Math.max(maximum, active.size);
+      started.get(entry.id)!.resolve();
+      try {
+        return await finish.get(entry.id)!.promise;
+      } finally {
+        active.delete(entry.id);
+      }
+    });
+    await Promise.all(['a', 'b'].map((id) => started.get(id)!.promise));
+    finish.get('b')!.resolve('b');
+    await started.get('c')!.promise;
+    expect(seen).toEqual(['a', 'b', 'c']);
+    finish.get('a')!.resolve('a');
+    finish.get('c')!.resolve('c');
+    await started.get('x')!.promise;
+    expect([...active]).toEqual(['x']);
+    finish.get('x')!.resolve('x');
+    await Promise.all(['d', 'e'].map((id) => started.get(id)!.promise));
+    const failure = new Error('synthetic executor failure');
+    finish.get('d')!.reject(failure);
+    finish.get('e')!.resolve('e');
+    await started.get('y')!.promise;
+    expect([...active]).toEqual(['y']);
+    finish.get('y')!.resolve('y');
+    await started.get('f')!.promise;
+    finish.get('f')!.resolve('f');
+    const results = await pending;
+    expect(seen).toEqual(selected.map((entry) => entry.id));
+    expect(maximum).toBe(2);
+    expect(active.size).toBe(0);
+    expect(results).toEqual(
+      selected.map((entry) =>
+        entry.id === 'd'
+          ? { status: 'rejected', reason: failure }
+          : { status: 'fulfilled', value: entry.id }
+      )
+    );
+  });
+
   it('uses the governed package manifest loader', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/run_checks.ts'), { encoding: 'utf8' })

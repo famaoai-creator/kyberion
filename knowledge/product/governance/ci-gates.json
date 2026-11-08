@@ -36,11 +36,12 @@
     },
     {
       "id": "golden",
+      "exclusive": true,
       "scope": "pr",
       "executable": "node",
       "args": ["dist/scripts/check_golden_output.js"],
       "owner": "quality",
-      "rationale": "Keeps deterministic pipeline output snapshots stable in every validation scope."
+      "rationale": "Keeps deterministic pipeline output snapshots stable in every validation scope. Resource isolation avoids overlapping baseline compiler/input scans with other CPU-heavy gates; an isolated diagnostic completed in 62s with natural exit and no retained handle. The exact failed-runner exit delay remains unattributed. Selection and the 120s timeout are unchanged."
     },
     {
       "id": "scenario-pr-deterministic",
