@@ -343,6 +343,30 @@ export default [
     },
   },
   {
+    // SX-03: registered KYBERION_* settings go through foundation/config (or
+    // foundation/env accessors). Direct process.env.KYBERION_* reads are
+    // already at foundation-adoption ratchet 0; keep them from returning.
+    files: ['libs/**/*.{ts,tsx}', 'scripts/**/*.ts', 'presence/**/*.{ts,tsx}'],
+    ignores: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/*.spec.ts',
+      'libs/core/foundation/process-env.ts',
+      'scripts/check_foundation_adoption.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "MemberExpression[object.type='MemberExpression'][object.object.name='process'][object.property.name='env'][property.name=/^KYBERION_/]",
+          message:
+            'SX-03: use @agent/core/foundation/config (config.get/text/bool) instead of process.env.KYBERION_*.',
+        },
+      ],
+    },
+  },
+  {
     // G13 (MSN-OPS-GAPS-20261008): library code logs through the shared
     // logger (`core.ts` logger / `createLogger`) so lines honour level/quiet
     // gating, stay off stdout and reach the log file sink. Raw console.* only
