@@ -43,6 +43,7 @@ import { authorizeConciergeHumanRequest } from '../../../lib/browser-human-reque
 import { conversationViewerForSelection } from '../../../lib/selected-tenant';
 import { workspaceConversationViewer } from '../../../lib/workspace-conversation';
 import { taskSessionVisible } from '../../../lib/progress-server';
+import { withCompanyFanoutInvalidation } from '../../../lib/company-fanout-cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -189,7 +190,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
   const access = resolveHearingAccess(req, 'write', 'conversation.turn', { narrow: false });
   if (access.response) return gateRefusal(access.response, 'conversation_access_denied', false);
   const read = await readHearingBody(req);
@@ -463,3 +464,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(unavailable(locale, requestId), { status: 503, headers: NO_STORE });
   }
 }
+
+/**
+ * This route reaches the deliverable inbox through `progress-server` (it only
+ * reads task-session visibility there), so it follows the company fan-out
+ * boundary: the personal fan-out cache is cleared once a turn settles.
+ */
+export const POST = withCompanyFanoutInvalidation(handlePost);
