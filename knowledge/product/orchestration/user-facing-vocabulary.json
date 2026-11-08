@@ -10045,6 +10045,16 @@
         "ja": "依存関係を確認",
         "qps-ploc": "⟦Ƈħėƈķ ḓėṗėñḓėñƈïėş ŀőřėɱ⟧"
       },
+      "cli_cmd_script_delegate_default": {
+        "en": "Hand a bounded task to a governed sub-agent",
+        "ja": "境界づけられたタスクを統制されたサブエージェントへ委任",
+        "qps-ploc": "⟦Ħȧñḓ ȧ ƀőůñḓėḓ ŧȧşķ ŧő ȧ ɠőṽėřñėḓ şůƀ-ȧɠėñŧ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_check_docs_impact": {
+        "en": "Report documented surfaces a change set did not update",
+        "ja": "変更差分が更新していないドキュメント面をレポート",
+        "qps-ploc": "⟦Řėṗőřŧ ḓőƈůɱėñŧėḓ şůřƒȧƈėş ȧ ƈħȧñɠė şėŧ ḓïḓ ñőŧ ůṗḓȧŧė ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
       "cli_cmd_script_media_visual_proof_ds04": {
         "en": "Generate the DS-04 video visual proof",
         "ja": "DS-04 動画のビジュアル検証を生成",
