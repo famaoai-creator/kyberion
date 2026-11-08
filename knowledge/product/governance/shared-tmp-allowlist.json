@@ -618,6 +618,12 @@
       "note": "empty working directory for the tool-less team-channel surface runtime (Team Channel E); holds no artifacts, recreated on demand"
     },
     {
+      "file": "libs/core/surface/hearing-runtime.ts",
+      "count": 1,
+      "classification": "migrate-candidate",
+      "note": "legacy pre-durable hearing records and canvases (sharedTmp('hearing')): read-only fallback and migration source only; every write goes to active/shared/runtime/hearing/. Moved unchanged from presence-studio (outside this ratchet's scan roots) by MSN-SERVER-HEARING-CORE-20261108"
+    },
+    {
       "file": "scripts/daemon_watchdog.ts",
       "count": 1,
       "classification": "legit-tmp",

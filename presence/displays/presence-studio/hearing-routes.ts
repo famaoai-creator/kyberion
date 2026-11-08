@@ -50,7 +50,7 @@ import {
   type HearingRecord,
   type HearingDecisionIdentity,
   type HearingScenario,
-} from './hearing.js';
+} from '@agent/core/surface/hearing';
 import {
   defaultHearingRecord,
   renderHearingCanvas,
@@ -60,17 +60,17 @@ import {
   HearingOperationError,
   parseHearingDecisionOperation,
   hearingDecisionReceipt,
-} from './hearing-runtime.js';
+} from '@agent/core/surface/hearing-runtime';
 import {
   hearingStorageForViewer,
   hearingDecisionScopeKey,
   type HearingStorage,
 } from './hearing-storage-access.js';
-import { generateHearingCanvas } from './hearing-canvas.js';
+import { generateHearingCanvas } from '@agent/core/surface/hearing-canvas';
 import {
   buildWorkInventoryDecompositionInput,
   renderWorkInventoryCanvasHtml,
-} from './hearing-work-inventory.js';
+} from '@agent/core/surface/hearing-work-inventory';
 import {
   HearingLedgerRequestError,
   renderLedgerCanvasForRecord,
@@ -79,6 +79,7 @@ import {
 import { parseDecisionsScenarioId } from '@agent/core/decision-ledger';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
 import { readHearingCompletion } from './hearing-completion.js';
+import type { HearingWorkInventoryHandoffFields } from '@agent/core/surface/hearing-completion';
 import {
   resolveHearingRequestViewer,
   resolveHearingHandoffScope,
@@ -94,16 +95,10 @@ class HearingRequestError extends Error {
   readonly status = 400 as const;
 }
 
-/** WI-08: additive fields this route owns on the hearing record, mirroring
- * `hearing-mission-routes.ts`'s `HearingMissionHandoffFields` intersection
- * — `hearing.ts` (the base `HearingRecord` contract) is the concurrent
- * sibling's file, so these are only ever read/written here, never added to
- * the base interface. */
-export interface HearingWorkInventoryHandoffFields {
-  work_inventory_entry_id?: string;
-  work_inventory_scope?: WorkInventoryScope;
-  work_inventory_steps?: number;
-}
+/** WI-08: additive fields this route owns on the hearing record — declared next
+ * to the completion reader in core (`libs/core/surface/hearing-completion.ts`),
+ * only ever read/written here, never added to the base interface. */
+export type { HearingWorkInventoryHandoffFields };
 
 export type HearingRecordWithInventoryFields = HearingRecord & HearingWorkInventoryHandoffFields;
 

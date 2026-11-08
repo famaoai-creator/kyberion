@@ -8,17 +8,17 @@
 // Safe by construction: every value is escaped, there is no script, no link,
 // no external resource, so it satisfies the same forbidden-pattern list the
 // sanitizer applies to the model's output (proved in the test).
-import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import type { SupportedLocale } from '@agent/core/foundation/locale-normalize';
+import { t as catalogT, type VocabularyKey } from '../localization/t.js';
+import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import {
   resolveCreativeDesign,
   type ResolvedCreativeDesign,
-} from '@agent/core/creative-design-resolver';
+} from '../design/creative-design-resolver.js';
 import type {
   ProjectionBrief,
   ProjectionRow,
   ProjectionVerdict,
-} from '@agent/core/decision-ledger';
+} from '../decision-ledger/projection.js';
 import { designTokenCssVars } from './hearing-canvas.js';
 
 function escapeHtml(value: unknown): string {

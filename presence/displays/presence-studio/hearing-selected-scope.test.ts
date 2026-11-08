@@ -24,22 +24,24 @@ vi.mock('@agent/core/workforce/work-inventory', async () => ({
   )),
   saveWorkInventoryEntry: vi.fn(),
 }));
-vi.mock('./hearing-canvas.js', async () => ({
-  ...(await vi.importActual<typeof import('./hearing-canvas.js')>('./hearing-canvas.js')),
+vi.mock('@agent/core/surface/hearing-canvas', async () => ({
+  ...(await vi.importActual<typeof import('@agent/core/surface/hearing-canvas')>(
+    '@agent/core/surface/hearing-canvas'
+  )),
   generateHearingCanvas: vi.fn(),
 }));
 import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
 import { proposeWorkDecomposition } from '@agent/core/workforce/work-inventory-decompose';
 import { saveWorkInventoryEntry } from '@agent/core/workforce/work-inventory';
-import { generateHearingCanvas } from './hearing-canvas.js';
+import { generateHearingCanvas } from '@agent/core/surface/hearing-canvas';
 import * as storageAccess from './hearing-storage-access.js';
 import {
   createHearingRecord,
   hearingRevision,
   type HearingRecord,
   type HearingDecisionOperation,
-} from './hearing.js';
-import { loadHearingRecord, saveHearingRecord } from './hearing-runtime.js';
+} from '@agent/core/surface/hearing';
+import { loadHearingRecord, saveHearingRecord } from '@agent/core/surface/hearing-runtime';
 import { registerHearingRoutes } from './hearing-routes.js';
 import { registerHearingMissionRoutes } from './hearing-mission-routes.js';
 import * as security from './security.js';
