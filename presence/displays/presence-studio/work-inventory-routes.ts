@@ -24,7 +24,7 @@ import type { PresenceStudioViewerContext } from './security.js';
 export function resolveWorkInventoryScopeForViewer(
   viewer: PresenceStudioViewerContext
 ): WorkInventoryScope | null {
-  return hearingWorkInventoryScope(viewer);
+  return hearingWorkInventoryScope(viewer, { owner: viewer.source === 'loopback' });
 }
 
 /**
@@ -37,5 +37,7 @@ export function workInventoryHandoffHref(
   scopedHref: string,
   viewer: PresenceStudioViewerContext
 ): string {
-  return hearingWorkInventoryHandoffHref(scopedHref, viewer);
+  return hearingWorkInventoryHandoffHref(scopedHref, viewer, {
+    owner: viewer.source === 'loopback',
+  });
 }

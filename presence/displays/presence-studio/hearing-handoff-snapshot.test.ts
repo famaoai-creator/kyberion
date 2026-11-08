@@ -125,7 +125,7 @@ describe('displayed hearing handoff snapshot contract', () => {
     expect(readHearingCompletion).toHaveBeenCalledWith(
       record,
       expect.objectContaining({ principalId: viewer.principalId, source: 'token' }),
-      { currentSurface: 'presence-studio' }
+      { currentSurface: 'presence-studio', owner: false }
     );
   });
   it('rejects a changed member mapping for the same authenticated principal', () => {
