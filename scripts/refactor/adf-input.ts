@@ -16,6 +16,7 @@ import {
   requiresProjectTrust,
 } from '@agent/core/trust-requiring-resources';
 import { readSafeJsonValueFile } from '../lib/json-input.js';
+import { withPlaygroundPathRole, withPlaygroundPathRoleSync } from '../actuator_playground.js';
 
 export interface AdfInputOptions {
   /** Trusted JSON snapshot validator, invoked before any pipeline effect. */
@@ -208,50 +209,54 @@ export function readValidatedPipelineAdf<T = any>(
   inputPath: string,
   options: AdfInputOptions = {}
 ): T {
-  assertPipelineResourceTrust(inputPath, options);
-  const pipeline = validatePipelineAdf(readJsonInput(inputPath));
-  const expanded = expandPipelineIncludesForGuardrails(pipeline, options);
-  const guardrails = validatePipelineGuardrails(expanded as any, inputPath, {
-    scriptWrapperBaseline: loadScriptWrapperBaseline(),
+  return withPlaygroundPathRoleSync(inputPath, () => {
+    assertPipelineResourceTrust(inputPath, options);
+    const pipeline = validatePipelineAdf(readJsonInput(inputPath));
+    const expanded = expandPipelineIncludesForGuardrails(pipeline, options);
+    const guardrails = validatePipelineGuardrails(expanded as any, inputPath, {
+      scriptWrapperBaseline: loadScriptWrapperBaseline(),
+    });
+    if (!guardrails.ok) {
+      const details = guardrails.findings
+        .filter((finding) => finding.severity === 'error')
+        .map((finding) => `${finding.path} ${finding.message}`)
+        .join('; ');
+      throw new Error(`Invalid pipeline ADF guardrails: ${details}`);
+    }
+    return pipeline as T;
   });
-  if (!guardrails.ok) {
-    const details = guardrails.findings
-      .filter((finding) => finding.severity === 'error')
-      .map((finding) => `${finding.path} ${finding.message}`)
-      .join('; ');
-    throw new Error(`Invalid pipeline ADF guardrails: ${details}`);
-  }
-  return pipeline as T;
 }
 
 export async function readValidatedWorkflowAdf<T = any>(
   inputPath: string,
   options: AdfInputOptions = {}
 ): Promise<T> {
-  assertPipelineResourceTrust(inputPath, options);
-  if (options.onValidatedInput && isWorkflowModulePath(inputPath))
-    throw new Error('A bounded JSON pipeline snapshot is required');
-  const sourceText = options.onValidatedInput
-    ? readAdfInputTextFile(resolveAdfInputPath(inputPath))
-    : undefined;
-  const raw =
-    sourceText !== undefined
-      ? parseSafeJsonInput(sourceText, 'validated pipeline snapshot')
-      : isWorkflowModulePath(inputPath)
-        ? await readWorkflowModuleInput<T>(inputPath)
-        : readJsonInput<T>(inputPath);
-  const pipeline = validatePipelineAdf(raw);
-  const expanded = expandPipelineIncludesForGuardrails(pipeline, options);
-  const guardrails = validatePipelineGuardrails(expanded as any, inputPath, {
-    scriptWrapperBaseline: loadScriptWrapperBaseline(),
+  return withPlaygroundPathRole(inputPath, async () => {
+    assertPipelineResourceTrust(inputPath, options);
+    if (options.onValidatedInput && isWorkflowModulePath(inputPath))
+      throw new Error('A bounded JSON pipeline snapshot is required');
+    const sourceText = options.onValidatedInput
+      ? readAdfInputTextFile(resolveAdfInputPath(inputPath))
+      : undefined;
+    const raw =
+      sourceText !== undefined
+        ? parseSafeJsonInput(sourceText, 'validated pipeline snapshot')
+        : isWorkflowModulePath(inputPath)
+          ? await readWorkflowModuleInput<T>(inputPath)
+          : readJsonInput<T>(inputPath);
+    const pipeline = validatePipelineAdf(raw);
+    const expanded = expandPipelineIncludesForGuardrails(pipeline, options);
+    const guardrails = validatePipelineGuardrails(expanded as any, inputPath, {
+      scriptWrapperBaseline: loadScriptWrapperBaseline(),
+    });
+    if (!guardrails.ok) {
+      const details = guardrails.findings
+        .filter((finding) => finding.severity === 'error')
+        .map((finding) => `${finding.path} ${finding.message}`)
+        .join('; ');
+      throw new Error(`Invalid pipeline ADF guardrails: ${details}`);
+    }
+    if (sourceText !== undefined) options.onValidatedInput!(pipeline, sourceText);
+    return pipeline as T;
   });
-  if (!guardrails.ok) {
-    const details = guardrails.findings
-      .filter((finding) => finding.severity === 'error')
-      .map((finding) => `${finding.path} ${finding.message}`)
-      .join('; ');
-    throw new Error(`Invalid pipeline ADF guardrails: ${details}`);
-  }
-  if (sourceText !== undefined) options.onValidatedInput!(pipeline, sourceText);
-  return pipeline as T;
 }
