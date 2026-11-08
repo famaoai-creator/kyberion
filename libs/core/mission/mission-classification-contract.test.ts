@@ -59,6 +59,7 @@ describe('mission-classification contract', () => {
       'legal_and_compliance',
       'strategy_and_governance',
       'procurement_and_supply',
+      'web_design_improvement',
     ]);
 
     const workflowCatalog = readJson<WorkflowCatalogFile>(
