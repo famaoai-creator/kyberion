@@ -94,6 +94,10 @@
   ],
   "scripts": [
     {
+      "id": "scripts/context_pack.ts",
+      "reason": "CLI entrypoint for agent fast-context provisioning (pnpm kyberion context pack)."
+    },
+    {
       "id": "scripts/contrastive_probe.ts",
       "reason": "harness2 PPC import (MSN-PPC-PROBE-20261018): standalone CLI for contrastive probe sessions on repeating work shapes; started by hand until a pipeline wraps it — unit-tested via libs/core/harnessing tests."
     }
