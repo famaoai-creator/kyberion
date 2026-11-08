@@ -1,3 +1,4 @@
+import { config } from './config.js';
 import { getRegisteredEnvText, isVitestProcess } from './env.js';
 import { isValidTenantSlug } from './scope.js';
 import { rawExistsSync, rawLstatSync, rawReadTextFile } from '../fs-primitives.js';
@@ -51,7 +52,7 @@ export function isBoundTenantInvalid(): boolean {
 function readRawProjectScope(): ProjectScopeBinding {
   let persisted: Record<string, string> = {};
   try {
-    const configuredPath = getRegisteredEnvText('KYBERION_SCOPE_ENV_PATH')?.trim();
+    const configuredPath = config.text('KYBERION_SCOPE_ENV_PATH')?.trim();
     // Hermetic-test contract: under vitest the operator's persisted scope
     // (written by `pnpm scope use`) must not leak tenant/org bindings into
     // test identity resolution. Tests that need a persisted scope point
@@ -74,10 +75,10 @@ function readRawProjectScope(): ProjectScopeBinding {
     persisted = {};
   }
 
-  const environmentProjectId = getRegisteredEnvText('KYBERION_PROJECT_ID')?.trim();
-  const environmentTenant = getRegisteredEnvText('KYBERION_TENANT')?.trim();
+  const environmentProjectId = config.text('KYBERION_PROJECT_ID')?.trim();
+  const environmentTenant = config.text('KYBERION_TENANT')?.trim();
   const environmentMissionId = getRegisteredEnvText('MISSION_ID')?.trim();
-  const environmentTaskId = getRegisteredEnvText('KYBERION_TASK_ID')?.trim();
+  const environmentTaskId = config.text('KYBERION_TASK_ID')?.trim();
   const projectId = environmentProjectId || persisted.KYBERION_PROJECT_ID;
   const tenantSlug = environmentTenant || persisted.KYBERION_TENANT;
   const missionId = environmentMissionId || persisted.MISSION_ID;

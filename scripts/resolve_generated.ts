@@ -159,6 +159,7 @@ export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
       'knowledge/product/governance/env-registry.json',
       'docs/developer/env.example',
       'docs/developer/CONFIGURATION.md',
+      'libs/core/foundation/config.generated.ts',
     ],
     mergeDriver: true,
     after: ['vocabulary-types', 'pii-rules'],

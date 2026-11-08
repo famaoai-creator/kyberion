@@ -35,9 +35,17 @@ import {
   type PresenceStudioViewerContext,
 } from './security.js';
 import { authorizePresenceOperation, presenceEnvelope } from './headless.js';
-import { defaultHearingRecord, hearingNamespace, loadHearingRecord } from './hearing-runtime.js';
-import { HEARING_SAFE_ID_PATTERN, nextHearingQuestion, type HearingRecord } from './hearing.js';
-import { buildHearingA2UI } from './hearing-a2ui.js';
+import {
+  defaultHearingRecord,
+  hearingNamespace,
+  loadHearingRecord,
+} from '@agent/core/surface/hearing-runtime';
+import {
+  HEARING_SAFE_ID_PATTERN,
+  nextHearingQuestion,
+  type HearingRecord,
+} from '@agent/core/surface/hearing';
+import { buildHearingA2UI } from '@agent/core/surface/hearing-a2ui';
 import { defaultCatalogScenario } from './hearing-routes.js';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
 import { presenceStudioAuthRateLimiter } from './surface-auth.js';

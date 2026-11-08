@@ -792,8 +792,8 @@ describe('FD-08 removed presence-studio dashboard panels', () => {
 
 describe('HT-06 i18n gate: hearing canvas + training help vocabulary', () => {
   it('hearing.ts and hearing-runtime.ts carry no raw Japanese/English requirement labels or canvas chrome text', () => {
-    const hearingTs = readRepoFile('presence/displays/presence-studio/hearing.ts');
-    const hearingRuntimeTs = readRepoFile('presence/displays/presence-studio/hearing-runtime.ts');
+    const hearingTs = readRepoFile('libs/core/surface/hearing.ts');
+    const hearingRuntimeTs = readRepoFile('libs/core/surface/hearing-runtime.ts');
     // The old raw labels are gone — every requirement now carries a
     // `front_desk:hearing_req_*` vocabulary key instead.
     for (const oldLabel of [

@@ -1,4 +1,5 @@
 export * from './ajv.js';
+export * from './config.js';
 export * from './env.js';
 export * from './governed-catalog.js';
 export { currentExecutionScope } from './execution-scope.js';
