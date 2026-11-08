@@ -44,6 +44,7 @@ export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
   tenant_approvals: 'active/shared/runtime/tenant-approvals',
   tenant_audit_mirror: 'active/shared/runtime/audit-mirror',
   delegations: 'active/shared/runtime/delegation-records',
+  asset_derivations: 'active/shared/runtime/asset-derivations',
 } as const;
 
 export const STORAGE_FLOOR_ROOTS = {

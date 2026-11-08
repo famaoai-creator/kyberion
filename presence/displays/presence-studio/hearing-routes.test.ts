@@ -33,8 +33,10 @@ vi.mock('@agent/core/organization/member-registry', async () => {
 // mock it so this file can drive its pending -> generated / pending ->
 // template transitions deterministically, without depending on a reasoning
 // backend or a real 20s timeout.
-vi.mock('./hearing-canvas.js', async () => {
-  const actual = await vi.importActual<typeof import('./hearing-canvas.js')>('./hearing-canvas.js');
+vi.mock('@agent/core/surface/hearing-canvas', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/surface/hearing-canvas')>(
+    '@agent/core/surface/hearing-canvas'
+  );
   return { ...actual, generateHearingCanvas: vi.fn() };
 });
 
@@ -78,9 +80,17 @@ import {
   saveWorkInventoryEntry,
   workInventoryRoot,
 } from '@agent/core/workforce/work-inventory';
-import { applyHearingTurn, createHearingRecord, type HearingRecord } from './hearing.js';
-import { hearingNamespace, loadHearingRecord, saveHearingRecord } from './hearing-runtime.js';
-import { generateHearingCanvas } from './hearing-canvas.js';
+import {
+  applyHearingTurn,
+  createHearingRecord,
+  type HearingRecord,
+} from '@agent/core/surface/hearing';
+import {
+  hearingNamespace,
+  loadHearingRecord,
+  saveHearingRecord,
+} from '@agent/core/surface/hearing-runtime';
+import { generateHearingCanvas } from '@agent/core/surface/hearing-canvas';
 import { registerHearingRoutes, type HearingRecordWithInventoryFields } from './hearing-routes.js';
 
 function flushMicrotasks(): Promise<void> {

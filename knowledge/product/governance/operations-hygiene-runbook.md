@@ -583,6 +583,17 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
 **Daemon contract.** This applies to every long-running loop: scheduler, supervisor,
 generation-schedule, bridges.
 
+**Detached maintenance lifetime.** `detached: true` changes the OS process group;
+it does not release Node's `ChildProcess` event-loop reference. For explicitly
+background maintenance with ignored stdio and `shutdownPolicy: detached`, call
+the returned child's `unref()` after managed registration. Preserve submission
+markers, supervision, child logs and failure markers. Do not globally unref
+manual/watch children or use `process.exit()` to hide a retained handle. Verify
+the actual baseline call site and natural parent exit with a finite managed
+Node child in `scripts/run_baseline_check.maintenance-submission.test.ts`, then
+run the golden gate under its unchanged deadline. A successful output oracle
+alone does not prove the process exited.
+
 **Windows local IPC ACL.** Node's default named-pipe DACL grants read access to
 Everyone and Anonymous. Every application-owned Windows pipe listener must await
 `restrictWindowsNamedPipeAcl()` before it advertises readiness or processes a
@@ -2182,7 +2193,7 @@ Bound the first-job UI wait for intake, revision, approval, rejection and unstar
 
 Reuse the same deadline semantics for approval decisions and recovery. Do not abort a mutation to imply cancellation, add automatic retries, invoke an operator tick from a refresh, or weaken authenticated approval checks. On a stalled submission, retain evidence and reconcile the original request through the normal read model; report unresolved state honestly.
 
-Regression gates: first-job-client.test.ts and first-job-approval-client.test.ts. Cover initial and revised intake, approve/reject, stalled headers and JSON, timely success and deadline cleanup, exact stored identities, no replay after repeated clicks or empty reads, read-only refresh, late responses and newer signed-out state. Exercise both controls together so the parent and approval view both unlock their read actions. A client VM harness is not a rendered browser or a live authenticated diagnostic execution; report each verification layer separately.
+Regression gates (Concierge, `presence/displays/concierge/`): `test/first-job-client.test.ts` (the guide, ported from Studio's first-job client harness and rendered in the fake DOM), `test/first-job-approval-client.test.ts` (the approval and recovery view), `test/first-job-page.test.ts` (state-machine unit cases and the page contract), the route files `src/app/api/first-job/route*.test.ts` (gate, delivery, recovery and uncertain outcomes on real stores) and the core `libs/core/surface/first-job.test.ts` (read model and diagnostic admission). Cover initial and revised intake, approve/reject, stalled headers and JSON, timely success and deadline cleanup, exact stored identities, no replay after repeated clicks or empty reads, read-only refresh, late responses and newer signed-out state. Exercise both controls together so the parent and approval view both unlock their read actions. A client VM harness is not a rendered browser or a live authenticated diagnostic execution; report each verification layer separately.
 
 ## Mission execution-ledger receipt integrity
 
@@ -3175,6 +3186,58 @@ quote-delimited spans per invocation and preserve raw-text matching, delimiter-b
 fallbacks and warning order. Verify parity against the old matcher, including adjacent and
 escaped quotes, Unicode, cross-line spans and long unrelated text. The catalog integrity
 suite and the unchanged catalog gate deadline enforce this bounded lookup behavior.
+
+## Derivation issuance and scope deletion
+
+Tenant-writable lineage is an index, not deletion authority. Producers must bind source
+snapshots and output bytes in the protected system partition of the registered derivation
+ledger. Replay requires the matching trusted issuance receipt and propagates inherited
+custodian taint through every hop. Missing, malformed, or unattested reachable lineage
+must block a clean offboarding result. Recreated files are reconsidered regardless of old
+path-only deletion audit entries. Before export and deletion, revalidate a planned regular
+file's identity and bytes; preserve lineage when any derived deletion fails. Cooperative
+checks do not provide an atomic conditional rename against an arbitrary external writer.
+The derivation receipt authority contract and adversarial derivation/offboarding tests
+enforce these boundaries, including aggregate rename/removal of the receipt directory.
+
+Operator offboarding must use the scope-limited lineage query, not a producer-role wrapper.
+The query authorizes the requested tenant's index through ordinary policy before testing
+existence, reads the exact system receipt file through a synchronous private store grant,
+revokes that grant before planning, and returns only the requested custodian's derived paths.
+Raw receipt reads remain producer-only. Test the ordinary operator identity with an
+unrelated receipt present, a foreign-tenant denial, raw-read denial and grant revocation;
+mocked offboarding I/O alone cannot establish this entrypoint's usability or isolation.
+
+Governed-store fixtures must declare their controller role and persona explicitly. Resetting
+a whole runtime ancestor also covers protected receipt state; keep the operation's actual
+actor unchanged when elevating only fixture teardown. Preserve canonical exports in partial
+path-resolver mocks and rebase mutable roots. Unix socket fixtures in deep checkouts should
+bind a checkout-relative address and reject listener errors directly, so path-length or
+sandbox IPC failures are not disguised as test timeouts. Verify under the existing CI
+settings; do not relax production grants or deadlines to accommodate a fixture.
+
+CLI dry-run fixtures that expect `not_found` must also declare the legitimate controller
+identity: checking an absent lineage index still requires ordinary read authority. Run the
+entire CLI suite with the scripts CI runner's empty role/persona defaults, and include a
+roleless negative case. Never skip permission checks because a path does not exist.
+
+## Audit bootstrap and identity resolver lifecycle
+
+Reducing a low-level dependency closure must preserve the audited operation's original
+recording contract. Canonical audit entries validate attribution at submission time and
+persist synchronously unless already inside the audit lock; only prepared entries defer
+until that lock releases. An optional governance-action sink does not make mandatory
+audit persistence optional. Do not replace this with a consumer-registration queue that
+can relabel tenants, discard overflow, or never drain. Measure the dependency closure
+after the repair, retain the real audit boundary exception, and report unmet targets.
+
+Identity registration must remain sole, roll back both registries on partial failure and
+release both even if removal listeners throw. Its lifetime must follow the owning seam's
+module graph rather than retaining an old authority resolver across module re-evaluation.
+Verify registration failure, disposal failure and real authority import/reset/reimport,
+alongside tenant-attributed synchronous audit writes. Enforcing suites include
+`identity-context-bridge.test.ts`, `identity-context-module-lifecycle.test.ts`,
+`audit-chain-lock.test.ts` and `tests/identity-context-resolver-boundary.test.ts`.
 
 ## Intake extension CI checks
 

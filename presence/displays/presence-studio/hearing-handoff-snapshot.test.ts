@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
-import { readHearingCompletion } from './hearing-completion.js';
+import { readHearingCompletion } from '@agent/core/surface/hearing-completion';
 import {
   hearingHandoffSnapshot,
   assertHearingHandoffSnapshot,
   withHearingHandoffSnapshot,
 } from './hearing-handoff-snapshot.js';
-import type { HearingRecord } from './hearing.js';
+import type { HearingRecord } from '@agent/core/surface/hearing';
 import type { PresenceStudioViewerContext } from './security.js';
 
 vi.mock('@agent/core/organization/member-registry', async () => ({
@@ -15,8 +15,10 @@ vi.mock('@agent/core/organization/member-registry', async () => ({
   )),
   resolveMemberByPrincipal: vi.fn(),
 }));
-vi.mock('./hearing-completion.js', async () => ({
-  ...(await vi.importActual<typeof import('./hearing-completion.js')>('./hearing-completion.js')),
+vi.mock('@agent/core/surface/hearing-completion', async () => ({
+  ...(await vi.importActual<typeof import('@agent/core/surface/hearing-completion')>(
+    '@agent/core/surface/hearing-completion'
+  )),
   readHearingCompletion: vi.fn(),
 }));
 const record: HearingRecord = {
@@ -103,6 +105,29 @@ describe('displayed hearing handoff snapshot contract', () => {
       );
     }
   );
+  it('resolves the member from the viewer principal binding and reads completion for this surface', () => {
+    const token: PresenceStudioViewerContext = {
+      ...viewer,
+      source: 'token',
+      principal: {
+        principalId: viewer.principalId,
+        registrationLabel: 'desk-token',
+        memberId: 'bound-member',
+      } as PresenceStudioViewerContext['principal'],
+    };
+    hearingHandoffSnapshot(record, token);
+    expect(resolveMemberByPrincipal).toHaveBeenCalledWith({
+      principalId: viewer.principalId,
+      source: 'token',
+      registrationLabel: 'desk-token',
+      memberId: 'bound-member',
+    });
+    expect(readHearingCompletion).toHaveBeenCalledWith(
+      record,
+      expect.objectContaining({ principalId: viewer.principalId, source: 'token' }),
+      { currentSurface: 'presence-studio' }
+    );
+  });
   it('rejects a changed member mapping for the same authenticated principal', () => {
     const snapshot = body();
     vi.mocked(resolveMemberByPrincipal).mockReturnValue({ ...member, member_id: 'new-member' });

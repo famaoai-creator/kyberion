@@ -22,6 +22,7 @@ import {
 } from './viewer-context';
 import { ConciergeViewerError } from './viewer-context';
 import { authorizeSurfaceContextOperation } from '@agent/core/surface/surface-authn';
+import { viewerPersonIds } from '@agent/core/surface/surface-authorization';
 
 const CONCIERGE_OPERATIONS: readonly HeadlessOperationDescriptor[] = [
   {
@@ -211,6 +212,8 @@ export function readConciergeHome(
     tenantSlugs: narrowed.tenantSlugs,
     organizationIds: narrowed.organizationIds,
     projectIds: narrowed.projectIds,
+    // The viewer's person ids admit person-custody records to their owner.
+    personIds: viewerPersonIds(viewer),
     ...(viewer.includeUntenanted ? { includeUntenanted: true } : {}),
   };
   return withConciergeViewerContext(viewer, () => {

@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  admitsCustody,
+  admitsScopeAudience,
   admitsTenant,
   authorizeSurfaceOperation,
   assertSurfaceOperation,
+  custodyOfScope,
+  viewerPersonIds,
   type SurfaceAuthorizationContext,
 } from './surface-authorization.js';
 
@@ -119,5 +123,128 @@ describe('admitsTenant (row-level tenant admission)', () => {
     expect(admitsTenant({ tenantSlugs: [], includeUntenanted: true }, 'acme')).toBe(false);
     expect(admitsTenant({ tenantSlugs: ['acme'] }, 'acme')).toBe(true);
     expect(admitsTenant({ tenantSlugs: ['acme'], includeUntenanted: true }, 'beta')).toBe(false);
+  });
+});
+
+describe('admitsCustody (P4 — custody-kind row admission)', () => {
+  it('validates both literal owner aliases before choosing custody', () => {
+    const viewer = { tenantSlugs: 'all' as const, principalId: 'alice' };
+    expect(admitsCustody(viewer, custodyOfScope({ nhi_id: 'alice' }))).toBe(true);
+    expect(admitsCustody(viewer, custodyOfScope({ owner_nhi: 'alice', nhi_id: 'alice' }))).toBe(
+      true
+    );
+    for (const scope of [
+      { owner_nhi: '', nhi_id: 'alice' },
+      { owner_nhi: 'alice', nhi_id: '' },
+      { owner_nhi: 'alice', nhi_id: 'bob' },
+      { nhi_id: ' alice ' },
+      { nhi_id: 12 },
+    ])
+      expect(admitsCustody(viewer, custodyOfScope(scope))).toBe(false);
+  });
+  it('fails closed on malformed identities and declarations without widening legacy tenant absence', () => {
+    const all = { tenantSlugs: 'all' as const, principalId: 'owner' };
+    for (const scope of [
+      { owner_nhi: '' },
+      { owner_nhi: ' owner ' },
+      { owner_nhi: 123 },
+      { tenant_slug: 'bad tenant' },
+      { tenant_slug: 123 },
+    ])
+      expect(admitsCustody(all, custodyOfScope(scope as never))).toBe(false);
+    expect(custodyOfScope({ tenant_slug: '' })).toEqual({ kind: 'system' });
+    expect(custodyOfScope({ tenant_slug: null })).toEqual({ kind: 'system' });
+    expect(viewerPersonIds({ personIds: ['', ' ', '*', 123, 'owner'] as never })).toEqual([
+      'owner',
+    ]);
+    expect(admitsCustody(all, { kind: 'unknown', ref: 'owner' } as never)).toBe(false);
+    expect(admitsScopeAudience(all, { owner_nhi: 'owner', allowed_audience: ['*'] })).toBe(false);
+    expect(
+      admitsScopeAudience(all, { owner_nhi: 'owner', allowed_audience: 'owner' as never })
+    ).toBe(false);
+  });
+  it('tenant custody follows the same rule admitsTenant always had', () => {
+    expect(admitsCustody({ tenantSlugs: 'all' }, { kind: 'tenant', ref: 'acme' })).toBe(true);
+    expect(admitsCustody({ tenantSlugs: ['acme'] }, { kind: 'tenant', ref: 'acme' })).toBe(true);
+    expect(admitsCustody({ tenantSlugs: ['acme'] }, { kind: 'tenant', ref: 'beta' })).toBe(false);
+    expect(
+      admitsCustody({ tenantSlugs: [], includeUntenanted: true }, { kind: 'tenant', ref: 'acme' })
+    ).toBe(false);
+  });
+
+  it('system custody is what untenanted always meant', () => {
+    expect(admitsCustody({ tenantSlugs: 'all' }, { kind: 'system' })).toBe(true);
+    expect(admitsCustody({ tenantSlugs: [], includeUntenanted: true }, { kind: 'system' })).toBe(
+      true
+    );
+    expect(admitsCustody({ tenantSlugs: [] }, { kind: 'system' })).toBe(false);
+    expect(admitsCustody({ tenantSlugs: ['acme'] }, { kind: 'system' })).toBe(false);
+  });
+
+  it('person custody is identity-bound — tenant scope never admits it', () => {
+    const person = { kind: 'person' as const, ref: 'human:owner' };
+    expect(admitsCustody({ tenantSlugs: 'all' }, person)).toBe(false);
+    expect(admitsCustody({ tenantSlugs: ['acme'], includeUntenanted: true }, person)).toBe(false);
+    expect(admitsCustody({ tenantSlugs: [], principalId: 'human:owner' }, person)).toBe(true);
+    expect(admitsCustody({ tenantSlugs: [], memberId: 'member-x' }, person)).toBe(false);
+    expect(admitsCustody({ tenantSlugs: [], personIds: ['human:owner'] }, person)).toBe(true);
+    // Another person's records stay closed even to an all-tenant viewer.
+    expect(
+      admitsCustody(
+        { tenantSlugs: 'all', principalId: 'human:owner' },
+        { kind: 'person', ref: 'human:other' }
+      )
+    ).toBe(false);
+  });
+
+  it('custodyOfScope derives tenant > person > system from record fields', () => {
+    expect(custodyOfScope({ tenant_slug: 'acme' })).toEqual({ kind: 'tenant', ref: 'acme' });
+    // A tenant binding wins over a person marker on the same record.
+    expect(custodyOfScope({ tenant_slug: 'acme', owner_nhi: 'human:x' })).toEqual({
+      kind: 'tenant',
+      ref: 'acme',
+    });
+    expect(custodyOfScope({ owner_nhi: 'human:x' })).toEqual({ kind: 'person', ref: 'human:x' });
+    // `nhi_id` is the governed (event-scope) person-binding field — one
+    // binding vocabulary with owner_nhi (approval-review-scope equivalence).
+    expect(custodyOfScope({ nhi_id: 'human:x' })).toEqual({ kind: 'person', ref: 'human:x' });
+    expect(custodyOfScope({ tenant_slug: 'acme', nhi_id: 'human:x' })).toEqual({
+      kind: 'tenant',
+      ref: 'acme',
+    });
+    expect(custodyOfScope({})).toEqual({ kind: 'system' });
+    expect(custodyOfScope(null)).toEqual({ kind: 'system' });
+    expect(custodyOfScope(undefined)).toEqual({ kind: 'system' });
+  });
+
+  it('viewerPersonIds resolves member, principal, and carried person ids', () => {
+    expect(viewerPersonIds({ memberId: 'member-a', principalId: 'human:a' }).sort()).toEqual([
+      'human:a',
+      'member-a',
+    ]);
+    expect(viewerPersonIds({ personIds: ['human:x'] })).toEqual(['human:x']);
+    expect(viewerPersonIds({})).toEqual([]);
+  });
+
+  it('admitsScopeAudience: audience grants admit by identity on person custody only', () => {
+    const shared = {
+      owner_nhi: 'human:owner',
+      allowed_audience: ['human:peer'],
+    };
+    // The owner and a listed audience member are admitted — by identity.
+    expect(admitsScopeAudience({ tenantSlugs: [], principalId: 'human:owner' }, shared)).toBe(true);
+    expect(admitsScopeAudience({ tenantSlugs: ['acme'], memberId: 'human:peer' }, shared)).toBe(
+      true
+    );
+    // 'all' admits neither — person custody is never scope-bound.
+    expect(admitsScopeAudience({ tenantSlugs: 'all' }, shared)).toBe(false);
+    expect(admitsScopeAudience({ tenantSlugs: ['acme'] }, shared)).toBe(false);
+    // Audience grants nothing on tenant or system custody.
+    expect(
+      admitsScopeAudience({ tenantSlugs: [], includeUntenanted: true }, { allowed_audience: ['x'] })
+    ).toBe(true); // system custody via includeUntenanted, audience irrelevant
+    expect(
+      admitsScopeAudience({ tenantSlugs: [] }, { tenant_slug: 'acme', allowed_audience: ['x'] })
+    ).toBe(false); // tenant custody not in scope — audience grants nothing
   });
 });

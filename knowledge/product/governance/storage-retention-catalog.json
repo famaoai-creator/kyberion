@@ -446,6 +446,12 @@
       "note": "Delegated-task trace and resumable records (libs/core/workforce/delegated-task-observability.ts): a registered tier/tenant-partitioned runtime ledger root (PARTITIONED_RUNTIME_LEDGER_ROOTS.delegations, store role delegation_record_store). system/ holds untenanted delegations; confidential/<tenant>/ holds tenant delegations (instruction, context and result text) — delegations.jsonl (append-only audit trace), records/<id>.json, records/child-inbox/<child>.jsonl and notifications.jsonl (the background-completion notification queue of libs/core/mission/delegation-notifications.ts: tenant instruction/result excerpts; claimed rows are kept as the delivered-once ledger). Tenant partitions are tenant_scope protected prefixes, read and written only as the tenant-bound delegation_record_store role; tenant offboarding exports and soft-deletes a tenant's partitions (target kind tenant_delegations). Records are the resume authority for continuable child sessions, so removal is a reviewed decision."
     },
     {
+      "path": "active/shared/runtime/asset-derivations",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "P3 asset-derivation lineage ledgers (libs/core/information-assets/asset-derivation.ts): derivations.jsonl records source references asset:{tenant}:{id}@v{n} | path:{repo-relative} and exact source/output snapshots. system/ holds trusted producer issuance receipts as well as system-custodian lineage; only mission_controller, knowledge_steward and chronos_gateway may mutate it. confidential/<tenant>/ and personal/<ref>/ index source-custodian lineage; neither index alone grants deletion authority. derivation-deletions.jsonl audits propagated deletions, but path-only tombstones never suppress an existing artifact. Tenant offboarding follows verified transitive lineage before removing its partition; failed or unattested derived targets block clean verification and retain lineage. Removal of receipts is a reviewed decision because it severs future deletion propagation."
+    },
+    {
       "path": "active/shared/runtime/task-sessions",
       "artifact_class": "state",
       "action": "review_required",

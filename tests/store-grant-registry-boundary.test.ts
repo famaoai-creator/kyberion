@@ -19,6 +19,7 @@ const registrants = [
   'libs/core/foundation/pr-publication-store-capability.ts',
   'libs/core/foundation/task-source-workspace-capability.ts',
   'libs/core/governance/person-charter-runtime.ts',
+  'libs/core/information-assets/asset-derivation-read-capability.ts',
   'libs/core/knowledge/memory-provenance-capability.ts',
 ];
 
