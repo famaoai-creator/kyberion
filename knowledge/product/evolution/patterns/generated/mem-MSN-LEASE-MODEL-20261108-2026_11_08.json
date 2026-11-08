@@ -1,0 +1,22 @@
+{
+  "record_id": "mem-MSN-LEASE-MODEL-20261108-2026_11_08",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Preserve lease backend exclusion across synchronous and asynchronous callbacks",
+  "summary": "Share namespace admission and separate callback results from success-settling queue tails.",
+  "candidate_id": "mem-MSN-LEASE-MODEL-20261108-2026_11_08",
+  "evidence_refs": [
+    "active/missions/public/MSN-LEASE-MODEL-20261108/evidence/implementation-report.md",
+    "active/missions/public/MSN-LEASE-MODEL-20261108/evidence/test-report.md",
+    "active/missions/public/MSN-LEASE-MODEL-20261108/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-11-08T06:56:46.427Z",
+  "applicability": ["mission", "mission:MSN-LEASE-MODEL-20261108"],
+  "reusable_steps": [
+    "Share namespace admission and separate callback results from success-settling queue tails"
+  ],
+  "expected_outcome": "A backend mutex must span the full protected callback independently of lease TTL. Sync and async paths share admission; reject sync while async ownership is queued or active. Keep the public callback result or original error separate from a private always-settling queue tail. Cleanup compares the exact stored tail identity so an older completion cannot remove a successor. Preserve FIFO and acquisition delay after predecessor failure. Validate with deferred callbacks, injected or fake clocks, red-before-green regressions, and a bounded independent model with a negative control. Synchronous callbacks must return synchronously; awaiting reentrant acquisition of the same namespace is unsupported. The assurance covers one-runtime memory exclusion and KV-stub queue semantics, not distributed consensus or crash recovery.",
+  "source_branch": "fix/lease-model-exclusion-20261108",
+  "source_commit": "ffd3c33568d0fb2ce9a2264002a2df876d986fed"
+}
