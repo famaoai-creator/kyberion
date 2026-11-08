@@ -87,6 +87,9 @@ describe('audit chain tenant mirror authority', () => {
     const samples = [
       path.join(root, 'active', 'shared', 'tmp', 'x.txt'),
       path.join(root, 'active', 'shared', 'logs', 'x.jsonl'),
+      path.join(root, 'active', 'shared', 'logs', 'audit', 'audit-fixture.jsonl'),
+      path.join(root, 'active', 'shared', 'runtime', 'audit', 'chain-key'),
+      path.join(root, 'active', 'shared', 'runtime', 'locks', 'audit-chain.lock'),
       path.join(root, 'customer', TENANT, 'logs', 'traces', 'x.jsonl'),
       path.join(root, 'customer', TENANT, 'customer.json'),
       path.join(root, 'knowledge', 'product', 'x.md'),
@@ -139,15 +142,17 @@ describe('audit chain tenant mirror authority', () => {
     restoreAuditIo = registerAuditChainIo(io);
 
     // Same shape as work coordination's store fence (G17 reproduction).
-    withExecutionContext('infrastructure_sentinel', () =>
+    withExecutionContext('infrastructure_sentinel', () => {
       auditChain.record({
         agentId: 'sovereign',
         action: 'work_item.created',
         operation: 'create:WI-G17',
         result: 'completed',
         tenantSlug: TENANT,
-      })
-    );
+      });
+      expect(scopedAssumedRole()).toBe('infrastructure_sentinel');
+      expect(currentExecutionScope()?.tenantSlug).toBeUndefined();
+    });
 
     const mirror = appends.find((entry) => entry.file.includes(path.join(MIRROR_SEGMENT, TENANT)));
     expect(mirror).toEqual({
@@ -156,9 +161,9 @@ describe('audit chain tenant mirror authority', () => {
       tenant: TENANT,
       allowed: true,
     });
-    // The master chain is unaffected: it is written under the caller's context.
+    // Master persistence uses the same audit-owned context; caller authority is restored.
     const master = appends.find((entry) => entry !== mirror);
     expect(master?.file).toContain(path.join('shared', 'logs', 'audit'));
-    expect(master?.tenant).toBeUndefined();
+    expect(master).toMatchObject({ role: MIRROR_WRITER, tenant: TENANT, allowed: true });
   });
 });
