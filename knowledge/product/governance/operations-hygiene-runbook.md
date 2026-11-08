@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-08
+last_updated: 2026-11-09
 ---
 
 # Operations Hygiene Runbook
@@ -20,6 +20,11 @@ preflight observation, tenant-store and tiered-mission suites. Build before
 compiled-module integration tests. The [relocation model](../architecture/checkout-tier-path-model.md)
 checks declared inner partitions across tiered ancestor layouts, including a
 negative ancestor-first control; it does not replace tenant or symlink guards.
+
+After promoting or revising product lessons, rerun
+`tests/scratch-usage-baseline.test.ts` and the catalogs gate. Generated knowledge
+participates in source and policy scans; passing tests before promotion does not
+validate the final promoted records.
 
 ## Explicit viewer tier caps
 
@@ -3343,6 +3348,14 @@ A rejected write must remain rejected and its required policy-violation record m
 Keep each gate's deadline and checks unchanged when isolating resource-intensive work. `ci-gates.json` may mark a gate `exclusive`: all earlier selected work drains, that gate runs alone, and subsequent gates resume the requested concurrency. Golden baseline compiler scans use this isolation; a measured standalone run took 62 seconds and exited naturally. A buffered success line alone does not prove a retained handle or the exact failed-runner cause. Record gate execution time separately from package-manager queue wait, and observe child exit/close when investigating a deadline.
 
 Runner, manifest, schema or CI workflow changes must also run the combined full profile on PR/merge-group CI. Separate `pr` and `full-only` jobs do not exercise the combined scheduling used on main. Gate tests enforce exact-once selection, stable output order, rejection continuation, exclusive barriers, unchanged default concurrency and deadlines (`run_checks.test.ts`, `run_checks.concurrency.test.ts`). Strict local tests require a quiet owned worktree: stop only a verified worktree-owned background process through its graceful shutdown path, keep real primary/other-provider processes running, and use the offline reasoning stub for deterministic validation.
+
+Filesystem-allocation fixtures must supply deterministic finite volume statistics
+while retaining the real workspace budget policy. Restore execution spies in
+guaranteed test cleanup: an earlier failed assertion must not leave a spy that
+the next test captures as its original implementation. Gate offline source clone
+failure, ledger rollback and reuse with
+`libs/core/mission/mission-development-offline-clone.test.ts`; never raise budget
+limits or delete live workspaces to make that fixture pass.
 
 ## Capture audit input before delegating persistence
 
