@@ -453,7 +453,8 @@ export interface RecordCliUsageOptions {
  * from the trusted process context (registered/persisted scope env + the
  * mission's own state record) rather than leaving it unscoped. Explicit ALS
  * attribution always wins. Derivation is read-only and honest — an
- * unresolvable mission or missing tier yields no scope, never a guess.
+ * unresolvable mission or missing tier yields no scope, never a guess; a
+ * bound tenant alone is still a valid tenant-scope attribution.
  * actor_id names the process identity (`kyberion:<role|persona>`), distinct
  * from `agent` (the backend that consumed tokens).
  */
@@ -475,13 +476,16 @@ function ambientCliUsageAttribution(): UsageAttribution | undefined {
         mission_id: missionId,
         ...(project.taskId ? { task_id: project.taskId } : {}),
       });
-    } else if (tenantSlug && (projectId || project.taskId)) {
+    } else if (tenantSlug) {
+      // A tenant boundary alone is a valid attribution: project/task/mission
+      // ids deepen it when present but are not required.
       scope = normalizeEventScope({
-        scope_kind: project.taskId ? 'task' : 'project',
+        scope_kind: project.taskId ? 'task' : projectId ? 'project' : 'tenant',
         tier: 'confidential',
         tenant_slug: tenantSlug,
         ...(projectId ? { project_id: projectId } : {}),
         ...(project.taskId ? { task_id: project.taskId } : {}),
+        ...(missionId ? { mission_id: missionId } : {}),
       });
     }
     if (!scope) return undefined;
