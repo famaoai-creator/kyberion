@@ -38,7 +38,13 @@ describe('manifest-driven check runner', () => {
     const manifest = loadGateManifest();
     expect(manifest.gates.filter((entry) => entry.exclusive).map((entry) => entry.id)).toEqual([
       'golden',
+      'module-boundaries',
+      'capability-seams-ast',
     ]);
+    for (const id of ['module-boundaries', 'capability-seams-ast'])
+      expect(
+        manifest.gates.find((entry) => entry.id === id)?.timeout_ms ?? DEFAULT_GATE_TIMEOUT_MS
+      ).toBe(120_000);
     expect(
       manifest.gates.find((entry) => entry.id === 'golden')?.timeout_ms ?? DEFAULT_GATE_TIMEOUT_MS
     ).toBe(120_000);
