@@ -233,6 +233,171 @@ export function parseGeminiCliUsage(stdout: string): CliUsageReport | undefined 
 }
 
 /**
+ * Devin's `--export` transcript carries session `final_metrics` totals.
+ * `total_prompt_tokens` is total input including cached reads (verified
+ * against exported sessions), so the uncached prompt is the difference.
+ */
+export function parseDevinCliTranscriptUsage(text: string): CliUsageReport | undefined {
+  let raw: unknown;
+  try {
+    raw = parseSafeJsonInput(text.trim(), 'devin transcript');
+  } catch {
+    return undefined;
+  }
+  const metrics = object(object(raw)?.final_metrics);
+  if (!metrics) return undefined;
+  const prompt = count(metrics.total_prompt_tokens);
+  const completion = count(metrics.total_completion_tokens);
+  const cached = metrics.total_cached_tokens === undefined ? 0 : count(metrics.total_cached_tokens);
+  if (prompt === undefined || completion === undefined || cached === undefined || cached > prompt)
+    return undefined;
+  return {
+    entries: [
+      {
+        usage: {
+          prompt_tokens: prompt - cached,
+          completion_tokens: completion,
+          cache_read_tokens: cached,
+        },
+      },
+    ],
+  };
+}
+
+/**
+ * AGY stream-json ends with one `result` event; `--output-format json`
+ * prints the same envelope at top level. `usage.input_tokens` is uncached
+ * input (total = input+output+thinking).
+ */
+export function parseAgyCliUsage(stdout: string): CliUsageReport | undefined {
+  const records = transportRecords(stdout);
+  const terminal = records.filter((record) => record.event === 'result').at(-1);
+  const result =
+    object(terminal?.result) ??
+    records.filter((record) => object(record.usage) !== undefined).at(-1);
+  const usage = object(result?.usage);
+  const status = result?.status;
+  const isError = status !== undefined && status !== 'SUCCESS';
+  if (!usage) return result ? { entries: [], isError } : undefined;
+  const prompt = count(usage.input_tokens);
+  const output = count(usage.output_tokens);
+  const thinking = usage.thinking_tokens === undefined ? 0 : count(usage.thinking_tokens);
+  const cached = usage.cache_read_tokens === undefined ? 0 : count(usage.cache_read_tokens);
+  if (
+    prompt === undefined ||
+    output === undefined ||
+    thinking === undefined ||
+    cached === undefined
+  )
+    return undefined;
+  const completion = output + thinking;
+  if (!Number.isSafeInteger(completion)) return undefined;
+  return {
+    entries: [
+      {
+        usage: {
+          prompt_tokens: prompt,
+          completion_tokens: completion,
+          cache_read_tokens: cached,
+        },
+      },
+    ],
+    isError,
+  };
+}
+
+/**
+ * Cursor Agent stream-json/json ends with `type:"result"` carrying
+ * camelCase usage. `outputTokens` already includes `reasoningTokens`.
+ */
+export function parseCursorCliUsage(stdout: string): CliUsageReport | undefined {
+  const terminal = transportRecords(stdout)
+    .filter((record) => record.type === 'result')
+    .at(-1);
+  if (!terminal) return undefined;
+  const usage = object(terminal.usage);
+  const isError = terminal.is_error === true;
+  if (!usage) return { entries: [], isError };
+  const prompt = count(usage.inputTokens);
+  const completion = count(usage.outputTokens);
+  const read = usage.cacheReadTokens === undefined ? 0 : count(usage.cacheReadTokens);
+  const write = usage.cacheWriteTokens === undefined ? 0 : count(usage.cacheWriteTokens);
+  if (prompt === undefined || completion === undefined || read === undefined || write === undefined)
+    return undefined;
+  const model = typeof terminal.model === 'string' ? terminal.model : undefined;
+  return {
+    entries: [
+      {
+        ...(model ? { model } : {}),
+        usage: {
+          prompt_tokens: prompt,
+          completion_tokens: completion,
+          cache_read_tokens: read,
+          cache_write_tokens: write,
+        },
+      },
+    ],
+    isError,
+  };
+}
+
+/**
+ * OpenCode `run --format json` emits `step_finish` events per step; token
+ * totals are the sum. `part.cost` is the CLI-reported list equivalent.
+ */
+export function parseOpencodeCliUsage(stdout: string): CliUsageReport | undefined {
+  const records = transportRecords(stdout).filter((record) => record.type === 'step_finish');
+  if (!records.length) return undefined;
+  let prompt = 0;
+  let completion = 0;
+  let cacheRead = 0;
+  let cacheWrite = 0;
+  let referenceCostUsd = 0;
+  let costSeen = false;
+  for (const record of records) {
+    const tokens = object(object(record.part)?.tokens);
+    const input = count(tokens?.input);
+    const output = count(tokens?.output);
+    const reasoning = tokens?.reasoning === undefined ? 0 : count(tokens.reasoning);
+    const cache = object(tokens?.cache);
+    const read = cache?.read === undefined ? 0 : count(cache.read);
+    const write = cache?.write === undefined ? 0 : count(cache.write);
+    if (
+      input === undefined ||
+      output === undefined ||
+      reasoning === undefined ||
+      read === undefined ||
+      write === undefined
+    )
+      continue;
+    prompt += input;
+    completion += output + reasoning;
+    cacheRead += read;
+    cacheWrite += write;
+    const cost = amount(object(record.part)?.cost);
+    if (cost !== undefined) {
+      referenceCostUsd += cost;
+      costSeen = true;
+    }
+  }
+  if (!Number.isSafeInteger(prompt) || !Number.isSafeInteger(completion)) return undefined;
+  if (prompt === 0 && completion === 0 && cacheRead === 0 && cacheWrite === 0) return undefined;
+  return {
+    entries: [
+      {
+        usage: {
+          prompt_tokens: prompt,
+          completion_tokens: completion,
+          cache_read_tokens: cacheRead,
+          cache_write_tokens: cacheWrite,
+        },
+        ...(costSeen ? { referenceCostUsd } : {}),
+      },
+    ],
+  };
+}
+
+/**
  * R5 result metadata from a provider-reported CLI usage envelope: summed
  * token counts (input includes cache reads/writes) and the served model when
  * every entry names the same one. `undefined` when the provider reported no
