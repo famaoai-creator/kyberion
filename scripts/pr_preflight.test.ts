@@ -20,7 +20,8 @@ vi.mock('@agent/core/knowledge/pr-knowledge-readiness', async (importOriginal) =
   checkPrKnowledgeReadiness: mocks.checkPrKnowledgeReadiness,
 }));
 
-import { main, PREFLIGHT_PR_CLI, runAffectedTests } from './pr_preflight.js';
+import { isCoreAffectedTest, main, PREFLIGHT_PR_CLI, runAffectedTests } from './pr_preflight.js';
+import { TEST_SUITES } from './test_suite.js';
 import { PUBLISH_PR_CLI } from './publish_pull_request.js';
 import { ciTestPaths } from './lib/affected-tests.js';
 
@@ -129,18 +130,29 @@ describe('pr preflight', () => {
         exists: always,
       });
       expect(runs).toEqual([
-        ['run', '--changed', 'abc123', '--passWithNoTests', ...ciTestPaths()],
+        ['run', '--changed', 'abc123', '--passWithNoTests', ...TEST_SUITES.core],
+        [
+          'run',
+          '--changed',
+          'abc123',
+          '--passWithNoTests',
+          ...ciTestPaths(),
+          '--exclude',
+          'libs/core/**',
+          '--exclude',
+          'libs/shared-*/**',
+        ],
         ['run', '--passWithNoTests', 'tests/good-first-issue-guidance-contract.test.ts'],
       ]);
       expect(result).toEqual({
-        testFiles: 4,
+        testFiles: 6,
         readerTests: ['tests/good-first-issue-guidance-contract.test.ts'],
         notRun: [],
       });
       const log = output.join('\n');
       expect(log).toContain('CONTRIBUTING.md → tests/good-first-issue-guidance-contract.test.ts');
       expect(log).toContain('Test Files  2 passed (2)');
-      expect(log).toContain('Affected tests passed (4 test file(s))');
+      expect(log).toContain('Affected tests passed (6 test file(s))');
     });
 
     it('never reports a pass when no test file ran', () => {
@@ -190,7 +202,7 @@ describe('pr preflight', () => {
             '--changed',
             'abc123',
             '--passWithNoTests',
-            ...ciTestPaths(),
+            ...TEST_SUITES.core,
           ],
           expect.objectContaining({
             env: {
@@ -204,9 +216,119 @@ describe('pr preflight', () => {
               KYBERION_SUDO: '',
             },
             maxOutputMB: 50,
+            timeoutMs: 2_400_000,
           })
         );
       }
+    });
+
+    it('classifies readers by canonical core ownership rather than a tests substring', () => {
+      for (const file of [
+        'libs/core/reader.test.ts',
+        'libs/core/nested/__tests__/reader.test.ts',
+        'libs/shared-network/src/reader.test.ts',
+      ])
+        expect(isCoreAffectedTest(file), file).toBe(true);
+      for (const file of [
+        'tests/libs/core/reader.test.ts',
+        'scripts/reader.test.ts',
+        'libs/actuators/example/__tests__/reader.test.ts',
+        'libs/sharedness/reader.test.ts',
+      ])
+        expect(isCoreAffectedTest(file), file).toBe(false);
+    });
+
+    it('drains core code and exact readers before the non-core code and readers', () => {
+      const readers = [
+        'libs/core/reader.test.ts',
+        'libs/shared-network/src/reader.test.ts',
+        'tests/libs/core/reader.test.ts',
+        'libs/actuators/example/src/reader.test.ts',
+      ];
+      const runs: string[][] = [];
+      runAffectedTests(() => undefined, 'origin/main', {
+        git: fakeGit(['libs/core/a.ts', 'CONTRIBUTING.md'], { 'CONTRIBUTING.md': readers }),
+        exists: always,
+        vitest: (args) => {
+          runs.push(args);
+          return passed(1);
+        },
+      });
+      expect(runs).toEqual([
+        ['run', '--changed', 'abc123', '--passWithNoTests', ...TEST_SUITES.core],
+        [
+          'run',
+          '--passWithNoTests',
+          ...readers.filter(isCoreAffectedTest),
+          '--no-file-parallelism',
+        ],
+        [
+          'run',
+          '--changed',
+          'abc123',
+          '--passWithNoTests',
+          ...ciTestPaths(),
+          '--exclude',
+          'libs/core/**',
+          '--exclude',
+          'libs/shared-*/**',
+        ],
+        ['run', '--passWithNoTests', ...readers.filter((file) => !isCoreAffectedTest(file)).sort()],
+      ]);
+      // The explicit core test selectors also present in ciPaths never duplicate
+      // the canonical core phase, and the non-core phase excludes every core owner.
+      expect(runs[0].filter((arg) => !arg.startsWith('-')).slice(2)).not.toContain(
+        'libs/core/meeting/meeting-participation-coordinator.test.ts'
+      );
+    });
+
+    it('does not launch empty reader groups and keeps exact core readers serial', () => {
+      const runs: string[][] = [];
+      runAffectedTests(() => undefined, undefined, {
+        git: fakeGit(['CONTRIBUTING.md'], {
+          'CONTRIBUTING.md': ['libs/core/reader.test.ts'],
+        }),
+        exists: always,
+        vitest: (args) => {
+          runs.push(args);
+          return passed(1);
+        },
+      });
+      expect(runs).toEqual([
+        ['run', '--passWithNoTests', 'libs/core/reader.test.ts', '--no-file-parallelism'],
+      ]);
+    });
+
+    it('collects failures and rejected launches while completing all later selections', () => {
+      const runs: string[][] = [];
+      let message = '';
+      try {
+        runAffectedTests(() => undefined, undefined, {
+          git: fakeGit(['libs/core/a.ts', 'CONTRIBUTING.md'], {
+            'CONTRIBUTING.md': ['libs/core/reader.test.ts', 'tests/reader.test.ts'],
+          }),
+          exists: always,
+          vitest: (args) => {
+            runs.push(args);
+            if (runs.length === 1) throw new Error('synthetic launch failure');
+            if (runs.length === 2)
+              return {
+                status: 1,
+                stdout: 'FAIL libs/core/reader.test.ts\nError: reader failure',
+                stderr: '',
+              };
+            return passed(1);
+          },
+        });
+      } catch (error) {
+        message = String(error);
+      }
+      expect(runs).toHaveLength(4);
+      expect(runs[2]).toContain('--exclude');
+      expect(runs[3]).toContain('tests/reader.test.ts');
+      expect(message).toContain('core code tests failed: synthetic launch failure');
+      expect(message).toContain('core readers tests failed (exit 1)');
+      expect(message).toContain('Error: reader failure');
     });
 
     it('retains early failure cases and their error when later stacks exceed the tail', () => {

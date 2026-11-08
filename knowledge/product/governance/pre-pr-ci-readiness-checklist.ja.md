@@ -381,3 +381,7 @@ PR scopeには `vocabulary-types` が含まれないため、PR scopeの成功�
 - [EXTENSION_POINTS.md](../../../docs/developer/EXTENSION_POINTS.md)
 
 Dot 実行の変更では、[タイムアウト後の副作用所有権と実行順の継続](./operations-hygiene-runbook.md#13-timed-out-effects-and-executor-continuation)を維持し、隔離した遅延書き込みとプロセス再起動の評価証跡を残す。
+
+### 広範囲の影響テストと core の実行順
+
+共有基盤の変更では `pr preflight` が canonical な `TEST_SUITES.core` の直列設定を引き継ぎ、core の関連コード・データ参照テストを先に、残りを後に実行する。元の選定範囲・strict 設定・各実行の制限は維持し、失敗しても後続の選定を完走してから全失敗を報告する。別 fixture による共通祖先の更新を避けるための構成であり、snapshot や権限検査を緩めて通さない。選定の漏れ・重複は `tests/preflight-core-profile-boundary.test.ts` が実際の test inventory で検証する。
