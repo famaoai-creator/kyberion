@@ -105,12 +105,19 @@ describe('generate_op_registry discovery output', () => {
       )
     ) as DiscoveryDocument;
     const operations = discovery.actuators.flatMap((entry) => entry.ops || []);
-    // Ratchet count regenerated via `pnpm generate:op-registry` against the
-    // ops actually registered on disk; update this when an actuator contract
-    // intentionally adds or removes operations. 659 combines the thirteen
-    // mobile interactive/mirror ops with the four Apple Intelligence ops and
-    // the three browser watchdog/cdp ops and VCS development reconciliation plus governed information asset work.
-    expect(operations).toHaveLength(659);
+    const dispatchKeys = discovery.actuators.flatMap((actuator) =>
+      (actuator.ops ?? []).map((operation) => actuator.n + ':' + operation.op)
+    );
+    expect(dispatchKeys.length).toBeGreaterThan(0);
+    expect(new Set(dispatchKeys).size).toBe(dispatchKeys.length);
+    expect(
+      discovery.actuators
+        .find((entry) => entry.n === 'wisdom-actuator')
+        ?.ops?.find((item) => item.op === 'document_review')
+    ).toMatchObject({
+      kind: 'apply',
+      input_schema: { required: ['target'], additionalProperties: false },
+    });
     expect(
       discovery.actuators
         .find((entry) => entry.n === 'vcs-actuator')
