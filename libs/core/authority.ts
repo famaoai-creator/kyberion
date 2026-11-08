@@ -1323,6 +1323,8 @@ registerOperationalAlertStore((fn) => withExecutionContext('ops_alert_store', fn
  * store writer or resident dot (infrastructure_sentinel) holds a mirror grant.
  */
 const TENANT_AUDIT_MIRROR_WRITER_ROLE = 'audit_mirror_writer';
+// The legacy seam also encloses canonical key/lock/master persistence after
+// caller validation. Its existing role grants and caller resource ceilings stay intact.
 // Guarded lookup, as in secure-io's registerOptionalAuditIo: a test's reduced
 // audit-chain mock may not export the seam.
 try {
