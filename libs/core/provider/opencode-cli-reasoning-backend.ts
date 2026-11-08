@@ -41,6 +41,7 @@ import {
 } from '../mission/delegation-concurrency.js';
 import * as pathResolver from '../path-resolver.js';
 import { safeReadFile, safeStat } from '../secure-io.js';
+import { parseOpencodeCliUsage, recordCliUsage } from './cli-usage-metering.js';
 import {
   runStructuredReasoningOp,
   structuredReasoningSpecs,
@@ -391,18 +392,37 @@ export class OpencodeCliReasoningBackend implements ReasoningBackend {
       prompt,
     ];
 
-    const stdout = await this.spawnCli(
-      args,
-      options?.signal,
-      resolveEffectiveProviderPermissionProfile('opencode', options?.profile)
-    );
-    return parseOpencodeRunJson(stdout);
+    const started = Date.now();
+    const capture = { stdout: '', requestNotSent: true };
+    let completionChars = 0;
+    let status: 'success' | 'error' = 'error';
+    try {
+      const stdout = await this.spawnCli(
+        args,
+        options?.signal,
+        resolveEffectiveProviderPermissionProfile('opencode', options?.profile),
+        capture
+      );
+      capture.stdout = stdout;
+      const result = parseOpencodeRunJson(stdout);
+      status = 'success';
+      completionChars = result.length;
+      return result;
+    } finally {
+      recordCliUsage('opencode-cli', model, started, status, {
+        report: parseOpencodeCliUsage(capture.stdout),
+        promptChars: prompt.length,
+        completionChars,
+        requestNotSent: capture.requestNotSent,
+      });
+    }
   }
 
   private spawnCli(
     args: string[],
     signal?: AbortSignal,
-    profile?: ProviderPermissionProfileName
+    profile?: ProviderPermissionProfileName,
+    capture: { stdout: string; requestNotSent: boolean } = { stdout: '', requestNotSent: true }
   ): Promise<string> {
     const spawnEnv = buildDelegationSpawnEnv({
       provider: 'opencode',
@@ -417,6 +437,7 @@ export class OpencodeCliReasoningBackend implements ReasoningBackend {
         cwd: this.workspaceDir,
       })
     );
+    capture.requestNotSent = false;
 
     return withWallClockBudget(
       {
@@ -443,6 +464,7 @@ export class OpencodeCliReasoningBackend implements ReasoningBackend {
             resolve(stdout);
           });
           child.on('error', (err) => {
+            if (!stdout) capture.requestNotSent = true;
             reject(new Error(`[opencode-cli] spawn failed: ${err.message}`));
           });
           child.stdin.end();

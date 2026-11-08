@@ -180,6 +180,12 @@
       "note": "captured photo is a session-scoped artifact"
     },
     {
+      "file": "libs/core/provider/devin-cli-reasoning-backend.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "Governed devin --export transcript path used only to read session-level final_metrics for usage metering; read once after the child exits, then deleted. Consumable metering intermediate, not a deliverable."
+    },
+    {
       "file": "libs/core/provider/claude-task-session-executor.ts",
       "count": 1,
       "classification": "migrate-candidate",

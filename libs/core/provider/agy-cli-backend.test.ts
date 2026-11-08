@@ -383,7 +383,9 @@ describe('agy-cli-backend', () => {
   });
 
   it('runs print mode with the current agy cli flags and parses JSON output', async () => {
-    spawnMock.mockReturnValueOnce(createChild(JSON.stringify({ response: '{"ok":true}' })));
+    spawnMock.mockReturnValueOnce(
+      createChild(JSON.stringify({ status: 'SUCCESS', response: '{"ok":true}' }))
+    );
 
     const backend = new AgyCliBackend({
       bin: 'agy',
@@ -408,10 +410,11 @@ describe('agy-cli-backend', () => {
         '--dangerously-skip-permissions',
         '-p',
         'Return JSON: {"ok":true}',
+        '--output-format',
+        'json',
       ]),
       expect.any(Object)
     );
-    expect(spawnMock.mock.calls[0][1]).not.toContain('--output-format');
     expect(spawnMock.mock.calls[0][1]).not.toContain('--json-schema');
     expect(spawnMock.mock.calls[0][1]).not.toContain('--system-prompt');
   });
@@ -482,6 +485,8 @@ describe('agy-cli-backend', () => {
         '--dangerously-skip-permissions',
         '-p',
         'hello',
+        '--output-format',
+        'json',
       ]);
     });
 
@@ -594,7 +599,11 @@ describe('agy-cli-backend', () => {
   it('runs structured mode by requesting json in the prompt and validates the response', async () => {
     spawnMock.mockReturnValueOnce(
       createChild(
-        '```json\n{"goal":"ship","constraints":[],"deliverables":[],"excluded":[],"stakeholders":[]}\n```'
+        JSON.stringify({
+          status: 'SUCCESS',
+          response:
+            '```json\n{"goal":"ship","constraints":[],"deliverables":[],"excluded":[],"stakeholders":[]}\n```',
+        })
       )
     );
 
