@@ -39,6 +39,7 @@
  *    and only when a decision resolves to `approved`. See
  *    `surface-mission-steering.test.ts`'s no-bypass structural test.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import { randomUUID } from 'node:crypto';
 import { logger } from '../core.js';
 import { withExecutionContext } from '../authority.js';
@@ -762,7 +763,7 @@ async function enqueueMissionSteeringInput(input: {
   delivery: 'steer' | 'follow_up';
   text: string;
   surface: SurfaceAsyncChannel;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   tenantSlug?: string;
   channel?: string;
   threadTs?: string;

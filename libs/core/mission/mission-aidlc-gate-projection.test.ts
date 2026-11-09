@@ -66,7 +66,7 @@ beforeEach(() => {
       execution_mode: 'local',
       relationships: {},
       priority: 3,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       git: { branch: 'mission/aidlc', start_commit: 'abc', latest_commit: 'abc', checkpoints: [] },
       history: [],

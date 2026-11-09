@@ -124,7 +124,7 @@ beforeAll(async () => {
         status: 'active',
         execution_mode: 'local',
         priority: 3,
-        assigned_persona: 'worker',
+        org_role: 'worker',
         confidence_score: 1,
         tenant_slug: 'alpha',
         git: { branch: 'main', start_commit: 'x', latest_commit: 'x', checkpoints: [] },

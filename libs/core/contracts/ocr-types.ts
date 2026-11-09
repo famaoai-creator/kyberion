@@ -1,6 +1,7 @@
+import type { StorageDataTier } from '../storage-layout.js';
 export type OcrRoutingMode = 'fast' | 'accurate' | 'balanced' | 'local_only' | 'privacy_first';
 export type OcrDataPolicy = 'local_only' | 'zero_retention' | 'training_eligible';
-export type OcrDataTier = 'public' | 'confidential' | 'personal';
+export type OcrDataTier = StorageDataTier;
 
 /**
  * Where a provider sends the image in order to read it. This is a capability of

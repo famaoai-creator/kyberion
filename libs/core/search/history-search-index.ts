@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as pathResolver from '../path-resolver.js';
@@ -26,7 +27,7 @@ import { loadMissionStateAtPath } from '../mission/mission-state-reader.js';
  * queries useful without an embedding call.
  */
 
-export type HistorySearchTier = 'public' | 'confidential' | 'personal' | 'product';
+export type HistorySearchTier = StorageDataTier | 'product';
 
 export interface HistoryIndexEntry {
   entryId?: string;
@@ -80,7 +81,7 @@ export interface HistorySearchReport {
   rebuilt: boolean;
 }
 
-export type GovernedHistoryTier = 'confidential' | 'personal';
+export type GovernedHistoryTier = Exclude<StorageDataTier, 'public'>;
 
 export interface MissionHistorySearchScope {
   missionId: string;

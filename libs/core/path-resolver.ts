@@ -1,3 +1,4 @@
+import type { StorageDataTier } from './storage-layout.js';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rawExistsSync, rawReadTextFile, rawReaddir } from './fs-primitives.js';
@@ -232,7 +233,7 @@ export function isSafeMissionManagementPath(value: unknown): value is string {
   return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
-type MissionTier = 'personal' | 'confidential' | 'public';
+type MissionTier = StorageDataTier;
 
 function readConfiguredMissionSubPath(tier: MissionTier | 'archive'): string | undefined {
   if (!rawExistsSync(MISSION_MANAGEMENT_CONFIG_PATH)) return undefined;
@@ -451,7 +452,7 @@ export function volatile(
   opts: {
     cadence?: VolatileCadence;
     periodKey?: string;
-    tier?: 'personal' | 'confidential' | 'public';
+    tier?: StorageDataTier;
   } = {}
 ): string {
   const cadence = opts.cadence ?? 'resident';
@@ -578,7 +579,7 @@ export function capabilityEntry(capabilityName: string) {
 
 export function missionDir(
   missionId: string,
-  tier: 'personal' | 'confidential' | 'public' = 'confidential',
+  tier: StorageDataTier = 'confidential',
   tenantSlug?: string
 ) {
   assertMissionIdArgument(missionId);
@@ -658,7 +659,7 @@ function normalizeTenantWorkspaceSegment(value = 'shared'): string {
  */
 export function projectWorkspaceDir(
   projectId: string,
-  tier: 'personal' | 'confidential' | 'public' = 'public',
+  tier: StorageDataTier = 'public',
   tenantSlug = 'shared',
   rootDir = PROJECT_ROOT_DIR
 ): string {
@@ -678,7 +679,7 @@ export function projectWorkspaceDir(
  */
 export function projectOsDir(
   projectId: string,
-  tier: 'personal' | 'confidential' | 'public' = 'public',
+  tier: StorageDataTier = 'public',
   tenantSlug = 'shared',
   rootDir = PROJECT_ROOT_DIR
 ): string {
@@ -692,7 +693,7 @@ export function projectOsDir(
  */
 export function projectStateDir(
   projectId: string,
-  tier: 'personal' | 'confidential' | 'public' = 'public',
+  tier: StorageDataTier = 'public',
   tenantSlug = 'shared',
   rootDir = PROJECT_ROOT_DIR
 ): string {
@@ -706,7 +707,7 @@ export function projectStateDir(
  */
 export function organizationWorkspaceDir(
   organizationId: string,
-  tier: 'personal' | 'confidential' | 'public' = 'public',
+  tier: StorageDataTier = 'public',
   tenantSlug = 'shared',
   rootDir = PROJECT_ROOT_DIR
 ): string {
@@ -726,7 +727,7 @@ export function organizationWorkspaceDir(
  */
 export function organizationStateDir(
   organizationId: string,
-  tier: 'personal' | 'confidential' | 'public' = 'public',
+  tier: StorageDataTier = 'public',
   tenantSlug = 'shared',
   rootDir = PROJECT_ROOT_DIR
 ): string {
@@ -827,10 +828,7 @@ export function findArchivedMissionDir(
 /**
  * Returns the path to the audit directory for a given mission (tier-aware).
  */
-export function missionAuditDir(
-  missionId: string,
-  tier: 'personal' | 'confidential' | 'public' = 'confidential'
-) {
+export function missionAuditDir(missionId: string, tier: StorageDataTier = 'confidential') {
   const missionPath =
     findMissionPath(missionId) ?? path.join(ACTIVE_ROOT, 'missions', tier, missionId);
   const dir = path.join(missionPath, 'audit');
@@ -856,7 +854,7 @@ export function missionEvidenceDir(missionId: string) {
 export function tenantMissionDir(
   missionId: string,
   tenantSlug: string,
-  tier: 'personal' | 'confidential' | 'public' = 'confidential'
+  tier: StorageDataTier = 'confidential'
 ): string {
   assertMissionIdArgument(missionId);
   const subPath = readConfiguredMissionSubPath(tier) || 'active/missions';

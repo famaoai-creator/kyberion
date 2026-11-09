@@ -105,7 +105,7 @@ export async function main(args: string[] = []): Promise<unknown> {
       throw new Error(`Mission state is invalid or unreadable: ${missionStatePath}`);
     }
     tier = state.tier;
-    assignedPersona = assignedPersona || state.assigned_persona;
+    assignedPersona = assignedPersona || state.org_role;
     missionTenantSlug = state.tenant_slug;
   }
 

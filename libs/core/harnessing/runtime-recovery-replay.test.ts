@@ -176,7 +176,7 @@ describe('runtime recovery replay across abrupt process termination', () => {
        safeMkdir(${JSON.stringify(missionDir)}, { recursive: true });
        safeWriteFile(${JSON.stringify(path.join(missionDir, 'mission-state.json'))}, JSON.stringify({
          mission_id: ${JSON.stringify(missionId)}, tier: 'public', status: 'active', execution_mode: 'local',
-         priority: 1, assigned_persona: 'worker', confidence_score: 1,
+         priority: 1, org_role: 'worker', confidence_score: 1,
          git: { branch: 'fixture', start_commit: 'a', latest_commit: 'a', checkpoints: [] }, history: []
        }));
        const messages = ${JSON.stringify(messages)};

@@ -3,6 +3,7 @@
  * Query/read models for mission listings and status views.
  */
 
+import type { StorageDataTier } from '../storage-layout.js';
 import { findMissionPath } from '../path-resolver.js';
 import { listMissionsInSearchDirs, loadState } from './mission-state.js';
 import { readOrNullOnMissionRefusal } from './mission-lookup.js';
@@ -46,7 +47,7 @@ export interface MissionSummary {
 }
 
 export interface MissionSummaryScopeFilter {
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   /** `null` means a non-public scope without tenant binding: fail closed. */
   tenantSlug?: string | null;
   organizationId?: string;
@@ -100,7 +101,7 @@ export function listMissionSummaries(
       projectId:
         (state as unknown as { project_id?: string }).project_id ||
         state.relationships?.project?.project_id,
-      persona: state.assigned_persona,
+      persona: state.org_role,
       checkpoints: state.git.checkpoints.length,
       lastEvent: lastHist ? `${lastHist.event} (${lastHist.ts.slice(0, 16)})` : '-',
     });

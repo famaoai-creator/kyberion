@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { assertBuiltinOnlyWorkerEventStream } from '../workforce/worker-event-stream.js';
 import {
   isFrontDeskDiagnosticDot,
@@ -101,7 +102,7 @@ export interface PreparedFrontDeskExecution {
   expectedContent: string;
   outputPath: string;
   tenant: string;
-  tier: 'public' | 'confidential';
+  tier: Exclude<StorageDataTier, 'personal'>;
 }
 
 /** Fail closed before effects, including on edited/revoked mappings or stale approvals. */

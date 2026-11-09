@@ -9,6 +9,7 @@
 /**
  * Standard output contract for Kyberion
  */
+import type { StorageDataTier } from '../storage-layout.js';
 export interface SkillOutput {
   /**
    * Name of the skill that produced this output
@@ -27,7 +28,7 @@ export interface SkillOutput {
   metadata?: {
     duration_ms?: number;
     token_usage?: number;
-    knowledge_tier_used?: 'personal' | 'confidential' | 'public';
+    knowledge_tier_used?: StorageDataTier;
     timestamp?: string;
     [k: string]: unknown;
   };
