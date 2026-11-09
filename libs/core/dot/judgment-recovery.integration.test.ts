@@ -324,7 +324,7 @@ async function fixture(operation: 'repair_fixture' | 'add_cost' = 'repair_fixtur
   const unbound = proposals.normalizeDotProposal({
     title: 'Recover fixed synthetic configuration',
     objective: 'Write the fixed known repair once',
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     pipeline_ref: latency.SYNTHETIC_LATENCY_PIPELINE_REF,
     target: 'service:synthetic-latency-service',
     intent: 'apply',

@@ -24,7 +24,7 @@ import {
  *      charter's wall-clock budget + 60 s, renewed during long turns);
  *   2. snapshot the dot's latest key-result values (`kr_snapshot`) and signal
  *      health (`signal_snapshot`) — the "before" of the DL-04 outcome check;
- *   3. route by `requested_work_shape`:
+ *   3. route by `requested_execution_shape` (legacy `requested_work_shape` read for one release):
  *      - `pipeline` → runs only a `pipeline_ref` listed in
  *        `charter.authority.allowed_pipelines`, otherwise blocked;
  *      - `direct_reply` → one bounded goal or advisory delegated turn;
@@ -86,6 +86,12 @@ import { recordAutonomyExecution } from '../governance/autonomy-action-state.js'
 import type { DotCharter, LoadedDotCharter } from './dot-charter.js';
 import type { DotStatusSection } from './dot-extensions.js';
 import { DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE, type DotExecutionShape } from './dot-proposals.js';
+import { requestedExecutionShape } from './dot-requested-shape.js';
+import {
+  dotRoutingDecision,
+  dotRoutingRefusal,
+  isDotExecutionShape,
+} from './dot-routing-decision.js';
 import {
   dotDailyTokenCapReached,
   recordDotTokenUsage,
@@ -143,6 +149,12 @@ export {
   type RequestDotWorkItemReleaseInput,
 } from './dot-executor-release.js';
 
+/** The shape a dot WorkItem requests (non-empty string), from either metadata key. */
+function requestedShape(item: WorkItem): string | undefined {
+  const value = requestedExecutionShape(item.metadata);
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
 const logger = createLogger('dot-executor');
 
 /** Wall-clock bound when the charter declares none (same as a delegated wake). */
@@ -163,7 +175,7 @@ export const DOT_EXECUTOR_MISSION_GUIDANCE =
   'mission-shaped work needs `mission_controller start` by an operator — the dot executor never starts missions; re-propose as a pipeline from your allowed_pipelines or an advisory direct_reply, or ask the operator to start a mission';
 export const DOT_EXECUTOR_TASK_SESSION_GUIDANCE = DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE;
 export const DOT_EXECUTOR_MISSING_SHAPE_GUIDANCE =
-  'WorkItem has no requested_work_shape — the dot re-proposes with a shape its charter allows';
+  'WorkItem has no requested_execution_shape — the dot re-proposes with a shape its charter allows';
 
 export type DotGoalMode = 'tool' | 'delegated' | { unavailable: string };
 
@@ -273,7 +285,7 @@ export function listClaimableDotWorkItems(c: DotCharter, deps: DotExecutorDeps =
       (item) =>
         item.status === 'ready' &&
         !item.metadata?.continuous_work &&
-        !(item.metadata?.requested_work_shape === 'mission' && item.metadata?.mandate_ref) &&
+        !(requestedShape(item) === 'mission' && item.metadata?.mandate_ref) &&
         !item.lease_id &&
         addressedTo(c, item) &&
         !activeTerminalResult(terminal, item) &&
@@ -335,9 +347,14 @@ async function routeItem(
   accountingId: string,
   deps: DotExecutorDeps
 ): Promise<Outcome> {
-  const shape = meta(item, 'requested_work_shape') as DotExecutionShape | undefined;
+  const shape = requestedShape(item) as DotExecutionShape | undefined;
   if (!shape) {
     return { mode: 'escalated', status: 'blocked', summary: DOT_EXECUTOR_MISSING_SHAPE_GUIDANCE };
+  }
+  // Route on the dot's RoutingDecision for its charter-bounded shape, never the bare shape.
+  if (isDotExecutionShape(shape)) {
+    const refusal = dotRoutingRefusal(shape, dotRoutingDecision(shape));
+    if (refusal) return { mode: 'escalated', status: 'blocked', summary: refusal };
   }
   if (shape === 'mission') {
     return { mode: 'escalated', status: 'blocked', summary: DOT_EXECUTOR_MISSION_GUIDANCE };
@@ -447,7 +464,7 @@ async function routeItem(
     return {
       mode: 'escalated',
       status: 'blocked',
-      summary: `unknown requested_work_shape '${shape}'`,
+      summary: `unknown requested_execution_shape '${shape}'`,
     };
   }
   if (shape === 'task_session' && (ports.taskSessionUnavailable || goalMode === 'delegated')) {
@@ -597,7 +614,7 @@ function diagnosticWorkRefusal(
   try {
     isFrontDeskDiagnosticDot(c);
     if (
-      meta(item, 'requested_work_shape') !== 'pipeline' ||
+      requestedShape(item) !== 'pipeline' ||
       meta(item, 'pipeline_ref') !== FRONT_DESK_RECEIPT_PIPELINE ||
       !item.metadata?.front_desk_execution
     )
@@ -685,7 +702,7 @@ export async function executeDotWorkItem(
     );
   }
   const diagnosticRefusal = diagnosticWorkRefusal(c, item, deps);
-  const shape = meta(item, 'requested_work_shape');
+  const shape = requestedShape(item);
   // A task_session the ports cannot run is closed as blocked without probing a backend.
   const conversational =
     !diagnosticRefusal &&

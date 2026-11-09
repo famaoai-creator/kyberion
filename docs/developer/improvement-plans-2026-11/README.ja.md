@@ -21,7 +21,7 @@ status: active
 
 1. [スコープ・ID・権限（Grant）の統合計画](./SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md) — planned
 2. [WorkItem（Issue と子ステップ）と Lease の統合計画](./WORKITEM_ISSUE_LEASE_CONSOLIDATION_PLAN_2026-11-10.ja.md) — planned
-3. [意図の解決器の一本化計画](./INTENT_RESOLVER_UNIFICATION_PLAN_2026-11-10.ja.md) — planned
+3. [意図の解決器の一本化計画](./INTENT_RESOLVER_UNIFICATION_PLAN_2026-11-10.ja.md) — completed
 4. [記憶のループを閉じる計画](./MEMORY_LOOP_CLOSURE_PLAN_2026-11-10.ja.md) — planned
 
 ## 外部ホスト連携

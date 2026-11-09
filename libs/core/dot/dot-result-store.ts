@@ -375,6 +375,7 @@ function validateOriginalSource(
     'dot_id',
     'action_ref',
     'requested_work_shape',
+    'requested_execution_shape',
     'pipeline_ref',
     'target',
     'intent',

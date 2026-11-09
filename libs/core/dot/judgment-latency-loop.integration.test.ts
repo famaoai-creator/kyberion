@@ -276,7 +276,7 @@ async function fixture() {
         kind === 'repair'
           ? 'Write only fixed parallel configuration'
           : 'Independently verify original goals',
-      work_shape: 'pipeline',
+      execution_shape: 'pipeline',
       pipeline_ref: latency.SYNTHETIC_LATENCY_PIPELINE_REF,
       target: 'service:synthetic-latency-service',
       intent: 'apply',
