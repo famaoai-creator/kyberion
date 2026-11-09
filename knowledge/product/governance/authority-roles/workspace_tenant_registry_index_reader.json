@@ -5,5 +5,10 @@
   "write_scopes": [],
   "scope_classes": [],
   "allowed_actuators": [],
-  "tier_access": ["personal"]
+  "tier_access": ["personal"],
+  "permissions": {
+    "allow_read": ["knowledge/personal/tenants/"],
+    "deny_read_descendants": ["knowledge/personal/tenants/"],
+    "allow_write": []
+  }
 }

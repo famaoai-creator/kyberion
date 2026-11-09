@@ -1,0 +1,7 @@
+{
+  "role": "run_baseline_check",
+  "assignable": false,
+  "permissions": {
+    "allow_write": ["active/shared/observability/ops-alerts.jsonl"]
+  }
+}

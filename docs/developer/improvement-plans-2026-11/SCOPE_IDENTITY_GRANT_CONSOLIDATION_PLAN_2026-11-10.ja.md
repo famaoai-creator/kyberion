@@ -83,6 +83,13 @@ importance: 9
 
 Org Role を `KYBERION_PERSONA` に写していた `scripts/compose_mission_team.ts` の経路は外した（S1 の続き）。Org Role の値が `sovereign` などの Persona の値と一致すると、チーム計画を書くプロセスの権限が上がる経路だった。
 
+#### レジストリの一本化（2026-11-10、実装済み）
+
+- Authority Role のレジストリは `knowledge/product/governance/authority-roles/` のカードだけになった（90 件）。カードはプロフィール（`description`、`tier_access` など）と、パスの許可 `permissions` を持つ。`security-policy.json` だけにあった 35 件は `"assignable": false` のプロセスロールのカードにした。プロセスロールはスクリプトやサービスが引き受けるだけで、チーム・組織・dot には割り当てられない（`loadAuthorityRoleIndex` は返さない）。
+- `authority-role-index.json`（割り当てできる 55 件）と `security-policy.json` の `authority_role_permissions`（`permissions` を持つ 86 件、そのまま写す）は `pnpm kyberion sync authority-roles` の生成物になった。`--check` と `governance-rules` のゲート（`validateAuthorityRolePermissionProjection`）が、カードに無いロール、欠けたロール、中身の違うロールを止める。実行時の判定（tier-guard）は今までどおり `security-policy.json` を読むので、判定は変わらない。移行の前後で、両方の生成物は既存のファイルとバイト単位で同じだった（`--check` で変更 0 件）。
+- `pnpm organization role create` / `promote` は、カードの `permissions` と `security-policy.json` を同じ承認の下で一緒に書く。プロフィールの書き換えでカードの `permissions` は消えない。`publication-role-migration` は、カードの `permissions` と移行元の `security-policy.json` が違えば拒否する。
+- `role-authority-map.json`（Org Role → Authority Role と persona）と `role-write-access.json` は、このレジストリにはまだ入っていない。
+
 ## 完了の合図
 
 concept-registry から次の項目の `lifecycle` を外します：`tenant`、`organization`、`stance`、`org-role`、`team-role`、`member-role`、`authority-role`、`grant`。`execution-persona` はレジストリと GLOSSARY から削除します。同じ変更で、他の項目の `not_to_confuse_with` にある `execution-persona`（`nhi`、`conversational-persona`）も外します。

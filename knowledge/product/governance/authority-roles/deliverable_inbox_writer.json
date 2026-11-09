@@ -5,5 +5,41 @@
   "write_scopes": ["active/shared/inbox/", "active/shared/runtime/locks/"],
   "scope_classes": ["operations_runtime"],
   "allowed_actuators": [],
-  "tier_access": ["public"]
+  "tier_access": ["public"],
+  "permissions": {
+    "allow_read": ["active/shared/inbox/", "active/shared/runtime/locks/"],
+    "allow_write": ["active/shared/inbox/", "active/shared/runtime/locks/"],
+    "narrow": {
+      "only": {
+        "write": [
+          {
+            "path": "active/shared/inbox/entries.jsonl"
+          },
+          {
+            "pattern": "^active/shared/runtime/locks/deliverable-inbox-[a-f0-9]{64}\\.lock[.A-Za-z0-9_-]{0,160}$"
+          }
+        ],
+        "mkdir": [
+          {
+            "path": "active/shared/inbox"
+          },
+          {
+            "path": "active/shared/runtime"
+          },
+          {
+            "path": "active/shared/runtime/locks"
+          }
+        ]
+      },
+      "only_reason": "[DELIVERABLE_INBOX_WRITER_SCOPE] The inbox writer writes only the deliverable inbox and its own lock",
+      "content_check": [
+        {
+          "path": "active/shared/inbox/entries.jsonl",
+          "kind": "append_only_jsonl",
+          "id_field": "entry_id",
+          "refusal_prefix": "[DELIVERABLE_INBOX_WRITE_REFUSED]"
+        }
+      ]
+    }
+  }
 }

@@ -5,5 +5,24 @@
   "write_scopes": ["knowledge/confidential/${KYBERION_TENANT}/connections/"],
   "scope_classes": ["customer_overlay"],
   "allowed_actuators": [],
-  "tier_access": ["confidential"]
+  "tier_access": ["confidential"],
+  "permissions": {
+    "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/channel-bindings.json"],
+    "allow_write": ["knowledge/confidential/${KYBERION_TENANT}/connections/"],
+    "narrow": {
+      "only": {
+        "write": [
+          {
+            "pattern": "^knowledge/confidential/[a-z][a-z0-9-]{1,30}/connections/channel-bindings\\.json$"
+          }
+        ],
+        "mkdir": [
+          {
+            "pattern": "^knowledge/confidential(/[a-z][a-z0-9-]{1,30}(/connections)?)?$"
+          }
+        ]
+      },
+      "only_reason": "[CUSTOMER_CHANNEL_BINDING_STORE_SCOPE] The binding store writes only knowledge/confidential/<tenant>/connections/channel-bindings.json"
+    }
+  }
 }

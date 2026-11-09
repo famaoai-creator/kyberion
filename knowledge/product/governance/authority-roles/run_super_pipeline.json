@@ -1,0 +1,21 @@
+{
+  "role": "run_super_pipeline",
+  "assignable": false,
+  "permissions": {
+    "allow_write": [
+      "active/shared/tmp/",
+      "active/shared/logs/traces/",
+      "active/audit/",
+      "active/shared/logs/process/",
+      "active/shared/data-vault/",
+      "active/missions/${MISSION_ID}/evidence/",
+      "active/missions/confidential/${MISSION_ID}/evidence/",
+      "active/missions/personal/${MISSION_ID}/evidence/",
+      "active/missions/public/${MISSION_ID}/evidence/",
+      "active/shared/logs/stances/${KYBERION_STANCE}/traces/",
+      "knowledge/product/governance/voice-profile-registry.json",
+      "knowledge/product/governance/voice-engine-registry.json",
+      "knowledge/product/governance/voice-engines/"
+    ]
+  }
+}

@@ -5,5 +5,9 @@
   "write_scopes": ["active/shared/runtime/audit-mirror/confidential/${KYBERION_TENANT}/"],
   "scope_classes": ["audit"],
   "allowed_actuators": [],
-  "tier_access": ["public"]
+  "tier_access": ["public"],
+  "permissions": {
+    "allow_read": [],
+    "allow_write": ["active/shared/runtime/audit-mirror/confidential/${KYBERION_TENANT}/"]
+  }
 }

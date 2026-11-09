@@ -5,5 +5,9 @@
   "write_scopes": ["active/audit/", "knowledge/incidents/"],
   "scope_classes": ["knowledge_core", "audit"],
   "allowed_actuators": ["artifact-actuator", "approval-actuator"],
-  "tier_access": ["public", "confidential", "personal"]
+  "tier_access": ["public", "confidential", "personal"],
+  "permissions": {
+    "allow_read": ["active/audit/", "knowledge/personal/stances/"],
+    "allow_write": ["active/audit/"]
+  }
 }

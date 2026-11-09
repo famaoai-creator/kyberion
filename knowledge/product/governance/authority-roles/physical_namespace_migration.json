@@ -1,0 +1,18 @@
+{
+  "role": "physical_namespace_migration",
+  "assignable": false,
+  "permissions": {
+    "allow_read": [
+      "active/shared/runtime/media-generation/schedules/",
+      "active/shared/coordination/channels/",
+      "active/shared/runtime/presence/",
+      "active/missions/"
+    ],
+    "allow_write": [
+      "active/shared/runtime/media-generation/schedules/",
+      "active/shared/coordination/channels/",
+      "active/shared/runtime/presence/",
+      "active/shared/runtime/migrations/physical-namespace/"
+    ]
+  }
+}

@@ -11,5 +11,167 @@
   ],
   "scope_classes": ["audit", "operations_runtime"],
   "allowed_actuators": [],
-  "tier_access": ["confidential", "personal", "public"]
+  "tier_access": ["confidential", "personal", "public"],
+  "permissions": {
+    "allow_read": [
+      "active/shared/runtime/dot-lifecycle-audit.jsonl",
+      "active/shared/runtime/heartbeats/",
+      "active/shared/runtime/dot/public/shared/",
+      "active/shared/runtime/dot/personal/shared/owners/",
+      "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
+      "active/shared/tmp/",
+      "knowledge/personal/",
+      "knowledge/confidential/${KYBERION_TENANT}/"
+    ],
+    "allow_write": [
+      "active/shared/runtime/dot-lifecycle-audit.jsonl",
+      "active/shared/runtime/heartbeats/",
+      "active/shared/runtime/dot/public/shared/",
+      "active/shared/runtime/dot/personal/shared/owners/",
+      "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
+      "active/shared/tmp/",
+      "knowledge/personal/",
+      "knowledge/confidential/${KYBERION_TENANT}/"
+    ],
+    "narrow": {
+      "only": {
+        "write": [
+          {
+            "path": "active/shared/runtime/dot-lifecycle-audit.jsonl"
+          },
+          {
+            "pattern": "^active/shared/runtime/dot/(?:public|confidential|personal)/.+/event-continuations/[^/]+\\.json$"
+          },
+          {
+            "pattern": "^active/shared/runtime/dot/(?:public|confidential|personal)/.+/events\\.jsonl$"
+          },
+          {
+            "pattern": "^active/shared/runtime/heartbeats/[^/]+\\.json$"
+          },
+          {
+            "pattern": "^active/shared/tmp/.+/active/shared/runtime/dot-lifecycle-audit\\.jsonl$"
+          },
+          {
+            "pattern": "^active/shared/tmp/.+/active/shared/runtime/dot/(?:public|confidential|personal)/.+/event-continuations/[^/]+\\.json$"
+          },
+          {
+            "pattern": "^active/shared/tmp/.+/active/shared/runtime/dot/(?:public|confidential|personal)/.+/events\\.jsonl$"
+          },
+          {
+            "pattern": "^active/shared/tmp/.+/active/shared/runtime/heartbeats/[^/]+\\.json$"
+          }
+        ],
+        "mkdir": [
+          {
+            "path": "active"
+          },
+          {
+            "path": "active/shared"
+          },
+          {
+            "path": "active/shared/runtime"
+          },
+          {
+            "path": "active/shared/runtime/heartbeats"
+          },
+          {
+            "pattern": "^active/shared/runtime/dot(/.*)?$"
+          },
+          {
+            "path": "active/shared/tmp"
+          },
+          {
+            "pattern": "^active/shared/tmp/.+$"
+          }
+        ],
+        "read": [
+          {
+            "prefix": "knowledge/product/"
+          },
+          {
+            "path": "active/shared/runtime/dot-lifecycle-audit.jsonl"
+          },
+          {
+            "prefix": "active/shared/runtime/heartbeats/"
+          },
+          {
+            "prefix": "active/shared/runtime/dot/public/shared/"
+          },
+          {
+            "prefix": "active/shared/runtime/dot/personal/shared/owners/"
+          },
+          {
+            "prefix": "active/shared/runtime/dot/confidential/"
+          },
+          {
+            "prefix": "active/shared/tmp/"
+          }
+        ],
+        "metadata": [
+          {
+            "prefix": "knowledge/product/"
+          },
+          {
+            "path": "active/shared/runtime/dot-lifecycle-audit.jsonl"
+          },
+          {
+            "prefix": "active/shared/runtime/heartbeats/"
+          },
+          {
+            "prefix": "active/shared/runtime/dot/public/shared/"
+          },
+          {
+            "prefix": "active/shared/runtime/dot/personal/shared/owners/"
+          },
+          {
+            "prefix": "active/shared/runtime/dot/confidential/"
+          },
+          {
+            "prefix": "active/shared/tmp/"
+          },
+          {
+            "path": "knowledge/product"
+          },
+          {
+            "path": "active"
+          },
+          {
+            "path": "active/shared"
+          },
+          {
+            "path": "active/shared/runtime"
+          },
+          {
+            "path": "active/shared/runtime/heartbeats"
+          },
+          {
+            "path": "active/shared/runtime/dot"
+          },
+          {
+            "path": "active/shared/runtime/dot/public"
+          },
+          {
+            "path": "active/shared/runtime/dot/public/shared"
+          },
+          {
+            "path": "active/shared/runtime/dot/personal"
+          },
+          {
+            "path": "active/shared/runtime/dot/personal/shared"
+          },
+          {
+            "path": "active/shared/runtime/dot/personal/shared/owners"
+          },
+          {
+            "path": "active/shared/runtime/dot/confidential"
+          },
+          {
+            "path": "active/shared/tmp"
+          }
+        ]
+      },
+      "only_reason": "[DOT_LIFECYCLE_RUNTIME_SCOPE] The lifecycle runtime store writes only the lifecycle audit ledger, dot event-continuation state and activation heartbeats",
+      "structural_mkdir": true
+    }
+  }
 }
