@@ -50,7 +50,7 @@ import {
 import { parseStructuredJson } from '../reasoning/structured-reasoning.js';
 import { logger } from '../core.js';
 import { t } from '../localization/t.js';
-import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
+import { findRelevantPromotedKnowledge } from '../knowledge/promoted-knowledge-retrieval.js';
 import { recordKnowledgeDelivery } from '../knowledge/knowledge-feedback-loop.js';
 import {
   enqueueSurfaceNotification,
@@ -68,6 +68,8 @@ import {
 } from '../provider/provider-egress-gate.js';
 import { delegateWorkItemWithReasoningBackend } from '../reasoning/reasoning-backend-execution-adapter.js';
 import { getWorkItem } from './work-coordination.js';
+import type { MemoryScopeEnvelope } from '../knowledge/memory-scope.js';
+import { missionMemoryCaptureScope } from '../knowledge/memory-capture-scope.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { findReusableLearningAssets } from '../knowledge/reusable-learning.js';
 
@@ -169,6 +171,12 @@ export interface BackgroundReviewForkInput {
   missionId?: string;
   /** Tenant scope for provider attestation lookup when this fork has one. */
   tenantSlug?: string;
+  /**
+   * D8: the session owner's principal. A session-scoped (non-mission) memory
+   * candidate is personal and is captured in this owner's partition; without
+   * it the queue rejects the candidate (scope is never inferred later).
+   */
+  ownerNhi?: string;
   workItemId?: string;
   approvalChannel?: string;
   approvalThreadTs?: string;
@@ -260,7 +268,7 @@ const BACKGROUND_REVIEW_KNOWLEDGE_EXCERPT_MAX = 200;
  * `canonicalSourceRef` above, which falls back to a `surface:...` ref when
  * absent). There is also no WorkItem/TaskSession/ProjectState here to
  * resolve a pack around. So this calls the lower-level primitive
- * `provisionTaskKnowledge` itself wraps (`findRelevantDistilledKnowledge`)
+ * the mission context pack uses for promoted records (`findRelevantPromotedKnowledge`)
  * directly, mirroring its excerpt/truncation conventions (200-char
  * excerpts, same shape as `renderSystemPromptForm` in
  * task-knowledge-provisioning.ts), and records delivery the same way KP-05
@@ -291,7 +299,8 @@ async function buildBackgroundReviewKnowledgeContext(
   try {
     const topic = boundedSnapshot(input.snapshot);
     if (!topic) return baseContext;
-    const entries = await findRelevantDistilledKnowledge({
+    // Public, tenantless reader: a tenant hint is not a grant (see buildForkPrompt).
+    const entries = await findRelevantPromotedKnowledge({
       topic,
       limit: BACKGROUND_REVIEW_KNOWLEDGE_HINT_LIMIT,
       minScore: 0.08,
@@ -416,6 +425,20 @@ function persistMemoryCandidate(
 ): string {
   assertBackgroundReviewOperationAllowed('memory:enqueue');
   const missionScoped = Boolean(input.missionId);
+  // D8: write tier and entity scope at capture — the mission's own tenant
+  // scope (from its state, not the tenant hint) for a mission fork, the
+  // session owner for a personal one. Without one the queue rejects it.
+  const missionScope = input.missionId
+    ? missionMemoryCaptureScope(input.missionId).scope
+    : undefined;
+  const ownerNhi = input.ownerNhi?.trim();
+  const scope: MemoryScopeEnvelope | undefined = missionScoped
+    ? missionScope?.tier === 'confidential'
+      ? missionScope
+      : undefined
+    : ownerNhi
+      ? { tier: 'personal', owner_nhi: ownerNhi }
+      : undefined;
   const candidate = createMemoryPromotionCandidate({
     sourceType: missionScoped ? 'mission' : 'task_session',
     sourceRef,
@@ -426,6 +449,7 @@ function persistMemoryCandidate(
     evidenceRefs: [sourceRef],
     sensitivityTier: (missionScoped ? 'confidential' : 'personal') as MemoryCandidateTier,
     ratificationRequired: true,
+    ...(scope ? { scope } : {}),
   });
   enqueueMemoryPromotionCandidate(candidate);
   return candidate.candidate_id;

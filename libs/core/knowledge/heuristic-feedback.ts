@@ -26,6 +26,7 @@ import {
   enqueueMemoryPromotionCandidate,
   type MemoryCandidate,
 } from './memory-promotion-queue.js';
+import type { MemoryScopeEnvelope } from './memory-scope.js';
 
 const HEURISTICS_ROOT = 'knowledge/confidential/heuristics';
 
@@ -214,6 +215,11 @@ export function queueHeuristicMemoryCandidate(input: {
   entryId: string;
   sensitivityTier?: 'public' | 'confidential' | 'personal';
   evidenceRef?: string;
+  /**
+   * D8: the entity scope the heuristic was captured in (the mission's tenant
+   * scope). Required for non-public tiers; the queue rejects it otherwise.
+   */
+  scope?: MemoryScopeEnvelope;
 }): MemoryCandidate {
   const entry = readHeuristic(input.entryId);
   if (!entry) {
@@ -228,8 +234,10 @@ export function queueHeuristicMemoryCandidate(input: {
     proposedMemoryKind: 'heuristic',
     summary: entry.decision || entry.anchor,
     evidenceRefs,
-    sensitivityTier: input.sensitivityTier || 'confidential',
+    sensitivityTier: input.sensitivityTier || input.scope?.tier || 'confidential',
     ratificationRequired: true,
+    kind: 'heuristic',
+    ...(input.scope ? { scope: input.scope } : {}),
   });
   enqueueMemoryPromotionCandidate(candidate);
   return candidate;
@@ -286,7 +294,12 @@ export interface MissionHeuristicValidationResult {
  * is finished twice does not restamp or re-queue anything.
  */
 export function validateMissionHeuristics(
-  outcome: MissionOutcome
+  outcome: MissionOutcome,
+  /**
+   * D8: the finished mission's tier and entity scope, written onto each queued
+   * candidate at capture. A public mission's heuristics queue at the public tier.
+   */
+  capture?: { tier: 'public' | 'confidential' | 'personal'; scope?: MemoryScopeEnvelope }
 ): MissionHeuristicValidationResult {
   const result: MissionHeuristicValidationResult = { validated: [], queued: [], errors: [] };
   const missionId = outcome.mission_id.toUpperCase();
@@ -296,7 +309,11 @@ export function validateMissionHeuristics(
       const validated = validateHeuristic({ entryId: entry.id, outcome });
       result.validated.push(entry.id);
       if ((validated.validation?.validity_score ?? 0) >= HEURISTIC_PROMOTION_THRESHOLD) {
-        queueHeuristicMemoryCandidate({ entryId: entry.id });
+        queueHeuristicMemoryCandidate({
+          entryId: entry.id,
+          ...(capture ? { sensitivityTier: capture.tier } : {}),
+          ...(capture?.scope ? { scope: capture.scope } : {}),
+        });
         result.queued.push(entry.id);
       }
     } catch (error) {

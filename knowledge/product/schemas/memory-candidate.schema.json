@@ -20,6 +20,25 @@
       "type": "string",
       "minLength": 1
     },
+    "kind": {
+      "description": "D8: what the captured learning is. Written at capture; legacy rows gain it on load.",
+      "type": "string",
+      "enum": [
+        "lesson",
+        "heuristic",
+        "process_improvement",
+        "hint",
+        "execution_feedback",
+        "organization_learning",
+        "advisory",
+        "asset_promotion"
+      ]
+    },
+    "lane": {
+      "description": "D8: promotion lane resolved at capture (see knowledge-promotion-policy.json).",
+      "type": "string",
+      "enum": ["auto", "evidence_gated", "pr_review", "steward"]
+    },
     "source_type": {
       "type": "string",
       "enum": ["mission", "task_session", "artifact", "incident", "authored"]

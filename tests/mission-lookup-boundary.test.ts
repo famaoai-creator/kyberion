@@ -70,6 +70,9 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   // mission's tenant; a hidden/ambiguous mission must leave it unattributed
   // (hidden from tenants).
   'libs/core/workforce/delegation-store-partition.ts': 'scope-derivation',
+  // D8: a memory candidate's tier and tenant scope come from its mission's
+  // state at capture; a hidden/ambiguous mission must throw, never queue looser.
+  'libs/core/knowledge/memory-capture-scope.ts': 'scope-derivation',
   'libs/core/search/history-search-index.ts': 'scope-derivation',
   'libs/core/governance/injection-signal.ts': 'scope-derivation',
   'libs/shared-perception/src/mark-target-resolver.ts': 'scope-derivation',

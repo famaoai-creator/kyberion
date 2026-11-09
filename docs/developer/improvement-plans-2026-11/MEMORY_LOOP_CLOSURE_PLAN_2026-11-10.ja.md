@@ -1,7 +1,7 @@
 ---
 title: 記憶のループを閉じる計画（スコープ付きの候補と 1 本の取り込み経路）
 kind: plan
-status: planned
+status: active
 last_updated: 2026-11-10
 tags: [plan, concepts, memory, distill, promotion, knowledge-index, context-pack, disclosure]
 importance: 9
@@ -45,6 +45,14 @@ importance: 9
 - distill：mission から候補を作ること。promote：候補を知識にすること。wisdom：actuator の名前だけ。
 - hint は 1 つのランタイムのストアと、そこから生成する `HINTS.md` のビューにまとめる。
 - GLOSSARY と registry を合わせ、`memory-candidate` の `lifecycle` を外す。
+
+## 進捗（2026-11-10）
+
+- **M1**：完了。昇格した記録は `findRelevantPromotedKnowledge` でコンテキストパックに入ります。
+- **M2（済）**：`MemoryCandidate` に `kind` と `lane` を足し、捕まえた時点で書きます。古い行は読み込み時に補います（スコープは補いません）。confidential と personal の候補は、スコープがないと登録の時点で `MEMORY_SCOPE_REQUIRED` で拒否します（`memory-candidate-capture-scope.test.ts`）。案件の結果、background review、mission の heuristics、レビューで差し戻された学び、知識の不足、curation の助言は、スコープを付けて登録します。`distill-knowledge-injector.ts` は削除し、残っていた 3 か所の呼び出しは promoted の経路に移しました。
+- **M2（残り）**：組織の学習候補（`OrganizationLearningCandidate`）とプロセス改善の提案は、まだそれぞれのストアで承認・適用しています。キューに二重に書くと、昇格の経路が 2 本になるため、今回は移していません。決定の流れをキューに移すのが次の作業です。`DistillCandidateRecord` も、まだ提案のストアとして使われています（background review、実行時のフィードバック、`wisdom:distill`）。
+- **M3（済）**：mission distill の識別子とログを用語に合わせました（`loadDistillPolicy` など。古い名前は 1 リリースの間、非推奨の別名として残します）。GLOSSARY の「Promotion (Memory)」「Memory Candidate」を直し、registry から `memory-candidate` の `lifecycle` を外しました。
+- **M3（残り）**：hint のストアを 1 つにまとめ、`HINTS.md` を生成するビューにする作業は残っています。今は、実行時のストア（`active/shared/runtime/feedback-loop/hints/`）と、昇格のたびに追記する `HINTS.md` が別々にあります。tenant の hint を共有のストアに書かない形で設計し直す必要があります。
 
 ## 完了の合図
 
