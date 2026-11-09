@@ -91,7 +91,7 @@ describe('charterInputForDecision', () => {
     });
     expect(c?.action.actor).toMatchObject({
       kind: 'agent',
-      id: 'kyberion://agent/acme/mission-controller',
+      id: 'kyberion://agent/acme/_/mission-controller',
       on_behalf_of: 'user:owner',
     });
   });
@@ -102,7 +102,7 @@ describe('charterInputForDecision', () => {
       opts(),
       NOW
     );
-    expect(c?.action.actor.id).toBe('kyberion://agent/acme/pipeline-worker');
+    expect(c?.action.actor.id).toBe('kyberion://agent/acme/_/pipeline-worker');
     expect(c?.action.action_class).toBe('sign_contract');
   });
 
@@ -187,7 +187,7 @@ describe('charterInputForDecision', () => {
       blast_radius: { recipients: 1 },
     });
     expect(c?.action.actor).toMatchObject({
-      id: 'kyberion://agent/acme/customer-conversation',
+      id: 'kyberion://agent/acme/_/customer-conversation',
       on_behalf_of: 'user:owner',
     });
     expect(charterInputForCustomerOutbound({}, opts(), NOW)).toBeUndefined();

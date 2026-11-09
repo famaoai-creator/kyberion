@@ -94,6 +94,7 @@ function issueTestIdentity(slug: string) {
   return withExecutionContext('mission_controller', () =>
     issueAgentIdentity({
       kind: 'agent',
+      tenantSlug: 'ni02-tenant',
       organizationId: 'ni02-org',
       slug,
       accountableHumanId: 'human:founder',

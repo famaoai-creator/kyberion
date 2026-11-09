@@ -887,7 +887,7 @@ export function getGraphEntity(
     })
     .map((link) => {
       // Staffing names an agent by its profile slug; the identity ledger by
-      // its full ActorRef (kyberion://agent/<org>/<slug>). Either resolves.
+      // its full ActorRef (kyberion://agent/<tenant>/<org|_>/<slug>). Either resolves.
       const actor =
         find('actor', link.actorId) ??
         graph.nodes.find(

@@ -65,4 +65,11 @@ Not all migrations are safely reversible. When a migration has no `rollback` (or
 
 ## Current migrations
 
-_None yet._ Pre-1.0 development. The first migration will accompany the first breaking change after `v0.1.0`.
+| Id                               | What it moves                                                                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `0001-stance-home`               | Stance overlays into `knowledge/personal/stances/{slug}/`                                                                            |
+| `0002-tenant-home`               | Company files from `customer/{tenant}/` into `knowledge/confidential/{tenant}/`                                                      |
+| `0003-deal-home`                 | Deals from `customer/{tenant}/deals/` into the tenant home                                                                           |
+| `0004-organization-profile-home` | `knowledge/confidential/{tenant}/organization-profile.json` to `organizations/{org}/organization-profile.json` (concept model v2 D3) |
+
+The NHI id migration (`kyberion://agent/<org>/<slug>` to `kyberion://agent/<tenant>/<org|_>/<slug>`) appends events to the identity journal instead of moving files, so it runs through the governed NHI facade: `pnpm nhi migrate-ids` (dry run), then `pnpm nhi migrate-ids --apply`.

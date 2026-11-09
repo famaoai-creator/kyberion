@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   selectAgentForTeamRole,
   type SelectAgentForTeamRoleInput,
@@ -171,11 +171,13 @@ describe('team-role assignment selection', () => {
     // NI-01: assigned agents carry their canonical durable-identity name
     // (org resolved from the active organization profile when not passed).
     expect(assignment.runtime_identity).toMatch(
-      /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/nerve-agent$/
+      /^kyberion:\/\/agent\/(?:_\/_|[a-z][a-z0-9-]*\/(?:_|[a-z][a-z0-9-]*))\/nerve-agent$/
     );
   });
 
   it('derives runtime_identity with an explicit organization id (NI-01)', () => {
+    // D3: the organization lives inside the active tenant.
+    vi.stubEnv('KYBERION_TENANT', 'demo-tenant');
     const assignment = selectAgentForTeamRole({
       teamRole: 'owner',
       teamRoleRecord: {
@@ -213,7 +215,8 @@ describe('team-role assignment selection', () => {
     });
 
     expect(assignment.status).toBe('assigned');
-    expect(assignment.runtime_identity).toBe('kyberion://agent/demo-org/nerve-agent');
+    expect(assignment.runtime_identity).toBe('kyberion://agent/demo-tenant/demo-org/nerve-agent');
+    vi.unstubAllEnvs();
   });
 
   it('returns unfilled when no compatible agent exists', () => {
@@ -364,7 +367,7 @@ describe('agent instance pools (NHI scale-out)', () => {
     expect(assignment.instance_index).toBe(2);
     // Each clone is its own canonical NHI.
     expect(assignment.runtime_identity).toMatch(
-      /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/planner-agent-2$/
+      /^kyberion:\/\/agent\/(?:_\/_|[a-z][a-z0-9-]*\/(?:_|[a-z][a-z0-9-]*))\/planner-agent-2$/
     );
   });
 

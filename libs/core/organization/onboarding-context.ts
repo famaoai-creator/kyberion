@@ -7,9 +7,13 @@ import {
   type TenantProfile,
 } from './tenant-registry.js';
 import { stanceDirForSlug } from '../authn/stance-resolver.js';
-import { tenantHomePath } from './tenant-home.js';
 import { isTenantActivationActive } from './tenant-activation.js';
-import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
+import {
+  loadOrganizationProfile,
+  organizationProfilePath,
+  resolveTenantOrganizationProfilePath,
+  type OrganizationProfile,
+} from './organization-profile.js';
 import {
   buildOrganizationScaffold,
   buildOrganizationOperationRecord,
@@ -289,7 +293,9 @@ function archiveOnboardingWorkItem(item: WorkItem | undefined, rootDir: string):
 /**
  * The tenant home that holds the company's organization profile: the bound
  * tenant's, else the company slug's (company onboarding run before a tenant
- * was chosen keys the company files by its slug).
+ * was chosen keys the company files by its slug). The profile itself is the
+ * company organization's own (`organizations/{customerSlug}/`), else the
+ * legacy tenant-root profile for one release.
  */
 export function companyProfileHome(
   tenantSlug: string,
@@ -297,9 +303,22 @@ export function companyProfileHome(
   rootDir: string
 ): string {
   for (const slug of [tenantSlug, customerSlug]) {
-    if (safeExistsSync(tenantHomePath(slug, 'organization-profile.json', rootDir))) return slug;
+    if (resolveTenantOrganizationProfilePath(slug, customerSlug, rootDir)) return slug;
   }
   return tenantSlug;
+}
+
+/** The company's organization profile file (see {@link companyProfileHome}). */
+export function companyProfilePath(
+  tenantSlug: string,
+  customerSlug: string,
+  rootDir: string
+): string {
+  const home = companyProfileHome(tenantSlug, customerSlug, rootDir);
+  return (
+    resolveTenantOrganizationProfilePath(home, customerSlug, rootDir)?.path ??
+    organizationProfilePath(home, customerSlug, rootDir)
+  );
 }
 
 function withCustomer<T>(customerSlug: string, fn: () => T): T {
@@ -635,7 +654,8 @@ export function resolveOnboardingContext(
   const tenant = resolveTenantForCustomer(customerSlug, tenantSlug, rootDir);
   const profile = loadOrganizationProfile(
     rootDir,
-    companyProfileHome(tenantSlug, customerSlug, rootDir)
+    companyProfileHome(tenantSlug, customerSlug, rootDir),
+    customerSlug
   );
   const binding = bindingFor({ ...input, customerSlug, tenantSlug }, profile);
   const organizationState = loadOrganizationOperationalState(binding.organization_id, {

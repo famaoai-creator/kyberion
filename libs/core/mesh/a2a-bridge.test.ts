@@ -1358,6 +1358,7 @@ describe('a2a-bridge', () => {
       const retired = withExecutionContext('mission_controller', () => {
         const record = identity.issueAgentIdentity({
           kind: 'agent',
+          tenantSlug: 'ni02-tenant',
           organizationId: 'ni02-org',
           slug: 'retired-sender',
           accountableHumanId: 'human:founder',
