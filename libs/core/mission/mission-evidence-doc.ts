@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { appendJsonLine, readJson } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
 /**
@@ -126,7 +127,7 @@ export class MissionEvidenceDoc<T> {
       metadata?: Record<string, unknown>;
       missionAudit?: boolean;
       /** Accepted for compatibility; the audit copy follows the mission's own location. */
-      tier?: 'personal' | 'confidential' | 'public';
+      tier?: StorageDataTier;
     }
   ): { audit_event_id: string } {
     // A write needs the existing mission: an unknown one fails closed

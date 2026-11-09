@@ -8,6 +8,7 @@ import {
 import { createHash } from 'node:crypto';
 import { rootDir } from './path-resolver.js';
 import { isReservedScopeName, isValidTenantSlug } from './foundation/scope.js';
+import type { KnowledgeTier } from './foundation/knowledge-tier.js';
 
 export { PARTITIONED_RUNTIME_STATE_ROOTS, PARTITIONED_RUNTIME_LEDGER_ROOTS, STORAGE_FLOOR_ROOTS };
 
@@ -31,7 +32,13 @@ export { PARTITIONED_RUNTIME_STATE_ROOTS, PARTITIONED_RUNTIME_LEDGER_ROOTS, STOR
  * - log → `active/shared/logs/`
  */
 
-export type StorageDataTier = 'personal' | 'confidential' | 'public';
+/**
+ * The data tier (`personal` / `confidential` / `public`). The single source is
+ * the `KNOWLEDGE_TIERS` tuple in foundation/knowledge-tier.ts; this alias is
+ * the import surface for libs/core modules (concept model v2 D5, S1). Do not
+ * redeclare the literal union — tests/tier-member-role-type-boundary.test.ts.
+ */
+export type StorageDataTier = KnowledgeTier;
 
 export const STORAGE_DATA_TIERS: readonly StorageDataTier[] = [
   'personal',

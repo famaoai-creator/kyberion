@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createLogger } from '../logger.js';
 import { evaluateEgressPolicy } from '../governance/egress-policy.js';
@@ -110,7 +111,7 @@ export function effectiveReasoningTrainingUse(scope: {
 
 export interface NonPublicReasoningPayloadScope extends ReasoningPayloadScopeBase {
   /** Most sensitive tier represented in what will be sent. */
-  tier: 'confidential' | 'personal';
+  tier: Exclude<StorageDataTier, 'public'>;
   /** Maximum provider data-use posture, declared explicitly. */
   training_use: ReasoningTrainingUse;
 }

@@ -1,4 +1,5 @@
 /** Request a human decision in the existing approval store; this grants no release authority. */
+import type { StorageDataTier } from '../storage-layout.js';
 import { createHash } from 'node:crypto';
 import { getWorkItem, listActiveWorkLeases } from '../workforce/work-coordination.js';
 import { workEffectOwnership } from '../workforce/work-effect-ownership.js';
@@ -29,7 +30,7 @@ export function requestWorkEffectReleaseApproval(input: {
   const security = item.metadata?.security_scope as { write_tier?: unknown } | undefined;
   const tier =
     security && ['public', 'confidential', 'personal'].includes(String(security.write_tier))
-      ? (security.write_tier as 'public' | 'confidential' | 'personal')
+      ? (security.write_tier as StorageDataTier)
       : item.context?.tenant_slug
         ? 'confidential'
         : 'public';

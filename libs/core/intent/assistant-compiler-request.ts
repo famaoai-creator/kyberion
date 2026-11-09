@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
@@ -51,7 +52,7 @@ export interface AssistantCompilerRequest {
   source_text: string;
   context: {
     locale?: string;
-    tier: 'personal' | 'confidential' | 'public';
+    tier: StorageDataTier;
     project_id?: string;
     project_name?: string;
     track_id?: string;
@@ -91,7 +92,7 @@ export interface CreateAssistantCompilerRequestInput {
   source: AssistantCompilerRequest['source'];
   sourceText: string;
   locale?: string;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   projectId?: string;
   projectName?: string;
   trackId?: string;

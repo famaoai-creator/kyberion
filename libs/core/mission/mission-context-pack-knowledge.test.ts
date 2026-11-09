@@ -65,7 +65,7 @@ function pinFixture() {
             tier: 'confidential',
             tenant_slug: 'pinned-fixture',
             status: 'active',
-            assigned_persona: 'worker',
+            org_role: 'worker',
             git: {
               branch: 'fixture',
               start_commit: 'fixture',

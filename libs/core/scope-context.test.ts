@@ -257,7 +257,7 @@ describe('scope-context', () => {
         status: 'active',
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'test',
+        org_role: 'test',
         confidence_score: 1,
         git: {
           branch: 'main',

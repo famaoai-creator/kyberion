@@ -1,4 +1,5 @@
 /** Record construction and rendering, independent of publisher and approval orchestration. */
+import type { StorageDataTier } from '../storage-layout.js';
 import type { DistillCandidateRecord } from './distill-candidate-registry.js';
 import type { OrganizationWorkLoopSummary } from '../workforce/work-design.js';
 import type { MemoryScopeEnvelope } from './memory-scope.js';
@@ -15,7 +16,7 @@ interface PromotedMemoryRecordBase {
   approved_payload_digest?: string;
   record_id: string;
   kind: 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template';
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   knowledge_domain: 'product' | 'organization' | 'personal';
   owner_nhi?: string;
   title: string;

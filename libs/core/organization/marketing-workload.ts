@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { createHash } from 'node:crypto';
 import * as customerResolver from '../authn/stance-resolver.js';
 import { pathResolver } from '../path-resolver.js';
@@ -21,7 +22,7 @@ export interface MarketingIntake {
   deliverables: string[];
   deadline: string;
   success_criteria: string[];
-  data_classification: 'public' | 'confidential' | 'personal';
+  data_classification: StorageDataTier;
   publication_intent: 'none' | 'internal' | 'public';
   risk_level: MarketingRiskLevel;
   claim_ids?: string[];
@@ -345,7 +346,7 @@ export function validateClaims(
 }
 
 export function validatePublicationClassification(input: {
-  source_classifications: Array<'public' | 'confidential' | 'personal' | 'customer_scoped'>;
+  source_classifications: Array<StorageDataTier | 'customer_scoped'>;
   publication_allowed: boolean;
   requires_redaction: boolean;
   pii_detected?: boolean;

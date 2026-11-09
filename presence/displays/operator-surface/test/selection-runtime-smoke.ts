@@ -183,7 +183,7 @@ async function parent() {
       status: 'active',
       execution_mode: 'local',
       priority: 1,
-      assigned_persona: 'ecosystem_architect',
+      org_role: 'ecosystem_architect',
       confidence_score: 1,
       git: {
         branch: 'synthetic',

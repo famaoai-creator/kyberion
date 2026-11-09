@@ -1101,7 +1101,11 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
         if (rawExistsSync(statePath)) {
           const state = parseJsonRecord(rawReadTextFile(statePath));
           if (!state) continue;
-          if (persona === 'unknown') persona = normalizePersona(state.assigned_persona);
+          // A mission-bound execution without an explicit persona runs as a
+          // worker. The mission's Org Role (`org_role`, formerly
+          // `assigned_persona`) is descriptive metadata and is never
+          // normalised into an execution persona (concept model v2 D5).
+          if (persona === 'unknown') persona = 'worker';
           if (!tenantSlug) tenantSlug = normalizeTenantSlug(stringField(state, 'tenant_slug'));
           const brokerage = state.cross_tenant_brokerage;
           const brokered = isJsonRecord(brokerage) ? brokerage.source_tenants : undefined;

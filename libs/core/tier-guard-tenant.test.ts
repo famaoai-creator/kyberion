@@ -919,7 +919,7 @@ describe('tier-guard brokered missions (C8)', () => {
         {
           mission_id: FIX_MISSION,
           tier: 'public',
-          assigned_persona: 'ecosystem_architect',
+          org_role: 'ecosystem_architect',
           cross_tenant_brokerage: {
             source_tenants: ['acme-corp', 'beta-co'],
             purpose: 'test broker',
@@ -1090,7 +1090,7 @@ describe('tier-guard brokered missions (C8)', () => {
         {
           mission_id: FIX_MISSION,
           tier: 'public',
-          assigned_persona: 'ecosystem_architect',
+          org_role: 'ecosystem_architect',
           cross_tenant_brokerage: {
             source_tenants: ['acme-corp'],
             purpose: 'expired broker',

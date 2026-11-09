@@ -4,6 +4,7 @@
  * prints the refs `activate` needs. It never activates anything and never
  * issues an NHI: it only observes, so a failed probe names what to fix.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { getAgentIdentity } from '../agent/agent-identity.js';
 import { getRegisteredEnvText, nowIso } from '../foundation/index.js';
@@ -31,7 +32,7 @@ export interface TenantActivationProbeInput {
   customerSlug: string;
   tenantSlug: string;
   organizationId: string;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   nhiIds: string[];
   serviceIds: string[];
   rootDir?: string;

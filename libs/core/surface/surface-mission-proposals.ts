@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { randomUUID } from 'node:crypto';
 import { parseEventScopeInput } from '../event/event-scope.js';
 import { assertScopeContext } from '../foundation/scope-context-validation.js';
@@ -542,7 +543,7 @@ export interface MissionIssuanceParams {
     tenant_slug: string;
     organization_id?: string;
     project_id?: string;
-    tier?: 'public' | 'confidential' | 'personal';
+    tier?: StorageDataTier;
   };
 }
 

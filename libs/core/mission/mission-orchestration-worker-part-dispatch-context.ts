@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import type { MissionTeamAssignment } from './mission-team-plan-composer.js';
 /**
  * Neutral context and trace seams shared by the mission worker dispatch paths.
@@ -172,7 +173,7 @@ export async function buildTaskDispatchContext(input: {
           mission_id: input.missionId,
           tier: 'public',
           status: 'active',
-          assigned_persona: 'worker',
+          org_role: 'worker',
           git: {
             branch: 'main',
             start_commit: '',
@@ -185,7 +186,7 @@ export async function buildTaskDispatchContext(input: {
   // KP-01: single provisioning entry point (resolve + persist + render) —
   // `form: 'pack'` reproduces the pre-KP-01 inline resolve/save/render
   // sequence byte-for-byte.
-  const missionTier = (missionState.tier as 'personal' | 'confidential' | 'public') || 'public';
+  const missionTier = (missionState.tier as StorageDataTier) || 'public';
   const missionTenantSlug =
     typeof (missionState as Record<string, unknown>).tenant_slug === 'string'
       ? String((missionState as Record<string, unknown>).tenant_slug)
