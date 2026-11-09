@@ -8,6 +8,7 @@ import {
   createBoard,
   createWorkItem,
   handoffWorkItem,
+  issueBoardView,
   listActiveWorkLeases,
   listBoardItems,
   listBoards,
@@ -216,7 +217,11 @@ async function runMain(args: string[] = []): Promise<void> {
       () => undefined
     )
     .command('create-board', 'Create or update a board', () => undefined)
-    .command('list-board', 'List board items or boards', () => undefined)
+    .command(
+      'list-board',
+      'List boards, or one board (--board-id) as Issues with step progress [--all-items lists steps too]',
+      () => undefined
+    )
     .command('claim-item', 'Claim a work item lease', () => undefined)
     .command('release-item', 'Release a work item lease', () => undefined)
     .command(
@@ -230,7 +235,7 @@ async function runMain(args: string[] = []): Promise<void> {
     .command('record-event', 'Append a coordination event', () => undefined)
     .command(
       'list-items',
-      'List work items [--project-id] [--organization-id] [--tenant-slug] [--status] [--board-id]',
+      'List work items [--project-id] [--organization-id] [--tenant-slug] [--status] [--board-id] [--top-level] [--parent-id]',
       () => undefined
     )
     .command(
@@ -319,6 +324,10 @@ async function runMain(args: string[] = []): Promise<void> {
     .option('head-sha', { type: 'string' })
     .option('change-state', { type: 'string' })
     .option('apply', { type: 'boolean', default: false })
+    .option('top-level', { type: 'boolean', default: false })
+    .option('parent-id', { type: 'string' })
+    .option('all-items', { type: 'boolean', default: false })
+    .option('status-from-children', { type: 'boolean', default: false })
     .option('json', { type: 'boolean', default: false });
   for (const entry of listWorkCoordinationImportCatalogEntries()) {
     yargs.command(
@@ -386,7 +395,9 @@ async function runMain(args: string[] = []): Promise<void> {
       if (argv['board-id']) {
         print({
           board: argv['board-id'],
-          items: listBoardItems(String(argv['board-id'])),
+          items: argv['all-items']
+            ? listBoardItems(String(argv['board-id']))
+            : issueBoardView(listBoardItems(String(argv['board-id'])), listWorkItems()),
         });
       } else {
         print({
@@ -405,6 +416,8 @@ async function runMain(args: string[] = []): Promise<void> {
             : {}),
           ...(argv['tenant-slug'] ? { tenantSlugs: [String(argv['tenant-slug'])] } : {}),
           ...(argv.status ? { status: String(argv.status) as WorkItemStatus } : {}),
+          ...(argv['top-level'] ? { topLevelOnly: true } : {}),
+          ...(argv['parent-id'] ? { parentItemId: String(argv['parent-id']) } : {}),
         }),
       });
       break;
@@ -515,6 +528,7 @@ async function runMain(args: string[] = []): Promise<void> {
         labels: argv.labels !== undefined ? csv(argv.labels) : undefined,
         dependencies: argv.dependencies !== undefined ? csv(argv.dependencies) : undefined,
         metadata: parseWorkCoordinationJson(argv.metadata),
+        ...(argv['status-from-children'] ? { statusFromChildren: true } : {}),
       });
       print(item);
       break;

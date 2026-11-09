@@ -92,8 +92,8 @@ export function isTopLevelWorkItem(item: Pick<WorkItem, 'parent_item_id'>): bool
 }
 
 /**
- * Parent status derived from its children (one rule set; W2 wires it into
- * boards). Returns null when there are no children — the parent keeps its
+ * Parent status derived from its children (one rule set; whether a parent
+ * takes it is {@link resolveParentStatusSync}). Returns null when there are no children — the parent keeps its
  * own status. Precedence:
  *   all archived → archived; all done/archived → review (a human closes the
  *   Issue); any in_progress/review → in_progress; any blocked → blocked;
@@ -112,6 +112,108 @@ export function aggregateParentStatus(
   if (has('done') || has('archived')) return 'in_progress';
   if (has('ready')) return 'ready';
   return 'backlog';
+}
+
+/** Why a parent keeps its status after a step changed (see {@link resolveParentStatusSync}). */
+export type ParentStatusHoldReason =
+  | 'no_children'
+  | 'terminal'
+  | 'claimed'
+  | 'pinned'
+  | 'unchanged'
+  | 'aggregate_terminal'
+  | 'not_forward';
+
+export type ParentStatusSyncDecision =
+  | { apply: true; status: WorkItemStatus }
+  | { apply: false; reason: ParentStatusHoldReason; aggregate: WorkItemStatus | null };
+
+/** Lifecycle order for the first aggregation of a parent that was never aggregated. */
+const FORWARD_RANK: Partial<Record<WorkItemStatus, number>> = {
+  backlog: 0,
+  ready: 1,
+  in_progress: 2,
+  blocked: 2,
+  review: 3,
+};
+
+/**
+ * W2: whether a parent Issue takes the status aggregated from its steps.
+ * The one rule table (documented in the WorkItem/Lease plan, W2), first
+ * match wins:
+ *   1. no steps → keep;
+ *   2. parent done/archived → keep (a person closed the Issue);
+ *   3. parent claimed (active lease or held effect) → keep (the holder owns it);
+ *   4. parent status set directly while it had steps (`manual`) → keep until
+ *      handed back with `statusFromChildren`;
+ *   5. aggregate equals the parent status → keep (idempotent, no write);
+ *   6. aggregate archived (every step withdrawn) → keep (never closes an Issue);
+ *   7. parent already aggregated (`children`) → take the aggregate;
+ *   8. parent never aggregated → take the aggregate only when it moves the
+ *      parent forward (backlog → ready → in_progress/blocked → review).
+ */
+export function resolveParentStatusSync(
+  parent: Pick<WorkItem, 'status' | 'status_origin'>,
+  children: ReadonlyArray<Pick<WorkItem, 'status'>>,
+  options: { claimed: boolean }
+): ParentStatusSyncDecision {
+  const aggregate = aggregateParentStatus(children);
+  const hold = (reason: ParentStatusHoldReason): ParentStatusSyncDecision => ({
+    apply: false,
+    reason,
+    aggregate,
+  });
+  if (aggregate === null) return hold('no_children');
+  if (parent.status === 'done' || parent.status === 'archived') return hold('terminal');
+  if (options.claimed) return hold('claimed');
+  if (parent.status_origin === 'manual') return hold('pinned');
+  if (aggregate === parent.status) return hold('unchanged');
+  if (aggregate === 'archived') return hold('aggregate_terminal');
+  if (parent.status_origin === 'children') return { apply: true, status: aggregate };
+  const from = FORWARD_RANK[parent.status] ?? 0;
+  const to = FORWARD_RANK[aggregate] ?? 0;
+  return to > from ? { apply: true, status: aggregate } : hold('not_forward');
+}
+
+/** Progress of an Issue's steps for boards: how many there are and how many are finished. */
+export interface WorkItemChildProgress {
+  total: number;
+  /** Steps that are done or archived. */
+  done: number;
+}
+
+/** Step counts per parent id, in one pass over `items`. */
+export function summarizeChildProgress(
+  items: ReadonlyArray<Pick<WorkItem, 'status' | 'parent_item_id'>>
+): Map<string, WorkItemChildProgress> {
+  const progress = new Map<string, WorkItemChildProgress>();
+  for (const child of items) {
+    if (!child.parent_item_id) continue;
+    const entry = progress.get(child.parent_item_id) ?? { total: 0, done: 0 };
+    entry.total += 1;
+    if (child.status === 'done' || child.status === 'archived') entry.done += 1;
+    progress.set(child.parent_item_id, entry);
+  }
+  return progress;
+}
+
+/**
+ * Board items as Issues (W2): drop the steps whose Issue is among `items`
+ * (they open inside it) and attach step progress counted over `allItems`. A
+ * step whose Issue is not in `items` stays, so no item becomes unreachable.
+ */
+export function issueBoardView<T extends Pick<WorkItem, 'item_id' | 'status' | 'parent_item_id'>>(
+  items: readonly T[],
+  allItems: ReadonlyArray<Pick<WorkItem, 'status' | 'parent_item_id'>>
+): Array<T & { steps?: WorkItemChildProgress }> {
+  const ids = new Set(items.map((item) => item.item_id));
+  const progress = summarizeChildProgress(allItems);
+  return items
+    .filter((item) => !item.parent_item_id || !ids.has(item.parent_item_id))
+    .map((item) => {
+      const steps = progress.get(item.item_id);
+      return steps ? { ...item, steps } : item;
+    });
 }
 
 type HierarchyLookup = (

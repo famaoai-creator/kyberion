@@ -31,7 +31,9 @@ import {
 } from './work-effect-transitions.js';
 import { applyWorkItemFilters, sortItems } from './work-coordination-query.js';
 import { loadWorkBoardCatalogAtPath, workBoardCatalogAtPath } from './work-board-catalog.js';
+import * as parentStatus from './work-item-parent-status.js';
 export { loadWorkBoardCatalogAtPath } from './work-board-catalog.js';
+export { issueBoardView } from './work-item-hierarchy.js';
 import { assertCreatedWorkItemParent, workItemHierarchyUpdate } from './work-item-hierarchy.js';
 import {
   assertClaimPayloadReplayable,
@@ -230,9 +232,18 @@ export function withUndispatchedWorkItemEvidence<T>(
   );
 }
 
-function activeLeaseForItem(itemId: string): WorkLease | null {
-  return currentLeaseForItem(itemId);
-}
+const activeLeaseForItem: (itemId: string) => WorkLease | null = currentLeaseForItem;
+
+// W2: every item snapshot is written through the parent-status sync.
+const parentStatusStore: parentStatus.ParentStatusStore = {
+  currentWorkItem,
+  currentWorkItems,
+  activeLeaseForItem,
+  appendItemSnapshot,
+  updateItemSnapshot,
+  appendEvent,
+};
+const writeItemSnapshot = parentStatus.bindItemSnapshotWriter(parentStatusStore);
 
 function materializeBoardCatalog(): WorkBoardCatalog {
   const filePath = boardsPath();
@@ -389,7 +400,7 @@ function createWorkItemInternal(input: CreateWorkItemInput): WorkItem {
     );
   }
   assertCreatedWorkItemParent(item, currentWorkItem);
-  appendItemSnapshot(item);
+  writeItemSnapshot(null, item);
   appendEvent({
     eventType: 'item_created',
     itemId: item.item_id,
@@ -451,8 +462,7 @@ function updateItemSnapshot(
       ? { current_attempt_id: patch.current_attempt_id }
       : {}),
   };
-  appendItemSnapshot(next);
-  return next;
+  return writeItemSnapshot(current, next);
 }
 
 export function updateWorkItem(input: UpdateWorkItemInput): WorkItem {
@@ -496,6 +506,7 @@ function updateWorkItemInternal(input: UpdateWorkItemInput): WorkItem {
     items: currentWorkItems,
   });
   const nextStatus = input.status || current.status;
+  const statusOrigin = parentStatus.nextStatusOrigin(parentStatusStore, current, input);
   const shouldClearLease =
     isTerminalStatus(nextStatus) || (input.endAttempt === true && nextStatus === 'blocked');
   const attemptStatus: Exclude<WorkItemAttemptStatus, 'running'> =
@@ -534,6 +545,7 @@ function updateWorkItemInternal(input: UpdateWorkItemInput): WorkItem {
       ...(input.dependencies ? { dependencies: [...input.dependencies] } : {}),
       ...(input.context ? { context: { ...input.context } } : {}),
       ...parentPatch,
+      ...(statusOrigin ? { status_origin: statusOrigin } : {}),
       ...(input.metadata ? { metadata: input.metadata } : {}),
       ...(finalizedAttempt
         ? {
@@ -585,7 +597,7 @@ function updateWorkItemInternal(input: UpdateWorkItemInput): WorkItem {
       ),
     },
   });
-  return next;
+  return statusOrigin === 'children' ? parentStatus.handBack(parentStatusStore, next) : next;
 }
 
 export function listBoards(): WorkBoard[] {
@@ -761,7 +773,7 @@ const pipelineContinuationStore = {
   activeLeaseForItem,
   currentLeaseById,
   appendLeaseSnapshot,
-  appendItemSnapshot,
+  appendItemSnapshot: (item: WorkItem) => writeItemSnapshot(currentWorkItem(item.item_id), item),
   appendLeaseEvent,
   appendWorkItemAttemptEvent,
   randomId,
@@ -872,7 +884,7 @@ function claimWorkItemInternal(input: ClaimWorkItemInput): {
     metadata: input.metadata,
   });
 
-  const next: WorkItem = appendItemSnapshot({
+  const next: WorkItem = writeItemSnapshot(current, {
     ...current,
     status: 'in_progress',
     version: current.version + 1,
@@ -993,7 +1005,7 @@ function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
   const requestedStatus = input.nextStatus || 'ready';
   const shouldPark = requestedStatus === 'ready' && trailingFailures >= DEFAULT_MAX_ERROR_ATTEMPTS;
 
-  const next: WorkItem = appendItemSnapshot({
+  const next: WorkItem = writeItemSnapshot(current, {
     ...current,
     status: shouldPark ? 'blocked' : requestedStatus,
     effect_ownership: effectOwnership,
@@ -1080,7 +1092,7 @@ export function quarantineWorkItemExecution(input: {
         'lease_conflict',
         'another unresolved effect owner must not be replaced'
       );
-    const next = appendItemSnapshot({
+    const next = writeItemSnapshot(current, {
       ...current,
       status: 'blocked',
       version: current.version + 1,
@@ -1147,7 +1159,7 @@ export function releaseWorkItemEffectOwnership(input: EffectReleaseInput): WorkI
         current_attempt_id: final.currentAttemptId,
       };
     }
-    const updated = appendItemSnapshot(next);
+    const updated = writeItemSnapshot(current, next);
     appendEvent(effectReleaseEvent(updated));
     return updated;
   });
@@ -1281,7 +1293,7 @@ function reapExpiredWorkLeasesInternal(options: ReapWorkLeasesOptions): ReapWork
         summary: 'completion evidence replayed after orphaned worker recovery',
         metadata: { ...(item.metadata || {}), replayed: true },
       });
-      const next = appendItemSnapshot({
+      const next = writeItemSnapshot(item, {
         ...item,
         status: 'done',
         effect_ownership: settledWorkEffect(item, 'completed', now),
@@ -1324,7 +1336,7 @@ function reapExpiredWorkLeasesInternal(options: ReapWorkLeasesOptions): ReapWork
     ).length;
     const shouldPark = claimAttempts >= maxClaims || errorAttempts >= maxErrors;
 
-    const next: WorkItem = appendItemSnapshot({
+    const next: WorkItem = writeItemSnapshot(item, {
       ...item,
       ...(workEffectOwnership(item) ? { effect_ownership: workEffectOwnership(item) } : {}),
       status: shouldPark ? 'blocked' : 'ready',
@@ -1403,7 +1415,7 @@ function reapExpiredWorkLeasesInternal(options: ReapWorkLeasesOptions): ReapWork
       failure_reason: 'lease_lost',
       summary: 'running attempt orphaned without a live lease; reconciled by reaper',
     };
-    const next = appendItemSnapshot({
+    const next = writeItemSnapshot(item, {
       ...item,
       version: item.version + 1,
       updated_at: now,

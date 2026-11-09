@@ -64,8 +64,17 @@ export interface WorkItem {
    * (see `work-item-hierarchy.ts`).
    */
   parent_item_id?: string;
+  /**
+   * W2: who set a parent Issue's status last. `children` — aggregated from
+   * its steps (`work-item-parent-status.ts`); `manual` — set directly while
+   * it had steps, which pins it until it is handed back with
+   * `statusFromChildren`. Absent on items that never had steps.
+   */
+  status_origin?: WorkItemStatusOrigin;
   metadata?: Record<string, unknown>;
 }
+
+export type WorkItemStatusOrigin = 'children' | 'manual';
 
 export interface WorkEffectOwnership {
   target: string;
@@ -231,6 +240,11 @@ export interface UpdateWorkItemInput {
   context?: WorkItemContext;
   /** D1: set (string) or detach (null) the parent Issue; omit to keep it. */
   parentItemId?: string | null;
+  /**
+   * W2: hand a parent Issue's status back to its steps — clears a `manual`
+   * pin and applies the aggregated status now. Ignored with `status`.
+   */
+  statusFromChildren?: boolean;
   /**
    * With `status: 'blocked'`: end the running attempt as blocked and release
    * its lease now. For a block that waits on someone else (a customer
