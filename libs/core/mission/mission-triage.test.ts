@@ -26,7 +26,7 @@ function prepareMission(
         status,
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'triage-test-actor',
+        org_role: 'triage-test-actor',
         confidence_score: 1,
         intent: { goal_summary: 'original mission goal' },
         git: {
@@ -170,7 +170,7 @@ describe('collectMissionTriageReport', () => {
           status: 'archived',
           execution_mode: 'local',
           priority: 1,
-          assigned_persona: 'triage-test-actor',
+          org_role: 'triage-test-actor',
           confidence_score: 1,
           git: { branch: 'test', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
           history: [],

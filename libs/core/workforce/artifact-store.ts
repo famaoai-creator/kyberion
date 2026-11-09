@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import {
   resolveGovernedArtifactPath,
   ensureRegularGovernedArtifactFile,
@@ -209,7 +210,7 @@ export interface WriteScopedArtifactInput {
   /** Optional execution-context role, honored like writeGovernedArtifactJson. */
   role?: GovernedArtifactRole;
   /** Data tier for project/organization/tenant/mission placement. Defaults to 'confidential'. */
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   /** Register the artifact for surfaces (deliverable inbox). Omit for internal artifacts. */
   publish?: ScopedArtifactPublication;
 }
@@ -381,7 +382,7 @@ function artifactFloorRoot(segments: string[]): string {
 interface ResolvedScopeRoot {
   artifactsRoot: string;
   kind: ScopedArtifactScopeKind;
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   /** Owner tenant slug; undefined for untenanted (`shared`) and system scopes. */
   tenant?: string;
   organizationId?: string;
@@ -392,7 +393,7 @@ function ownedRoot(
   owner: OwnerRef,
   kind: ScopedArtifactScopeKind,
   scope: ScopedArtifactScope,
-  requestedTier: 'personal' | 'confidential' | 'public' | undefined
+  requestedTier: StorageDataTier | undefined
 ): ResolvedScopeRoot {
   // The owner's record decides placement; the caller's tier/tenant only narrow.
   const resolved = resolveOwnerScope(owner, {
@@ -446,7 +447,7 @@ function ownedRoot(
  */
 function resolveScopeArtifactsRoot(
   scope: ScopedArtifactScope,
-  requestedTier?: 'personal' | 'confidential' | 'public'
+  requestedTier?: StorageDataTier
 ): ResolvedScopeRoot {
   if (scope.system !== undefined) {
     const others = (
@@ -581,7 +582,7 @@ function serializeScopedContent(content: unknown, format?: ScopedArtifactFormat)
 export function scopedArtifactDir(
   scope: ScopedArtifactScope,
   artifactClass: RetentionArtifactClass,
-  tier: 'personal' | 'confidential' | 'public' = 'confidential'
+  tier: StorageDataTier = 'confidential'
 ): { dir: string; scope_kind: ScopedArtifactScopeKind } {
   const { artifactsRoot, kind } = resolveScopeArtifactsRoot(scope, tier);
   const dir =
@@ -696,7 +697,7 @@ const ATTEMPT_SCOPE_KEYS = [
 
 export interface ScopedArtifactAttemptAddress {
   scope: ScopedArtifactScope;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   artifact_class: RetentionArtifactClass;
   /** One server-owned safe segment, never a model-supplied path. */
   namespace: string;
@@ -704,7 +705,7 @@ export interface ScopedArtifactAttemptAddress {
   effect_key: string;
 }
 export interface ScopedArtifactAttemptMetadata extends ScopedArtifactAttemptAddress {
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   schema_version: 1;
   attempt: number;
   created_at: string;
@@ -1295,7 +1296,7 @@ function mergeIntoExistingRecord(record: ArtifactRecord): ArtifactRecord {
 /** Read a scope-local artifacts index. Returns [] when the scope has no index yet. */
 export function readScopedArtifactIndex(
   scope: ScopedArtifactScope,
-  tier?: 'personal' | 'confidential' | 'public'
+  tier?: StorageDataTier
 ): ScopedArtifactIndexEntry[] {
   const { artifactsRoot } = resolveScopeArtifactsRoot(scope, tier);
   const indexPath = path.join(artifactsRoot, SCOPED_ARTIFACT_INDEX_FILENAME);

@@ -8,6 +8,7 @@
  * (tenant / organization / project), never by client-supplied parameters.
  */
 
+import type { StorageDataTier } from '../storage-layout.js';
 export type DiscussionRoomStatus =
   'forming' | 'running' | 'paused' | 'awaiting_human' | 'concluded' | 'stopped' | 'failed';
 
@@ -23,7 +24,7 @@ export interface DiscussionScope {
   project_id?: string;
   mission_id?: string;
   /** Data tier the room's outputs inherit (from the linked mission); defaults to confidential. */
-  tier?: 'public' | 'confidential' | 'personal';
+  tier?: StorageDataTier;
 }
 
 export interface DiscussionRequestBinding {

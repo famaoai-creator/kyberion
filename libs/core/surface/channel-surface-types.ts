@@ -4,6 +4,7 @@
  * These types define the contracts for surface interactions (Slack, Chronos, A2A).
  */
 
+import type { StorageDataTier } from '../storage-layout.js';
 import type { ApprovalRequestDraft, ApprovalRequestRecord } from '../governance/approval-store.js';
 import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 import type { A2AMessage } from '../mesh/a2a-bridge.js';
@@ -92,7 +93,7 @@ export type SlackApprovalRequestRecord = ApprovalRequestRecord;
 
 export interface SlackMissionIssuanceResult {
   missionId: string;
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   missionType: string;
   persona: string;
   startOutput: string;
@@ -157,7 +158,7 @@ export interface MissionProposal {
   mission_type?: string;
   summary?: string;
   assigned_persona?: string;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   vision_ref?: string;
   why?: string;
 }
@@ -443,7 +444,7 @@ export interface SurfaceConversationRuntimeDiagnostic {
 export interface SurfaceTenantIsolation {
   tenantSlug: string;
   /** Highest tier the turn may disclose; tenant knowledge is searched only at confidential. */
-  maxTier: 'public' | 'confidential';
+  maxTier: Exclude<StorageDataTier, 'personal'>;
 }
 
 interface SurfaceConversationInputBase {

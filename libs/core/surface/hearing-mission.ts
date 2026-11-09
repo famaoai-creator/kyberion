@@ -21,6 +21,8 @@
 //     `scripts/lib/decided-by-args.ts`, and the mission id grammar from
 //     `libs/core/mission/mission-creation.ts`'s `assertValidMissionId` — both are
 //     narrow, stable regexes duplicated here for the same boundary reason.
+import type { MemberRole } from '../organization/member-registry.js';
+import type { StorageDataTier } from '../storage-layout.js';
 import { createHash } from 'node:crypto';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
@@ -53,7 +55,7 @@ export interface MissionBrief {
   title?: string;
   intent?: string;
   persona?: string;
-  tier?: 'personal' | 'confidential' | 'public' | string;
+  tier?: StorageDataTier | string;
   sovereignSwitch?: 'governance-first' | 'autonomous-yolo' | string;
   victoryConditions?: string[];
   scope?: { in?: string[]; out?: string[] };
@@ -143,7 +145,7 @@ export interface HearingMissionMember {
   /** `user:<member_id>` — human-only, per FD-10 principle 4. */
   id: string;
   display_name?: string;
-  role?: 'owner' | 'approver' | 'viewer';
+  role?: Extract<MemberRole, 'owner' | 'approver' | 'viewer'>;
 }
 
 export interface HearingRecordToMissionBriefOptions {

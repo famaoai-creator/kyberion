@@ -173,7 +173,7 @@ beforeEach(() => {
       status: 'planned',
       execution_mode: 'local',
       priority: 3,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       relationships: {},
       git: {

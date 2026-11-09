@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
@@ -914,7 +915,7 @@ async function routeMissionTeamDelegation(
       teamRoles: [teamRole],
       scope: {
         scope_kind: 'mission',
-        tier: plan.tier as 'personal' | 'confidential' | 'public',
+        tier: plan.tier as StorageDataTier,
         mission_id: missionId,
         ...(plan.tenant_slug ? { tenant_slug: plan.tenant_slug } : {}),
       },

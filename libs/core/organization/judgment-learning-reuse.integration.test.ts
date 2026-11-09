@@ -552,7 +552,7 @@ async function fixture() {
         tier: recipient.tier,
         tenant_slug: recipient.tenant_slug,
         status: 'active',
-        assigned_persona: 'worker',
+        org_role: 'worker',
         git: {
           branch: 'fixture',
           start_commit: 'fixture',

@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { t } from '../localization/t.js';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
@@ -18,7 +19,7 @@ export interface ProjectRecord {
   name: string;
   summary: string;
   status: 'draft' | 'active' | 'paused' | 'archived';
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   organization_id?: string;
   tenant_slug?: string;
   primary_locale?: string;

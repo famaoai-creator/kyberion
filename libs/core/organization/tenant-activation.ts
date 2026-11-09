@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { stanceDirForSlug } from '../authn/stance-resolver.js';
 import { resolveTenant } from './tenant-registry.js';
@@ -47,7 +48,7 @@ export interface TenantActivationRecord {
   customer_slug: string;
   tenant_slug: string;
   organization_id: string;
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   owner_id: string;
   customer_stance: string;
   nhi_ids: string[];

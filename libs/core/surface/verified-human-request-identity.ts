@@ -7,6 +7,7 @@
  * token's unverified claims, or a legacy principalId. No token parser or remote
  * localadmin grant belongs here. Every call rereads the complete member registry.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import { createHash } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
 import { isValidTenantSlug } from '../entity-scope.js';
@@ -48,13 +49,13 @@ export interface HumanRequestServerPolicy {
   tenantSlugs: readonly string[];
   organizationIds: readonly string[] | 'all';
   projectIds: readonly string[] | 'all';
-  tierAccess: readonly ('public' | 'confidential')[];
+  tierAccess: readonly Exclude<StorageDataTier, 'personal'>[];
 }
 export interface HumanRequestNarrowing {
   tenant?: string | null;
   organizationId?: string | null;
   projectId?: string | null;
-  tier?: 'public' | 'confidential';
+  tier?: Exclude<StorageDataTier, 'personal'>;
 }
 export interface VerifiedHumanRequestInput {
   identity: VerifiedHumanClaims;

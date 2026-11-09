@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { pathResolver } from '../path-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
@@ -120,7 +121,7 @@ export interface IntentResolutionPacket {
   bundle_candidates?: IntentResolutionBundleCandidate[];
 }
 
-export type IntentResolutionTier = 'personal' | 'confidential' | 'public';
+export type IntentResolutionTier = StorageDataTier;
 
 export interface IntentResolutionOptions {
   tier?: IntentResolutionTier;

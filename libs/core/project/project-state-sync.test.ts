@@ -47,7 +47,7 @@ describe('syncProjectOperationalStateIfLinked', () => {
       status: 'active',
       tenant_slug: 'tenant-alpha',
       tenant_id: 'tenant-alpha',
-      assigned_persona: 'worker',
+      org_role: 'worker',
       relationships: {
         project: {
           project_id: 'PRJ-OPS',

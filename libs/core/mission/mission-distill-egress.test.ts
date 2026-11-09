@@ -98,7 +98,7 @@ function writeMissionState(tier: 'public' | 'confidential' | undefined, tenantSl
         status: 'distilling',
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'worker',
+        org_role: 'worker',
         confidence_score: 1,
         git: { branch: 'test', start_commit: 'abc123', latest_commit: 'abc123', checkpoints: [] },
         history: [{ ts: '2026-10-08T00:00:00.000Z', event: 'VERIFY', note: 'ready' }],

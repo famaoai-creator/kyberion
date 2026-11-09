@@ -20,6 +20,7 @@
  *     `decided`; only a human actor promotes, and only within the authority
  *     of their `level` (see `promote.ts`).
  */
+import type { MemberRole } from '../organization/member-registry.js';
 import type { ActorRef } from '../contracts/actor.js';
 
 export const DECISION_LEVELS = [
@@ -87,7 +88,7 @@ export interface DecisionDecidedBy {
   id: string;
   display_name?: string;
   /** Front-desk role of the deciding member at decision time. */
-  role?: 'owner' | 'approver' | 'viewer';
+  role?: Extract<MemberRole, 'owner' | 'approver' | 'viewer'>;
   on_behalf_of?: DecisionOnBehalfOf;
 }
 

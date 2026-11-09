@@ -1,3 +1,4 @@
+import type { KnowledgeTier } from './knowledge-tier.js';
 import { createHash } from 'node:crypto';
 import { isValidTenantSlug } from './scope.js';
 
@@ -157,7 +158,7 @@ export const RUNTIME_STATE_PATHS = {
 export type RuntimeStateKey = keyof typeof RUNTIME_STATE_PATHS;
 export interface RuntimeStateScope {
   tenant_slug?: string;
-  tier?: 'public' | 'confidential' | 'personal';
+  tier?: KnowledgeTier;
   owner_nhi?: string;
 }
 

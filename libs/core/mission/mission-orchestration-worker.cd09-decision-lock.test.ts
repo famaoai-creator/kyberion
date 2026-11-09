@@ -293,7 +293,7 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
           status: 'active',
           execution_mode: 'local',
           priority: 3,
-          assigned_persona: 'worker',
+          org_role: 'worker',
           confidence_score: 1,
           git: {
             branch: 'mission/cd09-lock',

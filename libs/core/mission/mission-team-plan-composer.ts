@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { withLockSync } from '../foundation/lock-utils.js';
@@ -158,7 +159,7 @@ export interface ResolveMissionTeamOptions {
   utterance?: string;
   artifactPaths?: string[];
   progressSignals?: string[];
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   assignedPersona?: string;
   tenantSlug?: string;
   organizationProfile?: OrganizationProfile | null;
@@ -265,7 +266,7 @@ function buildTeamGovernance(
 export function enrichAssignmentContext(input: {
   assignment: MissionTeamAssignment;
   missionId: string;
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   tenantId: string;
   risk: string;
 }): MissionTeamAssignment {
@@ -397,7 +398,7 @@ export function composeMissionTeamPlan(input: {
   utterance?: string;
   artifactPaths?: string[];
   progressSignals?: string[];
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   assignedPersona?: string;
   tenantSlug?: string;
   organizationProfile?: OrganizationProfile | null;
@@ -1077,7 +1078,7 @@ export function extendMissionTeamPlanRoster(
       model_hint: plan.assignments.find((assignment) => assignment.model_hint)?.model_hint,
     },
     missionId: plan.mission_id,
-    tier: plan.tier as 'personal' | 'confidential' | 'public',
+    tier: plan.tier as StorageDataTier,
     tenantId: plan.tenant_slug || 'default',
     risk: plan.mission_classification?.risk_profile || 'low',
   });
@@ -1248,7 +1249,7 @@ export function resolveMissionTeamReceiver(input: {
       model_hint: assignment.model_hint,
     },
     missionId: plan.mission_id,
-    tier: plan.tier as 'personal' | 'confidential' | 'public',
+    tier: plan.tier as StorageDataTier,
     tenantId: plan.tenant_slug || 'default',
     risk: plan.mission_classification?.risk_profile || 'low',
   });

@@ -67,7 +67,7 @@ describe('runtime task tool loop with native mission contracts', () => {
         status: 'active',
         execution_mode: 'local',
         priority: 3,
-        assigned_persona: 'worker',
+        org_role: 'worker',
         confidence_score: 1,
         git: { branch: 'test', start_commit: 'test', latest_commit: 'test', checkpoints: [] },
         history: [],

@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { listMissionsInSearchDirs, loadStateAtPath } from '../mission/mission-state.js';
 import type { MissionState } from '../mission/mission-types.js';
@@ -25,7 +26,7 @@ export const ACTIVE_PROJECT_MISSION_STATUSES: ReadonlySet<string> = new Set([
 
 /** Tier + tenant partition of a project (`shared` = untenanted). */
 export interface ProjectScope {
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   tenant: string;
 }
 

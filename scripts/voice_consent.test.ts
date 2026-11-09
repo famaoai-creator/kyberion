@@ -31,7 +31,7 @@ describe('voice_consent CLI helpers', () => {
       JSON.stringify({
         mission_id: FIX_MISSION,
         tier: 'confidential',
-        assigned_persona: 'ecosystem_architect',
+        org_role: 'ecosystem_architect',
         tenant_slug: 'alpha-team',
       })
     );

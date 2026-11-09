@@ -7,13 +7,14 @@
  * ingest). Fails closed: a non-public path whose owner cannot be determined
  * throws `PathAttributionError('TENANT_UNRESOLVED')`.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import * as pathResolver from '../path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRealpath } from '../secure-io.js';
 
-export type PathDataTier = 'public' | 'confidential' | 'personal';
+export type PathDataTier = StorageDataTier;
 export type PathAttributionFailureCode = 'TIER_UNRESOLVED' | 'TENANT_UNRESOLVED';
 
 export class PathAttributionError extends Error {

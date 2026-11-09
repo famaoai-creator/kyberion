@@ -3,6 +3,7 @@
  * Knowledge distillation (Wisdom extraction) for completed missions.
  */
 
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { z } from 'zod';
 import {
@@ -285,7 +286,7 @@ export function buildFallbackWisdom(missionId: string, state: MissionState): any
   return {
     title: `Mission ${missionId} ${distillPolicy.title_suffix}`,
     category: hasFailures ? 'Incident' : 'Operations',
-    tags: [state.tier, state.assigned_persona.toLowerCase().replace(/\s+/g, '-'), 'auto-distilled'],
+    tags: [state.tier, state.org_role.toLowerCase().replace(/\s+/g, '-'), 'auto-distilled'],
     importance: hasFailures ? 5 : 3,
     sections: {
       summary: `Mission ${missionId} completed with ${state.git.checkpoints.length} checkpoints and ${state.history.length} lifecycle events.`,
@@ -535,7 +536,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   // mission-closure path of the corporate-memory loop (execute → distill →
   // promote) advances without manual operator glue. Higher tiers require human
   // ratification before promotion.
-  const tier: 'public' | 'confidential' | 'personal' =
+  const tier: StorageDataTier =
     state.tier === 'public' ? 'public' : state.tier === 'personal' ? 'personal' : 'confidential';
   const candidate: MemoryCandidate = {
     candidate_id: `mem-${upperId}-${dateSlug}`,

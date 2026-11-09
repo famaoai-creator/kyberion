@@ -80,7 +80,7 @@ describe('list_missions tenant-bound enumeration', () => {
           status: 'active',
           execution_mode: 'local',
           priority: 50,
-          assigned_persona: 'worker',
+          org_role: 'worker',
           confidence_score: 80,
           tenant_slug: 'kyberion',
           git: { branch: '', start_commit: '', latest_commit: '', checkpoints: [] },

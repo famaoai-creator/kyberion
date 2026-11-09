@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 /**
  * Dot charter — loader and validation for resident-agent ('dot') charters.
@@ -153,7 +154,7 @@ export interface DotCharter {
   /** Organization-owned responsibility/provenance, never another authority axis. */
   work_binding?: { operation_id: string };
   scope: {
-    tier: 'public' | 'confidential' | 'personal';
+    tier: StorageDataTier;
     tenant_slug?: string;
     organization_id?: string;
     project_id?: string;

@@ -8,6 +8,7 @@
  * 語彙で表現する。
  */
 
+import type { StorageDataTier } from '../storage-layout.js';
 import {
   collectOperatorHomeSummary,
   type OperatorHomeScopeFilter,
@@ -197,7 +198,7 @@ export function notificationMatchesScope(
   if (
     Array.isArray(scope?.tiers) &&
     !(scopeless && scopedRecord.tier === undefined) &&
-    !scope.tiers.includes(scopedRecord.tier as 'personal' | 'confidential' | 'public')
+    !scope.tiers.includes(scopedRecord.tier as StorageDataTier)
   )
     return false;
   // Custody admission is the shared rule every viewer-scoped reader follows:

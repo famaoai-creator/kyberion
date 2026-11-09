@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { a2aBridge } from '../mesh/a2a-bridge.js';
 import { createKnowledgeDeliverySnapshot } from '../knowledge/knowledge-delivery-snapshot.js';
 import { clamp, readTextFile } from '../foundation/text.js';
@@ -89,7 +90,7 @@ import {
  */
 export function resolvedMissionDir(
   missionId: string,
-  _fallbackTier: 'personal' | 'confidential' | 'public' = 'public',
+  _fallbackTier: StorageDataTier = 'public',
   tenantSlug?: string
 ): string {
   const explicitTenant = tenantSlug?.trim();
@@ -906,7 +907,7 @@ export function buildRejectionLessonLines(): string[] {
  * Each team-role assignment carries its own `authority_role` (e.g. a
  * `tester` task's assignee might be authorized as `qa_lead`, an
  * `implementer` task's as `software_developer`) — a different, finer-grained
- * concept than the single mission-wide `assigned_persona` that
+ * concept than the single mission-wide `org_role` that
  * syncRoleProcedure (mission-governance.ts) mirrors at mission activation.
  * That mission-wide copy is fine as an audit artifact, but injecting it into
  * every task regardless of which role is actually doing the work would hand

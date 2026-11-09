@@ -269,7 +269,7 @@ describe('project-management facade', () => {
       status: 'active',
       execution_mode: 'local',
       priority: 1,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       relationships: { project: { project_id: PROJECT_ID } },
       git: {
@@ -570,7 +570,7 @@ describe('project-management facade', () => {
       tenant_slug: 'tenant-pmc-test',
       execution_mode: 'local',
       priority: 1,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       relationships: { project: { project_id: ownProject.project_id } },
       git: {
@@ -619,7 +619,7 @@ describe('project-management facade', () => {
       tenant_slug: 'tenant-pmc-test',
       execution_mode: 'local',
       priority: 1,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       relationships: { project: { project_id: project.project_id } },
       git: {
@@ -815,7 +815,7 @@ describe('project-management facade', () => {
       tenant_slug: 'tenant-pmc-test',
       execution_mode: 'local',
       priority: 1,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       relationships: { project: { project_id: project.project_id } },
       git: {
@@ -891,7 +891,7 @@ describe('project-management facade', () => {
       tenant_slug: 'other-tenant',
       execution_mode: 'local',
       priority: 1,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       relationships: {
         project: {
