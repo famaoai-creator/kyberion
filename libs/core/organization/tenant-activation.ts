@@ -15,7 +15,7 @@ import {
 } from '../secure-io.js';
 import { revokeGrantsForTenantBestEffort } from '../task/task-scoped-grants.js';
 import { isRecord, readTextFile } from '../foundation/text.js';
-import { parseNhiId } from '../contracts/nhi-id.js';
+import { nhiIdBelongsToOrganization } from '../contracts/nhi-id.js';
 
 export const TENANT_ACTIVATION_CHECKS = [
   'registry',
@@ -386,11 +386,10 @@ function buildChecks(
     }
     if (check === 'nhi_provisioned') {
       for (const nhiId of nhiIds) {
-        const parsed = parseNhiId(nhiId);
-        if (!parsed || parsed.organization_id !== input.organizationId) {
+        if (!nhiIdBelongsToOrganization(nhiId, input.tenantSlug, input.organizationId)) {
           checks[check] = false;
           blockers.push(
-            `nhi_provisioned: '${nhiId}' is not an NHI id of organization '${input.organizationId}' (expected kyberion://agent/${input.organizationId}/<agent-slug>)`
+            `nhi_provisioned: '${nhiId}' is not an NHI id of organization '${input.organizationId}' in tenant '${input.tenantSlug}' (expected kyberion://agent/${input.tenantSlug}/${input.organizationId}/<agent-slug>)`
           );
         }
       }

@@ -338,14 +338,14 @@ describe('mission-orchestration-worker NI-03 delegation chain', { timeout: 60_00
       granted_scope: {},
     });
     expect(String(payloadChain[0].actor)).toMatch(
-      /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/mission-orchestrator$/
+      /^kyberion:\/\/agent\/(?:_\/_|[a-z][a-z0-9-]*\/(?:_|[a-z][a-z0-9-]*))\/mission-orchestrator$/
     );
     expect(payloadChain[1]).toMatchObject({
       team_role: 'implementer',
       granted_scope: { capability_tier: 'implementer' },
     });
     expect(String(payloadChain[1].actor)).toMatch(
-      /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/implementation-architect$/
+      /^kyberion:\/\/agent\/(?:_\/_|[a-z][a-z0-9-]*\/(?:_|[a-z][a-z0-9-]*))\/implementation-architect$/
     );
     // The chain-carrying payload still satisfies the strict A2A task contract.
     expect(validateA2ATaskContract(envelope.payload).valid).toBe(true);

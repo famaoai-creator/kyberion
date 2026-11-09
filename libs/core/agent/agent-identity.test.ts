@@ -54,13 +54,17 @@ function cleanupTmpDir(): void {
 
 let previousMissionRole: string | undefined;
 let previousPersona: string | undefined;
+let previousTenant: string | undefined;
 let currentJournalPath = '';
 
 beforeEach(() => {
   previousMissionRole = process.env.MISSION_ROLE;
   previousPersona = process.env.KYBERION_PERSONA;
+  previousTenant = process.env.KYBERION_TENANT;
   delete process.env.MISSION_ROLE;
   delete process.env.KYBERION_PERSONA;
+  // D3: an NHI belongs to a tenant; the suite runs inside one active tenant.
+  process.env.KYBERION_TENANT = 'demo-tenant';
   currentJournalPath = nextJournalPath();
   resetAgentIdentityServiceForTests(currentJournalPath);
 });
@@ -71,6 +75,8 @@ afterEach(() => {
   else process.env.MISSION_ROLE = previousMissionRole;
   if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
   else process.env.KYBERION_PERSONA = previousPersona;
+  if (previousTenant === undefined) delete process.env.KYBERION_TENANT;
+  else process.env.KYBERION_TENANT = previousTenant;
   resetAgentIdentityServiceForTests();
 });
 
@@ -94,16 +100,27 @@ function issueTestIdentity(slug = 'nerve-agent', overrides: Record<string, unkno
 
 describe('agent-identity — nhi_id format', () => {
   it('builds and parses the canonical URI round-trip', () => {
-    const nhiId = buildNhiId('demo-org', 'nerve-agent');
-    expect(nhiId).toBe('kyberion://agent/demo-org/nerve-agent');
-    expect(parseNhiId(nhiId)).toEqual({ organization_id: 'demo-org', slug: 'nerve-agent' });
+    const nhiId = buildNhiId('demo-tenant', 'demo-org', 'nerve-agent');
+    expect(nhiId).toBe('kyberion://agent/demo-tenant/demo-org/nerve-agent');
+    expect(parseNhiId(nhiId)).toEqual({
+      tenant_slug: 'demo-tenant',
+      organization_id: 'demo-org',
+      slug: 'nerve-agent',
+      legacy: false,
+    });
   });
 
   it('rejects invalid slugs and orgs (agent-manifest agentId grammar)', () => {
-    expect(() => buildNhiId('demo-org', 'Bad_Slug')).toThrow(AgentIdentityFormatError);
-    expect(() => buildNhiId('demo-org', '1starts-with-digit')).toThrow(AgentIdentityFormatError);
-    expect(() => buildNhiId('Demo Org', 'ok-slug')).toThrow(AgentIdentityFormatError);
-    expect(parseNhiId('kyberion://agent/demo-org/Bad_Slug')).toBeNull();
+    expect(() => buildNhiId('demo-tenant', 'demo-org', 'Bad_Slug')).toThrow(
+      AgentIdentityFormatError
+    );
+    expect(() => buildNhiId('demo-tenant', 'demo-org', '1starts-with-digit')).toThrow(
+      AgentIdentityFormatError
+    );
+    expect(() => buildNhiId('demo-tenant', 'Demo Org', 'ok-slug')).toThrow(
+      AgentIdentityFormatError
+    );
+    expect(parseNhiId('kyberion://agent/demo-tenant/demo-org/Bad_Slug')).toBeNull();
     expect(parseNhiId('spiffe://other/thing')).toBeNull();
     expect(parseNhiId('stripe-prod')).toBeNull();
   });
@@ -111,13 +128,21 @@ describe('agent-identity — nhi_id format', () => {
   it('deriveAgentNhiId returns null for non-slug ids (e.g. service:stripe) instead of throwing', () => {
     expect(deriveAgentNhiId('service:stripe', 'demo-org')).toBeNull();
     expect(deriveAgentNhiId('nerve-agent', 'demo-org')).toBe(
-      'kyberion://agent/demo-org/nerve-agent'
+      'kyberion://agent/demo-tenant/demo-org/nerve-agent'
     );
   });
 
-  it('deriveAgentNhiId falls back to the organization profile org, then default', () => {
+  it('deriveAgentNhiId falls back to the tenant organization profile, then _ (never default)', () => {
     const derived = deriveAgentNhiId('nerve-agent');
-    expect(derived).toMatch(/^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/nerve-agent$/);
+    expect(derived).toBe('kyberion://agent/demo-tenant/_/nerve-agent');
+  });
+
+  it('deriveAgentNhiId is tenantless (org dropped) when no tenant is in scope', () => {
+    delete process.env.KYBERION_TENANT;
+    expect(deriveAgentNhiId('nerve-agent', 'demo-org')).toBe('kyberion://agent/_/_/nerve-agent');
+    expect(deriveAgentNhiId('nerve-agent', 'demo-org', 'acme')).toBe(
+      'kyberion://agent/acme/demo-org/nerve-agent'
+    );
   });
 });
 
@@ -129,18 +154,18 @@ describe('agent-identity — nhi_id format', () => {
 describe('agent-identity — deriveAgentNhiId organization threading', () => {
   it('derives a tenant-organization nhi_id, not the default fallback, when organizationId is supplied', () => {
     const nhiId = deriveAgentNhiId('tenant-worker', 'org-a');
-    expect(nhiId).toBe('kyberion://agent/org-a/tenant-worker');
+    expect(nhiId).toBe('kyberion://agent/demo-tenant/org-a/tenant-worker');
     expect(nhiId).not.toContain('/default/');
   });
 
-  it('still falls back to the organization profile (else default) when organizationId is omitted', () => {
+  it('still falls back to the tenant organization profile (else _) when organizationId is omitted', () => {
     const nhiId = deriveAgentNhiId('tenant-worker');
-    expect(nhiId).toMatch(/^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/tenant-worker$/);
+    expect(nhiId).toBe('kyberion://agent/demo-tenant/_/tenant-worker');
   });
 
   it('a tenant-organization-derived nhi_id satisfies assertRuntimeNhiScope for a scope in that same organization, and is rejected for another', () => {
     const record = issueTestIdentity('scope-checked-agent', { organizationId: 'org-a' });
-    expect(record.nhi_id).toBe('kyberion://agent/org-a/scope-checked-agent');
+    expect(record.nhi_id).toBe('kyberion://agent/demo-tenant/org-a/scope-checked-agent');
 
     const derivedNhiId = deriveAgentNhiId('scope-checked-agent', 'org-a');
     expect(derivedNhiId).toBe(record.nhi_id);
@@ -149,6 +174,7 @@ describe('agent-identity — deriveAgentNhiId organization threading', () => {
       assertRuntimeNhiScope({
         scope_kind: 'mission',
         tier: 'confidential',
+        tenant_slug: 'demo-tenant',
         organization_id: 'org-a',
         mission_id: 'MSN-SCOPE-CHECK',
         nhi_id: derivedNhiId!,
@@ -159,6 +185,7 @@ describe('agent-identity — deriveAgentNhiId organization threading', () => {
       assertRuntimeNhiScope({
         scope_kind: 'mission',
         tier: 'confidential',
+        tenant_slug: 'demo-tenant',
         organization_id: 'other-org',
         mission_id: 'MSN-SCOPE-CHECK',
         nhi_id: derivedNhiId!,
@@ -211,8 +238,8 @@ describe('agent-identity — fail-closed execution-context gate', () => {
   });
 
   it('reads are exempt from the gate', () => {
-    expect(() => getAgentIdentity('kyberion://agent/demo-org/none')).not.toThrow();
-    expect(getAgentIdentity('kyberion://agent/demo-org/none')).toBeNull();
+    expect(() => getAgentIdentity('kyberion://agent/demo-tenant/demo-org/none')).not.toThrow();
+    expect(getAgentIdentity('kyberion://agent/demo-tenant/demo-org/none')).toBeNull();
     expect(() => listAgentIdentities()).not.toThrow();
   });
 });
@@ -328,7 +355,7 @@ describe('agent-identity — accountable ownership and uniqueness', () => {
         })
       )
     ).toThrow(AgentIdentityAccountabilityError);
-    expect(getAgentIdentity('kyberion://agent/demo-org/unowned-agent')).toBeNull();
+    expect(getAgentIdentity('kyberion://agent/demo-tenant/demo-org/unowned-agent')).toBeNull();
   });
 
   it('service issuance without accountable_human_id fails closed', () => {
@@ -382,10 +409,17 @@ describe('agent-identity — accountable ownership and uniqueness', () => {
     const record = issueTestIdentity('bounded-agent', {
       affiliation: { tenant_slug: 'company-a' },
     });
-    const parameters = { slug: 'bounded-agent', organizationId: 'demo-org' };
+    expect(record.nhi_id).toBe('kyberion://agent/company-a/demo-org/bounded-agent');
+    const parameters = {
+      slug: 'bounded-agent',
+      organizationId: 'demo-org',
+      affiliation: { tenant_slug: 'company-a' },
+    };
+    // D3: the tenant is part of the id, so an explicit tenant that disagrees
+    // with the requested one is a conflict, never a silent re-affiliation.
     expect(() =>
-      ensureAgentIdentityProvisioned({ ...parameters, affiliation: { tenant_slug: 'company-b' } })
-    ).toThrow(AgentIdentityConflictError);
+      ensureAgentIdentityProvisioned({ ...parameters, tenantSlug: 'company-b' })
+    ).toThrow(AgentIdentityFormatError);
     expect(() =>
       ensureAgentIdentityProvisioned({ ...parameters, accountableHumanId: 'user:someone-else' })
     ).toThrow(AgentIdentityConflictError);
@@ -496,6 +530,7 @@ describe('agent-identity — lifecycle and restart replay', () => {
     expect(issued.lifecycle_status).toBe('provisioned');
     expect(issued.affiliation).toEqual({
       organization_id: 'demo-org',
+      tenant_slug: 'demo-tenant',
       mission_id: 'MSN-NI01-001',
     });
     expect(issued.created_at).toEqual(expect.any(String));
@@ -549,7 +584,7 @@ describe('agent-identity — lifecycle and restart replay', () => {
   it('mutating an unknown identity throws AgentIdentityNotFoundError', () => {
     expect(() =>
       withExecutionContext('mission_controller', () =>
-        retireAgentIdentity('kyberion://agent/demo-org/ghost', 'nope')
+        retireAgentIdentity('kyberion://agent/demo-tenant/demo-org/ghost', 'nope')
       )
     ).toThrow(AgentIdentityNotFoundError);
   });
@@ -557,7 +592,7 @@ describe('agent-identity — lifecycle and restart replay', () => {
   it('replay tolerates corrupt journal lines', () => {
     const journal = new AgentIdentityJournal({ journalPath: currentJournalPath });
     journal.append(AGENT_IDENTITY_OPS.identityProvisioned, {
-      nhi_id: 'kyberion://agent/demo-org/corrupt-test',
+      nhi_id: 'kyberion://agent/demo-tenant/demo-org/corrupt-test',
       kind: 'agent',
       display_name: 'corrupt-test',
       accountable_human_id: 'human:founder',
@@ -569,12 +604,12 @@ describe('agent-identity — lifecycle and restart replay', () => {
     safeAppendFileSync(absolutePath, 'this is not json\n');
     safeAppendFileSync(absolutePath, '{"v":1,"seq":"not-a-number"}\n');
     journal.append(AGENT_IDENTITY_OPS.identityActivated, {
-      nhi_id: 'kyberion://agent/demo-org/corrupt-test',
+      nhi_id: 'kyberion://agent/demo-tenant/demo-org/corrupt-test',
       activated_at: '2026-07-26T00:01:00.000Z',
     });
 
     const restored = new AgentIdentityJournal({ journalPath: currentJournalPath }).restore();
-    const record = restored.identities['kyberion://agent/demo-org/corrupt-test'];
+    const record = restored.identities['kyberion://agent/demo-tenant/demo-org/corrupt-test'];
     expect(record).toBeDefined();
     expect(record.lifecycle_status).toBe('active');
   });
@@ -703,7 +738,7 @@ describe('agent-identity — runtime instance binding', () => {
     );
     expect(sameRecord).toEqual(issued);
     const unknown = withExecutionContext('mission_controller', () =>
-      releaseRuntimeInstance('kyberion://agent/demo-org/ghost', 'anything')
+      releaseRuntimeInstance('kyberion://agent/demo-tenant/demo-org/ghost', 'anything')
     );
     expect(unknown).toBeNull();
   });
@@ -745,11 +780,11 @@ describe('agent-identity — listing and best-effort helpers', () => {
 
     expect(listAgentIdentities()).toHaveLength(3);
     expect(listAgentIdentities({ kind: 'service' }).map((r) => r.nhi_id)).toEqual([
-      'kyberion://agent/other-org/list-service',
+      'kyberion://agent/demo-tenant/other-org/list-service',
     ]);
     expect(listAgentIdentities({ organization_id: 'demo-org' })).toHaveLength(2);
     expect(listAgentIdentities({ mission_id: 'MSN-LIST-1' }).map((r) => r.nhi_id)).toEqual([
-      'kyberion://agent/demo-org/list-agent-a',
+      'kyberion://agent/demo-tenant/demo-org/list-agent-a',
     ]);
     expect(listAgentIdentities({ accountable_human_id: 'human:other' })).toHaveLength(1);
     expect(listAgentIdentities({ lifecycle_status: 'provisioned' })).toHaveLength(3);
@@ -761,7 +796,7 @@ describe('agent-identity — listing and best-effort helpers', () => {
       organizationId: 'demo-org',
       accountableHumanId: 'human:founder',
     });
-    expect(result.nhi_id).toBe('kyberion://agent/demo-org/best-effort-agent');
+    expect(result.nhi_id).toBe('kyberion://agent/demo-tenant/demo-org/best-effort-agent');
     expect(result.recorded).toBe(false);
     expect(getAgentIdentity(result.nhi_id!)).toBeNull();
   });
@@ -776,7 +811,9 @@ describe('agent-identity — listing and best-effort helpers', () => {
     );
     expect(result.recorded).toBe(true);
     expect(result.record?.lifecycle_status).toBe('provisioned');
-    expect(getAgentIdentity('kyberion://agent/demo-org/best-effort-recorded')).not.toBeNull();
+    expect(
+      getAgentIdentity('kyberion://agent/demo-tenant/demo-org/best-effort-recorded')
+    ).not.toBeNull();
   });
 
   it('ensureAgentIdentityBestEffort returns null nhi_id for an invalid slug', () => {
@@ -871,7 +908,7 @@ describe('runtime binding history references', () => {
     const { journal, reference, input } = fixture();
     expect(journal.resolveRuntimeBindingReference(reference, 'fixture-b')).toBeUndefined();
     for (const changes of [
-      { nhi_id: 'kyberion://agent/demo-org/foreign' },
+      { nhi_id: 'kyberion://agent/demo-tenant/demo-org/foreign' },
       { journal_seq: 0 },
       { journal_seq: -1 },
       { journal_seq: 1.5 },
