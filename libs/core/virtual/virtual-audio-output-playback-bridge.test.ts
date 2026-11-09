@@ -1,4 +1,13 @@
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
+// Device leases are covered by audio-device-lease / resource-lease tests; a
+// real lease here would write fenced records into live runtime state.
+vi.mock('../voice/audio-device-lease.js', () => ({
+  AudioDeviceLeaseManager: class {
+    acquire() {
+      return { record: {}, heartbeat: () => undefined, release: () => undefined };
+    }
+  },
+}));
 vi.mock('../governance/external-operation.js', () => ({
   runExternalOperation: vi.fn(async (_input, execute) => execute()),
   assertExternalOperationBatchResumable: vi.fn(),

@@ -15,6 +15,7 @@
  */
 
 import {
+  cloneFencedLeaseRecord,
   registerLeaseBackend,
   type FencedLeaseRecord,
   type LeaseBackend,
@@ -78,10 +79,10 @@ export function createKvLeaseBackendStub(options: KvLeaseBackendStubOptions = {}
     },
     read(leaseKey: string): FencedLeaseRecord | undefined {
       const record = store.records.get(leaseKey);
-      return record ? { ...record } : undefined;
+      return record ? cloneFencedLeaseRecord(record) : undefined;
     },
     write(leaseKey: string, record: FencedLeaseRecord): void {
-      store.records.set(leaseKey, { ...record });
+      store.records.set(leaseKey, cloneFencedLeaseRecord(record));
     },
     metricsPath(): null {
       return null;
