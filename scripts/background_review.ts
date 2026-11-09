@@ -18,6 +18,7 @@ import {
   restoreBackgroundReviewProposal,
   setBackgroundReviewProposalMaintenance,
 } from '@agent/core/workforce/background-review-curator';
+import { migrateLegacyBackgroundReviewProposals } from '@agent/core/workforce/background-review-proposals';
 import type { MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
 import { hasHelpFlag, parseGuardedCliArgs } from '@agent/core/cli-guard';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -25,8 +26,10 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 const USAGE = [
   'Usage: pnpm background-review <curate|status> [--dry-run] [--scope-json <exact scope>]',
   '  <pin|unpin|hold|manage|restore> --candidate <id> --actor-id <actor> [--dry-run] [--scope-json <exact scope>]',
-  '  <request|request-rollback|apply|apply-skill|apply-memory|rollback> --candidate <id> --expected-sha256 <digest> [--requested-by <actor>] [--mission-id <id>]',
+  '  <request|request-rollback|apply|apply-skill|apply-memory|rollback> --candidate <id> --expected-sha256 <digest> [--requested-by <actor>] [--mission-id <id>] [--scope-json <exact scope>]',
+  '  migrate [--dry-run]   (one release) import pending legacy proposals onto the memory queue with their mission scope',
   'status previews retention; curate archives eligible proposals; pin protects; hold disables automatic archival; manage re-enables it; restore returns a curator archive to review without applying changes.',
+  'Proposals are memory-queue rows; a session (personal) proposal is found only with its exact --scope-json.',
 ].join('\n');
 
 function usage(): never {
@@ -55,16 +58,19 @@ export const main = defineScript({
     }
     const allowedFlags = ['curate', 'status'].includes(command)
       ? ['--scope-json']
-      : ['pin', 'unpin', 'hold', 'manage', 'restore'].includes(command)
-        ? ['--candidate', '--actor-id', '--scope-json']
-        : [
-            '--candidate',
-            '--expected-sha256',
-            '--requested-by',
-            '--mission-id',
-            '--approved-by',
-            '--approval-ref',
-          ];
+      : command === 'migrate'
+        ? []
+        : ['pin', 'unpin', 'hold', 'manage', 'restore'].includes(command)
+          ? ['--candidate', '--actor-id', '--scope-json']
+          : [
+              '--candidate',
+              '--expected-sha256',
+              '--requested-by',
+              '--mission-id',
+              '--approved-by',
+              '--approval-ref',
+              '--scope-json',
+            ];
     const parsed = parseGuardedCliArgs(
       argv,
       {
@@ -85,6 +91,11 @@ export const main = defineScript({
         scope,
       });
       context.print({ ok: true, dry_run: command === 'status' || context.dryRun, ...result });
+      return;
+    }
+    if (command === 'migrate') {
+      const report = migrateLegacyBackgroundReviewProposals({ apply: !context.dryRun });
+      context.print({ ok: true, ...report });
       return;
     }
     if (['pin', 'unpin', 'hold', 'manage', 'restore'].includes(command)) {
@@ -114,7 +125,7 @@ export const main = defineScript({
       return;
     }
     // A dry run must never fall through to the effectful approval/apply path.
-    if (context.dryRun || scopeJson !== undefined) usage();
+    if (context.dryRun) usage();
     if (
       !['request', 'request-rollback', 'apply', 'apply-skill', 'apply-memory', 'rollback'].includes(
         command
@@ -129,6 +140,7 @@ export const main = defineScript({
         requestedBy: String(parsed.options['--requested-by'] || '').trim() || undefined,
         missionId: String(parsed.options['--mission-id'] || '').trim() || undefined,
         ...(command === 'request-rollback' ? { rollback: true } : {}),
+        ...(scope ? { scope } : {}),
       });
       context.print({
         ok: true,
@@ -155,6 +167,7 @@ export const main = defineScript({
       expectedSha256: String(parsed.options['--expected-sha256'] || '').trim(),
       approvedBy,
       approvalRef,
+      ...(scope ? { scope } : {}),
     });
     context.print({ ok: true, ...result });
   },

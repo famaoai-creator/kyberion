@@ -7572,6 +7572,10 @@
       "types": "./dist/workforce/background-review-curator.d.ts",
       "default": "./dist/workforce/background-review-curator.js"
     },
+    "./workforce/background-review-proposals": {
+      "types": "./dist/workforce/background-review-proposals.d.ts",
+      "default": "./dist/workforce/background-review-proposals.js"
+    },
     "./workforce/background-review-nudge": {
       "types": "./dist/workforce/background-review-nudge.d.ts",
       "default": "./dist/workforce/background-review-nudge.js"
