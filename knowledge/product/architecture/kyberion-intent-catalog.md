@@ -16,7 +16,8 @@ and environment integration points so operators know **what to ask for** and
 implementers know **what is wired**.
 
 For naming and primitives, see
-[`kyberion-canonical-concept-index.md`](kyberion-canonical-concept-index.md).
+[`organization-work-loop.md`](organization-work-loop.md) and the
+[concept registry](../governance/concept-registry.json).
 For the human-boundary contract, see [`../../../docs/USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md).
 
 ## 2. User-Facing Vocabulary
@@ -548,7 +549,7 @@ Remaining genuine gaps:
 
 ## 12. References
 
-- [`kyberion-canonical-concept-index.md`](kyberion-canonical-concept-index.md)
+- [`organization-work-loop.md`](organization-work-loop.md) and [concept registry](../governance/concept-registry.json) — parent model and single term definitions
   — canonical primitives and vocabulary
 - [`kyberion-concept-evaluation-2026-04-26.md`](kyberion-concept-evaluation-2026-04-26.md)
   — concept evaluation and improvement plan (origin/main 2026-04-26)

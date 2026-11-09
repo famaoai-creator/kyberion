@@ -228,7 +228,7 @@ Will the deployment serve >5 stakeholder personas (CEO, compliance, ops,
 ## 10. Reference
 
 - [`docs/USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md)
-- [`kyberion-canonical-concept-index.md`](kyberion-canonical-concept-index.md)
+- [`organization-work-loop.md`](organization-work-loop.md) and [concept registry](../governance/concept-registry.json) — parent model and single term definitions
 - [`kyberion-intent-catalog.md`](kyberion-intent-catalog.md)
 - [`multi-tenant-operations.md`](multi-tenant-operations.md)
 - [`../../../presence/displays/chronos-mirror-v2/`](../../../presence/displays/chronos-mirror-v2)

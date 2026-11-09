@@ -29,7 +29,7 @@ A governed capability module that actually does things — browser, files, voice
 
 Knowledge and data are split by **tier** — `personal/` → `confidential/` → `public/` — and by **tenant**, an isolation boundary identified by a slug (`knowledge/confidential/{tenant-slug}/`). Data never flows from a higher tier to a lower one, and cross-tenant access is denied unless brokered and audited. If you only work for yourself, you can stay in `personal/` and ignore tenants until later.
 
-- Glossary: [Tenant](./GLOSSARY.md#tenant) · [Tier Isolation](./GLOSSARY.md#tier-isolation) · [Stance (vs tenant customer)](./GLOSSARY.md#stance-vs-tenant-customer) _(advanced)_
+- Glossary: [Tenant](./GLOSSARY.md#tenant) · [Tier Isolation](./GLOSSARY.md#tier-isolation) · [Stance (vs tenant customer)](./GLOSSARY.md#stance) _(advanced)_
 
 For external API access, registering a personal key does not allocate it to a tenant.
 An explicit allocation permits use; trusted dispatch binds the allowed credential

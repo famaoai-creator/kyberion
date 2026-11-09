@@ -175,6 +175,42 @@ describe('knowledge-index', () => {
       });
     });
 
+    it('ranks a freshly retired doc below its older current replacement', async () => {
+      const proceduresDir = path.join(TEST_ROOT, 'public/procedures');
+      ensureDir(proceduresDir);
+      fs.writeFileSync(
+        path.join(proceduresDir, 'retired.md'),
+        [
+          '---',
+          'title: Old procedure',
+          'authority: policy',
+          // Retiring a doc touches last_updated; that must not read as freshness.
+          'last_updated: 2026-11-09',
+          'doc_status: superseded',
+          'superseded_by: knowledge/public/procedures/current.md',
+          '---',
+          '',
+          'Old guidance kept for history.',
+        ].join('\n')
+      );
+      fs.writeFileSync(
+        path.join(proceduresDir, 'current.md'),
+        ['---', 'title: Current procedure', 'last_updated: 2026-06-01', '---', '', 'Current.'].join(
+          '\n'
+        )
+      );
+
+      const index = await buildKnowledgeIndex(TEST_ROOT);
+      const retired = index.hints.find((hint) => hint.source.endsWith('procedures/retired.md'));
+      const current = index.hints.find((hint) => hint.source.endsWith('procedures/current.md'));
+      expect(retired).toMatchObject({ doc_authority: 'advisory' });
+      expect(retired?.last_updated).toBeUndefined();
+      const now = Date.parse('2026-11-10');
+      expect(rankingSignals.knowledgeMetadataScore(current!, 'global', {}, now)).toBeGreaterThan(
+        rankingSignals.knowledgeMetadataScore(retired!, 'global', {}, now)
+      );
+    });
+
     it('skips a markdown symlink that points outside the scanner project root', async () => {
       const proceduresDir = path.join(TEST_ROOT, 'public/procedures');
       const outsideFile = path.join(OUTSIDE_ROOT, 'secret.md');

@@ -6,6 +6,7 @@ importance: 10
 author: Ecosystem Architect
 last_updated: 2026-10-20
 kind: evergreen
+concepts: [organization-work-loop, mission, work-item]
 ---
 
 # Organization Work Loop
