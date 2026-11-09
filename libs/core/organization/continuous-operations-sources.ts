@@ -19,6 +19,7 @@ import {
   type ContinuousOperationsConfig,
   type ContinuousSourceSnapshot,
 } from './continuous-operations-policy.js';
+import { organizationCostMetrics } from './organization-cost-metrics.js';
 
 export interface ContinuousCollectionOptions {
   charter: DotCharter;
@@ -72,6 +73,14 @@ function organizationMetrics(
     tenantSlug: config.scope.tenant_slug,
     organizationId: config.scope.organization_id,
   };
+  const cost = organizationCostMetrics(
+    {
+      organizationId: config.scope.organization_id,
+      tenantSlug: config.scope.tenant_slug,
+      tier: config.scope.tier,
+    },
+    7
+  );
   return {
     overdue_operations: listOrganizationOperationStates(query).filter(
       (row) => row.due_status === 'overdue'
@@ -85,6 +94,13 @@ function organizationMetrics(
     unhealthy_services: listOrganizationServiceStates(query).filter(
       (row) => row.health === 'degraded' || row.health === 'critical'
     ).length,
+    cost_usd_7d: cost.cost_usd,
+    llm_tokens_7d: cost.llm_tokens,
+    llm_calls_7d: cost.llm_calls,
+    unknown_cost_calls_7d: cost.unknown_cost_calls,
+    // Completeness context: a possibly-partial total must not read as truth.
+    cost_evidence_complete_7d: cost.cost_complete ? 1 : 0,
+    cost_withheld_partitions_7d: cost.withheld_partitions,
   };
 }
 

@@ -168,8 +168,18 @@
                     "overdue_operations",
                     "open_incidents",
                     "pending_decisions",
-                    "unhealthy_services"
+                    "unhealthy_services",
+                    "cost_usd",
+                    "llm_tokens",
+                    "llm_calls",
+                    "unknown_cost_calls"
                   ]
+                },
+                "window_days": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 90,
+                  "description": "Trailing measurement window for cost metrics, in days (default 7)."
                 }
               }
             }
