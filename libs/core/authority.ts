@@ -10,6 +10,12 @@ import * as path from 'node:path';
 // resolveIdentityContext. Read-only bootstrap IO goes through fs-primitives.
 import { rawExistsSync, rawLstatSync, rawReaddir, rawReadTextFile } from './fs-primitives.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import {
+  NHI_ID_PATTERN,
+  NHI_SLUG_PATTERN,
+  buildNhiId,
+  buildTenantlessNhiId,
+} from './contracts/nhi-id.js';
 import * as pathResolver from './path-resolver.js';
 import { missionPathOrNull } from './mission/mission-lookup.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
@@ -981,9 +987,10 @@ function normalizeTenantSlug(value: string | undefined | null): string | undefin
 // KYBERION_TASK_GRANTS_PATH-or-default rule so they always read the same file.
 // ---------------------------------------------------------------------------
 
-/** Mirrors NHI_ID_PATTERN in agent-identity.ts (not importable here — see above). */
-const TASK_GRANT_NHI_ID_PATTERN = /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*$/;
-const TASK_GRANT_NHI_SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
+// The NHI grammar lives in the dependency-free leaf `contracts/nhi-id.ts`
+// (no secure-io / authority import), so it is safe to use here directly.
+const TASK_GRANT_NHI_ID_PATTERN = NHI_ID_PATTERN;
+const TASK_GRANT_NHI_SLUG_PATTERN = NHI_SLUG_PATTERN;
 
 /**
  * Authority names a task grant's `scope.capabilities` may confer. SUDO is
@@ -1034,29 +1041,29 @@ function resolveTaskGrantsReadPath(): string | undefined {
  *    supervisor / dispatch env stamps this for spawned workers);
  * 2. else, when the resolved role string is itself nhi-slug-shaped (an agent
  *    slug such as `implementation-architect`, not an underscore authority
- *    role like `mission_controller`), derive `kyberion://agent/<org>/<role>`
- *    with the org read raw from the organization profile ('default'
- *    fallback) — the same derivation as agent-identity.ts deriveAgentNhiId.
+ *    role like `mission_controller`), derive
+ *    `kyberion://agent/<tenant>/<org|_>/<role>` from the identity context's
+ *    resolved tenant and the active organization (`KYBERION_ORGANIZATION_ID`), or the
+ *    tenantless `kyberion://agent/_/_/<role>` when no tenant is in scope. The
+ *    pre-D3 'default' organization fallback is gone.
  * Fail-closed: no resolvable actor identity means no task grants are served.
  */
-function resolveGrantActorNhiId(role: string | undefined): string | undefined {
+function resolveGrantActorNhiId(
+  role: string | undefined,
+  tenantSlug: string | undefined
+): string | undefined {
   const explicit = getRegisteredEnvText('KYBERION_NHI_ID')?.trim();
   if (explicit) {
     return TASK_GRANT_NHI_ID_PATTERN.test(explicit) ? explicit : undefined;
   }
   if (!role || !TASK_GRANT_NHI_SLUG_PATTERN.test(role)) return undefined;
-  let organizationId = 'default';
-  try {
-    const profilePath = pathResolver.knowledge('product/governance/organization-profile.json');
-    if (rawExistsSync(profilePath)) {
-      const profile = parseJsonRecord(rawReadTextFile(profilePath));
-      const candidate = profile ? stringField(profile, 'organization_id') || '' : '';
-      if (TASK_GRANT_NHI_SLUG_PATTERN.test(candidate)) organizationId = candidate;
-    }
-  } catch (err) {
-    logger.debug(`task-grant actor org resolution fell back to 'default': ${err}`);
-  }
-  return `kyberion://agent/${organizationId}/${role}`;
+  if (!tenantSlug || !isValidTenantSlug(tenantSlug)) return buildTenantlessNhiId(role);
+  const organizationId = getRegisteredEnvText('KYBERION_ORGANIZATION_ID')?.trim();
+  return buildNhiId(
+    tenantSlug,
+    organizationId && TASK_GRANT_NHI_SLUG_PATTERN.test(organizationId) ? organizationId : null,
+    role
+  );
 }
 
 export function resolveIdentityContext(tenantOverride?: string): IdentityContext {
@@ -1199,7 +1206,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
     try {
       const taskGrantsPath = resolveTaskGrantsReadPath();
       if (taskGrantsPath && rawExistsSync(taskGrantsPath)) {
-        const actorNhiId = resolveGrantActorNhiId(envRole);
+        const actorNhiId = resolveGrantActorNhiId(envRole, tenantSlug);
         if (actorNhiId) {
           const taskId =
             identity?.taskId !== undefined

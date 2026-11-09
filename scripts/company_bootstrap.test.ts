@@ -50,7 +50,7 @@ describe('company bootstrap', () => {
     expect(result.writtenFiles.length).toBeGreaterThanOrEqual(6);
 
     const profileRaw = safeReadFile(
-      `${tmpRoot}/knowledge/confidential/acme-saas/organization-profile.json`,
+      `${tmpRoot}/knowledge/confidential/acme-saas/organizations/acme-saas/organization-profile.json`,
       {
         encoding: 'utf8',
       }
@@ -81,7 +81,9 @@ describe('company bootstrap', () => {
         expect(() => JSON.parse(readTextFile(filePath)), filePath).not.toThrow();
       }
       const company = JSON.parse(readTextFile(result.tenantDir + '/company.json'));
-      const profile = JSON.parse(readTextFile(result.tenantDir + '/organization-profile.json'));
+      const profile = JSON.parse(
+        readTextFile(result.tenantDir + '/organizations/acme-escaped/organization-profile.json')
+      );
       expect(company.display_name).toBe(companyName);
       expect(profile.name).toContain(companyName);
       expect(readTextFile(result.tenantDir + '/vision.md')).toContain(
