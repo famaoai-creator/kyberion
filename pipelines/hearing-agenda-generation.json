@@ -1,0 +1,51 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "hearing-agenda-generation",
+  "version": "1.0.0",
+  "name": "Hearing Agenda & Deliverable Review Pipeline",
+  "description": "成果物とヒアリング目的・相手ペルソナから、分身アバターが実施する顧客ヒアリングアジェンダと画面スポットライト定義を自動編纂し、正規ランタイム領域に発行するパイプライン。",
+  "labels": ["hearing", "concierge", "avatar", "customer_discovery"],
+  "context": {
+    "session_id": "hearing-session-portal-001",
+    "project_name": "新顧客管理ポータル 要件レビュー",
+    "customer_persona": "現場業務担当者・リーダー",
+    "deliverable_type": "interactive_app",
+    "deliverable_url": "./app-mock.html",
+    "deliverable_desc": "申請承認ワークフロー、CSV一括インポート、CRM外部同期設定",
+    "hearing_goal": "現場の実務フローに合致しているか、画面の操作感に無理がないか、エラー時のリカバリーに不安がないかをレビューしてほしい。",
+    "language": "ja",
+    "output_dir": "active/shared/runtime/hearing"
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🔍 [HEARING-PLANNER] Authoring hearing agenda for session {{session_id}} (Project: {{project_name}}, Persona: {{customer_persona}})"
+      }
+    },
+    {
+      "id": "generate_hearing_script",
+      "role": "source",
+      "op": "meeting:hearing_session",
+      "produces": { "channel": "hearing_script", "type": "HearingSessionResult" },
+      "params": {
+        "topic": "成果物レビュー: {{project_name}}",
+        "counterparty_label": "{{customer_persona}}",
+        "context": "成果物仕様: {{deliverable_desc}} / 目的: {{hearing_goal}}",
+        "language": "{{language}}",
+        "output_path": "{{output_dir}}/{{session_id}}/agenda.json"
+      }
+    },
+    {
+      "id": "log_complete",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "hearing_script",
+      "params": {
+        "message": "✅ [HEARING-PLANNER] Hearing agenda successfully published to {{output_dir}}/{{session_id}}/agenda.json"
+      }
+    }
+  ]
+}
