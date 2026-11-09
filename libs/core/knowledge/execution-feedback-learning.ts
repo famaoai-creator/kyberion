@@ -255,6 +255,7 @@ export function queueExecutionFeedbackLearning(
     candidateId: queueId,
     sourceType: 'task_session',
     sourceRef: 'task_session:' + id,
+    kind: 'execution_feedback',
     knowledgeDomain: 'organization',
     proposedMemoryKind: 'sop',
     summary: row.summary,

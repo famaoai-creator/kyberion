@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // KP-04: when a task_result reports unresolved `needs`, the retry prompt
 // gets a targeted second-round retrieval (the needs strings as query via
-// findRelevantDistilledKnowledge) instead of just re-sending the same
-// context. This mocks findRelevantDistilledKnowledge (the same seam
+// findRelevantPromotedKnowledge) instead of just re-sending the same
+// context. This mocks findRelevantPromotedKnowledge (the same seam
 // mission-context-pack.test.ts mocks) so both the first-round context pack
 // search and the second-round needs-driven search are deterministic and
 // hermetic — no real corpus lookups.
@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   buildMissionTeamView: vi.fn(),
   record: vi.fn(),
   emitMissionTaskEvent: vi.fn(),
-  findRelevantDistilledKnowledge: vi.fn(),
+  findRelevantPromotedKnowledge: vi.fn(),
 }));
 
 function makeTaskResultText(input: { summary: string; needs?: string[]; gaps?: string[] }): string {
@@ -67,20 +67,11 @@ vi.mock('./mission-task-events.js', () => ({
     `active/missions/public/${missionId}/coordination/events/task-events.jsonl`,
 }));
 
-vi.mock('../knowledge/distill-knowledge-injector.js', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../knowledge/distill-knowledge-injector.js')>();
-  return {
-    ...actual,
-    findRelevantDistilledKnowledge: mocks.findRelevantDistilledKnowledge,
-  };
-});
-
-// Round 1 (the context pack) reads promoted records (D8); round 2 (needs
-// re-query) still uses the distill seam. One mock drives both rounds.
+// Both rounds (the context pack and the needs re-query) read promoted
+// records (D8). One mock drives both rounds.
 vi.mock('../knowledge/promoted-knowledge-retrieval.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../knowledge/promoted-knowledge-retrieval.js')>()),
-  findRelevantPromotedKnowledge: mocks.findRelevantDistilledKnowledge,
+  findRelevantPromotedKnowledge: mocks.findRelevantPromotedKnowledge,
 }));
 
 const MISSION_ID = 'MSN-KP04-NEEDS';
@@ -236,7 +227,7 @@ describe(
       // work item text) surfaces only the "already delivered" doc. Round 2
       // (queried with the needs text itself) surfaces that same doc again
       // plus a genuinely new one — the delta must keep only the new one.
-      mocks.findRelevantDistilledKnowledge.mockImplementation(async (input: { topic: string }) => {
+      mocks.findRelevantPromotedKnowledge.mockImplementation(async (input: { topic: string }) => {
         if (input.topic.includes('widget procedure unknown')) {
           return [
             {
@@ -302,7 +293,7 @@ describe(
     it('does not call the retrieval seam again when the retry is only for parse errors (no needs)', async () => {
       const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
 
-      mocks.findRelevantDistilledKnowledge.mockResolvedValue([]);
+      mocks.findRelevantPromotedKnowledge.mockResolvedValue([]);
 
       mocks.route
         .mockResolvedValueOnce({

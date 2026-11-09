@@ -446,12 +446,7 @@
       "glossary_anchor": "memory-candidate",
       "canonical_doc": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md",
       "owner_modules": ["libs/core/knowledge/memory-promotion-queue.ts"],
-      "not_to_confuse_with": [],
-      "lifecycle": {
-        "state": "transitioning",
-        "decision": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md#d8--a-closed-scoped-memory-loop",
-        "plan": "docs/developer/improvement-plans-2026-11/MEMORY_LOOP_CLOSURE_PLAN_2026-11-10.ja.md"
-      }
+      "not_to_confuse_with": []
     }
   ]
 }

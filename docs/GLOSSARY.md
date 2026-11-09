@@ -384,7 +384,7 @@ The phase where actual changes are made and validated.
 
 ### Review & Distillation
 
-The cleanup and learning phase where results are preserved as reusable wisdom.
+The cleanup and learning phase. A finished mission is _distilled_ into memory candidates, and approved candidates are _promoted_ into knowledge (see [Memory Candidate](#memory-candidate)).
 
 ## Architecture terms
 
@@ -785,11 +785,11 @@ Aggregating a lower-cadence face into a higher-cadence face at period-end (daily
 
 ### Promotion (Memory)
 
-Nominating content in a volatile face to the `memory-promotion-queue` (`MemoryCandidate`) for promotion into `knowledge/`. The face's sidecar records `promotion_candidate_id` and transitions to `status: promoted`.
+Turning an approved [Memory Candidate](#memory-candidate) into knowledge: _promote_ = candidate → knowledge (the record lands under `knowledge/` and the candidate receipt records `promoted_ref`). Capturing a candidate is not promotion: nominating a volatile face only enqueues a candidate (the face's sidecar records `promotion_candidate_id`; its legacy `status: promoted` value means "nominated"). _Distill_ = mission → candidate; _wisdom_ names only the `wisdom-actuator`.
 
 ### Memory Candidate
 
-A captured learning awaiting promotion, of one type with kind and lane, carrying tier and entity scope from the moment of capture. _distill_ makes a candidate from a mission; _promote_ turns a candidate into knowledge. _Transitioning_: three candidate formats and four queues exist today; promoted records reach context packs by relevance, filtered by the reader's tier and tenant ([Memory loop plan](./developer/improvement-plans-2026-11/MEMORY_LOOP_CLOSURE_PLAN_2026-11-10.ja.md)).
+A captured learning awaiting promotion, of one type with kind and lane, carrying tier and entity scope from the moment of capture. `MemoryCandidate` (`libs/core/knowledge/memory-promotion-queue.ts`) is the one candidate type: `kind` is `lesson`, `heuristic`, `process_improvement`, `hint`, `execution_feedback`, `organization_learning`, `advisory` or `asset_promotion`, and `lane` is the promotion lane resolved at capture. Registration rejects a non-public candidate without its scope envelope (`MEMORY_SCOPE_REQUIRED`: tenant for confidential, `owner_nhi` for personal); scope is never inferred at promotion or ingest. Rows written before `kind`/`lane` existed gain them on load. Organization learning candidates and process-improvement proposals still decide in their own stores until their lifecycles move onto the queue ([Memory loop plan](./developer/improvement-plans-2026-11/MEMORY_LOOP_CLOSURE_PLAN_2026-11-10.ja.md)). _distill_ makes a candidate from a mission; _promote_ turns a candidate into knowledge. Promoted records reach context packs by relevance, filtered by the reader's tier and tenant.
 
 ### Sidecar (volatile)
 

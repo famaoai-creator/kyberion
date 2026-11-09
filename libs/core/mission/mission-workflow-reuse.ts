@@ -21,7 +21,7 @@ import { validatePipelineGuardrails } from '../pipeline/adf-guardrails.js';
 import { assessPipelineDryRun } from '../pipeline/pipeline-dry-run.js';
 import { runAdaptiveStructuredLlmProfile } from './mission-llm.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
-import { loadWisdomPolicy } from './mission-distill.js';
+import { loadDistillPolicy } from './mission-distill.js';
 
 /** A recipe is evidence, never an execution grant. Fresh judgment stays explicit. */
 export const WORKFLOW_REUSE_SCHEMA = z.object({
@@ -220,7 +220,7 @@ export async function prepareMissionWorkflowReuse(
         ].join('\n'),
         WORKFLOW_REUSE_LLM_SCHEMA,
         {
-          policy: loadWisdomPolicy()?.llm,
+          policy: loadDistillPolicy()?.llm,
           egress: {
             dataTier: state.tier,
             ...(state.tenant_slug ? { tenantSlug: state.tenant_slug } : {}),

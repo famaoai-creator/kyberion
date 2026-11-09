@@ -3,8 +3,8 @@
  * tenant-scoped knowledge search scope is constructed.
  *
  * DA-05 lands tenant knowledge under `knowledge/confidential/{tenant}/`, but
- * the mission context pack only ever queried the distill corpus
- * (`findRelevantDistilledKnowledge`), so ingested tenant knowledge never
+ * the mission context pack only ever queried the (now retired) distill corpus,
+ * so ingested tenant knowledge never
  * reached missions. This module makes it reachable by querying the scoped
  * knowledge index (`buildScopedIndex` / `queryKnowledge`) over a POSITIVELY
  * constructed allowlist of roots — never a blocklist:

@@ -26,7 +26,8 @@ import {
   recordKnowledgeDelivery,
   type DeliveredKnowledgeRef,
 } from '../knowledge/knowledge-feedback-loop.js';
-import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
+import { findRelevantPromotedKnowledge } from '../knowledge/promoted-knowledge-retrieval.js';
+import { queryTenantKnowledge } from '../organization/tenant-knowledge-retrieval.js';
 import { isKnowledgePathExcluded, resolveKnowledgeSlice } from '../knowledge/knowledge-slices.js';
 import * as nodePath from 'node:path';
 import * as path from 'node:path';
@@ -1036,9 +1037,10 @@ export const NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT = 3;
  * KP-04: when a `task_result` reports unresolved `needs`, the pre-KP-04
  * retry prompt only re-sent the same objective/context and asked again — it
  * never looked anything up. This targets a fresh, small retrieval using the
- * needs strings themselves as the query (`findRelevantDistilledKnowledge`,
- * the same entry point `loadKnowledgeHintsIfPossible` in
- * mission-context-pack.ts uses), excludes any path already delivered in the
+ * needs strings themselves as the query over the same two lanes
+ * `loadKnowledgeHintsIfPossible` in mission-context-pack-knowledge.ts uses
+ * (D8: promoted records via `findRelevantPromotedKnowledge`, plus the
+ * mission's own tenant subtree via `queryTenantKnowledge`), excludes any path already delivered in the
  * first-round context pack (`deliveredKnowledgeRefs`), and records what it
  * delivers via `recordKnowledgeDelivery` so KP-05 telemetry sees this
  * second round too. Fails open: a retrieval error must never block the
@@ -1066,22 +1068,40 @@ export async function buildNeedsKnowledgeReinforcementLines(input: {
       ...(tenantSlug ? { tenant: tenantSlug } : {}),
       ...(scope?.project_id ? { project: scope.project_id } : {}),
     });
-    const found = await findRelevantDistilledKnowledge({
-      topic: input.needs.join(' '),
-      limit: NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT * 2,
-      minScore: 0.08,
-      ...(scope && tenantSlug
+    const topic = input.needs.join(' ');
+    const fetchLimit = NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT * 2;
+    const tenantScope =
+      scope && tenantSlug
         ? {
-            scope: {
-              tier: 'confidential' as const,
-              tenant_slug: tenantSlug,
-              ...(scope.organization_id ? { organization_id: scope.organization_id } : {}),
-              ...(scope.project_id ? { project_id: scope.project_id } : {}),
-              mission_id: scope.mission_id,
-            },
+            tier: 'confidential' as const,
+            tenant_slug: tenantSlug,
+            ...(scope.organization_id ? { organization_id: scope.organization_id } : {}),
+            ...(scope.project_id ? { project_id: scope.project_id } : {}),
+            mission_id: scope.mission_id,
           }
-        : {}),
-    });
+        : undefined;
+    const [promoted, tenantHits] = await Promise.all([
+      findRelevantPromotedKnowledge({
+        topic,
+        limit: fetchLimit,
+        minScore: 0.08,
+        scope: tenantScope ?? {
+          tier: scope?.write_tier === 'confidential' ? 'confidential' : 'public',
+          mission_id: input.missionId,
+        },
+      }),
+      tenantScope
+        ? queryTenantKnowledge({
+            tenantSlug: tenantScope.tenant_slug,
+            topic,
+            limit: fetchLimit,
+            scope: tenantScope,
+          })
+        : Promise.resolve([]),
+    ]);
+    const found = [...promoted, ...tenantHits].sort(
+      (a, b) => b.score - a.score || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
+    );
     const fresh = found
       .filter((entry) => !excludePaths.has(entry.path))
       .filter((entry) => !isKnowledgePathExcluded(entry.path, slice.exclude))

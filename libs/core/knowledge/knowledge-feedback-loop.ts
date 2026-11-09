@@ -421,6 +421,7 @@ export function recordKnowledgeGap(input: {
       const candidate = createMemoryPromotionCandidate({
         sourceType: 'task_session',
         sourceRef,
+        kind: 'hint',
         proposedMemoryKind: 'clarification_prompt',
         summary: `Repeated scoped knowledge gap (3 observations): ${topic}`,
         evidenceRefs: [sourceRef, target],
@@ -824,6 +825,7 @@ function recordKnowledgeUsageFeedbackUnlocked(input: {
         // Closest existing kind (memory-candidate.schema.json enum) for "a
         // document/topic that was needed but not found" — a prompt to
         // clarify/author knowledge, not yet a validated SOP/heuristic.
+        kind: 'hint',
         proposedMemoryKind: 'clarification_prompt',
         summary: `Knowledge gap reported by ${sourceRef}: ${topic}`,
         evidenceRefs: [sourceRef],
