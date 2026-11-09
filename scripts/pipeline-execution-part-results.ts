@@ -83,6 +83,7 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { currentProcessArgv, exitProcess, ScriptExitError } from './lib/harness.js';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
+import { withPlaygroundPathRole } from './actuator_playground.js';
 import { runSteps } from './pipeline-execution-part-execution.js';
 
 import {
@@ -200,7 +201,34 @@ async function installReasoningBackendsForSteps(
   }
   logger.debug(`[pipeline] reasoning bootstrap required: ${needs.reasons.join(', ')}`);
   const { installReasoningBackends } = await import('@agent/core/reasoning/reasoning-bootstrap');
-  installReasoningBackends();
+  // Playground / actuator-only drafts under a persisted tenant scope often
+  // "require" bootstrap only because unknown domain:op steps are classified
+  // conservatively — they do not need a model. When no reason is a reasoning /
+  // wisdom / voice / secret / core:* step, degrade to the stub chain instead of
+  // demanding a WorkItem credential binding just to run vcs:log / file:read.
+  const needsTenantCredentials = needs.reasons.some((reason) => {
+    const domain = reason.split(':')[0] ?? '';
+    return (
+      domain === 'reasoning' ||
+      domain === 'wisdom' ||
+      domain === 'voice' ||
+      domain === 'secret' ||
+      domain === 'core'
+    );
+  });
+  try {
+    installReasoningBackends();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!needsTenantCredentials && message.includes('CREDENTIAL_BINDING_REQUIRED')) {
+      logger.info(
+        '[pipeline] tenant credential binding absent — actuator-only draft continues on the stub reasoning chain'
+      );
+      installReasoningBackends({ credentialRequirement: 'degrading' });
+      return false;
+    }
+    throw error;
+  }
   return true;
 }
 
@@ -266,7 +294,12 @@ export async function executePipelineFile(
 ) {
   const progress = { started: false };
   try {
-    return await executePipelineFileOnce(inputPath, options, progress);
+    // Tenant playground drafts live on a protected tmp partition; load / hash /
+    // journal re-reads need the same actuator_playground_worker identity the
+    // interactive record path already assumes.
+    return await withPlaygroundPathRole(inputPath, () =>
+      executePipelineFileOnce(inputPath, options, progress)
+    );
   } catch (error) {
     const tagged = error instanceof Error ? error : new Error(String(error));
     // A nested run's not-started tag must never describe this (started) run.

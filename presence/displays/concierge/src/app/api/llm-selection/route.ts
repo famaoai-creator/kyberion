@@ -3,6 +3,7 @@ import { withExecutionContextAsync } from '@agent/core/authority';
 import {
   getLlmSelectionSnapshot,
   saveLlmSelectionPreferences,
+  saveReasoningEndpoint,
 } from '@agent/core/llm-selection-preferences';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
 import { readRequestObject } from '../../../lib/request-input';
@@ -35,10 +36,17 @@ export async function POST(req: NextRequest) {
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
   try {
-    const parsed = await readRequestObject(req, 'request body', ['provider', 'model_id']);
+    const parsed = await readRequestObject(req, 'request body', [
+      'provider',
+      'model_id',
+      'action',
+      'url',
+    ]);
     if (!parsed.ok) return response({ ok: false, error: parsed.error }, 400);
     const snapshot = await withExecutionContextAsync('sovereign_concierge', () =>
-      saveLlmSelectionPreferences(parsed.body)
+      parsed.body.action === 'save_endpoint'
+        ? saveReasoningEndpoint(parsed.body)
+        : saveLlmSelectionPreferences(parsed.body)
     );
     return response({ ok: true, ...snapshot });
   } catch (error) {

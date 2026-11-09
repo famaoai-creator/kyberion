@@ -21,6 +21,53 @@ def emit(payload: dict[str, Any]) -> None:
     sys.stdout.flush()
 
 
+def _int(value: Any) -> int | None:
+    return value if isinstance(value, int) and value >= 0 else None
+
+
+def extract_usage(candidate: Any) -> dict[str, int] | None:
+    """Best-effort normalization of SDK usage payloads.
+
+    The Antigravity SDK does not document a per-step usage field, so accept
+    both `*_tokens` (agy CLI style) and `*_token_count` (Gemini style)
+    counter families. Returns None when no recognized counter is present —
+    usage is never fabricated.
+    """
+    if candidate is None:
+        return None
+    source = candidate if isinstance(candidate, dict) else vars(candidate) if hasattr(candidate, "__dict__") else None
+    if source is None:
+        return None
+    input_tokens = _int(source.get("input_tokens")) or _int(source.get("prompt_token_count"))
+    output_tokens = _int(source.get("output_tokens")) or _int(source.get("candidates_token_count"))
+    thinking = _int(source.get("thinking_tokens")) or _int(source.get("thoughts_token_count")) or 0
+    cache_read = _int(source.get("cache_read_tokens")) or _int(source.get("cached_content_token_count")) or 0
+    if input_tokens is None or output_tokens is None:
+        return None
+    # Thinking is reported separately: the metering side adds it to output,
+    # matching the agy CLI envelope convention.
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "thinking_tokens": thinking,
+        "cache_read_tokens": cache_read,
+    }
+
+
+def step_usage(step: Any) -> dict[str, int] | None:
+    for attr in ("usage", "token_usage", "usage_metadata"):
+        usage = extract_usage(getattr(step, attr, None))
+        if usage is not None:
+            return usage
+    metadata = getattr(step, "metadata", None)
+    if isinstance(metadata, dict):
+        for key in ("usage", "token_usage", "usage_metadata"):
+            usage = extract_usage(metadata.get(key))
+            if usage is not None:
+                return usage
+    return None
+
+
 class NativeTrace:
     def __init__(self, types: Any) -> None:
         self.types = types
@@ -187,7 +234,13 @@ class SdkSession:
         )
         await self.agent.conversation.send(delegated)
         parent_text: str | None = None
+        # Session-level usage (when the SDK reports it) is cumulative, so the
+        # last observation wins rather than summing snapshots.
+        usage: dict[str, int] | None = None
         async for step in self.agent.conversation.receive_steps():
+            step_usage_snapshot = step_usage(step)
+            if step_usage_snapshot is not None:
+                usage = step_usage_snapshot
             if not getattr(step, "is_complete_response", False):
                 continue
             cascade_id = str(getattr(step, "cascade_id", "") or "")
@@ -214,6 +267,7 @@ class SdkSession:
         return {
             "text": parent_text,
             "stopReason": "completed",
+            **({"usage": usage} if usage is not None else {}),
             "metadata": {
                 "nativeSubagent": {
                     "provider": "agy",
