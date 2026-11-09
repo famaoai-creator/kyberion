@@ -11,11 +11,9 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { withExecutionContext } from '../authority.js';
 import { withImmutableWorkItemInventorySnapshot } from './work-coordination-snapshot.js';
 import { enforceNhiActorPolicy } from '../agent/nhi-actor-verification.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeRmSync } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeRmSync } from '../secure-io.js';
 import { buildWorkItemHandoffPacket, type HandoffPacket } from '../mesh/handoff-packet.js';
 import { auditChain } from '../governance/audit-chain.js';
-import { pathResolver } from '../path-resolver.js';
-import { defineCatalog } from '../foundation/governed-catalog.js';
 import { WorkCoordinationError, assertWorkClaimsAllowed } from './work-coordination-error.js';
 import { logger } from '../core.js';
 import {
@@ -32,6 +30,9 @@ import {
   type EffectReleaseInput,
 } from './work-effect-transitions.js';
 import { applyWorkItemFilters, sortItems } from './work-coordination-query.js';
+import { loadWorkBoardCatalogAtPath, workBoardCatalogAtPath } from './work-board-catalog.js';
+export { loadWorkBoardCatalogAtPath } from './work-board-catalog.js';
+import { assertCreatedWorkItemParent, workItemHierarchyUpdate } from './work-item-hierarchy.js';
 import {
   assertClaimPayloadReplayable,
   assertOriginalWorkItemIdentity,
@@ -110,9 +111,6 @@ export type {
   WorkLeaseStatus,
 } from './work-coordination-types.js';
 
-const WORK_BOARD_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/work-board-catalog.schema.json'
-);
 import {
   appendEvent,
   appendItemSnapshot,
@@ -234,23 +232,6 @@ export function withUndispatchedWorkItemEvidence<T>(
 
 function activeLeaseForItem(itemId: string): WorkLease | null {
   return currentLeaseForItem(itemId);
-}
-
-function workBoardCatalogAtPath(filePath: string) {
-  return defineCatalog<WorkBoardCatalog>({
-    id: 'work-board-catalog',
-    path: filePath,
-    schema: WORK_BOARD_CATALOG_SCHEMA_PATH,
-  });
-}
-
-/** Load the persisted work-board catalog through the shared schema boundary. */
-export function loadWorkBoardCatalogAtPath(filePath: string): WorkBoardCatalog {
-  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
-  if (!safeLstat(safeFilePath).isFile()) {
-    throw new Error(`[WORK_BOARD_CATALOG] catalog must be a regular file: ${filePath}`);
-  }
-  return workBoardCatalogAtPath(safeFilePath).load();
 }
 
 function materializeBoardCatalog(): WorkBoardCatalog {
@@ -407,6 +388,7 @@ function createWorkItemInternal(input: CreateWorkItemInput): WorkItem {
       { item_id: item.item_id }
     );
   }
+  assertCreatedWorkItemParent(item, currentWorkItem);
   appendItemSnapshot(item);
   appendEvent({
     eventType: 'item_created',
@@ -509,6 +491,10 @@ function updateWorkItemInternal(input: UpdateWorkItemInput): WorkItem {
       );
   }
 
+  const parentPatch = workItemHierarchyUpdate(current, input, {
+    lookup: currentWorkItem,
+    items: currentWorkItems,
+  });
   const nextStatus = input.status || current.status;
   const shouldClearLease =
     isTerminalStatus(nextStatus) || (input.endAttempt === true && nextStatus === 'blocked');
@@ -547,6 +533,7 @@ function updateWorkItemInternal(input: UpdateWorkItemInput): WorkItem {
       ...(input.labels ? { labels: [...input.labels] } : {}),
       ...(input.dependencies ? { dependencies: [...input.dependencies] } : {}),
       ...(input.context ? { context: { ...input.context } } : {}),
+      ...parentPatch,
       ...(input.metadata ? { metadata: input.metadata } : {}),
       ...(finalizedAttempt
         ? {
@@ -1557,6 +1544,8 @@ export function importExternalWorkItem(input: {
   labels?: string[];
   dependencies?: string[];
   context?: WorkItemContext;
+  /** D1: the Issue this imported step belongs to (kept when omitted on re-sync). */
+  parentItemId?: string;
   metadata?: Record<string, unknown>;
 }): WorkItem {
   // Tenant registration gates creation only (as before): re-syncing an item
@@ -1588,6 +1577,7 @@ export function importExternalWorkItem(input: {
         labels: input.labels || existing.labels,
         dependencies: input.dependencies || existing.dependencies,
         context: input.context || existing.context,
+        parentItemId: input.parentItemId,
         metadata: input.metadata || existing.metadata,
       });
     }
@@ -1604,6 +1594,7 @@ export function importExternalWorkItem(input: {
       labels: input.labels,
       dependencies: input.dependencies,
       context: input.context,
+      parentItemId: input.parentItemId,
       metadata: input.metadata,
     });
     appendEvent({
