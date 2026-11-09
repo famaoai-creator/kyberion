@@ -1,9 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { Badge, Button } from '@agent/shared-ui';
+import { Badge, Button, Select, SettingRow, TextField } from '@agent/shared-ui';
 import { frontDeskFetch as fetch } from '../../../lib/front-desk-fetch';
-import type { SettingsTranslate } from './form-scope';
+import { FormScope, asText, type SettingsTranslate } from './form-scope';
 
 type ServiceEntry = {
   id: string;
@@ -67,25 +67,37 @@ export function ServiceCatalogPane({
       <p>{t('services.catalog_hint')}</p>
       {oauthBusyId ? <p role="status">{t('authority.connecting')}</p> : null}
       {oauthMessage ? <p role={oauthError ? 'alert' : 'status'}>{oauthMessage}</p> : null}
-      <div className="settings-row-block settings-inline-actions">
-        <label>
-          {t('services.search')}
-          <input
+      <FormScope
+        fields={{
+          'services.query': (value) => setQuery(asText(value)),
+          'services.auth_filter': (value) => setAuthFilter(asText(value)),
+        }}
+      >
+        <SettingRow label={t('services.search')} control_id="services-search">
+          <TextField
+            id="services-search"
+            name="services.query"
+            label={t('services.search')}
+            hide_label
             type="search"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onInput={(event) => setQuery(event.currentTarget.value)}
           />
-        </label>
-        <label>
-          {t('services.auth_filter')}
-          <select value={authFilter} onChange={(event) => setAuthFilter(event.target.value)}>
-            <option value="all">{t('services.filter_all')}</option>
-            <option value="oauth">{t('services.filter_oauth')}</option>
-            <option value="other">{t('services.filter_other')}</option>
-          </select>
-        </label>
-      </div>
+        </SettingRow>
+        <SettingRow label={t('services.auth_filter')} control_id="services-auth-filter">
+          <Select
+            id="services-auth-filter"
+            name="services.auth_filter"
+            label={t('services.auth_filter')}
+            hide_label
+            value={authFilter}
+            options={[
+              { value: 'all', label: t('services.filter_all') },
+              { value: 'oauth', label: t('services.filter_oauth') },
+              { value: 'other', label: t('services.filter_other') },
+            ]}
+          />
+        </SettingRow>
+      </FormScope>
       {failed ? (
         <div className="settings-row-block">
           <p role="alert">{t('services.catalog_failed')}</p>

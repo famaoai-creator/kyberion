@@ -860,6 +860,7 @@
         "deploy_release",
         "derive_test_inventory",
         "distill",
+        "document_review",
         "emit_dissent_log",
         "escalate_for_review",
         "evaluate_architecture_ready",

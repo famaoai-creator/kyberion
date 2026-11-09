@@ -1225,5 +1225,17 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
         },
       ],
     },
+    {
+      id: 'docs-impact-map',
+      schemaPath: 'knowledge/product/schemas/docs-impact-map.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/product/governance/docs-impact-map.json')],
+      invalidPayloads: [
+        {
+          $schema: '../schemas/docs-impact-map.schema.json',
+          version: '1.0.0',
+          rules: [{ change: 'x.ts' }],
+        },
+      ],
+    },
   ];
 }

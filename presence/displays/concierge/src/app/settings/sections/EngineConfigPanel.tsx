@@ -176,6 +176,20 @@ export function EngineConfigPanel({ locale }: { locale: ConciergeLocale }) {
                       { value: 'pane', label: text('engine_config_mode_pane') },
                     ]}
                   />
+                ) : key === 'agent_pane_runtime_provider' &&
+                  (snapshot?.pane_providers.length ?? 0) > 0 ? (
+                  <Select
+                    id={`engine-${key}`}
+                    name={`engine.${key}`}
+                    label={label(key)}
+                    hide_label
+                    value={draft[key]}
+                    disabled={busy}
+                    options={[
+                      { value: '', label: text('engine_config_mode_default') },
+                      ...(snapshot?.pane_providers ?? []).map((id) => ({ value: id, label: id })),
+                    ]}
+                  />
                 ) : (
                   <TextField
                     id={`engine-${key}`}

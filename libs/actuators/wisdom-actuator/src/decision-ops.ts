@@ -1,3 +1,6 @@
+import { runDocumentReview } from '@agent/core/document-review';
+import { DOCUMENT_REVIEW_INPUT_SCHEMA } from './op-catalog.js';
+import { createAjv } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import { sendOpsAlert } from '@agent/core/ops-alert';
 import {
@@ -948,6 +951,7 @@ export function evaluateSimulationQuality(summary: {
  * dispatcher can apply per-tenant rate limiting before delegating.
  */
 const RATE_LIMITED_OPS = new Set([
+  'document_review',
   'a2a_fanout',
   'cross_critique',
   'synthesize_counterparty_persona',
@@ -1008,6 +1012,25 @@ export async function dispatchWisdomOperation(
   }
 
   switch (op) {
+    case 'document_review': {
+      const input = Object.fromEntries(Object.keys(params).map((key) => [key, resolved(key)]));
+      const validate = createAjv().compile(DOCUMENT_REVIEW_INPUT_SCHEMA);
+      if (!validate(input)) {
+        throw new Error('[DOCUMENT_REVIEW_INPUT_INVALID] ' + JSON.stringify(validate.errors));
+      }
+      const result = await runDocumentReview({
+        target: input.target as string,
+        ...(input.references !== undefined ? { references: input.references as string[] } : {}),
+        ...(input.sources !== undefined ? { sources: input.sources as string[] } : {}),
+        ...(input.preset !== undefined
+          ? { preset: input.preset as 'comprehension' | 'design' }
+          : {}),
+        ...(input.generator !== undefined ? { generator: input.generator as string } : {}),
+        ...(input.timeout_ms !== undefined ? { timeout_ms: input.timeout_ms as number } : {}),
+      });
+      return { handled: true, ctx: assign(result) };
+    }
+
     case 'stakeholder_grid_sort': {
       const nodes = Array.isArray(params.nodes)
         ? params.nodes

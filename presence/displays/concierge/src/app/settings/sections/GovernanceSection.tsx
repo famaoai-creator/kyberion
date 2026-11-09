@@ -4,8 +4,8 @@ import * as React from 'react';
 import { frontDeskFetch as fetch } from '../../../lib/front-desk-fetch';
 import { useConciergeI18n } from '../../../lib/use-concierge-i18n';
 import { NeedsYouLink } from '../../../components/needs-you-link';
-import { Button, SettingsGroup, Badge } from '@agent/shared-ui';
-import type { SettingsTranslate } from './form-scope';
+import { Button, Callout, Select, SettingRow, SettingsGroup, Badge } from '@agent/shared-ui';
+import { FormScope, asText, type SettingsTranslate } from './form-scope';
 
 const record = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -147,46 +147,58 @@ export function GovernanceSection({ t }: { t: SettingsTranslate }) {
               )}
             </p>
             {!data.viewer_member_id && (
-              <>
-                <label>
-                  {t('governance.identity_pick')}
-                  <select value={linkMember} onChange={(e) => setLinkMember(e.target.value)}>
-                    <option value="">—</option>
-                    {data.members.map((member) => (
-                      <option key={member.member_id} value={member.member_id}>
-                        {member.display_name} ({member.member_id})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <Button
-                  label={busy ? '…' : t('governance.identity_link_button')}
-                  disabled={busy || !linkMember}
-                  onClick={() =>
-                    void run(async () => {
-                      const res = await fetch('/api/governance-overview', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'link_identity', member_id: linkMember }),
-                      });
-                      const value: unknown = await res.json().catch(() => null);
-                      if (!res.ok || !record(value) || value.ok !== true)
-                        throw new Error(
-                          record(value) && typeof value.error === 'string'
-                            ? value.error
-                            : `http_${res.status}`
+              <FormScope
+                fields={{ 'governance.link_member': (value) => setLinkMember(asText(value)) }}
+              >
+                <SettingRow
+                  label={t('governance.identity_pick')}
+                  control_id="governance-link-member"
+                >
+                  <Select
+                    id="governance-link-member"
+                    name="governance.link_member"
+                    label={t('governance.identity_pick')}
+                    hide_label
+                    value={linkMember}
+                    disabled={busy}
+                    placeholder="—"
+                    options={data.members.map((member) => ({
+                      value: member.member_id,
+                      label: `${member.display_name} (${member.member_id})`,
+                    }))}
+                  />
+                </SettingRow>
+                <div className="settings-row-actions">
+                  <Button
+                    label={busy ? '…' : t('governance.identity_link_button')}
+                    variant="primary"
+                    disabled={busy || !linkMember}
+                    onClick={() =>
+                      void run(async () => {
+                        const res = await fetch('/api/governance-overview', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'link_identity', member_id: linkMember }),
+                        });
+                        const value: unknown = await res.json().catch(() => null);
+                        if (!res.ok || !record(value) || value.ok !== true)
+                          throw new Error(
+                            record(value) && typeof value.error === 'string'
+                              ? value.error
+                              : `http_${res.status}`
+                          );
+                        setMessage(
+                          t('governance.linked_msg', {
+                            subject: data.current_identity?.subject ?? '',
+                            member: linkMember,
+                          })
                         );
-                      setMessage(
-                        t('governance.linked_msg', {
-                          subject: data.current_identity?.subject ?? '',
-                          member: linkMember,
-                        })
-                      );
-                      await load();
-                    })
-                  }
-                />
-              </>
+                        await load();
+                      })
+                    }
+                  />
+                </div>
+              </FormScope>
             )}
           </>
         ) : (
@@ -205,8 +217,12 @@ export function GovernanceSection({ t }: { t: SettingsTranslate }) {
           </ul>
         )}
       </div>
-      {error && <p role="alert">{error}</p>}
-      {message && <p aria-live="polite">{message}</p>}
+      {error && <Callout tone="danger" title={error} />}
+      {message && (
+        <p role="status" className="kb-text kb-text--body">
+          {message}
+        </p>
+      )}
     </SettingsGroup>
   );
 }
