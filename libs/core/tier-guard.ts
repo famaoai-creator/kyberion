@@ -1188,7 +1188,15 @@ function personaTierWriteDecision(
  * Determine the knowledge tier of a file based on its path.
  */
 export function detectTier(filePath: string): TierLevel {
-  const resolved = path.resolve(filePath);
+  const absolutePath = path.resolve(filePath);
+  const relativePath = policyRelativePath(absolutePath);
+  // Tier markers belong to the logical checkout path. A linked checkout may
+  // itself live beneath a tier-partitioned scratch, artifact or knowledge path.
+  // The policy helper also recognizes shared primary-checkout authority state.
+  const resolved =
+    isOutsideProjectRoot(relativePath) || path.isAbsolute(relativePath)
+      ? normalizePath(absolutePath)
+      : `/${relativePath}`;
   if (
     resolved.includes('/knowledge/personal/') ||
     resolved.includes('/active/organizations/personal/') ||
