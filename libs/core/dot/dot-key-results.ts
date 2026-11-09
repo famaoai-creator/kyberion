@@ -23,11 +23,17 @@ import {
   type StateProbeResult,
 } from '../pipeline/state-probe.js';
 import {
+  COST_ORG_METRICS,
   keyResultProgress,
   type KeyResultOrgMetric,
   type KeyResultSpec,
   type ObjectiveRef,
 } from '../organization/key-result-spec.js';
+import {
+  organizationCostMetrics,
+  organizationCostMetricValue,
+  type OrganizationCostMetricsDeps,
+} from '../organization/organization-cost-metrics.js';
 import {
   listOrganizationIncidents,
   listOrganizationDecisions,
@@ -82,8 +88,14 @@ export interface DotKeyResultDeps {
   readFile?: (relPath: string) => string;
   /** Measure every key result now, ignoring its `every_s` throttle (on-demand sweeps). */
   force?: boolean;
-  /** Organization metric port; defaults to the persisted organization records. */
-  orgMetric?: (metric: KeyResultOrgMetric, scope: OrgMetricScope) => number | undefined;
+  /** Organization metric port; defaults to the persisted organization records + cost report. */
+  orgMetric?: (
+    metric: KeyResultOrgMetric,
+    scope: OrgMetricScope,
+    opts?: { window_days?: number }
+  ) => number | undefined;
+  /** Cost-report port for cost org metrics; defaults to `buildCostReportFromHistory`. */
+  costReport?: OrganizationCostMetricsDeps['loadReport'];
   readSignals?: (dotId: string) => DotSignalEntry[];
   loadPurpose?: (scope: ObjectiveProgressScope) => OrganizationPurposeRecord | null | undefined;
   probeTimeoutMs?: number;
@@ -178,9 +190,24 @@ function defaultReadFile(rootDir: string | undefined): (rel: string) => string {
   };
 }
 
-function defaultOrgMetric(rootDir: string | undefined): NonNullable<DotKeyResultDeps['orgMetric']> {
-  return (metric, scope) => {
+function defaultOrgMetric(
+  rootDir: string | undefined,
+  deps: DotKeyResultDeps
+): NonNullable<DotKeyResultDeps['orgMetric']> {
+  return (metric, scope, opts) => {
     if (!scope.organizationId) return undefined;
+    if (COST_ORG_METRICS.has(metric)) {
+      const measured = organizationCostMetrics(
+        {
+          organizationId: scope.organizationId,
+          tenantSlug: scope.tenantSlug,
+          tier: scope.tier,
+        },
+        opts?.window_days,
+        { loadReport: deps.costReport, now: deps.now }
+      );
+      return organizationCostMetricValue(metric, measured);
+    }
     const query = {
       organizationId: scope.organizationId,
       tier: scope.tier,
@@ -301,9 +328,10 @@ async function measureSpec(
       return (100 * inWindow.filter((row) => row.healthy).length) / inWindow.length;
     }
     case 'org_metric': {
-      const value = (deps.orgMetric ?? defaultOrgMetric(deps.rootDir))(
+      const value = (deps.orgMetric ?? defaultOrgMetric(deps.rootDir, deps))(
         metric.metric,
-        target.orgScope
+        target.orgScope,
+        { window_days: metric.window_days }
       );
       if (value === undefined) throw new Error(`organization metric ${metric.metric} unavailable`);
       return value;
