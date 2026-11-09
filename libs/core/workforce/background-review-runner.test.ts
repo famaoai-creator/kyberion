@@ -19,7 +19,7 @@ import {
   loadMemoryPromotionCandidate,
   memoryPromotionQueuePath,
 } from '../knowledge/memory-promotion-queue.js';
-import { loadDistillCandidateRecord } from '../knowledge/distill-candidate-registry.js';
+import { loadBackgroundReviewProposal } from './background-review-proposals.js';
 import {
   applyBackgroundReviewPipelinePatch,
   createBackgroundReviewApprovalRequest,
@@ -43,6 +43,25 @@ import {
 vi.mock('../knowledge/promoted-knowledge-retrieval.js', () => ({
   findRelevantPromotedKnowledge: vi.fn(async () => []),
 }));
+// D8: proposals are captured with the mission's real scope from its state;
+// these fixture missions declare a confidential tenant scope.
+const missionScopeFor = (missionId: string) => ({
+  tier: 'confidential' as const,
+  tenant_slug: 'background-review-test-tenant',
+  mission_id: missionId,
+});
+vi.mock('../knowledge/memory-capture-scope.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../knowledge/memory-capture-scope.js')>();
+  return {
+    ...actual,
+    missionMemoryCaptureScope: (missionId: string) =>
+      missionId.startsWith('MSN-BACKGROUND-REVIEW-')
+        ? { tier: 'confidential' as const, scope: missionScopeFor(missionId) }
+        : actual.missionMemoryCaptureScope(missionId),
+  };
+});
+const loadDistillCandidateRecord = (candidateId: string) =>
+  loadBackgroundReviewProposal(candidateId);
 
 const queuePath = 'active/shared/tmp/test-memory-queue-background-review-runner.jsonl';
 const sessionIds = new Set<string>();
@@ -316,6 +335,11 @@ describe('background-review-runner', () => {
     candidatePaths.add(
       pathResolver.shared(`runtime/distill-candidates/${result.candidate_id}.json`)
     );
+    // D8: a queue row with the mission's real scope — no DistillCandidateRecord.
+    expect(
+      safeExistsSync(pathResolver.shared(`runtime/distill-candidates/${result.candidate_id}.json`))
+    ).toBe(false);
+    expect(record?.scope).toEqual(missionScopeFor('MSN-BACKGROUND-REVIEW-1'));
     expect(record).toMatchObject({
       source_type: 'mission',
       tier: 'confidential',
@@ -333,40 +357,68 @@ describe('background-review-runner', () => {
   it('stores a skill append-section proposal without applying it', async () => {
     const sessionId = `runner-skill-${process.pid}-${Date.now()}`;
     sessionIds.add(sessionId);
-    const result = await runBackgroundReviewFork({
-      sessionId,
+    const skillProposal = JSON.stringify({
+      action: 'skill_patch',
+      title: 'Add review checklist',
+      summary: 'Append a bounded review checklist to the managed skill.',
+      target_ref: 'active/shared/runtime/background-review/skills/review/SKILL.md',
+      patch: {
+        operation: 'append_section',
+        section: '## Review checklist\n\nVerify the output before promotion.',
+      },
+    });
+    // D8: a session proposal is a queue row in its owner's personal partition.
+    const ownerScope = {
+      tier: 'personal' as const,
+      owner_nhi: `kyberion://test/background-review-skill-owner-${process.pid}`,
+    };
+    const ownerQueue = memoryPromotionQueuePath(ownerScope);
+    try {
+      const result = await runBackgroundReviewFork({
+        sessionId,
+        surface: 'slack',
+        snapshot: 'A durable checklist belongs in the managed review skill.',
+        ownerNhi: ownerScope.owner_nhi,
+        backend: { delegateTask: async () => skillProposal },
+      });
+
+      expect(result).toMatchObject({ status: 'queued', action: 'skill_patch' });
+      expect(result.approval_request_id).toBeUndefined();
+      expect(result.approval_request_error).toMatch(/Skill target not found/);
+      // Owner partitions are reachable only with their exact scope.
+      expect(loadBackgroundReviewProposal(result.candidate_id!)).toBeNull();
+      expect(loadMemoryPromotionCandidate(result.candidate_id!, ownerScope)).toMatchObject({
+        kind: 'process_improvement',
+        status: 'queued',
+        scope: ownerScope,
+        origin: { record_kind: 'background_review', decided_via: 'pnpm background-review' },
+      });
+      expect(loadBackgroundReviewProposal(result.candidate_id!, ownerScope)).toMatchObject({
+        status: 'proposed',
+        tier: 'personal',
+        metadata: {
+          action: 'skill_patch',
+          patch: { operation: 'append_section' },
+          provenance: { generated_by: 'background-review-fork' },
+        },
+      });
+    } finally {
+      const ownerDir = path.dirname(path.dirname(ownerQueue));
+      if (safeExistsSync(ownerDir)) safeRmSync(ownerDir, { recursive: true, force: true });
+    }
+
+    // Without an owner the session proposal has no scope and is not captured.
+    const unscopedSession = `${sessionId}-unscoped`;
+    sessionIds.add(unscopedSession);
+    const unscoped = await runBackgroundReviewFork({
+      sessionId: unscopedSession,
       surface: 'slack',
       snapshot: 'A durable checklist belongs in the managed review skill.',
-      backend: {
-        delegateTask: async () =>
-          JSON.stringify({
-            action: 'skill_patch',
-            title: 'Add review checklist',
-            summary: 'Append a bounded review checklist to the managed skill.',
-            target_ref: 'active/shared/runtime/background-review/skills/review/SKILL.md',
-            patch: {
-              operation: 'append_section',
-              section: '## Review checklist\n\nVerify the output before promotion.',
-            },
-          }),
-      },
+      backend: { delegateTask: async () => skillProposal },
     });
-
-    expect(result).toMatchObject({ status: 'queued', action: 'skill_patch' });
-    expect(result.approval_request_id).toBeUndefined();
-    expect(result.approval_request_error).toMatch(/Skill target not found/);
-    const record = loadDistillCandidateRecord(result.candidate_id!);
-    candidatePaths.add(
-      pathResolver.shared(`runtime/distill-candidates/${result.candidate_id}.json`)
-    );
-    expect(record).toMatchObject({
-      status: 'proposed',
-      metadata: {
-        action: 'skill_patch',
-        patch: { operation: 'append_section' },
-        provenance: { generated_by: 'background-review-fork' },
-      },
-    });
+    expect(unscoped.status).toBe('failed');
+    expect(unscoped.reason).toMatch(/MEMORY_SCOPE_REQUIRED/);
+    expect(unscoped.candidate_id).toBeUndefined();
   });
 
   it('runs the mission-scoped nudge-to-approved-pipeline path end to end', async () => {

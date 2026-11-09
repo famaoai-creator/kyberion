@@ -219,6 +219,8 @@ describe('distillDotMemory', () => {
       candidate_id: 'cand-1',
     });
     expect(recorded).toHaveLength(1);
+    // D8: the review candidate is captured in the charter's own scope.
+    expect(recorded[0]).toMatchObject({ scope: CHARTER.scope });
     expect(await distillDotMemory(CHARTER, distillCtx)).toBeUndefined();
     const rows = readJsonLines(`${TEST_ROOT}/${dotStatePath(CHARTER, DOT_MEMORY_DISTILL_FILE)}`);
     expect(rows).toHaveLength(1);

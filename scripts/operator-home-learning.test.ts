@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { handleFeedbackSubcommand, handleImprovements } from './operator-home-secondary-actions.js';
+import {
+  handleFeedbackSubcommand,
+  handleImprovements,
+  improvementsArgsFromArgv,
+} from './operator-home-secondary-actions.js';
 import {
   createDistillCandidateRecord,
   loadDistillCandidateRecord,
@@ -10,8 +14,17 @@ import {
   resolveExecutionFeedbackPath,
   listExecutionFeedbackCandidates,
 } from '@agent/core/execution-feedback';
-import { memoryPromotionQueuePath } from '@agent/core/knowledge/memory-promotion-queue';
-import { safeExistsSync, safeReadFile, safeRmSync } from '@agent/core/secure-io';
+import {
+  listMemoryPromotionCandidates,
+  memoryPromotionQueuePath,
+} from '@agent/core/knowledge/memory-promotion-queue';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import type { MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
 const selected = vi.hoisted(() => ({ scope: { tier: 'public' } as MemoryScopeEnvelope }));
@@ -28,6 +41,12 @@ const executionFeedbackCandidatePath = (id: string, scope?: MemoryScopeEnvelope)
     : pathResolver.shared('runtime/distill-candidates/' + id + '.json');
 const legacyIds = new Set<string>();
 const ui = (key: string) => key;
+/** D8: the proposal is a queue row; snapshot its view instead of a file. */
+const snapshot = (id: string) =>
+  JSON.stringify(listExecutionFeedbackCandidates(scope).find((row) => row.candidate_id === id));
+/** Learning rows handed to human review (`MEM-FB-*`). */
+const learningRows = () =>
+  listMemoryPromotionCandidates(scope).filter((row) => row.candidate_id.startsWith('MEM-FB-'));
 afterEach(() => {
   safeRmSync(executionFeedbackScopeRoot(scope), { recursive: true, force: true });
   safeRmSync(memoryPromotionQueuePath(scope), { force: true });
@@ -48,8 +67,7 @@ describe('operator learning command boundary', () => {
   it('passes the selected scope into feedback and separates read-only review from explicit queue', () => {
     const row = feedback();
     expect(row.scope).toEqual(scope);
-    const file = executionFeedbackCandidatePath(row.candidate_id, scope);
-    const before = safeReadFile(file, { encoding: 'utf8' });
+    const before = snapshot(row.candidate_id);
     const output: unknown[] = [];
     handleImprovements(ui, { review: row.candidate_id, json: true }, (value) => output.push(value));
     expect(JSON.parse(String(output[0]))).toMatchObject({
@@ -58,10 +76,10 @@ describe('operator learning command boundary', () => {
       promotion: { status: 'none' },
       retrieval: { status: 'unmeasured' },
     });
-    expect(safeReadFile(file, { encoding: 'utf8' })).toBe(before);
-    expect(safeExistsSync(memoryPromotionQueuePath(scope))).toBe(false);
+    expect(snapshot(row.candidate_id)).toBe(before);
+    expect(learningRows()).toEqual([]);
     handleImprovements(ui, { queue: row.candidate_id });
-    expect(safeExistsSync(memoryPromotionQueuePath(scope))).toBe(true);
+    expect(learningRows()).toHaveLength(1);
     expect(
       listExecutionFeedbackCandidates(scope).find(
         (entry) => entry.candidate_id === row.candidate_id
@@ -72,11 +90,10 @@ describe('operator learning command boundary', () => {
     'does not let legacy --%s fake a human decision',
     (action) => {
       const row = feedback();
-      const file = executionFeedbackCandidatePath(row.candidate_id, scope);
-      const before = safeReadFile(file, { encoding: 'utf8' });
+      const before = snapshot(row.candidate_id);
       expect(() => handleImprovements(ui, { [action]: row.candidate_id })).toThrow();
-      expect(safeReadFile(file, { encoding: 'utf8' })).toBe(before);
-      expect(safeExistsSync(memoryPromotionQueuePath(scope))).toBe(false);
+      expect(snapshot(row.candidate_id)).toBe(before);
+      expect(learningRows()).toEqual([]);
     }
   );
   it.each(['personal', 'confidential'] as const)(
@@ -104,6 +121,10 @@ describe('operator learning command boundary', () => {
     saveDistillCandidateRecord(row);
     legacyIds.add(row.candidate_id);
     selected.scope = scope;
+    // D8: legacy records are read-only; unscoped ones are reported, never adopted.
+    expect(() =>
+      handleImprovements(ui, { review: row.candidate_id, queue: row.candidate_id })
+    ).toThrow();
     expect(() => handleImprovements(ui, { review: row.candidate_id })).toThrow(/NOT_FOUND/);
     const output: unknown[] = [];
     handleImprovements(ui, { review: row.candidate_id, legacy: true, json: true }, (value) =>
@@ -120,6 +141,73 @@ describe('operator learning command boundary', () => {
       safeReadFile(pathResolver.rootResolve('scripts/kyberion_home.ts'), { encoding: 'utf8' })
     );
     expect(entrypoint).toContain(".option('legacy'");
-    expect(entrypoint).toContain('legacy: Boolean(argv.legacy)');
+    expect(entrypoint).toContain('improvementsArgsFromArgv(argv)');
+    expect(improvementsArgsFromArgv({ legacy: true, review: 'id-1' })).toMatchObject({
+      legacy: true,
+      review: 'id-1',
+    });
+  });
+  it('migrates pending scoped legacy proposals with their own scope and reports unscoped ones (one release)', () => {
+    const legacyUnscoped = createDistillCandidateRecord({
+      source_type: 'task_session',
+      tier: 'personal',
+      title: 'Synthetic unscoped legacy',
+      summary: 'Synthetic legacy correction without a scope.',
+      status: 'proposed',
+      target_kind: 'procedure',
+      evidence_refs: ['intent:synthetic-legacy'],
+      metadata: { improvement_kind: 'execution_feedback' },
+    });
+    saveDistillCandidateRecord(legacyUnscoped);
+    legacyIds.add(legacyUnscoped.candidate_id);
+    const legacyScoped = createDistillCandidateRecord({
+      source_type: 'task_session',
+      tier: 'confidential',
+      scope,
+      title: 'Synthetic scoped legacy',
+      summary: 'Synthetic legacy correction in a tenant scope.',
+      status: 'proposed',
+      target_kind: 'procedure',
+      evidence_refs: ['intent:synthetic-legacy-scoped'],
+      metadata: { improvement_kind: 'execution_feedback' },
+    });
+    const scopedFile = executionFeedbackCandidatePath(legacyScoped.candidate_id, scope);
+    safeMkdir(path.dirname(scopedFile), { recursive: true });
+    safeWriteFile(scopedFile, JSON.stringify(legacyScoped, null, 2));
+    selected.scope = scope;
+    const before = String(safeReadFile(scopedFile, { encoding: 'utf8' }));
+    const dryRun: unknown[] = [];
+    handleImprovements(ui, { migrate: true }, (value) => dryRun.push(value));
+    const report = JSON.parse(String(dryRun[0]));
+    expect(report.mode).toBe('dry_run');
+    expect(report.imported).toEqual([
+      expect.objectContaining({ candidate_id: legacyScoped.candidate_id }),
+    ]);
+    expect(report.unresolved).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ candidate_id: legacyUnscoped.candidate_id }),
+      ])
+    );
+    expect(
+      listMemoryPromotionCandidates(scope).some(
+        (entry) => entry.candidate_id === legacyScoped.candidate_id
+      )
+    ).toBe(false);
+    expect(() => handleImprovements(ui, { write: true })).toThrow(/--migrate/);
+    handleImprovements(ui, { migrate: true, write: true }, () => undefined);
+    expect(
+      listMemoryPromotionCandidates(scope).find(
+        (entry) => entry.candidate_id === legacyScoped.candidate_id
+      )
+    ).toMatchObject({
+      kind: 'execution_feedback',
+      scope,
+      origin: { record_kind: 'execution_feedback', migrated_from: 'distill-candidate-registry' },
+    });
+    // The legacy file is untouched history; a second run is a no-op.
+    expect(String(safeReadFile(scopedFile, { encoding: 'utf8' }))).toBe(before);
+    const again: unknown[] = [];
+    handleImprovements(ui, { migrate: true, write: true }, (value) => again.push(value));
+    expect(JSON.parse(String(again[0])).already_on_queue).toContain(legacyScoped.candidate_id);
   });
 });
