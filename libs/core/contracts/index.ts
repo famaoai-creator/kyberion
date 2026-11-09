@@ -26,3 +26,4 @@ export * from './pptx-protocol.js';
 export * from './mission-contract.js';
 export * from './skill-output.js';
 export * from './guided-coordination-brief.js';
+export * from './routing-decision.js';

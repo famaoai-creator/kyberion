@@ -42,6 +42,7 @@
     "contracts/rejection-reason": 0,
     "contracts/resource-provenance": 0,
     "contracts/risky-op-ids": 0,
+    "contracts/routing-decision": 1,
     "contracts/shared-business-types": 0,
     "contracts/skill-output": 0,
     "contracts/specialist-ids": 0,

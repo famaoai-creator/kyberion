@@ -645,7 +645,7 @@ These are orthogonal axes: changing the operating mode does not by itself choose
 
 ### RoutingDecision
 
-The one decision the intent resolver emits per request: intent id, Execution Shape, authority level, delivery mode and promotion verdict. Only the intent resolver reads utterance text; surfaces are adapters that consume this decision, and the promotion verdict comes from `work-scope-policy.json` alone. _Transitioning_: about 13 routers resolve independently today ([Intent resolver plan](./developer/improvement-plans-2026-11/INTENT_RESOLVER_UNIFICATION_PLAN_2026-11-10.ja.md)).
+The one decision the intent resolver emits per request: intent id, Execution Shape, authority level, delivery mode and promotion verdict. Only the intent resolver reads utterance text; surfaces are adapters that consume this decision, and the promotion verdict comes from `work-scope-policy.json` alone. The contract is `libs/core/contracts/routing-decision.ts`; `resolveRoutingDecision` (`libs/core/intent/routing-decision.ts`) resolves once and the intent gateway carries the decision downstream as `routing_decision`. _Transitioning_: the other surfaces still resolve independently until they become adapters ([Intent resolver plan](./developer/improvement-plans-2026-11/INTENT_RESOLVER_UNIFICATION_PLAN_2026-11-10.ja.md)).
 
 ### WorkItem
 
