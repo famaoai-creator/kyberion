@@ -64,6 +64,10 @@
         "min_required_inputs": {
           "type": "integer",
           "minimum": 0
+        },
+        "work_scope_promotion": {
+          "type": "boolean",
+          "description": "Match only when work-scope-policy.json promotes the execution shape to mission scope on its own (the catalog-floor verdict). Durable shapes are named in work-scope-policy.json alone."
         }
       },
       "required": ["mode"]

@@ -56,3 +56,4 @@ export type { IntentRoutingDecisionDependencies } from './intent-routing-decisio
 export * from './intent-snapshot-store.js';
 export * from './intent-track-resolver.js';
 export * from './intent-use-case-scenario.js';
+export * from './routing-decision.js';
