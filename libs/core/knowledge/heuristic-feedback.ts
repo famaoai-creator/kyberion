@@ -300,7 +300,7 @@ export function validateMissionHeuristics(
    * D8: the finished mission's tier and entity scope, written onto each queued
    * candidate at capture. A public mission's heuristics queue at the public tier.
    */
-  capture?: { tier: 'public' | 'confidential' | 'personal'; scope?: MemoryScopeEnvelope }
+  capture?: { tier: StorageDataTier; scope?: MemoryScopeEnvelope }
 ): MissionHeuristicValidationResult {
   const result: MissionHeuristicValidationResult = { validated: [], queued: [], errors: [] };
   const missionId = outcome.mission_id.toUpperCase();
