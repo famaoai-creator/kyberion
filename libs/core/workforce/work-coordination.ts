@@ -32,6 +32,7 @@ import {
 import { applyWorkItemFilters, sortItems } from './work-coordination-query.js';
 import { loadWorkBoardCatalogAtPath, workBoardCatalogAtPath } from './work-board-catalog.js';
 import * as parentStatus from './work-item-parent-status.js';
+import * as workLease from './work-item-lease.js';
 export { loadWorkBoardCatalogAtPath } from './work-board-catalog.js';
 export { issueBoardView } from './work-item-hierarchy.js';
 import { assertCreatedWorkItemParent, workItemHierarchyUpdate } from './work-item-hierarchy.js';
@@ -123,6 +124,7 @@ import {
   createWorkItemAttempt,
   currentLeaseById,
   currentLeaseForItem,
+  leaseRecordsForItem,
   currentLeaseRecords,
   currentWorkItem,
   currentWorkItems,
@@ -772,6 +774,7 @@ const pipelineContinuationStore = {
   currentWorkItem,
   activeLeaseForItem,
   currentLeaseById,
+  leasesForItem: leaseRecordsForItem,
   appendLeaseSnapshot,
   appendItemSnapshot: (item: WorkItem) => writeItemSnapshot(currentWorkItem(item.item_id), item),
   appendLeaseEvent,
@@ -856,14 +859,19 @@ function claimWorkItemInternal(input: ClaimWorkItemInput): {
   const target = assertEffectClaimable(current, currentWorkItems());
 
   const now = nowIso();
+  const terms = workLease.grantWorkItemLeaseTerms({
+    itemId: current.item_id,
+    holder: input.actorPeerId,
+    ...(input.ttlMs ? { ttlMs: input.ttlMs } : {}),
+    history: leaseRecordsForItem(current.item_id),
+  });
   const lease: WorkLease = {
     lease_id: randomId('wlease'),
     item_id: current.item_id,
-    holder_peer_id: input.actorPeerId,
+    ...terms,
     ...(input.actorUserId ? { holder_user_id: input.actorUserId } : {}),
     purpose: input.purpose,
     status: 'active',
-    expires_at: new Date(Date.now() + (input.ttlMs || 15 * 60 * 1000)).toISOString(),
     created_at: now,
     renewed_at: now,
     ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
@@ -914,6 +922,7 @@ function claimWorkItemInternal(input: ClaimWorkItemInput): {
     input.actorUserId,
     input.expectedVersion
   );
+  workLease.auditWorkItemLease('acquire', lease, current);
   appendWorkItemAttemptEvent(
     'item_attempt_started',
     current.item_id,
@@ -966,7 +975,7 @@ function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
       active_lease_id: activeLease.lease_id,
     });
   }
-  if (activeLease.holder_peer_id !== input.actorPeerId) {
+  if (!workLease.isWorkLeaseHeldBy(activeLease, input.actorPeerId)) {
     throw new WorkCoordinationError(
       'lease_conflict',
       `lease owner mismatch for ${current.item_id}`,
@@ -1050,6 +1059,7 @@ function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
     input.actorUserId,
     input.expectedVersion
   );
+  workLease.auditWorkItemLease('release', released, current);
   appendWorkItemAttemptEvent(
     'item_attempt_released',
     current.item_id,
@@ -1077,7 +1087,7 @@ export function quarantineWorkItemExecution(input: {
       !lease ||
       current.lease_id !== input.leaseId ||
       lease.item_id !== current.item_id ||
-      lease.holder_peer_id !== input.actorPeerId ||
+      !workLease.isWorkLeaseHeldBy(lease, input.actorPeerId) ||
       lease.status === 'released' ||
       !current.current_attempt_id
     )
@@ -1146,6 +1156,7 @@ export function releaseWorkItemEffectOwnership(input: EffectReleaseInput): WorkI
     let next = verified;
     if (expiredLease && current) {
       appendLeaseSnapshot({ ...expiredLease, status: 'expired', released_at: now });
+      workLease.auditWorkItemLease('expire', expiredLease, current, 'effect-release');
       const final = finalizeWorkItemAttempt(current, 'released', {
         summary: 'Authenticated human reconciled the expired uncertain attempt',
       });
@@ -1180,30 +1191,18 @@ function renewWorkItemLeaseInternal(input: RenewWorkItemLeaseInput): WorkLease {
       status: current.status,
     });
   }
-  if (input.actorPeerId && current.holder_peer_id !== input.actorPeerId) {
-    throw new WorkCoordinationError(
-      'lease_conflict',
-      `lease holder mismatch for renewal: ${input.leaseId}`,
-      {
-        lease_id: input.leaseId,
-        holder_peer_id: current.holder_peer_id,
-        actor_peer_id: input.actorPeerId,
-      }
-    );
-  }
-  const expiresAtMs = new Date(current.expires_at).getTime();
-  if (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now()) {
-    throw new WorkCoordinationError('lease_conflict', `lease already lapsed: ${input.leaseId}`, {
-      lease_id: input.leaseId,
-      expires_at: current.expires_at,
-    });
-  }
+  const terms = workLease.renewWorkItemLeaseTerms(current, {
+    leaseId: input.leaseId,
+    ...(input.actorPeerId ? { holder: input.actorPeerId } : {}),
+    ...(input.ttlMs ? { ttlMs: input.ttlMs } : {}),
+  });
   const renewed: WorkLease = {
     ...current,
-    expires_at: new Date(Date.now() + (input.ttlMs || 15 * 60 * 1000)).toISOString(),
+    ...terms,
     renewed_at: nowIso(),
   };
   appendLeaseSnapshot(renewed);
+  workLease.auditWorkItemLease('renew', renewed);
   return renewed;
 }
 
@@ -1215,7 +1214,7 @@ function expireWorkItemLeasesInternal(now: string): WorkLease[] {
   const nowMs = new Date(now).getTime();
   const expired: WorkLease[] = [];
   for (const lease of currentLeaseRecords()) {
-    if (lease.status === 'active' && new Date(lease.expires_at).getTime() <= nowMs) {
+    if (lease.status === 'active' && !workLease.isWorkLeaseLive(lease, nowMs)) {
       const next: WorkLease = {
         ...lease,
         status: 'expired',
@@ -1223,6 +1222,7 @@ function expireWorkItemLeasesInternal(now: string): WorkLease[] {
       expired.push(next);
       appendLeaseSnapshot(next);
       appendLeaseEvent('lease_expired', lease.item_id, next, `expired lease ${lease.lease_id}`);
+      workLease.auditWorkItemLease('expire', next, null, 'lease-reaper');
     }
   }
   return expired;
@@ -1402,7 +1402,7 @@ function reapExpiredWorkLeasesInternal(options: ReapWorkLeasesOptions): ReapWork
     if (!runningAttempt) continue;
     if (activeLeaseForItem(item.item_id)) continue;
     const lease = currentLeaseById(runningAttempt.lease_id);
-    if (lease?.status === 'active' && new Date(lease.expires_at).getTime() > nowMs) continue;
+    if (lease && workLease.isWorkLeaseLive(lease, nowMs)) continue;
 
     const index = (item.attempts || []).findIndex(
       (attempt) => attempt.run_id === runningAttempt.run_id
@@ -1646,17 +1646,13 @@ export function describeWorkCoordinationStore(): Record<string, unknown> {
     events_path: eventsPath(),
     item_count: items.length,
     board_count: listBoards().length,
-    active_lease_count: currentLeaseRecords().filter(
-      (lease) => lease.status === 'active' && new Date(lease.expires_at).getTime() > Date.now()
-    ).length,
+    active_lease_count: listActiveWorkLeases().length,
     active_attempt_count: activeAttempts,
   };
 }
 
 export function listActiveWorkLeases(): WorkLease[] {
-  return currentLeaseRecords().filter(
-    (lease) => lease.status === 'active' && new Date(lease.expires_at).getTime() > Date.now()
-  );
+  return currentLeaseRecords().filter((lease) => workLease.isWorkLeaseLive(lease));
 }
 
 export function ensureDefaultWorkCoordinationCatalog(): void {

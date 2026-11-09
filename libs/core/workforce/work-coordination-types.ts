@@ -154,6 +154,8 @@ export interface WorkLease {
   payload_hash?: string;
   expected_version?: number;
   previous_lease_id?: string;
+  /** Claim generation (W3); absent on leases written before W3 (read as 0). */
+  fence?: number;
 }
 
 export type WorkCoordinationEventType =

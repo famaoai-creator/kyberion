@@ -86,6 +86,7 @@ describe('v4l2 virtual-camera output seam backend', () => {
     const bridge = new V4l2VirtualCameraOutputBridge({
       ffmpegBin: 'true',
       injectionBridge: injection,
+      lease_manager: new VideoDeviceLeaseManager({ lease_dir: leaseDir }),
     });
 
     await bridge.startAvatarOutput({ videoPath: 'active/shared/tmp/first.mp4' });
