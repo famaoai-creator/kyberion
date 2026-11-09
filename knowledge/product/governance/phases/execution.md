@@ -155,6 +155,13 @@ template task is recorded while the work happens**. Verified end to end on 2026-
      then `pnpm mission resume <MISSION_ID>`; or supersede the task properly and
      accept the frozen lock (it stays counted as frozen and live on the overview).
 
+   Development and refactoring missions carry a `docs-sync` delivery task: run
+   `pnpm check:docs-impact` against the mission diff and write
+   `evidence/docs-sync-report.md`. Every `not_updated` finding is closed either by
+   updating the doc in the same change or by recording the reason the surface does
+   not apply in the report's `## Resolution` section — the delivery gate requires
+   the report, so docs cannot silently fall behind the code.
+
 4. **Review with a different agent.** After an independent reviewer (a distinct subagent,
    or the agent reviewing the PR) has reviewed, record its verdict, then close the review
    task with its own deliverable:

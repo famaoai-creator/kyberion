@@ -56,6 +56,7 @@ import {
   assertPipelineExecutionCurrent,
   PipelineSuspendedError,
   resolveStepType,
+  resolveSemanticActuatorStepKind,
   resolveExportKey,
   buildReasoningPolicyNote,
   resolvePipelineReasoningOptions,
@@ -1447,7 +1448,9 @@ async function dispatchResolvedActuatorOperation(
 
   // CRITICAL: Safety check for source (capture) ops.
   // Resolve export key via produces > params.export_as > default.
-  if (effectiveType === 'capture') {
+  // Use registry semantics — prepareEngineSteps collapses capture → apply.
+  const semanticType = resolveSemanticActuatorStepKind(domain, action, effectiveType);
+  if (semanticType === 'capture') {
     const exportKey = resolveExportKey(step, 'last_capture');
     const actualCtx =
       result.ctx && typeof result.ctx === 'object' && 'context' in result.ctx

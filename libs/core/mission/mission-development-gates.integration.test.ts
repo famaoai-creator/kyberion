@@ -107,6 +107,10 @@ describe('stored development completion gates', () => {
           path.join(directory, 'evidence/delivery-report.md'),
           '# Existing verified publication report'
         );
+        io.safeWriteFile(
+          path.join(directory, 'evidence/docs-sync-report.md'),
+          '# Docs impact report'
+        );
         const marker = {
           operation_key: 'admitted:mission:improve',
           request_hash: 'a'.repeat(64),
@@ -163,6 +167,7 @@ describe('stored development completion gates', () => {
         });
         expect(pending.evaluation?.verdict).toBe('fail');
         expect(pending.evaluation?.checks.map((check) => check.kind)).toEqual([
+          'evidence_exists',
           'evidence_exists',
           'development_publication_verified',
         ]);

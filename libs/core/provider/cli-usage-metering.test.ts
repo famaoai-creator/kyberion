@@ -3,14 +3,23 @@ import { metrics } from '../analysis/metrics.js';
 import {
   cliOutputFormat,
   delegationMetadataFromCliReport,
+  parseAgyCliUsage,
   parseClaudeCliUsage,
   parseCodexCliUsage,
+  parseCursorCliUsage,
+  parseDevinCliTranscriptUsage,
   parseGeminiCliUsage,
+  parseOpencodeCliUsage,
   recordCliUsage,
   recordEstimatedCliUsage,
 } from './cli-usage-metering.js';
 import { withUsageAttribution } from '../finance/usage-accounting.js';
 import { runWithDelegationExecutionTracker } from '../workforce/delegation-execution-tracker.js';
+import { pathResolver, registerMissionLocator } from '../path-resolver.js';
+import { safeMkdir, safeWriteFile } from '../secure-io.js';
+import { withExecutionContext } from '../authority.js';
+import { resetMissionScopeCacheForTests } from '../foundation/mission-scope-env.js';
+import path from 'node:path';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -370,6 +379,147 @@ describe('native CLI usage envelopes', () => {
       expect(call[3]).not.toHaveProperty('usage');
     }
   });
+
+  it('reads Devin transcript final_metrics with cached input kept disjoint', () => {
+    const report = parseDevinCliTranscriptUsage(
+      JSON.stringify({
+        schema_version: 1,
+        session_id: 's-1',
+        agent: 'devin',
+        steps: [{ step_id: 1 }],
+        final_metrics: {
+          total_prompt_tokens: 18330205,
+          total_completion_tokens: 64809,
+          total_cached_tokens: 18189056,
+          total_steps: 160,
+        },
+      })
+    );
+    expect(report?.entries).toEqual([
+      {
+        usage: {
+          prompt_tokens: 141149,
+          completion_tokens: 64809,
+          cache_read_tokens: 18189056,
+        },
+      },
+    ]);
+    // Missing/malformed totals never become usage.
+    expect(parseDevinCliTranscriptUsage(JSON.stringify({ final_metrics: {} }))).toBeUndefined();
+    expect(
+      parseDevinCliTranscriptUsage(
+        JSON.stringify({
+          final_metrics: { total_prompt_tokens: 10, total_cached_tokens: 20 },
+        })
+      )
+    ).toBeUndefined();
+    expect(parseDevinCliTranscriptUsage('not json')).toBeUndefined();
+    expect(parseDevinCliTranscriptUsage(JSON.stringify({ steps: [] }))).toBeUndefined();
+  });
+
+  it('reads AGY result usage from stream-json events and json envelopes', () => {
+    const usage = {
+      input_tokens: 8870,
+      output_tokens: 1,
+      thinking_tokens: 4,
+      cache_read_tokens: 100,
+      total_tokens: 8971,
+    };
+    const envelope = { conversation_id: 'c', status: 'SUCCESS', response: 'OK\n', usage };
+    expect(
+      parseAgyCliUsage(JSON.stringify({ event: 'result', result: envelope }))?.entries
+    ).toEqual([
+      {
+        usage: {
+          prompt_tokens: 8870,
+          completion_tokens: 5,
+          cache_read_tokens: 100,
+        },
+      },
+    ]);
+    expect(parseAgyCliUsage(JSON.stringify(envelope))?.entries[0]?.usage.prompt_tokens).toBe(8870);
+    expect(parseAgyCliUsage(JSON.stringify({ ...envelope, status: 'FAILED' }))).toMatchObject({
+      isError: true,
+    });
+    expect(parseAgyCliUsage(JSON.stringify({ event: 'step_update' }))).toBeUndefined();
+    expect(
+      parseAgyCliUsage(JSON.stringify({ event: 'result', result: { status: 'SUCCESS' } }))
+    ).toEqual({ entries: [], isError: false });
+  });
+
+  it('reads Cursor result usage without double-counting reasoning output', () => {
+    const record = {
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      result: 'OK',
+      session_id: 's',
+      usage: {
+        inputTokens: 8875,
+        outputTokens: 27,
+        cacheReadTokens: 3968,
+        cacheWriteTokens: 5,
+        reasoningTokens: 26,
+      },
+    };
+    expect(parseCursorCliUsage(JSON.stringify(record))?.entries).toEqual([
+      {
+        usage: {
+          prompt_tokens: 8875,
+          completion_tokens: 27,
+          cache_read_tokens: 3968,
+          cache_write_tokens: 5,
+        },
+      },
+    ]);
+    expect(parseCursorCliUsage(JSON.stringify({ ...record, is_error: true }))).toMatchObject({
+      isError: true,
+    });
+    expect(parseCursorCliUsage(JSON.stringify({ type: 'result', result: 'no usage' }))).toEqual({
+      entries: [],
+      isError: false,
+    });
+    expect(parseCursorCliUsage(JSON.stringify({ type: 'assistant' }))).toBeUndefined();
+  });
+
+  it('sums OpenCode step_finish tokens and keeps the reported cost on the entry', () => {
+    const step = (tokens: unknown, cost = 0) =>
+      JSON.stringify({ type: 'step_finish', part: { tokens, cost } });
+    const stdout = [
+      JSON.stringify({ type: 'step_start', part: {} }),
+      step({ input: 4000, output: 10, reasoning: 4, cache: { read: 100, write: 0 } }, 0.01),
+      step({ input: 788, output: 2, reasoning: 10, cache: { read: 0, write: 3 } }),
+    ].join('\n');
+    const report = parseOpencodeCliUsage(stdout);
+    expect(report?.entries).toEqual([
+      {
+        usage: {
+          prompt_tokens: 4788,
+          completion_tokens: 26,
+          cache_read_tokens: 100,
+          cache_write_tokens: 3,
+        },
+        referenceCostUsd: 0.01,
+      },
+    ]);
+    expect(parseOpencodeCliUsage(JSON.stringify({ type: 'text' }))).toBeUndefined();
+    expect(parseOpencodeCliUsage('plain text')).toBeUndefined();
+  });
+
+  it('keeps AGY SDK bridge usage on the agy envelope convention', () => {
+    // The SDK bridge emits an agy-style usage dict; wrapping it in a
+    // transport record lets the shared parser read it unchanged.
+    const report = parseAgyCliUsage(
+      JSON.stringify({
+        usage: { input_tokens: 100, output_tokens: 5, thinking_tokens: 2, cache_read_tokens: 0 },
+      })
+    );
+    expect(report?.entries).toEqual([
+      {
+        usage: { prompt_tokens: 100, completion_tokens: 7, cache_read_tokens: 0 },
+      },
+    ]);
+  });
 });
 
 describe('R5 delegation result metadata from CLI usage envelopes', () => {
@@ -448,5 +598,112 @@ describe('R5 delegation result metadata from CLI usage envelopes', () => {
     expect(metadata).toEqual({
       usage: { input_tokens: 120, output_tokens: 10, total_tokens: 130 },
     });
+  });
+});
+
+describe('ambient usage attribution (no ALS binding)', () => {
+  const fixtureRoot = pathResolver.sharedTmp();
+  const located = new Map<string, string>();
+  registerMissionLocator((missionId) => located.get(missionId.toUpperCase()));
+
+  function seedMissionState(missionId: string, state: Record<string, unknown>): void {
+    const dir = path.join(fixtureRoot, `mission-scope-${process.pid}`, missionId);
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(dir, { recursive: true });
+      safeWriteFile(path.join(dir, 'mission-state.json'), JSON.stringify(state));
+    });
+    located.set(missionId.toUpperCase(), dir);
+    resetMissionScopeCacheForTests();
+  }
+
+  afterEach(() => {
+    located.clear();
+    resetMissionScopeCacheForTests();
+    delete process.env.MISSION_ID;
+    delete process.env.KYBERION_TENANT;
+  });
+
+  it('scopes the row to the mission record when MISSION_ID is bound', () => {
+    const spy = vi.spyOn(metrics, 'record').mockImplementation(() => undefined as never);
+    seedMissionState('MSN-AMBIENT-1', {
+      tier: 'confidential',
+      tenant_slug: 'acme-corp',
+      organization_id: 'org-acme',
+      relationships: { project: { project_id: 'proj-9' } },
+    });
+    process.env.MISSION_ID = 'MSN-AMBIENT-1';
+
+    recordCliUsage('devin-cli', 'swe', Date.now(), 'success', {
+      promptChars: 80,
+      completionChars: 20,
+    });
+
+    expect(spy).toHaveBeenCalledOnce();
+    const extra = spy.mock.calls[0][3] as Record<string, unknown>;
+    expect(extra.scope).toMatchObject({
+      scope_kind: 'mission',
+      tier: 'confidential',
+      tenant_slug: 'acme-corp',
+      organization_id: 'org-acme',
+      project_id: 'proj-9',
+      mission_id: 'MSN-AMBIENT-1',
+    });
+    expect(extra.mission_id).toBe('MSN-AMBIENT-1');
+    expect(String(extra.actor_id)).toMatch(/^kyberion:/);
+  });
+
+  it('leaves the row unscoped when the mission is not resolvable', () => {
+    const spy = vi.spyOn(metrics, 'record').mockImplementation(() => undefined as never);
+    process.env.MISSION_ID = 'MSN-DOES-NOT-EXIST-1';
+    resetMissionScopeCacheForTests();
+
+    recordCliUsage('devin-cli', 'swe', Date.now(), 'success', {
+      promptChars: 80,
+      completionChars: 20,
+    });
+
+    const extra = spy.mock.calls[0][3] as Record<string, unknown>;
+    expect(extra.mission_id).toBe('MSN-DOES-NOT-EXIST-1');
+    expect(extra).not.toHaveProperty('scope');
+    expect(extra).not.toHaveProperty('actor_id');
+  });
+
+  it('scopes to the tenant boundary when no mission or project is bound', () => {
+    const spy = vi.spyOn(metrics, 'record').mockImplementation(() => undefined as never);
+    process.env.KYBERION_TENANT = 'acme-corp';
+
+    recordCliUsage('devin-cli', 'swe', Date.now(), 'success', {
+      promptChars: 80,
+      completionChars: 20,
+    });
+
+    const extra = spy.mock.calls[0][3] as Record<string, unknown>;
+    expect(extra.scope).toMatchObject({
+      scope_kind: 'tenant',
+      tier: 'confidential',
+      tenant_slug: 'acme-corp',
+    });
+    expect((extra.scope as Record<string, unknown>).project_id).toBeUndefined();
+    expect(String(extra.actor_id)).toMatch(/^kyberion:/);
+  });
+
+  it('explicit withUsageAttribution wins over the ambient fallback', () => {
+    const spy = vi.spyOn(metrics, 'record').mockImplementation(() => undefined as never);
+    seedMissionState('MSN-AMBIENT-2', { tier: 'public', organization_id: 'org-wrong' });
+    process.env.MISSION_ID = 'MSN-AMBIENT-2';
+
+    withUsageAttribution(
+      { actor_id: 'dot:explicit', scope: { tier: 'public', scope_kind: 'system' } },
+      () =>
+        recordCliUsage('devin-cli', 'swe', Date.now(), 'success', {
+          promptChars: 80,
+          completionChars: 20,
+        })
+    );
+
+    const extra = spy.mock.calls[0][3] as Record<string, unknown>;
+    expect(extra.actor_id).toBe('dot:explicit');
+    expect(extra.scope).toMatchObject({ scope_kind: 'system' });
+    expect((extra.scope as Record<string, unknown>).organization_id).toBeUndefined();
   });
 });

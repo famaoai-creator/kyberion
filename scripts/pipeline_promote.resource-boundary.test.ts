@@ -3,11 +3,13 @@ import * as nodePath from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core';
+import { VITEST_LIVE_SANDBOX_ROOT } from '@agent/core/path-resolver';
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { deriveAssetId, readAssetLedger } from '@agent/core/ingest-asset-ledger';
 import {
   createPipelineRunJournal,
   newPipelineRunId,
+  pipelineRunJournalPath,
 } from '@agent/core/pipeline/pipeline-run-journal';
 import {
   buildTenantPipelineCatalog,
@@ -194,6 +196,9 @@ describe('pipeline promotion resource boundaries', () => {
     const target = `${knowledgeRoot}/pipelines/ledger-flow.json`;
     const ledger = async () => readAssetLedger(tenant, { knowledgeRoot });
     const journals: string[] = [];
+    const journalSandbox = pathResolver.rootResolve(
+      VITEST_LIVE_SANDBOX_ROOT + '/pool-pipeline-ledger-' + process.pid
+    );
     let runId: string;
     const writeSource = (message: string) => {
       const absolute = pathResolver.rootResolve(sourcePath);
@@ -207,10 +212,20 @@ describe('pipeline promotion resource boundaries', () => {
           steps: [{ op: 'core:log', params: { message } }],
         })
       );
+      const journalRunId = newPipelineRunId();
+      const journalScope = { tier: 'confidential' as const, tenantSlug: tenant };
+      const journalPath = pipelineRunJournalPath(journalRunId, undefined, journalScope);
+      expect(journalPath.startsWith(journalSandbox + nodePath.sep)).toBe(true);
+      // The run grant owns only pipeline-library-runs/confidential/<tenant>.
+      // Initialize its sandbox runtime parent as fixture infrastructure, before
+      // entering that exact grant; a fresh pool has no such ancestors yet.
+      safeMkdir(nodePath.resolve(nodePath.dirname(journalPath), '..', '..', '..'), {
+        recursive: true,
+      });
       vi.stubEnv('KYBERION_TIER', 'confidential');
       vi.stubEnv('KYBERION_TENANT', tenant);
       const journal = createPipelineRunJournal(
-        newPipelineRunId(),
+        journalRunId,
         {
           pipeline_id: 'ledger-flow',
           input_path: absolute,
@@ -219,7 +234,7 @@ describe('pipeline promotion resource boundaries', () => {
           step_ids: ['log'],
         },
         undefined,
-        { tier: 'confidential', tenantSlug: tenant }
+        journalScope
       );
       journal.append('node_completed', {
         step_id: 'log',
@@ -245,6 +260,9 @@ describe('pipeline promotion resource boundaries', () => {
       ]);
 
     beforeEach(() => {
+      // A private, freshly cleaned pool prevents another test from supplying
+      // missing journal ancestors and masking fixture setup omissions.
+      vi.stubEnv('VITEST_POOL_ID', 'pipeline-ledger-' + process.pid);
       vi.stubEnv('KYBERION_PERSONA', 'vitest-promoter');
       writeSource('one');
     });
@@ -253,6 +271,7 @@ describe('pipeline promotion resource boundaries', () => {
       vi.unstubAllEnvs();
       safeRmSync(pathResolver.rootResolve(fixture), { recursive: true, force: true });
       for (const file of journals.splice(0)) safeRmSync(file, { force: true });
+      safeRmSync(journalSandbox, { recursive: true, force: true });
     });
 
     it('writes no ledger record on --dry-run', async () => {
