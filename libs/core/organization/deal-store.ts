@@ -392,6 +392,9 @@ function queueDealDistillCandidate(deal: DealRecord): void {
     ],
     sensitivityTier: 'confidential',
     ratificationRequired: true,
+    // D8: the deal's tenant is its entity scope, written at capture.
+    kind: 'organization_learning',
+    scope: { tier: 'confidential', tenant_slug: deal.tenant_slug },
   });
   enqueueMemoryPromotionCandidate(candidate);
   appendDealLog(deal.tenant_slug, {

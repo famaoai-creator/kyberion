@@ -182,3 +182,37 @@ export function formatPromotedKnowledgeSummary(entry: PromotedKnowledgeEntry): s
   const tags = entry.tags.length ? ` [${entry.tags.slice(0, 3).join(', ')}]` : '';
   return `- ${entry.title}${tags} (score=${entry.score.toFixed(2)})\n  ${entry.excerpt.slice(0, 160)}…\n  source: ${entry.path}`;
 }
+
+/**
+ * @deprecated D8 retired the `distill_*` injector lane. Kept for one release
+ * as an alias over the promoted lane; use {@link PromotedKnowledgeEntry}.
+ */
+export type DistilledKnowledgeEntry = PromotedKnowledgeEntry;
+
+/** @deprecated Use {@link FindRelevantPromotedKnowledgeInput}; `tags` join the topic. */
+export interface FindRelevantInput {
+  topic: string;
+  tags?: string[];
+  limit?: number;
+  minScore?: number;
+  scope?: ScopeContext;
+}
+
+/**
+ * @deprecated D8: the `distill_*` corpus is historical and its injector is
+ * deleted. This alias queries promoted records instead (tags join the topic).
+ * Use {@link findRelevantPromotedKnowledge}; removed in the next release.
+ */
+export async function findRelevantDistilledKnowledge(
+  input: FindRelevantInput
+): Promise<DistilledKnowledgeEntry[]> {
+  return findRelevantPromotedKnowledge({
+    topic: [input.topic, ...(input.tags ?? [])].filter(Boolean).join(' '),
+    ...(input.limit !== undefined ? { limit: input.limit } : {}),
+    ...(input.minScore !== undefined ? { minScore: input.minScore } : {}),
+    ...(input.scope ? { scope: input.scope } : {}),
+  });
+}
+
+/** @deprecated Use {@link formatPromotedKnowledgeSummary}. */
+export const formatDistilledKnowledgeSummary = formatPromotedKnowledgeSummary;

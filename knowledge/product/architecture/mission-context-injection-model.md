@@ -6,7 +6,7 @@ authority: reference
 phase: [alignment, execution, review]
 tags: [mission, context, injection, pack, tier, tenant, knowledge]
 owner: ecosystem_architect
-last_updated: 2026-10-05
+last_updated: 2026-11-10
 ---
 
 # Mission Context Injection Model
@@ -167,7 +167,9 @@ The scoped injection flow should be owned by these modules or boundaries:
     relevant to the scoped pack through the knowledge index, admitted by the reader's
     tier and tenant (tenant-scoped records arrive through tenant retrieval)
   - keep the knowledge source as a derived input, not the primary execution store
-  - the legacy `distill_*` corpus and `distill-knowledge-injector.ts` are retired from this lane
+  - the legacy `distill_*` corpus is historical and `distill-knowledge-injector.ts` is deleted;
+    ADF repair, background review and the worker's needs re-query use this lane too (the
+    re-query adds the mission's own tenant subtree through `queryTenantKnowledge`)
 - `libs/core/mission/mission-workitem-dispatch.ts`
   - request a scoped context pack before dispatch
   - deliver the pack to the selected agent or subagent

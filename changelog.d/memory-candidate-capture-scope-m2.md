@@ -1,0 +1,7 @@
+---
+category: Changed
+---
+
+- Memory candidates now carry `kind` (lesson, heuristic, process_improvement, hint, execution_feedback, organization_learning, advisory, asset_promotion) and `lane`, written at capture; queue rows written before this change gain both when loaded. Registration rejects a confidential or personal candidate that has no scope envelope (`MEMORY_SCOPE_REQUIRED`), so tier and tenant are never inferred at promotion. Producers now pass their scope: deal outcomes, background reviews (mission tenant or session owner), mission heuristics and review-rejection lessons (the mission's tier and tenant), and curation advisories (the document's tier). Tenantless confidential or personal captures that have no scope are skipped with a warning instead of landing in the shared queue.
+- The retired `distill-knowledge-injector` is deleted. ADF repair, background review and the orchestration worker's needs re-query read promoted records through `findRelevantPromotedKnowledge` (plus the mission's own tenant subtree for the re-query). `findRelevantDistilledKnowledge` and `formatDistilledKnowledgeSummary` remain for one release as deprecated aliases over the promoted lane, and the `@agent/core/distill-knowledge-injector` subpath export is removed.
+- Mission distillation identifiers follow the D8 terms: `loadDistillPolicy`, `resolveDistillationOutputPath`, `DISTILLATION_SCHEMA`, `buildFallbackDistillation` and `formatDistillationMarkdown`, with the `*Wisdom*` names kept as deprecated aliases for one release.
