@@ -98,6 +98,7 @@
     "foundation/locale-normalize": 0,
     "foundation/lock-utils": 9,
     "foundation/message-format": 0,
+    "foundation/mission-scope-env": 6,
     "foundation/operational-store-policy": 0,
     "foundation/origin-policy": 0,
     "foundation/pcm-wav": 0,
