@@ -54,12 +54,7 @@
       "glossary_anchor": "workitem",
       "canonical_doc": "docs/GLOSSARY.md#units-of-work",
       "owner_modules": ["libs/core/workforce/work-coordination.ts"],
-      "not_to_confuse_with": ["mission", "task", "lease"],
-      "lifecycle": {
-        "state": "transitioning",
-        "decision": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md#d1--workitem-is-the-issue-steps-are-child-workitems-leases-are-taken-on-children",
-        "plan": "docs/developer/improvement-plans-2026-11/WORKITEM_ISSUE_LEASE_CONSOLIDATION_PLAN_2026-11-10.ja.md"
-      }
+      "not_to_confuse_with": ["mission", "task", "lease"]
     },
     {
       "id": "project",
@@ -370,13 +365,8 @@
       "definition": "Time-bounded, fenced exclusive control of one named resource by one holder; the single primitive behind WorkItem claims, Mission Lease, path and device leases.",
       "glossary_anchor": "lease",
       "canonical_doc": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md",
-      "owner_modules": ["libs/core/lease/lease-backend.ts"],
-      "not_to_confuse_with": ["work-item", "grant"],
-      "lifecycle": {
-        "state": "transitioning",
-        "decision": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md#d2--one-lease-primitive",
-        "plan": "docs/developer/improvement-plans-2026-11/WORKITEM_ISSUE_LEASE_CONSOLIDATION_PLAN_2026-11-10.ja.md"
-      }
+      "owner_modules": ["libs/core/lease/lease-backend.ts", "libs/core/lease/lease-terms.ts"],
+      "not_to_confuse_with": ["work-item", "grant"]
     },
     {
       "id": "member-role",

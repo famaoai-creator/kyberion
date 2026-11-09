@@ -84,6 +84,15 @@ describe('co-session', () => {
       participant_id: 'claude-1',
     });
     expect(lease.status).toBe('active');
+    expect(lease.fence).toBe(1);
+    // W3: the same holder renews (lease id and fence kept).
+    const renewed = acquireCoSessionLease({
+      session_id: 'cos-lease',
+      provider: 'claude',
+      path: 'scripts/co_session.ts',
+      participant_id: 'claude-1',
+    });
+    expect(renewed).toMatchObject({ lease_id: lease.lease_id, fence: 1 });
     expect(() =>
       acquireCoSessionLease({
         session_id: 'cos-lease',
@@ -105,6 +114,8 @@ describe('co-session', () => {
       participant_id: 'cursor-1',
     });
     expect(again.holder_provider).toBe('cursor');
+    // A new holder after release takes the next generation.
+    expect(again.fence).toBe(2);
   });
 
   it('serializes lease mutations through the shared inter-process lock', () => {
