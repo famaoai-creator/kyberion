@@ -1465,6 +1465,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_DISTILL_LLM_PROFILE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "LLM profile override for mission distillation (a profile name from distill-policy.json, or `stub` for structural distillation only). Replaces KYBERION_WISDOM_LLM_PROFILE.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_DOT_MAX_CONCURRENT_DELEGATIONS",
       "category": "tuning",
       "type": "number",
@@ -1886,6 +1894,14 @@
       "type": "string",
       "required": false,
       "description": "Optional runtime setting for harness subagent; leave unset to use the built-in configuration.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_HINT_STORE_ROOT",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Test-isolation override for the root of the D8 runtime hint store (default active/shared/runtime/hints); must stay inside the repository. Partitions keep the <tier>/<tenant|shared>/ layout below it.",
       "documented": true
     },
     {
@@ -5179,8 +5195,9 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Optional runtime setting for wisdom llm profile; leave unset to use the built-in configuration.",
-      "documented": true
+      "description": "Deprecated (Concept Model v2 D8): renamed to KYBERION_DISTILL_LLM_PROFILE. Read for one release when the new name is unset, with a deprecation warning.",
+      "documented": true,
+      "deprecated": "2026-11"
     },
     {
       "name": "KYBERION_WORK_COORDINATION_NAMESPACE",

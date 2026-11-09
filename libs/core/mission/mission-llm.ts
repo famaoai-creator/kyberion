@@ -8,6 +8,8 @@ import * as customerResolver from '../authn/stance-resolver.js';
 import { logger } from '../core.js';
 import { formatDiagnostic } from '../logger.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { distillLlmProfileOverride } from './distill-llm-profile.js';
+export { distillLlmProfileOverride } from './distill-llm-profile.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord, extractFencedBlock } from '../foundation/text.js';
 import * as path from 'node:path';
@@ -310,7 +312,7 @@ export function invokeShellProfile(
 function resolveCandidateProfileNames(purpose: string, policy?: LlmPolicyConfig): string[] {
   const purposeMap = policy?.purpose_map || {};
   const defaultName = policy?.default_profile || 'standard';
-  const overrideProfile = getRegisteredEnvText('KYBERION_WISDOM_LLM_PROFILE')?.trim();
+  const overrideProfile = distillLlmProfileOverride();
   if (overrideProfile === 'stub') return ['stub'];
   const targetName = overrideProfile || purposeMap[purpose] || defaultName;
   const profiles = Object.keys(policy?.profiles || {});
@@ -330,7 +332,7 @@ export function inspectLlmResolution(
   const profiles = policy?.profiles || {};
   const checkedProfiles: LlmResolutionStatus['checkedProfiles'] = [];
   const candidateNames = resolveCandidateProfileNames(purpose, policy);
-  const forceStubMode = getRegisteredEnvText('KYBERION_WISDOM_LLM_PROFILE')?.trim() === 'stub';
+  const forceStubMode = distillLlmProfileOverride() === 'stub';
 
   for (const name of candidateNames) {
     if (name === 'stub') {
@@ -455,7 +457,7 @@ export function resolveLlmConfig(
     .join('; ');
   throw new Error(
     `No usable LLM tool available for purpose "${purpose}". ` +
-      `Set KYBERION_WISDOM_LLM_PROFILE, update wisdom-policy.json, or use stub distillation. ` +
+      `Set KYBERION_DISTILL_LLM_PROFILE, update distill-policy.json, or use stub distillation. ` +
       `Checks: ${details || 'none'}`
   );
 }
