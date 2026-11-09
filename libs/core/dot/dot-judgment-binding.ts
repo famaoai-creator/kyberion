@@ -14,6 +14,7 @@ import {
 import { judgmentCanonicalHash } from '../organization/judgment-precedents.js';
 import type { DotCharter } from './dot-charter.js';
 import { normalizeDotProposal, type DotProposal } from './dot-proposals.js';
+import { dotProposalSchemaVersion, writtenDotProposal } from './dot-action-ledger-version.js';
 
 export interface DotJudgmentBinding {
   schema_version: '1';
@@ -117,17 +118,24 @@ export function validateServerDotJudgmentProposal(
   const binding = parseDotJudgmentBinding(descriptor.value);
   if (!binding) throw new Error('Present judgment binding is required');
   if (
-    proposal.work_shape !== 'pipeline' ||
+    proposal.execution_shape !== 'pipeline' ||
     !proposal.pipeline_ref ||
     ['front_desk_execution', 'continuous_work', 'mission_admission', 'handoff_to'].some((field) =>
       Object.hasOwn(proposal, field)
     )
   )
     throw new Error('Judged proposals cannot combine managed, diagnostic or handoff provenance');
+  // The original proposal hash pins the proposal as written (action schema version of
+  // its admission), so it is verified over the written form, like-for-like.
   const base = Object.fromEntries(
-    Object.entries(proposal).filter(([field]) => field !== 'semantic_judgment')
+    Object.entries(writtenDotProposal(proposal)).filter(([field]) => field !== 'semantic_judgment')
   );
-  const normalized = normalizeDotProposal(base);
+  const normalizedView = normalizeDotProposal(base);
+  const normalized = writtenDotProposal(
+    dotProposalSchemaVersion(proposal) === 1
+      ? { ...normalizedView, schema_version: 1 }
+      : normalizedView
+  );
   const baseHash = judgmentCanonicalHash(base);
   if (baseHash !== judgmentCanonicalHash(normalized) || baseHash !== binding.original_proposal_hash)
     throw new Error('Original normalized proposal differs from the judgment binding');
@@ -192,7 +200,7 @@ export function bindSyntheticDotJudgmentProposal(
     );
   if (
     charter.status !== 'active' ||
-    proposal.work_shape !== 'pipeline' ||
+    proposal.execution_shape !== 'pipeline' ||
     !proposal.pipeline_ref ||
     !(charter.authority.allowed_pipelines ?? []).includes(proposal.pipeline_ref) ||
     !(charter.authority.allowed_execution_shapes ?? []).includes('pipeline')

@@ -62,7 +62,7 @@ export function createFirstJobTenantStatusAssertion(
       if (
         !binding ||
         proposal.action_id !== 'dot_delegate_work' ||
-        proposal.work_shape !== 'pipeline' ||
+        proposal.execution_shape !== 'pipeline' ||
         proposal.pipeline_ref !== FRONT_DESK_RECEIPT_PIPELINE ||
         proposal.handoff_to !== undefined
       )

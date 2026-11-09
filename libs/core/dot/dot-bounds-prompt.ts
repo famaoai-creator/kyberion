@@ -37,8 +37,8 @@ export function composeDotBoundsPrompt(
   return [
     ...dotMissionAdmissionPrompt(charter, shapes, deps.now?.() ?? new Date()),
     shapes.length
-      ? `Allowed work_shape values: ${shapes.join(', ')}. Any other shape is refused.`
-      : 'No work_shape is available to you now; propose nothing and report status instead.',
+      ? `Allowed execution_shape values: ${shapes.join(', ')}. Any other shape is refused.`
+      : 'No execution_shape is available to you now; propose nothing and report status instead.',
     ...(shapes.includes('pipeline')
       ? [
           pipelines.length
