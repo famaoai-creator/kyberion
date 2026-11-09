@@ -50,6 +50,10 @@ import { resolveRole, withExecutionContext } from '../authority.js';
 import { logger } from '../core.js';
 import { enforceNhiActorPolicy } from '../agent/nhi-actor-verification.js';
 import {
+  deriveMissionOwnershipItemId,
+  ensureMissionOwnershipWorkItem,
+} from './mission-ownership-item.js';
+import {
   EventSourcingKernel,
   appendValidatedJournalEvent,
   journalEventEnvelopeSchema,
@@ -58,7 +62,6 @@ import {
 } from '../workforce/worker-state-journal.js';
 import {
   claimWorkItem,
-  createWorkItem,
   getWorkItem,
   releaseWorkItem,
   renewWorkItemLease,
@@ -438,9 +441,6 @@ function normalizeMissionId(missionId: string): string {
   return normalizeOrchestratorMissionId(missionId);
 }
 
-/** SO-03: deterministic namespace-safe id for a mission's ownership work-item claim. */
-const MISSION_OWNERSHIP_ITEM_PREFIX = 'mission-ownership:';
-
 /** SO-03: purpose tag stamped on the ownership work-item's lease. */
 export const ORCHESTRATOR_SESSION_OWNERSHIP_PURPOSE = 'mission_ownership';
 
@@ -448,28 +448,10 @@ export const ORCHESTRATOR_SESSION_OWNERSHIP_PURPOSE = 'mission_ownership';
 export const ORCHESTRATOR_SESSION_LEASE_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
- * The deterministic work-item id backing `missionId`'s ownership claim.
- * Prefixed and namespaced so it can never collide with a real work item
- * dispatched through the normal WorkItem flow (see work-coordination.ts).
+ * The deterministic work-item id backing `missionId`'s ownership claim; the
+ * item itself is the mission's Issue (D1) — see mission-ownership-item.ts.
  */
-export function deriveMissionOwnershipItemId(missionId: string): string {
-  return `${MISSION_OWNERSHIP_ITEM_PREFIX}${normalizeOrchestratorMissionId(missionId)}`;
-}
-
-/** Idempotent: create the mission-ownership work item on first use only. */
-function ensureMissionOwnershipWorkItem(itemId: string, missionId: string): void {
-  if (getWorkItem(itemId)) return;
-  createWorkItem({
-    itemId,
-    title: `Mission ownership: ${missionId}`,
-    description:
-      `SO-03 mission-ownership claim item for mission ${missionId}. This is not a real unit of ` +
-      'work — it exists only so orchestrator-session.ts can serialize "who owns this mission" ' +
-      'across processes through the same lease mechanism real work items use.',
-    projectId: 'orchestrator-sessions',
-    metadata: { mission_id: missionId, kind: 'mission_ownership' },
-  });
-}
+export { deriveMissionOwnershipItemId };
 
 export interface CreateOrchestratorSessionParams {
   surface: string;
@@ -517,7 +499,7 @@ export function createOrchestratorSession(
   // exclusion primitive here; the in-process check above is only a fast
   // path for the common (non-racing) case.
   const ownershipItemId = deriveMissionOwnershipItemId(missionId);
-  ensureMissionOwnershipWorkItem(ownershipItemId, missionId);
+  ensureMissionOwnershipWorkItem(missionId);
 
   let lease: WorkLease;
   try {
