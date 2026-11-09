@@ -559,6 +559,7 @@
 - [外部操作の接続と権限委任オンボーディング](./product/orchestration/onboarding-action-authority.md) (public | Unknown)
 - [情報資産の外部操作を承認済み mission で実行する](./product/orchestration/information-asset-mission-work.md) (public | Unknown)
 - [手順の成功チェック プレイブック（golden シナリオ）](./product/orchestration/procedure-success-check-playbook.ja.md) (public | Unknown)
+- [文書理解・設計レビューの実行と証跡](./product/orchestration/document-review-playbook.md) (public | Unknown)
 - [残留データ（残骸）運用プレイブック — 実測スナップショットと掃除・運用の虎の巻](./product/orchestration/storage-residue-operations-playbook.ja.md) (public | Unknown)
 - [知覚プレイブック（read / see / listen / watch — 感覚ごとに入口はひとつ）](./product/orchestration/perception-playbook.ja.md) (public | Ecosystem Architect)
 - [能力動詞の棚卸し（どの能力が一語になっていて、どれがなっていないか）](./product/orchestration/capability-verb-inventory.ja.md) (public | Ecosystem Architect)
