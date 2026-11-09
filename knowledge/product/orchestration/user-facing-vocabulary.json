@@ -13568,6 +13568,41 @@
         "ja": "{age}に更新",
         "qps-ploc": "⟦Ůṗḓȧŧėḓ {age} ŀőřė⟧"
       },
+      "ux_b_card_steps_progress": {
+        "en": "{done} of {total} steps done",
+        "ja": "ステップ {total} 件中 {done} 件が完了",
+        "qps-ploc": "⟦{done} őƒ {total} şŧėṗş ḓőñė ŀőřėɱ ïṗş⟧"
+      },
+      "ux_b_card_steps_show": {
+        "en": "Show steps",
+        "ja": "ステップを見る",
+        "qps-ploc": "⟦Şħőẇ şŧėṗş ŀőř⟧"
+      },
+      "ux_b_card_steps_label": {
+        "en": "Steps of {title}",
+        "ja": "「{title}」のステップ",
+        "qps-ploc": "⟦Şŧėṗş őƒ {title} ŀőřėɱ⟧"
+      },
+      "ux_b_card_steps_loading": {
+        "en": "Loading steps…",
+        "ja": "ステップを読み込んでいます…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ şŧėṗş… ŀőřė⟧"
+      },
+      "ux_b_card_steps_failed": {
+        "en": "The steps could not be loaded. Close and open this again to retry.",
+        "ja": "ステップを読み込めませんでした。閉じてもう一度開くと再試行します。",
+        "qps-ploc": "⟦Ŧħė şŧėṗş ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. Ƈŀőşė ȧñḓ őṗėñ ŧħïş ȧɠȧïñ ŧő řėŧřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ux_b_card_steps_empty": {
+        "en": "No steps you can see.",
+        "ja": "表示できるステップはありません。",
+        "qps-ploc": "⟦Ñő şŧėṗş ẏőů ƈȧñ şėė. ŀőřėɱ ⟧"
+      },
+      "ux_b_board_issues_hint": {
+        "en": "Each card is one piece of work. Its steps open inside the card, and its status follows them: when every step is done it moves to review.",
+        "ja": "カードは 1 件の仕事です。ステップはカードの中で開けます。状態はステップに合わせて進み、すべて完了するとレビューに移ります。",
+        "qps-ploc": "⟦Ėȧƈħ ƈȧřḓ ïş őñė ṗïėƈė őƒ ẇőřķ. Ïŧş şŧėṗş őṗėñ ïñşïḓė ŧħė ƈȧřḓ, ȧñḓ ïŧş şŧȧŧůş ƒőŀŀőẇş ŧħėɱ: ẇħėñ ėṽėřẏ şŧėṗ ïş ḓőñė ïŧ ɱőṽėş ŧő řėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
+      },
       "ux_b_lineage_label": {
         "en": "Project and mission",
         "ja": "プロジェクトとミッション",
@@ -13597,6 +13632,11 @@
         "en": "Change the status?",
         "ja": "状態を変更しますか",
         "qps-ploc": "⟦Ƈħȧñɠė ŧħė şŧȧŧůş? ŀőřėɱ⟧"
+      },
+      "ux_b_move_confirm_pins": {
+        "en": "This work has steps. Once you set its status yourself, it stops following them.",
+        "ja": "この仕事にはステップがあります。ここで状態を決めると、以後はステップに合わせて変わらなくなります。",
+        "qps-ploc": "⟦Ŧħïş ẇőřķ ħȧş şŧėṗş. Őñƈė ẏőů şėŧ ïŧş şŧȧŧůş ẏőůřşėŀƒ, ïŧ şŧőṗş ƒőŀŀőẇïñɠ ŧħėɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
       },
       "ux_b_move_confirm_message": {
         "en": "\"{title}\" moves from {from} to {to}.",
