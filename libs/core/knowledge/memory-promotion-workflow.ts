@@ -523,9 +523,10 @@ async function promoteMemoryCandidateToKnowledgeUnlocked(input: {
   if (candidate.origin) {
     throw new Error(
       `[MEMORY_PROMOTION_OWNED] ${candidateId} is a ${candidate.origin.record_kind} decided by its own facade | next: ${
-        candidate.origin.record_kind === 'organization_learning'
+        candidate.origin.decided_via ||
+        (candidate.origin.record_kind === 'organization_learning'
           ? 'pnpm organization learning transition'
-          : 'pnpm mission improvements --approve|--apply'
+          : 'pnpm mission improvements --approve|--apply')
       } ${candidate.origin.record_id}`
     );
   }

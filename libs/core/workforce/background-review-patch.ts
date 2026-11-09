@@ -6,6 +6,10 @@
  * patch to a system pipeline or an append-only section to an explicitly
  * registered background-review skill, verifies the candidate provenance and
  * the caller's expected pre-image hash, keeps a governed backup, then writes.
+ *
+ * D8: the candidate is a MemoryCandidate queue row (`origin.record_kind:
+ * background_review`, see background-review-proposals.ts). Personal (session)
+ * proposals live in their owner's partition and need `scope` to be found.
  */
 
 import { createHash, randomUUID } from 'node:crypto';
@@ -13,11 +17,12 @@ import * as path from 'node:path';
 import { withExecutionContext } from '../authority.js';
 import { assertBackgroundReviewOperationAllowed } from './background-review-policy.js';
 import {
-  loadDistillCandidateRecord,
-  updateDistillCandidateRecord,
-  withDistillCandidateRecordLock,
-  type DistillCandidateRecord,
-} from '../knowledge/distill-candidate-registry.js';
+  loadBackgroundReviewProposal,
+  updateBackgroundReviewProposal,
+  withBackgroundReviewProposalLock,
+  type BackgroundReviewProposalRecord,
+} from './background-review-proposals.js';
+import type { MemoryScopeEnvelope } from '../knowledge/memory-scope.js';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
@@ -84,6 +89,8 @@ export interface ApplyBackgroundReviewPipelinePatchInput {
   expectedSha256: string;
   approvedBy: string;
   approvalRef: string;
+  /** Exact capture scope; required to reach a personal (session) proposal. */
+  scope?: MemoryScopeEnvelope;
 }
 
 export interface ApplyBackgroundReviewPipelinePatchResult {
@@ -111,6 +118,8 @@ export interface BackgroundReviewApprovalRequestInput {
   approvalChannel?: string;
   approvalThreadTs?: string;
   rollback?: boolean;
+  /** Exact capture scope; required to reach a personal (session) proposal. */
+  scope?: MemoryScopeEnvelope;
 }
 
 export interface BackgroundReviewApprovalPreview {
@@ -123,12 +132,12 @@ export interface BackgroundReviewApprovalPreview {
 
 const BACKGROUND_REVIEW_APPROVAL_CHANNEL = 'background-review';
 
-function metadataOf(record: DistillCandidateRecord): BackgroundReviewMetadata {
+function metadataOf(record: BackgroundReviewProposalRecord): BackgroundReviewMetadata {
   return (record.metadata || {}) as BackgroundReviewMetadata;
 }
 
 function assertBackgroundProposal(
-  record: DistillCandidateRecord,
+  record: BackgroundReviewProposalRecord,
   action: 'pipeline_proposal' | 'skill_patch' | 'memory_consolidation'
 ): BackgroundReviewMetadata {
   const metadata = metadataOf(record);
@@ -347,13 +356,14 @@ function assertApprovedBackgroundReviewEffect(input: {
 
 /** Create a pending human approval for one exact background-review effect. */
 export function inspectBackgroundReviewProposal(
-  candidateIdInput: string
+  candidateIdInput: string,
+  scope?: MemoryScopeEnvelope
 ): BackgroundReviewApprovalPreview {
   const candidateId = String(candidateIdInput || '').trim();
   if (!candidateId) {
     throw new Error('[POLICY_VIOLATION] candidateId is required.');
   }
-  const record = loadDistillCandidateRecord(candidateId);
+  const record = loadBackgroundReviewProposal(candidateId, scope);
   if (!record) throw new Error(`Background-review candidate not found: ${candidateId}`);
   const metadata = metadataOf(record);
   const action = metadata.action;
@@ -392,7 +402,7 @@ export function createBackgroundReviewApprovalRequest(
 ): ApprovalRequestRecord {
   // Reference creation and curator archival share one candidate lock: an
   // approval can never appear after the curator's final reference check.
-  return withDistillCandidateRecordLock(String(input.candidateId || '').trim(), () =>
+  return withBackgroundReviewProposalLock(String(input.candidateId || '').trim(), () =>
     createBackgroundReviewApprovalRequestLocked(input)
   );
 }
@@ -408,8 +418,8 @@ function createBackgroundReviewApprovalRequestLocked(
     throw new Error('[POLICY_VIOLATION] candidateId and expectedSha256 are required.');
   }
   const preview = input.rollback
-    ? inspectBackgroundReviewRollback(candidateId)
-    : inspectBackgroundReviewProposal(candidateId);
+    ? inspectBackgroundReviewRollback(candidateId, input.scope)
+    : inspectBackgroundReviewProposal(candidateId, input.scope);
   if (preview.expectedSha256 !== expectedSha256) {
     throw new Error(
       `[POLICY_VIOLATION] Background-review approval pre-image hash mismatch for ${preview.targetRef}: expected ${expectedSha256}, got ${preview.expectedSha256}`
@@ -495,7 +505,7 @@ function applyBackgroundReviewPipelinePatchLocked(
     throw new Error('[POLICY_VIOLATION] expectedSha256 must be a lowercase SHA-256 digest.');
   }
 
-  const record = loadDistillCandidateRecord(candidateId);
+  const record = loadBackgroundReviewProposal(candidateId, input.scope);
   if (!record) throw new Error(`Background-review candidate not found: ${candidateId}`);
   const metadata = assertBackgroundProposal(record, 'pipeline_proposal');
   const target = resolvePipelineTarget(metadata.target_ref);
@@ -567,23 +577,27 @@ function applyBackgroundReviewPipelinePatchLocked(
     safeWriteFile(target.absolute, nextContent);
   });
 
-  updateDistillCandidateRecord(candidateId, {
-    status: 'promoted',
-    promoted_ref: target.ref,
-    metadata: {
-      ...metadata,
-      patch_application: {
-        operation: patch.operation,
-        target_ref: target.ref,
-        before_sha256: beforeSha256,
-        after_sha256: afterSha256,
-        backup_ref: backup,
-        approved_by: approvedBy,
-        approval_ref: approvalRef,
-        applied_at: nowIso(),
+  updateBackgroundReviewProposal(
+    candidateId,
+    {
+      status: 'promoted',
+      promoted_ref: target.ref,
+      metadata: {
+        ...metadata,
+        patch_application: {
+          operation: patch.operation,
+          target_ref: target.ref,
+          before_sha256: beforeSha256,
+          after_sha256: afterSha256,
+          backup_ref: backup,
+          approved_by: approvedBy,
+          approval_ref: approvalRef,
+          applied_at: nowIso(),
+        },
       },
     },
-  });
+    input.scope
+  );
 
   return {
     candidate_id: candidateId,
@@ -731,7 +745,7 @@ function applyBackgroundReviewMemoryConsolidationPatchLocked(
     throw new Error('[POLICY_VIOLATION] expectedSha256 must be a lowercase SHA-256 digest.');
   }
 
-  const record = loadDistillCandidateRecord(candidateId);
+  const record = loadBackgroundReviewProposal(candidateId, input.scope);
   if (!record) throw new Error(`Background-review candidate not found: ${candidateId}`);
   const metadata = assertBackgroundProposal(record, 'memory_consolidation');
   const target = resolveMemoryTarget(metadata.target_ref);
@@ -780,23 +794,27 @@ function applyBackgroundReviewMemoryConsolidationPatchLocked(
     safeWriteFile(target.absolute, nextContent);
   });
 
-  updateDistillCandidateRecord(candidateId, {
-    status: 'promoted',
-    promoted_ref: target.ref,
-    metadata: {
-      ...metadata,
-      patch_application: {
-        operation: patch.operation,
-        target_ref: target.ref,
-        before_sha256: beforeSha256,
-        after_sha256: afterSha256,
-        backup_ref: backup,
-        approved_by: approvedBy,
-        approval_ref: approvalRef,
-        applied_at: nowIso(),
+  updateBackgroundReviewProposal(
+    candidateId,
+    {
+      status: 'promoted',
+      promoted_ref: target.ref,
+      metadata: {
+        ...metadata,
+        patch_application: {
+          operation: patch.operation,
+          target_ref: target.ref,
+          before_sha256: beforeSha256,
+          after_sha256: afterSha256,
+          backup_ref: backup,
+          approved_by: approvedBy,
+          approval_ref: approvalRef,
+          applied_at: nowIso(),
+        },
       },
     },
-  });
+    input.scope
+  );
 
   return {
     candidate_id: candidateId,
@@ -826,7 +844,7 @@ function applyBackgroundReviewSkillPatchLocked(
     throw new Error('[POLICY_VIOLATION] expectedSha256 must be a lowercase SHA-256 digest.');
   }
 
-  const record = loadDistillCandidateRecord(candidateId);
+  const record = loadBackgroundReviewProposal(candidateId, input.scope);
   if (!record) throw new Error(`Background-review candidate not found: ${candidateId}`);
   const metadata = assertBackgroundProposal(record, 'skill_patch');
   const target = resolveManagedSkillTarget(metadata.target_ref);
@@ -873,23 +891,27 @@ function applyBackgroundReviewSkillPatchLocked(
     safeWriteFile(target.absolute, nextContent);
   });
 
-  updateDistillCandidateRecord(candidateId, {
-    status: 'promoted',
-    promoted_ref: target.ref,
-    metadata: {
-      ...metadata,
-      patch_application: {
-        operation: patch.operation,
-        target_ref: target.ref,
-        before_sha256: beforeSha256,
-        after_sha256: afterSha256,
-        backup_ref: backup,
-        approved_by: approvedBy,
-        approval_ref: approvalRef,
-        applied_at: nowIso(),
+  updateBackgroundReviewProposal(
+    candidateId,
+    {
+      status: 'promoted',
+      promoted_ref: target.ref,
+      metadata: {
+        ...metadata,
+        patch_application: {
+          operation: patch.operation,
+          target_ref: target.ref,
+          before_sha256: beforeSha256,
+          after_sha256: afterSha256,
+          backup_ref: backup,
+          approved_by: approvedBy,
+          approval_ref: approvalRef,
+          applied_at: nowIso(),
+        },
       },
     },
-  });
+    input.scope
+  );
 
   return {
     candidate_id: candidateId,
@@ -909,31 +931,37 @@ function targetForMetadata(metadata: BackgroundReviewMetadata) {
 }
 
 /** Serialize forward and reverse writes to the same asset across candidates. */
-function withPatchTargetLock<T>(candidateId: string, run: () => T): T {
-  const record = loadDistillCandidateRecord(candidateId);
+function withPatchTargetLock<T>(
+  candidateId: string,
+  scope: MemoryScopeEnvelope | undefined,
+  run: () => T
+): T {
+  const record = loadBackgroundReviewProposal(candidateId, scope);
   if (!record) throw new Error('[POLICY_VIOLATION] Background-review candidate not found');
   const target = targetForMetadata(metadataOf(record));
   return withLockSync('background-review-target:' + sha256(target.ref), run);
 }
 
 export function applyBackgroundReviewPipelinePatch(input: ApplyBackgroundReviewPipelinePatchInput) {
-  return withPatchTargetLock(input.candidateId, () =>
+  return withPatchTargetLock(input.candidateId, input.scope, () =>
     applyBackgroundReviewPipelinePatchLocked(input)
   );
 }
 export function applyBackgroundReviewSkillPatch(input: ApplyBackgroundReviewPipelinePatchInput) {
-  return withPatchTargetLock(input.candidateId, () => applyBackgroundReviewSkillPatchLocked(input));
+  return withPatchTargetLock(input.candidateId, input.scope, () =>
+    applyBackgroundReviewSkillPatchLocked(input)
+  );
 }
 export function applyBackgroundReviewMemoryConsolidationPatch(
   input: ApplyBackgroundReviewPipelinePatchInput
 ) {
-  return withPatchTargetLock(input.candidateId, () =>
+  return withPatchTargetLock(input.candidateId, input.scope, () =>
     applyBackgroundReviewMemoryConsolidationPatchLocked(input)
   );
 }
 
-function rollbackMaterial(candidateId: string) {
-  const record = loadDistillCandidateRecord(candidateId);
+function rollbackMaterial(candidateId: string, scope?: MemoryScopeEnvelope) {
+  const record = loadBackgroundReviewProposal(candidateId, scope);
   const metadata = record && metadataOf(record);
   const application = metadata?.patch_application as Record<string, unknown> | undefined;
   if (
@@ -985,9 +1013,10 @@ function rollbackMaterial(candidateId: string) {
 
 /** A rollback is a new human-approved effect, never reuse of the forward approval. */
 export function inspectBackgroundReviewRollback(
-  candidateId: string
+  candidateId: string,
+  scope?: MemoryScopeEnvelope
 ): BackgroundReviewApprovalPreview {
-  const material = rollbackMaterial(candidateId);
+  const material = rollbackMaterial(candidateId, scope);
   return {
     candidateId,
     action: 'rollback',
@@ -1004,9 +1033,9 @@ export function inspectBackgroundReviewRollback(
 export function rollbackBackgroundReviewPatch(
   input: ApplyBackgroundReviewPipelinePatchInput
 ): ApplyBackgroundReviewPipelinePatchResult {
-  return withPatchTargetLock(input.candidateId, () => {
-    const material = rollbackMaterial(input.candidateId);
-    const preview = inspectBackgroundReviewRollback(input.candidateId);
+  return withPatchTargetLock(input.candidateId, input.scope, () => {
+    const material = rollbackMaterial(input.candidateId, input.scope);
+    const preview = inspectBackgroundReviewRollback(input.candidateId, input.scope);
     if (input.expectedSha256 !== preview.expectedSha256)
       throw new Error('[POLICY_VIOLATION] Rollback pre-image hash mismatch');
     assertApprovedBackgroundReviewEffect({
@@ -1037,27 +1066,31 @@ export function rollbackBackgroundReviewPatch(
         throw new Error('[POLICY_VIOLATION] Target changed during rollback');
       safeWriteFile(material.target.absolute, material.content);
     });
-    updateDistillCandidateRecord(input.candidateId, {
-      status: 'archived',
-      metadata: {
-        ...material.metadata,
-        archive: {
-          reason: 'human-approved patch rollback',
-          previous_status: 'promoted',
-          archived_at: nowIso(),
-          reversible: true,
-        },
-        patch_application: {
-          ...material.application,
-          rollback: {
-            approval_ref: input.approvalRef,
-            approved_by: input.approvedBy,
-            restored_at: nowIso(),
-            backup_ref: reverseBackup,
+    updateBackgroundReviewProposal(
+      input.candidateId,
+      {
+        status: 'archived',
+        metadata: {
+          ...material.metadata,
+          archive: {
+            reason: 'human-approved patch rollback',
+            previous_status: 'promoted',
+            archived_at: nowIso(),
+            reversible: true,
+          },
+          patch_application: {
+            ...material.application,
+            rollback: {
+              approval_ref: input.approvalRef,
+              approved_by: input.approvedBy,
+              restored_at: nowIso(),
+              backup_ref: reverseBackup,
+            },
           },
         },
       },
-    });
+      input.scope
+    );
     return {
       candidate_id: input.candidateId,
       target_ref: preview.targetRef,

@@ -180,7 +180,13 @@ export interface MemoryCandidate {
   origin?: MemoryCandidateOrigin;
 }
 
-export type MemoryCandidateOriginKind = 'organization_learning' | 'process_improvement';
+export type MemoryCandidateOriginKind =
+  | 'organization_learning'
+  | 'process_improvement'
+  /** HA-01 skill / pipeline / memory-consolidation patch proposal (`pnpm background-review`). */
+  | 'background_review'
+  /** Execution-feedback improvement proposal (`pnpm kyberion improvements`). */
+  | 'execution_feedback';
 export interface MemoryCandidateOrigin {
   record_kind: MemoryCandidateOriginKind;
   /** The facade's own id (learning_id / proposal_id). */
@@ -190,6 +196,8 @@ export interface MemoryCandidateOrigin {
   attributes?: Record<string, unknown>;
   /** Set when the row was imported from the facade's legacy store. */
   migrated_from?: string;
+  /** The command that decides this row, e.g. `pnpm background-review`. */
+  decided_via?: string;
 }
 
 const SCHEMA_PATH = pathResolver.rootResolve(
@@ -1014,6 +1022,11 @@ function updateMemoryPromotionCandidateStatusUnlocked(input: {
   ratification?: { ratifiedAt: string; ratifiedCommit: string; ratificationTarget: string };
   /** W3: capability token asserted (only when required) before the write commits. */
   capability?: MemoryWriteCapability;
+  /**
+   * D8: facade-owned rows only — shallow-merged into `origin.attributes`
+   * (the facade's own decision fields). Rejected for rows without `origin`.
+   */
+  originAttributes?: Record<string, unknown>;
 }): MemoryCandidate | null {
   if (
     input.approvalChannel !== undefined &&
@@ -1148,8 +1161,20 @@ function updateMemoryPromotionCandidateStatusUnlocked(input: {
       // promotion; its ratified_at is only written from input.ratification.
       const approvalChannel = input.approvalChannel || current.approval_channel;
       const deferRatification = approvalChannel === 'pr_review';
+      if (input.originAttributes && !current.origin)
+        throw new Error(
+          `[MEMORY_ORIGIN_REQUIRED] candidate '${input.candidateId}' has no origin; origin attributes belong to facade-owned rows only`
+        );
       const next: MemoryCandidate = {
         ...current,
+        ...(input.originAttributes && current.origin
+          ? {
+              origin: {
+                ...current.origin,
+                attributes: { ...(current.origin.attributes || {}), ...input.originAttributes },
+              },
+            }
+          : {}),
         status: input.status,
         ...(input.curation && normalizedCurationRefs
           ? {

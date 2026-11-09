@@ -16,6 +16,7 @@ import {
   listExecutionFeedbackCandidates,
   inspectExecutionFeedbackLearning,
   queueExecutionFeedbackLearning,
+  migrateLegacyExecutionFeedbackCandidates,
 } from '@agent/core/execution-feedback';
 import { currentScope } from '@agent/core/scope-context';
 import type { MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
@@ -87,6 +88,7 @@ export function handleFeedbackSubcommand(
     print(ui('recorder:recorder_feedback_review', { id: improvement.candidate.candidate_id }));
   } else {
     print(ui('recorder:recorder_no_improvement'));
+    if (improvement.not_captured) print(improvement.not_captured);
   }
 }
 
@@ -97,6 +99,24 @@ function selectedFeedbackScope(): MemoryScopeEnvelope | undefined {
   return scope.tier !== 'public' || Object.keys(scope).some((key) => key !== 'tier')
     ? scope
     : undefined;
+}
+
+export type ImprovementsArgs = Parameters<typeof handleImprovements>[1];
+
+/** `pnpm kyberion improvements` flags from the parsed CLI argv. */
+export function improvementsArgsFromArgv(argv: Record<string, unknown>): ImprovementsArgs {
+  const text = (key: string) => (argv[key] ? String(argv[key]) : undefined);
+  return {
+    review: text('review'),
+    legacy: Boolean(argv.legacy),
+    queue: text('queue'),
+    migrate: Boolean(argv.migrate),
+    write: Boolean(argv.write),
+    approve: text('approve'),
+    deny: text('deny'),
+    note: text('note'),
+    json: Boolean(argv.json),
+  };
 }
 
 export function handleImprovements(
@@ -110,11 +130,25 @@ export function handleImprovements(
     json?: boolean;
     scope?: MemoryScopeEnvelope;
     legacy?: boolean;
+    /** D8 (one release): import pending legacy proposals onto the memory queue. */
+    migrate?: boolean;
+    write?: boolean;
   },
   print: HomePrint = () => undefined
 ): void {
-  if ([argv.approve, argv.deny, argv.review, argv.queue].filter(Boolean).length > 1) {
+  if ([argv.approve, argv.deny, argv.review, argv.queue, argv.migrate].filter(Boolean).length > 1) {
     throw new ScriptExitError(1, 'Choose one improvements action.');
+  }
+  if (argv.write && !argv.migrate)
+    throw new ScriptExitError(1, '--write is only supported with --migrate.');
+  if (argv.migrate) {
+    const migrationScope = argv.scope || selectedFeedbackScope();
+    const report = migrateLegacyExecutionFeedbackCandidates({
+      apply: Boolean(argv.write),
+      ...(migrationScope ? { scopes: [migrationScope] } : {}),
+    });
+    print(JSON.stringify(report, null, 2));
+    return;
   }
   if (argv.approve || argv.deny) {
     print(ui('recorder:recorder_improvement_decision_route'));
