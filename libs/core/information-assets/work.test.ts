@@ -37,7 +37,7 @@ const charter = {
   scope: { ...scope, tier: 'confidential' },
   authority: {
     allowed_pipelines: [INFORMATION_ASSET_WORK_PIPELINE],
-    allowed_work_shapes: ['pipeline', 'mission'],
+    allowed_execution_shapes: ['pipeline', 'mission'],
     mission_mandate_refs: ['fixture-mandate'],
   },
 } as DotCharter;

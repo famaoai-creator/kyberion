@@ -195,7 +195,7 @@ export function bindSyntheticDotJudgmentProposal(
     proposal.work_shape !== 'pipeline' ||
     !proposal.pipeline_ref ||
     !(charter.authority.allowed_pipelines ?? []).includes(proposal.pipeline_ref) ||
-    !(charter.authority.allowed_work_shapes ?? []).includes('pipeline')
+    !(charter.authority.allowed_execution_shapes ?? []).includes('pipeline')
   )
     throw new Error('Synthetic authoring requires an already bounded pipeline proposal');
   const normalized = normalizeDotProposal(proposal);

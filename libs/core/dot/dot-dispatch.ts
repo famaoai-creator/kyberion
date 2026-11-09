@@ -130,7 +130,7 @@ import {
   proposalActionIdentity,
   type DotDecisionLevel,
   type DotProposal,
-  type DotWorkShape,
+  type DotExecutionShape,
 } from './dot-proposals.js';
 import {
   learnedDotDecisionFloor,
@@ -155,12 +155,12 @@ import {
 const logger = createLogger('dot-dispatch');
 
 /**
- * Shapes a charter may dispatch when it declares no `allowed_work_shapes`.
+ * Shapes a charter may dispatch when it declares no `allowed_execution_shapes`.
  * `task_session` is not a default: no governed task-session executor exists,
  * so a charter may only opt in explicitly and dispatch still refuses it unless
  * {@link DotDispatchDeps.taskSessionExecutorAvailable} says one is configured.
  */
-export const DEFAULT_DOT_WORK_SHAPES: readonly DotWorkShape[] = ['direct_reply'];
+export const DEFAULT_DOT_EXECUTION_SHAPES: readonly DotExecutionShape[] = ['direct_reply'];
 /** Concurrency cap when a charter declares no `max_concurrent_delegations`. */
 export { DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS } from './dot-charter.js';
 /** The same proposal is not re-dispatched or re-asked within this window. */
@@ -220,11 +220,11 @@ export interface DotDispatchDeps {
 }
 
 /** The charter's declared (or default) shapes, minus capabilities this runtime lacks. */
-export function effectiveDotWorkShapes(
+export function effectiveDotExecutionShapes(
   charter: DotCharter,
   deps: Pick<DotDispatchDeps, 'taskSessionExecutorAvailable'> = {}
-): DotWorkShape[] {
-  const declared = charter.authority.allowed_work_shapes ?? DEFAULT_DOT_WORK_SHAPES;
+): DotExecutionShape[] {
+  const declared = charter.authority.allowed_execution_shapes ?? DEFAULT_DOT_EXECUTION_SHAPES;
   return declared.filter((shape) => shape !== 'task_session' || deps.taskSessionExecutorAvailable);
 }
 
@@ -268,7 +268,7 @@ export function dotQuietHours(charter: DotCharter): NotificationQuietHours | und
  * them instead of spending proposals on refusals. Same sources as enforcement.
  */
 export function dotBoundsPromptLines(charter: DotCharter, deps: DotDispatchDeps = {}): string[] {
-  return composeDotBoundsPrompt(charter, effectiveDotWorkShapes(charter, deps), deps);
+  return composeDotBoundsPrompt(charter, effectiveDotExecutionShapes(charter, deps), deps);
 }
 
 function defaultFindWorkItemByActionRef(
@@ -354,14 +354,14 @@ function checkDotProposalScope(
   if (!DOT_ACTION_IDS.includes(proposal.action_id)) {
     return { ok: false, reason: `action '${proposal.action_id}' is not a dot action` };
   }
-  const shapes = effectiveDotWorkShapes(charter, deps);
+  const shapes = effectiveDotExecutionShapes(charter, deps);
   if (proposal.work_shape === 'task_session' && !deps.taskSessionExecutorAvailable) {
     return { ok: false, reason: DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE };
   }
   if (!shapes.includes(proposal.work_shape)) {
     return {
       ok: false,
-      reason: `work_shape '${proposal.work_shape}' is outside allowed_work_shapes (${shapes.join(', ')})`,
+      reason: `work_shape '${proposal.work_shape}' is outside allowed_execution_shapes (${shapes.join(', ')})`,
     };
   }
   const tenantSlug = charter.scope.tenant_slug;

@@ -69,7 +69,7 @@ const CHARTER_JSON = {
   attention: { triggers: [{ kind: 'cron', cron: '0 9 * * *', timezone: 'UTC' }] },
   authority: {
     authority_role: 'infrastructure_sentinel',
-    allowed_work_shapes: ['direct_reply'],
+    allowed_execution_shapes: ['direct_reply'],
     max_concurrent_delegations: 2,
   },
   notification: { deliver_to: { surface: 'slack', channel: '#ops' } },

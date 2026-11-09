@@ -1,6 +1,6 @@
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
-import type { DotWorkShape } from './dot-proposals.js';
+import type { DotExecutionShape } from './dot-proposals.js';
 import type { DotProposal } from './dot-proposals.js';
 import type { DotCharter } from './dot-charter.js';
 
@@ -9,7 +9,7 @@ export interface DotExecutionPolicy {
   intake: {
     enabled: boolean;
     action_id: string;
-    allowed_work_shapes: DotWorkShape[];
+    allowed_execution_shapes: DotExecutionShape[];
     max_proposals_per_wake: number;
   };
   learning: {
@@ -26,7 +26,7 @@ const fallback: DotExecutionPolicy = {
   intake: {
     enabled: false,
     action_id: 'dot_intake_work',
-    allowed_work_shapes: [],
+    allowed_execution_shapes: [],
     max_proposals_per_wake: 1,
   },
   learning: {
@@ -63,6 +63,6 @@ export function isDotIntakeAdmission(charter: DotCharter, proposal: DotProposal)
     Boolean(charter.scope.tenant_slug) &&
     !proposal.continuous_work &&
     !proposal.front_desk_execution &&
-    policy.allowed_work_shapes.includes(proposal.work_shape)
+    policy.allowed_execution_shapes.includes(proposal.work_shape)
   );
 }

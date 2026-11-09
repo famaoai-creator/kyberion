@@ -107,7 +107,7 @@ export async function runContinuousOperationsReport(
       'Scoped report requires an enabled configuration containing only organization_metrics sources'
     );
   if (
-    !(charter.authority.allowed_work_shapes ?? []).includes('pipeline') ||
+    !(charter.authority.allowed_execution_shapes ?? []).includes('pipeline') ||
     !(charter.authority.allowed_pipelines ?? []).includes(CONTINUOUS_OPERATIONS_REPORT_PIPELINE)
   )
     throw new Error('Report pipeline is not permitted by the charter');
@@ -152,7 +152,7 @@ export async function runContinuousOperationsReport(
     !(currentCharter.authority.allowed_pipelines ?? []).includes(
       CONTINUOUS_OPERATIONS_REPORT_PIPELINE
     ) ||
-    !(currentCharter.authority.allowed_work_shapes ?? []).includes('pipeline')
+    !(currentCharter.authority.allowed_execution_shapes ?? []).includes('pipeline')
   )
     throw new Error('Report charter no longer authorizes this pipeline');
   (deps.authorize ?? assertContinuousOperationsCollectionAuthority)(config, currentCharter);

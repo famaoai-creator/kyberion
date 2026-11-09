@@ -32,6 +32,8 @@ importance: 8
 - `IntentResolutionShape` と `routeFamily` を、`ExecutionShape` からの名前付きの写像にする。`pipeline` を `task_session` に畳む処理は廃止する。
 - dot の `work_shape` / `allowed_work_shapes` を `execution_shape` / `allowed_execution_shapes` に改名する（charter の schema は互換の別名を 1 リリース残す）。
 
+R1 の実施状況（2026-11-10）：写像は `libs/core/contracts/execution-shape.ts` に置き、intent-resolution の契約は畳む前の値を `execution_shape` として一緒に運びます。`resolution.shape` は保存せず、読み込み時に `execution_shape` から導きます（`execution-shape-single-source.test.ts` が検査）。charter は `allowed_execution_shapes` に改名し、古いキーは読み込み時に置き換えます。dot の提案の `work_shape` は、ハッシュで固定された行動台帳に保存されているため、台帳の移行と一緒に改名します（未実施）。
+
 ### R2 — RoutingDecision と 1 回だけの解決
 
 - `RoutingDecision`（intent_id、execution_shape、authority_level、delivery_mode、promotion）を `libs/core/contracts/` に定義する。

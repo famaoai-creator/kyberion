@@ -2,7 +2,7 @@ import { dotDelegationCapacity } from './dot-admission-capacity.js';
 import { listDotCharters, type DotCharter } from './dot-charter.js';
 import type { DotDispatchDeps } from './dot-dispatch.js';
 import { dotMissionAdmissionPrompt } from './dot-mission-admission-bounds.js';
-import { DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE, type DotWorkShape } from './dot-proposals.js';
+import { DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE, type DotExecutionShape } from './dot-proposals.js';
 
 /** Handoffs preserve tenant and any jointly declared organization boundary. */
 export function sameDotHandoffScope(from: DotCharter, to: DotCharter): boolean {
@@ -17,7 +17,7 @@ export function sameDotHandoffScope(from: DotCharter, to: DotCharter): boolean {
 /** Prompt bounds share the same sources as dispatch enforcement. */
 export function composeDotBoundsPrompt(
   charter: DotCharter,
-  shapes: DotWorkShape[],
+  shapes: DotExecutionShape[],
   deps: DotDispatchDeps
 ): string[] {
   const pipelines = charter.authority.allowed_pipelines ?? [];
@@ -47,7 +47,7 @@ export function composeDotBoundsPrompt(
         ]
       : []),
     ...(!shapes.includes('task_session') &&
-    (charter.authority.allowed_work_shapes ?? []).includes('task_session')
+    (charter.authority.allowed_execution_shapes ?? []).includes('task_session')
       ? [DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE]
       : []),
     free > 0

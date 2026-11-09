@@ -1,11 +1,11 @@
 import { evaluateMissionStartMandate, loadMandateCatalog } from '../governance/mandate-shadow.js';
 import type { DotCharter } from './dot-charter.js';
-import type { DotProposal, DotWorkShape } from './dot-proposals.js';
+import type { DotProposal, DotExecutionShape } from './dot-proposals.js';
 
 /** The model sees only current, tenant-bound mandate scopes owned by this Dot. */
 export function dotMissionAdmissionPrompt(
   charter: DotCharter,
-  shapes: readonly DotWorkShape[],
+  shapes: readonly DotExecutionShape[],
   now: Date
 ): string[] {
   const refs = charter.authority.mission_mandate_refs ?? [];

@@ -87,6 +87,9 @@ export interface Intent {
   pipeline?: PipelineStep[];
 }
 export interface Resolution {
+  /**
+   * Deprecated: derived from execution_shape at load time. Do not store it in the base catalog; an overlay value loses to execution_shape.
+   */
   shape?: string;
   task_kind?: string;
   result_shape?: string;

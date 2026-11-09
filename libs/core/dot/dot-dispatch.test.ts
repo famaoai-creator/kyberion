@@ -38,7 +38,7 @@ import {
   currentDotActions,
   dispatchDotProposals,
   dotBoundsPromptLines,
-  effectiveDotWorkShapes,
+  effectiveDotExecutionShapes,
   dotNotificationRoute,
   dotDelegationCapacity,
   settleDotCapacityActions,
@@ -77,7 +77,7 @@ const CHARTER: DotCharter = {
   attention: { triggers: [{ kind: 'cron', cron: '0 9 * * *', timezone: 'UTC' }] },
   authority: {
     authority_role: 'organization_operator',
-    allowed_work_shapes: ['direct_reply', 'pipeline'],
+    allowed_execution_shapes: ['direct_reply', 'pipeline'],
     max_concurrent_delegations: 2,
   },
   notification: { deliver_to: { surface: 'slack', channel: 'C-EXEC' } },
@@ -420,7 +420,7 @@ describe('dispatchDotProposals — decision and delegation', () => {
 });
 
 describe('dispatchDotProposals — charter bounds', () => {
-  it('refuses a work shape outside allowed_work_shapes before the gate runs', () => {
+  it('refuses a work shape outside allowed_execution_shapes before the gate runs', () => {
     const h = harness('auto');
     const { records } = dispatchDotProposals(
       CHARTER,
@@ -428,7 +428,7 @@ describe('dispatchDotProposals — charter bounds', () => {
       h.deps
     );
     expect(records[0].status).toBe('refused');
-    expect(records[0].reason).toMatch(/allowed_work_shapes/);
+    expect(records[0].reason).toMatch(/allowed_execution_shapes/);
     expect(h.gateInputs).toHaveLength(0);
     expect(h.audits[0]).toMatchObject({ result: 'denied' });
   });
@@ -437,7 +437,10 @@ describe('dispatchDotProposals — charter bounds', () => {
     const h = harness('approve');
     const charter = {
       ...CHARTER,
-      authority: { ...CHARTER.authority, allowed_work_shapes: ['task_session', 'direct_reply'] },
+      authority: {
+        ...CHARTER.authority,
+        allowed_execution_shapes: ['task_session', 'direct_reply'],
+      },
     } as DotCharter;
     const { records } = dispatchDotProposals(
       charter,
@@ -464,8 +467,8 @@ describe('dispatchDotProposals — charter bounds', () => {
       ...CHARTER,
       authority: { authority_role: 'organization_operator' },
     } as DotCharter;
-    expect(effectiveDotWorkShapes(charter)).toEqual(['direct_reply']);
-    expect(effectiveDotWorkShapes(charter, { taskSessionExecutorAvailable: true })).toEqual([
+    expect(effectiveDotExecutionShapes(charter)).toEqual(['direct_reply']);
+    expect(effectiveDotExecutionShapes(charter, { taskSessionExecutorAvailable: true })).toEqual([
       'direct_reply',
     ]);
     const refused = dispatchDotProposals(
@@ -656,7 +659,7 @@ describe('dotBoundsPromptLines', () => {
         ...CHARTER,
         authority: {
           ...CHARTER.authority,
-          allowed_work_shapes: ['task_session', 'pipeline'],
+          allowed_execution_shapes: ['task_session', 'pipeline'],
           allowed_pipelines: ['pipelines/baseline-check.json'],
           max_concurrent_delegations: 2,
         },
@@ -939,7 +942,7 @@ describe('settleDotParkedActions + learning', () => {
     h.approvals.set('req-1', approval('approved'));
     const narrowed: DotCharter = {
       ...CHARTER,
-      authority: { ...CHARTER.authority, allowed_work_shapes: ['pipeline'] },
+      authority: { ...CHARTER.authority, allowed_execution_shapes: ['pipeline'] },
     };
     const settled = settleDotParkedActions(narrowed, h.deps);
     expect(settled[0]).toMatchObject({ status: 'declined' });

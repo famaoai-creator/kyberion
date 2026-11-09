@@ -126,7 +126,7 @@ export function prepareFrontDeskExecution(
   }
   if (
     charter.status !== 'active' ||
-    !charter.authority.allowed_work_shapes?.includes('pipeline') ||
+    !charter.authority.allowed_execution_shapes?.includes('pipeline') ||
     !charter.authority.allowed_pipelines?.includes(FRONT_DESK_RECEIPT_PIPELINE)
   )
     throw new Error('configured pipeline capability is unavailable');

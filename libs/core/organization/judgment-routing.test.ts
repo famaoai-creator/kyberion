@@ -423,7 +423,7 @@ describe('synthetic judgment routing with actual isolated persisted receipts', (
       attention: { triggers: [{ kind: 'cron', cron: '0 9 * * *', timezone: 'UTC' }] },
       authority: {
         authority_role: 'organization_operator',
-        allowed_work_shapes: ['direct_reply'],
+        allowed_execution_shapes: ['direct_reply'],
         max_concurrent_delegations: 2,
       },
       decisions: { default_decision: 'approve' },

@@ -199,10 +199,29 @@ function getIntentCatalogOverlay(filePath: string): GovernedCatalog<StandardInte
   return catalog;
 }
 
+/**
+ * `execution_shape` is the single source of an intent's shape (concept model v2, D7).
+ * `resolution.shape` is derived from it here at load time and is never stored in the
+ * catalog; a value an overlay still declares loses to `execution_shape`.
+ */
+export function withDerivedResolutionShape(
+  intent: StandardIntentDefinition
+): StandardIntentDefinition {
+  if (!intent.execution_shape || intent.resolution?.shape === intent.execution_shape) {
+    return intent;
+  }
+  return {
+    ...intent,
+    resolution: { ...(intent.resolution || {}), shape: intent.execution_shape },
+  };
+}
+
 export function loadStandardIntentCatalog(): StandardIntentDefinition[] {
   if (standardIntentCache) return standardIntentCache;
   const parsed = standardIntentCatalog.load();
-  standardIntentCache = Array.isArray(parsed.intents) ? parsed.intents : [];
+  standardIntentCache = Array.isArray(parsed.intents)
+    ? parsed.intents.map(withDerivedResolutionShape)
+    : [];
   return standardIntentCache;
 }
 
@@ -315,7 +334,10 @@ export function loadResolvedStandardIntentCatalog(
       if (!overlayId) continue;
       const existing = mergedById.get(overlayId);
       if (!existing) continue;
-      mergedById.set(overlayId, mergeIntentDefinition(existing, overlayIntent));
+      mergedById.set(
+        overlayId,
+        withDerivedResolutionShape(mergeIntentDefinition(existing, overlayIntent))
+      );
     }
   }
 

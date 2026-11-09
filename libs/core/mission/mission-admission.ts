@@ -248,7 +248,7 @@ function verifiedDotMissionAdmission(item: WorkItem, deps: Deps) {
     dot.scope.tenant_slug !== tenant ||
     dot.scope.organization_id !== item.context?.organization_id ||
     dotContext?.project_id !== item.context?.project_id ||
-    !dot.authority.allowed_work_shapes?.includes('mission') ||
+    !dot.authority.allowed_execution_shapes?.includes('mission') ||
     !dot.authority.mission_mandate_refs?.includes(admission.mandate_ref)
   )
     throw new Error('current Dot admission authority missing');
