@@ -529,6 +529,8 @@ function bumpUsageAggregate(
       not_used_count: current.not_used_count + (delta.not_used_count || 0),
       occurrences: current.occurrences + 1,
       last_seen: at,
+      ...(delta.delivered_count ? { last_delivered_at: at } : {}),
+      ...(delta.used_count ? { last_used_at: at } : {}),
     };
   } else {
     if (entries.length >= cap.max_usage_entries) {
@@ -545,6 +547,8 @@ function bumpUsageAggregate(
       not_used_count: delta.not_used_count || 0,
       occurrences: 1,
       last_seen: at,
+      ...(delta.delivered_count ? { last_delivered_at: at } : {}),
+      ...(delta.used_count ? { last_used_at: at } : {}),
     });
   }
   const serialized = JSON.stringify(entries, null, 2);

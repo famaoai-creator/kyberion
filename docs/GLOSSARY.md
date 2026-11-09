@@ -789,7 +789,7 @@ Nominating content in a volatile face to the `memory-promotion-queue` (`MemoryCa
 
 ### Memory Candidate
 
-A captured learning awaiting promotion, of one type with kind and lane, carrying tier and entity scope from the moment of capture. _distill_ makes a candidate from a mission; _promote_ turns a candidate into knowledge. _Transitioning_: three candidate formats and four queues exist today, and promoted records are not yet retrieved into tenantless context packs ([Memory loop plan](./developer/improvement-plans-2026-11/MEMORY_LOOP_CLOSURE_PLAN_2026-11-10.ja.md)).
+A captured learning awaiting promotion, of one type with kind and lane, carrying tier and entity scope from the moment of capture. _distill_ makes a candidate from a mission; _promote_ turns a candidate into knowledge. _Transitioning_: three candidate formats and four queues exist today; promoted records reach context packs by relevance, filtered by the reader's tier and tenant ([Memory loop plan](./developer/improvement-plans-2026-11/MEMORY_LOOP_CLOSURE_PLAN_2026-11-10.ja.md)).
 
 ### Sidecar (volatile)
 

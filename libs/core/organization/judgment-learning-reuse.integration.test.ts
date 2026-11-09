@@ -15,9 +15,9 @@ import type { DeliveredKnowledgeRef } from '../knowledge/knowledge-feedback-loop
 import type { ScopeContext } from '../scope-context.js';
 // Fuzzy/index searches are stubbed; the synchronous first-enqueue audit wrapper below still calls real storage.
 // Actual pinned bytes, scope and publication proof are real; production automatic audit behavior is not asserted.
-vi.mock('../knowledge/distill-knowledge-injector.js', async (original) => ({
-  ...(await original<typeof import('../knowledge/distill-knowledge-injector.js')>()),
-  findRelevantDistilledKnowledge: vi.fn(async () => []),
+vi.mock('../knowledge/promoted-knowledge-retrieval.js', async (original) => ({
+  ...(await original<typeof import('../knowledge/promoted-knowledge-retrieval.js')>()),
+  findRelevantPromotedKnowledge: vi.fn(async () => []),
 }));
 vi.mock('./tenant-knowledge-retrieval.js', async (original) => ({
   ...(await original<typeof import('./tenant-knowledge-retrieval.js')>()),

@@ -345,6 +345,10 @@ describe('recordKnowledgeDelivery', () => {
     expect(loadKnowledgeUsageAggregate(tenantScope)).toMatchObject([
       { document_path: doc, delivered_count: 1, used_count: 1 },
     ]);
+    // D8 loop health windows retrieval and use on these stamps.
+    const [stamped] = loadKnowledgeUsageAggregate(tenantScope);
+    expect(stamped.last_delivered_at).toEqual(expect.any(String));
+    expect(stamped.last_used_at).toEqual(expect.any(String));
     expect(knowledgeUsageAggregatePath(missionScope)).toBe(
       knowledgeUsageAggregatePath(tenantScope)
     );

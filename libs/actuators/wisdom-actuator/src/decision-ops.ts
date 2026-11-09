@@ -18,9 +18,9 @@ import {
   TenantRateLimitExceededError,
 } from '@agent/core/organization/tenant-rate-limiter';
 import {
-  findRelevantDistilledKnowledge,
-  formatDistilledKnowledgeSummary,
-} from '@agent/core/knowledge/distill-knowledge-injector';
+  findRelevantPromotedKnowledge,
+  formatPromotedKnowledgeSummary,
+} from '@agent/core/knowledge';
 import { listDistillCandidateRecords } from '@agent/core/knowledge/distill-candidate-registry';
 import {
   resolveReasoningParticipant,
@@ -1149,16 +1149,17 @@ export async function dispatchWisdomOperation(
       const tags = Array.isArray(tagsParam) ? tagsParam : [];
       const limit = Number(resolved('limit')) || 5;
       const minScore = params.min_score !== undefined ? Number(resolved('min_score')) : 0.0001;
-      const entries = await findRelevantDistilledKnowledge({
-        topic,
-        tags,
+      // D8: prior knowledge is the promoted corpus, ranked by the knowledge
+      // index; tags join the query so tag-only callers still match.
+      const entries = await findRelevantPromotedKnowledge({
+        topic: [topic, ...tags].filter(Boolean).join(' '),
         limit,
         minScore,
       });
       const summary =
         entries.length === 0
-          ? '(no relevant prior distilled knowledge found)'
-          : entries.map((e) => formatDistilledKnowledgeSummary(e)).join('\n');
+          ? '(no relevant prior promoted knowledge found)'
+          : entries.map((e) => formatPromotedKnowledgeSummary(e)).join('\n');
       const outputPath = resolved('output_path');
       if (outputPath) {
         writeJSON(outputPath, {

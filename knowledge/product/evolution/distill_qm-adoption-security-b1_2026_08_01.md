@@ -6,6 +6,7 @@ importance: 7
 source_mission: QM-ADOPTION-SECURITY-B1
 author: Kyberion Wisdom Distiller
 last_updated: 2026-08-01
+doc_status: historical
 ---
 
 # Asymmetric Command Screening and Ledger Reconciliation

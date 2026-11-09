@@ -6,6 +6,7 @@ importance: 4
 source_mission: MSN-CHRONOS-UX-SIMPLIFY-20260802
 author: Kyberion Wisdom Distiller
 last_updated: 2026-08-01
+doc_status: historical
 ---
 
 # Mission Journey中心のChronos情報設計
