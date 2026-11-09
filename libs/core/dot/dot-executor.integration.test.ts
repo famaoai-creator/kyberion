@@ -64,7 +64,7 @@ const CHARTER: DotCharter = {
   attention: { triggers: [{ kind: 'cron', cron: '0 9 * * *' }] },
   authority: {
     authority_role: 'infrastructure_sentinel',
-    allowed_work_shapes: ['direct_reply', 'pipeline'],
+    allowed_execution_shapes: ['direct_reply', 'pipeline'],
     allowed_pipelines: ['pipelines/ok.json'],
     max_concurrent_delegations: 2,
   },

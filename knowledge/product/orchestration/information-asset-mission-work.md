@@ -10,7 +10,7 @@ last_updated: 2026-11-02
 
 ## 初期設定
 
-対象 Dot の allowed_pipelines に knowledge/product/pipeline-templates/information-asset-work.json、allowed_work_shapes に pipeline と mission を登録する。mission_mandate_refs は、その tenant で有効な既存の包括委任だけを指定する。委任は work_type=information_asset.<recipe action>、リスク3、対象組織の active/organizations/confidential/<tenant>/<organization>/、固定サービス操作をカバーする必要がある。内部 admission は外部操作を許可しない。
+対象 Dot の allowed_pipelines に knowledge/product/pipeline-templates/information-asset-work.json、allowed_execution_shapes に pipeline と mission を登録する。mission_mandate_refs は、その tenant で有効な既存の包括委任だけを指定する。委任は work_type=information_asset.<recipe action>、リスク3、対象組織の active/organizations/confidential/<tenant>/<organization>/、固定サービス操作をカバーする必要がある。内部 admission は外部操作を許可しない。
 
 外部操作の effect は google-workspace:gmail_reply、github:resolve_review_thread、jira:answer_request_approval、jira:transition_issue、jira:add_comment の該当分だけを包括委任に宣言する。委任が無い・失効した・Dot に明示されていない場合は mission proposal の生成を拒否する。包括委任の登録は既存の governance facade を使い、レシピや外部データから新たな権限を発行しない。
 

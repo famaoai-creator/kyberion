@@ -639,7 +639,7 @@ The loopback, HMAC-authenticated `event-intake-surface` (`POST /events/<source>`
 
 ### Execution Shape
 
-The `execution_shape` field in the intent-coverage matrix describing the selected execution rung: `direct_reply`, `actuator_action`/`browser_session`, `task_session`, `pipeline`, `mission`, or `project_bootstrap`. It selects how an intent runs and is the only execution vocabulary: route families and resolution shapes are projections of it, and the dot charter's `work_shape` field (which holds Execution Shape values) is being renamed `execution_shape`. `work_shape` describes what kind of work a `WorkItem` is, so the two fields are not interchangeable.
+The `execution_shape` field in the intent-coverage matrix describing the selected execution rung: `direct_reply`, `actuator_action`/`browser_session`, `task_session`, `pipeline`, `mission`, or `project_bootstrap`. It selects how an intent runs and is the only execution vocabulary: route families and resolution shapes are projections of it (`libs/core/contracts/execution-shape.ts`), and the dot charter declares the shapes it may dispatch as `allowed_execution_shapes` (the old `allowed_work_shapes` key is a deprecated alias for one release); the dot proposal's persisted `work_shape` field still holds Execution Shape values and is yet to be renamed. `work_shape` describes what kind of work a `WorkItem` is, so the two fields are not interchangeable.
 
 These are orthogonal axes: changing the operating mode does not by itself choose the execution rung, and choosing a rung does not redefine the operating mode.
 

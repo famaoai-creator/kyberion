@@ -23,8 +23,13 @@ import { DOT_PROPOSE_TOOL_NAME, DOT_PROPOSALS_FENCE } from './dot-extensions.js'
 export { DOT_PROPOSE_TOOL_NAME, DOT_PROPOSALS_FENCE } from './dot-extensions.js';
 
 import type { ToolDefinition } from '../reasoning/reasoning-backend-contracts.js';
+import type { ExecutionShape } from '../contracts/execution-shape.js';
 
-export type DotWorkShape = 'mission' | 'task_session' | 'pipeline' | 'direct_reply';
+/** The ExecutionShape subset a dot may propose (ExecutionShape is the only execution vocabulary). */
+export type DotExecutionShape = Extract<
+  ExecutionShape,
+  'mission' | 'task_session' | 'pipeline' | 'direct_reply'
+>;
 export type DotDecisionLevel = 'auto' | 'notify' | 'approve';
 
 import {
@@ -48,7 +53,11 @@ export interface DotProposal {
   title: string;
   /** What the delegated worker (or receiving dot) should accomplish. */
   objective: string;
-  work_shape: DotWorkShape;
+  /**
+   * An ExecutionShape value. The key keeps its legacy name because it is persisted in the
+   * hash-bound dot action ledger; renaming it to `execution_shape` needs a ledger migration.
+   */
+  work_shape: DotExecutionShape;
   rationale?: string;
   /** Repo-relative paths the work is expected to touch (high-risk paths force approve). */
   changed_paths?: string[];
@@ -105,7 +114,7 @@ export const MAX_DOT_PROPOSALS_PER_WAKE = 10;
 export const DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE =
   'task_session is unavailable: no governed task-session executor is configured — propose a pipeline from your charter allowed_pipelines (pipeline_ref) or an advisory direct_reply, or ask the operator to do the work';
 
-const WORK_SHAPES: readonly DotWorkShape[] = [
+const WORK_SHAPES: readonly DotExecutionShape[] = [
   'mission',
   'task_session',
   'pipeline',
@@ -217,7 +226,7 @@ export function normalizeDotProposal(value: unknown): DotProposal {
   if (missionAdmission && (raw.work_shape !== 'mission' || raw.handoff_to))
     throw new Error('mission_admission requires direct mission work');
   const workShape = raw.work_shape;
-  if (!WORK_SHAPES.includes(workShape as DotWorkShape)) {
+  if (!WORK_SHAPES.includes(workShape as DotExecutionShape)) {
     throw new Error(`work_shape must be one of ${WORK_SHAPES.join(', ')}`);
   }
   const requested = raw.requested_decision;
@@ -269,7 +278,7 @@ export function normalizeDotProposal(value: unknown): DotProposal {
     ...(missionAdmission ? { mission_admission: missionAdmission } : {}),
     title: text(raw.title, 'title', 200),
     objective: text(raw.objective, 'objective'),
-    work_shape: workShape as DotWorkShape,
+    work_shape: workShape as DotExecutionShape,
     ...(optionalText(raw.rationale) ? { rationale: optionalText(raw.rationale) } : {}),
     ...(changedPaths?.length ? { changed_paths: changedPaths } : {}),
     ...(requested ? { requested_decision: requested as DotDecisionLevel } : {}),

@@ -3,6 +3,11 @@ import { assessContextualClarification } from './contextual-intent-clarification
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { classifyTaskSessionIntent } from '../task/task-session.js';
 import { t } from '../localization/t.js';
+import {
+  normalizeExecutionShape,
+  projectExecutionShapeToIntentResolutionShape,
+  type ExecutionShape,
+} from '../contracts/execution-shape.js';
 import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import {
   loadResolvedStandardIntentCatalog,
@@ -69,12 +74,9 @@ export function renderIntentOutcomeLabel(
   return t('tui:tui_cockpit_outcome_answer', undefined, locale);
 }
 
-function normalizeShape(shape?: string): IntentResolutionShape {
-  if (shape === 'project_bootstrap') return 'project_bootstrap';
-  if (shape === 'mission') return 'mission';
-  if (shape === 'direct_reply') return 'direct_answer';
-  if (shape === 'task_session' || shape === 'browser_session') return 'task_session';
-  return 'task_session';
+/** The selected intent's ExecutionShape; an unknown or missing shape reads as task_session. */
+function selectedExecutionShape(packet: IntentResolutionPacket): ExecutionShape {
+  return normalizeExecutionShape(packet.selected_resolution?.shape, 'task_session');
 }
 
 function inferOutcomeKind(
@@ -143,7 +145,7 @@ function resolveRequiredInputs(
 }
 
 function selectedShapeForIntent(packet: IntentResolutionPacket): IntentResolutionShape {
-  return normalizeShape(packet.selected_resolution?.shape);
+  return projectExecutionShapeToIntentResolutionShape(selectedExecutionShape(packet));
 }
 
 export function resolveIntentResolutionContract(
@@ -167,7 +169,7 @@ export function resolveIntentResolutionContract(
     overlayPaths: options.overlayPaths,
   });
   const selectedIntent = catalog.find((intent) => intent.id === packet.selected_intent_id);
-  const selectedShape = normalizeShape(packet.selected_resolution?.shape);
+  const selectedShape = selectedShapeForIntent(packet);
   const taskSessionIntent =
     packet.selected_intent_id &&
     ['task_session', 'mission', 'project_bootstrap'].includes(selectedShape)
@@ -205,9 +207,11 @@ export function resolveIntentResolutionContract(
           (selectedIntent?.outcome_ids || []).includes('approval_request')
         ? 'approval_required'
         : 'autonomous';
-  const resolutionShape: IntentResolutionShape = packet.selected_intent_id
-    ? selectedShape
-    : 'direct_answer';
+  const executionShape: ExecutionShape = packet.selected_intent_id
+    ? selectedExecutionShape(packet)
+    : 'direct_reply';
+  const resolutionShape: IntentResolutionShape =
+    projectExecutionShapeToIntentResolutionShape(executionShape);
   const rationale = packet.selected_intent_id
     ? `resolved from intent '${packet.selected_intent_id}' with confidence ${String(packet.selected_confidence || 0)}`
     : 'no confident intent match; clarification required';
@@ -255,6 +259,7 @@ export function resolveIntentResolutionContract(
     normalized_intent: packet.selected_intent_id || 'unresolved_intent',
     missing_inputs: missingInputs,
     resolution_shape: resolutionShape,
+    execution_shape: executionShape,
     outcome_kind: inferOutcomeKind(selectedIntent, packet.selected_resolution?.result_shape),
     authority_level: authorityLevel,
     next_action: nextAction,

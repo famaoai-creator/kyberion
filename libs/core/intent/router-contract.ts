@@ -8,11 +8,17 @@ import { pathResolver } from '../path-resolver.js';
 import { recordUnhandledIntent } from './unhandled-intent-registry.js';
 import { recordConversationSignal } from './conversation-signals.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
+import {
+  parseExecutionShape,
+  projectExecutionShapeToRouteFamily,
+  type RouteFamily,
+} from '../contracts/execution-shape.js';
 
 export interface SurfaceIntentResolution {
   intentId?: string;
   shape?: string;
-  routeFamily?: 'direct_reply' | 'browser_session' | 'task_session' | 'mission' | 'pipeline';
+  /** Projection of the selected ExecutionShape (projectExecutionShapeToRouteFamily). */
+  routeFamily?: RouteFamily;
   queryType?: 'weather' | 'location' | 'web_search' | 'knowledge_search';
   queryText?: string;
   browserCommandKind?: 'open_site' | 'browser_step';
@@ -61,12 +67,10 @@ function routeFamilyForIntent(
   intentId?: string,
   shape?: string
 ): SurfaceIntentResolution['routeFamily'] {
-  if (shape === 'pipeline') return 'pipeline';
-  if (shape === 'mission') return 'mission';
-  if (shape === 'browser_session') return 'browser_session';
-  if (shape === 'task_session') return 'task_session';
+  const executionShape = parseExecutionShape(shape);
+  const projected = executionShape ? projectExecutionShapeToRouteFamily(executionShape) : undefined;
+  if (projected) return projected;
   if (
-    shape === 'direct_reply' ||
     intentId === 'knowledge-query' ||
     intentId === 'query-knowledge' ||
     intentId === 'live-query'
