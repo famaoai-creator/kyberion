@@ -1,4 +1,4 @@
-import { appendJsonLine, parseSafeJsonInput, readJsonLines } from '../foundation/json.js';
+import { parseSafeJsonInput, readJsonLines } from '../foundation/json.js';
 import * as path from 'node:path';
 import { t } from '../localization/t.js';
 import { randomUUID } from 'node:crypto';
@@ -36,6 +36,16 @@ import type { MissionState } from './mission-types.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { readSupervisorEvents } from '../agent/agent-runtime-events.js';
 import { prepareMissionWorkflowReuse, type WorkflowReuseResult } from './mission-workflow-reuse.js';
+import {
+  createMemoryPromotionCandidate,
+  enqueueMemoryPromotionCandidate,
+  listMemoryPromotionCandidates,
+  updateMemoryPromotionCandidateStatus,
+  type MemoryCandidate,
+  type MemoryCandidateStatus,
+} from '../knowledge/memory-promotion-queue.js';
+import type { MemoryScopeEnvelope } from '../knowledge/memory-scope.js';
+import { resolveStorageFloor } from '../storage-layout.js';
 
 function safeMissionRoot(missionPath: string): string {
   return assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
@@ -402,11 +412,15 @@ function normalizeProposalDraft(
   };
 }
 
+/** @deprecated D8: read-only legacy queue; proposals live on the MemoryCandidate queue. */
 const IMPROVEMENT_QUEUE_PATH = 'coordination/process-improvements/queue.jsonl';
+/** Marker for rows imported by the one-release migration. */
+export const LEGACY_PROCESS_IMPROVEMENT_QUEUE = 'process-improvement-queue';
 const PROPOSAL_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/process-improvement-proposal.schema.json'
 );
 
+/** @deprecated D8: the read-only legacy queue path (migration input only). */
 export function processImprovementQueuePath(): string {
   return safeRepositoryPath(pathResolver.shared(IMPROVEMENT_QUEUE_PATH));
 }
@@ -699,16 +713,127 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
   return stats;
 }
 
-function enqueueProposal(proposal: ProcessImprovementProposal): void {
-  const queuePath = regularProcessImprovementQueuePath(processImprovementQueuePath());
-  safeMkdir(path.dirname(queuePath), { recursive: true });
-  appendJsonLine(
-    queuePath,
-    processImprovementProposalCatalog(queuePath).validate(proposal, queuePath)
+// D8 / MEMORY_LOOP_CLOSURE M2: process-improvement proposals decide on the
+// single MemoryCandidate queue (kind `process_improvement`,
+// origin.record_kind `process_improvement`). The old shared JSONL queue is
+// read-only legacy; `migrateLegacyProcessImprovementProposals` imports its
+// pending items for one release with the scope of the mission they came from.
+
+const TO_QUEUE_STATUS: Record<ProcessImprovementProposal['status'], MemoryCandidateStatus> = {
+  proposed: 'queued',
+  approved: 'approved',
+  rejected: 'rejected',
+  applied: 'promoted',
+};
+const FROM_QUEUE_STATUS: Record<MemoryCandidateStatus, ProcessImprovementProposal['status']> = {
+  queued: 'proposed',
+  approved: 'approved',
+  rejected: 'rejected',
+  promoted: 'applied',
+};
+
+/**
+ * Capture scope of a mission's proposals, read from its own mission state.
+ * Throws `[MEMORY_SCOPE_REQUIRED]` when the state does not determine it.
+ */
+export function processImprovementScope(missionId: string): MemoryScopeEnvelope {
+  const usage = missionUsageScope(resolveRetrospectiveMissionPath(missionId));
+  const mission_id = missionId.toUpperCase();
+  if (!usage)
+    throw new Error(
+      `[MEMORY_SCOPE_REQUIRED] mission ${missionId} has no readable mission state — its tier and tenant cannot be determined`
+    );
+  if (usage.tier === 'public') return { tier: 'public', mission_id };
+  if (usage.tier === 'confidential' && usage.tenant_slug)
+    return { tier: 'confidential', tenant_slug: usage.tenant_slug, mission_id };
+  throw new Error(
+    usage.tier === 'personal'
+      ? `[MEMORY_SCOPE_REQUIRED] personal mission ${missionId} names no owner_nhi for its proposals`
+      : `[MEMORY_SCOPE_REQUIRED] confidential mission ${missionId} has no tenant_slug`
   );
 }
 
-export function listProcessImprovementProposals(): ProcessImprovementProposal[] {
+function toProcessImprovementMemoryCandidate(
+  proposal: ProcessImprovementProposal,
+  scope: MemoryScopeEnvelope,
+  migratedFrom?: string
+): MemoryCandidate {
+  const candidate = createMemoryPromotionCandidate({
+    candidateId: proposal.proposal_id,
+    kind: 'process_improvement',
+    sourceType: 'artifact',
+    sourceRef: `process_improvement:${proposal.mission_id}/${proposal.proposal_id}`,
+    proposedMemoryKind: proposal.kind === 'team_composition' ? 'heuristic' : 'sop',
+    summary: proposal.proposal,
+    evidenceRefs: [`mission:${proposal.mission_id}`, ...proposal.evidence],
+    sensitivityTier: scope.tier,
+    queuedAt: proposal.created_at,
+    scope,
+  });
+  return {
+    ...candidate,
+    status: TO_QUEUE_STATUS[proposal.status],
+    origin: {
+      record_kind: 'process_improvement',
+      record_id: proposal.proposal_id,
+      title: `${proposal.kind}: ${proposal.target}`.slice(0, 120),
+      attributes: {
+        mission_id: proposal.mission_id,
+        kind: proposal.kind,
+        target: proposal.target,
+        proposal: proposal.proposal,
+        rationale: proposal.rationale,
+        evidence: proposal.evidence,
+        created_at: proposal.created_at,
+      },
+      ...(migratedFrom ? { migrated_from: migratedFrom } : {}),
+    },
+  };
+}
+
+function fromProcessImprovementMemoryCandidate(
+  row: MemoryCandidate
+): ProcessImprovementProposal | undefined {
+  if (row.origin?.record_kind !== 'process_improvement') return undefined;
+  const attributes = row.origin.attributes || {};
+  return normalizeProcessImprovementProposal({
+    proposal_id: row.origin.record_id,
+    mission_id: attributes.mission_id,
+    kind: attributes.kind,
+    target: attributes.target,
+    // The original text: the queue summary is fact-normalized on enqueue.
+    proposal: attributes.proposal ?? row.summary,
+    rationale: attributes.rationale ?? '',
+    evidence: attributes.evidence ?? [],
+    status: FROM_QUEUE_STATUS[row.status],
+    created_at: attributes.created_at ?? row.queued_at,
+  });
+}
+
+function queuedProcessImprovementRows(): MemoryCandidate[] {
+  return listMemoryPromotionCandidates().filter(
+    (row) => row.origin?.record_kind === 'process_improvement'
+  );
+}
+
+function enqueueProposal(proposal: ProcessImprovementProposal): boolean {
+  let scope: MemoryScopeEnvelope;
+  try {
+    scope = processImprovementScope(proposal.mission_id);
+  } catch (err) {
+    // D8: no scope, no capture — never guessed. The proposal stays in the report.
+    logger.warn(
+      `[process-improvement] ${proposal.proposal_id} not queued — ${err instanceof Error ? err.message : String(err)} | next: fix the mission state tier/tenant and re-run the retrospective | evidence: mission ${proposal.mission_id}`
+    );
+    return false;
+  }
+  processImprovementProposalCatalog(processImprovementQueuePath()).validate(proposal);
+  enqueueMemoryPromotionCandidate(toProcessImprovementMemoryCandidate(proposal, scope));
+  return true;
+}
+
+/** Legacy shared JSONL queue — read-only (history and not-yet-migrated items). */
+function listLegacyProcessImprovementProposals(): ProcessImprovementProposal[] {
   const queuePath = processImprovementQueuePath();
   return readJsonl(queuePath).flatMap((entry) => {
     try {
@@ -721,15 +846,30 @@ export function listProcessImprovementProposals(): ProcessImprovementProposal[] 
   });
 }
 
-function writeProcessImprovementQueue(
-  queuePath: string,
-  proposals: ProcessImprovementProposal[]
-): void {
-  const safeQueuePath = regularProcessImprovementQueuePath(queuePath);
-  const catalog = processImprovementProposalCatalog(safeQueuePath);
-  const canonical = proposals.map((proposal) => catalog.validate(proposal, safeQueuePath));
-  safeMkdir(path.dirname(safeQueuePath), { recursive: true });
-  safeWriteFile(safeQueuePath, canonical.map((entry) => JSON.stringify(entry)).join('\n') + '\n');
+/**
+ * Queue-backed proposals plus legacy items not yet on the queue (the queue
+ * row wins on a shared proposal id).
+ */
+export function listProcessImprovementProposals(): ProcessImprovementProposal[] {
+  const queued = queuedProcessImprovementRows().flatMap((row) => {
+    const proposal = fromProcessImprovementMemoryCandidate(row);
+    return proposal ? [proposal] : [];
+  });
+  const seen = new Set(queued.map((entry) => entry.proposal_id));
+  return [
+    ...queued,
+    ...listLegacyProcessImprovementProposals().filter((entry) => !seen.has(entry.proposal_id)),
+  ];
+}
+
+function loadQueuedProposalRow(proposalId: string): MemoryCandidate {
+  const row = queuedProcessImprovementRows().find((entry) => entry.candidate_id === proposalId);
+  if (row) return row;
+  if (listLegacyProcessImprovementProposals().some((entry) => entry.proposal_id === proposalId))
+    throw new Error(
+      `[PROCESS_IMPROVEMENT_NOT_ON_QUEUE] proposal ${proposalId} is only in the read-only legacy queue | next: pnpm mission improvements --migrate --write, then retry`
+    );
+  throw new Error(`process improvement proposal not found: ${proposalId}`);
 }
 
 /**
@@ -743,41 +883,53 @@ export function decideProcessImprovementProposal(
   decision: 'approved' | 'rejected',
   decidedBy = 'operator'
 ): ProcessImprovementProposal {
-  const proposals = listProcessImprovementProposals();
-  const index = proposals.findIndex((entry) => entry.proposal_id === proposalId);
-  if (index < 0) throw new Error(`process improvement proposal not found: ${proposalId}`);
-  const current = proposals[index];
+  const row = loadQueuedProposalRow(proposalId);
+  const current = fromProcessImprovementMemoryCandidate(row);
+  if (!current) throw new Error(`process improvement proposal is malformed: ${proposalId}`);
   if (current.status !== 'proposed') {
     throw new Error(`proposal ${proposalId} is ${current.status}; only proposed can be decided`);
   }
-  const updated: ProcessImprovementProposal = {
-    ...current,
-    status: decision,
-  };
-  proposals[index] = updated;
-  const queuePath = processImprovementQueuePath();
-  writeProcessImprovementQueue(queuePath, proposals);
+  updateMemoryPromotionCandidateStatus({
+    candidateId: proposalId,
+    ...(row.scope ? { scope: row.scope } : {}),
+    status: TO_QUEUE_STATUS[decision],
+    expectedStatus: 'queued',
+    ratificationNote: `${decision} by ${decidedBy}`,
+  });
   logger.info(
     `[process-improvement] ${proposalId} ${decision} by ${decidedBy}: ${current.proposal.slice(0, 80)}`
   );
-  return updated;
+  return { ...current, status: decision };
+}
+
+/** Work orders are deliverables of the proposal's own tier/tenant partition. */
+function processImprovementWorkOrderPath(
+  proposalId: string,
+  scope: MemoryScopeEnvelope | undefined
+): string {
+  const tier = scope?.tier || 'public';
+  return safeRepositoryPath(
+    resolveStorageFloor(
+      'artifact',
+      { kind: 'tier', tier, ...(scope?.tenant_slug ? { tenant: scope.tenant_slug } : {}) },
+      'process-improvements',
+      `${proposalId}.md`
+    )
+  );
 }
 
 export function applyProcessImprovementProposal(proposalId: string): {
   proposal: ProcessImprovementProposal;
   work_order_path: string;
 } {
-  const proposals = listProcessImprovementProposals();
-  const index = proposals.findIndex((entry) => entry.proposal_id === proposalId);
-  if (index < 0) throw new Error(`process improvement proposal not found: ${proposalId}`);
-  const current = proposals[index];
+  const row = loadQueuedProposalRow(proposalId);
+  const current = fromProcessImprovementMemoryCandidate(row);
+  if (!current) throw new Error(`process improvement proposal is malformed: ${proposalId}`);
   if (current.status !== 'approved') {
     throw new Error(`proposal ${proposalId} is ${current.status}; approve it before applying`);
   }
-  const workOrderDir = pathResolver.shared('coordination/process-improvements/applied');
-  const safeWorkOrderDir = safeRepositoryPath(workOrderDir);
-  safeMkdir(safeWorkOrderDir, { recursive: true });
-  const workOrderPath = safeRepositoryPath(path.join(safeWorkOrderDir, `${proposalId}.md`));
+  const workOrderPath = processImprovementWorkOrderPath(proposalId, row.scope);
+  safeMkdir(path.dirname(workOrderPath), { recursive: true });
   safeWriteFile(
     workOrderPath,
     [
@@ -800,10 +952,14 @@ export function applyProcessImprovementProposal(proposalId: string): {
       t('mission_ops:retro_wo_footer'),
     ].join('\n')
   );
+  updateMemoryPromotionCandidateStatus({
+    candidateId: proposalId,
+    ...(row.scope ? { scope: row.scope } : {}),
+    status: 'promoted',
+    expectedStatus: 'approved',
+    promotedRef: path.relative(pathResolver.rootDir(), workOrderPath).replace(/\\/g, '/'),
+  });
   const updated: ProcessImprovementProposal = { ...current, status: 'applied' };
-  proposals[index] = updated;
-  const queuePath = processImprovementQueuePath();
-  writeProcessImprovementQueue(queuePath, proposals);
   void notifyOperator('deliverable_ready', {
     title: t('mission_ops:retro_wo_issued_title', { kind: current.kind, id: proposalId }),
     body: current.proposal.slice(0, 200),
@@ -811,6 +967,64 @@ export function applyProcessImprovementProposal(proposalId: string): {
     correlation_id: proposalId,
   });
   return { proposal: updated, work_order_path: workOrderPath };
+}
+
+export interface ProcessImprovementMigrationReport {
+  mode: 'dry_run' | 'apply';
+  imported: Array<{ proposal_id: string; mission_id: string; status: string }>;
+  already_on_queue: string[];
+  /** Pending proposals whose mission scope cannot be determined — reported, not guessed. */
+  unresolved: Array<{ proposal_id: string; mission_id: string; reason: string }>;
+  /** Decided (rejected / applied) proposals stay read-only history in the legacy queue. */
+  left_as_history: string[];
+}
+
+/**
+ * One-release migration: import pending legacy proposals onto the queue with
+ * the tier/tenant of the mission that produced them. Idempotent.
+ */
+export function migrateLegacyProcessImprovementProposals(
+  options: { apply?: boolean } = {}
+): ProcessImprovementMigrationReport {
+  const report: ProcessImprovementMigrationReport = {
+    mode: options.apply ? 'apply' : 'dry_run',
+    imported: [],
+    already_on_queue: [],
+    unresolved: [],
+    left_as_history: [],
+  };
+  const onQueue = new Set(queuedProcessImprovementRows().map((row) => row.candidate_id));
+  for (const proposal of listLegacyProcessImprovementProposals()) {
+    if (proposal.status === 'rejected' || proposal.status === 'applied') {
+      report.left_as_history.push(proposal.proposal_id);
+      continue;
+    }
+    if (onQueue.has(proposal.proposal_id)) {
+      report.already_on_queue.push(proposal.proposal_id);
+      continue;
+    }
+    let scope: MemoryScopeEnvelope;
+    try {
+      scope = processImprovementScope(proposal.mission_id);
+    } catch (err) {
+      report.unresolved.push({
+        proposal_id: proposal.proposal_id,
+        mission_id: proposal.mission_id,
+        reason: err instanceof Error ? err.message : String(err),
+      });
+      continue;
+    }
+    if (options.apply)
+      enqueueMemoryPromotionCandidate(
+        toProcessImprovementMemoryCandidate(proposal, scope, LEGACY_PROCESS_IMPROVEMENT_QUEUE)
+      );
+    report.imported.push({
+      proposal_id: proposal.proposal_id,
+      mission_id: proposal.mission_id,
+      status: proposal.status,
+    });
+  }
+  return report;
 }
 
 function buildRetrospectivePrompt(stats: MissionExecutionStats): string {

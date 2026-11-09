@@ -448,7 +448,7 @@ For distillation and other structured reasoning tasks, see:
 
 - [`knowledge/product/governance/wisdom-policy-guide.md`](../knowledge/product/governance/wisdom-policy-guide.md)
 
-Those flows are policy-driven. The operator should not need to pick a specific CLI provider when `wisdom-policy.json` already defines the profile and adapter.
+Those flows are policy-driven. The operator should not need to pick a specific CLI provider when `distill-policy.json` already defines the profile and adapter.
 
 ## 5. Chronos Mental Model
 
@@ -769,7 +769,7 @@ as a request to rewrite the deliverable.
 ### Reasoning policy
 
 ```bash
-cat knowledge/product/governance/wisdom-policy.json
+cat knowledge/product/governance/distill-policy.json
 ```
 
 Use this when you need to inspect or update which backend profile and adapter is used for distillation.

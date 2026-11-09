@@ -4100,6 +4100,10 @@
       "types": "./dist/organization/organization-operating-model.d.ts",
       "default": "./dist/organization/organization-operating-model.js"
     },
+    "./organization/organization-learning-queue": {
+      "types": "./dist/organization/organization-learning-queue.d.ts",
+      "default": "./dist/organization/organization-learning-queue.js"
+    },
     "./organization/organization-operating-model-management": {
       "types": "./dist/organization/organization-operating-model-management.d.ts",
       "default": "./dist/organization/organization-operating-model-management.js"

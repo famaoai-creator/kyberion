@@ -730,7 +730,7 @@ function opNominatePromotion(params: Record<string, unknown>): unknown {
   enqueueMemoryPromotionCandidate(candidate);
 
   if (mdPath && isExistingRegularFile(mdPath)) {
-    touchSidecar(mdPath, { promotion_candidate_id: candidate.candidate_id, status: 'promoted' });
+    touchSidecar(mdPath, { promotion_candidate_id: candidate.candidate_id, status: 'nominated' });
   }
 
   return { nominated: true, candidateId: candidate.candidate_id };
@@ -815,7 +815,7 @@ function opRunGc(params: Record<string, unknown>): unknown {
           results.warnings.push(`malformed sidecar skipped: ${fullPath}`);
           continue;
         }
-        if (sidecar.status === 'archived' || sidecar.status === 'promoted') continue;
+        if (sidecar.status === 'archived' || sidecar.status === 'nominated') continue;
         if (sidecar.expires_at && sidecar.expires_at < now && !sidecar.pinned) {
           try {
             safeWriteFile(

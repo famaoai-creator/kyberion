@@ -415,6 +415,8 @@ export interface QueueOrganizationLearningCandidateInput {
   targetKind: OrganizationLearningCandidate['target_kind'];
   tier: OrganizationTier;
   tenantSlug?: string;
+  /** Personal-tier learnings need their owner (D8: scope is written at capture, never inferred). */
+  ownerNhi?: string;
   metadata?: Record<string, unknown>;
   rootDir?: string;
 }
