@@ -25,6 +25,7 @@ import {
 } from '../dot/dot-dispatch.js';
 import { runAsDotCharter } from '../dot/dot-key-results.js';
 import type { DotCharter, LoadedDotCharter } from '../dot/dot-charter.js';
+import { requestedExecutionShape } from '../dot/dot-requested-shape.js';
 import type { FrontDeskArtifactVerification } from '../dot/dot-state-paths.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
 import { assertApprovalUsable } from '../governance/approval-separation-of-duties.js';
@@ -142,7 +143,7 @@ export function prepareFrontDeskExecution(
     throw new Error('configured pipeline capability is unavailable');
   if (
     item.metadata?.pipeline_ref !== FRONT_DESK_RECEIPT_PIPELINE ||
-    item.metadata?.requested_work_shape !== 'pipeline' ||
+    requestedExecutionShape(item.metadata) !== 'pipeline' ||
     item.metadata?.dot_id !== charter.dot_id
   )
     throw new Error('WorkItem execution target changed');

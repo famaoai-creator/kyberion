@@ -177,7 +177,7 @@ async function scenario(entry: 'fence' | 'tool', kind: Scenario, approveFloor: b
     action_id: 'dot_delegate_work',
     title: 'Synthetic latency repair',
     objective: 'Prepare only the isolated synthetic fixture repair',
-    work_shape: 'pipeline' as const,
+    execution_shape: 'pipeline' as const,
     pipeline_ref: latency.SYNTHETIC_LATENCY_PIPELINE_REF,
   };
   const charter: DotCharter = {
@@ -361,7 +361,7 @@ async function scenario(entry: 'fence' | 'tool', kind: Scenario, approveFloor: b
       metadata: {
         dot_id: id,
         action_ref: identity.action_ref,
-        requested_work_shape: 'pipeline',
+        requested_execution_shape: 'pipeline',
         pipeline_ref: proposal.pipeline_ref,
       },
     });
@@ -393,7 +393,7 @@ async function scenario(entry: 'fence' | 'tool', kind: Scenario, approveFloor: b
       status: item.status,
       version: item.version,
       context: item.context,
-      requested_shape: item.metadata?.requested_work_shape,
+      requested_shape: item.metadata?.requested_execution_shape,
       pipeline: item.metadata?.pipeline_ref,
     })),
     approval: after.approvals.map((record) => ({

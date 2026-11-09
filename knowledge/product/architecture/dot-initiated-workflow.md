@@ -3,7 +3,7 @@ title: Dot-Initiated Workflow — observation → claim → execution → learni
 category: Architecture
 tags: [dot, workflow, work-item, inbox, wake, autonomy, ops-health-probe]
 importance: 8
-last_updated: 2026-10-17
+last_updated: 2026-11-10
 ---
 
 # Dot-Initiated Workflow
@@ -21,7 +21,7 @@ Observe   ops-health-probe (daily) / heartbeat watchdog (5 min)
 File      findings → WorkItem for the ops dot + one coalesced inbox wake
 Wake      dot-inbox.jsonl row → evaluateDotTriggersDue → wake ledger (delivered)
 Claim     executor step (runs before wakes each sweep) → claimWorkItem
-Execute   route by metadata.requested_work_shape → outcome → report-back inbox row
+Execute   route by metadata.requested_execution_shape → outcome → report-back inbox row
 Record    executor report → work-results.jsonl → dot outcome-continuation wake
 Learn     autonomy-outcomes ledger → promotion/demotion sweep → knowledge distill
 ```
@@ -36,7 +36,7 @@ item sits unclaimed forever:
 | `status: 'ready'`                                                                                                                                        | default `backlog` is never claimed — executors only pick `ready`  |
 | `metadata.dot_id` (or `handoff_to`)                                                                                                                      | `addressedTo()` finds no target                                   |
 | `context.tenant_slug` matching the charter's tenant                                                                                                      | `dotItemTenantMismatch` → cross-tenant refusal (undefined ≠ slug) |
-| `metadata.requested_work_shape`                                                                                                                          | executor escalates with missing-shape guidance                    |
+| `metadata.requested_execution_shape` (legacy `requested_work_shape` is read for one release)                                                             | executor escalates with missing-shape guidance                    |
 | shape in `authority.allowed_execution_shapes` (enforced at the step port for task_session)                                                               | capability_unavailable refusal                                    |
 | `metadata.pipeline_ref` in `authority.allowed_pipelines` for pipeline shape — **repo-relative path verbatim** (`pipelines/<name>.json`, not a bare name) | `allowed_pipelines` miss or `Resource path does not exist`        |
 

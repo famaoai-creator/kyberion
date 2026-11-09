@@ -30,13 +30,13 @@ export function dotMissionAdmissionPrompt(
 /** Recheck admission independently of prompt disclosure, including approval settlement. */
 export function dotMissionAdmissionRefusal(
   charter: DotCharter,
-  proposal: Pick<DotProposal, 'mission_admission' | 'work_shape' | 'handoff_to'>,
+  proposal: Pick<DotProposal, 'mission_admission' | 'execution_shape' | 'handoff_to'>,
   now?: Date
 ): string | undefined {
   const admission = proposal.mission_admission;
   if (!admission) return;
   if (
-    proposal.work_shape !== 'mission' ||
+    proposal.execution_shape !== 'mission' ||
     proposal.handoff_to ||
     !charter.authority.mission_mandate_refs?.includes(admission.mandate_ref)
   ) {

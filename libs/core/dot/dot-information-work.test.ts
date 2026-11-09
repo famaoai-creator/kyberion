@@ -5,7 +5,7 @@ const scope = { tenant_slug: 'acme', organization_id: 'support' };
 const charter = { scope: { ...scope, tier: 'confidential' } } as DotCharter;
 const proposal: DotScopedProposal = {
   action_id: 'dot_delegate_work',
-  work_shape: 'pipeline',
+  execution_shape: 'pipeline',
   pipeline_ref: 'knowledge/product/pipeline-templates/information-asset-work.json',
   information_asset_work: {
     version: 1,
@@ -32,7 +32,7 @@ describe('trusted information work scope bounds', () => {
     expect(
       informationWorkProposalRefusal(charter, {
         ...proposal,
-        work_shape: 'mission',
+        execution_shape: 'mission',
         mission_admission: {
           mandate_ref: 'existing',
           mandate_facts: {
@@ -49,7 +49,7 @@ describe('trusted information work scope bounds', () => {
   });
   it('refuses mission work without its admission, wrong pipeline, and scope widening', () => {
     expect(
-      informationWorkProposalRefusal(charter, { ...proposal, work_shape: 'mission' })
+      informationWorkProposalRefusal(charter, { ...proposal, execution_shape: 'mission' })
     ).toMatchObject({ ok: false });
     expect(
       informationWorkProposalRefusal(charter, { ...proposal, pipeline_ref: 'arbitrary.json' })

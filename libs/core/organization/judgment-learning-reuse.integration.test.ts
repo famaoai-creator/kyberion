@@ -249,7 +249,7 @@ async function fixture() {
     const proposal = proposals.normalizeDotProposal({
       title: 'Independent synthetic ' + kind,
       objective: 'Preserve 100 users, 500 ms and zero added JPY',
-      work_shape: 'pipeline',
+      execution_shape: 'pipeline',
       pipeline_ref: latency.SYNTHETIC_LATENCY_PIPELINE_REF,
       target: 'service:' + id,
       intent: 'apply',
