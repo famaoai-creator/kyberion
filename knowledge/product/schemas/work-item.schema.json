@@ -86,6 +86,11 @@
       "minLength": 1,
       "description": "D1: the parent Issue of a step WorkItem; absent on a top-level WorkItem."
     },
+    "status_origin": {
+      "type": "string",
+      "enum": ["children", "manual"],
+      "description": "W2: who set a parent Issue's status last — aggregated from its steps (children) or set directly while it had steps (manual, pinned)."
+    },
     "metadata": { "type": "object" }
   },
   "additionalProperties": true
