@@ -11,7 +11,10 @@ import {
   overlayCanonicalWorkScopeDecision,
   type OrganizationWorkLoopSummary,
 } from '../workforce/work-design.js';
-import { resolveWorkScopeSignalOptions } from '../workforce/work-scope-decision.js';
+import {
+  catalogShapePromotesToMission,
+  resolveWorkScopeSignalOptions,
+} from '../workforce/work-scope-decision.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { discoverProviders, type ProviderInfo } from '../provider/provider-discovery.js';
@@ -145,6 +148,8 @@ interface DeliveryModeDecisionRule {
   shapes?: ExecutionShape[];
   text_patterns?: Array<TextMatchRule | string>;
   min_required_inputs?: number;
+  /** Match only when work-scope-policy.json promotes the shape to mission scope. */
+  work_scope_promotion?: boolean;
 }
 
 interface IntentPolicyFile {
@@ -642,12 +647,15 @@ function deliveryRuleMatches(
   rule: DeliveryModeDecisionRule
 ): boolean {
   const shapeMatch = !rule.shapes?.length || rule.shapes.includes(context.shape);
+  const promotionMatch =
+    rule.work_scope_promotion === undefined ||
+    rule.work_scope_promotion === catalogShapePromotesToMission(context.shape);
   const minRequiredInputsMatch =
     rule.min_required_inputs === undefined ||
     context.requiredInputs.length >= rule.min_required_inputs;
   const textMatch =
     !rule.text_patterns?.length || matchesAnyTextRule(context.text, rule.text_patterns);
-  return shapeMatch && minRequiredInputsMatch && textMatch;
+  return shapeMatch && promotionMatch && minRequiredInputsMatch && textMatch;
 }
 
 export function inferGovernedDeliveryMode(
@@ -1278,7 +1286,7 @@ function attachCorrelationId(
 }
 
 export function deriveIntentDeliveryDecision(contract: IntentContract): IntentDeliveryDecision {
-  return deriveIntentDeliveryDecisionFromModule(contract);
+  return deriveIntentDeliveryDecisionFromModule(contract, catalogShapePromotesToMission);
 }
 
 export function deriveAgentRoutingDecision(
@@ -1289,6 +1297,7 @@ export function deriveAgentRoutingDecision(
   return deriveAgentRoutingDecisionWithDependencies(contract, workLoop, sourceText, {
     resolvePolicyRoutingDecision,
     findStandardIntentById,
+    shapePromotesToMission: catalogShapePromotesToMission,
   });
 }
 

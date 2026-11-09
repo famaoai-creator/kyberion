@@ -19,9 +19,9 @@ import { safeExistsSync } from '@agent/core/secure-io';
 import {
   chooseExecutionIntent,
   gatherImprovementHints,
-  resolveIntentResolutionPacket,
   type IntentResolutionPacket,
 } from '@agent/core/intent/intent-resolution';
+import { resolveRoutingDecision } from '@agent/core/intent';
 import { issueMissionFromProposal } from '@agent/core/surface/surface-mission-proposals';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { resolveAndExecuteIntent } from '../libs/actuators/orchestrator-actuator/src/super-nerve/resolver.js';
@@ -217,7 +217,9 @@ export async function main(args: string[] = []): Promise<IntentGatewayResult> {
     (context as any)?.tenantSlug ||
     (getRegisteredEnv<string>('KYBERION_TENANT') as string | undefined) ||
     (getRegisteredEnv<string>('KYBERION_STANCE') as string | undefined);
-  const packet = resolveIntentResolutionPacket(intent, {
+  // D7: the request is resolved once here; everything downstream reads the
+  // carried packet and RoutingDecision instead of re-resolving the utterance.
+  const { packet, decision: routingDecision } = resolveRoutingDecision(intent, {
     tier,
     tenantId: typeof tenantId === 'string' ? tenantId : undefined,
   });
@@ -225,6 +227,7 @@ export async function main(args: string[] = []): Promise<IntentGatewayResult> {
     ...(packet.selected_parameters || {}),
     ...(context as Record<string, unknown>),
     resolution_packet: packet,
+    routing_decision: routingDecision,
     // Preserve the utterance for intent-specific parameter extraction after
     // the canonical resolver has selected an intent ID.
     source_text: intent,

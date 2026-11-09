@@ -6,7 +6,7 @@
       {
         "id": "durable-shapes",
         "mode": "managed_program",
-        "shapes": ["project_bootstrap", "mission"]
+        "work_scope_promotion": true
       },
       {
         "id": "durable-keywords",
