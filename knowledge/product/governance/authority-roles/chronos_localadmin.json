@@ -18,5 +18,31 @@
     "audit"
   ],
   "allowed_actuators": ["presence-actuator", "artifact-actuator", "approval-actuator"],
-  "tier_access": ["public", "confidential", "personal"]
+  "tier_access": ["public", "confidential", "personal"],
+  "permissions": {
+    "allow_read": [
+      "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
+      "knowledge/personal/tenants/",
+      "active/missions/",
+      "active/archive/missions/",
+      "active/projects/",
+      "active/shared/artifacts/personal/",
+      "active/shared/artifacts/confidential/",
+      "active/shared/coordination/channels/",
+      "active/shared/coordination/chronos/",
+      "active/shared/coordination/orchestration/",
+      "active/organizations/",
+      "active/shared/observability/",
+      "active/shared/runtime/",
+      "active/audit/"
+    ],
+    "allow_write": [
+      "active/shared/coordination/channels/",
+      "active/shared/coordination/chronos/",
+      "active/shared/coordination/orchestration/",
+      "active/shared/observability/",
+      "active/shared/runtime/",
+      "active/audit/"
+    ]
+  }
 }

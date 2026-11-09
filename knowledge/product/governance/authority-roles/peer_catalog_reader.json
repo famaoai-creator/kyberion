@@ -5,5 +5,13 @@
   "write_scopes": [],
   "scope_classes": [],
   "allowed_actuators": [],
-  "tier_access": ["confidential", "personal"]
+  "tier_access": ["confidential", "personal"],
+  "permissions": {
+    "allow_read": [
+      "knowledge/confidential/${KYBERION_TENANT}/connections/peer-network.json",
+      "knowledge/confidential/${KYBERION_TENANT}/connections/peer-tasks.json",
+      "knowledge/personal/tenants/${KYBERION_TENANT}.json"
+    ],
+    "allow_write": []
+  }
 }

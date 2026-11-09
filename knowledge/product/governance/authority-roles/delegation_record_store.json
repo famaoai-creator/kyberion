@@ -5,5 +5,9 @@
   "write_scopes": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"],
   "scope_classes": ["audit"],
   "allowed_actuators": [],
-  "tier_access": ["confidential"]
+  "tier_access": ["confidential"],
+  "permissions": {
+    "allow_read": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"],
+    "allow_write": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"]
+  }
 }

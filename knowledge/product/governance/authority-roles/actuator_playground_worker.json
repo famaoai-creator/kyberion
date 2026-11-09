@@ -5,5 +5,15 @@
   "write_scopes": [],
   "scope_classes": [],
   "allowed_actuators": [],
-  "tier_access": ["personal", "confidential"]
+  "tier_access": ["personal", "confidential"],
+  "permissions": {
+    "allow_read": [
+      "active/shared/tmp/confidential/${KYBERION_TENANT}/actuator-playground/",
+      "active/shared/tmp/personal/${KYBERION_TENANT}/actuator-playground/"
+    ],
+    "allow_write": [
+      "active/shared/tmp/confidential/${KYBERION_TENANT}/actuator-playground/",
+      "active/shared/tmp/personal/${KYBERION_TENANT}/actuator-playground/"
+    ]
+  }
 }

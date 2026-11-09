@@ -1,0 +1,8 @@
+{
+  "role": "finance_controller",
+  "assignable": false,
+  "permissions": {
+    "allow_read": ["knowledge/product/governance/finance/", "active/shared/tmp/"],
+    "allow_write": ["knowledge/product/governance/finance/", "active/shared/tmp/"]
+  }
+}

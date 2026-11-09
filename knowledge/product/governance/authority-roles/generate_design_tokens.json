@@ -1,0 +1,10 @@
+{
+  "role": "generate_design_tokens",
+  "assignable": false,
+  "permissions": {
+    "allow_write": [
+      "knowledge/public/design-patterns/media-templates/themes.json",
+      "knowledge/public/design-patterns/media-templates/themes/themes.json"
+    ]
+  }
+}

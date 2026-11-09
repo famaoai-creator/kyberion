@@ -5,5 +5,26 @@
   "write_scopes": [],
   "scope_classes": [],
   "allowed_actuators": [],
-  "tier_access": ["personal", "confidential"]
+  "tier_access": ["personal", "confidential"],
+  "permissions": {
+    "allow_read": [
+      "active/archive/missions/confidential/${KYBERION_TENANT}/",
+      "active/archive/missions/personal/${KYBERION_TENANT}/"
+    ],
+    "allow_write": [],
+    "narrow": {
+      "deny": ["write", "mkdir"],
+      "deny_reason": "[RESOURCE_SCOPE_REQUIRED] Archived mission state reads require their exact read-only capability",
+      "require_scope": {
+        "custody": "tenant",
+        "exact": {
+          "read_only": true,
+          "read_path_pattern": "^active/archive/missions/(personal|confidential)/([a-z][a-z0-9-]{1,30})/[A-Za-z0-9][A-Za-z0-9._-]{0,160}/mission-state\\.json$",
+          "read_path_tenant_group": 2,
+          "allow_product_knowledge_read": true
+        },
+        "reason": "[RESOURCE_SCOPE_REQUIRED] Archived mission state reads require their exact read-only capability"
+      }
+    }
+  }
 }

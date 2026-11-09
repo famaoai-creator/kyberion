@@ -1,0 +1,13 @@
+{
+  "role": "generate_subagent_definitions",
+  "assignable": false,
+  "permissions": {
+    "allow_write": [
+      ".claude/agents/",
+      ".agents/agents/",
+      ".devin/agents/",
+      ".cursor/agents/",
+      ".codex/agents/"
+    ]
+  }
+}

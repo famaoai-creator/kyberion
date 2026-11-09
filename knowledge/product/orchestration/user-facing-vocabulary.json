@@ -11016,9 +11016,9 @@
         "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ȧɠėñŧ ṗřőƒïŀė ïñḓėẋ ƒřőɱ ŧħė ƈȧñőñïƈȧŀ ṗřőƒïŀėş ḓïřėƈŧőřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
       },
       "cli_cmd_script_sync_authority_roles": {
-        "en": "Regenerate the authority role index from the role definitions.",
-        "ja": "ロール定義から権限ロール索引を再生成する。",
-        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ȧůŧħőřïŧẏ řőŀė ïñḓėẋ ƒřőɱ ŧħė řőŀė ḓėƒïñïŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+        "en": "Regenerate the authority role index and the security policy role permissions from the role cards.",
+        "ja": "ロールのカードから、権限ロール索引とセキュリティポリシーのロール許可を再生成する。",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ȧůŧħőřïŧẏ řőŀė ïñḓėẋ ȧñḓ ŧħė şėƈůřïŧẏ ṗőŀïƈẏ řőŀė ṗėřɱïşşïőñş ƒřőɱ ŧħė řőŀė ƈȧřḓş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
       "cli_cmd_script_sync_service_endpoints": {
         "en": "Regenerate the service endpoint catalog from its sources.",

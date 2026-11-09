@@ -115,7 +115,7 @@ A human member's standing in a tenant or organization: owner, approver, operator
 
 ### Authority Role
 
-A named bundle of operations; which information it may touch is decided by the Grant's scope, never by the role name. Today two registries disagree (`authority-role-index.json`, 55 roles; `security-policy.json` `authority_role_permissions`, 86 roles), and about 40 roles exist only to name one store. These merge into one registry, and the store roles become store grants ([STORE_CATALOG_GRANT_GUARD_DESIGN](./developer/improvement-plans-2026-11/STORE_CATALOG_GRANT_GUARD_DESIGN_2026-11-05.ja.md)).
+A named bundle of operations; which information it may touch is decided by the Grant's scope, never by the role name. There is one registry: one card per role in `knowledge/product/governance/authority-roles/` (90 roles). A card holds the role's catalog profile and its path `permissions`; `authority-role-index.json` (the assignable roles) and `security-policy.json` `authority_role_permissions` are generated from the cards by `pnpm kyberion sync authority-roles`, and the `governance-rules` gate fails on drift. A process role (`assignable: false`) is assumed by a script or service only and is never offered to teams, organizations or dots. About 30 roles still exist only to name one store; they become store grants ([STORE_CATALOG_GRANT_GUARD_DESIGN](./developer/improvement-plans-2026-11/STORE_CATALOG_GRANT_GUARD_DESIGN_2026-11-05.ja.md)).
 
 ### Grant
 

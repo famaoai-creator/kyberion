@@ -5,5 +5,13 @@
   "write_scopes": ["active/shared/observability/retrospectives/"],
   "scope_classes": ["observability"],
   "allowed_actuators": [],
-  "tier_access": ["public"]
+  "tier_access": ["public"],
+  "permissions": {
+    "allow_read": [
+      "knowledge/product/governance/",
+      "knowledge/product/schemas/",
+      "active/shared/observability/retrospectives/"
+    ],
+    "allow_write": ["active/shared/observability/retrospectives/"]
+  }
 }

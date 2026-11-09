@@ -5,5 +5,23 @@
   "write_scopes": [],
   "scope_classes": [],
   "allowed_actuators": [],
-  "tier_access": ["personal", "confidential"]
+  "tier_access": ["personal", "confidential"],
+  "permissions": {
+    "allow_read": [
+      "active/shared/tmp/confidential/${KYBERION_TENANT}/",
+      "active/shared/tmp/personal/${KYBERION_TENANT}/",
+      "active/shared/staging/confidential/${KYBERION_TENANT}/",
+      "active/shared/staging/personal/${KYBERION_TENANT}/",
+      "active/shared/cache/confidential/${KYBERION_TENANT}/perception/",
+      "active/shared/cache/personal/${KYBERION_TENANT}/perception/"
+    ],
+    "allow_write": [
+      "active/shared/tmp/confidential/${KYBERION_TENANT}/",
+      "active/shared/tmp/personal/${KYBERION_TENANT}/",
+      "active/shared/staging/confidential/${KYBERION_TENANT}/",
+      "active/shared/staging/personal/${KYBERION_TENANT}/",
+      "active/shared/cache/confidential/${KYBERION_TENANT}/perception/",
+      "active/shared/cache/personal/${KYBERION_TENANT}/perception/"
+    ]
+  }
 }

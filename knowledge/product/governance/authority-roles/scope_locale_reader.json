@@ -5,5 +5,9 @@
   "write_scopes": [],
   "scope_classes": [],
   "allowed_actuators": [],
-  "tier_access": ["confidential"]
+  "tier_access": ["confidential"],
+  "permissions": {
+    "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/locale.json"],
+    "allow_write": []
+  }
 }
