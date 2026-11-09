@@ -55,6 +55,7 @@ vi.mock('../mesh/a2a-bridge.js', () => ({
 vi.mock('../intent/intent-contract.js', () => ({
   compileUserIntentFlow: mocks.compileUserIntentFlow,
   formatClarificationPacket: vi.fn(() => 'clarification'),
+  inferGovernedDeliveryMode: () => 'one_shot',
 }));
 
 vi.mock('../network.js', () => ({

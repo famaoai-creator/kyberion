@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 
 vi.mock('../core.js', () => ({
   logger: {
@@ -14,7 +14,40 @@ vi.mock('../secure-io.js', () => ({
   safeReadFile: () => '[]',
 }));
 
+const mocks = vi.hoisted(() => ({
+  catalog: [] as unknown[],
+  resolveRoutingPacket: vi.fn(),
+}));
+
+vi.mock('./intent-resolution.js', () => ({
+  loadStandardIntentCatalog: () => mocks.catalog,
+}));
+
+vi.mock('./intent-resolver-entry.js', () => ({
+  resolveRoutingPacket: mocks.resolveRoutingPacket,
+}));
+
+import type { RoutingDecision } from '../contracts/routing-decision.js';
 import { compileIntent, buildPipelineGenerationPrompt } from './intent-compiler.js';
+
+/** A carried decision selecting `intentId`; the compiler must not re-resolve. */
+function carried(intentId: string | undefined, confidence = 0.9): RoutingDecision {
+  return {
+    kind: 'routing_decision',
+    ...(intentId ? { intent_id: intentId } : {}),
+    confidence,
+    execution_shape: 'pipeline',
+    authority_level: 'autonomous',
+    delivery_mode: 'one_shot',
+    promotion: {
+      required: false,
+      execution_shape: 'pipeline',
+      reasons: [],
+      matched_rule_ids: [],
+      policy_version: 'test',
+    },
+  };
+}
 
 describe('intent-compiler', () => {
   const standardIntents = [
@@ -107,25 +140,45 @@ describe('intent-compiler', () => {
   ];
 
   describe('compileIntent', () => {
-    it('returns null for unknown intent', () => {
+    beforeEach(() => {
+      mocks.catalog = standardIntents;
+      mocks.resolveRoutingPacket.mockReset();
+      mocks.resolveRoutingPacket.mockReturnValue({ selected_intent_id: undefined });
+    });
+
+    it('returns null when the resolver selects nothing and no hint matches', () => {
       const result = compileIntent('do something completely unrelated xyz', {
-        standardIntents,
         knowledgeHints: [],
       });
 
       expect(result).toBeNull();
+      expect(mocks.resolveRoutingPacket).toHaveBeenCalledTimes(1);
     });
 
-    it('matches by keyword with confidence 0.8', () => {
-      const result = compileIntent('I need to take a screenshot of the page', {
-        standardIntents,
+    it('selects only through the resolver: a catalog trigger word alone no longer matches', () => {
+      // Before R3 an explicit catalog matched 'screenshot' by keyword (0.8).
+      expect(compileIntent('I need to take a screenshot of the page')).toBeNull();
+    });
+
+    it('compiles the resolver-selected intent with its confidence', () => {
+      mocks.resolveRoutingPacket.mockReturnValue({
+        selected_intent_id: 'take-screenshot',
+        selected_confidence: 0.83,
       });
+      const result = compileIntent('I need to take a screenshot of the page');
 
       expect(result).not.toBeNull();
-      expect(result!.confidence).toBe(0.8);
+      expect(result!.confidence).toBe(0.83);
       expect(result!.source).toBe('template');
       expect(result!.intentId).toBe('take-screenshot');
       expect(result!.steps.length).toBeGreaterThan(0);
+    });
+
+    it('acts on a carried decision without re-resolving', () => {
+      const result = compileIntent('anything', { routingDecision: carried('health-check', 0.7) });
+      expect(result?.intentId).toBe('health-check');
+      expect(result?.confidence).toBe(0.7);
+      expect(mocks.resolveRoutingPacket).not.toHaveBeenCalled();
     });
 
     it('matches knowledge hints with confidence 0.6', () => {
@@ -133,10 +186,7 @@ describe('intent-compiler', () => {
         { topic: 'pdf generation', hint: 'Use media actuator for PDF', tags: ['pdf', 'media'] },
       ];
 
-      const result = compileIntent('generate a pdf report', {
-        standardIntents: [],
-        knowledgeHints,
-      });
+      const result = compileIntent('generate a pdf report', { knowledgeHints });
 
       expect(result).not.toBeNull();
       expect(result!.confidence).toBe(0.6);
@@ -150,13 +200,12 @@ describe('intent-compiler', () => {
         { topic: '請求書', hint: 'Use the invoice template', tags: ['経理'] },
       ];
       // Whitespace split kept '請求書を作成して' as one word that no topic contains.
-      const result = compileIntent('請求書を作成して', { standardIntents: [], knowledgeHints });
+      const result = compileIntent('請求書を作成して', { knowledgeHints });
       expect(result?.source).toBe('hint');
       expect(result?.confidence).toBe(0.6);
       // Particles shared with an unrelated topic do not count.
       expect(
         compileIntent('メールを送って', {
-          standardIntents: [],
           knowledgeHints: [{ topic: '予定を確認', tags: [] }],
         })
       ).toBeNull();
@@ -165,9 +214,7 @@ describe('intent-compiler', () => {
     it('synthesizes a deterministic meeting orchestration step', () => {
       const result = compileIntent(
         'Teamsで開催されるオンラインミーティングに私の代わりに参加して無事成功させる',
-        {
-          standardIntents,
-        }
+        { routingDecision: carried('meeting-operations') }
       );
 
       expect(result).not.toBeNull();
@@ -177,14 +224,14 @@ describe('intent-compiler', () => {
 
     it('synthesizes deterministic live voice and voice clone steps', () => {
       const liveVoiceResult = compileIntent('ライブ音声で会話したい', {
-        standardIntents,
+        routingDecision: carried('live-voice'),
       });
       expect(liveVoiceResult).not.toBeNull();
       expect(liveVoiceResult!.intentId).toBe('live-voice');
       expect(liveVoiceResult!.steps[0]?.params?.cmd).toContain('pipelines/live-voice-smoke.json');
 
       const cloneVoiceResult = compileIntent('自分の声を使えるようにして', {
-        standardIntents,
+        routingDecision: carried('clone-my-voice'),
       });
       expect(cloneVoiceResult).not.toBeNull();
       expect(cloneVoiceResult!.intentId).toBe('clone-my-voice');
@@ -193,7 +240,7 @@ describe('intent-compiler', () => {
 
     it('lists running services before stopping when no target is selected', () => {
       const result = compileIntent('サービスを停止して', {
-        standardIntents,
+        routingDecision: carried('stop-service'),
       });
 
       expect(result).not.toBeNull();
@@ -205,7 +252,7 @@ describe('intent-compiler', () => {
 
     it('lists startable services before starting when no target is selected', () => {
       const result = compileIntent('サービスを起動して', {
-        standardIntents,
+        routingDecision: carried('start-service'),
       });
 
       expect(result).not.toBeNull();

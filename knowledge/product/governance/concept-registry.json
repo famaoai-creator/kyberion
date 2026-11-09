@@ -432,7 +432,8 @@
       "canonical_doc": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md",
       "owner_modules": [
         "libs/core/contracts/routing-decision.ts",
-        "libs/core/intent/routing-decision.ts"
+        "libs/core/intent/routing-decision.ts",
+        "libs/core/intent/intent-resolver-entry.ts"
       ],
       "not_to_confuse_with": ["execution-shape"],
       "lifecycle": {

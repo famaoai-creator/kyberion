@@ -7,7 +7,7 @@ import type { IntentUseCaseScenario } from './intent-use-case-scenario.js';
 import type { WorkflowExecutionShape } from '../contracts/execution-shape.js';
 import type { ActuatorExecutionBrief } from '../contracts/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from '../contracts/operator-interaction-packet.js';
-import type { RoutingDeliveryMode } from '../contracts/routing-decision.js';
+import type { RoutingDecision, RoutingDeliveryMode } from '../contracts/routing-decision.js';
 
 export type IntentCompilerProvider = 'codex' | 'claude' | 'gemini';
 /** Same vocabulary as RoutingDecision.delivery_mode (contracts/routing-decision.ts). */
@@ -90,6 +90,11 @@ export interface CompileUserIntentFlowInput {
   serviceBindings?: string[];
   runtimeContext?: Record<string, unknown>;
   resolutionPacket?: IntentResolutionPacket;
+  /**
+   * The RoutingDecision the entry resolved for this same request (D7). The
+   * fallback execution brief uses its intent instead of re-resolving the text.
+   */
+  carriedRoutingDecision?: RoutingDecision;
 }
 
 export interface IntentCompilerTarget {
