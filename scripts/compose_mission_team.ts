@@ -20,22 +20,24 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 export const MISSION_TEAM_COMPOSITION_USAGE =
   'Usage: pnpm mission:compose-team --mission-id <id> [--request <text>] [--write]';
 
-function withMissionWriteContext<T>(assignedPersona: string | undefined, fn: () => T): T {
+/**
+ * Writes the team plan as the mission controller. The mission's Org Role is
+ * descriptive team metadata and is never copied into the execution identity
+ * (concept model v2 D5): the write runs with whatever persona the caller
+ * already has, and a mission-bound process without one is pinned to `worker`
+ * by the authority resolver.
+ */
+function withMissionWriteContext<T>(fn: () => T): T {
   const previousRole = getRegisteredEnvText('MISSION_ROLE');
-  const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
 
   if (!getRegisteredEnvText('MISSION_ROLE')) {
     setRegisteredEnv('MISSION_ROLE', 'mission_controller');
-  }
-  if (!getRegisteredEnvText('KYBERION_PERSONA') && assignedPersona) {
-    setRegisteredEnv('KYBERION_PERSONA', assignedPersona);
   }
 
   try {
     return fn();
   } finally {
     setRegisteredEnv('MISSION_ROLE', previousRole);
-    setRegisteredEnv('KYBERION_PERSONA', previousPersona);
   }
 }
 
@@ -175,7 +177,7 @@ export async function main(args: string[] = []): Promise<unknown> {
   if (argv.write) {
     // Writing a team plan needs an existing mission; an unknown one fails closed.
     const targetDir = missionPath || resolveMissionDir(missionId);
-    withMissionWriteContext(assignedPersona, () => {
+    withMissionWriteContext(() => {
       writeMissionTeamPlan(targetDir, plan);
       initializeMissionTeamBindings(targetDir, plan);
       if (brief) writeMissionTeamBrief(targetDir, brief);
