@@ -6,7 +6,7 @@ import {
  * HA-01 asynchronous background-review fork.
  *
  * The fork is deliberately proposal-only: it may enqueue a governed memory
- * candidate, persist a distill proposal, and create a pending human approval
+ * candidate, capture a patch proposal on the same queue, and create a pending human approval
  * request for a valid patch proposal, but it never mutates mission state,
  * applies a skill patch, or promotes knowledge itself. The main surface turn
  * can therefore start this runner without awaiting it.
@@ -34,9 +34,9 @@ import {
   type MemoryCandidateTier,
 } from '../knowledge/memory-promotion-queue.js';
 import {
-  createDistillCandidateRecord,
-  saveDistillCandidateRecord,
-} from '../knowledge/distill-candidate-registry.js';
+  backgroundReviewCaptureScope,
+  captureBackgroundReviewProposal,
+} from './background-review-proposals.js';
 import {
   createBackgroundReviewApprovalRequest,
   inspectBackgroundReviewProposal,
@@ -459,7 +459,7 @@ function persistProposal(
   input: BackgroundReviewForkInput,
   proposal: BackgroundReviewProposal,
   sourceRef: string
-): string {
+): { candidateId: string; scope: MemoryScopeEnvelope } {
   const operation =
     proposal.action === 'pipeline_proposal'
       ? 'pipeline:promote'
@@ -467,14 +467,16 @@ function persistProposal(
         ? 'skill:patch'
         : 'memory:consolidate';
   assertBackgroundReviewOperationAllowed(operation);
-  const record = createDistillCandidateRecord({
+  // D8: a MemoryCandidate queue row with the mission's (or session owner's)
+  // real scope, decided via `pnpm background-review`. No scope, no capture.
+  const scope = backgroundReviewCaptureScope(input);
+  const record = captureBackgroundReviewProposal({
     source_type: input.missionId ? 'mission' : 'task_session',
-    tier: input.missionId ? 'confidential' : 'personal',
-    mission_id: input.missionId,
+    ...(input.missionId ? { mission_id: input.missionId } : {}),
     task_session_id: input.sessionId,
     title: proposal.title || 'Background review proposal',
     summary: proposal.summary || '',
-    status: 'proposed',
+    scope,
     target_kind: proposal.action === 'pipeline_proposal' ? 'sop_candidate' : 'pattern',
     evidence_refs: [sourceRef],
     metadata: {
@@ -490,8 +492,7 @@ function persistProposal(
       },
     },
   });
-  saveDistillCandidateRecord(record);
-  return record.candidate_id;
+  return { candidateId: record.candidate_id, scope };
 }
 
 /**
@@ -621,10 +622,11 @@ export async function runBackgroundReviewFork(
       return { status: 'no_action', session_id: input.sessionId, action: proposal.action };
     }
 
-    const candidateId =
+    const persisted =
       proposal.action === 'memory_candidate'
-        ? persistMemoryCandidate(input, proposal, sourceRef)
+        ? { candidateId: persistMemoryCandidate(input, proposal, sourceRef), scope: undefined }
         : persistProposal(input, proposal, sourceRef);
+    const candidateId = persisted.candidateId;
     let approvalRequestId: string | undefined;
     let approvalRequestError: string | undefined;
     let approvalNotificationId: string | undefined;
@@ -637,9 +639,10 @@ export async function runBackgroundReviewFork(
       // Generate the request from the persisted candidate so the exact target,
       // patch, and current pre-image are bound before a human sees it.
       try {
-        const preview = inspectBackgroundReviewProposal(candidateId);
+        const preview = inspectBackgroundReviewProposal(candidateId, persisted.scope);
         const approval = createBackgroundReviewApprovalRequest({
           candidateId,
+          ...(persisted.scope ? { scope: persisted.scope } : {}),
           expectedSha256: preview.expectedSha256,
           requestedBy: 'background-review-fork',
           missionId: input.missionId,

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { unlinkSync } from 'node:fs';
 import * as path from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 vi.mock('../authn/stance-resolver.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../authn/stance-resolver.js')>();
   const { customerRootWithSodOverlay } =
@@ -23,10 +23,9 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import {
-  createDistillCandidateRecord,
-  loadDistillCandidateRecord,
-  saveDistillCandidateRecord,
-} from '../knowledge/distill-candidate-registry.js';
+  captureBackgroundReviewProposal,
+  loadBackgroundReviewProposal,
+} from './background-review-proposals.js';
 import {
   applyBackgroundReviewPipelinePatch,
   applyBackgroundReviewSkillPatch,
@@ -45,6 +44,23 @@ const createdMemoryRefs: string[] = [];
 const createdBackupRefs: string[] = [];
 const createdApprovalRefs: string[] = [];
 const createdExternalTargets: string[] = [];
+// D8: proposals are MemoryCandidate queue rows; the test namespaces the queue.
+const queuePath = `active/shared/tmp/test-memory-queue-background-review-patch-${process.pid}.jsonl`;
+const originalQueuePath = process.env.KYBERION_MEMORY_QUEUE_PATH;
+const proposalScope = {
+  tier: 'confidential' as const,
+  tenant_slug: 'patch-test-tenant',
+  mission_id: 'MSN-BACKGROUND-REVIEW-PATCH-TEST',
+};
+beforeAll(() => {
+  process.env.KYBERION_MEMORY_QUEUE_PATH = queuePath;
+});
+afterAll(() => {
+  if (originalQueuePath === undefined) delete process.env.KYBERION_MEMORY_QUEUE_PATH;
+  else process.env.KYBERION_MEMORY_QUEUE_PATH = originalQueuePath;
+});
+const loadDistillCandidateRecord = (candidateId: string) =>
+  loadBackgroundReviewProposal(candidateId);
 
 function targetRef(suffix: string): string {
   const ref = `pipelines/background-review-patch-test-${process.pid}-${suffix}.json`;
@@ -108,27 +124,28 @@ function saveProposal(input: {
   action?: 'pipeline_proposal' | 'skill_patch' | 'memory_consolidation';
 }) {
   const action = input.action || 'pipeline_proposal';
-  const record = createDistillCandidateRecord({
-    candidate_id: input.candidateId,
-    source_type: 'task_session',
-    task_session_id: 'PATCH-TEST-SESSION',
-    title: 'Background pipeline patch test',
-    summary: 'A reviewed pipeline patch proposal.',
-    status: 'proposed',
-    target_kind: action === 'pipeline_proposal' ? 'sop_candidate' : 'pattern',
-    evidence_refs: [`surface:test:background-review:${input.candidateId}`],
-    metadata: {
-      origin: input.origin || 'background_review_fork',
-      action,
-      target_ref: input.targetRef,
-      patch: input.patch,
-      provenance: {
-        generated_by: 'background-review-fork',
-        session_id: 'PATCH-TEST-SESSION',
+  const record = withExecutionContext('surface_runtime', () =>
+    captureBackgroundReviewProposal({
+      candidate_id: input.candidateId,
+      source_type: 'task_session',
+      task_session_id: 'PATCH-TEST-SESSION',
+      title: 'Background pipeline patch test',
+      summary: 'A reviewed pipeline patch proposal.',
+      scope: proposalScope,
+      target_kind: action === 'pipeline_proposal' ? 'sop_candidate' : 'pattern',
+      evidence_refs: [`surface:test:background-review:${input.candidateId}`],
+      metadata: {
+        origin: input.origin || 'background_review_fork',
+        action,
+        target_ref: input.targetRef,
+        patch: input.patch,
+        provenance: {
+          generated_by: 'background-review-fork',
+          session_id: 'PATCH-TEST-SESSION',
+        },
       },
-    },
-  });
-  withExecutionContext('surface_runtime', () => saveDistillCandidateRecord(record));
+    })
+  );
   createdCandidateIds.push(record.candidate_id);
   return record;
 }
@@ -177,11 +194,10 @@ afterEach(() => {
     for (const ref of createdBackupRefs.splice(0)) {
       safeRmSync(pathResolver.rootResolve(ref), { force: true });
     }
-    for (const candidateId of createdCandidateIds.splice(0)) {
-      safeRmSync(pathResolver.shared(`runtime/distill-candidates/${candidateId}.json`), {
-        force: true,
-      });
-    }
+    createdCandidateIds.splice(0);
+  });
+  withExecutionContext('surface_runtime', () => {
+    safeRmSync(pathResolver.rootResolve(queuePath), { force: true });
   });
   withExecutionContext('mission_controller', () => {
     for (const approvalId of createdApprovalRefs.splice(0)) {
