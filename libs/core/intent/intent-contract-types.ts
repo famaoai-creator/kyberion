@@ -6,9 +6,11 @@ import type { IntentUseCaseScenario } from './intent-use-case-scenario.js';
 import type { WorkflowExecutionShape } from '../contracts/execution-shape.js';
 import type { ActuatorExecutionBrief } from '../contracts/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from '../contracts/operator-interaction-packet.js';
+import type { RoutingDeliveryMode } from '../contracts/routing-decision.js';
 
 export type IntentCompilerProvider = 'codex' | 'claude' | 'gemini';
-export type IntentDeliveryMode = 'one_shot' | 'managed_program';
+/** Same vocabulary as RoutingDecision.delivery_mode (contracts/routing-decision.ts). */
+export type IntentDeliveryMode = RoutingDeliveryMode;
 
 export interface IntentContract {
   kind: 'intent-contract';

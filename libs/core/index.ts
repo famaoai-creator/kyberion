@@ -137,5 +137,6 @@ export * from './information-assets/recipes.js';
 export * from './information-assets/work.js';
 export * from './information-assets/work-types.js';
 export * from './contracts/asset-scope.js';
+export * from './contracts/routing-decision.js';
 export * from './foundation/asset-address.js';
 export * from './governance/asset-scope-inspection.js';

@@ -40,6 +40,8 @@ R1 の実施状況（2026-11-10）：写像は `libs/core/contracts/execution-sh
 - 解決器はこれを 1 回だけ出し、入口から下流へ引き渡す。下流は発話を読み直さない（`intent-resolution.ts` の GAP1 を解消する）。
 - 格上げの判定を `work-scope-policy.json` だけに置き、他の 3 か所はその結果を読む。
 
+R2 の実施状況（2026-11-10）：`RoutingDecision` は `libs/core/contracts/routing-decision.ts` に置き、`libs/core/intent/routing-decision.ts` の `resolveRoutingDecision` が発話を 1 回だけ解決して packet と一緒に返します。`pnpm intent:run` はこれを入口で 1 回だけ呼び、`routing_decision` として下流へ運びます。Super-Nerve の実行経路（`compileIntent` の `routingDecision` 引数）は運ばれた判断を使い、発話を読み直しません（`scripts/run_intent.single-resolution.test.ts` が検査）。どの実行の形がそれだけで mission になるかは `work-scope-policy.json` の `catalog-floor` 規則だけが名指しし、`intent-routing-decision.ts`・`intent-delivery-decision.ts`・`intent-policy.json` の `durable-shapes`（`work_scope_promotion: true`）は `catalogShapePromotesToMission` でその判定を読みます。挙動は標準 intent 全件の特性化テスト（`promotion-judgment-characterization.test.ts`）で変更前と同じことを確かめています。残り：Slack などの入口（`surface-runtime-orchestrator.ts` ほか）と、`execution-brief.ts` がプロジェクト依頼の文面で公開層の解決をやり直す箇所は、R3 で入口のアダプターに寄せます。
+
 ### R3 — 入口のアダプター化
 
 - Slack、音声、terminal、front desk、discussion、dot を、RoutingDecision を使うだけのアダプターにする。

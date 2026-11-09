@@ -1,6 +1,7 @@
 import { compileIntent } from '@agent/core/intent/intent-compiler';
 import { logger } from '@agent/core/core';
 import { executeRegisteredSuperPipeline } from '@agent/core/super-nerve-execution-port';
+import { isRoutingDecision, type RoutingDecision } from '@agent/core/contracts';
 import {
   resolveIntentResolutionPacket,
   type IntentResolutionPacket,
@@ -42,11 +43,31 @@ function resolveServiceName(initialContext: any, sourceText: string): string | u
   return packet.selected_parameters?.service_name;
 }
 
+/**
+ * The request's carried RoutingDecision, when it belongs to `intentId`: either
+ * the decision selected that intent, or it had no selection and `intentId` is
+ * the raw utterance it was resolved from. Anything else is a different request.
+ */
+function carriedRoutingDecision(
+  intentId: string,
+  initialContext: any
+): RoutingDecision | undefined {
+  const decision = initialContext?.routing_decision;
+  if (!isRoutingDecision(decision)) return undefined;
+  if (decision.intent_id) return decision.intent_id === intentId ? decision : undefined;
+  const sourceText =
+    typeof initialContext?.source_text === 'string' ? initialContext.source_text.trim() : '';
+  return sourceText && sourceText === intentId.trim() ? decision : undefined;
+}
+
 export async function resolveIntentToSteps(
   intentId: string,
   initialContext: any = {}
 ): Promise<any[]> {
-  const result = compileIntent(intentId);
+  // D7: act on the request's carried decision instead of re-resolving.
+  const result = compileIntent(intentId, {
+    routingDecision: carriedRoutingDecision(intentId, initialContext),
+  });
   if (!result || result.steps.length === 0) {
     throw new Error(`Intent not resolved: ${intentId}`);
   }
