@@ -217,7 +217,7 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
             },
           },
           priority: 3,
-          assigned_persona: 'worker',
+          org_role: 'worker',
           confidence_score: 1,
           git: {
             branch: 'mission/worker-fixture',
@@ -2749,7 +2749,7 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
           status: 'active',
           execution_mode: 'local',
           priority: 1,
-          assigned_persona: 'tester',
+          org_role: 'tester',
           confidence_score: 1,
           git: {
             branch: 'main',

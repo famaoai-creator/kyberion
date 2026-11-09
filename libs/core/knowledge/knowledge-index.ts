@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { STANCES_DIR } from '../authn/stance-resolver.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -70,7 +71,7 @@ export interface KnowledgeHint {
   learning_candidate_id?: string;
   confidence: number;
   tags?: string[];
-  tier?: 'public' | 'confidential' | 'personal' | 'product';
+  tier?: StorageDataTier | 'product';
   customerId?: string;
   /**
    * DA-07: lexical relevance score for the active query. Populated only when
@@ -275,7 +276,7 @@ export interface KnowledgeScope {
    * customer records live in its confidential subtree (S3), so there is no
    * separate customer tier.
    */
-  tiers: Array<'public' | 'confidential' | 'personal' | 'product'>;
+  tiers: Array<StorageDataTier | 'product'>;
   /**
    * Restrict 'confidential' scanning to one customer subdirectory.
    * Also activates customer/ overlay for 'personal' tier.

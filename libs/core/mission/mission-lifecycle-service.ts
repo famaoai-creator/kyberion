@@ -25,6 +25,7 @@ export { resolveMissionTeamSelectionScope } from './mission-team-selection.js';
  * `status` is read-only and exempt from both — it never mutates mission
  * state, so gating/auditing it would only add noise.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import { buildMissionSystem, missionSystem } from './mission-system.js';
 import { assertCanGrantMissionAuthority } from './mission-state.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -339,7 +340,7 @@ export function buildMissionLifecycleService(
     },
     async create(
       id: string,
-      tier: 'personal' | 'confidential' | 'public' = 'confidential',
+      tier: StorageDataTier = 'confidential',
       tenantId: string = 'default',
       missionType: string = 'development',
       visionRef?: string,
@@ -369,7 +370,7 @@ export function buildMissionLifecycleService(
 
     async start(
       id: string,
-      tier: 'personal' | 'confidential' | 'public' = 'confidential',
+      tier: StorageDataTier = 'confidential',
       persona: string = 'worker',
       tenantId: string = 'default',
       missionType: string = 'development',

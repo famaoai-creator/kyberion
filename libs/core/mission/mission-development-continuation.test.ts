@@ -109,7 +109,7 @@ beforeEach(() =>
         status: 'active',
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'tester',
+        org_role: 'tester',
         confidence_score: 1,
         relationships: {
           project: { project_id: 'PRJ-DEVELOPMENT-FIXTURE', relationship_type: 'belongs_to' },

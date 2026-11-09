@@ -61,7 +61,7 @@ function makeMissionState(): MissionState {
     execution_mode: 'local',
     relationships: {},
     priority: 3,
-    assigned_persona: 'worker',
+    org_role: 'worker',
     confidence_score: 1,
     git: {
       branch: 'mission/process-plan',

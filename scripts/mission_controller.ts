@@ -761,7 +761,7 @@ async function showMissionStatus(id: string, follow: boolean = false) {
   printOutput(`  Mission:     ${state.mission_id}`);
   printOutput(`  Status:      ${renderStatus('mission', state.status, 'en')}`);
   printOutput(`  Tier:        ${state.tier}`);
-  printOutput(`  Persona:     ${state.assigned_persona}`);
+  printOutput(`  Org Role:    ${state.org_role}`);
   printOutput(`  Confidence:  ${state.confidence_score}`);
   printOutput(`  Priority:    ${state.priority}`);
   printOutput(`  Mode:        ${state.execution_mode}`);
@@ -1069,7 +1069,7 @@ export async function handoffMission(
     logger.error(`Mission ${upperId} not found.`);
     return;
   }
-  const previousPersona = state.assigned_persona;
+  const previousPersona = state.org_role;
   const handoffPacket = buildHandoffPacket({
     kind: 'mission',
     correlationId: `${upperId}:${previousPersona}->${nextPersona}:${Date.now().toString(36)}`,
@@ -1103,7 +1103,7 @@ export async function handoffMission(
     sourceRef: `persona:${previousPersona}`,
     targetRef: `persona:${nextPersona}`,
   });
-  state.assigned_persona = nextPersona;
+  state.org_role = nextPersona;
   state.history.push({
     ts: nowIso(),
     event: 'HANDOFF',

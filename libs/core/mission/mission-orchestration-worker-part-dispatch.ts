@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import type { MissionTeamAssignment } from './mission-team-plan-composer.js';
 import { sanitizeIdSegment } from '../foundation/text.js';
 import { agentRegistry } from '../agent/agent-registry.js';
@@ -549,11 +550,11 @@ export async function provisionGoalDrivenTaskKnowledge(input: {
       form: 'system_prompt',
       missionPath: resolvedMissionDir(
         input.missionId,
-        (tier as 'personal' | 'confidential' | 'public') || 'public',
+        (tier as StorageDataTier) || 'public',
         tenantSlug
       ),
       missionId: input.missionId,
-      tier: (tier as 'personal' | 'confidential' | 'public') || 'public',
+      tier: (tier as StorageDataTier) || 'public',
       recipientKind: 'agent',
       teamRole: input.teamRole,
       assigneePeerId: input.agentId,

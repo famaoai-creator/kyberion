@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { logger } from '../core.js';
 import * as customerResolver from '../authn/stance-resolver.js';
@@ -17,7 +18,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 export interface VoiceProfileRecord {
   profile_id: string;
   display_name: string;
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   languages: string[];
   sample_refs?: string[];
   default_engine_id: string;

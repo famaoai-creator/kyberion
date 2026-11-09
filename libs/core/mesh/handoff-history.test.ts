@@ -19,7 +19,7 @@ describe('integrated handoff history (HO-02)', () => {
             status: 'active',
             execution_mode: 'local',
             priority: 1,
-            assigned_persona: 'builder',
+            org_role: 'builder',
             confidence_score: 1,
             git: { branch: 'test', start_commit: 'a', latest_commit: 'b', checkpoints: [] },
             history: [
@@ -85,7 +85,7 @@ describe('integrated handoff history (HO-02)', () => {
             status: 'active',
             execution_mode: 'local',
             priority: 1,
-            assigned_persona: 'builder',
+            org_role: 'builder',
             confidence_score: 1,
             git: { branch: 'test', start_commit: 'a', latest_commit: 'b', checkpoints: [] },
             history: [

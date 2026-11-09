@@ -1,4 +1,5 @@
 /** Mission-owner execution surface. The dot worker executor cannot run these bindings. */
+import type { StorageDataTier } from '../storage-layout.js';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { assertContinuousDevelopmentApprovalPresentation } from './continuous-development-consent.js';
 import type { DotCharter } from '../dot/dot-charter.js';
@@ -35,7 +36,7 @@ import { assertSafeRepositoryPath } from '../secure-io.js';
 import { storagePartitionSegments } from '../storage-layout.js';
 
 export interface ContinuousWorkOwnerScope {
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   tenant_slug?: string;
   organization_id: string;
 }

@@ -219,7 +219,7 @@ describe('approved scoped learning reaches later task execution', () => {
           execution_mode: 'local',
           priority: 3,
           confidence_score: 1,
-          assigned_persona: 'worker',
+          org_role: 'worker',
           git: { branch: 'fixture', start_commit: '', latest_commit: '', checkpoints: [] },
           history: [],
           relationships: {
@@ -334,7 +334,7 @@ describe('approved scoped learning reaches later task execution', () => {
           limit: 10,
         });
         expect(afterEdit.map((hit) => hit.path)).not.toContain(promoted.promotedRef);
-        expect(missionState.assigned_persona).toBe('worker');
+        expect(missionState.org_role).toBe('worker');
         expect(provisioned.pack!.security_scope).toMatchObject({
           write_tier: 'confidential',
           tenant_slug: tenant,

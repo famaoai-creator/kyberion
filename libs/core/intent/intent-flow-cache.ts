@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import type { ValidateFunction } from 'ajv';
 import { createHash } from 'node:crypto';
 
@@ -48,7 +49,7 @@ type ConfidenceBand = 'low' | 'medium' | 'high';
 export interface IntentFlowCacheKey {
   normalized_intent_text: string;
   locale: string;
-  tier: 'public' | 'confidential';
+  tier: Exclude<StorageDataTier, 'personal'>;
   channel: string;
   service_bindings: string[];
   runtime_context_fingerprint: Record<string, unknown>;
@@ -253,7 +254,7 @@ function normalizeServiceBindings(bindings: string[] | undefined): string[] {
 
 function isCacheableTier(
   tier: CompileUserIntentFlowInput['tier']
-): tier is 'public' | 'confidential' {
+): tier is Exclude<StorageDataTier, 'personal'> {
   return tier === 'public' || tier === 'confidential';
 }
 

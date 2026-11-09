@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 
@@ -53,7 +54,7 @@ export interface SecurityAssetEntry {
     | 'identity';
   endpoints: string[];
   exposure: 'public' | 'partner-restricted' | 'internal-only' | 'unknown';
-  data_classification: 'personal' | 'confidential' | 'public' | 'unknown';
+  data_classification: StorageDataTier | 'unknown';
   auth_method: 'sso' | 'local-password' | 'api-key' | 'federated' | 'unknown';
   mfa_status: 'enforced' | 'optional' | 'unavailable' | 'unknown';
   log_access: string;

@@ -47,7 +47,7 @@ function state(id: string, tenant: string): string {
     status: 'archived',
     execution_mode: 'local',
     priority: 1,
-    assigned_persona: 'tester',
+    org_role: 'tester',
     confidence_score: 1,
     git: { branch: 'test', start_commit: 'abc123', latest_commit: 'abc123', checkpoints: [] },
     history: [],

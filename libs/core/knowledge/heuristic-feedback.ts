@@ -10,6 +10,7 @@
  * accumulating unchallenged.
  */
 
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { pathResolver, rootResolve } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
@@ -212,7 +213,7 @@ export function summarizeHeuristics(limit = 5): HeuristicReport {
 
 export function queueHeuristicMemoryCandidate(input: {
   entryId: string;
-  sensitivityTier?: 'public' | 'confidential' | 'personal';
+  sensitivityTier?: StorageDataTier;
   evidenceRef?: string;
 }): MemoryCandidate {
   const entry = readHeuristic(input.entryId);

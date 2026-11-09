@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { createHash } from 'node:crypto';
 import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
@@ -30,7 +31,7 @@ export type {
 export interface IntentResolutionContractOptions {
   packet?: IntentResolutionPacket;
   locale?: SupportedLocale;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   tenantId?: string;
   overlayPaths?: string[];
 }

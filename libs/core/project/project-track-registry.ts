@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
@@ -23,7 +24,7 @@ export interface ProjectTrackRecord {
     | 'incident_response'
     | 'continuous_operations'
     | 'research_cycle';
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   tenant_slug?: string;
   primary_locale?: string;
   release_id?: string;

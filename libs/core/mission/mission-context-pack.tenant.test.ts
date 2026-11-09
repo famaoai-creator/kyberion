@@ -145,7 +145,7 @@ function makeMissionState(
     execution_mode: 'local',
     priority: 3,
     confidence_score: 1,
-    assigned_persona: 'worker',
+    org_role: 'worker',
     git: { branch: 'b', start_commit: 's', latest_commit: 'l', checkpoints: [] },
     history: [],
     ...overrides,

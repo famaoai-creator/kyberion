@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { assertMemoryScope, type MemoryScopeEnvelope } from '../knowledge/memory-scope.js';
 import {
   createDistillCandidateRecord,
@@ -19,7 +20,7 @@ export interface BuildServiceProcedureCandidateOptions {
   recordingRef?: string;
   title?: string;
   summary?: string;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   tenantSlug?: string;
   projectId?: string;
   missionId?: string;

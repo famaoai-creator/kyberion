@@ -62,7 +62,7 @@ describe('meeting postprocess contract', () => {
         {
           mission_id: FIXTURE_MISSION_ID,
           tier: 'confidential',
-          assigned_persona: 'ecosystem_architect',
+          org_role: 'ecosystem_architect',
         },
         null,
         2

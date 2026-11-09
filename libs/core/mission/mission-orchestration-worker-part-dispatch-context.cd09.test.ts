@@ -104,7 +104,7 @@ describe('buildTaskDispatchContext CD-09 tier gate', { timeout: 60_000 }, () => 
         mission_id: MISSION,
         tier: 'public',
         status: 'active',
-        assigned_persona: 'worker',
+        org_role: 'worker',
         git: { branch: 'main', start_commit: '', latest_commit: '', checkpoints: [] },
         history: [],
       })
@@ -122,7 +122,7 @@ describe('buildTaskDispatchContext CD-09 tier gate', { timeout: 60_000 }, () => 
       mission_id: MISSION,
       tier: 'confidential',
       status: 'active',
-      assigned_persona: 'worker',
+      org_role: 'worker',
       history: [],
       relationships: {},
     });

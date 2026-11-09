@@ -122,7 +122,7 @@ describe('authority branch coverage', () => {
     }
   });
 
-  it('resolves persona from mission-state when env persona is unknown', async () => {
+  it('runs a mission-bound execution as worker and never derives a persona from the org role', async () => {
     process.env.MISSION_ID = 'MSN-1';
     process.env.MISSION_ROLE = 'chronos_gateway';
     process.env.KYBERION_PERSONA = 'mystery';
@@ -131,14 +131,18 @@ describe('authority branch coverage', () => {
     );
     mocks.rawReadTextFile.mockImplementation((p: string) => {
       if (p.endsWith('/missions/MSN-1/mission-state.json')) {
-        return JSON.stringify({ assigned_persona: 'Ecosystem Architect' });
+        return JSON.stringify({ org_role: 'Ecosystem Architect' });
       }
       return '[]';
     });
 
     const { resolveIdentityContext } = await import('./authority.js');
     const ctx = resolveIdentityContext();
-    expect(ctx.persona).toBe('ecosystem_architect');
+    // Concept model v2 D5: the Org Role is descriptive metadata. Before S1 an
+    // org role spelled like a persona ("Ecosystem Architect") escalated the
+    // process to ecosystem_architect with its intrinsic authorities.
+    expect(ctx.persona).toBe('worker');
+    expect(ctx.authorities).not.toContain('SECRET_READ');
     expect(ctx.role).toBe('chronos_gateway');
   });
 

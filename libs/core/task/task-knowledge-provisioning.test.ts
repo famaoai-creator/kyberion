@@ -69,7 +69,7 @@ function buildFixturePack(
       status: 'active',
       execution_mode: 'local',
       priority: 3,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       git: { branch: 'main', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
       history: [],

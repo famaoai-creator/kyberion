@@ -106,7 +106,9 @@ function tenantBindingConflict(tenantSlug: string): string | undefined {
  * `confidential` partition (a tenant_scope protected prefix); its recorded
  * scope keeps tier `public`.
  */
-export function tenantLedgerPartitionTier(tier: StorageDataTier): 'personal' | 'confidential' {
+export function tenantLedgerPartitionTier(
+  tier: StorageDataTier
+): Exclude<StorageDataTier, 'public'> {
   return tier === 'personal' ? 'personal' : 'confidential';
 }
 

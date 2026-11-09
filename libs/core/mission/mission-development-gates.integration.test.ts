@@ -83,7 +83,7 @@ describe('stored development completion gates', () => {
             status: 'active',
             execution_mode: 'local',
             priority: 1,
-            assigned_persona: 'tester',
+            org_role: 'tester',
             confidence_score: 1,
             relationships: {},
             git: {

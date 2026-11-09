@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import type { OrganizationWorkLoopSummary } from '../workforce/work-design.js';
 import type { IntentResolutionPacket, StandardIntentDefinition } from './intent-resolution.js';
 import type { ReasoningLevelDecision } from '../reasoning/reasoning-level-policy.js';
@@ -81,7 +82,7 @@ export interface CompileUserIntentFlowInput {
   projectName?: string;
   trackId?: string;
   trackName?: string;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   tenantId?: string;
   tenantSlug?: string;
   serviceBindings?: string[];

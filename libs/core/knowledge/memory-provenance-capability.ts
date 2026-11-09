@@ -14,6 +14,7 @@
  * every I/O made while it is live is narrowed to it
  * (`memoryProvenanceReadDenial`); there is no reader role.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import { runtimeStatePath, type RuntimeStateScope } from '../foundation/runtime-state-roots.js';
@@ -28,7 +29,7 @@ import { registerStoreGrant } from '../foundation/store-grant-registry.js';
  * assumable authority role.
  */
 export const MEMORY_PROVENANCE_GRANT_ISSUANCE_RIGHT = 'memory_provenance_reader';
-type Binding = RuntimeStateScope & { tier: 'public' | 'confidential' | 'personal'; file: string };
+type Binding = RuntimeStateScope & { tier: StorageDataTier; file: string };
 const reads = new AsyncLocalStorage<Readonly<Binding>>();
 const issued = new WeakSet<Readonly<Binding>>();
 

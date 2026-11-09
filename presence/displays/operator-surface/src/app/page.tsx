@@ -77,7 +77,7 @@ export default async function MissionsPage({
         status: { status: pill.status, domain: 'mission', label: pill.label },
         tier: { badge: tierLabel(mission.tier, t), tone: tierTone(mission.tier) },
         tenant: mission.tenant_slug ?? null,
-        persona: mission.assigned_persona ?? null,
+        persona: mission.org_role ?? null,
         checkpoints: formatCount(mission.checkpoints_count ?? 0, locale),
         commit: mission.latest_commit ?? null,
       },

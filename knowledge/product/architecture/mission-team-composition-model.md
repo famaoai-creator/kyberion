@@ -6,7 +6,7 @@ authority: reference
 phase: [alignment, execution]
 tags: [mission, team-composition, authority-role, team-role, agents]
 owner: ecosystem_architect
-last_updated: 2026-10-05
+last_updated: 2026-11-10
 ---
 
 # Mission Team Composition Model
@@ -27,7 +27,7 @@ Kyberion separates two kinds of roles:
 
 ### Persona vs authority
 
-- `assigned_persona` is mission metadata and prompt-shaping context.
+- `org_role` (formerly `assigned_persona`) is mission metadata and prompt-shaping context.
 - Mission file writes are governed by the process execution context (`MISSION_ROLE` / `KYBERION_PERSONA`), not by the descriptive persona string stored in mission state.
 - Mission lifecycle commands default to the safe worker persona. Use a more specific persona only when the mission explicitly needs that reasoning style.
 - `Ecosystem Architect` remains the system-maintenance persona for product-level editing, but it should not be the default mission lifecycle persona.
