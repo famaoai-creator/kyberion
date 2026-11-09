@@ -14,8 +14,11 @@ import {
   resolveRole,
   withExecutionContext,
   withExecutionContextAsync,
+  withStoreGrant,
+  withStoreGrantAsync,
 } from '../authority.js';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
+import { isDeclaredStoreGrantName } from '../foundation/declared-store-grant.js';
 import { pathResolver } from '../path-resolver.js';
 import { policyEngine } from '../governance/policy-engine.js';
 import {
@@ -819,46 +822,54 @@ describe('tenant-bound reader roles never follow a caller-supplied tenant', () =
     resetRoleAssumptionPolicyCache();
   });
 
+  // S4: a tenant-bound reader that became a declared store grant is entered through its
+  // facade's grant (withStoreGrant) with the same tenant binding rule.
+  const enter = <T>(role: string, fn: () => T, tenant?: string): T =>
+    isDeclaredStoreGrantName(role)
+      ? withStoreGrant(role, fn, tenant === undefined ? {} : { tenantSlug: tenant })
+      : withExecutionContext(role, fn, undefined, tenant);
+  const enterAsync = <T>(role: string, fn: () => Promise<T>, tenant?: string): Promise<T> =>
+    isDeclaredStoreGrantName(role)
+      ? withStoreGrantAsync(role, fn, tenant === undefined ? {} : { tenantSlug: tenant })
+      : withExecutionContextAsync(role, fn, undefined, tenant);
+
   for (const role of ['peer_catalog_reader', 'peer_responder_reader', 'scope_locale_reader']) {
     it(`${role}: another tenant than the active one is rejected`, () => {
       process.env.KYBERION_TENANT = 'tenant-a';
-      expect(() => withExecutionContext(role, () => 'ran', undefined, 'tenant-b')).toThrow(
+      expect(() => enter(role, () => 'ran', 'tenant-b')).toThrow(
         /\[ROLE_TENANT_SCOPE_MISMATCH\].*active tenant is 'tenant-a'/
       );
     });
 
     it(`${role}: the active tenant binds`, () => {
       process.env.KYBERION_TENANT = 'tenant-a';
-      expect(
-        withExecutionContext(role, () => currentExecutionScope()?.tenantSlug, undefined, 'tenant-a')
-      ).toBe('tenant-a');
+      expect(enter(role, () => currentExecutionScope()?.tenantSlug, 'tenant-a')).toBe('tenant-a');
     });
 
     it(`${role}: without an active tenant the process binds its own tenant`, async () => {
-      expect(
-        withExecutionContext(role, () => currentExecutionScope()?.tenantSlug, undefined, 'tenant-b')
-      ).toBe('tenant-b');
+      expect(enter(role, () => currentExecutionScope()?.tenantSlug, 'tenant-b')).toBe('tenant-b');
       await expect(
-        withExecutionContextAsync(
-          role,
-          async () => currentExecutionScope()?.tenantSlug,
-          undefined,
-          'tenant-b'
-        )
+        enterAsync(role, async () => currentExecutionScope()?.tenantSlug, 'tenant-b')
       ).resolves.toBe('tenant-b');
     });
 
     it(`${role}: a missing or invalid tenant is rejected`, async () => {
-      expect(() => withExecutionContext(role, () => 'ran')).toThrow(
-        /\[ROLE_TENANT_SCOPE_REQUIRED\]/
-      );
-      expect(() => withExecutionContext(role, () => 'ran', undefined, '../x')).toThrow(
-        /\[ROLE_TENANT_SCOPE_REQUIRED\]/
-      );
-      await expect(withExecutionContextAsync(role, async () => 'ran')).rejects.toThrow(
+      expect(() => enter(role, () => 'ran')).toThrow(/\[ROLE_TENANT_SCOPE_REQUIRED\]/);
+      expect(() => enter(role, () => 'ran', '../x')).toThrow(/\[ROLE_TENANT_SCOPE_REQUIRED\]/);
+      await expect(enterAsync(role, async () => 'ran')).rejects.toThrow(
         /\[ROLE_TENANT_SCOPE_REQUIRED\]/
       );
     });
+
+    if (isDeclaredStoreGrantName(role))
+      it(`${role}: is a store grant, never assumable as a role`, async () => {
+        expect(() => withExecutionContext(role, () => 'ran', undefined, 'tenant-a')).toThrow(
+          /\[ROLE_ASSUMPTION_DENIED\].*store grant/
+        );
+        await expect(
+          withExecutionContextAsync(role, async () => 'ran', undefined, 'tenant-a')
+        ).rejects.toThrow(/\[ROLE_ASSUMPTION_DENIED\].*store grant/);
+      });
   }
 
   it('an outer tenant-bound scope is the active tenant for a nested assumption', () => {

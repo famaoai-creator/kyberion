@@ -7,6 +7,7 @@ import type {
 import type { WriteContent } from './customer-decision-record-content.js';
 import { isValidTenantSlug } from './scope.js';
 import { isRecord } from './text.js';
+import { rolePermissionRecord } from './declared-store-grant.js';
 
 /**
  * Generic evaluator for `authority_role_permissions.<role>.narrow` declarations
@@ -93,8 +94,9 @@ function roleRulesRecord(
   if (!isRecord(policy)) return null;
   const permissions = policy.authority_role_permissions;
   if (!isRecord(permissions)) return null;
-  if (!Object.hasOwn(permissions, role)) return undefined;
-  const roleRules = permissions[role];
+  // S4: a live declared store grant's `store_grants` declaration narrows like a role's.
+  const roleRules = rolePermissionRecord(policy, role);
+  if (roleRules === undefined) return undefined;
   return isRecord(roleRules) ? roleRules : null;
 }
 
