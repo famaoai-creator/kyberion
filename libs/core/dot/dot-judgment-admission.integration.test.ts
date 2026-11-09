@@ -465,7 +465,7 @@ describe('synthetic judgment binding propagation through actual admission and Wo
       if (condition === 'diagnostic') f.charter.runtime.execution_mode = 'front_desk_diagnostic';
       if (condition === 'paused') f.charter.status = 'paused';
       if (condition === 'pipeline-removed') f.charter.authority.allowed_pipelines = [];
-      if (condition === 'shape-removed') f.charter.authority.allowed_work_shapes = [];
+      if (condition === 'shape-removed') f.charter.authority.allowed_execution_shapes = [];
       const forged = {
         ...f.bound,
         semantic_judgment: {

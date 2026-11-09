@@ -31,7 +31,7 @@ const charter = {
   },
   authority: {
     authority_role: 'organization_operator',
-    allowed_work_shapes: ['pipeline'],
+    allowed_execution_shapes: ['pipeline'],
     allowed_pipelines: [CONTINUOUS_MANAGED_WORK_PIPELINE],
     max_concurrent_delegations: 2,
   },

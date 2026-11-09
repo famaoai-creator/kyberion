@@ -23,7 +23,7 @@ import {
   sameRecoveryReceipt,
   type FrontDeskExecutionRecoveryReceipt,
 } from '../surface/front-desk-recovery-receipt.js';
-import type { DotWorkShape, DotDecisionLevel, DotProposal } from './dot-proposals.js';
+import type { DotExecutionShape, DotDecisionLevel, DotProposal } from './dot-proposals.js';
 import { parseMissionAdmissionRequest } from '../governance/mandate-shadow.js';
 import type { DotCharter } from './dot-charter.js';
 import { dotStatePath } from './dot-state-paths.js';
@@ -92,7 +92,7 @@ export interface DotActionRecord {
   action_id: string;
   title: string;
   objective: string;
-  work_shape: DotWorkShape;
+  work_shape: DotExecutionShape;
   mission_admission?: DotProposal['mission_admission'];
   status: DotActionStatus;
   proposal_hash: string;

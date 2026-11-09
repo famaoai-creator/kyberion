@@ -137,7 +137,7 @@ function fixture(
     attention: { triggers: [{ kind: 'cron', cron: '*/15 * * * *' }] },
     authority: {
       authority_role: 'infrastructure_sentinel',
-      allowed_work_shapes: ['pipeline'],
+      allowed_execution_shapes: ['pipeline'],
       allowed_pipelines: ['pipelines/result-fixture.json'],
       max_concurrent_delegations: 10,
     },

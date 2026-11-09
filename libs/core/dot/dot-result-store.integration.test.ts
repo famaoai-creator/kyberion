@@ -132,7 +132,7 @@ function fixture(options: { public?: boolean; shape?: 'pipeline' | 'task_session
     attention: { triggers: [{ kind: 'cron', cron: '*/15 * * * *' }] },
     authority: {
       authority_role: 'infrastructure_sentinel',
-      allowed_work_shapes: ['pipeline', 'task_session'],
+      allowed_execution_shapes: ['pipeline', 'task_session'],
       allowed_pipelines: ['pipelines/hook-fixture.json'],
       max_concurrent_delegations: 2,
     },
