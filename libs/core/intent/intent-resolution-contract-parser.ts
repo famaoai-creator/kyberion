@@ -6,12 +6,13 @@ import {
   type ExecutionShape,
   type IntentResolutionShape,
 } from '../contracts/execution-shape.js';
+import type { RoutingAuthorityLevel } from '../contracts/routing-decision.js';
 
 export type { IntentResolutionShape } from '../contracts/execution-shape.js';
 export type IntentOutcomeKind =
   'answer' | 'artifact' | 'approval_ready_plan' | 'service_change' | 'status_report';
-export type IntentAuthorityLevel =
-  'autonomous' | 'approval_required' | 'human_clarification_required';
+/** Same vocabulary as RoutingDecision.authority_level (contracts/routing-decision.ts). */
+export type IntentAuthorityLevel = RoutingAuthorityLevel;
 export type IntentNextActionKind = 'request_approval' | 'provide_input' | 'continue';
 
 export interface IntentResolutionNextAction {

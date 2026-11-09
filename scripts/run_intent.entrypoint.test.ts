@@ -9,8 +9,10 @@ describe('intent gateway entrypoint', () => {
       safeReadFile(pathResolver.rootResolve('scripts/run_intent.ts'), { encoding: 'utf8' })
     );
 
-    expect(source).toContain('resolveIntentResolutionPacket');
+    expect(source).toContain('resolveRoutingDecision');
+    expect(source).not.toContain('resolveIntentResolutionPacket(');
     expect(source).toContain('resolution_packet: packet');
+    expect(source).toContain('routing_decision: routingDecision');
     expect(source).toContain('print(result)');
     expect(source).not.toContain('console.log(');
     expect(source).not.toContain('logger.info(');
