@@ -22,6 +22,7 @@ import { validatePlanningPacket } from '../surface/planning-packet-contract.js';
 import { readProcessTemplateSeededTasks } from './mission-planning-packet.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { importExternalWorkItem, listWorkItems } from '../workforce/work-coordination.js';
+import { resolveMissionTaskParentItemId } from './mission-ownership-item.js';
 import type { PlannedNextTask } from './mission-orchestration-worker-contracts.js';
 
 type GateSummary = { lines: string[]; reworkCount: number };
@@ -350,6 +351,9 @@ export function createMissionProgressController(
           task.assigned_to && typeof task.assigned_to === 'object'
             ? (task.assigned_to as Record<string, unknown>)
             : {};
+        const context = { mission_id: missionId, project_id: missionId, task_id: taskId };
+        // D1: each planned task is a step of the mission's Issue (its ownership item).
+        const parentItemId = resolveMissionTaskParentItemId(missionId, context);
         importExternalWorkItem({
           source: 'local',
           sourceRef: `mission:${missionId}:${taskId}`,
@@ -362,7 +366,8 @@ export function createMissionProgressController(
               ? assignment.agent_id.trim()
               : undefined,
           dependencies: Array.isArray(task.dependencies) ? task.dependencies.map(String) : [],
-          context: { mission_id: missionId, project_id: missionId, task_id: taskId },
+          context,
+          ...(parentItemId ? { parentItemId } : {}),
           metadata: {
             task_id: taskId,
             mission_id: missionId,
