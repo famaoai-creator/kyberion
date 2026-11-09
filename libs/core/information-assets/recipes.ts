@@ -214,7 +214,7 @@ export function buildInformationAssetRecipeProposals(
         action_id: 'dot_delegate_work',
         title: recipe.title,
         objective: recipe.title + ' for source object ' + observation.subject_id,
-        work_shape: missionAdmission ? 'mission' : 'pipeline',
+        execution_shape: missionAdmission ? 'mission' : 'pipeline',
         pipeline_ref: INFORMATION_ASSET_WORK_PIPELINE,
         requested_decision: recipe.requires_approval ? 'approve' : 'auto',
         information_asset_work: binding,

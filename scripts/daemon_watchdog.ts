@@ -22,6 +22,7 @@ import {
   routeAutonomousDecision,
 } from '@agent/core/governance/approval-decision-routing';
 import { listActiveDotHeartbeatSpecs, type DotHeartbeatSpec } from '@agent/core/dot/dot-runtime';
+import { requestedExecutionShape } from '@agent/core/dot/dot-action-ledger';
 import { logger } from '@agent/core/core';
 import {
   DAEMON_SPECS,
@@ -591,7 +592,7 @@ if (
 export async function sweepMissionStartCandidates(deps: { rootDir?: string }): Promise<void> {
   const items = listWorkItems({ status: ['blocked', 'ready', 'in_progress'], ...deps });
   for (const item of items) {
-    if (item.metadata?.requested_work_shape !== 'mission') continue;
+    if (requestedExecutionShape(item.metadata) !== 'mission') continue;
     try {
       // Unscoped proposals cannot be promoted into a guessed/default tenant.
       if (!item.context?.tenant_slug) continue;

@@ -409,7 +409,7 @@ export function runOpsHealthProbe(deps: OpsHealthProbeDeps = {}): OpsHealthProbe
           // advisory turn: the dot diagnoses the finding and reports.
           metadata: {
             dot_id: OPS_WORK_ITEM_DOT_ID,
-            requested_work_shape: 'direct_reply',
+            requested_execution_shape: 'direct_reply',
           },
           // The executor refuses items whose context tenant differs from the
           // charter's — an unscoped item (undefined !== tenant) can NEVER be

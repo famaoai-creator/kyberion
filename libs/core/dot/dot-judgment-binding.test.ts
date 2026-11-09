@@ -22,7 +22,7 @@ function fixture(): SyntheticDotJudgmentBindingInput {
   const proposal = normalizeDotProposal({
     title: 'Repair fixture',
     objective: 'Preserve the fixed performance goal',
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     pipeline_ref: data.charter.authority.allowed_pipelines![0],
   });
   const judgmentBinding = {
@@ -178,7 +178,7 @@ describe('pure server-authored synthetic origin references (not persisted proof)
   it('requires exact canonical normalized proposals, allowed pipelines, active charter and complete matching scope', () => {
     const input = fixture();
     for (const proposal of [
-      { ...input.proposal, work_shape: 'direct_reply' as const },
+      { ...input.proposal, execution_shape: 'direct_reply' as const },
       { ...input.proposal, pipeline_ref: 'pipelines/unlisted.json' },
       { ...input.proposal, title: ' Repair fixture ' },
       { ...input.proposal, unknown: true },
@@ -301,7 +301,7 @@ describe('pure server-authored synthetic origin references (not persisted proof)
       { ...proposal, title: ' Repair fixture ' },
       { ...proposal, action_id: 'chosen-action' },
       { ...proposal, semantic_judgment: null },
-      { ...proposal, work_shape: 'direct_reply' },
+      { ...proposal, execution_shape: 'direct_reply' },
       { ...proposal, front_desk_execution: {} },
       { ...proposal, continuous_work: {} },
       { ...proposal, mission_admission: {} },

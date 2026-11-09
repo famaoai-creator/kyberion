@@ -1,7 +1,7 @@
 ---
 title: 意図の解決器の一本化計画（RoutingDecision と薄いアダプター）
 kind: plan
-status: planned
+status: completed
 last_updated: 2026-11-10
 tags: [plan, concepts, intent, routing, execution-shape, work-scope-policy, surfaces]
 importance: 8
@@ -32,7 +32,7 @@ importance: 8
 - `IntentResolutionShape` と `routeFamily` を、`ExecutionShape` からの名前付きの写像にする。`pipeline` を `task_session` に畳む処理は廃止する。
 - dot の `work_shape` / `allowed_work_shapes` を `execution_shape` / `allowed_execution_shapes` に改名する（charter の schema は互換の別名を 1 リリース残す）。
 
-R1 の実施状況（2026-11-10）：写像は `libs/core/contracts/execution-shape.ts` に置き、intent-resolution の契約は畳む前の値を `execution_shape` として一緒に運びます。`resolution.shape` は保存せず、読み込み時に `execution_shape` から導きます（`execution-shape-single-source.test.ts` が検査）。charter は `allowed_execution_shapes` に改名し、古いキーは読み込み時に置き換えます。dot の提案の `work_shape` は、ハッシュで固定された行動台帳に保存されているため、台帳の移行と一緒に改名します（未実施）。
+R1 の実施状況（2026-11-10）：写像は `libs/core/contracts/execution-shape.ts` に置き、intent-resolution の契約は畳む前の値を `execution_shape` として一緒に運びます。`resolution.shape` は保存せず、読み込み時に `execution_shape` から導きます（`execution-shape-single-source.test.ts` が検査）。charter は `allowed_execution_shapes` に改名し、古いキーは読み込み時に置き換えます。dot の提案の `work_shape` は、ハッシュで固定された行動台帳に保存されているため、台帳の移行と一緒に改名しました（R3 の dot 部分を参照）。
 
 ### R2 — RoutingDecision と 1 回だけの解決
 
@@ -57,8 +57,16 @@ R3 の実施状況（2026-11-10）：完了条件は満たしました。`resolv
 - discussion：提案の文面を入口で読んで組織の仕事の形を決めます。確信度が 0.7 未満なら、これまでどおり `solution_project` です。
 - 正規表現の分類：`classifyOrganizationWork` は `libs/core/intent/organization-work-classification.ts` に移し、組織の facade は入口の `resolveOrganizationWorkRouting` を使います（規則と確信度の計算は同じ）。`intent-compiler.ts` の keyword fallback（呼び出し側がカタログを渡したときだけ動き、本番の呼び出しはなかった）は削除しました。`intent-rules.yml` は読む処理がなかったため削除しました。移す前の出力は `resolver-adapter-characterization.test.ts`（+fixture）に記録し、移した後も同じです。
 - `execution-brief.ts`：運ばれた判断があればその intent を使い、プロジェクト依頼の文面を読み直しません。
-- 残り：dot。dot の提案の `work_shape` は、LLM が出す提案の schema、ハッシュで固定された行動台帳（提案全体のハッシュと、行と承認済みの提案の項目ごとの比較）、WorkItem の `requested_work_shape` に入っています。古い記録のハッシュ検証を変えずに改名するには、台帳に版を持たせて読み替える必要があります。dot は発話を読まず、charter で形を制限しているので、RoutingDecision を使うアダプターにするのはこの移行と一緒に行います。このため concept-registry の `lifecycle` はまだ外しません。
+- 残り（R3 の時点）：dot。dot の提案の `work_shape` は、LLM が出す提案の schema、ハッシュで固定された行動台帳（提案全体のハッシュと、行と承認済みの提案の項目ごとの比較）、WorkItem の `requested_work_shape` に入っていたため、台帳の移行と一緒に行いました（次の段落）。
+
+R3 の dot 部分の実施状況（2026-11-10）：dot の提案、行動台帳、WorkItem の項目名を `execution_shape` に揃え、dot を RoutingDecision を使うアダプターにしました。
+
+- 台帳の版：行動台帳に版を持たせました（`libs/core/dot/dot-action-ledger-version.ts`）。新しく書く行は `schema_version: 2` を持ち、行と承認済みの提案の両方に `execution_shape` を書きます。`schema_version` のない古い行（版 1）は `work_shape` のまま読み、コードには `execution_shape` として見せます。ハッシュ（`semantic_hash`、共有の索引の `private_content_hash`、復旧の受領書の `action_hash`、判断の `original_proposal_hash`）と、行と承認済みの提案の項目ごとの比較は、書いたときの形のまま行います。古い提案で承認された行を状態の変更で書き直すときは提案の版（版 1）のまま書くので、比較は同じ版どうしになります。同じ operation key で古い版の操作をもう一度提案したときは、古い版の形でハッシュが一致すれば同じ操作として扱い、もとの承認を使い続けます。版が混ざった行（版 1 の行に `execution_shape`、版 2 の行に `work_shape` の提案など）と未知の版は読み込みで拒否します。検査は `dot-action-ledger-version.test.ts` です（古い台帳の検証、新しい行の検証、古い承認の後の状態の書き直し、両方の版での改ざんの検出）。
+- 提案の schema と prompt：`dot_propose_action` の入力 schema、fenced block の説明、bounds の prompt は `execution_shape` を使います。`work_shape` と書いた提案は 1 リリースの間は別名として読み、両方あって値が違えば拒否します。
+- WorkItem：dot の WorkItem は `requested_execution_shape` を持ちます。版 1 の行から作る WorkItem は、作成時の不変の内容を変えないよう `requested_work_shape` のままです。executor、mission の受け入れ、front desk、continuous operations の報告、daemon watchdog、concierge の mission alignment は、1 リリースの間は両方を読みます（`libs/core/dot/dot-requested-shape.ts`）。
+- RoutingDecision：dot は発話を読まず、形は charter の `allowed_execution_shapes` で制限されています。そのため front desk と同じく、`routingDecisionForConfiguredShape` でその形の判断を作ります（`libs/core/dot/dot-routing-decision.ts`）。範囲の検査（dispatch、承認後の再検査、受け入れの照合、判断の効果前の検査で共通）はこの判断を結果として返し、executor はこの判断で実行の形を決めます。work-scope policy が別の形に変える場合は拒否し、dot は charter の範囲で提案し直します。今の policy ではどの形も変わらないので、挙動は同じです。判断そのものは WorkItem に載せていません。work-scope policy の版が変わると、復旧時に作り直す WorkItem の不変の内容と食い違うためです。
+- 組織の `work_shape`（`libs/core/entity-scope.ts` の WorkItem の種類）は、D7 のとおり名前を変えていません。
 
 ## 完了の合図
 
-concept-registry から `execution-shape`、`work-shape`、`routing-decision` の `lifecycle` を外します。
+concept-registry から `execution-shape`、`work-shape`、`routing-decision` の `lifecycle` を外します。2026-11-10 に外しました（`scripts/check_concept_registry.ts` が通ることを確認）。

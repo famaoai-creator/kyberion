@@ -150,7 +150,7 @@ function fixture(
   const proposal = proposals.normalizeDotProposal({
     title: 'Record synthetic result',
     objective: 'Persist status only',
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     pipeline_ref: 'pipelines/result-fixture.json',
     target: 'service:' + id,
     intent: 'apply',

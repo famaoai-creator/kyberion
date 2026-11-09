@@ -60,7 +60,7 @@ const PROPOSAL: DotProposal = {
   action_id: 'dot_delegate_work',
   title: 'Durable operation',
   objective: 'Create exactly one durable item',
-  work_shape: 'direct_reply',
+  execution_shape: 'direct_reply',
 };
 let rootDir: string;
 const children: ManagedProcessHandle[] = [];
@@ -449,6 +449,9 @@ function seedChildRoot(): string {
       'knowledge/product/schemas/workitem-label-taxonomy.schema.json',
       'knowledge/product/governance/security-policy.json',
       'knowledge/product/governance/role-assumption-policy.json',
+      // Dot dispatch reads the work-scope verdict through its RoutingDecision adapter.
+      'knowledge/product/governance/work-scope-policy.json',
+      'knowledge/product/schemas/work-scope-policy.schema.json',
     ]) {
       safeMkdir(path.dirname(path.join(fixtureRoot, relative)), { recursive: true });
       safeCopyFileSync(pathResolver.rootResolve(relative), path.join(fixtureRoot, relative));

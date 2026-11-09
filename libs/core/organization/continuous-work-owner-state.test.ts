@@ -45,7 +45,7 @@ function fixture() {
     action_id: 'dot_delegate_work',
     title: 'Repair',
     objective: 'Reduce errors',
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     pipeline_ref: CONTINUOUS_MANAGED_WORK_PIPELINE,
     continuous_work: {
       kind: 'mission',

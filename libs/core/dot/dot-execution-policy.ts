@@ -63,6 +63,6 @@ export function isDotIntakeAdmission(charter: DotCharter, proposal: DotProposal)
     Boolean(charter.scope.tenant_slug) &&
     !proposal.continuous_work &&
     !proposal.front_desk_execution &&
-    policy.allowed_execution_shapes.includes(proposal.work_shape)
+    policy.allowed_execution_shapes.includes(proposal.execution_shape)
   );
 }

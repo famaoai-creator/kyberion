@@ -26,6 +26,7 @@ import {
   readChronosStringParam,
 } from '../../../../lib/ops/request-input';
 import { requestWorkItemMissionAlignment, readWorkItemMissionAlignment } from './mission-alignment';
+import { requestedExecutionShape } from '@agent/core/dot/dot-action-ledger';
 import { CHRONOS_WORK_ITEM_STATUSES, parseWorkItemActionInput } from './work-item-input';
 
 export const dynamic = 'force-dynamic';
@@ -171,7 +172,7 @@ export async function POST(req: NextRequest) {
     if ('action' in input) {
       if (
         !current.context?.tenant_slug ||
-        current.metadata?.requested_work_shape !== 'mission' ||
+        requestedExecutionShape(current.metadata) !== 'mission' ||
         current.metadata?.admission_only !== true ||
         !['ready', 'blocked'].includes(current.status)
       )

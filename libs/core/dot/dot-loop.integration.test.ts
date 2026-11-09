@@ -140,7 +140,7 @@ const WAKE_REPLY = [
     {
       title: 'Clear overdue operations',
       objective: 'Work through the overdue operations list.',
-      work_shape: 'direct_reply',
+      execution_shape: 'direct_reply',
       expected_effect: { kr_id: 'overdue', direction: 'decrease' },
     },
   ]),

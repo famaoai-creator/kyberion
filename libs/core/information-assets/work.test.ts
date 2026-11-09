@@ -327,7 +327,7 @@ describe('information intake work', () => {
       recipeIds: ['jira.approval_pending'],
       missionAdmission: admission,
     })[0];
-    expect(proposal.work_shape).toBe('mission');
+    expect(proposal.execution_shape).toBe('mission');
     expect(proposal.mission_admission).toEqual(admission);
     const item = {
       ...f.item(),
