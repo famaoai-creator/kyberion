@@ -1,11 +1,18 @@
 ---
 title: Stance / Tenant / Customer — three layers that all get called "customer"
 tags: [architecture, governance, tenant, customer, stance, affiliation, multi-tenant]
-last_updated: 2026-11-06
+last_updated: 2026-11-10
 concepts: [stance, tenant, tenants-customers]
 ---
 
 # Stance / Tenant / Customer
+
+> **Decided direction (2026-11-10).** [Concept Model v2 D4](./decisions/2026-11-10-concept-model-v2.md)
+> redefines Stance as the _acting-for selection_: which permitted tenant an operator is acting
+> for now, as which Organization and Org Role. Switching it switches the data scope. Customer
+> communication (tone, contact window, route) moves to Tenant's Customers and Channel. This
+> document still describes the current overlay implementation. It is rewritten in step S2 of
+> the [Scope, identity and Grant plan](../../../docs/developer/improvement-plans-2026-11/SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md).
 
 Three different things in Kyberion are routinely called "customer". They sit at
 different layers, and conflating them puts records on the wrong side of a

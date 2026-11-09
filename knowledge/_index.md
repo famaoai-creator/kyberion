@@ -209,6 +209,7 @@
 - [音声・リアルタイム映像の技術再評価 2026-10](./product/architecture/realtime-av-technology-review-2026-10.md) (public | Unknown)
 
 ## 📁 product/architecture/decisions
+- [Concept Model v2: WorkItem as Issue, one Lease, Tenant 1:N Organization, Stance as acting-for, Grant = principal × scope × operation, one intent resolver, a closed memory loop](./product/architecture/decisions/2026-11-10-concept-model-v2.md) (public | Ecosystem Architect)
 - [Constrain Mesh Hub v1 to a Same-Tenant Single-Writer Control Plane](./product/architecture/decisions/2026-06-24-mesh-hub-v1-boundaries.md) (public | Ecosystem Architect)
 - [Keep Nine Mission Classes and Treat `knowledge_lifecycle` as a Category](./product/architecture/decisions/2026-06-22-knowledge-lifecycle-taxonomy-decision.md) (public | Ecosystem Architect)
 

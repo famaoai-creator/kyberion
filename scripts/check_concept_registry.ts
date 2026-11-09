@@ -42,6 +42,22 @@ export interface ConceptTerm {
   owner_modules?: string[];
   not_to_confuse_with?: string[];
   senses?: ConceptSense[];
+  lifecycle?: ConceptLifecycle;
+}
+
+/** Lifecycle states a registry term may be in. Absence means current: code and docs agree. */
+export const CONCEPT_LIFECYCLE_STATES = ['transitioning', 'deprecated'] as const;
+
+/**
+ * A decided change of meaning. `transitioning`: the definition is the decided target and
+ * code is migrating under `plan`. `deprecated`: the term is being removed in favour of
+ * `replaced_by`. Both cite the decision record that made the call.
+ */
+export interface ConceptLifecycle {
+  state: (typeof CONCEPT_LIFECYCLE_STATES)[number];
+  decision: string;
+  plan?: string;
+  replaced_by?: string[];
 }
 
 export interface ConceptRegistry {
@@ -154,7 +170,40 @@ function parseInlineList(value: string | undefined): string[] | null {
 
 function frontmatterOf(view: RepoView, relativePath: string): Record<string, string> | null {
   if (!relativePath.endsWith('.md') || !view.exists(relativePath)) return null;
-  return parseFrontmatter(view.read(relativePath));
+  const markdown = view.read(relativePath);
+  const fields = parseFrontmatter(markdown);
+  if (fields?.concepts === '') {
+    const folded = foldMultilineList(markdown, 'concepts');
+    if (folded !== undefined) fields.concepts = folded;
+  }
+  return fields;
+}
+
+/**
+ * Prettier wraps a long flow list (`key: [a, b, …]`) onto several lines, and authors may
+ * write a block list (`- a`). Both are folded back to the inline form `[a, b]`; any other
+ * multi-line value is left empty so the caller reports it.
+ */
+export function foldMultilineList(markdown: string, key: string): string | undefined {
+  const lines = markdown.replace(/\r\n/gu, '\n').split('\n');
+  const end = lines.indexOf('---', 1);
+  if (lines[0] !== '---' || end < 0) return undefined;
+  const start = lines.findIndex(
+    (line, index) => index < end && line.replace(/\s+$/u, '') === `${key}:`
+  );
+  if (start < 0) return undefined;
+  const body: string[] = [];
+  for (const line of lines.slice(start + 1, end)) {
+    // Indented continuation, or an unindented block-list item (`- a`, valid YAML).
+    if (!/^\s/u.test(line) && !line.startsWith('- ')) break;
+    body.push(line.trim());
+  }
+  const flow = body.join(' ');
+  if (/^\[.*\]$/u.test(flow)) return flow;
+  if (body.length > 0 && body.every((line) => line.startsWith('- '))) {
+    return `[${body.map((line) => line.slice(2).trim()).join(', ')}]`;
+  }
+  return undefined;
 }
 
 function retiredStatus(view: RepoView, relativePath: string): string | undefined {
@@ -208,12 +257,74 @@ export function validateRegistry(registry: ConceptRegistry, view: RepoView): str
       }
     }
   }
+  const deprecated = new Set(
+    registry.terms
+      .filter((entry) => entry.lifecycle?.state === 'deprecated')
+      .map((entry) => entry.id)
+  );
   for (const entry of registry.terms) {
     for (const other of entry.not_to_confuse_with ?? []) {
       if (!ids.has(other)) {
         failures.push(`registry: ${entry.id} not_to_confuse_with unknown id ${other}`);
       }
     }
+    failures.push(...checkLifecycle(entry, ids, deprecated, view));
+  }
+  return failures;
+}
+
+function checkLifecycle(
+  entry: ConceptTerm,
+  ids: ReadonlySet<string>,
+  deprecated: ReadonlySet<string>,
+  view: RepoView
+): string[] {
+  const lifecycle = entry.lifecycle;
+  if (!lifecycle) return [];
+  const failures: string[] = [];
+  if (!(CONCEPT_LIFECYCLE_STATES as readonly string[]).includes(lifecycle.state)) {
+    failures.push(
+      `registry: ${entry.id} lifecycle.state must be one of ${CONCEPT_LIFECYCLE_STATES.join('|')}`
+    );
+  }
+  if (!lifecycle.decision) failures.push(`registry: ${entry.id} lifecycle needs a decision record`);
+  for (const [field, target] of [
+    ['decision', lifecycle.decision],
+    ['plan', lifecycle.plan],
+  ] as const) {
+    if (!target) continue;
+    const { file, anchor } = stripAnchor(target);
+    if (!file || !view.exists(file)) {
+      failures.push(`registry: ${entry.id} lifecycle.${field} does not exist: ${target}`);
+    } else if (
+      anchor &&
+      file.endsWith('.md') &&
+      !collectHeadings(view.read(file)).some((heading) => heading.slug === anchor)
+    ) {
+      failures.push(
+        `registry: ${entry.id} lifecycle.${field} has no heading #${anchor}: ${target}`
+      );
+    }
+  }
+  if (lifecycle.state === 'transitioning' && !lifecycle.plan) {
+    failures.push(`registry: ${entry.id} is transitioning — name the migration plan`);
+  }
+  if (lifecycle.state === 'deprecated') {
+    const replacements = lifecycle.replaced_by ?? [];
+    if (replacements.length === 0) {
+      failures.push(`registry: ${entry.id} is deprecated — name replaced_by`);
+    }
+    for (const replacement of replacements) {
+      if (!ids.has(replacement)) {
+        failures.push(`registry: ${entry.id} replaced_by unknown id ${replacement}`);
+      } else if (deprecated.has(replacement)) {
+        failures.push(
+          `registry: ${entry.id} replaced_by ${replacement}, which is itself deprecated`
+        );
+      }
+    }
+  } else if (lifecycle.replaced_by?.length) {
+    failures.push(`registry: ${entry.id} lists replaced_by but is not deprecated`);
   }
   return failures;
 }
