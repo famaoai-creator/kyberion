@@ -1,0 +1,7 @@
+{
+  "role": "build_repository",
+  "assignable": false,
+  "permissions": {
+    "allow_write": ["dist/.build-generation.json"]
+  }
+}

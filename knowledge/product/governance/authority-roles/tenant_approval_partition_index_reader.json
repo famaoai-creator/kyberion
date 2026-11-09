@@ -5,5 +5,16 @@
   "write_scopes": [],
   "scope_classes": [],
   "allowed_actuators": [],
-  "tier_access": ["confidential", "personal"]
+  "tier_access": ["confidential", "personal"],
+  "permissions": {
+    "allow_read": [
+      "active/shared/runtime/tenant-approvals/personal/",
+      "active/shared/runtime/tenant-approvals/confidential/"
+    ],
+    "deny_read_descendants": [
+      "active/shared/runtime/tenant-approvals/personal/",
+      "active/shared/runtime/tenant-approvals/confidential/"
+    ],
+    "allow_write": []
+  }
 }

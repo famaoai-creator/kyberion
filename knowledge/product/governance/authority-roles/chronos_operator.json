@@ -5,5 +5,19 @@
   "write_scopes": [],
   "scope_classes": ["communication_surface"],
   "allowed_actuators": ["presence-actuator"],
-  "tier_access": ["public", "confidential", "personal"]
+  "tier_access": ["public", "confidential", "personal"],
+  "permissions": {
+    "allow_read": [
+      "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
+      "active/missions/",
+      "active/archive/missions/",
+      "active/projects/",
+      "active/organizations/",
+      "active/shared/artifacts/personal/",
+      "active/shared/artifacts/confidential/",
+      "active/shared/observability/",
+      "active/shared/runtime/"
+    ],
+    "allow_write": []
+  }
 }

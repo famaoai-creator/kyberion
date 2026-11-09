@@ -11,5 +11,21 @@
   ],
   "scope_classes": ["coordination_runtime", "operations_runtime", "observability"],
   "allowed_actuators": ["process-actuator"],
-  "tier_access": ["public"]
+  "tier_access": ["public"],
+  "permissions": {
+    "allow_read": [
+      "active/shared/coordination/channels/",
+      "active/shared/observability/",
+      "active/shared/runtime/",
+      "presence/bridge/runtime/",
+      "active/shared/tmp/"
+    ],
+    "allow_write": [
+      "active/shared/coordination/channels/",
+      "active/shared/observability/",
+      "active/shared/runtime/",
+      "presence/bridge/runtime/",
+      "active/shared/tmp/"
+    ]
+  }
 }

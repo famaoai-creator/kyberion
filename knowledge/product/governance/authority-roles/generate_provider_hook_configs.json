@@ -1,0 +1,7 @@
+{
+  "role": "generate_provider_hook_configs",
+  "assignable": false,
+  "permissions": {
+    "allow_write": [".gemini/", ".codex/hooks.json", ".claude/settings.json"]
+  }
+}

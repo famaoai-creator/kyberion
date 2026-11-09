@@ -9,5 +9,17 @@
   ],
   "scope_classes": ["operations_runtime"],
   "allowed_actuators": [],
-  "tier_access": ["public"]
+  "tier_access": ["public"],
+  "permissions": {
+    "allow_read": [
+      "active/shared/state/reasoning-route-user-config.json",
+      "active/shared/state/reasoning-route-user-config.json.previous",
+      "active/shared/state/reasoning-route-user-config.json.history/"
+    ],
+    "allow_write": [
+      "active/shared/state/reasoning-route-user-config.json",
+      "active/shared/state/reasoning-route-user-config.json.previous",
+      "active/shared/state/reasoning-route-user-config.json.history/"
+    ]
+  }
 }
