@@ -249,12 +249,19 @@ export function buildSafeExecEnv(
 
   // RA-01: a child inherits the role/persona assumed by the caller's own
   // execution scope, not whatever a concurrent async context last mirrored
-  // into the process-global env.
+  // into the process-global env. Tenant-bound assumptions also carry the
+  // bound tenant so `${KYBERION_TENANT}` grants expand in the child the same
+  // way the parent's ALS identity did (scope.env alone is not on the
+  // allowlist, so without this a confidential playground/perception spawn
+  // would keep MISSION_ROLE but lose the tenant binding).
   const scope = currentExecutionScope();
   if (scope?.assumedRole) {
     safeEnv.MISSION_ROLE = scope.assumedRole;
     if (typeof scope.assumedPersona === 'string') safeEnv.KYBERION_PERSONA = scope.assumedPersona;
     else if (scope.assumedPersona === null) delete safeEnv.KYBERION_PERSONA;
+  }
+  if (scope?.tenantBound && scope.tenantSlug) {
+    safeEnv.KYBERION_TENANT = scope.tenantSlug;
   }
 
   for (const [key, value] of Object.entries(extraEnv)) {
