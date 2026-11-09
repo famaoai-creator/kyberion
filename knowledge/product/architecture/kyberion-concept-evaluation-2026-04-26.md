@@ -2,13 +2,16 @@
 title: Kyberion コンセプト評価と実装改善計画
 category: Architecture
 tags: [concept, evaluation, abstraction, implementation-plan, codex]
-importance: 10
+importance: 3
 author: Codex
 audit_date: 2026-04-26
-last_updated: 2026-04-26
+last_updated: 2026-11-09
+doc_status: historical
 ---
 
 # Kyberion コンセプト評価と実装改善計画
+
+> **履歴文書 (2026-04-26 時点の評価)。** 現在の正本ではありません。親モデルは [organization-work-loop](./organization-work-loop.md)、用語の単一定義は [`concept-registry.json`](../governance/concept-registry.json) を参照してください。
 
 ## 1. 目的
 

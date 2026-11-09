@@ -2,6 +2,7 @@
 title: Canonical Entity Scope Hierarchy
 tags: [architecture, governance, tenant, organization, project, mission, task, session]
 last_updated: 2026-08-16
+concepts: [entity-scope, tenant, organization, project, work-shape]
 ---
 
 # Canonical Entity Scope Hierarchy

@@ -251,6 +251,7 @@
 - [Build-Generation Receipt v1 — 設計レビュー (R12)](./product/governance/build-generation-receipt-review.ja.md) (public | Unknown)
 - [CLI 信頼性ゲート — CI レーンマップ](./product/governance/cli-reliability-gates.ja.md) (public | Unknown)
 - [Claude に聞く効率チェック質問リスト](./product/governance/agent-efficiency-questions.md) (public | Unknown)
+- [Concept Registry Workflow: one definition per term, retire instead of accumulate](./product/governance/concept-registry-workflow.md) (public | Unknown)
 - [Config Protocol: The Sovereign Rule of System State](./product/governance/config-protocol.md) (public | Ecosystem Architect)
 - [Contract Design Principles — Absence, Failure, and Backend Opacity](./product/governance/contract-design-principles.md) (public | Unknown)
 - [Declarative Authorization Registry (3-layer model, 4 subject axes)](./product/governance/declarative-authorization-registry.md) (public | Unknown)

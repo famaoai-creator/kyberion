@@ -19,38 +19,38 @@ Intent, Plan, Result, Mission, Task Session, and Artifact are the words the firs
 
 ### Contributor vocabulary
 
-| Term                 | Canonical definition                                                  |
-| -------------------- | --------------------------------------------------------------------- |
-| Intent               | The human request expressed in natural language.                      |
-| Resolution           | The structured interpretation of an intent.                           |
-| Plan                 | A human-readable execution summary.                                   |
-| Result               | The user-facing outcome of execution.                                 |
-| Mission              | A bounded unit of work with lifecycle state and evidence.             |
-| Task Session         | A lighter-weight durable execution contract.                          |
-| Artifact             | The concrete output of work.                                          |
-| Work Shape           | The operating mode of a work item.                                    |
-| Execution Shape      | The selected execution rung for an intent.                            |
-| WorkItem             | The canonical unit of executable work.                                |
-| WorkItem Context     | The typed identity chain on a work item.                              |
-| Mission Context Pack | The bounded context delivered to a mission task.                      |
-| Handoff Packet       | The explicit transfer record between workers or phases.               |
-| Knowledge Slice      | A task-profile-driven knowledge placement rule.                       |
-| Knowledge Card       | A concise, frontmatter-backed knowledge artifact.                     |
-| Semantic Brief       | A content brief that leaves presentation choices to the design layer. |
-| Design Cascade       | The ordered resolution of creative design defaults.                   |
-| Actuator             | A concrete execution component.                                       |
-| Procedure            | Distilled operational knowledge or a reusable method.                 |
-| Pipeline             | A declarative, governed execution graph.                              |
-| ADF                  | A human-readable structured execution contract.                       |
-| Tenant               | An isolation boundary identified by a tenant slug.                    |
-| Viewer Context       | The server-resolved principal and allowed tenant scope.               |
-| Approval Contract    | The human-approval boundary for consequential actions.                |
-| Gateway              | The generic delivery contract shared by surfaces.                     |
-| Trace                | The root observability record for an execution.                       |
-| Span                 | A timed operation within a trace.                                     |
-| Event                | A point-in-time occurrence within a span.                             |
-| Lease                | A durable authority grant with an expiry.                             |
-| Mission Controller   | The governed mission lifecycle entry point.                           |
+| Term                 | Canonical definition                                                                                                                                 |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Intent               | The human request expressed in natural language.                                                                                                     |
+| Resolution           | The structured interpretation of an intent.                                                                                                          |
+| Plan                 | A human-readable execution summary.                                                                                                                  |
+| Result               | The user-facing outcome of execution.                                                                                                                |
+| Mission              | A bounded unit of work with lifecycle state and evidence.                                                                                            |
+| Task Session         | A lighter-weight durable work record for conversational work that does not need a mission.                                                           |
+| Artifact             | The concrete output of work.                                                                                                                         |
+| Work Shape           | The operating mode of a work item.                                                                                                                   |
+| Execution Shape      | The selected execution rung for an intent.                                                                                                           |
+| WorkItem             | The shared coordination record (claim, lease, visibility) that missions and tasks are projected onto; not a separate kind of work.                   |
+| WorkItem Context     | The typed identity chain on a work item.                                                                                                             |
+| Mission Context Pack | The bounded context delivered to a mission task.                                                                                                     |
+| Handoff Packet       | The explicit transfer record between workers or phases.                                                                                              |
+| Knowledge Slice      | A task-profile-driven knowledge placement rule.                                                                                                      |
+| Knowledge Card       | A concise, frontmatter-backed knowledge artifact.                                                                                                    |
+| Semantic Brief       | A content brief that leaves presentation choices to the design layer.                                                                                |
+| Design Cascade       | The ordered resolution of creative design defaults.                                                                                                  |
+| Actuator             | A concrete execution component.                                                                                                                      |
+| Procedure            | Distilled operational knowledge or a reusable method.                                                                                                |
+| Pipeline             | A declarative, validated ADF execution graph that Kyberion runs under governance; a parameterized variant for user workflows is a Pipeline Template. |
+| ADF                  | A human-readable structured execution contract.                                                                                                      |
+| Tenant               | An isolation boundary identified by a tenant slug.                                                                                                   |
+| Viewer Context       | The server-resolved principal and allowed tenant scope.                                                                                              |
+| Approval Contract    | The human-approval boundary for consequential actions.                                                                                               |
+| Gateway              | The generic delivery contract shared by surfaces.                                                                                                    |
+| Trace                | The root observability record for an execution.                                                                                                      |
+| Span                 | A timed operation within a trace.                                                                                                                    |
+| Event                | A point-in-time occurrence within a span.                                                                                                            |
+| Lease                | A durable authority grant with an expiry.                                                                                                            |
+| Mission Controller   | The governed mission lifecycle entry point.                                                                                                          |
 
 ## Disambiguation maps
 
@@ -214,7 +214,7 @@ The bounded, role-scoped context assembled for a mission task: governed instruct
 
 ### Task Session
 
-A lighter-weight durable execution contract used for conversational work such as document generation, service inspection, capture flows, and interactive browser assistance.
+A lighter-weight durable work record for conversational work that does not need a mission, such as document generation, service inspection, capture flows, and interactive browser assistance. It is not a [Task Contract](#task-contract).
 
 ### Project
 
@@ -232,9 +232,13 @@ The concrete output of work: a file, summary, delivery record, approval record, 
 
 A document/control model that treats project artifacts as an operating system for decision-making, delivery, validation, and transfer rather than as a loose bundle of documents.
 
+### Organization Work Loop
+
+The parent model of Kyberion: organizational intent becomes governed execution, evidence, and reusable memory. The Intent Loop, Company OS, and Enterprise Operating Kernel framings are projections of this one model, not competing definitions. Canonical: [organization-work-loop](../knowledge/product/architecture/organization-work-loop.md); registered terms and their single definitions: [`concept-registry.json`](../knowledge/product/governance/concept-registry.json).
+
 ### Enterprise Operating Kernel
 
-The top-level framing of Kyberion as a system where leadership provides intent and approval while the platform resolves, executes, accounts for, and learns from work.
+The leadership-facing projection of the [Organization Work Loop](#organization-work-loop): leadership provides intent and approval while the platform resolves, executes, accounts for, and learns from work.
 
 ### Mission Lease
 
@@ -304,7 +308,8 @@ One canonical term per layer; the aliases are names you will meet in code, docs,
 | A local capture screen                          | **Pad**        | capture pad, Capture desk                               | first-win |
 | The CEO-secretary surface                       | **Concierge**  | 秘書室                                                  | first-win |
 | The shared menu rail (5 core verbs + groups)    | **Front Desk** | フロントデスク, front-desk nav                          | first-win |
-| A runtime identity overlay                      | **Stance**     | customer overlay, `knowledge/personal/stances/{slug}/`  | advanced  |
+
+A **Stance** is not a surface layer; it is a runtime identity overlay — see [Stance](#stance).
 
 ### Surface
 
@@ -341,10 +346,6 @@ One canonical term per layer; the aliases are names you will meet in code, docs,
 ### Front Desk
 
 **(first-win)** The shared menu rail rendered by both Concierge and Presence Studio, built from `libs/core/surface/front-desk-nav.ts`: five core human verbs — ホーム (home), 頼む (ask), 決める (decide), 進み具合 (progress), 設定 (settings) — plus role-gated destinations grouped as 仕事 / 資料・学習 / 管理 (missions, work items, deliverables, knowledge, discussion, organization, operations, diagnostics, …; some hosted on Chronos). One implementation, two hosting surfaces, so a person sees one menu.
-
-### Stance (vs tenant customer)
-
-**(advanced)** A **stance** is the `knowledge/personal/stances/{slug}/` overlay selected by `KYBERION_STANCE` — "which hat am I wearing" — layered over `knowledge/personal/`. It is runtime configuration, **not** a scope in the `tenant → organization → project → mission → task` chain. A **tenant's customers** are the end customers a tenant delivers to; they live inside that tenant's own boundary (`knowledge/confidential/{tenant-slug}/`), never under `customer/`. See [Stance (Customer Overlay)](#stance-customer-overlay) and [Tenant's Customers](#tenants-customers).
 
 ## Lifecycle terms
 
@@ -627,7 +628,7 @@ These are orthogonal axes: changing the operating mode does not by itself choose
 
 ### WorkItem
 
-The canonical unit of executable work shared by all views and surfaces (`libs/core/workforce/work-coordination.ts`). Work items are claimed, leased, and transitioned by agents; every view (kanban, activity board, organization view) is a projection of the same records.
+The shared coordination record that missions and tasks are projected onto, used by all views and surfaces (`libs/core/workforce/work-coordination.ts`). It is not a separate kind of work (see [Units of work](#units-of-work)): work items are claimed, leased, and transitioned by agents, and every view (kanban, activity board, organization view) is a projection of the same records.
 
 ### WorkItem Context
 
@@ -661,9 +662,9 @@ Two different coordination surfaces — choose by participant type, shared state
 
 HMAC-signed peer-to-peer messaging between tenant instances. Peers are registered via `pnpm peer:register` with exposure classes (`same_host` / `same_lan` / `private_network` / `public_network`); shared secrets live in the tenant's confidential connection catalog and never in public metadata.
 
-### Stance (Customer Overlay)
+### Stance
 
-The `knowledge/personal/stances/{slug}/` overlay selected by `KYBERION_STANCE`, layering one identity / connections / policy / voice set over `knowledge/personal/` without forking (`libs/core/authn/stance-resolver.ts`). It answers "which hat am I wearing right now" — an FDE engagement is one such stance, and holding roles at several independent legal entities is another. A stance is runtime configuration, not a scope: it does not appear in the entity scope hierarchy. Stances used to live in the top-level `customer/` directory (selected by the now-deprecated `KYBERION_CUSTOMER`). → [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md)
+**(advanced)** The `knowledge/personal/stances/{slug}/` overlay selected by `KYBERION_STANCE`, layering one identity / connections / policy / voice set over `knowledge/personal/` without forking (`libs/core/authn/stance-resolver.ts`). It answers "which hat am I wearing right now" — an FDE engagement is one such stance, and holding roles at several independent legal entities is another. A stance is runtime configuration, not a scope: it does not appear in the `tenant → organization → project → mission → task` chain. It is also not a tenant's customer — see [Tenant's Customers](#tenants-customers). Stances used to live in the top-level `customer/` directory (selected by the now-deprecated `KYBERION_CUSTOMER`), which is why older docs call them a "customer overlay"; do not use that name in new docs. → [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md)
 
 ### Tenant's Customers
 
