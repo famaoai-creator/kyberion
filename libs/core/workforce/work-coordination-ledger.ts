@@ -13,6 +13,7 @@ import { withExecutionContext } from '../authority.js';
 import { selectCurrentWorkItems } from './work-coordination-snapshot.js';
 import { latestById } from './work-coordination-inventory.js';
 import { validateWorkItem } from './work-coordination-identity.js';
+import { isWorkLeaseLive } from './work-item-lease.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import { WORK_COORDINATION_ROOT_PATH } from '../foundation/runtime-state-roots.js';
@@ -236,12 +237,16 @@ export function currentLeaseRecords(): WorkLease[] {
   return latestById(records, 'lease_id').map((lease) => ({ ...lease }));
 }
 
+/** Every lease snapshot of one item (any status) — its fence history. */
+export function leaseRecordsForItem(itemId: string): WorkLease[] {
+  return currentLeaseRecords().filter((lease) => lease.item_id === itemId);
+}
+
 export function currentLeaseForItem(itemId: string): WorkLease | null {
   const now = Date.now();
   const leases = currentLeaseRecords()
     .filter((lease) => lease.item_id === itemId)
-    .filter((lease) => lease.status === 'active')
-    .filter((lease) => new Date(lease.expires_at).getTime() > now)
+    .filter((lease) => isWorkLeaseLive(lease, now))
     .sort((a, b) => a.renewed_at.localeCompare(b.renewed_at));
   return leases.length > 0 ? leases[leases.length - 1] : null;
 }
