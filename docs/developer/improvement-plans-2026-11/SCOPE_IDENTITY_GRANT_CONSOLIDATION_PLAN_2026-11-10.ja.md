@@ -1,0 +1,58 @@
+---
+title: スコープ・ID・権限（Grant）の統合計画
+kind: plan
+status: planned
+last_updated: 2026-11-10
+tags: [plan, concepts, tenant, organization, stance, role, persona, grant, authority, scope]
+importance: 9
+---
+
+# スコープ・ID・権限（Grant）の統合計画
+
+決定記録 [Concept Model v2](../../../knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md) の D3〜D6 を実装する計画です。4 本ある移行計画の 1 本目です。記憶の開示範囲（D8）と意図の振り分けでの権限レベル（D7）はこの計画の結果の上に乗るので、最初に進めます。
+
+権限の判定は新しく作りません。[保存先カタログと許可証による権限判定](./STORE_CATALOG_GRANT_GUARD_DESIGN_2026-11-05.ja.md) と [情報資産のスコープモデル](./INFORMATION_ASSET_SCOPE_MODEL_DESIGN_2026-11-05.ja.md) を土台にします。この計画が足すのは、「ロール」と「Persona」の側の整理です。
+
+## 結論
+
+| 決定             | 今                                                                                      | 移行後                                                                                                             |
+| ---------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| D3 Tenant と Org | NHI の ID が `kyberion://agent/<org>/<slug>`、tenant は任意、org がなければ `'default'` | `kyberion://agent/<tenant>/<org\|_>/<slug>`、`tenant_slug` は必須。Organization profile は Org ごと                |
+| D4 Stance        | identity / 設定 / customer overlay が混在。`KYBERION_CUSTOMER` を 14 か所が読む         | 「どのテナントの、どの Org と Org Role として動くか」を選んだ状態。口調や窓口は Tenant's Customers と Channel の側 |
+| D5 Role          | 6 種類。`assigned_persona` に Org Role が入り、Persona に変換されている                 | NHI / Member、Member Role、Authority Role → Grant、Org Role、Team Role。Execution Persona は廃止                   |
+| D6 Grant         | Authority Role が 2 つのレジストリ（55 件と 86 件）。保存先専用ロールが 40 件           | Grant = 誰 × スコープ × 操作。レジストリは 1 つ。保存先専用ロールは許可証に置き換え                                |
+
+## 段階
+
+### S1 — 安全な改名と型の一本化（挙動は変えない）
+
+- tier の型（`'personal'|'confidential'|'public'`、7 か所で宣言）を `libs/core/storage-layout.ts` の 1 つに寄せ、他はそこから import する。
+- Member Role（`owner|approver|operator|viewer`、6 か所）を 1 つの型として export し、3 値の部分集合は `Extract<>` で表す。
+- `mission-state.assigned_persona` を `org_role` に改名する。読み込みの互換は 1 リリースだけ残す。`authority.ts` で Persona に変換している箇所を外す。
+- 完了条件：重複宣言がなくなったことを境界テストで検査する。`assigned_persona` を書いている箇所が 0 件。
+
+### S2 — Stance の再定義
+
+- `stance-resolver.ts` を「許可テナントの一覧と、選んだテナント・Org・Org Role」の形にする。
+- 切り替えたときに参照できるデータの範囲が `ViewerContext` / `ResourceAccessScope` に反映されることを、テストで固定する。
+- `KYBERION_CUSTOMER` の読み込み（14 か所）を削除する。口調・窓口の設定は Tenant's Customers と Channel に移す。
+- `stance-tenant-customer-model.md` を新しい定義に書き換える。
+
+### S3 — Tenant 1:N Org と NHI の ID
+
+- NHI の ID に tenant を入れ、`tenant_slug` を必須にする。既存の ID は移行スクリプトで書き換え、旧 ID は別名として 1 リリース解決する。
+- `organization-profile.json` を Org ごとの置き場所に移す。Company を tenant の別名として扱う（`company.ts`）。
+
+### S4 — Execution Persona の廃止と Grant への一本化
+
+- `KYBERION_PERSONA` と `Persona` 型の利用箇所を棚卸しし、目的ごとに振り分ける。
+  - 権限 → Authority Role / Grant
+  - プロンプトの枠付け → Team Role の addendum
+  - agent ID として使っている箇所（`network.ts`）→ NHI の ID
+- `authority-role-index.json` と `security-policy.json` `authority_role_permissions` を 1 つのレジストリにまとめ、もう一方は生成物にするか削除する。
+- 保存先専用ロールを、tier-guard の再設計の許可証に置き換える（同計画の S 段階と並走）。
+- 完了条件：Authority Role の数が今の 95 件から大きく減る。レジストリは 1 つ。`Persona` 型の import が 0 件。
+
+## 完了の合図
+
+concept-registry から次の項目の `lifecycle` を外します：`tenant`、`organization`、`stance`、`org-role`、`team-role`、`member-role`、`authority-role`、`grant`。`execution-persona` はレジストリと GLOSSARY から削除します。同じ変更で、他の項目の `not_to_confuse_with` にある `execution-persona`（`nhi`、`conversational-persona`）も外します。

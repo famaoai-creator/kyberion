@@ -19,38 +19,38 @@ Intent, Plan, Result, Mission, Task Session, and Artifact are the words the firs
 
 ### Contributor vocabulary
 
-| Term                 | Canonical definition                                                                                                                                 |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Intent               | The human request expressed in natural language.                                                                                                     |
-| Resolution           | The structured interpretation of an intent.                                                                                                          |
-| Plan                 | A human-readable execution summary.                                                                                                                  |
-| Result               | The user-facing outcome of execution.                                                                                                                |
-| Mission              | A bounded unit of work with lifecycle state and evidence.                                                                                            |
-| Task Session         | A lighter-weight durable work record for conversational work that does not need a mission.                                                           |
-| Artifact             | The concrete output of work.                                                                                                                         |
-| Work Shape           | The operating mode of a work item.                                                                                                                   |
-| Execution Shape      | The selected execution rung for an intent.                                                                                                           |
-| WorkItem             | The shared coordination record (claim, lease, visibility) that missions and tasks are projected onto; not a separate kind of work.                   |
-| WorkItem Context     | The typed identity chain on a work item.                                                                                                             |
-| Mission Context Pack | The bounded context delivered to a mission task.                                                                                                     |
-| Handoff Packet       | The explicit transfer record between workers or phases.                                                                                              |
-| Knowledge Slice      | A task-profile-driven knowledge placement rule.                                                                                                      |
-| Knowledge Card       | A concise, frontmatter-backed knowledge artifact.                                                                                                    |
-| Semantic Brief       | A content brief that leaves presentation choices to the design layer.                                                                                |
-| Design Cascade       | The ordered resolution of creative design defaults.                                                                                                  |
-| Actuator             | A concrete execution component.                                                                                                                      |
-| Procedure            | Distilled operational knowledge or a reusable method.                                                                                                |
-| Pipeline             | A declarative, validated ADF execution graph that Kyberion runs under governance; a parameterized variant for user workflows is a Pipeline Template. |
-| ADF                  | A human-readable structured execution contract.                                                                                                      |
-| Tenant               | An isolation boundary identified by a tenant slug.                                                                                                   |
-| Viewer Context       | The server-resolved principal and allowed tenant scope.                                                                                              |
-| Approval Contract    | The human-approval boundary for consequential actions.                                                                                               |
-| Gateway              | The generic delivery contract shared by surfaces.                                                                                                    |
-| Trace                | The root observability record for an execution.                                                                                                      |
-| Span                 | A timed operation within a trace.                                                                                                                    |
-| Event                | A point-in-time occurrence within a span.                                                                                                            |
-| Lease                | A durable authority grant with an expiry.                                                                                                            |
-| Mission Controller   | The governed mission lifecycle entry point.                                                                                                          |
+| Term                 | Canonical definition                                                                                                                                                       |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Intent               | The human request expressed in natural language.                                                                                                                           |
+| Resolution           | The structured interpretation of an intent.                                                                                                                                |
+| Plan                 | A human-readable execution summary.                                                                                                                                        |
+| Result               | The user-facing outcome of execution.                                                                                                                                      |
+| Mission              | A bounded unit of work with lifecycle state and evidence.                                                                                                                  |
+| Task Session         | A lighter-weight durable work record for conversational work that does not need a mission.                                                                                 |
+| Artifact             | The concrete output of work.                                                                                                                                               |
+| Work Shape           | The kind of work a top-level WorkItem is (solution_project, service_operation, …).                                                                                         |
+| Execution Shape      | The selected execution rung for an intent; the only execution vocabulary, of which route families and resolution shapes are projections.                                   |
+| WorkItem             | The trackable unit of work (an Issue); missions, task sessions, pipelines and dot runs execute it, and steps that need ownership are child WorkItems that carry the lease. |
+| WorkItem Context     | The typed identity chain on a work item.                                                                                                                                   |
+| Mission Context Pack | The bounded context delivered to a mission task.                                                                                                                           |
+| Handoff Packet       | The explicit transfer record between workers or phases.                                                                                                                    |
+| Knowledge Slice      | A task-profile-driven knowledge placement rule.                                                                                                                            |
+| Knowledge Card       | A concise, frontmatter-backed knowledge artifact.                                                                                                                          |
+| Semantic Brief       | A content brief that leaves presentation choices to the design layer.                                                                                                      |
+| Design Cascade       | The ordered resolution of creative design defaults.                                                                                                                        |
+| Actuator             | A concrete execution component.                                                                                                                                            |
+| Procedure            | Distilled operational knowledge or a reusable method.                                                                                                                      |
+| Pipeline             | A declarative, validated ADF execution graph that Kyberion runs under governance; a parameterized variant for user workflows is a Pipeline Template.                       |
+| ADF                  | A human-readable structured execution contract.                                                                                                                            |
+| Tenant               | The contract and isolation boundary, identified by a tenant slug; it contains one or more Organizations (Company is an alias).                                             |
+| Viewer Context       | The server-resolved principal and allowed tenant scope.                                                                                                                    |
+| Approval Contract    | The human-approval boundary for consequential actions.                                                                                                                     |
+| Gateway              | The generic delivery contract shared by surfaces.                                                                                                                          |
+| Trace                | The root observability record for an execution.                                                                                                                            |
+| Span                 | A timed operation within a trace.                                                                                                                                          |
+| Event                | A point-in-time occurrence within a span.                                                                                                                                  |
+| Lease                | Time-bounded, fenced exclusive control of one named resource by one holder; the single primitive behind WorkItem claims, Mission Lease, path and device leases.            |
+| Mission Controller   | The governed mission lifecycle entry point.                                                                                                                                |
 
 ## Disambiguation maps
 
@@ -67,15 +67,15 @@ Intent ──resolves to an Execution Shape──┬─ direct_reply / actuator_
                                                 └──── each is projected as a WorkItem (claim / lease / visibility)
 ```
 
-| Term          | Answers                                    | Canonical source                                            |
-| ------------- | ------------------------------------------ | ----------------------------------------------------------- |
-| Mission       | Which lifecycle, evidence and git history? | `libs/core/mission/mission-status.ts`, `mission_controller` |
-| Task          | Which step inside a mission?               | the mission's `NEXT_TASKS.json`                             |
-| Task Contract | What exactly is one worker allowed to do?  | objective, write scope, outputs, acceptance criteria        |
-| Task Session  | Lighter durable work that is not a mission | task-session records                                        |
-| WorkItem      | Who holds it now, and who can see it?      | `libs/core/workforce/work-coordination.ts`                  |
+| Term          | Answers                                              | Canonical source                                            |
+| ------------- | ---------------------------------------------------- | ----------------------------------------------------------- |
+| Mission       | Which lifecycle, evidence and git history?           | `libs/core/mission/mission-status.ts`, `mission_controller` |
+| Task          | Which step inside a mission?                         | the mission's `NEXT_TASKS.json`                             |
+| Task Contract | What exactly is one worker allowed to do?            | objective, write scope, outputs, acceptance criteria        |
+| Task Session  | Lighter durable work that is not a mission           | task-session records                                        |
+| WorkItem      | What is the work, in which scope, and in what state? | `libs/core/workforce/work-coordination.ts`                  |
 
-A WorkItem is the shared record, not a sixth kind of work: a mission owns one WorkItem (`deriveMissionOwnershipItemId`), and each dispatched mission task becomes a WorkItem whose source is `mission:<mission_id>:<task_id>`. "Operation" is unrelated to this ladder — it means an actuator op (`domain:action`); `routine_operation` and `service_operation` are Work Shape values.
+A top-level WorkItem is the Issue: the trackable unit. Mission, Task Session, Pipeline and dot runs are ways of executing it, not competing units. A step that needs ownership (a dispatched mission task, a dot action) is a child WorkItem and carries the [Lease](#lease). _Transitioning_ ([Concept Model v2 D1](../knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md)): today a mission owns one WorkItem (`deriveMissionOwnershipItemId`) and each task is a sibling WorkItem with source `mission:<mission_id>:<task_id>`. The explicit `parent_item_id` link arrives with the [WorkItem and Lease plan](./developer/improvement-plans-2026-11/WORKITEM_ISSUE_LEASE_CONSOLIDATION_PLAN_2026-11-10.ja.md). "Operation" is unrelated to this ladder — it means an actuator op (`domain:action`); `routine_operation` and `service_operation` are Work Shape values.
 
 ### Actor identity and responsibility
 
@@ -97,16 +97,29 @@ it does not confer approval or permission to share across tenants.
 
 ### Role terms
 
-Four role words exist. Use the qualified name; never write a bare "role" or "persona" in new docs.
+Role words sit on separate axes, one type each ([Concept Model v2 D5–D6](../knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md)). Use the qualified name; never write a bare "role" or "persona" in new docs.
 
-| Term                                      | What it decides                                                                     | Values / source                                                                                                                                                       |
-| ----------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Execution Persona (legacy API: `Persona`) | The execution identity class of the running process, not the conversational persona | `sovereign`, `ecosystem_architect`, `mission_owner`, `worker`, `analyst`, `unknown` (`Persona` in `libs/core/types.ts`, `KYBERION_PERSONA`; `libs/core/authority.ts`) |
-| Authority Role                            | Which paths and actuators a process may write to                                    | `SYSTEM_ROLE` / `MISSION_ROLE`, `knowledge/product/governance/authority-role-index.json`                                                                              |
-| Org Role                                  | The org-chart role a mission is assigned at activation (`--persona` flag)           | a role directory under `knowledge/product/roles/` (the default `worker` has none); see [Team Role vs. Org Role](#team-role-vs-org-role)                               |
-| Team Role                                 | The per-task execution role inside a mission team                                   | `owner`, `planner`, `implementer`, `reviewer`, …; see [Team Role vs. Org Role](#team-role-vs-org-role)                                                                |
+| Axis                       | Term                                                | Values / source                                                                                                              |
+| -------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Who                        | NHI, Member                                         | [NHI](#nhi-non-human-identity) (`libs/core/agent/agent-identity.ts`); members in `libs/core/organization/member-registry.ts` |
+| Membership standing        | [Member Role](#member-role)                         | `owner`, `approver`, `operator`, `viewer`                                                                                    |
+| What may be done           | [Authority Role](#authority-role) → [Grant](#grant) | a named operation bundle; scope decides which information it touches                                                         |
+| Place in the org chart     | Org Role                                            | a role directory under `knowledge/product/roles/`; see [Team Role vs. Org Role](#team-role-vs-org-role)                      |
+| Role in this piece of work | Team Role                                           | `owner`, `planner`, `implementer`, `reviewer`, …; see [Team Role vs. Org Role](#team-role-vs-org-role)                       |
 
-The `--persona` flag selects an **Org Role**, not a `Persona`; the flag name is historical.
+**Execution Persona** (legacy API `Persona`, `KYBERION_PERSONA`: `sovereign`, `ecosystem_architect`, `mission_owner`, `worker`, `analyst`, `unknown` in `libs/core/types.ts` / `libs/core/authority.ts`) is **deprecated**. It began as prompt framing and accreted authority. Its authority purpose moves to Authority Role / Grant, and its framing moves to the Team Role addendum. Do not add new uses. The `--persona` flag selects an **Org Role**, not a `Persona`; the flag name is historical, and the mission-state field `assigned_persona` becomes `org_role` ([Scope, identity and Grant plan](./developer/improvement-plans-2026-11/SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md)).
+
+### Member Role
+
+A human member's standing in a tenant or organization: owner, approver, operator or viewer. One exported type (today it is declared in six modules, including the front desk and accountability charter). The viewer role `readonly` / `localadmin` folds into it. It decides standing, not operations: operations come from [Grant](#grant).
+
+### Authority Role
+
+A named bundle of operations; which information it may touch is decided by the Grant's scope, never by the role name. Today two registries disagree (`authority-role-index.json`, 55 roles; `security-policy.json` `authority_role_permissions`, 86 roles), and about 40 roles exist only to name one store. These merge into one registry, and the store roles become store grants ([STORE_CATALOG_GRANT_GUARD_DESIGN](./developer/improvement-plans-2026-11/STORE_CATALOG_GRANT_GUARD_DESIGN_2026-11-05.ja.md)).
+
+### Grant
+
+Permission for a principal (Member or NHI) to perform an operation set within a scope for a lifetime; standing, task-scoped and store grants are instances. Scope is the information-asset scope model (custody, disclosure, processing) over tier / tenant → organization → project. Org Role and Team Role carry no permissions; they map to default Grants. The lifetimes are listed in [Grants and approvals](#grants-and-approvals).
 
 ### Scope terms
 
@@ -122,7 +135,7 @@ The `--persona` flag selects an **Org Role**, not a `Persona`; the flag name is 
 | Resource Access Scope    | A server-created, deny-only path ceiling (`ResourceAccessScope`); its `custody` names the custodian it binds — `tenant` (with `tenantSlug`), `system`, or `person`                                                                       | `libs/core/foundation/resource-access-scope.ts`                    |
 | Viewer Record Custody    | Which custodian a displayed record belongs to (`ViewerRecordCustody`); row admission is `admitsCustody` — tenant via membership/`'all'`, system via `'all'`/server `includeUntenanted`, person only via an exact `viewerPersonIds` match | `libs/core/surface/surface-authorization.ts`                       |
 
-Tier (`personal` / `confidential` / `public`) and Stance (`knowledge/personal/stances/{slug}/`) are separate axes, not scopes; they never appear in the entity scope chain.
+Tier (`personal` / `confidential` / `public`) and Stance are not levels of the entity scope chain: tier is a classification axis, and a [Stance](#stance) selects which tenant scope applies.
 
 When the question is "what may be done with this information asset", use the **information asset scope model**: _custody_ (whose asset: `system` / `tenant` / `person`), _disclosure_ (who may see it: internal viewers → other custodians → external processors → external recipients → public), and _processing_ (what may be derived from it, and what derivatives inherit). Create / edit / delete / execute are operations judged by the existing authority layer, and tier is the classification label that caps disclosure and processing. G3/G4/P3/P4 phases implemented (stacked PRs #1438/#1439/#1442/#1443); viewer disclosure in particular is `admitsCustody` + `custodyOfScope` + `admitsScopeAudience` in `libs/core/surface/surface-authorization.ts`. → [INFORMATION_ASSET_SCOPE_MODEL_DESIGN](./developer/improvement-plans-2026-11/INFORMATION_ASSET_SCOPE_MODEL_DESIGN_2026-11-05.ja.md)
 
@@ -240,9 +253,13 @@ The parent model of Kyberion: organizational intent becomes governed execution, 
 
 The leadership-facing projection of the [Organization Work Loop](#organization-work-loop): leadership provides intent and approval while the platform resolves, executes, accounts for, and learns from work.
 
+### Lease
+
+Time-bounded, fenced exclusive control of one named resource by one holder; the single primitive behind WorkItem claims, Mission Lease, path and device leases. Implemented by `libs/core/lease/` (`LeaseBackend`, fenced records). A Lease answers "who holds this right now"; a [Grant](#grant) answers "who may do this at all". _Transitioning_: WorkItem claims, Co-Session path leases, dot arbitration and device leases still keep their own holder/expiry bookkeeping until the [WorkItem and Lease plan](./developer/improvement-plans-2026-11/WORKITEM_ISSUE_LEASE_CONSOLIDATION_PLAN_2026-11-10.ja.md) makes them adapters.
+
 ### Mission Lease
 
-A durable authority grant over a mission, task, bridge, or resource. Leases define who currently holds control and when that control expires.
+A [Lease](#lease) over a mission, task, bridge, or resource (`libs/core/mission/mission-lease.ts`, on `libs/core/lease/`). It defines who currently holds control of the mission and when that control expires.
 
 ### Handoff Packet
 
@@ -309,7 +326,7 @@ One canonical term per layer; the aliases are names you will meet in code, docs,
 | The CEO-secretary surface                       | **Concierge**  | 秘書室                                                  | first-win |
 | The shared menu rail (5 core verbs + groups)    | **Front Desk** | フロントデスク, front-desk nav                          | first-win |
 
-A **Stance** is not a surface layer; it is a runtime identity overlay — see [Stance](#stance).
+A **Stance** is not a surface layer; it is the acting-for selection — see [Stance](#stance).
 
 ### Surface
 
@@ -517,7 +534,7 @@ The internal set of specialists Kyberion assigns to a request, such as a browser
 
 ### Team Role vs. Org Role
 
-Two distinct, non-interchangeable role concepts that are easy to conflate (the other two role words, Persona and Authority Role, are in [Role terms](#role-terms)):
+Two distinct, non-interchangeable role concepts that are easy to conflate (the other role words — Member Role, Authority Role and the deprecated Execution Persona — are in [Role terms](#role-terms)):
 
 - **Team Role** (`teamRole`): the per-task execution role assigned by `mission-team-plan-composer.ts` from a mission's team template (`knowledge/product/orchestration/mission-team-templates.json`, e.g. `owner`/`planner`/`implementer`/`reviewer`/`tester`/`experience_designer`). It selects the working-principles addendum (`libs/core/workforce/working-principles.ts`) and gates artifact-review behavior in `mission-orchestration-worker.ts`. Team-template role names are not always the canonical addendum key (e.g. `tester` canonicalizes to `qa`, `experience_designer` to `designer`) — any code branching on team-role identity must compare `canonicalizeTeamRole(teamRole)`, never the raw string, or aliased roles silently miss the behavior their canonical role is supposed to get.
 - **Org Role** (historically "Assigned Persona"; selected with `--persona`): the one org-chart role assigned to a whole mission at activation (e.g. `product_manager`, `qa_lead`, `solution_architect` — the role directories under `knowledge/product/roles/{persona}/`). `syncRoleProcedure` mirrors that persona's `PROCEDURE.md` into the mission directory once at activation; it is then injected into the first task prompt as a one-shot dynamic injection (see `buildRolePersonaProcedureInjectionProvider` in `mission-orchestration-worker.ts`). A mission started without an explicit `--persona` defaults to `worker`, which has no corresponding role directory — no procedure gets injected in that case.
@@ -590,7 +607,7 @@ The control plane for running an organization beyond individual missions: purpos
 
 ### Work Shape
 
-The `work_shape` field classifying a work item's operating mode: `solution_project`, `service_operation`, `routine_operation`, `incident_response`, `governance_cadence`, or `improvement_experiment`. It distinguishes running the organization from building solutions.
+The `work_shape` of a top-level WorkItem: what kind of work it is — `solution_project`, `service_operation`, `routine_operation`, `incident_response`, `governance_cadence`, or `improvement_experiment`. It distinguishes running the organization from building solutions.
 
 ### Dot (Resident Dot)
 
@@ -622,13 +639,17 @@ The loopback, HMAC-authenticated `event-intake-surface` (`POST /events/<source>`
 
 ### Execution Shape
 
-The `execution_shape` field in the intent-coverage matrix describing the selected execution rung: `direct_reply`, `actuator_action`/`browser_session`, `task_session`, `pipeline`, `mission`, or `project_bootstrap`. It selects how an intent runs; `work_shape` describes the operating mode of a `WorkItem`, so the two fields are not interchangeable.
+The `execution_shape` field in the intent-coverage matrix describing the selected execution rung: `direct_reply`, `actuator_action`/`browser_session`, `task_session`, `pipeline`, `mission`, or `project_bootstrap`. It selects how an intent runs and is the only execution vocabulary: route families and resolution shapes are projections of it, and the dot charter's `work_shape` field (which holds Execution Shape values) is being renamed `execution_shape`. `work_shape` describes what kind of work a `WorkItem` is, so the two fields are not interchangeable.
 
 These are orthogonal axes: changing the operating mode does not by itself choose the execution rung, and choosing a rung does not redefine the operating mode.
 
+### RoutingDecision
+
+The one decision the intent resolver emits per request: intent id, Execution Shape, authority level, delivery mode and promotion verdict. Only the intent resolver reads utterance text; surfaces are adapters that consume this decision, and the promotion verdict comes from `work-scope-policy.json` alone. _Transitioning_: about 13 routers resolve independently today ([Intent resolver plan](./developer/improvement-plans-2026-11/INTENT_RESOLVER_UNIFICATION_PLAN_2026-11-10.ja.md)).
+
 ### WorkItem
 
-The shared coordination record that missions and tasks are projected onto, used by all views and surfaces (`libs/core/workforce/work-coordination.ts`). It is not a separate kind of work (see [Units of work](#units-of-work)): work items are claimed, leased, and transitioned by agents, and every view (kanban, activity board, organization view) is a projection of the same records.
+The trackable unit of work (an Issue); missions, task sessions, pipelines and dot runs execute it, and steps that need ownership are child WorkItems that carry the lease. Every view (kanban, activity board, organization view) is a projection of the same records (`libs/core/workforce/work-coordination.ts`); boards show top-level WorkItems by default. See [Units of work](#units-of-work) for the transition.
 
 ### WorkItem Context
 
@@ -644,7 +665,7 @@ A governed project record with lifecycle controls (create / update-status / arch
 
 ### Tenant
 
-An isolation boundary identified by a `tenant_slug` (pattern `^[a-z][a-z0-9-]{1,30}$`): its own confidential data, its own identity/approval flow, its own audit posture. Each tenant has an isolated knowledge root (default `knowledge/confidential/{tenant-slug}/`); cross-tenant access is deny-unless-brokered and audited. Tier and partition are an orthogonal axis, so `public` / `confidential` / `personal` / `shared` can never be a tenant slug (`RESERVED_SCOPE_NAMES` in `libs/core/entity-scope.ts`).
+The contract and isolation boundary identified by a `tenant_slug` (pattern `^[a-z][a-z0-9-]{1,30}$`), with its own confidential data, its own identity/approval flow, and its own audit posture. A tenant contains one or more [Organizations](#organization-and-tenancy-terms) (departments, business units); "Company" is an alias for tenant, not a third level (the Company OS framing of the [Organization Work Loop](#organization-work-loop) is a projection of the work model, not a tenant). Each tenant has an isolated knowledge root (default `knowledge/confidential/{tenant-slug}/`); cross-tenant access is deny-unless-brokered and audited. Tier and partition are an orthogonal axis, so `public` / `confidential` / `personal` / `shared` can never be a tenant slug (`RESERVED_SCOPE_NAMES` in `libs/core/entity-scope.ts`).
 
 ### Tenant Registry
 
@@ -664,7 +685,7 @@ HMAC-signed peer-to-peer messaging between tenant instances. Peers are registere
 
 ### Stance
 
-**(advanced)** The `knowledge/personal/stances/{slug}/` overlay selected by `KYBERION_STANCE`, layering one identity / connections / policy / voice set over `knowledge/personal/` without forking (`libs/core/authn/stance-resolver.ts`). It answers "which hat am I wearing right now" — an FDE engagement is one such stance, and holding roles at several independent legal entities is another. A stance is runtime configuration, not a scope: it does not appear in the `tenant → organization → project → mission → task` chain. It is also not a tenant's customer — see [Tenant's Customers](#tenants-customers). Stances used to live in the top-level `customer/` directory (selected by the now-deprecated `KYBERION_CUSTOMER`), which is why older docs call them a "customer overlay"; do not use that name in new docs. → [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md)
+**(advanced)** The acting-for selection: which permitted tenant an operator (human or agent) is acting for now, as which Organization and Org Role; switching it switches the data scope. Typical case: an FDE serving several customers says "right now I am acting for tenant A, as its delivery organization, in the solution_architect Org Role". A stance is chosen from the tenants the operator is permitted to serve and narrows the viewer scope accordingly; it is not a level of the `tenant → organization → project → mission → task` chain. Customer communication (tone, contact window, route) is not part of a stance: it belongs to [Tenant's Customers](#tenants-customers) and Channel. _Transitioning_ ([Concept Model v2 D4](../knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md)): today a stance is the `knowledge/personal/stances/{slug}/` overlay selected by `KYBERION_STANCE` (`libs/core/authn/stance-resolver.ts`); the legacy `KYBERION_CUSTOMER` and the name "customer overlay" are retired. → [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md)
 
 ### Tenant's Customers
 
@@ -764,7 +785,11 @@ Aggregating a lower-cadence face into a higher-cadence face at period-end (daily
 
 ### Promotion (Memory)
 
-Nominating content in a volatile face to the `memory-promotion-queue` (`MemoryCandidate`) for eventual distillation into `knowledge/`. The face's sidecar records `promotion_candidate_id` and transitions to `status: promoted`.
+Nominating content in a volatile face to the `memory-promotion-queue` (`MemoryCandidate`) for promotion into `knowledge/`. The face's sidecar records `promotion_candidate_id` and transitions to `status: promoted`.
+
+### Memory Candidate
+
+A captured learning awaiting promotion, of one type with kind and lane, carrying tier and entity scope from the moment of capture. _distill_ makes a candidate from a mission; _promote_ turns a candidate into knowledge. _Transitioning_: three candidate formats and four queues exist today, and promoted records are not yet retrieved into tenantless context packs ([Memory loop plan](./developer/improvement-plans-2026-11/MEMORY_LOOP_CLOSURE_PLAN_2026-11-10.ja.md)).
 
 ### Sidecar (volatile)
 
