@@ -1232,9 +1232,10 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Deprecated name of KYBERION_STANCE; still read (with a warning) when KYBERION_STANCE is unset.",
+      "description": "Retired (Concept Model v2 D4). For one release, when KYBERION_STANCE is unset and knowledge/personal/stances/<slug>/ exists it is read as that stance; otherwise ignored. Either way a deprecation warning is logged. Set KYBERION_STANCE instead.",
       "documented": true,
-      "subsystem": "tenancy"
+      "subsystem": "tenancy",
+      "deprecated": "2026-11"
     },
     {
       "name": "KYBERION_CUSTOMER_ROOM_PORT",
@@ -4202,7 +4203,7 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Active stance slug: which hat Kyberion wears. Selects the overlay knowledge/personal/stances/<slug>/ over knowledge/personal/.",
+      "description": "Active stance slug: the acting-for selection (which permitted tenant, Org and Org Role the operator acts for, declared in knowledge/personal/stances/<slug>/stance.json acting_for). Also selects that directory as the overlay over knowledge/personal/.",
       "documented": true,
       "subsystem": "tenancy"
     },

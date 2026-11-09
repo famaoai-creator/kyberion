@@ -27,6 +27,7 @@ import { rawExistsSync, rawReadTextFile, rawRealpathSync } from './fs-primitives
 import { resolveProjectScope, resolveProjectScopeId } from './foundation/project-scope-env.js';
 import { resolvePolicyIdentityContext } from './foundation/identity-context.js';
 import { createLogger, emitConsoleLine } from './logger.js';
+import { STANCE_SLUG_PATTERN, stanceSlugFromEnv } from './authn/stance-env.js';
 import type { AuditEntry } from './governance/audit-chain.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
@@ -271,10 +272,10 @@ function expandPolicyPath(pattern: string, missionId?: string, tenantSlug?: stri
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(projectId)) return null;
     pattern = pattern.split(PROJECT_ID_PLACEHOLDER).join(projectId);
   }
-  const slug = getRegisteredEnvText('KYBERION_STANCE') || getRegisteredEnvText('KYBERION_CUSTOMER');
+  const slug = stanceSlugFromEnv();
   return pattern
     .replace('${MISSION_ID}', missionId || 'NONE')
-    .replace('${KYBERION_STANCE}', slug?.trim() || 'NONE');
+    .replace('${KYBERION_STANCE}', slug && STANCE_SLUG_PATTERN.test(slug) ? slug : 'NONE');
 }
 
 function policyPathMatches(

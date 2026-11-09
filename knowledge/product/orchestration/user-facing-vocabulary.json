@@ -10441,9 +10441,9 @@
         "qps-ploc": "⟦Ɱïɠřȧŧė ṗėřşőñȧŀ ḓȧŧȧ ïñŧő ȧ şŧȧñƈė őṽėřŀȧẏ ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "cli_cmd_script_stance_switch": {
-        "en": "Switch the active stance overlay",
-        "ja": "有効なスタンスのオーバーレイを切り替え",
-        "qps-ploc": "⟦Şẇïŧƈħ ŧħė ȧƈŧïṽė şŧȧñƈė őṽėřŀȧẏ ŀőřėɱ ïṗşů⟧"
+        "en": "Switch the stance: which permitted tenant, Org and Org Role you act for",
+        "ja": "スタンスを切り替え（どの許可テナントの、どの Org と Org Role として動くか）",
+        "qps-ploc": "⟦Şẇïŧƈħ ŧħė şŧȧñƈė: ẇħïƈħ ṗėřɱïŧŧėḓ ŧėñȧñŧ, Őřɠ ȧñḓ Őřɠ Řőŀė ẏőů ȧƈŧ ƒőř ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
       "cli_cmd_script_backup": {
         "en": "Back up or export tenant data",
