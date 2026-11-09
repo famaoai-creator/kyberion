@@ -6,6 +6,7 @@ importance: 5
 source_mission: MSN-EXT-IDP-MEMBER-MAPPING-20260923
 author: Kyberion Wisdom Distiller
 last_updated: 2026-09-22
+doc_status: historical
 ---
 
 # Fail-closed external IdP member mapping with tenant-scoped roles

@@ -429,6 +429,9 @@ export interface LoadKnowledgeHintsInput {
   knowledgeSlicesPath?: string;
   /** KP-04: scales the hint budget. Omitted = `M` (pre-KP-04 default). */
   estimatedScope?: 'S' | 'M' | 'L';
-  /** DA-07 test seam for tenant-scoped retrieval fixtures. */
+  /**
+   * DA-07 test seam: fixture repo root for tenant-scoped retrieval and the
+   * promoted-record lane (`findRelevantPromotedKnowledge`).
+   */
   tenantKnowledgeRootDir?: string;
 }

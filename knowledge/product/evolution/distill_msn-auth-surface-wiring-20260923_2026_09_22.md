@@ -6,6 +6,7 @@ importance: 6
 source_mission: MSN-AUTH-SURFACE-WIRING-20260923
 author: Kyberion Wisdom Distiller
 last_updated: 2026-09-22
+doc_status: historical
 ---
 
 # Fail-Closed Authentication and Authorization Surface Wiring
