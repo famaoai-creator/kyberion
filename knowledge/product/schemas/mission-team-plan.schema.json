@@ -395,7 +395,7 @@
                   },
                   {
                     "type": "string",
-                    "pattern": "^kyberion://agent/[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$"
+                    "pattern": "^kyberion://agent/(?:[a-z][a-z0-9-]{1,30}/(?:_|[a-z][a-z0-9-]*)/|_/_/|[a-z][a-z0-9-]*/)[a-z][a-z0-9-]*$"
                   }
                 ]
               }

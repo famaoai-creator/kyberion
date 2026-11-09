@@ -17,7 +17,7 @@
     "created_at": { "type": "string" },
     "nhi_id": {
       "type": "string",
-      "pattern": "^kyberion://agent/[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$",
+      "pattern": "^kyberion://agent/(?:[a-z][a-z0-9-]{1,30}/(?:_|[a-z][a-z0-9-]*)/|_/_/|[a-z][a-z0-9-]*/)[a-z][a-z0-9-]*$",
       "description": "FD-10: the durable NI-01 identity (`agent-identity.ts`) this agent_id is linked to. Populated best-effort by browser-onboarding.ts via `ensureAgentIdentityBestEffort` — never required, since onboarding must never fail on an identity-ledger write it cannot make yet."
     },
     "persona_identity_bindings": {

@@ -63,7 +63,7 @@
         "actor": {
           "type": "string",
           "minLength": 1,
-          "description": "Canonical nhi_id (kyberion://agent/<org>/<slug>), 'user:<id>', or a legacy actor string."
+          "description": "Canonical nhi_id (kyberion://agent/<tenant>/<org|_>/<slug>), 'user:<id>', or a legacy actor string."
         },
         "team_role": { "type": "string" },
         "granted_scope": {
@@ -133,7 +133,7 @@
                   { "type": "null" },
                   {
                     "type": "string",
-                    "pattern": "^kyberion://agent/[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$"
+                    "pattern": "^kyberion://agent/(?:[a-z][a-z0-9-]{1,30}/(?:_|[a-z][a-z0-9-]*)/|_/_/|[a-z][a-z0-9-]*/)[a-z][a-z0-9-]*$"
                   }
                 ]
               }

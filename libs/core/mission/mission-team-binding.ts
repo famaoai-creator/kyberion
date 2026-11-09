@@ -220,8 +220,8 @@ function buildAssignmentId(missionId: string, teamRole: string, actorId: string)
 
 /**
  * NI-01: canonical runtime identity for an *agent* resource — prefer an
- * explicitly carried nhi_id, else derive `kyberion://agent/<org>/<slug>` from
- * the resource id. Humans keep `null`; services keep whatever external
+ * explicitly carried nhi_id, else derive `kyberion://agent/<tenant>/<org|_>/<slug>`
+ * from the resource id. Humans keep `null`; services keep whatever external
  * identity they declared (e.g. `stripe-prod`) — only kyberion agents get the
  * nhi derivation.
  */
@@ -312,7 +312,14 @@ function provisionStaffedAgentIdentity(resource: WorkforceResourceRef, missionId
   ensureAgentIdentityBestEffort({
     slug: parsed.slug,
     kind: 'agent',
-    organizationId: parsed.organization_id,
+    // Provision exactly the derived name: its tenant (none = tenantless) and org.
+    ...(parsed.legacy
+      ? {}
+      : {
+          personScope: true,
+          ...(parsed.tenant_slug ? { tenantSlug: parsed.tenant_slug } : {}),
+          ...(parsed.organization_id ? { organizationId: parsed.organization_id } : {}),
+        }),
     displayName: resource.display_name,
     accountableHumanId: resource.accountable_human_id ?? undefined,
     affiliation: { mission_id: missionId },

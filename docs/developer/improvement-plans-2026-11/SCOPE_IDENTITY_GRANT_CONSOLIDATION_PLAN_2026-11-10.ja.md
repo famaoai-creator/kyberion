@@ -43,6 +43,13 @@ importance: 9
 - NHI の ID に tenant を入れ、`tenant_slug` を必須にする。既存の ID は移行スクリプトで書き換え、旧 ID は別名として 1 リリース解決する。
 - `organization-profile.json` を Org ごとの置き場所に移す。Company を tenant の別名として扱う（`company.ts`）。
 
+**状況（2026-11-10、実装済み・統合待ち）**
+
+- ID の文法は `libs/core/contracts/nhi-id.ts` にあります。`buildNhiId(tenant, org, slug)` は tenant がないとき、予約名（`public` / `confidential` / `personal` / `shared`）のときに拒否します。Org がなければ `_` と書き、`'default'` への切り替えはなくしました。tenant に属する Org を tenant なしで指定すると拒否します。
+- テナントに属さない NHI（個人用オンボーディングのエージェント、tenant なしで起動した実行体）は、暫定で `kyberion://agent/_/_/<slug>` としました。D3 の「tenant は必須」とどう両立させるかは、オーナーの判断待ちです。
+- 移行は `pnpm nhi migrate-ids`（既定は dry run、`--apply` で書き込み）です。ジャーナルは書き換えず、`identity_id_migrated` のイベントを追記します。2 回目以降は何もしません。旧 ID は別名として解決し、ID ごとに 1 回だけ非推奨の警告を出します。移行前の台帳でも、新しい ID で引けば旧レコードが見つかるので、同じ NHI が二重に発行されることはありません。
+- Organization profile は `knowledge/confidential/{tenant}/organizations/{org}/organization-profile.json` に置きます。読み込みは新しい置き場所を優先し、旧来の tenant 直下は 1 リリースだけ警告付きで読みます。移動は migration `0004-organization-profile-home` です。`company.ts` は同じ解決関数を使い、Company 専用の置き場所は持ちません。
+
 ### S4 — Execution Persona の廃止と Grant への一本化
 
 - `KYBERION_PERSONA` と `Persona` 型の利用箇所を棚卸しし、目的ごとに振り分ける。

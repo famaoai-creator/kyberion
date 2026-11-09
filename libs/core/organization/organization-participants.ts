@@ -2,6 +2,7 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
+import { parseNhiId } from '../contracts/nhi-id.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { readJsonIfPresent, writeJson } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
@@ -68,7 +69,8 @@ const FILE = 'participant.json';
 function assignmentId(actor: string): string {
   if (
     !/^user:[a-z][a-z0-9-]{1,30}$/.test(actor) &&
-    !/^kyberion:\/\/agent\/[A-Za-z0-9][A-Za-z0-9._-]{0,63}\/[a-z][a-z0-9-]*$/.test(actor)
+    !/^kyberion:\/\/agent\/[A-Za-z0-9][A-Za-z0-9._-]{0,63}\/[a-z][a-z0-9-]*$/.test(actor) &&
+    !parseNhiId(actor)
   )
     fail('invalid_actor', 400, 'Select a registered human or agent identity.');
   return 'participant-' + createHash('sha256').update(actor).digest('hex').slice(0, 32);
