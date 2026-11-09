@@ -285,6 +285,7 @@ export function usage(): string {
     '  pnpm organization learning list --organization-id <id> [--status <status>] [--json]',
     '  pnpm organization learning enqueue --organization-id <id> --tier <tier> --learning-id <id> --source-type <incident_review|routine_exception|project_closure|governance_decision> --source-ref <ref> --title <title> --summary <summary> --target-kind <pattern|sop_candidate|knowledge_hint|report_template> [--evidence-ref <ref>] [--dry-run|--apply] [--json]',
     '  pnpm organization learning transition --organization-id <id> --tier <tier> [--tenant-slug <slug>] --learning-id <id> --record-status <approved|rejected|promoted> [--reason <text>] [--promoted-ref <knowledge/...>] --dry-run|--apply [--json]',
+    '  pnpm organization learning migrate [--organization-id <id>] [--tier <tier>] [--tenant-slug <slug>] --dry-run|--apply [--json]   (one release: import pending legacy learnings onto the memory candidate queue; unresolvable scopes are reported)',
     '  pnpm organization reconcile --organization-id <id> [--dry-run|--apply] [--json]',
     '  pnpm organization work resolve --organization-id <id> --intent "<request>" --dry-run [--json]',
     '',

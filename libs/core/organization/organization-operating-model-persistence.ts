@@ -253,6 +253,11 @@ export function recordQueryTiers(tier?: OrganizationTier): OrganizationTier[] {
   return tier ? [tier] : ['personal', 'confidential', 'public'];
 }
 
+/** The tenant an organization record query reads: explicit, else the process tenant. */
+export function organizationQueryTenantSlug(tenantSlug?: string): string | undefined {
+  return tenantSlug || getRegisteredEnvText('KYBERION_TENANT') || undefined;
+}
+
 export function recordQueryTenant(tenantSlug?: string): string {
   const tenant = tenantSlug || 'shared';
   assertTenantSlug(tenant);
@@ -1039,7 +1044,7 @@ export function listOrganizationRecordFiles(
   query: { organizationId?: string; tier?: OrganizationTier; tenantSlug?: string; rootDir?: string }
 ): string[] {
   if (query.organizationId) assertOrganizationId(query.organizationId);
-  const tenantSlug = recordQueryTenant(query.tenantSlug || getRegisteredEnvText('KYBERION_TENANT'));
+  const tenantSlug = recordQueryTenant(organizationQueryTenantSlug(query.tenantSlug));
   const tiers = recordQueryTiers(query.tier);
   return tiers.flatMap((tier) => {
     // Scope to the organization's own state directory. A substring match on
