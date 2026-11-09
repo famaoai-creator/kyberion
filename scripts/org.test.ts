@@ -241,6 +241,12 @@ describe('org role create', () => {
     expect(policy.authority_role_permissions?.finance_controller?.allow_write).toEqual(
       expect.arrayContaining(['knowledge/product/governance/finance/'])
     );
+    // The card is the registry; the policy entry is its projection.
+    expect(
+      readJson<{ permissions?: unknown }>(
+        'knowledge/product/governance/authority-roles/finance_controller.json'
+      ).permissions
+    ).toEqual(policy.authority_role_permissions?.finance_controller);
 
     const roleWriteAccess = readJson<{
       roles?: Record<string, { allow?: string[] }>;

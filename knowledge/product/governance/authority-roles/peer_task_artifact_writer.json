@@ -8,5 +8,15 @@
   ],
   "scope_classes": [],
   "allowed_actuators": [],
-  "tier_access": ["confidential"]
+  "tier_access": ["confidential"],
+  "permissions": {
+    "allow_read": [
+      "active/shared/artifacts/confidential/${KYBERION_TENANT}/report/peer-tasks/",
+      "active/shared/artifacts/confidential/${KYBERION_TENANT}/artifacts-index.jsonl"
+    ],
+    "allow_write": [
+      "active/shared/artifacts/confidential/${KYBERION_TENANT}/report/peer-tasks/",
+      "active/shared/artifacts/confidential/${KYBERION_TENANT}/artifacts-index.jsonl"
+    ]
+  }
 }

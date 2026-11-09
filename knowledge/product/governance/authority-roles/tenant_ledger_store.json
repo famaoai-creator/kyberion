@@ -8,5 +8,15 @@
   ],
   "scope_classes": ["audit"],
   "allowed_actuators": [],
-  "tier_access": ["confidential", "personal"]
+  "tier_access": ["confidential", "personal"],
+  "permissions": {
+    "allow_read": [
+      "active/shared/runtime/tenant-ledger/personal/${KYBERION_TENANT}/",
+      "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/"
+    ],
+    "allow_write": [
+      "active/shared/runtime/tenant-ledger/personal/${KYBERION_TENANT}/",
+      "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/"
+    ]
+  }
 }

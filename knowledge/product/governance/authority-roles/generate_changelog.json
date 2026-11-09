@@ -1,0 +1,7 @@
+{
+  "role": "generate_changelog",
+  "assignable": false,
+  "permissions": {
+    "allow_write": ["CHANGELOG.md"]
+  }
+}

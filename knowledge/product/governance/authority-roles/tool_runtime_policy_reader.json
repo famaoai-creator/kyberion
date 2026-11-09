@@ -5,5 +5,13 @@
   "write_scopes": [],
   "scope_classes": [],
   "allowed_actuators": [],
-  "tier_access": ["public", "personal", "confidential"]
+  "tier_access": ["public", "personal", "confidential"],
+  "permissions": {
+    "allow_read": [
+      "knowledge/product/governance/tool-runtime-policy.json",
+      "knowledge/personal/onboarding/tool-runtime-policy.json",
+      "knowledge/personal/stances/${KYBERION_STANCE}/onboarding/tool-runtime-policy.json"
+    ],
+    "allow_write": []
+  }
 }

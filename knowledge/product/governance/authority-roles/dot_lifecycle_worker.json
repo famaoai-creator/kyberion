@@ -1,0 +1,8 @@
+{
+  "role": "dot_lifecycle_worker",
+  "assignable": false,
+  "permissions": {
+    "allow_read": ["active/shared/runtime/locks/"],
+    "allow_write": ["active/shared/runtime/locks/"]
+  }
+}
