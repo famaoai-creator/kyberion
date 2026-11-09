@@ -11,10 +11,11 @@ import * as path from 'node:path';
 import { findMissionPath } from '../path-resolver.js';
 import { loadMissionStateForInference } from '../mission/mission-state-reader.js';
 import type { MemoryScopeEnvelope } from './memory-scope.js';
+import type { StorageDataTier } from '../storage-layout.js';
 
 export interface MissionMemoryCaptureScope {
   /** The mission's tier; `confidential` when the state is unreadable (fail closed). */
-  tier: 'public' | 'confidential' | 'personal';
+  tier: StorageDataTier;
   /** Tenant scope of a non-public tenant mission; absent otherwise. */
   scope?: MemoryScopeEnvelope;
 }
