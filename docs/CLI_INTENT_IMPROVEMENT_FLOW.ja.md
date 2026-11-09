@@ -1,7 +1,7 @@
 ---
 title: CLI インテント実行・改善ループ
 tags: [cli, intent, procedure, approval, feedback, distill]
-last_updated: 2026-08-10
+last_updated: 2026-11-10
 ---
 
 # CLI インテント実行・改善ループ
@@ -17,7 +17,7 @@ intent
   → approval gate
   → execute
   → execution feedback
-  → distill candidate
+  → improvement proposal (memory candidate キューの行)
   → human review
   → procedure update
 ```
@@ -69,7 +69,8 @@ CLI出力は統一locale解決を使う。`--locale en|ja|qps-ploc`、`KYBERION_
 - 録画が未レビュー、対象originが不一致、またはrecording hashが不一致の場合は停止する。
 - 高リスク操作は `pnpm kyberion approvals` の人間承認を通過するまで実行しない。
 - 入力値やsecretは手順録画へ保存しない。実行時入力としてのみ渡す。
-- `feedback` は実行手順を直接書き換えず、`distill-candidate` を `proposed` で作成する。
+- `feedback` は実行手順を直接書き換えません。改善の提案を、memory candidate キューの行（`kind: execution_feedback`、`origin` は `pnpm kyberion improvements`）として、feedback のスコープで作ります。スコープのない feedback は記録しますが、提案は作りません（理由を表示します）。
+- `improvements --queue <id>` は、提案を人間のレビューに渡します。古い distill-candidate の提案は読むだけです。1 リリースの間、`improvements --migrate [--write]` が、スコープのある保留中の提案をキューに取り込みます。スコープのない提案は `unresolved` に出します。
 - `improvements --approve` は改善候補を人間レビュー済みにするが、手順カタログは自動変更しない。実装・検証後に governed promotion で反映する。
 
 ## UIへの拡張

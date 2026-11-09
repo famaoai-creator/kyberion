@@ -94,6 +94,7 @@ import {
   handleDealsSubcommand,
   handleFeedbackSubcommand,
   handleImprovements,
+  improvementsArgsFromArgv,
 } from './operator-home-secondary-actions.js';
 import { printCommands, showHome, type HomePrint } from './operator-home-view.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -1275,6 +1276,8 @@ async function mainImpl(args: string[] = []): Promise<void> {
     .option('review', { type: 'string', description: 'improvements: read-only proposal review' })
     .option('queue', { type: 'string', description: 'improvements: queue for review' })
     .option('legacy', { type: 'boolean', description: 'Legacy --review only' })
+    .option('migrate', { type: 'boolean', description: 'improvements: legacy import report' })
+    .option('write', { type: 'boolean', description: 'improvements --migrate: import' })
     .option('approve', { type: 'string', description: 'approvals: approve request id' })
     .option('deny', { type: 'string', description: 'approvals: reject request id' })
     .option('revoke', {
@@ -1511,19 +1514,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
       );
       return;
     case 'improvements':
-      handleImprovements(
-        ui,
-        {
-          review: argv.review ? String(argv.review) : undefined,
-          legacy: Boolean(argv.legacy),
-          queue: argv.queue ? String(argv.queue) : undefined,
-          approve: argv.approve ? String(argv.approve) : undefined,
-          deny: argv.deny ? String(argv.deny) : undefined,
-          note: argv.note ? String(argv.note) : undefined,
-          json: Boolean(argv.json),
-        },
-        activePrint
-      );
+      handleImprovements(ui, improvementsArgsFromArgv(argv), activePrint);
       return;
     case 'help':
       printCommands(ui, activePrint);

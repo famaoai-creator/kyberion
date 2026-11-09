@@ -481,14 +481,19 @@
       }
     },
     "origin": {
-      "description": "D8: the decision-owning record (organization learning / process improvement) this candidate stands for; its facade decides it, the generic promotion workflow never promotes it.",
+      "description": "D8: the decision-owning record (organization learning / process improvement / background-review proposal / execution-feedback proposal) this candidate stands for; its facade decides it, the generic promotion workflow never promotes it.",
       "type": "object",
       "additionalProperties": false,
       "required": ["record_kind", "record_id"],
       "properties": {
         "record_kind": {
           "type": "string",
-          "enum": ["organization_learning", "process_improvement"]
+          "enum": [
+            "organization_learning",
+            "process_improvement",
+            "background_review",
+            "execution_feedback"
+          ]
         },
         "record_id": {
           "type": "string",
@@ -502,6 +507,11 @@
           "type": "object"
         },
         "migrated_from": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decided_via": {
+          "description": "The command that decides this row (e.g. `pnpm background-review`).",
           "type": "string",
           "minLength": 1
         }
