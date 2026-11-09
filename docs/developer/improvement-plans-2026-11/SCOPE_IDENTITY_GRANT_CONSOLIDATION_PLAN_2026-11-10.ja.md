@@ -90,6 +90,15 @@ Org Role を `KYBERION_PERSONA` に写していた `scripts/compose_mission_team
 - `pnpm organization role create` / `promote` は、カードの `permissions` と `security-policy.json` を同じ承認の下で一緒に書く。プロフィールの書き換えでカードの `permissions` は消えない。`publication-role-migration` は、カードの `permissions` と移行元の `security-policy.json` が違えば拒否する。
 - `role-authority-map.json`（Org Role → Authority Role と persona）と `role-write-access.json` は、このレジストリにはまだ入っていない。
 
+#### 残り（2026-11-10 時点）
+
+S4 は棚卸しとレジストリの一本化までで止めた。次の 2 つは、まだ済んでいない。
+
+1. **保存先専用ロールを許可証に置き換える。** 残りは 29 件（`STORE_CATALOG_GRANT_GUARD_DESIGN` の G3 の節の一覧）。そのうち少なくとも 8 件は許可証の形にならないと G3 で確かめてあり、オーナーの判断を待っている。横断して読む 3 件（`workspace_graph_reader`、`concierge_management_reader`、`peer_responder_reader`）を開示（スコープモデル P4）の問いとして扱うか。業務の流れで書く 2 件（`concierge_management_writer`、`dot_lifecycle_writer`）を、流れの facade が出す複数の許可証にするか。拒否だけの 3 件（`deliverable_inbox_writer`、`customer_channel_binding_store`、`archived_mission_state_reader`）を security-policy の宣言にするか。残りの 21 件は、呼び出し元ごとに許可証の発行を足し、(主体, パス, 操作) の判定が前後で同じことを比べる表のテストを付けて、1 件ずつ外す。Authority Role の数（90）は、この段階で減る。
+2. **Execution Persona をなくす。** `Persona` 型の import（3 ファイル）と、`persona_permissions` の 4 つの束（`sovereign` / `ecosystem_architect` / `worker` / `analyst`）を、レジストリの Authority Role として表し直す。`KYBERION_PERSONA` は運用者の `.env.local`、サーフェスの起動 env、CI が使っているので、1 リリースは非推奨の別名として読み、診断形式の警告を出す。1 の後に行う。
+
+このため、concept-registry の `lifecycle` は外していない。
+
 ## 完了の合図
 
 concept-registry から次の項目の `lifecycle` を外します：`tenant`、`organization`、`stance`、`org-role`、`team-role`、`member-role`、`authority-role`、`grant`。`execution-persona` はレジストリと GLOSSARY から削除します。同じ変更で、他の項目の `not_to_confuse_with` にある `execution-persona`（`nhi`、`conversational-persona`）も外します。
