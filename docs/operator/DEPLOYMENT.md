@@ -16,7 +16,7 @@ For development setup, see [`../QUICKSTART.md`](../QUICKSTART.md). This document
 
 Before installing on any environment:
 
-- [ ] Decide single-user vs. customer-overlay (FDE) mode. Customer-overlay = define `KYBERION_STANCE` and prepare `knowledge/personal/stances/{slug}/`.
+- [ ] Decide single-user vs. stance (FDE) mode. Stance mode = define `KYBERION_STANCE` and prepare `knowledge/personal/stances/{slug}/` with `acting_for` naming the tenant.
 - [ ] Decide reasoning backend: `claude-cli` (preferred when CLI is authenticated), `anthropic` (API key), `codex-cli`, `gemini-cli`, `agy-cli`, `copilot` (GitHub Copilot CLI via ACP), `openrouter` (OpenRouter API), `nemotron-api` (OpenAI-compatible endpoint), or `stub` (offline).
 - [ ] Decide voice tier: tier 0 (browser + native TTS, no install), tier 1 (cloud), tier 2 (local Style-Bert-VITS2).
 - [ ] Identify which actuators the use case needs (browser? voice? media? meeting?). Heavy ones (Playwright, Style-Bert-VITS2) only install if needed.
@@ -62,13 +62,17 @@ pnpm surfaces reconcile     # bring up background surfaces
 pnpm onboarding                # interactive identity setup → active stance overlay / personal fallback
 ```
 
-### 1.4 Configure (FDE / customer overlay)
+### 1.4 Configure (FDE / stance)
+
+A stance names the tenant you act for, as which Organization and Org Role
+(`acting_for` in `stance.json`); the tenant must be an active profile in
+`knowledge/personal/tenants/`. Company assets and customer channels stay in the
+tenant home `knowledge/confidential/<tenant>/`.
 
 ```bash
 pnpm stance:create customer-slug
-$EDITOR customer/customer-slug/customer.json
-$EDITOR customer/customer-slug/identity.json
-$EDITOR customer/customer-slug/vision.md
+$EDITOR knowledge/personal/stances/customer-slug/stance.json     # add acting_for
+$EDITOR knowledge/personal/stances/customer-slug/identity.json
 
 pnpm stance:switch customer-slug
 source active/shared/runtime/stance.env
@@ -441,7 +445,7 @@ Mission state is forward-compatible by design (additive fields only). If a major
 | `pnpm onboarding` says "no reasoning backend"     | No CLI/API key configured      | Set `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` (or `KYBERION_OPENROUTER_KEY`), `KYBERION_NEMOTRON_URL`, `KYBERION_LOCAL_LLM_URL`, or run `claude` to authenticate |
 | Mission stuck in `active` after process crash     | Stale lock                     | Lock has PID-based stale detection; next command auto-recovers                                                                                                   |
 | `Trace persisted path` empty in pipeline output   | Persistence policy denied      | Check `KYBERION_PERSONA` and `MISSION_ROLE` env vars                                                                                                             |
-| Customer overlay not picked up                    | `KYBERION_STANCE` not exported | `echo $KYBERION_STANCE` — must show your slug                                                                                                                    |
+| Stance not picked up                              | `KYBERION_STANCE` not exported | `echo $KYBERION_STANCE` — must show your slug                                                                                                                    |
 | Voice surface silent                              | OS TTS not installed           | Linux: `sudo apt-get install espeak`. macOS: built-in. Windows: built-in (SAPI)                                                                                  |
 
 ---

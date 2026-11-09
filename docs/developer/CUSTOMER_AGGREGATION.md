@@ -3,7 +3,7 @@ title: Customer Aggregation Point
 category: Developer
 tags: [fde, customer, configuration, aggregation]
 importance: 9
-last_updated: 2026-11-06
+last_updated: 2026-11-10
 ---
 
 # Customer Aggregation Point
@@ -12,15 +12,17 @@ How Kyberion isolates **per-stance configuration** from the rest of the codebase
 
 ## Current v2 contract (draft)
 
-Stance (the operating entity), tenant (the confidentiality boundary), and a tenant's customer are separate concepts. `customer/` is now a legacy migration source only. The current stance template is `templates/stance/`; the directory and API descriptions below the historical heading do not describe current behavior.
+Stance (the acting-for selection: which permitted tenant, Org and Org Role the operator acts for — [Concept Model v2 D4](../../knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md)), tenant (the confidentiality boundary), and a tenant's customer are separate concepts. The name "customer overlay" and `KYBERION_CUSTOMER` are retired; customer tone and contact live in the tenant's channel bindings and customer records. `customer/` is now a legacy migration source only. The current stance template is `templates/stance/`; the directory and API descriptions below the historical heading do not describe current behavior.
 
-| Purpose                                 | Current home / API                                                                   |
-| --------------------------------------- | ------------------------------------------------------------------------------------ |
-| Stance configuration                    | `knowledge/personal/stances/{stance}/`, `stance.json`; activation: `KYBERION_STANCE` |
-| Tenant company assets                   | `knowledge/confidential/{tenant}/`, `company.json`                                   |
-| Tenant deals, documents and escalations | `knowledge/confidential/{tenant}/deals/`                                             |
-| Stance traces                           | `active/shared/logs/stances/{stance}/traces/`                                        |
-| Tenant audit mirror                     | `active/shared/runtime/audit-mirror/confidential/{tenant}/`                          |
+| Purpose                                  | Current home / API                                                                   |
+| ---------------------------------------- | ------------------------------------------------------------------------------------ |
+| Stance configuration                     | `knowledge/personal/stances/{stance}/`, `stance.json`; activation: `KYBERION_STANCE` |
+| Stance selection (tenant, Org, Org Role) | `stance.json` `acting_for`; `resolveStance`, `narrowViewerScopeToStance`             |
+| Customer channel (language, mode)        | `knowledge/confidential/{tenant}/connections/channel-bindings.json`                  |
+| Tenant company assets                    | `knowledge/confidential/{tenant}/`, `company.json`                                   |
+| Tenant deals, documents and escalations  | `knowledge/confidential/{tenant}/deals/`                                             |
+| Stance traces                            | `active/shared/logs/stances/{stance}/traces/`                                        |
+| Tenant audit mirror                      | `active/shared/runtime/audit-mirror/confidential/{tenant}/`                          |
 
 Use published APIs, keeping selection separate from authorization:
 

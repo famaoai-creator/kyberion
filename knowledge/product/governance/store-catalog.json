@@ -362,7 +362,7 @@
       "status": "legacy-move",
       "moves_to": "stance",
       "sources": ["stance-overlay"],
-      "note": "Stance entries move to knowledge/personal/stances/<slug> with migration 0001-stance-home; KYBERION_CUSTOMER is the deprecated name of KYBERION_STANCE."
+      "note": "Stance entries move to knowledge/personal/stances/<slug> with migration 0001-stance-home; KYBERION_CUSTOMER is retired (Concept Model v2 D4) and read for one release only when it names an existing stance."
     },
     {
       "id": "legacy.customer-stance-logs",
