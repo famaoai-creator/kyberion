@@ -1,0 +1,8 @@
+{
+  "role": "strategic_sales",
+  "assignable": false,
+  "permissions": {
+    "allow_read": ["active/projects/proposals/", "active/shared/tmp/"],
+    "allow_write": ["active/projects/proposals/", "active/shared/tmp/"]
+  }
+}

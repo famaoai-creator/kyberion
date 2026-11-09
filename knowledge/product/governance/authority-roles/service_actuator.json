@@ -1,0 +1,12 @@
+{
+  "role": "service_actuator",
+  "assignable": false,
+  "permissions": {
+    "allow_read": [
+      "knowledge/personal/connections/",
+      "knowledge/product/orchestration/",
+      "active/shared/auth-grants.json"
+    ],
+    "allow_write": []
+  }
+}

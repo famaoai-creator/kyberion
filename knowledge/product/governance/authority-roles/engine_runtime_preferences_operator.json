@@ -1,0 +1,14 @@
+{
+  "role": "engine_runtime_preferences_operator",
+  "assignable": false,
+  "permissions": {
+    "allow_read": [
+      "knowledge/product/schemas/engine-runtime-preferences.schema.json",
+      "knowledge/product/governance/security-policy.json",
+      "knowledge/product/governance/role-assumption-policy.json",
+      "knowledge/product/governance/env-registry.json",
+      "knowledge/product/governance/agent-policies.yaml"
+    ],
+    "allow_write": ["knowledge/personal/"]
+  }
+}

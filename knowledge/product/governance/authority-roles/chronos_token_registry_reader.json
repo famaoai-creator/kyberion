@@ -5,5 +5,9 @@
   "write_scopes": [],
   "scope_classes": [],
   "allowed_actuators": [],
-  "tier_access": ["personal"]
+  "tier_access": ["personal"],
+  "permissions": {
+    "allow_read": ["knowledge/personal/connections/chronos-access.json"],
+    "allow_write": []
+  }
 }

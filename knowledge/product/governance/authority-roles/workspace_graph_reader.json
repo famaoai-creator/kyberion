@@ -5,5 +5,20 @@
   "write_scopes": [],
   "scope_classes": [],
   "allowed_actuators": [],
-  "tier_access": ["personal", "confidential", "public"]
+  "tier_access": ["personal", "confidential", "public"],
+  "permissions": {
+    "allow_read": [
+      "active/missions/",
+      "active/archive/missions/",
+      "active/projects/",
+      "active/organizations/",
+      "active/shared/runtime/work-coordination/",
+      "active/shared/coordination/channels/",
+      "active/shared/coordination/identity/",
+      "knowledge/personal/tenants/",
+      "knowledge/personal/members/",
+      "knowledge/personal/missions/"
+    ],
+    "allow_write": []
+  }
 }

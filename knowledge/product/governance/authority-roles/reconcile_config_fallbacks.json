@@ -1,0 +1,7 @@
+{
+  "role": "reconcile_config_fallbacks",
+  "assignable": false,
+  "permissions": {
+    "allow_write": ["knowledge/public/", "active/shared/tmp/"]
+  }
+}
