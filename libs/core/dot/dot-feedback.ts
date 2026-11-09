@@ -186,7 +186,15 @@ async function recordRejectionForDistill(entry: DotFeedbackEntry): Promise<void>
     comment: `Operator rejected "${entry.title}"${entry.note ? `: ${entry.note}` : ''}`,
     source: 'operator',
   });
-  materializeExecutionFeedbackCandidate({ feedback, procedureId: `dot:${entry.dot_id}` });
+  // D8: capture the review candidate in the dot charter's own scope; an
+  // unknown dot has none, so nothing is captured (scope is never guessed).
+  const { findDotCharter } = await import('./dot-charter.js');
+  const scope = findDotCharter(entry.dot_id)?.charter.scope;
+  materializeExecutionFeedbackCandidate({
+    feedback,
+    procedureId: `dot:${entry.dot_id}`,
+    ...(scope ? { scope } : {}),
+  });
 }
 
 /** Append one settled decision; rejections also feed the distill pipeline. */
