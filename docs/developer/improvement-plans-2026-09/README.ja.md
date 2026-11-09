@@ -31,7 +31,18 @@ status: active
 - [学びをコードと同じ PR に含める](./KNOWLEDGE_IN_PR_PLAN_2026-09-30.ja.md) — distill と promote を PR 前に移し、PR レビューを steward 審査、`finish` を ratify とする。`pr create` で学びの扱いを必ず検査。
 - [テナントナレッジと actuator 活用の評価](./TENANT_KNOWLEDGE_ACTUATOR_REVIEW_2026-09-11.ja.md) — 配置境界、computer-use の観測、受入検証の改善。
 
+## 責任・アクター・ディスパッチ
+
+- [責任者憲章(Accountability Charter)](./ACCOUNTABILITY_CHARTER_PLAN_2026-09-30.ja.md) — HITL から「誰が責任を持つか」へ。
+- [エージェントインスタンスプール](./AGENT_INSTANCE_POOL_PLAN_2026-09-28.ja.md) — 同一モデル複数 NHI によるスケールアウト。
+- [Surfaces 再設計 — 「個人」と「組織」の定義から作り直す](./SURFACE_ACTOR_MODEL_REDESIGN_PLAN_2026-09-30.ja.md)
+- [Seam dispatch の統一](./SEAM_DISPATCH_UNIFICATION_PLAN_2026-09-28.ja.md)
+
 ## 依存更新の証跡
+
+- [esbuild 更新 (2026-09-28)](./LOCKFILE_CHANGE_ESBUILD_2026-09-28.md)
+- [Next 更新 (2026-10-01)](./LOCKFILE_CHANGE_NEXT_2026-10-01.md)
+- [discord-bridge dist 依存修正 (2026-09-27)](./LOCKFILE_REVIEW_2026-09-27-discord-bridge-dist-deps.ja.md)
 
 - [pnpm lockfile review](./LOCKFILE_REVIEW_2026-09-10.ja.md) — 更新全体のレビュー記録。
 - [安全な更新](./LOCKFILE_REVIEW_2026-09-10-dependency-safe-updates.ja.md) — パッチ・互換更新の証跡。
