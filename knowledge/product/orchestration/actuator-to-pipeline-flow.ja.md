@@ -57,20 +57,60 @@ pnpm playground --actuator <id> --op <op> --params '{...}'           # 本実行
 複数ステップを記録して ADF draft 化（scratch → ADF）:
 
 ```bash
-pnpm playground -- --record <name> --actuator <id> --op <op> --params '{...}'  # 成功した live 実行ごとに追記
+# 先に tenant を bind — scratch 配置は active scope に従う
+pnpm scope use --tier confidential --tenant <slug>
+pnpm playground -- --actuator <id> --op <op> --params '{...}' --record <name>  # 成功した live 実行ごとに追記
 pnpm playground -- --record <name> --drop-last ...                            # 直前ステップを取り消し（単独なら削除のみ）
 pnpm playground -- --sessions / --show <name>                               # 記録済みセッションの確認
 pnpm playground -- --emit-adf <name> --request-trust                        # draft 出力＋trust 承認リクエスト発行
-pnpm kyberion approve <request-id> project-trust                            # 人間が承認
-pnpm pipeline --input active/shared/tmp/actuator-playground/<name>.adf.json --project-trust-approval <request-id>
-pnpm pipeline:promote --input active/shared/tmp/actuator-playground/<name>.adf.json --run <run-id> --source-is-public
+pnpm kyberion approvals --approve <request-id>                              # 人間が承認（TTY）
+# ここで `pnpm kyberion approve … project-trust` は使わない — tenant reasoning を
+# 起動して CREDENTIAL_BINDING_REQUIRED で止まりやすい
+pnpm pipeline --input active/shared/tmp/confidential/<slug>/actuator-playground/<name>.adf.json \
+  --project-trust-approval <request-id>
+# public draft:
+pnpm pipeline:promote --input <adf>.json --run <run-id> --source-is-public
+# tenant draft（confidential/personal）— asset ledger 用に identity が必要:
+MISSION_ROLE=worker KYBERION_PERSONA=worker \
+  pnpm pipeline:promote --input <adf>.json --run <run-id> --tenant <slug>
 ```
 
-scratch の draft は project-local コンテンツなので、実行には人間の
-project-trust 承認が必要で、昇格には同じファイルの成功したエンジン実行の
-`--run <run-id>` が必要です。`--emit-adf` はこの run カード（次の一手順）を
-表示します。`{{placeholder}}` がある draft では `--context '{...}'` ヒントも
-出ます。
+セッションと draft は active scope の scratch パーティション
+（`active/shared/tmp/<tier>/<tenant|shared>/actuator-playground/`）に置かれます。
+tenant 試行（稟議ブラウザ探索など）は legacy の非分割 scratch に混ざらず、
+その tenant の床に残ります。保護 tier の record / emit / sessions（および子 actuator）は
+tenant-bound の `actuator_playground_worker` ロールで動きます（media scratch の
+`perception_media_worker` と同じ型）。scratch の draft は project-local コンテンツなので、
+実行には人間の project-trust 承認が必要で、昇格には同じファイルの成功した
+エンジン実行の `--run <run-id>` が必要です。`--emit-adf` はこの run カード
+（次の一手順）を表示します。`{{placeholder}}` がある draft では
+`--context '{...}'` ヒントも出ます。
+
+### tenant 試行の運用メモ
+
+- **scratch と同じ checkout で通す。** セッション / ADF / run journal
+  （`active/shared/runtime/pipeline-library-runs/…`）/ `pipeline:promote` は
+  同じリポジトリ root を共有する必要があります。record していない worktree や
+  main から promote すると `source ADF must be an existing regular file` になります。
+  `--tenant` promote は journal を
+  `…/pipeline-library-runs/confidential/<slug>/` から探します（別 checkout の
+  `public/shared/` にはありません）。
+- **personal tenant profile。** promote は _この_ checkout の
+  `knowledge/personal/tenants/<slug>.json` を解決します（gitignore）。シンボリック
+  リンクは拒否されるので、別 checkout にしか無い場合はコピーか再登録が必要です。
+- **永続 tenant scope 下の actuator-only draft。** `vcs:*` / `file:*` などは
+  モデル不要です。WorkItem の credential binding が無くても stub reasoning に
+  degrade して進み、`CREDENTIAL_BINDING_REQUIRED` で止まらせません。reasoning /
+  voice / secrets が必要なステップは従来どおり claimed WorkItem が必要です。
+- **capture チャネル。** bare action payload（例: `vcs:log`）は
+  `last_capture` / `last_transform`（または `params.export_as`）に載ります。
+  one-step pipeline envelope は SDK 境界で畳まれ、`export_as` / `last_*`
+  キーがあれば channel 値、なければ branded context patch になるので
+  PTC / `system:json_query` も同じ channel 値を見ます（§5 Dispatch ABI
+  参照）。記録時は具体的な params を好みます
+  （例: `vcs:log` は `{"limit":5,"oneline":true}`）。
+- **編集は trust を無効化。** ADF のバイトが変わったら、再度
+  `--request-trust` / 承認が必要です。
 
 charter 委任（人間承認の代替）: `envelope.delegated_decisions` に
 `pipeline_trust_grant` を名付けた accountability charter は承認を肩代わり
@@ -142,7 +182,7 @@ ADF ライフサイクル: `draft → preflight → auto-repair → commit → e
 
 Trust: `pipelines/` と templates 以外は `[TRUST_REQUIRED]` で失敗します。
 `pnpm kyberion project-trust request <path>` → 人間が
-`pnpm kyberion approve <id> project-trust` → `--project-trust-approval <id>`
+`pnpm kyberion approvals --approve <id>` → `--project-trust-approval <id>`
 付きで実行。編集で承認は無効化されます。
 スケジュールは `schedule{id,cron,timezone,enabled}` ブロックと
 `pnpm kyberion schedule register` が別途必要です。
@@ -191,3 +231,22 @@ context-patch を減らす。`actionInput` は維持。
   [actuator-agent-usage.md](./actuator-agent-usage.md) の
   「Where agents reach actuators」表を参照。既知ギャップ一覧（`actuator_action`
   未配線、mandatory trigger の signal 未到達など）は英語正本 §5 Known gaps。
+- tenant playground 試行が非分割 scratch に混ざり、保護 tier 読みで
+  `Higher tier required` — scratch を
+  `tmp/<tier>/<tenant|shared>/actuator-playground/` に分割し、
+  `actuator_playground_worker`（子の `KYBERION_TENANT` は `buildSafeExecEnv`）
+  で解消。
+- tenant scope 下で `pnpm kyberion approve … project-trust` が
+  `CREDENTIAL_BINDING_REQUIRED` — run カードは
+  `pnpm kyberion approvals --approve`（TTY）を案内。actuator-only draft は
+  WorkItem binding 無しでも stub reasoning に degrade。
+- catalog-backed capture が payload を返しても `last_capture` が空 —
+  bare payload を `last_capture` / `last_transform`（または `export_as`）へ
+  載せるよう修正。envelope ごとチャネルに載せた初版は
+  `core:ptc`/`system:json_query` を壊したため、output 形で分岐
+  （envelope は `.context` unwrap を維持）。その後 SDK は payload 一本化
+  され、envelope は SDK 境界で channel 値 / context patch に正規化
+  されます（§5 Dispatch ABI 参照）。
+- 別 checkout からの `pipeline:promote --tenant` が ADF / journal /
+  personal tenant profile 欠落で失敗 — §2 の tenant 試行メモに同 root・
+  profile コピー・`MISSION_ROLE`/`KYBERION_PERSONA` を記載。

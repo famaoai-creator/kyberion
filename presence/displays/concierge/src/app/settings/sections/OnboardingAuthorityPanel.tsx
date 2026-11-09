@@ -6,6 +6,16 @@ import { frontDeskFetch as fetch } from '../../../lib/front-desk-fetch';
 import { conciergeText, type ConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
 import { InstallationAccessNotice } from './InstallationAccessNotice';
 import { isInstallationAccessCode } from '../../../lib/installation-access-client';
+import { FormScope, asText } from './form-scope';
+import {
+  Button,
+  Callout,
+  Checkbox,
+  Segmented,
+  Select,
+  SettingRow,
+  TextField,
+} from '@agent/shared-ui';
 
 type Grant =
   | { operation_id: 'vcs:pr_create'; repository: string; visibility?: 'private' }
@@ -142,6 +152,7 @@ export function OnboardingAuthorityPanel({
   const [writeTiers, setWriteTiers] = React.useState<string[]>([]);
   const [decisions, setDecisions] = React.useState<Record<string, string>>({});
   const [expires, setExpires] = React.useState('');
+  const [expiryChoice, setExpiryChoice] = React.useState('');
   const [mode, setMode] = React.useState<'grant' | 'revoke'>('grant');
   const [renewExisting, setRenewExisting] = React.useState(false);
   const [overview, setOverview] = React.useState<Overview | null>(null);
@@ -433,6 +444,7 @@ export function OnboardingAuthorityPanel({
         ? new Date(timestamp - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
         : ''
     );
+    setExpiryChoice('custom');
     setPreview(null);
   }
   function revoke(grant: Grant) {
@@ -450,243 +462,329 @@ export function OnboardingAuthorityPanel({
         ? new Date(timestamp - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
         : ''
     );
+    setExpiryChoice('custom');
     setPreview(null);
   }
+  const toggleTier = (access: 'read' | 'write', token: string, checked: boolean) => {
+    const update = access === 'read' ? setReadTiers : setWriteTiers;
+    update((previous) =>
+      checked ? [...new Set([...previous, token])] : previous.filter((value) => value !== token)
+    );
+  };
+  const tierTokens = ['public', kind === 'person' ? 'personal' : `confidential:${tenant}`];
+  const tierFields = Object.fromEntries(
+    (['read', 'write'] as const).flatMap((access) =>
+      tierTokens.map((token) => [
+        `authority.tier.${access}.${token}`,
+        (value: unknown) => toggleTier(access, token, value === true),
+      ])
+    )
+  );
+  const applyExpiryChoice = (choice: string) => {
+    setExpiryChoice(choice);
+    if (choice === 'custom' || !choice) return;
+    const days = Number(choice);
+    if (!Number.isFinite(days)) return;
+    const derived = new Date(Date.now() + days * 86_400_000);
+    setExpires(
+      new Date(derived.getTime() - derived.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+    );
+  };
   return (
-    <section className="settings-row-block" aria-label={t('authority.title')} aria-busy={busy}>
-      <h3>{t('authority.title')}</h3>
-      <p>{t('authority.separate')}</p>
-      <p>{t('authority.bounds')}</p>
-      <p>{t('authority.proposal_explanation')}</p>
-      <label>
-        {t('authority.scope')}
-        <select
-          value={kind}
-          disabled={busy}
-          onChange={(event) =>
-            setKind(event.target.value === 'organization' ? 'organization' : 'person')
+    <FormScope
+      fields={{
+        'authority.scope': (value) =>
+          setKind(asText(value) === 'organization' ? 'organization' : 'person'),
+        'authority.tenant': (value) => setTenant(asText(value)),
+        'authority.operation': (value) => {
+          const next = asText(value);
+          setOperation(next);
+          setMode('grant');
+          if (next === 'vcs:development') {
+            setBranch('agent/kyberion-development');
+            setMergeBase('main');
           }
-        >
-          <option value="person">{t('authority.person')}</option>
-          <option value="organization">{t('authority.organization')}</option>
-        </select>
-      </label>
-      {kind === 'organization' ? (
-        <label>
-          {t('authority.tenant')}
-          <select
-            value={tenant}
+        },
+        'authority.private_repo': (value) => setPrivateRepository(value === true),
+        'authority.target': (value) => setTarget(asText(value)),
+        'authority.branch': (value) => setBranch(asText(value)),
+        'authority.merge_base': (value) => setMergeBase(asText(value)),
+        'authority.tier_edit': (value) => {
+          const checked = value === true;
+          setEditTiers(checked);
+          if (checked) {
+            setReadTiers(overview?.charter?.data_tier?.read ?? ['public']);
+            setWriteTiers(overview?.charter?.data_tier?.write ?? []);
+          }
+        },
+        'authority.renew': (value) => setRenewExisting(value === true),
+        'authority.expiry_choice': (value) => applyExpiryChoice(asText(value)),
+        'authority.expiry_custom': (value) => setExpires(asText(value)),
+        ...tierFields,
+      }}
+    >
+      <section className="settings-row-block" aria-label={t('authority.title')} aria-busy={busy}>
+        <h3>{t('authority.title')}</h3>
+        <p className="kb-text kb-text--muted">{t('authority.separate')}</p>
+        <p className="kb-text kb-text--muted">{t('authority.bounds')}</p>
+        <p className="kb-text kb-text--muted">{t('authority.proposal_explanation')}</p>
+        <SettingRow label={t('authority.scope')}>
+          <Segmented
+            id="authority-scope"
+            name="authority.scope"
+            label={t('authority.scope')}
+            hide_label
+            value={kind}
             disabled={busy}
-            onChange={(event) => setTenant(event.target.value)}
-          >
-            <option value="">{t('authority.choose')}</option>
-            {tenants.map((item) => (
-              <option key={item.tenant_slug} value={item.tenant_slug}>
-                {item.display_name}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
-      <button type="button" disabled={busy} onClick={() => setReload((value) => value + 1)}>
-        {t('authority.refresh')}
-      </button>
-      {busy ? <p role="status">{t('authority.pending')}</p> : null}
-      {error && isInstallationAccessCode(error) ? (
-        <InstallationAccessNotice code={error} t={t} onConfirmed={() => setError(null)} />
-      ) : error ? (
-        <p role="alert">{error}</p>
-      ) : null}
-      {!overview && !error && (kind === 'person' || tenant) ? (
-        <p role="status">{t('authority.loading')}</p>
-      ) : null}
-      {ready ? (
-        <>
-          <p>
-            {t('authority.accountable')}: {overview.accountable.display_name}
+            options={[
+              { value: 'person', label: t('authority.person') },
+              { value: 'organization', label: t('authority.organization') },
+            ]}
+          />
+        </SettingRow>
+        {kind === 'organization' ? (
+          <SettingRow label={t('authority.tenant')} control_id="authority-tenant">
+            <Select
+              id="authority-tenant"
+              name="authority.tenant"
+              label={t('authority.tenant')}
+              hide_label
+              value={tenant}
+              disabled={busy}
+              placeholder={t('authority.choose')}
+              options={tenants.map((item) => ({
+                value: item.tenant_slug,
+                label: item.display_name,
+              }))}
+            />
+          </SettingRow>
+        ) : null}
+        <div className="settings-row-actions">
+          <Button
+            label={t('authority.refresh')}
+            variant="secondary"
+            disabled={busy}
+            onClick={() => setReload((value) => value + 1)}
+          />
+        </div>
+        {busy ? (
+          <p role="status" className="kb-text kb-text--muted">
+            {t('authority.pending')}
           </p>
-          <p role="status">
-            {overview.runtime.ready
-              ? t('authority.runtime_ready')
-              : t('authority.runtime_unavailable')}{' '}
-            {[
-              overview.runtime.agent_id,
-              !overview.runtime.ready ? overview.runtime.reason : undefined,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
+        ) : null}
+        {error && isInstallationAccessCode(error) ? (
+          <InstallationAccessNotice code={error} t={t} onConfirmed={() => setError(null)} />
+        ) : error ? (
+          <Callout tone="danger" title={error} />
+        ) : null}
+        {!overview && !error && (kind === 'person' || tenant) ? (
+          <p role="status" className="kb-text kb-text--muted">
+            {t('authority.loading')}
           </p>
-          {overview.charter ? (
-            <>
-              <p>
-                {overview.charter.stopped ? t('authority.stopped') : t('authority.current')} ·{' '}
-                {overview.charter.expires_at}
-              </p>
-              <ul>
-                {overview.charter.grants.map((grant, index) => (
-                  <li key={index}>
-                    {grant.operation_id} · {'repository' in grant ? grant.repository : grant.origin}
-                    {'branch' in grant ? ` · ${grant.branch}` : ''}{' '}
-                    {'visibility' in grant && grant.visibility === 'private'
-                      ? t('authority.private_repository')
-                      : null}{' '}
-                    <button type="button" disabled={busy} onClick={() => revoke(grant)}>
-                      {t('authority.revoke')}
-                    </button>
-                  </li>
-                ))}
-                {Object.entries(overview.charter.delegated_decisions ?? {}).map(
-                  ([type, policy]) => (
-                    <li key={type}>
-                      {type} · {policy}{' '}
-                      <button type="button" disabled={busy} onClick={() => revokeDecision(type)}>
-                        {t('authority.revoke')}
-                      </button>
-                    </li>
-                  )
-                )}
-              </ul>
-              {overview.charter.data_tier ? (
-                <p>
-                  {t('authority.tier_read')}:{' '}
-                  {overview.charter.data_tier.read.join(', ') || t('authority.tier_none')} ·{' '}
-                  {t('authority.tier_write')}:{' '}
-                  {overview.charter.data_tier.write.join(', ') || t('authority.tier_none')}
+        ) : null}
+        {ready ? (
+          <>
+            <p className="kb-text kb-text--body">
+              {t('authority.accountable')}: {overview.accountable.display_name}
+            </p>
+            <p role="status" className="kb-text kb-text--body">
+              {overview.runtime.ready
+                ? t('authority.runtime_ready')
+                : t('authority.runtime_unavailable')}{' '}
+              {[
+                overview.runtime.agent_id,
+                !overview.runtime.ready ? overview.runtime.reason : undefined,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+            {overview.charter ? (
+              <>
+                <p className="kb-text kb-text--body">
+                  {overview.charter.stopped ? t('authority.stopped') : t('authority.current')} ·{' '}
+                  {overview.charter.expires_at}
                 </p>
-              ) : null}
-            </>
-          ) : (
-            <p>{t('authority.none')}</p>
-          )}
-          <fieldset disabled={busy}>
-            <legend>{mode === 'revoke' ? t('authority.revoke') : t('authority.new')}</legend>
+                <ul className="settings-plain-list">
+                  {overview.charter.grants.map((grant, index) => (
+                    <li key={index}>
+                      {grant.operation_id} ·{' '}
+                      {'repository' in grant ? grant.repository : grant.origin}
+                      {'branch' in grant ? ` · ${grant.branch}` : ''}{' '}
+                      {'visibility' in grant && grant.visibility === 'private'
+                        ? t('authority.private_repository')
+                        : null}{' '}
+                      <Button
+                        label={t('authority.revoke')}
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={() => revoke(grant)}
+                      />
+                    </li>
+                  ))}
+                  {Object.entries(overview.charter.delegated_decisions ?? {}).map(
+                    ([type, policy]) => (
+                      <li key={type}>
+                        {type} · {policy}{' '}
+                        <Button
+                          label={t('authority.revoke')}
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() => revokeDecision(type)}
+                        />
+                      </li>
+                    )
+                  )}
+                </ul>
+                {overview.charter.data_tier ? (
+                  <p className="kb-text kb-text--muted">
+                    {t('authority.tier_read')}:{' '}
+                    {overview.charter.data_tier.read.join(', ') || t('authority.tier_none')} ·{' '}
+                    {t('authority.tier_write')}:{' '}
+                    {overview.charter.data_tier.write.join(', ') || t('authority.tier_none')}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p className="kb-text kb-text--muted">{t('authority.none')}</p>
+            )}
+            <h4 className="kb-text kb-text--body">
+              {mode === 'revoke' ? t('authority.revoke') : t('authority.new')}
+            </h4>
             {overview.renewal_required && overview.renewal ? (
-              <div>
-                <p>
+              <div className="settings-row-block">
+                <p className="kb-text kb-text--body">
                   {t('authority.renewal_limits')}: {overview.renewal.id}
                 </p>
-                <pre>
+                <pre className="kb-code">
                   {JSON.stringify(
                     { envelope: overview.renewal.envelope, appetite: overview.renewal.appetite },
                     null,
                     2
                   )}
                 </pre>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={renewExisting}
-                    onChange={(event) => setRenewExisting(event.target.checked)}
-                  />
-                  {t('authority.renew_existing')}
-                </label>
+                <Checkbox
+                  id="authority-renew"
+                  name="authority.renew"
+                  label={t('authority.renew_existing')}
+                  value={renewExisting}
+                  disabled={busy}
+                />
               </div>
             ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                setMode('grant');
-                setDecisions({});
-                setOperation('');
-                setTarget('');
-                setBranch('');
-                setMergeBase('');
-                setPrivateRepository(false);
-                setEditTiers(false);
-                setExpires('');
-              }}
-            >
-              {t('authority.new')}
-            </button>
-            <label>
-              {t('authority.operation')}
-              <select
-                value={operation}
-                onChange={(event) => {
-                  setOperation(event.target.value);
+            <div className="settings-row-actions">
+              <Button
+                label={t('authority.new')}
+                variant="ghost"
+                disabled={busy}
+                onClick={() => {
                   setMode('grant');
-                  if (event.target.value === 'vcs:development') {
-                    setBranch('agent/kyberion-development');
-                    setMergeBase('main');
-                  }
+                  setDecisions({});
+                  setOperation('');
+                  setTarget('');
+                  setBranch('');
+                  setMergeBase('');
+                  setPrivateRepository(false);
+                  setEditTiers(false);
+                  setExpires('');
+                  setExpiryChoice('');
                 }}
-              >
-                <option value="">{t('authority.choose')}</option>
-                <option value="vcs:development">{t('authority.development')}</option>
-                <option value="vcs:pr_create">{t('authority.pr')}</option>
-                <option value="vcs:pr_merge">{t('authority.merge')}</option>
-                <option value="vcs:push">{t('authority.push')}</option>
-                <option value="browser:goto">{t('authority.goto')}</option>
-                <option value="browser:open_tab">{t('authority.tab')}</option>
-              </select>
-            </label>
+              />
+            </div>
+            <SettingRow label={t('authority.operation')} control_id="authority-operation">
+              <Select
+                id="authority-operation"
+                name="authority.operation"
+                label={t('authority.operation')}
+                hide_label
+                value={operation}
+                disabled={busy}
+                placeholder={t('authority.choose')}
+                options={[
+                  { value: 'vcs:development', label: t('authority.development') },
+                  { value: 'vcs:pr_create', label: t('authority.pr') },
+                  { value: 'vcs:pr_merge', label: t('authority.merge') },
+                  { value: 'vcs:push', label: t('authority.push') },
+                  { value: 'browser:goto', label: t('authority.goto') },
+                  { value: 'browser:open_tab', label: t('authority.tab') },
+                ]}
+              />
+            </SettingRow>
             {operation.startsWith('vcs:') ? (
-              <label>
-                <input
-                  type="checkbox"
-                  checked={privateRepository}
-                  onChange={(event) => setPrivateRepository(event.target.checked)}
-                />
-                {t('authority.private_repository')}
-              </label>
+              <Checkbox
+                id="authority-private-repo"
+                name="authority.private_repo"
+                label={t('authority.private_repository')}
+                value={privateRepository}
+                disabled={busy}
+              />
             ) : null}
-            <label>
-              {t('authority.target')}
-              <input
+            <SettingRow label={t('authority.target')} control_id="authority-target">
+              <TextField
+                id="authority-target"
+                name="authority.target"
+                label={t('authority.target')}
+                hide_label
                 type="url"
                 value={target}
-                onChange={(event) => setTarget(event.target.value)}
+                disabled={busy}
                 placeholder="https://github.com/owner/repository"
               />
-            </label>
-            {operation === 'vcs:development' ? <p>{t('authority.development_bounds')}</p> : null}
+            </SettingRow>
+            {operation === 'vcs:development' ? (
+              <p className="kb-text kb-text--muted">{t('authority.development_bounds')}</p>
+            ) : null}
             {operation === 'vcs:pr_merge' ||
             operation === 'vcs:push' ||
             operation === 'vcs:development' ? (
-              <label>
-                {t(
+              <SettingRow
+                label={t(
                   operation === 'vcs:development'
                     ? 'authority.candidate_branch'
                     : 'authority.branch'
                 )}
-                <input
-                  type="text"
+                control_id="authority-branch"
+              >
+                <TextField
+                  id="authority-branch"
+                  name="authority.branch"
+                  label={t('authority.branch')}
+                  hide_label
                   value={branch}
-                  readOnly={operation === 'vcs:development'}
-                  onChange={(event) => setBranch(event.target.value)}
+                  readonly={operation === 'vcs:development'}
+                  disabled={busy}
                   placeholder="main"
                 />
-              </label>
+              </SettingRow>
             ) : null}
             {operation === 'vcs:development' ? (
-              <label>
-                {t('authority.merge_base')}
-                <input type="text" value={mergeBase} readOnly />
-              </label>
+              <SettingRow label={t('authority.merge_base')} control_id="authority-merge-base">
+                <TextField
+                  id="authority-merge-base"
+                  name="authority.merge_base"
+                  label={t('authority.merge_base')}
+                  hide_label
+                  value={mergeBase}
+                  readonly
+                  disabled={busy}
+                />
+              </SettingRow>
             ) : null}
-            <label>
-              <input
-                type="checkbox"
-                checked={editTiers}
-                onChange={(event) => {
-                  setEditTiers(event.target.checked);
-                  if (event.target.checked) {
-                    setReadTiers(overview.charter?.data_tier?.read ?? ['public']);
-                    setWriteTiers(overview.charter?.data_tier?.write ?? []);
-                  }
-                }}
-              />
-              {t('authority.tier_edit')}
-            </label>
+            <Checkbox
+              id="authority-tier-edit"
+              name="authority.tier_edit"
+              label={t('authority.tier_edit')}
+              value={editTiers}
+              disabled={busy}
+            />
             {editTiers ? (
-              <fieldset>
-                <legend>{t('authority.tier_scope')}</legend>
-                <p>{t('authority.tier_bounds')}</p>
+              <div className="settings-row-block">
+                <p className="kb-text kb-text--body">{t('authority.tier_scope')}</p>
+                <p className="kb-text kb-text--muted">{t('authority.tier_bounds')}</p>
                 {(['read', 'write'] as const).map((access) => (
-                  <fieldset key={access}>
-                    <legend>
+                  <div key={access} className="settings-row-block">
+                    <p className="kb-text kb-text--body">
                       {t(access === 'read' ? 'authority.tier_read' : 'authority.tier_write')}
-                    </legend>
+                    </p>
                     {[
                       { token: 'public', label: t('authority.tier_public') },
                       {
@@ -699,158 +797,187 @@ export function OnboardingAuthorityPanel({
                       },
                     ].map((choice) => {
                       const values = access === 'read' ? readTiers : writeTiers;
-                      const update = access === 'read' ? setReadTiers : setWriteTiers;
                       return (
-                        <label key={choice.token}>
-                          <input
-                            type="checkbox"
-                            checked={values.includes(choice.token)}
-                            onChange={(event) =>
-                              update((previous) =>
-                                event.target.checked
-                                  ? [...new Set([...previous, choice.token])]
-                                  : previous.filter((value) => value !== choice.token)
-                              )
-                            }
-                          />
-                          {choice.label}
-                        </label>
+                        <Checkbox
+                          key={choice.token}
+                          id={`authority-tier-${access}-${choice.token === 'public' ? 'public' : 'scoped'}`}
+                          name={`authority.tier.${access}.${choice.token}`}
+                          label={choice.label}
+                          value={values.includes(choice.token)}
+                          disabled={busy}
+                        />
                       );
                     })}
-                  </fieldset>
+                  </div>
                 ))}
-              </fieldset>
+              </div>
             ) : null}
             {(overview.delegable_decisions ?? []).length ? (
-              <fieldset>
-                <legend>{t('authority.decisions')}</legend>
-                <p>{t('authority.decisions_hint')}</p>
+              <div className="settings-row-block">
+                <p className="kb-text kb-text--body">{t('authority.decisions')}</p>
+                <p className="kb-text kb-text--muted">{t('authority.decisions_hint')}</p>
                 {overview.delegable_decisions.map((entry) => {
                   const current =
                     overview.charter?.delegated_decisions?.[entry.decision_type] ?? '';
                   const value = decisions[entry.decision_type] ?? '';
                   const rowLabel = entry.label?.[locale] ?? entry.label?.en ?? entry.decision_type;
                   return (
-                    <div key={entry.decision_type}>
-                      <span>
-                        {rowLabel}
-                        {current ? ` (${current})` : ''}
-                      </span>
-                      <select
-                        value={value}
-                        disabled={busy}
-                        onChange={(event) =>
-                          setDecisions((previous) => ({
-                            ...previous,
-                            [entry.decision_type]: event.target.value,
-                          }))
-                        }
+                    <SettingRow
+                      key={entry.decision_type}
+                      label={`${rowLabel}${current ? ` (${current})` : ''}`}
+                    >
+                      <FormScope
+                        fields={{
+                          [`authority.decision.${entry.decision_type}`]: (val) =>
+                            setDecisions((previous) => ({
+                              ...previous,
+                              [entry.decision_type]: asText(val),
+                            })),
+                        }}
                       >
-                        <option value="">
-                          {mode === 'revoke'
-                            ? t('authority.decision_keep')
-                            : t('authority.decision_unchanged')}
-                        </option>
-                        {mode === 'revoke' ? (
-                          <option value="__revoke__">{t('authority.decision_revoke')}</option>
-                        ) : (
-                          <>
-                            <option value="allow_with_review">
-                              {t('authority.policy_allow_with_review')}
-                            </option>
-                            <option value="allow">{t('authority.policy_allow')}</option>
-                            <option value="forbid">{t('authority.policy_forbid')}</option>
-                          </>
-                        )}
-                      </select>
-                    </div>
+                        <Select
+                          id={`authority-decision-${entry.decision_type}`}
+                          name={`authority.decision.${entry.decision_type}`}
+                          label={rowLabel}
+                          hide_label
+                          value={value}
+                          disabled={busy}
+                          options={[
+                            {
+                              value: '',
+                              label:
+                                mode === 'revoke'
+                                  ? t('authority.decision_keep')
+                                  : t('authority.decision_unchanged'),
+                            },
+                            ...(mode === 'revoke'
+                              ? [{ value: '__revoke__', label: t('authority.decision_revoke') }]
+                              : [
+                                  {
+                                    value: 'allow_with_review',
+                                    label: t('authority.policy_allow_with_review'),
+                                  },
+                                  { value: 'allow', label: t('authority.policy_allow') },
+                                  { value: 'forbid', label: t('authority.policy_forbid') },
+                                ]),
+                          ]}
+                        />
+                      </FormScope>
+                    </SettingRow>
                   );
                 })}
-              </fieldset>
+              </div>
             ) : null}
-            <label>
-              {t('authority.expiry')}
-              <input
-                type="datetime-local"
-                value={expires}
-                onChange={(event) => setExpires(event.target.value)}
-              />
-            </label>
-            <button
-              type="button"
-              disabled={
-                (!grants.length && !Object.keys(chosenDecisions).length && !editTiers) ||
-                (grants.length && !target) ||
-                (['vcs:push', 'vcs:pr_merge', 'vcs:development'].includes(operation) && !branch) ||
-                (operation === 'vcs:development' && (!mergeBase || mergeBase === branch)) ||
-                !expiry ||
-                Date.parse(expiry) <= Date.now() ||
-                (overview.renewal_required && !renewExisting)
-              }
-              onClick={() => void command('preview')}
-            >
-              {t('authority.preview')}
-            </button>
-          </fieldset>
-          {preview?.fingerprint === fingerprint ? (
-            <div>
-              <pre>{preview.statement}</pre>
-              <button type="button" disabled={busy} onClick={() => void command('request')}>
-                {t('authority.request')}
-              </button>
-            </div>
-          ) : null}
-          {requests.map((request) => (
-            <div key={request.request_id}>
-              <p>
-                {request.request_id} · {request.status}
-              </p>
-              {approvalHref(request.approval_url) ? (
-                <a href={approvalHref(request.approval_url)}>{t('authority.review')}</a>
-              ) : null}
-              {request.statement ? <pre>{request.statement}</pre> : null}
-              {request.status === 'pending' &&
-              request.statement &&
-              request.presented_digest &&
-              request.approval_channel === 'onboarding-authority' ? (
-                <div>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void decide(request, 'approved')}
-                  >
-                    {t('authority.approve')}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void decide(request, 'rejected')}
-                  >
-                    {t('authority.reject')}
-                  </button>
-                  <a href="#setup-profile">{t('authority.passkey_setup')}</a>
-                </div>
-              ) : null}
-              <button
-                type="button"
+            <SettingRow label={t('authority.expiry')}>
+              <Segmented
+                id="authority-expiry-choice"
+                name="authority.expiry_choice"
+                label={t('authority.expiry')}
+                hide_label
+                value={expiryChoice}
                 disabled={busy}
-                onClick={() => void command('status', request.request_id)}
-              >
-                {t('authority.status')}
-              </button>
-              {request.can_apply === true ? (
-                <button
-                  type="button"
+                options={[
+                  { value: '7', label: '7d' },
+                  { value: '30', label: '30d' },
+                  { value: '90', label: '90d' },
+                  { value: 'custom', label: t('authority.expiry_custom') },
+                ]}
+              />
+            </SettingRow>
+            {expiryChoice === 'custom' ? (
+              <SettingRow label={t('authority.expiry')} control_id="authority-expiry-custom">
+                <TextField
+                  id="authority-expiry-custom"
+                  name="authority.expiry_custom"
+                  label={t('authority.expiry')}
+                  hide_label
+                  value={expires}
                   disabled={busy}
-                  onClick={() => void command('apply', request.request_id)}
-                >
-                  {t('authority.apply')}
-                </button>
-              ) : null}
+                  placeholder="2027-01-31T23:59"
+                />
+              </SettingRow>
+            ) : null}
+            <div className="settings-row-actions">
+              <Button
+                label={t('authority.preview')}
+                variant="primary"
+                disabled={
+                  busy ||
+                  (!grants.length && !Object.keys(chosenDecisions).length && !editTiers) ||
+                  (grants.length && !target) ||
+                  (['vcs:push', 'vcs:pr_merge', 'vcs:development'].includes(operation) &&
+                    !branch) ||
+                  (operation === 'vcs:development' && (!mergeBase || mergeBase === branch)) ||
+                  !expiry ||
+                  Date.parse(expiry) <= Date.now() ||
+                  (overview.renewal_required && !renewExisting)
+                }
+                onClick={() => void command('preview')}
+              />
             </div>
-          ))}
-        </>
-      ) : null}
-    </section>
+            {preview?.fingerprint === fingerprint ? (
+              <div className="settings-row-block">
+                <pre className="kb-code">{preview.statement}</pre>
+                <div className="settings-row-actions">
+                  <Button
+                    label={t('authority.request')}
+                    variant="primary"
+                    disabled={busy}
+                    onClick={() => void command('request')}
+                  />
+                </div>
+              </div>
+            ) : null}
+            {requests.map((request) => (
+              <div key={request.request_id} className="settings-row-block">
+                <p className="kb-text kb-text--body">
+                  {request.request_id} · {request.status}
+                </p>
+                {approvalHref(request.approval_url) ? (
+                  <a href={approvalHref(request.approval_url)}>{t('authority.review')}</a>
+                ) : null}
+                {request.statement ? <pre className="kb-code">{request.statement}</pre> : null}
+                {request.status === 'pending' &&
+                request.statement &&
+                request.presented_digest &&
+                request.approval_channel === 'onboarding-authority' ? (
+                  <div className="settings-row-actions">
+                    <Button
+                      label={t('authority.approve')}
+                      variant="primary"
+                      disabled={busy}
+                      onClick={() => void decide(request, 'approved')}
+                    />
+                    <Button
+                      label={t('authority.reject')}
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => void decide(request, 'rejected')}
+                    />
+                    <a href="#setup-profile">{t('authority.passkey_setup')}</a>
+                  </div>
+                ) : null}
+                <div className="settings-row-actions">
+                  <Button
+                    label={t('authority.status')}
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => void command('status', request.request_id)}
+                  />
+                  {request.can_apply === true ? (
+                    <Button
+                      label={t('authority.apply')}
+                      variant="primary"
+                      disabled={busy}
+                      onClick={() => void command('apply', request.request_id)}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </>
+        ) : null}
+      </section>
+    </FormScope>
   );
 }

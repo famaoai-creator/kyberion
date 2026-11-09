@@ -1,6 +1,6 @@
 {
   "actuator_id": "wisdom-actuator",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Knowledge-tier search, injection, import/export, and decision-support operations",
   "contract_schema": "knowledge/product/schemas/wisdom-action.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -9,6 +9,13 @@
     "retry_profile": "wisdom-actuator"
   },
   "capabilities": [
+    {
+      "op": "document_review",
+      "platforms": ["darwin", "linux", "win32"],
+      "implementation": "full",
+      "note": "Bounded isolated document comprehension, design readiness and source drift review; returns evidence-bound report in context.",
+      "effect": "egress"
+    },
     {
       "op": "history_search",
       "platforms": ["darwin", "linux", "win32"],

@@ -7,6 +7,7 @@ import {
   type EngineRuntimeOperatorUpdate,
 } from '@agent/shared-voice/engine-runtime-preferences-operator';
 import { resolveEngineConfigOperator } from '../../../../lib/engine-config-access';
+import { listAgentPaneRuntimeBridges } from '@agent/core/agent-pane-runtime-bridge';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +46,14 @@ export function GET(req: NextRequest) {
   if (access.response) return access.response;
   if (!access.principal) return reply({ ok: false, error: access.denial }, access.status);
   try {
-    return reply({ ok: true, ...getOperatorEngineRuntimePreferences(access.principal) });
+    return reply({
+      ok: true,
+      ...getOperatorEngineRuntimePreferences(access.principal),
+      // Registered pane-runtime bridge ids — the only values
+      // `agent_pane_runtime_provider` accepts, so the form can offer them
+      // as options instead of free text.
+      pane_providers: listAgentPaneRuntimeBridges().map((bridge) => bridge.bridge_id),
+    });
   } catch (error) {
     return failure(error);
   }

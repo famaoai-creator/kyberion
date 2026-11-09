@@ -1422,6 +1422,7 @@ async function dispatchResolvedActuatorOperation(
   }
 
   // CRITICAL: Safety check for source (capture) ops that declared a channel.
+  // Resolve export key via produces > params.export_as > default.
   // Use registry semantics — prepareEngineSteps collapses capture → apply.
   // Legacy ad-hoc captures (e.g. file:exists → `exists`) land via context patch
   // without last_capture; only enforce when produces / export_as asked for a key.

@@ -138,6 +138,71 @@ const WISDOM_INPUT_SCHEMA = {
   additionalProperties: false,
 };
 
+export const DOCUMENT_REVIEW_INPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    target: {
+      type: 'string',
+      minLength: 1,
+    },
+    references: {
+      type: 'array',
+      items: {
+        type: 'string',
+        minLength: 1,
+      },
+      maxItems: 16,
+    },
+    sources: {
+      type: 'array',
+      items: {
+        type: 'string',
+        minLength: 1,
+      },
+      maxItems: 16,
+    },
+    preset: {
+      enum: ['comprehension', 'design'],
+    },
+    generator: {
+      type: 'string',
+      minLength: 1,
+    },
+    timeout_ms: {
+      type: 'integer',
+      minimum: 1000,
+      maximum: 120000,
+    },
+    export_as: {
+      type: 'string',
+      minLength: 1,
+    },
+  },
+  required: ['target'],
+  additionalProperties: false,
+  allOf: [
+    {
+      if: {
+        required: ['preset'],
+        properties: {
+          preset: {
+            const: 'design',
+          },
+        },
+      },
+      then: {
+        required: ['sources'],
+        properties: {
+          sources: {
+            minItems: 1,
+            type: 'array',
+          },
+        },
+      },
+    },
+  ],
+};
+
 export const WISDOM_ACTUATOR_CAPTURE_OPS = [
   'glob_files',
   'history_search',
@@ -158,6 +223,7 @@ export const WISDOM_ACTUATOR_TRANSFORM_OPS = [
 ] as const;
 
 export const WISDOM_ACTUATOR_APPLY_OPS = [
+  'document_review',
   'a2a_fanout',
   'perspective_fanout',
   'a2a_roleplay',
@@ -280,6 +346,7 @@ const ENSEMBLE_OPS = new Set([
 ]);
 
 const SINGLE_REASONING_OPS = new Set([
+  'document_review',
   'reasoning',
   'peer_advice',
   'synthesize_counterparty_persona',
@@ -352,10 +419,16 @@ function toSpec(op: string, kind: PipelineStepType) {
     op,
     kind,
     owner: forwardTo?.actuator || 'wisdom',
-    input_schema: WISDOM_REQUIRED_INPUTS[op]
-      ? { ...WISDOM_INPUT_SCHEMA, required: WISDOM_REQUIRED_INPUTS[op] }
-      : WISDOM_INPUT_SCHEMA,
-    examples: [{ export_as: 'result' }],
+    input_schema:
+      op === 'document_review'
+        ? DOCUMENT_REVIEW_INPUT_SCHEMA
+        : WISDOM_REQUIRED_INPUTS[op]
+          ? { ...WISDOM_INPUT_SCHEMA, required: WISDOM_REQUIRED_INPUTS[op] }
+          : WISDOM_INPUT_SCHEMA,
+    examples:
+      op === 'document_review'
+        ? [{ target: 'docs/GLOSSARY.md', preset: 'comprehension', export_as: 'document_review' }]
+        : [{ export_as: 'result' }],
     idempotency: IDEMPOTENCY_BY_OP[op] || 'non_idempotent',
     execution_kind: executionKind,
     ...(canonicalOp ? { canonical_op: canonicalOp, deprecated: true } : {}),

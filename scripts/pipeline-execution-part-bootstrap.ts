@@ -637,7 +637,8 @@ export function resolveReasoningContextParam(
 
 /**
  * ADF engine routing collapses capture/transform into `apply` via
- * `prepareEngineSteps`. Recover the catalog kind for channel assignment.
+ * `prepareEngineSteps` / `resolveEngineStepType`. Recover the catalog kind so
+ * payload mapping still targets `last_capture` / `last_transform`.
  */
 export function resolveSemanticActuatorStepKind(
   domain: string,
@@ -677,8 +678,7 @@ export function mapActuatorDispatchOutputToContext(
       ? params.export_as.trim()
       : undefined;
   if (explicitExport || type === 'capture' || type === 'transform') {
-    const exportKey =
-      explicitExport || (type === 'transform' ? 'last_transform' : 'last_capture');
+    const exportKey = explicitExport || (type === 'transform' ? 'last_transform' : 'last_capture');
     return { ...ctx, [exportKey]: output };
   }
   if (output && typeof output === 'object' && !Array.isArray(output)) {
@@ -849,6 +849,8 @@ export async function loadActuatorDispatch(
         );
       }
       const output = sdkResult.output;
+      // Semantic kind comes from the op registry when the ADF engine has
+      // already collapsed capture/transform → apply.
       const semanticType = resolveSemanticActuatorStepKind(domain, op, type);
       result = {
         handled: true,
