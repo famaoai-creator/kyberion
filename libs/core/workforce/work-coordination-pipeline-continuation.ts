@@ -3,6 +3,11 @@ import { nowIso } from '../foundation/time.js';
 import { enforceNhiActorPolicy } from '../agent/nhi-actor-verification.js';
 import { WorkCoordinationError, assertWorkClaimsAllowed } from './work-coordination-error.js';
 import { workEffectOwnership } from './work-effect-ownership.js';
+import {
+  auditWorkItemLease,
+  grantWorkItemLeaseTerms,
+  isWorkLeaseHeldBy,
+} from './work-item-lease.js';
 import type { LedgerEntry } from '../governance/accountability-charter-registry.js';
 import type {
   WorkItem,
@@ -16,6 +21,8 @@ interface PipelineContinuationStore {
   currentWorkItem(id: string): WorkItem | null;
   activeLeaseForItem(id: string): WorkLease | null;
   currentLeaseById(id: string): WorkLease | null;
+  /** Every lease snapshot of the item (any status) — the fence history. */
+  leasesForItem(id: string): WorkLease[];
   appendLeaseSnapshot(lease: WorkLease): WorkLease;
   appendItemSnapshot(item: WorkItem): WorkItem;
   appendLeaseEvent(
@@ -57,6 +64,7 @@ export async function continueSuspendedPipelineWorkItem(
     currentWorkItem,
     activeLeaseForItem,
     currentLeaseById,
+    leasesForItem,
     appendLeaseSnapshot,
     appendItemSnapshot,
     appendLeaseEvent,
@@ -212,11 +220,13 @@ export async function continueSuspendedPipelineWorkItem(
     if (
       !oldLease ||
       oldLease.item_id !== current.item_id ||
-      oldLease.holder_peer_id !== input.actorPeerId
+      !isWorkLeaseHeldBy(oldLease, input.actorPeerId)
     )
       deny('original scheduling lease missing');
-    if (oldLease!.status === 'active')
+    if (oldLease!.status === 'active') {
       appendLeaseSnapshot({ ...oldLease!, status: 'expired', released_at: now });
+      auditWorkItemLease('expire', oldLease!, current, input.actorPeerId);
+    }
     if (action === 'deny') {
       const deniedAttempt: WorkItemAttempt = {
         ...original,
@@ -271,15 +281,20 @@ export async function continueSuspendedPipelineWorkItem(
       );
       return { item: deniedItem };
     }
+    const terms = grantWorkItemLeaseTerms({
+      itemId: current.item_id,
+      holder: input.actorPeerId,
+      ttlMs: Math.min(Math.max(input.ttlMs ?? 900000, 1000), 900000),
+      // The superseded scheduling lease was just expired above; every
+      // earlier generation still advances the fence.
+      history: leasesForItem(current.item_id),
+    });
     const lease: WorkLease = {
       lease_id: randomId('wlease'),
       item_id: current.item_id,
-      holder_peer_id: input.actorPeerId,
+      ...terms,
       purpose: 'resume original approved pipeline',
       status: 'active',
-      expires_at: new Date(
-        Date.now() + Math.min(Math.max(input.ttlMs ?? 900000, 1000), 900000)
-      ).toISOString(),
       created_at: now,
       renewed_at: now,
       previous_lease_id: oldLease!.lease_id,
@@ -322,6 +337,7 @@ export async function continueSuspendedPipelineWorkItem(
       'continued original approved pipeline attempt',
       input.actorPeerId
     );
+    auditWorkItemLease('acquire', lease, current);
     appendWorkItemAttemptEvent(
       'item_attempt_started',
       current.item_id,

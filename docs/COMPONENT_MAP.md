@@ -275,7 +275,7 @@ The kernel of the ecosystem. Important responsibilities:
 
 - secure file/process helpers
 - path resolution for tiered directories
-- resource locks, leases, and concurrency guards
+- resource locks, leases, and concurrency guards: one lease primitive in `lease/` — `lease-backend.ts` (exclusion, fenced records, `resource_kind`), `lease-terms.ts` (holder, expiry, fence), `resource-lease.ts` / `device-lease.ts` (held leases on the backend), `lease-audit.ts` (one audit shape); WorkItem claims (`workforce/work-item-lease.ts`), Co-Session path leases, Mission Lease and device leases are adapters
 - CLI utilities and common runtime helpers
 - runtime supervision for agent, PTY, and service ownership
 - control-plane helpers for channel routing, feedback, and session-scoped artifacts

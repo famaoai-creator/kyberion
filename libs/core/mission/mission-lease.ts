@@ -39,6 +39,13 @@
 
 import { type FencedLeaseRecord, type LeaseBackend } from '../lease/lease-backend.js';
 import { createMemoryLeaseBackend } from '../lease/memory-lease-backend.js';
+import {
+  grantLeaseTerms,
+  isLeaseLive,
+  releaseLeaseTerms,
+  renewLeaseTerms,
+  type LeaseTerms,
+} from '../lease/lease-terms.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -206,13 +213,66 @@ function issue(code: MissionLeaseErrorCode, message: string): MissionLeaseIssue 
 
 /** A lease is live only while stored 'active' and not yet at its deadline. */
 function isLive(lease: StoredLease | undefined, now: number): lease is StoredLease {
-  return Boolean(lease && lease.status === 'active' && lease.expires_at_ms > now);
+  return Boolean(lease && lease.status === 'active' && isLeaseLive(lease, now));
 }
 
 function toPublic(lease: StoredLease, now: number): MissionLease {
   const status: MissionLeaseStatus =
-    lease.status === 'active' && lease.expires_at_ms <= now ? 'expired' : lease.status;
+    lease.status === 'active' && !isLeaseLive(lease, now) ? 'expired' : lease.status;
   return { ...lease, status };
+}
+
+function storedTerms(lease: StoredLease): LeaseTerms {
+  return {
+    resource_kind: 'mission',
+    resource_id: lease.resource_id,
+    holder: lease.holder,
+    fence: lease.fence,
+    acquired_at_ms: lease.acquired_at_ms,
+    renewed_at_ms: lease.renewed_at_ms,
+    expires_at_ms: lease.expires_at_ms,
+  };
+}
+
+/** A new generation after `previousFence` — terms decided by the lease primitive. */
+function grantStored(
+  resource: string,
+  holder: string,
+  ttlMs: number,
+  now: number,
+  previousFence: number
+): StoredLease {
+  const terms = grantLeaseTerms({
+    kind: 'mission',
+    resourceId: resource,
+    holder,
+    ttlMs,
+    nowMs: now,
+    previous: { fence: previousFence, released: true },
+  });
+  return {
+    lease_id: leaseIdFor(resource, terms.fence),
+    resource_id: terms.resource_id,
+    holder: terms.holder,
+    fence: terms.fence,
+    status: 'active',
+    acquired_at_ms: terms.acquired_at_ms,
+    expires_at_ms: terms.expires_at_ms,
+    renewed_at_ms: terms.renewed_at_ms,
+    renew_count: 0,
+  };
+}
+
+/** Extend a validated live lease in place (terms from the lease primitive). */
+function renewStored(stored: StoredLease, extendMs: number, now: number): void {
+  const terms = renewLeaseTerms(storedTerms(stored), {
+    holder: stored.holder,
+    ttlMs: extendMs,
+    nowMs: now,
+  });
+  stored.expires_at_ms = terms.expires_at_ms;
+  stored.renewed_at_ms = terms.renewed_at_ms;
+  stored.renew_count += 1;
 }
 
 function defaultLeaseKeyFor(resource: string): string {
@@ -233,6 +293,7 @@ function toDurable(lease: StoredLease): FencedLeaseRecord {
     owner_id: lease.holder,
     fence: lease.fence,
     expires_at_ms: lease.expires_at_ms,
+    resource_kind: 'mission',
   };
 }
 
@@ -359,7 +420,7 @@ export class MissionLeaseManager {
     // Preserve the fence so an older token can never look current (writer-lease parity).
     this.backend.write(this.leaseKeyFor(lease.resource_id), {
       ...toDurable(lease),
-      expires_at_ms: 0,
+      expires_at_ms: releaseLeaseTerms(storedTerms(lease)).expires_at_ms,
     });
   }
 
@@ -425,19 +486,14 @@ export class MissionLeaseManager {
 
       // Takeover: fence survives tombstones and durable releases.
       const durable = this.backend.read(this.leaseKeyFor(resource));
-      const nextFence = Math.max(state.fence, durable?.fence ?? 0) + 1;
-      state.fence = nextFence;
-      const stored: StoredLease = {
-        lease_id: leaseIdFor(resource, nextFence),
-        resource_id: resource,
+      const stored = grantStored(
+        resource,
         holder,
-        fence: nextFence,
-        status: 'active',
-        acquired_at_ms: input.now,
-        expires_at_ms: input.now + input.ttlMs,
-        renewed_at_ms: input.now,
-        renew_count: 0,
-      };
+        input.ttlMs,
+        input.now,
+        Math.max(state.fence, durable?.fence ?? 0)
+      );
+      state.fence = stored.fence;
       this.leases.set(stored.lease_id, stored);
       state.lease_id = stored.lease_id;
       // The winner is the holder, no longer a contender; all other contenders
@@ -529,9 +585,7 @@ export class MissionLeaseManager {
       if (renewIssues.length)
         return { ok: false, lease: toPublic(stored, input.now), issues: renewIssues };
 
-      stored.expires_at_ms = input.now + input.extendMs;
-      stored.renewed_at_ms = input.now;
-      stored.renew_count += 1;
+      renewStored(stored, input.extendMs, input.now);
       this.persistLive(stored);
       return { ok: true, lease: toPublic(stored, input.now), issues: [] };
     });
@@ -747,19 +801,14 @@ export class MissionLeaseManager {
       }
 
       const durable = this.backend.read(this.leaseKeyFor(resource));
-      const nextFence = Math.max(state.fence, durable?.fence ?? 0) + 1;
-      state.fence = nextFence;
-      const stored: StoredLease = {
-        lease_id: leaseIdFor(resource, nextFence),
-        resource_id: resource,
+      const stored = grantStored(
+        resource,
         holder,
-        fence: nextFence,
-        status: 'active',
-        acquired_at_ms: input.now,
-        expires_at_ms: input.now + input.ttlMs,
-        renewed_at_ms: input.now,
-        renew_count: 0,
-      };
+        input.ttlMs,
+        input.now,
+        Math.max(state.fence, durable?.fence ?? 0)
+      );
+      state.fence = stored.fence;
       this.leases.set(stored.lease_id, stored);
       state.lease_id = stored.lease_id;
       state.contenders.delete(holder);
@@ -844,9 +893,7 @@ export class MissionLeaseManager {
       if (renewIssues.length)
         return { ok: false, lease: toPublic(stored, input.now), issues: renewIssues };
 
-      stored.expires_at_ms = input.now + input.extendMs;
-      stored.renewed_at_ms = input.now;
-      stored.renew_count += 1;
+      renewStored(stored, input.extendMs, input.now);
       this.persistLive(stored);
       return { ok: true, lease: toPublic(stored, input.now), issues: [] };
     });
