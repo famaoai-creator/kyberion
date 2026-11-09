@@ -13,6 +13,7 @@
  * to tenant T never resolves another tenant's owner — that reads as not found,
  * so nothing about the other tenant is disclosed.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { resolveProjectScope } from '../foundation/project-scope-env.js';
@@ -22,7 +23,7 @@ import { safeExistsSync, safeLstat, safeReaddir } from '../secure-io.js';
 import { loadMissionStateAtPath } from '../mission/mission-state-reader.js';
 import { loadProjectRecord } from '../project/project-registry.js';
 
-export type OwnerTier = 'personal' | 'confidential' | 'public';
+export type OwnerTier = StorageDataTier;
 
 const OWNER_TIERS: readonly OwnerTier[] = ['personal', 'confidential', 'public'];
 

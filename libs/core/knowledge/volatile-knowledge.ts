@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from '../foundation/json.js';
 import * as pathResolver from '../path-resolver.js';
@@ -12,7 +13,7 @@ import type { VolatileCadence, VolatileScope } from '../path-resolver.js';
 export type { VolatileCadence, VolatileScope } from '../path-resolver.js';
 
 export type VolatileStatus = 'active' | 'expired' | 'rolled-over' | 'promoted' | 'archived';
-export type VolatileTier = 'personal' | 'confidential' | 'public';
+export type VolatileTier = StorageDataTier;
 export type VolatileLifetime =
   'session' | 'mission' | 'daily' | 'weekly' | 'ttl' | 'until-distilled' | 'sticky';
 

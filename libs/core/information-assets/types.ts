@@ -1,4 +1,5 @@
 /** Pure contracts shared by information asset catalogs, collectors and intake recipes. */
+import type { StorageDataTier } from '../storage-layout.js';
 export type InformationJson =
   null | boolean | number | string | InformationJson[] | { [key: string]: InformationJson };
 export type InformationObject = { [key: string]: InformationJson };
@@ -23,7 +24,7 @@ export interface InformationAssetLocation {
   service_id: string;
   collector_id: string;
   selectors: InformationObject;
-  tier: 'confidential' | 'personal';
+  tier: Exclude<StorageDataTier, 'public'>;
   authoritative: boolean;
   freshness_seconds: number;
   enabled: boolean;

@@ -60,7 +60,7 @@ function prepareMission(overrides?: Record<string, unknown>): void {
         status: 'validating',
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: actorId,
+        org_role: actorId,
         confidence_score: 1,
         intent: {
           goal_summary: 'original mission goal',

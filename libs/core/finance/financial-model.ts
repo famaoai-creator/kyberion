@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
@@ -20,7 +21,7 @@ export interface FinancialPeriod {
 export interface FinancialModel {
   company_id: string;
   tenant_slug: string | null;
-  source_kind: 'confidential' | 'public' | 'derived';
+  source_kind: Exclude<StorageDataTier, 'personal'> | 'derived';
   source_path: string;
   periods: FinancialPeriod[];
 }

@@ -9,6 +9,7 @@
  * the store role's own grant (resolved through its bound tenant) apply. The
  * tenant scope check runs before this in tier-guard.validateWritePermission.
  */
+import type { StorageDataTier } from './storage-layout.js';
 import {
   tenantStoreLedgerPartitionOf,
   PARTITIONED_RUNTIME_LEDGER_ROOTS,
@@ -51,7 +52,9 @@ export function protectedFloorPartitionPrefix(relativePath: string): string | un
   return `${STORAGE_FLOOR_ROOTS[floor.floor]}/${tier}/`;
 }
 
-export function partitionedRuntimeTier(prefix: string): 'personal' | 'confidential' | undefined {
+export function partitionedRuntimeTier(
+  prefix: string
+): Exclude<StorageDataTier, 'public'> | undefined {
   const normalized = normalizeTenantPolicyPath(prefix);
   for (const root of [
     ...Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS),

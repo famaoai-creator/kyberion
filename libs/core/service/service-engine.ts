@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { consumeScopedServiceCaptureAdmission } from './service-capture-admission.js';
 import { createLogger } from '../logger.js';
 import {
@@ -48,7 +49,7 @@ export interface ServicePresetCacheOptions {
   /** Project scope for the vault entry (defaults to _global). */
   project_id?: string;
   /** Data tier for vault storage (defaults to confidential). */
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
 }
 
 function enforceTenantBindingContract(

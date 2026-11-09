@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import {
   classifySurfaceQueryIntent,
   extractSurfaceKnowledgeQuery,
@@ -38,7 +39,7 @@ export interface SurfaceIntentResolution {
 }
 
 export interface SurfaceIntentResolutionOptions {
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   tenantId?: string;
   packet?: IntentResolutionPacket;
 }

@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -113,7 +114,7 @@ export interface TaskSession {
     track_id?: string;
     track_name?: string;
     tenant_slug?: string;
-    tier?: 'personal' | 'confidential' | 'public';
+    tier?: StorageDataTier;
     service_bindings?: string[];
     locale?: string;
   };

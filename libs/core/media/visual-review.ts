@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { z } from 'zod';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
@@ -186,8 +187,8 @@ export interface RunVisualReviewInput {
 import { KNOWLEDGE_TIER_RANK as TIER_ORDER } from '../foundation/knowledge-tier.js';
 
 /** The most sensitive tier present decides how the payload must be treated. */
-function mostSensitiveTier(tiers: readonly string[]): 'public' | 'confidential' | 'personal' {
-  let worst: 'public' | 'confidential' | 'personal' = 'public';
+function mostSensitiveTier(tiers: readonly string[]): StorageDataTier {
+  let worst: StorageDataTier = 'public';
   for (const tier of tiers) {
     if ((TIER_ORDER as any)[tier] > TIER_ORDER[worst]) {
       worst = tier as typeof worst;

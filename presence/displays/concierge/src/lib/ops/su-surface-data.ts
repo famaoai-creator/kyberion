@@ -403,7 +403,7 @@ export function projectMissionHistoryItems(
         missionType: state.mission_type,
         tenantId: state.tenant_id,
         tenantSlug: state.tenant_slug,
-        persona: state.assigned_persona,
+        persona: state.org_role,
         organizationId: state.organization_id || state.relationships?.organization?.organization_id,
         projectId: state.relationships?.project?.project_id,
         trackId: state.relationships?.track?.track_id,

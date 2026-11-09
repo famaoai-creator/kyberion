@@ -512,7 +512,7 @@ export async function buildWorkItemDispatchContext(input: {
     mission_id: input.missionId,
     mission_type: input.missionState.mission_type,
     tenant_slug: input.missionState.tenant_slug,
-    assigned_persona: input.missionState.assigned_persona,
+    org_role: input.missionState.org_role,
     status: input.missionState.status,
     team_role: input.teamRole,
     recipient_kind: contextPack.recipient.kind,

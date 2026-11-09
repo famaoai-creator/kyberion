@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import type {
   WorkPolicyFile,
   RoutingMatch,
@@ -126,7 +127,7 @@ export interface OrganizationWorkLoopSummary {
     project_name?: string;
     track_id?: string;
     track_name?: string;
-    tier: 'personal' | 'confidential' | 'public';
+    tier: StorageDataTier;
     locale?: string;
     service_bindings: string[];
   };
@@ -229,7 +230,7 @@ export function overlayCanonicalWorkScopeDecision(
   };
 }
 
-function normalizeKnowledgeTier(value?: string): 'personal' | 'confidential' | 'public' {
+function normalizeKnowledgeTier(value?: string): StorageDataTier {
   return value === 'personal' || value === 'public' ? value : 'confidential';
 }
 
@@ -513,7 +514,7 @@ export function resolveWorkDesign(input: {
   queryType?: string;
   shape?: string;
   outcomeIds?: string[];
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
 }): WorkDesignSummary {
   const specialists = loadSpecialistCatalog();
   const outcomes = loadOutcomeCatalog();
@@ -578,7 +579,7 @@ export function buildOrganizationWorkLoopSummary(input: {
   artifactPaths?: string[];
   progressSignals?: string[];
   outcomeIds?: string[];
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   projectId?: string;
   projectName?: string;
   trackId?: string;

@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { reserveMissionTeamSelectionDispatch } from './mission-team-selection.js';
 import { resolveAgentLifecycleModelId } from '../agent/agent-lifecycle.js';
 import { ensureAgentRuntime } from '../agent/agent-runtime-port.js';
@@ -178,7 +179,7 @@ export async function ensureMissionTeamRuntime(
         missionId: missionId.toUpperCase(),
         scope: requestedScope || {
           scope_kind: 'mission',
-          tier: plan.tier as 'personal' | 'confidential' | 'public',
+          tier: plan.tier as StorageDataTier,
           mission_id: plan.mission_id,
           ...(plan.tenant_slug ? { tenant_slug: plan.tenant_slug } : {}),
           ...(plan.organization_profile?.organization_id

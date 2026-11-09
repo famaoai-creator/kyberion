@@ -90,7 +90,7 @@ it('prepares a confidential source target then edits only its exact private file
     status: 'active',
     execution_mode: 'local',
     priority: 1,
-    assigned_persona: 'tester',
+    org_role: 'tester',
     confidence_score: 1,
     git: { branch: 'main', start_commit: sha, latest_commit: sha, checkpoints: [] },
     history: [],

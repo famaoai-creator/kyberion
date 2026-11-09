@@ -94,7 +94,7 @@ describe('virtual office surface', () => {
         tenant_slug: 'acme-prod',
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'operator',
+        org_role: 'operator',
         confidence_score: 1,
         git: {
           branch: 'main',
@@ -135,7 +135,7 @@ describe('virtual office surface', () => {
         tenant_slug: 'beta',
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'operator',
+        org_role: 'operator',
         confidence_score: 1,
         git: {
           branch: 'main',
@@ -169,7 +169,7 @@ describe('virtual office surface', () => {
         tenant_slug: 'acme-prod',
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'operator',
+        org_role: 'operator',
         confidence_score: 1,
         git: {
           branch: 'main',
