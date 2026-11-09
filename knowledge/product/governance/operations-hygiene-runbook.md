@@ -2,10 +2,49 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-08
+last_updated: 2026-11-09
 ---
 
 # Operations Hygiene Runbook
+
+## Checkout relocation preserves resource tiers
+
+Classify logical repository paths through the shared policy-relative authority
+mapping before interpreting tier markers. An outer scratch, artifact or knowledge
+partition describes the checkout's location, not every resource inside it.
+Preserve primary authority-store mapping and normalized outside-root fallback;
+do not repair ancestor shadowing by reordering tier substring checks.
+
+Gate changes with `libs/core/tier-guard.path-model.test.ts` and the tier-guard,
+preflight observation, tenant-store and tiered-mission suites. Build before
+compiled-module integration tests. The [relocation model](../architecture/checkout-tier-path-model.md)
+checks declared inner partitions across tiered ancestor layouts, including a
+negative ancestor-first control; it does not replace tenant or symlink guards.
+
+After promoting or revising product lessons, rerun
+`tests/scratch-usage-baseline.test.ts` and the catalogs gate. Generated knowledge
+participates in source and policy scans; passing tests before promotion does not
+validate the final promoted records.
+
+## Explicit viewer tier caps
+
+At a data-bearing narrowing boundary, an already resolved empty cap means no
+access. Never restore role defaults because its array is empty. Default/role
+policy resolution belongs upstream; a client request can only select inside the
+server viewer's supplied set. Missing or non-array resolved caps fail closed.
+
+After changing tier narrowing, run `surface-viewer-tier.model.test.ts`,
+`surface-mutation-guard.test.ts` and the real Concierge `ops-viewer.test.ts` from
+the repository root with its canonical Vitest aliases. Gate all role/tier/subset
+combinations, grant-removal monotonicity, empty/default distinction and a negative
+fallback mutation. A zero-file test selection is not validation. The
+[subset model](../architecture/viewer-tier-subset-model.md) covers this finite
+boundary; it does not establish route-wide custody or credential guarantees.
+
+Caller fixtures must supply a resolved `ViewerContext`. Prefer partial mocks
+that preserve real scope predicates over whole-module mocks that silently omit
+new exports. Preserve no-inspection/no-execution assertions on refusal, including
+404 non-disclosure for an invisible cross-tenant mission.
 
 ## Review independence assurance
 
@@ -83,6 +122,30 @@ diff; they do not prove that an arbitrary starting checkout was current. This
 checkout comparison is a required operational preflight, not a new claim made
 by those automated checks.
 
+## Lease backend exclusion across callback modes
+
+A namespace mutex must span the complete protected callback, even when a writer
+lease's TTL has elapsed. Memory providers must use shared admission for sync and
+async callers: refuse synchronous entry while async ownership is pending or
+active, retain sync re-entry refusal, and keep different namespaces independent.
+A timeout does not establish that an earlier callback has stopped.
+
+Keep the caller's returned Promise separate from the queue's private tail. The
+tail must settle successfully on callback success or failure and remove its
+reservation only if the map still contains that exact tail. Never compare a
+`finally`-derived tail with the original callback Promise: that retains entries
+and can create an unhandled rejection. Preserve callback error identity and FIFO
+handoff; KV-stub acquisition delay must also apply after predecessor failure.
+
+After changing a lease backend, run `lease-backend-exclusion.test.ts`,
+`lease-backend.model.test.ts`, `lease-backend.test.ts` and `writer-lease.test.ts`
+under strict live-state checking. Use deferred Promises and injected/fake clocks,
+not real sleeps. The independent model must reject a conflicting-admission
+mutation. These suites are the regression gate for this procedure. Affected-test
+selection follows imports; run all four explicitly even when the selected subset
+is smaller. Their finite model and KV
+stub do not establish real multi-node exclusion or crash recovery.
+
 ## NHI lifecycle and session-admission fencing
 
 Allocate identity-journal sequence numbers and check the expected identity revision
@@ -119,6 +182,17 @@ Gates: agent-identity lease-interleaving and alternating-writer tests, session-a
 ABA/legacy-plan tests, post-append and uncertain-result compensation tests, live-before-
 expiry control and suspension/replay regressions. These synthetic gates do not establish
 that a real organization has been onboarded or admitted.
+
+Writer-lease numeric safety is a separate gate: run
+`libs/core/lease/writer-lease.numeric-model.test.ts` with the writer/backend and NHI
+lifecycle suites after changing token or expiry handling. Reject unsafe persisted
+fences and non-finite/negative clocks; refuse allocation at MAX_SAFE_INTEGER and
+validate finite, strictly-future expiry before writing. Never reset or clamp a
+fence to recover from malformed or exhausted state. Preserve fresh post-write and
+exit observations and the original-token-after-renew contract. A later clock
+failure can follow a valid write; do not describe that as an unchanged record.
+The [fencing model](../architecture/writer-fencing-safety-model.md) defines the
+initial-input no-write guarantee and its limits.
 
 ## Private task source preparation and local test boundaries
 
@@ -3280,6 +3354,14 @@ A rejected write must remain rejected and its required policy-violation record m
 Keep each gate's deadline and checks unchanged when isolating resource-intensive work. `ci-gates.json` may mark a gate `exclusive`: all earlier selected work drains, that gate runs alone, and subsequent gates resume the requested concurrency. Golden baseline compiler scans use this isolation; a measured standalone run took 62 seconds and exited naturally. A buffered success line alone does not prove a retained handle or the exact failed-runner cause. Record gate execution time separately from package-manager queue wait, and observe child exit/close when investigating a deadline.
 
 Runner, manifest, schema or CI workflow changes must also run the combined full profile on PR/merge-group CI. Separate `pr` and `full-only` jobs do not exercise the combined scheduling used on main. Gate tests enforce exact-once selection, stable output order, rejection continuation, exclusive barriers, unchanged default concurrency and deadlines (`run_checks.test.ts`, `run_checks.concurrency.test.ts`). Strict local tests require a quiet owned worktree: stop only a verified worktree-owned background process through its graceful shutdown path, keep real primary/other-provider processes running, and use the offline reasoning stub for deterministic validation.
+
+Filesystem-allocation fixtures must supply deterministic finite volume statistics
+while retaining the real workspace budget policy. Restore execution spies in
+guaranteed test cleanup: an earlier failed assertion must not leave a spy that
+the next test captures as its original implementation. Gate offline source clone
+failure, ledger rollback and reuse with
+`libs/core/mission/mission-development-offline-clone.test.ts`; never raise budget
+limits or delete live workspaces to make that fixture pass.
 
 ## Capture audit input before delegating persistence
 

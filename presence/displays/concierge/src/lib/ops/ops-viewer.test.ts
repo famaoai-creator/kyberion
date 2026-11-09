@@ -56,6 +56,24 @@ describe('operations viewer helpers (one viewer model)', () => {
     expect(() => strictViewerTier(scoped, 'confidential')).toThrow(ConciergeViewerError);
   });
 
+  it('denies explicit empty tier caps while retaining omitted defaults and nonempty caps', () => {
+    for (const role of ['readonly', 'localadmin'] as const) {
+      const empty = { ...scoped, role, tierAccess: [] };
+      for (const tier of ['public', 'confidential', 'personal'] as const) {
+        expect(() => strictViewerTier(empty, tier)).toThrow(ConciergeViewerError);
+      }
+
+      const omitted = { ...scoped, role, tierAccess: undefined };
+      expect(strictViewerTier(omitted, 'public')).toBe('public');
+      expect(strictViewerTier(omitted, 'confidential')).toBe('confidential');
+      expect(() => strictViewerTier(omitted, 'personal')).toThrow(ConciergeViewerError);
+
+      const narrowed: ViewerContext = { ...scoped, role, tierAccess: ['public'] };
+      expect(strictViewerTier(narrowed, 'public')).toBe('public');
+      expect(() => strictViewerTier(narrowed, 'confidential')).toThrow(ConciergeViewerError);
+    }
+  });
+
   it('never exposes the personal tier', () => {
     expect(resolveViewerTierAccess('localadmin')).not.toContain('personal');
     expect(() => resolveViewerTierAccess('localadmin', ['personal'])).toThrow(ConciergeViewerError);
