@@ -1185,12 +1185,19 @@ function _extractRankingMetadata(content: string, relSource: string): KnowledgeR
   const lastUpdated =
     _extractFrontmatterValue(content, 'last_updated') ??
     _extractFrontmatterValue(content, 'audit_date');
-  const authority =
-    _extractFrontmatterValue(content, 'doc_authority') ??
-    _extractFrontmatterValue(content, 'authority');
+  // A retired doc (doc_status superseded|historical, enforced by the concept-registry gate)
+  // keeps its history but drops to the lowest retrieval authority and earns no recency
+  // credit — retiring a doc touches its last_updated, which must not make it look fresh —
+  // so in metadata ranking the doc that replaced it outranks the stale one it still matches.
+  const docStatus = _extractFrontmatterValue(content, 'doc_status');
+  const retired = docStatus === 'superseded' || docStatus === 'historical';
+  const authority = retired
+    ? 'advisory'
+    : (_extractFrontmatterValue(content, 'doc_authority') ??
+      _extractFrontmatterValue(content, 'authority'));
   const scope = _extractFrontmatterValue(content, 'scope');
   return {
-    ...(lastUpdated ? { last_updated: lastUpdated } : {}),
+    ...(lastUpdated && !retired ? { last_updated: lastUpdated } : {}),
     ...(authority
       ? { doc_authority: authority }
       : defaults.doc_authority

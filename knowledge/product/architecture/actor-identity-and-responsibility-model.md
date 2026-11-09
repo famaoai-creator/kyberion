@@ -2,6 +2,7 @@
 title: Actor identity and responsibility model
 tags: [architecture, governance, identity, nhi, tenant, organization, delegation, review]
 last_updated: 2026-11-04
+concepts: [nhi, conversational-persona, execution-persona, org-role, team-role]
 ---
 
 # Actor identity and responsibility model

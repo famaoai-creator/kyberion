@@ -2,6 +2,7 @@
 title: 'Kyberion Concept Map'
 kind: evergreen
 last_updated: 2026-10-05
+concepts: [organization-work-loop, mission, project]
 ---
 
 # Kyberion Concept Map

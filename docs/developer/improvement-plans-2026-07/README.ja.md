@@ -521,3 +521,9 @@ AO 系の推奨: **AO-03(デーモン監督・エスカレーション)を Wave 
 3. テストを先に緑で確認 → 変更 → 同テストが緑のままであることを確認、の順で進める。
 4. 挙動を変える判断(fail-open → fail-closed 等)は計画に明記がない限り行わず、TODO コメントと本計画への参照を残して報告する。
 5. 一時ファイルは `active/shared/tmp/` のみ使用。
+
+## 7. 関連文書(このフォルダの個別計画・レビュー)
+
+- [Browser Actuator browser-cli 概念昇華計画](./BROWSER_ACTUATOR_BROWSER_CLI_CONCEPTS.ja.md)
+- [adf-replay-extension 統合レビュー 2026-08-10](./REVIEW_ADF_REPLAY_EXTENSION_2026-08-10.ja.md)
+- [エージェント協調可視化計画 (UX-07)](./UX-07_AGENT_COLLABORATION_VISIBILITY.ja.md)

@@ -6,6 +6,7 @@ importance: 9
 author: Ecosystem Architect
 last_updated: 2026-10-05
 kind: evergreen
+concepts: [surface, display, concierge, front-desk]
 ---
 
 # Surface Responsibility Model
