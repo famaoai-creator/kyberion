@@ -15,7 +15,7 @@ import { withFrontDeskDispatchLock } from './front-desk-dispatch-lock.js';
 import { safeReadFile, safeExistsSync, safeLstat } from '../secure-io.js';
 import { writeScopedArtifact } from '../workforce/artifact-store.js';
 import { physicalScopedPath } from '../storage/physical-namespace.js';
-import { resolveWorkScopeDecision } from '../workforce/work-scope-decision.js';
+import { routingDecisionForConfiguredShape } from '../intent/routing-decision.js';
 import { getWorkItem, type WorkItem } from '../workforce/work-coordination.js';
 import {
   dispatchDotProposals,
@@ -49,6 +49,16 @@ import {
   frontDeskBindingsEqual,
   frontDeskExecutionProposal,
 } from './front-desk-execution-proposal.js';
+
+/**
+ * Thin adapter (R3): the front desk's execution shape is configured (the
+ * receipt pipeline), not read from text, so it asks the resolver entry for the
+ * decision of that configured shape. A work-scope policy that promotes it is
+ * seen as a different execution shape and the front desk refuses.
+ */
+function frontDeskRoutingDecision() {
+  return routingDecisionForConfiguredShape('pipeline', { authorityLevel: 'approval_required' });
+}
 
 /** Durable outbox reader called by the existing supervisor, never from a chat request. */
 export async function runFrontDeskExecutionIntake(
@@ -88,8 +98,7 @@ export async function runFrontDeskExecutionIntake(
         // Capacity waiting owns no approval or executable reservation. Only
         // this original, revalidated outbox may retry it when a slot is free.
         if (prior && prior.status !== 'waiting_capacity') return;
-        const shape = resolveWorkScopeDecision({ catalogMinimumShape: 'pipeline' });
-        if (shape.execution_shape !== 'pipeline') return;
+        if (frontDeskRoutingDecision().promotion.execution_shape !== 'pipeline') return;
         dispatchDotProposals(charter, [frontDeskExecutionProposal(entry.binding)], deps);
       });
     });
@@ -144,7 +153,7 @@ export function prepareFrontDeskExecution(
     )
       throw new Error('WorkItem authority scope changed');
   }
-  if (resolveWorkScopeDecision({ catalogMinimumShape: 'pipeline' }).execution_shape !== 'pipeline')
+  if (frontDeskRoutingDecision().promotion.execution_shape !== 'pipeline')
     throw new Error('work-scope policy requires another execution shape');
   const row = currentDotActions(charter.dot_id, deps).find(
     (value) => value.action_ref === item.metadata?.action_ref

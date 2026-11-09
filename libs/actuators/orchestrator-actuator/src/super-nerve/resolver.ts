@@ -2,10 +2,8 @@ import { compileIntent } from '@agent/core/intent/intent-compiler';
 import { logger } from '@agent/core/core';
 import { executeRegisteredSuperPipeline } from '@agent/core/super-nerve-execution-port';
 import { isRoutingDecision, type RoutingDecision } from '@agent/core/contracts';
-import {
-  resolveIntentResolutionPacket,
-  type IntentResolutionPacket,
-} from '@agent/core/intent/intent-resolution';
+import type { IntentResolutionPacket } from '@agent/core/intent/intent-resolution';
+import { resolveRoutingPacket } from '@agent/core/intent';
 
 /**
  * Intent Resolver: Resolves high-level semantic intents into Super-Nerve pipeline steps.
@@ -39,7 +37,7 @@ function isIntentResolutionPacket(value: unknown): value is IntentResolutionPack
 function resolveServiceName(initialContext: any, sourceText: string): string | undefined {
   const packet = isIntentResolutionPacket(initialContext?.resolution_packet)
     ? initialContext.resolution_packet
-    : resolveIntentResolutionPacket(sourceText);
+    : resolveRoutingPacket(sourceText);
   return packet.selected_parameters?.service_name;
 }
 

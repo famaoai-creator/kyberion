@@ -2,7 +2,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { defineCatalog } from '@agent/core/foundation';
 import { buildContextualIntentFrame } from '@agent/core/contextual-intent-frame';
 import { compileUserIntentFlow } from '@agent/core/intent/intent-contract';
-import { resolveIntentResolutionPacket } from '@agent/core/intent/intent-resolution';
+import { resolveRoutingPacket } from '@agent/core/intent';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type CorpusItem = {
@@ -98,7 +98,7 @@ export async function main(): Promise<EvaluationResult> {
 
   for (const item of corpus.items) {
     const frame = buildContextualIntentFrame(item.utterance);
-    const packet = resolveIntentResolutionPacket(item.utterance);
+    const packet = resolveRoutingPacket(item.utterance);
     const flow = await compileUserIntentFlow(
       { text: item.utterance },
       { askFn: async () => 'not json' }

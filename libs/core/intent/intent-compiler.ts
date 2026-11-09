@@ -5,11 +5,8 @@
  */
 import { logger } from '../core.js';
 import type { RoutingDecision } from '../contracts/routing-decision.js';
-import {
-  loadStandardIntentCatalog,
-  resolveIntentResolutionPacket,
-  type IntentResolutionPacket,
-} from './intent-resolution.js';
+import { loadStandardIntentCatalog, type IntentResolutionPacket } from './intent-resolution.js';
+import { resolveRoutingPacket } from './intent-resolver-entry.js';
 import { segmentKeywordTerms } from '../foundation/locale-normalize.js';
 
 /**
@@ -49,16 +46,18 @@ function synthesizeDeterministicSteps(intentDef: any): any[] {
  * Attempt to compile a natural language intent into pipeline steps.
  *
  * Resolution order:
- * 1. Exact match in standard-intents.json → confidence 1.0
- * 2. Keyword match in standard-intents.json → confidence 0.8
- * 3. Knowledge hint match → returns hints as context, confidence 0.6
- * 4. Returns null if no match (caller should use LLM with the returned context)
+ * 1. The request's resolved intent (carried RoutingDecision, else the resolver
+ *    entry) has a pipeline in standard-intents.json → template
+ * 2. Knowledge hint match → returns hints as context, confidence 0.6
+ * 3. Returns null if no match (caller should use LLM with the returned context)
+ *
+ * The keyword fallback over a caller-supplied catalog was removed in R3 of the
+ * intent resolver unification plan: intent selection belongs to the resolver.
  */
 export function compileIntent(
   intent: string,
   options?: {
     knowledgeHints?: any[];
-    standardIntents?: any[];
     /**
      * The request's carried RoutingDecision (D7). When present the compiler
      * acts on it instead of re-resolving `intent`; the caller guarantees it
@@ -67,27 +66,22 @@ export function compileIntent(
     routingDecision?: RoutingDecision;
   }
 ): CompiledIntent | null {
-  const usesCanonicalResolver = options?.standardIntents === undefined;
-  const standardIntents = usesCanonicalResolver
-    ? loadStandardIntentCatalog()
-    : options.standardIntents;
-  const carried = usesCanonicalResolver ? options?.routingDecision : undefined;
-  const resolutionPacket:
-    Pick<IntentResolutionPacket, 'selected_intent_id' | 'selected_confidence'> | undefined =
-    !usesCanonicalResolver
-      ? undefined
-      : carried
-        ? { selected_intent_id: carried.intent_id, selected_confidence: carried.confidence }
-        : resolveIntentResolutionPacket(intent);
+  // Catalog entries may carry the legacy `{ pipeline: { steps } }` form.
+  const standardIntents: any[] = loadStandardIntentCatalog();
+  const carried = options?.routingDecision;
+  const resolutionPacket: Pick<
+    IntentResolutionPacket,
+    'selected_intent_id' | 'selected_confidence'
+  > = carried
+    ? { selected_intent_id: carried.intent_id, selected_confidence: carried.confidence }
+    : resolveRoutingPacket(intent);
 
   const intentLower = intent.toLowerCase();
 
-  // 1. Exact ID match
-  const exactMatch = standardIntents.find(
-    (si) =>
-      si.id === resolutionPacket?.selected_intent_id ||
-      (resolutionPacket === undefined && (si.id === intent || si.id === intentLower))
-  );
+  // 1. The resolved intent's catalog pipeline.
+  const exactMatch = resolutionPacket.selected_intent_id
+    ? standardIntents.find((si) => si.id === resolutionPacket.selected_intent_id)
+    : undefined;
   if (exactMatch) {
     const steps = exactMatch.pipeline
       ? exactMatch.pipeline.steps || exactMatch.pipeline
@@ -96,57 +90,16 @@ export function compileIntent(
     logger.info(`[INTENT_COMPILER] Exact match: ${exactMatch.id}`);
     return {
       intentId: exactMatch.id,
-      confidence: resolutionPacket?.selected_confidence ?? 1.0,
+      confidence: resolutionPacket.selected_confidence ?? 1.0,
       source: 'template',
       steps,
       explanation: `Exact match: ${exactMatch.id}`,
     };
   }
 
-  // 2. Keyword match is retained only for callers supplying an explicit
-  // catalog (tests and compatibility tooling). Production resolution must
-  // come from the canonical IntentResolutionPacket above.
-  if (resolutionPacket !== undefined) {
-    const hints = options?.knowledgeHints || [];
-    const matchedHints = hints.filter((h) => hintMatchesIntent(h, intentLower));
-    if (matchedHints.length > 0) {
-      logger.info(`[INTENT_COMPILER] Found ${matchedHints.length} knowledge hints`);
-      return {
-        intentId: `hint-${Date.now()}`,
-        confidence: 0.6,
-        source: 'hint',
-        steps: [],
-        explanation: `Found ${matchedHints.length} knowledge hints. Use LLM to generate pipeline steps.`,
-        warnings: ['No pre-defined pipeline. Hints available for LLM-based generation.'],
-      };
-    }
-    return null;
-  }
-
-  // 2. Keyword match for explicit compatibility catalogs.
-  for (const si of standardIntents) {
-    const triggers: string[] = si.triggers || si.trigger_keywords || si.keywords || [];
-    const matched = triggers.some((t: string) => intentLower.includes(t.toLowerCase()));
-    if (matched) {
-      const steps = si.pipeline
-        ? si.pipeline.steps || si.pipeline
-        : synthesizeDeterministicSteps(si);
-      if (!steps.length) continue;
-      logger.info(`[INTENT_COMPILER] Keyword match: ${si.id}`);
-      return {
-        intentId: si.id,
-        confidence: 0.8,
-        source: 'template',
-        steps,
-        explanation: `Keyword match: ${si.id} (trigger: ${triggers.join(', ')})`,
-      };
-    }
-  }
-
-  // 3. Knowledge hint match for explicit compatibility catalogs.
+  // 2. Knowledge hint match.
   const hints = options?.knowledgeHints || [];
   const matchedHints = hints.filter((h: any) => hintMatchesIntent(h, intentLower));
-
   if (matchedHints.length > 0) {
     logger.info(`[INTENT_COMPILER] Found ${matchedHints.length} knowledge hints`);
     return {
@@ -159,7 +112,7 @@ export function compileIntent(
     };
   }
 
-  // 4. No match
+  // 3. No match
   return null;
 }
 

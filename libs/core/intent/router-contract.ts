@@ -4,7 +4,8 @@ import {
   extractSurfaceKnowledgeQuery,
   extractSurfaceWebSearchQuery,
 } from '../surface/surface-query.js';
-import { resolveIntentResolutionPacket, type IntentResolutionPacket } from './intent-resolution.js';
+import type { IntentResolutionPacket } from './intent-resolution.js';
+import { resolveRoutingPacket } from './intent-resolver-entry.js';
 import { pathResolver } from '../path-resolver.js';
 import { recordUnhandledIntent } from './unhandled-intent-registry.js';
 import { recordConversationSignal } from './conversation-signals.js';
@@ -95,7 +96,7 @@ export function resolveSurfaceIntent(
 ): SurfaceIntentResolution {
   const packet =
     options.packet ||
-    resolveIntentResolutionPacket(utterance, {
+    resolveRoutingPacket(utterance, {
       tier: options.tier,
       tenantId: options.tenantId,
     });

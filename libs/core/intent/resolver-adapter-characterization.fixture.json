@@ -1,0 +1,1012 @@
+{
+  "organization": [
+    {
+      "utterance": "本番障害を収束させる",
+      "result": {
+        "workShape": "incident_response",
+        "managementUnit": "incident",
+        "reasonKey": "organization:organization_resolution_reason_incident",
+        "confidence": 0.93,
+        "signals": {
+          "prior": 0.93,
+          "matched_shapes": ["incident_response"],
+          "strong_shapes": ["incident_response"],
+          "competition": 1,
+          "specificity": 1
+        }
+      }
+    },
+    {
+      "utterance": "請求まわり",
+      "result": {
+        "workShape": "routine_operation",
+        "managementUnit": "operation",
+        "reasonKey": "organization:organization_resolution_reason_routine",
+        "confidence": 0.52,
+        "signals": {
+          "prior": 0.88,
+          "matched_shapes": ["routine_operation"],
+          "strong_shapes": ["routine_operation"],
+          "competition": 1,
+          "specificity": 0.595
+        }
+      }
+    },
+    {
+      "utterance": "今月の運用レポートを作る",
+      "result": {
+        "workShape": "routine_operation",
+        "managementUnit": "operation",
+        "reasonKey": "organization:organization_resolution_reason_routine",
+        "confidence": 0.88,
+        "signals": {
+          "prior": 0.88,
+          "matched_shapes": ["routine_operation", "service_operation", "solution_project"],
+          "strong_shapes": ["routine_operation"],
+          "competition": 1,
+          "specificity": 1
+        }
+      }
+    },
+    {
+      "utterance": "障害対応の月次レポートを作って承認をもらう",
+      "result": {
+        "workShape": "incident_response",
+        "managementUnit": "incident",
+        "reasonKey": "organization:organization_resolution_reason_incident",
+        "confidence": 0.56,
+        "signals": {
+          "prior": 0.93,
+          "matched_shapes": ["incident_response", "governance_cadence", "routine_operation"],
+          "strong_shapes": ["incident_response", "governance_cadence", "routine_operation"],
+          "competition": 0.6,
+          "specificity": 1
+        }
+      }
+    },
+    {
+      "utterance": "経営会議の資料をレビューして",
+      "result": {
+        "workShape": "governance_cadence",
+        "managementUnit": "cadence",
+        "reasonKey": "organization:organization_resolution_reason_governance",
+        "confidence": 0.9,
+        "signals": {
+          "prior": 0.9,
+          "matched_shapes": ["governance_cadence"],
+          "strong_shapes": ["governance_cadence"],
+          "competition": 1,
+          "specificity": 1
+        }
+      }
+    },
+    {
+      "utterance": "予算の承認フローを決めたい",
+      "result": {
+        "workShape": "governance_cadence",
+        "managementUnit": "cadence",
+        "reasonKey": "organization:organization_resolution_reason_governance",
+        "confidence": 0.9,
+        "signals": {
+          "prior": 0.9,
+          "matched_shapes": ["governance_cadence"],
+          "strong_shapes": ["governance_cadence"],
+          "competition": 1,
+          "specificity": 1
+        }
+      }
+    },
+    {
+      "utterance": "月次の請求処理を回して",
+      "result": {
+        "workShape": "routine_operation",
+        "managementUnit": "operation",
+        "reasonKey": "organization:organization_resolution_reason_routine",
+        "confidence": 0.88,
+        "signals": {
+          "prior": 0.88,
+          "matched_shapes": ["routine_operation"],
+          "strong_shapes": ["routine_operation"],
+          "competition": 1,
+          "specificity": 1
+        }
+      }
+    },
+    {
+      "utterance": "顧客対応の窓口を整える",
+      "result": {
+        "workShape": "service_operation",
+        "managementUnit": "service",
+        "reasonKey": "organization:organization_resolution_reason_service",
+        "confidence": 0.84,
+        "signals": {
+          "prior": 0.84,
+          "matched_shapes": ["service_operation"],
+          "strong_shapes": ["service_operation"],
+          "competition": 1,
+          "specificity": 1
+        }
+      }
+    },
+    {
+      "utterance": "サポート窓口の運用を見直す",
+      "result": {
+        "workShape": "service_operation",
+        "managementUnit": "service",
+        "reasonKey": "organization:organization_resolution_reason_service",
+        "confidence": 0.84,
+        "signals": {
+          "prior": 0.84,
+          "matched_shapes": ["service_operation"],
+          "strong_shapes": ["service_operation"],
+          "competition": 1,
+          "specificity": 1
+        }
+      }
+    },
+    {
+      "utterance": "新しい問い合わせ導線を試す",
+      "result": {
+        "workShape": "improvement_experiment",
+        "managementUnit": "experiment",
+        "reasonKey": "organization:organization_resolution_reason_experiment",
+        "confidence": 0.82,
+        "signals": {
+          "prior": 0.82,
+          "matched_shapes": ["improvement_experiment", "solution_project"],
+          "strong_shapes": ["improvement_experiment"],
+          "competition": 1,
+          "specificity": 1
+        }
+      }
+    },
+    {
+      "utterance": "パイロットで改善を実験したい",
+      "result": {
+        "workShape": "improvement_experiment",
+        "managementUnit": "experiment",
+        "reasonKey": "organization:organization_resolution_reason_experiment",
+        "confidence": 0.82,
+        "signals": {
+          "prior": 0.82,
+          "matched_shapes": ["improvement_experiment"],
+          "strong_shapes": ["improvement_experiment"],
+          "competition": 1,
+          "specificity": 1
+        }
+      }
+    },
+    {
+      "utterance": "新しい社内ポータルを構築する",
+      "result": {
+        "workShape": "solution_project",
+        "managementUnit": "project",
+        "reasonKey": "organization:organization_resolution_reason_project",
+        "confidence": 0.8,
+        "signals": {
+          "prior": 0.8,
+          "matched_shapes": ["solution_project"],
+          "strong_shapes": ["solution_project"],
+          "competition": 1,
+          "specificity": 1
+        }
+      }
+    },
+    {
+      "utterance": "Build a new onboarding portal",
+      "result": {
+        "workShape": "solution_project",
+        "managementUnit": "project",
+        "reasonKey": "organization:organization_resolution_reason_project",
+        "confidence": 0.56,
+        "signals": {
+          "prior": 0.8,
+          "matched_shapes": ["solution_project"],
+          "strong_shapes": [],
+          "competition": 1,
+          "specificity": 0.7
+        }
+      }
+    },
+    {
+      "utterance": "The API is down, emergency",
+      "result": {
+        "workShape": "incident_response",
+        "managementUnit": "incident",
+        "reasonKey": "organization:organization_resolution_reason_incident",
+        "confidence": 0.65,
+        "signals": {
+          "prior": 0.93,
+          "matched_shapes": ["incident_response"],
+          "strong_shapes": ["incident_response"],
+          "competition": 1,
+          "specificity": 0.7
+        }
+      }
+    },
+    {
+      "utterance": "Weekly report for the board",
+      "result": {
+        "workShape": "routine_operation",
+        "managementUnit": "operation",
+        "reasonKey": "organization:organization_resolution_reason_routine",
+        "confidence": 0.62,
+        "signals": {
+          "prior": 0.88,
+          "matched_shapes": ["routine_operation"],
+          "strong_shapes": ["routine_operation"],
+          "competition": 1,
+          "specificity": 0.7
+        }
+      }
+    },
+    {
+      "utterance": "Please review the audit findings",
+      "result": {
+        "workShape": "governance_cadence",
+        "managementUnit": "cadence",
+        "reasonKey": "organization:organization_resolution_reason_governance",
+        "confidence": 0.9,
+        "signals": {
+          "prior": 0.9,
+          "matched_shapes": ["governance_cadence"],
+          "strong_shapes": ["governance_cadence"],
+          "competition": 1,
+          "specificity": 1
+        }
+      }
+    },
+    {
+      "utterance": "こんにちは",
+      "result": {
+        "workShape": "routine_operation",
+        "managementUnit": "operation",
+        "confidence": 0.4,
+        "reasonKey": "organization:organization_resolution_reason_fallback_routine"
+      }
+    },
+    {
+      "utterance": "こんにちは",
+      "selected_task_kind": "project_bootstrap",
+      "result": {
+        "workShape": "solution_project",
+        "managementUnit": "project",
+        "confidence": 0.62,
+        "reasonKey": "organization:organization_resolution_reason_fallback_project"
+      }
+    },
+    {
+      "utterance": "こんにちは",
+      "selected_task_kind": "mission",
+      "result": {
+        "workShape": "solution_project",
+        "managementUnit": "project",
+        "confidence": 0.62,
+        "reasonKey": "organization:organization_resolution_reason_fallback_project"
+      }
+    },
+    {
+      "utterance": "こんにちは",
+      "selected_task_kind": "task_session",
+      "result": {
+        "workShape": "service_operation",
+        "managementUnit": "service",
+        "confidence": 0.58,
+        "reasonKey": "organization:organization_resolution_reason_fallback_service"
+      }
+    },
+    {
+      "utterance": "何か手伝って",
+      "selected_task_kind": "direct_reply",
+      "result": {
+        "workShape": "routine_operation",
+        "managementUnit": "operation",
+        "confidence": 0.4,
+        "reasonKey": "organization:organization_resolution_reason_fallback_routine"
+      }
+    },
+    {
+      "utterance": "提案書を作って",
+      "result": {
+        "workShape": "routine_operation",
+        "managementUnit": "operation",
+        "confidence": 0.4,
+        "reasonKey": "organization:organization_resolution_reason_fallback_routine"
+      }
+    },
+    {
+      "utterance": "来週の会議のレビュー資料を作って",
+      "result": {
+        "workShape": "governance_cadence",
+        "managementUnit": "cadence",
+        "reasonKey": "organization:organization_resolution_reason_governance",
+        "confidence": 0.9,
+        "signals": {
+          "prior": 0.9,
+          "matched_shapes": ["governance_cadence"],
+          "strong_shapes": [],
+          "competition": 1,
+          "specificity": 1
+        }
+      }
+    },
+    {
+      "utterance": "週次レビューの議事録ドキュメントを作成して",
+      "result": {
+        "workShape": "governance_cadence",
+        "managementUnit": "cadence",
+        "reasonKey": "organization:organization_resolution_reason_governance",
+        "confidence": 0.9,
+        "signals": {
+          "prior": 0.9,
+          "matched_shapes": ["governance_cadence", "routine_operation"],
+          "strong_shapes": ["routine_operation"],
+          "competition": 1,
+          "specificity": 1
+        }
+      }
+    },
+    {
+      "utterance": "障害の振り返りレポートを作成して",
+      "result": {
+        "workShape": "incident_response",
+        "managementUnit": "incident",
+        "reasonKey": "organization:organization_resolution_reason_incident",
+        "confidence": 0.79,
+        "signals": {
+          "prior": 0.93,
+          "matched_shapes": ["incident_response", "routine_operation"],
+          "strong_shapes": ["incident_response", "routine_operation"],
+          "competition": 0.85,
+          "specificity": 1
+        }
+      }
+    },
+    {
+      "utterance": "optimize the onboarding flow",
+      "result": {
+        "workShape": "improvement_experiment",
+        "managementUnit": "experiment",
+        "reasonKey": "organization:organization_resolution_reason_experiment",
+        "confidence": 0.57,
+        "signals": {
+          "prior": 0.82,
+          "matched_shapes": ["improvement_experiment"],
+          "strong_shapes": [],
+          "competition": 1,
+          "specificity": 0.7
+        }
+      }
+    },
+    {
+      "utterance": "サービス",
+      "result": {
+        "workShape": "service_operation",
+        "managementUnit": "service",
+        "reasonKey": "organization:organization_resolution_reason_service",
+        "confidence": 0.5,
+        "signals": {
+          "prior": 0.84,
+          "matched_shapes": ["service_operation"],
+          "strong_shapes": [],
+          "competition": 1,
+          "specificity": 0.595
+        }
+      }
+    }
+  ],
+  "surface": [
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "Webサービスを作って",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "6/6-6/8で沖縄のホテルを探して",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "zzzzzzzzqqqq",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "今日の天気を教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "hello",
+      "compile": false
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "ミッション一覧を教えて",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "voice-hub を再起動して",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "今週の進捗レポートを docx で作って",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "左下の承認ボタンを押して",
+      "compile": false
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "承認を依頼して",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "稟議の決裁しておいて",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "スケジュールを調整して",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "来週の予定教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "mission authority を教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "implement this change",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "この文章を要約してください。とても長い文章なのですが、要点だけを三行でまとめてほしいです。よろしくお願いします。追加で背景も説明します。",
+      "compile": false
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "this is a fairly long message that does not obviously match any intent at all but keeps going and going past eighty characters",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "text": "一行目\n二行目",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "Webサービスを作って",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "6/6-6/8で沖縄のホテルを探して",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "zzzzzzzzqqqq",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "今日の天気を教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "hello",
+      "compile": false
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "ミッション一覧を教えて",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "voice-hub を再起動して",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "今週の進捗レポートを docx で作って",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "左下の承認ボタンを押して",
+      "compile": false
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "承認を依頼して",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "稟議の決裁しておいて",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "スケジュールを調整して",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "来週の予定教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "mission authority を教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "implement this change",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "この文章を要約してください。とても長い文章なのですが、要点だけを三行でまとめてほしいです。よろしくお願いします。追加で背景も説明します。",
+      "compile": false
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "this is a fairly long message that does not obviously match any intent at all but keeps going and going past eighty characters",
+      "compile": true
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "一行目\n二行目",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "Webサービスを作って",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "6/6-6/8で沖縄のホテルを探して",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "zzzzzzzzqqqq",
+      "compile": false
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "今日の天気を教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "hello",
+      "compile": false
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "ミッション一覧を教えて",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "voice-hub を再起動して",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "今週の進捗レポートを docx で作って",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "左下の承認ボタンを押して",
+      "compile": false
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "承認を依頼して",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "稟議の決裁しておいて",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "スケジュールを調整して",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "来週の予定教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "mission authority を教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "implement this change",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "この文章を要約してください。とても長い文章なのですが、要点だけを三行でまとめてほしいです。よろしくお願いします。追加で背景も説明します。",
+      "compile": false
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "this is a fairly long message that does not obviously match any intent at all but keeps going and going past eighty characters",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "text": "一行目\n二行目",
+      "compile": false
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "Webサービスを作って",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "6/6-6/8で沖縄のホテルを探して",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "zzzzzzzzqqqq",
+      "compile": false
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "今日の天気を教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "hello",
+      "compile": false
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "ミッション一覧を教えて",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "voice-hub を再起動して",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "今週の進捗レポートを docx で作って",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "左下の承認ボタンを押して",
+      "compile": false
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "承認を依頼して",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "稟議の決裁しておいて",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "スケジュールを調整して",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "来週の予定教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "mission authority を教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "implement this change",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "この文章を要約してください。とても長い文章なのですが、要点だけを三行でまとめてほしいです。よろしくお願いします。追加で背景も説明します。",
+      "compile": false
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "this is a fairly long message that does not obviously match any intent at all but keeps going and going past eighty characters",
+      "compile": true
+    },
+    {
+      "agent_id": "slack-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "一行目\n二行目",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "Webサービスを作って",
+      "compile": true
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "6/6-6/8で沖縄のホテルを探して",
+      "compile": true
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "zzzzzzzzqqqq",
+      "compile": true
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "今日の天気を教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "hello",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "ミッション一覧を教えて",
+      "compile": true
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "voice-hub を再起動して",
+      "compile": true
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "今週の進捗レポートを docx で作って",
+      "compile": true
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "左下の承認ボタンを押して",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "承認を依頼して",
+      "compile": true
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "稟議の決裁しておいて",
+      "compile": true
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "スケジュールを調整して",
+      "compile": true
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "来週の予定教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "mission authority を教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "implement this change",
+      "compile": true
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "この文章を要約してください。とても長い文章なのですが、要点だけを三行でまとめてほしいです。よろしくお願いします。追加で背景も説明します。",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "this is a fairly long message that does not obviously match any intent at all but keeps going and going past eighty characters",
+      "compile": true
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "text": "一行目\n二行目",
+      "compile": true
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "Webサービスを作って",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "6/6-6/8で沖縄のホテルを探して",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "zzzzzzzzqqqq",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "今日の天気を教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "hello",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "ミッション一覧を教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "voice-hub を再起動して",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "今週の進捗レポートを docx で作って",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "左下の承認ボタンを押して",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "承認を依頼して",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "稟議の決裁しておいて",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "スケジュールを調整して",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "来週の予定教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "mission authority を教えて",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "implement this change",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "この文章を要約してください。とても長い文章なのですが、要点だけを三行でまとめてほしいです。よろしくお願いします。追加で背景も説明します。",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "this is a fairly long message that does not obviously match any intent at all but keeps going and going past eighty characters",
+      "compile": false
+    },
+    {
+      "agent_id": "presence-surface-agent",
+      "receiver": "chronos-mirror",
+      "text": "一行目\n二行目",
+      "compile": false
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "mission_handoff": true,
+      "text": "Webサービスを作って",
+      "compile": false
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "mission_handoff": true,
+      "text": "6/6-6/8で沖縄のホテルを探して",
+      "compile": false
+    },
+    {
+      "agent_id": "cli-surface-agent",
+      "mission_handoff": true,
+      "text": "zzzzzzzzqqqq",
+      "compile": false
+    }
+  ]
+}

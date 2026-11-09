@@ -2,7 +2,7 @@ import { pathResolver } from '../path-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
-import { resolveIntentResolutionPacket } from '../intent/intent-resolution.js';
+import { resolveRoutingPacket } from '../intent/intent-resolver-entry.js';
 import type { SurfaceIntentResolutionOptions } from '../intent/router-contract.js';
 import {
   listSurfaceQueryOverlayCatalogEntries,
@@ -363,7 +363,7 @@ export function classifySurfaceQueryIntent(
 ): SurfaceQueryIntent {
   const packet =
     options.packet ||
-    resolveIntentResolutionPacket(text, {
+    resolveRoutingPacket(text, {
       tier: options.tier,
       tenantId: options.tenantId,
     });

@@ -15,6 +15,7 @@ import {
 } from '../workforce/artifact-record.js';
 import { renderDiscussionBriefHtml } from './discussion-brief.js';
 import { createWorkItem } from '../workforce/work-coordination.js';
+import { resolveOrganizationWorkRouting } from '../intent/intent-resolver-entry.js';
 import {
   discussionExecutionSummary,
   discussionRoleLabel,
@@ -412,6 +413,29 @@ export function refreshDiscussionDeliverables(roomId: string): void {
   }
 }
 
+/** Below this the resolver's organization-work classification asks a human (same gate as the facade). */
+const CONFIDENT_WORK_SHAPE = 0.7;
+
+/**
+ * Thin adapter (R3): the proposal's organization work shape comes from the
+ * resolver entry reading the agreed proposal, not a constant. An unclear
+ * proposal keeps the discussion default, `solution_project`.
+ */
+export function discussionProposalWorkShape(
+  room: Pick<DiscussionRoomState, 'scope'>,
+  proposal: Pick<DiscussionWorkProposal, 'title' | 'description'>
+) {
+  const text = [proposal.title, proposal.description].filter(Boolean).join('\n').trim();
+  if (!text) return 'solution_project' as const;
+  const { organizationWork } = resolveOrganizationWorkRouting(text, {
+    ...(room.scope.tier ? { tier: room.scope.tier } : {}),
+    ...(room.scope.tenant_slug ? { tenantId: room.scope.tenant_slug } : {}),
+  });
+  return organizationWork.confidence >= CONFIDENT_WORK_SHAPE
+    ? organizationWork.workShape
+    : ('solution_project' as const);
+}
+
 export interface CreateWorkItemsResult {
   created: Array<{ proposal_id: string; item_id: string }>;
   skipped: string[];
@@ -457,7 +481,7 @@ export function createWorkItemsFromDecision(
         ...(room.scope.organization_id ? { organization_id: room.scope.organization_id } : {}),
         ...(room.scope.project_id ? { project_id: room.scope.project_id } : {}),
         ...(room.scope.mission_id ? { mission_id: room.scope.mission_id } : {}),
-        work_shape: 'solution_project',
+        work_shape: discussionProposalWorkShape(room, proposal),
       },
       metadata: {
         discussion_id: room.id,
