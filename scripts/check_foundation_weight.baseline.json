@@ -80,6 +80,7 @@
     "foundation/deliverable-inbox-writer-capability": 0,
     "foundation/discussion-request-capability": 4,
     "foundation/dot-result-store-capability": 4,
+    "foundation/env-dotenv": 50,
     "foundation/env": 0,
     "foundation/execution-scope": 5,
     "foundation/failure-tracker": 0,
