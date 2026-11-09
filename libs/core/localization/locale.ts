@@ -19,7 +19,7 @@ import {
 } from '../foundation/locale-normalize.js';
 import { assertScopeContext, type ScopeContext } from '../scope-context.js';
 import { loadPersonalIdentityAtPath } from '../authn/personal-identity-state.js';
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
 
 /**
@@ -117,10 +117,11 @@ function readDeprecatedUiLocaleAlias(): SupportedLocale | null {
 }
 
 /**
- * S2: least-privilege role that may read exactly one file per tenant —
- * `knowledge/confidential/<tenant>/locale.json` (security-policy.json). Surface
- * runtimes (slack_bridge, surface_runtime, …) cannot read the confidential tier,
- * so the tenant locale is read under this role, bound to the turn's tenant.
+ * S2/S4: the store grant that reads exactly one file per tenant —
+ * `knowledge/confidential/<tenant>/locale.json` (security-policy.json
+ * `store_grants`). Surface runtimes (slack_bridge, surface_runtime, …) cannot
+ * read the confidential tier, so the tenant locale is read under this grant,
+ * bound to the turn's tenant. It is not an assumable role.
  */
 export const SCOPE_LOCALE_READER_ROLE = 'scope_locale_reader';
 
@@ -136,7 +137,7 @@ function warnLocaleOverlayDenied(candidate: string, error: unknown): void {
   const reason = (error instanceof Error ? error.message : String(error)).split('\n')[0];
   logger.warn(
     `[locale] scope locale overlay ${relative} is not readable by the current role — the reply falls back to the operator locale | ` +
-      `grant the runtime role read access or move the locale to the tenant overlay (knowledge/confidential/<tenant>/locale.json, read via ${SCOPE_LOCALE_READER_ROLE}) | ${reason}`
+      `grant the runtime role read access or move the locale to the tenant overlay (knowledge/confidential/<tenant>/locale.json, read under the ${SCOPE_LOCALE_READER_ROLE} store grant) | ${reason}`
   );
 }
 
@@ -198,18 +199,15 @@ function resolveScopedLocale(scope?: LocaleContext['scope']): SupportedLocale | 
     const locale = readLocaleOverlayOrWarn(candidate, () => readLocaleOverlay(candidate));
     if (locale) return locale;
   }
-  // The tenant overlay is read under the narrow reader role bound to the
+  // The tenant overlay is read under the narrow store grant bound to the
   // turn's tenant — never for a different tenant than the caller is bound to.
   const callerTenant = resolvePolicyIdentityContext().tenantSlug;
   if (callerTenant && callerTenant !== tenant) return null;
   const tenantCandidate = pathResolver.knowledge(`confidential/${tenant}/locale.json`);
   return readLocaleOverlayOrWarn(tenantCandidate, () =>
-    withExecutionContext(
-      SCOPE_LOCALE_READER_ROLE,
-      () => readLocaleOverlay(tenantCandidate),
-      undefined,
-      tenant
-    )
+    withStoreGrant(SCOPE_LOCALE_READER_ROLE, () => readLocaleOverlay(tenantCandidate), {
+      tenantSlug: tenant,
+    })
   );
 }
 

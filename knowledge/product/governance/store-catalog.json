@@ -1125,7 +1125,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["scope_locale_reader"],
+      "grants": ["scope_locale_reader"],
       "sources": ["role-policy"]
     }
   ]
