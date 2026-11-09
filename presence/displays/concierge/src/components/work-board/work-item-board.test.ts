@@ -5,7 +5,10 @@ import {
   boardMoveTargets,
   cardTitle,
   groupBoardColumns,
+  groupIssueCards,
+  orderBoardSteps,
   resolveBoardDrop,
+  stepProgress,
   summarizeWorkItemDescription,
   withCardStatus,
   type BoardCard,
@@ -139,5 +142,37 @@ describe('card text helpers', () => {
     expect(ageInDays('2026-11-01T12:00:00Z', now)).toBe(3);
     expect(ageInDays('not a date', now)).toBeNull();
     expect(ageInDays(undefined, now)).toBeNull();
+  });
+});
+
+describe('Issue cards and steps (W2)', () => {
+  it('turns a flat list into Issue cards carrying their step progress', () => {
+    const { cards, stepsOf } = groupIssueCards([
+      card('issue', 'in_progress'),
+      { ...card('step-1', 'done'), parentId: 'issue' },
+      { ...card('step-2', 'ready'), parentId: 'issue' },
+      { ...card('orphan', 'ready'), parentId: 'hidden-issue' },
+    ]);
+    expect(cards.map((entry) => entry.id)).toEqual(['issue', 'orphan']);
+    expect(cards[0].steps).toEqual({ total: 2, done: 1 });
+    expect(cards[1].steps).toBeUndefined();
+    expect(stepsOf.get('issue')?.map((step) => step.id)).toEqual(['step-1', 'step-2']);
+  });
+
+  it('describes step progress only when there are steps', () => {
+    expect(stepProgress(undefined)).toBeNull();
+    expect(stepProgress({ total: 0, done: 0 })).toBeNull();
+    expect(stepProgress({ total: 3, done: 1 })).toEqual({ total: 3, done: 1, percent: 33 });
+    expect(stepProgress({ total: 2, done: 5 })).toEqual({ total: 2, done: 2, percent: 100 });
+  });
+
+  it('orders steps along the board, unknown statuses last', () => {
+    const ordered = orderBoardSteps([
+      { title: 'b', status: 'done' },
+      { title: 'z', status: 'mystery' },
+      { title: 'a', status: 'backlog' },
+      { title: 'c', status: 'done' },
+    ]);
+    expect(ordered.map((step) => step.title)).toEqual(['a', 'b', 'c', 'z']);
   });
 });
