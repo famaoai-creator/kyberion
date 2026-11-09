@@ -38,6 +38,8 @@ export interface EngineConfigSnapshot {
   values: EngineConfigValues;
   revision: string;
   profile: { kind: 'personal' | 'customer'; id: string };
+  /** Registered pane-runtime bridge ids valid for `agent_pane_runtime_provider`. */
+  pane_providers: string[];
 }
 
 /** Pure. A server response, or null when it does not match the contract. */
@@ -73,10 +75,16 @@ export function parseEngineConfig(body: unknown): EngineConfigSnapshot | null {
       return null;
     values[key] = value ?? '';
   }
+  const paneProviders = Array.isArray((data as { pane_providers?: unknown }).pane_providers)
+    ? ((data as { pane_providers: unknown[] }).pane_providers.filter(
+        (id): id is string => typeof id === 'string'
+      ) as string[])
+    : [];
   return {
     values,
     revision: data.revision,
     profile: { kind: data.profile.kind, id: data.profile.id },
+    pane_providers: paneProviders,
   };
 }
 
