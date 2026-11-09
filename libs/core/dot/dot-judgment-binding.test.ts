@@ -189,7 +189,7 @@ describe('pure server-authored synthetic origin references (not persisted proof)
     for (const charter of [
       { ...input.charter, status: 'paused' as const },
       { ...input.charter, authority: { ...input.charter.authority, allowed_pipelines: [] } },
-      { ...input.charter, authority: { ...input.charter.authority, allowed_work_shapes: [] } },
+      { ...input.charter, authority: { ...input.charter.authority, allowed_execution_shapes: [] } },
       { ...input.charter, scope: { ...input.charter.scope, project_id: 'other-project' } },
     ]) {
       expect(() => bindSyntheticDotJudgmentProposal({ ...input, charter })).toThrow();

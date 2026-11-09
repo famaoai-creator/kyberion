@@ -60,7 +60,7 @@ export function diagnosticDraft(tenant: string): DotCharter {
     attention: { triggers: [] },
     authority: {
       authority_role: 'infrastructure_sentinel',
-      allowed_work_shapes: ['pipeline'],
+      allowed_execution_shapes: ['pipeline'],
       allowed_pipelines: [FRONT_DESK_RECEIPT_PIPELINE],
       max_concurrent_delegations: 1,
     },

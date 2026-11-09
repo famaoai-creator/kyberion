@@ -9,11 +9,11 @@
     "intake": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "action_id", "allowed_work_shapes", "max_proposals_per_wake"],
+      "required": ["enabled", "action_id", "allowed_execution_shapes", "max_proposals_per_wake"],
       "properties": {
         "enabled": { "type": "boolean" },
         "action_id": { "const": "dot_intake_work" },
-        "allowed_work_shapes": {
+        "allowed_execution_shapes": {
           "type": "array",
           "uniqueItems": true,
           "items": { "enum": ["direct_reply", "task_session", "mission", "pipeline"] }

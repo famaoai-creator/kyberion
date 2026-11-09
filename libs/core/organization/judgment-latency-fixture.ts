@@ -352,7 +352,7 @@ export function createJudgmentLatencyFixture(input: { untrustedReport?: string }
     attention: { triggers: [] },
     authority: {
       authority_role: 'organization_operator',
-      allowed_work_shapes: ['pipeline'],
+      allowed_execution_shapes: ['pipeline'],
       allowed_pipelines: [SYNTHETIC_LATENCY_PIPELINE_REF],
       max_concurrent_delegations: 1,
     },

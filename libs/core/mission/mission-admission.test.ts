@@ -174,7 +174,7 @@ beforeEach(() => {
     },
     authority: {
       authority_role: 'mission_controller',
-      allowed_work_shapes: ['mission'],
+      allowed_execution_shapes: ['mission'],
       mission_mandate_refs: ['docs'],
     },
   };

@@ -92,7 +92,7 @@ describe('inactive three-role dot team starter', () => {
 
   it('allows only bounded advisory proposals and never silently raises autonomy', () => {
     for (const charter of templates()) {
-      expect(charter.authority.allowed_work_shapes).toEqual(['direct_reply']);
+      expect(charter.authority.allowed_execution_shapes).toEqual(['direct_reply']);
       expect(charter.authority.allowed_pipelines).toEqual([]);
       expect(charter.authority.max_concurrent_delegations).toBeUndefined();
       expect(charter.decisions).toEqual({

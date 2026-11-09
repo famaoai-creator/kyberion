@@ -118,7 +118,7 @@ export function describeDotIntakePlan(input: {
       ...(charter.scope.organization_id ? { organization_id: charter.scope.organization_id } : {}),
       ...(charter.scope.project_id ? { project_id: charter.scope.project_id } : {}),
       authority_role: charter.authority.authority_role,
-      work_shapes: [...(charter.authority.allowed_work_shapes ?? ['direct_reply'])],
+      work_shapes: [...(charter.authority.allowed_execution_shapes ?? ['direct_reply'])],
       decision: charter.decisions?.default_decision ?? 'notify',
       goal: charter.goal.statement,
     };

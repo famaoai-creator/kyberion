@@ -74,7 +74,7 @@ function charter(overrides: Partial<DotCharter> = {}): DotCharter {
     },
     authority: {
       authority_role: 'infrastructure_sentinel',
-      allowed_work_shapes: ['direct_reply', 'pipeline'],
+      allowed_execution_shapes: ['direct_reply', 'pipeline'],
     },
     decisions: { default_decision: 'notify' },
     notification: { deliver_to: { surface: 'slack', channel: '#ops' } },

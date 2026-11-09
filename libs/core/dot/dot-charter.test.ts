@@ -161,6 +161,34 @@ describe('tenant dot charters', () => {
       );
   });
 
+  it('reads the deprecated allowed_work_shapes key as allowed_execution_shapes', () => {
+    const legacy = {
+      ...VALID_CHARTER,
+      authority: { ...VALID_CHARTER.authority, allowed_work_shapes: ['pipeline'] },
+    };
+    const charter = validateDotCharter(legacy);
+    expect(charter.authority.allowed_execution_shapes).toEqual(['pipeline']);
+    expect(Object.hasOwn(charter.authority, 'allowed_work_shapes')).toBe(false);
+    // The caller's object is not mutated.
+    expect(legacy.authority.allowed_work_shapes).toEqual(['pipeline']);
+    expect(
+      validateDotCharter({
+        ...VALID_CHARTER,
+        authority: { ...VALID_CHARTER.authority, allowed_execution_shapes: ['direct_reply'] },
+      }).authority.allowed_execution_shapes
+    ).toEqual(['direct_reply']);
+    expect(() =>
+      validateDotCharter({
+        ...VALID_CHARTER,
+        authority: {
+          ...VALID_CHARTER.authority,
+          allowed_execution_shapes: ['direct_reply'],
+          allowed_work_shapes: ['pipeline'],
+        },
+      })
+    ).toThrow(/allowed_work_shapes \(deprecated\) and allowed_execution_shapes differ/);
+  });
+
   it('preserves literal hyphen and dot role grammar without treating it as role registration', () => {
     expect(
       validateDotCharter({

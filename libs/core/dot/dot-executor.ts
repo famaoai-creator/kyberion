@@ -85,7 +85,7 @@ export { assertDotAccountabilityCharter } from './dot-authority.js';
 import { recordAutonomyExecution } from '../governance/autonomy-action-state.js';
 import type { DotCharter, LoadedDotCharter } from './dot-charter.js';
 import type { DotStatusSection } from './dot-extensions.js';
-import { DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE, type DotWorkShape } from './dot-proposals.js';
+import { DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE, type DotExecutionShape } from './dot-proposals.js';
 import {
   dotDailyTokenCapReached,
   recordDotTokenUsage,
@@ -335,7 +335,7 @@ async function routeItem(
   accountingId: string,
   deps: DotExecutorDeps
 ): Promise<Outcome> {
-  const shape = meta(item, 'requested_work_shape') as DotWorkShape | undefined;
+  const shape = meta(item, 'requested_work_shape') as DotExecutionShape | undefined;
   if (!shape) {
     return { mode: 'escalated', status: 'blocked', summary: DOT_EXECUTOR_MISSING_SHAPE_GUIDANCE };
   }

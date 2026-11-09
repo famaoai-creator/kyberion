@@ -37,7 +37,7 @@ item sits unclaimed forever:
 | `metadata.dot_id` (or `handoff_to`)                                                                                                                      | `addressedTo()` finds no target                                   |
 | `context.tenant_slug` matching the charter's tenant                                                                                                      | `dotItemTenantMismatch` → cross-tenant refusal (undefined ≠ slug) |
 | `metadata.requested_work_shape`                                                                                                                          | executor escalates with missing-shape guidance                    |
-| shape in `authority.allowed_work_shapes` (enforced at the step port for task_session)                                                                    | capability_unavailable refusal                                    |
+| shape in `authority.allowed_execution_shapes` (enforced at the step port for task_session)                                                               | capability_unavailable refusal                                    |
 | `metadata.pipeline_ref` in `authority.allowed_pipelines` for pipeline shape — **repo-relative path verbatim** (`pipelines/<name>.json`, not a bare name) | `allowed_pipelines` miss or `Resource path does not exist`        |
 
 ## 3. Wake delivery (inbox rows)
@@ -55,12 +55,12 @@ item sits unclaimed forever:
 
 ## 4. Work-shape routing (executor)
 
-`DotWorkShape` routes claimed items:
+`DotExecutionShape` routes claimed items:
 
 - `direct_reply` — one bounded advisory goal turn ("advisory result, effects
   are unverified" prefix).
 - `task_session` — bounded goalTurn multi-turn, enabled **per-charter**:
-  `authority.allowed_work_shapes` must declare it; the step sets
+  `authority.allowed_execution_shapes` must declare it; the step sets
   `taskSessionUnavailable` otherwise. Sessions are advisory turns only (no
   work tools — a claimed "complete" cannot prove task execution).
 - `pipeline` — runs `metadata.pipeline_ref` from `allowed_pipelines` via the

@@ -1230,6 +1230,17 @@ export function createKyberionMcpServer(): McpServer {
             'mission',
             'project_bootstrap',
           ]),
+          execution_shape: z
+            .enum([
+              'direct_reply',
+              'actuator_action',
+              'browser_session',
+              'task_session',
+              'pipeline',
+              'mission',
+              'project_bootstrap',
+            ])
+            .optional(),
           outcome_kind: z.enum([
             'answer',
             'artifact',
