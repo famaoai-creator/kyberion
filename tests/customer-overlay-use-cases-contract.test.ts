@@ -8,18 +8,19 @@ function read(relPath: string): string {
   return safeReadFile(path.join(rootDir, relPath), { encoding: 'utf8' }) as string;
 }
 
-describe('Customer overlay use cases contract', () => {
-  it('documents the customer overlay story and operational commands', () => {
+describe('Stance use cases contract', () => {
+  it('documents the stance story and operational commands', () => {
     const doc = read('docs/user/customer-overlay-use-cases.md');
     const readme = read('docs/user/README.md');
     const customerReadme = read('templates/stance/README.md');
 
-    expect(doc).toContain('Stance Overlay Use Cases');
-    expect(doc).toContain('create a customer overlay from the template');
+    expect(doc).toContain('# Stance Use Cases');
+    expect(doc).toContain('create a stance from the template and declare `acting_for`');
     expect(doc).toContain(
-      'inspect which customer overlays are present and whether the required files are filled in'
+      'inspect which stances are present and whether the required files are filled in'
     );
-    expect(doc).toContain('switch the active customer only after the overlay is ready');
+    expect(doc).toContain('a tenant they are not permitted to serve is rejected');
+    expect(doc).toContain('retired');
     expect(doc).toContain('pnpm stance:create <slug>');
     expect(doc).toContain('pnpm stance:migrate-from-personal <slug>');
     expect(doc).toContain('pnpm stance:list');
