@@ -29,7 +29,7 @@ const charter: DotCharter = {
   attention: { triggers: [] },
   authority: {
     authority_role: 'infrastructure_sentinel',
-    allowed_work_shapes: ['pipeline'],
+    allowed_execution_shapes: ['pipeline'],
     allowed_pipelines: ['pipelines/front-desk-request-receipt.json'],
     max_concurrent_delegations: 1,
   },

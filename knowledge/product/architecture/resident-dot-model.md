@@ -86,7 +86,7 @@ governs each one in the supervisor process, under the charter role
 
 1. **Charter bounds**: the policy action is derived, never chosen by the dot
    (`dot_handoff` with `handoff_to`, else `dot_delegate_work`), so a dot cannot
-   name a cheaper policy action. Then `allowed_work_shapes` (default
+   name a cheaper policy action. Then `allowed_execution_shapes` (default
    `direct_reply`; `task_session` is refused up-front while no governed
    task-session executor is configured, even when declared), handoff acceptance, and `max_concurrent_delegations`
    (default 3). Open WorkItems and parked decisions both count toward the cap.

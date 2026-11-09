@@ -37,6 +37,7 @@ import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseInflightLimit } from '../foundation/inflight-limit.js';
 import type { ValidateFunction } from 'ajv';
+import type { DotExecutionShape } from './dot-proposals.js';
 
 /** Per-dot admission slots, independent of provider/LLM process concurrency. */
 export const DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS = 100;
@@ -185,7 +186,8 @@ export interface DotCharter {
   authority: {
     authority_role: string;
     accountability_charter_ref?: string;
-    allowed_work_shapes?: Array<'mission' | 'task_session' | 'pipeline' | 'direct_reply'>;
+    /** Execution shapes the dot may dispatch (formerly `allowed_work_shapes`, still read as an alias). */
+    allowed_execution_shapes?: DotExecutionShape[];
     max_concurrent_delegations?: number;
     /** Repo-relative pipelines the executor may run for pipeline-shaped work. */
     allowed_pipelines?: string[];
@@ -320,6 +322,38 @@ function assertFeedTriggersHaveConsumer(charter: DotCharter, sourcePath: string)
   }
 }
 
+const warnedLegacyShapeKeys = new Set<string>();
+
+/**
+ * Deprecated alias, accepted for one release: `authority.allowed_work_shapes` is read as
+ * `allowed_execution_shapes` and removed, so runtime code sees only the canonical key.
+ * Declaring both with different values is ambiguous and rejected.
+ */
+function normalizeDeprecatedCharterKeys(charter: DotCharter, sourcePath: string): DotCharter {
+  type LegacyAuthority = DotCharter['authority'] & { allowed_work_shapes?: DotExecutionShape[] };
+  if (!Object.hasOwn(charter.authority, 'allowed_work_shapes')) return charter;
+  // Normalize a copy so the caller's object is never mutated.
+  const normalized = structuredClone(charter);
+  const authority = normalized.authority as LegacyAuthority;
+  const legacy = authority.allowed_work_shapes;
+  if (
+    authority.allowed_execution_shapes !== undefined &&
+    !isDeepStrictEqual(authority.allowed_execution_shapes, legacy)
+  )
+    throw new Error(
+      `Invalid dot charter at ${sourcePath}: authority.allowed_work_shapes (deprecated) and allowed_execution_shapes differ — keep only allowed_execution_shapes`
+    );
+  if (!warnedLegacyShapeKeys.has(sourcePath)) {
+    warnedLegacyShapeKeys.add(sourcePath);
+    logger.warn(
+      `dot charter uses deprecated authority.allowed_work_shapes — read as allowed_execution_shapes | rename the key | ${sourcePath}`
+    );
+  }
+  authority.allowed_execution_shapes = legacy;
+  delete authority.allowed_work_shapes;
+  return normalized;
+}
+
 export function validateDotCharter(value: unknown, sourcePath = '<inline>'): DotCharter {
   const candidate =
     value && typeof value === 'object' && !Array.isArray(value) && '$schema' in value
@@ -332,8 +366,8 @@ export function validateDotCharter(value: unknown, sourcePath = '<inline>'): Dot
       .join('; ');
     throw new Error(`Invalid dot charter at ${sourcePath}: ${errors}`);
   }
-  isFrontDeskDiagnosticDot(candidate as DotCharter);
-  const bound = candidate as DotCharter;
+  const bound = normalizeDeprecatedCharterKeys(candidate as DotCharter, sourcePath);
+  isFrontDeskDiagnosticDot(bound);
   if (isInternalDotStoreRole(bound.authority.authority_role))
     throw new Error(
       `Invalid dot charter at ${sourcePath}: ${bound.authority.authority_role} is an internal store role`
@@ -345,9 +379,9 @@ export function validateDotCharter(value: unknown, sourcePath = '<inline>'): Dot
     throw new Error(
       `Invalid dot charter at ${sourcePath}: an operation binding requires an organization, excludes a project and cannot supervise organization-wide cadence`
     );
-  assertOperationsCadenceTimezones(candidate as DotCharter, sourcePath);
-  assertFeedTriggersHaveConsumer(candidate as DotCharter, sourcePath);
-  return candidate as DotCharter;
+  assertOperationsCadenceTimezones(bound, sourcePath);
+  assertFeedTriggersHaveConsumer(bound, sourcePath);
+  return bound;
 }
 
 export function loadDotCharter(filePath: string): DotCharter {
@@ -798,8 +832,8 @@ export function assertFrontDeskDiagnosticDotCharter(charter: DotCharter): void {
     failures.push('scope must be public and name one valid, non-reserved tenant');
   if (charter.authority.authority_role !== 'infrastructure_sentinel')
     failures.push('authority_role must be infrastructure_sentinel');
-  if (!exact(charter.authority.allowed_work_shapes, 'pipeline'))
-    failures.push('allowed_work_shapes must contain only pipeline');
+  if (!exact(charter.authority.allowed_execution_shapes, 'pipeline'))
+    failures.push('allowed_execution_shapes must contain only pipeline');
   if (!exact(charter.authority.allowed_pipelines, FRONT_DESK_DIAGNOSTIC_PIPELINE))
     failures.push('allowed_pipelines must contain only the front-desk receipt pipeline');
   if (charter.decisions?.default_decision !== 'approve')

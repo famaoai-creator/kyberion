@@ -4,7 +4,7 @@
   "intake": {
     "enabled": true,
     "action_id": "dot_intake_work",
-    "allowed_work_shapes": ["direct_reply", "task_session", "mission", "pipeline"],
+    "allowed_execution_shapes": ["direct_reply", "task_session", "mission", "pipeline"],
     "max_proposals_per_wake": 10
   },
   "learning": {
