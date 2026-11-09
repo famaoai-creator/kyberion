@@ -7,6 +7,6 @@ Type=oneshot
 User=kyberion
 WorkingDirectory=%h/kyberion
 Environment=NODE_ENV=production
-Environment=KYBERION_CUSTOMER=customer-slug
+Environment=KYBERION_STANCE=customer-slug
 EnvironmentFile=-/etc/kyberion/env
 ExecStart=/usr/bin/pnpm daemon:watchdog -- --daemon chronos-daemon --daemon agent-runtime-supervisor-daemon
