@@ -1,0 +1,22 @@
+{
+  "record_id": "mem-MSN-EGM-REVIEW-20261109-2026_11_08",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Bind review completion and fixes to verified full-input manifests",
+  "summary": "Review convergence requires evidence for every requested reviewer and for the exact document, references, source snapshots and review configuration.",
+  "candidate_id": "mem-MSN-EGM-REVIEW-20261109-2026_11_08",
+  "evidence_refs": [
+    "active/missions/public/MSN-EGM-REVIEW-20261109/evidence/implementation-report.md",
+    "active/missions/public/MSN-EGM-REVIEW-20261109/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-EGM-REVIEW-20261109/evidence/test-report.md"
+  ],
+  "created_at": "2026-11-08T17:25:43.820Z",
+  "applicability": ["mission", "mission:MSN-EGM-REVIEW-20261109"],
+  "reusable_steps": [
+    "Review convergence requires evidence for every requested reviewer and for the exact document, references, source snapshots and review configuration"
+  ],
+  "expected_outcome": "For document and design reviews, hash an immutable manifest containing all supplied snapshot hashes and each reviewer input, rather than only the target document. Treat missing, empty, malformed and timed-out reviewers as not_run; require evidenced checklist coverage even when a readiness or drift reviewer reports no findings. A fixed resolution must be verified by the existing governed evidence boundary and refer to a changed revision; model-authored fix labels or evidence paths alone cannot clear blockers. Invalidate prior clearance when inputs change, reopen recurring fixed findings, and require two clean reviews of the same corrected manifest before convergence. Keep host snapshot injection evidence separate from native file-read traces, live isolation probes, authenticated actor independence and human approval.",
+  "source_branch": "feat/egm-review",
+  "source_commit": "5e1d29a24527c8f08ca5506cbb8ef3377659e888"
+}

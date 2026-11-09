@@ -1,3 +1,4 @@
+import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import * as path from 'node:path';
 import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator/actuator-op-discovery';
 import {
@@ -426,12 +427,23 @@ function buildReport(current: CurrentIndexRecord[], legacy: LegacyRecord[]): str
   return `${lines.join('\n')}\n`;
 }
 
-function render(): GeneratedFile[] {
+export async function renderComponentInventory(): Promise<GeneratedFile[]> {
   const { current, legacy } = collectComponentInventory();
-  return [
-    ...renderJsonArtifacts(current, legacy),
+  const markdown = [
     { path: REPORT_PATH, content: buildReport(current, legacy) },
     { path: CAPABILITIES_GUIDE_PATH, content: buildCapabilitiesGuide(current) },
+  ];
+  return [
+    ...renderJsonArtifacts(current, legacy),
+    ...(await Promise.all(
+      markdown.map(async (file) => ({
+        ...file,
+        content: await prettierFormat(file.content, {
+          ...((await resolvePrettierConfig(file.path)) ?? {}),
+          filepath: file.path,
+        }),
+      }))
+    )),
   ];
 }
 
@@ -456,7 +468,7 @@ export const runSyncComponentInventory = defineGenerator({
     CAPABILITIES_GUIDE_PATH,
   ],
   normalize: normalizeGeneratedContent,
-  render,
+  render: renderComponentInventory,
 });
 
 if (

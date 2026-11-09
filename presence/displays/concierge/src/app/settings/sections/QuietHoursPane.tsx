@@ -18,6 +18,14 @@ import {
 } from '../../../lib/quiet-hours-view';
 import type { ConciergeMessageKey } from '../../../lib/i18n';
 import { FormScope, asText, type SettingsTranslate } from './form-scope';
+const TIMEZONE_OPTIONS = (() => {
+  try {
+    return Intl.supportedValuesOf('timeZone').map((zone) => ({ value: zone, label: zone }));
+  } catch {
+    return [] as { value: string; label: string }[];
+  }
+})();
+
 type AuthSnapshot = { revision: number; token: string | null };
 const currentAuth = (): AuthSnapshot => ({
   revision: getFrontDeskAuthRevision(),
@@ -223,6 +231,7 @@ export function QuietHoursPane({ t }: { t: SettingsTranslate }) {
                 name="quiet.start"
                 label={t('setup.quiet_hours_start')}
                 hide_label
+                type="time"
                 disabled={!editable}
                 value={start}
               />
@@ -233,19 +242,36 @@ export function QuietHoursPane({ t }: { t: SettingsTranslate }) {
                 name="quiet.end"
                 label={t('setup.quiet_hours_end')}
                 hide_label
+                type="time"
                 disabled={!editable}
                 value={end}
               />
             </SettingRow>
             <SettingRow label={t('setup.quiet_hours_timezone')}>
-              <TextField
-                id="quiet-hours-timezone"
-                name="quiet.timezone"
-                label={t('setup.quiet_hours_timezone')}
-                hide_label
-                disabled={!editable}
-                value={timezone}
-              />
+              {TIMEZONE_OPTIONS.length ? (
+                <Select
+                  id="quiet-hours-timezone"
+                  name="quiet.timezone"
+                  label={t('setup.quiet_hours_timezone')}
+                  hide_label
+                  disabled={!editable}
+                  value={timezone}
+                  options={
+                    TIMEZONE_OPTIONS.some((option) => option.value === timezone)
+                      ? TIMEZONE_OPTIONS
+                      : [{ value: timezone, label: timezone }, ...TIMEZONE_OPTIONS]
+                  }
+                />
+              ) : (
+                <TextField
+                  id="quiet-hours-timezone"
+                  name="quiet.timezone"
+                  label={t('setup.quiet_hours_timezone')}
+                  hide_label
+                  disabled={!editable}
+                  value={timezone}
+                />
+              )}
             </SettingRow>
             <SettingRow label={t('setup.urgent_events_label')}>
               <Select

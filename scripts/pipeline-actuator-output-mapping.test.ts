@@ -10,6 +10,7 @@ describe('actuator dispatch output → pipeline context mapping', () => {
     expect(resolveSemanticActuatorStepKind('vcs', 'log', 'apply')).toBe('capture');
     expect(resolveSemanticActuatorStepKind('system', 'json_query', 'apply')).toBe('transform');
     expect(resolveSemanticActuatorStepKind('vcs', 'commit', 'apply')).toBe('apply');
+    expect(resolveSemanticActuatorStepKind('vcs', 'log', 'capture')).toBe('capture');
   });
 
   it('merges branded context patches from legacy envelope ops', () => {

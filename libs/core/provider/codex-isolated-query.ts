@@ -395,7 +395,8 @@ async function runIsolatedChild(
   assertGovernedExec(bin, args);
   const child = spawn(bin, args, {
     cwd: options.cwd,
-    env: options.env,
+    // A tools-off child never inherits the daemon role, even if an upstream env builder changes.
+    env: { ...options.env, SYSTEM_ROLE: undefined },
     shell: false,
     stdio: ['pipe', 'pipe', 'pipe'],
   });

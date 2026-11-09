@@ -94,6 +94,10 @@
   ],
   "scripts": [
     {
+      "id": "scripts/context_pack.ts",
+      "reason": "CLI entrypoint for agent fast-context provisioning (pnpm kyberion context pack)."
+    },
+    {
       "id": "scripts/contrastive_probe.ts",
       "reason": "harness2 PPC import (MSN-PPC-PROBE-20261018): standalone CLI for contrastive probe sessions on repeating work shapes; started by hand until a pipeline wraps it — unit-tested via libs/core/harnessing tests."
     }
@@ -223,6 +227,10 @@
     {
       "id": "pipelines/vcs-development-preflight.json",
       "reason": "Manual read-only preflight entry point documented in pipelines/README.md for a prepared mission WorkItem PR. Operator supplies exact PR, WorkItem and independent review task IDs; scheduling absent evidence would fabricate autonomous author execution. Reachability is enforced by orphan_op_reachability.test.ts."
+    },
+    {
+      "id": "pipelines/document-review.json",
+      "reason": "Explicit document/design review run by an operator per document-review-playbook.md and pipelines/README.md. Its wisdom:document_review caller is exercised by orphan_op_reachability.test.ts; no background model usage or automatic risk acceptance."
     }
   ],
   "actuator_ops": [

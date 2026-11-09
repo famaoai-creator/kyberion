@@ -10045,6 +10045,16 @@
         "ja": "依存関係を確認",
         "qps-ploc": "⟦Ƈħėƈķ ḓėṗėñḓėñƈïėş ŀőřėɱ⟧"
       },
+      "cli_cmd_script_delegate_default": {
+        "en": "Hand a bounded task to a governed sub-agent",
+        "ja": "境界づけられたタスクを統制されたサブエージェントへ委任",
+        "qps-ploc": "⟦Ħȧñḓ ȧ ƀőůñḓėḓ ŧȧşķ ŧő ȧ ɠőṽėřñėḓ şůƀ-ȧɠėñŧ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_check_docs_impact": {
+        "en": "Report documented surfaces a change set did not update",
+        "ja": "変更差分が更新していないドキュメント面をレポート",
+        "qps-ploc": "⟦Řėṗőřŧ ḓőƈůɱėñŧėḓ şůřƒȧƈėş ȧ ƈħȧñɠė şėŧ ḓïḓ ñőŧ ůṗḓȧŧė ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
       "cli_cmd_script_media_visual_proof_ds04": {
         "en": "Generate the DS-04 video visual proof",
         "ja": "DS-04 動画のビジュアル検証を生成",
@@ -21062,6 +21072,11 @@
         "en": "Open the mission",
         "ja": "ミッションを開く",
         "qps-ploc": "⟦Őṗėñ ŧħė ɱïşşïőñ ŀőřėɱ⟧"
+      },
+      "authority.expiry_custom": {
+        "en": "Pick a date",
+        "ja": "日時を指定",
+        "qps-ploc": "⟦Ṗïƈķ ȧ ḓȧŧė ŀőř⟧"
       },
       "ia_shell_automation_title": {
         "en": "Automation",
@@ -34957,6 +34972,91 @@
         "en": "Engine, model and how far it may act alone",
         "ja": "エンジン・モデルと、任せる範囲",
         "qps-ploc": "⟦Ėñɠïñė, ɱőḓėŀ ȧñḓ ħőẇ ƒȧř ïŧ ɱȧẏ ȧƈŧ ȧŀőñė ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ia_settings_reasoning_setup_lead": {
+        "en": "Engines below need one registration — an API key or a connection URL — right here on this page.",
+        "ja": "下のエンジンは、この画面でAPIキーか接続先URLを1回登録すれば使えるようになります。",
+        "qps-ploc": "⟦Ėñɠïñėş ƀėŀőẇ ñėėḓ őñė řėɠïşŧřȧŧïőñ — ȧñ ȦṖÏ ķėẏ őř ȧ ƈőññėƈŧïőñ ŮŘĿ — řïɠħŧ ħėřė őñ ŧħïş ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "ia_settings_reasoning_setup_apikey": {
+        "en": "Register API key",
+        "ja": "APIキーを登録",
+        "qps-ploc": "⟦Řėɠïşŧėř ȦṖÏ ķėẏ ŀőřėɱ⟧"
+      },
+      "ia_settings_reasoning_setup_endpoint": {
+        "en": "Register endpoint URL",
+        "ja": "接続先URLを登録",
+        "qps-ploc": "⟦Řėɠïşŧėř ėñḓṗőïñŧ ŮŘĿ ŀőřėɱ ⟧"
+      },
+      "ia_settings_reasoning_setup_cli_hint": {
+        "en": "Installed in the terminal — see the command below.",
+        "ja": "ターミナルで導入します(下のコマンドを参照)。",
+        "qps-ploc": "⟦Ïñşŧȧŀŀėḓ ïñ ŧħė ŧėřɱïñȧŀ — şėė ŧħė ƈőɱɱȧñḓ ƀėŀőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ia_settings_reasoning_apikey_label": {
+        "en": "API key",
+        "ja": "APIキー",
+        "qps-ploc": "⟦ȦṖÏ ķėẏ ŀőř⟧"
+      },
+      "ia_settings_reasoning_apikey_help": {
+        "en": "Stored on the Kyberion computer — the value never stays in the browser.",
+        "ja": "キーはKyberionを動かしているPCに保存され、ブラウザには残りません。",
+        "qps-ploc": "⟦Şŧőřėḓ őñ ŧħė Ķẏƀėřïőñ ƈőɱṗůŧėř — ŧħė ṽȧŀůė ñėṽėř şŧȧẏş ïñ ŧħė ƀřőẇşėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "ia_settings_reasoning_endpoint_label": {
+        "en": "Endpoint URL",
+        "ja": "接続先URL",
+        "qps-ploc": "⟦Ėñḓṗőïñŧ ŮŘĿ ŀőř⟧"
+      },
+      "ia_settings_reasoning_endpoint_help": {
+        "en": "For example http://localhost:11434",
+        "ja": "例: http://localhost:11434",
+        "qps-ploc": "⟦Ƒőř ėẋȧɱṗŀė ħŧŧṗ://ŀőƈȧŀħőşŧ:11434 ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_settings_reasoning_endpoint_invalid": {
+        "en": "Enter a valid http(s) URL, for example http://localhost:11434",
+        "ja": "http(s) のURLを入力してください(例: http://localhost:11434)",
+        "qps-ploc": "⟦Ėñŧėř ȧ ṽȧŀïḓ ħŧŧṗ(ş) ŮŘĿ, ƒőř ėẋȧɱṗŀė ħŧŧṗ://ŀőƈȧŀħőşŧ:11434 ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "ia_settings_reasoning_setup_register": {
+        "en": "Register",
+        "ja": "登録する",
+        "qps-ploc": "⟦Řėɠïşŧėř ŀőř⟧"
+      },
+      "ia_settings_reasoning_setup_registered": {
+        "en": "Registered — this engine is now selectable.",
+        "ja": "登録しました。このエンジンを選択できます。",
+        "qps-ploc": "⟦Řėɠïşŧėřėḓ — ŧħïş ėñɠïñė ïş ñőẇ şėŀėƈŧȧƀŀė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ia_settings_reasoning_setup_failed": {
+        "en": "Registration failed.",
+        "ja": "登録できませんでした。",
+        "qps-ploc": "⟦Řėɠïşŧřȧŧïőñ ƒȧïŀėḓ. ŀőřėɱ ⟧"
+      },
+      "ia_settings_reasoning_unsupported_group": {
+        "en": "Not available in this configuration",
+        "ja": "この構成では利用できないエンジン",
+        "qps-ploc": "⟦Ñőŧ ȧṽȧïŀȧƀŀė ïñ ŧħïş ƈőñƒïɠůřȧŧïőñ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ia_settings_reasoning_setup_pending": {
+        "en": "Preparing registration…",
+        "ja": "登録の準備をしています…",
+        "qps-ploc": "⟦Ṗřėṗȧřïñɠ řėɠïşŧřȧŧïőñ… ŀőřėɱ ï⟧"
+      },
+      "ia_settings_reasoning_kind_api": {
+        "en": "API service",
+        "ja": "APIサービス",
+        "qps-ploc": "⟦ȦṖÏ şėřṽïƈė ŀőř⟧"
+      },
+      "ia_settings_reasoning_kind_local": {
+        "en": "Local server",
+        "ja": "ローカルサーバー",
+        "qps-ploc": "⟦Ŀőƈȧŀ şėřṽėř ŀőř⟧"
+      },
+      "ia_settings_reasoning_kind_cli": {
+        "en": "Command-line tool",
+        "ja": "コマンドラインツール",
+        "qps-ploc": "⟦Ƈőɱɱȧñḓ-ŀïñė ŧőőŀ ŀőřėɱ⟧"
       }
     },
     "operator": {

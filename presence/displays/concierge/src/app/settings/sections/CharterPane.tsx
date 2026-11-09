@@ -3,7 +3,7 @@
 import { frontDeskFetch as fetch } from '../../../lib/front-desk-fetch';
 
 import * as React from 'react';
-import { Button, Select, SettingRow, SettingsGroup, TextField } from '@agent/shared-ui';
+import { Button, Segmented, Select, SettingRow, SettingsGroup, TextField } from '@agent/shared-ui';
 import {
   DEFAULT_CHARTER_DRAFT,
   applyProposalToDraft,
@@ -396,7 +396,31 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
             {field('per_month', t('setup.charter_per_month'), 'charter-per-month')}
             {field('max_loss_per_incident', t('setup.charter_max_loss'), 'charter-max-loss')}
             {field('deputies', t('setup.charter_deputies'), 'charter-deputies')}
-            {field('expires_in_days', t('setup.charter_expires_days'), 'charter-expires-days')}
+            <SettingRow label={t('setup.charter_expires_days')}>
+              <Segmented
+                id="charter-expires-days"
+                name="charter.expires_in_days"
+                label={t('setup.charter_expires_days')}
+                hide_label
+                value={String(draft.expires_in_days)}
+                options={[
+                  ...(!['7', '30', '90', '180', '365'].includes(String(draft.expires_in_days)) &&
+                  String(draft.expires_in_days)
+                    ? [
+                        {
+                          value: String(draft.expires_in_days),
+                          label: String(draft.expires_in_days),
+                        },
+                      ]
+                    : []),
+                  { value: '7', label: '7' },
+                  { value: '30', label: '30' },
+                  { value: '90', label: '90' },
+                  { value: '180', label: '180' },
+                  { value: '365', label: '365' },
+                ]}
+              />
+            </SettingRow>
             <p>{t('setup.charter_information_scope_help')}</p>
             {field(
               'recipient_purposes',

@@ -74,7 +74,14 @@ pnpm playground -- --show <name>                                            # in
 pnpm playground -- --emit-adf <name> [--name <slug>] [--out <path>] [--request-trust]
 ```
 
-Session files and drafts live under `active/shared/tmp/actuator-playground/`.
+Session files and drafts live under the active scope's scratch partition:
+`active/shared/tmp/<tier>/<tenant|shared>/actuator-playground/`. Tenant trials
+(e.g. confidential browser discovery for an internal approval flow) therefore
+stay on that tenant's floor instead of the legacy unpartitioned scratch root.
+Protected-tier record / emit / sessions I/O (and child actuator spawns) run
+under the tenant-bound `actuator_playground_worker` role — the same pattern
+as `perception_media_worker` for media scratch — so the interactive CLI can
+read its own tenant partition without a broader confidential grant.
 Emitted steps use the ADF `domain:op` form with the Typed Flow role mapped
 from the recorded op kind; a shared `session_id` is set when browser steps
 are present; string params under sensitive-looking keys (password/secret/
@@ -90,16 +97,53 @@ in the same command; a still-valid approval for unchanged content is reused
 automatically:
 
 ```bash
+# Bind the tenant first — scratch placement follows the active scope.
+pnpm scope use --tier confidential --tenant <slug>
+pnpm playground -- --actuator <id> --op <op> --params '{...}' --record <name>
 pnpm playground -- --emit-adf <name> --request-trust
-pnpm kyberion approve <request-id> project-trust                            # human decides
-pnpm pipeline --input active/shared/tmp/actuator-playground/<name>.adf.json \
+pnpm kyberion approvals --approve <request-id>                              # human decides (TTY)
+# Do NOT use `pnpm kyberion approve … project-trust` here: that verb bootstraps
+# tenant reasoning and often fails with CREDENTIAL_BINDING_REQUIRED.
+pnpm pipeline --input active/shared/tmp/confidential/<slug>/actuator-playground/<name>.adf.json \
   --project-trust-approval <request-id>                                     # prints Run ID
-pnpm pipeline:promote --input active/shared/tmp/actuator-playground/<name>.adf.json \
-  --run <run-id> --source-is-public
+# public drafts:
+pnpm pipeline:promote --input <adf>.json --run <run-id> --source-is-public
+# tenant drafts (confidential/personal partition) — identity required for the asset ledger:
+MISSION_ROLE=worker KYBERION_PERSONA=worker \
+  pnpm pipeline:promote --input <adf>.json --run <run-id> --tenant <slug>
 ```
 
 When the draft declares `{{placeholders}}`, the run card appends the matching
 `--context '{...}'` hint to the `pnpm pipeline` line.
+
+### Tenant-trial operator notes
+
+- **Same checkout as the scratch.** Session files, the ADF, the run journal
+  (`active/shared/runtime/pipeline-library-runs/…`), and `pipeline:promote`
+  must share one repository root. A git worktree that never saw the record
+  step will fail with “source ADF must be an existing regular file”, and
+  `--tenant` promote looks for the journal under
+  `…/pipeline-library-runs/confidential/<slug>/` (not another checkout’s
+  `public/shared/` copy).
+- **Personal tenant profile.** Promote resolves
+  `knowledge/personal/tenants/<slug>.json` in _this_ checkout (gitignored).
+  Symlinks are refused; copy or recreate the profile in the worktree if it
+  only exists on another checkout.
+- **Actuator-only drafts under a persisted tenant scope.** `vcs:*` / `file:*`
+  / similar steps do not need a model. The engine degrades reasoning to the
+  stub chain when there is no WorkItem credential binding, instead of
+  stopping on `CREDENTIAL_BINDING_REQUIRED`. Steps that _do_ need reasoning /
+  voice / secrets still require a claimed WorkItem binding.
+- **Capture channel.** Bare action payloads (e.g. `vcs:log`) land on
+  `last_capture` / `last_transform` (or `params.export_as`). One-step pipeline
+  envelopes are collapsed at the SDK boundary — to the channel value when
+  `export_as` / a `last_*` key is present, otherwise to a branded context
+  patch — so PTC / `system:json_query` see the same channel value (see §5
+  Dispatch ABI). Prefer concrete params when recording (e.g. `vcs:log` with
+  `{"limit":5,"oneline":true}`) so the draft is reviewable before promote.
+- **Edits invalidate trust.** Any byte change to the ADF needs a new
+  `--request-trust` / approval before `--project-trust-approval` will accept
+  it again.
 
 Charter delegation (alternative to the human round-trip): an accountability
 charter that names `pipeline_trust_grant` in `envelope.delegated_decisions`
@@ -175,7 +219,7 @@ Placement:
 
 Trust: anything outside `pipelines/` + templates fails `[TRUST_REQUIRED]`
 unless approved (`pnpm kyberion project-trust request <path>` → human
-`pnpm kyberion approve <id> project-trust` → run with
+`pnpm kyberion approvals --approve <id>` → run with
 `--project-trust-approval <id>`). Any edit invalidates the approval.
 Schedules additionally need a `schedule{id,cron,timezone,enabled}` block and
 `pnpm kyberion schedule register`.
@@ -273,3 +317,24 @@ declared channels so context-patch returns become rare. `actionInput` stays.
   `--record <name> --drop-last` (standalone drop, or success-gated
   replacement when combined with a run) plus `--sessions` / `--show` to
   inspect what was recorded.
+- Tenant playground trials mixed into the unpartitioned scratch root and
+  then failed protected-tier reads (`Higher tier required`) — fixed by
+  partitioning scratch under `tmp/<tier>/<tenant|shared>/actuator-playground/`
+  and assuming `actuator_playground_worker` (with child `KYBERION_TENANT`
+  mirrored through `buildSafeExecEnv`).
+- `pnpm kyberion approve … project-trust` under a tenant scope hit
+  `CREDENTIAL_BINDING_REQUIRED` — run card now points at
+  `pnpm kyberion approvals --approve` (TTY). Actuator-only drafts also
+  degrade reasoning instead of requiring a WorkItem binding just to run
+  `vcs:log`.
+- Catalog-backed capture steps returned a payload object but left
+  `last_capture` empty — fixed by mapping bare action payloads onto
+  `last_capture` / `last_transform` (or `export_as`). A first cut that also
+  wrapped one-step pipeline envelopes under the channel key broke
+  `core:ptc`/`system:json_query` (envelope must keep its `.context` unwrap);
+  the engine now branches on output shape. The SDK has since been converged
+  onto payload-only dispatch results — envelopes normalize to channel values
+  or context patches at the SDK boundary (see §5 Dispatch ABI).
+- `pipeline:promote --tenant` from another checkout failed with missing ADF /
+  journal / personal tenant profile — documented in §2 tenant-trial notes
+  (same root, copy profile, set `MISSION_ROLE`/`KYBERION_PERSONA`).
