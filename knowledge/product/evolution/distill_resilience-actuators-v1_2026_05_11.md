@@ -6,6 +6,7 @@ importance: 6
 source_mission: RESILIENCE-ACTUATORS-V1
 author: Kyberion Wisdom Distiller
 last_updated: 2026-05-11
+doc_status: historical
 ---
 
 # Adaptive Resilience and Backlog Recovery for Service Actuators

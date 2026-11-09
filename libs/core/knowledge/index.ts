@@ -32,5 +32,6 @@ export * from './procedure-inputs.js';
 export * from './procedure-registry.js';
 export * from './procedure-self-repair.js';
 export * from './procedure-types.js';
+export * from './promoted-knowledge-retrieval.js';
 export * from './vocabulary-catalog.js';
 export * from './vocabulary-keys.generated.js';

@@ -162,9 +162,12 @@ The scoped injection flow should be owned by these modules or boundaries:
   - assemble the mission context pack
   - render the pack into prompt text
   - persist the pack into mission-local coordination storage
-- `libs/core/knowledge/distill-knowledge-injector.ts`
-  - resolve distilled knowledge hints that are relevant to the scoped pack
+- `libs/core/knowledge/promoted-knowledge-retrieval.ts`
+  - resolve promoted records (`knowledge/{product/evolution,public/common}/*/generated/`)
+    relevant to the scoped pack through the knowledge index, admitted by the reader's
+    tier and tenant (tenant-scoped records arrive through tenant retrieval)
   - keep the knowledge source as a derived input, not the primary execution store
+  - the legacy `distill_*` corpus and `distill-knowledge-injector.ts` are retired from this lane
 - `libs/core/mission/mission-workitem-dispatch.ts`
   - request a scoped context pack before dispatch
   - deliver the pack to the selected agent or subagent

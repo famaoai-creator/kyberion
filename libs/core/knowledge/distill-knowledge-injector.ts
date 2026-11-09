@@ -17,10 +17,12 @@
  * matching is intentionally simple (overlap of tags + keyword match in
  * title) — semantic search via embeddings is a Phase-2 upgrade.
  *
- * Used by:
- *   - `wisdom:inject_prior_knowledge` pipeline op (called early in
- *     hypothesis-tree.json so personas have access to the corpus)
- *   - `mission_controller create` (informational logging only)
+ * RETIRED lane (D8, Concept Model v2): the mission context pack and
+ * `wisdom:inject_prior_knowledge` now read promoted records through
+ * `promoted-knowledge-retrieval.ts`, and the `distill_*` corpus carries
+ * `doc_status: historical`. Remaining callers (ADF repair hints, background
+ * review, needs re-query in the orchestration worker) migrate in a follow-up
+ * of MEMORY_LOOP_CLOSURE M1; do not add new ones.
  *
  * Output is read-only: this module never writes to `knowledge/`.
  */

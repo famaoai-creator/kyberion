@@ -54,6 +54,14 @@ import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
 } from './memory-promotion-queue.js';
+import {
+  computeMemoryLoopHealth,
+  formatMemoryLoopHealthLine,
+  type MemoryLoopHealth,
+} from './memory-loop-health.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('knowledge-curation-report');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -155,6 +163,8 @@ export interface KnowledgeCurationReport {
   /** DA-08: per-tenant ingested-asset freshness sections (advisory only). */
   tenant_ingest: TenantIngestCurationSection[];
   scanned_document_count: number;
+  /** D8: promoted → retrieved → used over the loop-health window (advisory). */
+  memory_loop?: MemoryLoopHealth;
   summary: {
     low_yield_count: number;
     freshness_breach_count: number;
@@ -656,6 +666,13 @@ export async function computeCurationReport(
     readArchiveHistory()
   );
 
+  let memoryLoop: MemoryLoopHealth | undefined;
+  try {
+    memoryLoop = computeMemoryLoopHealth({ now, tenants: registeredKnowledgeTenants() });
+  } catch {
+    memoryLoop = undefined;
+  }
+
   return {
     generated_at: now.toISOString(),
     config,
@@ -665,6 +682,7 @@ export async function computeCurationReport(
     archive_advisories: archiveAdvisories,
     tenant_ingest: tenantIngest,
     scanned_document_count: docs.length,
+    ...(memoryLoop ? { memory_loop: memoryLoop } : {}),
     summary: {
       low_yield_count: lowYieldHints.length,
       freshness_breach_count: freshnessBreaches.length,
@@ -704,6 +722,8 @@ export function renderCurationReportMarkdown(report: KnowledgeCurationReport): s
     `scanned_document_count: ${report.scanned_document_count}`,
     `legacy_unscoped_hint_count: ${(report.legacy_unscoped_hints || []).length}`,
     `archive_advisory_count: ${(report.archive_advisories || []).length}`,
+    ...(report.memory_loop ? [formatMemoryLoopHealthLine(report.memory_loop)] : []),
+    ...(report.memory_loop?.warning ? [`memory_loop_warning: ${report.memory_loop.warning}`] : []),
     '',
     '## Low-Yield Hints',
     '',
@@ -836,6 +856,9 @@ export async function generateKnowledgeCurationReport(options: { now?: Date } = 
           : {}),
       })
     );
+  }
+  if (reportWithAdvisories.memory_loop?.warning) {
+    logger.warn(`[KP-06] ${reportWithAdvisories.memory_loop.warning}`);
   }
   const { reportPath: writtenPath } = writeCurationReport(reportWithAdvisories);
   return { report: reportWithAdvisories, reportPath: writtenPath };

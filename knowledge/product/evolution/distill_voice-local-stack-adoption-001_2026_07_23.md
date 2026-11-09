@@ -6,6 +6,7 @@ importance: 5
 source_mission: VOICE-LOCAL-STACK-ADOPTION-001
 author: Kyberion Wisdom Distiller
 last_updated: 2026-07-23
+doc_status: historical
 ---
 
 # Mission VOICE-LOCAL-STACK-ADOPTION-001 Implementation Summary

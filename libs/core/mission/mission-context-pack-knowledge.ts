@@ -3,9 +3,9 @@ import { knowledgeTextSha256 } from '../knowledge/knowledge-delivery-snapshot.js
 import { resolveScopedLearningRetrieval } from '../knowledge/scoped-learning-retrieval.js';
 import { compileScopedContextPack } from '../governance/context-security-scope.js';
 import {
-  findRelevantDistilledKnowledge,
-  type DistilledKnowledgeEntry,
-} from '../knowledge/distill-knowledge-injector.js';
+  findRelevantPromotedKnowledge,
+  type PromotedKnowledgeEntry,
+} from '../knowledge/promoted-knowledge-retrieval.js';
 import {
   resolveKnowledgeSlice,
   isKnowledgePathExcluded,
@@ -292,7 +292,7 @@ export function knowledgeHintFragment(
 }
 
 function mergeTenantKnowledgeHints(input: {
-  distill: MissionContextPackKnowledgeHint[];
+  promoted: MissionContextPackKnowledgeHint[];
   tenant: MissionContextPackKnowledgeHint[];
   cap: number;
   deliveredPaths: ReadonlySet<string>;
@@ -301,14 +301,14 @@ function mergeTenantKnowledgeHints(input: {
   const seen = new Set(input.deliveredPaths);
   let d = 0;
   let t = 0;
-  while (out.length < input.cap && (d < input.distill.length || t < input.tenant.length)) {
-    const distillHead = input.distill[d];
+  while (out.length < input.cap && (d < input.promoted.length || t < input.tenant.length)) {
+    const promotedHead = input.promoted[d];
     const tenantHead = input.tenant[t];
     let takeTenant: boolean;
-    if (!distillHead) takeTenant = true;
+    if (!promotedHead) takeTenant = true;
     else if (!tenantHead) takeTenant = false;
-    else takeTenant = (tenantHead.score ?? 0) >= (distillHead.score ?? 0);
-    const next = takeTenant ? tenantHead! : distillHead!;
+    else takeTenant = (tenantHead.score ?? 0) >= (promotedHead.score ?? 0);
+    const next = takeTenant ? tenantHead! : promotedHead!;
     if (takeTenant) t += 1;
     else d += 1;
     if (seen.has(next.path)) continue;
@@ -370,22 +370,6 @@ export async function loadKnowledgeHintsIfPossible(
     .filter(Boolean)
     .join(' ');
   if (!topic) return [];
-
-  const tags = new Set<string>(
-    [
-      input.missionState.tier,
-      input.missionState.mission_type || '',
-      input.teamRole || '',
-      input.projectState?.project_id || '',
-      input.trackRecord?.track_type || '',
-    ]
-      .map((value) =>
-        String(value || '')
-          .trim()
-          .toLowerCase()
-      )
-      .filter(Boolean)
-  );
 
   const phase =
     input.phase ?? deriveGovernancePhaseFromMissionState(input.missionState, input.workItem);
@@ -517,13 +501,19 @@ export async function loadKnowledgeHintsIfPossible(
       }
     : undefined;
 
+  // D8: promoted records (evolution/*/generated) reach later work by
+  // relevance through the knowledge index, admitted by the reader's scope.
+  // Tenant-scoped promoted records arrive through the tenant lane below.
   const searchLimit = slice.exclude.length > 0 ? candidateCap * 2 : candidateCap;
-  const relevant = await findRelevantDistilledKnowledge({
+  const relevant = await findRelevantPromotedKnowledge({
     topic,
-    tags: Array.from(tags),
     limit: searchLimit,
     minScore: 0.08,
-    ...(retrievalScope ? { scope: retrievalScope } : {}),
+    scope: retrievalScope ?? {
+      tier: consumerScope.tier,
+      mission_id: input.missionState.mission_id,
+    },
+    ...(input.tenantKnowledgeRootDir ? { rootDir: input.tenantKnowledgeRootDir } : {}),
   });
 
   const filtered =
@@ -543,16 +533,13 @@ export async function loadKnowledgeHintsIfPossible(
         ]
       : filtered;
 
-  const distillHints = prioritized.map((entry: DistilledKnowledgeEntry) => ({
+  const promotedHints = prioritized.map((entry: PromotedKnowledgeEntry) => ({
     path: entry.path,
     title: entry.title,
     excerpt: entry.excerpt,
     ...(entry.source_sha256 ? { source_sha256: entry.source_sha256 } : {}),
     tags: entry.tags,
-    ...(typeof entry.score === 'number' ? { score: entry.score } : {}),
-    ...(entry.category ? { category: entry.category } : {}),
-    ...(entry.source_mission ? { source_mission: entry.source_mission } : {}),
-    ...(entry.last_updated ? { last_updated: entry.last_updated } : {}),
+    score: entry.score,
   }));
 
   let tenantHints: MissionContextPackKnowledgeHint[] = [];
@@ -594,11 +581,11 @@ export async function loadKnowledgeHintsIfPossible(
   }
 
   if (tenantHints.length === 0) {
-    return annotate(await narrow([...pinnedHints, ...distillHints.slice(0, candidateCap)]));
+    return annotate(await narrow([...pinnedHints, ...promotedHints.slice(0, candidateCap)]));
   }
 
   const merged = mergeTenantKnowledgeHints({
-    distill: distillHints,
+    promoted: promotedHints,
     tenant: tenantHints,
     cap: candidateCap,
     deliveredPaths: new Set(pinnedHints.map((hint) => hint.path)),

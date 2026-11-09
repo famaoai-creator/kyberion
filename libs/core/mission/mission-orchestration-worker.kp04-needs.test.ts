@@ -76,6 +76,13 @@ vi.mock('../knowledge/distill-knowledge-injector.js', async (importOriginal) => 
   };
 });
 
+// Round 1 (the context pack) reads promoted records (D8); round 2 (needs
+// re-query) still uses the distill seam. One mock drives both rounds.
+vi.mock('../knowledge/promoted-knowledge-retrieval.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../knowledge/promoted-knowledge-retrieval.js')>()),
+  findRelevantPromotedKnowledge: mocks.findRelevantDistilledKnowledge,
+}));
+
 const MISSION_ID = 'MSN-KP04-NEEDS';
 
 // Full dispatch flow through real module wiring, same style as
