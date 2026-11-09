@@ -75,7 +75,7 @@ Intent ──resolves to an Execution Shape──┬─ direct_reply / actuator_
 | Task Session  | Lighter durable work that is not a mission           | task-session records                                        |
 | WorkItem      | What is the work, in which scope, and in what state? | `libs/core/workforce/work-coordination.ts`                  |
 
-A top-level WorkItem is the Issue: the trackable unit. Mission, Task Session, Pipeline and dot runs are ways of executing it, not competing units. A step that needs ownership (a dispatched mission task, a dot action) is a child WorkItem and carries the [Lease](#lease). _Transitioning_ ([Concept Model v2 D1](../knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md)): today a mission owns one WorkItem (`deriveMissionOwnershipItemId`) and each task is a sibling WorkItem with source `mission:<mission_id>:<task_id>`. The explicit `parent_item_id` link arrives with the [WorkItem and Lease plan](./developer/improvement-plans-2026-11/WORKITEM_ISSUE_LEASE_CONSOLIDATION_PLAN_2026-11-10.ja.md). "Operation" is unrelated to this ladder — it means an actuator op (`domain:action`); `routine_operation` and `service_operation` are Work Shape values.
+A top-level WorkItem is the Issue: the trackable unit. Mission, Task Session, Pipeline and dot runs are ways of executing it, not competing units. A step that needs ownership (a dispatched mission task, a dot action) is a child WorkItem and carries the [Lease](#lease). _Transitioning_ ([Concept Model v2 D1](../knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md)): a mission owns one WorkItem (`deriveMissionOwnershipItemId`), its Issue, and each dispatched task is a child WorkItem linked by `parent_item_id` (W1). Boards list Issues with their step progress and open steps inside the card, and a parent's status follows its steps by the rule table below (W2); the Lease adapters follow in the [WorkItem and Lease plan](./developer/improvement-plans-2026-11/WORKITEM_ISSUE_LEASE_CONSOLIDATION_PLAN_2026-11-10.ja.md). "Operation" is unrelated to this ladder — it means an actuator op (`domain:action`); `routine_operation` and `service_operation` are Work Shape values.
 
 ### Actor identity and responsibility
 
@@ -649,7 +649,22 @@ The one decision the intent resolver emits per request: intent id, Execution Sha
 
 ### WorkItem
 
-The trackable unit of work (an Issue); missions, task sessions, pipelines and dot runs execute it, and steps that need ownership are child WorkItems that carry the lease. Every view (kanban, activity board, organization view) is a projection of the same records (`libs/core/workforce/work-coordination.ts`); boards show top-level WorkItems by default. See [Units of work](#units-of-work) for the transition.
+The trackable unit of work (an Issue); missions, task sessions, pipelines and dot runs execute it, and steps that need ownership are child WorkItems that carry the lease. Every view (kanban, activity board, organization view) is a projection of the same records (`libs/core/workforce/work-coordination.ts`); boards show top-level WorkItems by default, each with its step progress, and a step opens inside its Issue.
+
+**Parent status from steps** (`resolveParentStatusSync` in `libs/core/workforce/work-item-hierarchy.ts`, applied after every step write by `work-item-parent-status.ts`). The aggregate of the steps is: every step archived → archived; every step done or archived → review; any in progress or review → in progress; any blocked → blocked; some finished → in progress; any ready → ready; otherwise backlog. Whether the parent takes it, first match wins:
+
+| Parent                                                | Result                                                                                          |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| has no steps                                          | keeps its status                                                                                |
+| is done or archived                                   | keeps it — a person closed the Issue                                                            |
+| is claimed (active lease or held effect)              | keeps it — the holder owns it                                                                   |
+| status was set directly while it had steps (`manual`) | keeps it until handed back (`statusFromChildren`)                                               |
+| aggregate equals its status                           | no write (idempotent)                                                                           |
+| aggregate is archived                                 | keeps it — withdrawn steps never close an Issue                                                 |
+| was aggregated before (`status_origin: children`)     | takes the aggregate                                                                             |
+| was never aggregated                                  | takes the aggregate only when it moves forward (backlog → ready → in progress/blocked → review) |
+
+See [Units of work](#units-of-work) for the transition.
 
 ### WorkItem Context
 
