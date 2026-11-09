@@ -189,7 +189,7 @@ describe('first-job bound tenant status, real production authority', () => {
           assertTenant: callback,
           countOpenWorkItems: () => 0,
         })
-      ).toEqual({ ok: true });
+      ).toMatchObject({ ok: true, routing_decision: { execution_shape: 'pipeline' } });
     });
   });
   it('grants the new role only the bound record, without writes or neighboring personal reads', () => {

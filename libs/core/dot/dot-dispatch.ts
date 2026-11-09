@@ -78,6 +78,9 @@ import { withFrontDeskDispatchLock } from '../surface/front-desk-dispatch-lock.j
 import { inspectFrontDeskPendingRequest as inspectPendingRequest } from '../surface/front-desk-conversation-persistence.js';
 import { recoveryEvidenceHash } from '../surface/front-desk-recovery-receipt.js';
 import { validateServerDotJudgmentProposal } from './dot-judgment-binding.js';
+import { sameVersionOneAdmission } from './dot-action-ledger-version.js';
+import { dotRoutingDecision, dotRoutingRefusal } from './dot-routing-decision.js';
+import type { RoutingDecision } from '../contracts/routing-decision.js';
 import {
   evaluateAutonomousOpsAction,
   getAutonomousOpsPolicy,
@@ -314,7 +317,9 @@ function recordAudit(
   }
 }
 
-export type DotBoundsVerdict = { ok: true } | { ok: false; reason: string; capacity?: true };
+/** `routing_decision`: the dot's RoutingDecision for its charter-bounded shape (dot-routing-decision.ts). */
+export type DotBoundsVerdict =
+  { ok: true; routing_decision: RoutingDecision } | { ok: false; reason: string; capacity?: true };
 
 /** What the proposal may be at all: action, shape, handoff target. Re-checked at settlement. */
 function checkDotProposalScope(
@@ -339,7 +344,7 @@ function checkDotProposalScope(
     }
     if (
       !charter.scope.organization_id ||
-      proposal.work_shape !== 'pipeline' ||
+      proposal.execution_shape !== 'pipeline' ||
       proposal.pipeline_ref !== CONTINUOUS_MANAGED_WORK_PIPELINE ||
       !(charter.authority.allowed_pipelines ?? []).includes(CONTINUOUS_MANAGED_WORK_PIPELINE) ||
       proposal.handoff_to ||
@@ -356,15 +361,18 @@ function checkDotProposalScope(
     return { ok: false, reason: `action '${proposal.action_id}' is not a dot action` };
   }
   const shapes = effectiveDotExecutionShapes(charter, deps);
-  if (proposal.work_shape === 'task_session' && !deps.taskSessionExecutorAvailable) {
+  if (proposal.execution_shape === 'task_session' && !deps.taskSessionExecutorAvailable) {
     return { ok: false, reason: DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE };
   }
-  if (!shapes.includes(proposal.work_shape)) {
+  if (!shapes.includes(proposal.execution_shape)) {
     return {
       ok: false,
-      reason: `work_shape '${proposal.work_shape}' is outside allowed_execution_shapes (${shapes.join(', ')})`,
+      reason: `execution_shape '${proposal.execution_shape}' is outside allowed_execution_shapes (${shapes.join(', ')})`,
     };
   }
+  const routingDecision = dotRoutingDecision(proposal.execution_shape);
+  const routingRefusal = dotRoutingRefusal(proposal.execution_shape, routingDecision);
+  if (routingRefusal) return { ok: false, reason: routingRefusal };
   const tenantSlug = charter.scope.tenant_slug;
   if (tenantSlug) {
     try {
@@ -408,7 +416,7 @@ function checkDotProposalScope(
       };
     }
   }
-  return { ok: true };
+  return { ok: true, routing_decision: routingDecision };
 }
 
 /** Charter bounds that never depend on the gate: action, shape, handoff acceptance, concurrency. */
@@ -427,7 +435,7 @@ export function checkDotProposalBounds(
       reason: `max_concurrent_delegations ${cap} reached (${open} open or awaiting a decision)`,
     };
   }
-  return { ok: true };
+  return scope;
 }
 
 /** Gate verdict raised to the charter floor, learned floor, and requested decision. */
@@ -975,16 +983,19 @@ function dispatchDotProposalsUnlocked(
     assertDotJudgmentProposalCharter(charter, proposal);
     const now = nowOf(deps);
     const hash = dotProposalHash(charter.dot_id, proposal);
-    const identity = proposal.front_desk_execution
+    let identity = proposal.front_desk_execution
       ? undefined
       : (retryIdentity ??
         genericDotActionIdentity(charter, proposal, ordinalOffset + index, deps.operationKey));
     const priorOperation =
       identity && (deps.operationKey || retryIdentity)
         ? currentDotActions(charter.dot_id, deps).find(
-            (row) => row.action_ref === identity.action_ref
+            (row) => row.action_ref === identity!.action_ref
           )
         : undefined;
+    // Same operation admitted under action schema version 1: keep its original admission.
+    if (priorOperation && sameVersionOneAdmission(priorOperation.admission, identity?.admission))
+      identity = { action_ref: priorOperation.action_ref, admission: priorOperation.admission };
     if (priorOperation) {
       if (priorOperation.admission?.semantic_hash !== identity?.admission?.semantic_hash) {
         records.push({
@@ -1048,7 +1059,7 @@ function dispatchDotProposalsUnlocked(
       action_id: proposal.action_id,
       title: proposal.title,
       objective: proposal.objective,
-      work_shape: proposal.work_shape,
+      execution_shape: proposal.execution_shape,
       status: 'refused',
       proposal_hash: hash,
       ...(proposal.handoff_to ? { handoff_to: proposal.handoff_to } : {}),

@@ -89,7 +89,7 @@ const PROPOSAL: DotProposal = {
   action_id: 'dot_delegate_work',
   title: 'Tick overdue operations',
   objective: 'Run the overdue operation tick.',
-  work_shape: 'direct_reply',
+  execution_shape: 'direct_reply',
 };
 
 function gateResult(
@@ -237,7 +237,7 @@ describe('dispatchDotProposals — decision and delegation', () => {
     };
     const proposal: DotProposal = {
       ...PROPOSAL,
-      work_shape: 'pipeline',
+      execution_shape: 'pipeline',
       pipeline_ref: pipeline,
       objective: 'Noncritical objective '.repeat(80),
       continuous_work: {
@@ -461,7 +461,7 @@ describe('dispatchDotProposals — charter bounds', () => {
     const h = harness('auto');
     const { records } = dispatchDotProposals(
       CHARTER,
-      [{ ...PROPOSAL, work_shape: 'mission' }],
+      [{ ...PROPOSAL, execution_shape: 'mission' }],
       h.deps
     );
     expect(records[0].status).toBe('refused');
@@ -481,7 +481,7 @@ describe('dispatchDotProposals — charter bounds', () => {
     } as DotCharter;
     const { records } = dispatchDotProposals(
       charter,
-      [{ ...PROPOSAL, work_shape: 'task_session' }],
+      [{ ...PROPOSAL, execution_shape: 'task_session' }],
       h.deps
     );
     expect(records[0].status).toBe('refused');
@@ -492,7 +492,7 @@ describe('dispatchDotProposals — charter bounds', () => {
     const opted = harness('auto', { taskSessionExecutorAvailable: true });
     const allowed = dispatchDotProposals(
       charter,
-      [{ ...PROPOSAL, work_shape: 'task_session' }],
+      [{ ...PROPOSAL, execution_shape: 'task_session' }],
       opted.deps
     );
     expect(allowed.records[0].status).toBe('dispatched');
@@ -510,7 +510,7 @@ describe('dispatchDotProposals — charter bounds', () => {
     ]);
     const refused = dispatchDotProposals(
       charter,
-      [{ ...PROPOSAL, work_shape: 'task_session' }],
+      [{ ...PROPOSAL, execution_shape: 'task_session' }],
       h.deps
     );
     expect(refused.records[0].status).toBe('refused');
@@ -524,7 +524,7 @@ describe('dispatchDotProposals — charter bounds', () => {
     };
     const { records } = dispatchDotProposals(
       charter,
-      [{ ...PROPOSAL, work_shape: 'pipeline' }],
+      [{ ...PROPOSAL, execution_shape: 'pipeline' }],
       h.deps
     );
     expect(records[0].status).toBe('refused');
@@ -703,7 +703,7 @@ describe('dotBoundsPromptLines', () => {
       },
       { rootDir: TEST_ROOT, countOpenWorkItems: () => 1, listCharters: () => [CHARTER, partner] }
     );
-    expect(lines.join('\n')).toContain('Allowed work_shape values: pipeline.');
+    expect(lines.join('\n')).toContain('Allowed execution_shape values: pipeline.');
     expect(lines.join('\n')).toContain(
       'Allowed pipeline_ref values: pipelines/baseline-check.json'
     );

@@ -102,7 +102,7 @@ describe('describeDotIntakePlan', () => {
       enabled_by: 'policy',
       tenant_ok: true,
       authority_role: 'infrastructure_sentinel',
-      work_shapes: ['direct_reply', 'pipeline'],
+      execution_shapes: ['direct_reply', 'pipeline'],
       decision: 'notify',
     });
     expect(push?.types).toEqual(['issues', 'workflow_run']);

@@ -150,7 +150,7 @@ function fixture(options: { public?: boolean; shape?: 'pipeline' | 'task_session
   const proposal = proposals.normalizeDotProposal({
     title: 'Synthetic result work',
     objective: 'Keep private body scoped',
-    work_shape: options.shape ?? 'pipeline',
+    execution_shape: options.shape ?? 'pipeline',
     ...(options.shape === 'task_session' ? {} : { pipeline_ref: 'pipelines/hook-fixture.json' }),
     target: 'service:' + id,
     intent: 'apply',
