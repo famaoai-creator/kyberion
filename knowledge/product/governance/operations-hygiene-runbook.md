@@ -190,6 +190,8 @@ had regressed.
 
 ## §1 CI workflows
 
+Generated Markdown that a commit hook formats must use the same repository Prettier configuration in its canonical generator. Verify formatter idempotence and rerun the generator in check mode after formatting; do not bypass hooks or weaken byte-comparison gates to ship generated inventory. The component inventory generator enforces this with `scripts/sync_component_inventory.contract.test.ts`.
+
 **Compiler readiness and recovery accounting.** `pnpm build`, `pnpm build:packages` and
 `pnpm build:repo` enter the source-only `scripts/build_repository.ts` bootstrap. The compiler
 writer and L2 baseline scanner share the `compiler-outputs` mutex; standalone clean uses the
@@ -737,6 +739,8 @@ gets clean JSON.
 
 ## §5 Tests: pollution and host dependencies
 
+Before entering an exact-path resource scope, initialize any test-owned sandbox ancestor directories in fixture setup. A narrow capability may create its admitted leaf directories, never missing ancestors outside its grant. Verify a fresh sandbox as well as a warmed one; `scripts/pipeline_promote.resource-boundary.test.ts` covers journal setup without weakening the runtime guard.
+
 Production source inventories must exclude runtime storage roots before traversing
 them. The single-instance scan skips legacy root-level `work/` metrics, whose I/O is
 redirected into a per-test fixture; it still scans nested code directories named
@@ -1264,6 +1268,8 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
 ---
 
 ## §7 LLM and provider calls
+
+Document/design review snapshots must reject unknown-tier runtime locations before content I/O or provider dispatch, and retain the more restrictive of canonical path and source classification. Case variants and archived mission paths must not fall back to public. Use the existing source classifiers; `document-review.test.ts` enforces this boundary without a caller public waiver.
 
 **Non-public reasoning scopes declare `training_use`.** A `withReasoningPayloadScope` scope with tier `confidential` or `personal` names its `training_use` explicitly. An omitted posture falls back to `local_only` inside the egress gate, which denies every external backend (claude-cli included), and callers used to report that as a generic backend failure. Choose the posture from what the call sends: `no_training` for tenant working material that may reach a provider the tenant attested (as peer auto-reply drafting does), and an explicit `local_only` for personal material or anything that must stay on this host. Never weaken the gate to make a call pass. Report an egress denial as its own status (`egress_denied`) with the denial's `next:` step (`isReasoningEgressDenial`, `reasoningEgressDenialNext`), not as `backend_unavailable`. Public material may be used for provider training: a `public` scope that declares no posture is `training_eligible` (`effectiveReasoningTrainingUse`, decided 2026-11-05), and the same default applies to explicitly public OCR requests and knowledge contexts. An explicit `local_only` on public material is still honoured. Gates: `ReasoningPayloadScope` makes the field required at the type level, and `tests/reasoning-payload-scope-training-use.test.ts` (registration-tests) statically backstops untyped and dynamic call sites. Its allowlist stays empty.
 

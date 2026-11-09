@@ -338,7 +338,9 @@ describe('runCodexIsolatedQuery', () => {
     for (const call of calls) {
       expect(Object.keys(call.options.env).sort()).toEqual(
         Object.keys(call.options.env)
-          .filter((key) => ['PATH', 'HOME', 'USER', 'LANG', 'TMPDIR', 'CODEX_HOME'].includes(key))
+          .filter((key) =>
+            ['PATH', 'HOME', 'USER', 'LANG', 'TMPDIR', 'CODEX_HOME', 'SYSTEM_ROLE'].includes(key)
+          )
           .sort()
       );
       expect(call.options.env.HOME).toBe('/home/tester');
@@ -347,6 +349,7 @@ describe('runCodexIsolatedQuery', () => {
         false
       );
       expect(call.options.env.OPENAI_API_KEY).toBeUndefined();
+      expect(call.options.env.SYSTEM_ROLE).toBeUndefined();
     }
   });
 
