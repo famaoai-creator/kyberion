@@ -1,7 +1,7 @@
 ---
 title: スコープ・ID・権限（Grant）の統合計画
 kind: plan
-status: planned
+status: partial
 last_updated: 2026-11-10
 tags: [plan, concepts, tenant, organization, stance, role, persona, grant, authority, scope]
 importance: 9
@@ -37,6 +37,14 @@ importance: 9
 - 切り替えたときに参照できるデータの範囲が `ViewerContext` / `ResourceAccessScope` に反映されることを、テストで固定する。
 - `KYBERION_CUSTOMER` の読み込み（14 か所）を削除する。口調・窓口の設定は Tenant's Customers と Channel に移す。
 - `stance-tenant-customer-model.md` を新しい定義に書き換える。
+
+状況（2026-11-10、実装済み）：
+
+- `stance.json` の `acting_for`（`tenant_slug`、任意で `organization_id` と `org_role`）が選択を表す。`resolveStance` は許可テナントの一覧にないテナントを `[STANCE_NOT_PERMITTED]` で拒否する。許可テナントは、CLI ではテナント台帳（`knowledge/personal/tenants/`）の active なプロファイル、HTTP ではビューアー資格情報の `tenant_slugs` です。stance 自身は許可を宣言しない。
+- `pnpm stance:switch` は `KYBERION_STANCE` に加えて `KYBERION_TENANT` / `KYBERION_ORGANIZATION_ID` を `stance.env` に書く。`acting_for` のない stance は、従来どおり overlay だけを選ぶ。
+- `narrowViewerScopeToStance` が `ViewerContext` を選んだテナントと Org に絞る（広げることはない）。`stanceResourceBinding` が `ResourceAccessScope` をそのテナントに結び付ける。切り替えで範囲が移ることと、許可の外へ広がらないことを `libs/core/authn/stance-scope.test.ts` で固定した。
+- `KYBERION_CUSTOMER` の読み込みは、14 か所から既に 2 か所（`stance-resolver.ts` と `tier-guard.ts`）に減っていた。この 2 か所を `libs/core/authn/stance-env.ts` の 1 か所に寄せた。移行のため 1 リリースだけ、`KYBERION_STANCE` が未設定で `knowledge/personal/stances/<slug>/` があるときに限り、その stance として読む。それ以外は無視する。どちらの場合も診断形式の警告を 1 回出す。env-registry では `deprecated: 2026-11` とした。
+- 口調・窓口は既にテナント側にあった（`connections/channel-bindings.json` の `language` / `mode` / `counterpart`、`customers/<customer>/` の actor ごとの `channel`）。stance 側の記述（テンプレート、use cases、DEPLOYMENT）から「customer overlay」と顧客とのやり取りの扱いを外した。stance の `voice/` は運用者自身の音声として残した。テナントへ移すかは未決。
 
 ### S3 — Tenant 1:N Org と NHI の ID
 
