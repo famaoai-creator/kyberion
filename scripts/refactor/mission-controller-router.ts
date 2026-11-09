@@ -998,8 +998,18 @@ export async function runMissionControllerAction(
         applyProcessImprovementProposal,
         decideProcessImprovementProposal,
         listProcessImprovementProposals,
+        migrateLegacyProcessImprovementProposals,
       } = await import('@agent/core/mission/mission-retrospective');
-      if (approveId) {
+      if (context.argv.includes('--migrate')) {
+        // D8 one-release migration of the legacy shared proposal queue.
+        context.print?.(
+          JSON.stringify(
+            migrateLegacyProcessImprovementProposals({ apply: context.argv.includes('--write') }),
+            null,
+            2
+          )
+        );
+      } else if (approveId) {
         context.print?.(
           JSON.stringify(decideProcessImprovementProposal(approveId, 'approved'), null, 2)
         );

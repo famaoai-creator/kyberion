@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, intent-loop, wiring, feedback-loop, audit]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-08-31
+last_updated: 2026-11-10
 ---
 
 # Intent-Loop Wiring Status
@@ -18,7 +18,7 @@ Connection audit of Kyberion's core loop (capture intent → goal → execute �
 | Surface → mission (Slack/Chronos)                          | ✓                                             | `surface-mission-proposals.ts:175` shells `mission_controller start`                                                                                                                                                               |
 | Intent drift gate at mission stages                        | ✓ **enforced**                                | `mission-orchestration-worker.ts:55,87` `emitIntentSnapshot`; `mission-lifecycle.ts:229-231` **blocks delivery on blocking drift**                                                                                                 |
 | Governance (tier-guard / approval / audit / trace→Chronos) | ✓                                             | tier checks on every `secure-io` write; `enforceApprovalGate` on ≥4 paths; audit JSONL + trace feed read by Chronos                                                                                                                |
-| Execution → feedback hints (write)                         | ✓                                             | `run_pipeline.ts:779,847` → `runFeedbackLoop` persists trace hints to `active/shared/runtime/feedback-loop/hints/`                                                                                                                 |
+| Execution → feedback hints (write)                         | ✓                                             | `run_pipeline.ts:779,847` → `runFeedbackLoop` persists trace hints to the D8 hint store `active/shared/runtime/hints/<tier>/<tenant                                                                                                | shared>/`(legacy`feedback-loop/hints/` read-only) |
 | **Feedback hints → resolution (read-back, ④→①)**           | ✓ **(fixed 2026-06-25)**                      | `knowledge-index.ts _scanProductTier` now ingests the feedback-loop hints dir → resurface via `queryKnowledge`                                                                                                                     |
 | **`wisdom:distill` op (⑤→⑥)**                              | ✓ **(fixed 2026-06-25 / updated 2026-07-04)** | `decision-ops.ts` `case 'distill'` sources recent `listDistillCandidateRecords()` (deduped) → `memory-distillation.json` now nominates a promotion candidate and `promoted-memory.ts` appends approved knowledge hints to HINTS.md |
 | **Mission distill → promotion queue**                      | ✓ **(fixed 2026-06-25)**                      | `mission-distill.ts` auto-calls `enqueueMemoryPromotionCandidate` on completion                                                                                                                                                    |

@@ -4,7 +4,7 @@ category: Architecture
 tags: [hardening, backlog, governance, usability]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-04-18
+last_updated: 2026-11-10
 ---
 
 # Hardening Backlog
@@ -158,5 +158,5 @@ Reference:
 - [Personal Voice Narrated Video Delivery Plan](personal-voice-narrated-video-delivery-plan.md)
 - [Model and Harness Adaptation Phase](model-adaptation-phase.md)
 - [CLI Harness Coordination Model](cli-harness-coordination-model.md)
-- [Wisdom Policy Adapter Guide](../governance/wisdom-policy-guide.md)
+- [Distill Policy Adapter Guide](../governance/wisdom-policy-guide.md)
 - [Studio Agent Orchestration Absorption Plan](studio-agent-orchestration-absorption-plan.md)

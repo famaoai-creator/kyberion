@@ -291,7 +291,7 @@ export async function buildTaskDispatchContext(input: {
     }
   }
   const artifactReviewLines = buildArtifactReviewLines(input.task);
-  const rejectionLessonLines = buildRejectionLessonLines();
+  const rejectionLessonLines = buildRejectionLessonLines(input.missionId);
   // KC-06: deliver claimed background-delegation completions into this dispatch.
   const delegationNotificationLines = buildDelegationNotificationLines(
     DELEGATION_NOTIFICATION_CLAIM_LIMIT,

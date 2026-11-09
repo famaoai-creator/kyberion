@@ -882,7 +882,7 @@ async function showReasoningBackendStatus(): Promise<void> {
     `    Selected: ${selectedMode || registeredEnv('KYBERION_REASONING_BACKEND') || 'auto'}`
   );
   printOutput(
-    `    Wisdom profile: ${registeredEnv('KYBERION_WISDOM_LLM_PROFILE') || 'distill policy default'}`
+    `    Distill profile: ${registeredEnv('KYBERION_DISTILL_LLM_PROFILE') || registeredEnv('KYBERION_WISDOM_LLM_PROFILE') || 'distill policy default'}`
   );
   for (const provider of providers) {
     const state = provider.installed

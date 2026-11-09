@@ -1,7 +1,7 @@
 {
-  "$schema": "https://kyberion.local/schemas/wisdom-policy.schema.json",
+  "$schema": "https://kyberion.local/schemas/distill-policy.schema.json",
   "version": "2.0.0",
-  "name": "Global Wisdom Distillation Policy",
+  "name": "Global Mission Distillation Policy",
   "description": "Rules for automated insight extraction and knowledge evolution.",
   "llm": {
     "profiles": {

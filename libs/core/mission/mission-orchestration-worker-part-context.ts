@@ -4,6 +4,7 @@ import { createKnowledgeDeliverySnapshot } from '../knowledge/knowledge-delivery
 import { clamp, readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { readHintsByCategory } from '../knowledge/feedback-loop.js';
+import { missionMemoryCaptureScope } from '../knowledge/memory-capture-scope.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import {
   classifyQuestionDecision,
@@ -894,9 +895,13 @@ export function buildMissionGoalLines(missionState: Record<string, unknown>): st
  * repeating a rejection the operator already explained. Ephemeral advisory
  * lines — deliberately outside the context-pack pruning budget.
  */
-export function buildRejectionLessonLines(): string[] {
+export function buildRejectionLessonLines(missionId?: string): string[] {
   try {
-    return readHintsByCategory('human-rejection')
+    // D8: only lessons captured in this mission's own scope (never another
+    // tenant's). A mission whose scope is undetermined gets none.
+    if (!missionId) return [];
+    const capture = missionMemoryCaptureScope(missionId);
+    return readHintsByCategory('human-rejection', capture.scope ?? { tier: capture.tier })
       .slice(-3)
       .map((hint) => `- ${hint.hint}`);
   } catch {

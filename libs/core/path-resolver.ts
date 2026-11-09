@@ -304,6 +304,8 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/work-coordination/',
   'shared/observability/work-coordination/',
   'shared/runtime/feedback-loop/',
+  // D8 runtime hint store partitions (knowledge/hint-store.ts).
+  'shared/runtime/hints/',
   'shared/runtime/tenants/',
   'shared/runtime/tenant-ledger/',
   'shared/runtime/audit-mirror/',

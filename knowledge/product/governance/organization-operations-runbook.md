@@ -1,7 +1,7 @@
 ---
 title: Organization Operations Runbook
 tags: [organization, operation, incident, decision, governance]
-last_updated: 2026-10-22
+last_updated: 2026-11-10
 ---
 
 # Organization operations
@@ -56,6 +56,8 @@ Keep human intervention focused on the concrete missing authority and retain
 the original attempt when an external outcome is unknown.
 
 Incidents, routine exceptions, project closures and governance decisions become learning candidates with `learning enqueue`. Triage them with `learning transition`: `proposed → approved → promoted`, or `→ rejected` with `--reason`. Promote only after the learning is written into `knowledge/` in the same tier and tenant, and pass that document as `--promoted-ref`. `status` lists candidates still waiting.
+
+A learning candidate is a row on the one memory candidate queue (`kind: organization_learning`, scope = the organization's tier, tenant and organization id), so `learning enqueue` and `learning transition` read and decide that row, and the generic memory promotion never promotes it. The old per-organization `learning/<id>/candidate.json` files are read-only history. For one release, `learning migrate --dry-run|--apply` imports their pending (proposed / approved) items onto the queue with the scope the record itself declares; an item whose scope the record does not determine (a personal-tier learning has no owner) is listed under `unresolved` and left alone. A transition on a learning that is only in the old store fails with `ORGANIZATION_LEARNING_NOT_ON_QUEUE` until it is migrated.
 
 ## Objectives and key results
 
