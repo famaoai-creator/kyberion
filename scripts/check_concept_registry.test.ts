@@ -139,7 +139,7 @@ describe('markdown helpers', () => {
     expect(foldMultilineList(fm('concepts:\n  [\n    a,\n    b,\n  ]'), 'concepts')).toBe(
       '[ a, b, ]'
     );
-    expect(foldMultilineList(fm('concepts:\r\n  [a, b]').replace(/\n/g, '\r\n'), 'concepts')).toBe(
+    expect(foldMultilineList(fm('concepts:\n  [a, b]').replace(/\n/g, '\r\n'), 'concepts')).toBe(
       '[a, b]'
     );
     expect(foldMultilineList(fm('concepts:\n  - a\n  - "b"\nother: x'), 'concepts')).toBe(
