@@ -20,6 +20,7 @@ import { projectDotResultRecords, dotResultScopeSchema } from '@agent/core/dot/d
 import {
   DOT_ACTION_LEDGER_PATH,
   readDotActionLedgerStrict,
+  requestedExecutionShape,
   type DotActionRecord,
 } from '@agent/core/dot/dot-action-ledger';
 import {
@@ -313,7 +314,7 @@ export async function readFirstJobStatus(
           item.metadata?.action_ref !== action.action_ref ||
           item.metadata?.approval_request_id !== action.request_id ||
           item.metadata?.pipeline_ref !== FRONT_DESK_RECEIPT_PIPELINE ||
-          item.metadata?.requested_work_shape !== 'pipeline' ||
+          requestedExecutionShape(item.metadata) !== 'pipeline' ||
           !frontDeskBindingsEqual(binding, item.metadata?.front_desk_execution) ||
           item.context?.tenant_slug !== charter.scope.tenant_slug ||
           item.context?.organization_id !== charter.scope.organization_id ||

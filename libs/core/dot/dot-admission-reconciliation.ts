@@ -5,7 +5,7 @@ import type { WorkItem } from '../workforce/work-coordination-types.js';
 import type { AutonomousOpsGateResult } from '../governance/autonomous-ops-gate.js';
 import { currentDotActions, type DotActionRecord } from './dot-action-ledger.js';
 import { dotAdmissionScopeHash, withDotAdmissionLock } from './dot-admission-identity.js';
-import { recoveryEvidenceHash } from '../surface/front-desk-recovery-receipt.js';
+import { dotProposalEvidenceHash } from './dot-action-ledger-version.js';
 import {
   AUTONOMY_APPROVAL_CHANNEL,
   resolveInterventionLevel,
@@ -43,7 +43,7 @@ export function reconcileAdmittedDotAction(
       !identity ||
       identity.scope_hash !== dotAdmissionScopeHash(charter) ||
       identity.authority_role !== charter.authority.authority_role ||
-      recoveryEvidenceHash(identity.proposal) !== identity.semantic_hash
+      dotProposalEvidenceHash(identity.proposal) !== identity.semantic_hash
     )
       return latest;
     try {

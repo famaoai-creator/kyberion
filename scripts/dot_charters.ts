@@ -665,7 +665,7 @@ function printIntake(intake: DotIntakePlan, print: (line: string) => void): void
       `${pad(row.source, 20)} ${pad(row.mode, 4)} ${pad(row.dot_id, 22)} ${pad(row.armed ? 'yes' : 'no', 5)} ${pad(
         row.types.join(',') || '(all)',
         34
-      )} ${row.authority_role} / ${row.work_shapes.join('|')} / ${row.decision}`
+      )} ${row.authority_role} / ${row.execution_shapes.join('|')} / ${row.decision}`
     );
     print(
       `  ${row.mode === 'pull' ? `feed ${row.feed?.service_id}:${row.feed?.action} every ${row.feed?.every_s}s — ${row.feed?.coverage.state}: ${row.feed?.coverage.detail}` : `enablement: ${row.enabled_by}`}`

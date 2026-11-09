@@ -276,7 +276,11 @@ describe('runDotWake', () => {
         runLoop: async (options) => {
           options.executeTool!({
             name: 'dot_propose_action',
-            input: { title: 'Rerun CI', objective: 'Re-run the job.', work_shape: 'task_session' },
+            input: {
+              title: 'Rerun CI',
+              objective: 'Re-run the job.',
+              execution_shape: 'task_session',
+            },
           });
           return {
             finalState: 'blocked',
@@ -413,7 +417,7 @@ describe('runDotWake', () => {
           return [
             'CI is red on main.',
             '```dot-proposals',
-            '[{"title":"Fix main","objective":"Repair the failing test.","work_shape":"task_session"}]',
+            '[{"title":"Fix main","objective":"Repair the failing test.","execution_shape":"task_session"}]',
             '```',
           ].join('\n');
         },
@@ -449,7 +453,7 @@ describe('runDotWake', () => {
             input: {
               title: 'Rerun CI',
               objective: 'Re-run the flaky job.',
-              work_shape: 'task_session',
+              execution_shape: 'task_session',
             },
           }).resultText,
           options.executeTool!({ name: 'shell_exec', input: { cmd: 'rm -rf /' } }).resultText,
@@ -467,7 +471,7 @@ describe('runDotWake', () => {
     });
     expect(governed).toEqual(['Rerun CI']);
     expect(toolReplies[1]).toMatch(/not available to a dot/);
-    expect(receipt.proposal_errors?.[0]).toMatch(/work_shape/);
+    expect(receipt.proposal_errors?.[0]).toMatch(/execution_shape/);
   });
 
   it('retries a failed wake only after the backoff window', async () => {
@@ -744,7 +748,11 @@ describe('runtime reliability (DL-02)', () => {
         now: () => t0,
       });
       const [trigger] = evaluateDotFollowupsDue(charter, deps);
-      const proposal = { title: 'Fix main', objective: 'Repair it.', work_shape: 'task_session' };
+      const proposal = {
+        title: 'Fix main',
+        objective: 'Repair it.',
+        execution_shape: 'task_session',
+      };
       const replacement = { delay_minutes: 10, reason: 'successor' };
       const dispatched: string[] = [];
       const originalWrite = secureIo.safeWriteFile;
@@ -1164,7 +1172,7 @@ describe('runtime reliability (DL-02)', () => {
               training_use: 'training_eligible',
               purpose: 'dot-wake',
             });
-            return 'Fallback.\n```dot-proposals\n[{"title":"Fix","objective":"Do it.","work_shape":"task_session"}]\n```';
+            return 'Fallback.\n```dot-proposals\n[{"title":"Fix","objective":"Do it.","execution_shape":"task_session"}]\n```';
           },
         },
         dispatch: (_charter, proposals) => {

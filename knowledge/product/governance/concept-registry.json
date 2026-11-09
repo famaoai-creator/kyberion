@@ -95,12 +95,7 @@
       "glossary_anchor": "execution-shape",
       "canonical_doc": "docs/GLOSSARY.md#execution-shape",
       "owner_modules": ["libs/core/contracts/execution-shape.ts"],
-      "not_to_confuse_with": ["work-shape"],
-      "lifecycle": {
-        "state": "transitioning",
-        "decision": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md#d7--one-intent-resolver-thin-surface-adapters",
-        "plan": "docs/developer/improvement-plans-2026-11/INTENT_RESOLVER_UNIFICATION_PLAN_2026-11-10.ja.md"
-      }
+      "not_to_confuse_with": ["work-shape"]
     },
     {
       "id": "work-shape",
@@ -110,12 +105,7 @@
       "glossary_anchor": "work-shape",
       "canonical_doc": "knowledge/product/architecture/entity-scope-hierarchy.md",
       "owner_modules": ["libs/core/entity-scope.ts"],
-      "not_to_confuse_with": ["execution-shape", "actuator-op"],
-      "lifecycle": {
-        "state": "transitioning",
-        "decision": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md#d7--one-intent-resolver-thin-surface-adapters",
-        "plan": "docs/developer/improvement-plans-2026-11/INTENT_RESOLVER_UNIFICATION_PLAN_2026-11-10.ja.md"
-      }
+      "not_to_confuse_with": ["execution-shape", "actuator-op"]
     },
     {
       "id": "tier",
@@ -425,12 +415,7 @@
         "libs/core/intent/routing-decision.ts",
         "libs/core/intent/intent-resolver-entry.ts"
       ],
-      "not_to_confuse_with": ["execution-shape"],
-      "lifecycle": {
-        "state": "transitioning",
-        "decision": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md#d7--one-intent-resolver-thin-surface-adapters",
-        "plan": "docs/developer/improvement-plans-2026-11/INTENT_RESOLVER_UNIFICATION_PLAN_2026-11-10.ja.md"
-      }
+      "not_to_confuse_with": ["execution-shape"]
     },
     {
       "id": "memory-candidate",

@@ -373,7 +373,7 @@ export function evaluateContinuousOperations(
       action_id: DEFAULT_DOT_ACTION_ID,
       title: rule.title,
       objective: rule.objective,
-      work_shape: 'pipeline',
+      execution_shape: 'pipeline',
       pipeline_ref: rule.pipeline_ref,
       rationale: `Continuous operations ${config.loop_id}: ${rule.source_id}/${rule.metric} matched rule ${rule.rule_id}.`,
     };

@@ -7,6 +7,7 @@ import { recoveryEvidenceHash } from '../surface/front-desk-recovery-receipt.js'
 import type { DotCharter } from './dot-charter.js';
 import type { DotProposal } from './dot-proposals.js';
 import type { DotActionRecord } from './dot-action-ledger.js';
+import { dotProposalEvidenceHash } from './dot-action-ledger-version.js';
 import {
   validateServerDotJudgmentProposal,
   dotJudgmentCharterHash,
@@ -62,7 +63,8 @@ export function genericDotActionIdentity(
   if (operationKey !== undefined && (!operationKey.trim() || operationKey.length > 2000))
     throw new Error('invalid dot operation key');
   const scope_hash = dotAdmissionScopeHash(charter);
-  const semantic_hash = recoveryEvidenceHash(proposal);
+  // Pins the proposal as written (a version-1 view hashes with its stored `work_shape`).
+  const semantic_hash = dotProposalEvidenceHash(proposal);
   const key = operationKey ?? randomUUID();
   return {
     action_ref: 'dact-' + recoveryEvidenceHash([scope_hash, key, ordinal]),
@@ -120,7 +122,9 @@ export function admissionForDotRecord(
     action_id: row.action_id,
     title: row.title,
     objective: row.objective,
-    work_shape: row.work_shape,
+    execution_shape: row.execution_shape,
+    // A version-1 row keeps its version (and its WorkItem envelope) once bound.
+    ...(row.schema_version === 1 ? { schema_version: 1 as const } : {}),
   };
   for (const key of [
     'priority',

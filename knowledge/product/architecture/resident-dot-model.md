@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, autonomy, resident-agent, dots, charter, supervision]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-10-17
+last_updated: 2026-11-10
 ---
 
 # Resident Dot Model
@@ -91,8 +91,12 @@ governs each one in the supervisor process, under the charter role
    task-session executor is configured, even when declared), handoff acceptance, and `max_concurrent_delegations`
    (default 3). Open WorkItems and parked decisions both count toward the cap.
    A tenant-scoped dot also needs its tenant registered and operational, so
-   the operator is never asked to approve work that cannot run. Every bound
-   except the cap is re-checked when an approved action settles.
+   the operator is never asked to approve work that cannot run. A dot never
+   reads utterances, so its proposed `execution_shape` is turned into the
+   shared `RoutingDecision` for that charter-bounded shape
+   (`libs/core/dot/dot-routing-decision.ts`); work the work-scope policy would
+   route to another shape is refused and re-proposed. Every bound except the
+   cap is re-checked when an approved action settles.
 2. **Decision**: the `autonomous-ops-gate` verdict is raised to the strictest
    of `decisions.default_decision`, the floor learned from operator
    rejections, and the dot's own `requested_decision`. A charter
@@ -320,6 +324,16 @@ follow-up reasons, event bodies, results) never lands in a system-floor file:
 the pre-existing flat ledgers (`dot-wake-ledger`, `dot-action-ledger`,
 `dot-inbox`) stay shared, so tenant dots write only category-level text there.
 See [runtime-storage-layout](./runtime-storage-layout.md).
+
+**Action ledger versions**: rows and admitted proposals are hash-bound, so the
+ledger is versioned instead of rewritten (`libs/core/dot/dot-action-ledger-version.ts`).
+New rows carry `schema_version: 2` and `execution_shape`; rows written before
+the rename (no `schema_version`, `work_shape`) are read through a mapping and
+verified in the form they were written. A status change of an old admitted
+action is written in the old version, so a row and its admitted proposal are
+always compared like-for-like. Dot WorkItems carry `requested_execution_shape`
+(items created from old actions keep `requested_work_shape`; readers accept
+both for one release).
 
 **One owner per `dot_id`**: those shared ledgers, the inbox, WorkItems and
 approvals are keyed by `dot_id`, so exactly one charter may load per ID
