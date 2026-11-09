@@ -293,6 +293,12 @@ export {
   WorkCoordinationError,
   updateWorkItem,
 } from './workforce/work-coordination.js';
+export {
+  aggregateParentStatus,
+  isTopLevelWorkItem,
+  MAX_WORK_ITEM_DEPTH,
+  sharesWorkItemTenantScope,
+} from './workforce/work-item-hierarchy.js';
 
 export type {
   AppendCoordinationEventInput,

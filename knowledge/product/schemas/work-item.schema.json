@@ -81,6 +81,11 @@
         "additionalProperties": false
       }
     },
+    "parent_item_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "D1: the parent Issue of a step WorkItem; absent on a top-level WorkItem."
+    },
     "metadata": { "type": "object" }
   },
   "additionalProperties": true

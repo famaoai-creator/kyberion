@@ -32,6 +32,7 @@ import type {
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import { VETO_WINDOW_DECIDER } from '../governance/approval-veto-window.js';
 import type { CreateWorkItemInput, WorkItem } from '../workforce/work-coordination-types.js';
+import { createWorkItem } from '../workforce/work-coordination.js';
 import type { DotCharter } from './dot-charter.js';
 import {
   composeDotDigest,
@@ -365,6 +366,42 @@ describe('dispatchDotProposals — decision and delegation', () => {
     expect(h.routed[0].requestedBy).toBe('dot:org-ops');
     expect(h.audits.at(-1)).toMatchObject({ agentId: 'dot:org-ops', result: 'completed' });
     expect(h.notes).toHaveLength(0);
+  });
+
+  it('makes a dot action on an existing WorkItem its child (D1); other actions stay top-level', () => {
+    createWorkItem({
+      rootDir: TEST_ROOT,
+      itemId: 'issue-acme',
+      title: 'Acme Issue',
+      description: 'Existing Issue the dot acts on',
+      context: { tenant_slug: 'acme', organization_id: 'acme-team' },
+    });
+    createWorkItem({
+      rootDir: TEST_ROOT,
+      itemId: 'issue-other',
+      title: 'Other tenant Issue',
+      description: 'Issue in another tenant',
+      context: { tenant_slug: 'other-co' },
+    });
+    const h = harness('auto');
+    dispatchDotProposals(
+      CHARTER,
+      [
+        { ...PROPOSAL, title: 'On the Issue', target: 'work_item:issue-acme' },
+        { ...PROPOSAL, title: 'Cross tenant', target: 'work_item:issue-other' },
+        { ...PROPOSAL, title: 'On a path', target: 'path:docs/**' },
+      ],
+      h.deps
+    );
+    expect(h.items.map((item) => item.title)).toEqual([
+      'On the Issue',
+      'Cross tenant',
+      'On a path',
+    ]);
+    const byTitle = Object.fromEntries(h.items.map((item) => [item.title, item.parentItemId]));
+    expect(byTitle['On the Issue']).toBe('issue-acme');
+    expect(byTitle['Cross tenant']).toBeUndefined();
+    expect(byTitle['On a path']).toBeUndefined();
   });
 
   it('raises the gate to the charter default_decision floor', () => {

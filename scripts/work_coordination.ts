@@ -243,6 +243,11 @@ async function runMain(args: string[] = []): Promise<void> {
       'Backfill typed WorkItem context from legacy snapshots',
       () => undefined
     )
+    .command(
+      'migrate-parents',
+      'Backfill parent_item_id on mission task WorkItems (dry run; --apply writes)',
+      () => undefined
+    )
     .command('list-events', 'List coordination events', () => undefined)
     .command('list-leases', 'List active leases', () => undefined)
     .command('history <correlationId>', 'Show the integrated handoff history', () => undefined)
@@ -331,6 +336,15 @@ async function runMain(args: string[] = []): Promise<void> {
     case 'migrate-context': {
       print({
         quality: migrateLegacyWorkItemContexts({ apply: Boolean(argv.apply) }),
+        applied: Boolean(argv.apply),
+      });
+      break;
+    }
+    case 'migrate-parents': {
+      // Loaded on demand: the mission layer is not needed by the other commands.
+      const { migrateMissionTaskWorkItemParents } = await import('@agent/core');
+      print({
+        quality: migrateMissionTaskWorkItemParents({ apply: Boolean(argv.apply) }),
         applied: Boolean(argv.apply),
       });
       break;

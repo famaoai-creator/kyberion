@@ -20,6 +20,7 @@ import {
   type WorkItem,
 } from '../workforce/work-coordination.js';
 import { logger } from '../core.js';
+import { resolveMissionTaskParentItemId } from './mission-ownership-item.js';
 import { dispatchThroughMissionWorkerCore } from './mission-orchestration-worker-dispatch-port.js';
 import { canonicalizeTeamRole } from '../workforce/working-principles.js';
 import {
@@ -597,6 +598,8 @@ export async function dispatchGoalDrivenMissionTask(
   traceCtx: TraceContext
 ): Promise<DispatchMissionTaskOutcome | null> {
   const workItemSourceRef = `mission:${input.missionId}:${input.task.task_id}:goal`;
+  // D1: the goal-driven task is a step of the mission's Issue (its ownership item).
+  const parentItemId = resolveMissionTaskParentItemId(input.missionId, undefined);
   const workItem = importExternalWorkItem({
     source: 'local',
     sourceRef: workItemSourceRef,
@@ -607,6 +610,7 @@ export async function dispatchGoalDrivenMissionTask(
     projectId: input.missionId,
     assigneePeerId: input.assignment.agent_id,
     labels: [`mission:${input.missionId}`, `team_role:${input.teamRole}`, 'goal_driven'],
+    ...(parentItemId ? { parentItemId } : {}),
     dependencies: Array.isArray(input.task.dependencies) ? input.task.dependencies : [],
     metadata: {
       deliverable: input.task.deliverable,

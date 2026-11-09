@@ -88,6 +88,7 @@ export function buildWorkItemCreation(input: CreateWorkItemInput): WorkItem {
     ...(input.currentAttemptId ? { current_attempt_id: input.currentAttemptId } : {}),
     ...(input.attempts ? { attempts: input.attempts.map((attempt) => ({ ...attempt })) } : {}),
     context,
+    ...(input.parentItemId ? { parent_item_id: input.parentItemId } : {}),
     ...(input.metadata ? { metadata: input.metadata } : {}),
   };
   return item;
@@ -95,7 +96,16 @@ export function buildWorkItemCreation(input: CreateWorkItemInput): WorkItem {
 
 /** Original persisted creation fields, independent of later edits or claims. */
 function creationIdentity(item: WorkItem): unknown {
-  const { created_at: _created, updated_at: _updated, version: _version, ...identity } = item;
+  // D1: the parent link is structure, not creation identity — a backfill may
+  // attach a parent to an item created before parents existed, and a replay of
+  // that original creation must stay a replay.
+  const {
+    created_at: _created,
+    updated_at: _updated,
+    version: _version,
+    parent_item_id: _parent,
+    ...identity
+  } = item;
   // Compare the persisted JSON representation (optional undefined values and
   // object key insertion order must not turn a replay into a false conflict).
   return parseSafeJsonInput(JSON.stringify(identity), 'work item creation identity');
