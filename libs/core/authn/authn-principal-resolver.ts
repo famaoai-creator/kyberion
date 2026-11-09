@@ -65,7 +65,7 @@ export interface AuthnExecutionContext {
   persona?: string;
   missionRole?: string;
   missionId?: string;
-  /** A canonical actor id (`kyberion://agent/<org>/<slug>`) asserted by the runtime. */
+  /** A canonical actor id (`kyberion://agent/<tenant>/<org|_>/<slug>`) asserted by the runtime. */
   actorHint?: string;
 }
 

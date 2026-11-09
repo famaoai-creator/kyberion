@@ -9,6 +9,7 @@ import { readJsonIfPresent, writeJson } from '../foundation/json.js';
 import { withLock } from '../foundation/lock-utils.js';
 import { safeMkdir } from '../secure-io.js';
 import { humanActor } from '../contracts/actor.js';
+import { buildNhiId } from '../contracts/nhi-id.js';
 import {
   SurfaceManagementError,
   verifySurfaceManagementAuthorization,
@@ -68,6 +69,10 @@ interface Readiness {
   accountable_human?: { resource_id?: string };
   first_work?: { goal?: string };
 }
+/** The company's AI CEO worker: company = tenant, its organization keyed by the same slug. */
+const companyWorkerNhiId = (tenantSlug: string) =>
+  buildNhiId(tenantSlug, tenantSlug, 'ceo-operator');
+
 function fail(code: string, message: string, status = 409): never {
   throw new SurfaceManagementError(code, status, message);
 }
@@ -368,7 +373,7 @@ export async function executeCompanySetup(
             fail('company_missing', 'Register the company first.');
           const result = await runTenantActivationProbes({
             ...scope(auth),
-            nhiIds: ['kyberion://agent/' + auth.tenantSlug + '/ceo-operator'],
+            nhiIds: [companyWorkerNhiId(auth.tenantSlug)],
             serviceIds: [],
           });
           receipt = {
@@ -404,7 +409,7 @@ export async function executeCompanySetup(
               customerSlug: auth.tenantSlug,
               organizationId: auth.tenantSlug,
               tier: 'confidential',
-              nhiIds: ['kyberion://agent/' + auth.tenantSlug + '/ceo-operator'],
+              nhiIds: [companyWorkerNhiId(auth.tenantSlug)],
               serviceIds: [],
               evidenceRef: receipt.evidenceRef,
             },

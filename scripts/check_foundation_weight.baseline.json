@@ -32,7 +32,7 @@
     "contracts/narrated-video-publish-plan": 0,
     "contracts/narrated-video-upload-package": 0,
     "contracts/next-action-contract": 0,
-    "contracts/nhi-id": 0,
+    "contracts/nhi-id": 1,
     "contracts/ocr-types": 0,
     "contracts/operator-interaction-packet": 0,
     "contracts/pdf-protocol": 0,
