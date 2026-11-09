@@ -25,7 +25,7 @@ growing. This workflow and the `concept-registry` gate make the meaning checkabl
 
 ## What the gate enforces (`pnpm check --only concept-registry`)
 
-1. **Registry integrity** — unique ids; a term/alias claimed by one entry only; canonical docs and owner modules exist; `not_to_confuse_with` ids exist.
+1. **Registry integrity** — unique ids; a term/alias claimed by one entry only; canonical docs and owner modules exist; `not_to_confuse_with` ids exist. A term whose meaning was decided but whose code still lags carries `lifecycle`: `transitioning` (the definition is the decided target; needs an existing `decision` record and migration `plan`) or `deprecated` (needs `replaced_by` ids that are not themselves deprecated). Dropping `lifecycle` is the observable "migration done" signal.
 2. **One glossary definition per term** — a GLOSSARY `###` heading base term appears once, unless every qualified heading (`Term (qualifier)`) is a declared sense.
 3. **Glossary agrees with the registry** — every entry has a GLOSSARY heading; a registry term that is a row of the _Contributor vocabulary_ table must use the registry definition verbatim.
 4. **Retirement is explicit** — `doc_status` is validated in every markdown file under `docs/`, `knowledge/product/` and `knowledge/public/`: only `superseded` or `historical`; `superseded` needs an existing, non-retired `superseded_by` (a **repo-root-relative** path, e.g. `knowledge/product/architecture/x.md`). Improvement plans never use `doc_status` — they have their own `status`.
@@ -46,6 +46,13 @@ their own GLOSSARY heading — an alias with its own definition is a second conc
 exists, extend that entry and its canonical doc — do not write a parallel doc. If it is new and
 likely to be confused, add a registry entry _and_ its GLOSSARY heading in the same change, then
 reference its id from the architecture doc's `concepts:`.
+
+**Changing what a concept means.** Record the decision (an ADR under
+`knowledge/product/architecture/decisions/`), write the decided meaning into the registry and
+GLOSSARY at once, and mark the term `lifecycle: transitioning` with the migration plan. Docs
+describe the target and name today's behaviour as _transitioning_. They do not keep describing
+the old meaning as current. [Concept Model v2](../architecture/decisions/2026-11-10-concept-model-v2.md)
+is the first such decision.
 
 **Writing a new architecture doc.** Declare `concepts: [...]` with the ids it explains. If no id
 fits, that is the signal to register the concept first (or to put the doc elsewhere, e.g. a

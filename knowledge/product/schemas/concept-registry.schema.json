@@ -42,6 +42,18 @@
                 "definition": { "type": "string", "minLength": 1 }
               }
             }
+          },
+          "lifecycle": {
+            "description": "A decided change of meaning. Absent = current (code and docs agree). transitioning = the definition is the decided target and code migrates under plan; deprecated = being removed in favour of replaced_by.",
+            "type": "object",
+            "required": ["state", "decision"],
+            "additionalProperties": false,
+            "properties": {
+              "state": { "enum": ["transitioning", "deprecated"] },
+              "decision": { "type": "string", "minLength": 1 },
+              "plan": { "type": "string", "minLength": 1 },
+              "replaced_by": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+            }
           }
         }
       }
