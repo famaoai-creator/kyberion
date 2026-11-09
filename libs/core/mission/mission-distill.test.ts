@@ -68,10 +68,10 @@ import { loadMissionStateIncludingArchive, loadState } from './mission-state.js'
 import {
   gatherDistillContext,
   distillMission,
-  formatWisdomMarkdown,
+  formatDistillationMarkdown,
   isRegularMissionDistillPromptPath,
-  resolveWisdomOutputPath,
-  WISDOM_SCHEMA,
+  resolveDistillationOutputPath,
+  DISTILLATION_SCHEMA,
 } from './mission-distill.js';
 import { promoteMemoryCandidateToKnowledge } from '../knowledge/memory-promotion-workflow.js';
 import { safeExec } from '../secure-io.js';
@@ -292,7 +292,7 @@ describe('mission-distill end-to-end promotion flow', () => {
     );
 
     const hints = safeReadFile(scratchHintsPath, { encoding: 'utf8' }) as string;
-    expect(hints).not.toContain('Distilled wisdom from mission'); // risk_rule records do not pollute operational hints
+    expect(hints).not.toContain('Distilled lesson from mission'); // risk_rule records do not pollute operational hints
     expect(hints).not.toContain(`source_ref: ${queued.candidate_id}`);
     expect(queued?.evidence_refs).toContain(
       path
@@ -525,9 +525,9 @@ describe('mission-distill end-to-end promotion flow', () => {
   });
 });
 
-describe('resolveWisdomOutputPath', () => {
+describe('resolveDistillationOutputPath', () => {
   it('rejects output directories outside the repository root', () => {
-    expect(() => resolveWisdomOutputPath('../../outside-wisdom', 'distill.md')).toThrow(
+    expect(() => resolveDistillationOutputPath('../../outside-wisdom', 'distill.md')).toThrow(
       '[RESOURCE_PATH_SCOPE]'
     );
   });
@@ -540,7 +540,7 @@ describe('resolveWisdomOutputPath', () => {
     safeSymlinkSync(target, link);
     try {
       expect(() =>
-        resolveWisdomOutputPath(
+        resolveDistillationOutputPath(
           `active/shared/tmp/mission-distill-output-link-${suffix}`,
           'distill.md'
         )
@@ -552,7 +552,7 @@ describe('resolveWisdomOutputPath', () => {
   });
 });
 
-describe('WISDOM_SCHEMA harness2 experience contract', () => {
+describe('DISTILLATION_SCHEMA harness2 experience contract', () => {
   const baseWisdom = {
     title: 'Test wisdom',
     category: 'Evolution' as const,
@@ -568,15 +568,15 @@ describe('WISDOM_SCHEMA harness2 experience contract', () => {
   };
 
   it('accepts a wisdom object without the new optional fields (backward compatible)', () => {
-    expect(WISDOM_SCHEMA.safeParse(baseWisdom).success).toBe(true);
+    expect(DISTILLATION_SCHEMA.safeParse(baseWisdom).success).toBe(true);
   });
 
   it('accepts explicit null optional lessons from structured-output providers', () => {
     expect(
-      WISDOM_SCHEMA.safeParse({ ...baseWisdom, experience: null, edit_rows: null }).success
+      DISTILLATION_SCHEMA.safeParse({ ...baseWisdom, experience: null, edit_rows: null }).success
     ).toBe(true);
     expect(
-      WISDOM_SCHEMA.safeParse({
+      DISTILLATION_SCHEMA.safeParse({
         ...baseWisdom,
         experience: { cue: 'c', lesson: 'l', confidence: 'high' },
         edit_rows: null,
@@ -608,7 +608,7 @@ describe('WISDOM_SCHEMA harness2 experience contract', () => {
         },
       ],
     };
-    expect(WISDOM_SCHEMA.safeParse(wisdom).success).toBe(true);
+    expect(DISTILLATION_SCHEMA.safeParse(wisdom).success).toBe(true);
   });
 
   it('rejects a partial experience block (missing evidence)', () => {
@@ -616,12 +616,12 @@ describe('WISDOM_SCHEMA harness2 experience contract', () => {
       ...baseWisdom,
       experience: { cue: 'cue', lesson: 'lesson', confidence: 'high' },
     };
-    expect(WISDOM_SCHEMA.safeParse(wisdom).success).toBe(false);
+    expect(DISTILLATION_SCHEMA.safeParse(wisdom).success).toBe(false);
   });
 
   it('rejects empty-string fields inside an experience block', () => {
     expect(
-      WISDOM_SCHEMA.safeParse({
+      DISTILLATION_SCHEMA.safeParse({
         ...baseWisdom,
         experience: { cue: 'c', lesson: 'l', evidence: '', confidence: 'high' },
       }).success
@@ -633,11 +633,11 @@ describe('WISDOM_SCHEMA harness2 experience contract', () => {
       ...baseWisdom,
       edit_rows: [{ component: 'c', change: 'x', observed: 'y', verdict: 'probably_helped' }],
     };
-    expect(WISDOM_SCHEMA.safeParse(wisdom).success).toBe(false);
+    expect(DISTILLATION_SCHEMA.safeParse(wisdom).success).toBe(false);
   });
 });
 
-describe('formatWisdomMarkdown experience rendering', () => {
+describe('formatDistillationMarkdown experience rendering', () => {
   const baseWisdom = {
     title: 'Render Test',
     category: 'Operations',
@@ -653,7 +653,7 @@ describe('formatWisdomMarkdown experience rendering', () => {
   };
 
   it('renders change-attribution rows and the transferable lesson when present', () => {
-    const md = formatWisdomMarkdown(
+    const md = formatDistillationMarkdown(
       {
         ...baseWisdom,
         edit_rows: [
@@ -681,7 +681,7 @@ describe('formatWisdomMarkdown experience rendering', () => {
   });
 
   it('omits both sections when the fields are absent', () => {
-    const md = formatWisdomMarkdown(baseWisdom, 'MSN-RENDER-2');
+    const md = formatDistillationMarkdown(baseWisdom, 'MSN-RENDER-2');
     expect(md).not.toContain('What Each Change Did');
     expect(md).not.toContain('Transferable Lesson');
   });

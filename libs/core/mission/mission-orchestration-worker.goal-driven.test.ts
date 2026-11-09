@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 // deterministic fixture pack (same technique as
 // task-knowledge-provisioning.test.ts) so these tests stay hermetic — real
 // selection/search behavior is covered by mission-context-pack.test.ts and
-// distill-knowledge-injector.test.ts.
+// mission-context-pack-promoted-knowledge.test.ts.
 const mocks = vi.hoisted(() => ({
   resolveMissionContextPack: vi.fn(),
 }));

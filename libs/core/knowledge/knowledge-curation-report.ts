@@ -843,14 +843,26 @@ export async function generateKnowledgeCurationReport(options: { now?: Date } = 
     },
   };
   for (const advisory of observedAdvisories) {
+    // D8: the advisory is captured at the tier of the document it is about.
+    // A tenant document is tenant-scoped; a product/public document is public;
+    // any other tenantless document has no scope to capture and is skipped
+    // (it stays visible in CURATION_REPORT.md).
+    const publicDocument = /^knowledge\/(product|public)\//.test(advisory.document_path);
+    if (!advisory.tenant_slug && !publicDocument) {
+      logger.warn(
+        `[KP-06] archive advisory not queued — ${advisory.document_path} has no tenant or public scope to capture | next: review it from CURATION_REPORT.md | evidence: ${advisory.consecutive_weeks} weeks`
+      );
+      continue;
+    }
     enqueueMemoryPromotionCandidate(
       createMemoryPromotionCandidate({
         sourceType: 'artifact',
         sourceRef: `curation:${advisory.tenant_slug || 'unscoped'}:${advisory.document_path}`,
+        kind: 'advisory',
         proposedMemoryKind: 'archive_advisory',
         summary: `Review ${advisory.document_path} for archival after ${advisory.consecutive_weeks} consecutive weekly low-yield and freshness-breach observations.`,
         evidenceRefs: [advisory.document_path, 'knowledge/product/governance/CURATION_REPORT.md'],
-        sensitivityTier: advisory.tenant_slug ? 'confidential' : 'personal',
+        sensitivityTier: advisory.tenant_slug ? 'confidential' : 'public',
         ...(advisory.tenant_slug
           ? { scope: { tier: 'confidential' as const, tenant_slug: advisory.tenant_slug } }
           : {}),

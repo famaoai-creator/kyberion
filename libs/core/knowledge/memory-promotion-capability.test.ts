@@ -17,6 +17,7 @@ import { issueMemoryCapabilityToken } from './memory-capability-token.js';
 
 const TEST_SECRET = 'w3-test-hmac-secret';
 const DENIED = '[MEMORY_CAPABILITY_DENIED]';
+const TENANT = 'tenant-w3';
 
 // Keep the aggregate read from discovering the repository's real tenant
 // shards during this suite — unique per file to avoid collisions.
@@ -62,6 +63,10 @@ describe('memory promotion queue — write capability gate (W3)', () => {
       summary: 'Promote repeatable mission closing flow.',
       evidenceRefs: [`evidence:${sourceRef}`],
       sensitivityTier,
+      // D8: a confidential candidate carries its tenant scope from capture.
+      ...(sensitivityTier === 'confidential'
+        ? { scope: { tier: 'confidential' as const, tenant_slug: TENANT } }
+        : {}),
     });
 
   const capability = (overrides?: {
@@ -74,7 +79,7 @@ describe('memory promotion queue — write capability gate (W3)', () => {
     return {
       token: issueMemoryCapabilityToken(
         {
-          partition: overrides?.partition ?? 'tier:confidential',
+          partition: overrides?.partition ?? `confidential/${TENANT}`,
           ops: overrides?.ops ?? ['write'],
           subject: 'w3-test-writer',
           issuer: 'w3-test-issuer',
@@ -195,10 +200,10 @@ describe('memory promotion queue — write capability gate (W3)', () => {
       // every committed row — a token for tenant-b must not move a row out
       // of the tier:confidential partition it cannot grant.
       const cap = capability({ partition: 'confidential/tenant-b' });
+      // A legacy unscoped row (written before D8 capture scope) awaiting adoption.
       const c = candidate('mission:MSN-W3-SCOPEMOVE');
-      enqueueMemoryPromotionCandidate(c, {
-        capability: capability({ partition: 'tier:confidential' }),
-      });
+      delete c.scope;
+      safeWriteFile(queuePath, `${JSON.stringify(c)}\n`);
       expect(() =>
         updateMemoryPromotionCandidateStatus({
           candidateId: c.candidate_id,
