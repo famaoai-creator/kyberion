@@ -28,10 +28,8 @@ import {
   summarizeRelevantExecutionProfilesForIntentIds,
   summarizeRelevantExecutionProfilesForIntentIdsCompact,
 } from './intent-execution-profile-registry.js';
-import {
-  loadResolvedStandardIntentCatalog,
-  resolveIntentResolutionPacket,
-} from './intent-resolution.js';
+import { loadResolvedStandardIntentCatalog } from './intent-resolution.js';
+import { resolveRoutingPacket } from './intent-resolver-entry.js';
 import type {
   IntentResolutionOptions,
   IntentResolutionPacket,
@@ -490,12 +488,12 @@ function resolveIntentAwareCompilerTarget(
 
 export function summarizeRelevantIntents(
   text: string,
-  packet?: ReturnType<typeof resolveIntentResolutionPacket>,
+  packet?: IntentResolutionPacket,
   options: IntentResolutionOptions = {}
 ): { text: string; omitted_count: number } {
   const policy = loadIntentPolicy();
   const intents = loadResolvedStandardIntentCatalog(options);
-  const resolvedPacket = packet || resolveIntentResolutionPacket(text);
+  const resolvedPacket = packet || resolveRoutingPacket(text);
   const catalogById = new Map(intents.map((intent) => [String(intent.id || ''), intent]));
   const scored = resolvedPacket.candidates
     .slice(0, policy.compiler.relevant_intent_limit)
@@ -690,11 +688,12 @@ function toExecutionBriefSeed(
     serviceBindings: input.serviceBindings,
     summaryHint: extras.summaryHint,
     contextualFrame: extras.contextualFrame || input.resolutionPacket?.contextual_frame,
+    ...(input.carriedRoutingDecision ? { routingDecision: input.carriedRoutingDecision } : {}),
   };
 }
 
 function resolveIntentPacketForInput(input: CompileUserIntentFlowInput): IntentResolutionPacket {
-  return resolveIntentResolutionPacket(input.text, {
+  return resolveRoutingPacket(input.text, {
     tier: input.tier,
     tenantId: resolveTenantId(input),
   });
