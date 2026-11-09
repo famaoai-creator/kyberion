@@ -150,8 +150,11 @@ export function listOrganizationProfiles(
     for (const entry of safeReaddir(tenantHomeRoot).sort()) {
       const full = path.join(tenantHomeRoot, entry);
       if (!safeLstat(full).isDirectory()) continue;
-      const profilePath = path.join(full, 'organization-profile.json');
-      if (!safeExistsSync(profilePath)) continue;
+      // Per-organization profiles (D3), else the legacy tenant-root profile.
+      const hasProfile =
+        safeExistsSync(path.join(full, 'organization-profile.json')) ||
+        safeExistsSync(path.join(full, 'organizations'));
+      if (!hasProfile) continue;
       const profile = withOrganizationContext(entry, () =>
         loadOrganizationProfile(undefined, entry)
       );

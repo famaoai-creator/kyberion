@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach, afterAll } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import * as pathResolver from '../path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { withExecutionContext } from '../authority.js';
@@ -97,9 +97,12 @@ describe('mission-team-binding', () => {
     resetAgentIdentityServiceForTests(
       `${TEST_IDENTITY_JOURNAL_DIR}/agent-identities-${identityJournalCounter}.jsonl`
     );
+    // D3: a mission's organization lives inside its tenant.
+    vi.stubEnv('KYBERION_TENANT', 'demo-tenant');
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     safeRmSync(TEST_MISSION_DIR, { recursive: true, force: true });
     resetAgentIdentityServiceForTests();
   });
@@ -126,7 +129,7 @@ describe('mission-team-binding', () => {
     // NI-01: agent resources always carry a canonical durable identity —
     // org from the plan's organization profile, slug from the agent id.
     expect(staffing.assignments[0]?.resource.runtime_identity).toBe(
-      'kyberion://agent/demo-org/nerve-agent'
+      'kyberion://agent/demo-tenant/demo-org/nerve-agent'
     );
   });
 
@@ -135,7 +138,7 @@ describe('mission-team-binding', () => {
       buildMissionStaffingAssignments(SAMPLE_PLAN)
     );
     const nhiId = staffing.assignments[0]?.resource.runtime_identity;
-    expect(nhiId).toBe('kyberion://agent/demo-org/nerve-agent');
+    expect(nhiId).toBe('kyberion://agent/demo-tenant/demo-org/nerve-agent');
 
     const identity = getAgentIdentity(nhiId!);
     expect(identity).not.toBeNull();
@@ -261,7 +264,7 @@ describe('mission-team-binding', () => {
     expect(parsed.team_role).toBe('owner');
     // NI-01: ledger entries for staffed agents resolve the durable identity
     // from the mission's staffing assignments on disk.
-    expect(parsed.runtime_identity).toBe('kyberion://agent/demo-org/nerve-agent');
+    expect(parsed.runtime_identity).toBe('kyberion://agent/demo-tenant/demo-org/nerve-agent');
     const updatedReceipts = String(safeReadFile(receiptPath, { encoding: 'utf8' }))
       .trim()
       .split('\n')
@@ -389,7 +392,7 @@ describe('mission-team-binding', () => {
     // (org falls back to the active organization profile for artifacts that
     // predate organization stamping).
     expect(loaded?.assignments[0]?.resource.runtime_identity).toMatch(
-      /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/legacy-agent$/
+      /^kyberion:\/\/agent\/(?:_\/_|[a-z][a-z0-9-]*\/(?:_|[a-z][a-z0-9-]*))\/legacy-agent$/
     );
   });
 

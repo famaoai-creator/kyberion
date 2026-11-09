@@ -219,7 +219,8 @@ export function describeActor(
   const known = names?.(id);
   if (known && known !== id) return { text: known };
   if (SERVICE_ACTOR_KEYS[id]) return { key: SERVICE_ACTOR_KEYS[id] };
-  const agentRef = /^kyberion:\/\/agent\/[^/]+\/([^/]+)$/u.exec(id);
+  // `kyberion://agent/<tenant>/<org|_>/<slug>`, or the legacy `<org>/<slug>` alias.
+  const agentRef = /^kyberion:\/\/agent\/(?:[^/]+\/)?[^/]+\/([^/]+)$/u.exec(id);
   if (agentRef) return { key: 'ux_a_actor_agent', params: { name: slugToName(agentRef[1]!) } };
   const [prefix, ...rest] = id.split(':');
   const value = rest.join(':');

@@ -15,7 +15,7 @@
  */
 
 import { agentActor } from '../contracts/actor.js';
-import { buildNhiId, NHI_SLUG_PATTERN } from '../contracts/nhi-id.js';
+import { buildNhiId, buildTenantlessNhiId, NHI_SLUG_PATTERN } from '../contracts/nhi-id.js';
 import {
   parseInformationFlowFacts,
   type CharterAction,
@@ -64,7 +64,7 @@ export function charterInputForDecision(
   const charter = findActiveCharter(scope, now, pathOptions);
   if (!charter) return undefined;
   const actor = agentActor(
-    buildNhiId(input.tenantSlug, workerSlug(input.agentId)),
+    buildNhiId(input.tenantSlug, null, workerSlug(input.agentId)),
     charter.accountable.actor
   );
   const usableAmount =
@@ -140,9 +140,12 @@ export function charterInputForPipelineTrust(
     options.rootDir ? { rootDir: options.rootDir } : {}
   );
   if (!charter) return undefined;
-  const orgSlug = input.scope.kind === 'organization' ? input.scope.tenant_slug : 'system';
+  const workerNhiId =
+    input.scope.kind === 'organization'
+      ? buildNhiId(input.scope.tenant_slug, null, workerSlug(input.agentId))
+      : buildTenantlessNhiId(workerSlug(input.agentId));
   const action: CharterAction = {
-    actor: agentActor(buildNhiId(orgSlug, workerSlug(input.agentId)), charter.accountable.actor),
+    actor: agentActor(workerNhiId, charter.accountable.actor),
     action_class: entry.action_class,
     decision_type: entry.decision_type,
     reversible: entry.reversible,
@@ -182,7 +185,7 @@ export function charterInputForCustomerOutbound(
     scope,
     action: {
       actor: agentActor(
-        buildNhiId(input.tenantSlug, 'customer-conversation'),
+        buildNhiId(input.tenantSlug, null, 'customer-conversation'),
         charter.accountable.actor
       ),
       action_class: 'send_message_external',

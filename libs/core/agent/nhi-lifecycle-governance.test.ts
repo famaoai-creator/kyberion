@@ -31,6 +31,24 @@ vi.mock('../secure-io.js', async () => {
   };
 });
 
+// D3: fixtures belong to `demo-tenant`; treat it as a registered tenant so
+// orphan detection judges only the mission/project/accountability scopes.
+vi.mock('../organization/tenant-registry.js', async () => {
+  const actual = await vi.importActual<typeof import('../organization/tenant-registry.js')>(
+    '../organization/tenant-registry.js'
+  );
+  return {
+    ...actual,
+    readTenantProfile: ((slug: string, ...rest: unknown[]) =>
+      slug === 'demo-tenant'
+        ? ({ tenant_slug: 'demo-tenant' } as unknown as ReturnType<typeof actual.readTenantProfile>)
+        : (actual.readTenantProfile as (...args: unknown[]) => unknown)(
+            slug,
+            ...rest
+          )) as typeof actual.readTenantProfile,
+  };
+});
+
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const WRITER_LEASE_SCHEMAS = ['writer-lease.schema.json', 'writer-lease-metrics.schema.json'].map(
   (name) => ({
@@ -58,6 +76,8 @@ function issue(slug: string, affiliation: Record<string, string>, organizationId
   return authority.withExecutionContext('mission_controller', () =>
     identity.issueAgentIdentity({
       kind: 'agent',
+      // D3: an NHI belongs to a tenant; fixtures without one use demo-tenant.
+      ...(affiliation.tenant_slug ? {} : { tenantSlug: 'demo-tenant' }),
       organizationId,
       slug,
       accountableHumanId: 'human:founder',
@@ -74,6 +94,7 @@ function issueWithAccountableHuman(
   return authority.withExecutionContext('mission_controller', () =>
     identity.issueAgentIdentity({
       kind: 'agent',
+      tenantSlug: 'demo-tenant',
       organizationId,
       slug,
       accountableHumanId,

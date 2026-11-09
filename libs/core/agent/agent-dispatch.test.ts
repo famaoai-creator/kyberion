@@ -1050,7 +1050,7 @@ describe('agent-dispatch NI-03 delegation chain', () => {
     expect(extracted.chain).toHaveLength(1);
     // 'Mission Controller' slugifies to mission-controller and derives an nhi id.
     expect(extracted.chain![0].actor).toMatch(
-      /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/mission-controller$/
+      /^kyberion:\/\/agent\/(?:_\/_|[a-z][a-z0-9-]*\/(?:_|[a-z][a-z0-9-]*))\/mission-controller$/
     );
     expect(extracted.chain![0].granted_scope).toEqual({});
   });

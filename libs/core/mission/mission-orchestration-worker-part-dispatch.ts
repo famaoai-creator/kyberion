@@ -901,8 +901,8 @@ export interface DispatchPlannedMissionTaskInput {
  * registry record at spawn; falls back to the deterministic name derivation
  * when the runtime is not up yet (dispatch opens its trace before
  * ensure/spawn). `organizationId`, when the caller has one in scope, keeps
- * that derivation inside the mission's own organization instead of the
- * agent-identity 'default' fallback. Best-effort — attribution must never
+ * that derivation inside the mission's own organization (within the active
+ * tenant; D3 removed the old 'default' organization fallback). Best-effort — attribution must never
  * affect dispatch.
  */
 export function resolveDispatchActorNhiId(

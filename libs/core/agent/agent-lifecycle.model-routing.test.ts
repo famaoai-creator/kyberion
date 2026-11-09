@@ -417,7 +417,9 @@ describe('agent-lifecycle NI-01 identity wiring', () => {
     });
 
     const nhiId = agentRegistry.getRuntimeIdentity(agentId);
-    expect(nhiId).toMatch(/^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/ni01-wired-agent$/);
+    expect(nhiId).toMatch(
+      /^kyberion:\/\/agent\/(?:_\/_|[a-z][a-z0-9-]*\/(?:_|[a-z][a-z0-9-]*))\/ni01-wired-agent$/
+    );
 
     const identity = getAgentIdentity(nhiId!);
     expect(identity).not.toBeNull();

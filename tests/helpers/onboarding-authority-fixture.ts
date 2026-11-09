@@ -124,7 +124,8 @@ export function useOnboardingAuthorityFixture() {
       const issued = identities.issueAgentIdentity({
         kind: 'agent',
         slug,
-        organizationId: 'fixture-system',
+        // The installed personal agent belongs to no tenant (person scope, D3 `_/_`).
+        personScope: true,
         displayName: 'Synthetic installed agent',
         accountableHumanId: 'user:owner',
       });
