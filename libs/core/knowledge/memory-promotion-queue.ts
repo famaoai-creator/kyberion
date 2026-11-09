@@ -168,6 +168,28 @@ export interface MemoryCandidate {
   distill_experience?: MemoryDistillExperience;
   /** True when distillation ran but declined to emit a lesson (no reusable contrast). */
   distill_experience_declined?: boolean;
+  /**
+   * D8: the decision-owning record a candidate stands for, when a facade other
+   * than the generic promotion workflow decides it (organization learning via
+   * `pnpm organization learning transition`, process improvement via
+   * `pnpm mission improvements`). The queue row is the single
+   * source of truth; `origin` keeps the facade's own fields so it can project
+   * the row back into its view. Such rows are never promoted by
+   * `promoteMemoryCandidateToKnowledge` — one promotion path per learning.
+   */
+  origin?: MemoryCandidateOrigin;
+}
+
+export type MemoryCandidateOriginKind = 'organization_learning' | 'process_improvement';
+export interface MemoryCandidateOrigin {
+  record_kind: MemoryCandidateOriginKind;
+  /** The facade's own id (learning_id / proposal_id). */
+  record_id: string;
+  title?: string;
+  /** Facade-specific fields that have no MemoryCandidate column. */
+  attributes?: Record<string, unknown>;
+  /** Set when the row was imported from the facade's legacy store. */
+  migrated_from?: string;
 }
 
 const SCHEMA_PATH = pathResolver.rootResolve(

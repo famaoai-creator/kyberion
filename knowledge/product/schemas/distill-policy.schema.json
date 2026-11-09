@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "wisdom-policy.schema.json",
-  "title": "Wisdom Distillation Policy",
+  "$id": "distill-policy.schema.json",
+  "title": "Mission Distillation Policy",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "name", "llm", "rules", "tier_mapping"],

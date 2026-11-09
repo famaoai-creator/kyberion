@@ -8,6 +8,7 @@ import { readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { createLogger } from '../logger.js';
 import * as pathResolver from '../path-resolver.js';
+import { hintPartitionDir, legacyHintsDir } from './hint-store.js';
 import {
   safeExistsSync,
   safeReaddir,
@@ -705,9 +706,12 @@ function _scanProductTier(knowledgeBase: string, domains: string[], hints: Knowl
   // ingested here so trace-derived lessons re-enter resolution / mission context
   // via queryKnowledge. Without this the feedback loop only ever writes, never
   // reads back (the "溜まるだけで参照されない" failure the concept warns of).
-  const feedbackHintsDir = pathResolver.shared('runtime/feedback-loop/hints');
-  if (safeExistsSync(feedbackHintsDir)) {
-    _loadJsonHints(feedbackHintsDir, knowledgeBase, 'product', undefined, hints);
+  // D8: only the public partition of the hint store is product-level; the
+  // pre-partition legacy directory is read for one release.
+  for (const feedbackHintsDir of [hintPartitionDir({ tier: 'public' }), legacyHintsDir()]) {
+    if (safeExistsSync(feedbackHintsDir)) {
+      _loadJsonHints(feedbackHintsDir, knowledgeBase, 'product', undefined, hints);
+    }
   }
 
   // Scan declared domains; fall back to full product root when using TIER1_SUBDIRS default

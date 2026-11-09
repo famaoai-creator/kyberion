@@ -980,6 +980,12 @@
       "note": "Saved seam provider defaults per tenant / organization / project (libs/core/provider/seam-selection-defaults.ts), tier/tenant partitioned — human judgment, never auto-deleted; offboarded with the tenant."
     },
     {
+      "path": "active/shared/runtime/hints",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "D8 runtime hint store (libs/core/knowledge/hint-store.ts), partitioned <tier>/<tenant|shared>/<category>.json. Trace, learning-signal and human-rejection hints plus the promoted hints that generate HINTS.md views; tenant partitions are offboarded with the tenant, never auto-deleted."
+    },
+    {
       "path": "active/shared/runtime/provider-attestations",
       "artifact_class": "state",
       "action": "review_required",

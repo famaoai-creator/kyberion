@@ -36,7 +36,7 @@
         "source_type": "artifact",
         "evidence_refs": ["active/shared/tmp/memory-distillation-summary.md"],
         "proposed_memory_kind": "heuristic",
-        "sensitivity_tier": "confidential"
+        "sensitivity_tier": "public"
       }
     }
   ]

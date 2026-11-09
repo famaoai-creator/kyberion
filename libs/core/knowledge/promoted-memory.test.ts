@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { createDistillCandidateRecord } from './distill-candidate-registry.js';
 import {
   buildPromotedMemoryRecord,
@@ -49,6 +50,11 @@ describe('promoted-memory', () => {
     fs.writeFileSync(scratchHintsPath, originalHintsRaw ?? '');
     process.env.KYBERION_HINTS_PATH = scratchHintsPath;
     process.env.KYBERION_HINTS_ARCHIVE_DIR = `${scratchHintsDir}/archive`;
+    // D8: HINTS.md is a view generated from the hint store; isolate it too.
+    process.env.KYBERION_HINT_STORE_ROOT = path.relative(
+      pathResolver.rootDir(),
+      `${scratchHintsDir}/store`
+    );
   });
 
   afterEach(() => {
@@ -73,6 +79,7 @@ describe('promoted-memory', () => {
   afterAll(() => {
     delete process.env.KYBERION_HINTS_PATH;
     delete process.env.KYBERION_HINTS_ARCHIVE_DIR;
+    delete process.env.KYBERION_HINT_STORE_ROOT;
     fs.rmSync(scratchHintsDir, { recursive: true, force: true });
     if (originalHintsRaw !== null) {
       if (!fs.existsSync(hintsPath)) {
@@ -429,7 +436,7 @@ describe('promoted-memory', () => {
   it('appends promoted knowledge hints into governance HINTS.md', () => {
     const candidate = createDistillCandidateRecord({
       source_type: 'task_session',
-      tier: 'personal',
+      tier: 'public',
       track_id: 'TRK-DEMO-HINTS',
       track_name: 'Hints demo',
       title: 'Browser hint for repeatable navigation',
@@ -458,7 +465,7 @@ describe('promoted-memory', () => {
   it('rejects a governance HINTS path replaced by a directory', () => {
     const candidate = createDistillCandidateRecord({
       source_type: 'task_session',
-      tier: 'personal',
+      tier: 'public',
       track_id: 'TRK-DEMO-HINTS-DIRECTORY',
       title: 'Directory replacement boundary',
       summary: 'A replaced governance hints path must fail closed.',
@@ -472,9 +479,7 @@ describe('promoted-memory', () => {
       },
     });
     rememberWrite(
-      pathResolver.resolve(
-        `knowledge/personal/common/wisdom/generated/${candidate.candidate_id}.md`
-      )
+      pathResolver.resolve(`knowledge/public/common/wisdom/generated/${candidate.candidate_id}.md`)
     );
 
     fs.rmSync(scratchHintsPath, { force: true });
@@ -498,7 +503,7 @@ describe('promoted-memory', () => {
     try {
       const candidate = createDistillCandidateRecord({
         source_type: 'task_session',
-        tier: 'personal',
+        tier: 'public',
         title: 'External override boundary',
         summary: 'The governed fallback remains inside the repository.',
         status: 'promoted',
@@ -555,13 +560,16 @@ describe('promoted-memory', () => {
       '',
     ].join('\n');
 
+    // First generation from an existing view: no store partition yet, so the
+    // view's sections seed it (D8 one-time import).
+    fs.rmSync(`${scratchHintsDir}/store`, { recursive: true, force: true });
     withExecutionContext('ecosystem_architect', () => {
       safeWriteFile(scratchHintsPath, fixture);
     });
 
     const candidate = createDistillCandidateRecord({
       source_type: 'task_session',
-      tier: 'personal',
+      tier: 'public',
       track_id: 'TRK-DEMO-HINTS-ARCHIVE',
       track_name: 'Hints archive demo',
       title: 'Browser hint for archived rotation',
@@ -594,6 +602,64 @@ describe('promoted-memory', () => {
     expect(archived).toContain('# Archived Operational Hints');
     expect(archived).toContain('archived_sections: 1');
     expect(archived).toContain('## LIVE-01 (2026-07-03)');
+  });
+
+  it('D8: keeps personal hints out of the product HINTS.md view and the public store', () => {
+    const candidate = createDistillCandidateRecord({
+      source_type: 'task_session',
+      tier: 'personal',
+      track_id: 'TRK-DEMO-HINTS-PERSONAL',
+      track_name: 'Personal hint demo',
+      title: 'Personal hint that must stay personal',
+      summary: 'A personal operating preference that must never reach product hints.',
+      status: 'promoted',
+      target_kind: 'knowledge_hint',
+      evidence_refs: ['active/shared/tmp/hints-source.md'],
+      metadata: {
+        hint_scope: 'personal preference',
+        hint_triggers: ['personal workflow'],
+        recommended_refs: ['knowledge/public/procedures/browser/navigate-web.md'],
+      },
+    });
+    const saved = savePromotedMemoryRecord(candidate, { executionRole: 'mission_controller' });
+    rememberWrite(pathResolver.resolve(saved.logicalPath));
+    const hints = fs.existsSync(scratchHintsPath)
+      ? (safeReadFile(scratchHintsPath, { encoding: 'utf8' }) as string)
+      : '';
+    expect(hints).not.toContain('must never reach product hints');
+    const store = `${scratchHintsDir}/store/public/shared/promoted.json`;
+    const stored = fs.existsSync(store) ? fs.readFileSync(store, 'utf8') : '';
+    expect(stored).not.toContain('must never reach product hints');
+  });
+
+  it('D8: writes a public promoted hint to the public store partition the view is built from', () => {
+    const candidate = createDistillCandidateRecord({
+      source_type: 'task_session',
+      tier: 'public',
+      track_id: 'TRK-DEMO-HINTS-STORE',
+      track_name: 'Hint store demo',
+      title: 'Hint store generates the view',
+      summary: 'Promoted hints are stored first and the HINTS.md view is generated from the store.',
+      status: 'promoted',
+      target_kind: 'knowledge_hint',
+      evidence_refs: ['active/shared/tmp/hints-source.md'],
+      metadata: {
+        hint_scope: 'hint store',
+        hint_triggers: ['generated view'],
+        recommended_refs: ['knowledge/public/procedures/browser/navigate-web.md'],
+      },
+    });
+    const saved = savePromotedMemoryRecord(candidate, { executionRole: 'mission_controller' });
+    rememberWrite(pathResolver.resolve(saved.logicalPath));
+    const store = JSON.parse(
+      fs.readFileSync(`${scratchHintsDir}/store/public/shared/promoted.json`, 'utf8')
+    ) as Array<{ topic: string; evidence_refs?: string[] }>;
+    expect(store.find((hint) => hint.topic === saved.record.record_id)).toMatchObject({
+      evidence_refs: ['active/shared/tmp/hints-source.md'],
+    });
+    expect(safeReadFile(scratchHintsPath, { encoding: 'utf8' })).toContain(
+      `## ${saved.record.record_id} (`
+    );
   });
 
   describe('value threshold (isMeaningfulPromotionCandidate)', () => {

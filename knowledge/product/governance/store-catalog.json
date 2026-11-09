@@ -305,6 +305,24 @@
       }
     },
     {
+      "id": "hints",
+      "path": "active/shared/runtime/hints/<tier>/<tenant>",
+      "custody": {
+        "kind": "tenant",
+        "ref": "<tenant>",
+        "note": "D8 runtime hint store (libs/core/knowledge/hint-store.ts): one schema, partitioned by capture scope. public/shared holds product-level hints; confidential/<tenant> holds that tenant's hints. Personal hints are not stored here."
+      },
+      "tiers": ["confidential", "public"],
+      "status": "active",
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "hints",
+        "order": 16,
+        "retention_path": "active/shared/runtime/hints"
+      }
+    },
+    {
       "id": "legacy.customer-audit-mirror",
       "path": "customer/<tenant>/logs/audit",
       "custody": {

@@ -33,7 +33,6 @@ import {
   validateOrganizationIncident,
   validateOrganizationCadence,
   validateOrganizationDecision,
-  validateOrganizationLearningCandidate,
   organizationOperationalStatePath,
   loadOrganizationPurpose,
   saveOrganizationOperationalState,
@@ -48,6 +47,7 @@ import {
   loadOrganizationOperation,
 } from './organization-operating-model-operations.js';
 import { rollUpObjectiveProgress } from './organization-objective-progress.js';
+import { listOrganizationLearningCandidatesFromQueue } from './organization-learning-queue.js';
 import { orgKrLedgerPath, type KrMeasurementRow } from '../dot/dot-state-paths.js';
 import { readJsonLines } from '../foundation/json.js';
 import type {
@@ -95,7 +95,6 @@ const SERVICE_STATE_FILE_NAME = 'service-state.json';
 const INCIDENT_FILE_NAME = 'incident.json';
 const CADENCE_FILE_NAME = 'cadence.json';
 const DECISION_FILE_NAME = 'decision.json';
-const LEARNING_FILE_NAME = 'candidate.json';
 
 function hasFreshServiceObservation(state: OrganizationServiceState, now = Date.now()): boolean {
   const sourceTime = Date.parse(state.source_timestamp);
@@ -532,6 +531,11 @@ export function listOrganizationDecisions(
     .sort((a, b) => a.due_at.localeCompare(b.due_at));
 }
 
+/**
+ * D8: organization learnings decide on the MemoryCandidate queue; the legacy
+ * per-organization store is listed read-only for history and not-yet-migrated
+ * items (see organization-learning-queue.ts).
+ */
 export function listOrganizationLearningCandidates(
   query: {
     organizationId?: string;
@@ -541,15 +545,7 @@ export function listOrganizationLearningCandidates(
     status?: OrganizationLearningCandidate['status'];
   } = {}
 ): OrganizationLearningCandidate[] {
-  return listOrganizationRecordFiles('learning', LEARNING_FILE_NAME, query)
-    .map((filePath) =>
-      readJsonRecord<OrganizationLearningCandidate>(filePath, 'organization learning candidate')
-    )
-    .filter((record): record is OrganizationLearningCandidate =>
-      Boolean(record && validateOrganizationLearningCandidate(record))
-    )
-    .filter((record) => !query.status || record.status === query.status)
-    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  return listOrganizationLearningCandidatesFromQueue(query);
 }
 
 export function listOrganizationDomains(
