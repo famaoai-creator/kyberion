@@ -49,6 +49,16 @@ R2 の実施状況（2026-11-10）：`RoutingDecision` は `libs/core/contracts/
 - 正規表現で独自に分類しているもの（`classifyOrganizationWork`、`intent-compiler.ts` の keyword fallback、`intent-rules.yml`）は、解決器に吸収するか削除する。
 - 完了条件：`resolveIntentResolutionPacket` を呼ぶのは解決器の入口 1 か所だけ。境界テストで固定する。
 
+R3 の実施状況（2026-11-10）：完了条件は満たしました。`resolveIntentResolutionPacket` を使う本番のモジュールは解決器の入口 `libs/core/intent/intent-resolver-entry.ts` だけで、`tests/intent-resolver-entry-boundary.test.ts` がこれを固定します。入口は解決器だけを読み込む末端のモジュールで、packet を返す `resolveRoutingPacket`、組織の仕事の形も一緒に返す `resolveOrganizationWorkRouting`、入口ごとの事実から共通の compiler を通すかを決める `decideSurfaceCompilation` を持ちます。`routing-decision.ts` の `resolveRoutingDecision` はこの入口で読んだ packet から判断を作ります（contract を作る側が入口を使っても循環しないように分けました）。文面ではなく設定で形が決まっている依頼のために `routingDecisionForConfiguredShape` を加えました。
+
+- Slack・音声・terminal：共通の `surface-runtime-orchestrator.ts` が入口で 1 回だけ `resolveRoutingDecision` を呼び、packet と判断を下流へ渡します（`compileUserIntentFlow` の `carriedRoutingDecision`）。音声（voice-hub）と terminal（terminal-hud の ask）もこの共通の経路を通ります。入力中のプレビューと失敗時の contract は入口を通して読みます。
+- 入口ごとの特例：`surface-runtime-router.ts` の slack / presence / 80 文字の分岐は、`decideSurfaceCompilation` への入力の属性（受け取った agent、発話の長さ、複数行か、provider policy が委任を強制するか、mission team への引き継ぎか、受け手が決まっているか）に移しました。router は属性を報告するだけです。
+- front desk：受付 pipeline の形は設定で決まっているので、`routingDecisionForConfiguredShape('pipeline')` の格上げの判定を読みます（挙動は同じ）。
+- discussion：提案の文面を入口で読んで組織の仕事の形を決めます。確信度が 0.7 未満なら、これまでどおり `solution_project` です。
+- 正規表現の分類：`classifyOrganizationWork` は `libs/core/intent/organization-work-classification.ts` に移し、組織の facade は入口の `resolveOrganizationWorkRouting` を使います（規則と確信度の計算は同じ）。`intent-compiler.ts` の keyword fallback（呼び出し側がカタログを渡したときだけ動き、本番の呼び出しはなかった）は削除しました。`intent-rules.yml` は読む処理がなかったため削除しました。移す前の出力は `resolver-adapter-characterization.test.ts`（+fixture）に記録し、移した後も同じです。
+- `execution-brief.ts`：運ばれた判断があればその intent を使い、プロジェクト依頼の文面を読み直しません。
+- 残り：dot。dot の提案の `work_shape` は、LLM が出す提案の schema、ハッシュで固定された行動台帳（提案全体のハッシュと、行と承認済みの提案の項目ごとの比較）、WorkItem の `requested_work_shape` に入っています。古い記録のハッシュ検証を変えずに改名するには、台帳に版を持たせて読み替える必要があります。dot は発話を読まず、charter で形を制限しているので、RoutingDecision を使うアダプターにするのはこの移行と一緒に行います。このため concept-registry の `lifecycle` はまだ外しません。
+
 ## 完了の合図
 
 concept-registry から `execution-shape`、`work-shape`、`routing-decision` の `lifecycle` を外します。
