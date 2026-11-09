@@ -4,7 +4,12 @@
  * Uses knowledge hints + standard intents as context for LLM generation.
  */
 import { logger } from '../core.js';
-import { loadStandardIntentCatalog, resolveIntentResolutionPacket } from './intent-resolution.js';
+import type { RoutingDecision } from '../contracts/routing-decision.js';
+import {
+  loadStandardIntentCatalog,
+  resolveIntentResolutionPacket,
+  type IntentResolutionPacket,
+} from './intent-resolution.js';
 import { segmentKeywordTerms } from '../foundation/locale-normalize.js';
 
 /**
@@ -51,15 +56,29 @@ function synthesizeDeterministicSteps(intentDef: any): any[] {
  */
 export function compileIntent(
   intent: string,
-  options?: { knowledgeHints?: any[]; standardIntents?: any[] }
+  options?: {
+    knowledgeHints?: any[];
+    standardIntents?: any[];
+    /**
+     * The request's carried RoutingDecision (D7). When present the compiler
+     * acts on it instead of re-resolving `intent`; the caller guarantees it
+     * belongs to this request.
+     */
+    routingDecision?: RoutingDecision;
+  }
 ): CompiledIntent | null {
   const usesCanonicalResolver = options?.standardIntents === undefined;
   const standardIntents = usesCanonicalResolver
     ? loadStandardIntentCatalog()
     : options.standardIntents;
-  const resolutionPacket = usesCanonicalResolver
-    ? resolveIntentResolutionPacket(intent)
-    : undefined;
+  const carried = usesCanonicalResolver ? options?.routingDecision : undefined;
+  const resolutionPacket:
+    Pick<IntentResolutionPacket, 'selected_intent_id' | 'selected_confidence'> | undefined =
+    !usesCanonicalResolver
+      ? undefined
+      : carried
+        ? { selected_intent_id: carried.intent_id, selected_confidence: carried.confidence }
+        : resolveIntentResolutionPacket(intent);
 
   const intentLower = intent.toLowerCase();
 
