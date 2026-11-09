@@ -228,6 +228,8 @@ describe('discussion outcomes', () => {
       const items = withExecutionContext(ROLE, () => listWorkItems({}));
       const item = items.find((i) => i.item_id === first.created[0].item_id)!;
       expect(item.context).toMatchObject({ tenant_slug: 'demo', project_id: 'proj-x' });
+      // D1: a discussion outcome is an Issue, never a step of another item.
+      expect(item.parent_item_id).toBeUndefined();
       expect(readDiscussionRoom(id)!.outcomes.work_items['wp-1']).toBe(item.item_id);
     } finally {
       clearWorkCoordinationNamespace();

@@ -99,6 +99,7 @@ import {
 } from '../governance/approval-store.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { createWorkItemIfAbsent, listWorkItems } from '../workforce/work-coordination.js';
+import { dotParentItemId } from './dot-work-item-parent.js';
 
 import {
   getFrontDeskExecutionMapping,
@@ -820,7 +821,9 @@ function executeDotActionUnlocked(
         ? undefined
         : (ref: string) => defaultFindWorkItemByActionRef(ref, deps.rootDir));
     const existing = options.reuseExisting ? find?.(record.action_ref) : undefined;
-    const input = dotWorkItemInput(charter, record, deps.rootDir, existing);
+    const envelope = dotWorkItemInput(charter, record, deps.rootDir, existing);
+    const parentItemId = dotParentItemId(record, envelope.context, deps.rootDir);
+    const input = parentItemId ? { ...envelope, parentItemId } : envelope;
     assertDotExistingWorkItem(record, existing, input, Boolean(deps.createWorkItem));
     requireCurrentDotJudgmentApproval(charter, record, deps);
     item =

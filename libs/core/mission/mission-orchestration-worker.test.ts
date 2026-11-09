@@ -891,12 +891,20 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
 
     await dispatchMissionNextTasks('MSN-FOLLOWUP');
 
-    const workItems = listWorkItems({ source: 'local' });
+    // D1: the task WorkItem is a step of the mission's Issue (its ownership item).
+    expect(listWorkItems({ source: 'local', topLevelOnly: true })).toMatchObject([
+      { item_id: 'mission-ownership:MSN-FOLLOWUP' },
+    ]);
+    const workItems = listWorkItems({
+      source: 'local',
+      parentItemId: 'mission-ownership:MSN-FOLLOWUP',
+    });
     expect(workItems).toHaveLength(1);
     expect(workItems[0]).toMatchObject({
       source_ref: 'mission:MSN-FOLLOWUP:task-work-item',
       project_id: 'MSN-FOLLOWUP',
       status: 'done',
+      parent_item_id: 'mission-ownership:MSN-FOLLOWUP',
     });
     expect(listWorkItemAttempts(workItems[0].item_id)).toHaveLength(1);
     expect(listWorkItemAttempts(workItems[0].item_id)[0]).toMatchObject({

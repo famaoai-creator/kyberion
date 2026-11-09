@@ -27,6 +27,15 @@ importance: 8
 - dot（`dot-dispatch.ts`）と discussion（`discussion-outcomes.ts`）が作る WorkItem に、親がある場合は設定する。
 - 完了条件：新規に作られるステップの WorkItem は全件が親を持つ。既存のアイテムには、`context.mission_id` / `task_id` から親を埋める移行（`migrateLegacyWorkItemContexts` を拡張）。
 
+実装の記録（W1）：
+
+- 型と検証：`parent_item_id` は `work-item-hierarchy.ts` で検証します。親が存在すること、自分自身を親にしないこと、循環しないこと（`MAX_WORK_ITEM_DEPTH` 段まで）、親と子のテナントが同じこと（組織は両方にあるときだけ一致を求める）。親のリンクは作成の同一性（`createWorkItemIfAbsent` の再実行判定）には含めません。
+- mission のタスク：`mission-ownership-item.ts` が所有アイテムを作り（最初のタスクのテナントで）、`mission-orchestration-progress.ts`、`mission-orchestration-worker-part-core.ts`、`mission-orchestration-worker-part-dispatch.ts`（goal-driven）、`mission-ticket-dispatch.ts` が親を設定します。所有アイテムが別のテナントにあるときは親を付けずに警告します。`recordMissionHandoff` は既存のアイテムを更新するだけで、作成はしません。
+- dot：`target: work_item:<id>` で既存のアイテムに作用するアクションだけが、そのアイテムの子になります（同じテナントのとき）。それ以外（path / service / pr / org_operation / mission の受け入れ / target なし）には自然な親がないので上位のままです。
+- discussion の結論は Issue なので上位のままです。
+- 既存のアイテム：`pnpm work migrate-parents`（既定は dry run、`--apply` で書き込み、何度実行しても同じ結果）。
+- 一覧：`listWorkItems` の `topLevelOnly` / `parentItemId`。親の状態の集約は純関数 `aggregateParentStatus` だけを用意し、ボードへの接続は W2 で行います。
+
 ### W2 — ボードの既定表示と状態の集約
 
 - board（kanban）の既定表示を上位の WorkItem にする。子は展開して見る。

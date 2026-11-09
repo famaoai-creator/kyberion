@@ -286,3 +286,10 @@ export * from './mission-workitem-dispatch-response.js';
 // skipped './mission-workitem-dispatch-ticket.js' (all exports shadowed)
 export { dispatchMissionWorkItems } from './mission-workitem-dispatch.js';
 export * from './orchestrator-session.js';
+export {
+  ensureMissionOwnershipWorkItem,
+  migrateMissionTaskWorkItemParents,
+  resolveMissionTaskParentItemId,
+  type MissionOwnershipScope,
+  type MissionTaskParentMigrationResult,
+} from './mission-ownership-item.js';
