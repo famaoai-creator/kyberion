@@ -38,6 +38,8 @@ export * from './onboarding-summary-policy.js';
 export * from './organization-digest.js';
 export * from './organization-digest-artifacts.js';
 export * from './organization-cadence.js';
+export * from './organization-cost-metrics.js';
+export * from './organization-improvement-scan.js';
 export * from './organization-operation-tick.js';
 export * from './organization-retro.js';
 export * from './organization-standup.js';
