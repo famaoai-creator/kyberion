@@ -338,7 +338,7 @@ If you need to understand or change which reasoning backend is used for distilla
 
 The policy guide explains:
 
-- how `wisdom-policy.json` selects a profile
+- how `distill-policy.json` selects a profile
 - how `adapter` maps to a runtime runner
 - how to add a new local LLM without hardcoding a provider branch
 

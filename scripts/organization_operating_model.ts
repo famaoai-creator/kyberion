@@ -24,7 +24,6 @@ import {
   buildOrganizationServiceState,
   ensureOrganizationOperationalState,
   enqueueOrganizationLearningCandidate,
-  saveOrganizationLearningCandidate,
   loadOrganizationOperation,
   listOrganizationOperationRuns,
   saveOrganizationOperation,
@@ -54,6 +53,11 @@ import {
   retireOrganizationEntity,
   type OrganizationTier,
 } from '@agent/core/organization/organization-operating-model';
+import {
+  migrateLegacyOrganizationLearningCandidates,
+  saveOrganizationLearningDecision,
+} from '@agent/core/organization/organization-learning-queue';
+import { memoryPromotionQueuePath } from '@agent/core/knowledge/memory-promotion-queue';
 import { resolveScopeResolution } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
@@ -630,8 +634,26 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
       {
         mode,
         learning,
-        saved_path: mode === 'apply' ? saveOrganizationLearningCandidate(learning) : null,
+        // D8: the decision lands on the MemoryCandidate queue row.
+        saved_path:
+          mode === 'apply'
+            ? memoryPromotionQueuePath(saveOrganizationLearningDecision(current, learning).scope)
+            : null,
       },
+      parsed.json
+    );
+    return;
+  },
+  'learning migrate': (ctx) => {
+    const { parsed, organizationId } = ctx;
+    const mode = resolveWriteMode(parsed, 'learning migrate');
+    emit(
+      migrateLegacyOrganizationLearningCandidates({
+        ...(organizationId ? { organizationId } : {}),
+        ...(parsed.tier ? { tier: parsed.tier } : {}),
+        ...(parsed.tenantSlug ? { tenantSlug: parsed.tenantSlug } : {}),
+        apply: mode === 'apply',
+      }),
       parsed.json
     );
     return;

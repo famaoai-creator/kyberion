@@ -427,6 +427,8 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
       .filter(
         (candidate) =>
           candidate.status === 'approved' &&
+          // D8: facade-owned rows promote through their own facade.
+          !candidate.origin &&
           !(candidate.scope && candidate.proposed_memory_kind === 'sop') &&
           memoryCandidateVisibleToViewer(candidate, resolvedViewer.context, requestedTenant)
       )

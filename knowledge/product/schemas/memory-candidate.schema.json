@@ -479,6 +479,33 @@
           "pattern": "^[a-f0-9]{64}$"
         }
       }
+    },
+    "origin": {
+      "description": "D8: the decision-owning record (organization learning / process improvement) this candidate stands for; its facade decides it, the generic promotion workflow never promotes it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_kind", "record_id"],
+      "properties": {
+        "record_kind": {
+          "type": "string",
+          "enum": ["organization_learning", "process_improvement"]
+        },
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attributes": {
+          "type": "object"
+        },
+        "migrated_from": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
   },
   "additionalProperties": false,

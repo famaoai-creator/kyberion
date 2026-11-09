@@ -33,11 +33,11 @@ import { findMissionPath } from '../path-resolver.js';
 import { loadMissionStateIncludingArchive, loadState, saveState } from './mission-state.js';
 import { syncProjectLedgerIfLinked } from './mission-project-ledger.js';
 import { runAdaptiveStructuredLlmProfile, type LlmPolicyConfig } from './mission-llm.js';
+import { distillLlmProfileOverride } from './distill-llm-profile.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { readJsonIfPresent, writeJson } from '../foundation/json.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
 
 export const DISTILL_MEMORY_OUTBOX_FILE = 'memory-promotion-outbox.json';
 
@@ -92,10 +92,16 @@ function deliverDistillMemoryOutbox(filePath: string, state: MissionState): void
   writeJson(filePath, { ...outbox, status: 'delivered' });
 }
 
-const WISDOM_POLICY_PATH = pathResolver.knowledge('product/governance/wisdom-policy.json');
-const WISDOM_POLICY_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/wisdom-policy.schema.json'
+const DISTILL_POLICY_PATH = pathResolver.knowledge('product/governance/distill-policy.json');
+const DISTILL_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/distill-policy.schema.json'
 );
+/**
+ * D8 / M3: the policy was `wisdom-policy.json` before "wisdom" became the
+ * actuator name only. Read for one release when the new file is absent.
+ * @deprecated remove after the 2026-12 release.
+ */
+const LEGACY_DISTILL_POLICY_PATH = pathResolver.knowledge('product/governance/wisdom-policy.json');
 
 interface DistillPolicyFile {
   version: string;
@@ -106,18 +112,36 @@ interface DistillPolicyFile {
   tier_mapping: Record<string, string>;
 }
 
-const distillPolicyCatalog = defineCatalog<DistillPolicyFile>({
-  id: 'wisdom-policy',
-  path: WISDOM_POLICY_PATH,
-  schema: WISDOM_POLICY_SCHEMA_PATH,
-});
+function distillPolicyCatalogAt(policyPath: string) {
+  return defineCatalog<DistillPolicyFile>({
+    id: 'distill-policy',
+    path: policyPath,
+    schema: DISTILL_POLICY_SCHEMA_PATH,
+  });
+}
+
+let warnedLegacyDistillPolicy = false;
+
+/** The policy file to read: the canonical path, else the one-release legacy path. */
+export function resolveDistillPolicyPath(): string | null {
+  if (safeExistsSync(DISTILL_POLICY_PATH)) return DISTILL_POLICY_PATH;
+  if (!safeExistsSync(LEGACY_DISTILL_POLICY_PATH)) return null;
+  if (!warnedLegacyDistillPolicy) {
+    warnedLegacyDistillPolicy = true;
+    logger.warn(
+      'wisdom-policy.json is deprecated — read once more because distill-policy.json is absent; it stops being read next release | next: rename knowledge/product/governance/wisdom-policy.json to distill-policy.json | evidence: docs/developer/improvement-plans-2026-11/MEMORY_LOOP_CLOSURE_PLAN_2026-11-10.ja.md'
+    );
+  }
+  return LEGACY_DISTILL_POLICY_PATH;
+}
 
 export function loadDistillPolicy(): DistillPolicyFile | null {
-  if (!safeExistsSync(WISDOM_POLICY_PATH)) return null;
+  const policyPath = resolveDistillPolicyPath();
+  if (!policyPath) return null;
   try {
-    return distillPolicyCatalog.load();
+    return distillPolicyCatalogAt(policyPath).load();
   } catch (error: any) {
-    logger.warn(`⚠️ Failed to load wisdom-policy.json: ${error.message}`);
+    logger.warn(`⚠️ Failed to load ${path.basename(policyPath)}: ${error.message}`);
     return null;
   }
 }
@@ -470,7 +494,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   let distillation: any = null;
   let llmUsed = false;
   let structuralReason: 'stub_requested' | 'llm_unavailable' | undefined;
-  const stubRequested = getRegisteredEnvText('KYBERION_WISDOM_LLM_PROFILE')?.trim() === 'stub';
+  const stubRequested = distillLlmProfileOverride() === 'stub';
   try {
     const llmPolicy: LlmPolicyConfig | undefined = distillPolicy?.llm;
     distillation = await runAdaptiveStructuredLlmProfile(
@@ -494,7 +518,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   } catch {
     structuralReason = stubRequested ? 'stub_requested' : 'llm_unavailable';
     logger.warn(
-      `LLM distillation unavailable — ${structuralReason} | next: inspect the llm profile in wisdom-policy.json or review structural evidence | evidence: mission ${upperId}`
+      `LLM distillation unavailable — ${structuralReason} | next: inspect the llm profile in distill-policy.json or review structural evidence | evidence: mission ${upperId}`
     );
     logger.info('Falling back to structural distillation (no LLM)...');
     distillation = buildFallbackDistillation(upperId, state);

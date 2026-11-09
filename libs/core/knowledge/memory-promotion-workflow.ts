@@ -396,6 +396,8 @@ function resolveAutopromoteMode(): 'personal' | null {
 function shouldConsiderPersonalAutopromote(candidate: MemoryCandidate): boolean {
   return (
     candidate.sensitivity_tier === 'personal' &&
+    // D8: facade-owned rows (organization learning, process improvement) decide elsewhere.
+    !candidate.origin &&
     candidate.status !== 'promoted' &&
     candidate.status !== 'rejected'
   );
@@ -516,6 +518,17 @@ async function promoteMemoryCandidateToKnowledgeUnlocked(input: {
   if (!candidateId) throw new Error('candidateId is required.');
   const candidate = loadMemoryPromotionCandidate(candidateId, input.scope);
   if (!candidate) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
+  // D8: one promotion path per learning — a row whose decision belongs to
+  // another facade is never promoted (or self-ratified) here.
+  if (candidate.origin) {
+    throw new Error(
+      `[MEMORY_PROMOTION_OWNED] ${candidateId} is a ${candidate.origin.record_kind} decided by its own facade | next: ${
+        candidate.origin.record_kind === 'organization_learning'
+          ? 'pnpm organization learning transition'
+          : 'pnpm mission improvements --approve|--apply'
+      } ${candidate.origin.record_id}`
+    );
+  }
   assertReusableLearningBinding(candidate);
   // W3: fail closed before any durable publication — the per-row queue gate
   // below re-asserts at commit, but the capability must be proven before

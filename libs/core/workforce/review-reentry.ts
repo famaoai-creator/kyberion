@@ -110,6 +110,8 @@ function persistRejectionLearning(record: ReviewReentryRequest): void {
     .filter(Boolean)
     .join(' ');
   try {
+    // D8: the hint lands in the rejected mission's own scope partition.
+    const hintCapture = missionMemoryCaptureScope(record.mission_id);
     persistHints(
       [
         {
@@ -120,7 +122,8 @@ function persistRejectionLearning(record: ReviewReentryRequest): void {
           tags: ['human_rejection', record.verdict, category],
         },
       ],
-      'human-rejection'
+      'human-rejection',
+      hintCapture.scope ?? { tier: hintCapture.tier }
     );
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);

@@ -12,17 +12,14 @@ import {
 import { logger } from '../core.js';
 import { createFailureTracker } from '../foundation/failure-tracker.js';
 import { loadRuntimeControlPolicy } from '../governance/runtime-control-policy.js';
-import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import {
-  assertSafeRepositoryPath,
-  safeWriteFile,
-  safeExistsSync,
-  safeLstat,
-  safeMkdir,
-} from '../secure-io.js';
-import * as path from 'path';
-import { pathResolver } from '../path-resolver.js';
+  loadHintFileAtPath,
+  persistScopedHints,
+  readLegacyHints,
+  readScopedHints,
+  sanitizeHintCategory,
+} from './hint-store.js';
 
 // Import types
 import type { Trace, TraceSpan } from '../analysis/trace.js';
@@ -35,25 +32,6 @@ import type {
 import { sendOpsAlert } from '../daemon/ops-alert.js';
 import type { OpsAlertInput, OpsAlertOptions, OpsAlertReceipt } from '../daemon/ops-alert.js';
 
-const FEEDBACK_HINTS_DIR = pathResolver.shared('runtime/feedback-loop/hints');
-const FEEDBACK_HINTS_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/feedback-knowledge-hints.schema.json'
-);
-
-function feedbackHintsCatalogAtPath(filePath: string) {
-  return defineCatalog<KnowledgeHint[]>({
-    id: 'feedback-knowledge-hints',
-    path: filePath,
-    schema: FEEDBACK_HINTS_SCHEMA_PATH,
-  });
-}
-
-function omitUndefinedHintFields(hint: KnowledgeHint): KnowledgeHint {
-  return Object.fromEntries(
-    Object.entries(hint).filter(([, value]) => value !== undefined)
-  ) as KnowledgeHint;
-}
-
 function sanitizeSpanName(name: string): string {
   return name.replace(/[^\w:-]+/g, ' ').trim();
 }
@@ -64,25 +42,6 @@ function sanitizeErrorMessage(error: string): string {
     .replace(/active\/[^\s"']+/g, '[artifact]')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-/** Strip leading/trailing '-' without a regex (an anchored `-+$` backtracks polynomially). */
-function trimDashes(value: string): string {
-  let start = 0;
-  let end = value.length;
-  while (start < end && value[start] === '-') start += 1;
-  while (end > start && value[end - 1] === '-') end -= 1;
-  return value.slice(start, end);
-}
-
-function sanitizeCategory(category: string): string {
-  const normalized = trimDashes(
-    String(category || 'auto-learned')
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9._-]+/g, '-')
-  );
-  return normalized || 'auto-learned';
 }
 
 /**
@@ -119,62 +78,47 @@ export function extractHintsFromTrace(trace: Trace): KnowledgeHint[] {
 }
 
 /**
- * Persist extracted hints to the knowledge layer.
- * Appends to existing hint files or creates new ones.
+ * Persist extracted hints into the D8 hint store (hint-store.ts), in the
+ * capture scope's partition: the explicit scope, else the credential-bound
+ * tenant of this execution, else public. Never into a shared directory for a
+ * tenant's hints.
  */
-export function persistHints(hints: KnowledgeHint[], category: string = 'auto-learned'): void {
+export function persistHints(
+  hints: KnowledgeHint[],
+  category: string = 'auto-learned',
+  scope?: { tier: string; tenant_slug?: string } | null
+): void {
   if (hints.length === 0) return;
-
-  const hintsDir = FEEDBACK_HINTS_DIR;
-  if (!safeExistsSync(hintsDir)) safeMkdir(hintsDir, { recursive: true });
-
-  const filePath = path.join(hintsDir, `${sanitizeCategory(category)}.json`);
-  let existing: KnowledgeHint[] = [];
-
-  if (safeExistsSync(filePath)) {
-    try {
-      existing = loadFeedbackHintsAtPath(filePath);
-    } catch {
-      /* start fresh */
-    }
-  }
-
-  // Deduplicate by topic
-  const topicSet = new Set(existing.map((h) => h.topic));
-  const newHints = hints.filter((h) => !topicSet.has(h.topic));
-
-  if (newHints.length === 0) return;
-
-  // Keep max 100 auto-generated hints (rotate oldest)
-  const combined = [...existing, ...newHints].slice(-100).map(omitUndefinedHintFields);
-  const validated = feedbackHintsCatalogAtPath(filePath).validate(combined, filePath);
-  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
+  const result = persistScopedHints(hints, category, scope);
+  if (result.written.length === 0) return;
   logger.info(
-    `[FEEDBACK] Persisted ${newHints.length} new hints to ${category}.json (total: ${combined.length})`
+    `[FEEDBACK] Persisted ${result.written.length} new hints to ${sanitizeHintCategory(category)}.json (total: ${result.total})`
   );
 }
 
 /**
  * LC-03: read back a persisted hint category (e.g. 'adf-repair') so repair /
- * planning prompts can inject lessons from earlier same-class failures.
+ * planning prompts can inject lessons from earlier same-class failures. Reads
+ * the scope's partition; an unscoped (system) reader also sees the pre-D8
+ * legacy directory for one release.
  */
-export function readHintsByCategory(category: string): KnowledgeHint[] {
-  const filePath = path.join(FEEDBACK_HINTS_DIR, `${sanitizeCategory(category)}.json`);
-  if (!safeExistsSync(filePath)) return [];
+export function readHintsByCategory(
+  category: string,
+  scope?: { tier: string; tenant_slug?: string } | null
+): KnowledgeHint[] {
   try {
-    return loadFeedbackHintsAtPath(filePath);
+    const scoped = readScopedHints(category, scope);
+    if (scope) return scoped;
+    const seen = new Set(scoped.map((hint) => hint.topic));
+    return [...readLegacyHints(category).filter((hint) => !seen.has(hint.topic)), ...scoped];
   } catch {
     return [];
   }
 }
 
-/** Load one persisted feedback-hint category through its schema and path boundary. */
+/** Load one persisted hint category file through its schema and path boundary. */
 export function loadFeedbackHintsAtPath(filePath: string): KnowledgeHint[] {
-  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
-  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
-    throw new Error(`[FEEDBACK_HINTS_FILE] hints must be a regular file: ${filePath}`);
-  }
-  return feedbackHintsCatalogAtPath(safePath).load();
+  return loadHintFileAtPath(filePath);
 }
 
 /**

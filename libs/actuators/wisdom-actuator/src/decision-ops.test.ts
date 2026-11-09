@@ -790,6 +790,45 @@ describe("dispatchDecisionOp 'distill' (memory-distillation op)", () => {
     expect(typeof result.ctx.lessons_learned).toBe('string');
     expect((result.ctx.lessons_learned as string).length).toBeGreaterThan(0);
   });
+
+  it('D8: reads public MemoryCandidates only, never DistillCandidateRecords or tenant rows', async () => {
+    const queue = await import('@agent/core/knowledge/memory-promotion-queue');
+    const { rel } = tmpPath(`distill-queue-${Date.now()}/promotion-queue.jsonl`);
+    vi.stubEnv('KYBERION_MEMORY_QUEUE_PATH', rel);
+    try {
+      queue.enqueueMemoryPromotionCandidate(
+        queue.createMemoryPromotionCandidate({
+          sourceType: 'artifact',
+          sourceRef: 'artifact:distill-public',
+          proposedMemoryKind: 'heuristic',
+          summary: 'Public lesson: re-read the file before editing.',
+          evidenceRefs: ['knowledge/public/example.md'],
+          sensitivityTier: 'public',
+        })
+      );
+      queue.enqueueMemoryPromotionCandidate(
+        queue.createMemoryPromotionCandidate({
+          sourceType: 'artifact',
+          sourceRef: 'artifact:distill-tenant',
+          proposedMemoryKind: 'heuristic',
+          summary: 'Tenant lesson that must not leave the tenant.',
+          evidenceRefs: ['artifact:tenant-only'],
+          sensitivityTier: 'confidential',
+          scope: { tier: 'confidential', tenant_slug: 'tenant-distill-op' },
+        })
+      );
+      const result = await dispatchDecisionOp(
+        'distill',
+        { scope: 'recent_missions', export_as: 'lessons_learned' },
+        {}
+      );
+      const markdown = String(result.ctx.lessons_learned);
+      expect(markdown).toContain('re-read the file before editing');
+      expect(markdown).not.toContain('must not leave the tenant');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
 
 describe("dispatchDecisionOp 'resolve_hypothesis_conflict' / 'adjust_proposal'", () => {
