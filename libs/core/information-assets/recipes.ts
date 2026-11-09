@@ -203,7 +203,7 @@ export function buildInformationAssetRecipeProposals(
           : undefined;
       if (
         missionAdmission &&
-        (!charter.authority.allowed_work_shapes?.includes('mission') ||
+        (!charter.authority.allowed_execution_shapes?.includes('mission') ||
           !charter.authority.mission_mandate_refs?.includes(missionAdmission.mandate_ref))
       )
         throw new Error(

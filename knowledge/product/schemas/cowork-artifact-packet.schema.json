@@ -26,6 +26,17 @@
         "resolution_shape": {
           "enum": ["direct_answer", "task_session", "mission", "project_bootstrap"]
         },
+        "execution_shape": {
+          "enum": [
+            "direct_reply",
+            "actuator_action",
+            "browser_session",
+            "task_session",
+            "pipeline",
+            "mission",
+            "project_bootstrap"
+          ]
+        },
         "outcome_kind": {
           "enum": ["answer", "artifact", "approval_ready_plan", "service_change", "status_report"]
         },

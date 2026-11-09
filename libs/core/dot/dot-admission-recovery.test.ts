@@ -50,7 +50,7 @@ const CHARTER: DotCharter = {
   attention: { triggers: [{ kind: 'cron', cron: '0 9 * * *', timezone: 'UTC' }] },
   authority: {
     authority_role: 'organization_operator',
-    allowed_work_shapes: ['direct_reply'],
+    allowed_execution_shapes: ['direct_reply'],
     max_concurrent_delegations: 20,
   },
   notification: { deliver_to: { surface: 'surface', channel: 'inbox' } },
@@ -380,7 +380,7 @@ describe('durable generic dot admission', () => {
       let options = deps();
       if (kind === 'inactive') charter.status = 'paused';
       if (kind === 'role') charter.authority.authority_role = 'different-role';
-      if (kind === 'shape') charter.authority.allowed_work_shapes = [];
+      if (kind === 'shape') charter.authority.allowed_execution_shapes = [];
       if (kind === 'gate') {
         const gate = options.gate!;
         options = { ...options, gate: (input) => ({ ...gate(input), allowed: false }) };
