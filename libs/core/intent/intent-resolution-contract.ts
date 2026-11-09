@@ -12,10 +12,10 @@ import {
 import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import {
   loadResolvedStandardIntentCatalog,
-  resolveIntentResolutionPacket,
   type IntentResolutionPacket,
   type StandardIntentDefinition,
 } from './intent-resolution.js';
+import { resolveRoutingPacket } from './intent-resolver-entry.js';
 import {
   type IntentAuthorityLevel,
   type IntentOutcomeKind,
@@ -156,7 +156,7 @@ export function resolveIntentResolutionContract(
   const trimmed = utterance.trim();
   const packet =
     options.packet ||
-    resolveIntentResolutionPacket(trimmed, {
+    resolveRoutingPacket(trimmed, {
       tier: options.tier,
       tenantId: options.tenantId,
       overlayPaths: options.overlayPaths,
